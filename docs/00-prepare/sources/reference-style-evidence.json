@@ -1,0 +1,65 @@
+{
+  "source_page": "https://aconland-mudah-milik.vercel.app/customer/loyalty",
+  "retrieved_on": "2026-09-14",
+  "method": "read-only HTTPS outside restricted sandbox; static HTML/CSS/JS inspection",
+  "browser_render_verified": false,
+  "assets": [
+    {
+      "url": "https://aconland-mudah-milik.vercel.app/_next/static/chunks/0xh6wh_1u6m3d.css",
+      "bytes": 14397,
+      "sha256": "708e62facd3f3b1f01f6d74e7b22d5f9ab3b4cfd8582e282533f0c0d385a152e"
+    },
+    {
+      "url": "https://aconland-mudah-milik.vercel.app/_next/static/chunks/0xipyi-ld-nvh.css",
+      "bytes": 121894,
+      "sha256": "c82aea5b94003b541e4b50593a115af6bb11ffba76c7e3514b45c0ce24f37869"
+    },
+    {
+      "url": "https://aconland-mudah-milik.vercel.app/_next/static/chunks/0_n04r.htcg3l.js",
+      "bytes": 44193,
+      "sha256": "4e87f549e65243bd71c7b7cb050b5f6e7750640a50ae46e0662a38db8acd0240"
+    }
+  ],
+  "declarations": {
+    ".bg-bg": "background-color:#f8fbff",
+    ".bg-background": "background-color:#fff",
+    ".bg-surface": "background-color:#fff",
+    ".bg-surface-2": "background-color:#edf6ff",
+    ".bg-primary-soft": "background-color:#e6f0ff",
+    ".bg-secondary": "background-color:#edf6ff",
+    ".text-fg": "color:#0d2238",
+    ".text-fg-muted": "color:#0d2238b8",
+    ".text-fg-subtle": "color:#0d223880",
+    ".border-border": "border-color:#d6e4f5",
+    ".bg-success-bg": "background-color:#dcfce7",
+    ".text-success-fg": "color:#059669",
+    ".bg-danger-bg": "background-color:#ffe5e9",
+    ".bg-warning-bg": "background-color:#ffedd5",
+    ".text-warning-fg": "color:#9a3412",
+    ".rounded-md": "border-radius:10px",
+    ".rounded-lg": "border-radius:16px",
+    ".rounded-xl": "border-radius:14px",
+    ".font-display": "font-family:var(--font-display), var(--font-plus-jakarta), system-ui, sans-serif"
+  },
+  "html_sha256": "54dd5e0b8c7a9bd753a458c8244486f7034571a5acadcc9a11dda6244a773792",
+  "fonts": {
+    "body": "Plus Jakarta Sans",
+    "mono": "Geist Mono",
+    "display_available_not_applied_to_loyalty_h1": "Bricolage Grotesque"
+  },
+  "html_classes": {
+    "page": "max-w-6xl",
+    "content": "px-4 xl:px-8 py-6 xl:py-8",
+    "heading": "text-2xl md:text-3xl font-bold text-fg",
+    "metrics": "grid-cols-2 gap-3 md:grid-cols-4 md:gap-4",
+    "detail": "grid-cols-1 gap-5 lg:grid-cols-[1fr_20rem]",
+    "card": "rounded-xl p-5 shadow-[0_14px_34px_rgba(13,34,56,0.055)]",
+    "sidebar_inline": "--sidebar-width:15rem;--sidebar-width-icon:3.5rem"
+  },
+  "sidebar_breakpoint": {
+    "js": "window.innerWidth<1280",
+    "css": "xl:block; xl:hidden; min-width:80rem",
+    "desktop_width_px": 240,
+    "collapsed_width_px": 56
+  }
+}
