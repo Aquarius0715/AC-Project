@@ -13,7 +13,7 @@ scope: frontend-demo-1A
 
 ## 企業要望と共通UIUXへの展開
 
-一次資料は[企業要件の英語原文（SRC-06）](../00-prepare/sources/company-requirements-original.txt)です。企業原文の表示・操作目的から共通ルールを定義し、見た目は依頼者指定の参考HTML/CSSに合わせます。ライブラリ、デモ言語、細かな寸法は制作方針・設計提案です。
+一次資料は[企業要件の英語原文（SRC-06）](../00-prepare/sources/company-requirements-original.txt)です。企業原文の表示・操作目的から共通ルールを定義し、見た目はドキュメント作成者指定の参考HTML/CSSに合わせます。ライブラリ、デモ言語、細かな寸法は制作方針・設計提案です。
 
 | 出所 | 求められる体験 | 共通ルール・受入観点 |
 |---|---|---|

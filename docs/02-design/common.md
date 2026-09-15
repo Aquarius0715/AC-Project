@@ -131,7 +131,7 @@ interface CommandRepository {
 | in_progress | 担当者が必須報告を提出 | submitted |
 | submitted | 業者品質担当（外注）またはHQ（社内）が確認 | completed / rework_requested |
 | rework_requested | 担当者が再作業開始 | in_progress（前報告版を保持） |
-| requested | 依頼者の取消 | cancelled |
+| requested | 保守依頼を行ったクライアントによる取消 | cancelled |
 | offered / accepted / assigned | HQが理由付き取消 | cancelled。関連割当を失効 |
 | in_progress / submitted | HQが理由付き中断 | on_hold。自動的な完了・取消にはしない |
 | on_hold | HQが現在条件を確認して再開 / 終了 | in_progress / cancelled（理由と未完了記録必須） |
