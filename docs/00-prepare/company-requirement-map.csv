@@ -1,0 +1,27 @@
+company_item_id,origin,source_id,source_locator,topic,request_nature,company_request_summary,frontend_interpretation,related_requirement_ids,coverage_note
+BIZ-01,企業原文,SRC-06,Sign In / Sign Out / Forget Password,共通利用,要望,サインイン、サインアウト、パスワード再設定,利用開始・終了・再設定の画面とデモ操作,FR-X01,既存要件に関連
+BIZ-02,企業原文,SRC-06,In any language text,言語,要望,任意の言語を選べる表示,言語切替と翻訳可能な画面構成。初期言語の範囲は別途設定,FR-X01;NFR-08,初期の英語・日本語は設計提案
+BIZ-03,企業原文,SRC-06,respond to voice ai,音声,要望,音声AIで応答・操作できること,音声入力・応答のデモとテキスト代替,FR-X02,実音声接続は対象外
+BIZ-04,企業原文,SRC-06,For End Users/Clients / Technicians / Admin/HQ,利用者,要望,顧客、社内/外部技術者、管理者/HQの視覚的なダッシュボード,利用者ごとに必要な指標・状態・次の操作を表示,FR-C01;FR-T01;FR-A01,施工業者の独立は依頼者の制作方針
+BIZ-05,企業原文,SRC-06,For Split Unit Air Con (phase 1),段階開発,要望,分離型エアコンを先行し、最初にクリック可能なUI/UX、その後に全体ソリューション,分離型を対象とした画面・操作・模擬状態を設計,FR-X05;FR-X06,今回の成果物はフロントエンド文書
+BIZ-06,企業原文,SRC-06,For HVAC / any air con brands,将来対象,将来構想,HVACを第2段階とし、メーカーや分離型・中央空調・カセット型等へ対応拡大,機器種別・型番・対応機能を区別する画面設計,FR-A04;FR-X06,全メーカー対応の実証は対象外
+BIZ-07,企業原文,SRC-06,Select for Categories,場所管理,要望,自宅/オフィス、エリア・階・部屋・スペース別の管理,場所階層から設備を選び、状態を確認する,FR-C02;FR-A02,登録・編集の詳細手順は設計補完
+BIZ-08,企業原文,SRC-06,Purpose is to monitor every aspect,監視・通知,要望,異常を事前または発生時に把握し、リアルタイム通知する,測定値・異常・更新時刻・対応導線を合成データで表示,FR-C01;FR-C08;FR-T03;FR-T07;FR-A05,検知可能項目と精度は未確定
+BIZ-09,企業原文,SRC-06,Signals & Notifications,状態表現,要望,赤・オレンジ・緑のシグナルと通知,重要度を色・文字・アイコンで表示,FR-X03;FR-C08,各色の具体的な意味づけは設計提案
+BIZ-10,企業原文,SRC-06,Indoor Unit Parts / Outdoor Unit Parts / Electrical and Control Parts,部品管理,要望・例示,室内機、室外機、電気・制御部品の状態把握,部品別の状態・根拠・点検記録。対象部品は下表に整理,FR-T04;FR-T05;FR-T06,点検入力の形式・承認手順は設計補完
+BIZ-11,企業原文,SRC-06,Predictive Maintenance / Predictive diagnostics,予防保全,要望・期待効果,振動・高温・冷媒低下、微小漏れ、フィルター詰まり等の早期把握,異常の疑い・根拠データ・保守案内をデモ表示,FR-T03;FR-T07;FR-A05,微小漏れ等の検知能力は要検証
+BIZ-12,企業原文,SRC-06,"general maintenance (regular, reactive and preventive)",保守業務,要望,定期・事後・予防保全。RTO以外の一般保守にも利用,保守依頼・作業進捗・結果を役割横断で確認,FR-C09;FR-T08;FR-T09;FR-A06;FR-X06,受付・割当・品質確認の責任は設計補完
+BIZ-13,企業原文,SRC-06,Thermostat / Remote Control,遠隔操作,要望・検討質問,スマートサーモスタット等で温度を確認し、離れた場所から設定を変更,室温と設定温度を分け、変更要求と応答をデモ表示,FR-C03;FR-T10,モード・風量等の細かい操作項目は機種能力に応じた提案
+BIZ-14,企業原文,SRC-06,Lower Energy Bills / auto turn off,時間・在室,要望,スケジュール、帰宅前冷房、無人時の自動停止,曜日・時間帯・在室条件の設定と模擬発火,FR-C04;FR-C05,時間の上限・競合優先順は設計提案
+BIZ-15,企業原文,SRC-06,Dynamic Geofencing,位置連動,要望,GPSに応じて外出時に冷房を抑え、帰宅時に再開,外出/帰宅イベントによる自動運転デモ,FR-C05,位置取得の同意と取消は設計上の補完
+BIZ-16,企業原文,SRC-06,Time-of-Use-Shift / solar and/or other battery storage,料金・エネルギー連動,要望,安い時間帯の予冷、ピーク料金回避、太陽光・蓄電池との連携,料金・ピーク・太陽光/蓄電池の条件と結果を模擬表示,FR-A11;FR-C06,外部データ・機器への実接続は対象外
+BIZ-17,企業原文,SRC-06,Automated Comfort / open window or uninsulated wall,生活・天候,要望・例示,生活パターンや天候に応じた運転、開いた窓や断熱不足に起因する負荷への通知,自動運転条件・負荷異常の案内を整理,FR-C05;FR-A11;FR-T07,窓開放・断熱不足の専用通知は既存詳細に未明示
+BIZ-18,企業原文,SRC-06,How do you calculate the CO2 and air quality,空気環境,要望・検討質問,CO₂濃度、粉じん、湿度、アレルゲン等の把握と清掃・換気案内,指標・単位・値・品質・案内を区別して表示,FR-C07;FR-A12;FR-X03,アレルゲン等の表示項目・根拠は追加整理が必要
+BIZ-19,企業原文,SRC-06,ventilations control,換気制御,要望・検討質問,CO₂上昇時に外気導入等を行い、空気環境を改善,対応換気設備がある場合の要求デモ、ない場合の利用者案内,FR-C07;FR-A12;FR-X06,送風と外気導入を区別。健康安全の保証ではない
+BIZ-20,企業原文,SRC-06,gadget to be small / firmware / stolen and/or removed,小型IoT・改ざん通知,要望・検討質問,小型・低価格で空調内に設置する機器、FW、取り外し・盗難への対策と通知,機器情報・接続・更新・取り外し検知のデモ,FR-T11;FR-T12;FR-A04;FR-A16,寸法・価格・検知方式は未確定。登録・校正手順は設計提案
+BIZ-21,企業原文,SRC-06,payments are not made / slow down / stop,支払いと制限,要望,RTO等の未払い時に管理者が冷房を抑制・停止する,支払い状態、制限理由・予定・適用/解除のデモ表示,FR-C10;FR-C12;FR-A07;FR-A08;FR-A09;FR-A10,予告・猶予・例外・入金後解除の詳細は設計補完
+BIZ-22,企業原文,SRC-06,whatsapp and/or email / credit card or debit card,支払い案内,要望,WhatsApp/メールとカード決済・支払い手順への導線,通知プレビュー、模擬クレジット/デビットカード・支払い案内,FR-C11;FR-A08,デビット区分は既存のdemo_card内の扱いを補足する必要
+BIZ-23,企業原文,SRC-06,Cut wasted run time by 10% to 20% / savings with our solution,省エネ効果,要望・期待効果,電力と電気代を可視化し、通常運転と比較。10〜20%以上の無駄削減への期待,基準と実績、推定料金・削減量・比較条件の表示,FR-C06;FR-A13,原文の数値は期待値であり効果保証・受入基準ではない
+BIZ-24,企業原文,SRC-06,How do you offset carbon / exchange and/or offset,任意オフセット,要望・検討質問,希望者が炭素オフセット・交換プラットフォームを利用する,排出量・任意申込・模擬購入/償却記録への導線,FR-C13;FR-A15,制度・プラットフォーム・実取引は未確定
+BIZ-25,企業原文,SRC-06,Digital MRV / Scope 2 Emission Auditing,MRV・Scope 2,要望・将来構想,基準比較、測定・報告・検証、地域排出係数による企業向け排出報告とクレジット創出への展望,算定条件・品質・根拠・レポートのプレビュー,FR-A13;FR-A14;FR-C13,Scope 2表記・地域係数・算定境界の説明を補足。発行資格や監査適合は保証しない
+BIZ-26,企業原文,SRC-06,Tokenized Carbon Offsets / with API to real time carbon trading platforms,炭素取引の拡張,将来構想,削減価値のトークン化、分散台帳、マイクロオフセット、市場取引、リアルタイム炭素市場API,将来構想として保持。今回の模擬オフセット記録とは区別,FR-A15;FR-C13,取引画面・トークン残高・接続方式は今回の必須に含めず確認事項として残す

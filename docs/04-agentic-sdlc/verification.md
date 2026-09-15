@@ -1,6 +1,6 @@
 ---
 document_id: TEST-PLAN
-version: 0.2.0
+version: 0.3.0
 status: planned-not-executed
 owner: test-agent
 scope: frontend-demo-1A
@@ -18,7 +18,7 @@ scope: frontend-demo-1A
 |---|---|---|
 | Unit | policyのテナント/期間/能力、状態遷移、金額・排出量計算、schema境界 | ケース名・結果・対象関数 |
 | Component | 入力検証、disabled理由、要求/確認値、欠測、Dialogのフォーカス | RTL等の利用者操作テスト結果 |
-| Contract | Repositoryのscope・DTO・error・冪等性・version。1Aはmock、1BはHTTPにも同じ試験 | adapter名、request/responseのマスク済み記録 |
+| Contract | フロントサービスの入出力・合成エラー・表示範囲・重複操作・version。対象はmockのみ | adapter名、request/responseのマスク済み記録 |
 | E2E | 同一タブで4役割を切替するS01〜S08、ディープリンクと再読込 | 実装版、ブラウザ、動画/trace/スクリーンショット |
 | 手動・自動a11y | キーボード、スクリーンリーダー、コントラスト、360/768/1280、拡大200%、日英 | 環境と実際の操作・結果。自動検査だけで適合を宣言しない |
 
@@ -119,7 +119,7 @@ scope: frontend-demo-1A
 | AT-NFR01 / AT-NFR02 | 自動a11y＋手動キーボード/読み上げ、3幅、200%拡大、エラー/空状態 |
 | AT-NFR03 / AT-NFR05 | 機密・実カードなし、失効、拒否、通信断・競合・失敗から回復 |
 | AT-NFR04 | production build、固定データ量と測定条件を記録。200ms/2秒の目標との比較 |
-| AT-NFR06 | UIがmock/HTTPを直接importしない。mock契約試験。HTTP試験は1B未実装なら明記 |
+| AT-NFR06 | UIがモック実体を直接importせずinterfaceを経由する。モックの入出力と差替え境界を検証。API試験は対象外 |
 | AT-NFR07 | 実在scriptsの型/lint/build/必要試験の終了コードと証跡 |
 | AT-NFR08 | 保存UTC、表示時間帯、日英、長文翻訳、金額・単位整形 |
 
@@ -151,4 +151,4 @@ scope: frontend-demo-1A
 - 保存: Unicode code pointでの文字数、5MiB画像境界、MIMEと内容の一致、draft/submitの必須条件差、409でdirty値保持。
 - 非同期: Command30秒、stale120秒、見積15分、予告24時間はデモ値として境界試験。制限解除の意思を保持し、未確定の適用要求と解除を競合送信しない。
 - 会計・環境: 全額入金の額/通貨/参照一致、基準と実績の同一境界、MRVの版固定、購入確認前の償却拒否・二重償却拒否。
-- 操作カタログ: 全論理操作の入出力とrole DDを照合。mock-only/local-only操作をHTTP adapterへ転送しない。
+- 操作カタログ: 全論理操作の入出力とrole DDを照合。全操作がモックまたはローカル表示設定で完結し、外部接続を行わない。

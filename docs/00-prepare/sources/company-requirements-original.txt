@@ -1,0 +1,75 @@
+Sign In
+Sign Out
+Forget Password
+
+In any language text as the option would be good and that can also respond to voice ai too.
+
+For End Users/Clients with strong visible and graphical dashboard
+For Technicians/Internal & 3rd Parties with strong visible and graphical dashboard
+For Admin/HQ with strong visible and graphical dashboard
+
+For Split Unit Air Con (phase 1: do this first with ui/ux clickable and to do the full solution with firmware (the gadget to be small and inserted into the air con and to be relatively cheap and affordable to localized markets)
+For HVAC (phase 2: second stage)
+
+Select for Categories: For home (which area/floor/room or space) or office (which area/floor/room or space)
+
+Purpose is to monitor every aspect of the split air con and hvac if possible so that we know what is the problem are in advance or when it happens so that we can plan and proactively help to manage and maintain the air con and hvac with real time notifications while having the ability to cut off or slow down the air con coolness by Admin if the payments are not made by the users for the company if it is related to rent to own services or by any other programs to be inserted later on. 
+
+It can also be used for general maintenance (regular, reactive and preventive) too if it is not under the rent to own services as it can be used for CO2 and carbon offset as a service too with energy savings (can show a solution that show the savings with our solution and normal what it will be) as a solution too by managing the usage, air quality and the temperature of the air con and hvac that can be seen on apps etc.
+
+Signals & Notifications with red, orange and green alerts 
+
+E.g. 
+
+Indoor Unit Parts
+
+•⁠  ⁠Air Filters
+•⁠  ⁠Evaporator Coils
+•⁠  ⁠Blower Motor & Fan
+•⁠  ⁠Condensate drain line and pan
+•⁠  ⁠Vents and louvers
+
+Outdoor Unit Parts
+
+•⁠  ⁠Condenser coils
+•⁠  ⁠Compressor
+•⁠  ⁠Condenser fan and blades
+•⁠  ⁠Refrigerant lines
+
+Electrical and Control Parts
+
+•⁠  ⁠Thermostat (can it be a smart thermostat and sensor systems - to tell the temperature and to control the temperature too remotely)
+•⁠  ⁠Capacitor and contactor
+•⁠  ⁠Electrical wiring
+
+Key Benefits
+
+•⁠  ⁠Lower Energy Bills: Smart monitors track electricity usage in real time. Then let you set schedules so the unit turns off when nobody is at home or when you wish to switch it one before you are home too. Cut wasted run time by 10% to 20% or more through smart automation - that can be linked to solar and/or other battery storage solutions for more savings. Off-peak optimisation: avoid high daytime electricity rates by pre-cooling rooms efficiently. Can auto turn off feature if room is empty.
+
+•⁠  ⁠Predictive Maintenance: Sensors detect unusual vibrations, high temperatures or drops in coolant before the system break completely. This avoids emergency repair fees. Prevent system burnout with timely maintenance warnings. Predictive diagnostics: Sensors spot microscopic refrigerant leaks or filter blockage early. Early repairs avoid high emergency fixing cost.
+
+•⁠  ⁠Dynamic Geofencing: System connects to mobile GPS locations. It throttles cooling down when users leave and boots up upon return.
+
+•⁠  ⁠Time-of-Use-Shift: Systems cool environments aggressively when grid rates are cheapest. They rest during peak-pricing windows.
+
+•⁠  ⁠Better Air Quality: Monitors track humidity and filter cleanliness. They alert you when filters need washing or replacing to keep air fresh.
+
+•⁠  ⁠Remote Control: smartphones apps let you check the temperature and adjust settings from anywhere. You can cool your home before you arrive home.
+
+•⁠  ⁠Automated Comfort: Systems learn your daily routine and adjust temperatures automatically. They can also sync with local weather reports to optimize cooling. Users get notifications: if an open window or uninsulated wall forces the compressor to work twice as hard.
+
+How do you calculate the CO2 and air quality - fresh air alerts e.g. stale air, causing sleepiness and poor focus, ventilations control e.g. triggers the system to pull in fresh outdoor air or run a fan when CO2 rises and health protection e.g. tracks dust, humidity, and allergens to keep the indoor environment safe (including automated comfort) here accurately that is linked to the air con and/or hvac that is linked to the firmware and/or iot that is hidden so that it cannot be stolen and/or removed without our knowledge (including we are alerted it the gadget to removed)?
+
+How do you offset carbon here if one wishes and link to a platform that you can exchange and/or offset?
+
+Note: There is a feature to allow admin to slow down on the coldness of the aircon or to stop if if there are payment problems as it can be notified to the user as an option via whatsapp and/or email notification that can be linked to credit card or debit card or instruction for payments etc.
+
+This can be used for any air con brands regardless of it is for split system aircon, central air con, cassette aircon etc. (including hvacs).
+
+•⁠  ⁠Digital MRV (monitoring, reporting and verification): For smart home or office networks, IOT enabled AC meter generate real time data regarding exactly how much electricity was saved compared to the baseline. This provides the audit ready proof needed to issue high quality carbon credits.
+
+•⁠  ⁠Tokenized Carbon Offsets: Verified reductions can be linked to decentralized ledger applications or carbon management platforms. This allows property owners to trade their accumulated energy savings as micro offsets on open voluntary carbon markets.
+
+•⁠  ⁠Scope 2 Emission Auditing: Precise data logging maps energy reductions directly to regional grid emission factors, converting everyday smart home actions into formal corporate sustainability reports.
+
+with API to real time carbon trading platforms

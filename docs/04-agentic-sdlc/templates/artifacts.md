@@ -6,7 +6,7 @@
 
 ```yaml
 task_id: AC-000
-document_version: 0.2.0
+document_version: 0.3.0
 status: planned
 agent_role: implementation
 objective: "対象要件に対する具体的な成果"

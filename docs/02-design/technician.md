@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.2.0
+version: 0.3.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 ## 入力・責務
 
-入力: [役割別要件](../01-requirements/technician.md)、[共通要件](../01-requirements/common.md)。必読: [共通詳細設計](common.md)、[UIUX仕様書](../03-uiux/UIUXSpecification.md)。以下はPROPOSEDのフロントエンド契約であり、稼働中のAPI仕様ではない。
+入力: [役割別要件](../01-requirements/technician.md)、[共通要件](../01-requirements/common.md)。必読: [共通詳細設計](common.md)、[UIUX仕様書](../03-uiux/UIUXSpecification.md)。以下はフロントエンドの項目・表示・モック動作の設計。画面上の登録・割当・入金・制限・監査はすべて共有モックメモリの状態遷移で、サーバー実装やDB設計を依頼するものではない。
 
 ルートパラメーターは未信頼入力として検証する。表のservice名は共通Repositoryの論理操作名。同じルートの行は同一画面内の機能を分担する。全行にloading/empty/error/forbidden/not-foundを実装する。再試行は回復可能なエラーだけに提供し、権限不足では許可された画面へ戻す。
 
@@ -35,7 +35,7 @@ scope: frontend-demo-1A
 ## 実装の共通手順
 
 1. セッションとスコープを確認し、ID・URLフィルターをschemaで検証する。
-2. Query経由でRepositoryを呼び、DTOを共通domainモデルへ変換する。
+2. Query経由でモックサービスを呼び、画面モデルとして受け取る。
 3. フォームはReact Hook Form＋共通schemaを利用し、能力・期間等の検証も適用する。
 4. mutation直前に対象のversion・権限・現在状態を照合。高影響操作は対象と理由を確認する。
 5. Repositoryで共有デモ状態を変更し、相関ID付きイベントを発行。該当Queryを無効化する。
@@ -51,7 +51,7 @@ scope: frontend-demo-1A
 
 ### DD-T01 詳細
 
-対象: FR-T01 / 主表示pattern: **UI-OVERVIEW**。API境界は`jobs.list, alerts.list`。
+対象: FR-T01 / 主表示pattern: **UI-OVERVIEW**。画面サービス境界は`jobs.list, alerts.list`。
 
 **初期表示と前提**: 社内は担当範囲、外部は自社かつ個別割当・作業期間を取得できる。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -67,9 +67,9 @@ scope: frontend-demo-1A
 1. 今日/期間の担当案件を開く → 異常重要度・期限・進捗で並替え → 設備詳細または作業画面へ進む。
 2. 保存または操作直前に次の業務ガードを実行する: 未対応はrequested全件ではなく、自分が担当して未着手の案件。社内の横断閲覧も所属テナントと担当範囲を超えない。
 3. 参照のみ。予定0件の際は空状態と利用可能な履歴導線。
-4. 更新対象Query: `jobs / assignments / alerts`。読取だけのケースは業務mutationを発行しない。複数更新はRepository内の1コマンドでまとめる。
+4. 更新対象Query: `jobs / assignments / alerts`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
 
-**競合・失敗時**: 外部担当の期限終了をまたぐと当該live設備を隠す。別技術者の案件ID直打ちでも作業開始不可。 共通HTTP/DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。409後の再送は更新された対象を利用者が確認してから行う。
+**競合・失敗時**: 外部担当の期限終了をまたぐと当該live設備を隠す。別技術者の案件ID直打ちでも作業開始不可。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
 
 **監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
 
@@ -77,7 +77,7 @@ scope: frontend-demo-1A
 
 ### DD-T02 詳細
 
-対象: FR-T02 / 主表示pattern: **UI-DETAIL**。API境界は`units.get, devices.list`。
+対象: FR-T02 / 主表示pattern: **UI-DETAIL**。画面サービス境界は`units.get, devices.list`。
 
 **初期表示と前提**: 対象設備に閲覧可能な担当関係がある。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -93,9 +93,9 @@ scope: frontend-demo-1A
 1. 案件から台帳を開く → 設置場所・型番・構成・設置日・保守範囲を確認 → 診断/作業へ進む。
 2. 保存または操作直前に次の業務ガードを実行する: 機種能力はcapability版を表示。未登録/不明項目は未登録と表示し、典型機種の値で補完しない。
 3. 参照のみ。技術者はメーカー台帳・顧客所属・請求を変更しない。
-4. 更新対象Query: `なし（読取）`。読取だけのケースは業務mutationを発行しない。複数更新はRepository内の1コマンドでまとめる。
+4. 更新対象Query: `なし（読取）`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
 
-**競合・失敗時**: 台帳に設置日なしなら現在日を補わない。外部技術者が非割当設備を参照しても情報を返さない。 共通HTTP/DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。409後の再送は更新された対象を利用者が確認してから行う。
+**競合・失敗時**: 台帳に設置日なしなら現在日を補わない。外部技術者が非割当設備を参照しても情報を返さない。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
 
 **監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
 
@@ -103,7 +103,7 @@ scope: frontend-demo-1A
 
 ### DD-T03 詳細
 
-対象: FR-T03 / 主表示pattern: **UI-DETAIL / UI-ANALYSIS**。API境界は`telemetry.series, telemetry.summary`。
+対象: FR-T03 / 主表示pattern: **UI-DETAIL / UI-ANALYSIS**。画面サービス境界は`telemetry.series, telemetry.summary`。
 
 **初期表示と前提**: 対象設備のtelemetry閲覧権。センサーなしでも通信情報は表示可能。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -120,9 +120,9 @@ scope: frontend-demo-1A
 1. 指標と期間を選ぶ → センサー/電力/運転/通信の値と時刻を確認 → デモ更新イベントで変更 → 切断時は更新停止を認識する。
 2. 保存または操作直前に次の業務ガードを実行する: 観測時刻と受信時刻を分け、staleAfterSeconds超過はstale。古いイベントを最新値へ上書きしない。系列の単位を固定し欠測の間を連結しない。
 3. 最新値と時系列を同じeventId/版で整合させる。画面離脱・scope変更で購読解除。
-4. 更新対象Query: `telemetry / unit summary`。読取だけのケースは業務mutationを発行しない。複数更新はRepository内の1コマンドでまとめる。
+4. 更新対象Query: `telemetry / unit summary`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
 
-**競合・失敗時**: 順序逆転・重複イベントで値が逆行しない。通信断時も最後の値は時刻付きで残せるがリアルタイムと表示しない。 共通HTTP/DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。409後の再送は更新された対象を利用者が確認してから行う。
+**競合・失敗時**: 順序逆転・重複イベントで値が逆行しない。通信断時も最後の値は時刻付きで残せるがリアルタイムと表示しない。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
 
 **監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
 
@@ -130,7 +130,7 @@ scope: frontend-demo-1A
 
 ### DD-T04 詳細
 
-対象: FR-T04 / 主表示pattern: **UI-FORM**。API境界は`jobs.get, jobs.saveDraft, jobs.submit`。
+対象: FR-T04 / 主表示pattern: **UI-FORM**。画面サービス境界は`jobs.get, jobs.saveDraft, jobs.submit`。
 
 **初期表示と前提**: 有効な担当案件がin_progressである。保守範囲と部品別の点検対象が取得済み。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -148,9 +148,9 @@ scope: frontend-demo-1A
 1. 対象部品ごとに点検結果を選ぶ → 必要な所見・測定・写真を関連付け → 未点検/対象外は理由を記入 → ドラフトまたは報告へ保存する。
 2. 保存または操作直前に次の業務ガードを実行する: 対象グループはindoor、項目はfilter / evaporator_coil / blower_motor / blower_fan / drain_pipe / drain_pan / outlet / louver。初期結果はnullで、未点検のまま提出するなら明示的なnot_inspectedと理由が必要。設備に存在しない部品はnot_applicableと理由を記録する。
 3. 点検結果を報告版・作者・観測時刻へ紐付ける。センサー推定は別の根拠として残し、現地点検結果で元データを上書きしない。
-4. 更新対象Query: `report draft / inspection items`。読取だけのケースは業務mutationを発行しない。複数更新はRepository内の1コマンドでまとめる。
+4. 更新対象Query: `report draft / inspection items`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
 
-**競合・失敗時**: 未入力、単位なし測定、未点検理由なし、他案件の写真参照を拒否。正常を初期選択して空点検を完了扱いしない。 共通HTTP/DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。409後の再送は更新された対象を利用者が確認してから行う。
+**競合・失敗時**: 未入力、単位なし測定、未点検理由なし、他案件の写真参照を拒否。正常を初期選択して空点検を完了扱いしない。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
 
 **監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
 
@@ -158,7 +158,7 @@ scope: frontend-demo-1A
 
 ### DD-T05 詳細
 
-対象: FR-T05 / 主表示pattern: **UI-FORM**。API境界は`jobs.get, jobs.saveDraft, jobs.submit`。
+対象: FR-T05 / 主表示pattern: **UI-FORM**。画面サービス境界は`jobs.get, jobs.saveDraft, jobs.submit`。
 
 **初期表示と前提**: 有効な担当案件がin_progressである。保守範囲と部品別の点検対象が取得済み。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -176,9 +176,9 @@ scope: frontend-demo-1A
 1. 対象部品ごとに点検結果を選ぶ → 必要な所見・測定・写真を関連付け → 未点検/対象外は理由を記入 → ドラフトまたは報告へ保存する。
 2. 保存または操作直前に次の業務ガードを実行する: 対象グループはoutdoor、項目はcondenser_coil / compressor / fan / blade / refrigerant_pipe。初期結果はnullで、未点検のまま提出するなら明示的なnot_inspectedと理由が必要。設備に存在しない部品はnot_applicableと理由を記録する。
 3. 点検結果を報告版・作者・観測時刻へ紐付ける。センサー推定は別の根拠として残し、現地点検結果で元データを上書きしない。
-4. 更新対象Query: `report draft / inspection items`。読取だけのケースは業務mutationを発行しない。複数更新はRepository内の1コマンドでまとめる。
+4. 更新対象Query: `report draft / inspection items`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
 
-**競合・失敗時**: 未入力、単位なし測定、未点検理由なし、他案件の写真参照を拒否。正常を初期選択して空点検を完了扱いしない。 共通HTTP/DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。409後の再送は更新された対象を利用者が確認してから行う。
+**競合・失敗時**: 未入力、単位なし測定、未点検理由なし、他案件の写真参照を拒否。正常を初期選択して空点検を完了扱いしない。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
 
 **監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
 
@@ -186,7 +186,7 @@ scope: frontend-demo-1A
 
 ### DD-T06 詳細
 
-対象: FR-T06 / 主表示pattern: **UI-FORM**。API境界は`jobs.get, jobs.saveDraft, jobs.submit`。
+対象: FR-T06 / 主表示pattern: **UI-FORM**。画面サービス境界は`jobs.get, jobs.saveDraft, jobs.submit`。
 
 **初期表示と前提**: 有効な担当案件がin_progressである。保守範囲と部品別の点検対象が取得済み。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -204,9 +204,9 @@ scope: frontend-demo-1A
 1. 対象部品ごとに点検結果を選ぶ → 必要な所見・測定・写真を関連付け → 未点検/対象外は理由を記入 → ドラフトまたは報告へ保存する。
 2. 保存または操作直前に次の業務ガードを実行する: 対象グループはelectrical、項目はthermostat / sensor / capacitor / contactor / wiring。初期結果はnullで、未点検のまま提出するなら明示的なnot_inspectedと理由が必要。設備に存在しない部品はnot_applicableと理由を記録する。
 3. 点検結果を報告版・作者・観測時刻へ紐付ける。センサー推定は別の根拠として残し、現地点検結果で元データを上書きしない。
-4. 更新対象Query: `report draft / inspection items`。読取だけのケースは業務mutationを発行しない。複数更新はRepository内の1コマンドでまとめる。
+4. 更新対象Query: `report draft / inspection items`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
 
-**競合・失敗時**: 未入力、単位なし測定、未点検理由なし、他案件の写真参照を拒否。正常を初期選択して空点検を完了扱いしない。 共通HTTP/DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。409後の再送は更新された対象を利用者が確認してから行う。
+**競合・失敗時**: 未入力、単位なし測定、未点検理由なし、他案件の写真参照を拒否。正常を初期選択して空点検を完了扱いしない。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
 
 **監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
 
@@ -214,7 +214,7 @@ scope: frontend-demo-1A
 
 ### DD-T07 詳細
 
-対象: FR-T07 / 主表示pattern: **UI-DETAIL**。API境界は`alerts.list, alerts.get, alerts.acknowledge, alerts.resolve`。
+対象: FR-T07 / 主表示pattern: **UI-DETAIL**。画面サービス境界は`alerts.list, alerts.get, alerts.acknowledge, alerts.resolve`。
 
 **初期表示と前提**: 担当設備に異常または診断の疑いがある。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -231,9 +231,9 @@ scope: frontend-demo-1A
 1. 異常一覧から根拠を開く → 計測/推定/現地点検と履歴を確認 → 確認済みにする → 必要なら再測定・理由付き解消へ進む。
 2. 保存または操作直前に次の業務ガードを実行する: 推定に確信度がない場合は数値の確率を生成しない。確認操作はacknowledged。解消には再測定で設定条件を満たすかalert.resolve権限と理由が必要。
 3. 検知、確認、解消の各時刻と主体を保持。再発は新alertIdで旧事象と関連付ける。
-4. 更新対象Query: `alerts / alert events / customer summary / admin summary / audit`。読取だけのケースは業務mutationを発行しない。複数更新はRepository内の1コマンドでまとめる。
+4. 更新対象Query: `alerts / alert events / customer summary / admin summary / audit`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
 
-**競合・失敗時**: Job完了だけではresolvedにしない。通信断だけの根拠で盗難と断定せず、取り外し専用事象と分離する。 共通HTTP/DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。409後の再送は更新された対象を利用者が確認してから行う。
+**競合・失敗時**: Job完了だけではresolvedにしない。通信断だけの根拠で盗難と断定せず、取り外し専用事象と分離する。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
 
 **監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
 
@@ -241,7 +241,7 @@ scope: frontend-demo-1A
 
 ### DD-T08 詳細
 
-対象: FR-T08 / 主表示pattern: **UI-DETAIL**。API境界は`jobs.get, jobs.start, jobs.resume, jobs.submit`。
+対象: FR-T08 / 主表示pattern: **UI-DETAIL**。画面サービス境界は`jobs.get, jobs.start, jobs.resume, jobs.submit`。
 
 **初期表示と前提**: assigned案件を担当し、有効期間内。定期/事後/予防は同じ作業状態モデル。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -257,9 +257,9 @@ scope: frontend-demo-1A
 1. 担当と予定を確認 → 作業開始 → 報告を編集 → 提出 → 品質確認待ち → 差戻しなら再作業と再提出。
 2. 保存または操作直前に次の業務ガードを実行する: 開始可能はassigned、差戻し再開はrework_requested。submittedでは提出版を読取専用。顧客承認を技術者が代行しない。
 3. 開始時刻・提出時刻・reportVersionを保存。完了は品質担当のreviewで決定。
-4. 更新対象Query: `jobs / reports / job events / notifications / audit`。読取だけのケースは業務mutationを発行しない。複数更新はRepository内の1コマンドでまとめる。
+4. 更新対象Query: `jobs / reports / job events / notifications / audit`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
 
-**競合・失敗時**: 未割当、取消、on_hold、期限外のstart/submitを拒否。提出失敗ではin_progressとドラフトを保持する。 共通HTTP/DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。409後の再送は更新された対象を利用者が確認してから行う。
+**競合・失敗時**: 未割当、取消、on_hold、期限外のstart/submitを拒否。提出失敗ではin_progressとドラフトを保持する。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
 
 **監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
 
@@ -267,7 +267,7 @@ scope: frontend-demo-1A
 
 ### DD-T09 詳細
 
-対象: FR-T09 / 主表示pattern: **UI-FORM**。API境界は`jobs.saveDraft, attachments.add, jobs.submit`。
+対象: FR-T09 / 主表示pattern: **UI-FORM**。画面サービス境界は`jobs.saveDraft, attachments.add, jobs.submit`。
 
 **初期表示と前提**: in_progressまたは再作業中。点検項目とドラフトを取得済み。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -283,11 +283,11 @@ scope: frontend-demo-1A
 **処理手順**
 
 1. 点検・測定・写真・交換部品・作業本文・次回対応を入力 → ドラフト保存 → 提出前チェック → 報告版を確定する。
-2. 保存または操作直前に次の業務ガードを実行する: 報告は作者・版を保持。画像はJPEG/PNG、1枚5MiB以下、最大10枚。数量は正整数、次回対応はnoneまたは日時/内容を明示。サーバー再取得でdirty内容を消さない。
+2. 保存または操作直前に次の業務ガードを実行する: 報告は作者・版を保持。画像はJPEG/PNG、1枚5MiB以下、最大10枚。数量は正整数、次回対応はnoneまたは日時/内容を明示。サービス再取得でdirty内容を消さない。
 3. 保存成功時にdraft版を更新し、提出時は固定したreportVersionをJobへ紐付ける。写真削除時にobject URLを解放する。
-4. 更新対象Query: `draft / attachments / reports / jobs（提出時）`。読取だけのケースは業務mutationを発行しない。複数更新はRepository内の1コマンドでまとめる。
+4. 更新対象Query: `draft / attachments / reports / jobs（提出時）`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
 
-**競合・失敗時**: 本文9/4001文字、偽MIME、11枚目、5MiB超過、部品数量0、写真アップロード失敗を検証。失敗写真が残るまま提出不可。 共通HTTP/DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。409後の再送は更新された対象を利用者が確認してから行う。
+**競合・失敗時**: 本文9/4001文字、偽MIME、11枚目、5MiB超過、部品数量0、写真アップロード失敗を検証。失敗写真が残るまま提出不可。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
 
 **監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
 
@@ -295,7 +295,7 @@ scope: frontend-demo-1A
 
 ### DD-T10 詳細
 
-対象: FR-T10 / 主表示pattern: **UI-DETAIL / UI-FORM**。API境界は`commands.create, commands.get`。
+対象: FR-T10 / 主表示pattern: **UI-DETAIL / UI-FORM**。画面サービス境界は`commands.create, commands.get`。
 
 **初期表示と前提**: 担当期間内、control.diagnose能力、機器online。契約制限を超えない。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -312,9 +312,9 @@ scope: frontend-demo-1A
 1. 現在状態・担当案件を確認 → 診断操作・試運転時間・理由を指定 → 確認 → Commandの応答と履歴を見る。
 2. 保存または操作直前に次の業務ガードを実行する: 同時FW更新や未完了Command中は開始不可。試運転終了も終了Commandの応答が必要で、ブラウザタイマー終了を実停止扱いしない。
 3. 理由とjobId付きCommandを作成。終了予定と終了応答を別表示し、終了失敗は注意として残す。
-4. 更新対象Query: `commands / unit detail / audit`。読取だけのケースは業務mutationを発行しない。複数更新はRepository内の1コマンドでまとめる。
+4. 更新対象Query: `commands / unit detail / audit`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
 
-**競合・失敗時**: 制限温度の迂回、担当期間外、16分の試運転、理由なしを拒否。終了応答がなければ停止済みにしない。 共通HTTP/DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。409後の再送は更新された対象を利用者が確認してから行う。
+**競合・失敗時**: 制限温度の迂回、担当期間外、16分の試運転、理由なしを拒否。終了応答がなければ停止済みにしない。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
 
 **監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
 
@@ -322,7 +322,7 @@ scope: frontend-demo-1A
 
 ### DD-T11 詳細
 
-対象: FR-T11 / 主表示pattern: **UI-LIST / UI-FORM / UI-DETAIL**。API境界は`devices.list, devices.register, devices.bind, devices.check, devices.calibrate, devices.updateFirmware, devices.get`。
+対象: FR-T11 / 主表示pattern: **UI-LIST / UI-FORM / UI-DETAIL**。画面サービス境界は`devices.list, devices.register, devices.bind, devices.check, devices.calibrate, devices.updateFirmware, devices.get`。
 
 **初期表示と前提**: device.maintainと対象設備の有効担当。登録/校正/更新はモック。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -340,9 +340,9 @@ scope: frontend-demo-1A
 1. serial登録 → 設備紐付け → 接続確認 → 校正値と参照を記録 → 対応FW候補を選び更新 → 進行/結果を確認する。
 2. 保存または操作直前に次の業務ガードを実行する: serialはtrim/大文字化して一意判定。校正は履歴追加、既存測定値は書き換えない。FWは対応版リストからのみ選択。URLやバイナリを自由入力させない。
 3. Device、CalibrationRecord、DeviceOperationを保持。succeededだけfirmwareVersion更新。更新中は競合制御不可。
-4. 更新対象Query: `devices / operations / calibrations / capabilities / audit`。読取だけのケースは業務mutationを発行しない。複数更新はRepository内の1コマンドでまとめる。
+4. 更新対象Query: `devices / operations / calibrations / capabilities / audit`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
 
-**競合・失敗時**: 重複serial、別設備への無断再紐付け、offline更新、単位不一致、失敗更新を検証。失敗しても旧FW版を保持。 共通HTTP/DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。409後の再送は更新された対象を利用者が確認してから行う。
+**競合・失敗時**: 重複serial、別設備への無断再紐付け、offline更新、単位不一致、失敗更新を検証。失敗しても旧FW版を保持。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
 
 **監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
 
@@ -350,7 +350,7 @@ scope: frontend-demo-1A
 
 ### DD-T12 詳細
 
-対象: FR-T12 / 主表示pattern: **UI-DETAIL / UI-TIMELINE**。API境界は`devices.get, devices.events, alerts.acknowledge`。
+対象: FR-T12 / 主表示pattern: **UI-DETAIL / UI-TIMELINE**。画面サービス境界は`devices.get, devices.events, alerts.acknowledge`。
 
 **初期表示と前提**: 担当Deviceにイベント閲覧権がある。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -367,9 +367,9 @@ scope: frontend-demo-1A
 1. 通信断・電源断・取り外し検知を別々に模擬発火 → 通知を確認 → 対応メモ → 復旧/確認を記録する。
 2. 保存または操作直前に次の業務ガードを実行する: connectionとtamperを独立管理。電源断判定は電源専用信号のデモがある時のみ。heartbeatなしから電源断と断定しない。
 3. 検知時刻・観測根拠・対応・復旧時刻を別イベントで保持。通知の確認は物理状態を変更しない。
-4. 更新対象Query: `devices / alerts / device events / notifications / audit`。読取だけのケースは業務mutationを発行しない。複数更新はRepository内の1コマンドでまとめる。
+4. 更新対象Query: `devices / alerts / device events / notifications / audit`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
 
-**競合・失敗時**: 通信再接続で未確認のtamperアラートが消えない。out-of-orderの古いheartbeatでonlineへ戻さない。 共通HTTP/DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。409後の再送は更新された対象を利用者が確認してから行う。
+**競合・失敗時**: 通信再接続で未確認のtamperアラートが消えない。out-of-orderの古いheartbeatでonlineへ戻さない。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
 
 **監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
 

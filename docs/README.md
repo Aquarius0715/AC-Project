@@ -1,21 +1,21 @@
 # AC Project フロントエンド開発ドキュメント
 
-版: 0.2.0 / 作成日: 2026-09-14 / 状態: レビュー用ドラフト / 言語: 日本語
+版: 0.4.0 / 作成日: 2026-09-14 / 更新日: 2026-09-15 / 状態: レビュー用ドラフト / 言語: 日本語
 
-対象はSplit Unit ACの監視・操作・保守・契約に関するクリック可能なフロントエンドデモ（1A）。アプリケーションの実装、本番API、機器接続は今回の成果物に含まない。
+対象はSplit Unit ACの監視・操作・保守・契約に関するクリック可能なフロントエンドデモ（1A）。今回作成する文書はフロントエンド設計のみ。API仕様・HTTP契約・DB・サーバー処理・本番運用は設計対象外。将来のAPI接続はフロント側interfaceの差替え口だけを定義する。アプリ実装も今回の作業には含まない。
 
 ## 読む順序
 
 | 順序 | 文書 | 用途 |
 |---|---|---|
-| 1 | [PrepareDocument](00-prepare/PrepareDocument.md) | 要件整理、参考サイトとの差分、仮定と未決事項 |
+| 1 | [PrepareDocument（企業向け）](00-prepare/PrepareDocument.md) | 企業要件・参考モックの説明、原文要望の整理、出所別の比較と対応方針 |
 | 2 | [共通要件](01-requirements/common.md) | 全役割の業務境界・非機能要件・権限 |
 | 3 | 役割別要件: [クライアント](01-requirements/client.md) / [施工業者](01-requirements/contractor.md) / [技術者](01-requirements/technician.md) / [管理者](01-requirements/admin.md) | 要件ID、優先度、受入条件 |
 | 4 | [共通詳細設計](02-design/common.md) | データ、API境界、状態遷移、モック設計 |
 | 5 | 役割別詳細設計: [クライアント](02-design/client.md) / [施工業者](02-design/contractor.md) / [技術者](02-design/technician.md) / [管理者](02-design/admin.md) | 画面、入力、処理、権限、異常系 |
 | 6 | [共通UIUX仕様書](03-uiux/UIUXSpecification.md) | ライブラリ、状態管理、トークン、アクセシビリティ |
 | 7 | [Agentic SDLC](04-agentic-sdlc/README.md) | エージェント分担、ゲート、引き継ぎ契約 |
-| 8 | [参考デザイン分析](00-prepare/reference-design-analysis.md) / [共通実装契約](02-design/implementation-contracts.md) / [操作カタログ](02-design/operation-catalog.csv) | ソース由来の視覚値・詳細入出力 |
+| 8 | [参考デザイン分析](00-prepare/reference-design-analysis.md) / [フロントエンド入出力契約](02-design/implementation-contracts.md) / [操作カタログ](02-design/operation-catalog.csv) | ソース由来の視覚値・詳細入出力 |
 | 9 | [検証計画](04-agentic-sdlc/verification.md) / [追跡表](00-prepare/traceability.csv) | 要件→設計→テストの照合 |
 
 4種類の本体文書はPrepareDocument、要件定義書、詳細設計書、UIUX仕様書。要件・設計は4役割に分割し、重複を防ぐため共通事項を別ファイルに置く。Agentic SDLC文書は実行時の付属資料であり、第5の製品仕様ではない。
@@ -41,4 +41,8 @@
 
 追加確認（2026-09-14）: 指定された顧客Loyaltyページは制限環境外のHTTP取得で確認できました。[PrepareDocument](00-prepare/PrepareDocument.md)のSRC-05・GAP-11に追記しています。クリック・描画・本番処理は未検証です。
 
-0.2.0: 参考HTML/CSSに合わせたtokenへ改訂。4役割49機能それぞれに業務規則・項目定義・例外・AT-N/E/Bを追加しました。概要表だけで実装せず、機能別本文と共通実装契約を合わせて使用してください。未確定の商用判断は引き続きPrepareのOPEN台帳を参照します。
+0.2.0: 参考HTML/CSSに合わせたtokenへ改訂。4役割49機能それぞれに業務規則・項目定義・例外・AT-N/E/Bを追加しました。概要表だけで実装せず、機能別本文とフロントエンド入出力契約を合わせて使用してください。未確定の商用判断は引き続きPrepareのOPEN台帳を参照します。
+
+0.3.0: フロントエンド限定へ整理。操作カタログからHTTP method/endpointを除去し、画面向けの109モック/ローカル操作へ変更しました。項目定義・表示状態・業務フローデモ・参考準拠UIの詳細は保持しています。
+
+PrepareDocument 0.4.0（2026-09-15）: 企業提示用に構成・表現を改訂しました。企業の英語原文を一次資料として保存し、[企業要望対応表](00-prepare/company-requirement-map.csv)で26の整理項目と既存要件を関連付けています。企業原文・依頼者の制作方針・モック観察・設計提案を区別し、技術選択の詳細は[開発者向け補足](00-prepare/internal/design-assumptions.md)へ分離しました。原文照合で見つかった補足事項はPrepareDocumentのOPEN-08・09に記載しています。

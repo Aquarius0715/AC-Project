@@ -1,17 +1,17 @@
 ---
 document_id: DD-CONTRACTS
-version: 0.2.0
+version: 0.3.0
 status: proposed-frontend-contract
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
 scope: frontend-demo-1A
 ---
 
-# 共通実装契約・データ入出力
+# フロントエンド入出力契約・モック動作
 
-本書は[共通詳細設計](common.md)を実装可能な入出力へ具体化する。各役割詳細のフィールド表・業務規則と合わせて実装する。ここで定める値は1Aのデモ仕様（DEC-09）。本番APIの稼働・業務承認を意味しない。
+本書は[共通詳細設計](common.md)を実装可能な入出力へ具体化する。各役割詳細のフィールド表・業務規則と合わせて実装する。ここで定める値は1Aのデモ仕様（DEC-09）。対象はブラウザ内の画面モデル・フォーム・モックサービス。DB、サーバー処理、API endpoint、認証方式は定義しない。「保存」「一意」「監査」は架空データのブラウザ内動作であり、本番での永続化や安全性を保証しない。
 
-## DDC-01 共通型と不変条件
+## DDC-01 フロントエンド共通型と表示整合
 
 | 型 | 値・制約 | 保存・表示 |
 |---|---|---|
@@ -31,6 +31,10 @@ scope: frontend-demo-1A
 ### 共通操作型
 
 ```ts
+type DemoViewContext = {
+  tenantId: string; membershipId: string; scopeVersion: number;
+};
+
 type UnitAction =
   | { kind: 'set_power'; power: boolean }
   | { kind: 'set_temperature'; celsius: number }
@@ -45,15 +49,15 @@ type CreateCommandInput = {
   reason?: string;      // 診断/HQ変更は必須
   expectedUnitVersion: number;
 };
-type WriteMeta = {
+type DemoWriteOptions = {
   idempotencyKey: string;
   expectedVersion?: number;
 };
-type ApiEnvelope<T> = {
+type ServiceResult<T> = {
   data: T;
-  meta: { correlationId: string; serverTime: string };
+  meta: { correlationId: string; snapshotAt: string };
 };
-type ApiErrorEnvelope = {
+type ServiceErrorResult = {
   error: {
     code: string;
     messageKey: string;
@@ -66,7 +70,7 @@ type ApiErrorEnvelope = {
 
 型名は契約上の名前。TypeScript/Zodの実ファイルは実装工程で作る。mode/fan/levelの値はCapabilityの候補と一致し、単なるstringで任意入力を受け入れない。1Aは1回の確認送信につき1Action。複数Actionの一括操作・部分成功UIは今回の必須にしない。複数設備への制限は別のRestrictionユースケースで設備別Commandとして管理する。
 
-### 要求・応答の具体例
+### 画面からモックサービスへ渡す値・戻り値の例
 
 ```json
 {
@@ -89,11 +93,11 @@ type ApiErrorEnvelope = {
     "expiresAt": "2026-09-14T01:00:30Z",
     "isDemo": true
   },
-  "meta": { "correlationId": "corr-demo-001", "serverTime": "2026-09-14T01:00:00Z" }
+  "meta": { "correlationId": "corr-demo-001", "snapshotAt": "2026-09-14T01:00:00Z" }
 }
 ```
 
-HTTP候補はPOST `/api/v1/units/unit-online-rto/commands`、202。`Idempotency-Key`をheaderで送り、認証はサーバーの信頼できる主体へ紐付ける。要求時の旧Unitは室温28・設定26のまま、成功応答後に設定24へ更新する。
+画面は`commands.create`を呼び、モックはrequested状態を返す。要求時の室温28・確認済み設定26を保持し、合成した成功イベント後に設定24へ更新する。HTTP送信や機器接続は行わない。
 
 ```json
 {
@@ -149,17 +153,17 @@ CONFLICTは最新データを取得して利用者の確認後に新しい意思
 | adapter応答 | DTO schema検証、未知enumはunsupported/error。生の内部例外は画面へ出さない |
 | 更新通知 | entityId＋version＋eventIdで重複/古いイベント除外。欠番や切断は再照会 |
 
-| DomainError / HTTP候補 | UI動作 | 入力・再試行 |
+| モックが返すDomainError | UI動作 | 入力・再試行 |
 |---|---|---|
-| VALIDATION / 422 | error summaryとfieldErrors、最初の欄へfocus | 値を保持して修正。無条件再送なし |
-| UNAUTHENTICATED / 401 | セッション終了とlogin | 旧スコープのQuery・機微な下書き/写真を破棄 |
-| FORBIDDEN / 403 | 操作不可と許可されたホーム/一覧へ | 権限変更時は対象データを破棄。繰返し再試行しない |
-| NOT_FOUND / 404 | 対象が利用できない旨と一覧へ | 存在を漏らす詳細を出さない |
-| CONFLICT / 409 | 変更発生の説明＋最新取得＋差分確認 | 自動上書きなし。変更意図を再確認して新規要求 |
+| VALIDATION | error summaryとfieldErrors、最初の欄へfocus | 値を保持して修正。無条件再送なし |
+| UNAUTHENTICATED | セッション終了とlogin | 旧スコープのQuery・機微な下書き/写真を破棄 |
+| FORBIDDEN | 操作不可と許可されたホーム/一覧へ | 権限変更時は対象データを破棄。繰返し再試行しない |
+| NOT_FOUND | 対象が利用できない旨と一覧へ | 存在を漏らす詳細を出さない |
+| CONFLICT | 変更発生の説明＋最新取得＋差分確認 | 自動上書きなし。変更意図を再確認して新規要求 |
 | OFFLINE | 最後の通信時刻と保留/操作不可 | 新規制御は不可。送信済は状態照会、自動成功なし |
-| TIMEOUT / 408相当 | 処理未確定と相関ID | writeは状態照会→同じ冪等キーで再試行。元処理未実行と断定しない |
-| RATE_LIMITED / 429 | 待機時間と再試行案内 | Retry-Afterを守る。通常フォーム値保持 |
-| UNAVAILABLE / 5xx | インラインエラーと再試行 | GET最大2回バックオフ、writeは明示再試行のみ |
+| TIMEOUT | 処理未確定と相関ID | writeは状態照会→同じ冪等キーで再試行。元処理未実行と断定しない |
+| RATE_LIMITED | 待機時間と再試行案内 | モック結果のretryAfterSecondsを表示する。通常フォーム値保持 |
+| UNAVAILABLE | インラインエラーと再試行 | 読取サービスの再試行は最大2回、writeは明示再試行のみ |
 
 画面error時にKPIを0件や正常へ置換しない。前回値を残す場合はstaleと前回成功時刻を明示。対象やroleが変わった場合は前回値を残さない。
 
@@ -167,20 +171,20 @@ CONFLICTは最新データを取得して利用者の確認後に新しい意思
 
 | 設定 | 1A既定値・挙動 |
 |---|---|
-| HTTP timeout | 10秒。mock読取成功は即時〜300msの固定設定、試験では時計を注入 |
+| モック待機タイムアウト | 10秒。mock読取成功は即時〜300msの固定設定、試験では時計を注入 |
 | Command expiry | 要求時から30秒（デモ仮値）。送信/応答はシナリオイベントで制御 |
 | Telemetry stale | sensorに設定、seedは120秒。境界now-observedAt > staleAfterSeconds |
 | Offer期限 | seedで24時間後。受諾はnow < offerExpiresAt |
 | 予告期間 | seedルールで24時間。executeAfter >= noticeAt+24h。商用ルールではない |
 | OffsetQuote有効期間 | デモ15分、申込時点でnow < expiresAt |
-| write処理 | validate→version check→state mutation→audit/eventの記録をRepository内で原子的に実行。途中失敗で半端な複数レコード更新を残さない |
+| write処理 | 共有メモリの遷移関数で入力・版を確認してから状態と表示用履歴をまとめて更新する。DBトランザクションは設計しない |
 | invalidate | operationが触ったentityと関連集計をscope付きQuery keyで無効化。UIは手動コピーしない |
 | role変更 | pending requestをabort、旧Query除去、次scopeのsession取得後に描画。遅い旧応答はsession generationで破棄 |
 | reload/reset | DEC-07。reloadはseed、role切替は同タブ業務データ保持。resetは時計・世代・object URLも初期化 |
 
 通常の顧客/診断コマンドは同一設備に未完了要求がある間は競合要求を拒否する。入金後の解除は別の調整処理として解除意思を先に保持し、適用要求の反映を照会してから解除Commandを送る。未確定のまま適用と解除を同時送信しない。
 
-`AbortController`は通信や表示への反映を中断するためのもの。既に受理された機器・決済処理の取消と混同しない。1Bへ移行する際にはサーバー状態照会を必須とする。
+`AbortController`は通信や表示への反映を中断するためのもの。既に受理された機器・決済処理の取消と混同しない。将来の外部処理の取消仕様はAPI側の仕様決定後にadapterへ対応させる。
 
 ## 通知と公開範囲
 
@@ -199,12 +203,12 @@ CONFLICTは最新データを取得して利用者の確認後に新しい意思
 
 in-app通知は翻訳キーとparamsを保存し選択言語で描画。メール/WhatsAppはpreview/simulatedで、送信済み実績として扱わない。通知には対象参照IDとsnapshot scopeを持ち、遷移時にも現在の認可を検証する。
 
-## DDC-05 API移行の受入条件
+## DDC-05 フロントエンド境界の完了条件
 
-- [操作カタログ](operation-catalog.csv)全行にrequest schema、response schema、認可、状態ガードを実装する。GET共通規約は本書、業務入力は各DDのフィールド表を参照する。
-- mock-onlyの操作はHTTP adapterへ流さず、実接続用操作とは分離する。公開API候補は未合意で、サーバー側仕様が決まった時点で版を更新する。
-- entity/DTOのmapper、DomainError変換、scope/period/capability/冪等性/versionのcontract testsを同じケース集合で実行する。
-- ボタンや画面をAPI接続のために作り直さず、composition-rootのadapterと認証・購読層を置き換える。ブラウザ側のrole制御だけを本番の認可にしない。
+- [操作カタログ](operation-catalog.csv)の各操作を、対応画面の入力型・戻り値・モック結果へ対応させる。
+- UIはモック実体に直接依存せず、サービスinterface経由で取得・変更する。
+- 成功・受付中・失敗・競合・閲覧不可の合成結果を使い、画面が期待どおり表示・回復することを検証する。
+- 将来のAPI接続はadapterの差替えで対応できる構成だけを用意する。HTTP adapterの実装・検証、本番認証、サーバー側の処理設計は今回の完了条件に含めない。
 
 ## DDC-06 画面構成とローカル状態
 
@@ -225,7 +229,7 @@ dialog open、選択中tabなど短命stateは最も近いcomponentへ。対象�
 | 音声/テキストパネル | text:空、intent:未解決、target:未選択 | intent解決→対象候補→変更は確認→既存Command。照会は読取のみ | 認識不可/同名複数/確認取消ならCommand0件 |
 | /demo | scenarioId、eventType、clockAdvance、reset | 許可された合成イベントのみ、reset時にgeneration更新 | 任意URL/スクリプト/実機宛先を受け入れない |
 
-共通操作の論理契約は`demoSession.signIn/signOut/switchMembership`、`auth.previewPasswordReset`、`preferences.get/update`、`voice.resolveIntent`、`notifications.list/markRead`、`demo.trigger/reset`。demo/auth/voiceは1Aではモック専用、API版は別途認証方式を合意する。preferencesは低頻度の表示設定Providerに置き、業務Repositoryのデータや請求通貨とは分離する。
+共通操作の論理契約は`demoSession.signIn/signOut/switchMembership`、`auth.previewPasswordReset`、`preferences.get/update`、`voice.resolveIntent`、`notifications.list/markRead`、`demo.trigger/reset`。demo/auth/voiceは1Aではモック専用、実認証への接続仕様は対象外。preferencesは低頻度の表示設定Providerに置き、業務Repositoryのデータや請求通貨とは分離する。
 
 ### 能力権限の名称と付与先
 
@@ -246,6 +250,6 @@ roleによる候補allowlistとpermissionの両方を判定する。既知でな
 
 Inquiry作成は`invoiceIdまたはrestrictionId、subjectType、message(1〜2000文字)`。HQ回答は`inquiryId、reply(1〜2000文字)、expectedVersion`でreceived→answered、顧客は返信を読取。閉じる操作は1Aでは任意で未実装なら表示しない。
 
-MRV draftの初回保存はPOST `/api/v1/mrv/drafts`で新ID、既存版保存はPUT `/api/v1/mrv/{id}/draft`。reportIdなしの画面から存在しないIDへPUTしない。
+MRV draftは`mrv.saveDraft`を呼ぶ。初回はモックが新IDを返し、編集時は保持済みIDと版で更新する。通信先や永続化方式は定義しない。
 
 監視・制御に必要なデータ取得と操作カタログには、補助的なget/listも含める。UIに編集ボタンを置く場合は対象detailの読取と保存契約を対にする。

@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.2.0
+version: 0.3.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # 共通詳細設計書
 
-入力: [共通要件](../01-requirements/common.md)、[PrepareDocument](../00-prepare/PrepareDocument.md)。実装粒度の入出力・エラー・デモ時間値は[共通実装契約](implementation-contracts.md)、全論理操作は[操作カタログ](operation-catalog.csv)を併読する。以下の技術構成・APIパス・型はPROPOSED。サーバーの実装や契約が存在するという意味ではない。
+入力: [共通要件](../01-requirements/common.md)、[PrepareDocument](../00-prepare/PrepareDocument.md)。実装粒度の入出力・エラー・デモ時間値は[フロントエンド入出力契約](implementation-contracts.md)、全論理操作は[操作カタログ](operation-catalog.csv)を併読する。本書が定義するのはブラウザ側の画面モデル・モックサービス・表示状態だけ。APIパス、DB、認証サーバー、バックエンド業務処理は設計対象外。
 
 ## 1. 構成と責任
 
@@ -21,7 +21,7 @@ src/
   domain/             entities, policies, transitions, repository-contracts
   infrastructure/
     mock/             repository, fixtures, scenario-clock, event-bus
-    api/              http-client, dto-schemas, mappers（1Bで接続）
+    adapters/         外部データへの差替え口（今回はinterfaceのみ）
   shared/
     ui/               shadcnベースのUI primitives
     components/       StatusBadge, MetricCard等の共通業務表示
@@ -50,7 +50,9 @@ PROPOSED構成はTypeScript strict、React、Vite、React Router。SSR要件が�
 
 loadingは骨格表示、emptyは説明と許可された次アクション、errorは再試行、offlineは更新時刻と操作不可理由、staleは古い値の注記。閲覧不可をemptyで誤魔化さない。404/403は機密存在を漏らさない文言に揃える。
 
-## 3. ドメインモデル
+## 3. フロントエンドの画面・モック用モデル
+
+以下はDBのテーブル定義ではない。「保存」「履歴」はすべて同一タブ内の共有モックメモリへの保持を指す。
 
 共通: `id: string`、`tenantId: string`、時刻はISO 8601 UTC、可変リソースは`version: number`。デモidも不変。nullと未登録はschemaで意味を分け、未知enumはunsupportedとして安全に扱う。
 
@@ -76,61 +78,29 @@ loadingは骨格表示、emptyは説明と許可された次アクション、er
 
 Telemetryの`isDemo`は測定区分と独立。デモの「実測」も合成値であると分かるよう表示する。連絡先・写真は架空のみ。ブラウザ画像object URLは削除・リセット・サインアウト時にrevokeする。
 
-## 4. Repositoryと将来APIの契約
+## 4. フロントエンドのデータサービス境界
+
+`page → feature hook → Repository interface → mock adapter`で分離する。ここでいうRepositoryはフロントエンドから呼ぶ非同期サービスの抽象であり、DBアクセス層ではない。今回作成するのはinterfaceと共有メモリのmock adapter。
 
 ```ts
-type RequestContext = {
-  tenantId: string;
-  membershipId: string;
-  scopeVersion: number;
-};
-type Page<T> = { items: T[]; nextCursor: string | null; total?: number };
-type WriteOptions = {
-  idempotencyKey: string;
-  expectedVersion?: number;
-  signal?: AbortSignal;
-};
-type DomainError = {
-  code: 'UNAUTHENTICATED' | 'FORBIDDEN' | 'NOT_FOUND' | 'VALIDATION'
-    | 'CONFLICT' | 'OFFLINE' | 'TIMEOUT' | 'RATE_LIMITED' | 'UNAVAILABLE';
-  messageKey: string;
-  fieldErrors?: Record<string, string>;
-  correlationId: string;
-  retryAfterSeconds?: number;
-};
 interface CommandRepository {
-  create(ctx: RequestContext, input: {
-    unitId: string; action: UnitAction; expectedUnitVersion: number;
-  }, options: WriteOptions): Promise<Command>;
-  get(ctx: RequestContext, commandId: string, signal?: AbortSignal): Promise<Command>;
+  create(context: DemoViewContext, input: {
+    unitId: string;
+    action: UnitAction;
+    expectedUnitVersion: number;
+  }, options: DemoWriteOptions): Promise<Command>;
+  get(context: DemoViewContext, commandId: string,
+      signal?: AbortSignal): Promise<Command>;
 }
 ```
 
-上記は型の説明用抜粋。実装ではUnitAction（[実装契約](implementation-contracts.md)）を判別unionにしてZodで検証する。全操作は`Promise<DomainEntity>`、一覧は`Promise<Page<T>>`、集計は型付きSummary、エラーはDomainErrorに統一する。ctxはUIの境界に必要だが、本番サーバーはブラウザの自己申告を認証・認可の根拠にしない。
+`DemoViewContext`は選択中の架空ユーザー・役割・閲覧範囲を表す。`DemoWriteOptions`は同じデモ操作の重複防止用キーと変更前の版を持つ。これらは本番認証やサーバーの認可方式を規定しない。具体的なフィールドは[フロントエンド入出力契約](implementation-contracts.md)を参照する。
 
-| 論理操作（役割設計と一致） | 将来HTTP候補 / 入出力の要点 |
-|---|---|
-| session.get | GET /api/v1/session → 有効Membership・scopeVersion。認証方式はOPEN-04 |
-| organizations/customers/units/properties/spaces/contracts/invoices/devices/alerts/jobs/automations/members等のlist/get | GET /api/v1/{resource}?cursor&limit&filter / {id} → Page<T> / T。フィルターはallowlist、limit初期25・最大100（仮） |
-| organizations/customers/properties/spaces/units/contracts/members/capabilities/policies/baselines/automationsのsave | POST collectionで作成、PATCH /{id}で版付き更新 → 更新後entity。ID付替えでスコープ変更不可 |
-| members.eligible | GET /api/v1/jobs/{id}/eligible-technicians → スコープ・所属・資格・期間内の候補 |
-| telemetry.summary / series、energy.summary、admin.summary | GET /api/v1/{resource}/summary または /telemetry/series、metric/from/to/unitIds指定 → 品質・単位・期間付き結果 |
-| commands.create / get | POST /api/v1/units/{id}/commands → 202 Command(requested)、GET /api/v1/commands/{id} → 現在の状態 |
-| jobs.create / offer / accept / decline / assign / start / submit / review / saveCost | POST /api/v1/jobs または /jobs/{id}/{action} → Job。action payloadは委託先/担当/日程/報告版/判断/金額。状態遷移の前提を検証 |
-| jobs.saveDraft / events / addNote、attachments.add | PUT /jobs/{id}/draft、GET /jobs/{id}/events、POST /jobs/{id}/notes、POST /jobs/{id}/attachments → Draft/イベント/案件メモ/Attachment。実アップロード方式は1Bで確定 |
-| alerts.acknowledge、notifications.markRead / preview | POST /alerts/{id}/acknowledge、POST /notifications/{id}/read、POST /notification-previews → Alert/Notification/プレビュー |
-| invoices.create / payments.confirm | POST /invoices、POST /payments/{id}/confirm → Invoice/Payment。入金確認は1Bでは信頼できるサーバー処理または権限付き操作 |
-| restrictions.get / schedule / execute / release / defer / exempt / cancel / override | GET /restrictions/{id}、POST /restrictionsまたは /{id}/{action} → Restriction。理由・ルール版・expectedVersion必須 |
-| devices.register / bind / check / calibrate / updateFirmware / events | POST /devices、POST /devices/{id}/{action}、GET /devices/{id}/events → Deviceまたは進捗Operation。実FW転送なし |
-| consents.get / update | GET /consents、PUT /consents/{purpose} → Consent。取消で条件依存automationを停止 |
-| mrv.preview / saveDraft / recordReview、offsets.preview / list、audit.list | POST /mrv/preview、PUT /mrv/{id}/draft、POST /mrv/{id}/demo-review、POST /offsets/preview、GET /offsets、GET /audit-events → プレビュー/報告/記録/Page |
-| payments.simulate / offsets.simulate / automations.simulate | モック専用操作。実APIへ転送しない。将来は別の正式コマンド契約へ置換 |
+[操作カタログ](operation-catalog.csv)にはUIが必要とする109のローカルサービス操作、その入力・戻り値・参照画面をまとめる。URL、HTTP method、DBテーブル、サーバートランザクションは定義しない。
 
-パスはサーバーチームへの提案。実装時はoperation registryにmethod/path/request schema/response schema/error/retryを登録し、全論理操作を網羅する。DTOに余分な内部情報を含めず、金額や単位はmapperで明示変換する。
+モックの操作結果は成功・受付中・失敗・競合・閲覧不可として返す。画面はDomainErrorに応じて表示・入力保持・再読込を決める。遅延した古い応答は操作IDと表示世代で除外し、役割切替前の値を描画しない。
 
-HTTP候補: 401=サインインへ、403/404=安全な不可表示、409=再取得し競合を説明、422=フィールドエラー、429=Retry-Afterを尊重、5xx=再試行案内。GETは最大2回のバックオフ再試行（仮）、変更要求は自動再送しない。タイムアウト既定10秒（仮）。ブラウザの中断はサーバー処理の取消ではない。
-
-同じ意思の再送は同じ冪等キーを保持し、新しい意思のみ新キー。時刻変更や重複応答で完了状態を逆行させない。CommandはunitId＋commandId、他更新はversionで照合する。1BのストリームはeventIdで重複除去、versionで順序判定し、切断/欠番時は再取得する。
+将来APIが用意された場合も、画面が使うinterfaceを維持し、新しいadapterで外部レスポンスを画面モデルへ変換する。実際のAPI仕様・認証方式・通信契約は今回決定しない。
 
 ## 5. 状態遷移と整合性
 
@@ -212,10 +182,11 @@ Query keyは`[tenantId, membershipId, scopeVersion, resource, id, normalizedFilt
 - coverage=有効サンプル数/期待サンプル数。期待数0なら未算定。品質に問題があれば集計とレポートに注記する。欠測を0補完しない。
 - 室内CO₂ ppmは上記排出量計算には使用しない。省エネ率の期待値は保証値ではない。
 
-## 8. API接続へ移行する条件
+## 8. 将来APIへつなぐために残すもの
 
-1. OPEN-02〜06の依存項目を担当責任者が確定し、API担当とDTO・認可・エラー・冪等性・応答状態を合意する。
-2. HTTP adapterに認証方式を実装。サーバーでテナント/期間/能力を検証。デモ役割選択を本番認証として流用しない。
-3. モックとHTTP adapterへ同じcontract testsを適用する。ページ・フォーム・domainの直接API依存を増やさない。
-4. 単なるHTTP 202を機器操作成功とみなさない。通知・決済・FW・MRVの実処理はそれぞれ検証可能な応答に接続する。
-5. mock-onlyのsimulate操作とデモUIは本番構成で到達不能にする。実接続は今回の作業に含まれず、別途明示の実行指示が必要。
+- 画面が必要とする入力・戻り値のTypeScript型と非同期interface。
+- 外部データを画面モデルへ変換するadapterの差替え口。
+- UIが扱うloading/error/empty/pending/confirmedと、役割切替時の表示破棄規則。
+- 合成応答を使ったフロントエンド検証。
+
+APIパス・HTTP方式・DB・サーバー認証認可・実決済・実通知・実機制御は本書の設計対象外。これらの未決定は今回のフロントエンド文書の完成を妨げない。

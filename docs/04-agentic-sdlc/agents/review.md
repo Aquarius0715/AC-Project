@@ -1,6 +1,6 @@
 ---
 agent_id: review-agent
-version: 0.2.0
+version: 0.3.0
 status: proposed-agent-profile
 scope: frontend-demo-1A
 ---
@@ -29,7 +29,7 @@ scope: frontend-demo-1A
 
 利用環境に同等のSKILL.mdがある場合は内容と権限を確認して適用する。存在しないSkillを利用済みと報告しない。通常の文書・実装作業は本仕様の手順で進められる。
 
-0.2.0では概要表だけで判断せず、対象機能の項目表・BR・事後条件・AT-N/E/B、共通実装契約、操作カタログを読む。UIは参照HTML/CSSの根拠とREF/ADAPTの差を確認する。
+0.2.0では概要表だけで判断せず、対象機能の項目表・BR・事後条件・AT-N/E/B、フロントエンド入出力契約、操作カタログを読む。UIは参照HTML/CSSの根拠とREF/ADAPTの差を確認する。
 
 ## 作業手順
 

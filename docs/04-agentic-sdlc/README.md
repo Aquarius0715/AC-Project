@@ -1,6 +1,6 @@
 ---
 document_id: SDLC-001
-version: 0.2.0
+version: 0.3.0
 status: draft
 owner: orchestration-agent
 scope: frontend-demo-1A
@@ -22,7 +22,7 @@ scope: frontend-demo-1A
 
 各エージェントは[文書索引](../README.md)、[PrepareDocument](../00-prepare/PrepareDocument.md)、共通要件、共通設計、UIUX、本規約を読み、担当役割の要件・設計を追加する。全文を無条件に各タスクへ貼る代わりに、文書版・ファイル・IDを指定する。
 
-0.2.0の引き渡しでは概要表だけを切り出さず、対象の`FR-番号`本文・`DD-番号 詳細`・[共通実装契約](../02-design/implementation-contracts.md)・[操作カタログ](../02-design/operation-catalog.csv)・AT-N/E/Bを渡す。UI担当は[参考デザイン分析](../00-prepare/reference-design-analysis.md)と抽出証跡も読む。
+0.2.0の引き渡しでは概要表だけを切り出さず、対象の`FR-番号`本文・`DD-番号 詳細`・[フロントエンド入出力契約](../02-design/implementation-contracts.md)・[操作カタログ](../02-design/operation-catalog.csv)・AT-N/E/Bを渡す。UI担当は[参考デザイン分析](../00-prepare/reference-design-analysis.md)と抽出証跡も読む。
 
 ## 2. サイクルと品質ゲート
 
@@ -80,3 +80,5 @@ G1の具体的チェック: 各機能に開始条件、型/必須/初期/制約�
 全エージェントは[共通テンプレート](templates/artifacts.md)のtask packetとhandoffを使う。タスクID、参照版、要件/設計/試験ID、変更ファイル、実行コマンド、実結果、未決、次担当を必須とする。テスト結果は実装の同一リビジョンまたは差分ハッシュに紐付ける。未実行の試験にpassを記入しない。
 
 成果物配置案: `docs/04-agentic-sdlc/runs/<task-id>/`。タスクが実際に動いた時だけ生成し、今回架空の実行記録は作らない。最終報告はユーザー向けに簡潔にし、詳細証跡へのリンクを付ける。
+
+0.3.0のスコープガード: 全5エージェントはフロントエンド文書・実装・試験だけを担当する。API endpoint、DBテーブル、サーバー認証認可、Webhook、決済/IoTの実処理を設計・実装しない。G1〜G5は画面・フォーム・UI state・モック・フロント試験だけで判定し、バックエンド未実装を未達成項目にしない。

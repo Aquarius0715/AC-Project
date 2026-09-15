@@ -1,6 +1,6 @@
 ---
 document_id: REQ-A
-version: 0.2.0
+version: 0.3.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -10,6 +10,8 @@ scope: frontend-demo-1A
 # 管理者・HQ 要件定義書
 
 ## 目的と前提
+
+本書の対象は利用者がフロントエンドで確認・入力・操作できること。登録・請求・入金・機器操作・通知はモックで再現する。バックエンドの実処理・永続化・実認証は要件に含めない。
 
 管理対象組織の顧客、設備、保守、請求、制御方針、環境実績を管理する。
 

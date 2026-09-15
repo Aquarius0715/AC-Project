@@ -1,6 +1,6 @@
 ---
 agent_id: design-agent
-version: 0.2.0
+version: 0.3.0
 status: proposed-agent-profile
 scope: frontend-demo-1A
 ---
@@ -24,12 +24,12 @@ Prepareの分析を要件・画面・データ・遷移・受入条件へ落と�
 |---|---|
 | requirements-analysis | C/T/A原文IDと4役割の要件の対応を維持する |
 | frontend-domain-design | 機器状態・コマンド・請求・制限を独立モデルと遷移表で設計する |
-| api-contract-design | Repository、DTO、エラー、冪等性、認可境界を設計する |
+| frontend-service-design | 画面モデル、モックサービスの入力・戻り値、合成エラー、将来の差替え境界を設計する。API/DB/サーバー仕様は作らない |
 | ui-system-design | 共通ライブラリ、フォーム、token、状態管理、a11yを統一する |
 
 利用環境に同等のSKILL.mdがある場合は内容と権限を確認して適用する。存在しないSkillを利用済みと報告しない。通常の文書・実装作業は本仕様の手順で進められる。
 
-0.2.0では概要表だけで判断せず、対象機能の項目表・BR・事後条件・AT-N/E/B、共通実装契約、操作カタログを読む。UIは参照HTML/CSSの根拠とREF/ADAPTの差を確認する。
+0.2.0では概要表だけで判断せず、対象機能の項目表・BR・事後条件・AT-N/E/B、フロントエンド入出力契約、操作カタログを読む。UIは参照HTML/CSSの根拠とREF/ADAPTの差を確認する。
 
 ## 作業手順
 

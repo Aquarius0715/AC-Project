@@ -1,6 +1,6 @@
 ---
 document_id: UX-COMMON
-version: 0.2.0
+version: 0.3.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -61,7 +61,7 @@ Contextはセッション等の配布に限定し、必要なProviderは許可�
 - ラベル、必須/任意、説明、単位、エラー、disabled理由を共通Fieldで統一。placeholderだけをラベルにしない。
 - 初期値はschemaと一致させ、非同期読込後のresetは対象ID変更時または明示的再読込時に限る。バックグラウンド更新でdirty入力を上書きしない。
 - 初回検証はblur/submit、エラー後は修正時に再検証する方針。送信時は最初のエラーへフォーカスし、上部要約から該当項目へ移動できる。
-- 送信中は二重送信を抑制し、失敗時は値を保持。サーバー422はfieldErrorsへ、409は競合案内へ変換する。
+- 送信中は二重送信を抑制し、失敗時は値を保持。モックのVALIDATION結果はfieldErrorsへ、CONFLICT結果は競合案内へ変換する。
 - 点検ドラフト保存は未完了入力を許容、提出schemaは必須を満たす。完了状態のフォームを直接書き換えず新報告版を作る。
 - 温度・時間・金額は文字列から境界で変換。空文字を0にしない。許容範囲は能力・共通schemaから取得する。
 - 未保存で離脱する場合のみ破棄確認。通常の閲覧遷移には不要な確認を追加しない。
