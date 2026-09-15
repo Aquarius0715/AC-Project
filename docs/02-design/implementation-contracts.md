@@ -262,7 +262,7 @@ MRV draftは`mrv.saveDraft`を呼ぶ。初回はモックが新IDを返し、編
 |---|---|---|
 | alerts.list / Alert | causeCode、evidenceKind、evidenceText、observedAt | DD-C08、DD-T07、DD-A05 |
 | telemetry.series / 空気環境モデル | allergenObservationの取得状態・対象物質・値・単位・出典・観測時刻 | DD-C07、DD-A12 |
-| payments.simulate / Payment、invoices.list / 請求表示モデル | methodはdemo_credit_card / demo_debit_card / demo_instructions | DD-C11、DD-A08 |
+| payments.simulate / Payment、invoices.list / 請求表示モデル | Payment.methodをInvoice表示モデルのpaymentMethodへ変換。demo_credit_card / demo_debit_card / demo_instructions。未選択・手動確認はnull、処理中・失敗でも種別を保持 | DD-C11、DD-A08 |
 | MRVレポートプレビュー | Scope 2分類、組織・期間・拠点・地域係数・算定境界・品質 | DD-A14 |
 | offsets.preview / OffsetQuote | marketConcept: future_concept・未選定・未検証・未接続 | DD-C13、DD-A15 |
 

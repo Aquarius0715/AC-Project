@@ -73,12 +73,14 @@ loadingは骨格表示、emptyは説明と許可された次アクション、er
 | Alert | unitId, type, severity(critical/warning/normal), status, evidenceIds[], detectedAt, acknowledgedAt?, resolvedAt?, resolutionReason?。正常は健康サマリーにも使い、openアラートを正常へ自動変換しない |
 | MaintenanceJob | unitId, alertIds[], type(periodic/reactive/preventive), status, contractorOrgId?, assignmentId?, requestedSlot, scheduledSlot?, dueAt, reportVersion?, costs[] |
 | WorkReport / InspectionItem / Attachment | jobId, authorId, version, items[], measurements[], replacementParts[], workText, nextAction, submittedAt? / componentGroup, componentKey, result, reason?, evidenceIds[] / name, mime, size, previewUrl, status |
-| Contract / Invoice / Payment | customerOrgId, unitIds[], planType, period, rulesVersion / contractId, amountMinor, currency, dueAt, status / invoiceId, amountMinor, status, externalRef?, confirmedAt? |
+| Contract / Invoice / Payment | customerOrgId, unitIds[], planType, period, rulesVersion / contractId, amountMinor, currency, dueAt, status / invoiceId, amountMinor, method?, status, externalRef?, confirmedAt? |
 | Restriction | contractId, unitIds[], rulesVersion, noticeAt, executeAfter, reason, policy, state, applyCommandIds[], releaseCommandIds[], exception?, graceUntil? |
 | Automation / Consent | unitIds[], condition(discriminated union), action, priority, timezone, enabled / purpose, granted, grantedAt?, revokedAt? |
 | Notification / AuditEvent | recipientId, channel(inApp/email/whatsapp), templateKey, params, readAt?, deliveryState(preview/simulated/failed) / actorId, action, targetId, before?, after?, reason?, result, correlationId, occurredAt |
 | EnergyBaseline / EmissionFactor | unitIds[], period, method, version, kWh, boundary / region, year, kgCO2ePerKWh, source, version, isDemo |
 | MRVReport / OffsetRecord | period, baselineId, factorId, boundary, coverage, totals, evidenceIds[], reviewHistory[], status(draft/demo_reviewed) / amountKg, state(quoted/demo_requested/demo_purchased/demo_retired/failed), demoCertificateRef?, isDemo |
+
+上表は共通モデルの要約です。原文補完の原因候補・アレルゲン・支払い方法・Scope 2・市場構想の項目は[表示モデルの補完](implementation-contracts.md#ddc-原文補完-企業要望に対応する表示モデル)と該当DDを合わせて適用します。Invoice表示モデルはPaymentからpaymentMethod/paymentStatusを導出し、保存状態を二重管理しません。
 
 Telemetryの`isDemo`は測定区分と独立。デモの「実測」も合成値であると分かるよう表示する。連絡先・写真は架空のみ。ブラウザ画像object URLは削除・リセット・サインアウト時にrevokeする。
 

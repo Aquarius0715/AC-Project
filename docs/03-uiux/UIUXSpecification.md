@@ -86,7 +86,7 @@ Contextはセッション等の配布に限定し、必要なProviderは許可�
 
 ## UX-04. 参考準拠のデザイントークン
 
-唯一の値定義先は`src/shared/styles/tokens.css`。以下が0.2.0の正本で、旧Inter・ティール補助色・1440px幅案を置換する。`REF`は取得ソースにある値、`ADAPT`は今回の要件のための明示的補正。根拠は[抽出証跡](../00-prepare/sources/reference-style-evidence.json)。
+唯一の値定義先は`src/shared/styles/tokens.css`。以下を本版の採用値とする。`REF`は取得ソースにある値、`ADAPT`は今回の要件のための明示的補正。根拠は[抽出証跡](../00-prepare/sources/reference-style-evidence.json)。
 
 | semantic token | 採用値 | 根拠・用途 |
 |---|---|---|

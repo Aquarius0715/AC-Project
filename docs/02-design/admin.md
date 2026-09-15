@@ -277,13 +277,13 @@ alerts.listのAlertにcauseCode（window_open / insulation_loss / unknown）、e
 
 ### DD-A08 詳細
 
-**カード種別と案内の選択の表示・処理設計（BIZ-22）**
+**カード種別と支払い案内の確認（BIZ-22）**
 
-payments.simulateのmethodをdemo_credit_card / demo_debit_card / demo_instructionsにする。クレジットとデビットは同じ状態遷移を用い、選択種別を確認画面とPayment結果に保持。支払い手順の閲覧だけではpaidへ遷移しない。notifications.previewは請求ID・案内チャネル・選択方法を表示。実カード情報や銀行情報の入力欄を設けない。
+クライアントがDD-C11で選んだ模擬支払い方法を、HQはinvoices.listの請求表示モデルで確認する。paymentMethodはdemo_credit_card / demo_debit_card / demo_instructions / null、paymentStatusは最新の模擬Paymentの状態とする。支払い操作がない場合だけmethodをnull（未選択）とし、処理中・失敗時も選択済みの種別を保持する。手動入金確認だけの場合はmethodを補完せず、paymentReferenceと確認理由を表示する。
 
-検証: AT-A08-SRC — 各カード種別で処理中・成功・失敗を再現し、履歴の種別が一致する。支払い手順だけを開いても未入金のまま。
+notifications.previewで請求・案内チャネル・選択済み方法を確認する。HQの入金確認はpayments.confirmで行い、カード選択フォームやpayments.simulateによる顧客の決済操作は配置しない。案内閲覧・プレビューだけではpaidへ遷移しない。
 
-invoices.listの請求表示モデルへpaymentMethodと模擬Paymentの状態を追加し、入金がない場合は未選択として表示する。HQはinvoices.listの請求表示モデルに含まれるpaymentMethodを表示し、顧客向けカード選択フォームを配置しない。
+検証: AT-A08-SRC — クライアントで各方法の処理中・成功・失敗を再現した後、HQの同じ請求で方法と状態が一致する。未操作は未選択、失敗時は選択種別を保持し、案内プレビューだけでは未入金のまま。
 
 **一次資料との対応**: SRC-06 BIZ-21, BIZ-22 → FR-A08 → DD-A08。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 請求・模擬入金確認。フィールド型・必須性・初期値・操作順序は実装提案。
 
@@ -304,7 +304,7 @@ invoices.listの請求表示モデルへpaymentMethodと模擬Paymentの状態�
 
 **処理手順**
 
-1. 契約版から請求作成 → 期限/状態で絞込 → 模擬決済または権限付き入金確認 → 督促プレビューと顧客表示を確認する。
+1. 契約版から請求作成 → 期限/状態で絞込 → 模擬決済結果の確認または権限付き入金確認 → 督促プレビューと顧客表示を確認する。
 2. 保存または操作直前に次の業務ガードを実行する: 1Aは全額入金のみ。invoiceId+paymentReferenceの二重確認は同じ結果を返す。督促対象は未入金・期限超過で、例外や係争の有無を表示する。
 3. Payment confirmed、Invoice paid、監査を記録。関連Restrictionがある場合は解除要求を生成/案内し、実機応答待ちを維持。
 4. 更新対象Query: `invoices / payments / restrictions / notifications / audit`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
@@ -378,7 +378,7 @@ invoices.listの請求表示モデルへpaymentMethodと模擬Paymentの状態�
 
 **一次資料との対応**: SRC-06 BIZ-14, BIZ-16, BIZ-17 → FR-A11 → DD-A11。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 条件設定とシミュレーション。フィールド型・必須性・初期値・操作順序は実装提案。
 
-対象: FR-A11 / 主表示pattern: **UI-FORM**。画面サービス境界は`policies.save, automations.simulate, telemetry.series`。
+対象: FR-A11 / 主表示pattern: **UI-FORM**。画面サービス境界は`policies.save, automations.simulate`。
 
 **初期表示と前提**: automation.policy.manage。対象設備と制御能力を取得済み。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 

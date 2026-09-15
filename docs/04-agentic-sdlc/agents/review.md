@@ -23,13 +23,13 @@ scope: frontend-demo-1A
 | Skill名 | 期待する能力 |
 |---|---|
 | traceability-review | 64要件と対象設計/ATの欠落を照合する |
-| architecture-review | 依存方向、状態の単一管理、schema/API境界、保守性を確認する |
+| architecture-review | 依存方向、状態の単一管理、schema/Repository境界、保守性を確認する |
 | risk-review | 越権、誤成功、実処理混入、算定単位・品質の誤認を評価する |
 | evidence-review | 実装版・試験版・報告の一致を確認し、根拠ある指摘を作る |
 
 利用環境に同等のSKILL.mdがある場合は内容と権限を確認して適用する。存在しないSkillを利用済みと報告しない。通常の文書・実装作業は本仕様の手順で進められる。
 
-0.2.0では概要表だけで判断せず、対象機能の項目表・BR・事後条件・AT-N/E/B、フロントエンド入出力契約、操作カタログを読む。UIは参照HTML/CSSの根拠とREF/ADAPTの差を確認する。
+本版では概要表だけで判断せず、対象機能の項目表・BR・事後条件・AT-N/E/Bと該当AT-*-SRC、フロントエンド入出力契約、操作カタログを読む。UIは参照HTML/CSSの根拠とREF/ADAPTの差を確認する。
 
 ## 作業手順
 
