@@ -1,0 +1,65 @@
+requirement_id,origin,company_item_ids,original_phrases,design_supplement
+FR-C01,企業原文 SRC-06＋設計補完,BIZ-04;BIZ-08,For End Users/Clients / Technicians / Admin/HQ; Purpose is to monitor every aspect,集計範囲・欠測表示
+FR-C02,企業原文 SRC-06＋設計補完,BIZ-07,Select for Categories,階層編集・削除規則
+FR-C03,企業原文 SRC-06＋設計補完,BIZ-13,Thermostat / Remote Control,モード・風量・応答状態
+FR-C04,企業原文 SRC-06＋設計補完,BIZ-14,Lower Energy Bills / auto turn off,曜日入力・時間競合の規則
+FR-C05,企業原文 SRC-06＋設計補完,BIZ-14;BIZ-15;BIZ-17,Lower Energy Bills / auto turn off; Dynamic Geofencing; Automated Comfort / open window or uninsulated wall,同意取消・条件優先順
+FR-C06,企業原文 SRC-06＋設計補完,BIZ-16;BIZ-23,Time-of-Use-Shift / solar and/or other battery storage; Cut wasted run time by 10% to 20% / savings with our solution,比較期間・料金版・品質表示
+FR-C07,企業原文 SRC-06＋設計補完,BIZ-18;BIZ-19,How do you calculate the CO2 and air quality; ventilations control,換気能力判定・欠測表示
+FR-C08,企業原文 SRC-06＋設計補完,BIZ-08;BIZ-09;BIZ-17,Purpose is to monitor every aspect; Signals & Notifications; Automated Comfort / open window or uninsulated wall,既読と異常解消の分離
+FR-C09,企業原文 SRC-06＋設計補完,BIZ-12,"general maintenance (regular, reactive and preventive)",予約・取消・案件進捗
+FR-C10,企業原文 SRC-06＋設計補完,BIZ-21,payments are not made / slow down / stop,契約一覧・請求状態
+FR-C11,企業原文 SRC-06＋設計補完,BIZ-22,whatsapp and/or email / credit card or debit card,決済状態と通知プレビュー
+FR-C12,企業原文 SRC-06＋設計補完,BIZ-21,payments are not made / slow down / stop,予告・猶予・解除保留
+FR-C13,企業原文 SRC-06＋設計補完,BIZ-23;BIZ-24;BIZ-25;BIZ-26,Cut wasted run time by 10% to 20% / savings with our solution; How do you offset carbon / exchange and/or offset; Digital MRV / Scope 2 Emission Auditing; Tokenized Carbon Offsets / with API to real time carbon trading platforms,模擬申込・償却状態・市場構想の表示
+FR-P01,制作方針 SRC-02＋設計補完,BIZ-04;BIZ-12,"For End Users/Clients / Technicians / Admin/HQ; general maintenance (regular, reactive and preventive)",受託案件ダッシュボード
+FR-P02,制作方針 SRC-02＋設計補完,BIZ-12,"general maintenance (regular, reactive and preventive)",受諾・辞退の手順
+FR-P03,制作方針 SRC-02＋設計補完,BIZ-12,"general maintenance (regular, reactive and preventive)",自社担当割当と資格確認
+FR-P04,制作方針 SRC-02＋設計補完,BIZ-12,"general maintenance (regular, reactive and preventive)",対象設備・異常根拠の限定閲覧
+FR-P05,制作方針 SRC-02＋設計補完,BIZ-12,"general maintenance (regular, reactive and preventive)",報告の品質確認・差戻し
+FR-P06,制作方針 SRC-02＋設計補完,BIZ-12,"general maintenance (regular, reactive and preventive)",自社作業者・資格・稼働の閲覧
+FR-P07,制作方針 SRC-02＋設計補完,BIZ-12;BIZ-20,"general maintenance (regular, reactive and preventive); gadget to be small / firmware / stolen and/or removed",案件連絡・異常の共有
+FR-P08,制作方針 SRC-02＋設計補完,BIZ-12,"general maintenance (regular, reactive and preventive)",委託先・担当期間に基づくアクセス制限
+FR-T01,企業原文 SRC-06＋設計補完,BIZ-04;BIZ-08,For End Users/Clients / Technicians / Admin/HQ; Purpose is to monitor every aspect,担当期間による表示範囲
+FR-T02,設計補完（企業目的に対応）,BIZ-06;BIZ-07;BIZ-10,For HVAC / any air con brands; Select for Categories; Indoor Unit Parts / Outdoor Unit Parts / Electrical and Control Parts,設備台帳の項目と閲覧手順
+FR-T03,企業原文 SRC-06＋設計補完,BIZ-08;BIZ-11,Purpose is to monitor every aspect; Predictive Maintenance / Predictive diagnostics,系列選択と品質表示
+FR-T04,企業原文 SRC-06＋設計補完,BIZ-10,Indoor Unit Parts / Outdoor Unit Parts / Electrical and Control Parts,点検フォーム・未点検理由
+FR-T05,企業原文 SRC-06＋設計補完,BIZ-10,Indoor Unit Parts / Outdoor Unit Parts / Electrical and Control Parts,点検フォーム・未点検理由
+FR-T06,企業原文 SRC-06＋設計補完,BIZ-10,Indoor Unit Parts / Outdoor Unit Parts / Electrical and Control Parts,点検フォーム・未点検理由
+FR-T07,企業原文 SRC-06＋設計補完,BIZ-08;BIZ-11;BIZ-17,Purpose is to monitor every aspect; Predictive Maintenance / Predictive diagnostics; Automated Comfort / open window or uninsulated wall,原因候補と根拠・解消手順
+FR-T08,企業原文 SRC-06＋設計補完,BIZ-12,"general maintenance (regular, reactive and preventive)",開始・提出・再提出の状態
+FR-T09,設計補完（企業目的に対応）,BIZ-12,"general maintenance (regular, reactive and preventive)",写真・交換部品・報告版の管理
+FR-T10,設計補完（企業目的に対応）,BIZ-13,Thermostat / Remote Control,技術者の操作権限と試運転手順
+FR-T11,設計補完（企業目的に対応）,BIZ-20,gadget to be small / firmware / stolen and/or removed,登録・校正・更新の模擬手順
+FR-T12,企業原文 SRC-06＋設計補完,BIZ-20,gadget to be small / firmware / stolen and/or removed,通信断・電源断と取り外しの区別
+FR-A01,企業原文 SRC-06＋設計補完,BIZ-04;BIZ-08,For End Users/Clients / Technicians / Admin/HQ; Purpose is to monitor every aspect,全体集計・担当導線
+FR-A02,企業原文 SRC-06＋設計補完,BIZ-07,Select for Categories,登録・編集・アーカイブ
+FR-A03,設計補完（企業目的に対応）,BIZ-04,For End Users/Clients / Technicians / Admin/HQ,権限・所属・担当期間の管理
+FR-A04,企業原文 SRC-06＋設計補完,BIZ-06;BIZ-20,For HVAC / any air con brands; gadget to be small / firmware / stolen and/or removed,機種能力・IoT台帳の編集
+FR-A05,企業原文 SRC-06＋設計補完,BIZ-08;BIZ-11;BIZ-17,Purpose is to monitor every aspect; Predictive Maintenance / Predictive diagnostics; Automated Comfort / open window or uninsulated wall,しきい値の設定と異常処理
+FR-A06,企業原文 SRC-06＋設計補完,BIZ-12,"general maintenance (regular, reactive and preventive)",受付・委託・品質確認
+FR-A07,設計補完（企業目的に対応）,BIZ-21,payments are not made / slow down / stop,プラン・契約編集
+FR-A08,企業原文 SRC-06＋設計補完,BIZ-21;BIZ-22,payments are not made / slow down / stop; whatsapp and/or email / credit card or debit card,請求・模擬入金確認
+FR-A09,企業原文 SRC-06＋設計補完,BIZ-21,payments are not made / slow down / stop,予告・実行確認・機器応答
+FR-A10,設計補完（企業目的に対応）,BIZ-21,payments are not made / slow down / stop,猶予・例外・監査手順
+FR-A11,企業原文 SRC-06＋設計補完,BIZ-14;BIZ-16;BIZ-17,Lower Energy Bills / auto turn off; Time-of-Use-Shift / solar and/or other battery storage; Automated Comfort / open window or uninsulated wall,条件設定とシミュレーション
+FR-A12,企業原文 SRC-06＋設計補完,BIZ-18;BIZ-19,How do you calculate the CO2 and air quality; ventilations control,換気ルール・欠測の扱い
+FR-A13,企業原文 SRC-06＋設計補完,BIZ-23;BIZ-25,Cut wasted run time by 10% to 20% / savings with our solution; Digital MRV / Scope 2 Emission Auditing,基準版・算定条件の管理
+FR-A14,企業原文 SRC-06＋設計補完,BIZ-25,Digital MRV / Scope 2 Emission Auditing,レポート項目・証跡・プレビュー
+FR-A15,企業原文 SRC-06＋設計補完,BIZ-24;BIZ-26,How do you offset carbon / exchange and/or offset; Tokenized Carbon Offsets / with API to real time carbon trading platforms,模擬償却・市場構想のプレビュー
+FR-A16,企業原文 SRC-06＋設計補完,BIZ-20,gadget to be small / firmware / stolen and/or removed,監査フィルター・相関ID
+FR-X01,企業原文 SRC-06＋設計補完,BIZ-01;BIZ-02,Sign In / Sign Out / Forget Password; In any language text,4役割デモ・初期en/ja・再設定文言
+FR-X02,企業原文 SRC-06＋設計補完,BIZ-03,respond to voice ai,音声デモとテキスト代替・変更確認
+FR-X03,企業原文 SRC-06＋設計補完,BIZ-09;BIZ-18,Signals & Notifications; How do you calculate the CO2 and air quality,色の意味・単位・品質・非色表現
+FR-X04,設計補完（企業目的に対応）,BIZ-04,For End Users/Clients / Technicians / Admin/HQ,役割・担当・期間・能力の表示制限
+FR-X05,企業原文 SRC-06＋設計補完,BIZ-05,For Split Unit Air Con (phase 1),共有モック・リセット・実処理の区別
+FR-X06,企業原文 SRC-06＋設計補完,BIZ-05;BIZ-06;BIZ-12;BIZ-19,"For Split Unit Air Con (phase 1); For HVAC / any air con brands; general maintenance (regular, reactive and preventive); ventilations control",機種能力と画面有効判定
+FR-X07,企業原文 SRC-06＋設計補完,BIZ-08;BIZ-20;BIZ-22,Purpose is to monitor every aspect; gadget to be small / firmware / stolen and/or removed; whatsapp and/or email / credit card or debit card,既読・関連画面・操作履歴
+NFR-01,設計補完（品質基準）,BIZ-05,For Split Unit Air Con (phase 1),初期言語・品質目標は設計提案であり企業の確定値ではない
+NFR-02,設計補完（品質基準）,BIZ-05,For Split Unit Air Con (phase 1),初期言語・品質目標は設計提案であり企業の確定値ではない
+NFR-03,設計補完（品質基準）,BIZ-05,For Split Unit Air Con (phase 1),初期言語・品質目標は設計提案であり企業の確定値ではない
+NFR-04,設計補完（品質基準）,BIZ-05,For Split Unit Air Con (phase 1),初期言語・品質目標は設計提案であり企業の確定値ではない
+NFR-05,設計補完（品質基準）,BIZ-05,For Split Unit Air Con (phase 1),初期言語・品質目標は設計提案であり企業の確定値ではない
+NFR-06,制作方針 SRC-02＋設計補完,BIZ-05,For Split Unit Air Con (phase 1),初期言語・品質目標は設計提案であり企業の確定値ではない
+NFR-07,設計補完（品質基準）,BIZ-05,For Split Unit Air Con (phase 1),初期言語・品質目標は設計提案であり企業の確定値ではない
+NFR-08,設計補完（品質基準）,BIZ-02,In any language text,初期言語・品質目標は設計提案であり企業の確定値ではない

@@ -1,6 +1,6 @@
 ---
 document_id: DD-C
-version: 0.3.0
+version: 0.5.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 ## 入力・責務
 
-入力: [役割別要件](../01-requirements/client.md)、[共通要件](../01-requirements/common.md)。必読: [共通詳細設計](common.md)、[UIUX仕様書](../03-uiux/UIUXSpecification.md)。以下はフロントエンドの項目・表示・モック動作の設計。画面上の登録・割当・入金・制限・監査はすべて共有モックメモリの状態遷移で、サーバー実装やDB設計を依頼するものではない。
+一次資料: [企業要件原文（SRC-06）](../00-prepare/sources/company-requirements-original.txt)。原文を再整理した要件から画面・入力・状態・受入条件を設計する。入力: [役割別要件](../01-requirements/client.md)、[共通要件](../01-requirements/common.md)。必読: [共通詳細設計](common.md)、[UIUX仕様書](../03-uiux/UIUXSpecification.md)。以下はフロントエンドの項目・表示・モック動作の設計。画面上の登録・割当・入金・制限・監査はすべて共有モックメモリの状態遷移で、サーバー実装やDB設計を依頼するものではない。
 
 ルートパラメーターは未信頼入力として検証する。表のservice名は共通Repositoryの論理操作名。同じルートの行は同一画面内の機能を分担する。全行にloading/empty/error/forbidden/not-foundを実装する。再試行は回復可能なエラーだけに提供し、権限不足では許可された画面へ戻す。
 
@@ -46,11 +46,13 @@ scope: frontend-demo-1A
 
 設計ID DD-C番号ごとに同番号AT-Cの受入条件、上表の異常系、権限外の直接呼出しを検証する。テストデータと役割横断シナリオは[検証計画](../04-agentic-sdlc/verification.md)を正とする。設計の例示文字数等を変更する場合はschema、文書、境界値試験を同時更新する。
 
-## 機能別詳細仕様（0.2.0）
+## 機能別詳細仕様（0.5.0）
 
 表の入力はRHFで保持し、schema検証する。read-only値はQueryの単一sourceから表示する。共通の型・ページング・時間・エラーは[実装契約](implementation-contracts.md)を正とし、以下の個別条件を重ねる。視覚値は[UIUX](../03-uiux/UIUXSpecification.md) UX-04/08の参照準拠tokenとpatternを使用する。
 
 ### DD-C01 詳細
+
+**一次資料との対応**: SRC-06 BIZ-04, BIZ-08 → FR-C01 → DD-C01。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 集計範囲・欠測表示。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-C01 / 主表示pattern: **UI-OVERVIEW**。画面サービス境界は`units.list, telemetry.summary, alerts.list`。
 
@@ -77,6 +79,8 @@ scope: frontend-demo-1A
 **検証**: AT-C01-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-C02 詳細
+
+**一次資料との対応**: SRC-06 BIZ-07 → FR-C02 → DD-C02。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 階層編集・削除規則。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-C02 / 主表示pattern: **UI-LIST / UI-FORM**。画面サービス境界は`properties.list, properties.save, properties.archive, spaces.list, spaces.save, spaces.archive, units.list`。
 
@@ -106,6 +110,8 @@ scope: frontend-demo-1A
 
 ### DD-C03 詳細
 
+**一次資料との対応**: SRC-06 BIZ-13 → FR-C03 → DD-C03。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: モード・風量・応答状態。フィールド型・必須性・初期値・操作順序は実装提案。
+
 対象: FR-C03 / 主表示pattern: **UI-DETAIL**。画面サービス境界は`units.get, commands.create, commands.get`。
 
 **初期表示と前提**: 有効Membership、対象設備のcontrol能力、オンライン、契約制限内の要求。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
@@ -132,6 +138,8 @@ scope: frontend-demo-1A
 **検証**: AT-C03-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-C04 詳細
+
+**一次資料との対応**: SRC-06 BIZ-14 → FR-C04 → DD-C04。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 曜日入力・時間競合の規則。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-C04 / 主表示pattern: **UI-LIST / UI-FORM**。画面サービス境界は`automations.list, automations.save, automations.simulate`。
 
@@ -163,6 +171,8 @@ scope: frontend-demo-1A
 
 ### DD-C05 詳細
 
+**一次資料との対応**: SRC-06 BIZ-14, BIZ-15, BIZ-17 → FR-C05 → DD-C05。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 同意取消・条件優先順。フィールド型・必須性・初期値・操作順序は実装提案。
+
 対象: FR-C05 / 主表示pattern: **UI-FORM**。画面サービス境界は`consents.get, consents.update, automations.save, automations.simulate`。
 
 **初期表示と前提**: 自動運転対象と条件種別が選択可能。位置依存の場合は目的別の同意が必要。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
@@ -192,6 +202,8 @@ scope: frontend-demo-1A
 
 ### DD-C06 詳細
 
+**一次資料との対応**: SRC-06 BIZ-16, BIZ-23 → FR-C06 → DD-C06。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 比較期間・料金版・品質表示。フィールド型・必須性・初期値・操作順序は実装提案。
+
 対象: FR-C06 / 主表示pattern: **UI-ANALYSIS**。画面サービス境界は`energy.summary, baselines.list`。
 
 **初期表示と前提**: 自組織設備の期間データ。基準・料金がない場合も実績だけは閲覧可能。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
@@ -218,6 +230,14 @@ scope: frontend-demo-1A
 **検証**: AT-C06-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-C07 詳細
+
+**アレルゲンを含む空気環境の表示・処理設計（BIZ-18）**
+
+telemetry.seriesの空気環境表示モデルにallergenObservationを追加。availabilityはavailable / not_measured / unsupported、substance・value・unit・observedAt・sourceLabelは取得時のみ表示。availableでは根拠・時刻が必須、数値がある場合は単位も必須。不完全な結果は不明扱い。PM2.5からアレルゲン量を算出しない。CO₂はppm、電力排出量は別画面のkgCO₂e。換気能力なしの場合は案内だけを表示する。
+
+検証: AT-C07-SRC — 未計測・非対応・合成観測のfixtureで表示を切り替え、未計測で0や「安全」を表示しない。数値の単位欠落は不明になる。
+
+**一次資料との対応**: SRC-06 BIZ-18, BIZ-19 → FR-C07 → DD-C07。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 換気能力判定・欠測表示。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-C07 / 主表示pattern: **UI-ANALYSIS**。画面サービス境界は`telemetry.series, units.get, commands.create`。
 
@@ -246,6 +266,14 @@ scope: frontend-demo-1A
 
 ### DD-C08 詳細
 
+**窓開放・断熱不足の負荷通知の表示・処理設計（BIZ-17）**
+
+alerts.listのAlertにcauseCode（window_open / insulation_loss / unknown）、evidenceKind（demo_observation / inferred / inspection）、evidenceText、observedAtを追加する。causeCodeとevidenceKindは必須、根拠未取得はunknownとし、倍増などの数値を固定表示しない。推定は「疑い」、点検結果は「点検記録」と表示。通知詳細から同じunitIdの設備・保守依頼へ移動する。
+
+検証: AT-C08-SRC — 窓開放の疑い・断熱不足の点検記録・根拠なしの3 fixtureで、文言・根拠・時刻が異なり、既読にしても異常が解消しない。
+
+**一次資料との対応**: SRC-06 BIZ-08, BIZ-09, BIZ-17 → FR-C08 → DD-C08。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 既読と異常解消の分離。フィールド型・必須性・初期値・操作順序は実装提案。
+
 対象: FR-C08 / 主表示pattern: **UI-LIST**。画面サービス境界は`alerts.list, notifications.markRead, notifications.list`。
 
 **初期表示と前提**: 顧客スコープ内の通知とアラートが取得可能。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
@@ -271,6 +299,8 @@ scope: frontend-demo-1A
 **検証**: AT-C08-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-C09 詳細
+
+**一次資料との対応**: SRC-06 BIZ-12 → FR-C09 → DD-C09。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 予約・取消・案件進捗。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-C09 / 主表示pattern: **UI-LIST / UI-FORM / UI-DETAIL**。画面サービス境界は`jobs.list, jobs.create, jobs.get, jobs.cancel, jobs.addNote`。
 
@@ -300,6 +330,8 @@ scope: frontend-demo-1A
 
 ### DD-C10 詳細
 
+**一次資料との対応**: SRC-06 BIZ-21 → FR-C10 → DD-C10。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 契約一覧・請求状態。フィールド型・必須性・初期値・操作順序は実装提案。
+
 対象: FR-C10 / 主表示pattern: **UI-LIST / UI-DETAIL**。画面サービス境界は`contracts.list, invoices.list`。
 
 **初期表示と前提**: 自組織の契約が0件以上。閲覧のために支払い操作は不要。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
@@ -327,6 +359,14 @@ scope: frontend-demo-1A
 
 ### DD-C11 詳細
 
+**カード種別と案内の選択の表示・処理設計（BIZ-22）**
+
+payments.simulateのmethodをdemo_credit_card / demo_debit_card / demo_instructionsにする。クレジットとデビットは同じ状態遷移を用い、選択種別を確認画面とPayment結果に保持。支払い手順の閲覧だけではpaidへ遷移しない。notifications.previewは請求ID・案内チャネル・選択方法を表示。実カード情報や銀行情報の入力欄を設けない。
+
+検証: AT-C11-SRC — 各カード種別で処理中・成功・失敗を再現し、履歴の種別が一致する。支払い手順だけを開いても未入金のまま。
+
+**一次資料との対応**: SRC-06 BIZ-22 → FR-C11 → DD-C11。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 決済状態と通知プレビュー。フィールド型・必須性・初期値・操作順序は実装提案。
+
 対象: FR-C11 / 主表示pattern: **UI-DETAIL / UI-FORM**。画面サービス境界は`invoices.get, payments.simulate, notifications.preview`。
 
 **初期表示と前提**: 未払い請求、現在金額、模擬決済であることを確認。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
@@ -334,7 +374,7 @@ scope: frontend-demo-1A
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
 | invoiceId | ID/必須 | 未払い請求 | 対象 |
-| method | enum/必須 | demo_card/demo_instructions | 模擬手段 |
+| method | enum/必須 | demo_credit_card/demo_debit_card/demo_instructions | 模擬手段 |
 | channel | enum/プレビュー時 | email/whatsapp | 案内 |
 | demoConfirmed | boolean/必須 | 初期false | 模擬処理確認 |
 | outcome | enum/デモ制御側 | processing/confirmed/failed | 試験用イベント。通常フォームと分離 |
@@ -353,6 +393,8 @@ scope: frontend-demo-1A
 **検証**: AT-C11-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-C12 詳細
+
+**一次資料との対応**: SRC-06 BIZ-21 → FR-C12 → DD-C12。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 予告・猶予・解除保留。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-C12 / 主表示pattern: **UI-DETAIL**。画面サービス境界は`restrictions.forInvoice, commands.get, inquiries.create`。
 
@@ -380,6 +422,14 @@ scope: frontend-demo-1A
 **検証**: AT-C12-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-C13 詳細
+
+**炭素市場への将来連携の表示の表示・処理設計（BIZ-26）**
+
+offsets.previewの表示用結果にmarketConceptを追加。stage=future_concept、providerLabel=未選定、verificationStatus=unverified、ledgerStatus=not_connectedを必須とする。省エネ量、推定削減排出量、模擬購入・償却記録を分ける。市場価格・実トークン残高・売買実行ボタンは設けず、将来の連携先と検証条件が未確定であることを説明する。UIはRepositoryの非同期結果を表示し、将来データ取得をadapterへ追加できる構造とする。
+
+検証: AT-C13-SRC — オフセット未選択で申込が作られない。市場構想を開いても残高・実証明・取引結果が生成されず、模擬償却とは異なる状態を表示する。
+
+**一次資料との対応**: SRC-06 BIZ-23, BIZ-24, BIZ-25, BIZ-26 → FR-C13 → DD-C13。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 模擬申込・償却状態・市場構想の表示。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-C13 / 主表示pattern: **UI-ANALYSIS / UI-FORM**。画面サービス境界は`energy.summary, offsets.preview, offsets.simulate, offsets.list`。
 

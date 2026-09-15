@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.3.0
+version: 0.5.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -10,6 +10,8 @@ scope: frontend-demo-1A
 # 共通詳細設計書
 
 入力: [共通要件](../01-requirements/common.md)、[PrepareDocument](../00-prepare/PrepareDocument.md)。実装粒度の入出力・エラー・デモ時間値は[フロントエンド入出力契約](implementation-contracts.md)、全論理操作は[操作カタログ](operation-catalog.csv)を併読する。本書が定義するのはブラウザ側の画面モデル・モックサービス・表示状態だけ。APIパス、DB、認証サーバー、バックエンド業務処理は設計対象外。
+
+本書の業務目的は[企業要件原文](../00-prepare/sources/company-requirements-original.txt)から整理したBIZ項目と[共通要件](../01-requirements/common.md)に基づきます。型、Repository、キャッシュ、権限ガード、モック状態は、その目的をフロントエンドで実現する設計提案です。将来のAPI導入時は表示用モデルへの変換をadapterへ集約します。サーバーの認証・DB・通信契約は本書では定義しません。
 
 ## 1. 構成と責任
 

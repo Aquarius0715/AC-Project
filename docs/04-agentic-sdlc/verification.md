@@ -1,6 +1,6 @@
 ---
 document_id: TEST-PLAN
-version: 0.3.0
+version: 0.5.0
 status: planned-not-executed
 owner: test-agent
 scope: frontend-demo-1A
@@ -152,3 +152,20 @@ scope: frontend-demo-1A
 - 非同期: Command30秒、stale120秒、見積15分、予告24時間はデモ値として境界試験。制限解除の意思を保持し、未確定の適用要求と解除を競合送信しない。
 - 会計・環境: 全額入金の額/通貨/参照一致、基準と実績の同一境界、MRVの版固定、購入確認前の償却拒否・二重償却拒否。
 - 操作カタログ: 全論理操作の入出力とrole DDを照合。全操作がモックまたはローカル表示設定で完結し、外部接続を行わない。
+
+## 企業原文の具体化に対する追加検証
+
+原文対応の受入条件は役割別要件のAT-*-SRC本文を正とする。通常のN/E/Bに加えて実施し、成功例だけでなく欠測・未確認・処理中も検証する。以下は計画であり実行結果ではない。
+
+| 要件 | 追加ケース | 詳細設計 | 状態 |
+|---|---|---|---|
+| FR-C07 | AT-C07-SRC | DD-C07 | not_run |
+| FR-C08 | AT-C08-SRC | DD-C08 | not_run |
+| FR-C11 | AT-C11-SRC | DD-C11 | not_run |
+| FR-C13 | AT-C13-SRC | DD-C13 | not_run |
+| FR-T07 | AT-T07-SRC | DD-T07 | not_run |
+| FR-A05 | AT-A05-SRC | DD-A05 | not_run |
+| FR-A08 | AT-A08-SRC | DD-A08 | not_run |
+| FR-A12 | AT-A12-SRC | DD-A12 | not_run |
+| FR-A14 | AT-A14-SRC | DD-A14 | not_run |
+| FR-A15 | AT-A15-SRC | DD-A15 | not_run |

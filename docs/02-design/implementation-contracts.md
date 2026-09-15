@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTRACTS
-version: 0.3.0
+version: 0.5.0
 status: proposed-frontend-contract
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -253,3 +253,17 @@ Inquiry作成は`invoiceIdまたはrestrictionId、subjectType、message(1〜200
 MRV draftは`mrv.saveDraft`を呼ぶ。初回はモックが新IDを返し、編集時は保持済みIDと版で更新する。通信先や永続化方式は定義しない。
 
 監視・制御に必要なデータ取得と操作カタログには、補助的なget/listも含める。UIに編集ボタンを置く場合は対象detailの読取と保存契約を対にする。
+
+## DDC-原文補完. 企業要望に対応する表示モデル
+
+一次資料はSRC-06。以下はフロントエンドの表示用拡張で、APIの通信仕様ではない。詳細・必須性・欠落時の処理は各DDを正とする。
+
+| 既存の論理操作・結果 | 表示用拡張 | 利用設計 |
+|---|---|---|
+| alerts.list / Alert | causeCode、evidenceKind、evidenceText、observedAt | DD-C08、DD-T07、DD-A05 |
+| telemetry.series / 空気環境モデル | allergenObservationの取得状態・対象物質・値・単位・出典・観測時刻 | DD-C07、DD-A12 |
+| payments.simulate / Payment、invoices.list / 請求表示モデル | methodはdemo_credit_card / demo_debit_card / demo_instructions | DD-C11、DD-A08 |
+| MRVレポートプレビュー | Scope 2分類、組織・期間・拠点・地域係数・算定境界・品質 | DD-A14 |
+| offsets.preview / OffsetQuote | marketConcept: future_concept・未選定・未検証・未接続 | DD-C13、DD-A15 |
+
+上記の表示変換はfeatureの純粋関数に集約し、mock adapterは正常・欠落・失敗の合成結果を返す。実API導入時にはadapterがこの画面モデルへ変換する。画面から外部APIへ直接接続しない。

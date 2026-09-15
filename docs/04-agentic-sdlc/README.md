@@ -1,6 +1,6 @@
 ---
 document_id: SDLC-001
-version: 0.3.0
+version: 0.5.0
 status: draft
 owner: orchestration-agent
 scope: frontend-demo-1A

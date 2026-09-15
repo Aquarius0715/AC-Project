@@ -1,6 +1,6 @@
 ---
 document_id: DD-P
-version: 0.3.0
+version: 0.5.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 ## 入力・責務
 
-入力: [役割別要件](../01-requirements/contractor.md)、[共通要件](../01-requirements/common.md)。必読: [共通詳細設計](common.md)、[UIUX仕様書](../03-uiux/UIUXSpecification.md)。以下はフロントエンドの項目・表示・モック動作の設計。画面上の登録・割当・入金・制限・監査はすべて共有モックメモリの状態遷移で、サーバー実装やDB設計を依頼するものではない。
+一次資料: [企業要件原文（SRC-06）](../00-prepare/sources/company-requirements-original.txt)。原文を再整理した要件から画面・入力・状態・受入条件を設計する。入力: [役割別要件](../01-requirements/contractor.md)、[共通要件](../01-requirements/common.md)。必読: [共通詳細設計](common.md)、[UIUX仕様書](../03-uiux/UIUXSpecification.md)。以下はフロントエンドの項目・表示・モック動作の設計。画面上の登録・割当・入金・制限・監査はすべて共有モックメモリの状態遷移で、サーバー実装やDB設計を依頼するものではない。
 
 ルートパラメーターは未信頼入力として検証する。表のservice名は共通Repositoryの論理操作名。同じルートの行は同一画面内の機能を分担する。全行にloading/empty/error/forbidden/not-foundを実装する。再試行は回復可能なエラーだけに提供し、権限不足では許可された画面へ戻す。
 
@@ -41,11 +41,13 @@ scope: frontend-demo-1A
 
 設計ID DD-P番号ごとに同番号AT-Pの受入条件、上表の異常系、権限外の直接呼出しを検証する。テストデータと役割横断シナリオは[検証計画](../04-agentic-sdlc/verification.md)を正とする。設計の例示文字数等を変更する場合はschema、文書、境界値試験を同時更新する。
 
-## 機能別詳細仕様（0.2.0）
+## 機能別詳細仕様（0.5.0）
 
 表の入力はRHFで保持し、schema検証する。read-only値はQueryの単一sourceから表示する。共通の型・ページング・時間・エラーは[実装契約](implementation-contracts.md)を正とし、以下の個別条件を重ねる。視覚値は[UIUX](../03-uiux/UIUXSpecification.md) UX-04/08の参照準拠tokenとpatternを使用する。
 
 ### DD-P01 詳細
+
+**一次資料との対応**: SRC-06 BIZ-04, BIZ-12 → FR-P01 → DD-P01。出所区分: 制作方針 SRC-02＋設計補完。本節で具体化する設計補完: 受託案件ダッシュボード。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-P01 / 主表示pattern: **UI-OVERVIEW**。画面サービス境界は`jobs.list, jobs.get`。
 
@@ -72,6 +74,8 @@ scope: frontend-demo-1A
 **検証**: AT-P01-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-P02 詳細
+
+**一次資料との対応**: SRC-06 BIZ-12 → FR-P02 → DD-P02。出所区分: 制作方針 SRC-02＋設計補完。本節で具体化する設計補完: 受諾・辞退の手順。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-P02 / 主表示pattern: **UI-DETAIL**。画面サービス境界は`jobs.get, jobs.accept, jobs.decline`。
 
@@ -100,6 +104,8 @@ scope: frontend-demo-1A
 
 ### DD-P03 詳細
 
+**一次資料との対応**: SRC-06 BIZ-12 → FR-P03 → DD-P03。出所区分: 制作方針 SRC-02＋設計補完。本節で具体化する設計補完: 自社担当割当と資格確認。フィールド型・必須性・初期値・操作順序は実装提案。
+
 対象: FR-P03 / 主表示pattern: **UI-LIST / UI-FORM**。画面サービス境界は`jobs.list, members.eligible, jobs.assign`。
 
 **初期表示と前提**: 受諾済み案件で、自社の割当管理権限を持つ。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
@@ -127,6 +133,8 @@ scope: frontend-demo-1A
 
 ### DD-P04 詳細
 
+**一次資料との対応**: SRC-06 BIZ-12 → FR-P04 → DD-P04。出所区分: 制作方針 SRC-02＋設計補完。本節で具体化する設計補完: 対象設備・異常根拠の限定閲覧。フィールド型・必須性・初期値・操作順序は実装提案。
+
 対象: FR-P04 / 主表示pattern: **UI-DETAIL**。画面サービス境界は`units.get, alerts.list, telemetry.summary`。
 
 **初期表示と前提**: 受諾済みの有効委託に対象設備が含まれる。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
@@ -152,6 +160,8 @@ scope: frontend-demo-1A
 **検証**: AT-P04-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-P05 詳細
+
+**一次資料との対応**: SRC-06 BIZ-12 → FR-P05 → DD-P05。出所区分: 制作方針 SRC-02＋設計補完。本節で具体化する設計補完: 報告の品質確認・差戻し。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-P05 / 主表示pattern: **UI-DETAIL / UI-FORM**。画面サービス境界は`jobs.get, jobs.review`。
 
@@ -179,6 +189,8 @@ scope: frontend-demo-1A
 
 ### DD-P06 詳細
 
+**一次資料との対応**: SRC-06 BIZ-12 → FR-P06 → DD-P06。出所区分: 制作方針 SRC-02＋設計補完。本節で具体化する設計補完: 自社作業者・資格・稼働の閲覧。フィールド型・必須性・初期値・操作順序は実装提案。
+
 対象: FR-P06 / 主表示pattern: **UI-LIST**。画面サービス境界は`members.list, jobs.list`。
 
 **初期表示と前提**: 自社の作業者一覧を読む権限。ユーザー作成権限は含まない。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
@@ -204,6 +216,8 @@ scope: frontend-demo-1A
 **検証**: AT-P06-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-P07 詳細
+
+**一次資料との対応**: SRC-06 BIZ-12, BIZ-20 → FR-P07 → DD-P07。出所区分: 制作方針 SRC-02＋設計補完。本節で具体化する設計補完: 案件連絡・異常の共有。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-P07 / 主表示pattern: **UI-TIMELINE / UI-FORM**。画面サービス境界は`jobs.events, jobs.addNote, notifications.preview`。
 
@@ -232,6 +246,8 @@ scope: frontend-demo-1A
 **検証**: AT-P07-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-P08 詳細
+
+**一次資料との対応**: SRC-06 BIZ-12 → FR-P08 → DD-P08。出所区分: 制作方針 SRC-02＋設計補完。本節で具体化する設計補完: 委託先・担当期間に基づくアクセス制限。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-P08 / 主表示pattern: **全patternのGuard**。画面サービス境界は`session.get, jobs.get`。
 

@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.3.0
+version: 0.5.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 ## 入力・責務
 
-入力: [役割別要件](../01-requirements/technician.md)、[共通要件](../01-requirements/common.md)。必読: [共通詳細設計](common.md)、[UIUX仕様書](../03-uiux/UIUXSpecification.md)。以下はフロントエンドの項目・表示・モック動作の設計。画面上の登録・割当・入金・制限・監査はすべて共有モックメモリの状態遷移で、サーバー実装やDB設計を依頼するものではない。
+一次資料: [企業要件原文（SRC-06）](../00-prepare/sources/company-requirements-original.txt)。原文を再整理した要件から画面・入力・状態・受入条件を設計する。入力: [役割別要件](../01-requirements/technician.md)、[共通要件](../01-requirements/common.md)。必読: [共通詳細設計](common.md)、[UIUX仕様書](../03-uiux/UIUXSpecification.md)。以下はフロントエンドの項目・表示・モック動作の設計。画面上の登録・割当・入金・制限・監査はすべて共有モックメモリの状態遷移で、サーバー実装やDB設計を依頼するものではない。
 
 ルートパラメーターは未信頼入力として検証する。表のservice名は共通Repositoryの論理操作名。同じルートの行は同一画面内の機能を分担する。全行にloading/empty/error/forbidden/not-foundを実装する。再試行は回復可能なエラーだけに提供し、権限不足では許可された画面へ戻す。
 
@@ -45,11 +45,13 @@ scope: frontend-demo-1A
 
 設計ID DD-T番号ごとに同番号AT-Tの受入条件、上表の異常系、権限外の直接呼出しを検証する。テストデータと役割横断シナリオは[検証計画](../04-agentic-sdlc/verification.md)を正とする。設計の例示文字数等を変更する場合はschema、文書、境界値試験を同時更新する。
 
-## 機能別詳細仕様（0.2.0）
+## 機能別詳細仕様（0.5.0）
 
 表の入力はRHFで保持し、schema検証する。read-only値はQueryの単一sourceから表示する。共通の型・ページング・時間・エラーは[実装契約](implementation-contracts.md)を正とし、以下の個別条件を重ねる。視覚値は[UIUX](../03-uiux/UIUXSpecification.md) UX-04/08の参照準拠tokenとpatternを使用する。
 
 ### DD-T01 詳細
+
+**一次資料との対応**: SRC-06 BIZ-04, BIZ-08 → FR-T01 → DD-T01。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 担当期間による表示範囲。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-T01 / 主表示pattern: **UI-OVERVIEW**。画面サービス境界は`jobs.list, alerts.list`。
 
@@ -77,6 +79,8 @@ scope: frontend-demo-1A
 
 ### DD-T02 詳細
 
+**一次資料との対応**: SRC-06 BIZ-06, BIZ-07, BIZ-10 → FR-T02 → DD-T02。出所区分: 設計補完（企業目的に対応）。本節で具体化する設計補完: 設備台帳の項目と閲覧手順。フィールド型・必須性・初期値・操作順序は実装提案。
+
 対象: FR-T02 / 主表示pattern: **UI-DETAIL**。画面サービス境界は`units.get, devices.list`。
 
 **初期表示と前提**: 対象設備に閲覧可能な担当関係がある。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
@@ -102,6 +106,8 @@ scope: frontend-demo-1A
 **検証**: AT-T02-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-T03 詳細
+
+**一次資料との対応**: SRC-06 BIZ-08, BIZ-11 → FR-T03 → DD-T03。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 系列選択と品質表示。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-T03 / 主表示pattern: **UI-DETAIL / UI-ANALYSIS**。画面サービス境界は`telemetry.series, telemetry.summary`。
 
@@ -129,6 +135,8 @@ scope: frontend-demo-1A
 **検証**: AT-T03-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-T04 詳細
+
+**一次資料との対応**: SRC-06 BIZ-10 → FR-T04 → DD-T04。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 点検フォーム・未点検理由。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-T04 / 主表示pattern: **UI-FORM**。画面サービス境界は`jobs.get, jobs.saveDraft, jobs.submit`。
 
@@ -158,6 +166,8 @@ scope: frontend-demo-1A
 
 ### DD-T05 詳細
 
+**一次資料との対応**: SRC-06 BIZ-10 → FR-T05 → DD-T05。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 点検フォーム・未点検理由。フィールド型・必須性・初期値・操作順序は実装提案。
+
 対象: FR-T05 / 主表示pattern: **UI-FORM**。画面サービス境界は`jobs.get, jobs.saveDraft, jobs.submit`。
 
 **初期表示と前提**: 有効な担当案件がin_progressである。保守範囲と部品別の点検対象が取得済み。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
@@ -185,6 +195,8 @@ scope: frontend-demo-1A
 **検証**: AT-T05-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-T06 詳細
+
+**一次資料との対応**: SRC-06 BIZ-10 → FR-T06 → DD-T06。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 点検フォーム・未点検理由。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-T06 / 主表示pattern: **UI-FORM**。画面サービス境界は`jobs.get, jobs.saveDraft, jobs.submit`。
 
@@ -214,6 +226,14 @@ scope: frontend-demo-1A
 
 ### DD-T07 詳細
 
+**窓開放・断熱不足の負荷通知の表示・処理設計（BIZ-17）**
+
+alerts.listのAlertにcauseCode（window_open / insulation_loss / unknown）、evidenceKind（demo_observation / inferred / inspection）、evidenceText、observedAtを追加する。causeCodeとevidenceKindは必須、根拠未取得はunknownとし、倍増などの数値を固定表示しない。推定は「疑い」、点検結果は「点検記録」と表示。通知詳細から同じunitIdの設備・保守依頼へ移動する。
+
+検証: AT-T07-SRC — 窓開放の疑い・断熱不足の点検記録・根拠なしの3 fixtureで、文言・根拠・時刻が異なり、既読にしても異常が解消しない。
+
+**一次資料との対応**: SRC-06 BIZ-08, BIZ-11, BIZ-17 → FR-T07 → DD-T07。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 原因候補と根拠・解消手順。フィールド型・必須性・初期値・操作順序は実装提案。
+
 対象: FR-T07 / 主表示pattern: **UI-DETAIL**。画面サービス境界は`alerts.list, alerts.get, alerts.acknowledge, alerts.resolve`。
 
 **初期表示と前提**: 担当設備に異常または診断の疑いがある。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
@@ -241,6 +261,8 @@ scope: frontend-demo-1A
 
 ### DD-T08 詳細
 
+**一次資料との対応**: SRC-06 BIZ-12 → FR-T08 → DD-T08。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 開始・提出・再提出の状態。フィールド型・必須性・初期値・操作順序は実装提案。
+
 対象: FR-T08 / 主表示pattern: **UI-DETAIL**。画面サービス境界は`jobs.get, jobs.start, jobs.resume, jobs.submit`。
 
 **初期表示と前提**: assigned案件を担当し、有効期間内。定期/事後/予防は同じ作業状態モデル。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
@@ -266,6 +288,8 @@ scope: frontend-demo-1A
 **検証**: AT-T08-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-T09 詳細
+
+**一次資料との対応**: SRC-06 BIZ-12 → FR-T09 → DD-T09。出所区分: 設計補完（企業目的に対応）。本節で具体化する設計補完: 写真・交換部品・報告版の管理。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-T09 / 主表示pattern: **UI-FORM**。画面サービス境界は`jobs.saveDraft, attachments.add, jobs.submit`。
 
@@ -295,6 +319,8 @@ scope: frontend-demo-1A
 
 ### DD-T10 詳細
 
+**一次資料との対応**: SRC-06 BIZ-13 → FR-T10 → DD-T10。出所区分: 設計補完（企業目的に対応）。本節で具体化する設計補完: 技術者の操作権限と試運転手順。フィールド型・必須性・初期値・操作順序は実装提案。
+
 対象: FR-T10 / 主表示pattern: **UI-DETAIL / UI-FORM**。画面サービス境界は`commands.create, commands.get`。
 
 **初期表示と前提**: 担当期間内、control.diagnose能力、機器online。契約制限を超えない。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
@@ -321,6 +347,8 @@ scope: frontend-demo-1A
 **検証**: AT-T10-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-T11 詳細
+
+**一次資料との対応**: SRC-06 BIZ-20 → FR-T11 → DD-T11。出所区分: 設計補完（企業目的に対応）。本節で具体化する設計補完: 登録・校正・更新の模擬手順。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-T11 / 主表示pattern: **UI-LIST / UI-FORM / UI-DETAIL**。画面サービス境界は`devices.list, devices.register, devices.bind, devices.check, devices.calibrate, devices.updateFirmware, devices.get`。
 
@@ -349,6 +377,8 @@ scope: frontend-demo-1A
 **検証**: AT-T11-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
 
 ### DD-T12 詳細
+
+**一次資料との対応**: SRC-06 BIZ-20 → FR-T12 → DD-T12。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 通信断・電源断と取り外しの区別。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-T12 / 主表示pattern: **UI-DETAIL / UI-TIMELINE**。画面サービス境界は`devices.get, devices.events, alerts.acknowledge`。
 
