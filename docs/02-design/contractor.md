@@ -1,6 +1,6 @@
 ---
 document_id: DD-P
-version: 0.5.0
+version: 0.6.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -25,7 +25,7 @@ scope: frontend-demo-1A
 | DD-P02 / FR-P02 | `/partner/jobs/:id` / `PartnerJob` | `jobs.get, jobs.accept, jobs.decline` | 受諾は有効期間内の自社offerのみ。辞退理由1〜1000文字（仮） | 期限切れ・HQ取消・他更新はCONFLICT扱いで再取得。辞退で案件を消さない |
 | DD-P03 / FR-P03 | `/partner/schedule` / `AssignmentEditor` | `jobs.list, members.eligible, jobs.assign` | 技術者ID、開始/終了、必要資格。作業期間が委託期間内か検証 | 確定した重複予定は保存拒否し再調整。作業開始後の再割当は理由必須で旧アクセス取消 |
 | DD-P04 / FR-P04 | `/partner/units/:id` / `PartnerUnit` | `units.get, alerts.list, telemetry.summary` | 設備IDから有効な受託案件を照合。顧客連絡先は必要最小限 | 受託期限終了後の直接URLも拒否。遠隔操作ボタンなし |
-| DD-P05 / FR-P05 | `/partner/jobs/:id/review` / `QualityReview` | `jobs.get, jobs.review` | 提出済みのみ。受理/差戻し、理由（差戻し必須）。改版前レポートも保持 | 技術者の原報告を上書き不可。作業者自身の品質承認不可 |
+| DD-P05 / FR-P05 | `/partner/jobs/:id/review` / `QualityReview` | `jobs.get, jobs.review, reports.get, attachments.getContent` | 提出済みのみ。受理/差戻し、理由（差戻し必須）。改版前レポートも保持 | 技術者の原報告を上書き不可。作業者自身の品質承認不可 |
 | DD-P06 / FR-P06 | `/partner/team` / `TeamCapacity` | `members.list, jobs.list` | 自社スコープに限定した日付・資格フィルター。資格は架空のデモ属性 | 所属失効の候補は割当不可。ユーザー登録はHQへ引き継ぐ |
 | DD-P07 / FR-P07 | `/partner/history` / `PartnerHistory` | `jobs.events, jobs.addNote, notifications.preview` | jobIdとテンプレート。メモ1〜2000文字（仮）、宛先は権限内から選ぶ | 外部宛先自由入力不可。機密の顧客請求情報をテンプレートに含めない |
 | DD-P08 / FR-P08 | `/partner/*` / `PartnerAccessGuard` | `session.get, jobs.get` | 各操作直前にも受託・期間を検証。期限はデモ時計基準 | 期限境界で画面表示中でも操作を拒否しキャッシュ破棄 |
@@ -43,9 +43,9 @@ scope: frontend-demo-1A
 
 設計ID DD-P番号ごとに同番号AT-Pの受入条件、上表の異常系、権限外の直接呼出しを検証する。テストデータと役割横断シナリオは[検証計画](../04-agentic-sdlc/verification.md)を正とする。設計の例示文字数等を変更する場合はschema、文書、境界値試験を同時更新する。
 
-## 機能別詳細仕様（0.5.0）
+## 機能別詳細仕様（0.6.0）
 
-表の入力はRHFで保持し、schema検証する。read-only値はQueryの単一sourceから表示する。共通の型・ページング・時間・エラーは[実装契約](implementation-contracts.md)を正とし、以下の個別条件を重ねる。視覚値は[UIUX](../03-uiux/UIUXSpecification.md) UX-04/08の参照準拠tokenとpatternを使用する。
+入力フォームの値はRHFで保持し、schema検証する。読取専用画面にはフォーム検証を要求しない。監査・通知・共通エラーは入出力契約DDC-03/09に従う。read-only値はQueryの単一sourceから表示する。共通の型・ページング・時間・エラーは[実装契約](implementation-contracts.md)を正とし、以下の個別条件を重ねる。視覚値は[UIUX](../03-uiux/UIUXSpecification.md) UX-04/08の参照準拠tokenとpatternを使用する。
 
 ### DD-P01 詳細
 
@@ -65,15 +65,13 @@ scope: frontend-demo-1A
 **処理手順**
 
 1. 自社の受諾待ち・予定・進行・品質確認待ちを集計 → 状態を選んで案件一覧へ → 対象案件の窓口操作へ進む。
-2. 保存または操作直前に次の業務ガードを実行する: 受諾前は案件種別・地域・必要資格・日程候補までの最小情報。詳細設備値や顧客連絡情報は受諾後かつ期間内に限定する。
+2. 読取・操作に応じて次の業務条件を適用する: 受諾前は案件種別・地域・必要資格・日程候補までの最小情報。詳細設備値や顧客連絡情報は受諾後かつ期間内に限定する。
 3. 閲覧による受諾は発生しない。KPIと一覧の対象集合を同じ検索条件で揃える。
-4. 更新対象Query: `jobs / partner summary（イベント時）`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
+4. 更新対象Query: `jobs / partner summary（イベント時）`。
 
-**競合・失敗時**: 他社のofferを件数に含めない。委託期間終了で設備閲覧を閉じても、自社の受諾/辞退履歴の最小記録は確認できる。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
+**境界条件・失敗時**: 他社のofferを件数に含めない。委託期間終了で設備閲覧を閉じても、自社の受諾/辞退履歴の最小記録は確認できる。
 
-**監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
-
-**検証**: AT-P01-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
+**検証**: 追跡表のAT-P01配下（N/E/B・該当SRC/R01）と該当Sシナリオ。
 
 ### DD-P02 詳細
 
@@ -94,15 +92,13 @@ scope: frontend-demo-1A
 **処理手順**
 
 1. 案件の最小情報・委託条件を確認 → 受諾または理由付き辞退 → HQと自社の状態表示を更新する。
-2. 保存または操作直前に次の業務ガードを実行する: 受諾は技術者割当や確定予約とは別。辞退時はrequestedへ戻し、辞退者・理由・offerIdを保持。再委託は新offerId。
+2. 読取・操作に応じて次の業務条件を適用する: 受諾は技術者割当や確定予約とは別。辞退時はrequestedへ戻し、辞退者・理由・offerIdを保持。再委託は新offerId。
 3. 受諾でaccepted、必要な設備閲覧権を委託期間内だけ開く。辞退は詳細閲覧権を付与しない。
-4. 更新対象Query: `jobs / offers / partner summary / admin summary / notifications / audit`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
+4. 更新対象Query: `jobs / offers / partner summary / admin summary / notifications / audit`。
 
-**競合・失敗時**: 締切一致時は辞退/受諾を拒否して再取得。受諾直前のHQ取消とのCONFLICT競合は自動上書きしない。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
+**境界条件・失敗時**: 締切一致時は辞退/受諾を拒否して再取得。受諾直前のHQ取消とのCONFLICT競合は自動上書きしない。
 
-**監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
-
-**検証**: AT-P02-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
+**検証**: 追跡表のAT-P02配下（N/E/B・該当SRC/R01）と該当Sシナリオ。
 
 ### DD-P03 詳細
 
@@ -123,15 +119,13 @@ scope: frontend-demo-1A
 **処理手順**
 
 1. 希望枠と委託期間を確認 → 自社の有効技術者・資格・空き時間を検索 → 作業開始/終了を指定 → 割当確認 → 日程と担当を共有する。
-2. 保存または操作直前に次の業務ガードを実行する: 候補検索だけで権限判定を済ませず保存直前に所属・資格・期間を再照合。重複予定は警告し、同時間帯の確定重複は1Aでは保存拒否する。
-3. Assignment作成、scheduledSlot確定、Job assigned。再割当は旧割当を失効、元報告の著者を維持し変更理由を保存。
-4. 更新対象Query: `jobs / assignments / eligible members / schedule / notifications / audit`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
+2. 読取・操作に応じて次の業務条件を適用する: 候補検索だけで権限判定を済ませず保存直前に所属・資格・期間を再照合。重複予定は警告し、同時間帯の確定重複は1Aでは保存拒否する。
+3. 初回割当はAssignment作成、scheduledSlot確定、Job assigned。再割当は元のassigned/in_progressを維持し、旧割当を失効、元報告の著者を維持し変更理由を保存。
+4. 更新対象Query: `jobs / assignments / eligible members / schedule / notifications / audit`。
 
-**競合・失敗時**: 他社/無資格/委託外期間の割当を拒否。作業中の再割当は理由なしでは保存できず、旧技術者は直ちに変更操作不可。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
+**境界条件・失敗時**: 他社/無資格/委託外期間の割当を拒否。作業中の再割当は理由なしでは保存できず、旧技術者は直ちに変更操作不可。
 
-**監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
-
-**検証**: AT-P03-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
+**検証**: 追跡表のAT-P03配下（N/E/B・該当SRC/R01）と該当Sシナリオ。
 
 ### DD-P04 詳細
 
@@ -151,21 +145,19 @@ scope: frontend-demo-1A
 **処理手順**
 
 1. 案件から設備を開く → 場所・型番・保守範囲・通信状態・異常根拠を閲覧 → 案件へ戻る。
-2. 保存または操作直前に次の業務ガードを実行する: 診断に必要な値を読取専用表示。請求、支払い、他契約、全顧客履歴は取得しない。serialや場所は必要範囲に限定する。
+2. 読取・操作に応じて次の業務条件を適用する: 診断に必要な値を読取専用表示。請求、支払い、他契約、全顧客履歴は取得しない。serialや場所は必要範囲に限定する。
 3. 業務更新なし。委託終了後は顧客設備のlive値を表示せず、自社案件履歴の最小参照へ戻す。
-4. 更新対象Query: `なし（読取）`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
+4. 更新対象Query: `なし（読取）`。
 
-**競合・失敗時**: 画面を開いたまま期限を越えても次要求で拒否・キャッシュ破棄。監視値を見られることを制御権限と扱わない。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
+**境界条件・失敗時**: 画面を開いたまま期限を越えても次要求で拒否・キャッシュ破棄。監視値を見られることを制御権限と扱わない。
 
-**監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
-
-**検証**: AT-P04-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
+**検証**: 追跡表のAT-P04配下（N/E/B・該当SRC/R01）と該当Sシナリオ。
 
 ### DD-P05 詳細
 
 **一次資料との対応**: SRC-06 BIZ-12 → FR-P05 → DD-P05。出所区分: 制作方針 SRC-02＋設計補完。本節で具体化する設計補完: 報告の品質確認・差戻し。フィールド型・必須性・初期値・操作順序は実装提案。
 
-対象: FR-P05 / 主表示pattern: **UI-DETAIL / UI-FORM**。画面サービス境界は`jobs.get, jobs.review`。
+対象: FR-P05 / 主表示pattern: **UI-DETAIL / UI-FORM**。画面サービス境界は`jobs.get, jobs.review, reports.get, attachments.getContent`。
 
 **初期表示と前提**: submittedの自社委託案件。レビュー担当は報告作成者と異なる。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -179,15 +171,13 @@ scope: frontend-demo-1A
 **処理手順**
 
 1. 提出版の点検・写真・測定・作業・次回対応を確認 → 受理または差戻し理由を記入 → 技術者/顧客/HQへ結果を共有する。
-2. 保存または操作直前に次の業務ガードを実行する: 受理は必須点検の記録と根拠が揃うこと。未点検/対象外の理由が妥当か確認。レビュー担当は技術者の原記録を編集しない。
+2. 読取・操作に応じて次の業務条件を適用する: 受理は必須点検の記録と根拠が揃うこと。未点検/対象外の理由が妥当か確認。レビュー担当は技術者の原記録を編集しない。
 3. 受理でcompleted、差戻しでrework_requested。レビュー履歴を報告版へ紐付ける。完了時もAlertを自動解消しない。
-4. 更新対象Query: `jobs / reports / job events / notifications / audit`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
+4. 更新対象Query: `jobs / reports / job events / notifications / audit`。
 
-**競合・失敗時**: 自己承認、古いreportVersion、空の差戻し理由を拒否。差戻し後に古い受理操作が届いてもcompletedにしない。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
+**境界条件・失敗時**: 自己承認、古いreportVersion、空の差戻し理由を拒否。差戻し後に古い受理操作が届いてもcompletedにしない。
 
-**監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
-
-**検証**: AT-P05-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
+**検証**: 追跡表のAT-P05配下（N/E/B・該当SRC/R01）と該当Sシナリオ。
 
 ### DD-P06 詳細
 
@@ -207,15 +197,13 @@ scope: frontend-demo-1A
 **処理手順**
 
 1. 日付・資格・有効/失効を選ぶ → 自社技術者の割当と空き枠を確認 → 対象案件の割当へ進む。
-2. 保存または操作直前に次の業務ガードを実行する: 稼働率は割当時間/表示期間の設定作業可能時間で、分母未設定なら割合なし。個人の位置追跡・他社予定を表示しない。
+2. 読取・操作に応じて次の業務条件を適用する: 稼働率は割当時間/表示期間の設定作業可能時間で、4時間/8時間なら50%、分母未設定なら割合なし。個人の位置追跡・他社予定を表示しない。
 3. 閲覧だけで所属や資格を更新しない。所属変更はHQへ調整依頼。
-4. 更新対象Query: `members / assignments（閲覧）`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
+4. 更新対象Query: `members / assignments（閲覧）`。
 
-**競合・失敗時**: 会社IDをURLから書換えて他社名簿を取得できない。失効した技術者を候補として選べない。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
+**境界条件・失敗時**: 会社IDをURLから書換えて他社名簿を取得できない。失効した技術者を候補として選べない。
 
-**監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
-
-**検証**: AT-P06-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
+**検証**: 追跡表のAT-P06配下（N/E/B・該当SRC/R01）と該当Sシナリオ。
 
 ### DD-P07 詳細
 
@@ -232,20 +220,18 @@ scope: frontend-demo-1A
 | message | 文字列/必須 | 1〜2000文字 | 連絡内容 |
 | visibility | enum/必須 | internal/customer、初期internal | 公開範囲 |
 | recipientRole | enum/必須 | hq/assigned_technician/customer_contact | 宛先 |
-| channel | enum/必須 | inApp/email_preview/whatsapp_preview | 連絡手段 |
+| channel | enum/必須 | inApp/email/whatsapp（deliveryState=preview） | 連絡手段 |
 
 **処理手順**
 
 1. 案件履歴を開く → 日程調整/品質連絡テンプレートを選ぶ → メモ・宛先役割を確認 → in-app記録と外部送信プレビューを作成する。
-2. 保存または操作直前に次の業務ガードを実行する: 実送信はしない。宛先は該当案件のHQ/担当技術者/顧客窓口のみ。内部品質メモは顧客非公開を初期値とする。
+2. 読取・操作に応じて次の業務条件を適用する: 実送信はしない。宛先は該当案件のHQ/担当技術者/顧客窓口のみ。内部品質メモは顧客非公開を初期値とする。
 3. Noteを作者・公開範囲付きで保存。プレビュー操作だけではdeliveryStateをsentへ変更しない。
-4. 更新対象Query: `job notes / job events / notification previews / audit`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
+4. 更新対象Query: `job notes / job events / notification previews / audit`。
 
-**競合・失敗時**: 任意メール宛先・他案件の宛先・顧客請求の転記を拒否。保存失敗でメモを保持する。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
+**境界条件・失敗時**: 任意メール宛先・他案件の宛先・顧客請求の転記を拒否。保存失敗でメモを保持する。
 
-**監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
-
-**検証**: AT-P07-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
+**検証**: 追跡表のAT-P07配下（N/E/B・該当SRC/R01）と該当Sシナリオ。
 
 ### DD-P08 詳細
 
@@ -265,13 +251,11 @@ scope: frontend-demo-1A
 **処理手順**
 
 1. Membership確認 → 自社offer/委託/期間を確認 → 最小データを返す → 操作直前に再確認する。
-2. 保存または操作直前に次の業務ガードを実行する: live設備は受諾済みかつ期間内だけ。失効後の履歴は自社受諾/辞退/作業の最小記録で、過去アクセスを理由に顧客データ全件を返さない。
+2. 読取・操作に応じて次の業務条件を適用する: live設備は受諾済みかつ期間内だけ。失効後の履歴は自社受諾/辞退/作業の最小記録で、過去アクセスを理由に顧客データ全件を返さない。
 3. 拒否では業務変更0件。監査には秘密を含めず拒否理由コードを記録。session切替で旧Queryを破棄。
-4. 更新対象Query: `scope変更時に全旧cache`。読取だけのケースは業務mutationを発行しない。複数の表示状態は共有モックの遷移関数でまとめて更新する。
+4. 更新対象Query: `scope変更時に全旧cache`。
 
-**競合・失敗時**: 他社jobId、期限一致、未受諾の設備、請求変更、制限操作をそれぞれ拒否し、禁止対象のデータを応答へ含めない。 共通DomainErrorは[実装契約](implementation-contracts.md)の表示・再試行表へ変換する。CONFLICT後の再送は更新された対象を利用者が確認してから行う。
+**境界条件・失敗時**: 他社jobId、期限一致、未受諾の設備、請求変更、制限操作をそれぞれ拒否し、禁止対象のデータを応答へ含めない。
 
-**監査と通知**: 業務変更は`action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt`を記録。取得/検索は業務履歴へ成功イベントを乱造せず、アクセス拒否のみ監査対象とする。機能の通知先・公開タイミングは[通知・公開契約](implementation-contracts.md#通知と公開範囲)に従う。
-
-**検証**: AT-P08-N/E/Bと該当Sシナリオ。フォームの必須/最小/最大/境界直外を検証し、能力/担当期間の変化があるケースは保存直前にも検証する。
+**検証**: 追跡表のAT-P08配下（N/E/B・該当SRC/R01）と該当Sシナリオ。
 

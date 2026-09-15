@@ -1,6 +1,6 @@
 ---
 document_id: PREP-INTERNAL
-version: 0.5.0
+version: 0.6.0
 status: working-notes
 scope: frontend-only
 updated: 2026-09-15
@@ -24,8 +24,9 @@ updated: 2026-09-15
 | DEC-07 | PROPOSED | 共有メモリのデモRepository。再読込でseedに戻る。同一タブの役割切替で保持 | デモ操作説明、テスト。永続化・複数タブ同期は対象外 |
 | DEC-08 | PROPOSED | 音声は文字起こし・応答のシミュレーションが標準。実マイク不要 | FR-X02、同意・拒否デモ |
 | DEC-09 | PROPOSED | 49機能の入力・業務細則・出力・失敗を具体化。デモの時間/上限/受諾前projection/確定予定重複拒否等は[実装契約](../../02-design/implementation-contracts.md)と各DDを正とする | 本番の承認を意味しない。変更時は同じIDの要件・設計・AT-N/E/Bを更新 |
+| DEC-10 | PROPOSED | 1Aの再訪・複数資源・競合を具体化。再割当は状態維持、手動入金はinvoice起点、制限は原因請求全件入金で解除、解除は元の電源/温度を復元しない。試運転・画像は共有モックへ保持 | [DDC-08](../../02-design/implementation-contracts.md#ddc-08-複数資源再訪役割横断の契約)、AT-*-R01、該当FR/DD。企業の正式ルールではない |
 
-PROPOSEDの項目は人による業務承認済みではない。DEC-06の参考準拠方針は最新の明示指示に基づく。可逆的な1Aは提案基準で進行できる。
+PROPOSEDの項目は人による業務承認済みではない。DEC-06は過去の制作指示要約に記録されている。原指示メッセージは未収録であり、[指示の確認状態](../sources/production-instructions.md)を参照する。可逆的な1Aは提案基準で進行できる。
 
 
 ## 確認範囲の記録

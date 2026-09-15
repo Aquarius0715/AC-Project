@@ -1,6 +1,6 @@
 ---
 document_id: SDLC-001
-version: 0.5.0
+version: 0.6.0
 status: draft
 owner: orchestration-agent
 scope: frontend-demo-1A
@@ -22,7 +22,7 @@ scope: frontend-demo-1A
 
 各エージェントは[文書索引](../README.md)、[PrepareDocument](../00-prepare/PrepareDocument.md)、共通要件、共通設計、UIUX、本規約を読み、担当役割の要件・設計を追加する。全文を無条件に各タスクへ貼る代わりに、文書版・ファイル・IDを指定する。
 
-本版の引き渡しでは概要表だけを切り出さず、対象の`FR-番号`本文・`DD-番号 詳細`・[フロントエンド入出力契約](../02-design/implementation-contracts.md)・[操作カタログ](../02-design/operation-catalog.csv)・AT-N/E/Bと該当AT-*-SRCを渡す。UI担当は[参考デザイン分析](../00-prepare/reference-design-analysis.md)と抽出証跡も読む。
+本版の引き渡しでは概要表だけを切り出さず、対象の`FR-番号`本文・`DD-番号 詳細`・[フロントエンド入出力契約](../02-design/implementation-contracts.md)・[操作カタログ](../02-design/operation-catalog.csv)・追跡表のAT-N/E/Bと該当AT-*-SRC・AT-*-R01を渡す。UI担当は[参考デザイン分析](../00-prepare/reference-design-analysis.md)と抽出証跡も読む。
 
 ## 2. サイクルと品質ゲート
 
@@ -44,13 +44,13 @@ Prepare → 要件/設計 → 実装 → テスト → レビュー → 受入�
 
 通常の可逆的な設計・実装・テストはゲート条件を満たせばエージェント間で進める。各工程で人の確認を必須にしない。今回の依頼は文書作成まででありG2以降の実行は未着手。業務受入・本番公開・外部接続は別の判断である。
 
-G1の具体的チェック: 各機能に開始条件、型/必須/初期/制約を含む項目表、状態ガード、操作契約、保存後の更新、通知公開範囲、失敗回復、AT-N/E/Bがあること。UIの参考値と意図的補正が区別され、同じ条件の矛盾がないこと。概要の機能一覧だけでG1を合格にしない。
+G1の具体的チェック: 各機能に開始条件、型/必須/初期/制約を含む項目表、状態ガード、操作契約、保存後の更新、通知公開範囲、失敗回復、AT-N/E/Bがあること。UIの参考値と意図的補正が区別され、同じ条件の矛盾がないこと。概要の機能一覧だけでG1を合格にしない。対象のSRC/R01を含む受入subcaseの入力・期待値を実装前に固定し、manifestと仕様ファイルのSHA-256からspec_baseline_idを記録する。仕様変更時の証跡失効と再判定は検証計画に従う。
 
 ## 3. タスク分解と実行単位
 
 推奨順序: 共通基盤＋FR-X → S01設備操作 → S02社内保守＋S08外注 → S03請求・制限 → S04環境・自動運転 → S05エネルギー/MRV → S06 IoT → S07言語・音声 → 全体検証。
 
-1タスクは「要件ID・担当ファイル・受入条件・依存・対象外」が一意な範囲に切る。タスク状態はready→in_progress→in_review→done、依存不足はblocked。doneには証跡が必要。複数エージェントを使う場合、同じ共有schema・token・状態遷移を同時に別々に編集させない。オーケストレーションが単一ownerを割り当てる。
+1タスクは「要件ID・担当ファイル・受入条件・依存・対象外」が一意な範囲に切る。タスク状態はplanned→ready→in_progress→in_review→done、依存不足はblocked。差戻しはin_review→in_progress。blocked解除は依存・baseline再確認後にreadyへ戻す。doneには証跡が必要。複数エージェントを使う場合、同じ共有schema・token・状態遷移を同時に別々に編集させない。オーケストレーションが単一ownerを割り当てる。
 
 ## 4. 共通ガードレール
 
@@ -77,7 +77,9 @@ G1の具体的チェック: 各機能に開始条件、型/必須/初期/制約�
 
 ## 6. 成果物の契約
 
-全エージェントは[共通テンプレート](templates/artifacts.md)のtask packetとhandoffを使う。タスクID、参照版、要件/設計/試験ID、変更ファイル、実行コマンド、実結果、未決、次担当を必須とする。テスト結果は実装の同一リビジョンまたは差分ハッシュに紐付ける。未実行の試験にpassを記入しない。
+状態値は[成果物テンプレートの状態schema](templates/artifacts.md#状態schema)を正とし、task_statusとtest_resultとgate_resultを混在させない。
+
+全エージェントは[共通テンプレート](templates/artifacts.md)のtask packetとhandoffを使う。タスクID、参照版、要件/設計/試験ID、変更ファイル、実行コマンド、実結果、未決、次担当を必須とする。テスト結果は実装の同一リビジョンまたは差分ハッシュに加え、読み込んだ仕様ファイルのSHA-256 manifest（spec_baseline_id）に紐付ける。未実行の試験にpassedを記入しない。
 
 成果物配置案: `docs/04-agentic-sdlc/runs/<task-id>/`。タスクが実際に動いた時だけ生成し、今回架空の実行記録は作らない。最終報告はユーザー向けに簡潔にし、詳細証跡へのリンクを付ける。
 

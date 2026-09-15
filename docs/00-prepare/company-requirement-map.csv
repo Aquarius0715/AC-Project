@@ -1,7 +1,7 @@
 company_item_id,origin,source_id,source_locator,topic,request_nature,company_request_summary,frontend_interpretation,related_requirement_ids,coverage_note
 BIZ-01,企業原文,SRC-06,Sign In / Sign Out / Forget Password,共通利用,要望,サインイン、サインアウト、パスワード再設定,利用開始・終了・再設定の画面とデモ操作,FR-X01,FR-X01で画面・操作・受入条件を定義
 BIZ-02,企業原文,SRC-06,In any language text,言語,要望,任意の言語を選べる表示,言語切替と翻訳可能な画面構成。初期言語の範囲は別途設定,FR-X01;NFR-08,初期の英語・日本語は設計提案
-BIZ-03,企業原文,SRC-06,respond to voice ai,音声,要望,音声AIで応答・操作できること,音声入力・応答のデモとテキスト代替,FR-X02,実音声接続は対象外
+BIZ-03,企業原文,SRC-06,respond to voice ai,音声,要望,音声AIで応答できること,音声入力・応答のデモとテキスト代替。温度照会・機器操作への展開は設計提案,FR-X02,原文は機器変更操作までは明記していない。実音声接続は対象外
 BIZ-04,企業原文,SRC-06,For End Users/Clients / Technicians / Admin/HQ,利用者,要望,顧客、社内/外部技術者、管理者/HQの視覚的なダッシュボード,利用者ごとに必要な指標・状態・次の操作を表示,FR-C01;FR-P01;FR-T01;FR-A01;FR-A03;FR-X04,施工業者の独立はドキュメント作成者の制作方針
 BIZ-05,企業原文,SRC-06,For Split Unit Air Con (phase 1),段階開発,要望,分離型エアコンを先行し、最初にクリック可能なUI/UX、その後に全体ソリューション,分離型を対象とした画面・操作・模擬状態を設計,FR-X05;FR-X06;NFR-01;NFR-02;NFR-03;NFR-04;NFR-05;NFR-06;NFR-07,今回の成果物はフロントエンド文書
 BIZ-06,企業原文,SRC-06,For HVAC / any air con brands,将来対象,将来構想,HVACを第2段階とし、メーカーや分離型・中央空調・カセット型等へ対応拡大,機器種別・型番・対応機能を区別する画面設計,FR-T02;FR-A04;FR-X06,全メーカー対応の実証は対象外

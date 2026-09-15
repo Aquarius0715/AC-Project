@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTRACTS
-version: 0.5.0
+version: 0.6.0
 status: proposed-frontend-contract
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -57,15 +57,14 @@ type ServiceResult<T> = {
   data: T;
   meta: { correlationId: string; snapshotAt: string };
 };
-type ServiceErrorResult = {
-  error: {
-    code: string;
-    messageKey: string;
-    fieldErrors?: Record<string, string>;
-    correlationId: string;
-    retryAfterSeconds?: number;
-  };
-};
+// 失敗時はこの型を持つErrorをthrowし、Promiseをrejectする。
+interface DomainError extends Error {
+  code: string;
+  messageKey: string;
+  fieldErrors?: Record<string, string>;
+  correlationId: string;
+  retryAfterSeconds?: number;
+}
 ```
 
 型名は契約上の名前。TypeScript/Zodの実ファイルは実装工程で作る。mode/fan/levelの値はCapabilityの候補と一致し、単なるstringで任意入力を受け入れない。1Aは1回の確認送信につき1Action。複数Actionの一括操作・部分成功UIは今回の必須にしない。複数設備への制限は別のRestrictionユースケースで設備別Commandとして管理する。
@@ -99,13 +98,26 @@ type ServiceErrorResult = {
 
 画面は`commands.create`を呼び、モックはrequested状態を返す。要求時の室温28・確認済み設定26を保持し、合成した成功イベント後に設定24へ更新する。HTTP送信や機器接続は行わない。
 
+失敗は成功値として返さず、次の属性を持つDomainErrorでrejectする（以下はエラーの記録例）。
+
 ```json
 {
-  "error": {
-    "code": "CONFLICT",
-    "messageKey": "errors.resource_changed",
-    "correlationId": "corr-demo-002"
-  }
+  "name": "DomainError",
+  "message": "Resource changed",
+  "code": "CONFLICT",
+  "messageKey": "errors.resource_changed",
+  "correlationId": "corr-demo-002"
+}
+```
+
+全サービスの成功型は`Promise<ServiceResult<T>>`。操作カタログのresult_contractは包みの内側のTを表す。void操作も`ServiceResult<void>`を返す。失敗オブジェクトをresolveしない。Query hookは成功時の`result.data`を表示データとし、catchしたDomainErrorをDDC-03へ渡す。ローカル設定操作も同じ非同期規約に合わせる。
+
+```ts
+try {
+  const result = await commands.create(context, input, options);
+  showRequestedCommand(result.data); // requestedを表示し、機器成功とはしない
+} catch (error) {
+  showDomainError(asDomainError(error)); // 未知例外はUNAVAILABLEへ正規化
 }
 ```
 
@@ -121,10 +133,10 @@ CONFLICTは最新データを取得して利用者の確認後に新しい意思
 | UnitDetail | UnitSummary＋installedAt, components, serviceScope, capabilities, lastSeenAt, pendingCommandIds | capabilityと観測設定・要求設定を別プロパティ |
 | JobOfferSummary | jobId, offerId, type, regionLabel, requiredQualifications, requestedSlot, dueAt, offerExpiresAt, termsVersion | 未受諾業者には正確な住所・live telemetry・顧客請求を返さない |
 | JobSummary | id, version, unitRef, type, status, dueAt, requestedSlot, scheduledSlot, assignmentSummary, severity, isDemo | 内部Note・顧客請求なし。未受諾外注はJobOfferSummaryへ |
-| JobDetail | id, version, unitRef, type, status, requestedSlot, scheduledSlot, assignment, offer, reportRefs, costSummary, eventCursor | 顧客には内部Note・未受理報告を含めず、費用は顧客向け表示が許可されたものだけ |
+| JobDetail | id, version, unitRef, type, status, requestedSlot, scheduledSlot, assignment, offer, draftReportRef, reportRefs（reportId/reportVersion）, costSummary, eventCursor | 顧客には内部Note・未受理報告を含めず、費用は顧客向け表示が許可されたものだけ |
 | JobHistorySnapshot | jobId, type, status, contractorOrgId, completedAt, ownDecisionEvents, redactedReportSummary | 外部失効後のlive設備参照・顧客個人情報・新規制御は不可 |
 | InvoiceDetail | id, version, contractId, contractVersion, amountMinor, currency, dueAt, paymentState, paymentRefs, restrictionIds | 戻り値にカード情報なし。制限はrestrictionIdsまたはforInvoiceで取得 |
-| RestrictionDetail | id, version, contractId, rulesVersion, state, reason, executeAfter, graceUntil, exception, perUnitApply, perUnitRelease, events | 設備ごとにCommand ID・状態・最後の確認時刻 |
+| RestrictionDetail | id, version, contractId, causeInvoiceIds, rulesVersion, state, reason, executeAfter, graceUntil, exception, perUnitApply, perUnitRelease, events | 設備ごとにCommand ID・状態・最後の確認時刻 |
 | DeviceDetail | id, version, unitId, serial, connection, lastSeenAt, sensors, calibrationRefs, firmwareVersion, activeOperation | offline、power断、tamperを別軸 |
 | EnergySummary | period, unitIds, totals, baselineRef, factorRef, tariffRef, boundary, coverage, qualityWarnings | totalsの未算定値はnull。丸め前の計算値と表示桁を分離 |
 | AuditView | id, actorId, actorRoleAtTime, action, targetRef, occurredAt, correlationId, result, maskedBefore, maskedAfter, reason | 現在のMembership名で過去主体を上書きしない |
@@ -156,7 +168,7 @@ CONFLICTは最新データを取得して利用者の確認後に新しい意思
 | モックが返すDomainError | UI動作 | 入力・再試行 |
 |---|---|---|
 | VALIDATION | error summaryとfieldErrors、最初の欄へfocus | 値を保持して修正。無条件再送なし |
-| UNAUTHENTICATED | セッション終了とlogin | 旧スコープのQuery・機微な下書き/写真を破棄 |
+| UNAUTHENTICATED | セッション終了とlogin | 旧スコープのQuery・画面内の未保存下書き/写真・一時URLを破棄。保存済み報告/BlobはDDC-08に従い共有Repositoryに保持 |
 | FORBIDDEN | 操作不可と許可されたホーム/一覧へ | 権限変更時は対象データを破棄。繰返し再試行しない |
 | NOT_FOUND | 対象が利用できない旨と一覧へ | 存在を漏らす詳細を出さない |
 | CONFLICT | 変更発生の説明＋最新取得＋差分確認 | 自動上書きなし。変更意図を再確認して新規要求 |
@@ -267,3 +279,119 @@ MRV draftは`mrv.saveDraft`を呼ぶ。初回はモックが新IDを返し、編
 | offsets.preview / OffsetQuote | marketConcept: future_concept・未選定・未検証・未接続 | DD-C13、DD-A15 |
 
 上記の表示変換はfeatureの純粋関数に集約し、mock adapterは正常・欠落・失敗の合成結果を返す。実API導入時にはadapterがこの画面モデルへ変換する。画面から外部APIへ直接接続しない。
+
+## DDC-08 複数資源・再訪・役割横断の契約
+
+以下はDEC-10の1A設計提案。企業の商用ルールを確定するものではない。各DDの入出力・事後条件に適用する。全操作は明示した資源IDと現在のDemoViewContextで認可し、画面の「選択中ID」を暗黙参照しない。カタログの入力に加え、サービスの第1引数にcontextを、最後の引数のread options（{signal?: AbortSignal}）にAbortSignalを渡せる。更新のDemoWriteOptionsはカタログ記載位置で渡す。
+
+### 1. 読取・履歴・添付
+
+| 操作 | 読取・更新の意味 | 権限・再訪時の扱い |
+|---|---|---|
+| policies.list/get | Policyはid/version/kind(alert/automation/air_quality)/unitIds/enabledと、該当DDの入力項目を保持。getは保存した現在版を返す | alertはalert.policy.manage、automationとair_qualityはautomation.policy.manage。対象内でのみ閲覧・更新。再訪時はgetでフォーム初期化 |
+| jobs.get | draftReportRefとreportRefsはreportId/reportVersionの組。未作成draftはnull | 技術者の初回draftはjobId付きsaveDraftでIDを生成。既存draftはreports.getで再開する |
+| reports.get | jobId/reportId/reportVersionがすべて一致するWorkReportを返す。items/measurements/parts/workText/nextAction/attachmentRefsと作者・版・提出/受理情報を含む | 有効担当は自案件draft/提出版、品質担当は提出版、顧客は受理済み版のみ。旧版は不変。外部委託失効後はJobHistorySnapshotのみで本文取得を拒否 |
+| attachments.add | 作成済みdraftのjobId/reportIdにJPEG/PNGを追加。MIME・内容・サイズ・枚数を検証し、BlobとAttachmentを同じモック内で保持 | 技術者の有効担当かつ編集可能draftだけ。Attachmentはid/jobId/reportId/blobId/name/mime/size/statusを持つ |
+| attachments.getContent | 指定のreportVersionに紐付くattachmentIdのBlobを返す。URLは返さない | reports.getと同じ公開判定。画面がURL.createObjectURLで一時URLを作り、離脱・切替でrevoke。再訪時に再取得・再生成 |
+| inquiries.list | 顧客は自分のinvoiceId/restrictionIdに紐付くInquiry、HQはbilling.manageの管理範囲を返す | 顧客はreceived/answeredとreplyを閲覧。回答通知のtargetIdから同じ請求画面を開き、inquiryIdで対象を選ぶ。別顧客の回答を返さない |
+| devices.addResponseNote | deviceId/eventIdにresponseNote（1〜1000文字）を作者・時刻・相関ID付きで追記 | device.maintainと有効担当が必要。確認メモは接続状態やtamperを変更しない。復旧は/demoの独立イベント |
+
+画像本体は共有Repositoryの`Map<blobId, Blob>`に保持する。サインアウトや役割切替で共有Blobを消さない。未保存のローカル選択画像は離脱時に破棄できる。draftからの写真削除はjobs.saveDraftのattachmentIds差分で表し、提出済み旧版で参照されるBlobは残す。参照がなくなったBlobは解放し、resetでは全Blob・全一時URLを解放する。提出失敗で本文や保存済み画像が失われない。
+
+`WorkReportDraft`の入力はjobId、reportId?（初回なし）、items、measurements、parts、workText、nextAction、attachmentIds。初回応答にreportId/versionを返し、更新はexpectedVersion必須。ドラフトでは未完了項目を許容し、submitで各DDの必須項目を検証する。提出版・旧版を直接編集しない。再作業や再割当では旧版を参照して新draft版を作り、旧版と各記録の作者を維持する。
+
+### 2. 試運転
+
+```ts
+type CreateDiagnosticRunInput = {
+  jobId: string;
+  unitId: string;
+  startAction: UnitAction;
+  endAction: UnitAction;
+  durationMinutes: number; // 整数1〜15
+  reason: string;          // 1〜1000文字
+  expectedUnitVersion: number;
+  expectedJobVersion: number;
+};
+type DiagnosticRun = {
+  id: string; tenantId: string; version: number;
+  jobId: string; unitId: string; actorMembershipId: string;
+  startAction: UnitAction; endAction: UnitAction;
+  durationMinutes: number; reason: string;
+  state: 'awaiting_start' | 'running' | 'end_requested' |
+         'completed' | 'start_failed' | 'end_failed' | 'end_blocked';
+  startCommandId: string; endCommandId: string | null;
+  startedAt: string | null; endAt: string | null;
+  failureCode: string | null;
+};
+```
+
+通常の1回の診断操作はcommands.create。時間付き試運転はdiagnosticRuns.createがrunと開始Commandを作り、getが同じrunを返す。create時は両actionの能力・制限・control.diagnose・有効担当・online・FW非更新を検証する。同一設備の進行中run（awaiting_start/running/end_requested）または未完了CommandがあればCONFLICT。start_failed/end_failed/end_blockedは履歴上の終了状態で、状態再照会後の明示的な復旧操作を妨げない。開始/終了CommandはdiagnosticRunIdを持つ。
+
+| 現状態 | イベント | 次状態・結果 |
+|---|---|---|
+| awaiting_start | 開始Commandが期限内acknowledged | running。startedAtは応答時刻、endAt=startedAt+durationMinutes |
+| awaiting_start | 開始失敗・30秒期限超過 | start_failed。終了タイマーなし。開始済みと表示しない |
+| running | now>=endAt、元の担当・権限・現能力・制限・onlineを再確認して終了要求 | end_requested。endActionのCommandを1件作成 |
+| running | 終了時に担当失効・権限剥奪・能力/制限変更・FW競合 | end_blocked。要求0件、未停止/要確認の注意をHQと技術者へ表示 |
+| running | 終了時にoffline | end_failed。未停止/要確認と再照会導線。成功表示なし |
+| end_requested | 終了Commandの期限内acknowledged | completed。応答したendActionの観測値を表示。「停止済み」はendActionが電源OFFの場合だけ |
+| end_requested | 失敗・期限超過 | end_failed。終了を確認できない旨とCommand履歴を保持 |
+
+create時に`now+30秒+duration < 担当validUntil`を要求し、通常の実行中に期限が切れる予定を拒否する。それでも途中の失効・剥奪は終了時に再判定する。終了不能の復旧は現在の権限を満たす担当の明示的な診断操作から行い、自動再送しない。旧runの失敗履歴をcompletedへ改変しない。
+
+タイマーは画面ではなく共有モック時計の購読として保持する。サインアウト・画面離脱・役割切替は閲覧要求だけ中断し、受理済みrunの業務イベントは継続する。実行主体は作成時Membershipを使って現在権限を再評価し、切替先主体へ置換しない。resetのRepository generation変更だけで旧runと旧イベントを破棄する。
+
+### 3. 手動入金と複数請求
+
+- `payments.confirm(paymentId, ...)`は既存processing Paymentをconfirmedにする。`payments.recordManual(invoiceId, ...)`はPaymentのない/失敗履歴だけがあるunpaid請求へ、method=nullのconfirmed Paymentを新規作成する。両操作はbilling.manageが必要。
+- recordManualの金額は請求全額、通貨は請求通貨と一致、reasonは1〜1000文字、paymentReferenceは1〜128文字。processing PaymentがあればCONFLICTとし、結果確定後に再照会する。paidには新しい入金を作らない。
+- 同一tenant/invoice/reference・同一金額/通貨の再確認は、expectedVersion判定より先に既存の成功結果を返す。参照を別請求に流用、または同参照の金額変更はCONFLICT。新しい意思の別キーでも二重入金を拒否する。
+- Payment confirmed、Invoice paid、監査・通知・関連制限の評価を同じモック遷移で更新する。顧客カード成功イベントも同じ確定関数を使う。決済シミュレーションと手動確認の競合では、一方だけが確定する。
+- InvoiceのpaymentMethod/paymentStatusは最新Paymentのmethod/statusから導出。失敗したカードの後に手動入金が確定した場合、現在方法はnull、過去カード種別は履歴に残す。paymentRefsはid/version/method/status/reference/confirmedAtを表示に必要な範囲で返す。
+
+制限作成時の`causeInvoiceIds`は、同じ契約にある期限超過かつ未入金の請求全件を列挙し、空集合を拒否する。作成時にモックで再計算して入力集合と一致を確認し、以後は固定する。契約・顧客・通貨を照合し、別契約の請求を混ぜない。`restrictions.forInvoice`はこの集合の包含で検索する。
+
+原因請求全件がpaidのときだけ自動的にscheduledをcancelled、requested/appliedをrelease_requestedへ進める。1件だけ入金なら適用状態を維持し、原因請求の未入金件数を表示する。processingはpaidではない。後から発行した請求を既存の予告へ自動追加しない。
+
+1Aは1設備につき進行中制限（scheduled/requested/applied/release_requested）を1件に限定し、重なる新規scheduleをCONFLICTで拒否する。既存制限がcancelled/releasedになった後、新たな原因請求に対して別IDの予告を作れる。手動解除はrestriction.override、適用後の猶予・例外に伴う解除はrestriction.manageにより許可する提案で、いずれもInvoiceを変更しない。release操作は未入金が残れば拒否し、例外操作の権限経路と混同しない。
+
+### 4. 制限Commandと解除の観測値
+
+```ts
+type RestrictionPolicy =
+  | { kind: 'temperature_limit'; minimumCoolingSetpoint: number }
+  | { kind: 'power_off' };
+type RestrictionAction =
+  | { kind: 'apply_restriction'; restrictionId: string;
+      rulesVersion: string; policy: RestrictionPolicy }
+  | { kind: 'remove_restriction'; restrictionId: string;
+      rulesVersion: string };
+```
+
+RestrictionActionは共有モックのrestriction遷移だけが作る内部actionで、commands.create、音声、顧客automation、診断から受け付けない。Command.actionはUnitActionまたはRestrictionAction。機器確認状態に`observedRestriction: {restrictionId, rulesVersion, policy} | null`と確認時刻を持ち、通常の設定値と分離する。
+
+| 応答したaction | 確認済みの状態変化 | 変化させない値 |
+|---|---|---|
+| temperature_limit適用 | observedRestrictionへ保存。設定温度が下限未満なら下限へ上げ、下限以上なら維持 | 電源状態・室温は変更しない |
+| power_off適用 | observedRestrictionへ保存し、確認済み電源をOFFへ | 設定温度・室温は変更しない |
+| remove_restriction | 対象ID/版のobservedRestrictionをnullへ。通常操作を再び許可 | 自動ON・適用前温度の復元は行わず、解除時点の電源・設定温度を維持 |
+
+応答前は観測値を変更しない。ただし適用要求中/解除要求中も、通常操作のpolicyでは制限を保持して迂回を防ぐ。解除は同じrestrictionId・版・Command IDへの成功応答と観測nullの照合で設備別完了とし、全台完了時だけreleased。適用要求が未確定なら解除意思だけ保持し、適用結果を照会後にremoveを送る。遅い適用イベントでrelease_requestedをappliedへ戻さない。
+
+### 5. 用語と入力型の共通規則
+
+正規名はUnitAction、parentSpaceId、planType=rto、channel=inApp/email/whatsapp、証明参照接頭辞DEMO-。preview/simulated/failedはdeliveryStateで表し、channel値に混ぜない。UIの「RTO」「顧客」「HQ」は翻訳ラベルで、保存enumとは分ける。
+
+各`*Input`は対応DDの入力欄を名前付きプロパティとして持つ。save操作は新規id省略/既存id必須とし、既存更新はexpectedVersion必須。PolicyInputはkindを判別子にし、DD-A05/A11/A12をそれぞれ別schemaにする。AutomationInputはschedule（DD-C04）とevent（DD-C05）をkindで区別し、共通にid?/name/unitIds/timezone/enabled/priority（既定50）を持つ。event条件はoccupancy={occupied:boolean}、location={event:arrival/departure}、pattern={localTime:HH:mm}、weather={metric:temperature_c,operator:gt/gte/lt/lte,value:number}。HQ条件はoccupancy同型、tariff={operator,value,unit:MYR_per_kWh}、peak={active:boolean}、solar/battery={operator,value,unit:kW}のデモに限定し、欠測を成立としない。
+
+ListQueryのfilters/sortは各DDの検索項目名に限定する。追加の共通filterはtenant由来のscope、resource ID、kind、enabled、from/to。sortはcreatedAt/updatedAt/name/statusを当該モデルが持つ場合だけasc/descで指定し、既定はid昇順。不明キーはVALIDATION。任意のsort式を受け入れない。
+
+
+## DDC-09 共通の監査・試験規則
+
+業務変更はaction / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAtを記録する。取得成功だけで業務履歴を増やさず、アクセス拒否は内容をマスクして記録する。通知先・公開タイミングは本書「通知と公開範囲」に従う。読取専用画面はmutationを行わず、入力フォームがある操作だけ必須・文字数・境界を検証する。保存直前の認可・版照合、失敗回復はDDC-03を共通適用する。
+
+MRV確認は同じreportId/reportVersion・同じコメントの再送なら既存結果を返し、履歴を追加しない。異なるコメントで同じ確認済み版を変更しようとした場合はCONFLICT。改版後の報告を改めて確認する。
+
+顧客メモはvisibility=customerのみ、業者メモはinternal/customerを指定できる。notifications.previewのrecipientRoleはjobIdの関係者から解決し、internalならcustomer_contactへの公開を拒否する。任意アドレスや請求レコード参照の転記を許可しない。自由文の内容を完全に自動検出できるという保証はせず、デモの架空データのみを使用する。

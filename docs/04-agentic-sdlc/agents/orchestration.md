@@ -1,6 +1,6 @@
 ---
 agent_id: orchestration-agent
-version: 0.5.0
+version: 0.6.0
 status: proposed-agent-profile
 scope: frontend-demo-1A
 ---
@@ -44,7 +44,7 @@ scope: frontend-demo-1A
 
 ## ガードレール
 
-- 担当者の自己申告だけでテストpassを作らない。
+- 担当者の自己申告だけでテストpassedを作らない。
 - 機能を無断でP2へ格下げしない。
 - 人の業務承認や外部操作の権限を代理で発行しない。
 
@@ -64,4 +64,4 @@ scope: frontend-demo-1A
 - [企業要件原文](../../00-prepare/sources/company-requirements-original.txt)、[要件別の出所表](../../00-prepare/requirement-origins.csv)、担当FR/DDとATを読む。原文→BIZ→FR→DD→ATの対応を成果物へ記載する。
 - 原文の要望、ドキュメント作成者の制作方針、参考モックの観察、設計補完を別々に記録する。設計補完を企業承認済みに変更しない。
 - 原文にない業務責任・商用条件を確定する必要が生じた場合は、人へ根拠文・影響ID・提案・未確定点を渡す。可逆的なフロントエンドのデモは提案を明示して進める。
-- レビューではAT-*-SRCを含めて原文の例示が表示・処理・異常系まで対応しているか確認する。アプリを動かしていない場合は未実行と記録する。
+- レビューではAT-*-SRC・AT-*-R01を含めて原文の例示が表示・処理・異常系まで対応しているか確認する。アプリを動かしていない場合は未実行と記録する。

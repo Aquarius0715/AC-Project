@@ -49,7 +49,7 @@ FR-A14,企業原文 SRC-06＋設計補完,BIZ-25,Digital MRV / Scope 2 Emission 
 FR-A15,企業原文 SRC-06＋設計補完,BIZ-24;BIZ-26,How do you offset carbon / exchange and/or offset; Tokenized Carbon Offsets / with API to real time carbon trading platforms,模擬償却・市場構想のプレビュー
 FR-A16,企業原文 SRC-06＋設計補完,BIZ-20,gadget to be small / firmware / stolen and/or removed,監査フィルター・相関ID
 FR-X01,企業原文 SRC-06＋設計補完,BIZ-01;BIZ-02,Sign In / Sign Out / Forget Password; In any language text,4役割デモ・初期en/ja・再設定文言
-FR-X02,企業原文 SRC-06＋設計補完,BIZ-03,respond to voice ai,音声デモとテキスト代替・変更確認
+FR-X02,企業原文 SRC-06＋設計補完,BIZ-03,respond to voice ai,音声応答から温度照会・機器操作・問い合わせへの展開、音声デモとテキスト代替・変更確認
 FR-X03,企業原文 SRC-06＋設計補完,BIZ-09;BIZ-18,Signals & Notifications; How do you calculate the CO2 and air quality,色の意味・単位・品質・非色表現
 FR-X04,設計補完（企業目的に対応）,BIZ-04,For End Users/Clients / Technicians / Admin/HQ,役割・担当・期間・能力の表示制限
 FR-X05,企業原文 SRC-06＋設計補完,BIZ-05,For Split Unit Air Con (phase 1),共有モック・リセット・実処理の区別

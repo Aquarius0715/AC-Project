@@ -4,7 +4,8 @@ alerts.acknowledge,"alertId,expectedVersion,idempotencyKey",Alert,DD-T07;DD-T12,
 alerts.get,id,Alert,DD-T07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 alerts.list,ListQuery,Page<Alert>,DD-A05;DD-C01;DD-C08;DD-P04;DD-T01;DD-T07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 alerts.resolve,"alertId,resolutionReason,resolutionEvidenceIds,DemoWriteOptions",Alert,DD-T07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-attachments.add,"JPEG/PNG file,DemoWriteOptions",Attachment,DD-T09,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+attachments.add,"jobId,reportId,JPEG/PNG file,DemoWriteOptions",Attachment,DD-T09,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+attachments.getContent,"jobId,reportId,reportVersion,attachmentId",Blob,DD-A06;DD-C09;DD-P05;DD-T09,mock-service,DDC-08および対応DDの対象・版・権限・状態を照合,DDC-03のDomainError。readは再照会、writeは同じ意思だけ同一キーで再試行
 audit.list,ListQuery,Page<AuditView>,DD-A10;DD-A16,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 auth.previewPasswordReset,demoEmail,ResetPreview,DDC-07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 automations.list,ListQuery,Page<Automation>,DD-C04,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
@@ -12,13 +13,13 @@ automations.save,AutomationInput + DemoWriteOptions,Automation,DD-C04;DD-C05,moc
 automations.simulate,"automationId or policyId,simulationEvent,evaluateOnly",SimulationResult,DD-A11;DD-A12;DD-C04;DD-C05,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 baselines.list,ListQuery,Page<EnergyBaseline>,DD-A13;DD-C06,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 baselines.save,EnergyBaselineInput + DemoWriteOptions,EnergyBaseline,DD-A13,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-capabilities.list,ListQuery,Page<Capability>,DD-A04,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+capabilities.list,ListQuery,Page<Capability>,DD-A02;DD-A04,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 capabilities.save,CapabilityInput + DemoWriteOptions,Capability,DD-A04,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 commands.create,CreateCommandInput + DemoWriteOptions,Command,DD-C03;DD-C07;DD-T10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-commands.get,id,Command,DD-A09;DD-C03;DD-C12;DD-T10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+commands.get,id,Command,DD-A09;DD-A12;DD-C03;DD-C07;DD-C12;DD-T10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 consents.get,purpose,Consent,DD-C05,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 consents.update,"purpose,granted,DemoWriteOptions",Consent,DD-C05,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-contracts.list,ListQuery,Page<Contract>,DD-A07;DD-C10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+contracts.list,ListQuery,Page<Contract>,DD-A07;DD-A08;DD-C10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 contracts.save,ContractInput + DemoWriteOptions,Contract,DD-A07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 customers.list,ListQuery,Page<Customer>,DD-A02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 customers.save,CustomerInput + DemoWriteOptions,Customer,DD-A02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
@@ -27,6 +28,7 @@ demo.trigger,"scenarioId,eventType,payload",DemoEvent,DDC-07,mock-service,フロ
 demoSession.signIn,"demoActorId,returnTo?",Session,DDC-07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 demoSession.signOut,none,void,DDC-07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 demoSession.switchMembership,demoMembershipId,Session,DDC-07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+devices.addResponseNote,"deviceId,eventId,responseNote,DemoWriteOptions",DeviceEvent,DD-T12,mock-service,DDC-08および対応DDの対象・版・権限・状態を照合,DDC-03のDomainError。readは再照会、writeは同じ意思だけ同一キーで再試行
 devices.bind,"deviceId,unitId,reason?,DemoWriteOptions",Device,DD-T11,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 devices.calibrate,"CalibrationInput,DemoWriteOptions",CalibrationRecord,DD-T11,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 devices.check,"id,DemoWriteOptions",DeviceOperation,DD-T11,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
@@ -34,24 +36,26 @@ devices.events,"id,ListQuery",Page<DeviceEvent>,DD-A16;DD-T12,mock-service,フ�
 devices.get,id,DeviceDetail,DD-T11;DD-T12,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 devices.list,ListQuery,Page<Device>,DD-A04;DD-T02;DD-T11,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 devices.register,"serial,sensorTypes,DemoWriteOptions",Device,DD-T11,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-devices.updateFirmware,"firmwareVersion,DemoWriteOptions",DeviceOperation,DD-T11,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+devices.updateFirmware,"deviceId,firmwareVersion,DemoWriteOptions",DeviceOperation,DD-T11,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+diagnosticRuns.create,CreateDiagnosticRunInput + DemoWriteOptions,DiagnosticRun,DD-T10,mock-service,DDC-08および対応DDの対象・版・権限・状態を照合,DDC-03のDomainError。readは再照会、writeは同じ意思だけ同一キーで再試行
+diagnosticRuns.get,diagnosticRunId,DiagnosticRun,DD-T10,mock-service,DDC-08および対応DDの対象・版・権限・状態を照合,DDC-03のDomainError。readは再照会、writeは同じ意思だけ同一キーで再試行
 energy.summary,"unitIds,from,to,baselineId?,tariffVersion?",EnergySummary,DD-A13;DD-C06;DD-C13,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 factors.list,ListQuery,Page<EmissionFactor>,DD-A14,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 factors.save,EmissionFactorInput + DemoWriteOptions,EmissionFactor,DD-A14,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 inquiries.answer,"inquiryId,reply,DemoWriteOptions",Inquiry,DD-A08,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 inquiries.create,"invoiceId?,restrictionId?,subjectType,message,DemoWriteOptions",Inquiry,DD-C12,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-inquiries.list,ListQuery,Page<Inquiry>,DD-A08,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+inquiries.list,ListQuery,Page<Inquiry>,DD-A08;DD-C12,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 invoices.create,"contractId,contractVersion,period,amountMinor,currency,dueAt,DemoWriteOptions",Invoice,DD-A08,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 invoices.get,id,InvoiceDetail,DD-C11,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 invoices.list,ListQuery,Page<Invoice> (paymentMethod/paymentStatusを表示用に含む),DD-A08;DD-C10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.accept,"jobId,offerId,termsVersion,DemoWriteOptions",MaintenanceJob,DD-P02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-jobs.addNote,"message,visibility,DemoWriteOptions",JobNote,DD-C09;DD-P07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+jobs.addNote,"jobId,message,visibility,DemoWriteOptions",JobNote,DD-C09;DD-P07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.assign,"jobId,technicianMembershipId,startAt,endAt,reason?,DemoWriteOptions",MaintenanceJob,DD-A06;DD-P03,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.cancel,"jobId,cancelReason,DemoWriteOptions",MaintenanceJob,DD-A06;DD-C09,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-jobs.create,"unitId,type,symptom,requestedStart,requestedEnd,dueAt?,DemoWriteOptions",MaintenanceJob,DD-A06;DD-C09,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+jobs.create,"unitId,type,symptom,requestedStart,requestedEnd,contactWindow?,dueAt?,DemoWriteOptions",MaintenanceJob,DD-A06;DD-C09,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.decline,"jobId,offerId,reason,DemoWriteOptions",MaintenanceJob,DD-P02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.events,"jobId,ListQuery",Page<JobEvent>,DD-P07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-jobs.get,id,JobDetail | JobOfferSummary | JobHistorySnapshot (scope dependent),DD-A06;DD-C09;DD-P01;DD-P02;DD-P05;DD-P08;DD-T04;DD-T05;DD-T06;DD-T08,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+jobs.get,jobId,JobDetail | JobOfferSummary | JobHistorySnapshot (scope dependent),DD-A06;DD-C09;DD-P01;DD-P02;DD-P05;DD-P08;DD-T04;DD-T05;DD-T06;DD-T08;DD-T09;DD-T10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.hold,"jobId,reason,DemoWriteOptions",MaintenanceJob,DD-A06,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.list,ListQuery,Page<JobSummary | JobOfferSummary>,DD-A06;DD-C09;DD-P01;DD-P03;DD-P06;DD-T01,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.offer,"jobId,contractorOrgId,offerExpiresAt,accessValidFrom,accessValidUntil,termsVersion,DemoWriteOptions",MaintenanceJob,DD-A06,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
@@ -61,32 +65,36 @@ jobs.saveCost,"jobId,costLines[{kind,amountMinor,currency,description}],DemoWrit
 jobs.saveDraft,WorkReportDraft + DemoWriteOptions,WorkReportDraft,DD-T04;DD-T05;DD-T06;DD-T09,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.start,"jobId,startConfirmed,DemoWriteOptions",MaintenanceJob,DD-T08,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.submit,"jobId,reportVersion,DemoWriteOptions",MaintenanceJob,DD-T04;DD-T05;DD-T06;DD-T08;DD-T09,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-members.eligible,"jobId,startAt,endAt",Page<Membership>,DD-P03,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+members.eligible,"jobId,startAt,endAt",Page<Membership>,DD-A06;DD-P03,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 members.list,ListQuery,Page<Membership>,DD-A03;DD-P06,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 members.save,MembershipInput + DemoWriteOptions,Membership,DD-A03,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 mrv.get,id,MRVReport,DD-A14,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 mrv.list,ListQuery,Page<MRVReport>,DD-A14,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 mrv.preview,MRVConditions,MRVPreview,DD-A14,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-mrv.recordReview,"reportVersion,reviewComment,DemoWriteOptions",MRVReport,DD-A14,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+mrv.recordReview,"reportId,reportVersion,reviewComment,DemoWriteOptions",MRVReport,DD-A14,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 mrv.saveDraft,"id?,MRVDraft,DemoWriteOptions",MRVReport,DD-A14,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 notifications.list,ListQuery;unreadOnly,Page<Notification>,DD-C08;DDC-07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 notifications.markRead,"id,DemoWriteOptions",Notification,DD-C08,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-notifications.preview,"targetId,templateKey,params,channel",NotificationPreview,DD-A05;DD-A08;DD-C11;DD-P07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+notifications.preview,"targetId,templateKey,params,channel,recipientRole?",NotificationPreview,DD-A05;DD-A08;DD-C11;DD-P07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 offsets.list,ListQuery,Page<OffsetRecord>,DD-A15;DD-C13,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-offsets.preview,"amountKg,period,unitIds",OffsetQuote,DD-A15;DD-C13,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+offsets.preview,"customerId（顧客はsession由来）,purpose,amountKg,period,unitIds",OffsetQuote,DD-A15;DD-C13,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 offsets.simulate,"quoteId or recordId,event=request/purchase_confirm/retire/fail,demoConfirmed,DemoWriteOptions",OffsetRecord,DD-A15;DD-C13,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-organizations.list,ListQuery,Page<Organization>,DD-A02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+organizations.list,ListQuery,Page<Organization>,DD-A02;DD-A06,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 organizations.save,OrganizationInput + DemoWriteOptions,Organization,DD-A02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 payments.confirm,"paymentId,paymentReference,confirmedAmountMinor,currency,reason,DemoWriteOptions",Payment,DD-A08,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+payments.recordManual,"invoiceId,paymentReference,confirmedAmountMinor,currency,reason,DemoWriteOptions",Payment,DD-A08,mock-service,DDC-08および対応DDの対象・版・権限・状態を照合,DDC-03のDomainError。readは再照会、writeは同じ意思だけ同一キーで再試行
 payments.simulate,"invoiceId,method,event=initiate/processing/confirm/fail,demoConfirmed,DemoWriteOptions",Payment,DD-C11,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 plans.generateNext,"id,occurrenceDate,DemoWriteOptions",MaintenanceJob,DD-A06,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 plans.save,"unitId,recurrence,nextDueAt,DemoWriteOptions",MaintenancePlan,DD-A06,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+policies.get,policyId,Policy,DD-A05;DD-A11;DD-A12,mock-service,DDC-08および対応DDの対象・版・権限・状態を照合,DDC-03のDomainError。readは再照会、writeは同じ意思だけ同一キーで再試行
+policies.list,ListQuery（kind/対象設備で絞込）,Page<Policy>,DD-A05;DD-A11;DD-A12,mock-service,DDC-08および対応DDの対象・版・権限・状態を照合,DDC-03のDomainError。readは再照会、writeは同じ意思だけ同一キーで再試行
 policies.save,PolicyInput + DemoWriteOptions,Policy,DD-A05;DD-A11;DD-A12,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 preferences.get,none,Preferences,DDC-07,local-preference,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 preferences.update,"locale,timezone,currency",Preferences,DDC-07,local-preference,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 properties.archive,"id,reason,DemoWriteOptions",ArchivedResource,DD-C02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-properties.list,ListQuery,Page<Property>,DD-C02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+properties.list,ListQuery,Page<Property>,DD-A02;DD-C02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 properties.save,PropertyInput + DemoWriteOptions,Property,DD-A02;DD-C02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+reports.get,"jobId,reportId,reportVersion",WorkReport,DD-A06;DD-C09;DD-P05;DD-T04;DD-T05;DD-T06;DD-T08;DD-T09,mock-service,DDC-08および対応DDの対象・版・権限・状態を照合,DDC-03のDomainError。readは再照会、writeは同じ意思だけ同一キーで再試行
 restrictions.cancel,"restrictionId,reason,DemoWriteOptions",Restriction,DD-A10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 restrictions.defer,"restrictionId,until,reason,DemoWriteOptions",Restriction,DD-A10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 restrictions.execute,"restrictionId,confirmedRulesVersion,DemoWriteOptions",Restriction,DD-A09,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
@@ -95,16 +103,16 @@ restrictions.forInvoice,invoiceId,Page<RestrictionDetail>,DD-C12,mock-service,�
 restrictions.get,id,RestrictionDetail,DD-A09;DD-A10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 restrictions.list,ListQuery,Page<RestrictionDetail>,DD-A09,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 restrictions.override,"restrictionId,reason,DemoWriteOptions",Restriction,DD-A10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-restrictions.release,"restrictionId,paymentId,DemoWriteOptions",Restriction,DD-A09,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-restrictions.schedule,"contractId,unitIds,policy,noticeAt,executeAfter,reason,rulesVersion,DemoWriteOptions",Restriction,DD-A09,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+restrictions.release,"restrictionId,DemoWriteOptions（原因請求全件の入金を再照合）",Restriction,DD-A09,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+restrictions.schedule,"contractId,causeInvoiceIds,unitIds,policy,noticeAt,executeAfter,reason,rulesVersion,DemoWriteOptions",Restriction,DD-A09,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 session.get,none,Session,DD-P08,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 spaces.archive,"id,reason,DemoWriteOptions",ArchivedResource,DD-C02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-spaces.list,ListQuery,Page<Space>,DD-C02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+spaces.list,ListQuery,Page<Space>,DD-A02;DD-C02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 spaces.save,SpaceInput + DemoWriteOptions,Space,DD-A02;DD-C02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 telemetry.series,"scope,unitIds,metric?,from,to",Page<Measurement>,DD-C07;DD-T03;DD-A12,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 telemetry.summary,"scope,unitIds,metric?,from,to",TelemetrySummary,DD-C01;DD-P04;DD-T03,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 units.archive,"id,reason,DemoWriteOptions",ArchivedResource,DD-A02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-units.get,id,UnitDetail,DD-A02;DD-C03;DD-C07;DD-P04;DD-T02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+units.get,id,UnitDetail,DD-A02;DD-A12;DD-C03;DD-C07;DD-P04;DD-T02;DD-T10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 units.list,ListQuery,Page<UnitSummary>,DD-A02;DD-C01;DD-C02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 units.save,ACUnitInput + DemoWriteOptions,ACUnit,DD-A02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 voice.resolveIntent,"text,locale",ResolvedIntent | CandidateTargets,DDC-07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照

@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.5.0
+version: 0.6.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -69,12 +69,12 @@ loadingは骨格表示、emptyは説明と許可された次アクション、er
 | ACUnit / Capability | spaceId, manufacturer, model, type(split), installedAt, serviceScope / temperature(min,max,step), modes[], fanLevels[], ventilation, control, sensors[] |
 | Device / Sensor | unitId, serial, connection(online/offline/unknown), lastSeenAt, firmwareVersion / deviceId, metric, unit, calibrationAt, staleAfterSeconds |
 | Telemetry | unitId, sensorId?, metric, value:number\|null, unit, observedAt, receivedAt, origin(measured/estimated/inspection), quality(valid/missing/stale/suspect), isDemo |
-| Command | unitId, actorId, action:UnitAction, status, requestedAt, sentAt?, acknowledgedAt?, expiresAt, failureCode?, idempotencyKey, expectedVersion, correlationId |
+| Command | unitId, actorId, action:UnitActionまたは内部RestrictionAction, diagnosticRunId?, status, requestedAt, sentAt?, acknowledgedAt?, expiresAt, failureCode?, idempotencyKey, expectedVersion, correlationId |
 | Alert | unitId, type, severity(critical/warning/normal), status, evidenceIds[], detectedAt, acknowledgedAt?, resolvedAt?, resolutionReason?。正常は健康サマリーにも使い、openアラートを正常へ自動変換しない |
-| MaintenanceJob | unitId, alertIds[], type(periodic/reactive/preventive), status, contractorOrgId?, assignmentId?, requestedSlot, scheduledSlot?, dueAt, reportVersion?, costs[] |
-| WorkReport / InspectionItem / Attachment | jobId, authorId, version, items[], measurements[], replacementParts[], workText, nextAction, submittedAt? / componentGroup, componentKey, result, reason?, evidenceIds[] / name, mime, size, previewUrl, status |
+| MaintenanceJob | unitId, alertIds[], type(periodic/reactive/preventive), status, contractorOrgId?, assignmentId?, requestedSlot, scheduledSlot?, dueAt, reportVersion?, draftReportRef?, costs[] |
+| WorkReport / InspectionItem / Attachment | jobId, authorId, version, items[], measurements[], replacementParts[], workText, nextAction, submittedAt? / componentGroup, componentKey, result, reason?, evidenceIds[] / jobId, reportId, blobId, name, mime, size, status（previewUrlは画面だけで生成） |
 | Contract / Invoice / Payment | customerOrgId, unitIds[], planType, period, rulesVersion / contractId, amountMinor, currency, dueAt, status / invoiceId, amountMinor, method?, status, externalRef?, confirmedAt? |
-| Restriction | contractId, unitIds[], rulesVersion, noticeAt, executeAfter, reason, policy, state, applyCommandIds[], releaseCommandIds[], exception?, graceUntil? |
+| Restriction | contractId, causeInvoiceIds[], unitIds[], rulesVersion, noticeAt, executeAfter, reason, policy, state, applyCommandIds[], releaseCommandIds[], exception?, graceUntil? |
 | Automation / Consent | unitIds[], condition(discriminated union), action, priority, timezone, enabled / purpose, granted, grantedAt?, revokedAt? |
 | Notification / AuditEvent | recipientId, channel(inApp/email/whatsapp), templateKey, params, readAt?, deliveryState(preview/simulated/failed) / actorId, action, targetId, before?, after?, reason?, result, correlationId, occurredAt |
 | EnergyBaseline / EmissionFactor | unitIds[], period, method, version, kWh, boundary / region, year, kgCO2ePerKWh, source, version, isDemo |
@@ -82,7 +82,7 @@ loadingは骨格表示、emptyは説明と許可された次アクション、er
 
 上表は共通モデルの要約です。原文補完の原因候補・アレルゲン・支払い方法・Scope 2・市場構想の項目は[表示モデルの補完](implementation-contracts.md#ddc-原文補完-企業要望に対応する表示モデル)と該当DDを合わせて適用します。Invoice表示モデルはPaymentからpaymentMethod/paymentStatusを導出し、保存状態を二重管理しません。
 
-Telemetryの`isDemo`は測定区分と独立。デモの「実測」も合成値であると分かるよう表示する。連絡先・写真は架空のみ。ブラウザ画像object URLは削除・リセット・サインアウト時にrevokeする。
+Telemetryの`isDemo`は測定区分と独立。デモの「実測」も合成値であると分かるよう表示する。連絡先・写真は架空のみ。画像本体は共有モックのBlobストアに保持し、AttachmentはblobIdで参照する。画面で生成するobject URLは離脱・役割切替・サインアウト時にrevokeし、再表示時に認可付き取得から再生成する。提出済みBlobはサインアウトで消さず、resetで解放する。詳細は入出力契約DDC-08を参照。
 
 ## 4. フロントエンドのデータサービス境界
 
@@ -90,19 +90,16 @@ Telemetryの`isDemo`は測定区分と独立。デモの「実測」も合成値
 
 ```ts
 interface CommandRepository {
-  create(context: DemoViewContext, input: {
-    unitId: string;
-    action: UnitAction;
-    expectedUnitVersion: number;
-  }, options: DemoWriteOptions): Promise<Command>;
+  create(context: DemoViewContext, input: CreateCommandInput,
+      options: DemoWriteOptions): Promise<ServiceResult<Command>>;
   get(context: DemoViewContext, commandId: string,
-      signal?: AbortSignal): Promise<Command>;
+      signal?: AbortSignal): Promise<ServiceResult<Command>>;
 }
 ```
 
 `DemoViewContext`は選択中の架空ユーザー・役割・閲覧範囲を表す。`DemoWriteOptions`は同じデモ操作の重複防止用キーと変更前の版を持つ。これらは本番認証やサーバーの認可方式を規定しない。具体的なフィールドは[フロントエンド入出力契約](implementation-contracts.md)を参照する。
 
-[操作カタログ](operation-catalog.csv)にはUIが必要とする109のローカルサービス操作、その入力・戻り値・参照画面をまとめる。URL、HTTP method、DBテーブル、サーバートランザクションは定義しない。
+[操作カタログ](operation-catalog.csv)にはUIが必要とする117のローカルサービス操作、その入力・戻り値・参照画面をまとめる。URL、HTTP method、DBテーブル、サーバートランザクションは定義しない。
 
 モックの操作結果は成功・受付中・失敗・競合・閲覧不可として返す。画面はDomainErrorに応じて表示・入力保持・再読込を決める。遅延した古い応答は操作IDと表示世代で除外し、役割切替前の値を描画しない。
 
@@ -140,7 +137,7 @@ interface CommandRepository {
 | in_progress / submitted | HQが理由付き中断 | on_hold。自動的な完了・取消にはしない |
 | on_hold | HQが現在条件を確認して再開 / 終了 | in_progress / cancelled（理由と未完了記録必須） |
 
-completed後の追加作業は関連する新jobIdを作る。外注報告の自己承認は不可。同一userIdをMembership切替で別担当として承認することも禁止。施工業者の品質担当不在はHQへエスカレーション。顧客による正式な最終承認はOPEN-01で未確定のため、1Aでは結果閲覧と問い合わせまで。
+completed後の追加作業は関連する新jobIdを作る。再割当後、新担当は現在draftから新しい報告版を作って継続し、旧版・各点検の元作者を変更しない。外注報告の自己承認は不可。同一userIdをMembership切替で別担当として承認することも禁止。施工業者の品質担当不在はHQへエスカレーション。顧客による正式な最終承認はOPEN-01で未確定のため、1Aでは結果閲覧と問い合わせまで。
 
 Alertはopen→acknowledged→resolved。resolvedの再発は新Alert（previousAlertIdで関連）にする。resolvedは再測定条件を満たすか、HQ/許可された診断者の理由付き確認を必要とし、Jobのcompletedから自動遷移させない。
 
@@ -152,10 +149,10 @@ Paymentはinitiated→processing→confirmed/failed。Offsetはquoted→demo_req
 |---|---|---|
 | 未作成 | 制限可能契約、未払い、権限、理由、予告 | scheduled |
 | scheduled | 期限到来、猶予/例外なし、未払いを再確認 | requested、設備別適用Command作成 |
-| scheduled | 入金確認または取消、猶予、例外 | cancelled / scheduled（期日変更または適用保留と理由） |
+| scheduled | 原因請求全件の入金確認または取消、猶予、例外 | cancelled / scheduled（期日変更または適用保留と理由） |
 | requested | 対象設備に適用応答 | 全件成功ならapplied。一部未応答はrequestedで設備別状態を表示 |
 | requested | オフライン・失敗・期限切れ | requestedのままpendingReasonとcommand結果。自動成功/再送しない |
-| requested / applied | 入金確認または権限付き手動解除 | release_requested。適用要求との競合を照会し解除の意思を保持 |
+| requested / applied | 原因請求全件の入金確認または権限付き手動解除 | release_requested。適用要求との競合を照会し解除の意思を保持 |
 | release_requested | 全対象の解除確認 | released |
 | release_requested | オフライン・失敗 | 保留表示、再照会・明示再試行 |
 
