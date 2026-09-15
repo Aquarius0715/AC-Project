@@ -13,6 +13,8 @@ scope: frontend-demo-1A
 
 本書の業務目的は[企業要件原文](../00-prepare/sources/company-requirements-original.txt)から整理したBIZ項目と[共通要件](../01-requirements/common.md)に基づきます。型、Repository、キャッシュ、権限ガード、モック状態は、その目的をフロントエンドで実現する設計提案です。将来のAPI導入時は表示用モデルへの変換をadapterへ集約します。サーバーの認証・DB・通信契約は本書では定義しません。
 
+設計対象の機能・画面項目・状態・例外は企業原文と対応要件を基準とし、各FRを満たす処理と受入条件を定義します。参考モックは共通UIの外観検討に使用します。
+
 ## 1. 構成と責任
 
 ```text

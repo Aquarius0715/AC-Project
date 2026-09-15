@@ -16,13 +16,13 @@ Prepareの分析を要件・画面・データ・遷移・受入条件へ落と�
 ## 入力
 
 - PrepareDocument、共通要件、対象役割要件、既存詳細設計、UIUX
-- 参考サイトの確認範囲とGAP、DEC/OPEN台帳
+- 企業原文とBIZ対応表、デザイン参考資料、DEC/OPEN台帳
 
 ## Skills（必要能力・実行手順）
 
 | Skill名 | 期待する能力 |
 |---|---|
-| requirements-analysis | C/T/A原文IDと4役割の要件の対応を維持する |
+| requirements-analysis | 企業原文の記述、BIZ整理項目、4役割のFR、受入条件の対応を維持する |
 | frontend-domain-design | 機器状態・コマンド・請求・制限を独立モデルと遷移表で設計する |
 | frontend-service-design | 画面モデル、モックサービスの入力・戻り値、合成エラー、将来の差替え境界を設計する。API/DB/サーバー仕様は作らない |
 | ui-system-design | 共通ライブラリ、フォーム、token、状態管理、a11yを統一する |

@@ -9,6 +9,8 @@ scope: frontend-demo-1A
 
 # クライアント 詳細設計書
 
+設計対象の機能・画面項目・状態・例外は企業原文と対応要件を基準とし、各FRを満たす処理と受入条件を定義します。参考モックは共通UIの外観検討に使用します。
+
 ## 入力・責務
 
 一次資料: [企業要件原文（SRC-06）](../00-prepare/sources/company-requirements-original.txt)。原文を再整理した要件から画面・入力・状態・受入条件を設計する。入力: [役割別要件](../01-requirements/client.md)、[共通要件](../01-requirements/common.md)。必読: [共通詳細設計](common.md)、[UIUX仕様書](../03-uiux/UIUXSpecification.md)。以下はフロントエンドの項目・表示・モック動作の設計。画面上の登録・割当・入金・制限・監査はすべて共有モックメモリの状態遷移で、サーバー実装やDB設計を依頼するものではない。
