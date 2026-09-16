@@ -1,8 +1,10 @@
 # AC Project フロントエンド開発ドキュメント
 
-版: 0.7.0 / 作成日: 2026-09-14 / 更新日: 2026-09-16 / 状態: レビュー用ドラフト / 言語: 日本語
+版: 0.17.0 / 作成日: 2026-09-14 / 更新日: 2026-09-16 / 状態: レビュー用ドラフト / 言語: 日本語
 
 対象はSplit Unit ACの監視・操作・保守・契約に関するクリック可能なフロントエンドデモ（1A）。今回作成する文書はフロントエンド設計のみ。API仕様・HTTP契約・DB・サーバー処理・本番運用は設計対象外。将来のAPI接続はフロント側interfaceの差替え口だけを定義する。アプリ実装も今回の作業には含まない。
+
+ドキュメント作成者・1A仕様の最終判断者: **北野正樹（Masaki Kitano）、若井悠馬（Yuma Wakai）**。モックデモ範囲と業務ルールの採用判断は[DEC-12](00-prepare/internal/decision-record-2026-09-16.md)を参照。デプロイ前の最終確認は人および外部レビュアーが行う。
 
 ## 読む順序
 
@@ -44,3 +46,28 @@
 0.6.0（2026-09-15）: 入出力・読取・試運転・手動入金・制限解除の契約を具体化し、117操作に更新。受入条件を具体的な入力と期待結果へ整理し、追加R01 10件を含む182ケース束を追跡します。実行状態schema、仕様baselineと変更時の再判定を統一しました。[制作指示の確認状態](00-prepare/sources/production-instructions.md)で未収録の原指示と設計解釈を区別します。アプリ試験は未実行です。
 
 0.7.0（2026-09-16）: 4役割147行の受入条件（AT-N/E/B）をfixture値と観測可能な期待値の対へ書き直し、①②…のsubcase番号を導入しました。`automations.fire`（発火の書込み契約）と`jobs.resumeHold/resumeRework`を追加し119操作に更新。出所ラベルの判定規則をPrepareDocument §2に定め、FR-T02・FR-A07を再判定。優先順位を原記録の有無で分け、施工業者の独立役割をOPEN-10へ登録。役割識別子の正規名表（DDC-08§5）、エージェント定義の共通規則の一元化（SDLC README §7）、文書工程のgate記録（`04-agentic-sdlc/runs/`）を追加しました。アプリ試験は未実行です。
+
+
+0.8.0（2026-09-16）: 厳格レビュー36件への修正。1Aの認可・発火仲裁・制限復旧・支払試行・数値・状態・表示安全性を[確定契約](02-design/deterministic-contracts.md)で具体化し、[正規DTO](02-design/service-contracts.ts)、131操作、47画面、Component/Query契約を追加。受入条件と元文書の矛盾を修正。AT-FIX-001〜036は追加試験計画でありアプリ実行結果ではない。
+
+現行baselineは[DOC-0.17.0](04-agentic-sdlc/runs/DOC-0.17.0/spec-manifest.json)。DOC-0.7.0は旧版の記録であり、現在の実装入力として使用しない。検証は `python3 docs/tools/validate_documents.py`。文書修正者による自己再レビューと、別主体によるG1承認は区別する。本番接続はD11の成果物確定までNOT READY。
+
+0.9.0（2026-09-16）: STRICT-DOC-0.8.0の指摘21件の修正仕様を反映。期間・offset失敗・制限中契約編集の3件は2026-09-16ユーザー承認済み。G1はpendingで、旧版の承認は流用しない。詳細は[修正契約](02-design/strict-review-contracts.md)。
+
+0.10.0（2026-09-16）: 設計再レビュー8件をSR22〜29へ反映し、反復確認の追加8件も修正。承認済みSR17〜19は維持。設計書の静的検証とシナリオ照合を行い、アプリの実装/動作試験は今回の完了条件としない。独立G1承認は別記録。
+
+0.11.0（2026-09-16）: [再レビュー修正契約](02-design/review-resolution-contracts.md)で17件を仕様化。長時間メモリ容量1件は追加要件候補として明示保留。修正後の自己再レビューで追加6件も修正。[24件の受入計画](04-agentic-sdlc/acceptance-resolution.csv)を追跡表へ反映。独立G1はpending。
+
+0.12.0（2026-09-16）: 再レビューで見つけた8件を修正。制限の全対象scope・予告宛先、受諾再送、限定投影sort、督促preview、分始点の積算、測定/点検保存、Fact評価を明確化。[受入計画](04-agentic-sdlc/acceptance-convergence.csv)を追加。
+
+0.13.0: 案件の公開投影に関する再レビュー5件を修正。[受入計画](04-agentic-sdlc/acceptance-projection.csv)で一覧の検索/件数、期限後履歴、集計、ページング中の失効を追跡する。アプリ試験は未実施。
+
+0.14.0: 設置物件住所と期限後報告状態のユーザー判断を反映。案件集計の条件、停止理由の取得、機種保存の理由入力と操作件数を修正。アプリ試験は未実施。
+
+0.15.0: 独立レビューIRV-001〜006を修正。集計AT、住所説明、現行引渡し参照を統一し、完了日時・設備アラート重大度・共同編集報告の自己承認禁止を具体化。判定証跡は現行runsを参照。アプリ試験は未実施。
+
+0.16.0: 再レビューで案件filter・監査取得経路・相関ID検索・Page件数説明を修正。権限は2種類、ソート機能のデフォルトは業務順というユーザー回答を反映済み。現行G1の判定は[gate記録](04-agentic-sdlc/runs/DOC-0.16.0/gate-G1.yaml)を参照。旧DOC-0.15.0の合格は本版へ流用しない。
+
+0.16.0の判定記録は[runs/DOC-0.16.0](04-agentic-sdlc/runs/DOC-0.16.0/review.md)に当時版として保持する。
+
+0.17.0（2026-09-16）: 別AIによる独立レビュー（FRV-001〜025、CRITICAL 2・MAJOR 8・MINOR 15）を反映。解除要求の起動経路とreleaseの冪等性、デモ時計ジャンプとセッション寿命、transport障害・ネットワーク断の注入、顧客起点案件の期限、archived資源の可視性、顧客数の母集団、1h/24hプリセット、役割別投影の非公開項目、Device登録時のSensor生成、表示書式・翻訳fallback・描画例外を[IR35〜44](02-design/review-resolution-contracts.md)で確定。SCR-X-not-foundとComponent契約9件を追加（48画面・66 Component）。採用した設計提案は[DEC-19〜24](00-prepare/internal/review-decisions-017.json)（PROPOSED、可逆）。[現行レビュー報告（13項目）](04-agentic-sdlc/runs/DOC-0.17.0/review.md)・[判定表](04-agentic-sdlc/runs/DOC-0.17.0/traceability-matrix.csv)・[受入計画15件](04-agentic-sdlc/acceptance-review-017.csv)を参照。修正後の再確認は修正担当と同一エージェントによる自己再レビューであり、独立G1は[gate記録](04-agentic-sdlc/runs/DOC-0.17.0/gate-G1.yaml)のとおりpending。アプリ試験は未実施。

@@ -1,0 +1,142 @@
+{
+  "scope": "document-validator-mutations-only",
+  "application_tests": "not_run",
+  "results": [
+    {
+      "case": "review_ui_availability_missing",
+      "detected": true,
+      "expected_diagnostic": "Report review availability absent"
+    },
+    {
+      "case": "stale_handoff_baseline",
+      "detected": true,
+      "expected_diagnostic": "Current handoff baseline mismatch"
+    },
+    {
+      "case": "job_completed_time_missing",
+      "detected": true,
+      "expected_diagnostic": "Job completion timestamp source absent"
+    },
+    {
+      "case": "report_contributors_missing",
+      "detected": true,
+      "expected_diagnostic": "Report revision contributors absent"
+    },
+    {
+      "case": "filtered_kpi_old_expectation",
+      "detected": true,
+      "expected_diagnostic": "Filtered partner KPI acceptance mismatch"
+    },
+    {
+      "case": "contributor_deny_missing",
+      "detected": true,
+      "expected_diagnostic": "Contributing reviewer denial absent"
+    },
+    {
+      "case": "severity_resolved_included",
+      "detected": true,
+      "expected_diagnostic": "Job severity source and ranking absent"
+    },
+    {
+      "case": "history_free_text",
+      "detected": true,
+      "expected_diagnostic": "Report history must not expose free text"
+    },
+    {
+      "case": "absent_report_accepted",
+      "detected": true,
+      "expected_diagnostic": "Absent report cannot be accepted"
+    },
+    {
+      "case": "address_missing_null",
+      "detected": true,
+      "expected_diagnostic": "Offer must use nullable installation address"
+    },
+    {
+      "case": "disabled_reason_missing",
+      "detected": true,
+      "expected_diagnostic": "Rule disable reason absent"
+    },
+    {
+      "case": "stale_operation_count",
+      "detected": true,
+      "expected_diagnostic": "Common operation count drift"
+    },
+    {
+      "case": "unsafe_job_receipt",
+      "detected": true,
+      "expected_diagnostic": "Job receipt contains unexpected fields"
+    },
+    {
+      "case": "caller_notice_time",
+      "detected": true,
+      "expected_diagnostic": "Notice time must not be caller controlled"
+    },
+    {
+      "case": "override_apply_permission",
+      "detected": true,
+      "expected_diagnostic": "Override retry must be release only"
+    },
+    {
+      "case": "missing_view_epoch",
+      "detected": true,
+      "expected_diagnostic": "Resolution DTO invariant missing Session"
+    },
+    {
+      "case": "unknown_raw_unit_unrepresentable",
+      "detected": true,
+      "expected_diagnostic": "Resolution DTO invariant missing RawMeasurement"
+    },
+    {
+      "case": "missing_notification_type",
+      "detected": true,
+      "expected_diagnostic": "Resolution DTO invariant missing Notification"
+    },
+    {
+      "case": "missing_actual_boundary",
+      "detected": true,
+      "expected_diagnostic": "Energy boundary source missing EnergySummary"
+    },
+    {
+      "case": "override_entry_blocked",
+      "detected": true,
+      "expected_diagnostic": "Override-only list entry inaccessible"
+    },
+    {
+      "case": "release_sort_field_missing",
+      "detected": true,
+      "expected_diagnostic": "Release list sort field absent updatedAt"
+    },
+    {
+      "case": "reminder_read_gate_missing",
+      "detected": true,
+      "expected_diagnostic": "Reminder preview authorization absent"
+    },
+    {
+      "case": "inspection_operation_typo",
+      "detected": true,
+      "expected_diagnostic": "Inspection normalization operation invalid"
+    },
+    {
+      "case": "notice_recipient_scope_missing",
+      "detected": true,
+      "expected_diagnostic": "Convergence behavioral guard missing \u5168\u5bfe\u8c61Unit\u3092\u95b2\u89a7\u3067\u304d\u308b\u5b9b\u5148"
+    },
+    {
+      "case": "job_history_list_missing",
+      "detected": true,
+      "expected_diagnostic": "Expired job list projection absent"
+    },
+    {
+      "case": "offer_severity_disclosure",
+      "detected": true,
+      "expected_diagnostic": "Offer public search fields absent"
+    },
+    {
+      "case": "internal_history_null_missing",
+      "detected": true,
+      "expected_diagnostic": "Internal technician history must allow null contractor"
+    }
+  ],
+  "passed": true
+}

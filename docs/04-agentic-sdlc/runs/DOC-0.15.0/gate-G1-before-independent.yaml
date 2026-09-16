@@ -1,0 +1,8 @@
+gate_id: G1
+task_id: DOC-0.15.0
+gate_result: pending
+spec_baseline_id: f11600bc8735d2a10797b418bb13da76601b8021184a7d4cef6c2a70d355dd5f
+independent_review: in_progress
+application_tests: not_run
+corrected_findings: 6
+validator_mutation_checks: 27_passed

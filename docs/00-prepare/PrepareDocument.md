@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.7.0
+version: 0.17.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -196,7 +196,7 @@ updated: 2026-09-16
 
 役割別のFR番号は本プロジェクトの管理番号です。内容は企業原文から再整理し、制作方針と設計補完を分けています。詳細設計はこの要件に対応し、UIUX仕様書は企業要望に基づく操作・表示規則と参考モック由来の外観規則を区別します。
 
-## 付録：出典・確認範囲
+## 9. 出典・確認範囲
 
 | 出典ID | 資料 | 位置づけ |
 |---|---|---|
@@ -208,3 +208,31 @@ updated: 2026-09-16
 | SRC-03 | 開発作業環境の初期確認 | 内部管理情報。企業要件・参考モックの機能の根拠には使用しない |
 
 この資料は要件と対応方針のご確認用です。企業による詳細仕様の承認、開発完了、実機接続済み、第三者検証済みを示すものではありません。
+
+## 10. 決定責任・期限
+
+1Aデモ仕様は2026-09-16のユーザー回答（[DEC-12](internal/decision-record-2026-09-16.md)）により採用済み。ドキュメント作成者・1A仕様の最終判断者は北野正樹（Masaki Kitano）と若井悠馬（Yuma Wakai）。商用承認とは分ける。詳細設計の具体化はDEC-11。下表の未決事項をAIが商用確定として扱ってはならない。「企業検収前」はデモを業務要件として承認する直前、「本番設計開始前」は1BのAPI/機器接続設計の開始前を意味する。以下のWho Should Decideは商用・本番側の責任を示す。1A側の最終判断者は上記2名で指定済み。本番技術担当者の指名は本番設計開始前に行う。
+
+| ID | Who Should Decide | 期限/ゲート | 関連要件 | 1Aの決定済み提案 |
+|---|---|---|---|---|
+| OPEN-01 | Product Owner / Business | 企業検収前 | FR-P03/P05/T09/A06 | D06の割当・品質確認・HQ引継ぎ |
+| OPEN-02 | Product Owner / UI/UX / Business | 企業検収前 | FR-X01/C11/A09 | en/ms・MYR表示・D03/D09のデモ条件 |
+| OPEN-03 | IoT | 本番設計開始前 | FR-T11/T12/A04 | D05/D07の模擬接続・合成値 |
+| OPEN-04 | Backend / Security / IoT | 本番設計開始前 | FR-X04、NFR03/05/06 | D11。本番API/DB/認証はNOT DEFINED |
+| OPEN-05 | Backend / Business / Security | 本番設計開始前 | FR-C05/C11、FR-X07 | 実送信/課金/位置取得なし |
+| OPEN-06 | Business / Product Owner | 本番設計開始前 | FR-C06/C13/A13/A14/A15 | D07の固定仮係数・模擬記録 |
+| OPEN-07 | UI/UX / Product Owner | 企業検収前 | NFR01/02/04 | D10の検収環境・UIUX token |
+| OPEN-08 | IoT / Product Owner | 企業検収前 | FR-C07/C08/T07/A05/A12 | 根拠/未計測を表示し能力を保証しない |
+| OPEN-09 | Business / Product Owner | 企業検収前 | FR-C11/C13/A08/A14/A15 | カード情報なし、Scope 2デモ、将来市場は未接続 |
+| OPEN-10 | Product Owner / Business | 企業検収前 | FR-P01〜08、FR-X04 | 4役割の可逆的提案を維持 |
+| OPEN-11 | Backend / IoT | 本番設計開始前 | FR-T10/C04/A09 | 1A時計だけ。本番の終了操作の実行主体・障害復旧はNOT DEFINED |
+
+本番API未定義と企業承認未了は、1Aの実装を推測で補う理由にならない。本番接続の実装ゲートはNOT READY。1Aの独立G1と分離して管理する。
+
+1AではOPEN-01/02/07/08/09/10のデモ採用判断をDEC-12で完了とする。これらの商用確認とOPEN-03〜06/11の本番検討は残すが、1Aの未解決欠陥として数えない。独立AIレビューをG1とし、人および外部レビュアーによるデプロイ前の最終確認は別の必須工程とする。
+
+0.11.0技術修正は[DEC-15](internal/decision-record-2026-09-16.md#dec-15-再レビュー修正の技術的具体化0110)を参照。既存1A範囲の具体化であり独立承認は未取得。
+
+0.17.0の独立レビュー（FRV）で採用した可逆的な設計提案は[DEC-19〜24](internal/review-decisions-017.json)にPROPOSEDとして記録し、企業検収前にProduct Owner／Business／Security／UI/UXが確認する（IR35〜44）。
+
+0.16.0再レビューの[DEC-17/18](internal/review-decisions-016.json)はユーザー回答により確定。制限操作はrestriction.manage/overrideの2権限、案件一覧はソート機能を備え、デフォルトは業務順の昇順とする。具体的な比較順・UI・受入条件はIR34を参照。旧G1の合格は修正後baselineに適用しない。

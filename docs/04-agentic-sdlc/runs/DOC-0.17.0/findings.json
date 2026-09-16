@@ -1,0 +1,161 @@
+{
+  "review_id": "INDEPENDENT-DOC-0.16.0-FRV-2026-09-16",
+  "target_baseline": "fe251845299c3b5d0a9d493683be3e70076111af3b290b8b01a8fa2f7450e0b2",
+  "corrected_baseline": "654be5e4973d1defe98cc875c8d585e292d58796b7205517b5a82e1b41b4d8df",
+  "reviewer": "independent-review-fable-5.1 (same session as corrections)",
+  "initial_verdict": "NOT READY",
+  "post_correction_self_rereview": "no unresolved findings",
+  "independent_g1": "pending",
+  "findings": [
+    {
+      "id": "FRV-001",
+      "severity": "CRITICAL",
+      "status": "resolved",
+      "contract": "IR35"
+    },
+    {
+      "id": "FRV-002",
+      "severity": "CRITICAL",
+      "status": "resolved",
+      "contract": "IR36"
+    },
+    {
+      "id": "FRV-003",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR37"
+    },
+    {
+      "id": "FRV-004",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR38"
+    },
+    {
+      "id": "FRV-005",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR39"
+    },
+    {
+      "id": "FRV-006",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR40"
+    },
+    {
+      "id": "FRV-007",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR41"
+    },
+    {
+      "id": "FRV-008",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR42"
+    },
+    {
+      "id": "FRV-009",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR43"
+    },
+    {
+      "id": "FRV-010",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR44"
+    },
+    {
+      "id": "FRV-011",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    },
+    {
+      "id": "FRV-012",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    },
+    {
+      "id": "FRV-013",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    },
+    {
+      "id": "FRV-014",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    },
+    {
+      "id": "FRV-015",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    },
+    {
+      "id": "FRV-016",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    },
+    {
+      "id": "FRV-017",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    },
+    {
+      "id": "FRV-018",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    },
+    {
+      "id": "FRV-019",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    },
+    {
+      "id": "FRV-020",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    },
+    {
+      "id": "FRV-021",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    },
+    {
+      "id": "FRV-022",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    },
+    {
+      "id": "FRV-023",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    },
+    {
+      "id": "FRV-024",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    },
+    {
+      "id": "FRV-025",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR44/catalogs"
+    }
+  ]
+}

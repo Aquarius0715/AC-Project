@@ -1,0 +1,19 @@
+gate_id: G1
+task_id: DOC-0.10.0
+gate_result: pending
+spec_baseline_id: 5fe7520330a26332d3199983ab5dbaf10b0ba3d61f00367fc875cef06857151f
+spec_manifest: spec-manifest.json
+self_review: passed_design_scope
+independent_review: not_run
+pending_business_decisions: []
+known_unresolved_findings_in_reviewed_scope: 0
+original_rereview_findings_resolved: 8
+additional_cycle_findings_resolved: 8
+correction_review_cycles: 3
+typescript_contract_check: passed
+application_implementation: out_of_current_task_scope
+application_tests: not_run
+application_tests_required_for_document_completion: false
+notes:
+  - User requested design documents only; app execution is not required for document completion
+  - Self review is not an independent G1 approval

@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.7.0
+version: 0.17.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -10,6 +10,8 @@ scope: frontend-demo-1A
 # 技術者 詳細設計書
 
 この設計書は、機能・画面の項目・状態・例外を決めます。企業が書いた原文と、それに対応する要件をもとにします。各FR(機能要件)を満たす処理と、受け入れ条件を定義します。参考にするモック画面は、共通UIの見た目を検討するために使います。
+
+**0.17.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 入力・責務
 
@@ -21,18 +23,18 @@ scope: frontend-demo-1A
 
 | 設計ID / 要件 | ルート / 主コンポーネント | 取得・操作契約 | 入力・処理・検証 | 異常系と禁止事項 |
 |---|---|---|---|---|
-| DD-T01 / FR-T01 | `/technician` / `TechnicianOverview` | `jobs.list, alerts.list` | 期間と重要度でしぼり込みます。割当と期限をサービスで確認します | 自分が担当していない他の案件は、検索結果や集計に出しません |
-| DD-T02 / FR-T02 | `/technician/units/:id` / `DiagnosticUnit` | `units.get, devices.list` | 設備IDと対応できる機能を見ます。保守の範囲外であることは、はっきり示します | 台帳に登録されていない場合と、通信が切れている場合を区別します |
-| DD-T03 / FR-T03 | `/technician/units/:id` / `TelemetryPanel` | `telemetry.series, telemetry.summary` | 指標(見る項目)と期間を選びます。データの購読(継続的な取得)はRepositoryを通します。1A(このフェーズ)では、あらかじめ決まったイベントだけを使います | 古い値をリアルタイムの値として表示しません。データの流れ(ストリーム)が切れたときは、もう一度取得し直します |
-| DD-T04 / FR-T04 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get, jobs.saveDraft, jobs.submit, reports.get` | 部品ごとに、正常/要対応/未点検/対象外のいずれかを選びます。所見(気づいた点)と測定の根拠も記録します。「正常」を初期値にはしません | 対象外や未点検を選んだ場合は、理由の入力が必須です。デモ(模擬)の診断結果を、実際の測定結果として置き換えてはいけません |
-| DD-T05 / FR-T05 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get, jobs.saveDraft, jobs.submit, reports.get` | 室内機は共通のschema(データ構造)を使いますが、部品グループは分けて管理します | センサーを選んでいないのに、微小な漏れを検知できると言い切る文言は認めません |
-| DD-T06 / FR-T06 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get, jobs.saveDraft, jobs.submit, reports.get` | 測定値には数値・単位・観測時刻・点検した人を記録します。操作手順や施工の指示は、この設計書では扱いません | 測定していないのに、それを0や正常として保存してはいけません |
-| DD-T07 / FR-T07 | `/technician/units/:id/alerts` / `DiagnosticEvidence` | `alerts.list, alerts.get, alerts.acknowledge, alerts.resolve` | 確認(acknowledge)は確認済みの状態にするところまでです。解消するには、再測定するか、権限を持つ人が理由を記録する必要があります | 通信が切れただけで盗難と決めつけません。取り外しの検知は別の事象として扱います |
-| DD-T08 / FR-T08 | `/technician/jobs/:id` / `JobWorkspace` | `jobs.get, jobs.start, jobs.resumeRework, jobs.submit, reports.get` | 有効な割当と、開始できる条件を確認します。提出後は品質確認を待つ状態になります | 割当が失効・取消された後の提出は拒否します。送信に失敗した場合は、ドラフト(下書き)を残します |
-| DD-T09 / FR-T09 | `/technician/jobs/:id` / `ReportEditor` | `jobs.saveDraft, attachments.add, jobs.submit, jobs.get, reports.get, attachments.getContent` | 報告の本文は10〜4000文字です。写真はJPEGまたはPNGで1枚5MiB以下、最大10枚(仮の値)です。部品は数量が0より大きい必要があります | ドラフトは途中の状態のままでも保存できます。提出時にはschemaを検証します。画像の処理に失敗した場合は選び直しますが、本文はそのまま残します |
-| DD-T10 / FR-T10 | `/technician/units/:id/control` / `DiagnosticControl` | `commands.create, commands.get, diagnosticRuns.create, diagnosticRuns.get, units.get, jobs.get` | `control.diagnose`という権限、設備の能力、理由、試運転の時間(1〜15分、仮の値)を確認します | 契約上の制限を、試運転を使って回避してはいけません。期限が切れても自動で再送はしません |
-| DD-T11 / FR-T11 | `/technician/devices` / `DeviceMaintenance` | `devices.list, devices.register, devices.bind, devices.check, devices.calibrate, devices.updateFirmware, devices.get` | シリアル番号は重複しないようにします。unitId(設備ID)とセンサーの種類も指定します。校正では単位・参照値・日時を入力します。ファームウェアは対応版の中から選びます | 通信が切れているときは更新を開始できません。更新に失敗した場合、新しいバージョンが反映済みだと表示してはいけません |
-| DD-T12 / FR-T12 | `/technician/devices/:id` / `DeviceEvents` | `devices.get, devices.events, alerts.acknowledge, devices.addResponseNote` | eventType(イベントの種類)と、検知した根拠を表示します。取り外しは専用の模擬イベントで表します | 通信が復旧しても、取り外しのアラートを自動では消しません |
+| DD-T01 / FR-T01 | `/technician` / `TechnicianOverview` | `jobs.list`、`alerts.list`、`summaries.get` | 期間と重要度でしぼり込みます。割当と期限をサービスで確認します | 自分が担当していない他の案件は、検索結果や集計に出しません |
+| DD-T02 / FR-T02 | `/technician/units/:id` / `DiagnosticUnit` | `units.get`、`devices.list` | 設備IDと対応できる機能を見ます。保守の範囲外であることは、はっきり示します | 台帳に登録されていない場合と、通信が切れている場合を区別します |
+| DD-T03 / FR-T03 | `/technician/units/:id` / `TelemetryPanel` | `telemetry.series`、`telemetry.summary` | 指標(見る項目)と期間を選びます。データの購読(継続的な取得)はRepositoryを通します。1A(このフェーズ)では、あらかじめ決まったイベントだけを使います | 古い値をリアルタイムの値として表示しません。データの流れ(ストリーム)が切れたときは、もう一度取得し直します |
+| DD-T04 / FR-T04 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`、`jobs.saveDraft`、`jobs.submit`、`reports.get`、`units.get` | 部品ごとに、正常/要対応/未点検/対象外のいずれかを選びます。所見(気づいた点)と測定の根拠も記録します。「正常」を初期値にはしません | 対象外や未点検を選んだ場合は、理由の入力が必須です。デモ(模擬)の診断結果を、実際の測定結果として置き換えてはいけません |
+| DD-T05 / FR-T05 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`、`jobs.saveDraft`、`jobs.submit`、`reports.get`、`units.get` | 室外機も共通のschema(データ構造)を使いますが、部品グループは分けて管理します | センサーを選んでいないのに、微小な漏れを検知できると言い切る文言は認めません |
+| DD-T06 / FR-T06 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`、`jobs.saveDraft`、`jobs.submit`、`reports.get`、`units.get` | 測定値には数値・単位・観測時刻・点検した人を記録します。操作手順や施工の指示は、この設計書では扱いません | 測定していないのに、それを0や正常として保存してはいけません |
+| DD-T07 / FR-T07 | `/technician/units/:id/alerts` / `DiagnosticEvidence` | `alerts.list`、`alerts.get`、`alerts.acknowledge`、`alerts.resolve` | 確認(acknowledge)は確認済みの状態にするところまでです。解消するには、再測定するか、権限を持つ人が理由を記録する必要があります | 通信が切れただけで盗難と決めつけません。取り外しの検知は別の事象として扱います |
+| DD-T08 / FR-T08 | `/technician/jobs/:id` / `JobWorkspace` | `jobs.get`、`jobs.submit`、`reports.get`、`jobs.start`、`jobs.resumeRework`、`units.get` | 有効な割当と、開始できる条件を確認します。提出後は品質確認を待つ状態になります | 割当が失効・取消された後の提出は拒否します。送信に失敗した場合は、ドラフト(下書き)を残します |
+| DD-T09 / FR-T09 | `/technician/jobs/:id` / `ReportEditor` | `jobs.get`、`jobs.saveDraft`、`jobs.submit`、`reports.get`、`attachments.add`、`attachments.getContent`、`units.get` | 報告の本文は10〜4000文字です。写真はJPEGまたはPNGで1枚5MiB以下、最大10枚(仮の値)です。部品は数量が0より大きい必要があります | ドラフトは途中の状態のままでも保存できます。提出時にはschemaを検証します。画像の処理に失敗した場合は選び直しますが、本文はそのまま残します |
+| DD-T10 / FR-T10 | `/technician/units/:id/control` / `DiagnosticControl` | `commands.create`、`commands.get`、`diagnosticRuns.create`、`diagnosticRuns.get`、`units.get`、`jobs.get`、`diagnosticRuns.list` | `control.diagnose`という権限、設備の能力、理由、試運転の時間(1〜15分、仮の値)を確認します | 契約上の制限を、試運転を使って回避してはいけません。期限が切れても自動で再送はしません |
+| DD-T11 / FR-T11 | `/technician/devices` / `DeviceMaintenance` | `devices.list`、`devices.register`、`devices.bind`、`devices.check`、`devices.calibrate`、`devices.updateFirmware`、`devices.get`、`units.list`、`units.get`、`jobs.list`、`devices.calibrations`、`devices.operations` | シリアル番号は重複しないようにします。unitId(設備ID)とセンサーの種類も指定します。校正では単位・参照値・日時を入力します。ファームウェアは対応版の中から選びます | 通信が切れているときは更新を開始できません。更新に失敗した場合、新しいバージョンが反映済みだと表示してはいけません |
+| DD-T12 / FR-T12 | `/technician/devices/:id` / `DeviceEvents` | `devices.get`、`devices.events`、`alerts.get`、`alerts.acknowledge`、`devices.addResponseNote` | eventType(イベントの種類)と、検知した根拠を表示します。取り外しは専用の模擬イベントで表します | 通信が復旧しても、取り外しのアラートを自動では消しません |
 
 ## 実装の共通手順
 
@@ -55,7 +57,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06のBIZ-04とBIZ-08から、FR-T01を経て、DD-T01につながります。出所区分(情報の出どころ): 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、担当期間によって表示する範囲を決めることです。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
 
-対象はFR-T01です。主な表示pattern(画面の型)は**UI-OVERVIEW**です。この画面が使うサービスの範囲は`jobs.list, alerts.list`です。
+対象はFR-T01です。主な表示pattern(画面の型)は**UI-OVERVIEW**です。この画面が使うサービスの範囲は`jobs.list, alerts.list, summaries.get`です。
 
 **初期表示と前提**: 社内の技術者は、自分の担当範囲を見られます。社外の技術者は、自分の会社かつ個別に割り当てられた案件と、作業期間を取得できます。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
 
@@ -114,7 +116,7 @@ scope: frontend-demo-1A
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
 | unitId / metric | 必須 | 担当内・センサー対応 | 対象系列 |
-| from / to | ISO日時/必須 | 最大366日 | 期間 |
+| period / from / to | enum・ISO日時/必須 | 1h/24h/7d/custom、初期24h。1h/24hは移動窓、7dは暦日、customは最大366日(IR41) | 期間 |
 | observedAt / receivedAt | 読取 | UTC | 鮮度 |
 | staleAfterSeconds | 読取 | sensor policy由来、デモ120秒 | stale判定 |
 | eventId / version | 読取 | 重複・順序制御 | 更新根拠 |
@@ -134,7 +136,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06のBIZ-10から、FR-T04を経て、DD-T04につながります。出所区分: 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、点検フォームと、未点検のときの理由の扱いです。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
 
-対象はFR-T04です。主な表示patternは**UI-FORM**です。この画面が使うサービスの範囲は`jobs.get, jobs.saveDraft, jobs.submit, reports.get`です。
+対象はFR-T04です。主な表示patternは**UI-FORM**です。この画面が使うサービスの範囲は`jobs.get, jobs.saveDraft, jobs.submit, reports.get, units.get`です。
 
 **初期表示と前提**: 有効な担当案件が`in_progress`(進行中)の状態であることが前提です。保守の範囲と、部品ごとの点検対象は、すでに取得済みです。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
 
@@ -162,7 +164,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06のBIZ-10から、FR-T05を経て、DD-T05につながります。出所区分: 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、点検フォームと、未点検のときの理由の扱いです。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
 
-対象はFR-T05です。主な表示patternは**UI-FORM**です。この画面が使うサービスの範囲は`jobs.get, jobs.saveDraft, jobs.submit, reports.get`です。
+対象はFR-T05です。主な表示patternは**UI-FORM**です。この画面が使うサービスの範囲は`jobs.get, jobs.saveDraft, jobs.submit, reports.get, units.get`です。
 
 **初期表示と前提**: 有効な担当案件が`in_progress`(進行中)の状態であることが前提です。保守の範囲と、部品ごとの点検対象は、すでに取得済みです。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
 
@@ -190,7 +192,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06のBIZ-10から、FR-T06を経て、DD-T06につながります。出所区分: 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、点検フォームと、未点検のときの理由の扱いです。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
 
-対象はFR-T06です。主な表示patternは**UI-FORM**です。この画面が使うサービスの範囲は`jobs.get, jobs.saveDraft, jobs.submit, reports.get`です。
+対象はFR-T06です。主な表示patternは**UI-FORM**です。この画面が使うサービスの範囲は`jobs.get, jobs.saveDraft, jobs.submit, reports.get, units.get`です。
 
 **初期表示と前提**: 有効な担当案件が`in_progress`(進行中)の状態であることが前提です。保守の範囲と、部品ごとの点検対象は、すでに取得済みです。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
 
@@ -251,7 +253,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06のBIZ-12から、FR-T08を経て、DD-T08につながります。出所区分: 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、開始・提出・再提出という状態の扱いです。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
 
-対象はFR-T08です。主な表示patternは**UI-DETAIL**です。この画面が使うサービスの範囲は`jobs.get, jobs.start, jobs.resumeRework, jobs.submit, reports.get`です。
+対象はFR-T08です。主な表示patternは**UI-DETAIL**です。この画面が使うサービスの範囲は`jobs.get, jobs.submit, reports.get, jobs.start, jobs.resumeRework, units.get`です。
 
 **初期表示と前提**: `assigned`(割り当て済み)の案件を担当していて、有効期間内であることが前提です。定期点検・事後対応・予防保全のいずれも、同じ作業状態のモデルを使います。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
 
@@ -277,7 +279,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06のBIZ-12から、FR-T09を経て、DD-T09につながります。出所区分: 設計側で補った内容です(企業の目的に対応するもの)。この節で具体化する設計補完の内容は、写真・交換部品・報告のバージョンの管理方法です。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
 
-対象はFR-T09です。主な表示patternは**UI-FORM**です。この画面が使うサービスの範囲は`jobs.saveDraft, attachments.add, jobs.submit, jobs.get, reports.get, attachments.getContent`です。
+対象はFR-T09です。主な表示patternは**UI-FORM**です。この画面が使うサービスの範囲は`jobs.get, jobs.saveDraft, jobs.submit, reports.get, attachments.add, attachments.getContent, units.get`です。
 
 **初期表示と前提**: `in_progress`(進行中)、または再作業中であることが前提です。点検項目とドラフトは、すでに取得済みです。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
 
@@ -305,7 +307,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06のBIZ-13から、FR-T10を経て、DD-T10につながります。出所区分: 設計側で補った内容です(企業の目的に対応するもの)。この節で具体化する設計補完の内容は、技術者の操作権限と、試運転の手順です。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
 
-対象はFR-T10です。主な表示patternは**UI-DETAIL**と**UI-FORM**です。この画面が使うサービスの範囲は`commands.create, commands.get, diagnosticRuns.create, diagnosticRuns.get, units.get, jobs.get`です。
+対象はFR-T10です。主な表示patternは**UI-DETAIL**と**UI-FORM**です。この画面が使うサービスの範囲は`commands.create, commands.get, diagnosticRuns.create, diagnosticRuns.get, units.get, jobs.get, diagnosticRuns.list`です。
 
 **初期表示と前提**: 担当期間内であること、`control.diagnose`という能力を持つこと、機器がonline(通信可能)であることが前提です。契約上の制限を超えないことも前提です。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
 
@@ -332,13 +334,14 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06のBIZ-20から、FR-T11を経て、DD-T11につながります。出所区分: 設計側で補った内容です(企業の目的に対応するもの)。この節で具体化する設計補完の内容は、登録・校正・更新を模擬する手順です。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
 
-対象はFR-T11です。主な表示patternは**UI-LIST**、**UI-FORM**、**UI-DETAIL**です。この画面が使うサービスの範囲は`devices.list, devices.register, devices.bind, devices.check, devices.calibrate, devices.updateFirmware, devices.get`です。
+対象はFR-T11です。主な表示patternは**UI-LIST**、**UI-FORM**、**UI-DETAIL**です。この画面が使うサービスの範囲は`devices.list, devices.register, devices.bind, devices.check, devices.calibrate, devices.updateFirmware, devices.get, units.list, units.get, jobs.list, devices.calibrations, devices.operations`です。
 
 **初期表示と前提**: `device.maintain`という権限と、対象設備を有効に担当していることが前提です。登録・校正・更新は、いずれもモック(模擬)の動作です。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
 
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
 | serial | 文字列/登録必須 | 英数ハイフン3〜64文字、正規化後一意 | 識別子 |
+| sensorTypes | Metric配列/登録必須 | 重複なし、空可。対象設備のCapability.sensorsにあるmetricのみ。単位/stale秒/境界は能力から複写(IR43) | 生成するセンサー |
 | unitId | ID/紐付け必須 | 担当・登録済み | 対象 |
 | metric / unit | enum/校正必須 | センサー能力の組合せ | 測定種別 |
 | referenceValue / measuredValue | number/校正必須 | 有限値、同じ単位 | 校正根拠 |
@@ -349,7 +352,7 @@ scope: frontend-demo-1A
 
 1. シリアル番号(serial)を登録します。設備と紐付けます。接続を確認します。校正値と参照値を記録します。対応しているファームウェアの候補を選んで更新します。進行状況と結果を確認します。
 2. シリアル番号は、前後の空白を除き大文字に揃えたうえで、重複していないか判定します。校正は履歴として追加するだけで、既存の測定値を書き換えることはありません。ファームウェアは、対応しているバージョンの一覧からのみ選べます。URLやバイナリデータを自由に入力させることはしません。
-3. `Device`(機器)、`CalibrationRecord`(校正記録)、`DeviceOperation`(機器操作の記録)を保存します。`firmwareVersion`(ファームウェアのバージョン)が更新されるのは、結果が`succeeded`(成功)のときだけです。更新中は、競合を制御することはできません。
+3. `Device`(機器)、`CalibrationRecord`(校正記録)、`DeviceOperation`(機器操作の記録)を保存します。`firmwareVersion`(ファームウェアのバージョン)が更新されるのは、結果が`succeeded`(成功)のときだけです。更新中の制御要求はCONFLICTとして拒否します。排他はD05に従います。
 4. 更新対象のQueryは`devices / operations / calibrations / capabilities / audit`です。
 
 **境界条件・失敗時**: シリアル番号の重複、別の設備への無断での再紐付け、単位の不一致は、いずれも拒否し、台帳は変更しません。オフラインのときは、ファームウェアの更新を開始しません。ファームウェアの更新に失敗した場合は`failed`(失敗)と表示し、古いバージョンをそのまま保持します。
@@ -360,7 +363,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06のBIZ-20から、FR-T12を経て、DD-T12につながります。出所区分: 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、通信断・電源断・取り外しをどう区別するかです。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
 
-対象はFR-T12です。主な表示patternは**UI-DETAIL**と**UI-TIMELINE**です。この画面が使うサービスの範囲は`devices.get, devices.events, alerts.acknowledge, devices.addResponseNote`です。
+対象はFR-T12です。主な表示patternは**UI-DETAIL**と**UI-TIMELINE**です。この画面が使うサービスの範囲は`devices.get, devices.events, alerts.get, alerts.acknowledge, devices.addResponseNote`です。
 
 **初期表示と前提**: 担当しているDevice(機器)について、イベントを見る権限があることが前提です。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
 
@@ -382,3 +385,11 @@ scope: frontend-demo-1A
 **境界条件・失敗時**: 通信が再接続しても、まだ確認していないtamper(不正な取り外し)のアラートは消えません。順序が入れ替わって届いた古いheartbeatによって、online(通信可能)の状態に戻すことはありません。
 
 **検証**: 追跡表にあるAT-T12の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
+
+0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
+
+0.10.0: T12はDeviceEvent.alertIdsからalerts.getを取得しAlert.versionで確認する（SR23）。機器履歴は発生時scopeで絞る（SR24）。
+
+現行0.17.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+
+案件一覧とjobs.listのソートはIR34を適用する。URL sort未指定はstatus:asc。選択変更でcursorを破棄し、filterを保持して新snapshotの初頁から取得する。状態/重大度/期限の昇降順を選べる。

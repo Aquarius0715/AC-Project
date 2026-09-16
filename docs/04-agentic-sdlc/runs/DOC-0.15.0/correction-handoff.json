@@ -1,0 +1,60 @@
+{
+  "task_id": "DOC-0.15.0",
+  "agent_role": "design",
+  "spec_baseline_id": "f11600bc8735d2a10797b418bb13da76601b8021184a7d4cef6c2a70d355dd5f",
+  "previous_baseline_id": "f8e6cdd8387f1e623f69616518f41108e55ae9cd5f7ec4b223be5776238f4096",
+  "finding_ids": [
+    "IRV-001",
+    "IRV-002",
+    "IRV-003",
+    "IRV-004",
+    "IRV-005",
+    "IRV-006"
+  ],
+  "new_contracts": [
+    "IR29",
+    "IR30",
+    "IR31"
+  ],
+  "changed_files": [
+    "00-prepare/PrepareDocument.md",
+    "00-prepare/internal/decision-record-2026-09-16.md",
+    "00-prepare/internal/design-assumptions.md",
+    "00-prepare/traceability.csv",
+    "01-requirements/admin.md",
+    "01-requirements/client.md",
+    "01-requirements/common.md",
+    "01-requirements/contractor.md",
+    "01-requirements/technician.md",
+    "02-design/admin.md",
+    "02-design/client.md",
+    "02-design/common.md",
+    "02-design/contractor.md",
+    "02-design/deterministic-contracts.md",
+    "02-design/implementation-contracts.md",
+    "02-design/review-resolution-contracts.md",
+    "02-design/service-contracts.ts",
+    "02-design/strict-review-contracts.md",
+    "02-design/technician.md",
+    "03-uiux/UIUXSpecification.md",
+    "04-agentic-sdlc/README.md",
+    "04-agentic-sdlc/acceptance-independent-g1.csv",
+    "04-agentic-sdlc/agents/design.md",
+    "04-agentic-sdlc/agents/implementation.md",
+    "04-agentic-sdlc/agents/orchestration.md",
+    "04-agentic-sdlc/agents/review.md",
+    "04-agentic-sdlc/agents/test.md",
+    "04-agentic-sdlc/fixture-contract.json",
+    "04-agentic-sdlc/verification.md",
+    "README.md",
+    "tools/check_review_regressions.py",
+    "tools/validate_documents.py"
+  ],
+  "checks": [
+    "static-check.json",
+    "validator-negative-checks.json"
+  ],
+  "application_tests": "not_run",
+  "next_agent": "/root/independent_review",
+  "next_action": "Independent re-review and G1 decision"
+}

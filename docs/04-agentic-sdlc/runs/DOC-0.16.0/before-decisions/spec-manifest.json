@@ -1,0 +1,228 @@
+{
+  "version": "0.16.0",
+  "spec_baseline_id": "c42b5ff33ed94be46318486b01d5706c244890d07bbc71ceefa51b48bd370ebc",
+  "hash_algorithm": "sha256",
+  "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
+  "spec_files": [
+    {
+      "path": "00-prepare/PrepareDocument.md",
+      "sha256": "07763761f1da5c5b41f9a6da91f732a88b9770b742a727041c734c44de9aa155"
+    },
+    {
+      "path": "00-prepare/company-requirement-map.csv",
+      "sha256": "11561533d1b6128b0e3e4f5102570a968700f930094216ba973aba9204782230"
+    },
+    {
+      "path": "00-prepare/internal/decision-record-2026-09-16.md",
+      "sha256": "f6f3c9d283a635105b28afdfdf10d8053fd51322b108470faed97f1e76062cae"
+    },
+    {
+      "path": "00-prepare/internal/design-assumptions.md",
+      "sha256": "b7769c0f5a6c2c3525cc21412f912597d2c4d5bfc7bd67448a36220f649a69c0"
+    },
+    {
+      "path": "00-prepare/internal/review-decisions-016.json",
+      "sha256": "deb312a95f9cce49f8b5c42b7f7c61d98f16c012e6f01cae6f63d4f8c8321dc3"
+    },
+    {
+      "path": "00-prepare/reference-design-analysis.md",
+      "sha256": "37e81d80aa4606183d7533829d9ac58b8ec1b49aaccc9112ed08c24fe8e9be24"
+    },
+    {
+      "path": "00-prepare/requirement-origins.csv",
+      "sha256": "5f0b29537ca06dda6d7ab4ec3f52fb6a29ca935e78a347b7fcc268a72acd9f68"
+    },
+    {
+      "path": "00-prepare/sources/company-requirements-original.txt",
+      "sha256": "526927ffef80f32f2dce775414858013031d75313eeb96c4f89dabd582ee958f"
+    },
+    {
+      "path": "00-prepare/sources/original-handover.md",
+      "sha256": "930b541711deca7b7e1764b364953da879757482fba4217b142aff1be63a8080"
+    },
+    {
+      "path": "00-prepare/sources/production-instructions.md",
+      "sha256": "4dc1e01ebbd097d41c2bf4239fc4dc1c3dcb0272c7e704edcd1ec018321c1eb7"
+    },
+    {
+      "path": "00-prepare/sources/reference-style-evidence.json",
+      "sha256": "6a905fd59d5b83a4152a805135d08bef5598cae86f501bc5f207bb45f875cc66"
+    },
+    {
+      "path": "00-prepare/traceability.csv",
+      "sha256": "297006c7c178e94ef25786f6b3a45132fd0e5b6a511d2304f50dbb50dd1d3982"
+    },
+    {
+      "path": "01-requirements/admin.md",
+      "sha256": "8a7e66e8f176815e4021447c1ea490509083e23933b27ae785f95437e9dd4223"
+    },
+    {
+      "path": "01-requirements/client.md",
+      "sha256": "2a8d6ac52d571f03e66e201c4ac724ccee8ac7ef1ca8a05fc82f45c7437590ef"
+    },
+    {
+      "path": "01-requirements/common.md",
+      "sha256": "309b637a9b1ed2f070e9b5c66052cf15541baf4e6aac79ab210c2d04e390effe"
+    },
+    {
+      "path": "01-requirements/contractor.md",
+      "sha256": "052477ab27313ebc19423a3ed2dcfc42c2452a2da5ea1087515d0e106092a0b7"
+    },
+    {
+      "path": "01-requirements/technician.md",
+      "sha256": "6bcf95c05c3a55201d89e9efe747bc739bf81bd53cdf67f08e87ca01afd8c1ef"
+    },
+    {
+      "path": "02-design/admin.md",
+      "sha256": "56883897d176294765fe0c5a3456035cc0d7f63799cf84243f1eb5fd5e535978"
+    },
+    {
+      "path": "02-design/client.md",
+      "sha256": "06b7422f16d6a912982a23710e677123162b2c20228ce82d2c82447e1bf53cc1"
+    },
+    {
+      "path": "02-design/common.md",
+      "sha256": "ec2868abf3a0270cd5950eb1a4d7c17d81b0e40972bdab664d158ca6142e507d"
+    },
+    {
+      "path": "02-design/contractor.md",
+      "sha256": "94dc4db93e347d8a361af742572aec4a75de5dac59de6cb2104206e1b271377e"
+    },
+    {
+      "path": "02-design/deterministic-contracts.md",
+      "sha256": "3fe3045358e528772e13cf729f410cdb5015026f166bad484ec8250bcb2613b9"
+    },
+    {
+      "path": "02-design/implementation-contracts.md",
+      "sha256": "d32a35c2e117c705b50d589b381c6d7286867de6cffc0d9132b66fac3e168568"
+    },
+    {
+      "path": "02-design/operation-catalog.csv",
+      "sha256": "9bf62cc00ef4d6ef0122f5759809e9fe7c99045539ad8812eebdf5aa20d0cd64"
+    },
+    {
+      "path": "02-design/query-catalog.csv",
+      "sha256": "ff6387721cad40cd4b06f1344228be3b69e083c83611d016680f7275d8c25258"
+    },
+    {
+      "path": "02-design/review-resolution-contracts.md",
+      "sha256": "82168aebb431b98b4497442b90e79fd5ad1a843a44de1c470cca4d81231bc372"
+    },
+    {
+      "path": "02-design/service-contracts.ts",
+      "sha256": "fdfe38027701e06b187c8ab1bf7e9d1a98f4f8e8597f77fe2d362c68bfac92f2"
+    },
+    {
+      "path": "02-design/strict-review-contracts.md",
+      "sha256": "020f1bc56ce7396fbb0c9d7d4ea876f5cbb1f030a5924f8fd374aaee676fbcf1"
+    },
+    {
+      "path": "02-design/technician.md",
+      "sha256": "0699be65ac82612860c4e331a069a282848d169888838d63ce20df1b42942ef4"
+    },
+    {
+      "path": "02-design/write-version-catalog.csv",
+      "sha256": "6712fa11d279df2f7fbc55b76bc8455d3e4f0f4b65d9d28f1fa7fd6bbe272857"
+    },
+    {
+      "path": "03-uiux/UIUXSpecification.md",
+      "sha256": "6d6b5c95e6b8cf9975e24817167770863d5888fe31e2909fe92cbd69ae309fed"
+    },
+    {
+      "path": "03-uiux/component-contracts.csv",
+      "sha256": "c2d179f88fd6a7b9044809818c4d8004d0d50e66cd9fff1bdaf8dfdf68baba6f"
+    },
+    {
+      "path": "03-uiux/screen-catalog.csv",
+      "sha256": "b831ec1112d722dc7eaa05a5524712fa168f090cc6111b7a4fccad5292e04302"
+    },
+    {
+      "path": "04-agentic-sdlc/README.md",
+      "sha256": "0e2ed308aeb2f19f4063d35c3dbf8e3f6779a2cea38199cd025f71087487bdc7"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-convergence.csv",
+      "sha256": "383f1c2f637d4203d446b044a7ecea568fb1b774c8bc917b35284bc11f0a6acb"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-fixes.csv",
+      "sha256": "8eb961968fe6f689daaa730c6d3d26938d709265bc8b61e45155cdfb649a9212"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-independent-g1.csv",
+      "sha256": "2e8b3ec91a2870b3d01018a43a98c5a4eadd36bba0a7900f3a0de9c9a202216b"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-independent.csv",
+      "sha256": "81ac2d05ed3499b2f49fa36db3762b5b2a92193390c374bbd7542cba2ff7a29c"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-loop.csv",
+      "sha256": "2b9d61b89d9e981e470b45841962f64740ab52d9710e8497d7db0d7a8de01ddd"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-projection.csv",
+      "sha256": "1c15c24dd3afe516b0d4917ac198dc7f51e3157b06e18f01ef238ab13f048087"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-rereview.csv",
+      "sha256": "e247ac0f37e5cfe2f9290b2f685aa5c98917c4c10b89fa2330b7c6004d820d6a"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-resolution.csv",
+      "sha256": "7239528a53fbeb88ddc092fc2cab4fce2ac86ec68848980660ff9a3f6b12618f"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-review-016.csv",
+      "sha256": "b87d4ec672dc53e0c3c96c43a1a1a0b38e2a599687c5528fc7c9dc45ea3dc3f4"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-strict-review.csv",
+      "sha256": "fae128a2738dd3cce790ae63bbddf1bca5449529c444784721c53953cdf83334"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/design.md",
+      "sha256": "2efb0b2d9a124cacd6077c8ea8175ef2f8fa9ec676c4fbad2fb68ab3bb040e3e"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/implementation.md",
+      "sha256": "b2bed2cb623649577a7f2d62821f751f714a97f8b3ed9926b7a3030647d29910"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/orchestration.md",
+      "sha256": "17aa8e7d7140784869e838c5a6bf6e88ba0f09cca5e36ae857520af29779798b"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/review.md",
+      "sha256": "d9001b27e8f835ab665ba6d6f283913ea9aa619907f70c0d62d1959ecb4a049e"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/test.md",
+      "sha256": "7dc0fa334f541e501159151388fcfbf69543111d58d0f6d1b8fb1b1dfe07dfd6"
+    },
+    {
+      "path": "04-agentic-sdlc/fixture-contract.json",
+      "sha256": "2b3d8bbe615278bcaf7ea9b4823c9739ad185b8026685244edf05e5ef17ebd04"
+    },
+    {
+      "path": "04-agentic-sdlc/templates/artifacts.md",
+      "sha256": "c5f86be36137a3c047cee1b63a106acf5e0fe1d7225ed0f4d3b52c6d2d05627a"
+    },
+    {
+      "path": "04-agentic-sdlc/verification.md",
+      "sha256": "9106d69035d9cb1fd0b2326e4543c2f495cf83d872c1b58072e0fc6d72ed9e97"
+    },
+    {
+      "path": "README.md",
+      "sha256": "3cc87bdc59337c6055b62ae65b4ddfd42df0385126d03cb2508e03e6a26b65b8"
+    },
+    {
+      "path": "tools/check_review_regressions.py",
+      "sha256": "dfa7e82b109786e7e09de46beb38d7ea50532ef17fdafec6eef9ad24a5319c0b"
+    },
+    {
+      "path": "tools/validate_documents.py",
+      "sha256": "82f4bf33e65dca90de7c57affe97d3705e652f9dea732159208a9269bd7468a5"
+    }
+  ]
+}

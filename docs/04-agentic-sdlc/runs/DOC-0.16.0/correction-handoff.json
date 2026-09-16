@@ -1,0 +1,23 @@
+{
+  "task_status": "done",
+  "scope": "frontend-demo-1A-documents",
+  "spec_baseline_id": "fe251845299c3b5d0a9d493683be3e70076111af3b290b8b01a8fa2f7450e0b2",
+  "review_rounds": 3,
+  "findings": 7,
+  "corrected": 7,
+  "unresolved": [],
+  "pending_decisions": [],
+  "accepted_decisions": [
+    "DEC-17",
+    "DEC-18"
+  ],
+  "specification_corrections_complete": true,
+  "independent_post_correction_review": "passed",
+  "application_tests": "not_run",
+  "next_action": "Implement frontend demo 1A using this fixed baseline and its acceptance plans; application tests start not_run.",
+  "task_id": "DOC-0.16.0",
+  "evidence_status": "current",
+  "independent_findings": 1,
+  "independent_findings_resolved": 1,
+  "next_agent": "implementation"
+}

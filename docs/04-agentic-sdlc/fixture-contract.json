@@ -1,0 +1,489 @@
+{
+  "version": "0.17.0",
+  "isDemo": true,
+  "clock": "2026-09-14T01:00:00.000Z",
+  "actors": [
+    {
+      "membershipId": "customer-a",
+      "userId": "user-customer-a",
+      "role": "client",
+      "permissions": [
+        "control.execute"
+      ],
+      "tenantId": "tenant-a",
+      "validFrom": "2026-09-01T00:00:00.000Z",
+      "validUntil": "2026-10-01T00:00:00.000Z",
+      "organizationId": "org-customer-a",
+      "scopeVersion": 1,
+      "employment": null,
+      "scopes": [
+        {
+          "kind": "organization",
+          "id": "org-customer-a"
+        }
+      ],
+      "qualifications": [],
+      "displayName": "customer-a"
+    },
+    {
+      "membershipId": "customer-b",
+      "userId": "user-customer-b",
+      "role": "client",
+      "permissions": [
+        "control.execute"
+      ],
+      "tenantId": "tenant-a",
+      "validFrom": "2026-09-01T00:00:00.000Z",
+      "validUntil": "2026-10-01T00:00:00.000Z",
+      "organizationId": "org-customer-b",
+      "scopeVersion": 1,
+      "employment": null,
+      "scopes": [
+        {
+          "kind": "organization",
+          "id": "org-customer-b"
+        }
+      ],
+      "qualifications": [],
+      "displayName": "customer-b"
+    },
+    {
+      "membershipId": "contractor-a",
+      "userId": "user-contractor-a",
+      "role": "contractor",
+      "permissions": [
+        "partner.accept",
+        "partner.assign",
+        "partner.review"
+      ],
+      "tenantId": "tenant-a",
+      "validFrom": "2026-09-01T00:00:00.000Z",
+      "validUntil": "2026-10-01T00:00:00.000Z",
+      "organizationId": "org-contractor-a",
+      "scopeVersion": 1,
+      "employment": null,
+      "scopes": [
+        {
+          "kind": "organization",
+          "id": "org-contractor-a"
+        }
+      ],
+      "qualifications": [],
+      "displayName": "contractor-a"
+    },
+    {
+      "membershipId": "contractor-b",
+      "userId": "user-contractor-b",
+      "role": "contractor",
+      "permissions": [
+        "partner.accept",
+        "partner.assign",
+        "partner.review"
+      ],
+      "tenantId": "tenant-a",
+      "validFrom": "2026-09-01T00:00:00.000Z",
+      "validUntil": "2026-10-01T00:00:00.000Z",
+      "organizationId": "org-contractor-b",
+      "scopeVersion": 1,
+      "employment": null,
+      "scopes": [
+        {
+          "kind": "organization",
+          "id": "org-contractor-b"
+        }
+      ],
+      "qualifications": [],
+      "displayName": "contractor-b"
+    },
+    {
+      "membershipId": "tech-internal-a",
+      "userId": "user-tech-internal-a",
+      "role": "technician",
+      "permissions": [
+        "control.diagnose",
+        "device.maintain",
+        "alert.resolve"
+      ],
+      "tenantId": "tenant-a",
+      "validFrom": "2026-09-01T00:00:00.000Z",
+      "validUntil": "2026-10-01T00:00:00.000Z",
+      "organizationId": "org-operator-a",
+      "scopeVersion": 1,
+      "employment": "internal",
+      "scopes": [
+        {
+          "kind": "unit",
+          "id": "unit-online-rto"
+        },
+        {
+          "kind": "unit",
+          "id": "unit-offline-rto"
+        },
+        {
+          "kind": "unit",
+          "id": "unit-non-rto"
+        },
+        {
+          "kind": "unit",
+          "id": "unit-limited"
+        }
+      ],
+      "qualifications": [
+        {
+          "code": "demo_indoor",
+          "validFrom": "2026-09-01T00:00:00.000Z",
+          "validUntil": "2026-10-01T00:00:00.000Z",
+          "revokedAt": null
+        },
+        {
+          "code": "demo_outdoor",
+          "validFrom": "2026-09-01T00:00:00.000Z",
+          "validUntil": "2026-10-01T00:00:00.000Z",
+          "revokedAt": null
+        },
+        {
+          "code": "demo_electrical",
+          "validFrom": "2026-09-01T00:00:00.000Z",
+          "validUntil": "2026-10-01T00:00:00.000Z",
+          "revokedAt": null
+        }
+      ],
+      "displayName": "tech-internal-a"
+    },
+    {
+      "membershipId": "tech-external-a",
+      "userId": "user-tech-external-a",
+      "role": "technician",
+      "permissions": [
+        "control.diagnose",
+        "device.maintain",
+        "alert.resolve"
+      ],
+      "tenantId": "tenant-a",
+      "validFrom": "2026-09-01T00:00:00.000Z",
+      "validUntil": "2026-10-01T00:00:00.000Z",
+      "organizationId": "org-contractor-a",
+      "scopeVersion": 1,
+      "employment": "external",
+      "scopes": [
+        {
+          "kind": "unit",
+          "id": "unit-online-rto"
+        },
+        {
+          "kind": "unit",
+          "id": "unit-offline-rto"
+        },
+        {
+          "kind": "unit",
+          "id": "unit-non-rto"
+        },
+        {
+          "kind": "unit",
+          "id": "unit-limited"
+        }
+      ],
+      "qualifications": [
+        {
+          "code": "demo_indoor",
+          "validFrom": "2026-09-01T00:00:00.000Z",
+          "validUntil": "2026-10-01T00:00:00.000Z",
+          "revokedAt": null
+        },
+        {
+          "code": "demo_outdoor",
+          "validFrom": "2026-09-01T00:00:00.000Z",
+          "validUntil": "2026-10-01T00:00:00.000Z",
+          "revokedAt": null
+        },
+        {
+          "code": "demo_electrical",
+          "validFrom": "2026-09-01T00:00:00.000Z",
+          "validUntil": "2026-10-01T00:00:00.000Z",
+          "revokedAt": null
+        }
+      ],
+      "displayName": "tech-external-a"
+    },
+    {
+      "membershipId": "tech-external-b",
+      "userId": "user-tech-external-b",
+      "role": "technician",
+      "permissions": [
+        "control.diagnose",
+        "device.maintain",
+        "alert.resolve"
+      ],
+      "tenantId": "tenant-a",
+      "validFrom": "2026-09-01T00:00:00.000Z",
+      "validUntil": "2026-10-01T00:00:00.000Z",
+      "organizationId": "org-contractor-b",
+      "scopeVersion": 1,
+      "employment": "external",
+      "scopes": [
+        {
+          "kind": "unit",
+          "id": "unit-other-customer"
+        }
+      ],
+      "qualifications": [
+        {
+          "code": "demo_indoor",
+          "validFrom": "2026-09-01T00:00:00.000Z",
+          "validUntil": "2026-10-01T00:00:00.000Z",
+          "revokedAt": null
+        },
+        {
+          "code": "demo_outdoor",
+          "validFrom": "2026-09-01T00:00:00.000Z",
+          "validUntil": "2026-10-01T00:00:00.000Z",
+          "revokedAt": null
+        },
+        {
+          "code": "demo_electrical",
+          "validFrom": "2026-09-01T00:00:00.000Z",
+          "validUntil": "2026-10-01T00:00:00.000Z",
+          "revokedAt": null
+        }
+      ],
+      "displayName": "tech-external-b"
+    },
+    {
+      "membershipId": "hq-operator",
+      "userId": "user-hq-operator",
+      "role": "admin",
+      "permissions": [
+        "dashboard.read",
+        "asset.manage",
+        "control.execute",
+        "device.manage",
+        "alert.resolve",
+        "job.manage",
+        "contract.manage",
+        "billing.manage",
+        "identity.manage",
+        "alert.policy.manage",
+        "automation.policy.manage",
+        "energy.manage",
+        "mrv.manage",
+        "offset.manage",
+        "audit.read"
+      ],
+      "tenantId": "tenant-a",
+      "validFrom": "2026-09-01T00:00:00.000Z",
+      "validUntil": "2026-10-01T00:00:00.000Z",
+      "organizationId": "org-operator-a",
+      "scopeVersion": 1,
+      "employment": null,
+      "scopes": [
+        {
+          "kind": "tenant",
+          "id": "tenant-a"
+        }
+      ],
+      "qualifications": [],
+      "displayName": "hq-operator"
+    },
+    {
+      "membershipId": "hq-restriction-manager",
+      "userId": "user-hq-restriction-manager",
+      "role": "admin",
+      "permissions": [
+        "dashboard.read",
+        "asset.manage",
+        "control.execute",
+        "device.manage",
+        "alert.resolve",
+        "job.manage",
+        "contract.manage",
+        "billing.manage",
+        "identity.manage",
+        "alert.policy.manage",
+        "automation.policy.manage",
+        "energy.manage",
+        "mrv.manage",
+        "offset.manage",
+        "audit.read",
+        "restriction.manage",
+        "restriction.override"
+      ],
+      "tenantId": "tenant-a",
+      "validFrom": "2026-09-01T00:00:00.000Z",
+      "validUntil": "2026-10-01T00:00:00.000Z",
+      "organizationId": "org-operator-a",
+      "scopeVersion": 1,
+      "employment": null,
+      "scopes": [
+        {
+          "kind": "tenant",
+          "id": "tenant-a"
+        }
+      ],
+      "qualifications": [],
+      "displayName": "hq-restriction-manager"
+    },
+    {
+      "membershipId": "hq-override-only",
+      "userId": "user-hq-override-only",
+      "role": "admin",
+      "permissions": [
+        "restriction.override"
+      ],
+      "tenantId": "tenant-a",
+      "validFrom": "2026-09-01T00:00:00.000Z",
+      "validUntil": "2026-10-01T00:00:00.000Z",
+      "organizationId": "org-operator-a",
+      "scopeVersion": 1,
+      "employment": null,
+      "scopes": [
+        {
+          "kind": "tenant",
+          "id": "tenant-a"
+        }
+      ],
+      "qualifications": [],
+      "displayName": "hq-operator"
+    }
+  ],
+  "defaultLocale": "en",
+  "defaultTimezone": "Asia/Kuala_Lumpur",
+  "defaultCurrency": "MYR",
+  "defaultWaitMs": 300,
+  "energy": {
+    "from": "2026-09-14T00:00:00.000Z",
+    "to": "2026-09-14T01:00:00.000Z",
+    "slotSeconds": 60,
+    "slotCount": 60,
+    "powerKwEachSlot": 80,
+    "baselineKWh": 100,
+    "tariffMyrPerKWh": 0.5,
+    "factorKgPerKWh": 0.5,
+    "expectedKWh": 80,
+    "expectedCoverage": 1,
+    "baselineQuality": {
+      "kind": "modeled",
+      "coverage": null,
+      "expectedSlots": null,
+      "validSlots": null,
+      "sourceSnapshot": null
+    }
+  },
+  "note": "各試験はreset後に開始し、境界試験の時計/権限/状態はGivenで上書き。権限不足caseは対象permissionだけを除く。userIdは自己承認試験だけ同一へ上書き。Scope関係はverification §2と対応AT。これはアプリseed実装ではなく検証fixture仕様。",
+  "qualificationRequirements": {
+    "indoor": "demo_indoor",
+    "outdoor": "demo_outdoor",
+    "electrical": "demo_electrical"
+  },
+  "resourceGraph": [
+    {
+      "unitId": "unit-online-rto",
+      "propertyId": "property-home-a",
+      "customerOrgId": "org-customer-a",
+      "tenantId": "tenant-a"
+    },
+    {
+      "unitId": "unit-offline-rto",
+      "propertyId": "property-office-a",
+      "customerOrgId": "org-customer-a",
+      "tenantId": "tenant-a"
+    },
+    {
+      "unitId": "unit-non-rto",
+      "propertyId": "property-home-a",
+      "customerOrgId": "org-customer-a",
+      "tenantId": "tenant-a"
+    },
+    {
+      "unitId": "unit-limited",
+      "propertyId": "property-office-a",
+      "customerOrgId": "org-customer-a",
+      "tenantId": "tenant-a"
+    },
+    {
+      "unitId": "unit-other-customer",
+      "propertyId": "property-home-b",
+      "customerOrgId": "org-customer-b",
+      "tenantId": "tenant-a"
+    }
+  ],
+  "defaultEmissionFactorId": "factor-demo-2026",
+  "emissionFactorFixture": {
+    "id": "factor-demo-2026",
+    "version": 1,
+    "kgPerKWh": 0.5,
+    "source": "1A demo fixed; not a real regional factor"
+  },
+  "airPolicyNotificationInput": {
+    "severity": "warning",
+    "channels": [
+      "inApp"
+    ],
+    "cooldownMinutes": 5,
+    "escalateAfterMinutes": 60,
+    "note": "受入Givenの明示入力例。新規フォームの既定値ではない"
+  },
+  "powerClassification": {
+    "snapshotAt": "2026-09-14T01:00:00.000Z",
+    "connection": "online",
+    "observedAt": "2026-09-14T00:59:30.000Z",
+    "measurementQuality": "valid",
+    "powerMeasurementValue": 1,
+    "sensorStaleAfterSeconds": 120,
+    "boundary": "age=120s valid; age=120s+1ms unknown"
+  },
+  "reviewResolution": {
+    "policyDefaults": {
+      "timezone": "Asia/Kuala_Lumpur",
+      "enabled": false,
+      "priority": 50
+    },
+    "notificationClassification": [
+      {
+        "alertType": "maintenance",
+        "notificationType": "cleaning_due"
+      },
+      {
+        "alertType": "sensor",
+        "notificationType": "fault"
+      }
+    ],
+    "actualBoundaryId": "ac_input_electricity",
+    "mismatchBaselineBoundaryId": "whole_building_electricity",
+    "rawUnitMismatch": {
+      "metric": "power",
+      "unit": "W",
+      "value": 1000,
+      "expectedValue": null,
+      "expectedQuality": "suspect",
+      "expectedReason": "unit_mismatch"
+    },
+    "originCoverage": {
+      "slotCount": 3,
+      "origins": [
+        "measured",
+        "estimated",
+        "inspection"
+      ],
+      "expectedValidSlots": 1
+    },
+    "factTTLSeconds": {
+      "weather_temperature": 1800,
+      "tariff": 300,
+      "solar": 120,
+      "battery": 120,
+      "occupied": 120,
+      "peak": 120,
+      "location": 0
+    },
+    "sessionEpochSequence": [
+      "signIn:A",
+      "switch:B",
+      "switch:A",
+      "signOut",
+      "signIn:A",
+      "expire",
+      "reset"
+    ],
+    "memoryRetention": "until reset; long-running capacity deferred"
+  }
+}

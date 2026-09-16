@@ -19,7 +19,7 @@
 
 ```yaml
 task_id: AC-000
-document_version: 0.7.0
+document_version: 0.10.0
 spec_baseline_id: null
 spec_files: [] # pathとsha256。要件・設計・AT・共通契約・出所を含む
 acceptance_manifest_hash: null

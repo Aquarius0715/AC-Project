@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.7.0
+version: 0.17.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -14,6 +14,8 @@ scope: frontend-demo-1A
 この文書の業務目的は、[企業要件原文](../00-prepare/sources/company-requirements-original.txt)から整理したBIZ項目と、[共通要件](../01-requirements/common.md)にもとづきます。型・Repository(データを取り出す仕組み)・キャッシュ(一時保存)・権限ガード(アクセス制限)・モック状態は、その目的をフロントエンドで実現するための設計案です。将来、実際のAPIを導入するときは、表示用データへの変換をadapter(変換の仕組み)にまとめます。サーバー側の認証・データベース・通信の取り決めは、この文書では決めません。
 
 設計の対象になる機能・画面項目・状態・例外は、企業原文と対応する要件をもとにします。各FR(機能要件)を満たすための処理と、受入条件(合格の基準)をこの文書で決めます。参考にしているモック画面は、共通UIの見た目を考えるためだけに使います。
+
+**0.17.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 1. 構成と責任
 
@@ -31,7 +33,7 @@ src/
     components/       StatusBadge, MetricCard等の共通業務表示
     styles/           tokens.css
     config/           demo-settings, locale-settings
-    i18n/             en, ja
+    i18n/             en, ms
 tests/                unit, component, contract, e2e
 ```
 
@@ -47,10 +49,11 @@ tests/                unit, component, contract, e2e
 |---|---|
 | /login | 架空のアカウントと4つの役割を選ぶ画面。「本物の認証ではない」ことを表示する |
 | /forgot-password | メールの形式を確認したあと、「そのメールが存在するかどうか」は教えない案内を出す。送信はプレビューのみ |
-| /settings/preferences | 言語、表示するタイムゾーン、デモ用の通貨、同意の設定 |
+| /settings/preferences | 言語、表示するタイムゾーン、デモ通貨MYRの読取表示、同意の設定 |
 | /notifications | 自分の担当範囲内の通知一覧と既読の管理。業務の状態そのものとは別 |
 | /demo | シナリオの切り替え、失敗イベントの発生、デモ用の時計、リセット。デモ専用の画面 |
-| /forbidden、未定義のルート | アクセスできないとき、ページが見つからないときの表示。許可されている範囲のホーム画面へ戻す |
+| /forbidden | アクセスできないときの表示。許可されている範囲のホーム画面へ戻す |
+| `*`（未定義のルート） | ページが見つからないときの表示（SCR-X-not-found）。D01のnot-found文言と同じ。許可されている範囲のホーム画面へ戻す |
 
 共通ヘッダーには、言語切り替え・通知・音声/テキストの切り替え・サインアウトを置きます。デモ用の役割切り替えは、専用のメニューにして、通常業務での「ユーザー変更」とは分けます。
 
@@ -61,6 +64,7 @@ tests/                unit, component, contract, e2e
 - error(エラー): 再試行のボタン
 - offline(通信できない): 最後に更新した時刻と、操作できない理由
 - stale(古いデータ): 「これは古い値です」という注記
+- 描画例外: 共通ErrorBoundaryがcorrelationId付きの全画面errorを表示し、白画面にしない(IR44)
 
 見る権限がないだけなのに、empty(データなし)のふりをして誤魔化してはいけません。404(見つからない)と403(権限なし)は、「本当は存在するかどうか」を悟られない同じような文言にそろえます。
 
@@ -75,17 +79,17 @@ tests/                unit, component, contract, e2e
 - 変わりうるデータには`version: number`(バージョン番号)をつける
 - デモ用のIDも、あとから値を変えない
 
-null(値がない)と「未登録」は、schema(データの形式ルール)で意味を分けます。知らないenum(選択肢の値)が来たときは、unsupported(対応していない)として安全に扱います。
+null(値がない)と「未登録」は、schema(データの形式ルール)で意味を分けます。知らないenum(選択肢の値)が来たときは、D01に従いUNAVAILABLEとして扱います。
 
 | エンティティ | 主なフィールドと関係 |
 |---|---|
-| User / Membership | userId、organizationId、role(client/contractor/technician/admin)、employment(internal/external/null)、permissions[]、scopeIds[]、validFrom、validUntil。Userにひとつのroleだけを直接書き込まない |
+| User / Membership | userId、organizationId、role(client/contractor/technician/admin)、employment(internal/external/null)、permissions[]、scopes[]、validFrom、validUntil。Userにひとつのroleだけを直接書き込まない |
 | Organization / Customer | name、kind(customer/contractor/operator)、status / organizationId、serviceProfile。顧客のIDとUserのIDを分け、作成するときも管理しているテナントの中に限る |
 | ContractorOrganization / Assignment | contractorOrgId、jobId、technicianMembershipId、delegatedScope、validFrom/Until、status。委託した側のtenantと、受託した会社のIDを分ける |
 | Property / Space | customerOrgId、kind(home/office)、name / propertyId、parentSpaceId、kind(area/floor/room/space)。親子の階層が循環しないようにする |
 | ACUnit / Capability | spaceId、manufacturer、model、type(split)、installedAt、serviceScope / temperature(min,max,step)、modes[]、fanLevels[]、ventilation、control、sensors[] |
-| Device / Sensor | unitId、serial、connection(online/offline/unknown)、lastSeenAt、firmwareVersion / deviceId、metric、unit、calibrationAt、staleAfterSeconds |
-| Telemetry | unitId、sensorId?、metric、value:number\|null、unit、observedAt、receivedAt、origin(measured/estimated/inspection)、quality(valid/missing/stale/suspect)、isDemo |
+| Device / Sensor | unitId、serial、connection(online/offline/unknown/connecting/error)、lastSeenAt、firmwareVersion / deviceId、metric、unit、calibrationAt、staleAfterSeconds |
+| Telemetry | unitId、sensorId、metric、value:number\|null、unit、observedAt、receivedAt、origin(measured/estimated/inspection)、quality(valid/missing/stale/suspect)、isDemo |
 | Command | unitId、actorId、action:UnitActionまたは内部のRestrictionAction、diagnosticRunId?、status、requestedAt、sentAt?、acknowledgedAt?、expiresAt、failureCode?、idempotencyKey(重複防止のキー)、expectedVersion、correlationId |
 | Alert | unitId、type、severity(critical/warning/normal)、status、evidenceIds[]、detectedAt、acknowledgedAt?、resolvedAt?、resolutionReason?。normal(正常)は健康サマリーにも使う。open(未対応)のアラートを、勝手に正常へ変えてはいけない |
 | MaintenanceJob | unitId、alertIds[]、type(periodic/reactive/preventive)、status、contractorOrgId?、assignmentId?、requestedSlot、scheduledSlot?、dueAt、reportVersion?、draftReportRef?、costs[] |
@@ -116,19 +120,13 @@ interface CommandRepository {
 
 `DemoViewContext`は、今選んでいる架空のユーザー・役割・見られる範囲を表します。`DemoWriteOptions`は、同じデモ操作を二重に実行しないためのキーと、変更前のバージョンを持ちます。これらは、本番の認証方法やサーバー側の権限の仕組みを決めるものではありません。具体的な項目は、[フロントエンド入出力契約](implementation-contracts.md)を見てください。
 
-[操作カタログ](operation-catalog.csv)には、画面が必要とする119個のローカルサービス操作と、それぞれの入力・戻り値・使われる画面をまとめています。URL、HTTPのメソッド、データベースのテーブル、サーバー側のトランザクションは、ここでは決めません。
+[操作カタログ](operation-catalog.csv)には、画面が必要とする136個のローカルサービス操作と、それぞれの入力・戻り値・使われる画面をまとめています。URL、HTTPのメソッド、データベースのテーブル、サーバー側のトランザクションは、ここでは決めません。
 
-モックの操作結果は、次のどれかとして返します。
-
-- success(成功)
-- pending(受付中)
-- failed(失敗)
-- conflict(競合)
-- forbidden(閲覧・操作不可)
+モック操作の成功はServiceResult<T>、失敗はDomainErrorのrejectです。受付中は成功DTO内のCommand.status等で表し、Promiseの独自pending応答型は作りません。
 
 画面は、返ってきたDomainError(業務エラーの種類)に応じて、表示・入力内容の保持・再読み込みのどれをするか決めます。遅れて届いた古い応答は、操作IDと表示の世代(バージョン)で判定して無視します。役割を切り替える前の値を、あとから描画してはいけません。
 
-将来、実際のAPIが用意されたときも、画面が使うinterface(約束事)はそのまま残し、新しいadapter(変換の仕組み)で外部からの応答を画面用のデータに変換します。実際のAPI仕様・認証方式・通信の取り決めは、今回は決めません。
+将来、実際のAPIが用意されたときも、画面が使うinterface(約束事)はそのまま残し、新しいadapter(変換の仕組み)で外部からの応答を画面用のデータに変換する方針です。外部契約が確定するまでは差替えだけで接続可能とは保証しません。実際のAPI仕様・認証方式・通信の取り決めは、今回は決めません。
 
 ## 5. 状態遷移と整合性
 
@@ -164,7 +162,7 @@ interface CommandRepository {
 
 completed(完了)になったあとの追加作業は、新しいjobId(依頼ID)を作って別の依頼として扱います。担当を変えたあとの新しい担当者は、今のdraft(下書き)から新しい報告バージョンを作って作業を続け、古いバージョンや各点検のもとの作成者は変更しません。外注の報告を、自分で自分の作業を承認することはできません。同じuserId(ユーザーID)の人が、Membership(所属)を切り替えて別の担当者として承認することも禁止します。施工業者の品質担当がいないときは、HQにエスカレーション(引き上げて対応)します。顧客が正式に最終承認する仕組みは、OPEN-01でまだ決まっていないため、今回(1A)では結果を見ることと問い合わせまでにとどめます。
 
-Alert(異常通知)は、open(未対応)→acknowledged(確認済み)→resolved(解消)という順に進みます。resolved(解消)のあとにまた同じ異常が起きたときは、新しいAlertとして作り、previousAlertId(前のAlertとの関連)で紐づけます。resolved(解消)にするには、もう一度測定して条件を満たすか、HQまたは許可された診断者が理由をつけて確認する必要があります。Job(依頼)がcompleted(完了)になっただけで、自動的にresolved(解消)へは進めません。
+Alert(異常通知)は、open(未対応)→acknowledged(確認済み)→resolved(解消)という順に進みます。D08の継続回復または許可された手動解消ではopen→resolvedも許可します。resolved(解消)のあとにまた同じ異常が起きたときは、新しいAlertとして作り、previousAlertId(前のAlertとの関連)で紐づけます。resolved(解消)にするには、もう一度測定して条件を満たすか、HQまたは許可された診断者が理由をつけて確認する必要があります。Job(依頼)がcompleted(完了)になっただけで、自動的にresolved(解消)へは進めません。
 
 ### 支払い・制限
 
@@ -177,8 +175,8 @@ Payment(支払い)は、initiated(開始)→processing(処理中)→confirmed(�
 | scheduled | 原因になった請求がすべて入金確認された、または取消・猶予・例外になった | cancelled(取消) / scheduled(予定日を変える、または適用を保留し、理由をつける) |
 | requested | 対象設備から適用の応答がある | 全台成功ならapplied(適用済み)。一部が未応答ならrequestedのまま、設備ごとの状態を表示する |
 | requested | オフライン・失敗・期限切れ | requestedのまま、pendingReason(保留の理由)とcommandの結果を保持する。自動で成功にしたり、再送したりしない |
-| requested / applied | 原因になった請求がすべて入金確認された、または権限のある人が手動で解除する | release_requested(解除要求)。適用要求との競合を確認し、解除する意思を記録する |
-| release_requested | すべての対象で解除が確認できた | released(解除済み) |
+| requested / applied | 原因になった請求がすべて入金確認された、猶予・例外が設定された、強制解除された、または権限のある人がrestrictions.releaseで明示要求した(IR35) | release_requested(解除要求)。同一遷移でD03の設備別解除評価を行い、適用済みのonline設備にremove Commandを作る。release_requestedへのrestrictions.releaseは冪等 |
+| release_requested | すべての対象で解除または確定未適用の証跡が得られた（D03） | released(解除済み) |
 | release_requested | オフライン・失敗 | 保留の表示。もう一度確認するか、はっきり再試行する |
 
 requested(要求済み)以降に取り消したときは、「まだ何も適用されていない」と決めつけず、解除の流れに進めます。applied(適用済み)のあとに猶予・例外になった場合も、必要なら解除の要求を作ります。解除を要求したあとに、遅れて届いた「適用できた」という応答で、状態をapplied(適用済み)に戻してはいけません。各設備の観測値と、解除の要求内容をもう一度照合します。override(強制的な変更)は、支払いの記録そのものは変更しません。
@@ -199,11 +197,11 @@ Command(命令)とRestriction(制限)、Job(依頼)とAlert(異常通知)、Invo
 
 ## 6. Queryとデモ状態
 
-Query(データ取得)のキーは、`[tenantId, membershipId, scopeVersion, resource, id, normalizedFilters]`という組み合わせです。役割を切り替えたとき、またはサインアウトしたときは、古いリクエストと購読を中断し、キャッシュ(一時保存データ)を消してから、次の画面を表示します。権限が変わったときは、scopeVersion(担当範囲のバージョン)を更新します。
+Query(データ取得)のキーは、`[repositoryInstanceId, generation, viewEpoch, tenantId, membershipId, scopeVersion, resource, id, normalizedFilters, normalizedSort, cursor, limit]`という組み合わせです。役割を切り替えたとき、またはサインアウトしたときは、古いリクエストと購読を中断し、キャッシュ(一時保存データ)を消してから、次の画面を表示します。権限が変わったときは、scopeVersion(担当範囲のバージョン)を更新します。
 
 モックのRepository(データ管理の仕組み)は、同じブラウザタブの中に1つだけ存在します。正規化されたMap(データの一覧)とイベントの列を持ち、画面のuseState(画面ごとの状態)には複製しません。更新のイベントが起きたら、jobs/units/invoices/restrictionsなど、関係するQueryを無効化して取り直します。例えば、S02という報告完了のシナリオでは、job(依頼)と履歴を更新しますが、Alert(異常通知)の解消は別のイベントが来るまで待ちます。
 
-画面を再読み込みすると、最初のデモデータ(seed)に戻ります(DEC-07)。ログアウトすると、閲覧していたキャッシュや、まだ保存していない写真は消えますが、みんなで共有している架空の業務データは残ります。リセットの操作をすると、デモ用の時計・遅延の処理・購読・画像のURL・キャッシュ・業務データを、まとめて最初の状態に戻します。リセットする前に起きた「遅れて届くイベント」は、世代番号を使って無視します。
+デモ時計はseed時刻から実時間と同じ速さで進み、`demo.advanceClock`で前方へジャンプします。ジャンプはセッション寿命を消費しません(IR36)。画面を再読み込みすると、最初のデモデータ(seed)に戻ります(DEC-07)。ログアウトすると、閲覧していたキャッシュや、まだ保存していない写真は消えますが、みんなで共有している架空の業務データは残ります。リセットの操作をすると、デモ用の時計・遅延の処理・購読・画像のURL・キャッシュ・業務データを、まとめて最初の状態に戻します。リセットする前に起きた「遅れて届くイベント」は、世代番号を使って無視します。
 
 時計・IDの生成・成功や失敗の結果は、あとから差し替えられるようにします。乱数や実際の時刻に依存するテストは避けます。失敗・通信断・機器の取り外し・支払い・応答は、/demo画面からはっきり発生させられるようにします。テスト用に、次のような架空データを用意します。
 
@@ -230,3 +228,7 @@ Query(データ取得)のキーは、`[tenantId, membershipId, scopeVersion, res
 - 作り物の応答を使った、フロントエンドの検証方法。
 
 APIのパス・HTTPの方式・データベース・サーバー側の認証や認可・実際の決済・実際の通知・実際の機器制御は、この文書の設計対象ではありません。これらがまだ決まっていないことは、今回のフロントエンド文書を完成させる妨げにはなりません。
+
+0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
+
+現行0.17.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。

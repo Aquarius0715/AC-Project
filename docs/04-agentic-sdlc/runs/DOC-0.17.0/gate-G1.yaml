@@ -1,0 +1,19 @@
+gate_id: G1
+task_id: DOC-0.17.0
+gate_result: pending
+spec_baseline_id: 654be5e4973d1defe98cc875c8d585e292d58796b7205517b5a82e1b41b4d8df
+reviewer_agent: independent-review-fable-5.1 (本会話)
+specification_editor: independent-review-fable-5.1 (本会話、同一エージェント)
+orchestrator: independent-review-fable-5.1 (本会話)
+independent_post_correction_review: not_performed  # 修正後の再確認は同一エージェントの自己再レビュー。別主体による判定が必要
+self_rereview_after_correction: completed
+application_tests: not_run
+implementation_status: not_started
+production_connection_readiness: NOT_READY
+deployment_approval: false
+unresolved_findings: []
+resolved_findings: [FRV-001, FRV-002, FRV-003, FRV-004, FRV-005, FRV-006, FRV-007, FRV-008, FRV-009, FRV-010, FRV-011, FRV-012, FRV-013, FRV-014, FRV-015, FRV-016, FRV-017, FRV-018, FRV-019, FRV-020, FRV-021, FRV-022, FRV-023, FRV-024, FRV-025]
+pending_business_decisions: []
+proposed_reversible_decisions: [DEC-19, DEC-20, DEC-21, DEC-22, DEC-23, DEC-24]
+traceability: {OK: 64, INCOMPLETE: 0, MISSING: 0, CONFLICT: 0}
+evidence_paths: [review.md, findings.json, traceability-matrix.csv, static-check.json]

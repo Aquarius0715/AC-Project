@@ -1,0 +1,18 @@
+{
+  "scope": "document-type-examples-only",
+  "command": [
+    "node",
+    "/private/tmp/ac-typescript-check/package/lib/tsc.js",
+    "--strict",
+    "--noEmit",
+    "--target",
+    "ES2022",
+    "--lib",
+    "ES2022,DOM",
+    "docs/04-agentic-sdlc/runs/DOC-0.15.0/contract-type-examples.ts"
+  ],
+  "exit_code": 0,
+  "output": "",
+  "spec_baseline_id": "f11600bc8735d2a10797b418bb13da76601b8021184a7d4cef6c2a70d355dd5f",
+  "application_tests": "not_run"
+}

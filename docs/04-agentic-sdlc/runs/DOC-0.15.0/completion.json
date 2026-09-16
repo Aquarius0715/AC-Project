@@ -1,0 +1,15 @@
+{
+  "task_id": "DOC-0.15.0",
+  "task_status": "done",
+  "scope": "frontend-demo-1A-document-review-and-correction",
+  "spec_baseline_id": "f11600bc8735d2a10797b418bb13da76601b8021184a7d4cef6c2a70d355dd5f",
+  "review_rounds": 2,
+  "corrected_independent_findings": 6,
+  "unresolved_findings": [],
+  "requirements_ok": 64,
+  "readiness_ready": 10,
+  "gate_result": "passed",
+  "review_evidence": "independent-round-2.json",
+  "application_tests": "not_run",
+  "deployment_approval": false
+}

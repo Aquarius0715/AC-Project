@@ -1,0 +1,17 @@
+gate_id: G1
+task_id: DOC-0.9.0
+gate_result: pending
+spec_baseline_id: 16946120bd4f12d4d4fd71dd56a161c1ac606cd2b92f9e595e54e2fdf01bff0f
+spec_manifest: spec-manifest.json
+self_review: completed_for_specified_changes
+independent_review: not_run
+application_tests: not_run
+typescript_contract_check: passed
+pending_business_decisions: []
+business_decision: DEC-13
+user_decision: approved_all_three_recommendations
+notes:
+  - 21 findings have correction specifications and static checks; independent resolution review is not completed
+  - All 3 business decisions approved by the user on 2026-09-16; independent review remains pending
+  - DOC-0.8.0 approval applies only to that old manifest
+  - Scope remains 1A frontend mock documentation only

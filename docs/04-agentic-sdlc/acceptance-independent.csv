@@ -1,0 +1,8 @@
+case_id,finding_id,contract,given,when,then,execution_status
+AT-IND-001,IND-001,invoices.get/DD-A08,HQ billing.manage、Invoiceにprocessing Payment p1/v2,画面再訪→請求選択→invoices.get→p1/v2でpayments.confirm,InvoiceDetail.paymentRefsからID/版を取得できる。不存在ID推測なし。旧Payment版はCONFLICT,not_run
+AT-IND-002,IND-002,query-catalog.csv/D15,JobEventにoccurredAtのみ、接続offline Unit、state=received Inquiry,jobs.eventsのoccurredAt sort/禁止dueAt sort、units.status=offline、inquiries.status=received,occurredAt順。dueAt sortはVALIDATION。status aliasがそれぞれconnection/stateへ一意に適用,not_run
+AT-IND-003,IND-003,DD-C11/DD-A08/PaymentMethod,未払いInvoice・Payment0、UI paymentChoice=demo_instructions,instructionsで案内、続いて手動入金、別fixtureで両カードの処理中/失敗/成功,案内はPayment0/Invoice方法不変、手動method=null。カードmethodは2種のみ。method=demo_instructions送信はVALIDATION,not_run
+AT-IND-004,IND-004,notifications.recipients/preview/D15,P07の有効委託job、宛先複数。別fixtureで候補0,候補取得→Membership選択→messageだけでpreview、policy保存も候補照合,候補DTOはid/role/displayLabel/allowedChannelsのみ、連絡先なし。paramsはRepository生成、入力params拒否。候補0は送信不可,not_run
+AT-IND-005,IND-005,alerts.get/list/D15,HQ permissions=[alert.resolve]、scope内Alert。別HQはalert.policy.manageのみ,A05へ入る→それぞれ許可section読取→前者が根拠付きresolve,resolve担当はalerts.get/list成功、policy Queryを呼ばない。後者にresolve許可を流用しない。scope外はNOT_FOUND,not_run
+AT-IND-006,IND-006,Condition/DD-C05/DD-A11,weather条件metric=temperature、Fact.metric=weather_temperature,正規Condition保存、temperature_c入力、params wrapper入力,正規型だけ保存成功。不正enum/wrapperはVALIDATION。室温temperature Factで天候条件を成立させない,not_run
+AT-IND-007,IND-007,plans.list/get/generateNext/D16,clock=2027-01-01、月間隔1/nextDueAt=2027-01-31T10:00Z,保存→離脱→再訪→get→1月回生成→2月回生成、1月回を別キーで再生成,planID/version再取得、Job必須値はD16通り、次回2/28→3/31。同回Job1件、別キー重複CONFLICT、同キー再送は既存結果,not_run

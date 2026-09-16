@@ -1,0 +1,20 @@
+{
+  "scope": "document-static-only",
+  "requirements": 64,
+  "acceptance_bundles": 182,
+  "role_details": 49,
+  "operations": 135,
+  "screens": 47,
+  "components": 57,
+  "query_contracts": 35,
+  "fix_cases": 36,
+  "independent_fix_cases": 7,
+  "strict_fix_cases": 21,
+  "pending_business_decisions": 0,
+  "write_version_branches": 92,
+  "spec_files": 45,
+  "baseline": "16946120bd4f12d4d4fd71dd56a161c1ac606cd2b92f9e595e54e2fdf01bff0f",
+  "application_tests": "not_run",
+  "typescript_semantic_check": "passed",
+  "errors": []
+}

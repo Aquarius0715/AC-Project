@@ -1,0 +1,80 @@
+{
+  "task_id": "DOC-0.16.0",
+  "review_id": "INDEPENDENT-G1-DOC-0.16.0",
+  "reviewer": "/root/independent_g1_016",
+  "spec_editor": "/root",
+  "independent": true,
+  "scope": "frontend-demo-1A-design-only",
+  "spec_baseline_id": "fe251845299c3b5d0a9d493683be3e70076111af3b290b8b01a8fa2f7450e0b2",
+  "gate_id": "G1",
+  "gate_result": "passed",
+  "readiness": "READY",
+  "evidence_status": "current",
+  "unresolved_findings": [],
+  "unresolved_count": 0,
+  "findings": [
+    {
+      "finding_id": "G1R-001",
+      "severity": "MINOR",
+      "finding_status": "resolved",
+      "summary": "Accepted decision provenance metadata missing; editor fixed and independent reviewer rechecked",
+      "document": "00-prepare/internal/review-decisions-016.json",
+      "retest_baseline": "fe251845299c3b5d0a9d493683be3e70076111af3b290b8b01a8fa2f7450e0b2"
+    }
+  ],
+  "previous_findings_rechecked": {
+    "REV-001": "resolved",
+    "REV-002": "resolved",
+    "REV-003": "resolved",
+    "REV-004": "resolved",
+    "REV-005": "resolved",
+    "REV-006": "resolved",
+    "REV-007": "resolved"
+  },
+  "checks": {
+    "manifest_sha256": {
+      "result": "passed",
+      "files": 55,
+      "mismatches": []
+    },
+    "canonical_baseline": {
+      "result": "passed",
+      "algorithm": "sha256 UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
+      "paths_sorted_unique": true
+    },
+    "document_static": {
+      "result": "passed",
+      "requirements": 64,
+      "operations": 136,
+      "screens": 47,
+      "components": 57,
+      "errors": []
+    },
+    "typescript_strict": "passed",
+    "semantic_review": "passed",
+    "application_tests": "not_run",
+    "performance_tests": "not_run",
+    "accessibility_tests": "not_run"
+  },
+  "semantic_scope": [
+    "REV-001..007 resolution",
+    "IR32..34 requirement/type/query/URL/screen/component/AT consistency",
+    "permission combinations and release-only projection",
+    "authorization-first audit search and resource links",
+    "public job projection sort/filter/null/tie/pagination",
+    "session/viewEpoch/snapshot expiry and delayed responses",
+    "related control/restriction/device/retry/report contracts",
+    "selected existing AT samples"
+  ],
+  "limitations": [
+    "No application implementation or execution",
+    "Static traceability for all 64 requirements is not exhaustive runtime proof",
+    "Long-duration memory bounds deferred under IR18",
+    "Production HTTP/authentication/DB/IoT excluded"
+  ],
+  "production_readiness": "NOT_READY",
+  "deployment_approval": "not_granted",
+  "report": "independent-g1-review.md",
+  "next_agent": "orchestration",
+  "next_action": "Record G1 passed for exactly this baseline; retain application tests not_run"
+}

@@ -1,0 +1,80 @@
+{
+  "review_id": "IND-DOC-0.8.0-2026-09-16",
+  "reviewer": {
+    "agent_id": "/root/independent_review",
+    "role": "independent_document_reviewer",
+    "separate_from_editor": true
+  },
+  "spec_baseline_id": "fb9aa0204aadc09f7af800529892194c06d5492a4ee1b1a6ea3c14560baf32e6",
+  "review_date": "2026-09-16",
+  "gate": "G1",
+  "result": "passed",
+  "scope": "frontend-demo-1A document implementation handoff only",
+  "documents_reviewed": [
+    "PrepareDocument and DEC-12 decision record",
+    "Requirements and requirement traceability",
+    "Detailed designs and deterministic contracts",
+    "TypeScript DTO/input/result contracts",
+    "Operation/query/screen catalogs",
+    "UI/UX specification",
+    "Verification and independent acceptance cases"
+  ],
+  "findings": [
+    {
+      "id": "IND-001",
+      "severity": "CRITICAL",
+      "status": "resolved",
+      "verification": "Source contracts and related screen/operation definitions reread; corresponding AT-IND case specified, application execution not performed."
+    },
+    {
+      "id": "IND-002",
+      "severity": "CRITICAL",
+      "status": "resolved",
+      "verification": "Source contracts and related screen/operation definitions reread; corresponding AT-IND case specified, application execution not performed."
+    },
+    {
+      "id": "IND-003",
+      "severity": "CRITICAL",
+      "status": "resolved",
+      "verification": "Source contracts and related screen/operation definitions reread; corresponding AT-IND case specified, application execution not performed."
+    },
+    {
+      "id": "IND-004",
+      "severity": "CRITICAL",
+      "status": "resolved",
+      "verification": "Source contracts and related screen/operation definitions reread; corresponding AT-IND case specified, application execution not performed."
+    },
+    {
+      "id": "IND-005",
+      "severity": "CRITICAL",
+      "status": "resolved",
+      "verification": "Source contracts and related screen/operation definitions reread; corresponding AT-IND case specified, application execution not performed."
+    },
+    {
+      "id": "IND-006",
+      "severity": "CRITICAL",
+      "status": "resolved",
+      "verification": "Source contracts and related screen/operation definitions reread; corresponding AT-IND case specified, application execution not performed."
+    },
+    {
+      "id": "IND-007",
+      "severity": "CRITICAL",
+      "status": "resolved",
+      "verification": "Source contracts and related screen/operation definitions reread; corresponding AT-IND case specified, application execution not performed."
+    }
+  ],
+  "open_findings": [],
+  "checks": {
+    "independent_document_rereview": "passed",
+    "static_validator": "passed, 64 requirements / 131 operations / 47 screens / 42 manifest files; matching baseline",
+    "typescript_semantic_check": "not rerun by independent reviewer; editor reports passed",
+    "application_tests": "not_run"
+  },
+  "limitations": [
+    "This is a document gate, not a claim that the implementation works or that no future defects exist.",
+    "New AT-IND-001 through AT-IND-007 are acceptance specifications; execution remains not_run.",
+    "Production API/auth/backend/DB/IoT execution contracts are outside 1A and are not approved.",
+    "Human and external reviewer final checks remain required before deployment per user decision."
+  ],
+  "review_record": "docs/05-document-review/independent-review-current.md (gitignored working review record)"
+}

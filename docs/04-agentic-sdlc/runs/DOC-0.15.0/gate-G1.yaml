@@ -1,0 +1,30 @@
+gate_id: G1
+task_id: DOC-0.15.0
+gate_result: passed
+spec_baseline_id: f11600bc8735d2a10797b418bb13da76601b8021184a7d4cef6c2a70d355dd5f
+reviewer_agent: /root/independent_review
+specification_editor: /root
+orchestrator: /root
+independent_review: completed_round_2
+application_tests: not_run
+implementation_status: not_started
+production_connection_readiness: NOT_READY
+deployment_approval: false
+resolved_findings: [IRV-001, IRV-002, IRV-003, IRV-004, IRV-005, IRV-006]
+unresolved_findings: []
+new_findings: []
+requirements_ok: 64
+implementation_readiness_ready: 10
+validator_mutation_checks: 27_passed
+evidence_paths:
+  - independent-round-2.md
+  - independent-round-2.json
+  - independent-round-2-traceability.csv
+  - static-check.json
+  - validator-negative-checks.json
+  - contract-type-examples-result.json
+  - baseline-integrity-check.json
+supersedes_evidence:
+  - ../DOC-0.14.0/independent-round-1.md
+  - ../DOC-0.14.0/gate-G1.yaml
+deferred_requirement_candidates: [REV-018]

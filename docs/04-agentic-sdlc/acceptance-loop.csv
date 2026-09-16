@@ -1,0 +1,6 @@
+finding_id,case_id,requirement_ids,given,when,then,contract,execution_status
+REV-001,AT-LOOP-001,FR-P01;FR-P02;FR-X04,Property.address=Site A、別顧客のSite B、自社未受諾Offer,jobs.list/getを取得、住所変更、期限終了,自社はSite Aのみ、他社は非公開、新snapshotは変更住所、期限後historyは住所なし,02-design/review-resolution-contracts.md#ir25-設置場所の住所と期限後の報告表示,not_run
+REV-002,AT-LOOP-002,FR-P01;FR-P08;FR-T01;FR-X04,報告なし、未受理版、受理版、受理旧版と未受理新版、本文に住所,アクセス終了後にjobs.list/get、言語変更、後続受理,3通りのReportHistorySummaryのみ、最新可視版で判定、本文なし、期限後の値は不変,02-design/review-resolution-contracts.md#ir25-設置場所の住所と期限後の報告表示,not_run
+REV-003,AT-LOOP-003,FR-P01;FR-T01,有効summaryとoffer/historyが混在,同じstatus/severity/periodで一覧と集計を取得,認可・投影後の同じ集合で算定、customerへ案件条件はVALIDATION,02-design/review-resolution-contracts.md#ir26-案件集計の検索条件,not_run
+REV-004,AT-LOOP-004,FR-A04;FR-C04;FR-C05;FR-X06,有効なAutomationが能力変更で不適合,能力保存、automation再取得、未修正で再有効化、修正後再有効化,disabledReason=capability_changed、未修正拒否、修正後はenabled=true/理由null、顧客に監査権限不要,02-design/review-resolution-contracts.md#ir27-自動運転の停止理由,not_run
+REV-005,AT-LOOP-005,FR-A04,機種新規または既存更新、理由省略/空/1文字,capabilities.save,新規省略可、更新省略と空はVALIDATION、副作用0、有効理由で更新可,02-design/review-resolution-contracts.md#ir28-機種保存の理由入力,not_run

@@ -1,6 +1,6 @@
 ---
 document_id: UX-COMMON
-version: 0.7.0
+version: 0.17.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -10,6 +10,8 @@ scope: frontend-demo-1A
 # 共通UIUX仕様書
 
 この文書は、4つの役割すべてに共通する、実装・操作・表示のルールを定める。ワイヤフレーム(画面のラフな下書き)や画面配置図は、この文書の対象外である。各画面の業務処理については[詳細設計](../02-design/common.md)を見てほしい。使用するライブラリは、DEC-02/03で決めた提案標準に従う。配色・書体・形状は、ユーザーが指定したLoyaltyページから取得したHTML/CSSに合わせる。根拠と、値を補正した箇所については[参考デザイン分析](../00-prepare/reference-design-analysis.md)を見てほしい。
+
+**0.17.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 企業要望と共通UIUXへの展開
 
@@ -132,15 +134,16 @@ shadcnの`--primary`/`--background`/`--card`/`--muted`/`--border`は、上記の
 
 | 共通コンポーネント | 受け取る情報 | ルール |
 |---|---|---|
-| AppShell / RoleNavigation | role(役割)、許可されたルート、表示名 | ナビの表示と、サービスの利用可否の両方を確認する。現在いる場所はaria-currentで表現する |
+| AppShell / RoleNavigation | role(役割)、許可されたルート、表示名 | ナビの表示と、サービスの利用可否の両方を確認する。現在いる場所はaria-currentで表現する。音声切替は権限のない役割ではdisabledと理由表示(IR44) |
+| ErrorBoundary | fallback、correlationId | 描画時の未捕捉例外を全画面errorとして表示し、白画面にしない(IR44) |
 | MetricCard / TelemetryValue | value(値)/null、unit(単位)、origin(出所)、quality(データの品質)、observedAt(観測時刻)、isDemo(デモかどうか) | 未計測の場合は「— 未計測」と表示する。デモであること・推定であること・更新時刻を隠さない |
 | StatusBadge | domain(分類)、status(状態)、labelKey(表示名のキー) | 設備・通信・案件・請求の状態名は、それぞれ別の辞書で管理する。色だけで区別しない |
 | DataTable | columns(列)、rows(行)、sort(並び替え)、pagination(ページ分割)、rowAction(行の操作) | キーボードでもモバイルでも操作できるようにする。件数が多い表はページングする。行をクリックする操作だけに頼らない |
-| TimeSeriesChart | series(系列)、unit(単位)、quality(データの品質)、period(期間) | 欠測を線でつなげない。数値の表と凡例を併せて表示する。2軸を使う場合は単位を明示する |
+| TimeSeriesChart / EnergyChart | series(系列)、unit(単位)、quality(データの品質)、period(期間) | 欠測を線でつなげない。数値の表と凡例を併せて表示する。2軸を使う場合は単位を明示する |
 | CommandPanel | capability(能力)、observedState(観測された状態)、pendingCommand(処理中の操作)、permission(権限) | 要求中の状態を、成功トーストで上書きしない。対応できない理由を表示する |
 | ConfirmActionDialog | target(対象)、action(操作内容)、impact(影響)、reason(理由)、onConfirm(確定時の処理) | 制限・解除・試運転・ファームウェア更新・音声設定の変更など共通して使う。初期フォーカスは安全な選択肢に置く |
 | AsyncBoundary / EmptyState | status(状態)、messageKey(メッセージのキー)、retryAction(再試行の操作) | 持続的なエラーを、一時的なトーストだけで済ませない |
-| AuditTimeline / NotificationPreview | actor(操作した人)、time(時刻)、action(操作内容)、result(結果)、correlationId(相関ID) | 「プレビュー・未送信」であることを表示する。既読になったことと、業務が完了したことを区別する |
+| Timeline / NotificationPanel / NotificationPreview | actor(操作した人)、time(時刻)、action(操作内容)、result(結果)、correlationId(相関ID) | 「プレビュー・未送信」であることを表示する。既読になったことと、業務が完了したことを区別する |
 
 UI primitives(基本部品)は、業務用のRepositoryを直接呼び出さない。業務用のコンポーネントは、型のついたpropsとcallback(呼び出し関数)を受け取り、データの取得はfeature hook(機能ごとのhook)に任せる。役割による違いは、権限や表示するデータで表現し、同じコンポーネントをコピーして4つ保守するようなことはしない。
 
@@ -148,7 +151,7 @@ UI primitives(基本部品)は、業務用のRepositoryを直接呼び出さな�
 
 グラフや状態を示すカードは、概要から根拠・詳細へと段階的に確認できるようにする。期間・組織・単位は、常に分かる位置に表示する。成功・保留・失敗の状態を明確にし、エラーには次にすべき行動を添える。破壊的な操作の直後に「元に戻す」ボタンを出す場合も、実際に取り消せる操作のときだけにする。
 
-英語・マレー語のキー、複数形の扱い、長い翻訳文をきちんと検証する。時刻はIntl.DateTimeFormat、金額はIntl.NumberFormatを使って整形し、予約にはタイムゾーンを表示する。言語を変更しても、測定単位や、保存するUTC(協定世界時)の値を勝手に変えない。音声によるデモは、文字起こし・対象・操作内容を確認したうえで、通常のCommand(操作)として処理する。
+英語・マレー語のキー、複数形の扱い、長い翻訳文をきちんと検証する。msに欠けたキーはenへfallbackし、両方欠ければキー文字列を表示する。en/msのキー集合の一致はlintで検査する(IR44)。locale tagはen-MY/ms-MY、金額は「120.00 MYR」の順、温度は小数1桁、丸めは十進の四捨五入とする(IR44)。時刻はIntl.DateTimeFormat、金額はIntl.NumberFormatを使って整形し、予約にはタイムゾーンを表示する。言語を変更しても、測定単位や、保存するUTC(協定世界時)の値を勝手に変えない。音声によるデモは、文字起こし・対象・操作内容を確認したうえで、通常のCommand(操作)として処理する。
 
 WCAG 2.2 AAという基準を設計の目標とする。通常の文字はコントラスト比4.5:1以上、大きな文字は3:1以上とし、操作対象が見分けられるか、フォーカスの位置が見えるかを検証する。これは「基準に適合していると保証するもの」ではなく、実装時に検査するための基準である。[W3C公式クイックリファレンス](https://www.w3.org/WAI/WCAG22/quickref/)
 
@@ -160,7 +163,7 @@ WCAG 2.2 AAという基準を設計の目標とする。通常の文字はコン
 - フォーム、Query、URL、局所的なstateの役割分担ができていて、Effectを使う場合は、それぞれ外部と同期する理由があること。
 - 色・フォント・サイズ・余白がtokenを参照していることを確認し、状態を表す色には文字とアイコンも併用されていること。
 - loading(読込中)/empty(空)/error(エラー)/forbidden(禁止)/offline(オフライン)/stale(古い状態)の各表示と、送信に失敗したときに入力内容が保持されることを確認すること。
-- スマートフォン、キーボード操作、日英の切り替え、データの欠測、長い文章、音声の代替手段を含めて検証し、まだ実施していない項目は明記すること。
+- スマートフォン、キーボード操作、英語・マレー語の切り替え、データの欠測、長い文章、音声の代替手段を含めて検証し、まだ実施していない項目は明記すること。
 - 機器の確認が終わる前に成功と表示すること、実際の取引と誤解させる表現、CO₂の単位の混同、既読にしただけで異常が解消したように見せることがないこと。
 
 ## UX-08. 参考デザインに準拠した画面パターンと検収
@@ -181,3 +184,29 @@ PC向けのnav(ナビゲーション)は、1280px以上の画面幅では左側�
 業務画面での読みやすさ・操作性のために採用したルールは、ADAPT(調整)として記録する。360px、768px、1024px、1279px、1280px、1440pxの画面幅で、レイアウトの幅・折り返し・ナビの切り替え境界を検証する。入力を伴う業務画面では、44pxの操作領域を優先し、参考にしたページにある28pxの操作領域をそのままコピーしない。
 
 検収では、tokenの値、フォントの適用状況、カードの角丸14px、サイドバーの幅240/56px、ブレークポイント、主要なコンポーネントを、DOM(画面の構造)やcomputed style(実際に適用されているスタイル)で確認し、実装したときのスクリーンショットを記録する。参照ページとのピクセル単位の比較は、参照ページ側の描画基準を別途取得できた場合にだけ行う。行っていない場合を、行ったこととして合格にしない。
+
+## UX-09 画面・Componentの実装契約（0.17.0）
+
+[画面カタログ](screen-catalog.csv)で48 routeのScreen ID、対象role、FR/DD、入口/出口、URL選択、タブ、主要/補助Query、状態、入出力を定義する。[Component契約](component-contracts.csv)で表示責務・Props・State・Event・依存・Loading/Error/Emptyを定義する。単体ページに共通部品を合成し、データの変更はPageのRepository操作で行う。
+
+ボタン押下は入力検証→確認（制御・削除・制限・支払・提出/受理）→write→版付き結果→Query無効化→再表示。確認取消でwrite0。読取・選択・previewには破壊的確認を挿入しない。送信中は同じ操作disabled、別経路からの重複はD04のキーで防ぐ。成功は受付と機器応答を区別し、失敗時は入力・相関ID・再試行導線を保つ。通信offlineとDevice offline、connecting、error、staleは別表示とする。
+
+共同routeのC04/C05はschedule/event、C11/C12はpayment/restriction/inquiryをURL tabで選択する。部分失敗は補助Queryのパネルだけ、制御の能力/制限取得失敗は操作disabled。未測定と空リストと404を同じ状態にしない。残りの遷移・入力制約は確定契約D01/D09/D10/D13を参照する。
+
+0.9.0修正契約: [厳格レビュー修正契約](../02-design/strict-review-contracts.md)と[操作別版契約](../02-design/write-version-catalog.csv)を併読する。
+
+2026-09-16承認反映: 期間プリセットはSR17を適用。offset再試行ボタンはfailedだけに表示し、購入/償却の失敗段階をラベルへ出す（SR18）。契約編集拒否理由と制限取消/解除への導線はSR19に従う。
+
+現行0.17.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+
+0.14.0: IR25に従い、受諾前住所は設備の設置物件から取得し、期限後の報告表示は報告有無・受理状態だけを凍結する。
+
+P01/T01の一覧・集計条件はIR26で共通化する。C04/C05/A04の停止理由はIR27のdisabledReasonを表示する。機種フォームの理由の必須性はIR28の新規/更新分岐に従う。
+
+0.15.0: P01/T01の重大度はIR30の未解消アラート分類。normalを設備全体の健康保証と表示しない。自己承認拒否はIR31のFORBIDDENとして表示する。
+
+P05/A06の受理・差戻しボタンはWorkReport.reviewAvailabilityに従って無効化し、理由を表示する。直接呼出しはIR31でも拒否する。
+
+0.16.0: A16の必須監査Query・機器候補選択・URL復元・権限付き関連リンクはIR33。P01/T01の一覧・集計のunitIdsはIR32。
+
+案件一覧のソートはIR34。状態（業務順）・重大度・期限の項目と昇順/降順を選択でき、初期値は状態の業務順（昇順）。URL復元・cursor初期化・loading/error・キーボード操作・aria-sortを共通DataTableへ適用する。制限操作の表示はrestriction.manage/overrideの2権限で分ける。

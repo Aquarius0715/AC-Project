@@ -1,0 +1,65 @@
+{
+  "version": "0.16.0",
+  "scope": "frontend-demo-1A",
+  "decisions": [
+    {
+      "id": "DEC-17",
+      "issue_id": "REV-001",
+      "status": "accepted",
+      "question": "FR-A10の権限粒度: restriction.manage/overrideの2権限か、4操作を個別権限にするか",
+      "owner": "Product Owner / Security",
+      "selected": {
+        "permissions": [
+          "restriction.manage",
+          "restriction.override"
+        ]
+      },
+      "source": "ユーザー回答:「２種類にしましょうか」「ソート機能をつけてください。デフォルトは業務順でお願いします」",
+      "decision_status": "accepted",
+      "decided_by": "本会話のユーザー",
+      "decided_at": "2026-09-16",
+      "decided_at_precision": "day",
+      "answer": "２種類にしましょうか"
+    },
+    {
+      "id": "DEC-18",
+      "issue_id": "REV-005",
+      "status": "accepted",
+      "question": "Job.status sortの比較順: 明示した業務順か状態コードASCII順か",
+      "owner": "Product Owner / UI/UX",
+      "selected": {
+        "sortable_fields": [
+          "status",
+          "severity",
+          "dueAt"
+        ],
+        "directions": [
+          "asc",
+          "desc"
+        ],
+        "default_sort": {
+          "field": "status",
+          "direction": "asc"
+        },
+        "status_order": [
+          "requested",
+          "offered",
+          "accepted",
+          "assigned",
+          "in_progress",
+          "on_hold",
+          "submitted",
+          "rework_requested",
+          "completed",
+          "cancelled"
+        ]
+      },
+      "source": "ユーザー回答:「２種類にしましょうか」「ソート機能をつけてください。デフォルトは業務順でお願いします」",
+      "decision_status": "accepted",
+      "decided_by": "本会話のユーザー",
+      "decided_at": "2026-09-16",
+      "decided_at_precision": "day",
+      "answer": "これは、ソート機能をつけてください。デフォルトは業務順でお願いします"
+    }
+  ]
+}

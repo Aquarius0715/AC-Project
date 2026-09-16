@@ -1,0 +1,26 @@
+[
+  {
+    "case": "unchanged-copy",
+    "expected_exit": 0,
+    "actual_exit": 0,
+    "passed": true
+  },
+  {
+    "case": "modified-spec-rejected",
+    "expected_exit": 1,
+    "actual_exit": 1,
+    "passed": true
+  },
+  {
+    "case": "malformed-csv-rejected",
+    "expected_exit": 1,
+    "actual_exit": 1,
+    "passed": true
+  },
+  {
+    "case": "unknown-screen-operation-rejected",
+    "expected_exit": 1,
+    "actual_exit": 1,
+    "passed": true
+  }
+]

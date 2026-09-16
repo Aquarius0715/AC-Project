@@ -1,0 +1,92 @@
+{
+  "baseline": "f8e6cdd8387f1e623f69616518f41108e55ae9cd5f7ec4b223be5776238f4096",
+  "scope": "1A document correction and self re-review",
+  "rounds": [
+    {
+      "round": 1,
+      "findings": [
+        {
+          "issue_id": "REV-001",
+          "severity": "MAJOR",
+          "document": "02-design/service-contracts.ts",
+          "location": "JobOfferSummary / FR-P01",
+          "problem": "regionLabelの入力元が存在しない",
+          "why_it_matters": "設置場所との不一致と二重管理を招く",
+          "example_failure": "HQが案件ごとに地域を推測入力する",
+          "required_fix": "設置物件を唯一の取得元にする",
+          "suggested_revision": "IR25: siteAddress=Property.address、未登録null",
+          "status": "resolved_in_self_review"
+        },
+        {
+          "issue_id": "REV-002",
+          "severity": "CRITICAL",
+          "document": "02-design/review-resolution-contracts.md",
+          "location": "IR23 / JobHistorySnapshot",
+          "problem": "redactedReportSummaryが自由文で伏せ字規則がない",
+          "why_it_matters": "期限後の公開範囲を一意に実装できない",
+          "example_failure": "報告本文中の住所や電話番号が残る",
+          "required_fix": "承認された報告有無・受理状態のみにする",
+          "suggested_revision": "IR25: ReportHistorySummaryの3状態、最新可視版を終了時に凍結",
+          "status": "resolved_in_self_review"
+        },
+        {
+          "issue_id": "REV-003",
+          "severity": "MAJOR",
+          "document": "02-design/query-catalog.csv",
+          "location": "summaries.get / DD-P01・T01",
+          "problem": "案件画面の状態・重大度条件を集計APIが受け取れない",
+          "why_it_matters": "一覧とKPIの同条件要件が満たせない",
+          "example_failure": "warning一覧にcriticalの件数も表示する",
+          "required_fix": "案件集計のfilterと投影規則を一致させる",
+          "suggested_revision": "IR26: partner/technicianに案件条件を追加、customerは拒否",
+          "status": "resolved_in_self_review"
+        },
+        {
+          "issue_id": "REV-004",
+          "severity": "MAJOR",
+          "document": "02-design/service-contracts.ts",
+          "location": "RuleBase / AT-A04-B",
+          "problem": "能力変更時に停止理由を表示する要件に出力項目がない",
+          "why_it_matters": "顧客画面は監査権限なしで理由を取得できない",
+          "example_failure": "enabled=falseだけを表示し停止理由が消える",
+          "required_fix": "Repository生成の停止理由と消去条件を定義する",
+          "suggested_revision": "IR27: disabledReason、明示再有効化時の検証と解除",
+          "status": "resolved_in_self_review"
+        },
+        {
+          "issue_id": "REV-005",
+          "severity": "MAJOR",
+          "document": "02-design/service-contracts.ts",
+          "location": "capabilities.save / DD-A04",
+          "problem": "DDは理由が更新時のみ必須、型は新規にも必須",
+          "why_it_matters": "新規入力の実装が分岐する",
+          "example_failure": "新規登録で未定義のダミー理由を送る",
+          "required_fix": "新規任意・更新必須を型と検証に反映する",
+          "suggested_revision": "IR28: changeReason optional、既存IDでは非空必須",
+          "status": "resolved_in_self_review"
+        },
+        {
+          "issue_id": "REV-006",
+          "severity": "MINOR",
+          "document": "02-design/common.md",
+          "location": "§4",
+          "problem": "操作件数が135だがカタログは136",
+          "why_it_matters": "引継ぎ時に欠落と誤認する",
+          "example_failure": "136件を実装して余剰操作と判断される",
+          "required_fix": "実際のカタログ件数に一致させる",
+          "suggested_revision": "136へ訂正、検証器で件数照合",
+          "status": "resolved_in_self_review"
+        }
+      ]
+    },
+    {
+      "round": 2,
+      "focus": "修正6件の本文・DTO・カタログ・受入条件、旧住所禁止記述、報告版凍結、再有効化時の停止理由",
+      "new_findings": [],
+      "unresolved_in_reviewed_changes": 0
+    }
+  ],
+  "independent_review": "not_run",
+  "application_tests": "not_run",
+  "gate_result": "pending"
+}

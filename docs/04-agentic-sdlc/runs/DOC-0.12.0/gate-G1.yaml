@@ -1,0 +1,11 @@
+gate_id: G1
+task_id: DOC-0.12.0
+gate_result: pending
+spec_baseline_id: 254bd3088246362701d9816ab7cf4334a1d299e87cb93a347297363824bc36f0
+self_review: completed_document_scope
+independent_review: not_run
+application_tests: not_run
+corrected_findings: 8
+unresolved_findings_in_reviewed_changes: 0
+validator_mutation_checks: 12_passed
+deferred_requirement_candidates: [REV-018]

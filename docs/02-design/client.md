@@ -1,6 +1,6 @@
 ---
 document_id: DD-C
-version: 0.7.0
+version: 0.17.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -10,6 +10,8 @@ scope: frontend-demo-1A
 # クライアント 詳細設計書
 
 この文書では、クライアント(お客様)向け画面の機能・画面項目・状態・エラー(例外)を決めます。基準にするのは、企業の元の要件文書と、それに対応する要件です。各FR(機能要件)を満たすために必要な処理と、受け入れ条件(テストで確認する内容)を定義します。参考として用意したモック(見本画面)は、共通のUI(画面デザイン)の見た目を検討するためだけに使います。
+
+**0.17.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 入力・責務
 
@@ -23,19 +25,19 @@ scope: frontend-demo-1A
 
 | 設計ID / 要件 | ルート / 主コンポーネント | 取得・操作契約 | 入力・処理・検証 | 異常系と禁止事項 |
 |---|---|---|---|---|
-| DD-C01 / FR-C01 | `/customer` / `Overview` | `units.list, telemetry.summary, alerts.list` | 物件と期間で絞り込みます。絞り込み条件はURLに保存し、自分が見てよい設備だけを集計します | 「データがない」状態と「値が0」の状態を区別して表示します。値が古い場合は、更新時刻も一緒に表示します |
-| DD-C02 / FR-C02 | `/customer/properties` / `PropertyExplorer` | `properties.list, properties.save, properties.archive, spaces.list, spaces.save, spaces.archive, units.list` | 自分の組織が持つ物件の種類・名前・階層構造を作成・編集できます。親の場所IDが循環している場合や、他の物件を親に指定した場合は拒否します。設備の性能やメーカー台帳の編集はHQ(本部)だけが行えます | 設備が残っている場所は削除できません。削除した対象のURLを開くと、not-found(見つからない)と表示します。パンくずリスト(現在地を示すリンク)から上の階層へ戻れます |
-| DD-C03 / FR-C03 | `/customer/units/:id` / `UnitControl` | `units.get, commands.create, commands.get` | 設備の性能に応じて、温度の最小値・最大値・刻み幅、モード、風量の候補を作ります。内容を確認した後に変更(mutation)を実行します。現在の室温と設定値は、別々の欄に表示します | 拒否・期限切れ・失敗の理由を画面に表示します。その後、あらためて状態を確認してから、手動で再試行します |
-| DD-C04 / FR-C04 | `/customer/automations` / `AutomationEditor` | `automations.list, automations.save, automations.simulate, automations.fire` | 曜日を1つ以上、開始/終了時刻、タイムゾーン、対象設備、動作の指定を必須にします。日をまたぐ設定は、その旨を明示的に確認します | 条件が重複している場合は警告を出し、優先順位を表示します。利用制限中は、自動運転が発火しても実行を拒否し、理由を表示します |
-| DD-C05 / FR-C05 | `/customer/automations` / `AutomationEditor` | `consents.get, consents.update, automations.save, automations.simulate, automations.fire` | 条件の種類ごとに入力項目を切り替えます(判別union)。位置情報を使う同意については、何のために使うかを説明します。デモでは実際の位置情報は取得せず、「帰宅」「外出」といったイベントを手入力します | 同意を拒否した場合や位置情報が使えない場合は、手動操作か時刻指定の方式に切り替えます。利用履歴から生活パターンを推定する機能は、デモであることを明示します |
-| DD-C06 / FR-C06 | `/customer/energy` / `EnergyExplorer` | `energy.summary, baselines.list` | 期間は「開始<終了」とし、最大366日までとします(仮の値)。通貨、料金のバージョン、比較する期間、データの信頼度を表示します | データが欠けている場合は、集計に使えたデータの割合も一緒に表示します。推計で補った値を、実測値として扱いません |
-| DD-C07 / FR-C07 | `/customer/air-quality` / `AirQuality` | `telemetry.series, units.get, commands.create, commands.get` | 指標(何を測るか)と期間を選びます。換気を要求する場合は、その設備が換気(ventilation)の機能を持っているかを別途確認します | センサーがない場合は「対応していません」と表示します。送風を、外の空気を取り込む換気として扱いません |
-| DD-C08 / FR-C08 | `/customer/alerts` / `AlertInbox` | `alerts.list, notifications.markRead, notifications.list` | 重要度や未読かどうかで絞り込みます。通知のID(notificationId)と異常のID(alertId)は別々のものとして扱います | データの取得に失敗したときに、「異常はありません」という正常な状態のサマリーを表示してはいけません |
-| DD-C09 / FR-C09 | `/customer/maintenance` / `MaintenanceRequest` | `jobs.list, jobs.create, jobs.get, jobs.cancel, jobs.addNote, reports.get, attachments.getContent` | 設備ID(unitId)、種類、症状の説明(10〜2000文字)、これから先の希望日時を必須にします(仮の値)。この日時はあくまで「希望」であり、確定した予約ではありません | 同じ依頼が二重に送信されないようにします。希望の日時が使えない場合は、候補を選び直してもらいます。お客様が自分で取り消せるのは、まだ担当者が割り当てられていない依頼だけです |
-| DD-C10 / FR-C10 | `/customer/payments` / `BillingOverview` | `contracts.list, invoices.list` | 契約ID・請求状態で絞り込みます。金額は通貨の最小単位(例: 円やセントなど)で扱います | 自分が見てよい範囲を超えたデータは表示を拒否します。まだ請求が発生していない状態を、「支払いが滞っている」ように表示してはいけません |
-| DD-C11 / FR-C11 | `/customer/payments/:id` / `PaymentDemo` | `invoices.get, payments.simulate, notifications.preview` | 請求ID、デモ用の支払い方法、内容の確認を入力します。実際のカード番号などを入力する欄は作りません | 実際の送金は行いません。処理が終わっていないのに「完了しました」と表示してはいけません。再試行するときは、同じ冪等キー(重複防止用の識別子)を使います |
-| DD-C12 / FR-C12 | `/customer/payments/:id` / `RestrictionNotice` | `restrictions.forInvoice, commands.get, inquiries.create, inquiries.list` | 利用制限の内容は閲覧のみです。問い合わせを作る導線と、支払いへ進む導線を用意します。対象の設備と、適用しているルールのバージョンを表示します | オフラインのときは処理を保留します。お客様が自分で強制的に制限を解除する機能は用意しません |
-| DD-C13 / FR-C13 | `/customer/energy/offsets` / `OffsetPreview` | `energy.summary, offsets.preview, offsets.simulate, offsets.list` | 希望する量(0より大きい値)、対象期間、デモでの確認を入力します。実際の取引や認証を証明する番号は発行しません | 実際に減らせたCO2の量と、すでに使った(償却済みの)クレジットを別々に表示します。失敗した場合は、同じ申し込みを重複して作らないようにします |
+| DD-C01 / FR-C01 | `/customer` / `Overview` | `units.list`、`telemetry.summary`、`alerts.list`、`summaries.get` | 物件と期間で絞り込みます。絞り込み条件はURLに保存し、自分が見てよい設備だけを集計します | 「データがない」状態と「値が0」の状態を区別して表示します。値が古い場合は、更新時刻も一緒に表示します |
+| DD-C02 / FR-C02 | `/customer/properties` / `PropertyExplorer` | `properties.list`、`properties.save`、`properties.archive`、`spaces.list`、`spaces.save`、`spaces.archive`、`units.list` | 自分の組織が持つ物件の種類・名前・階層構造を作成・編集できます。親の場所IDが循環している場合や、他の物件を親に指定した場合は拒否します。設備の性能やメーカー台帳の編集はHQ(本部)だけが行えます | 設備が残っている場所は削除できません。削除した対象のURLを開くと、not-found(見つからない)と表示します。パンくずリスト(現在地を示すリンク)から上の階層へ戻れます |
+| DD-C03 / FR-C03 | `/customer/units/:id` / `UnitControl` | `units.get`、`commands.create`、`commands.get` | 設備の性能に応じて、温度の最小値・最大値・刻み幅、モード、風量の候補を作ります。内容を確認した後に変更(mutation)を実行します。現在の室温と設定値は、別々の欄に表示します | 拒否・期限切れ・失敗の理由を画面に表示します。その後、あらためて状態を確認してから、手動で再試行します |
+| DD-C04 / FR-C04 | `/customer/automations` / `AutomationEditor` | `automations.list`、`automations.save`、`automations.simulate`、`automations.fire`、`automations.nextRuns`、`units.list`、`units.get` | 曜日を1つ以上、開始/終了時刻、タイムゾーン、対象設備、動作の指定を必須にします。日をまたぐ設定は、その旨を明示的に確認します | 条件が重複している場合は警告を出し、優先順位を表示します。利用制限中は、自動運転が発火しても実行を拒否し、理由を表示します |
+| DD-C05 / FR-C05 | `/customer/automations` / `AutomationEditor` | `automations.save`、`automations.simulate`、`automations.fire`、`consents.get`、`consents.update`、`units.list`、`units.get` | 条件の種類ごとに入力項目を切り替えます(判別union)。位置情報を使う同意については、何のために使うかを説明します。デモでは実際の位置情報は取得せず、「帰宅」「外出」といったイベントを手入力します | 同意を拒否した場合や位置情報が使えない場合は、手動操作か時刻指定の方式に切り替えます。利用履歴から生活パターンを推定する機能は、デモであることを明示します |
+| DD-C06 / FR-C06 | `/customer/energy` / `EnergyExplorer` | `energy.summary`、`baselines.list`、`units.list` | 期間は「開始<終了」とし、最大366日までとします(仮の値)。通貨、料金のバージョン、比較する期間、データの信頼度を表示します | データが欠けている場合は、集計に使えたデータの割合も一緒に表示します。推計で補った値を、実測値として扱いません |
+| DD-C07 / FR-C07 | `/customer/air-quality` / `AirQuality` | `telemetry.series`、`units.get`、`commands.create`、`commands.get`、`units.list` | 指標(何を測るか)と期間を選びます。換気を要求する場合は、その設備が換気(ventilation)の機能を持っているかを別途確認します | センサーがない場合は「対応していません」と表示します。送風を、外の空気を取り込む換気として扱いません |
+| DD-C08 / FR-C08 | `/customer/alerts` / `AlertInbox` | `alerts.list`、`notifications.markRead`、`notifications.list` | 重要度や未読かどうかで絞り込みます。通知のID(notificationId)と異常のID(alertId)は別々のものとして扱います | データの取得に失敗したときに、「異常はありません」という正常な状態のサマリーを表示してはいけません |
+| DD-C09 / FR-C09 | `/customer/maintenance` / `MaintenanceRequest` | `jobs.list`、`jobs.create`、`jobs.get`、`jobs.cancel`、`jobs.addNote`、`reports.get`、`attachments.getContent`、`units.list` | 設備ID(unitId)、種類、症状の説明(10〜2000文字)、これから先の希望日時を必須にします(仮の値)。この日時はあくまで「希望」であり、確定した予約ではありません | 同じ依頼が二重に送信されないようにします。希望の日時が使えない場合は、候補を選び直してもらいます。お客様が自分で取り消せるのは、まだ担当者が割り当てられていない依頼だけです |
+| DD-C10 / FR-C10 | `/customer/payments` / `BillingOverview` | `contracts.list`、`invoices.list` | 契約ID・請求状態で絞り込みます。金額は通貨の最小単位(例: 円やセントなど)で扱います | 自分が見てよい範囲を超えたデータは表示を拒否します。まだ請求が発生していない状態を、「支払いが滞っている」ように表示してはいけません |
+| DD-C11 / FR-C11 | `/customer/payments/:id` / `PaymentDemo` | `invoices.get`、`payments.simulate`、`notifications.preview`、`notifications.recipients` | 請求ID、デモ用の支払い方法、内容の確認を入力します。実際のカード番号などを入力する欄は作りません | 実際の送金は行いません。処理が終わっていないのに「完了しました」と表示してはいけません。再試行するときは、同じ冪等キー(重複防止用の識別子)を使います |
+| DD-C12 / FR-C12 | `/customer/payments/:id` / `RestrictionNotice` | `restrictions.forInvoice`、`commands.get`、`inquiries.create`、`inquiries.list` | 利用制限の内容は閲覧のみです。問い合わせを作る導線と、支払いへ進む導線を用意します。対象の設備と、適用しているルールのバージョンを表示します | オフラインのときは処理を保留します。お客様が自分で強制的に制限を解除する機能は用意しません |
+| DD-C13 / FR-C13 | `/customer/energy/offsets` / `OffsetPreview` | `energy.summary`、`offsets.preview`、`offsets.simulate`、`offsets.list`、`units.list` | 希望する量(0より大きい値)、対象期間、デモでの確認を入力します。実際の取引や認証を証明する番号は発行しません | 実際に減らせたCO2の量と、すでに使った(償却済みの)クレジットを別々に表示します。失敗した場合は、同じ申し込みを重複して作らないようにします |
 
 ## 実装の共通手順
 
@@ -58,7 +60,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06 BIZ-04, BIZ-08 → FR-C01 → DD-C01。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 集計する範囲と、データが欠けているときの表示方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
 
-対象: FR-C01 / 主な表示パターン: **UI-OVERVIEW**。この画面が使うサービス境界は`units.list, telemetry.summary, alerts.list`です。
+対象: FR-C01 / 主な表示パターン: **UI-OVERVIEW**。この画面が使うサービス境界は`units.list, telemetry.summary, alerts.list, summaries.get`です。
 
 **初期表示と前提**: 自分の組織に、利用できる設備が登録されていることを前提とします。設備が0件でも画面自体は開けます。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
 
@@ -149,7 +151,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06 BIZ-14 → FR-C04 → DD-C04。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 曜日入力と時間の重複に関するルール。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
 
-対象: FR-C04 / 主な表示パターン: **UI-LIST / UI-FORM**。この画面が使うサービス境界は`automations.list, automations.save, automations.simulate, automations.fire`です。
+対象: FR-C04 / 主な表示パターン: **UI-LIST / UI-FORM**。この画面が使うサービス境界は`automations.list, automations.save, automations.simulate, automations.fire, automations.nextRuns, units.list, units.get`です。
 
 **初期表示と前提**: 対象の設備がスケジュール制御に対応していることを前提とします。表示と保存に使うタイムゾーンを確定できることも前提です。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
 
@@ -162,7 +164,7 @@ scope: frontend-demo-1A
 | endsNextDay | boolean/必須 | 初期false | 日跨ぎ |
 | timezone | IANA文字列/必須 | 初期表示設定、存在するzone | 実行基準 |
 | startAction / endAction | UnitAction/必須 | 能力に適合 | 開始・終了動作 |
-| enabled | boolean/必須 | 新規false、保存後明示有効化 | 運転開始の意思 |
+| enabled | boolean/必須 | 新規false、確認画面で明示ONにしたsaveはtrue可 | 運転開始の意思 |
 
 **処理手順**
 
@@ -183,14 +185,14 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06 BIZ-14, BIZ-15, BIZ-17 → FR-C05 → DD-C05。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 同意の取り消しと、条件同士の優先順位。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
 
-対象: FR-C05 / 主な表示パターン: **UI-FORM**。この画面が使うサービス境界は`consents.get, consents.update, automations.save, automations.simulate, automations.fire`です。
+対象: FR-C05 / 主な表示パターン: **UI-FORM**。この画面が使うサービス境界は`automations.save, automations.simulate, automations.fire, consents.get, consents.update, units.list, units.get`です。
 
 **初期表示と前提**: 自動運転の対象と条件の種類を選べる状態であることを前提とします。位置情報を使う条件の場合は、目的ごとの同意が必要です。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
 
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
 | condition.type | enum/必須 | occupancy/location/pattern/weather | 条件種別 |
-| condition.value | 判別union/必須 | 在室有無、arrival/departure、予定時刻、天候比較 | 条件内容 |
+| condition（Condition型） | 判別union/必須 | 在室有無、arrival/departure、予定時刻、天候比較 | 条件内容 |
 | consentPurpose | enum/位置時必須 | location_automation | 利用目的 |
 | granted | boolean/位置時必須 | 初期false | 同意 |
 | action | UnitAction/必須 | 設備能力内 | 実行内容 |
@@ -216,7 +218,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06 BIZ-16, BIZ-23 → FR-C06 → DD-C06。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 比較する期間・料金のバージョン・データ品質の表示方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
 
-対象: FR-C06 / 主な表示パターン: **UI-ANALYSIS**。この画面が使うサービス境界は`energy.summary, baselines.list`です。
+対象: FR-C06 / 主な表示パターン: **UI-ANALYSIS**。この画面が使うサービス境界は`energy.summary, baselines.list, units.list`です。
 
 **初期表示と前提**: 自分の組織の設備について、期間ごとのデータがあることを前提とします。基準値や料金が設定されていなくても、実績データだけは閲覧できます。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
 
@@ -253,7 +255,7 @@ telemetry.seriesの空気環境の表示データに、allergenObservation(ア�
 
 **一次資料との対応**: SRC-06 BIZ-18, BIZ-19 → FR-C07 → DD-C07。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 換気機能の判定方法と、データが欠けているときの表示方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
 
-対象: FR-C07 / 主な表示パターン: **UI-ANALYSIS**。この画面が使うサービス境界は`telemetry.series, units.get, commands.create, commands.get`です。
+対象: FR-C07 / 主な表示パターン: **UI-ANALYSIS**。この画面が使うサービス境界は`telemetry.series, units.get, commands.create, commands.get, units.list`です。
 
 **初期表示と前提**: 空気環境用のセンサーがあるかどうかと、換気の機能があるかどうかを取得できることを前提とします。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
 
@@ -261,7 +263,7 @@ telemetry.seriesの空気環境の表示データに、allergenObservation(ア�
 |---|---|---|---|
 | spaceId / unitId | ID/いずれか必須 | 有効な対象。telemetry.seriesへはunitIdsまたはspaceIdで渡す | 測定場所 |
 | metric | enum/必須 | co2/pm25/temperature/humidity | 表示指標 |
-| period | enum/必須 | 1h/24h/7d、初期24h | 時系列 |
+| period | enum/必須 | 1h/24h/7d/custom、初期24h。1h/24hは[to-60分,to)/[to-1440分,to)の移動窓、7dはSR17暦日、toはUTC分境界(IR41) | 時系列 |
 | value / quality / observedAt | 読取 | nullと0を区別 | 測定根拠 |
 | ventilationAction | UnitAction/任意 | ventilation能力時のみ | 換気要求 |
 
@@ -318,7 +320,7 @@ alerts.listのAlert(異常データ)に、causeCode(原因コード。window_ope
 
 **一次資料との対応**: SRC-06 BIZ-12 → FR-C09 → DD-C09。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 予約・取り消し・案件の進み具合の扱い方。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
 
-対象: FR-C09 / 主な表示パターン: **UI-LIST / UI-FORM / UI-DETAIL**。この画面が使うサービス境界は`jobs.list, jobs.create, jobs.get, jobs.cancel, jobs.addNote, reports.get, attachments.getContent`です。
+対象: FR-C09 / 主な表示パターン: **UI-LIST / UI-FORM / UI-DETAIL**。この画面が使うサービス境界は`jobs.list, jobs.create, jobs.get, jobs.cancel, jobs.addNote, reports.get, attachments.getContent, units.list`です。
 
 **初期表示と前提**: 依頼の対象が、自分の組織の有効な設備であることを前提とします。RTO(契約の種類の一種)があるかどうかは、依頼できるかどうかの判断には使いません。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
 
@@ -329,6 +331,7 @@ alerts.listのAlert(異常データ)に、causeCode(原因コード。window_ope
 | symptom | 文字列/必須 | 10〜2000文字 | 症状 |
 | requestedStart / requestedEnd | ISO日時/必須 | 現在より未来、start<end | 希望枠 |
 | contactWindow | 文字列/任意 | 0〜200文字、実連絡先なし | 連絡可能時間 |
+| dueAt | 読取 | 顧客は入力不可。Repositoryが希望枠の終了時刻を保存(IR38) | 案件期限 |
 | cancelReason / note | 文字列/操作時必須 | 1〜1000 / 1〜2000文字 | 取消・調整依頼 |
 
 **処理手順**
@@ -356,7 +359,7 @@ alerts.listのAlert(異常データ)に、causeCode(原因コード。window_ope
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
 | contractId | ID/任意 | 自組織のみ | 契約選択 |
-| status | enum/任意 | all/unpaid/processing/paid/overdue | 請求絞込 |
+| status | enum/任意 | all/unpaid/processing/paid/overdue（UI値。overdueはoverdueOnly=trueへ、allはstatus省略へ変換） | 請求絞込 |
 | amountMinor / currency | 読取 | 整数、通貨セット | 金額 |
 | dueAt / paidAt | 読取 | UTC→表示zone | 期限・入金日 |
 | planType / unitIds | 読取 | rto/general/energy/environment | 適用契約 |
@@ -367,7 +370,7 @@ alerts.listのAlert(異常データ)に、causeCode(原因コード。window_ope
 2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
    - 契約が終了していることと、設備が使えなくなることは、同じ意味ではありません。
    - Invoice(請求)が遅延しているかどうかは、期限と未入金の残額から判断します。支払い処理中(payment processing)であっても、支払い済み(paid)とはしません。
-3. この画面は閲覧のみです。非RTO(契約の種類)の場合は「契約なし・一般保守」と表示し、監視画面への戻り先を用意します。
+3. 非RTOのgeneral/energy/environment契約は契約種別・期間・請求を表示します。この画面は閲覧のみです。契約が0件の場合だけ「契約なし・一般保守」と表示し、監視画面への戻り先を用意します。
 4. 更新の対象になるQuery: `contracts / invoices(閲覧のみ)`。
 
 **境界条件・失敗時**: お客様Bの請求ID(invoiceId)を、お客様Aが指定しても取得できません。支払い済み(paid)の請求に、「支払いを開始する」ボタンは表示しません。
@@ -378,20 +381,20 @@ alerts.listのAlert(異常データ)に、causeCode(原因コード。window_ope
 
 **カードの種類や案内方法を選ぶ画面の表示・処理設計(BIZ-22)**
 
-payments.simulateのmethod(支払い方法)を、demo_credit_card(デモ用クレジットカード)/demo_debit_card(デモ用デビットカード)/demo_instructions(デモ用の案内)にします。クレジットカードとデビットカードは同じ状態の流れを使い、選んだ種類を確認画面と支払い結果の両方に保持します。支払い手順を見るだけでは、paid(支払い済み)の状態には進みません。notifications.previewでは、請求ID・案内する連絡手段・選んだ支払い方法を表示します。実際のカード情報や銀行情報を入力する欄は作りません。
+画面のpaymentChoiceはdemo_credit_card/demo_debit_card/demo_instructionsです。カードはpayments.simulate(event=initiate)のmethodへカード2種だけを渡します。demo_instructions選択時はevent=instructionsとinvoiceId/demoConfirmedだけを渡し、Paymentを作らずInvoiceの方法・状態も変更しません。クレジットカードとデビットカードは同じ状態の流れを使い、選んだ種類を確認画面と支払い結果の両方に保持します。支払い手順を見るだけでは、paid(支払い済み)の状態には進みません。notifications.previewでは、請求ID・案内する連絡手段・選んだ支払い方法を表示します。実際のカード情報や銀行情報を入力する欄は作りません。
 
 検証: AT-C11-SRC。それぞれのカードの種類で、処理中・成功・失敗の各状態を再現します。履歴に記録される種類が、実際に選んだ種類と一致することを確認します。支払い手順を開いただけでは、未入金のままであることを確認します。
 
 **一次資料との対応**: SRC-06 BIZ-22 → FR-C11 → DD-C11。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 決済の状態と、通知プレビューの扱い方。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
 
-対象: FR-C11 / 主な表示パターン: **UI-DETAIL / UI-FORM**。この画面が使うサービス境界は`invoices.get, payments.simulate, notifications.preview`です。
+対象: FR-C11 / 主な表示パターン: **UI-DETAIL / UI-FORM**。この画面が使うサービス境界は`invoices.get, payments.simulate, notifications.preview, notifications.recipients`です。
 
 **初期表示と前提**: 未払いの請求があり、現在の金額が分かり、これがデモ用の決済であることが確認できることを前提とします。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
 
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
 | invoiceId | ID/必須 | 未払い請求 | 対象 |
-| method | enum/必須 | demo_credit_card/demo_debit_card/demo_instructions | 模擬手段 |
+| paymentChoice | UI enum/必須 | demo_credit_card/demo_debit_card/demo_instructions | カードはinitiate.method、案内はinstructionsイベントへ変換 |
 | channel | enum/プレビュー時 | email/whatsapp | 案内 |
 | demoConfirmed | boolean/必須 | 初期false | 模擬処理確認 |
 | outcome | enum/デモ制御側 | processing/confirmed/failed | 試験用イベント。通常フォームと分離 |
@@ -435,7 +438,7 @@ payments.simulateのmethod(支払い方法)を、demo_credit_card(デモ用ク�
 3. この画面では制限そのものは変更せず、支払いや問い合わせに関連するIDを渡すだけです。問い合わせはアプリ内のデモ受付であり、実際に外部へ送信することはありません。
 4. 更新の対象になるQuery: `inquiries / inquiry events(送信したときだけ)`。
 
-**境界条件・失敗時**: オフラインの設備が1台でも残っていれば、全体を「解除済み」とはしません。お客様がURLの書き換えやサービスの直接呼び出しで、制限を上書き(override)することはできません。
+**境界条件・失敗時**: オフラインで適用結果が不明の設備が残っていれば「解除済み」とはしません。D03の確定未適用はnot_requiredです。お客様がURLの書き換えやサービスの直接呼び出しで、制限を上書き(override)することはできません。
 
 **検証**: 追跡表のAT-C12配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
 
@@ -449,7 +452,7 @@ offsets.previewの表示結果に、marketConcept(市場構想に関する情報
 
 **一次資料との対応**: SRC-06 BIZ-23, BIZ-24, BIZ-25, BIZ-26 → FR-C13 → DD-C13。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: デモの申し込み・償却の状態・市場構想の表示方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
 
-対象: FR-C13 / 主な表示パターン: **UI-ANALYSIS / UI-FORM**。この画面が使うサービス境界は`energy.summary, offsets.preview, offsets.simulate, offsets.list`です。
+対象: FR-C13 / 主な表示パターン: **UI-ANALYSIS / UI-FORM**。この画面が使うサービス境界は`energy.summary, offsets.preview, offsets.simulate, offsets.list, units.list`です。
 
 **初期表示と前提**: 自分の組織に、算定の対象になる期間があることを前提とします。オフセット(排出権)の利用は任意です。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
 
@@ -473,3 +476,13 @@ offsets.previewの表示結果に、marketConcept(市場構想に関する情報
 **境界条件・失敗時**: 希望する量が0や負の値の場合、見積もりの有効期限が切れている場合、別のお客様の算定結果を指定した場合は、いずれも拒否します。デモの模擬償却と、外部の実際の認証を、同じ言葉で表示してはいけません。
 
 **検証**: 追跡表のAT-C13配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+
+条件フォームはCondition型のtype判別unionへ変換する。occupancyは{type,occupied}、locationは{type,event}、patternは{type,localTime}、weatherは{type,metric:"temperature",operator,value}、tariffは{type,operator,value,unit:"MYR_per_kWh"}、peakは{type,active}、solar/batteryは{type,operator,value,unit:"kW"}。paramsという追加wrapperは送らない。天候の評価Fact.metricはweather_temperatureとし、室温temperatureのFactとは混同しない。
+
+0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
+
+2026-09-16承認反映: C01/C06の期間境界はSR17。C13のretryはA15と同じSR18に従い、offsets.listで現在版とattemptIdを得る。
+
+現行0.17.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+
+案件一覧とjobs.listのソートはIR34を適用する。URL sort未指定はstatus:asc。選択変更でcursorを破棄し、filterを保持して新snapshotの初頁から取得する。状態/重大度/期限の昇降順を選べる。

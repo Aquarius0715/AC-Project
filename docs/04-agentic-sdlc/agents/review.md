@@ -1,13 +1,13 @@
 ---
 agent_id: review-agent
-version: 0.7.0
+version: 0.17.0
 status: proposed-agent-profile
 scope: frontend-demo-1A
 ---
 
 # レビューエージェントへの指示
 
-全員に共通する規則は[実行規約 §7](../README.md#7-全エージェント共通の規則各役割仕様から参照)と[成果物テンプレート](../templates/artifacts.md)を見てほしい。このファイルには、レビューエージェントだけに関わる内容だけを書く。
+全員に共通する規則は[実行規約 §7](../README.md#7-全エージェント共通の規則各役割の仕様文書から参照される)と[成果物テンプレート](../templates/artifacts.md)を見てほしい。このファイルには、レビューエージェントだけに関わる内容だけを書く。
 
 ## ミッション
 
@@ -56,3 +56,5 @@ scope: frontend-demo-1A
 ## 完了の条件
 
 合否とその根拠、未解決の指摘、必要な再検証の内容がはっきりしていること。
+
+0.9.0ではstrict-review-contracts.md、write-version-catalog.csv、acceptance-strict-review.csvも必須入力。SR17〜19は2026-09-16ユーザー承認済みの契約を適用する。独立レビュー/G1承認とは区別する。

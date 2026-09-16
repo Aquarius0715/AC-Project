@@ -1,0 +1,36 @@
+{
+  "scope": "validator-only",
+  "baseline": "16946120bd4f12d4d4fd71dd56a161c1ac606cd2b92f9e595e54e2fdf01bff0f",
+  "probes": [
+    {
+      "probe": "missing-job-version",
+      "expected_error": "Missing strict DTO invariant",
+      "detected": true
+    },
+    {
+      "probe": "missing-write-version-row",
+      "expected_error": "Write version coverage drift",
+      "detected": true
+    },
+    {
+      "probe": "missing-query-filter-type",
+      "expected_error": "Query filter not expressible",
+      "detected": true
+    },
+    {
+      "probe": "missing-screen-dependency",
+      "expected_error": "Missing strict screen dependency",
+      "detected": true
+    },
+    {
+      "probe": "missing-offset-attempt",
+      "expected_error": "Approved decision DTO missing",
+      "detected": true
+    },
+    {
+      "probe": "missing-restriction-contract-version",
+      "expected_error": "Approved decision DTO missing",
+      "detected": true
+    }
+  ]
+}

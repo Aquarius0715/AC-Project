@@ -1,0 +1,21 @@
+{
+  "task_id": "DOC-0.17.0",
+  "task_status": "in_review",
+  "scope": "frontend-demo-1A-independent-review-and-correction",
+  "spec_baseline_id": "654be5e4973d1defe98cc875c8d585e292d58796b7205517b5a82e1b41b4d8df",
+  "gate_result": "pending",
+  "unresolved_findings": [],
+  "resolved_findings": 25,
+  "proposed_decisions": [
+    "DEC-19",
+    "DEC-20",
+    "DEC-21",
+    "DEC-22",
+    "DEC-23",
+    "DEC-24"
+  ],
+  "independent_post_correction_review": "not_performed",
+  "application_tests": "not_run",
+  "production_connection_readiness": "NOT_READY",
+  "deployment_approval": false
+}

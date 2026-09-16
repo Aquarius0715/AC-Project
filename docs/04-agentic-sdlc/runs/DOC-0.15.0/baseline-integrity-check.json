@@ -1,0 +1,23 @@
+{
+  "baseline": "f11600bc8735d2a10797b418bb13da76601b8021184a7d4cef6c2a70d355dd5f",
+  "primary_sources": [
+    {
+      "path": "00-prepare/sources/company-requirements-original.txt",
+      "unchanged": true
+    },
+    {
+      "path": "00-prepare/sources/original-handover.md",
+      "unchanged": true
+    },
+    {
+      "path": "00-prepare/sources/production-instructions.md",
+      "unchanged": true
+    },
+    {
+      "path": "00-prepare/sources/reference-style-evidence.json",
+      "unchanged": true
+    }
+  ],
+  "baseline_files_verified": 53,
+  "application_tests": "not_run"
+}

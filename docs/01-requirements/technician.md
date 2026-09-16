@@ -1,6 +1,6 @@
 ---
 document_id: REQ-T
-version: 0.7.0
+version: 0.17.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -8,6 +8,8 @@ scope: frontend-demo-1A
 ---
 
 # 技術者 要件定義書
+
+**0.17.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 目的と前提
 
@@ -57,7 +59,7 @@ scope: frontend-demo-1A
 
 上の表は目次にあたるものです。ここから先は、各要件について「業務をいつ始められるか」「どんな手順で進むか」「どんな結果になるか」「合格の条件は何か」を詳しく説明します。
 
-受入条件の行にある①②…という番号は、書かれている順番のサブケース(細かい場合分け、例: AT-C01-E.01)を示します。「Given(前提)」側と「Then(結果)」側で同じ番号どうしが対応します。
+受入行の①②…はそのセル内の観測項目番号です。Givenの独立条件とThenの結果は記述内容で対応付け、複数assertionとcase IDを混同しません。失敗コードはD01の原因別優先表で一意に決定します。
 
 fixture(テスト用の決まったデータ)の名前は、[検証計画](../04-agentic-sdlc/verification.md)で決めた固定のfixtureを使います。
 
@@ -77,14 +79,14 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-T01-N | tech-external-a: job-contractor-a assigned（validUntil=2026-09-20）、他技術者のrequested1件。When: `/technician` today | ①担当1件、未着手1 ②他人のrequestedは非表示 ③書込み0件 |
-| AT-T01-E | ①now=validUntilで外部担当画面 ②別技術者のjobIdでstart | ①当該live設備を非表示 ②FORBIDDEN |
+| AT-T01-E | ①now=validUntilで外部担当画面 ②tech-external-aが別技術者だけのjobIdでstart | ①当該live設備を非表示 ②NOT_FOUND |
 | AT-T01-B | ①自分のassigned ②他人のrequested ③社内scope外 ④外部割当期間外 | ①表示 ②③④非表示 |
 
 設計: [DD-T01](../02-design/technician.md#dd-t01-詳細)。親ケースAT-T01は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
 ### FR-T02 設備台帳
 
-- **企業要望の根拠**: SRC-06 BIZ-06, BIZ-07, BIZ-10 — まずはHVAC(空調設備)を対象にし、その後メーカーや、分離型・中央空調・カセット型などへ対応を広げたい。自宅・オフィス、エリア・階・部屋・スペースごとに管理したい。室内機、室外機、電気・制御部品の状態を把握したい。
+- **企業要望の根拠**: SRC-06 BIZ-06, BIZ-07, BIZ-10 — Split Unit ACを第1段階とし、HVAC(空調設備)は第2段階で扱い、メーカー・機種の対応を広げたい。自宅・オフィス、エリア・階・部屋・スペースごとに管理したい。室内機、室外機、電気・制御部品の状態を把握したい。
 - **設計補完の範囲**: 設備台帳に載せる項目と、見るときの手順。
 
 - **利用開始条件**: 対象の設備について、見る権限のある担当関係にあること。
@@ -108,13 +110,13 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 - **利用開始条件**: 対象の設備のtelemetry(センサーなどのデータ)を見る権限があること。センサーがなくても、通信の情報は表示できる。
 - **基本フロー**: 見たい指標と期間を選ぶ → センサー・電力・運転状況・通信状況の値と時刻を確認する → デモ用の更新イベントで値が変わることを確認する → 通信が切れたときは、更新が止まっていることに気づけるようにする。
-- **業務規則 BR-T03**: 「観測した時刻」と「受け取った時刻」は分けて扱う。決められた秒数(staleAfterSeconds)を超えてデータが更新されていない場合は「古い(stale)」とみなす。古いイベントで、新しい値を上書きしてはいけない。データの系列ごとに単位は固定し、データが取れていない区間をつなげて表示しない。
+- **業務規則 BR-T03**: 期間プリセットは1h/24h/7d/customで、1h/24hは固定長の移動窓、7dは暦日(IR41)。「観測した時刻」と「受け取った時刻」は分けて扱う。決められた秒数(staleAfterSeconds)を超えてデータが更新されていない場合は「古い(stale)」とみなす。古いイベントで、新しい値を上書きしてはいけない。データの系列ごとに単位は固定し、データが取れていない区間をつなげて表示しない。
 - **完了後の業務状態**: 最新の値とグラフ(時系列)は、同じイベントID・同じバージョンで整合させる。画面から離れたり、見る範囲(scope)を変えたりすると、データの購読(受信)を止める。
 - **境界条件・禁止事項**: イベントの順番が入れ替わったり、重複したりしても、値が逆戻りしないようにする。通信が切れているときも、最後に受け取った値は時刻付きで残せるが、「リアルタイム」とは表示しない。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-T03-N | unit-online-rto、staleAfterSeconds=120。When: metric=temperature、24hで表示→/demoでevent version=4を発火→通信断 | ①系列と最新値が同じeventId／版 ②発火後に最新値更新 ③通信断で「更新停止」表示、購読解除 |
+| AT-T03-N | unit-online-rto、staleAfterSeconds=120。When: metric=temperature、24h(IR41の移動窓[to-1440分,to))で表示→/demoでevent version=4を発火→通信断 | ①系列と最新値が同じeventId／版 ②発火後に最新値更新 ③通信断で「更新停止」表示、購読解除 |
 | AT-T03-E | ①version=3の後に2と重複3を送る ②通信断にする | ①値が逆行しない、重複は無視 ②最後の値と時刻を残し「リアルタイム」表示なし |
 | AT-T03-B | ①観測から120秒 ②120秒+1ms ③系列途中にnull | ①valid ②stale ③欠測区間を線で連結しない |
 
@@ -134,7 +136,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-T04-N | in_progress案件、indoor 8部品。When: filter=attention（理由あり、写真1枚）、他7部品normalでドラフト保存→提出 | ①ドラフト保存でreportVersion=1 ②提出成功、8部品の結果・作者・観測時刻が版に紐付く ③センサー推定は別根拠として残る |
-| AT-T04-E | 提出時に ①result=null 1部品 ②測定に単位なし ③not_inspected理由なし ④他案件のattachmentId | 各VALIDATION、提出0件 |
+| AT-T04-E | 提出時に ①result=null 1部品 ②測定に単位なし ③not_inspected理由なし ④本人の閲覧scope内だが別案件のattachmentId | 各VALIDATION、提出0件 |
 | AT-T04-B | indoor 8部品を ①normal ②attention（理由あり） ③not_inspected（理由あり） ④not_applicable（理由あり） ⑤null で保存／提出 | ①〜④ドラフト保存可・提出可 ⑤ドラフト保存可・提出はVALIDATION。初期値はnullで「normal」が既定選択されない |
 
 設計: [DD-T04](../02-design/technician.md#dd-t04-詳細)。親ケースAT-T04は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
@@ -153,7 +155,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-T05-N | in_progress案件、outdoor 5部品。When: compressor=attention（理由あり）、他4部品normalでドラフト保存→提出 | ①ドラフト保存でreportVersion=1 ②提出成功、5部品の結果・作者・観測時刻が版に紐付く ③センサー推定は別根拠として残る |
-| AT-T05-E | 提出時に ①result=null 1部品 ②測定に単位なし ③not_inspected理由なし ④他案件のattachmentId | 各VALIDATION、提出0件 |
+| AT-T05-E | 提出時に ①result=null 1部品 ②測定に単位なし ③not_inspected理由なし ④本人の閲覧scope内だが別案件のattachmentId | 各VALIDATION、提出0件 |
 | AT-T05-B | outdoor 5部品を ①normal ②attention（理由あり） ③not_inspected（理由あり） ④not_applicable（理由あり） ⑤null で保存／提出 | ①〜④ドラフト保存可・提出可 ⑤ドラフト保存可・提出はVALIDATION。初期値はnull |
 
 設計: [DD-T05](../02-design/technician.md#dd-t05-詳細)。親ケースAT-T05は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
@@ -172,7 +174,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-T06-N | in_progress案件、electrical 5部品。When: capacitor=attention（理由あり、測定値付き）、他4部品normalでドラフト保存→提出 | ①ドラフト保存でreportVersion=1 ②提出成功、5部品の結果・作者・観測時刻が版に紐付く ③測定値にunit・observedAt・origin=inspection |
-| AT-T06-E | 提出時に ①result=null 1部品 ②測定に単位なし ③not_inspected理由なし ④他案件のattachmentId | 各VALIDATION、提出0件 |
+| AT-T06-E | 提出時に ①result=null 1部品 ②測定に単位なし ③not_inspected理由なし ④本人の閲覧scope内だが別案件のattachmentId | 各VALIDATION、提出0件 |
 | AT-T06-B | electrical 5部品を ①normal ②attention（理由あり） ③not_inspected（理由あり） ④not_applicable（理由あり） ⑤null で保存／提出 | ①〜④ドラフト保存可・提出可 ⑤ドラフト保存可・提出はVALIDATION。初期値はnull |
 
 設計: [DD-T06](../02-design/technician.md#dd-t06-詳細)。親ケースAT-T06は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
@@ -230,12 +232,12 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 - **基本フロー**: 点検・測定値・写真・交換した部品・作業内容・次回の対応を入力する → 下書きを保存する → 提出前にチェックする → 報告のバージョンを確定する。
 - **業務規則 BR-T09**: 報告には、作成者とバージョンの情報を残す。画像はJPEGまたはPNG形式で、1枚あたり5MiB以下、最大10枚まで。部品の数量は正の整数で入力する。次回の対応は「なし(none)」か、日時・内容をはっきり書く。サーバーから情報を再取得しても、まだ保存していない編集中の内容(dirty)は消さない。
 - **完了後の業務状態**: 保存に成功すると、下書きのバージョンが更新される。提出すると、確定した報告のバージョン(reportVersion)を案件(Job)に結びつける。写真を削除すると、一時的な画像データ(object URL)を解放する。
-- **境界条件・禁止事項**: 本文が9文字未満、または4001文字以上のとき、部品の数量が0のときは、提出を拒否する。偽のファイル形式、11枚目の画像、5MiBを超える画像は、追加自体を拒否する。画像の処理に失敗した場合は「失敗(failed)」と表示し、失敗した写真が残ったままでは提出できない。すでに保存済みの本文や画像は、そのまま残す。
+- **境界条件・禁止事項**: 本文が9文字以下、または4001文字以上のとき、部品の数量が0のときは、提出を拒否する。偽のファイル形式、11枚目の画像、5MiBを超える画像は、追加自体を拒否する。画像の処理に失敗した場合は「失敗(failed)」と表示し、失敗した写真が残ったままでは提出できない。すでに保存済みの本文や画像は、そのまま残す。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-T09-N | in_progress案件。When: 本文50文字、写真JPEG 1枚、部品1点、nextAction=noneでドラフト保存→提出 | ①draft version=1、Attachment status=ready ②提出でreportVersion固定、JobにreportRefs ③写真削除でobject URL解放 |
-| AT-T09-E | ①本文9／4001文字 ②偽MIME ③11枚目 ④5MiB+1byte ⑤部品数量0 ⑥failed写真が残る | ①⑤⑥提出VALIDATION ②③④追加拒否 ⑦保存済み本文・画像は保持 |
+| AT-T09-N | in_progress案件。When: 本文50文字、写真JPEG 1枚、部品1点、nextAction=noneでドラフト保存→提出 | ①初回本文保存はdraft version=1。写真追加後は版+1、Attachment status=ready。最新reports.getの版で提出 ②提出でreportVersion固定、JobにreportRefs ③写真削除でobject URL解放 |
+| AT-T09-E | ①本文9／4001文字 ②偽MIME ③11枚目 ④5MiB+1byte ⑤部品数量0 ⑥failed写真が残る | ①⑤⑥提出VALIDATION ②③④追加拒否 全ケースで保存済み本文・画像は保持 |
 | AT-T09-B | ①5MiBちょうどのJPEG／PNG各10枚 ②数量1 ③nextAction=follow_up（未来日時・内容） ④dirty中にreports.get再取得 | ①追加可 ②提出可 ③提出可 ④dirty値が保持される |
 
 設計: [DD-T09](../02-design/technician.md#dd-t09-詳細)。親ケースAT-T09は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
@@ -272,7 +274,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 - **利用開始条件**: `device.maintain`(機器の保守)権限があり、対象の設備を有効に担当していること。登録・校正・更新は、いずれもモック(見本の動き)。
 - **基本フロー**: 製品番号(serial)を登録する → 設備と結びつける → 接続を確認する → 校正した値と参照を記録する → 対応するファームウェアの候補を選んで更新する → 進行状況・結果を確認する。
-- **業務規則 BR-T11**: 製品番号は、前後の空白を取り除き、大文字にそろえて、同じものかどうかを判定する。校正をすると履歴が追加されるが、すでにある測定値は書き換えない。ファームウェアは、対応するバージョンの一覧からしか選べない。URLやファイルそのものを自由に入力させることはしない。
+- **業務規則 BR-T11**: 製品番号は、前後の空白を取り除き、大文字にそろえて、同じものかどうかを判定する。登録時のsensorTypesは対象設備の機種能力(Capability.sensors)にあるmetricだけを許し、単位・stale秒・境界は能力定義から複写する(IR43)。校正をすると履歴が追加されるが、すでにある測定値は書き換えない。ファームウェアは、対応するバージョンの一覧からしか選べない。URLやファイルそのものを自由に入力させることはしない。
 - **完了後の業務状態**: 機器(Device)、校正の記録(CalibrationRecord)、機器の操作履歴(DeviceOperation)を保存する。更新が成功(succeeded)した場合だけ、ファームウェアのバージョン(firmwareVersion)を更新する。更新中は、同時に別の操作をすることはできない。
 - **境界条件・禁止事項**: 製品番号の重複、別の設備への無断の結びつけ直し、単位が合わないことは、いずれも拒否し、台帳は変更しない。オフラインの状態では、ファームウェアの更新を開始しない。ファームウェアの更新に失敗した場合は「失敗(failed)」と表示し、古いバージョンのまま保持する。
 
@@ -309,3 +311,9 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 設計: [DD-T12](../02-design/technician.md#dd-t12-詳細)。親ケースAT-T12は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
+
+0.9.0修正契約: [厳格レビュー修正契約](../02-design/strict-review-contracts.md)と[操作別版契約](../02-design/write-version-catalog.csv)を併読する。
+
+現行0.17.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+
+案件一覧には状態（業務順）・重大度・期限の昇順/降順ソートを設ける。デフォルトは状態の業務順（IR34）。全対象を並べ替えてからページ分割し、言語切替では順序を変えない。受入はAT-REV16-005を併用する。

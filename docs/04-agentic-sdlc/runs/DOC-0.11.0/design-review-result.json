@@ -1,0 +1,203 @@
+{
+  "review_id": "SELF-CYCLE-DOC-0.11.0-2026-09-16",
+  "baseline": "43d3c2b9c31307109808c42d41a7c71b6cac91c12af81dceca7ed29c5d475648",
+  "prior_review": "INDEPENDENT-DOC-0.10.0-2026-09-16",
+  "prior_baseline": "5fe7520330a26332d3199983ab5dbaf10b0ba3d61f00367fc875cef06857151f",
+  "result": "self_review_complete_pending_independent_G1",
+  "original_findings_specified": 17,
+  "additional_findings_specified": 6,
+  "deferred_candidates": [
+    "REV-018"
+  ],
+  "cycles": [
+    {
+      "round": 1,
+      "work": "18 original findings disposition; 17 contract corrections; 1 future capacity candidate documented",
+      "review_focus": "projection, ownership, override-only route, reminders, notice, payment, policy, energy, voice, notification, raw normalization, acceptance, versions, export scope, facts, session"
+    },
+    {
+      "round": 2,
+      "work": "6 follow-through findings corrected",
+      "finding_ids": [
+        "RC-001",
+        "RC-002",
+        "RC-003",
+        "RC-004",
+        "RC-005",
+        "RC-006"
+      ],
+      "review_focus": "callers and catalog dependencies; limited authorization; generation paths"
+    },
+    {
+      "round": 3,
+      "work": "final cross-document scenario inspection, current baseline validation, strict TypeScript, 8 mutation checks",
+      "notes": "Policy name length kept at existing 120; form rows merged; detail operation lists synchronized; no further blocking issue identified by this self-review"
+    }
+  ],
+  "application_tests": "not_run",
+  "independent_review": "not_run",
+  "source_inputs": [
+    {
+      "path": "00-prepare/sources/company-requirements-original.txt",
+      "unchanged": true
+    },
+    {
+      "path": "00-prepare/sources/original-handover.md",
+      "unchanged": true
+    },
+    {
+      "path": "00-prepare/sources/production-instructions.md",
+      "unchanged": true
+    },
+    {
+      "path": "00-prepare/sources/reference-style-evidence.json",
+      "unchanged": true
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "REV-001",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-001",
+      "contract": "02-design/review-resolution-contracts.md#ir01-受諾と辞退の最小応答"
+    },
+    {
+      "finding_id": "REV-002",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-002",
+      "contract": "02-design/review-resolution-contracts.md#ir02-所有顧客の不変性"
+    },
+    {
+      "finding_id": "REV-003",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-003",
+      "contract": "02-design/review-resolution-contracts.md#ir03-強制解除専用権限"
+    },
+    {
+      "finding_id": "REV-004",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-004",
+      "contract": "02-design/review-resolution-contracts.md#ir04-督促の共有された模擬記録"
+    },
+    {
+      "finding_id": "REV-005",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-005",
+      "contract": "02-design/review-resolution-contracts.md#ir05-予告の時刻と証跡"
+    },
+    {
+      "finding_id": "REV-006",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-006",
+      "contract": "02-design/review-resolution-contracts.md#ir06-決済試行の排他"
+    },
+    {
+      "finding_id": "REV-007",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-007",
+      "contract": "02-design/review-resolution-contracts.md#ir07-policy共通フォーム"
+    },
+    {
+      "finding_id": "REV-008",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-008",
+      "contract": "02-design/review-resolution-contracts.md#ir08-電力量の由来"
+    },
+    {
+      "finding_id": "REV-009",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-009",
+      "contract": "02-design/review-resolution-contracts.md#ir09-音声変更の操作文脈"
+    },
+    {
+      "finding_id": "REV-010",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-010",
+      "contract": "02-design/review-resolution-contracts.md#ir10-通知の業務分類"
+    },
+    {
+      "finding_id": "REV-011",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-011",
+      "contract": "02-design/review-resolution-contracts.md#ir11-算定境界の識別"
+    },
+    {
+      "finding_id": "REV-012",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-012",
+      "contract": "02-design/review-resolution-contracts.md#ir12-生測定と正規測定"
+    },
+    {
+      "finding_id": "REV-013",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-013",
+      "contract": "02-design/review-resolution-contracts.md#ir13-現行受入条件の統一"
+    },
+    {
+      "finding_id": "REV-014",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-014",
+      "contract": "02-design/review-resolution-contracts.md#ir14-現行版の識別"
+    },
+    {
+      "finding_id": "REV-015",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-015",
+      "contract": "02-design/review-resolution-contracts.md#ir15-mrv出力の範囲"
+    },
+    {
+      "finding_id": "REV-016",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-016",
+      "contract": "02-design/review-resolution-contracts.md#ir16-factの鮮度と再利用"
+    },
+    {
+      "finding_id": "REV-017",
+      "disposition": "specified",
+      "case_id": "AT-RESOLVE-017",
+      "contract": "02-design/review-resolution-contracts.md#ir17-repository世代と閲覧世代"
+    },
+    {
+      "finding_id": "REV-018",
+      "disposition": "deferred_candidate",
+      "case_id": "AT-RESOLVE-018",
+      "contract": "02-design/review-resolution-contracts.md#ir18-長時間メモリ保持の扱い"
+    },
+    {
+      "finding_id": "RC-001",
+      "disposition": "specified",
+      "case_id": "AT-RC-001",
+      "contract": "02-design/review-resolution-contracts.md#ir03-強制解除専用権限"
+    },
+    {
+      "finding_id": "RC-002",
+      "disposition": "specified",
+      "case_id": "AT-RC-002",
+      "contract": "02-design/review-resolution-contracts.md#ir10-通知の業務分類"
+    },
+    {
+      "finding_id": "RC-003",
+      "disposition": "specified",
+      "case_id": "AT-RC-003",
+      "contract": "02-design/review-resolution-contracts.md#ir06-決済試行の排他"
+    },
+    {
+      "finding_id": "RC-004",
+      "disposition": "specified",
+      "case_id": "AT-RC-004",
+      "contract": "02-design/review-resolution-contracts.md#ir07-policy共通フォーム"
+    },
+    {
+      "finding_id": "RC-005",
+      "disposition": "specified",
+      "case_id": "AT-RC-005",
+      "contract": "02-design/review-resolution-contracts.md#ir12-生測定と正規測定"
+    },
+    {
+      "finding_id": "RC-006",
+      "disposition": "specified",
+      "case_id": "AT-RC-006",
+      "contract": "02-design/review-resolution-contracts.md#ir17-repository世代と閲覧世代"
+    }
+  ]
+}

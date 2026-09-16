@@ -1,0 +1,14 @@
+{
+  "version": "0.17.0",
+  "scope": "frontend-demo-1A",
+  "review_id": "INDEPENDENT-DOC-0.16.0-FRV-2026-09-16",
+  "note": "本レビューで修正担当が採用した可逆的な設計提案。README規約のPROPOSEDに相当し、1Aデモ実装は進行可能。企業承認・商用確定ではない。owner欄の役割は本番前に確認する担当候補。",
+  "decisions": [
+    {"id":"DEC-19","issue_id":"FRV-001","status":"proposed","decision_status":"proposed","question":"解除要求の起動経路: 入金確認で自動起動し、restrictions.releaseはrelease_requestedで冪等とするか","selected":{"auto_release_on_full_payment":true,"release_idempotent_when_release_requested":true},"proposed_by":"修正担当AI（本会話）","proposed_at":"2026-09-16","owner":"Product Owner / Business","reversible":true,"contract":"IR35"},
+    {"id":"DEC-20","issue_id":"FRV-002","status":"proposed","decision_status":"proposed","question":"demo.advanceClockのジャンプがセッション寿命を消費しないこととするか","selected":{"session_expiry_shifts_with_clock_jump":true,"backward_clock_only_right_after_reset":true},"proposed_by":"修正担当AI（本会話）","proposed_at":"2026-09-16","owner":"Frontend / Test","reversible":true,"contract":"IR36"},
+    {"id":"DEC-21","issue_id":"FRV-004","status":"proposed","decision_status":"proposed","question":"顧客起点案件のdueAtを希望枠終了時刻とし、顧客は期限を指定できないとするか","selected":{"client_dueAt":"requestedEnd","client_input_dueAt":"VALIDATION"},"proposed_by":"修正担当AI（本会話）","proposed_at":"2026-09-16","owner":"Product Owner","reversible":true,"contract":"IR38"},
+    {"id":"DEC-22","issue_id":"FRV-006","status":"proposed","decision_status":"proposed","question":"顧客数の母集団をCustomer.statusとOrganization.statusがともにactiveな1対1のCustomer件数とするか","selected":{"customer_organization_cardinality":"1:1","customerCount":"both_active"},"proposed_by":"修正担当AI（本会話）","proposed_at":"2026-09-16","owner":"Product Owner / Business","reversible":true,"contract":"IR40"},
+    {"id":"DEC-23","issue_id":"FRV-007","status":"proposed","decision_status":"proposed","question":"1h/24hプリセットを暦日ではなく固定長の移動窓とするか","selected":{"1h":"rolling_60min","24h":"rolling_1440min","7d":"SR17_calendar"},"proposed_by":"修正担当AI（本会話）","proposed_at":"2026-09-16","owner":"UI/UX / Product Owner","reversible":true,"contract":"IR41"},
+    {"id":"DEC-24","issue_id":"FRV-008","status":"proposed","decision_status":"proposed","question":"顧客・技術者・業者向け投影でOffer辞退理由・再割当理由・HQ理由・内部費用・監査actorを非公開とするか","selected":{"client_offer":"null","client_assignment_reason":"null","client_restriction_events":"masked","technician_contractor_costs":"[]"},"proposed_by":"修正担当AI（本会話）","proposed_at":"2026-09-16","owner":"Security / Product Owner","reversible":true,"contract":"IR42"}
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "review_id": "SELF-CYCLE-DOC-0.13.0",
+  "baseline": "941c5a3152e4fa6057bcb33792a09fdfa64955f14059f951bb8071eb39282da5",
+  "prior_baseline": "254bd3088246362701d9816ab7cf4334a1d299e87cb93a347297363824bc36f0",
+  "rounds": [
+    {
+      "round": 1,
+      "findings": [
+        "PV-001",
+        "PV-002",
+        "PV-003",
+        "PV-004"
+      ],
+      "result": "corrected"
+    },
+    {
+      "round": 2,
+      "findings": [
+        "PV-005"
+      ],
+      "result": "corrected; internal technician path and aggregate dependencies checked"
+    },
+    {
+      "round": 3,
+      "result": "static, strict TypeScript and 15 validator mutation cases passed"
+    }
+  ],
+  "scope": "document contracts and changed dependency paths",
+  "unresolved_findings_in_reviewed_changes": 0,
+  "independent_review": "not_run",
+  "application_tests": "not_run",
+  "deferred_candidates": [
+    "REV-018 long-session memory capacity remains outside demo scope"
+  ],
+  "source_inputs_unchanged": 4,
+  "cases": [
+    {
+      "finding_id": "PV-001",
+      "case_id": "AT-PV-001",
+      "requirement_ids": "FR-P02;FR-P04;FR-X04;NFR-03",
+      "given": "未受諾Offerの背後のAlert/Job状態を変更",
+      "when": "status/severity/unitIdで検索・sort",
+      "then": "非公開変更で件数/順序が変わらない",
+      "contract": "02-design/review-resolution-contracts.md#ir23-案件一覧の投影と検索--pv-001003",
+      "execution_status": "not_run"
+    },
+    {
+      "finding_id": "PV-002",
+      "case_id": "AT-PV-002",
+      "requirement_ids": "FR-P01;FR-P08;NFR-06",
+      "given": "受諾していたOfferのアクセスが終了",
+      "when": "jobs.list/getからhistoryを開く",
+      "then": "型付き凍結履歴だけ、設備IDと編集導線なし",
+      "contract": "02-design/review-resolution-contracts.md#ir23-案件一覧の投影と検索--pv-001003",
+      "execution_status": "not_run"
+    },
+    {
+      "finding_id": "PV-003",
+      "case_id": "AT-PV-003",
+      "requirement_ids": "FR-P01;FR-P06;NFR-03",
+      "given": "将来開始accepted Offerと期限後history",
+      "when": "一覧とpartner summaryを同条件で取得",
+      "then": "同じ投影集合、業務稼働件数は現有効summaryのみ",
+      "contract": "02-design/review-resolution-contracts.md#ir23-案件一覧の投影と検索--pv-001003",
+      "execution_status": "not_run"
+    },
+    {
+      "finding_id": "PV-004",
+      "case_id": "AT-PV-004",
+      "requirement_ids": "FR-X04;NFR-03;NFR-05",
+      "given": "一覧1ページ後にOffer期限、scopeVersion不変",
+      "when": "2ページと旧callbackを取得",
+      "then": "snapshot CONFLICT、viewEpoch更新、初頁からhistoryを取得",
+      "contract": "02-design/review-resolution-contracts.md#ir24-ページング中の公開範囲縮小--pv-004",
+      "execution_status": "not_run"
+    },
+    {
+      "finding_id": "PV-005",
+      "case_id": "AT-PV-005",
+      "requirement_ids": "FR-T01;FR-X04;NFR-06",
+      "given": "施工業者ID=nullの社内担当Assignmentが終了",
+      "when": "本人と別担当で一覧/詳細/集計を取得",
+      "then": "本人に凍結history、contractorOrgId=null、別担当へ履歴移管なし、稼働件数に加えない",
+      "contract": "02-design/review-resolution-contracts.md#ir23-案件一覧の投影と検索--pv-001003",
+      "execution_status": "not_run"
+    }
+  ]
+}

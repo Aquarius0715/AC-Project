@@ -1,6 +1,6 @@
 ---
 document_id: DD-P
-version: 0.7.0
+version: 0.17.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -10,6 +10,8 @@ scope: frontend-demo-1A
 # 施工業者 詳細設計書
 
 この文書では、施工業者向け画面の機能・画面項目・状態・エラー(例外)を決めます。基準にするのは、企業の元の要件文書と、それに対応する要件です。各FR(機能要件)を満たすために必要な処理と、受け入れ条件(テストで確認する内容)を定義します。参考として用意したモック(見本画面)は、共通のUI(画面デザイン)の見た目を検討するためだけに使います。
+
+**0.17.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 入力・責務
 
@@ -23,14 +25,14 @@ scope: frontend-demo-1A
 
 | 設計ID / 要件 | ルート / 主コンポーネント | 取得・操作契約 | 入力・処理・検証 | 異常系と禁止事項 |
 |---|---|---|---|---|
-| DD-P01 / FR-P01 | `/partner` / `PartnerOverview` | `jobs.list, jobs.get` | 委託先の組織ID(contractorOrgId)は、セッション(ログイン情報)から取得します。期限を過ぎている案件と、設備の緊急度は、別々に表示します | 案件が0件の場合は「空の状態」として表示します。アクセス権が失効したときは、それ以前の集計結果を消します |
-| DD-P02 / FR-P02 | `/partner/jobs/:id` / `PartnerJob` | `jobs.get, jobs.accept, jobs.decline` | 受諾できるのは、有効期間内で自社宛てのofferだけです。辞退する場合は理由(1〜1000文字、仮)を必須にします | 期限切れ・HQ(本部)による取り消し・他の人による更新があった場合は、CONFLICT(競合)として扱い、データを取り直します。辞退しても案件自体は消しません |
-| DD-P03 / FR-P03 | `/partner/schedule` / `AssignmentEditor` | `jobs.list, members.eligible, jobs.assign` | 技術者ID、作業の開始/終了時刻、必要な資格を入力します。作業期間が委託期間内に収まっているかを検証します | すでに確定している予定と時間が重なる場合は保存を拒否し、日程を調整し直します。作業開始後に担当を変更する場合は理由を必須にし、以前のアクセス権を取り消します |
-| DD-P04 / FR-P04 | `/partner/units/:id` / `PartnerUnit` | `units.get, alerts.list, telemetry.summary` | 設備IDから、有効な受託案件を照らし合わせます。お客様の連絡先は、必要最小限だけ表示します | 受託期間が終わった後に直接URLを開いても拒否します。遠隔で操作するボタンは用意しません |
-| DD-P05 / FR-P05 | `/partner/jobs/:id/review` / `QualityReview` | `jobs.get, jobs.review, reports.get, attachments.getContent` | 提出済みの報告だけを対象にします。「受理」または「差し戻し」を選び、理由は差し戻しの場合に必須です。改訂前のレポートも保持します | 技術者が書いた元の報告を上書きすることはできません。作業した本人が、自分の作業の品質を承認することもできません |
-| DD-P06 / FR-P06 | `/partner/team` / `TeamCapacity` | `members.list, jobs.list` | 自社の範囲だけに限定した、日付や資格での絞り込みができます。資格はデモ用の架空の属性です | 所属が失効している候補者は割り当てられません。新しいユーザーの登録はHQに引き継ぎます |
-| DD-P07 / FR-P07 | `/partner/history` / `PartnerHistory` | `jobs.events, jobs.addNote, notifications.preview` | jobId(案件番号)とテンプレートを選びます。メモは1〜2000文字(仮)、宛先は権限のある相手の中から選びます | 自由入力での外部の宛先は使えません。お客様の請求に関する機密情報を、テンプレートに含めてはいけません |
-| DD-P08 / FR-P08 | `/partner/*` / `PartnerAccessGuard` | `session.get, jobs.get` | 各操作の直前に、受託しているかどうかと期間を毎回検証します。期限の判定はデモ用の時計を基準にします | 期限を過ぎた瞬間に、画面を表示したままでも次の操作は拒否し、キャッシュ(一時保存データ)を破棄します |
+| DD-P01 / FR-P01 | `/partner` / `PartnerOverview` | `jobs.list`、`jobs.get`、`summaries.get` | 委託先の組織ID(contractorOrgId)は、セッション(ログイン情報)から取得します。期限を過ぎている案件と、設備の緊急度は、別々に表示します | 案件が0件の場合は「空の状態」として表示します。アクセス権が失効したときは、それ以前の集計結果を消します |
+| DD-P02 / FR-P02 | `/partner/jobs/:id` / `PartnerJob` | `jobs.get`、`jobs.accept`、`jobs.decline` | 受諾できるのは、有効期間内で自社宛てのofferだけです。辞退する場合は理由(1〜1000文字、仮)を必須にします | 期限切れ・HQ(本部)による取り消し・他の人による更新があった場合は、CONFLICT(競合)として扱い、データを取り直します。辞退しても案件自体は消しません |
+| DD-P03 / FR-P03 | `/partner/schedule` / `AssignmentEditor` | `jobs.list`、`members.eligible`、`jobs.assign` | 技術者ID、作業の開始/終了時刻、必要な資格を入力します。作業期間が委託期間内に収まっているかを検証します | すでに確定している予定と時間が重なる場合は保存を拒否し、日程を調整し直します。作業開始後に担当を変更する場合は理由を必須にし、以前のアクセス権を取り消します |
+| DD-P04 / FR-P04 | `/partner/units/:id` / `PartnerUnit` | `units.get`、`alerts.list`、`telemetry.summary` | 設備IDから、有効な受託案件を照らし合わせます。現場住所・入場案内は、必要最小限だけ表示します | 受託期間が終わった後に直接URLを開いても拒否します。遠隔で操作するボタンは用意しません |
+| DD-P05 / FR-P05 | `/partner/jobs/:id/review` / `QualityReview` | `jobs.get`、`jobs.review`、`reports.get`、`attachments.getContent` | 提出済みの報告だけを対象にします。「受理」または「差し戻し」を選び、理由は差し戻しの場合に必須です。改訂前のレポートも保持します | 技術者が書いた元の報告を上書きすることはできません。作業した本人が、自分の作業の品質を承認することもできません |
+| DD-P06 / FR-P06 | `/partner/team` / `TeamCapacity` | `members.list`、`jobs.list`、`members.capacity` | 自社の範囲だけに限定した、日付や資格での絞り込みができます。資格はデモ用の架空の属性です | 所属が失効している候補者は割り当てられません。新しいユーザーの登録はHQに引き継ぎます |
+| DD-P07 / FR-P07 | `/partner/history` / `PartnerHistory` | `jobs.events`、`jobs.addNote`、`notifications.preview`、`notifications.recipients` | jobId(案件番号)とテンプレートを選びます。メモは1〜2000文字(仮)、宛先は権限のある相手の中から選びます | 自由入力での外部の宛先は使えません。お客様の請求に関する機密情報を、テンプレートに含めてはいけません |
+| DD-P08 / FR-P08 | `/partner/*` / `PartnerAccessGuard` | `jobs.get`、`session.get` | 各操作の直前に、受託しているかどうかと期間を毎回検証します。期限の判定はデモ用の時計を基準にします | 期限を過ぎた瞬間に、画面を表示したままでも次の操作は拒否し、キャッシュ(一時保存データ)を破棄します |
 
 ## 実装の共通手順
 
@@ -53,7 +55,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06 BIZ-04, BIZ-12 → FR-P01 → DD-P01。出所区分: 制作方針 SRC-02+設計での補足。ここで新しく具体化した設計上の補足: 受託案件のダッシュボード。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
 
-対象: FR-P01 / 主な表示パターン: **UI-OVERVIEW**。この画面が使うサービス境界は`jobs.list, jobs.get`です。
+対象: FR-P01 / 主な表示パターン: **UI-OVERVIEW**。この画面が使うサービス境界は`jobs.list, jobs.get, summaries.get`です。
 
 **初期表示と前提**: 有効な施工業者としてのMembership(組織への所属情報)があることを前提とします。HQ(本部)からのofferは、受諾する前でも案件の概要を閲覧できます。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
 
@@ -68,8 +70,8 @@ scope: frontend-demo-1A
 
 1. 自社の「受諾待ち」「予定」「進行中」「品質確認待ち」の案件数を集計します。状態を選んで案件一覧を開き、対象案件の担当画面へ進みます。
 2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 受諾する前は、案件の種類・地域・必要な資格・日程の候補までという、最小限の情報だけを表示します。
-   - 詳しい設備の値や、お客様の連絡先は、受諾した後で、かつ委託期間内のときだけ見られます。
+   - 受諾する前は、案件の種類・エアコンに紐づく設置物件の登録住所・必要な資格・日程の候補までという、最小限の情報だけを表示します。
+   - 詳しい設備の値や入場案内は、受諾した後で、かつ委託期間内のときだけ見られます。
 3. 画面を見るだけでは、受諾したことにはなりません。KPI(件数などの指標)と一覧に表示する対象は、同じ検索条件で揃えます。
 4. 更新の対象になるQuery: `jobs / partner summary(イベントが起きたとき)`。
 
@@ -178,7 +180,7 @@ scope: frontend-demo-1A
 | jobId / reportVersion | ID・整数/必須 | submittedの現在版 | 対象 |
 | decision | enum/必須 | accept/return | 品質判断 |
 | reason | 文字列/差戻し時必須 | 1〜2000文字 | 指摘 |
-| reviewerId | セッション由来 | report.authorIdと異なる | 責任者 |
+| reviewerId | セッション由来 | IR31のreviewAvailabilityを表示し、Repositoryが対象版寄与者のuserIdと照合 | 責任者 |
 
 **処理手順**
 
@@ -198,7 +200,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06 BIZ-12 → FR-P06 → DD-P06。出所区分: 制作方針 SRC-02+設計での補足。ここで新しく具体化した設計上の補足: 自社の作業者・資格・稼働状況の閲覧方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
 
-対象: FR-P06 / 主な表示パターン: **UI-LIST**。この画面が使うサービス境界は`members.list, jobs.list`です。
+対象: FR-P06 / 主な表示パターン: **UI-LIST**。この画面が使うサービス境界は`members.list, jobs.list, members.capacity`です。
 
 **初期表示と前提**: 自社の作業者一覧を読む権限があることを前提とします。新しいユーザーを作る権限は含みません。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
 
@@ -226,7 +228,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06 BIZ-12, BIZ-20 → FR-P07 → DD-P07。出所区分: 制作方針 SRC-02+設計での補足。ここで新しく具体化した設計上の補足: 案件についての連絡と、異常情報の共有方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
 
-対象: FR-P07 / 主な表示パターン: **UI-TIMELINE / UI-FORM**。この画面が使うサービス境界は`jobs.events, jobs.addNote, notifications.preview`です。
+対象: FR-P07 / 主な表示パターン: **UI-TIMELINE / UI-FORM**。この画面が使うサービス境界は`jobs.events, jobs.addNote, notifications.preview, notifications.recipients`です。
 
 **初期表示と前提**: 自社の案件について、連絡と履歴を閲覧する権限があることを前提とします。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
 
@@ -257,7 +259,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06 BIZ-12 → FR-P08 → DD-P08。出所区分: 制作方針 SRC-02+設計での補足。ここで新しく具体化した設計上の補足: 委託先と担当期間にもとづくアクセス制限。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
 
-対象: FR-P08 / 主な表示パターン: **すべてのパターンで使うGuard(見張り役)**。この画面が使うサービス境界は`session.get, jobs.get`です。
+対象: FR-P08 / 主な表示パターン: **すべてのパターンで使うGuard(見張り役)**。この画面が使うサービス境界は`jobs.get, session.get`です。
 
 **初期表示と前提**: 施工業者としてアクセスする、すべてのルートとRepository(データを扱う共通の仕組み)の操作が対象です。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
 
@@ -280,3 +282,13 @@ scope: frontend-demo-1A
 **境界条件・失敗時**: 他社のjobId、期限とちょうど同じ時刻、まだ受諾していない設備、請求内容の変更、利用制限の操作は、それぞれ拒否し、禁止されているデータを応答に含めません。
 
 **検証**: 追跡表のAT-P08配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+
+0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
+
+現行0.17.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+
+0.14.0: IR25に従い、受諾前住所は設備の設置物件から取得し、期限後の報告表示は報告有無・受理状態だけを凍結する。
+
+0.15.0: DD-P01の設備重大度はIR30、DD-P05の完了日時はIR29、共同編集版の自己承認禁止はIR31を適用する。
+
+案件一覧とjobs.listのソートはIR34を適用する。URL sort未指定はstatus:asc。選択変更でcursorを破棄し、filterを保持して新snapshotの初頁から取得する。状態/重大度/期限の昇降順を選べる。

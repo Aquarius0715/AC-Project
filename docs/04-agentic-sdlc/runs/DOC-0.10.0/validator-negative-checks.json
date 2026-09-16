@@ -1,0 +1,46 @@
+{
+  "scope": "document-validator-only",
+  "baseline": "5fe7520330a26332d3199983ab5dbaf10b0ba3d61f00367fc875cef06857151f",
+  "probes": [
+    {
+      "probe": "client-retry",
+      "expected_error": "Offset event authorization drift",
+      "detected": true
+    },
+    {
+      "probe": "t12-read",
+      "expected_error": "T12 alert version read dependency missing",
+      "detected": true
+    },
+    {
+      "probe": "history-scope",
+      "expected_error": "Device history provenance missing",
+      "detected": true
+    },
+    {
+      "probe": "binding-source",
+      "expected_error": "Design cycle DTO invariant missing",
+      "detected": true
+    },
+    {
+      "probe": "air-config",
+      "expected_error": "AirPolicy notification setting missing",
+      "detected": true
+    },
+    {
+      "probe": "baseline-input",
+      "expected_error": "Baseline write must use input type",
+      "detected": true
+    },
+    {
+      "probe": "power-counter",
+      "expected_error": "Power unknown counter missing",
+      "detected": true
+    },
+    {
+      "probe": "contract-guard",
+      "expected_error": "Design cycle DTO invariant missing",
+      "detected": true
+    }
+  ]
+}

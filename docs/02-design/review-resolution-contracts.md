@@ -1,0 +1,292 @@
+---
+document_id: DD-REVIEW-RESOLUTION
+version: 0.17.0
+status: self-reviewed-pending-independent-G1
+scope: frontend-demo-1A
+---
+
+# DOC-0.10.0再レビューの修正契約
+
+2026-09-16のINDEPENDENT-DOC-0.10.0のREV-001〜018を扱う。ユーザーの修正・反復レビュー指示に基づく1Aの技術仕様。企業原文・DEC-12〜14の承認内容は変更しない。本書は同じ論点について旧DD/D/SRの記述より優先する。正規型・操作/画面/版カタログ・受入計画も本書と同時更新する。実装・実機・実決済の合格記録ではない。
+
+## IR01 受諾と辞退の最小応答
+
+jobs.accept/declineはJobDecisionReceiptだけを返す。jobId/jobVersion/offerId/decision以外の設備・住所・症状・費用・報告を含めない。受諾後もaccessValidFrom到来前は詳細を取得できない。成功後はP02の結果表示→案件一覧へ戻る。詳細リンクは現在有効な受諾期間内だけ表示し、jobs.getで別途認可する。受諾・辞退の同キー再送とwrites.getResultは、元のuserと当該業者Membershipの有効なpartner.acceptおよび自身のOfferに対する最小受領記録の閲覧権を照合する。受諾開始前・辞退後・Offer期限後の詳細閲覧権を再送条件にしない。この受領記録の認可はD01の冪等照合前に行い、初回操作に必要な未決定Offer/応答期限の判定は既存受領記録のない新規操作だけに適用する。別キーで決定済みOfferを操作するとCONFLICT。期限後も有効な当該Membershipには受領記録だけを返せる。Membership失効/別業者なら返さない。writes.getResultのresourceIdsもjobId/offerIdのみとし、保存済みの案件本体を返さない。
+
+## IR02 所有顧客の不変性
+
+1Aは既存Unit.customerOrgId、Property.customerOrgId、Customer.organizationId、Contract.customerId/customerOrgIdの変更を禁止する。idありsaveで差異があればCONFLICT、全副作用0。新規では認可済み親から所有顧客を確定し、Unit/Space/Property/Contractの親と設備集合を同一顧客に限定する。Space.propertyId変更も移動元/先の顧客が一致する場合だけ許可し、parentSpaceIdは移動先Property所属・非循環、既存子孫Space/UnitのpropertyIdとの整合が保てない移動はCONFLICTとする。別顧客への移管は別IDの新規登録であり、旧履歴の複製/付替えは行わない。organizations.saveで既存Organization.kindの変更も禁止する。
+
+同一顧客内Unit移設は双方のscopeとchangeReasonを検証し、進行中Command/run/operation、active Job、active Restriction/未解決回復caseがある間はCONFLICT。成功でUnit.versionを増分し、旧/新Property・Space、Unit、一覧・集計・関連履歴Queryをinvalidateする。Property単位の閲覧者は移設後のscopeを再照合し、旧scopeのキャッシュを破棄する。請求/点検/Telemetry/報告の所有顧客は変わらない。SR24のDevice移設履歴の積集合認可も維持する。
+
+## IR03 強制解除専用権限
+
+restriction.overrideのみのHQにも管理scope内のrestrictions.list/getを許可する。結果はRestrictionReleaseView（projection=release）で、id/version/createdAt/updatedAt/unitIds/rulesVersion/policy/state/perUnit/recoveryCasesと操作判断に必要な制限時刻だけを返す。請求ID・契約ID・督促文・監査全体は含めない。restriction.manageには従来のRestrictionを返す。A09の一覧入口はoverride専用者にも開放し、list→A10のget→override→getの経路を持つ。A09の作成/適用sectionと契約/請求/設備補助readはmanage保持者だけに要求する。override専用者のlist filterはstatusだけ（invoiceId/contractIdはFORBIDDEN）、件数/並び順も限定投影のscope内のみ。audit.listはaudit.readがある場合だけ取得する。
+
+override後の解除意思があるrelease_requested、または終端記録の未解決回復caseに限り、override専用者もreconcileとretry(phase=release)を許可する。通常適用中のreconcile、retry(apply)、schedule/execute/defer/exempt/cancel/releaseはmanageが必要。overrideは理由必須、最新Restriction.version、新キーで実行。reconcile/retryの版読取もget。解除Commandの状態はget.perUnit/recoveryCasesで追跡できるためcommands.getへの追加権限は不要。overrideの応答は常にRestrictionReleaseView。reconcile/retryのwrite応答とwrites.getResultも現在権限でRestrictionReadへ投影し、manageを失った場合に保存済み完全応答を漏らさない。投影外のresourceIdsも除く。
+
+## IR04 督促の共有された模擬記録
+
+notifications.previewはreadのまま、保存0件。HQ A08は期限超過unpaidのInvoiceを取得→notifications.recipients(target=invoice,templateKey=payment_reminder,channel)で顧客宛先を選択→preview→明示「模擬督促を記録」でinvoices.remindを呼ぶ。入力はinvoiceId/recipientMembershipId/channel/reason、expectedVersionはInvoice.version、idempotencyKey必須。reasonは1〜1000文字。外部送信は行わない。
+
+Repositoryはbilling.manage・請求scope・最新version・now>dueAt・status=unpaid・受信者が有効な当該顧客Membershipでchannel適格なことを同じ遷移で検証する。失効宛先はVALIDATION、paid/processing/期限内はCONFLICT。成功でNotificationを1件と監査1件保存しInvoice.versionを1増分する。NotificationはtemplateKey/type=payment_reminder、inAppはsimulated、email/whatsappはpreview、全channelともnotifications.listに保存される。戻りはInvoiceReminderReceiptでinvoiceId/notificationId/invoiceVersionだけ。通知宛先本人以外のHQに通知本文を返さない。顧客はC08で同じ通知、C11で同じInvoiceを確認する。再送は同キーで同受領記録、二重生成なし。新キーで再督促する場合は再確認した最新Invoice版が必要。読取previewだけではInvoice版も増やさない。
+
+## IR05 予告の時刻と証跡
+
+restrictions.schedule入力からnoticeAtを除く。Repositoryが受付nowをnoticeAtとし、executeAfter>=now+24時間を検証する。対象顧客の有効client Membershipのうち当該ContractとRestrictionの全対象Unitを閲覧できる宛先全員へinApp制限予告を生成し、そのIDをnoticeNotificationIdsへ保存する。宛先0ならVALIDATIONで制限/通知/監査成功記録0件。Restrictionと通知の保存は不可分。予告は顧客の同一タブ通知一覧から確認できる。これは模擬予告であり実配送証明ではない。
+
+execute/retry(apply)は予告IDが同じRestriction・顧客・予告時刻を指すこと、予告後24時間とexecuteAfterの両方が経過したこと、元のpolicy/rulesVersion/対象/原因請求条件を再検証する。予告後に適用内容を変更する場合は新規予告。通知既読は実行の必須条件にしない。過去のfixtureは初期seed専用で通知証跡も一緒に生成する。通常操作/demo.triggerで過去のnoticeAtを差し込めない。時計advanceによる24時間待機を使う。
+
+## IR06 決済試行の排他
+
+Invoiceにつきinitiated/processingのPaymentは合計最大1件。payments.simulate(event=initiate)の同一遷移内でunpaidかつ非終端Paymentなしを検証し、Payment=initiatedを作りInvoice.status=processing/paymentStatus=initiatedとしてInvoice.versionを増分する。初回expectedVersionはInvoice版。同キー再送は当時結果を返す。別キーは最新Invoice版を取得していてもCONFLICTとなり試行を増やさない。
+
+processingイベントはPaymentとInvoice.paymentStatusをprocessingへ更新し各versionを増分する。confirmは両者をconfirmed/paidへ、failはfailed/unpaidへ更新する。Invoice.paymentMethodは失敗後も保持する。確定後の再送は版を増やさない。recordManualはinitiated/processingのいずれがあってもCONFLICT。失敗後の再試行は最新Invoice版・新キー。demo_instructionsはPaymentを作らずこの排他/版に影響しない。状態更新と購読通知は同じ遷移の確定後に配信する。
+
+## IR07 Policy共通フォーム
+
+A05/A11/A12の全kindはname（trim後1〜120文字）、unitIds（重複なし非空）、timezone（対応IANA名）、enabled（boolean）、priority（整数0〜100）を必須入力とする。新規はname空・設備未選択、timezone=Preferences.timezone、enabled=false、priority=50をUIに明示表示する。編集は取得値を使い、Repositoryで欠落値を補わない。Automationの初期値とも整合させる。kind固有必須欄は既存DD/SR28に従い未入力なら保存不可。
+
+A05はalertsの有無に依存せずunits.list→選択units.getで対象設備/能力を得る。A12もunits.list→units.get。A05の候補readはalert.policy.manage、A12はautomation.policy.manageのscope内。通知先は全選択対象/channelの適格集合を用いる。readonly担当にpolicy保存フォームを表示しない。
+
+## IR08 電力量の由来
+
+D07の実績とSR29のdemo_period_comparison基準はorigin=measuredかつ品質validのpowerサンプルだけを積算する。isDemo=trueは全デモ値のラベルでありoriginとは別軸。estimated/inspectionは系列表示可能だが実測slot/coverageに加算せずqualityWarningsにnon_measured_inputを含める。slot始点に一致する候補だけから先にD07のsequence/id順で1件を選び、その後origin/品質/単位を判定する。最新がestimated/suspectの場合、古いmeasured/validへfallbackしない。除外slotがあればcoverage<1で比較値はnull。固定モデル基準は従来どおりmodeledを明示する。SR27の稼働判定も最新powerがmeasuredであることを要求する。
+
+## IR09 音声変更の操作文脈
+
+VoicePanelはresolveIntent成功だけでCommandを作らない。changeの場合は設備・要求温度・現観測を確認表示する。technicianはjobs.listの自己担当候補を対象unitIdで絞りjobs.getのdetailで選択jobIdと有効期間を確認する。候補0なら操作不可、複数なら明示選択。ページのjobIdを初期選択できるが再検証は省かない。technician/adminはreason（trim後1〜1000文字）を必須入力とする。clientはjobIdを送らず通常の自己設備制御条件を使う。
+
+確認時にunits.get（technicianはjobIdも指定）と必要なjobs.getを再取得し、観測/版/担当が変化したら確認表示を更新し再確認を求める。commands.createへjobId・reason・expectedUnitVersionを通常フォームと同じ形で渡す。確認中失効は拒否、cancel/help/unsupported/温度照会ではwrite0件。ホームから開いた場合も同じ選択手順。VoicePanelの依存操作は共通component契約へ明記し、全音声対応ページで遅延取得する。
+
+## IR10 通知の業務分類
+
+Notification.typeをseverityと別に保存する。型はcleaning_due/fault/quality/schedule_change/report_return/completion/payment/payment_reminder/restriction/inquiry。Alert.type=maintenanceはcleaning_due、それ以外のsensor/tamper/reconciliation_requiredはfault、qualityはqualityへ写像する。alertテンプレートのpreview入力にはsourceAlertIdを必須とし、起点Alertの現在scopeとtarget.unit一致をRepositoryで照合して分類する。欠落/target不一致はVALIDATION、scope外はNOT_FOUND。保存Notification.sourceAlertIdにも起点IDを保存する。他テンプレートでは入力禁止・出力null。その他templateKeyは同名type。通知作成後は分類を保持する。cleaning_dueは清掃アイコン、faultは故障アイコンを表示しseverityは重大度の色/ラベルだけを担う。未知分類はD01どおりUNAVAILABLEで正常アイコンへfallbackしない。
+
+## IR11 算定境界の識別
+
+1Aの実績境界IDはac_input_electricity（AC設備入力電力、共用設備/太陽光/蓄電池を含めない）。Sensor.boundaryIdはpowerの場合このID、それ以外null。Measurement.boundaryIdは取り込み時のSensorから確定して不変保存し、現在のSensor移設で書き換えない。inspectionはnull。実績集計は当該境界の測定だけを採用し、欠落/不一致はslot無効としてboundary_mismatchを付ける。EnergySummary.boundaryIdは基準とは無関係にこのID、boundaryは固定説明文。
+
+BaselineInput/EnergyBaselineのboundaryIdはac_input_electricityまたはwhole_building_electricity。後者は比較不一致のデモ用固定モデルのみ許可し、demo_period_comparisonではVALIDATION。境界説明boundaryは編集可能な1〜500文字で、同一性判定には使用しない。比較はID一致が必須で、不一致なら差分/率/削減関連値null、実績自体は維持。MRVConditionsもboundaryIdを必須にし、基準/実績との不一致ならincomplete=true・demo_reviewed不可。保存済みReportにはIDと当時説明をsnapshotとして保持する。UIは固定候補から選択し自由入力IDを受けない。
+
+## IR12 生測定と正規測定
+
+RawMeasurementはデモの入力境界専用でunit:string/value:number|nullを受ける。demo.trigger telemetryはRawMeasurementを受け、公開Measurementへ正規化してから保存する。未知metricは入力VALIDATION。sensor不存在またはscope外はNOT_FOUND。既知sensorの未知unitまたはmetricと異なるunitは、単位換算せずvalue=null/quality=suspect、unitにはsensorの期待単位、qualityReason=unit_mismatch、rawUnitに受信文字列（最大32文字）を保存する。UIは値を欠測として表示し、rawUnitをエスケープして根拠表示する。非有限値はnon_finite、範囲外はout_of_range。正常値はqualityReason/rawUnitともnull。suspect原因があるnullをmissingへ上書きしない。
+
+取り込み時にboundaryIdはSensorから、id/version/tenantId/createdAt/updatedAt/isDemoはRepositoryから生成する。RawMeasurementにこれらの出力専用値を受け取らない。observedAt/receivedAtはRawMeasurementの入力であり、ISO UTC形式と時系列を検証する。外側DemoTrigger.eventIdとmeasurement.eventIdは一致必須、所属違いはscope外ならNOT_FOUND、同一scope内のsensor/unit対応不整合ならVALIDATION。日時の未来不整合はinvalid_time。原因が複数ならunit_mismatch→non_finite→out_of_range→invalid_timeの順。点検入力の正規化も同じ追加フィールドを生成する。公開DTOの未知enumは依然としてUNAVAILABLE。raw受信文字列の未知と公開enumの未知を混同しない。
+
+## IR13 現行受入条件の統一
+
+AT-C01-N/AT-A01-Nの現時点設備KPI遷移先はscopeとpowerStateだけ。periodは時系列/金額集計の条件で、設備一覧へ送らない。戻る操作では元ダッシュボードのperiodを復元する。AT-A08-Nは期限超過unpaid時の模擬督促→入金確認→paid後の督促拒否を順に検証する。previewと保存操作の件数を区別する。Restrictionの入金後遷移はscheduled→cancelled、requested/applied→release_requestedを区別する。
+
+## IR14 現行版の識別
+
+現行仕様はDOC-0.17.0のmanifest収録ファイル。front matter、現行実装基準と案内を0.17.0に統一する。過去レビュー/DEC/変更履歴/旧runsは当時版のまま保持し、旧合格記録を現版の承認として利用しない。
+
+## IR15 MRV出力の範囲
+
+FR-A14は画面プレビュー・ドラフト保存・版参照・デモ確認まで。CSV/PDF等のファイルexport/downloadは1A対象外。DDの「出力されたデータ」は「保存済み版のプレビュー」を指すよう修正し、実装で未定義のexport機能を追加しない。
+
+## IR16 Factの鮮度と再利用
+
+Factの評価時刻はRepositoryのデモ時計now。fireのoccurredAtは現在tickと一致必須、予約イベントはそのtickへ時計が到達したときに評価する。過去tickへの新規fireはVALIDATION。同じeventIdの既存結果取得は再評価しない。simulateは現在snapshot上の仮評価で保存しない。
+
+| metric | 型/単位 | TTL秒 | 保持 |
+|---|---|---|---|
+| 通常Metric | D07の数値/単位 | Sensor.staleAfterSeconds | 最新観測 |
+| weather_temperature | number / °C | 1800 | 最新観測 |
+| tariff | number / MYR_per_kWh | 300 | 最新観測 |
+| solar / battery | number / kW | 120 | 最新観測 |
+| occupied / peak | boolean / boolean | 120 | 最新観測 |
+| location | arrivalまたはdeparture / event | 0 | 同じtickのみ |
+
+未来observedAtはquality不良としてmissing_data、now-observedAt>TTLはstale。TTL境界ちょうどはfresh。通常MetricはD07の範囲、weatherは-50〜100、tariffは0〜100、solar/batteryは0〜1000の有限デモ値。未知metric/型/単位は入力VALIDATION、value=null/quality不良は不成立。保持型は最新observedAtを選び、同時刻ならD02のeventId順を適用してから品質を判定する。古いvalidへfallbackしない。統合factsはfire/予約イベント確定時のみ更新し、simulateで変更しない。locationは次tickへ持ち越さず、同意撤回で未評価locationを破棄。時計tickでTTL失効を再評価し、過去成立を再発火しない。
+
+## IR17 Repository世代と閲覧世代
+
+Session.generation/ChangeEvent.generation/冪等キーのgenerationはRepository世代で、reset時だけ単調増加する。役割切替/ログアウトで共有業務記録を消さない。Session.viewEpochは閲覧世代でsignIn成功・switch成功・signOut・期限失効・resetごとに単調増加し、A→B→Aでも過去値を再利用しない。scopeVersion/権限の変更通知を受けたときも増加し、Sessionを再取得する。両世代は別のカウンタ。
+
+UIのquery key/非同期callbackはRepository instance識別子・generation・viewEpoch・tenantId・membershipId・scopeVersionを捕捉し、描画/通知前に現在値と全て比較する。購読closureにもviewEpochを捕捉し、旧購読は解除済みでも配送済みcallbackを捨てる。reloadは別instance識別子で旧応答を拒否する。中止は業務の取消を意味せず、受理済み処理はRepositoryへ確定し、現在セッションが再認可の上で取得する。ContextにviewEpochは送らず、認可根拠にも使わない。
+
+## IR18 長時間メモリ保持の扱い
+
+REV-018は既存要件の不具合ではなく追加要件候補としてdeferredにする。1Aの保証対象はD10の100設備/1000サンプル規模のデモであり、無制限の長時間連続稼働・メモリ上限は保証しない。reset/reloadまでsnapshot/event/冪等結果を保持する現契約は維持する。自動削除や暗黙resetを加えない。容量上限・拒否/退避方式は継続運用を対象に加える段階の要件とし、未試験の性能合格を主張しない。利用者が選ぶresetの破棄確認は既存仕様に従う。この候補はG1の既存機能欠落件数には数えないが、引継ぎに残す。
+
+## 補足 再レビューで確定した生成・参照経路
+
+IR11/12: Capability.sensorsの境界は機種フォームがmetric=powerならac_input_electricity、それ以外nullを読取専用の派生欄として表示して送信し、機種保存時にその対応を検証する。devices.register/bindで同じ値のSensorを生成する。jobs.saveDraftのInspectionMeasurementInputはorigin=inspection・boundaryId=nullとし、品質原因/rawUnitを正規化時に埋める。正常入力は両者null、測定欠如もnull。Sensor境界を任意の値で偽装して実績に混入させない。
+
+IR17: viewEpoch変更時は全一覧cursorとsnapshot Queryも破棄する。Query cursorは引き続きSR14のRepository世代/scopeに属し、UIは別viewEpochで使い回さない。新閲覧世代では初頁からsnapshotを作り直す。
+
+## IR19 複数設備制限の公開範囲 — CV-001
+
+Restrictionのget/list/forInvoice、write応答、通知、writes.getResultにはSR03の全対象Unit条件を適用する。一部だけ読めるMembershipにはRestriction全体を返さず、個別はNOT_FOUND、一覧は件数にも含めない。顧客はさらに当該Contract/Invoiceの自己顧客条件が必要。通知宛先の所属組織だけで全設備の閲覧を許可しない。schedule時に適格な全対象閲覧者が0ならIR05のVALIDATION。予告作成後に受信者が失効しても保存済み予告証跡は消さず、通知読取を現在scopeで拒否する。設備単位の利用者にはUnitDetail.effectiveControlPolicyの請求情報を含まない投影だけを返す。
+
+## IR20 督促previewの事前条件 — CV-004
+
+payment_reminderのnotifications.preview/recipientsはbilling.manageのHQだけ。target.kind=invoice、now>dueAt、Invoice.status=unpaidをread時にも照合し、不適格状態はCONFLICT、権限不足はFORBIDDEN、scope外はNOT_FOUND。previewはIR04と同じ顧客宛先/channel条件を検証する。preview後に決済が始まればremindで再検証して拒否する。previewのNotificationは未保存であり、その仮IDをmarkReadや通知一覧に流用しない。remind成功時はRepositoryが保存用IDを発行する。
+
+## IR21 Fact評価の時点とセンサー — CV-007
+
+simulate/fireとも新規入力occurredAtは現在のデモ時計tickと一致必須。simulateは現在の保持factsへ入力factsを一時的に重ねて同じ評価関数を使い、保持値・cooldown・継続カウンタを更新しない。通常MetricのTTLは当該Unitの現bindingの同metric Sensorから決める。Sensor不在はmissing_data。factの単位はそのSensor単位と一致必須。過去bindingの値は新bindingで再利用せず、bind時に保持factsを破棄する。solar等の外部デモFactにはIR16の固定TTLを使う。同一入力内のunitId/metric重複、および入力unitIdsに含まれないFactはVALIDATION。別イベントを同tickへ統合するときだけD02のeventId順を使う。同じeventIdの確定fire再送は認可後に既存結果を返し、現在tick一致検証より先に冪等照合する。
+
+## IR22 生測定と点検の保存経路 — CV-006
+
+RawMeasurementはdemo.trigger telemetry専用。jobs.saveDraftは引き続きInspectionMeasurementInputを使い、既知UnitSymbolだけを受ける。点検で不一致単位を指定した場合はVALIDATIONとして報告保存全体を拒否し、部分更新しない。Raw受信の不一致をsuspectとして保存するIR12と区別する。点検の非有限値/範囲外/未来時刻は同じ品質原因を付けてvalue=null、その他正常値はqualityReason/rawUnit=null、origin=inspection、boundaryId=null。公開Measurement生成時にはisDemo=trueを必ず設定する。
+
+## IR23 案件一覧の投影と検索 — PV-001〜003
+
+jobs.listはJobSummary/JobOfferSummary/JobHistorySnapshotのunion。業者について、受諾前と受諾済みだがaccessValidFrom前はoffer、受諾した有効期間内はsummary、終了後はhistory。辞退済み案件は一覧から除き、IR01の受領記録だけを取得できる。未応答のOfferがofferExpiresAtに達した場合も一覧から除く。自己受諾した案件だけに期限後履歴を用意する。
+
+JobOfferSummary.statusは自身のOffer.decisionがnullならoffered、acceptならaccepted。現場のJob.statusを公開statusへ流用しない。severity=nullは未公開でありnormalを意味しない。JobHistorySnapshotはアクセス終了直前に読めた案件のstatus/type/contractorOrgId/completedAt、自己決定イベントとredactedReportSummaryを固定する。asOfは凍結時刻。未到来のアクセスが撤回された場合は受領記録だけで履歴を作らない。期限後の他社作業・報告更新を反映しない。historyのseverity/dueAtはnull、設備ID/住所/連絡情報/費用/Assignmentは含めない。ownDecisionEventsは自分の受諾/辞退操作だけでnote/reportRef=nullとし、他者イベントを混入させない。
+
+フィルター・sort・totalは投影後に評価する。summaryは認可済み設備との結合を含む従来定義。offerはid=jobId、公開status/dueAt/requestedSlotを使い、organizationIdは自社との一致だけを判定する。severity/unitId/membershipId/customerId/propertyIdは非公開なので指定時そのofferは不一致とする。historyもid=jobId、固定status/contractorOrgIdを使い、期間はcompletedAt、nullなら期間条件に不一致。severity/unitId/membershipId/customerId/propertyId/overdueOnly=trueには不一致。offerの期間はrequestedSlot.startAt、overdueは公開dueAtから判断する。sortは公開フィールドのみ、nullはasc/descとも最後、同値はid/jobIdのASCII昇順。現在の非公開Job/Alertを変更してもoffer/historyの件数・順序・フィルター結果は変わらない。
+
+P01/P03/P06はprojectionを判別し、offerでは重大度未公開、historyでは期限欄を「対象外」と表示する。historyクリックはjobs.getの履歴表示だけで設備リンクや編集操作を作らない。partner summaryは同じ投影・同じfilter集合から計算し、totalはその件数、offerCountはoffer.status=offered、業務active/scheduled/inProgress/review/overdueは現在有効なsummaryのみで従来status規則を適用する。将来開始のaccepted offerとhistoryは業務稼働件数に加えない。ゼロの重大度を正常台数として数えない。
+
+## IR24 ページング中の公開範囲縮小 — PV-004
+
+SR14の不変snapshotは業務値の更新に対する保証であり、過去の閲覧権を保持する権利ではない。各ページとwrites.getResult返却時に、現在の委託/担当/資格/資源所属をscopeVersionとは独立して再検証する。snapshot内のいずれかの行で公開projectionが狭くなる、または閲覧権を失う場合はsnapshot全体を無効化しCONFLICT、件数や部分行を返さず初頁から再取得する。新snapshotではIR23のhistory等へ投影する。session失効はUNAUTHENTICATEDを優先する。
+
+Offer/Assignment期限、撤回、Unit移設によるアクセス変更は時計/変更イベントで現在viewEpochを増分し、表示中の該当Query・詳細・snapshot cursorを破棄する。期限直後の旧callbackはIR17で拒否する。Repository読取時にも同じ検証を行い、イベント通知待ちの間に旧データを再返却しない。history凍結はアクセス終了時の内部処理として一度だけ行い、後から期限前データを復元するために現在のJobを読まない。
+
+IR23の技術者経路（PV-005）: 有効Assignmentと閲覧条件を満たす間はsummary/detail、過去に実際の閲覧期間を持ち担当期限が終了した本人にはhistoryだけを返す。社内案件のcontractorOrgIdはnull、自己受諾/辞退のない技術者のownDecisionEventsは空配列。historyはRepository内部で元userId/membershipIdへ束縛し、現在も有効な同Membershipかつ現在scope内である場合だけ返す。他者への再割当で履歴所有者を書き換えない。未開始Assignmentの取消ではhistoryを作らない。technicianの業務件数と担当設備数も現在有効なsummaryだけから計算し、historyを稼働に加えない。
+
+
+## IR25 設置場所の住所と期限後の報告表示
+
+ユーザー判断: 住所はエアコンに紐づく設置場所を使用する。期限後の報告要約は「報告あり／なし」「受理済み／未受理」のみ。HQが委託時に住所・地域を再入力する設計は採用しない。
+
+JobOfferSummary.siteAddressはJob.unitId→ACUnit.propertyId→Property.addressの値を現在の読取snapshotで取得する。regionLabelは廃止する。受諾前の自社Offer投影に限りこの住所を公開し、Property全体の読取権やUnit ID・入場案内・顧客連絡先の公開を追加しない。住所は既存の設置場所フォームで管理し、委託フォームには読取専用で表示する。null/空白のみならnullへ正規化し「住所未登録」と表示する。物件名や報告本文から補完・地域推定をしない。住所更新はjobs Queryもinvalidateする。ページsnapshotではSR14を適用し、住所変更は新snapshotに反映する。期限後historyには住所を残さない。
+
+redactedReportSummaryは自由文ではなくReportHistorySummary。アクセス終了直前に当該閲覧主体が取得可能な報告版のうち最大versionを対象とする（提出前draftを閲覧できる主体にはdraftも含む）。対象なしは{hasReport:false,acceptance:not_accepted}、対象ありはhasReport=true、当該版に受理イベントがあればaccepted、それ以外はnot_accepted。受理済み旧版があっても閲覧可能な最新改訂版が未受理なら未受理とする。Repository内部で凍結し、本文・写真・メモ・連絡先・報告ID・版番号を含めない。UIはen/ms辞書で「報告なし／未受理」「報告あり／未受理」「報告あり／受理済み」の3通りを表示する。翻訳された自由文をDTOに保存しない。後続の報告提出・受理・住所変更で期限後snapshotを書き換えない。報告書の原本・保存版は従来どおり保持する。
+
+## IR26 案件集計の検索条件
+
+summaries.getのkind=partner/technicianはjobs.listと共通のstatus/statuses/severity/overdueOnlyを追加で受け取る。statusとstatusesの併用、空statuses、不正enumはVALIDATION。kind=customerでこれらの案件専用条件はVALIDATION。既存のcustomerId/propertyId/unitId/unitIds/from/toは維持する。unitIdsはIR23で公開unitIdのあるsummaryにだけ照合し、空配列は0件。partner/technicianの案件数はIR23の投影・同じAND条件を適用した集合から算定し、history/offerの非公開値を絞込に使わない。technicianの担当設備数はその集合の現在有効summaryのunitIdを重複除去する。P01/T01の状態・重大度・期間変更は一覧と集計へ同じ条件を渡し、KPIと一覧の片側だけを絞らない。kind=customerの設備指標は案件条件と混在させない。
+
+## IR27 自動運転の停止理由
+
+既存FR-A04の停止理由表示をRuleBase.disabledReasonで返す。Repository生成のcapability_changed/unit_archived/nullで、フォーム入力に含めない。能力変更で既存Automationが不適合となればenabled=false、disabledReason=capability_changed、versionを増分し、同一遷移の後にautomations/units/capabilitiesへ変更通知する。設備archiveによる停止はunit_archived。新規および利用者によるenabled=true→falseの明示無効化ではnull。停止後の自動再有効化は行わない。明示save(enabled=true)では全対象設備の現能力・archive・scopeを再検証し、不適合なら副作用0、成功なら理由をnullへ戻す。disabledのまま編集すると既存理由を保持する。複数対象で1台でも不適合ならルール全体を停止する。C04/C05/A04は返された理由をen/ms辞書から表示し、停止の理由を知るために顧客へaudit.readを要求しない。Policyにも同じ出力型を用いるが、本節だけでPolicyの新たな自動停止処理を追加しない。
+
+## IR28 機種保存の理由入力
+
+capabilities.saveのchangeReasonは新規では省略可能、既存IDの更新ではtrim後1〜1000文字必須。新規でも指定された場合は同じ文字数で検証する。欠落または空の更新理由はVALIDATION。新規のUIは任意欄、編集のUIは必須欄。正規型のoptionalは入力分岐の表現であり、更新時の検証を省略できるという意味ではない。
+
+
+## IR29 案件の完了時刻
+
+MaintenanceJob.completedAtはRepositoryが保持するInstant|null。jobs.createおよびplans.generateNextの新規案件はnull。jobs.review(decision=accept)が認可・自己承認検査・版検査・状態検査に成功した同一遷移でstatus=completedとし、完了時刻にその遷移のRepositoryデモ時計nowを一度だけ保存する。対象報告版の受理イベントとjob.completedイベントも同じ時刻を使う。return・拒否・未完了/取消案件はnull。同キー再送、閲覧、メモ、費用更新はcompletedAtを変更しない。完了案件を再開する機能は1Aにない。UI入力にcompletedAtを受け取らず、updatedAt・提出時刻・予定終了から補完しない。
+
+IR23のhistoryはアクセス終了直前のMaintenanceJob.completedAtをそのまま凍結する。終端前にアクセスが終了すればnullのまま、その後の他者の完了を反映しない。期間filterは凍結completedAtに[from,to)を適用し、nullなら不一致。初期seedにcompleted案件を含める場合は受理イベントと同一のcompletedAtを必ず用意する。
+
+## IR30 案件に表示する設備のアラート重大度
+
+JobSummary.severityは当該Job.unitIdの設備に属する、現在の閲覧主体へ公開可能なAlertのうちstatus=open/acknowledgedの最大重大度。critical>warning>normalの順。Job.alertIdsは案件発生の根拠リンクであり、この現在設備重大度の対象をその配列へ限定しない。resolvedは除外し、対象0件はnormal（未解消アラートなし）とする。通信や測定の正常性を保証する値ではなく、offline/stale/missingは別の品質表示を維持する。
+
+一覧・重大度filter/sort・P01/T01集計は同じ認可済みsnapshotの関数を共有し、Job/Alertの片側だけ新しいsnapshotで再計算しない。Alertの作成・解消・重大度変更はjobsとpartner/technician summaryもinvalidateする。JobOfferSummaryとJobHistorySnapshotは従来どおりseverity=nullであり、非公開Alertの存在・重大度を公開しない。例: 同Unitのresolved criticalとopen warning→warning、acknowledged critical追加→critical、全てresolved→normal。これらの変更でoffer/historyのfilter結果は変わらない。
+
+## IR31 報告の共同編集と自己承認
+
+Repository内部に各reportId/reportVersionのcontributorUserIds（重複なしuserId集合）を保存する。公開WorkReport.authorIdは従来の原作者を保持し、項目authorIdもSR07を維持する。自己承認の判定を単一authorIdの比較で代用しない。UIから寄与者を受け取らず、外部向けDTOへこの内部集合を追加しない。
+
+初回draft作成者を集合へ登録する。新しい内容版を作るときは直前版の集合を継承し、本文・点検項目・測定・部品・次回対応・写真参照のいずれかを実際に追加/変更/削除した操作の実行userIdを追加する。attachments.addで写真を追加した人も含む。再割当後、on_hold/reworkからのコピー版も元版の集合を継承する。閲覧、割当のみ、完全な無変更save、提出のみ、受理/差戻し操作のみでは新たな寄与者を追加しない。冪等再送で集合や内容版を増やさない。集合は版の提出時に固定し、過去版を後から変更しない。
+
+jobs.reviewは対象の提出版の集合を読み、現在Session.userIdが含まれる場合、accept/returnともFORBIDDEN、副作用0（D01の拒否監査のみ）。別Membership、partner.review、HQの通常review、hq_escalationのすべてに同じ検査を適用する。別担当の承認を得るために原作者・項目作者・寄与者履歴を書き換えない。集合が欠けたseed/旧版を非寄与と推測せずUNAVAILABLEでレビューを拒否し、fixtureを修正する。seed報告にも生成履歴と整合した寄与者集合を必須とする。
+
+再現例: T1のdraftをT2へ再割当し、T2が本文だけ、測定だけ、写真だけのいずれかを変更して提出した各ケースで集合はT1/T2を含む。T2が別Membershipの品質担当またはHQへ切り替えてもFORBIDDEN。作成・編集していない有効なT3は他の認可/状態条件を満たせば受理できる。T2が割当・閲覧・提出だけを行い内容を変更しない場合には寄与者に追加せず、自己承認条件では拒否しない（通常の品質担当権限は別途必須）。
+
+
+IR31のUI投影: reports.getとWorkReportを返すwrite/再送応答には、現在の閲覧主体別reviewAvailabilityを合成する。元の報告本文・内容版・寄与者集合は変えない。判定順は、現在の対象案件でpartner.reviewまたはHQの通常/引継ぎreview資格がない→permission_denied、対象版の寄与者に現在userIdが含まれる→self_authored、最新報告版でない→not_current、Job.statusがsubmittedでないか対象版が未提出→not_submitted、すべて通過→allowed=true/reason=null。読取scope自体がない場合は従来どおりDTOを返さずNOT_FOUND。資格は現在の委託・所属・scope・自己承認以外の既存review条件も含む。引継ぎモード・理由・input/options版の送信時検証は別途維持する。
+
+P05/A06は取得したreviewAvailability.allowed=falseで受理/差戻しボタンをdisabledにし、reasonを翻訳して表示する。元作者IDだけからボタン可否を計算しない。再割当・報告改版・権限変更は当該Queryをinvalidateし、確認中の変更は再取得して確認をやり直す。Repositoryは送られたUI可否を信用せずjobs.review実行時にIR31を再検証する。contributorUserIds欠落時はUNAVAILABLEとし、可否を許可へfallbackしない。
+
+
+## IR32 案件一覧と集計の設備集合条件
+
+jobs.listもsummaries.get(kind=partner/technician)と同じunitIdsを受ける。Queryの共通制約を適用し、認可・IR23投影後のsummary.unitIdが配列に含まれる行だけを対象とする。空配列は0件。unitIdも指定された場合はAND。offer/historyには公開unitIdがないため、非空配列でも不一致とする。非公開Jobの設備IDで照合しない。P01/T01は両読取へ同一の共通filter値を送信する。集計固有・一覧固有の未許可filterを暗黙に捨てない。
+
+## IR33 監査画面の参照経路と検索境界
+
+A16はaudit.listを必須Queryとし、失敗を正常空表示にしない。機器イベントは独立した補助パネルでdevices.listから認可済み候補を取得し、deviceId選択後だけdevices.events({id:deviceId,query})を呼ぶ。未選択は選択案内、候補0件はempty、一覧失敗はパネル内retry、無効・非可視の選択IDはnot-foundとして停止し別機器へ置換しない。選択deviceIdをURLへ保持し、Back/Forwardも同じ手順で復元する。audit.readの候補/履歴read許可は既存操作カタログどおりで、device.manageを追加で与えない。
+
+監査のtargetRefから既存の詳細画面へ移動する場合、kind=jobは/admin/jobs?jobId=:id、restrictionは/admin/restrictions/:id、deviceは/admin/devices?deviceId=:idを使い、それぞれの既存read権限を必要とする。commandはcommands.getの既存権限を持つ場合だけ別途取得し、そのunitIdで/admin/units?unitId=:unitIdへ移動する。A16のaudit.readだけで他資源への権限を拡張しない。リンク解決は共有Navigation/feature hookで行い、権限なし・未知kindはマスク済み監査詳細だけを表示する。削除済み/失効はリンク先でnot-found、元の監査は保持する。
+
+audit.listは全filterを認可済み集合へ適用する。別テナントのcorrelationIdも存在しないcorrelationIdもitems=[]/total=0/nextCursor=nullとし、全テナントを先に検索してNOT_FOUNDへ分岐しない。個別資源のgetに対するD01のNOT_FOUNDとは区別する。監査の追加はRepository内部の業務イベントだけでありA16にwrite操作はない。
+
+
+## IR34 ユーザー確定の権限と案件ソート
+
+DEC-17: 制限操作の権限は2種類。defer/exempt/cancelはrestriction.manage、overrideはrestriction.override。両方を持てば両方の操作を行えるが、片方からもう片方を暗黙付与しない。その他のschedule/execute/release等の既存manage条件、IR03のoverride後の解除追跡だけを許す条件は維持する。メニュー/ボタンとRepositoryの双方で判定し、理由・scope・状態・版の検証は省略しない。権限不足の直接writeはFORBIDDEN、業務変更0件、D01の拒否監査のみ。これはFR-A10の一覧と詳細の矛盾修正であり、新permissionは追加しない。
+
+DEC-18: 案件一覧は状態（業務順）・重大度・期限のソート項目と昇順/降順を提供する。既定はstatus asc、同順位は常にid/jobId ASCII asc。状態の比較順位は次の全10状態で固定する。
+
+requested → offered → accepted → assigned → in_progress → on_hold → submitted → rework_requested → completed → cancelled
+
+これは表示順位であり状態遷移の許可表ではない。状態descは上記順位の逆順。同状態のIDはdescでもasc。severityはnormal < warning < critical、dueAtはUTC時刻で比較し、nullはどちらの方向でも最後。翻訳ラベルや現在ページ内だけでsortしない。認可→IR23の公開投影→filter→全snapshotのsort→ページ分割の順。offerの公開status、historyの凍結statusを使い、非公開のJob状態を参照しない。未知statusはD01のUNAVAILABLEで拒否する。
+
+正規型にJOB_STATUS_ORDERを公開する。これはデモ契約定数でありアプリ実装ではない。Repositoryのsort省略もstatus asc;id asc。既存のid sortは内部契約として保持するが、利用者の選択肢はstatus/severity/dueAtの3種類。全jobs.listを使う案件一覧に適用する。案件候補の読取もsort省略時は同じ既定値を使う。
+
+UIのURLキーsortはfield:direction（例sort=status:asc、sort=dueAt:desc）。省略はstatus:asc。不正なfield/方向、重複sort、空値はVALIDATIONで条件修正を求める。UI選択肢外のidをURLから指定することは拒否する。選択変更は他のfilterを保持し、URLを更新してcursorを除去、新条件の初頁を取得する。Back/ForwardはそのURLのsort/filterを復元し、古いcursorを新条件へ流用しない。Query keyにも正規化sortを含め、遅い旧条件応答で新一覧を上書きしない。購読による再取得では現在のsort選択を保持する。言語切替は順位・ID・UTC値を変えない。
+
+ソートコントロールにはラベルを付け、キーボードとモバイルでも選択可能にする。選択後は新条件のloadingを表示し、失敗はerror/retry、0件はempty。旧順の行を新しい順序で取得済みと表示しない。対応する列見出しにはaria-sortを反映する。「既定に戻す」はsortだけをstatus:ascへ戻して初頁から再取得し、他のfilterは保持する。KPIはsortに依存せず、summaries.getへsortを渡さない。
+
+## IR35 解除要求の起動経路とrestrictions.releaseの前提 — FRV-001
+
+解除要求（state=release_requested）の起動経路は次の3つだけとし、いずれも同じ内部遷移関数を使う。①入金確認: payments.confirm／payments.recordManual／payments.simulate(confirm)が原因請求（causeInvoiceIds）を全件paidにした同一遷移で、scheduledはcancelled、requested/appliedはrelease_requestedへ遷移し、releaseIntent={source:'payment',at:now,actorMembershipId}を保存する。②猶予・例外: restrictions.defer/exemptがrequested/appliedに対して行われた同一遷移でrelease_requestedへ遷移し、source='exception'。③強制解除: restrictions.overrideでsource='override'。
+
+release_requestedへ遷移した同一遷移で、perUnitごとにD03の解除評価を1回実行する。applyState=appliedかつonlineの設備にはremove_restriction Commandを作成しreleaseState=requested、not_sent/not_appliedはnot_required、sent_unknownはwaiting_reconcile、offlineのappliedはfailedではなくreleaseState=none/pendingReason=offlineとして明示retry(phase=release)を待つ。呼出者がclientでも解除Commandは作成される（Command.actorMembershipIdはRepositoryの内部主体'system-restriction'、監査のactorは入金確認の実行者）。
+
+`restrictions.release`はrestriction.manage保持者による解除要求の明示操作であり、前提はstate∈{requested,applied,release_requested}かつ「原因請求が全件paid」または「exception/graceが有効」のいずれか。未入金かつ猶予・例外なしはFORBIDDEN（契約制限違反）。requested/appliedからは上記②と同じ遷移（source='manual'）を行う。既にrelease_requestedの場合は冪等に現在のRestrictionを返し、Command・監査（拒否監査を除く）・versionを増やさない。再送や失敗設備の再要求はrestrictions.retry(phase=release)だけが行う。AT-A09-N④の「release」はこの冪等応答であり、release_requestedへの遷移自体は入金確認の遷移で起きる。AT-C11-N④はclientの入金確認だけで①が起動することを検証する。
+
+## IR36 デモ時計の進行モデルとセッション寿命 — FRV-002
+
+デモ時計はreset/reload時にfixture.clock（2026-09-14T01:00:00.000Z）から始まり、実時間と同じ速さで単調に進む。demo.advanceClock({to})はtoが現在時計以上なら前方へジャンプし、ジャンプ中に到来する期限（Command expiry、Offer/Assignment/資格の期限、staleAfterSeconds、Fact TTL、predicted occurrence、DiagnosticRun endAt、cooldown）をD04のイベント優先順で時刻順に処理する。toが現在時計より前の場合、reset直後で業務イベントがseedのeventCursorから増えていないときだけ「初期時刻の設定」として許可し、それ以外はVALIDATION（AT-C04-E③はreset直後にこの設定を行う）。
+
+Sessionの寿命30分はデモ時計で測るが、advanceClockのジャンプはセッション寿命を消費しない。ジャンプ確定時に有効なSessionのissuedAt/expiresAtを同じ差分だけ後ろへずらす（初期時刻の設定時も同様）。利用者操作による延長はない。セッション失効の試験はdemo.trigger(session_expired)またはジャンプなしの経過で行う。Membership.validUntil、Offer、Assignment、資格、契約、請求期限はジャンプで通常どおり失効する。ジャンプで失効した資源を表示中のQueryはIR24のとおりviewEpochを増分して破棄する。
+
+## IR37 transport障害の注入とネットワーク断 — FRV-003
+
+DemoTriggerにeventType='transport'を追加する。入力は`{operation:OperationName, outcome:'UNAVAILABLE'|'TIMEOUT'|'RATE_LIMITED'|'DELAY', retryAfterSeconds:number|null, delayMs:number|null, remainingCalls:number}`。remainingCallsは1〜100の整数で、当該operationの次のremainingCalls回の呼出しに適用し、適用のたびに減らす。outcome=UNAVAILABLE/TIMEOUTはRepositoryが業務処理を実行せずDomainError{code}でrejectする（writeは副作用0、冪等キーも記録しない）。RATE_LIMITEDはretryAfterSecondsを必須（1〜3600）としD04どおり受理を止める。DELAYはdelayMs（1〜60000）だけ応答を遅らせてから通常処理し、D10の意図的slow（3000ms）と10秒timeout表示（12000ms）はこの経路で注入する。受入条件の「units.listをUNAVAILABLEにする」「jobs.createをUNAVAILABLE」「submitをUNAVAILABLE」はこの注入を指す。read側のUNAVAILABLE自動再試行はremainingCallsを消費するため、AT-C01-E③のように最終的なerror表示を検証する場合はremainingCalls>=3を与える。
+
+DemoTrigger network(connected=false)は「ネットワーク断の模擬」で、全Repository操作（demoSession/preferences/demo.*を除く）をDomainError{code:'UNAVAILABLE', messageKey:'errors.network_disconnected', retryAfterSeconds:null}でrejectし、業務処理を実行しない。events.subscribeは断中にイベントを配送せず、UIは購読を解除して「更新停止」と最後の成功時刻を表示する（画面状態offline）。connected=trueで再接続すると、UIはD07の再snapshot→再購読で復帰し、断中に確定していたRepositoryイベントはリプレイで反映される。ネットワーク断と機器offline（code OFFLINE）は表示領域・文言を分ける。断中にexpireしたCommand/期限は時計どおり失効する。
+
+## IR38 顧客起点案件の期限導出 — FRV-004
+
+jobs.createのdueAtはjob.manage保持者（HQ）だけが指定できる。clientがdueAtを送るとVALIDATION（fieldErrors.dueAt）。省略時はRepositoryがdueAt=requestedEndを保存する（D16の生成案件と同じ規則）。HQが指定する場合はdueAt>=requestedEndを検証し、下回る場合はVALIDATION。dueAtの後からの変更操作は1Aにない（新規案件で対応する）。JobSummary.dueAt、overdueOnly、dueAt sort、technician/partnerのoverdueCountはこの保存値だけを使う。
+
+## IR39 archived資源の可視性 — FRV-005
+
+Property/Space/ACUnitのarchived=trueは、全一覧（properties/spaces/units.list）、summaries.get/admin.summaryの件数・分母・KPI、候補選択（units.list経由）、通知宛先解決、新規業務のscope判定から除外する。archivedフィルターは1Aで提供せず、除外は無条件。個別取得（units.get、およびspace/property選択の解決）はclient/contractor/technicianにはNOT_FOUND、HQのasset.manage保持者だけにarchived:trueの読取専用DTOを返し、制御・割当・契約・制限・Deviceの各操作はCONFLICT（理由archived）。既存のJob/Report/Audit/Command履歴からのUnit参照はD05のとおり履歴閲覧を許し、履歴画面はarchivedラベルを表示する。archive操作の同一遷移でunits/properties/spaces/summaries/自動運転のQueryをinvalidateする。unitIdsフィルターにarchived IDを含めた場合は不一致として0件に数える。
+
+## IR40 顧客数の母集団 — FRV-006
+
+Customer（サービス台帳）とOrganization(kind=customer)は1Aでは1対1。customers.saveは同じorganizationIdの2件目をCONFLICTとし、organizationIdはkind=customerかつ管理scope内であることを検証する。AdminSummary.customerCountはCustomer.status=activeかつ対応Organization.status=activeのCustomer件数（filters.customerId指定時はその1件の該当有無で0/1）。inactiveの顧客の設備・案件・請求はKPIから除外しないが、Customer/Organizationのどちらかがinactiveなら顧客数に数えない。AT-A01-N/Bの「active顧客」はこの定義で作る。
+
+## IR41 時系列プリセット1h/24h — FRV-007
+
+DD-C07およびDD-T03の期間プリセットは1h/24h/7d/custom。toはSR17と同じくデモ時計をUTC分境界へ切り捨てた値。1hは[to-60分,to)、24hは[to-1440分,to)の固定長・移動窓（暦日を使わない）。7dはSR17の暦日規則。customはfrom<to、最大366日。プリセットのラベルはIR17のviewEpochとURLに保存したfrom/toで再現し、明示更新時に選択中プリセットを再計算する。当日最初の1分でfrom=toとなるのはtodayだけで、1h/24hは常に非空。C01/C06/A01/A13のtoday/7d/30dはSR17を変更しない。
+
+## IR42 役割別投影の非公開項目 — FRV-008/FRV-009
+
+readとwriteの応答に次の投影規則を追加する。client向けJobDetail: offer=null、assignment={id,version,jobId,technicianMembershipId,scheduledStart,scheduledEnd,status,validFrom,validUntil,reason:null}、costsはvisibility=customerのみ、draftReportRef=null、reportRefsは受理済み版のみ、contactWindowは自己入力値。technician向けJobDetail: offer=null、costs=[]、assignment.reasonは自己の割当のものだけ。contractor向けJobDetail: 自社Offerのみ（他社のOffer/declineReasonは含めない）、costs=[]、assignment.reasonは自社割当のもの。HQは全項目。
+
+jobs.events: client向けにはnote.visibility=internalのイベントを配列から除外し（note=nullにするのではなく行ごと除外）、totalも除外後の件数。contractor向けは自社案件のinternal/customer両方、technicianは有効担当案件の両方。除外したイベントの存在を件数・cursorで漏らさない。JobNoteの本文はテキストノード表示（D08）。
+
+client向けRestrictionDetail（forInvoice/通知リンク）: events[]は state変更イベント（action∈{scheduled,requested,applied,release_requested,released,cancelled,defer,exempt}）に限定し、actorId='masked'、actorRoleAtTime=admin、reason=null、maskedBefore/After={}。exception.reasonはnull、graceUntil/exception.untilは返す。perUnitはそのまま。HQ向けは全項目。Restriction.reason（予告理由）は顧客向け文言としてHQが入力する項目であり、DD-A09の入力欄に「顧客に表示される」と明記する。
+
+members.list/members.eligible/members.capacityのcontractor向けMembership投影: permissions=[]、scopes=[]、qualificationsは自社技術者分のみ、validFrom/validUntilは返す。HQ向けは全項目。
+
+## IR43 Device登録時のSensor生成 — FRV-010
+
+devices.registerのsensorTypesは重複なしのMetric配列で空を許可する（device-no-sensor）。各metricは対象UnitのCapability.sensorsに同じmetricの定義が存在しなければVALIDATION（fieldErrors.sensorTypes）。Sensorはregister時に生成し、unit/staleAfterSeconds/boundaryIdをCapability.sensorsの同metric定義から複写し、idをRepositoryが採番、calibratedAt=nullとする。bindで別UnitへつなぐときはSR24のとおり新sensorIdを発行し、同じ複写規則をbind先の能力に適用する。能力に定義のないmetricのTelemetryは受け取らない（demo.trigger telemetryのsensor不存在=NOT_FOUND）。firmwareVersionの初期値は対象能力のfirmwareCandidates先頭（ASCII昇順）、候補が空なら'unknown'。
+
+## IR44 表示書式・翻訳・描画例外・補足 — FRV-019〜025
+
+- Intl locale tagはen→'en-MY'、ms→'ms-MY'。金額はIntl.NumberFormat(tag,{minimumFractionDigits:2,maximumFractionDigits:2})の数値部と通貨コードを半角空白で連結し「120.00 MYR」の順で表示する（通貨記号・currencyDisplayは使わない）。温度は小数1桁（"24.0°C"）、湿度/割合は小数1桁、電力量1桁、kgCO₂e 1桁、ppm/µg/m³は整数。丸めは十進の四捨五入（half away from zero）で、Number.prototype.toFixedを丸めに使わない。受入条件の数値（24°C等）は値の指定であり、表示はこの桁数に従う。日時はIntl.DateTimeFormat(tag,{timeZone:Preferences.timezone, dateStyle:'medium', timeStyle:'short'})とタイムゾーン略称を併記する。
+- 翻訳キーがms辞書に欠けていればen辞書へfallbackし、開発ビルドでconsole.warnを出す。両方欠ければキー文字列をそのまま表示する。en/msのキー集合の一致はNFR-07のlintで検査し、不一致はビルド失敗とする。
+- 描画時の未捕捉例外は共通ErrorBoundaryで捕捉し、correlationId付きの全画面errorとして表示する（白画面にしない）。再試行は同一routeの再マウント、失敗が続けばrole homeへの導線。RepositoryのDomainErrorは従来どおりAsyncBoundaryが扱う。
+- voice.resolveIntentの権限がないrole（contractor、権限を持たないHQ/技術者）にはVoicePanelを表示せず、ヘッダーの音声切替はdisabledで理由（voice.unavailable_for_role）を表示する。
+- Summary.countsで当該kindに該当しないカウンタ（customerのoffer/active/review/scheduled/inProgress/overdue/assigned、partner/technicianのpowerOn/powerOff/powerUnknown/alertCount等）は0を返し、UIは表示しない。nullにしない。
+- demo.trigger.scenarioIdは1〜64文字の任意ラベルで、DemoEvent.typeと監査に記録するだけで挙動を変えない。S01〜S08のシナリオ名を推奨する。
+- units.save.installedAtはInstant|nullを受け、nullは「未登録」として保存し、未来日はVALIDATION。既存の未登録設備を編集する際にnullのまま保存できる。

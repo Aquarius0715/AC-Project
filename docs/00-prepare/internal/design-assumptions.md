@@ -1,6 +1,6 @@
 ---
 document_id: PREP-INTERNAL
-version: 0.7.0
+version: 0.17.0
 status: working-notes
 scope: frontend-only
 updated: 2026-09-16
@@ -19,12 +19,16 @@ updated: 2026-09-16
 | DEC-02 | PROPOSED | 新規SPAはReact + TypeScript + Vite + React Router。SSRが必要なら再検討 | 共通設計・ビルド。依存版は実装開始時に互換性を確認・固定 |
 | DEC-03 | PROPOSED | 「reactForms」をReact Hook Formと解釈。Zod、shadcn/ui、Lucide、TanStack Queryを利用 | UIUX・フォーム・データ境界 |
 | DEC-04 | PROPOSED | 英語（en）・マレー語（ms）を初期デモ言語とし、英語を初期選択。追加言語・提供順序は未確定 | 翻訳キーとAT-X01/X02 |
-| DEC-05 | PROPOSED | デモ通貨MYR、表示時間帯Asia/Kuala_Lumpur。設定から変更可能 | 市場決定ではない。金額・時刻整形 |
+| DEC-05 | PROPOSED | デモ通貨MYR、表示時間帯Asia/Kuala_Lumpur。言語・表示時間帯は変更可能。通貨はMYR固定のデモ値（請求は元通貨のまま） | 市場決定ではない。金額・時刻整形 |
 | DEC-06 | 制作方針（ドキュメント作成者指定） | 顧客LoyaltyのHTML/CSSのデザインに合わせる。主色#005BEA、Plus Jakarta Sans、14pxカード。旧独立配色案を廃止 | [デザイン分析](../reference-design-analysis.md)とUIUXに根拠を記録。a11y補正はADAPTとして明示 |
 | DEC-07 | PROPOSED | 共有メモリのデモRepository。再読込でseedに戻る。同一タブの役割切替で保持 | デモ操作説明、テスト。永続化・複数タブ同期は対象外 |
 | DEC-08 | PROPOSED | 音声は文字起こし・応答のシミュレーションが標準。実マイク不要 | FR-X02、同意・拒否デモ |
 | DEC-09 | PROPOSED | 49機能の入力・業務細則・出力・失敗を具体化。デモの時間/上限/受諾前projection/確定予定重複拒否等は[実装契約](../../02-design/implementation-contracts.md)と各DDを正とする | 本番の承認を意味しない。変更時は同じIDの要件・設計・AT-N/E/Bを更新 |
 | DEC-10 | PROPOSED | 1Aの再訪・複数資源・競合を具体化。再割当は状態維持、手動入金はinvoice起点、制限は原因請求全件入金で解除、解除は元の電源/温度を復元しない。試運転・画像は共有モックへ保持 | [DDC-08](../../02-design/implementation-contracts.md#ddc-08-複数資源再訪役割横断の契約)、AT-*-R01、該当FR/DD。企業の正式ルールではない |
+| DEC-11 | PROPOSED（今回の修正指示による可逆的デモ設計） | 36件の指摘へのデモ仕様具体化。正規DTO・認可・仲裁・復旧・数値・画面・検証条件 | [確定契約](../../02-design/deterministic-contracts.md)、操作／画面カタログ。商用承認・本番契約は含まない |
+
+| DEC-19〜24 | PROPOSED | 0.17.0独立レビューFRVの技術的具体化（IR35〜44）。解除起動経路、時計ジャンプ、案件期限、顧客数、プリセット、投影 | [決定記録](review-decisions-017.json)。可逆、企業承認ではない |
+| DEC-12 | ACCEPTED FOR 1A | 今回はモックのみ。提示業務ルール採用、商用承認と分離。最終判断者は北野正樹（Masaki Kitano）・若井悠馬（Yuma Wakai）。別AI独立レビュー、人/外部によるデプロイ前最終確認 | [ユーザーの決定記録](decision-record-2026-09-16.md)。本番契約を推測で埋めない |
 
 PROPOSEDの項目は人による業務承認済みではない。DEC-06は過去の制作指示要約に記録されている。原指示メッセージは未収録であり、[指示の確認状態](../sources/production-instructions.md)を参照する。可逆的な1Aは提案基準で進行できる。
 
@@ -38,3 +42,5 @@ PROPOSEDの項目は人による業務承認済みではない。DEC-06は過去
 FRは企業要件原文（SRC-06）から再整理した管理番号です。[要件別の出所表](../requirement-origins.csv)で原文の記述位置と設計補完を確認します。例えば担当割当、報告承認、入金確認、FW校正・登録の詳しい手順は、企業の監視・保守という目的を実現するための設計補完を含む。
 
 画面での赤/オレンジ/緑の意味づけ、同意取得、値の品質区分、状態遷移の名称・時間値は、企業目的を支えるフロントエンド提案として扱う。企業原文中の検討質問や期待値を、検証済み能力や達成保証へ変換しない。
+
+DEC-12の採用判断は、上記の提案のうち同決定記録に列挙したデモ方針を確定する。従来のPROPOSEDという出所ラベルは商用承認済みを意味しないため保持するが、デモ採用の再確認は不要。

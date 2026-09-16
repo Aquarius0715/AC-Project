@@ -1,0 +1,7 @@
+finding_id,case_id,requirement_ids,given,when,then,contract,execution_status
+IRV-001,AT-G1-001,FR-P01,自社offered/accepted/submitted各1、受諾分のアクセス有効、全て期間内,status省略後offeredに変更,一覧3→1、offer/active/review=1/1/1→1/0/0、別社件数0,01-requirements/contractor.md#fr-p01-受託ダッシュボード,not_run
+IRV-002,AT-G1-002,FR-P01;FR-A02;FR-X04,住所と入場案内を登録した自社Offer,未受諾→受諾期間内→期限後で取得,住所は未受諾で公開、入場案内は期間内だけ、historyに双方なし,02-design/review-resolution-contracts.md#ir25-設置場所の住所と期限後の報告表示,not_run
+IRV-003,AT-G1-003,NFR-07,現行manifestを固定,索引とSDLC引渡しリンクを取得,両方が検証器の現行DOCを参照、旧版を実装入力と案内しない,04-agentic-sdlc/README.md#8-現行の引き渡し,not_run
+IRV-004,AT-G1-004,FR-P01;FR-P05;FR-P08;FR-A06,未完了Job、提出済み報告、now=2026-09-14T02:00:00.000Z,受理→再送→メモ更新→期限終了,受理時completedAtを一度だけ保存、後続不変、historyへ凍結、期間境界を半開評価,02-design/review-resolution-contracts.md#ir29-案件の完了時刻,not_run
+IRV-005,AT-G1-005,FR-P01;FR-T01,同Unitにresolved criticalとopen warning、Job.alertIds空,一覧/filter/集計→acknowledged critical追加→全resolved,warning→critical→normal、同snapshotで一致、offer/historyはnull不変,02-design/review-resolution-contracts.md#ir30-案件に表示する設備のアラート重大度,not_run
+IRV-006,AT-G1-006,FR-P05;FR-A06;FR-T09;FR-X04,T1のdraftをT2へ再割当、T2が本文/測定/写真を各独立caseで変更,提出後T2別MembershipまたはHQでaccept/return、T3でaccept,T2は全caseでFORBIDDEN副作用0、T3は通常条件下で受理、割当/閲覧のみは寄与者を増やさない、reports.getはT2へreviewAvailability=false/self_authored、P05/A06ボタンdisabled、寄与者集合は非公開,02-design/review-resolution-contracts.md#ir31-報告の共同編集と自己承認,not_run

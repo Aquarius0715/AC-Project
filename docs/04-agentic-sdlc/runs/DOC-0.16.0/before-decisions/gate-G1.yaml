@@ -1,0 +1,13 @@
+gate_id: G1
+task_id: DOC-0.16.0
+gate_result: pending
+reviewer_and_editor: /root
+independent_post_correction_review: not_run
+application_tests: not_run
+production_connection_readiness: NOT_READY
+deployment_approval: false
+unresolved_findings: [REV-001, REV-005]
+spec_baseline_id: c42b5ff33ed94be46318486b01d5706c244890d07bbc71ceefa51b48bd370ebc
+resolved_findings: [REV-002, REV-003, REV-004, REV-006, REV-007]
+traceability: {OK: 57, INCOMPLETE: 6, MISSING: 0, CONFLICT: 1}
+evidence_paths: [review.md, traceability-matrix.csv, static-check.json, validator-negative-checks.json, baseline-integrity-check.json]

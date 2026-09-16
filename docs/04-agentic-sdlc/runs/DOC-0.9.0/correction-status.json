@@ -1,0 +1,156 @@
+{
+  "review_id": "STRICT-DOC-0.8.0-2026-09-16",
+  "corrected_baseline": "16946120bd4f12d4d4fd71dd56a161c1ac606cd2b92f9e595e54e2fdf01bff0f",
+  "scope": "document-and-contract-corrections",
+  "independent_review": "not_run",
+  "application_tests": "not_run",
+  "findings": [
+    {
+      "finding_id": "REV-001",
+      "title": "受諾前のDTOから楽観ロックの版を取得できない",
+      "status": "specified_self_checked",
+      "contract_section": "SR01",
+      "acceptance_case": "AT-STRICT-001"
+    },
+    {
+      "finding_id": "REV-002",
+      "title": "新規作成型操作が存在しない資源の版を要求する",
+      "status": "specified_self_checked",
+      "contract_section": "SR02",
+      "acceptance_case": "AT-STRICT-002"
+    },
+    {
+      "finding_id": "REV-003",
+      "title": "scopeIdsの意味と空集合の認可が仕様未定義",
+      "status": "specified_self_checked",
+      "contract_section": "SR03",
+      "acceptance_case": "AT-STRICT-003"
+    },
+    {
+      "finding_id": "REV-004",
+      "title": "画面が必要とする候補・関連データ取得が操作一覧から欠落",
+      "status": "specified_self_checked",
+      "contract_section": "SR04",
+      "acceptance_case": "AT-STRICT-004"
+    },
+    {
+      "finding_id": "REV-005",
+      "title": "制御UIが論理的に有効な制限を取得できない",
+      "status": "specified_self_checked",
+      "contract_section": "SR05",
+      "acceptance_case": "AT-STRICT-005"
+    },
+    {
+      "finding_id": "REV-006",
+      "title": "延滞・階層・KPI絞り込みをQuery契約で表現できない",
+      "status": "specified_self_checked",
+      "contract_section": "SR06",
+      "acceptance_case": "AT-STRICT-006"
+    },
+    {
+      "finding_id": "REV-007",
+      "title": "手入力の測定値がサーバー相当メタデータ一式を要求する",
+      "status": "specified_self_checked",
+      "contract_section": "SR07",
+      "acceptance_case": "AT-STRICT-007"
+    },
+    {
+      "finding_id": "REV-008",
+      "title": "校正履歴・終了済み操作・試運転を再訪時に取得できない",
+      "status": "specified_self_checked",
+      "contract_section": "SR08",
+      "acceptance_case": "AT-STRICT-008"
+    },
+    {
+      "finding_id": "REV-009",
+      "title": "MRVが必要な係数snapshotと旧版表示を復元できない",
+      "status": "specified_self_checked",
+      "contract_section": "SR09",
+      "acceptance_case": "AT-STRICT-009"
+    },
+    {
+      "finding_id": "REV-010",
+      "title": "受入条件が確定契約と反対の結果を要求する",
+      "status": "specified_self_checked",
+      "contract_section": "SR10",
+      "acceptance_case": "AT-STRICT-010"
+    },
+    {
+      "finding_id": "REV-011",
+      "title": "選択IDのURL仕様が画面ごとに欠ける",
+      "status": "specified_self_checked",
+      "contract_section": "SR11",
+      "acceptance_case": "AT-STRICT-011"
+    },
+    {
+      "finding_id": "REV-012",
+      "title": "宛先ゼロの通知失敗を返すモデルがない",
+      "status": "specified_self_checked",
+      "contract_section": "SR12",
+      "acceptance_case": "AT-STRICT-012"
+    },
+    {
+      "finding_id": "REV-013",
+      "title": "資格の必要条件・失効をデータとイベントで表せない",
+      "status": "specified_self_checked",
+      "contract_section": "SR13",
+      "acceptance_case": "AT-STRICT-013"
+    },
+    {
+      "finding_id": "REV-014",
+      "title": "更新中の複数ページ取得が安定したsnapshotを完了できない",
+      "status": "specified_self_checked",
+      "contract_section": "SR14",
+      "acceptance_case": "AT-STRICT-014"
+    },
+    {
+      "finding_id": "REV-015",
+      "title": "オフセット画面の許可role条件が矛盾",
+      "status": "specified_self_checked",
+      "contract_section": "SR15",
+      "acceptance_case": "AT-STRICT-015"
+    },
+    {
+      "finding_id": "REV-016",
+      "title": "必読契約の参照範囲がD11で止まっている",
+      "status": "specified_self_checked",
+      "contract_section": "SR16",
+      "acceptance_case": "AT-STRICT-016"
+    },
+    {
+      "finding_id": "REV-017",
+      "title": "today/7d/30dのUTC期間への変換が未定義",
+      "status": "specified_self_checked",
+      "contract_section": "SR17",
+      "acceptance_case": "AT-STRICT-017"
+    },
+    {
+      "finding_id": "REV-018",
+      "title": "オフセットのfailed後の回復と遅延イベントが未定義",
+      "status": "specified_self_checked",
+      "contract_section": "SR18",
+      "acceptance_case": "AT-STRICT-018"
+    },
+    {
+      "finding_id": "REV-019",
+      "title": "契約改版が進行中制限へ与える影響が未定義",
+      "status": "specified_self_checked",
+      "contract_section": "SR19",
+      "acceptance_case": "AT-STRICT-019"
+    },
+    {
+      "finding_id": "REV-020",
+      "title": "復旧イベントが通信・電源・tamperのどれを回復するか不明",
+      "status": "specified_self_checked",
+      "contract_section": "SR20",
+      "acceptance_case": "AT-STRICT-020"
+    },
+    {
+      "finding_id": "REV-021",
+      "title": "通知だけのAirPolicyの評価結果を表現できない",
+      "status": "specified_self_checked",
+      "contract_section": "SR21",
+      "acceptance_case": "AT-STRICT-021"
+    }
+  ]
+}

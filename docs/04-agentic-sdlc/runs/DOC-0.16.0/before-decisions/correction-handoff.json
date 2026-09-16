@@ -1,0 +1,20 @@
+{
+  "task_status": "awaiting_user_decisions",
+  "scope": "frontend-demo-1A-documents",
+  "spec_baseline_id": "c42b5ff33ed94be46318486b01d5706c244890d07bbc71ceefa51b48bd370ebc",
+  "review_rounds": 2,
+  "findings": 7,
+  "corrected": 5,
+  "unresolved": [
+    "REV-001",
+    "REV-005"
+  ],
+  "pending_decisions": [
+    "DEC-17",
+    "DEC-18"
+  ],
+  "all_ok": false,
+  "independent_post_correction_review": "not_run",
+  "application_tests": "not_run",
+  "next_action": "Record user selections; update affected requirements/design/UI/acceptance; rerun review and independent G1."
+}

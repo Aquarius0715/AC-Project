@@ -1,0 +1,19 @@
+gate_id: G1
+task_id: DOC-0.11.0
+gate_result: pending
+spec_baseline_id: 43d3c2b9c31307109808c42d41a7c71b6cac91c12af81dceca7ed29c5d475648
+spec_manifest: spec-manifest.json
+self_review: completed_document_scope
+independent_review: not_run
+original_findings_specified: 17
+additional_cycle_findings_specified: 6
+deferred_requirement_candidates: [REV-018]
+pending_business_decisions: []
+review_rounds: 3
+typescript_contract_check: passed
+validator_mutation_checks: 8_passed
+application_implementation: out_of_current_task_scope
+application_tests: not_run
+notes:
+  - Self review does not approve independent G1
+  - REV-018 long-session memory capacity is outside the current demo guarantee

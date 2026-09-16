@@ -1,0 +1,47 @@
+{
+  "scope": "document-validator-mutations-only",
+  "application_tests": "not_run",
+  "results": [
+    {
+      "case": "unsafe_job_receipt",
+      "detected": true,
+      "expected_diagnostic": "Job receipt contains unexpected fields"
+    },
+    {
+      "case": "caller_notice_time",
+      "detected": true,
+      "expected_diagnostic": "Notice time must not be caller controlled"
+    },
+    {
+      "case": "override_apply_permission",
+      "detected": true,
+      "expected_diagnostic": "Override retry must be release only"
+    },
+    {
+      "case": "missing_view_epoch",
+      "detected": true,
+      "expected_diagnostic": "Resolution DTO invariant missing Session"
+    },
+    {
+      "case": "unknown_raw_unit_unrepresentable",
+      "detected": true,
+      "expected_diagnostic": "Resolution DTO invariant missing RawMeasurement"
+    },
+    {
+      "case": "missing_notification_type",
+      "detected": true,
+      "expected_diagnostic": "Resolution DTO invariant missing Notification"
+    },
+    {
+      "case": "missing_actual_boundary",
+      "detected": true,
+      "expected_diagnostic": "Energy boundary source missing EnergySummary"
+    },
+    {
+      "case": "override_entry_blocked",
+      "detected": true,
+      "expected_diagnostic": "Override-only list entry inaccessible"
+    }
+  ],
+  "passed": true
+}

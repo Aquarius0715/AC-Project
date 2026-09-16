@@ -1,6 +1,6 @@
 ---
 document_id: REQ-P
-version: 0.7.0
+version: 0.17.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -8,6 +8,8 @@ scope: frontend-demo-1A
 ---
 
 # 施工業者 要件定義書
+
+**0.17.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 目的と前提
 
@@ -53,7 +55,7 @@ scope: frontend-demo-1A
 
 上の表は目次にあたるものです。ここから先は、各要件について「業務をいつ始められるか」「どんな手順で進むか」「どんな結果になるか」「合格の条件は何か」を詳しく説明します。
 
-受入条件の行にある①②…という番号は、書かれている順番のサブケース(細かい場合分け、例: AT-C01-E.01)を示します。「Given(前提)」側と「Then(結果)」側で同じ番号どうしが対応します。
+受入行の①②…はそのセル内の観測項目番号です。Givenの独立条件とThenの結果は記述内容で対応付け、複数assertionとcase IDを混同しません。失敗コードはD01の原因別優先表で一意に決定します。
 
 fixture(テスト用の決まったデータ)の名前は、[検証計画](../04-agentic-sdlc/verification.md)で決めた固定のfixtureを使います。
 
@@ -66,15 +68,15 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 - **利用開始条件**: 有効な施工業者としてのMembership(利用資格)があること。本社(HQ)からの依頼(offer)は、受諾する前でも案件の概要は見られる。
 - **基本フロー**: 自社の「受諾待ち」「予定」「進行中」「品質確認待ち」の件数を集計する → 状態を選んで案件の一覧を見る → 対象の案件の操作画面に進む。
-- **業務規則 BR-P01**: 受諾する前に見られるのは、案件の種類・地域・必要な資格・日程の候補までの、最小限の情報だけ。設備の詳しい数値や、顧客の連絡先の情報は、受諾したあとで、かつ作業できる期間内に限って見られる。
+- **業務規則 BR-P01**: 受諾する前に見られるのは、案件の種類・エアコンに紐づく設置物件の登録住所・必要な資格・日程の候補までの情報。設備の詳しい数値や入場案内は、受諾したあとで、かつ作業できる期間内に限って見られる。
 - **完了後の業務状態**: 画面を見るだけでは、案件を受諾したことにはならない。集計の件数(KPI)と一覧に出す対象は、同じ検索条件でそろえる。
 - **境界条件・禁止事項**: 他社への依頼(offer)は件数に含めない。委託の期間が終わって設備が見られなくなっても、自社の受諾・辞退の履歴の最小限の記録は確認できる。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-P01-N | contractor-aにoffered1・accepted1・submitted1、contractor-bにoffered1。When: `/partner`→status=offered | ①offerCount=1／activeCount=1／reviewCount=1 ②一覧1件、bのofferなし ③閲覧後もOffer decision=null |
+| AT-P01-N | contractor-aに未応答かつ期限内offered1、有効受諾期間内のaccepted1・submitted1、contractor-bにoffered1。全件は選択期間内。When: ①`/partner`をstatus条件なしで取得 ②status=offeredへ変更 | ①一覧3件、offerCount=1／activeCount=1／reviewCount=1 ②一覧1件、offerCount=1／activeCount=0／reviewCount=0、bのofferなし ③閲覧後も未応答Offer decision=null |
 | AT-P01-E | ①contractor-b宛offerのjobIdを直打ち ②委託期限後に自社履歴を開く | ①NOT_FOUND ②JobHistorySnapshot（自社決定・完了日）のみ、live値なし |
-| AT-P01-B | 同じofferを①受諾前 ②受諾後・期間内 ③委託失効後に開く | ①JobOfferSummary（住所・telemetry・請求なし） ②JobDetail ③JobHistorySnapshot |
+| AT-P01-B | 同じofferを①受諾前 ②受諾後・期間内 ③委託失効後に開く | ①JobOfferSummary（設置物件の登録住所のみ参照、入場案内・telemetry・請求なし） ②JobDetail ③JobHistorySnapshot |
 
 設計: [DD-P01](../02-design/contractor.md#dd-p01-詳細)。親ケースAT-P01は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -111,7 +113,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-P03-N | accepted案件、tech-external-a（有資格・contractor-a）。When: 2026-09-15 10:00〜12:00で割当 | ①Assignment作成 ②scheduledSlot確定 ③Job assigned ④担当技術者へ通知プレビュー1件 |
-| AT-P03-E | ①contractor-bの技術者 ②無資格 ③委託期間外 ④in_progressで理由なし再割当 ⑤理由あり再割当 | ①②③FORBIDDEN／VALIDATION、割当0件 ④VALIDATION ⑤成功、Jobはin_progress維持 |
+| AT-P03-E | ①contractor-bの技術者 ②無資格 ③委託期間外 ④in_progressで理由なし再割当 ⑤理由あり再割当 | ①NOT_FOUND ②FORBIDDEN ③VALIDATION（指定枠が委託期間に収まらない）、割当0件 ④VALIDATION ⑤成功、Jobはin_progress維持 |
 | AT-P03-B | ①非重複日程 ②同時間帯の確定重複 ③保存直前に候補の資格を失効 | ①成功 ②CONFLICT ③FORBIDDEN |
 
 **追加受入条件 AT-P03-R01（再訪・競合・役割横断）**
@@ -155,7 +157,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-P05-N | submitted report v1（作者tech-external-a）、品質担当は別user。When: accept | ①completed ②reviewHistoryがv1に紐付く ③顧客が報告本文を取得可 ④Alertはopen維持 |
-| AT-P05-E | ①作者と同userIdの別Membershipで受理 ②reportVersion=0で受理 ③return理由なし ④returnの後にv1でaccept | ①FORBIDDEN ②CONFLICT ③VALIDATION ④CONFLICT、rework_requested維持 |
+| AT-P05-E | ①作者と同userIdの別Membershipで受理 ②reportVersion=0で受理 ③return理由なし ④returnの後にv1でaccept | ①FORBIDDEN ②VALIDATION（versionは正整数） ③VALIDATION ④CONFLICT、rework_requested維持 |
 | AT-P05-B | ①全点検記録あり ②未点検あり理由あり ③未点検あり理由なし | ①②受理可 ③受理ボタン無効、VALIDATION |
 
 **追加受入条件 AT-P05-R01（再訪・競合・役割横断）**
@@ -180,7 +182,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-P06-N | contractor-aに技術者2名。When: date=2026-09-15、activeOnly=true | ①2名の割当と空き枠 ②他社0名 ③書込み0件 |
-| AT-P06-E | ①URLの会社IDをcontractor-bへ ②失効した技術者を候補に選ぶ | ①NOT_FOUND ②候補に表示されず、直接指定はVALIDATION |
+| AT-P06-E | ①URLの会社IDをcontractor-bへ ②失効した技術者を候補に選ぶ | ①NOT_FOUND ②候補に表示されず、直接指定はFORBIDDEN |
 | AT-P06-B | ①作業可能8h・割当4h ②分母未設定 ③他社技術者 | ①50% ②「—」 ③非表示 |
 
 設計: [DD-P06](../02-design/contractor.md#dd-p06-詳細)。親ケースAT-P06は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
@@ -192,14 +194,14 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 - **利用開始条件**: 自社の案件について、連絡や履歴を見る権限があること。
 - **基本フロー**: 案件の履歴を開く → 日程調整・品質連絡のテンプレート(定型文)を選ぶ → メモの内容と宛先の役割を確認する → アプリ内の記録と、外部送信の見本(プレビュー)を作る。
-- **業務規則 BR-P07**: 実際には送信しない。宛先は、その案件に関わる本社(HQ)・担当の技術者・顧客の窓口だけに限る。社内向けの品質についてのメモは、初期設定では顧客には見せない。
+- **業務規則 BR-P07**: 実際には送信しない。顧客の履歴(jobs.events)からはvisibility=internalのメモを含むイベント自体を除外する(IR42)。宛先は、その案件に関わる本社(HQ)・担当の技術者・顧客の窓口だけに限る。社内向けの品質についてのメモは、初期設定では顧客には見せない。
 - **完了後の業務状態**: メモ(Note)を、作成者と公開範囲の情報とともに保存する。見本(プレビュー)を作っただけでは、「送信済み(deliveryState=sent)」の状態には変えない。
 - **境界条件・禁止事項**: 自由に入力したメールの宛先、他の案件への宛先、顧客の請求内容の転記は拒否する。保存に失敗しても、書いたメモの内容は消さずに残す。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-P07-N | job-contractor-a。When: template=schedule_change、recipient=hq、visibility=internal、channel=emailでプレビュー | ①JobNote保存、authorId ②NotificationPreview deliveryState=preview ③顧客画面にNote非表示 |
-| AT-P07-E | ①任意メール宛先 ②他案件の宛先 ③請求レコード参照params ④保存失敗 | ①②③VALIDATION／FORBIDDEN ④メモ本文を保持 |
+| AT-P07-E | ①任意メール宛先 ②他案件の宛先 ③請求レコード参照params ④保存失敗 | ①②③D01による単一エラー ④メモ本文を保持 |
 | AT-P07-B | ①internal ②customer ③許可宛先 ④外部自由宛先 | ①顧客非表示 ②顧客表示 ③プレビュー生成 ④拒否 |
 
 **追加受入条件 AT-P07-R01（再訪・競合・役割横断）**
@@ -224,8 +226,18 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-P08-N | contractor-a session。When: 全route・Repository操作 | ①最小projection ②操作直前に再確認 ③拒否時の業務変更0件 |
-| AT-P08-E | ①他社jobId ②now=validUntil ③未受諾設備 ④invoices.create ⑤restrictions.schedule | 各FORBIDDEN／NOT_FOUND、監査に理由コード、応答に禁止データなし |
+| AT-P08-E | ①他社jobId ②now=validUntil ③未受諾設備 ④invoices.create ⑤restrictions.schedule | 各D01による単一エラー、監査に理由コード、応答に禁止データなし |
 | AT-P08-B | ①未受諾 ②期間内受諾済み ③期間失効 | ①JobOfferSummary ②JobDetail＋live設備 ③JobHistorySnapshotのみ |
 
 設計: [DD-P08](../02-design/contractor.md#dd-p08-詳細)。親ケースAT-P08は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
+
+0.9.0修正契約: [厳格レビュー修正契約](../02-design/strict-review-contracts.md)と[操作別版契約](../02-design/write-version-catalog.csv)を併読する。
+
+現行0.17.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+
+0.14.0: IR25に従い、受諾前住所は設備の設置物件から取得し、期限後の報告表示は報告有無・受理状態だけを凍結する。
+
+0.15.0: FR-P01の一覧・集計はIR26/IR30、FR-P05の自己承認禁止はIR31の提出版全寄与者で判定する。
+
+案件一覧には状態（業務順）・重大度・期限の昇順/降順ソートを設ける。デフォルトは状態の業務順（IR34）。全対象を並べ替えてからページ分割し、言語切替では順序を変えない。受入はAT-REV16-005を併用する。

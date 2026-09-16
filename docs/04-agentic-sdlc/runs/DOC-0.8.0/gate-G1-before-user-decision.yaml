@@ -1,0 +1,20 @@
+# 0.8.0文書修正と自己再レビュー。独立承認・アプリ試験ではない。
+gate_id: G1
+task_id: DOC-0.8.0
+gate_result: pending
+spec_baseline_id: fe631d032894f302b713cc564f059ed23760cb6bd609638738de63fa89953b0a
+spec_manifest: spec-manifest.json
+self_review: completed
+independent_review: pending
+application_tests: not_run
+typescript_contract_check: passed
+typescript_version: 5.9.3
+evidence_paths:
+  - static-check.json
+  - validator-negative-checks.json
+notes:
+  - 前回36件へ文書修正・範囲決定・追加受入条件を対応付けた
+  - 1A自己再レビューで未解決BLOCKER/CRITICALは検出していない
+  - 別主体のG1承認を自己レビューで置換しない
+  - 本番APIと実機終了責任はNOT DEFINED、企業判断はOPENとして継続
+  - 詳細レビュー記録は05-document-reviewに保存（既存方針によりコミット対象外）

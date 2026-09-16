@@ -1,0 +1,204 @@
+{
+  "version": "0.11.0",
+  "spec_baseline_id": "43d3c2b9c31307109808c42d41a7c71b6cac91c12af81dceca7ed29c5d475648",
+  "hash_algorithm": "sha256",
+  "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
+  "spec_files": [
+    {
+      "path": "00-prepare/PrepareDocument.md",
+      "sha256": "6a3d3252b67832f3609326898b1ca3c015b21478421fa03eac48a5d183d0c291"
+    },
+    {
+      "path": "00-prepare/company-requirement-map.csv",
+      "sha256": "11561533d1b6128b0e3e4f5102570a968700f930094216ba973aba9204782230"
+    },
+    {
+      "path": "00-prepare/internal/decision-record-2026-09-16.md",
+      "sha256": "2266242446dfdb5871914b8747a529eda9b20297d6f9c4181fe6d63fad578e72"
+    },
+    {
+      "path": "00-prepare/internal/design-assumptions.md",
+      "sha256": "b42b692553fd0801e5377b369bbe014851bc16500136864c5a0a3c11adacb33e"
+    },
+    {
+      "path": "00-prepare/reference-design-analysis.md",
+      "sha256": "37e81d80aa4606183d7533829d9ac58b8ec1b49aaccc9112ed08c24fe8e9be24"
+    },
+    {
+      "path": "00-prepare/requirement-origins.csv",
+      "sha256": "5f0b29537ca06dda6d7ab4ec3f52fb6a29ca935e78a347b7fcc268a72acd9f68"
+    },
+    {
+      "path": "00-prepare/sources/company-requirements-original.txt",
+      "sha256": "526927ffef80f32f2dce775414858013031d75313eeb96c4f89dabd582ee958f"
+    },
+    {
+      "path": "00-prepare/sources/original-handover.md",
+      "sha256": "930b541711deca7b7e1764b364953da879757482fba4217b142aff1be63a8080"
+    },
+    {
+      "path": "00-prepare/sources/production-instructions.md",
+      "sha256": "4dc1e01ebbd097d41c2bf4239fc4dc1c3dcb0272c7e704edcd1ec018321c1eb7"
+    },
+    {
+      "path": "00-prepare/sources/reference-style-evidence.json",
+      "sha256": "6a905fd59d5b83a4152a805135d08bef5598cae86f501bc5f207bb45f875cc66"
+    },
+    {
+      "path": "00-prepare/traceability.csv",
+      "sha256": "14c6ec2c091b5f10c8333be87a6d76dee290a1959ea545f10b29080c9c0d2c67"
+    },
+    {
+      "path": "01-requirements/admin.md",
+      "sha256": "f5cb107a422e0429c4846a9ce0eace8759760c763918f3de39c5f261d849ee0c"
+    },
+    {
+      "path": "01-requirements/client.md",
+      "sha256": "d410cef43a132330757b391e5f7ec65193ce55c8d4125b6bdcfb2d5cbbf76fb6"
+    },
+    {
+      "path": "01-requirements/common.md",
+      "sha256": "a18e8fd1747bdf7b1e91b61dad97e1bae746198498f0d5031aa8675892d854e8"
+    },
+    {
+      "path": "01-requirements/contractor.md",
+      "sha256": "2dd1a9d4cdf9cd7e1a6107c70e6a26374b9a08a047bce700f53564a2c0e40c0b"
+    },
+    {
+      "path": "01-requirements/technician.md",
+      "sha256": "aa65f613e92c2ba0eb035dde986c8022aebb2b87815d563d0b0b6837cb259b79"
+    },
+    {
+      "path": "02-design/admin.md",
+      "sha256": "d51b5d7e323e4ffa255a0703a9dd83b047fbed5d2b5fc39ba420c0acbfdc7a3b"
+    },
+    {
+      "path": "02-design/client.md",
+      "sha256": "9ee6ccdfdb57e51a4072bc18a369fa06ecb86fce1283009386082955f000d1b3"
+    },
+    {
+      "path": "02-design/common.md",
+      "sha256": "0f57a58fff448c8599a76e096da7e2aefdab20524aab54a0ab47f2db12364943"
+    },
+    {
+      "path": "02-design/contractor.md",
+      "sha256": "301a26582babea5122f219c07c3e97b5b84c5fea6aa8f509bc8ebe40ba3c5558"
+    },
+    {
+      "path": "02-design/deterministic-contracts.md",
+      "sha256": "b71dac2a01d12460d360d88d6997504dda3ebb8b1601faa2667687c41b28a95a"
+    },
+    {
+      "path": "02-design/implementation-contracts.md",
+      "sha256": "cc00bd3aa16b92b0b5478d53055afae967a8f39fb0e64fbe2fbad5e14f5db482"
+    },
+    {
+      "path": "02-design/operation-catalog.csv",
+      "sha256": "90538335771a93e07d1e48255370a21d4f5f5f18e34244fcce2e91240efda4d1"
+    },
+    {
+      "path": "02-design/query-catalog.csv",
+      "sha256": "7c1116e498c1ff39e79d0bf6718589e18f6646389d6adfdbbffc584ed3977859"
+    },
+    {
+      "path": "02-design/review-resolution-contracts.md",
+      "sha256": "d3452b216ac408bac402b09055a8b60a970172d85255b4dea3c20feff351fed3"
+    },
+    {
+      "path": "02-design/service-contracts.ts",
+      "sha256": "bf0619921dfdd4393521437fee2ecccbc98e71249eb12984b3a406143d9a2058"
+    },
+    {
+      "path": "02-design/strict-review-contracts.md",
+      "sha256": "81f1330521f6d63ad8d52bec4bbd5da329dcb8152d84745089626fbe2d759133"
+    },
+    {
+      "path": "02-design/technician.md",
+      "sha256": "28fb4caf73d9243ef4dd64d4dbe3bdabaf7d4c6a1763b9cf6fe711e0755f0001"
+    },
+    {
+      "path": "02-design/write-version-catalog.csv",
+      "sha256": "6712fa11d279df2f7fbc55b76bc8455d3e4f0f4b65d9d28f1fa7fd6bbe272857"
+    },
+    {
+      "path": "03-uiux/UIUXSpecification.md",
+      "sha256": "e6ca2d037394b9eb439c88645d54755ee79772743e8a427890f3904a833d34e4"
+    },
+    {
+      "path": "03-uiux/component-contracts.csv",
+      "sha256": "2b11abd7b6ac342b3a2a475d76df3e8b5d0f8806a685e31eec5189b4822c8c27"
+    },
+    {
+      "path": "03-uiux/screen-catalog.csv",
+      "sha256": "58ed5ddec1abea1a20d9984002314ac8b2ee3a5111449c473ea42cd4c300c838"
+    },
+    {
+      "path": "04-agentic-sdlc/README.md",
+      "sha256": "ab7ab0039b6afb127086a1763a5824c844cce703d550d38cf9ab6c6c9d3e5a59"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-fixes.csv",
+      "sha256": "8eb961968fe6f689daaa730c6d3d26938d709265bc8b61e45155cdfb649a9212"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-independent.csv",
+      "sha256": "81ac2d05ed3499b2f49fa36db3762b5b2a92193390c374bbd7542cba2ff7a29c"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-rereview.csv",
+      "sha256": "e247ac0f37e5cfe2f9290b2f685aa5c98917c4c10b89fa2330b7c6004d820d6a"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-resolution.csv",
+      "sha256": "7239528a53fbeb88ddc092fc2cab4fce2ac86ec68848980660ff9a3f6b12618f"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-strict-review.csv",
+      "sha256": "fae128a2738dd3cce790ae63bbddf1bca5449529c444784721c53953cdf83334"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/design.md",
+      "sha256": "fa9bfbc6f52d57ddee28be019eba2c345893e327550637795308b95ad3e9fee5"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/implementation.md",
+      "sha256": "6b579145d19756ce668b22f25fc4391e0b8efbb29bf744865492a6180207af89"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/orchestration.md",
+      "sha256": "f594e3faa140ab6aef229ca05b5e15223a0e875440a92a4dd410a5fa4df35ea6"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/review.md",
+      "sha256": "c70972cc69d5095b3900daa0f1ce075142a51c9b8fa9bbb622a9aeffe4c356c3"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/test.md",
+      "sha256": "b30b4a2cbe1f0ff87c88e95662eb01345608eb238c94a9c87b341be25545b554"
+    },
+    {
+      "path": "04-agentic-sdlc/fixture-contract.json",
+      "sha256": "1b3e36c6c65ce2cabe7a2494ff236d987a124c00ed102f8c91feb014a825d35b"
+    },
+    {
+      "path": "04-agentic-sdlc/templates/artifacts.md",
+      "sha256": "c5f86be36137a3c047cee1b63a106acf5e0fe1d7225ed0f4d3b52c6d2d05627a"
+    },
+    {
+      "path": "04-agentic-sdlc/verification.md",
+      "sha256": "bbf0e8d4462f3b9c2c5ee2e03b0629ff0274fe5cdde5b4c1068b107122c56e4a"
+    },
+    {
+      "path": "README.md",
+      "sha256": "8894be06608059b6ac187e994c3f91cb88a35275ee57d8e475cf34ec734e4c8e"
+    },
+    {
+      "path": "tools/check_review_regressions.py",
+      "sha256": "2a26ad351f06b9ca052d86375201749afa8de798fffaa8203010ec48f5372b29"
+    },
+    {
+      "path": "tools/validate_documents.py",
+      "sha256": "4bf0e25cb93c4013a61da52db2e629bc4376d4b487000b4da1603b6a11b7b347"
+    }
+  ]
+}
