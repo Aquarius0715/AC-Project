@@ -37,6 +37,8 @@ tests/                unit, component, contract, e2e
 
 データの依存する向きは、`page(画面) → feature hook(機能ごとの処理) → Repository interface(取り出し方の約束事) → injected adapter(差し込む変換の仕組み)`という順番です。domain(業務のルールを扱う層)は、React・HTTP通信・モックのどれにも依存しません。ページから、fetch(通信)・mock seed(初期データ)・localStorageを直接使ってはいけません。composition-root(組み立て役)だけが、どのadapterを使うかを選びます。
 
+画面遷移も同じ考え方で扱います。pageやfeature hookは、React Router固有のAPI(`useNavigate`、`useParams`、`useLocation`等)を直接呼びません。代わりに`shared`配下に置く小さなNavigation interface(例: `navigateTo(routeKey, params)`、`getParam(name)`)を経由し、React Routerへの実装はcomposition-root側だけが知ります。これはRepositoryパターンと同じ「取り出し方の約束事と実装を分ける」目的で、将来ルーターを差し替える場合の変更範囲をNavigation interfaceの実装だけに閉じるためです。
+
 いま提案している構成(PROPOSED)は、TypeScript(strictモード)、React、Vite、React Routerです。サーバー側でHTMLを組み立てる必要(SSR)がないので、SPA(1つのページで動くアプリ)として作ります。URLを直接開く「ディープリンク」に対応するには、将来、ホスティング側でSPA用のフォールバック設定が必要です。使うライブラリのバージョンは、実装を始めるときに互換性を確認し、lockfile(バージョン固定ファイル)に固定します。アプリを起動するコマンドはまだ作っておらず、この文書では「動作確認済み」とは書きません。
 
 ## 2. 共通ルートと画面状態
