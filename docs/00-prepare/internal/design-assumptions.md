@@ -18,7 +18,7 @@ updated: 2026-09-16
 | DEC-01 | PROPOSED | 施工業者は受託と自社人員・品質を担当。HQの委託範囲内のみ再割当 | FR-P全件、S02/S08、MaintenanceJob |
 | DEC-02 | PROPOSED | 新規SPAはReact + TypeScript + Vite + React Router。SSRが必要なら再検討 | 共通設計・ビルド。依存版は実装開始時に互換性を確認・固定 |
 | DEC-03 | PROPOSED | 「reactForms」をReact Hook Formと解釈。Zod、shadcn/ui、Lucide、TanStack Queryを利用 | UIUX・フォーム・データ境界 |
-| DEC-04 | PROPOSED | 英語・日本語を初期デモ言語、英語を初期選択。追加言語・提供順序は未確定 | 翻訳キーとAT-X01/X02 |
+| DEC-04 | PROPOSED | 英語（en）・マレー語（ms）を初期デモ言語とし、英語を初期選択。追加言語・提供順序は未確定 | 翻訳キーとAT-X01/X02 |
 | DEC-05 | PROPOSED | デモ通貨MYR、表示時間帯Asia/Kuala_Lumpur。設定から変更可能 | 市場決定ではない。金額・時刻整形 |
 | DEC-06 | 制作方針（ドキュメント作成者指定） | 顧客LoyaltyのHTML/CSSのデザインに合わせる。主色#005BEA、Plus Jakarta Sans、14pxカード。旧独立配色案を廃止 | [デザイン分析](../reference-design-analysis.md)とUIUXに根拠を記録。a11y補正はADAPTとして明示 |
 | DEC-07 | PROPOSED | 共有メモリのデモRepository。再読込でseedに戻る。同一タブの役割切替で保持 | デモ操作説明、テスト。永続化・複数タブ同期は対象外 |
