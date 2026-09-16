@@ -1,9 +1,9 @@
 ---
 document_id: PREP-INTERNAL
-version: 0.6.0
+version: 0.7.0
 status: working-notes
 scope: frontend-only
-updated: 2026-09-15
+updated: 2026-09-16
 ---
 
 # 開発者向け補足：仮定・技術選択

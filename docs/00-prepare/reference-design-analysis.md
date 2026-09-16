@@ -1,6 +1,6 @@
 ---
 document_id: PREP-STYLE
-version: 0.6.0
+version: 0.7.0
 status: source-inspected
 owner: design-agent
 updated: 2026-09-14

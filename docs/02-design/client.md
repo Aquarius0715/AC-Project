@@ -1,6 +1,6 @@
 ---
 document_id: DD-C
-version: 0.6.0
+version: 0.7.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -24,15 +24,15 @@ scope: frontend-demo-1A
 | DD-C01 / FR-C01 | `/customer` / `Overview` | `units.list, telemetry.summary, alerts.list` | 物件・期間フィルター。URLに保持し、許可された設備のみ集計 | データなしと0を区別。古い値に更新時刻を併記 |
 | DD-C02 / FR-C02 | `/customer/properties` / `PropertyExplorer` | `properties.list, properties.save, properties.archive, spaces.list, spaces.save, spaces.archive, units.list` | 自組織の物件種別・名称、階層を作成/編集。循環・他物件親IDを拒否。設備能力・メーカー台帳の編集はHQ | 関連設備がある場所の削除は拒否。対象削除後のURLはnot-found。パンくずで上位へ戻る |
 | DD-C03 / FR-C03 | `/customer/units/:id` / `UnitControl` | `units.get, commands.create, commands.get` | 能力から温度min/max/step、mode、fan候補を生成。確認後mutation。現在室温・設定値は別欄 | 拒否・期限切れ・失敗理由を表示。再照会後に手動再試行 |
-| DD-C04 / FR-C04 | `/customer/automations` / `AutomationEditor` | `automations.list, automations.save, automations.simulate` | 曜日1件以上、開始/終了、timezone、設備、動作を必須。日跨ぎは明示チェック | 重複条件は警告し優先順位を表示。制限中は発火しても拒否理由 |
-| DD-C05 / FR-C05 | `/customer/automations` / `AutomationEditor` | `consents.get, consents.update, automations.save, automations.simulate` | 条件は判別union。位置同意の目的を提示。デモは座標取得せず帰宅/外出イベント入力 | 拒否・利用不可は手動/時刻方式へ。利用履歴推定はデモと明示 |
+| DD-C04 / FR-C04 | `/customer/automations` / `AutomationEditor` | `automations.list, automations.save, automations.simulate, automations.fire` | 曜日1件以上、開始/終了、timezone、設備、動作を必須。日跨ぎは明示チェック | 重複条件は警告し優先順位を表示。制限中は発火しても拒否理由 |
+| DD-C05 / FR-C05 | `/customer/automations` / `AutomationEditor` | `consents.get, consents.update, automations.save, automations.simulate, automations.fire` | 条件は判別union。位置同意の目的を提示。デモは座標取得せず帰宅/外出イベント入力 | 拒否・利用不可は手動/時刻方式へ。利用履歴推定はデモと明示 |
 | DD-C06 / FR-C06 | `/customer/energy` / `EnergyExplorer` | `energy.summary, baselines.list` | 期間開始<終了、最大366日（仮）。通貨、料金版、比較期間、データ品質を表示 | 欠測は集計対象率を併記し、推計補完を実測として扱わない |
 | DD-C07 / FR-C07 | `/customer/air-quality` / `AirQuality` | `telemetry.series, units.get, commands.create, commands.get` | 指標と期間。換気要求はventilation能力を別確認 | センサーなしは未対応。送風を外気導入として扱わない |
 | DD-C08 / FR-C08 | `/customer/alerts` / `AlertInbox` | `alerts.list, notifications.markRead, notifications.list` | 重要度・未読フィルター。通知IDとalertIdを分離 | 取得失敗時に正常サマリーを表示しない |
 | DD-C09 / FR-C09 | `/customer/maintenance` / `MaintenanceRequest` | `jobs.list, jobs.create, jobs.get, jobs.cancel, jobs.addNote, reports.get, attachments.getContent` | unitId、種別、症状10〜2000文字、未来の希望枠を必須（仮）。日時は希望であり確定予約ではない | 二重送信を抑止。希望枠不可なら候補選び直し。顧客による取消は未割当のみ |
 | DD-C10 / FR-C10 | `/customer/payments` / `BillingOverview` | `contracts.list, invoices.list` | 契約ID・状態フィルター。金額は通貨最小単位で扱う | 閲覧範囲外は拒否。請求なしを滞納表示しない |
 | DD-C11 / FR-C11 | `/customer/payments/:id` / `PaymentDemo` | `invoices.get, payments.simulate, notifications.preview` | 請求ID、デモ決済方法、確認。生カード番号等の項目を設けない | 実送信しない。処理中に完了表示せず、再試行は同じ冪等キー |
-| DD-C12 / FR-C12 | `/customer/payments/:id` / `RestrictionNotice` | `restrictions.forInvoice, commands.get, inquiries.create, inquiries.list` | 閲覧のみ。支払い・問い合わせ導線。対象設備と適用条件の版を表示 | オフラインでは保留。顧客の強制解除操作は提供しない |
+| DD-C12 / FR-C12 | `/customer/payments/:id` / `RestrictionNotice` | `restrictions.forInvoice, commands.get, inquiries.create, inquiries.list` | 制限は閲覧のみ。問い合わせ作成と支払い導線。対象設備と適用条件の版を表示 | オフラインでは保留。顧客の強制解除操作は提供しない |
 | DD-C13 / FR-C13 | `/customer/energy/offsets` / `OffsetPreview` | `energy.summary, offsets.preview, offsets.simulate, offsets.list` | 希望量>0、対象期間、デモ確認。取引や認証を示す実証明番号は生成しない | 排出削減と償却済みクレジットを別表示。失敗時は重複申込しない |
 
 ## 実装の共通手順
@@ -137,7 +137,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06 BIZ-14 → FR-C04 → DD-C04。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 曜日入力・時間競合の規則。フィールド型・必須性・初期値・操作順序は実装提案。
 
-対象: FR-C04 / 主表示pattern: **UI-LIST / UI-FORM**。画面サービス境界は`automations.list, automations.save, automations.simulate`。
+対象: FR-C04 / 主表示pattern: **UI-LIST / UI-FORM**。画面サービス境界は`automations.list, automations.save, automations.simulate, automations.fire`。
 
 **初期表示と前提**: 対象設備がスケジュール制御可能。表示と保存のtimezoneを確定できる。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -156,7 +156,7 @@ scope: frontend-demo-1A
 
 1. 曜日・運転時間帯・設定を入力 → 次回実行予定を確認 → 保存/停止 → デモ時計で開始・終了イベントを発火する。
 2. 読取・操作に応じて次の業務条件を適用する: 曜日は開始日の曜日。終了<=開始は日跨ぎフラグがある場合のみ翌日。開始=終了は24時間運転と推定せず拒否。終了時の動作も必須で、黙ってOFFにしない。
-3. Automationにtimezone、開始/終了action、enabledを保存。作成だけで即時コマンドを送らない。発火時に再認可する。
+3. Automationにtimezone、開始/終了action、enabledを保存。作成だけで即時コマンドを送らない。デモ時計のイベントは`automations.fire`へ渡し、発火時に再認可してCommandを作る（DDC-08§6）。
 4. 更新対象Query: `automations / next-run preview / audit`。
 
 **境界条件・失敗時**: 曜日0件、終了動作なし、曖昧/存在しない夏時間のローカル時刻を拒否。停止後の予約イベントでは要求を作らない。
@@ -167,7 +167,7 @@ scope: frontend-demo-1A
 
 **一次資料との対応**: SRC-06 BIZ-14, BIZ-15, BIZ-17 → FR-C05 → DD-C05。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 同意取消・条件優先順。フィールド型・必須性・初期値・操作順序は実装提案。
 
-対象: FR-C05 / 主表示pattern: **UI-FORM**。画面サービス境界は`consents.get, consents.update, automations.save, automations.simulate`。
+対象: FR-C05 / 主表示pattern: **UI-FORM**。画面サービス境界は`consents.get, consents.update, automations.save, automations.simulate, automations.fire`。
 
 **初期表示と前提**: 自動運転対象と条件種別が選択可能。位置依存の場合は目的別の同意が必要。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -235,7 +235,7 @@ telemetry.seriesの空気環境表示モデルにallergenObservationを追加。
 
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
-| spaceId / unitId | ID/必須 | 有効な対象 | 測定場所 |
+| spaceId / unitId | ID/いずれか必須 | 有効な対象。telemetry.seriesへはunitIdsまたはspaceIdで渡す | 測定場所 |
 | metric | enum/必須 | co2/pm25/temperature/humidity | 表示指標 |
 | period | enum/必須 | 1h/24h/7d、初期24h | 時系列 |
 | value / quality / observedAt | 読取 | nullと0を区別 | 測定根拠 |

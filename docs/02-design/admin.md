@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.6.0
+version: 0.7.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -26,13 +26,13 @@ scope: frontend-demo-1A
 | DD-A03 / FR-A03 | `/admin/settings/access` / `AccessManager` | `members.list, members.save` | identity.manage、membershipId、role、scope、validFrom/Until。HQ権限は能力別 | 無期限の外部割当を拒否（デモ方針）。自分の高権限付与を自動許可しない |
 | DD-A04 / FR-A04 | `/admin/devices` / `DeviceRegistry` | `capabilities.list, capabilities.save, devices.list` | 温度範囲min<=max、step>0、許可mode/fan、ventilationを明示 | 既存コマンドと不整合な能力変更は影響を表示。勝手に対応機能を推定しない |
 | DD-A05 / FR-A05 | `/admin/alerts` / `AlertPolicyEditor` | `alerts.list, policies.save, notifications.preview, policies.list, policies.get` | 単位整合、上下限、継続時間>0、通知先必須。しきい値はデモ | 通知既読でアラートを解消しない。外部送信はプレビューのみ |
-| DD-A06 / FR-A06 | `/admin/jobs` / `MaintenanceCoordinator` | `jobs.list, jobs.create, jobs.offer, jobs.assign, jobs.review, jobs.saveCost, jobs.hold, jobs.resume, jobs.cancel, plans.save, plans.generateNext, jobs.get, reports.get, attachments.getContent, members.eligible, organizations.list` | 種別・対象・期日、社内/外注、費用は金額>=0+通貨。外注は受諾後に自社割当 | 辞退なら再委託。作業完了と異常解消は別。実業者報酬送金なし |
+| DD-A06 / FR-A06 | `/admin/jobs` / `MaintenanceCoordinator` | `jobs.list, jobs.create, jobs.offer, jobs.assign, jobs.review, jobs.saveCost, jobs.hold, jobs.resumeHold, jobs.cancel, plans.save, plans.generateNext, jobs.get, reports.get, attachments.getContent, members.eligible, organizations.list` | 種別・対象・期日、社内/外注、費用は金額>=0+通貨。外注は受諾後に自社割当 | 辞退なら再委託。作業完了と異常解消は別。実業者報酬送金なし |
 | DD-A07 / FR-A07 | `/admin/billing/contracts` / `ContractEditor` | `contracts.list, contracts.save` | 種別、customerId、unitIds、期間、料金。制限可否は契約属性 | 一般保守にRTO制限を誤適用しない。確定請求に影響する変更は新しい版 |
 | DD-A08 / FR-A08 | `/admin/billing` / `BillingManager` | `invoices.list, invoices.create, payments.confirm, notifications.preview, inquiries.list, inquiries.answer, payments.recordManual, contracts.list` | billing.manage、契約、金額、期限、入金参照ID。手動確認理由必須 | 同じ入金参照を二重計上しない。入金確認をブラウザ遷移だけで行わない |
 | DD-A09 / FR-A09 | `/admin/restrictions` / `RestrictionManager` | `restrictions.schedule, restrictions.execute, restrictions.release, commands.get, restrictions.list, restrictions.get` | restriction.manage、契約、設備、理由、予告期限、制限内容。実行前に再照会し条件確認 | 入金済/猶予/例外/非対応なら実行拒否。失敗・期限切れは未反映を保持 |
 | DD-A10 / FR-A10 | `/admin/restrictions/:id` / `RestrictionException` | `restrictions.defer, restrictions.exempt, restrictions.cancel, restrictions.override, audit.list, restrictions.get` | override権限、理由、期限。実行要求中は取消競合を照会し、必要なら解除要求へ | 支払い状態を手動解除に合わせて改変しない。履歴削除不可 |
-| DD-A11 / FR-A11 | `/admin/settings/automation` / `ControlPolicy` | `policies.save, automations.simulate, policies.list, policies.get` | 適用設備、優先順位、イベント、動作、停止条件。契約制限/安全能力を優先 | データ元欠測時は自動発火を停止。外部電力設備への実要求なし |
-| DD-A12 / FR-A12 | `/admin/settings/air-quality` / `AirPolicy` | `policies.save, automations.simulate, telemetry.series, policies.list, policies.get, units.get, commands.get` | ppm、µg/m³、°C、%の単位を対応指標に固定 | 健康安全保証を表示しない。送風能力で換気命令を許可しない |
+| DD-A11 / FR-A11 | `/admin/settings/automation` / `ControlPolicy` | `policies.save, automations.simulate, automations.fire, policies.list, policies.get` | 適用設備、優先順位、イベント、動作、停止条件。契約制限/安全能力を優先 | データ元欠測時は自動発火を停止。外部電力設備への実要求なし |
+| DD-A12 / FR-A12 | `/admin/settings/air-quality` / `AirPolicy` | `policies.save, automations.simulate, automations.fire, telemetry.series, policies.list, policies.get, units.get, commands.get` | ppm、µg/m³、°C、%の単位を対応指標に固定 | 健康安全保証を表示しない。送風能力で換気命令を許可しない |
 | DD-A13 / FR-A13 | `/admin/energy` / `EnergyAnalysis` | `energy.summary, baselines.list, baselines.save` | 基準期間/境界/モデル版、設備集合。期間重複・欠測条件を検証 | 基準なしは算定不可。10〜20%以上を保証しない |
 | DD-A14 / FR-A14 | `/admin/mrv` / `MRVWorkspace` | `mrv.preview, mrv.saveDraft, mrv.recordReview, factors.list, factors.save, mrv.list, mrv.get` | 対象期間、設備、基準版、係数版、境界を必須。根拠一覧を表示 | 欠測時に推定を注記。外部検証済みと表示せず「デモ確認」を使用 |
 | DD-A15 / FR-A15 | `/admin/offsets` / `OffsetRegistry` | `offsets.preview, offsets.simulate, offsets.list` | 希望量>0、制度/プロバイダーは未選定ラベル、demoフラグ必須 | 排出量をクレジット残高へ転記しない。実取引/実証明作成なし |
@@ -209,7 +209,7 @@ alerts.listのAlertにcauseCode（window_open / insulation_loss / unknown）、e
 
 **一次資料との対応**: SRC-06 BIZ-12 → FR-A06 → DD-A06。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 受付・委託・品質確認。フィールド型・必須性・初期値・操作順序は実装提案。
 
-対象: FR-A06 / 主表示pattern: **UI-LIST / UI-DETAIL / UI-FORM**。画面サービス境界は`jobs.list, jobs.create, jobs.offer, jobs.assign, jobs.review, jobs.saveCost, jobs.hold, jobs.resume, jobs.cancel, plans.save, plans.generateNext, jobs.get, reports.get, attachments.getContent, members.eligible, organizations.list`。
+対象: FR-A06 / 主表示pattern: **UI-LIST / UI-DETAIL / UI-FORM**。画面サービス境界は`jobs.list, jobs.create, jobs.offer, jobs.assign, jobs.review, jobs.saveCost, jobs.hold, jobs.resumeHold, jobs.cancel, plans.save, plans.generateNext, jobs.get, reports.get, attachments.getContent, members.eligible, organizations.list`。
 
 **初期表示と前提**: job.manage。対象設備と社内/外注の選択肢を取得済み。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -235,7 +235,7 @@ alerts.listのAlertにcauseCode（window_open / insulation_loss / unknown）、e
 
 ### DD-A07 詳細
 
-**一次資料との対応**: SRC-06 BIZ-21 → FR-A07 → DD-A07。出所区分: 設計補完（企業目的に対応）。本節で具体化する設計補完: プラン・契約編集。フィールド型・必須性・初期値・操作順序は実装提案。
+**一次資料との対応**: SRC-06 BIZ-21 → FR-A07 → DD-A07。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: プラン・契約編集。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-A07 / 主表示pattern: **UI-LIST / UI-FORM**。画面サービス境界は`contracts.list, contracts.save`。
 
@@ -338,7 +338,7 @@ notifications.previewで請求・案内チャネル・選択済み方法を確�
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
 | restrictionId | ID/必須 | 管理範囲内 | 対象 |
-| action | enum/必須 | defer/exempt/cancel/override_release | 例外操作 |
+| action | enum/必須 | defer/exempt/cancel/override_release | 例外操作。対応操作: defer→`restrictions.defer`（until必須）、exempt→`restrictions.exempt`（until必須）、cancel→`restrictions.cancel`、override_release→`restrictions.override`（restriction.override必須）。reasonは全操作で必須 |
 | until | ISO日時/猶予・例外必須 | 現在より未来 | 有効期限 |
 | reason | 文字列/必須 | 1〜2000文字 | 例外根拠 |
 | expectedVersion | 整数/必須 | 再照会後の版 | 競合 |
@@ -358,7 +358,7 @@ notifications.previewで請求・案内チャネル・選択済み方法を確�
 
 **一次資料との対応**: SRC-06 BIZ-14, BIZ-16, BIZ-17 → FR-A11 → DD-A11。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 条件設定とシミュレーション。フィールド型・必須性・初期値・操作順序は実装提案。
 
-対象: FR-A11 / 主表示pattern: **UI-FORM**。画面サービス境界は`policies.save, automations.simulate, policies.list, policies.get`。
+対象: FR-A11 / 主表示pattern: **UI-FORM**。画面サービス境界は`policies.save, automations.simulate, automations.fire, policies.list, policies.get`。
 
 **初期表示と前提**: automation.policy.manage。対象設備と制御能力を取得済み。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -375,7 +375,7 @@ notifications.previewで請求・案内チャネル・選択済み方法を確�
 
 1. 在室・料金・ピーク・太陽光/蓄電池の条件を選ぶ → 動作と優先順位を設定 → 競合プレビュー → 合成イベントで評価する。
 2. 読取・操作に応じて次の業務条件を適用する: 能力・有効制限→HQ方針→顧客ルールの優先。各層で数値priorityの大きい方、同値はID昇順。データ欠測や失効時は実行を見送り理由を表示。
-3. 方針版を保存。simulationは採用/抑止ルールと理由を返し、発火する場合も共通Commandを経る。
+3. 方針版を保存。`automations.simulate`は採用/抑止ルールと理由だけを返しCommandを作らない。発火は`automations.fire`（DemoWriteOptions付き）で行い、共通Command policyを経てcommandIdsを返す（DDC-08§6）。
 4. 更新対象Query: `policies / automations / simulation results / audit`。
 
 **境界条件・失敗時**: 顧客ルールよりHQ方針を優先、同順位の結果が毎回同じ、太陽光データ欠測で勝手に実行しない。
@@ -392,7 +392,7 @@ telemetry.seriesの空気環境表示モデルにallergenObservationを追加。
 
 **一次資料との対応**: SRC-06 BIZ-18, BIZ-19 → FR-A12 → DD-A12。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 換気ルール・欠測の扱い。フィールド型・必須性・初期値・操作順序は実装提案。
 
-対象: FR-A12 / 主表示pattern: **UI-FORM / UI-ANALYSIS**。画面サービス境界は`policies.save, automations.simulate, telemetry.series, policies.list, policies.get, units.get, commands.get`。
+対象: FR-A12 / 主表示pattern: **UI-FORM / UI-ANALYSIS**。画面サービス境界は`policies.save, automations.simulate, automations.fire, telemetry.series, policies.list, policies.get, units.get, commands.get`。
 
 **初期表示と前提**: 環境policy管理権限。機器に対象metricと換気能力の定義がある。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 
@@ -408,7 +408,7 @@ telemetry.seriesの空気環境表示モデルにallergenObservationを追加。
 
 1. 指標・しきい値・継続/回復条件を設定 → 通知と換気要求の有無を選ぶ → 対象の能力確認 → 模擬評価する。
 2. 読取・操作に応じて次の業務条件を適用する: 換気自動要求はventilation=trueの対象だけ。それ以外は通知onlyにし、保存前に対象別の実行内容を表示する。
-3. 環境policy版・通知プレビューを保存。要求を作る場合は機器応答を追い、室内環境の改善は後続測定で確認する。
+3. 環境policy版・通知プレビューを保存。換気要求は`automations.fire`がventilation=trueの対象にだけventilate Commandを作り（DDC-08§6）、機器応答を追う。室内環境の改善は後続測定で確認する。
 4. 更新対象Query: `policies / alerts / commands / notifications / audit`。
 
 **境界条件・失敗時**: ppmとµg/m³の閾値を混用しない。未計測は正常/回復判定に使わない。換気非対応機器へ送風コマンドを代用しない。

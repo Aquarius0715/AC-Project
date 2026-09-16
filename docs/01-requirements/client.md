@@ -1,6 +1,6 @@
 ---
 document_id: REQ-C
-version: 0.6.0
+version: 0.7.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -54,7 +54,7 @@ scope: frontend-demo-1A
 
 ## 機能別ユースケース・業務規則（0.6.0）
 
-上の表は索引。以下が各要件の業務上の開始条件・手順・結果・受入条件の本文。原文に記載のない閾値・運用細則はDEC-09の1A提案として扱う。本番の確定ルールと混同しない。
+上の表は索引。以下が各要件の業務上の開始条件・手順・結果・受入条件の本文。受入行の①②…は記載順のsubcase（例: AT-C01-E.01）で、Given側とThen側の同じ番号が対になる。fixture名は[検証計画](../04-agentic-sdlc/verification.md)の固定fixtureを使う。原文に記載のない閾値・運用細則はDEC-09の1A提案として扱う。本番の確定ルールと混同しない。
 
 ### FR-C01 監視ダッシュボード
 
@@ -69,9 +69,9 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C01-N | 自組織に利用可能な設備が登録されている。設備0件でも画面へ入れる。 対象物件と期間を選ぶ → 稼働・室温・湿度・空気環境・電力・異常件数を確認 → 状態カードから該当設備一覧または詳細を開く。 | 閲覧だけでは業務状態を更新しない。絞込条件をURLに保存し、戻る操作で復元する。 異なる部屋の室温を代表温度として平均しない。温湿度は選択設備または部屋の測定点別、電力量は期間内、現在電力は最新観測時刻を表示する。 |
-| AT-C01-E | 自設備1台の測定値をnullにする／別顧客unitIdで検索する | 1台だけ未計測にした場合、正常台数へ加えず不明台数に計上する。別顧客の設備を検索条件へ指定しても集計しない。 |
-| AT-C01-B | 異なる2部屋を28°C・24°Cにし、設備選択と期間を変える | 異なる部屋の室温を代表温度として平均しない。温湿度は選択設備または部屋の測定点別、電力量は期間内、現在電力は最新観測時刻を表示する。 |
+| AT-C01-N | customer-a、property-home-a配下にunit-online-rto（power ON、室温28.0°C、湿度60%、最終観測00:59:30Z）とunit-non-rto（power OFF）、openアラート1件。When: `/customer?propertyId=property-home-a&period=today`を開き、稼働カードから一覧へ遷移して戻る | ①稼働カード「稼働1 / 停止1 / 不明0」、異常1件。設備未選択時の室温欄は「設備を選択」で平均値なし ②電力カードにasOf=00:59:30Z ③一覧のURLに同じpropertyId・periodが残り、戻ると同条件で復元 ④Repositoryへの書込み0件 |
+| AT-C01-E | ①unit-online-rtoの最新telemetry value=nullにする ②`/customer?unitId=unit-other-customer`を開く ③units.listをUNAVAILABLEにする | ①「稼働0 / 停止1 / 不明1」。正常台数へ加算しない ②集計0件・「対象外の設備」表示、他顧客の値を含めない ③KPIはerror表示と再試行。0件や前回値を正常として表示しない |
+| AT-C01-B | ①room-1=28.0°C、room-2=24.0°Cで設備未選択 ②unitId=room-1の設備を選択 ③period=7dへ変更 | ①代表温度を表示しない（26.0°Cが画面に出ない） ②室温28.0°Cと観測時刻 ③電力量は7日間[from,to)の積算値、現在電力の時刻は最新観測時刻のまま |
 
 設計: [DD-C01](../02-design/client.md#dd-c01-詳細)。親ケースAT-C01は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -88,9 +88,9 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C02-N | 自組織の物件編集が許可されている。設備台帳の能力編集はHQに限定。 自宅/オフィスの物件を作成 → 必要なエリア・階・部屋を追加 → 場所を選択して設備を閲覧 → 名称・分類を編集する。 | 作成IDと版を取得しツリーとパンくずを更新。設備の所属変更はHQ台帳へ誘導し、名称変更で設備IDは変えない。 場所は単一の親に所属。親は同一物件内、自己参照と子孫への移動を禁止。設備や子場所がある場所はアーカイブ/削除を拒否し、先に移動先を案内する。 |
-| AT-C02-E | 名称を空・121文字にする／親を自身・子孫・他組織にする／保存前に版を進める | 空の名称、121文字、循環、他組織の親IDを拒否。CONFLICT時は現在版を提示して入力を保持し、自動上書きしない。 |
-| AT-C02-B | 同物件の親変更、自己/子孫への変更、子場所あり・設備あり・空の場所のアーカイブを比較する | 場所は単一の親に所属。親は同一物件内、自己参照と子孫への移動を禁止。設備や子場所がある場所はアーカイブ/削除を拒否し、先に移動先を案内する。 |
+| AT-C02-N | customer-a、物件0件。When: kind=home・name=自宅を作成→floor「1F」→room「寝室」（parent=1F）を追加→寝室を「主寝室」へ改名 | ①Property1件・Space2件、各id・version=1 ②パンくず「自宅 > 1F > 主寝室」 ③改名後version=2、配下unitのidは不変 ④設備の所属変更ボタンは非表示、HQ台帳への案内文 |
+| AT-C02-E | ①name=空／121文字 ②parentSpaceId=自身／子孫／customer-bの物件のspace ③version=1で表示中に別操作でversion=2にしてから保存 | ①VALIDATION、fieldErrors.name、保存0件 ②自身・子孫はVALIDATION、他組織はNOT_FOUND、保存0件 ③CONFLICT、現在版version=2を提示し入力値を保持、自動上書きなし |
+| AT-C02-B | ①1Fの親を同物件の2Fへ変更 ②設備ありの主寝室をアーカイブ ③子場所あり1Fをアーカイブ ④空の「倉庫」をアーカイブ | ①成功、version+1 ②③CONFLICTと「先に移動先を選択」案内、状態不変 ④成功、以後のURL直打ちはnot-found |
 
 設計: [DD-C02](../02-design/client.md#dd-c02-詳細)。親ケースAT-C02は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -107,9 +107,9 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C03-N | 有効Membership、対象設備のcontrol能力、オンライン、契約制限内の要求。 室温と確認済み設定を確認 → 電源/温度/モード/風量を編集 → 対象と変更内容を確認 → 要求受付・送信・機器応答を順に確認する。 | Commandを1件作成し要求値を別表示。acknowledged後のみ確認済み設定を更新。失敗時も要求・理由を履歴に残す。 1回の確認送信は1Actionとし、電源・温度・モード・風量をそれぞれ変更する。温度は機種のmin/max/step、モード・風量は列挙能力から選択。電源OFF要求でも機器の温度測定値を0にしない。pending中の同一設備への競合要求は操作不可にする。 |
-| AT-C03-E | 能力16〜30°C/1°C刻みに15・31・24.5を送る／offline・他顧客・制限違反・期限後応答をそれぞれ与える | 16〜30°C/1°C刻みのデモ能力なら15、31、24.5を拒否。offline、他顧客、制限違反、遅延応答でも成功扱いしない。 |
-| AT-C03-B | 電源OFF、温度min/max/step、対応mode/fanを個別送信し、pending中に別操作を送る | 1回の確認送信は1Actionとし、電源・温度・モード・風量をそれぞれ変更する。温度は機種のmin/max/step、モード・風量は列挙能力から選択。電源OFF要求でも機器の温度測定値を0にしない。pending中の同一設備への競合要求は操作不可にする。 |
+| AT-C03-N | customer-a、unit-online-rto（能力16〜30°C/1°C、modes cool/dry/fan、fan low/mid/high、確認済み設定26°C、室温28°C、version=7）。When: 温度24を入力→確認→送信→/demoでsent→acknowledged | ①Command1件 status=requested、要求24°Cと確認済み26°Cを別欄 ②sentで「機器応答待ち」 ③acknowledged後のみ確認済み24°C、室温28°Cは不変 ④履歴に同一commandIdでrequested→sent→acknowledged |
+| AT-C03-E | ①温度15／31／24.5 ②unit-offline-rto ③unit-other-customer ④unit-limited（制限下限24°C）へ22 ⑤acknowledgedを要求から30秒+1msに送る | ①VALIDATION、Command0件 ②OFFLINE、Command0件 ③NOT_FOUND ④FORBIDDEN（制限違反）、Command0件 ⑤status=expired、確認済み26°Cのまま、遅延応答は履歴に「期限後」として記録 |
+| AT-C03-B | ①power=false ②温度16と30を順に送る ③mode=dry、fan=highを順に送る ④requested中に温度25を送る | ①Command action=set_power、温度測定値28°Cは不変 ②各1件受付（min/max） ③各1件、1送信=1Action ④送信ボタン無効、直接呼出しはCONFLICT |
 
 設計: [DD-C03](../02-design/client.md#dd-c03-詳細)。親ケースAT-C03は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -126,9 +126,9 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C04-N | 対象設備がスケジュール制御可能。表示と保存のtimezoneを確定できる。 曜日・運転時間帯・設定を入力 → 次回実行予定を確認 → 保存/停止 → デモ時計で開始・終了イベントを発火する。 | Automationにtimezone、開始/終了action、enabledを保存。作成だけで即時コマンドを送らない。発火時に再認可する。 曜日は開始日の曜日。終了<=開始は日跨ぎフラグがある場合のみ翌日。開始=終了は24時間運転と推定せず拒否。終了時の動作も必須で、黙ってOFFにしない。 |
-| AT-C04-E | 曜日を空にする／終了動作を省略する／America/New_Yorkの2026-03-08 02:30と2026-11-01 01:30を実行候補にする／停止後に予定イベントを送る | 曜日0件、終了動作なし、曖昧/存在しない夏時間のローカル時刻を拒否。停止後の予約イベントでは要求を作らない。 |
-| AT-C04-B | 月曜23:00〜火曜01:00、日跨ぎなし、開始=終了、終了動作なしを比較する | 曜日は開始日の曜日。終了<=開始は日跨ぎフラグがある場合のみ翌日。開始=終了は24時間運転と推定せず拒否。終了時の動作も必須で、黙ってOFFにしない。 |
+| AT-C04-N | unit-online-rto、timezone=Asia/Kuala_Lumpur。When: weekdays=[1,3]、18:00〜22:00、start=cool 25°C、end=power OFF、enabled=trueで保存→デモ時計を月曜18:00へ→22:00へ | ①Automation1件、次回=2026-09-14 18:00+08:00 ②保存時点でCommand0件 ③18:00でCommand1件（set_temperature 25）、再認可を監査に記録 ④22:00でCommand1件（set_power false） |
+| AT-C04-E | ①weekdays=[] ②endAction省略 ③timezone=America/New_Yorkで2026-03-08 02:30／2026-11-01 01:30を開始時刻にする ④enabled=falseへ停止後に開始イベント | ①②VALIDATION、保存0件 ③VALIDATION（存在しない時刻／曖昧な時刻） ④Command0件 |
+| AT-C04-B | ①月23:00〜火01:00、endsNextDay=true ②同時間帯でendsNextDay=false ③start=end=10:00 | ①保存成功、終了は翌日01:00と表示 ②VALIDATION（終了<=開始） ③VALIDATION、24時間運転と解釈しない |
 
 設計: [DD-C04](../02-design/client.md#dd-c04-詳細)。親ケースAT-C04は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -145,9 +145,9 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C05-N | 自動運転対象と条件種別が選択可能。位置依存の場合は目的別の同意が必要。 在室・帰宅/外出・生活パターン・天候の条件を選択 → 必要な同意を確認 → 動作を保存 → 模擬イベントで一致/不一致を確認する。 | 同意取消で該当条件のルールをdisabledにし、既発行Commandを取消したとは表示しない。手動制御は権限内で継続可能。 位置同意と一般利用同意を分離する。位置情報の取得は1Aでは合成イベントのみ。生活パターンはデモ推定で、個人の実行履歴を収集しない。条件欠測を条件成立としない。 |
-| AT-C05-E | 位置同意なしで有効化する／同意取消後に帰宅イベントを送る／天候値をnullにする | 同意なしでlocation条件を有効化できない。取消後の帰宅イベントはコマンド0件。天候データ欠測ではスキップ理由を表示する。 |
-| AT-C05-B | 一般同意だけ・位置同意あり・位置同意取消・条件欠測で同じ帰宅イベントを評価する | 位置同意と一般利用同意を分離する。位置情報の取得は1Aでは合成イベントのみ。生活パターンはデモ推定で、個人の実行履歴を収集しない。条件欠測を条件成立としない。 |
+| AT-C05-N | 位置同意なし。When: location_automation同意→condition=location arrival、action=cool 24°Cを保存→/demoでarrival→同意取消→arrival | ①Consent granted=true、grantedAt保存 ②Automation enabled=true ③1回目arrivalでCommand1件 ④取消後ルールはdisabled、2回目arrivalでCommand0件、既存Commandの状態は不変 |
+| AT-C05-E | ①位置同意なしでlocation条件をenabled=trueで保存 ②同意取消後にarrival ③weather条件でvalue=null | ①VALIDATION、保存0件 ②Command0件 ③skipReason=missing_data表示、Command0件 |
+| AT-C05-B | 同じarrivalイベントを ①一般同意のみ ②位置同意あり ③位置同意取消済み ④condition欠測 で評価 | ①③④Command0件と理由表示 ②Command1件 |
 
 設計: [DD-C05](../02-design/client.md#dd-c05-詳細)。親ケースAT-C05は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -164,9 +164,9 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C06-N | 自組織設備の期間データ。基準・料金がない場合も実績だけは閲覧可能。 期間・設備を選ぶ → 電力量と推定料金を見る → 基準条件を展開 → 比較とデータ品質を確認する。 | 条件変更はURLとQuery keyを更新。表示のみで契約料金や排出係数は変更しない。 最大366日。集計は[from,to)で、料金・排出係数の版を表示。基準と実績の設備集合・算定境界が違う場合は差分を算定しない。金額は最後に通貨桁へ丸める。 |
+| AT-C06-N | 基準100kWh、実績80kWh、単価0.5MYR/kWh、from=2026-09-01 to=2026-09-08。When: 表示→基準条件を展開 | ①電力量80.0kWh、推定料金40.00MYR、tariffVersion表示 ②差-20.0kWh、削減率20.0%、節約10.00MYR ③coverage=100% ④URLに`from`・`to`・`unitIds` |
 | AT-C06-E | 基準100・実績80kWh・単価0.5MYRで照会する／基準0・実績120・欠測ありを個別に照会する | 100/80なら節約10MYR。基準0は削減率null、実績120は増加20%。欠測はcoverageを下げるが有効値は表示し、画面全体を拒否しない。 |
-| AT-C06-B | 366日と366日+1ms、同じ設備/境界と異なる設備/境界で比較する | 最大366日。集計は[from,to)で、料金・排出係数の版を表示。基準と実績の設備集合・算定境界が違う場合は差分を算定しない。金額は最後に通貨桁へ丸める。 |
+| AT-C06-B | ①366日 ②366日+1ms ③同じ設備集合・同じ算定境界 ④異なる設備集合 | ①成功 ②VALIDATION ③差分表示 ④差分null、理由「算定境界不一致」 |
 
 設計: [DD-C06](../02-design/client.md#dd-c06-詳細)。親ケースAT-C06は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -189,9 +189,9 @@ CO₂・粉じん・湿度に加え、アレルゲン情報の有無と出典を
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C07-N | 空気環境センサー有無と換気能力を取得できる。 部屋・指標を選ぶ → 値・単位・品質を確認 → 換気/清掃案内を見る → 換気能力がある場合のみ確認付き要求へ進む。 | 閲覧は変更なし。換気要求時は通常Command履歴を作成し、その応答だけで室内CO₂低下を推定しない。 CO₂ ppm、PM2.5 µg/m³、温度°C、湿度%を別系列で表示。湿度0は欠測ではなく測定値0、nullは欠測。換気能力がなければ手動案内のみ。 |
+| AT-C07-N | room-1: CO₂=1000ppm、PM2.5=12µg/m³、温度28°C、湿度60%、ventilation-demo対応。When: 表示→換気要求を確認送信→acknowledged | ①4系列を単位付きで別表示 ②案内「換気を推奨」 ③Command1件 kind=ventilate ④応答後もCO₂表示は1000ppmのまま（推定低下を表示しない） |
 | AT-C07-E | CO₂=null、PM2.5=12µg/m³で表示する／fanのみ対応の設備で換気要求する | CO₂は未計測、PM2.5は12µg/m³を表示。fanのみの設備は換気ボタンを無効にし、直接要求も拒否、Command0件。 |
-| AT-C07-B | CO₂=1000ppm、PM2.5=12µg/m³、湿度=0%とnull、換気あり/なしを表示する | CO₂ ppm、PM2.5 µg/m³、温度°C、湿度%を別系列で表示。湿度0は欠測ではなく測定値0、nullは欠測。換気能力がなければ手動案内のみ。 |
+| AT-C07-B | ①湿度=0 ②湿度=null ③換気非対応設備を表示 | ①「0%」 ②「未計測」 ③換気ボタン非表示、手動換気案内文 |
 
 設計: [DD-C07](../02-design/client.md#dd-c07-詳細)。親ケースAT-C07は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -214,9 +214,9 @@ CO₂・粉じん・湿度に加え、アレルゲン情報の有無と出典を
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C08-N | 顧客スコープ内の通知とアラートが取得可能。 重要度・未読で絞る → 通知本文を開く → 設備根拠または保守依頼へ遷移 → 通知だけを既読にする。 | 既読時刻をNotificationへ保存。Alert.statusは変えない。遷移先に戻るとフィルター・ページを復元。 critical、warningは対応順位。normalは健康サマリーであり未対応アラートではない。清掃・交換の予定通知と異常発生通知をtypeで区別する。 |
-| AT-C08-E | 一覧取得をUNAVAILABLEにする／通知対象設備の閲覧権を失効させリンクを開く | 取得失敗時に異常0件表示をしない。通知先の設備が失効した場合は詳細を漏らさず利用不可を表示。 |
-| AT-C08-B | critical/warning/normalと清掃予定・異常発生の各typeを開く | critical、warningは対応順位。normalは健康サマリーであり未対応アラートではない。清掃・交換の予定通知と異常発生通知をtypeで区別する。 |
+| AT-C08-N | customer-aにcritical1・warning1・normal1の通知、causeCode=window_openのAlert。When: unreadOnly=true→criticalを開く→設備へ遷移→戻る→既読にする | ①3件、critical先頭 ②遷移先URLがunit-online-rto ③戻るとunreadOnlyが復元 ④readAt保存、Alert.status=openのまま |
+| AT-C08-E | ①notifications.listをUNAVAILABLEにする ②通知対象unitの閲覧権を失効させてからリンクを開く | ①error表示、「異常0件」を表示しない ②「利用できません」表示、設備名・値なし |
+| AT-C08-B | ①critical ②warning ③normal ④type=cleaning_due ⑤type=fault を開く | ①②未対応件数に計上 ③計上しない（健康サマリー） ④⑤別アイコン・別ラベル |
 
 設計: [DD-C08](../02-design/client.md#dd-c08-詳細)。親ケースAT-C08は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -233,9 +233,9 @@ CO₂・粉じん・湿度に加え、アレルゲン情報の有無と出典を
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C09-N | 依頼対象が自組織の有効設備。RTOの有無は依頼可否に使わない。 設備・保守種別・症状・希望枠を入力 → 内容確認 → 受付番号取得 → 一覧から確定日程・進捗・報告履歴を確認する。 | 同じjobIdをHQ・業者・技術者が参照。未割当取消はcancelledと理由を記録。提出済報告は品質確認後に顧客へ公開する。 希望枠は確定予約ではない。requestedだけ顧客取消可能。assigned以降は調整依頼メモを送れ、顧客が作業予定や担当を直接変更しない。 |
-| AT-C09-E | 症状を9・2001文字にする／過去の希望枠・unitIdなしで送る／保存失敗・同一キー二重送信を与える | 症状9文字/2001文字、過去の希望枠、設備なしを拒否。通信失敗で症状を保持。二重送信で案件が増えない。 |
-| AT-C09-B | requestedで取消、assignedで調整メモ、品質受理前後の報告を顧客で確認する | 希望枠は確定予約ではない。requestedだけ顧客取消可能。assigned以降は調整依頼メモを送れ、顧客が作業予定や担当を直接変更しない。 |
+| AT-C09-N | unit-online-rto。When: type=reactive、症状20文字、希望枠2026-09-15 10:00〜12:00を送信→HQ割当→技術者提出→受理 | ①jobId返却、status=requested、希望枠は「希望」表示 ②assigned後に確定日程 ③受理前は報告本文非表示 ④completedで報告閲覧可、同じjobId |
+| AT-C09-E | ①症状9／2001文字 ②希望枠が過去 ③unitIdなし ④jobs.createをUNAVAILABLE ⑤同じidempotencyKeyで2回送信 | ①②③VALIDATION、案件0件 ④error表示、症状入力を保持 ⑤案件1件 |
+| AT-C09-B | ①requestedで取消 ②assignedで取消 ③assignedで調整メモ ④受理前／受理後に報告取得 | ①cancelled、cancelReason保存 ②CONFLICT、状態不変 ③JobNote visibility=customer 1件 ④受理前FORBIDDEN、受理後取得可 |
 
 設計: [DD-C09](../02-design/client.md#dd-c09-詳細)。親ケースAT-C09は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -252,9 +252,9 @@ CO₂・粉じん・湿度に加え、アレルゲン情報の有無と出典を
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C10-N | 自組織の契約が0件以上。閲覧のために支払い操作は不要。 契約を選択 → 対象設備・期間・プランを確認 → 請求金額・期限・入金状態を見る → 請求詳細へ進む。 | 閲覧のみ。非RTOは契約なし/一般保守と表示し、監視画面への戻り先を提供。 契約終了と設備利用不可は同義ではない。Invoice遅延は期限と未入金残額から導出し、payment processing中もpaidとはしない。 |
-| AT-C10-E | 顧客aで顧客bのinvoiceIdを開く／paid請求を開く | 顧客bのinvoiceIdを顧客aが指定しても取得しない。paid請求に支払い開始ボタンを表示しない。 |
-| AT-C10-B | 期限一致と1ms超過、processing/paid、契約終了済み設備を比較する | 契約終了と設備利用不可は同義ではない。Invoice遅延は期限と未入金残額から導出し、payment processing中もpaidとはしない。 |
+| AT-C10-N | contract-rto-a（unit-online-rto、planType=rto）、invoice-overdue-a 120.00MYR dueAt=2026-09-10 unpaid。When: 契約選択→請求詳細。customer-bでも開く | ①契約と設備の紐付け表示 ②120.00 MYR、期限、「未入金・期限超過」 ③請求詳細へ遷移 ④customer-bは「契約なし／一般保守」と監視画面への導線 |
+| AT-C10-E | ①customer-aでcustomer-bのinvoiceIdを開く ②paid請求を開く | ①NOT_FOUND ②支払い開始ボタンなし |
+| AT-C10-B | ①now=dueAt ②dueAt+1ms ③processing ④paid ⑤契約終了済み設備 | ①遅延なし ②遅延 ③「処理中」（paidではない） ④paid ⑤設備は監視・操作可 |
 
 設計: [DD-C10](../02-design/client.md#dd-c10-詳細)。親ケースAT-C10は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -277,9 +277,9 @@ WhatsApp／メール案内から、模擬クレジットカード、模擬デビ
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C11-N | 未払い請求、現在金額、模擬決済であることを確認。 通知プレビューを確認 → 模擬カード/支払い手順を選択 → デモ決済を開始 → processing/失敗/入金確認イベントを確認する。 | Paymentを作成し、確認イベント後にInvoiceをpaidへ。結果・参照IDを履歴表示し、制限は解除要求へ進めても応答前は解除済みにしない。 カード番号・CVV・有効期限を入力させない。画面遷移だけで入金確認しない。processing中は追加の決済意思を受け付けない。 |
-| AT-C11-E | 決済開始を二重クリックする／同じ参照の確認イベントを2回送る／決済失敗を発火する | 二重クリック/同一参照の確認で二重計上しない。決済失敗で元の未入金状態と支払い再試行導線を維持する。 |
-| AT-C11-B | カードデモ開始前・processing・confirmedを順に確認し、processing中に再開始する | カード番号・CVV・有効期限を入力させない。画面遷移だけで入金確認しない。processing中は追加の決済意思を受け付けない。 |
+| AT-C11-N | invoice-overdue-a unpaid。When: emailプレビュー→demo_credit_card選択→開始→processing→confirm | ①プレビューにinvoiceId・channel・method ②Payment initiated→processing、Invoice processing ③confirm後Invoice paid、Payment confirmed、参照ID表示 ④関連Restrictionはrelease_requested、released表示なし |
+| AT-C11-E | ①開始を二重クリック ②同参照のconfirmを2回 ③failを発火 | ①Payment1件 ②confirmed Payment1件、Invoice paid ③Invoice unpaid、method保持、再試行導線 |
+| AT-C11-B | ①開始前 ②processing中に再開始 ③confirmed後 | ①カード番号・CVV・有効期限欄なし ②ボタン無効、直接呼出しCONFLICT ③paid表示 |
 
 設計: [DD-C11](../02-design/client.md#dd-c11-詳細)。親ケースAT-C11は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -296,9 +296,9 @@ WhatsApp／メール案内から、模擬クレジットカード、模擬デビ
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C12-N | 自分の契約に関連する制限情報。制限なしも正常な空状態。 予告・理由・対象設備・予定日を確認 → 猶予/例外と解除条件を見る → 支払いまたは調整問い合わせへ進む。 | 制限を変更せず、支払い/問い合わせへ関連IDを渡す。問い合わせはin-appデモ受付で実外部送信しない。 制限予定、適用要求、設備別反映、解除要求、解除済みを別表示。部分反映は対象設備ごとの状態を表示し、集約badgeだけで隠さない。 |
-| AT-C12-E | 解除対象2台のうち1台をofflineにする／顧客でoverrideを直接呼ぶ | offline設備が1台残れば全体を解除済みとしない。顧客はURL/サービス呼出しでもoverrideできない。 |
-| AT-C12-B | scheduled/requested/applied/release_requested/released、一部応答と全台応答を比較する | 制限予定、適用要求、設備別反映、解除要求、解除済みを別表示。部分反映は対象設備ごとの状態を表示し、集約badgeだけで隠さない。 |
+| AT-C12-N | Restriction scheduled（invoice-overdue-a、unit-online-rto＋unit-offline-rto、executeAfter=2026-09-15 01:00Z）。When: 表示→問い合わせ送信 | ①予告・理由・2台・executeAfter表示 ②解除条件「原因請求全件の入金」 ③Inquiry received、外部送信0件 ④Restriction不変 |
+| AT-C12-E | ①解除要求後に1台をofflineにする ②顧客でrestrictions.overrideを直接呼ぶ | ①release_requested、offline台はpending、released表示なし ②FORBIDDEN、状態不変 |
+| AT-C12-B | ①scheduled ②requested ③applied ④release_requested ⑤released ⑥requestedで1台のみ応答 | ①〜⑤それぞれ別ラベル ⑥集約はrequested、設備別に「反映済み／保留」を表示 |
 
 **追加受入条件 AT-C12-R01（再訪・競合・役割横断）**
 
@@ -327,9 +327,9 @@ WhatsApp／メール案内から、模擬クレジットカード、模擬デビ
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C13-N | 自組織の算定対象期間があり、オフセットは任意。 推定排出・削減と条件を確認 → 希望量を入力 → 模擬見積 → 確認後にデモ申込 → 模擬記録を見る。 | OffsetRecordはdemo_requestedとして保存。見積のみでは申込記録を作らない。証明欄はDEMO-接頭辞付き参照か未発行。 電力の削減結果から取引可能残高を生成しない。希望量は正数、係数欠落時は排出量算定不可。申込自体は外部購入を意味しない。 |
-| AT-C13-E | 希望量0・-1／失効見積／別顧客の算定結果で申込を試す／模擬償却記録を開く | 希望量0/負値、見積失効、別顧客の算定結果を拒否。模擬償却と外部認証を同一文言にしない。 |
-| AT-C13-B | 省エネ20kWhを表示後、希望量1kgの見積だけと申込後を比較し、係数なしでも確認する | 電力の削減結果から取引可能残高を生成しない。希望量は正数、係数欠落時は排出量算定不可。申込自体は外部購入を意味しない。 |
+| AT-C13-N | 実績40kgCO₂e、削減10kgCO₂e表示中。When: amountKg=1→見積→申込→記録を開く | ①OffsetQuote quoted、expiresAt=now+15分 ②見積のみではOffsetRecord0件 ③申込でdemo_requested 1件 ④証明欄「未発行」、marketConcept=future_concept |
+| AT-C13-E | ①amountKg=0／-1 ②失効見積で申込 ③customer-bの算定結果で申込 ④模擬償却記録を開く | ①VALIDATION ②CONFLICT（失効） ③FORBIDDEN ④「デモ償却」表示、「認証済み」文言なし |
+| AT-C13-B | ①省エネ20kWh表示 ②見積のみ ③申込後 ④係数なし | ①残高欄なし ②記録0件 ③記録1件 ④排出量「算定不可」、申込ボタン無効 |
 
 設計: [DD-C13](../02-design/client.md#dd-c13-詳細)。親ケースAT-C13は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 

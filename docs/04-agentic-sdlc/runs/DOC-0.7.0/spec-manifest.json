@@ -1,0 +1,133 @@
+{
+ "spec_baseline_id": "0fce18188c32e468b94ed4a0eee506d00c9a5c98ba372d15351c266803ce2edb",
+ "spec_files": [
+  {
+   "path": "00-prepare/PrepareDocument.md",
+   "sha256": "80f3fcd7118f833087a1be49ea6aba8f4a4724ccf00bc2249bbea3a0a4079876"
+  },
+  {
+   "path": "00-prepare/company-requirement-map.csv",
+   "sha256": "41933cf479d34fd790d0f401f745c2c646595d2c0d3d10f958780438f7b52212"
+  },
+  {
+   "path": "00-prepare/internal/design-assumptions.md",
+   "sha256": "e0cd27932bbc636b7a6fe79821cf19a8853b56c265f3170ab6e9deebdc2225d8"
+  },
+  {
+   "path": "00-prepare/reference-design-analysis.md",
+   "sha256": "37e81d80aa4606183d7533829d9ac58b8ec1b49aaccc9112ed08c24fe8e9be24"
+  },
+  {
+   "path": "00-prepare/requirement-origins.csv",
+   "sha256": "21c643c849368f3e4eece4705befba3ae3f06249e055c1679621033b77a34675"
+  },
+  {
+   "path": "00-prepare/sources/company-requirements-original.txt",
+   "sha256": "526927ffef80f32f2dce775414858013031d75313eeb96c4f89dabd582ee958f"
+  },
+  {
+   "path": "00-prepare/sources/original-handover.md",
+   "sha256": "930b541711deca7b7e1764b364953da879757482fba4217b142aff1be63a8080"
+  },
+  {
+   "path": "00-prepare/sources/production-instructions.md",
+   "sha256": "4dc1e01ebbd097d41c2bf4239fc4dc1c3dcb0272c7e704edcd1ec018321c1eb7"
+  },
+  {
+   "path": "00-prepare/sources/reference-style-evidence.json",
+   "sha256": "6a905fd59d5b83a4152a805135d08bef5598cae86f501bc5f207bb45f875cc66"
+  },
+  {
+   "path": "00-prepare/traceability.csv",
+   "sha256": "e7c808ec96f9a5c84a671a64911ca1dcb3b7303d92a9e801e87b990245ea0ca2"
+  },
+  {
+   "path": "01-requirements/admin.md",
+   "sha256": "7472208e68634baa00f020ba3a620688e9653da045e9fda5ec28f07d9b638dfd"
+  },
+  {
+   "path": "01-requirements/client.md",
+   "sha256": "2bcdaacda3c996f4398de5df5dfc2b951c68ece2ffe5911fa6ad792cdd1f502e"
+  },
+  {
+   "path": "01-requirements/common.md",
+   "sha256": "3955a7bb9b691393b2582748975cebc85ca5b08c2a86981161cea0d9ff9e5def"
+  },
+  {
+   "path": "01-requirements/contractor.md",
+   "sha256": "6c28ffc6468ebfaf4778d94192a5eb66df03123dd8ba4e02bbe167ef369c84b9"
+  },
+  {
+   "path": "01-requirements/technician.md",
+   "sha256": "13dbe9bf274aa3475da6b29438ac9d5da438c6a502fe62089375d16eea138446"
+  },
+  {
+   "path": "02-design/admin.md",
+   "sha256": "b5b0f65c96d088da9162c4ddffb35fb14b79b322a294141a88ffb2d689d64981"
+  },
+  {
+   "path": "02-design/client.md",
+   "sha256": "a66c2a8eb581f9349d9e24009bfe9ea3b2ad9b9787b9305a16dae772a5de6219"
+  },
+  {
+   "path": "02-design/common.md",
+   "sha256": "6e7156c9c62342e638e98036dce16eaf6264d3be97d5989adca0dd67ba059044"
+  },
+  {
+   "path": "02-design/contractor.md",
+   "sha256": "bb92f76c08a38ec93f730dc49130691483552760ebb013a6444641b7317d6566"
+  },
+  {
+   "path": "02-design/implementation-contracts.md",
+   "sha256": "2674bbc132fee3f127eadfce1759a689f9c825b8152e4c40274c54c76d50101a"
+  },
+  {
+   "path": "02-design/operation-catalog.csv",
+   "sha256": "962d15615ade847dcc5b86019a975aca4b31182a25ee51904120f71fcd56c71b"
+  },
+  {
+   "path": "02-design/technician.md",
+   "sha256": "91c74962b934b8ea99dc6ca72516931a17a6c0316a38f53d4c036bee4885bc9c"
+  },
+  {
+   "path": "03-uiux/UIUXSpecification.md",
+   "sha256": "2f59dd8d9601736af7f2f7de999aa3ed7bc7b9cf76ae1b7e48d18143f97ac797"
+  },
+  {
+   "path": "04-agentic-sdlc/README.md",
+   "sha256": "14a06effba772cc2c092f2f63abf0779486526304e626cda4cf3efbfaf9ec51a"
+  },
+  {
+   "path": "04-agentic-sdlc/agents/design.md",
+   "sha256": "3a763681f42fec23a960d3aa34cab5d731e83e3f2687917f9358162df64ce61c"
+  },
+  {
+   "path": "04-agentic-sdlc/agents/implementation.md",
+   "sha256": "13bf1160590600774344e073eb97ed49feb755cba4bb4316b2f8029437610735"
+  },
+  {
+   "path": "04-agentic-sdlc/agents/orchestration.md",
+   "sha256": "36ed9c021ca497b88af41e99e70f13af49e1891d757b75f042c1330b4aa45756"
+  },
+  {
+   "path": "04-agentic-sdlc/agents/review.md",
+   "sha256": "e15152e72dc4eb0484fea21b681ec48c2ea817abdf6a653fbf06ee6171ec5062"
+  },
+  {
+   "path": "04-agentic-sdlc/agents/test.md",
+   "sha256": "d20a8970aad07e0fdcc7eb2d9c5a62997112a13d62e7fda151c028d8afc1b380"
+  },
+  {
+   "path": "04-agentic-sdlc/templates/artifacts.md",
+   "sha256": "44633f276746d25efc6081a6be66ca91a4e255f59660349418631775df262397"
+  },
+  {
+   "path": "04-agentic-sdlc/verification.md",
+   "sha256": "f9cbde2b0ec4ae24492d8e31371418404f2b63a37e9f7b839148a962b0e496a8"
+  },
+  {
+   "path": "README.md",
+   "sha256": "ae4a1ac38228f3533c5a6ef3e621e2aa115b8b4ad9bf975a17aa63262b9c9b2a"
+  }
+ ]
+}

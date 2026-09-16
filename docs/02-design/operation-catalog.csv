@@ -8,14 +8,15 @@ attachments.add,"jobId,reportId,JPEG/PNG file,DemoWriteOptions",Attachment,DD-T0
 attachments.getContent,"jobId,reportId,reportVersion,attachmentId",Blob,DD-A06;DD-C09;DD-P05;DD-T09,mock-service,DDC-08および対応DDの対象・版・権限・状態を照合,DDC-03のDomainError。readは再照会、writeは同じ意思だけ同一キーで再試行
 audit.list,ListQuery,Page<AuditView>,DD-A10;DD-A16,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 auth.previewPasswordReset,demoEmail,ResetPreview,DDC-07,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+automations.fire,"automationId or policyId,simulationEvent,DemoWriteOptions",FireResult (decision,reasons,commandIds[]),DD-A11;DD-A12;DD-C04;DD-C05,mock-service,DDC-08および対応DDの対象・版・権限・状態を照合,DDC-03のDomainError。readは再照会、writeは同じ意思だけ同一キーで再試行
 automations.list,ListQuery,Page<Automation>,DD-C04,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 automations.save,AutomationInput + DemoWriteOptions,Automation,DD-C04;DD-C05,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-automations.simulate,"automationId or policyId,simulationEvent,evaluateOnly",SimulationResult,DD-A11;DD-A12;DD-C04;DD-C05,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+automations.simulate,"automationId or policyId,simulationEvent",SimulationResult (decision,reasons; 読取のみ、Command生成なし),DD-A11;DD-A12;DD-C04;DD-C05,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 baselines.list,ListQuery,Page<EnergyBaseline>,DD-A13;DD-C06,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 baselines.save,EnergyBaselineInput + DemoWriteOptions,EnergyBaseline,DD-A13,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 capabilities.list,ListQuery,Page<Capability>,DD-A02;DD-A04,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 capabilities.save,CapabilityInput + DemoWriteOptions,Capability,DD-A04,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-commands.create,CreateCommandInput + DemoWriteOptions,Command,DD-C03;DD-C07;DD-T10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+commands.create,CreateCommandInput + DemoWriteOptions,Command,DD-C03;DD-C07;DD-T10;automations.fire経由でDD-A11;DD-A12;DD-C04;DD-C05,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 commands.get,id,Command,DD-A09;DD-A12;DD-C03;DD-C07;DD-C12;DD-T10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 consents.get,purpose,Consent,DD-C05,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 consents.update,"purpose,granted,DemoWriteOptions",Consent,DD-C05,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
@@ -59,7 +60,8 @@ jobs.get,jobId,JobDetail | JobOfferSummary | JobHistorySnapshot (scope dependent
 jobs.hold,"jobId,reason,DemoWriteOptions",MaintenanceJob,DD-A06,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.list,ListQuery,Page<JobSummary | JobOfferSummary>,DD-A06;DD-C09;DD-P01;DD-P03;DD-P06;DD-T01,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.offer,"jobId,contractorOrgId,offerExpiresAt,accessValidFrom,accessValidUntil,termsVersion,DemoWriteOptions",MaintenanceJob,DD-A06,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-jobs.resume,"jobId,reason?,DemoWriteOptions; actor/state guard from transition table",MaintenanceJob,DD-A06;DD-T08,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+jobs.resumeHold,"jobId,reason,DemoWriteOptions",MaintenanceJob (on_hold→in_progress、HQ job.manage),DD-A06,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+jobs.resumeRework,"jobId,DemoWriteOptions",MaintenanceJob (rework_requested→in_progress、担当技術者),DD-T08,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.review,"jobId,reportVersion,decision,reason?,DemoWriteOptions",MaintenanceJob,DD-A06;DD-P05,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.saveCost,"jobId,costLines[{kind,amountMinor,currency,description}],DemoWriteOptions",MaintenanceJob,DD-A06,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 jobs.saveDraft,WorkReportDraft + DemoWriteOptions,WorkReportDraft,DD-T04;DD-T05;DD-T06;DD-T09,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
@@ -109,8 +111,8 @@ session.get,none,Session,DD-P08,mock-service,フロント入力検証・表示�
 spaces.archive,"id,reason,DemoWriteOptions",ArchivedResource,DD-C02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 spaces.list,ListQuery,Page<Space>,DD-A02;DD-C02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 spaces.save,SpaceInput + DemoWriteOptions,Space,DD-A02;DD-C02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-telemetry.series,"scope,unitIds,metric?,from,to",Page<Measurement>,DD-C07;DD-T03;DD-A12,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
-telemetry.summary,"scope,unitIds,metric?,from,to",TelemetrySummary,DD-C01;DD-P04;DD-T03,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+telemetry.series,"scope,unitIds または spaceId,metric,from,to",Page<Measurement>,DD-C07;DD-T03;DD-A12,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
+telemetry.summary,"scope,unitIds,metric?,from,to（概要は全metric可）",TelemetrySummary,DD-C01;DD-P04;DD-T03,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 units.archive,"id,reason,DemoWriteOptions",ArchivedResource,DD-A02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 units.get,id,UnitDetail,DD-A02;DD-A12;DD-C03;DD-C07;DD-P04;DD-T02;DD-T10,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照
 units.list,ListQuery,Page<UnitSummary>,DD-A02;DD-C01;DD-C02,mock-service,フロント入力検証・表示範囲・状態ガード：対応DDとDDC-03参照,合成結果に応じた表示・入力保持・再試行：DDC-03参照

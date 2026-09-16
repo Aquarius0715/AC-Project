@@ -1,6 +1,6 @@
 ---
 document_id: REQ-A
-version: 0.6.0
+version: 0.7.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -31,7 +31,7 @@ scope: frontend-demo-1A
 | FR-A04 | P1 | 企業原文 SRC-06＋設計補完 / BIZ-06, BIZ-20 | 型番・IoT能力台帳 | メーカー、型番、操作能力、センサー、FWを管理し非対応操作が無効になる。 |
 | FR-A05 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-08, BIZ-11, BIZ-17 | アラート・通知方針 | 指標、しきい値、継続時間、通知先、チャネル、担当エスカレーションを登録しデモ発火。 |
 | FR-A06 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-12 | 保守計画と品質・費用 | 定期/事後/予防を作成し社内割当または施工業者委託。期限、品質、費用見積/実績を追える。 |
-| FR-A07 | P0 | 設計補完（企業目的に対応） / BIZ-21 | 契約プラン | RTO、一般保守、省エネ、環境サービスのプラン・設備紐付けを保存。 |
+| FR-A07 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-21 | 契約プラン | RTO、一般保守、省エネ、環境サービスのプラン・設備紐付けを保存。 |
 | FR-A08 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-21, BIZ-22 | 請求・入金・督促 | 請求作成、模擬決済の入金確認、督促プレビューが顧客側へ反映。 |
 | FR-A09 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-21 | 予告・制限・入金後解除 | 契約ルールに基づき予告→実行要求→反映、入金後解除要求→反映を表現。オフラインは保留。 |
 | FR-A10 | P0 | 設計補完（企業目的に対応） / BIZ-21 | 猶予・例外・手動解除・監査 | 独立権限で猶予/例外/取消/手動解除を記録。理由、操作者、変更前後が追跡可能。 |
@@ -57,7 +57,7 @@ scope: frontend-demo-1A
 
 ## 機能別ユースケース・業務規則（0.6.0）
 
-上の表は索引。以下が各要件の業務上の開始条件・手順・結果・受入条件の本文。原文に記載のない閾値・運用細則はDEC-09の1A提案として扱う。本番の確定ルールと混同しない。
+上の表は索引。以下が各要件の業務上の開始条件・手順・結果・受入条件の本文。受入行の①②…は記載順のsubcase（例: AT-C01-E.01）で、Given側とThen側の同じ番号が対になる。fixture名は[検証計画](../04-agentic-sdlc/verification.md)の固定fixtureを使う。原文に記載のない閾値・運用細則はDEC-09の1A提案として扱う。本番の確定ルールと混同しない。
 
 ### FR-A01 全体ダッシュボード
 
@@ -72,9 +72,9 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A01-N | HQ Membershipに対象テナントの集計閲覧権がある。 顧客/拠点/期間を絞る → 顧客数・設備・稼働・異常・保守・請求・電力を確認 → KPIから同じ条件の一覧へ進む。 | 閲覧のみ。ダッシュボードと遷移先一覧で期間・スコープ・定義が一致する。 稼働率は最新状態を把握できる有効設備のうちpowerOnの割合とし、全設備数・不明数を必ず併記。顧客数はactiveの顧客組織数、請求遅延は未入金額ベース。 |
+| AT-A01-N | hq-operator、tenant-aに既知ON2台・OFF2台・unknown1台、active顧客2、期限超過未入金120.00MYR。When: `/admin` today→設備KPIから一覧へ | ①稼働率50%（分母4）、全5台・不明1台併記 ②顧客数2 ③未入金120.00 MYR ④一覧URLに同じ期間・scope |
 | AT-A01-E | unknown設備あり／MYRとUSDの未入金あり／設備0件の3条件で集計を開く | unknown数を別表示し、稼働率の分母から除外。MYR/USDは通貨別合計。設備0件の率はnull。 |
-| AT-A01-B | 既知ON2台・既知OFF2台・unknown1台、active/inactive顧客、期限超過未入金を集計する | 稼働率は最新状態を把握できる有効設備のうちpowerOnの割合とし、全設備数・不明数を必ず併記。顧客数はactiveの顧客組織数、請求遅延は未入金額ベース。 |
+| AT-A01-B | ①既知ON2・OFF2・unknown1 ②active/inactive顧客 ③期限超過未入金 | ①50%、不明1 ②activeのみ計上 ③未入金額ベース |
 
 設計: [DD-A01](../02-design/admin.md#dd-a01-詳細)。親ケースAT-A01は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -91,9 +91,9 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A02-N | 管理対象組織の台帳編集権。顧客・物件・設備の関係を解決できる。 顧客組織作成 → 物件・場所階層作成 → split設備の型番と場所を登録 → 検索/編集/移設/アーカイブを行う。 | 不変IDと版、変更前後・理由を保持。移設は現行の所属場所を更新し履歴に旧場所を残す。 新規設備はcustomerOrgId・spaceId・modelIdの整合必須。契約/案件/IoT紐付けがある設備は物理削除不可。別テナントへの移管は1A対象外。 |
-| AT-A02-E | 別顧客spaceId・循環親・未知modelId・使用中設備削除・inactive顧客への登録を個別に試す | 他顧客の部屋、循環階層、存在しないmodelId、使用中設備の削除を拒否。inactive顧客に新規設備を登録しない。 |
-| AT-A02-B | 同顧客/他顧客spaceId、契約/案件/IoT参照のある設備と未使用設備を編集する | 新規設備はcustomerOrgId・spaceId・modelIdの整合必須。契約/案件/IoT紐付けがある設備は物理削除不可。別テナントへの移管は1A対象外。 |
+| AT-A02-N | hq-operator。When: 顧客組織→home物件→floor/room→split設備（modelId有効）登録→移設（理由付き）→アーカイブ | ①各id・version=1 ②移設で現行場所更新、履歴に旧場所 ③archived、使用中なら拒否 |
+| AT-A02-E | ①customer-bのspaceId ②循環親 ③未知modelId ④契約ありunitの物理削除 ⑤inactive顧客へ登録 | ①②③VALIDATION／NOT_FOUND ④CONFLICT ⑤VALIDATION |
+| AT-A02-B | ①同顧客spaceId ②他顧客spaceId ③契約／案件／IoT参照あり設備 ④未使用設備 | ①成功 ②拒否 ③物理削除不可・アーカイブ可 ④削除可 |
 
 設計: [DD-A02](../02-design/admin.md#dd-a02-詳細)。親ケースAT-A02は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -110,9 +110,9 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A03-N | identity.manage。変更対象の現在role・scope・有効期間を取得済み。 ユーザー/所属を選ぶ → 4役割と技術者の社内/外部を指定 → スコープ/期間/個別能力を設定 → 差分を確認して保存する。 | Membership版とscopeVersionを更新。旧セッションの閲覧キャッシュを破棄し、次変更要求は新権限で判定。 roleと能力を分ける。管理者でもrestriction.manage/overrideを自動付与しない。外部技術者に終了なしの設備アクセスを付与しない。自分への高権限付与は別HQ権限管理者の操作に限定。 |
-| AT-A03-E | 別tenant scope／外部validUntil=null／from>=until／自己override追加／失効前の古い版を保存する | 別テナントscope、外部で期限なし、validFrom>=validUntil、自分へのoverride追加を拒否。失効操作後の古い画面からの保存を拒否。 |
-| AT-A03-B | role=adminへの初期能力、外部技術者の期限、自分/別HQによる権限追加を比較する | roleと能力を分ける。管理者でもrestriction.manage/overrideを自動付与しない。外部技術者に終了なしの設備アクセスを付与しない。自分への高権限付与は別HQ権限管理者の操作に限定。 |
+| AT-A03-N | identity.manage。When: tech-external-bにrole=technician、employment=external、validUntil=2026-09-30、permissions=[control.diagnose]で保存 | ①Membership version+1、scopeVersion更新 ②旧セッションのキャッシュ破棄 ③監査に理由 |
+| AT-A03-E | ①別tenant scope ②外部validUntil=null ③from>=until ④自分へrestriction.override ⑤失効前の古い版で保存 | ①②③VALIDATION ④FORBIDDEN ⑤CONFLICT |
+| AT-A03-B | ①role=adminの初期能力 ②外部技術者の期限 ③自分／別HQによる権限追加 | ①restriction.manage/overrideなし ②until必須 ③自分は拒否、別HQは可 |
 
 設計: [DD-A03](../02-design/admin.md#dd-a03-詳細)。親ケースAT-A03は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -129,9 +129,9 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A04-N | device.manageまたは型番管理能力を持つ。能力値はデモ台帳として管理。 型番を登録 → 温度/モード/風量/センサー/換気/FW候補を設定 → 影響設備を確認 → 新しい能力版を保存する。 | Capability版を更新してUnit操作候補へ反映。未完了Commandの要求内容は履歴として保持し、勝手に新能力へ書換えない。 能力の未確認はfalse/unknown。対応modeを製品カテゴリから推定しない。既存automationが新能力に違反する場合は該当ルールを停止し理由を表示する。 |
-| AT-A04-E | min>max／step=0／mode制御ありでmodes=[]／対応候補外FWを保存する | min>max、step<=0、空mode集合でmode制御trueを拒否。非対応FW版を候補へ紛れ込ませない。 |
-| AT-A04-B | 未確認能力を登録し、既存ルールに違反する能力版へ変更する | 能力の未確認はfalse/unknown。対応modeを製品カテゴリから推定しない。既存automationが新能力に違反する場合は該当ルールを停止し理由を表示する。 |
+| AT-A04-N | device.manage。When: 型番登録 min=16 max=30 step=1、modes=[cool,dry]、ventilation=false→保存 | ①Capability version=1 ②Unit操作候補に反映 ③未完了Commandの要求内容は不変 |
+| AT-A04-E | ①min>max ②step=0 ③control=trueでmodes=[] ④非対応FWを候補に | 各VALIDATION、保存0件 |
+| AT-A04-B | ①未確認能力を登録 ②既存automationに違反する能力版へ変更 | ①false/unknown表示 ②該当ルールdisabled、理由表示 |
 
 設計: [DD-A04](../02-design/admin.md#dd-a04-詳細)。親ケースAT-A04は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -154,9 +154,9 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A05-N | alert.policy.manageと通知先の閲覧権。指標単位・対象設備を取得済み。 対象・指標・比較条件・継続時間を設定 → 通知先・手段・エスカレーション時間を指定 → 保存 → 合成値で発火/解除条件を確認する。 | Policy版を保存。発火でAlertとNotificationプレビューを作成。通知既読とAlert確認を分離。 単位はmetricに従い変更不可。missing/staleは測定閾値の正常判定に使わず通信/品質通知へ。繰返し通知はcooldownで抑制し、重大度変化は新しい通知理由として保持する。 |
+| AT-A05-N | alert.policy.manage。When: metric=temperature、gte 30°C、duration=60秒、severity=warning、recipient=customer-a、channel=inApp保存→合成値30°Cを60秒継続 | ①Policy version=1 ②Alert1件、Notificationプレビュー1件 ③通知既読でAlert不変 |
 | AT-A05-E | 宛先=[]／継続0秒／回復閾値の方向逆転で保存する／閾値直前・一致と継続時間直前・一致を評価する | 宛先0・継続0・回復方向逆転はVALIDATIONで保存0件。gte閾値100では99は不成立、100が指定秒数継続した時点で発火、継続時間直前は発火0件。 |
-| AT-A05-B | missing/stale、cooldown内の同重要度再発、重大度上昇を評価する | 単位はmetricに従い変更不可。missing/staleは測定閾値の正常判定に使わず通信/品質通知へ。繰返し通知はcooldownで抑制し、重大度変化は新しい通知理由として保持する。 |
+| AT-A05-B | ①missing／stale ②cooldown内の同重要度再発 ③重大度上昇 | ①測定判定に使わず品質通知 ②通知抑制 ③新通知 |
 
 設計: [DD-A05](../02-design/admin.md#dd-a05-詳細)。親ケースAT-A05は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -173,16 +173,16 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A06-N | job.manage。対象設備と社内/外注の選択肢を取得済み。 保守種別・設備・期限を登録 → 社内へ直接割当または業者へ委託 → 日程と進捗を追う → 品質確認と費用実績を記録する。 | Job/Assignment/Offer/費用明細・品質履歴を同じjobIdに集約。完了してもAlert解消は別判断。 社内はHQが担当・日程を確定、外注はoffer受諾後に自社割当。定期計画の繰返し設定は次回生成予定を表示し、同じ計画/回の案件は1件。 |
+| AT-A06-N | job.manage。When: reactive案件作成→contractor-aへoffer→受諾→業者割当→提出→accept→費用実績記録 | ①同じjobIdでrequested→offered→accepted→assigned→submitted→completed ②costLines保存 ③Alertは別判断 |
 | AT-A06-E | 辞退後に再委託する／確定日程を重複させる／期限を超える／報告を差戻す／見積MYRと実績USDを入力する | 辞退後は新offerIdでrequested→offered。確定日程重複は保存拒否。期限超過は状態を勝手に変えず注意表示。差戻しはrework_requested。見積/実績は通貨別に集計。 |
-| AT-A06-B | internalのHQ割当とcontractorの受諾後割当、同一計画・予定日の2回生成を比較する | 社内はHQが担当・日程を確定、外注はoffer受諾後に自社割当。定期計画の繰返し設定は次回生成予定を表示し、同じ計画/回の案件は1件。 |
+| AT-A06-B | ①internalでHQ割当 ②contractorで受諾後割当 ③同一計画・同予定日で2回生成 | ①assigned ②accepted後assigned ③2回目CONFLICT、案件1件 |
 
 設計: [DD-A06](../02-design/admin.md#dd-a06-詳細)。親ケースAT-A06は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
 ### FR-A07 契約プラン
 
-- **企業要望の根拠**: SRC-06 BIZ-21 — RTO等の未払い時に管理者が冷房を抑制・停止する。
-- **設計補完の範囲**: プラン・契約編集。
+- **企業要望の根拠**: SRC-06 BIZ-21 — RTO等の未払い時に管理者が冷房を抑制・停止する。原文はrent to ownと「後から挿入する他のプログラム」を直接述べる。
+- **設計補完の範囲**: プラン種別・契約編集の手順。
 
 - **利用開始条件**: contract.manage。顧客と紐付け設備が同じテナント内。
 - **基本フロー**: プラン種別・期間・料金・設備を設定 → RTO制限可否とルール版を指定 → 内容確認 → 契約を保存/改版する。
@@ -192,9 +192,9 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A07-N | contract.manage。顧客と紐付け設備が同じテナント内。 プラン種別・期間・料金・設備を設定 → RTO制限可否とルール版を指定 → 内容確認 → 契約を保存/改版する。 | 契約版を保持し、新請求には新しい版、過去請求には元の版を参照させる。契約終了を実機停止として扱わない。 一般保守はrestrictionEligible=false。RTOでも明示的に制限可能とした契約だけ対象。既に発行した請求は契約改版で遡及変更しない。 |
-| AT-A07-E | 別顧客unitId／期間逆転／負料金／generalで制限有効にする／契約なし設備を監視する | 他顧客設備、期間逆転、負料金、一般保守の制限有効化を拒否。契約なし設備の監視・保守を妨げない。 |
-| AT-A07-B | general、制限不可rto、制限可rtoを作り、請求発行後に契約を改版する | 一般保守はrestrictionEligible=false。RTOでも明示的に制限可能とした契約だけ対象。既に発行した請求は契約改版で遡及変更しない。 |
+| AT-A07-N | contract.manage。When: planType=rto、unit-online-rto、restrictionEligible=true、rulesVersion=demo-v1で保存→請求発行→改版 | ①契約version=1 ②請求はversion=1参照 ③改版でversion=2、既存請求は元版のまま |
+| AT-A07-E | ①customer-bの設備 ②期間逆転 ③負料金 ④generalで制限有効 ⑤契約なし設備を監視 | ①②③④VALIDATION／NOT_FOUND ⑤監視可 |
+| AT-A07-B | ①general ②制限不可rto ③制限可rto ④請求発行後に改版 | ①②制限対象外 ③対象 ④旧請求不変 |
 
 設計: [DD-A07](../02-design/admin.md#dd-a07-詳細)。親ケースAT-A07は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -217,9 +217,9 @@ HQはクライアントが選択した模擬クレジットカード・模擬デ
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A08-N | billing.manage。契約・請求・模擬決済の対象を照合できる。 契約版から請求作成 → 期限/状態で絞込 → 模擬決済結果の確認または権限付き入金確認 → 督促プレビューと顧客表示を確認する。 | Payment confirmed、Invoice paid、監査を記録。関連RestrictionのcauseInvoiceIds全件がpaidなら、scheduledはcancelled、requested/appliedはrelease_requestedへ進める。未入金が残れば解除せず、機器応答待ちと残件数を表示する。 1Aは全額入金のみ。invoiceId+paymentReferenceの二重確認は同じ結果を返す。督促対象は未入金・期限超過で、例外や係争の有無を表示する。 |
-| AT-A08-E | 額・通貨不一致／同参照を別invoiceへ流用／paidへの再請求／督促直前の入金を個別に与える | 金額違い、通貨違い、同参照の別請求流用、paidの再請求を拒否。入金済みになった直後の督促実行を再確認して止める。 |
-| AT-A08-B | 全額入金と不足入金、同一invoice/reference再確認、未期限/期限超過/paidの督促を比較する | 1Aは全額入金のみ。invoiceId+paymentReferenceの二重確認は同じ結果を返す。督促対象は未入金・期限超過で、例外や係争の有無を表示する。 |
+| AT-A08-N | billing.manage、契約version=1。When: 請求作成→顧客決済を確認→督促プレビュー | ①Invoice unpaid ②Payment confirmed、Invoice paid、監査 ③関連Restriction評価（全件paidならrelease_requested） ④督促はpreview |
+| AT-A08-E | ①額不一致 ②通貨不一致 ③同参照を別invoiceへ ④paidへ再請求 ⑤督促直前に入金 | ①②VALIDATION ③CONFLICT ④CONFLICT ⑤督促中止 |
+| AT-A08-B | ①全額 ②不足額 ③同一invoice/reference再確認 ④未期限／期限超過／paidの督促 | ①confirmed ②VALIDATION ③同じ結果 ④期限超過のみ対象 |
 
 **追加受入条件 AT-A08-R01（再訪・競合・役割横断）**
 
@@ -242,9 +242,9 @@ HQはクライアントが選択した模擬クレジットカード・模擬デ
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A09-N | restriction.manage、制限可能RTO契約、未入金、対象設備の能力確認。 予告の理由・対象・内容・時刻を入力 → 顧客プレビュー → 開始時に請求/猶予/例外を再照合 → 設備別適用要求 → 入金後解除要求と応答を追う。 | Restrictionと設備別Commandを作成。原因請求causeInvoiceIds全件の入金確認後はscheduledならcancelled、requested/appliedならrelease_requested。1件でも未入金なら状態を維持する。 UIで期限到来しても自動実停止しない。1AはHQの明示確認で模擬要求。対象全台が応答するまでapplied/releasedにしない。停止と温度制限は別policy。 |
-| AT-A09-E | 実行直前に入金・猶予・例外を設定する／未通知・非対応機器に実行する／一部offline・遅い適用応答・解除失敗を与える | 実行直前に原因請求全件が入金済みならcancelledとし適用要求を作らない。猶予・例外中、未通知、非対応機器も適用不可。一部offlineでは全体をappliedにせず設備別保留を表示。解除失敗ではrelease_requestedを保持し、遅い適用応答でappliedへ戻さない。 |
-| AT-A09-B | 通知期限直前/一致、HQ確認なし/あり、対象2台の一部/全件応答を比較する | UIで期限到来しても自動実停止しない。1AはHQの明示確認で模擬要求。対象全台が応答するまでapplied/releasedにしない。停止と温度制限は別policy。 |
+| AT-A09-N | hq-restriction-manager、invoice-overdue-a、unit-online-rto＋unit-offline-rto。When: schedule（power_off）→時計をexecuteAfterへ→execute→online台応答→全額入金→release→全台応答 | ①scheduled ②requested、Command2件 ③1台applied、集約はrequested ④release_requested ⑤released |
+| AT-A09-E | ①実行直前に全件入金 ②猶予中 ③未通知 ④非対応機器 ⑤一部offline ⑥解除失敗 ⑦解除要求後の遅い適用応答 | ①cancelled、Command0件 ②③④CONFLICT／VALIDATION ⑤設備別保留 ⑥release_requested保持 ⑦appliedへ戻らない |
+| AT-A09-B | ①通知期限直前 ②一致 ③HQ確認なし ④対象2台の一部応答／全件応答 | ①拒否 ②実行可 ③要求0件 ④requested／applied |
 
 **追加受入条件 AT-A09-R01（再訪・競合・役割横断）**
 
@@ -267,9 +267,9 @@ HQはクライアントが選択した模擬クレジットカード・模擬デ
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A10-N | 猶予/例外にはrestriction.manage、手動解除にはrestriction.override。 対象の現在状態と機器反映を照会 → 猶予・例外・取消・手動解除を選ぶ → 理由/期限/影響を確認 → 保存 → 設備別結果を追う。 | 例外・猶予の変更前後と期限、解除の理由・主体を記録。手動解除でInvoiceの未入金を解消しない。 適用前の取消はcancelled。適用要求後は反映が不明でも解除フローへ。例外・猶予の期限が切れても自動再適用せず条件再確認を要する。 |
-| AT-A10-E | overrideなしで手動解除／空理由／過去untilを保存する／requestedでcancelを実行する | overrideなしHQ、空理由、過去の猶予期限を拒否。requested中の取消でも実際の適用可能性をゼロと推定しない。 |
-| AT-A10-B | scheduledとrequestedで取消、appliedで例外、例外期限一致後を比較する | 適用前の取消はcancelled。適用要求後は反映が不明でも解除フローへ。例外・猶予の期限が切れても自動再適用せず条件再確認を要する。 |
+| AT-A10-N | restriction.manage＋override。When: appliedでexempt（until未来）→override_release | ①exception保存、変更前後 ②release_requested、Invoice unpaidのまま |
+| AT-A10-E | ①overrideなしで手動解除 ②理由空 ③過去until ④requestedでcancel | ①FORBIDDEN ②③VALIDATION ④解除フローへ、適用0と推定しない |
+| AT-A10-B | ①scheduledでcancel ②requestedでcancel ③appliedでexempt ④例外期限一致後 | ①cancelled ②release_requested ③exception ④自動再適用なし |
 
 設計: [DD-A10](../02-design/admin.md#dd-a10-詳細)。親ケースAT-A10は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -286,9 +286,9 @@ HQはクライアントが選択した模擬クレジットカード・模擬デ
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A11-N | automation.policy.manage。対象設備と制御能力を取得済み。 在室・料金・ピーク・太陽光/蓄電池の条件を選ぶ → 動作と優先順位を設定 → 競合プレビュー → 合成イベントで評価する。 | 方針版を保存。simulationは採用/抑止ルールと理由を返し、発火する場合も共通Commandを経る。 能力・有効制限→HQ方針→顧客ルールの優先。各層で数値priorityの大きい方、同値はID昇順。データ欠測や失効時は実行を見送り理由を表示。 |
+| AT-A11-N | automation.policy.manage。When: condition=tariff gt 0.6 MYR/kWh、action=set_temperature 26、priority=60保存→合成イベント | ①Policy version=1 ②simulationが採用／抑止と理由 ③発火はCommand経由 |
 | AT-A11-E | HQと顧客の競合ルール／同priorityのHQルール2件／solar値nullで評価する | HQルールを採用し顧客ルールを抑止。同priorityはID昇順で常に同じ採用結果。solar=nullはスキップ理由を表示し、そのルールのCommand0件。 |
-| AT-A11-B | HQと顧客の同時成立、同層priority=50と60、同値でID=a/b、条件nullを評価する | 能力・有効制限→HQ方針→顧客ルールの優先。各層で数値priorityの大きい方、同値はID昇順。データ欠測や失効時は実行を見送り理由を表示。 |
+| AT-A11-B | ①HQと顧客の同時成立 ②同層priority=50と60 ③同値でID=a/b ④条件null | ①HQ採用 ②60採用 ③a採用 ④スキップ |
 
 **追加受入条件 AT-A11-R01（再訪・競合・役割横断）**
 
@@ -317,9 +317,9 @@ CO₂・粉じん・湿度に加え、アレルゲン情報の有無と出典を
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A12-N | 環境policy管理権限。機器に対象metricと換気能力の定義がある。 指標・しきい値・継続/回復条件を設定 → 通知と換気要求の有無を選ぶ → 対象の能力確認 → 模擬評価する。 | 環境policy版・通知プレビューを保存。要求を作る場合は機器応答を追い、室内環境の改善は後続測定で確認する。 換気自動要求はventilation=trueの対象だけ。それ以外は通知onlyにし、保存前に対象別の実行内容を表示する。 |
-| AT-A12-E | ppm用閾値にµg/m³を指定する／測定をnullにする／ventilation=false・fan=trueで評価する | ppmとµg/m³の閾値を混用しない。未計測は正常/回復判定に使わない。換気非対応機器へ送風コマンドを代用しない。 |
-| AT-A12-B | 換気対応1台・非対応1台へ同じCO₂方針を保存・評価する | 換気自動要求はventilation=trueの対象だけ。それ以外は通知onlyにし、保存前に対象別の実行内容を表示する。 |
+| AT-A12-N | 環境policy権限。When: metric=co2、threshold=1000ppm、responseMode=notify_and_ventilate、対象2台（換気対応1・非対応1）保存→評価 | ①Policy version=1 ②対応台にventilate Command1件、非対応台は通知のみ ③室内改善は後続測定まで表示しない |
+| AT-A12-E | ①ppm閾値にµg/m³ ②測定null ③ventilation=false・fan=true | ①VALIDATION ②判定に使わず ③送風で代用しない、Command0件 |
+| AT-A12-B | 換気対応1台・非対応1台へ同じCO₂方針 | 対応台のみ換気要求、非対応台は通知のみ、保存前に対象別内容表示 |
 
 設計: [DD-A12](../02-design/admin.md#dd-a12-詳細)。親ケースAT-A12は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -336,9 +336,9 @@ CO₂・粉じん・湿度に加え、アレルゲン情報の有無と出典を
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A13-N | energy.manage、管理範囲の期間データ。基準モデルの根拠を入力可能。 基準対象・期間・方法を指定 → 比較条件を確認 → 実績と差を表示 → 品質・根拠を展開する。 | 基準保存時に新しい版。既存MRVレポートの基準版を遡及変更しない。 基準は設備集合・境界・期間条件・モデル版を保持。気象等の補正モデル未実装なら補正済みと表示しない。負の削減を0へ丸めない。 |
+| AT-A13-N | energy.manage。When: baseline 100kWh、boundary記入、version保存→実績80kWhと比較 | ①Baseline version=1 ②差20kWh、20% ③補正モデル未実装なら「補正済み」表示なし |
 | AT-A13-E | 基準0／実績欠測／設備集合・boundary不一致／100と80・100と120kWhで比較する | 基準0は率null、実績欠測は品質注記、設備集合/境界不一致は差分算定不可。100/80は20kWh・20%、100/120は-20kWh・-20%。 |
-| AT-A13-B | 同境界の100/80kWhと100/120kWhを比較し、基準の版を更新する | 基準は設備集合・境界・期間条件・モデル版を保持。気象等の補正モデル未実装なら補正済みと表示しない。負の削減を0へ丸めない。 |
+| AT-A13-B | ①同境界100/80 ②100/120 ③基準版更新 | ①20kWh/20% ②-20kWh/-20% ③新版、旧MRV不変 |
 
 設計: [DD-A13](../02-design/admin.md#dd-a13-詳細)。親ケースAT-A13は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -361,9 +361,9 @@ CO₂・粉じん・湿度に加え、アレルゲン情報の有無と出典を
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A14-N | mrv.manage。対象期間、設備、基準版、係数版、境界が選択済み。 算定条件を指定 → 測定/品質/計算結果をプレビュー → 根拠を確認 → ドラフト保存 → デモ確認履歴・報告プレビューを表示する。 | MRVReportに係数/基準のスナップショット参照と算定結果・品質・reviewHistoryを保存。プレビューのみでは確定記録を作らない。 係数の地域・年度・単位・出典を必須。確認履歴はdemo_reviewedで外部認証と区別。入力版が変われば新しい報告版を作り、旧結果は保持する。 |
+| AT-A14-N | mrv.manage。When: 条件指定→プレビュー→ドラフト保存→recordReview | ①プレビューのみでは記録0件 ②MRVReport draft、係数／基準スナップショット ③reviewHistory1件、status=demo_reviewed |
 | AT-A14-E | 係数なし／係数単位不一致／coverage=0でプレビューする／同一版へ同じ確認を2回送る | 係数なし/単位不一致/coverage0は算定未完了、認証済み表示なし。同一版への同一確認再送は既存結果を返し履歴を増やさない。 |
-| AT-A14-B | 地域/年度/単位/出典あり・なしの係数で算定し、入力版を変更して報告を保存する | 係数の地域・年度・単位・出典を必須。確認履歴はdemo_reviewedで外部認証と区別。入力版が変われば新しい報告版を作り、旧結果は保持する。 |
+| AT-A14-B | ①地域／年度／単位／出典あり ②なし ③入力版変更後に保存 | ①算定可 ②算定未完了 ③新報告版、旧結果保持 |
 
 **追加受入条件 AT-A14-R01（再訪・競合・役割横断）**
 
@@ -392,9 +392,9 @@ CO₂・粉じん・湿度に加え、アレルゲン情報の有無と出典を
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A15-N | mrv.manageまたはoffset.manage。模擬取引のみであることを表示。 希望量と目的を指定 → 模擬見積 → 模擬申込 → デモ購入確認 → デモ償却 → 証明情報プレビューを閲覧する。 | quoted→demo_requested→demo_purchased→demo_retiredを履歴に保存。証明参照はDEMO-接頭辞で実証明として出力しない。 購入申込と購入確認と償却を別イベントにする。1Aは1記録の全量償却のみ。自社排出削減計算を購入済み残高に加算しない。 |
-| AT-A15-E | 未購入retire／retire二重送信／amountKg=0／失効見積／他tenant記録／購入失敗を与える | 未購入の償却、二重償却、希望量0、見積失効、別テナントの記録操作を拒否。失敗はfailedと直前段階を保持。 |
-| AT-A15-B | quoted/requested/purchased/retiredと失敗の各段階を確認する | 購入申込と購入確認と償却を別イベントにする。1Aは1記録の全量償却のみ。自社排出削減計算を購入済み残高に加算しない。 |
+| AT-A15-N | offset.manage。When: amountKg=1→見積→request→purchase_confirm→retire | ①quoted ②demo_requested ③demo_purchased ④demo_retired、demoCertificateRef=DEMO-接頭辞 |
+| AT-A15-E | ①未購入でretire ②retire二重 ③amountKg=0 ④失効見積 ⑤他tenant記録 ⑥購入失敗 | ①②CONFLICT ③VALIDATION ④CONFLICT ⑤NOT_FOUND ⑥failed、previousState保持 |
+| AT-A15-B | ①quoted ②requested ③purchased ④retired ⑤failed | 各段階のラベル、購入・確認・償却は別イベント |
 
 設計: [DD-A15](../02-design/admin.md#dd-a15-詳細)。親ケースAT-A15は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -411,9 +411,9 @@ CO₂・粉じん・湿度に加え、アレルゲン情報の有無と出典を
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A16-N | audit.read。管理テナントを超えず、機微情報を含まない監査projection。 期間・主体・対象・結果・相関IDを検索 → 履歴詳細を開く → 関連Command/Job/Restrictionの状態と照合する。 | 閲覧のみ。条件をURLへ保持するが機密本文をURLへ入れない。 監査は成功/拒否/失敗を分離し、before/afterは秘密・連絡先をマスク。フロント上は追加のみで編集/削除を提供しない。ブラウザ内デモに耐改ざん保証はしない。 |
-| AT-A16-E | 他tenant correlationIdで検索／監査削除相当の未定義操作／from>=to／閲覧者Membership切替を試す | 他テナント相関ID、削除API相当の呼出し、期間逆転を拒否。実行主体が役割切替後の別人に書換わらない。 |
-| AT-A16-B | 成功/拒否/失敗イベントを検索し、機微before/afterと別Membershipでの過去主体を確認する | 監査は成功/拒否/失敗を分離し、before/afterは秘密・連絡先をマスク。フロント上は追加のみで編集/削除を提供しない。ブラウザ内デモに耐改ざん保証はしない。 |
+| AT-A16-N | audit.read。When: 期間・correlationIdで検索→詳細 | ①成功／拒否／失敗を別結果 ②before/afterマスク ③URLに条件、本文なし |
+| AT-A16-E | ①他tenant correlationId ②削除相当操作 ③from>=to ④閲覧者Membership切替 | ①NOT_FOUND ②操作なし ③VALIDATION ④過去主体不変 |
+| AT-A16-B | ①成功 ②拒否 ③失敗イベント ④別Membershipで過去主体 | ①②③別result ④actorRoleAtTime不変 |
 
 設計: [DD-A16](../02-design/admin.md#dd-a16-詳細)。親ケースAT-A16は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 

@@ -21,7 +21,7 @@ FR-P06,制作方針 SRC-02＋設計補完,BIZ-12,"general maintenance (regular, 
 FR-P07,制作方針 SRC-02＋設計補完,BIZ-12;BIZ-20,"general maintenance (regular, reactive and preventive); gadget to be small / firmware / stolen and/or removed",案件連絡・異常の共有
 FR-P08,制作方針 SRC-02＋設計補完,BIZ-12,"general maintenance (regular, reactive and preventive)",委託先・担当期間に基づくアクセス制限
 FR-T01,企業原文 SRC-06＋設計補完,BIZ-04;BIZ-08,For End Users/Clients / Technicians / Admin/HQ; Purpose is to monitor every aspect,担当期間による表示範囲
-FR-T02,設計補完（企業目的に対応）,BIZ-06;BIZ-07;BIZ-10,For HVAC / any air con brands; Select for Categories; Indoor Unit Parts / Outdoor Unit Parts / Electrical and Control Parts,設備台帳の項目と閲覧手順
+FR-T02,企業原文 SRC-06＋設計補完,BIZ-06;BIZ-07;BIZ-10,For HVAC / any air con brands; Select for Categories; Indoor Unit Parts / Outdoor Unit Parts / Electrical and Control Parts,設備台帳の項目と閲覧手順
 FR-T03,企業原文 SRC-06＋設計補完,BIZ-08;BIZ-11,Purpose is to monitor every aspect; Predictive Maintenance / Predictive diagnostics,系列選択と品質表示
 FR-T04,企業原文 SRC-06＋設計補完,BIZ-10,Indoor Unit Parts / Outdoor Unit Parts / Electrical and Control Parts,点検フォーム・未点検理由
 FR-T05,企業原文 SRC-06＋設計補完,BIZ-10,Indoor Unit Parts / Outdoor Unit Parts / Electrical and Control Parts,点検フォーム・未点検理由
@@ -38,7 +38,7 @@ FR-A03,設計補完（企業目的に対応）,BIZ-04,For End Users/Clients / Te
 FR-A04,企業原文 SRC-06＋設計補完,BIZ-06;BIZ-20,For HVAC / any air con brands; gadget to be small / firmware / stolen and/or removed,機種能力・IoT台帳の編集
 FR-A05,企業原文 SRC-06＋設計補完,BIZ-08;BIZ-11;BIZ-17,Purpose is to monitor every aspect; Predictive Maintenance / Predictive diagnostics; Automated Comfort / open window or uninsulated wall,しきい値の設定と異常処理
 FR-A06,企業原文 SRC-06＋設計補完,BIZ-12,"general maintenance (regular, reactive and preventive)",受付・委託・品質確認
-FR-A07,設計補完（企業目的に対応）,BIZ-21,payments are not made / slow down / stop,プラン・契約編集
+FR-A07,企業原文 SRC-06＋設計補完,BIZ-21,rent to own services / or by any other programs to be inserted later on,プラン・契約編集
 FR-A08,企業原文 SRC-06＋設計補完,BIZ-21;BIZ-22,payments are not made / slow down / stop; whatsapp and/or email / credit card or debit card,請求・模擬入金確認
 FR-A09,企業原文 SRC-06＋設計補完,BIZ-21,payments are not made / slow down / stop,予告・実行確認・機器応答
 FR-A10,設計補完（企業目的に対応）,BIZ-21,payments are not made / slow down / stop,猶予・例外・監査手順

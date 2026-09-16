@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTRACTS
-version: 0.6.0
+version: 0.7.0
 status: proposed-frontend-contract
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -180,6 +180,8 @@ CONFLICTは最新データを取得して利用者の確認後に新しい意思
 画面error時にKPIを0件や正常へ置換しない。前回値を残す場合はstaleと前回成功時刻を明示。対象やroleが変わった場合は前回値を残さない。
 
 ## DDC-04 非同期・モック実行の基準
+
+デモ仮値（時間・上限・枚数・期間）の定義先は本節とDDC-01。要件・各DDに同じ数値が書かれている場合は本節を正とし、変更時は本節を先に更新して同一変更で各所を揃える。
 
 | 設定 | 1A既定値・挙動 |
 |---|---|
@@ -381,12 +383,25 @@ RestrictionActionは共有モックのrestriction遷移だけが作る内部acti
 
 ### 5. 用語と入力型の共通規則
 
-正規名はUnitAction、parentSpaceId、planType=rto、channel=inApp/email/whatsapp、証明参照接頭辞DEMO-。preview/simulated/failedはdeliveryStateで表し、channel値に混ぜない。UIの「RTO」「顧客」「HQ」は翻訳ラベルで、保存enumとは分ける。
+正規名はUnitAction、parentSpaceId、planType=rto、channel=inApp/email/whatsapp、証明参照接頭辞DEMO-。役割の識別子は次の表を正とし、他はすべて翻訳ラベル。
+
+| 役割 | role enum | route prefix | permission prefix | 組織kind | 日本語正式名（略記） | 英語表示 |
+|---|---|---|---|---|---|---|
+| クライアント | client | /customer | control.* | customer | クライアント（顧客） | Client |
+| 施工業者 | contractor | /partner | partner.* | contractor | 施工業者（業者） | Contractor |
+| 技術者 | technician | /technician | control.diagnose, device.maintain, alert.resolve | contractor または operator | 技術者（社内/外部） | Technician |
+| 管理者 | admin | /admin | job/contract/billing/identity/device/restriction/mrv/offset/audit/*.policy | operator | 管理者（HQ） | Admin / HQ |
+
+企業向け文書（PrepareDocument）は正式名を使い、要件・設計本文の「顧客」「業者」「HQ」は同じ役割の略記として扱う。routeやenumを表示名から推測しない。preview/simulated/failedはdeliveryStateで表し、channel値に混ぜない。UIの「RTO」「顧客」「HQ」は翻訳ラベルで、保存enumとは分ける。
 
 各`*Input`は対応DDの入力欄を名前付きプロパティとして持つ。save操作は新規id省略/既存id必須とし、既存更新はexpectedVersion必須。PolicyInputはkindを判別子にし、DD-A05/A11/A12をそれぞれ別schemaにする。AutomationInputはschedule（DD-C04）とevent（DD-C05）をkindで区別し、共通にid?/name/unitIds/timezone/enabled/priority（既定50）を持つ。event条件はoccupancy={occupied:boolean}、location={event:arrival/departure}、pattern={localTime:HH:mm}、weather={metric:temperature_c,operator:gt/gte/lt/lte,value:number}。HQ条件はoccupancy同型、tariff={operator,value,unit:MYR_per_kWh}、peak={active:boolean}、solar/battery={operator,value,unit:kW}のデモに限定し、欠測を成立としない。
 
 ListQueryのfilters/sortは各DDの検索項目名に限定する。追加の共通filterはtenant由来のscope、resource ID、kind、enabled、from/to。sortはcreatedAt/updatedAt/name/statusを当該モデルが持つ場合だけasc/descで指定し、既定はid昇順。不明キーはVALIDATION。任意のsort式を受け入れない。
 
+
+### 6. 自動運転・方針の発火
+
+`automations.simulate`は読取専用で、対象ルール/方針と合成イベントから採用・抑止・理由（`SimulationResult`）を返し、Command・監査・通知を作らない。実際の発火は`automations.fire`（DemoWriteOptions必須）が行う。fireは同じ評価関数を使い、採用されたactionごとに`commands.create`と同じpolicy（能力・制限・同意・担当・online・未完了Command）を通してCommandを作成し、`FireResult{decision, reasons, commandIds[]}`を返す。抑止・欠測・同意取消・制限中は`commandIds=[]`と理由を返し、FORBIDDENにはしない。デモ時計の予定イベント、HQ方針の評価、換気方針（ventilation=trueの対象だけ`ventilate`）はすべてfire経由で、UIや/demoが直接Commandを作らない。同一Automation/方針・同一イベント時刻の再送は冪等キーで1回だけ発火する。
 
 ## DDC-09 共通の監査・試験規則
 

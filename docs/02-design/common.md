@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.6.0
+version: 0.7.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -99,7 +99,7 @@ interface CommandRepository {
 
 `DemoViewContext`は選択中の架空ユーザー・役割・閲覧範囲を表す。`DemoWriteOptions`は同じデモ操作の重複防止用キーと変更前の版を持つ。これらは本番認証やサーバーの認可方式を規定しない。具体的なフィールドは[フロントエンド入出力契約](implementation-contracts.md)を参照する。
 
-[操作カタログ](operation-catalog.csv)にはUIが必要とする117のローカルサービス操作、その入力・戻り値・参照画面をまとめる。URL、HTTP method、DBテーブル、サーバートランザクションは定義しない。
+[操作カタログ](operation-catalog.csv)にはUIが必要とする119のローカルサービス操作、その入力・戻り値・参照画面をまとめる。URL、HTTP method、DBテーブル、サーバートランザクションは定義しない。
 
 モックの操作結果は成功・受付中・失敗・競合・閲覧不可として返す。画面はDomainErrorに応じて表示・入力保持・再読込を決める。遅延した古い応答は操作IDと表示世代で除外し、役割切替前の値を描画しない。
 
@@ -131,11 +131,11 @@ interface CommandRepository {
 | assigned / in_progress | HQ（社内）または受託業者（外注）が理由付き再割当 | 状態維持。旧割当を失効、新割当を作成し、作業途中の記録は元作者を保持 |
 | in_progress | 担当者が必須報告を提出 | submitted |
 | submitted | 業者品質担当（外注）またはHQ（社内）が確認 | completed / rework_requested |
-| rework_requested | 担当者が再作業開始 | in_progress（前報告版を保持） |
+| rework_requested | 担当者が再作業開始（`jobs.resumeRework`） | in_progress（前報告版を保持） |
 | requested | 保守依頼を行ったクライアントによる取消 | cancelled |
 | offered / accepted / assigned | HQが理由付き取消 | cancelled。関連割当を失効 |
 | in_progress / submitted | HQが理由付き中断 | on_hold。自動的な完了・取消にはしない |
-| on_hold | HQが現在条件を確認して再開 / 終了 | in_progress / cancelled（理由と未完了記録必須） |
+| on_hold | HQが現在条件を確認して再開（`jobs.resumeHold`、理由必須） / 終了 | in_progress / cancelled（理由と未完了記録必須） |
 
 completed後の追加作業は関連する新jobIdを作る。再割当後、新担当は現在draftから新しい報告版を作って継続し、旧版・各点検の元作者を変更しない。外注報告の自己承認は不可。同一userIdをMembership切替で別担当として承認することも禁止。施工業者の品質担当不在はHQへエスカレーション。顧客による正式な最終承認はOPEN-01で未確定のため、1Aでは結果閲覧と問い合わせまで。
 

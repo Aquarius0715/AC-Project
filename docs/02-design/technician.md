@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.6.0
+version: 0.7.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -28,7 +28,7 @@ scope: frontend-demo-1A
 | DD-T05 / FR-T05 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get, jobs.saveDraft, jobs.submit, reports.get` | 室内機と共通schema、部品グループを分離 | 未選定センサーで微小漏れ検知を保証する文言を拒否 |
 | DD-T06 / FR-T06 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get, jobs.saveDraft, jobs.submit, reports.get` | 測定値は数値+単位+観測時刻+点検者。操作手順や施工指示は本書対象外 | 測定なしを0や正常として保存しない |
 | DD-T07 / FR-T07 | `/technician/units/:id/alerts` / `DiagnosticEvidence` | `alerts.list, alerts.get, alerts.acknowledge, alerts.resolve` | 確認はacknowledgedまで。解消は再測定または権限付き理由記録 | 通信断だけで盗難と断定せず、取り外し検知を別事象 |
-| DD-T08 / FR-T08 | `/technician/jobs/:id` / `JobWorkspace` | `jobs.get, jobs.start, jobs.resume, jobs.submit, reports.get` | 有効割当と開始条件を検証。提出後は品質確認待ち | 失効・取消後の提出は拒否。送信失敗時はドラフトを保持 |
+| DD-T08 / FR-T08 | `/technician/jobs/:id` / `JobWorkspace` | `jobs.get, jobs.start, jobs.resumeRework, jobs.submit, reports.get` | 有効割当と開始条件を検証。提出後は品質確認待ち | 失効・取消後の提出は拒否。送信失敗時はドラフトを保持 |
 | DD-T09 / FR-T09 | `/technician/jobs/:id` / `ReportEditor` | `jobs.saveDraft, attachments.add, jobs.submit, jobs.get, reports.get, attachments.getContent` | 報告本文10〜4000文字、写真JPEG/PNG各5MiB以下・最大10枚（仮）、部品は数量>0 | ドラフトは不完全保存可。提出はschema検証。画像失敗は再選択し本文を保持 |
 | DD-T10 / FR-T10 | `/technician/units/:id/control` / `DiagnosticControl` | `commands.create, commands.get, diagnosticRuns.create, diagnosticRuns.get, units.get, jobs.get` | control.diagnose、設備能力、理由、試運転時間1〜15分（仮）を検証 | 契約制限を試運転で迂回しない。期限切れは自動再送しない |
 | DD-T11 / FR-T11 | `/technician/devices` / `DeviceMaintenance` | `devices.list, devices.register, devices.bind, devices.check, devices.calibrate, devices.updateFirmware, devices.get` | serial一意、unitId、センサー種別。校正は単位/参照値/日時、FWは対応版から選択 | 通信断時の更新は開始不可。失敗を新バージョン反映済みと表示しない |
@@ -79,7 +79,7 @@ scope: frontend-demo-1A
 
 ### DD-T02 詳細
 
-**一次資料との対応**: SRC-06 BIZ-06, BIZ-07, BIZ-10 → FR-T02 → DD-T02。出所区分: 設計補完（企業目的に対応）。本節で具体化する設計補完: 設備台帳の項目と閲覧手順。フィールド型・必須性・初期値・操作順序は実装提案。
+**一次資料との対応**: SRC-06 BIZ-06, BIZ-07, BIZ-10 → FR-T02 → DD-T02。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 設備台帳の項目と閲覧手順。フィールド型・必須性・初期値・操作順序は実装提案。
 
 対象: FR-T02 / 主表示pattern: **UI-DETAIL**。画面サービス境界は`units.get, devices.list`。
 
@@ -251,7 +251,7 @@ alerts.listのAlertにcauseCode（window_open / insulation_loss / unknown）、e
 
 **一次資料との対応**: SRC-06 BIZ-12 → FR-T08 → DD-T08。出所区分: 企業原文 SRC-06＋設計補完。本節で具体化する設計補完: 開始・提出・再提出の状態。フィールド型・必須性・初期値・操作順序は実装提案。
 
-対象: FR-T08 / 主表示pattern: **UI-DETAIL**。画面サービス境界は`jobs.get, jobs.start, jobs.resume, jobs.submit, reports.get`。
+対象: FR-T08 / 主表示pattern: **UI-DETAIL**。画面サービス境界は`jobs.get, jobs.start, jobs.resumeRework, jobs.submit, reports.get`。
 
 **初期表示と前提**: assigned案件を担当し、有効期間内。定期/事後/予防は同じ作業状態モデル。 ルート/条件検証→session scope→必要Queryの順に取得し、未取得状態と0件を分ける。
 

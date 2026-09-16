@@ -21,7 +21,7 @@ FR-P06,制作方針 SRC-02＋設計補完,01-requirements/contractor.md,DD-P06,0
 FR-P07,制作方針 SRC-02＋設計補完,01-requirements/contractor.md,DD-P07,02-design/contractor.md,AT-P07,S08,P1,not_run,AT-P07-N;AT-P07-E;AT-P07-B;AT-P07-R01,DD-P07 詳細,02-design/implementation-contracts.md,BIZ-12;BIZ-20,案件連絡・異常の共有,
 FR-P08,制作方針 SRC-02＋設計補完,01-requirements/contractor.md,DD-P08,02-design/contractor.md,AT-P08,S08,P0,not_run,AT-P08-N;AT-P08-E;AT-P08-B,DD-P08 詳細,02-design/implementation-contracts.md,BIZ-12,委託先・担当期間に基づくアクセス制限,
 FR-T01,企業原文 SRC-06＋設計補完,01-requirements/technician.md,DD-T01,02-design/technician.md,AT-T01,S02;S08,P0,not_run,AT-T01-N;AT-T01-E;AT-T01-B,DD-T01 詳細,02-design/implementation-contracts.md,BIZ-04;BIZ-08,担当期間による表示範囲,
-FR-T02,設計補完（企業目的に対応）,01-requirements/technician.md,DD-T02,02-design/technician.md,AT-T02,S02,P0,not_run,AT-T02-N;AT-T02-E;AT-T02-B,DD-T02 詳細,02-design/implementation-contracts.md,BIZ-06;BIZ-07;BIZ-10,設備台帳の項目と閲覧手順,
+FR-T02,企業原文 SRC-06＋設計補完,01-requirements/technician.md,DD-T02,02-design/technician.md,AT-T02,S02,P0,not_run,AT-T02-N;AT-T02-E;AT-T02-B,DD-T02 詳細,02-design/implementation-contracts.md,BIZ-06;BIZ-07;BIZ-10,設備台帳の項目と閲覧手順,
 FR-T03,企業原文 SRC-06＋設計補完,01-requirements/technician.md,DD-T03,02-design/technician.md,AT-T03,S06,P0,not_run,AT-T03-N;AT-T03-E;AT-T03-B,DD-T03 詳細,02-design/implementation-contracts.md,BIZ-08;BIZ-11,系列選択と品質表示,
 FR-T04,企業原文 SRC-06＋設計補完,01-requirements/technician.md,DD-T04,02-design/technician.md,AT-T04,S02,P0,not_run,AT-T04-N;AT-T04-E;AT-T04-B,DD-T04 詳細,02-design/implementation-contracts.md,BIZ-10,点検フォーム・未点検理由,
 FR-T05,企業原文 SRC-06＋設計補完,01-requirements/technician.md,DD-T05,02-design/technician.md,AT-T05,S02,P0,not_run,AT-T05-N;AT-T05-E;AT-T05-B,DD-T05 詳細,02-design/implementation-contracts.md,BIZ-10,点検フォーム・未点検理由,
@@ -38,7 +38,7 @@ FR-A03,設計補完（企業目的に対応）,01-requirements/admin.md,DD-A03,0
 FR-A04,企業原文 SRC-06＋設計補完,01-requirements/admin.md,DD-A04,02-design/admin.md,AT-A04,S06,P1,not_run,AT-A04-N;AT-A04-E;AT-A04-B,DD-A04 詳細,02-design/implementation-contracts.md,BIZ-06;BIZ-20,機種能力・IoT台帳の編集,
 FR-A05,企業原文 SRC-06＋設計補完,01-requirements/admin.md,DD-A05,02-design/admin.md,AT-A05,S02,P0,not_run,AT-A05-N;AT-A05-E;AT-A05-B,DD-A05 詳細,02-design/implementation-contracts.md,BIZ-08;BIZ-11;BIZ-17,しきい値の設定と異常処理,AT-A05-SRC
 FR-A06,企業原文 SRC-06＋設計補完,01-requirements/admin.md,DD-A06,02-design/admin.md,AT-A06,S02;S08,P0,not_run,AT-A06-N;AT-A06-E;AT-A06-B,DD-A06 詳細,02-design/implementation-contracts.md,BIZ-12,受付・委託・品質確認,
-FR-A07,設計補完（企業目的に対応）,01-requirements/admin.md,DD-A07,02-design/admin.md,AT-A07,S03,P0,not_run,AT-A07-N;AT-A07-E;AT-A07-B,DD-A07 詳細,02-design/implementation-contracts.md,BIZ-21,プラン・契約編集,
+FR-A07,企業原文 SRC-06＋設計補完,01-requirements/admin.md,DD-A07,02-design/admin.md,AT-A07,S03,P0,not_run,AT-A07-N;AT-A07-E;AT-A07-B,DD-A07 詳細,02-design/implementation-contracts.md,BIZ-21,プラン・契約編集,
 FR-A08,企業原文 SRC-06＋設計補完,01-requirements/admin.md,DD-A08,02-design/admin.md,AT-A08,S03,P0,not_run,AT-A08-N;AT-A08-E;AT-A08-B;AT-A08-R01,DD-A08 詳細,02-design/implementation-contracts.md,BIZ-21;BIZ-22,請求・模擬入金確認,AT-A08-SRC
 FR-A09,企業原文 SRC-06＋設計補完,01-requirements/admin.md,DD-A09,02-design/admin.md,AT-A09,S03,P0,not_run,AT-A09-N;AT-A09-E;AT-A09-B;AT-A09-R01,DD-A09 詳細,02-design/implementation-contracts.md,BIZ-21,予告・実行確認・機器応答,
 FR-A10,設計補完（企業目的に対応）,01-requirements/admin.md,DD-A10,02-design/admin.md,AT-A10,S03,P0,not_run,AT-A10-N;AT-A10-E;AT-A10-B,DD-A10 詳細,02-design/implementation-contracts.md,BIZ-21,猶予・例外・監査手順,

@@ -1,6 +1,6 @@
 ---
 document_id: UX-COMMON
-version: 0.6.0
+version: 0.7.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
