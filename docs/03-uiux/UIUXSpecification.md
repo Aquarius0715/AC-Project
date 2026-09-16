@@ -9,175 +9,175 @@ scope: frontend-demo-1A
 
 # 共通UIUX仕様書
 
-4役割に共通する実装・操作・表示の規則を定義する。ワイヤフレームや画面配置図は対象外。各画面の業務処理は[詳細設計](../02-design/common.md)を参照する。ライブラリはDEC-02/03の提案標準。配色・書体・形状はユーザー指定のLoyaltyページの取得HTML/CSSに合わせる。根拠と補正箇所は[参考デザイン分析](../00-prepare/reference-design-analysis.md)を参照。
+この文書は、4つの役割すべてに共通する、実装・操作・表示のルールを定める。ワイヤフレーム(画面のラフな下書き)や画面配置図は、この文書の対象外である。各画面の業務処理については[詳細設計](../02-design/common.md)を見てほしい。使用するライブラリは、DEC-02/03で決めた提案標準に従う。配色・書体・形状は、ユーザーが指定したLoyaltyページから取得したHTML/CSSに合わせる。根拠と、値を補正した箇所については[参考デザイン分析](../00-prepare/reference-design-analysis.md)を見てほしい。
 
 ## 企業要望と共通UIUXへの展開
 
-一次資料は[企業要件の英語原文（SRC-06）](../00-prepare/sources/company-requirements-original.txt)です。企業原文の表示・操作目的から共通ルールを定義し、見た目はドキュメント作成者指定の参考HTML/CSSに合わせます。ライブラリ、デモ言語、細かな寸法は制作方針・設計提案です。
+一次資料は[企業要件の英語原文(SRC-06)](../00-prepare/sources/company-requirements-original.txt)である。企業の原文にある表示・操作の目的から、共通のルールを定義する。見た目については、ドキュメント作成者が指定した参考HTML/CSSに合わせる。ライブラリの選定、デモに使う言語、細かい寸法は、制作方針にもとづく設計上の提案である。
 
-| 出所 | 求められる体験 | 共通ルール・受入観点 |
+| 出所 | 求められる体験 | 共通ルール・受入時に確認する観点 |
 |---|---|---|
-| 企業原文 BIZ-01〜03 | 利用開始・終了、多言語、音声AI | 認証デモを明示。翻訳キーで全役割を切替。音声は入力・解釈・確認・応答を分け、テキスト代替で完遂。初期en/jaは提案 |
-| 企業原文 BIZ-04・07・08 | 視覚的なダッシュボード、場所と状態把握 | 選択物件・設備を常時識別し、KPIから対象一覧へ遷移。グラフに期間・単位・取得時刻と表の代替を付ける |
-| 企業原文 BIZ-09〜11・17 | 赤・橙・緑の通知、部品状態と原因の把握 | 色に文言・アイコンを併用。通信状態と重要度を別表示。窓開放・断熱不足は根拠付き原因候補として表示し、推定を確定原因と表示しない |
-| 企業原文 BIZ-13〜16・19 | 遠隔制御、予定、位置・料金連動、換気 | 現在値と要求値、設定保存と模擬発火、要求中と応答済みを分離。対応能力と無効理由を確認できる |
-| 企業原文 BIZ-18 | CO₂・粉じん・湿度・アレルゲン | CO₂濃度ppmと排出量kgCO₂eを別概念として表示。アレルゲンは対象・出典・観測時刻・取得状態を提示し、未計測を0や安全へ変換しない |
-| 企業原文 BIZ-21・22 | 支払い案内と冷房制限 | 対象・理由・期限・解除状況を説明。クレジット／デビット／支払い手順の3区分。デモ選択式で実カード入力を設けない |
-| 企業原文 BIZ-23〜26 | 省エネ比較、MRV・Scope 2、任意オフセット | 基準・期間・係数・境界・品質を同じ場所で確認。省エネ・推定削減量・模擬償却・将来市場構想を別表示。オフセットは初期未選択 |
-| 制作方針 SRC-02 | 4役割、参考外観、共通ライブラリ、将来API接続 | 同じComponent・Icon・token・form規則を適用。業務データは非同期Repository経由 |
-| 参考モック SRC-05 | 配色・書体・余白・形状 | UX-04以降および参考デザイン分析のREF値へ準拠。読みやすさの補正はADAPTとして記録 |
+| 企業原文 BIZ-01〜03 | 利用開始・終了、多言語対応、音声AI | 認証がデモであることを明示する。翻訳キーですべての役割の表示を切り替える。音声は、入力・解釈・確認・応答の4段階に分け、テキストでも操作を完了できるようにする。初期言語をen/jaにするのは提案である |
+| 企業原文 BIZ-04・07・08 | 視覚的なダッシュボード、場所と状態の把握 | 選択中の物件・設備を常に分かるようにし、KPI(重要指標)から対象の一覧へ移動できるようにする。グラフには期間・単位・取得時刻と、表形式での代替表示を付ける |
+| 企業原文 BIZ-09〜11・17 | 赤・橙・緑による通知、部品の状態と原因の把握 | 色だけでなく文言やアイコンも併用する。通信状態と重要度は別々に表示する。窓の開放や断熱不足は、根拠を示した「原因の候補」として表示し、まだ推定にすぎないものを確定した原因のように表示しない |
+| 企業原文 BIZ-13〜16・19 | 遠隔操作、予定設定、位置・料金との連動、換気 | 現在の値と要求する値、設定の保存と模擬的な発火、要求中の状態と応答済みの状態を、それぞれ分けて表示する。対応できる能力と、対応できない理由を確認できるようにする |
+| 企業原文 BIZ-18 | CO₂・粉じん・湿度・アレルゲン | CO₂の濃度(ppm)と排出量(kgCO₂e)は、別の概念として表示する。アレルゲンについては、対象・出典・観測時刻・取得できたかどうかの状態を示し、未計測を0や「安全」に変換しない |
+| 企業原文 BIZ-21・22 | 支払いの案内と冷房の制限 | 対象・理由・期限・解除状況を説明する。クレジット・デビット・支払い手順の3種類に区分する。デモでは選択式にし、実際のカード番号を入力する欄は設けない |
+| 企業原文 BIZ-23〜26 | 省エネの比較、MRV(測定・報告・検証)・Scope 2、任意のオフセット | 基準・期間・係数・境界・データの品質を、同じ場所で確認できるようにする。省エネ量・推定削減量・模擬的な償却・将来の市場構想は、それぞれ別に表示する。オフセットは初期状態では未選択にする |
+| 制作方針 SRC-02 | 4つの役割、参考にした外観、共通ライブラリ、将来のAPI接続 | 同じComponent(部品)・Icon(アイコン)・token(共通の値)・formのルールを適用する。業務データは非同期のRepository(データ取得の仕組み)経由で扱う |
+| 参考モック SRC-05 | 配色・書体・余白・形状 | UX-04以降と、参考デザイン分析にあるREF(参照)値に従う。読みやすさのために補正した箇所はADAPT(調整)として記録する |
 
-画面別の原文補完ケースAT-*-SRCは、以下の共通ルールと合わせて検証します。モックで観察した機能を企業の必須要求へ追加する場合は、設計提案として理由・影響範囲を記録します。
+画面ごとに原文を補うケース(AT-*-SRC)は、以下の共通ルールと合わせて検証する。モックで見つかった機能を、企業にとって必須の要求に追加する場合は、設計上の提案として、その理由と影響範囲を記録する。
 
 ## UX-01. UIライブラリと取得元
 
-| 用途 | 標準・取得元 | プロジェクト内の使用ルール |
+| 用途 | 標準・取得元 | プロジェクト内での使用ルール |
 |---|---|---|
-| 基本UI | [shadcn/ui公式](https://ui.shadcn.com/docs) | 公式コンポーネントをshared/uiに取り込み管理する方式。ボタン、Dialog、Sheet、Tabs、Select、Popover等を共通化。独自の同等UIを役割別に作らない |
-| アイコン | [Lucide React公式](https://lucide.dev/guide/react) | lucide-reactから名前付きimport。標準16px、主要操作20px、強調24px。線幅1.75を標準（参考sidebarのSVGに合わせる）。装飾はaria-hidden、アイコンのみのボタンは名前必須 |
-| フォーム | [React Hook Form公式リポジトリ](https://github.com/react-hook-form/react-hook-form) | react-hook-formを標準とする。「reactForms」の解釈はDEC-03。入力状態はフォーム内で管理し画面stateへコピーしない |
-| スキーマ検証 | Zod + @hookform/resolvers | 入力schemaとDTO schemaを区別。ユースケースの必須・形式・条件分岐をschemaへ集約 |
-| データ取得・更新 | [TanStack Query公式](https://tanstack.com/query/latest/docs/framework/react/overview) | Repositoryへの非同期要求、キャッシュ、mutationを共通hookへ集約 |
-| 一覧・グラフ | TanStack Table / Recharts | 複雑な並替え・ページングや時系列グラフに使用。単純一覧は共通Table。グラフを独自描画し直さない |
-| 日付入力 | shadcn Calendar系 | 日付と時刻・タイムゾーンを別管理。表示書式はIntl、UTC変換を共通関数へ集約 |
-| 翻訳 | i18next + react-i18next | en/jaのキーを同時更新。通知テンプレート・音声デモ応答も同じ辞書体系 |
-| 検証 | Vitest、React Testing Library、Playwright、axe-core | ロジック・利用者操作・E2E・自動a11yで役割分担 |
+| 基本UI | [shadcn/ui公式](https://ui.shadcn.com/docs) | 公式のコンポーネントをshared/uiに取り込んで管理する方式にする。ボタン、Dialog(ダイアログ)、Sheet(シート)、Tabs(タブ)、Select(選択)、Popover(ポップオーバー)などを共通化する。役割ごとに、同じ役割のUIを独自に作らない |
+| アイコン | [Lucide React公式](https://lucide.dev/guide/react) | lucide-reactから名前付きでimportする。標準サイズは16px、主要な操作は20px、強調したいものは24pxとする。線の太さは1.75を標準とする(参考にしたsidebarのSVGに合わせる)。装飾用のアイコンにはaria-hiddenを付け、アイコンだけのボタンには名前(ラベル)を必ず付ける |
+| フォーム | [React Hook Form公式リポジトリ](https://github.com/react-hook-form/react-hook-form) | react-hook-formを標準とする。「reactForms」という言葉の解釈はDEC-03を参照する。入力の状態はフォームの中で管理し、画面のstateにコピーしない |
+| スキーマ検証 | Zod + @hookform/resolvers | 入力用のschemaと、DTO(データ転送)用のschemaを区別する。ユースケースごとの必須項目・形式・条件分岐は、schemaにまとめる |
+| データ取得・更新 | [TanStack Query公式](https://tanstack.com/query/latest/docs/framework/react/overview) | Repositoryへの非同期の要求、キャッシュ、更新(mutation)は、共通のhookにまとめる |
+| 一覧・グラフ | TanStack Table / Recharts | 複雑な並び替え・ページングや、時系列のグラフに使う。単純な一覧には共通のTableを使う。グラフを独自に描き直さない |
+| 日付入力 | shadcn Calendar系 | 日付と、時刻・タイムゾーンは別々に管理する。表示の書式はIntl(国際化API)を使い、UTC(協定世界時)への変換は共通の関数にまとめる |
+| 翻訳 | i18next + react-i18next | en(英語)/ja(日本語)のキーを同時に更新する。通知のテンプレートや、音声デモの応答文も、同じ辞書の仕組みを使う |
+| 検証 | Vitest、React Testing Library、Playwright、axe-core | ロジックの検証、利用者操作の検証、E2E(画面をまたぐ検証)、自動でのアクセシビリティ検証を、それぞれ役割分担する |
 
-公式資料の取得確認日: 2026-09-14。shadcn、Lucide、TanStack Queryは公式文書を確認。React Hook Formのガイド本文は取得できず公式リポジトリで確認。その他は本プロジェクトの採用候補であり、互換性・ライセンス・メンテナンス状況は実装開始時に確認する。バージョン番号を推測して固定しない。
+公式資料を取得して確認した日: 2026-09-14。shadcn、Lucide、TanStack Queryについては公式の文書を確認した。React Hook Formについては、ガイド本文を取得できなかったため、公式リポジトリで確認した。それ以外はこのプロジェクトでの採用候補であり、互換性・ライセンス・メンテナンス状況は、実装を始めるときに改めて確認する。バージョン番号を推測して固定しない。
 
-既存実装はない。導入時に1つの互換セットとlockfileを作り、採用版・ライセンスを記録する。同じ目的のUIキットやアイコンセットを追加しない。例外は必要機能、標準で足りない理由、負担、影響、置換可能性を決定記録に残す。セマンティックHTMLで足りる部分にライブラリを強制しない。
+現時点で既存の実装はない。導入するときに、1つの互換性が取れたセットとlockfile(バージョン固定ファイル)を作り、採用したバージョンとライセンスを記録する。同じ目的のUIキットやアイコンセットを、重ねて追加しない。例外を作る場合は、必要な機能、標準ライブラリで足りない理由、負担、影響、置き換えられるかどうかを、決定記録に残す。セマンティックHTML(意味の通ったHTML)だけで十分な部分に、無理にライブラリを使わせない。
 
-## UX-02. State・Effect・Contextの責任
+## UX-02. State・Effect・Contextの責任分担
 
-| 状態の種類 | 保管先 | 禁止する二重管理 |
+| 状態の種類 | 保管先 | やってはいけない二重管理 |
 |---|---|---|
-| Repository由来の設備・案件・請求・履歴 | TanStack Query cache | 取得結果をuseState/Context/Zustand等へ再コピー |
-| 検索・ソート・ページ・期間・選択物件 | URL search params（schema検証） | URLとローカルstateの双方向Effect同期 |
-| 入力値・dirty・validation・送信状態 | React Hook Form | 各入力をuseStateで再管理、独自エラー辞書 |
-| ダイアログ開閉など短命な局所状態 | コンポーネントのuseState、必要ならuseReducer | 全画面Contextへの格納 |
-| 絞込結果・合計・ボタン有効判定 | render時の純粋な導出関数 | 導出値をEffectで別stateに格納 |
-| テーマ・locale・セッション・Repository参照 | ライブラリProvider/小さなContext | テレメトリー等高頻度更新を巨大Contextに混在 |
-| 共有デモ業務データ | mock Repository内部 | 画面ごとのseed変更、Contextを疑似DBに使用 |
+| Repositoryから得られる設備・案件・請求・履歴のデータ | TanStack Query cache(キャッシュ) | 取得結果を、useState/Context/Zustandなどへ再度コピーすること |
+| 検索・並び替え・ページ・期間・選択中の物件 | URLのsearch params(検証つき) | URLと、ローカルのstateを、Effectで双方向に同期させること |
+| 入力値・変更されたかどうか(dirty)・入力検証・送信状態 | React Hook Form | 各入力項目を、それぞれuseStateで再度管理すること、独自のエラー辞書を作ること |
+| ダイアログの開閉のような、短い間だけ使う局所的な状態 | コンポーネント内のuseState、必要ならuseReducer | 画面全体のContextに格納すること |
+| 絞り込んだ結果・合計・ボタンを有効にするかの判定 | 描画時にその場で計算する純粋な関数 | 計算した結果を、Effectで別のstateに保存すること |
+| テーマ・言語(locale)・セッション・Repositoryへの参照 | ライブラリのProvider、または小さなContext | テレメトリー(利用状況の記録)など、頻繁に更新される値を、巨大なContextに混ぜること |
+| 共有するデモ用の業務データ | mock Repositoryの内部 | 画面ごとにseed(初期データ)を変えること、Contextを疑似データベースとして使うこと |
 
-Effectは外部システムへの同期が必要な場合に限定する。イベントに起因する保存はイベントハンドラー/mutationで実行し、依存配列を隠して動作を抑えない。React公式も不要なEffectを避ける考え方を説明している。[React公式: You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect)
+Effect(副作用)は、外部のシステムと同期する必要があるときだけに限定する。何かのイベントをきっかけに保存する処理は、イベントハンドラーやmutation(更新処理)の中で行い、依存配列を隠して動作を分かりにくくしない。React公式のドキュメントも、不要なEffectは避けるべきだという考え方を説明している。[React公式: You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect)
 
-許可例は購読/解除、メディアAPI、DOM外部widgetとの同期。理由とcleanupをセットにし、Strict Modeの再実行で二重登録しない。取得は原則Query hookへ。`useMemo`/`useCallback`は測定や参照安定性の必要がある場合に限定する。
+Effectを使ってよい例としては、購読と解除、メディアAPI、DOM外部のwidgetとの同期がある。使う理由とcleanup(後始末の処理)は必ずセットにし、Strict Mode(React開発時の二重実行モード)で再実行されても、二重に登録されないようにする。データの取得は、原則としてQueryのhookを使う。`useMemo`/`useCallback`は、測定によって必要性が確認できた場合や、参照の安定性が必要な場合にだけ使う。
 
 ```tsx
-// 方針例: 選択はURL、取得はQuery、表示用の変換は純粋な導出。
+// 方針例: 選択条件はURL、データ取得はQuery、表示用の変換は純粋な導出関数で行う。
 const filters = parseUnitFilters(searchParams);
 const unitsQuery = useUnits(filters);
 const visibleUnits = selectVisibleUnits(unitsQuery.data?.items ?? [], filters);
-// visibleUnitsを別stateへコピーするEffectは作らない。
+// visibleUnitsを別のstateへコピーするEffectは作らない。
 ```
 
-Contextはセッション等の配布に限定し、必要なProviderは許可する。「Context禁止」「useEffectゼロ」「useStateゼロ」を目的化しない。レビューでは保管先が1つか、外部同期が必要かを判断する。
+Contextは、セッション情報のように広く配布する必要があるものに限定する。必要なProviderは使ってよい。「Contextは禁止」「useEffectは0にする」「useStateは0にする」といったルール自体を目的にしない。レビューでは、保管先が1つにまとまっているか、外部との同期が本当に必要かを判断する。
 
-## UX-03. フォーム標準
+## UX-03. フォームの標準
 
-- `useForm`＋`zodResolver`を基本とし、ネイティブ入力はregister、制御型コンポーネントはControllerを必要箇所だけに使う。配列入力はuseFieldArray。
-- ラベル、必須/任意、説明、単位、エラー、disabled理由を共通Fieldで統一。placeholderだけをラベルにしない。
-- 初期値はschemaと一致させ、非同期読込後のresetは対象ID変更時または明示的再読込時に限る。バックグラウンド更新でdirty入力を上書きしない。
-- 初回検証はblur/submit、エラー後は修正時に再検証する方針。送信時は最初のエラーへフォーカスし、上部要約から該当項目へ移動できる。
-- 送信中は二重送信を抑制し、失敗時は値を保持。モックのVALIDATION結果はfieldErrorsへ、CONFLICT結果は競合案内へ変換する。
-- 点検ドラフト保存は未完了入力を許容、提出schemaは必須を満たす。完了状態のフォームを直接書き換えず新報告版を作る。
-- 温度・時間・金額は文字列から境界で変換。空文字を0にしない。許容範囲は能力・共通schemaから取得する。
-- 未保存で離脱する場合のみ破棄確認。通常の閲覧遷移には不要な確認を追加しない。
+- `useForm`と`zodResolver`を基本として使う。ネイティブな入力にはregisterを使い、制御されたコンポーネントには、必要な箇所だけControllerを使う。配列形式の入力にはuseFieldArrayを使う。
+- ラベル、必須か任意か、説明文、単位、エラー、disabled(無効)にしている理由は、共通のFieldコンポーネントで統一する。placeholder(入力欄の中の薄い文字)だけをラベル代わりにしない。
+- 初期値はschemaと一致させる。非同期でデータを読み込んだ後のresetは、対象IDが変わったときか、明示的に再読み込みしたときだけに限る。バックグラウンドでの更新によって、まだ保存していない入力(dirty)を上書きしない。
+- 最初の検証はフォーカスが外れたとき(blur)または送信時に行い、エラーが出た後は修正するたびに再検証する方針とする。送信時には最初のエラー項目にフォーカスを移し、上部のエラー要約から該当項目へ移動できるようにする。
+- 送信中は二重送信を防ぎ、送信に失敗した場合は入力値を保持する。モックのVALIDATION結果はfieldErrors(項目ごとのエラー)へ、CONFLICT結果は競合の案内へ変換する。
+- 点検の下書き保存では、まだ入力が完了していない状態も許可する。提出用のschemaでは必須項目をすべて満たす必要がある。すでに完了した状態のフォームを直接書き換えるのではなく、新しい報告として作り直す。
+- 温度・時間・金額は、文字列から数値へ変換するときに境界値を確認する。空文字を0として扱わない。許容範囲は、能力データや共通のschemaから取得する。
+- 保存していない内容があるまま画面を離れようとする場合だけ、破棄してよいか確認する。通常の閲覧のための画面遷移には、不要な確認を追加しない。
 
-## UX-04. 参考準拠のデザイントークン
+## UX-04. 参考デザインに準拠したデザイントークン
 
-唯一の値定義先は`src/shared/styles/tokens.css`。以下を本版の採用値とする。`REF`は取得ソースにある値、`ADAPT`は今回の要件のための明示的補正。根拠は[抽出証跡](../00-prepare/sources/reference-style-evidence.json)。
+値を定義する唯一の場所は`src/shared/styles/tokens.css`である。以下の値を、この版での採用値とする。`REF`は取得元のサイトにある値、`ADAPT`は今回の要件のために明示的に補正した値を表す。根拠は[抽出証跡](../00-prepare/sources/reference-style-evidence.json)を見てほしい。
 
-| semantic token | 採用値 | 根拠・用途 |
+| semantic token(意味づけされた値) | 採用する値 | 根拠・用途 |
 |---|---|---|
-| --color-primary / --color-primary-fg | #005BEA / #FFFFFF | REF 主ボタン、選択nav |
-| --color-primary-soft | #E6F0FF | REF アイコン枠、選択候補の背景 |
-| --color-primary-hover | rgb(0 91 234 / .90) | REF hover:bg-primary/90。背景と合成し固定の濃青へ勝手に変更しない |
-| --color-background / --color-surface / --color-surface-2 | #F8FBFF / #FFFFFF / #EDF6FF | REF ページ・カード・補助領域 |
-| --color-secondary / --color-secondary-fg | #EDF6FF / #0D2238 | REF secondary。ティール系を第2ブランド色にしない |
-| --color-text / --color-text-muted | #0D2238 / rgb(13 34 56 / .72) | REF 本文・説明 |
-| --color-text-subtle-reference / --color-text-subtle | rgb(13 34 56 / .50) / rgb(13 34 56 / .72) | REF値を残し、12px程度の意味あるラベルはADAPTで濃くする |
-| --color-hero / --color-hero-fg | #0D2238 / #FFFFFF | REF 主要サマリー、補助文字は白72%へADAPT |
-| --color-border / --color-input-border | #D6E4F5 / #71849A | 装飾REF、入力境界はADAPTで視認性を補強 |
-| --color-success-accent / --color-success / --color-success-soft | #059669 / #166534 / #DCFCE7 | REF装飾・背景、文字はADAPT |
-| --color-critical-accent / --color-critical / --color-critical-soft | #FF4757 / #B91C1C / #FFE5E9 | REF装飾・背景、文字はADAPT |
-| --color-warning / --color-warning-soft | #9A3412 / #FFEDD5 | REF、オレンジ系の注意 |
-| --color-unknown / --color-unknown-soft | #475569 / #EDF6FF | ADAPT、不明/欠測を正常色にしない |
-| --color-focus | #005BEA | REF 2px outline＋2px offset。ボタンは補助ring3px/50% |
-| --chart-series-1〜4 | #005BEA / #0D2238 / #7C3AED / #9A3412 | ADAPT、1/2はブランド色。色＋線種＋凡例 |
+| --color-primary / --color-primary-fg | #005BEA / #FFFFFF | REF 主要ボタン、選択中のnav(ナビゲーション) |
+| --color-primary-soft | #E6F0FF | REF アイコンの枠、選択候補の背景 |
+| --color-primary-hover | rgb(0 91 234 / .90) | REF hover:bg-primary/90。背景と合成した値であり、勝手に別の固定の濃い青に変えない |
+| --color-background / --color-surface / --color-surface-2 | #F8FBFF / #FFFFFF / #EDF6FF | REF ページ全体・カード・補助領域の背景 |
+| --color-secondary / --color-secondary-fg | #EDF6FF / #0D2238 | REF secondary(第2の色)。ティール系の色を第2ブランドカラーにしない |
+| --color-text / --color-text-muted | #0D2238 / rgb(13 34 56 / .72) | REF 本文・補足説明の文字色 |
+| --color-text-subtle-reference / --color-text-subtle | rgb(13 34 56 / .50) / rgb(13 34 56 / .72) | REFの値は残しつつ、12px程度で意味のあるラベルには、より濃いADAPTの値を使う |
+| --color-hero / --color-hero-fg | #0D2238 / #FFFFFF | REF 主要なサマリー領域。補助的な文字は白72%にADAPT |
+| --color-border / --color-input-border | #D6E4F5 / #71849A | 装飾目的の枠線はREF、入力欄の枠線は視認性を高めるためADAPT |
+| --color-success-accent / --color-success / --color-success-soft | #059669 / #166534 / #DCFCE7 | 装飾・背景はREF、文字色はADAPT |
+| --color-critical-accent / --color-critical / --color-critical-soft | #FF4757 / #B91C1C / #FFE5E9 | 装飾・背景はREF、文字色はADAPT |
+| --color-warning / --color-warning-soft | #9A3412 / #FFEDD5 | REF、オレンジ系の注意を表す色 |
+| --color-unknown / --color-unknown-soft | #475569 / #EDF6FF | ADAPT、不明・欠測を正常な色として見せない |
+| --color-focus | #005BEA | REF 2pxのoutline(輪郭線)と2pxのoffset(余白)。ボタンには補助的に3px/50%のringを使う |
+| --chart-series-1〜4 | #005BEA / #0D2238 / #7C3AED / #9A3412 | ADAPT、1番目と2番目はブランドカラー。色だけでなく線の種類と凡例も併用する |
 
-| 分類 | tokenと値 | 使用規則 |
+| 分類 | tokenと値 | 使用のルール |
 |---|---|---|
-| 本文font | --font-sans: "Plus Jakarta Sans", "Noto Sans JP", system-ui, sans-serif | REF英数字、ADAPT日本語fallback。font-display:swap |
-| ID/コードfont | --font-mono: "Geist Mono", ui-monospace, monospace | REF。契約ID/機器serialに限定 |
-| 任意display font | --font-display: "Bricolage Grotesque", var(--font-sans) | REF定義はあるが業務h1の標準には使わない |
-| 文字サイズ | --text-xs:12px / sm:14px / base:16px / lg:18px / xl:20px / 2xl:24px / 3xl:30px / 5xl:48px / 6xl:60px | REF scale。本文14〜16px、重要説明は12px以上。5xl/6xlはhero数値だけ |
-| 行高 | xs:16px / sm:20px / base:24px / 2xl:32px / 3xl:36px / hero:1 | REF。日本語長文はbody1.6へADAPT |
-| 太さ・字間 | normal400 / medium500 / semibold600 / bold700、KPI数値-.01em | REF。英語短いlabelのみ.12em、和文へuppercase/広い字間を適用しない |
-| 余白 | --space-1〜8:4/8/12/16/20/24/28/32px、--space-12:48px | REF 4px基準。カード内16/20px、hero24→28px |
-| 角丸 | --radius-control:10px / --radius-card:14px / --radius-nav:16px / --radius-small:6px | REF。rounded-lg=16、rounded-xl=14の実値を保持 |
-| 影 | --shadow-card:0 14px 34px rgba(13,34,56,.055) | REF。1px白70%ring、border90%と組合せ可能 |
-| ボタン影 | --shadow-action:0 10px 22px rgba(0,91,234,.18) / hover:0 14px 30px rgba(0,91,234,.24) | REF primaryだけ。全カードをhover浮上させない |
-| 動き | --duration-normal:200ms、--ease-out:cubic-bezier(0,0,.2,1) | REF hover y=-2px、press y=1px/scale=.985。reduced-motionでは移動なし |
-| 内容幅 | --content-max:1152px | REF max-w-6xl=72rem。margin-inline:autoは参考HTMLにないため自動追加しない |
-| sidebar | --sidebar-width:240px / --sidebar-width-icon:56px | REF画面inline。ライブラリ既定256/48pxを使わない |
-| breakpoint | sm640 / md768 / lg1024 / xl1280px | REF。nav切替はxl、KPIはmd、補助領域はlg |
-| 層 | --z-sidebar:10 / --z-header:30 / --z-modal:50 / --z-toast:60 | 前2つREF、後2つADAPT。重なりとfocusを共通管理 |
+| 本文用フォント | --font-sans: "Plus Jakarta Sans", "Noto Sans JP", system-ui, sans-serif | 英数字部分はREF、日本語のfallback(代替フォント)はADAPT。font-display:swapを指定する |
+| ID・コード用フォント | --font-mono: "Geist Mono", ui-monospace, monospace | REF。契約IDや機器のシリアル番号など、限られた用途に使う |
+| 任意で使うdisplay用フォント | --font-display: "Bricolage Grotesque", var(--font-sans) | REFとして定義はあるが、業務画面のh1見出しの標準としては使わない |
+| 文字サイズ | --text-xs:12px / sm:14px / base:16px / lg:18px / xl:20px / 2xl:24px / 3xl:30px / 5xl:48px / 6xl:60px | REFのscale(段階)。本文は14〜16px、重要な説明は12px以上とする。5xl/6xlはhero(目立つ数値)だけに使う |
+| 行の高さ | xs:16px / sm:20px / base:24px / 2xl:32px / 3xl:36px / hero:1 | REF。日本語の長文にはADAPTとして行間1.6を使う |
+| 太さ・字間 | normal400 / medium500 / semibold600 / bold700、KPI(重要指標)の数値は-.01em | REF。短い英語のラベルだけ.12emとし、和文には大文字化(uppercase)や広い字間を適用しない |
+| 余白 | --space-1〜8:4/8/12/16/20/24/28/32px、--space-12:48px | REF 4px刻み。カード内は16/20px、hero部分は24px→28px |
+| 角丸 | --radius-control:10px / --radius-card:14px / --radius-nav:16px / --radius-small:6px | REF。rounded-lg=16、rounded-xl=14という実際の値を保持する |
+| 影 | --shadow-card:0 14px 34px rgba(13,34,56,.055) | REF。1pxの白70%のring(枠)や、border90%との組み合わせも可能 |
+| ボタンの影 | --shadow-action:0 10px 22px rgba(0,91,234,.18) / hover:0 14px 30px rgba(0,91,234,.24) | REF、primaryのボタンだけに使う。すべてのカードをhover時に浮き上がらせない |
+| 動き | --duration-normal:200ms、--ease-out:cubic-bezier(0,0,.2,1) | REF hover時はy=-2px、press(押下)時はy=1px/scale=.985。reduced-motion(動きを減らす設定)のときは移動させない |
+| 内容の幅 | --content-max:1152px | REF max-w-6xl=72rem。参考にしたHTMLにはmargin-inline:autoの指定がないため、自動で追加しない |
+| サイドバー | --sidebar-width:240px / --sidebar-width-icon:56px | REFの画面にあるinlineの値。ライブラリの初期値である256/48pxは使わない |
+| ブレークポイント(画面幅の切り替え) | sm640 / md768 / lg1024 / xl1280px | REF。nav(ナビ)の切り替えはxl、KPIの表示切り替えはmd、補助領域の切り替えはlgとする |
+| 重なりの層 | --z-sidebar:10 / --z-header:30 / --z-modal:50 / --z-toast:60 | 前の2つはREF、後ろの2つはADAPT。要素の重なりとフォーカスをまとめて管理する |
 
-shadcnの`--primary`/`--background`/`--card`/`--muted`/`--border`を上記へマッピングする。参考の.bg-backgroundは白、ページ.bg-bgは薄青なので、両者を1つのtokenに統合しない。raw値はこの表と生成元だけに置き、各画面ではsemantic tokenを参照する。
+shadcnの`--primary`/`--background`/`--card`/`--muted`/`--border`は、上記の値に対応づける。参考ページの.bg-backgroundは白で、.bg-bgは薄い青なので、この2つを1つのtokenにまとめない。生の色の値は、この表と生成元だけに置き、各画面ではsemantic token(意味づけされた値)を参照する。
 
-fontは公式配布のライセンスを確認してローカル配信する。参考のハッシュ付きwoff2を恒久hotlinkしない。日本語fontは参照サイトの確認値ではなく追加設計。dark modeとブランドロゴの複製は今回の標準に含めない。
+フォントは、公式配布のライセンスを確認したうえでローカル配信する。参考サイトにあるハッシュ付きのwoff2ファイルへ、恒久的にリンク(hotlink)しない。日本語フォントは、参照サイトで確認した値ではなく、追加で設計する。ダークモードとブランドロゴの複製は、今回の標準には含めない。
 
 ## UX-05. コンポーネントの共通契約
 
-| 共通コンポーネント | 受け取る情報 | 規則 |
+| 共通コンポーネント | 受け取る情報 | ルール |
 |---|---|---|
-| AppShell / RoleNavigation | role、許可ルート、表示名 | ナビ表示とサービス認可は両方必要。現在位置をaria-currentで表現 |
-| MetricCard / TelemetryValue | value/null、unit、origin、quality、observedAt、isDemo | 未計測は「— 未計測」。デモ・推定・更新時刻を隠さない |
-| StatusBadge | domain、status、labelKey | 設備・通信・案件・請求の状態名を別辞書で管理。色だけで区別しない |
-| DataTable | columns、rows、sort、pagination、rowAction | キーボードとモバイルで操作可能。大量表はページング。操作は行クリックのみに依存しない |
-| TimeSeriesChart | series、unit、quality、period | 欠測を線で連結せず、数値表と凡例を併設。二軸は単位を明示 |
-| CommandPanel | capability、observedState、pendingCommand、permission | 要求中を成功トーストで上書きしない。非対応理由を表示 |
-| ConfirmActionDialog | target、action、impact、reason、onConfirm | 制限・解除・試運転・FW・音声変更に共通。初期フォーカスは安全な選択 |
-| AsyncBoundary / EmptyState | status、messageKey、retryAction | 永続的なエラーを一時トーストだけにしない |
-| AuditTimeline / NotificationPreview | actor、time、action、result、correlationId | 「プレビュー・未送信」を表示。既読と業務完了を区別 |
+| AppShell / RoleNavigation | role(役割)、許可されたルート、表示名 | ナビの表示と、サービスの利用可否の両方を確認する。現在いる場所はaria-currentで表現する |
+| MetricCard / TelemetryValue | value(値)/null、unit(単位)、origin(出所)、quality(データの品質)、observedAt(観測時刻)、isDemo(デモかどうか) | 未計測の場合は「— 未計測」と表示する。デモであること・推定であること・更新時刻を隠さない |
+| StatusBadge | domain(分類)、status(状態)、labelKey(表示名のキー) | 設備・通信・案件・請求の状態名は、それぞれ別の辞書で管理する。色だけで区別しない |
+| DataTable | columns(列)、rows(行)、sort(並び替え)、pagination(ページ分割)、rowAction(行の操作) | キーボードでもモバイルでも操作できるようにする。件数が多い表はページングする。行をクリックする操作だけに頼らない |
+| TimeSeriesChart | series(系列)、unit(単位)、quality(データの品質)、period(期間) | 欠測を線でつなげない。数値の表と凡例を併せて表示する。2軸を使う場合は単位を明示する |
+| CommandPanel | capability(能力)、observedState(観測された状態)、pendingCommand(処理中の操作)、permission(権限) | 要求中の状態を、成功トーストで上書きしない。対応できない理由を表示する |
+| ConfirmActionDialog | target(対象)、action(操作内容)、impact(影響)、reason(理由)、onConfirm(確定時の処理) | 制限・解除・試運転・ファームウェア更新・音声設定の変更など共通して使う。初期フォーカスは安全な選択肢に置く |
+| AsyncBoundary / EmptyState | status(状態)、messageKey(メッセージのキー)、retryAction(再試行の操作) | 持続的なエラーを、一時的なトーストだけで済ませない |
+| AuditTimeline / NotificationPreview | actor(操作した人)、time(時刻)、action(操作内容)、result(結果)、correlationId(相関ID) | 「プレビュー・未送信」であることを表示する。既読になったことと、業務が完了したことを区別する |
 
-UI primitivesは業務Repositoryを呼ばない。業務コンポーネントはtyped propsとcallbackを受け、データ取得はfeature hookへ。役割の違いは権限や表示データで表し、コピーした同一コンポーネントを4つ保守しない。
+UI primitives(基本部品)は、業務用のRepositoryを直接呼び出さない。業務用のコンポーネントは、型のついたpropsとcallback(呼び出し関数)を受け取り、データの取得はfeature hook(機能ごとのhook)に任せる。役割による違いは、権限や表示するデータで表現し、同じコンポーネントをコピーして4つ保守するようなことはしない。
 
 ## UX-06. 操作・言語・アクセシビリティ
 
-グラフや状態カードは概要から根拠・詳細へ進める。期間・組織・単位は常に分かる位置に表示する。成功、保留、失敗を明確にし、エラーには次の行動を添える。破壊的操作の直後に「元に戻す」を出す場合も実際に取り消せるものだけにする。
+グラフや状態を示すカードは、概要から根拠・詳細へと段階的に確認できるようにする。期間・組織・単位は、常に分かる位置に表示する。成功・保留・失敗の状態を明確にし、エラーには次にすべき行動を添える。破壊的な操作の直後に「元に戻す」ボタンを出す場合も、実際に取り消せる操作のときだけにする。
 
-英語・日本語のキー、複数形、長い翻訳を検証する。時刻はIntl.DateTimeFormat、金額はIntl.NumberFormatで整形し、予約にはタイムゾーンを表示する。言語変更で測定単位や保存UTCを勝手に変えない。音声デモは文字起こし・対象・操作内容を確認してから通常Commandへ渡す。
+英語・日本語のキー、複数形の扱い、長い翻訳文をきちんと検証する。時刻はIntl.DateTimeFormat、金額はIntl.NumberFormatを使って整形し、予約にはタイムゾーンを表示する。言語を変更しても、測定単位や、保存するUTC(協定世界時)の値を勝手に変えない。音声によるデモは、文字起こし・対象・操作内容を確認したうえで、通常のCommand(操作)として処理する。
 
-WCAG 2.2 AAを設計目標とする。通常文字のコントラスト4.5:1、大きな文字3:1、操作対象の識別・フォーカスの視認性を検証する。これは適合保証ではなく実装時の検査基準。[W3C公式クイックリファレンス](https://www.w3.org/WAI/WCAG22/quickref/)
+WCAG 2.2 AAという基準を設計の目標とする。通常の文字はコントラスト比4.5:1以上、大きな文字は3:1以上とし、操作対象が見分けられるか、フォーカスの位置が見えるかを検証する。これは「基準に適合していると保証するもの」ではなく、実装時に検査するための基準である。[W3C公式クイックリファレンス](https://www.w3.org/WAI/WCAG22/quickref/)
 
-プロジェクトの操作領域目標は44×44px。キーボードで主要シナリオを完遂し、Dialogを閉じると呼出元へフォーカスを戻す。重大エラーは適切なlive regionで通知し、テレメトリー更新を毎回読み上げない。ブラウザ拡大200%、360px幅、スクリーンリーダーでフォームと状態を確認する。
+このプロジェクトでの操作領域の目標は44×44pxである。キーボードだけで主要なシナリオを完了できるようにし、Dialog(ダイアログ)を閉じたときは呼び出し元にフォーカスを戻す。重大なエラーは、適切なlive region(読み上げ対象の領域)で通知し、テレメトリー(利用状況データ)の更新のたびに読み上げさせない。ブラウザの200%拡大、360px幅、スクリーンリーダーでの操作も確認する。
 
 ## UX-07. UIレビューの合格条件
 
-- ライブラリ取得元・採用版と共通componentの場所を報告し、重複キットを追加していない。
-- フォーム、Query、URL、局所stateの責務が分かれ、Effectごとに外部同期の理由がある。
-- 色・フォント・サイズ・余白のtoken参照を確認し、状態色に文字とアイコンがある。
-- loading/empty/error/forbidden/offline/staleと送信失敗時の入力保持を確認する。
-- スマホ、キーボード、日英切替、欠測、長文、音声代替を含め検証し、未実施を明記する。
-- 機器確認前の成功表示、実取引と誤認する表現、CO₂単位混同、既読で異常解消がない。
+- ライブラリの取得元・採用したバージョンと、共通コンポーネントの置き場所を報告し、重複するキットを追加していないこと。
+- フォーム、Query、URL、局所的なstateの役割分担ができていて、Effectを使う場合は、それぞれ外部と同期する理由があること。
+- 色・フォント・サイズ・余白がtokenを参照していることを確認し、状態を表す色には文字とアイコンも併用されていること。
+- loading(読込中)/empty(空)/error(エラー)/forbidden(禁止)/offline(オフライン)/stale(古い状態)の各表示と、送信に失敗したときに入力内容が保持されることを確認すること。
+- スマートフォン、キーボード操作、日英の切り替え、データの欠測、長い文章、音声の代替手段を含めて検証し、まだ実施していない項目は明記すること。
+- 機器の確認が終わる前に成功と表示すること、実際の取引と誤解させる表現、CO₂の単位の混同、既読にしただけで異常が解消したように見せることがないこと。
 
-## UX-08. 参考準拠の画面パターンと検収
+## UX-08. 参考デザインに準拠した画面パターンと検収
 
-ワイヤフレームは作らず、再利用可能な構成規則を定義する。各役割の詳細設計にpatternを明記する。
+ワイヤフレームは作らず、繰り返し使える構成のルールを定義する。各役割の詳細設計には、使用するpattern(パターン)を明記する。
 
-| Pattern ID | 構成・寸法規則 | 主な用途 |
+| Pattern ID | 構成・寸法のルール | 主な用途 |
 |---|---|---|
-| UI-OVERVIEW | タイトル24→30px＋説明14px、必要なら濃色hero、KPI2→4列、下部カード。page padding x16/y24→x32/y32（xl） | 各役割dashboard |
-| UI-LIST | 同じshell、見出し＋操作、検索/絞込、白カードの一覧、件数/ページング、詳細導線 | 設備・案件・請求・デバイス |
-| UI-DETAIL | 主要情報カードと関連履歴。lg以上はminmax(0,1fr)+320px、gap20px。小画面は縦並び | 設備・案件・請求詳細 |
-| UI-FORM | 白カード内の14px label/16px input、意味ごとのsection、欄間16px、主操作と取消。エラー要約 | 場所、報告、方針、契約 |
-| UI-ANALYSIS | 共通KPI、単位・期間、chart＋数値table、根拠/品質card | 電力、空気環境、MRV |
-| UI-TIMELINE | 白カード、行py12px、左に事象と時刻、右に結果badge。長いIDは折返し | 監査・案件履歴 |
+| UI-OVERVIEW | タイトル24px→30px+説明文14px、必要に応じて濃い色のhero(目立つ領域)、KPI(重要指標)は2列→4列、下部にカードを配置。ページの余白はx16/y24→x32/y32(xl幅のとき) | 各役割のdashboard(ダッシュボード) |
+| UI-LIST | 同じ枠組みを使い、見出し+操作、検索・絞り込み、白いカードでの一覧、件数・ページング、詳細への導線を配置 | 設備・案件・請求・デバイスの一覧 |
+| UI-DETAIL | 主要な情報のカードと、関連する履歴を配置。lg以上の画面幅ではminmax(0,1fr)+320pxの構成で、間隔(gap)は20px。小さい画面では縦に並べる | 設備・案件・請求の詳細画面 |
+| UI-FORM | 白いカードの中に14pxのlabel(ラベル)/16pxのinput(入力欄)を配置し、意味のまとまりごとにsection(区画)を分ける。欄と欄の間は16px、主操作ボタンと取消ボタンを配置し、エラーの要約も表示する | 場所、報告、方針、契約の入力画面 |
+| UI-ANALYSIS | 共通のKPI、単位・期間の表示、グラフと数値の表、根拠・データ品質のカードを配置 | 電力、空気環境、MRVの分析画面 |
+| UI-TIMELINE | 白いカードの中に、1行あたりpy12pxで、左に出来事と時刻、右に結果を示すbadge(バッジ)を配置。長いIDは折り返す | 監査ログ・案件の履歴画面 |
 
-PC navは1280px以上で固定左、未満は上部header＋Sheet。drawerは背景スクロールを止め、Escで閉じ、選択後に閉じて遷移先見出しへfocus。roleが違っても色やfont体系を変更せず、メニューと権限・主要指標で区別する。
+PC向けのnav(ナビゲーション)は、1280px以上の画面幅では左側に固定表示し、それ未満では上部のheader(ヘッダー)とSheet(引き出しメニュー)で表示する。drawer(引き出し)は、開いている間は背景のスクロールを止め、Escキーで閉じられるようにし、選択した後は閉じて遷移先の見出しにフォーカスを移す。役割が違っても、色やフォントの体系は変えず、メニューの内容と権限・主要な指標の違いで区別する。
 
-業務画面の読みやすさ・操作性のための採用規則をADAPTとして記録する。360px、768px、1024px、1279px、1280px、1440pxで幅・折返し・nav境界を検証する。入力を含む業務画面では44px操作領域を優先し、参考の28px操作をそのままコピーしない。
+業務画面での読みやすさ・操作性のために採用したルールは、ADAPT(調整)として記録する。360px、768px、1024px、1279px、1280px、1440pxの画面幅で、レイアウトの幅・折り返し・ナビの切り替え境界を検証する。入力を伴う業務画面では、44pxの操作領域を優先し、参考にしたページにある28pxの操作領域をそのままコピーしない。
 
-検収はtoken値、font適用、card radius14px、sidebar240/56px、breakpoint、主要componentをDOM/computed styleで確認し、実装のスクリーンショットを記録する。参照ページとのpixel比較は参照側の描画基準を別途取得できた場合に実施し、未実施を合格としない。
+検収では、tokenの値、フォントの適用状況、カードの角丸14px、サイドバーの幅240/56px、ブレークポイント、主要なコンポーネントを、DOM(画面の構造)やcomputed style(実際に適用されているスタイル)で確認し、実装したときのスクリーンショットを記録する。参照ページとのピクセル単位の比較は、参照ページ側の描画基準を別途取得できた場合にだけ行う。行っていない場合を、行ったこととして合格にしない。

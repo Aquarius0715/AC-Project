@@ -1,21 +1,21 @@
 # Agentic SDLC 成果物テンプレート
 
-以下はコピー用。空欄の承認や実行結果を補完して作り上げない。状態は以下の対象別schemaを使用する。
+以下はコピーして使うためのテンプレートである。空欄になっている承認結果や実行結果を、事実に基づかずに埋めて完成させたことにしない。状態を表す値は、対象ごとに決まった以下のschema(型の定義)を使う。
 
 ## 状態schema
 
-| 対象 | フィールドと許容値 | 完了・遷移規則 |
+| 対象 | フィールドと許容される値 | 完了・状態遷移のルール |
 |---|---|---|
-| タスク | task_status: planned/ready/in_progress/in_review/done/blocked | planned→readyは依存・受入subcase・仕様baseline確認後。doneは必要ゲートpassedと証跡が必要 |
-| 試験 | test_result: not_run/passed/failed/blocked | 実行なしはnot_run、期待値不明・環境不足はblocked。実結果と全subcaseから判定 |
-| ゲート | gate_result: pending/passed/failed/blocked/stale | 未判定pending。関連仕様変更で過去passedはstaleとして再判定対象にする |
-| 証跡有効性 | evidence_status: current/stale | 過去試験の実結果を改変せず、現行仕様への適用可否を分離 |
-| 指摘 | finding_status: open/in_progress/resolved | 修正と再検証を確認してresolved |
-| 決定 | decision_status: open/proposed/accepted/rejected/superseded | acceptedには実在するdecided_by/at/answerが必要。提案の実装許可と業務承認を混同しない |
+| タスク | task_status: planned(計画中)/ready(着手可能)/in_progress(作業中)/in_review(レビュー中)/done(完了)/blocked(保留) | plannedからreadyに進むのは、依存関係・受入subcase・仕様baselineを確認した後。doneにするには、必要なゲートがpassed(合格)になっていて、証跡があること |
+| 試験 | test_result: not_run(未実行)/passed(合格)/failed(不合格)/blocked(保留) | 実行していなければnot_run。期待値が不明、または環境が足りない場合はblocked。実際の結果とすべてのsubcaseから判定する |
+| ゲート | gate_result: pending(判定待ち)/passed(合格)/failed(不合格)/blocked(保留)/stale(古くなった) | 未判定はpending。関連する仕様が変わった場合、過去にpassedだったものもstaleとして扱い、再判定の対象にする |
+| 証跡の有効性 | evidence_status: current(現行)/stale(古くなった) | 過去に行った試験の実際の結果は書き換えず、それが今の仕様にも当てはまるかどうかを別に管理する |
+| 指摘 | finding_status: open(未対応)/in_progress(対応中)/resolved(解決済み) | 修正されたことと、再検証されたことを確認してからresolvedにする |
+| 決定 | decision_status: open(未対応)/proposed(提案中)/accepted(承認済み)/rejected(却下)/superseded(別の決定に置き換え) | acceptedにするには、実際にdecided_by(決定した人)/at(日時)/answer(回答)が必要。提案の実装を許可することと、業務としての承認を混同しない |
 
-文書front matterのdraft/proposed等は文書状態であり、この実行schemaの対象外。異なる状態種別を単一status列で集計しない。
+文書のfront matter(先頭のメタデータ)にあるdraft/proposedなどは、文書自体の状態を表すものであり、この実行用のschemaとは別のものである。異なる種類の状態を、1つのstatus列にまとめて集計しない。
 
-## タスク入力（オーケストレーション→担当）
+## タスク入力(オーケストレーションエージェント→担当エージェント)
 
 ```yaml
 task_id: AC-000
@@ -41,7 +41,7 @@ deliverables: []
 completion_criteria: []
 ```
 
-## 引き継ぎ（全エージェント）
+## 引き継ぎ(すべてのエージェント共通)
 
 ```yaml
 task_id: AC-000
@@ -106,7 +106,7 @@ finding_status: open
 retest_evidence: null
 ```
 
-指摘優先度: P0=越権・実処理誤発火・重大なデータ破壊、P1=必須フロー/状態・重要a11yの欠陥、P2=代替可能な軽微不具合、P3=改善提案。これは要件の実装優先度とは別。P0/P1未解決で合格にしない。
+指摘の優先度: P0=権限を超えた操作・実際の処理の誤発火・重大なデータ破壊、P1=必須の操作の流れや状態に関わる欠陥・重要なアクセシビリティの欠陥、P2=代わりの方法がある軽い不具合、P3=改善の提案。この優先度は、要件そのものの実装優先度とは別のものである。P0/P1が未解決のままでは合格にしない。
 
 ## 人への判断依頼・決定記録
 
@@ -129,7 +129,7 @@ decided_at: null
 decision_status: open
 ```
 
-## 仕様baseline・変更影響とゲート記録
+## 仕様baseline・変更の影響とゲート記録
 
 ```yaml
 gate_id: G1
@@ -144,12 +144,12 @@ invalidated_acceptance_ids: []
 supersedes_evidence: []
 ```
 
-spec_baseline_idはspec_files（path/sha256をpath順で固定したmanifest）のハッシュ。document_versionだけで同一仕様と判断しない。未コミット差分を含む実ファイルをハッシュ化し、manifestそのものも成果物に保存する。指示原記録が未収録ならその事実をassumptionsへ残す。存在しない原記録のハッシュを作らない。
+spec_baseline_idとは、spec_files(pathとsha256をpathの順番で並べて固定したmanifest、つまりファイル一覧)から計算したハッシュ値である。document_version(文書のバージョン番号)が同じというだけで、同じ仕様だと判断してはいけない。まだコミットしていない差分を含めて実際のファイルをハッシュ化し、そのmanifest自体も成果物として保存する。指示の元になった記録が収録されていない場合は、その事実をassumptions(仮定)として残す。存在しない元記録について、架空のハッシュを作らない。
 
-仕様を変更したら、オーケストレーションが変更FR/DD/AT/DECから追跡表・操作カタログ・task dependenciesを逆引きし、影響タスク・試験・ゲートを列挙する。共通schema・状態遷移・権限の変更は全参照タスクが対象。過去の実行結果は保持し、証跡をstale、影響ゲートをstale、完了タスクをready（依存未解決ならblocked）、現行baselineの該当試験をnot_runへ戻す。無関係なタスクまで再実行しない。
+仕様を変更したときは、オーケストレーションエージェントが、変更されたFR/DD/AT/DECから追跡表・操作カタログ・タスクの依存関係を逆にたどり、影響を受けるタスク・試験・ゲートを洗い出す。共通のスキーマ・状態遷移・権限に関する変更は、それを参照しているすべてのタスクが対象になる。過去の実行結果はそのまま保持したうえで、証跡をstale(古い)、影響するゲートをstale、完了していたタスクをready(依存関係が未解決ならblocked)に戻し、現在のbaselineに対応する試験をnot_run(未実行)に戻す。無関係なタスクまで再実行する必要はない。
 
-例: 実装差分なしでFR-A09の解除条件を変更した場合も、AT-A09とS03、関連する請求・制限タスクのG1/G3/G4を再判定する。旧結果は旧spec_baseline_idに残し、同じ実装revisionの新試験でも新しい期待値とbaselineを記録する。再開時はowned_files、現在差分、spec_baseline_idを再確認し、途中の担当変更を引き継ぎへ残す。
+例: 実装の差分がなくても、FR-A09の解除条件を変更した場合は、AT-A09とS03、および関連する請求・制限のタスクについて、G1/G3/G4を再判定する。以前の結果は古いspec_baseline_idのまま残しておき、同じ実装revision(版)であっても、新しい試験では新しい期待値とbaselineを記録する。作業を再開するときは、owned_files(担当ファイル)・現在の差分・spec_baseline_idを再確認し、途中で担当者が変わった場合はその旨を引き継ぎに残す。
 
 ## 完了報告
 
-対象・変更理由、実装した画面/操作、実施した検証と未実施、デモ/未実装/実接続済みの区別、仮定・未決、次の意思決定、将来のAPI接続に備えたadapter差替え箇所を記載する。文書のみのタスクならビルド成功やデモ完成を主張しない。
+対象の内容と変更した理由、実装した画面や操作、実施した検証と実施していない検証、デモ用・未実装・実際に接続済みのものの区別、仮定や未決事項、次に必要な意思決定、将来API接続をする際に差し替える予定の箇所を記載する。文書だけを作るタスクの場合、ビルドが成功したことやデモが完成したことを主張しない。
