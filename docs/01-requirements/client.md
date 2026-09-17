@@ -1,6 +1,6 @@
 ---
 document_id: REQ-C
-version: 0.20.0
+version: 0.21.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # クライアント 要件定義書
 
-**0.20.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.21.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 目的と前提
 
@@ -348,6 +348,6 @@ WhatsApp・メールの案内から、テスト用のクレジットカード、
 
 2026-09-16承認反映: FR-C01/C06: today/7d/30dは表示timezoneの暦日と完了分を使用する（SR17）。FR-C13: 模擬offsetの失敗再試行は同一記録・失敗段階のみ（SR18）。
 
-現行0.20.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.21.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 案件一覧には状態（業務順）・重大度・期限の昇順/降順ソートを設ける。デフォルトは状態の業務順（IR34）。全対象を並べ替えてからページ分割し、言語切替では順序を変えない。受入はAT-REV16-005を併用する。

@@ -1,6 +1,6 @@
 ---
 document_id: TEST-PLAN
-version: 0.20.0
+version: 0.21.0
 status: planned-not-executed
 owner: test-agent
 scope: frontend-demo-1A
@@ -221,3 +221,7 @@ HTTP 400/401/403/404/409/429/500は1Aでは実通信しない。DomainError VALI
 ## 0.19.0独立レビュー（REV19）の追加検収
 
 [追加受入計画](acceptance-review-019.csv)のAT-REV19-001〜042を既存ATと合わせて検証する。demoSeedの省略形式はIR91の規則で正規DTOへ展開し、受入ごとの固定差分は[fixture-contract.json](fixture-contract.json)の`acceptancePatches`（IR85）を使う。作業窓の開始前・終了時の技術者画面（IR76/IR89）、シミュレーターの複写条件（IR77）、管理ダッシュボードの省エネ予想（IR78）、再取得中の表示（IR83）を含む。AT-REV18-013①の「permission-denied表示（開始時刻の案内）」はIR76のwork-not-started状態で判定し、AT-REV18-019はIR78のenergyForecastで判定する。全ケースのアプリ実行はnot_run。
+
+## 0.21.0 独立G1指摘の追加検収
+
+[AT-G121-001〜005](acceptance-review-021.csv)を既存受入と合わせて全件確認する。A12の継続時間はIR103の通常tickで59秒/60秒を分ける。通知のtype/severity、アレルゲンのQuery再取得、通知fixtureのscopeVersionAtCreationを含む。文書検証器・変異テストの成功はアプリ受入の実行結果ではない。

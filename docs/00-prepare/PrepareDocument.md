@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.20.0
+version: 0.21.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -244,3 +244,5 @@ updated: 2026-09-17
 0.17.0の独立レビュー（FRV）で採用した可逆的な設計提案は[DEC-19〜24](internal/review-decisions-017.json)にPROPOSEDとして記録し、企業検収前にProduct Owner／Business／Security／UI/UXが確認する（IR35〜44）。
 
 0.16.0再レビューの[DEC-17/18](internal/review-decisions-016.json)はユーザー回答により確定。制限操作はrestriction.manage/overrideの2権限、案件一覧はソート機能を備え、デフォルトは業務順の昇順とする。具体的な比較順・UI・受入条件はIR34を参照。旧G1の合格は修正後baselineに適用しない。
+
+0.21.0: DOC-0.20.0の独立G1指摘G120-001〜005をIR103〜106で修正。継続時間と通知重大度の可逆的なデモ提案は[DEC-60〜61](internal/review-decisions-021.json)。[受入計画](../04-agentic-sdlc/acceptance-review-021.csv)を追跡表へ反映し、新baselineに対して独立G1を再判定する。判定は[現行gate](../04-agentic-sdlc/runs/DOC-0.21.0/gate-G1.yaml)を参照。

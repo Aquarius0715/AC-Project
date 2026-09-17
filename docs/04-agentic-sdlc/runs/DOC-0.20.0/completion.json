@@ -4,8 +4,14 @@
   "scope": "frontend-demo-1A-independent-g1-correction",
   "reviewed_target": "DOC-0.19.0 independent G1 findings",
   "spec_baseline_id": "4f45da02ef91f0cf93075848d6ded3373878521740aa2f4047673eee709e4acc",
-  "gate_result": "pending",
-  "unresolved_findings": [],
+  "gate_result": "fail",
+  "unresolved_findings": [
+    "G120-001",
+    "G120-002",
+    "G120-003",
+    "G120-004",
+    "G120-005"
+  ],
   "resolved_findings": 29,
   "answered_questions": 2,
   "user_accepted_decisions": [
@@ -20,11 +26,13 @@
     "DEC-58",
     "DEC-59"
   ],
-  "independent_post_correction_review": "to_be_requested",
+  "independent_post_correction_review": "completed",
   "static_check": "passed",
   "validator_mutation_check": "passed",
   "typescript_semantic_check": "passed",
   "application_tests": "not_run",
   "production_connection_readiness": "NOT_READY",
-  "deployment_approval": false
+  "deployment_approval": false,
+  "independent_review_record": "independent-g1/gate-decision.yaml",
+  "prior_resolved_findings_count_scope": "29 refers to Claude self-review of G1-001..031; independent residual findings are G120-001..005"
 }

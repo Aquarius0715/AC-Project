@@ -1,6 +1,6 @@
 ---
 document_id: DD-C
-version: 0.20.0
+version: 0.21.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 この文書では、クライアント(お客様)向け画面の機能・画面項目・状態・エラー(例外)を決めます。基準にするのは、企業の元の要件文書と、それに対応する要件です。各FR(機能要件)を満たすために必要な処理と、受け入れ条件(テストで確認する内容)を定義します。参考として用意したモック(見本画面)は、共通のUI(画面デザイン)の見た目を検討するためだけに使います。
 
-**0.20.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.21.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 入力・責務
 
@@ -485,6 +485,6 @@ offsets.previewの表示結果に、marketConcept(市場構想に関する情報
 
 2026-09-16承認反映: C01/C06の期間境界はSR17。C13のretryはA15と同じSR18に従い、offsets.listで現在版とattemptIdを得る。
 
-現行0.20.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.21.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 案件一覧とjobs.listのソートはIR34を適用する。URL sort未指定はstatus:asc。選択変更でcursorを破棄し、filterを保持して新snapshotの初頁から取得する。状態/重大度/期限の昇降順を選べる。

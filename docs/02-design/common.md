@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.20.0
+version: 0.21.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -15,7 +15,7 @@ scope: frontend-demo-1A
 
 設計の対象になる機能・画面項目・状態・例外は、企業原文と対応する要件をもとにします。各FR(機能要件)を満たすための処理と、受入条件(合格の基準)をこの文書で決めます。参考にしているモック画面は、共通UIの見た目を考えるためだけに使います。
 
-**0.20.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.21.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 1. 構成と責任
 
@@ -234,4 +234,4 @@ APIのパス・HTTPの方式・データベース・サーバー側の認証や�
 
 0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
 
-現行0.20.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.21.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。

@@ -1,6 +1,6 @@
 ---
 document_id: REQ-P
-version: 0.20.0
+version: 0.21.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # 施工業者 要件定義書
 
-**0.20.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.21.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 目的と前提
 
@@ -234,7 +234,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 0.9.0修正契約: [厳格レビュー修正契約](../02-design/strict-review-contracts.md)と[操作別版契約](../02-design/write-version-catalog.csv)を併読する。
 
-現行0.20.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.21.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 0.14.0: IR25に従い、受諾前住所は設備の設置物件から取得し、期限後の報告表示は報告有無・受理状態だけを凍結する。
 

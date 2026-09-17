@@ -1,0 +1,8 @@
+{
+  "reviewed_commit": "717c545cccff8ab11932fab016c854ff8526897f",
+  "files_checked": 63,
+  "mismatches": [],
+  "expected_baseline": "4f45da02ef91f0cf93075848d6ded3373878521740aa2f4047673eee709e4acc",
+  "recomputed_baseline": "4f45da02ef91f0cf93075848d6ded3373878521740aa2f4047673eee709e4acc",
+  "passed": true
+}

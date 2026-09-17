@@ -1,17 +1,17 @@
 gate_id: G1
 task_id: DOC-0.20.0
-gate_result: pending
+gate_result: fail
 spec_baseline_id: 4f45da02ef91f0cf93075848d6ded3373878521740aa2f4047673eee709e4acc
 reviewed_target: DOC-0.19.0 independent G1 findings (G1-001..031)
 previous_gate: ../DOC-0.19.0/independent-g1/gate-decision.yaml  # FAIL
 specification_editor: 修正担当AI（本会話、Opus 5）
-reviewer_agent: null  # 別エージェントの独立G1を依頼する。修正担当の自己再レビューはG1ではない
+reviewer_agent: Codex independent review team  # 仕様修正者Claudeとは別主体
 self_rereview_after_correction: completed
 application_tests: not_run
 implementation_status: not_started
 production_connection_readiness: NOT_READY
 deployment_approval: false
-unresolved_findings: []
+unresolved_findings: [G120-001, G120-002, G120-003, G120-004, G120-005]
 resolved_findings: [G1-001, G1-002, G1-003, G1-004, G1-005, G1-006, G1-007, G1-008, G1-009, G1-010, G1-011, G1-012, G1-013, G1-014, G1-015, G1-016, G1-017, G1-018, G1-019, G1-020, G1-021, G1-022, G1-023, G1-024, G1-025, G1-026, G1-027, G1-028, G1-029]
 answered_questions: [G1-030, G1-031]
 user_accepted_decisions: [DEC-44, DEC-50]
@@ -22,3 +22,9 @@ static_check: passed  # python3 docs/tools/validate_documents.py --tsc <typescri
 validator_mutation_check: passed  # 84 mutations
 typescript_semantic_check: passed  # validate_documents.py --tsc の出力
 evidence_paths: [review.md, findings.json, traceability-matrix.csv, static-check.json, validator-negative-checks.json, spec-manifest.json]
+
+independent_post_correction_review: completed
+independent_reviewed_commit: 717c545cccff8ab11932fab016c854ff8526897f
+independent_counts: {blocker: 0, critical: 0, major: 1, minor: 4, question: 0}
+independent_gate_record: independent-g1/gate-decision.yaml
+independent_evidence_paths: [independent-g1/review.md, independent-g1/findings.json, independent-g1/static-check.json, independent-g1/validator-negative-checks.json, independent-g1/baseline-integrity-check.json]

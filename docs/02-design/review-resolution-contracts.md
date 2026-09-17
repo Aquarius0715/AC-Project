@@ -1,6 +1,6 @@
 ---
 document_id: DD-REVIEW-RESOLUTION
-version: 0.20.0
+version: 0.21.0
 status: self-reviewed-pending-independent-G1
 scope: frontend-demo-1A
 ---
@@ -81,7 +81,7 @@ AT-C01-N/AT-A01-Nの現時点設備KPI遷移先はscopeとpowerStateだけ。per
 
 ## IR14 現行版の識別
 
-現行仕様はREADMEが示す現行baseline（0.20.0ではDOC-0.20.0、IR75）のmanifest収録ファイル。front matter、現行実装基準と案内をその版に統一する。過去レビュー/DEC/変更履歴/旧runsは当時版のまま保持し、旧合格記録を現版の承認として利用しない。
+現行仕様はREADMEが示す現行baseline（0.21.0ではDOC-0.21.0、IR75）のmanifest収録ファイル。front matter、現行実装基準と案内をその版に統一する。過去レビュー/DEC/変更履歴/旧runsは当時版のまま保持し、旧合格記録を現版の承認として利用しない。
 
 ## IR15 MRV出力の範囲
 
@@ -449,6 +449,7 @@ ChangeEvent.entityTypeは次の表の値とcursor_onlyだけを取る。events.s
 |---|---|
 | unit | units.list, units.get, summaries.get, admin.summary, telemetry.summary |
 | device | devices.list, devices.get, devices.events, units.list, units.get, summaries.get, admin.summary |
+| allergen_observation | telemetry.series |
 | measurement | telemetry.series, telemetry.summary, units.list, units.get, summaries.get, admin.summary, energy.summary |
 | command | commands.get, units.get, diagnosticRuns.get, restrictions.get, restrictions.forInvoice |
 | diagnostic_run | diagnosticRuns.list, diagnosticRuns.get, units.get |
@@ -527,7 +528,7 @@ check_review_regressions.pyの変異対象は現行baselineと現行文言に一
 
 ## IR75 現行baselineと0.18.0記録の扱い — REV19-001
 
-0.18.0の修正（REV18）は、自己再レビューとbaseline作成の前に作業が中断した。0.18.0のspec-manifestは作成しない。runs/DOC-0.18.0にはREV18の指摘一覧（review.md、findings.json）と、gate-G1.yaml（gate_result=not_evaluated、spec_baseline_id=null、interrupted=true）だけを保存し、実装入力として使用しない。現行baselineはDOC-0.19.0で、runs/DOC-0.19.0にspec-manifest.json、review.md、findings.json、traceability-matrix.csv、static-check.json、validator-negative-checks.json、gate-G1.yaml、completion.jsonを保存する。受入計画CSVの値にカンマや引用符を含む場合はCSV規則どおり引用し、列数不一致は静的検証エラーとする。README・SDLC §8・IR14の現行版表記はDOC-0.19.0に揃える。
+0.18.0の修正（REV18）は、自己再レビューとbaseline作成の前に作業が中断した。0.18.0のspec-manifestは作成しない。runs/DOC-0.18.0にはREV18の指摘一覧（review.md、findings.json）と、gate-G1.yaml（gate_result=not_evaluated、spec_baseline_id=null、interrupted=true）だけを保存し、実装入力として使用しない。現行baselineはDOC-0.21.0で、runs/DOC-0.21.0にspec-manifest.json、review.md、findings.json、traceability-matrix.csv、static-check.json、validator-negative-checks.json、gate-G1.yaml、completion.jsonを保存する。受入計画CSVの値にカンマや引用符を含む場合はCSV規則どおり引用し、列数不一致は静的検証エラーとする。README・SDLC §8・IR14の現行版表記はDOC-0.21.0に揃える。DOC-0.19.0とDOC-0.20.0は独立G1不合格の旧版として記録を保持する。
 
 ## IR76 作業窓開始前の技術者画面 — REV19-002
 
@@ -665,7 +666,7 @@ demoSeedとacceptancePatchesの行は省略形式で記述する。Repositoryは
 6. Measurement: eventId=id、isDemo=true、qualityReason=null、rawUnit=null。
 7. Command: correlationId=`seed-`＋id、diagnosticRunId/jobId/reason/failureCode=null。
 8. Alert: evidenceIds=[]、deliveryFailures=[]、acknowledgedAt/resolvedAt/resolutionReason=null。
-9. Notification: paramsは実行時と同じテンプレート生成関数で、正規化済みseedの対象資源から生成する（D12）。
+9. Notification: paramsは実行時と同じテンプレート生成関数で、正規化済みseedの対象資源から生成する（D12）。scopeVersionAtCreationの省略時はIR106に従って受信Membershipから補完する。
 10. MaintenanceJob: planId/occurrenceAt/startedAt/completedAt/draftReportRef=null、reportRefs/costs=[]。
 11. Restriction: events=[]。perUnit[].observedRestrictionは同じUnitのobservedRestriction、perUnit[].evidenceIdはnull。
 12. acceptancePatchesの`{entity,id,set}`で、idが存在すればsetの項目を上書きし、存在しなければsetを新しい行として本節の規則で正規化して追加する。
@@ -679,8 +680,8 @@ demoSeedとacceptancePatchesの行は省略形式で記述する。Repositoryは
 2. 対象が書かれていない場合の既定: 顧客の設備操作・監視・自動運転・方針の対象はunit-online-rto、換気非対応の設備はunit-non-rto、制限中の設備はunit-limited、オフライン設備はunit-offline-rto、顧客はcustomer-a、業者はcontractor-a、外注の技術者はtech-external-aとjob-contractor-a、社内の技術者はtech-internal-a、HQはhq-operator（制限・解除の操作はhq-restriction-manager）、請求はinvoice-overdue-a、制限はrestriction-limited-a。
 3. 「in_progress案件」「submitted報告」「受諾済み案件」など業務状態を表すGivenは、acceptancePatchesが無い限り、seedから通常の操作（jobs.start、jobs.saveDraft、jobs.submit、jobs.offer、jobs.accept等）を書かれた順に実行して作る。
 4. ①②…で状態を列挙するGivenは、規則2の対象の該当フィールドだけを各subcaseで独立にpatchする。ただしIR97の3で通常の操作が必要な状態（Restriction.state、報告版を伴うJob.status、Payment/Invoiceの状態）はpatchせず、受入本文に書いた操作で作る。
-5. fixture-contract.jsonの`acceptancePatches`は、キーがcase ID（subcaseは`.番号`）または`shared:`名で、値は`{clock, simulator, include?, patches, query?, expected?, input?, evaluation?, trigger?, advanceSeconds?, flow?}`（`shared:`は`{description, patches, input?, bindAtUse?}`）。inputは保存操作の完全な入力、evaluationはEvaluationInput、triggerはDemoTrigger、flowは状態を作る通常操作の順序、bindAtUseは受入本文で決める値（IR97）。includeに挙げた共有patchを先に展開してから自身のpatchesを適用する。patchは`{entity,id,set}`（IR91の12）か、測定系列の`{entity:'measurements', series:{idPrefix, unitId, sensorId, metric, unit, boundaryId, from, to, stepSeconds, value, origin, quality, sequenceStart, skip}}`。seriesは[from,to)のfrom+k×stepSecondsの各時刻（skipの[from,to)に入る時刻を除く）に、id=`idPrefix-k`、observedAt=receivedAt=その時刻、sequence=sequenceStart+kの行を作る。entityはdemoSeedの節名（membershipsはactors）。
-6. acceptancePatchesを持つcase: AT-A01-N、AT-C06-N、AT-C06-E.2、AT-C06-E.3、AT-C06-E.4、AT-C08-N、AT-P01-N、AT-P03-R01、AT-P06-N、AT-P06-B、AT-T07-N、AT-T10-E.1、AT-T11-N、AT-A09-R01、AT-A13-N、AT-A14-N、AT-C13-N、AT-C10-E.1、AT-C08-SRC、AT-T07-SRC、AT-A05-SRC、AT-C07-SRC.4、AT-A12-SRC.4、AT-T12-N、AT-A05-N、AT-A11-N、AT-A12-N、AT-X02-B、AT-X06-B.1、AT-X06-B.2、AT-X06-B.3、AT-X06-B.5、AT-REV17-005、AT-X04-E.5。共有patch: shared:energy-actual-80、shared:tech-internal-a-job-online、shared:load-cause-alerts、shared:report-draft-all-normal。受入本文はキーを明記する。
+5. fixture-contract.jsonの`acceptancePatches`は、キーがcase ID（subcaseは`.番号`）または`shared:`名で、値は`{clock, simulator, include?, patches, query?, expected?, input?, evaluation?, finalEvaluation?, trigger?, advanceSeconds?, flow?}`（`shared:`は`{description, patches, input?, bindAtUse?}`）。inputは保存操作の完全な入力、evaluationはEvaluationInput、triggerはDemoTrigger、flowは状態を作る通常操作の順序、bindAtUseは受入本文で決める値（IR97）。includeに挙げた共有patchを先に展開してから自身のpatchesを適用する。patchは`{entity,id,set}`（IR91の12）か、測定系列の`{entity:'measurements', series:{idPrefix, unitId, sensorId, metric, unit, boundaryId, from, to, stepSeconds, value, origin, quality, sequenceStart, skip}}`。seriesは[from,to)のfrom+k×stepSecondsの各時刻（skipの[from,to)に入る時刻を除く）に、id=`idPrefix-k`、observedAt=receivedAt=その時刻、sequence=sequenceStart+kの行を作る。entityはdemoSeedの節名（membershipsはactors）。
+6. acceptancePatchesを持つcase: AT-A01-N、AT-C06-N、AT-C06-E.2、AT-C06-E.3、AT-C06-E.4、AT-C08-N、AT-P01-N、AT-P03-R01、AT-P06-N、AT-P06-B、AT-T07-N、AT-T10-E.1、AT-T11-N、AT-A09-R01、AT-A13-N、AT-A14-N、AT-C13-N、AT-C10-E.1、AT-C08-SRC、AT-T07-SRC、AT-A05-SRC、AT-C07-SRC.4、AT-A12-SRC.4、AT-T12-N、AT-A05-N、AT-A11-N、AT-A12-N、AT-X02-B、AT-X06-B.1、AT-X06-B.2、AT-X06-B.3、AT-X06-B.5、AT-REV17-005、AT-X04-E.5、AT-G121-002、AT-G121-004。共有patch: shared:energy-actual-80、shared:tech-internal-a-job-online、shared:load-cause-alerts、shared:report-draft-all-normal。受入本文はキーを明記する。
 7. 電力量・排出量の受入（C06/C13/A13/A14、S05）は、fixture.energyの窓[2026-09-14T00:00Z, 01:00Z)とunitIds=[unit-online-rto]を使う。demoSeed.factorsのfactor-demo-2026（0.5 kgCO₂e/kWh）がfixture.defaultEmissionFactorIdの実体である。
 8. 同じ設備を対象に含む契約の期間重複は1Aでは拒否しない（現行規則の明文化。制限は設備ごとに進行中1件、DDC-08 §3）。
 
@@ -750,7 +751,7 @@ jobs.assignとmembers.eligibleは、候補技術者のMembership.scopesがJob.un
 
 Policy由来のAlert・品質通知（SR21/SR28/D08）、制限予告（IR05）、督促（IR04）はそれぞれの節に従う。それ以外の業務イベントの通知は次の表だけで生成する（DEC-55）。表に無いイベント（IR48のOffer期限到来、閲覧、下書き保存、メモ、プレビュー等）は通知を作らない。
 
-共通規則: channel=inApp、deliveryState=simulated、宛先Membershipごとに1件、target・paramsはD08/D12、occurredAt=遷移のnow、イベントを起こした操作のMembership（actor）には送らない、宛先は現在scopeと有効期間で再判定し閲覧できないMembershipには作らない、同じイベントIDの再送で増やさない。templateKeyとtypeは同名（IR10）。
+共通規則: channel=inApp、deliveryState=simulated、宛先Membershipごとに1件、target・paramsはD08/D12、occurredAt=遷移のnow、イベントを起こした操作のMembership（actor）には送らない、宛先は現在scopeと有効期間で再判定し閲覧できないMembershipには作らない、同じイベントIDの再送で増やさない。templateKey=alertはIR10のAlert分類に従い、それ以外はtemplateKeyとtypeを同名にする。severityはIR104の表で決める。
 
 | イベント | templateKey | target | 宛先 |
 |---|---|---|---|
@@ -792,7 +793,7 @@ IR35の解除要求の起動経路は、入金確認・猶予/例外・強制解
 4. 受入試験は既定でsimulator=falseで開始する（DEC-58）。自動生成そのものを検証するAT-REV18-001、AT-REV19-003、AT-REV19-009だけsimulator=trueとする。
 5. 保存入力を伴う受入は、acceptancePatchesの`input`に正規型の完全な入力オブジェクトを置き、本文から参照する（AT-A05-N、AT-A11-N、AT-A12-N等）。UIやRepositoryが欠けた必須値を補わない（SR28）。
 6. 受入本文の「通知」「通知プレビュー」は、inAppの保存Notification（deliveryState=simulated）を指す。保存しないnotifications.previewは「プレビュー（保存0件）」と書く。
-7. AT-A12-N/Bは`acceptancePatches["AT-A12-N"]`でdevice-tamperにCO₂センサー（sensor-tamper-co2）を加え、同じキーの`evaluation`（両設備のco2=1100 ppm、observedAt=00:59:00Z、valid、occurredAt=01:00:00Z）でautomations.fireを行う。unit-non-rtoは換気非対応のため制御results=suppressed/invalid_capability、通知はcreated（SR25）。
+7. AT-A12-N/Bは`acceptancePatches["AT-A12-N"]`のCO₂センサー追加・input・evaluation・flowを使い、IR103の順序で59秒と60秒の継続境界を確認する。保存直後の1回のfireで通知createdを期待しない。
 
 validate_documents.pyは1・2を全acceptancePatchesで検査し、受入計画CSV（acceptance-review-019/020）が参照するキーの存在も検査する。
 
@@ -872,3 +873,52 @@ demoSeed.capabilitiesは所属tenantを明示する（tenantId）。tenant-bのu
 - G1-027: IR98のとおり。
 - G1-028: AppShellのeventにswitchMembership(demoMembershipId)を追加し、ShellContainerがdemoSession.switchMembershipを実行する。
 - G1-029: AT-A09-E③は「予告の宛先となる顧客Membershipが0件（全対象Unitを閲覧できるclientがいない）でschedule→VALIDATION（IR05）」とする。
+
+
+## IR103 方針の継続時間とA12受入の評価順序 — G120-001
+
+D08の継続時間は、保存済みの有効なPolicyが現在tickで初めてfresh/validかつ閾値成立のFactを評価した時点から数える。保存前の履歴や遅着FactのobservedAtを開始時刻にしない。elapsedSeconds=now−条件成立の開始tickとし、durationSeconds=60なら開始時点は0秒、59秒時点は不成立、60秒到達時点で初めて成立する。品質不良・stale・通信断・条件不成立で開始tickを破棄する（D08）。新規保存ではカウンタを0から開始する。同一tickの内部評価とfireで二重に時間を加算しない。
+
+air_qualityの通知評価とnotify_and_ventilateの換気候補は、この継続条件の成立後にSR25で独立評価する。成立前は通知suppressed/not_due、当該方針からの制御候補はなし（他の候補もないUnitではresults=suppressed/no_match）。成立後は換気能力やbusy・制限の有無によって通知を抑止しない。これはDEC-60の可逆的なデモ具体化である。
+
+AT-A12-N/BとAT-G120-005はfixtureの`acceptancePatches["AT-A12-N"]`を次の順序で使う。
+
+1. clock=2026-09-14T01:00:00.000Z、simulator=false。hq-operatorがinputでPolicyを保存し、そのidを以後の通知評価のpolicyIdとして観測する。
+2. evaluationの両Unitのco2=1100 ppm、observedAt=occurredAt=01:00:00Z、quality=validをautomations.fireへ投入する。開始時点の対象Policy通知はsuppressed/not_due、対象Policy由来Commandは0件。
+3. テスト時計を1秒tickずつ59回進める。これは注入時計の通常経過であり、demo.advanceClockの一括ジャンプではない。保持FactはSensorのTTL=120秒以内なのでfresh。01:00:59Zでは対象Policy由来のAlert/Notification/Commandはいずれも0件。
+4. さらに通常の1秒tickを1回進める。01:01:00Zの内部評価で対象PolicyのAlertは各Unitに1件、hq-operator宛Notificationは各Unitに1件（severity=warning、inApp、simulated）。unit-online-rtoにはventilate lowのCommandが1件、unit-non-rtoには0件。対象Policy以外のseed通知をこの件数に含めない。
+5. 同じtickでfinalEvaluationをautomations.fireへ渡すと、そのtickの確定済み結果を返す（D02/IR54）。resultsは対応設備がrequested、非対応設備がsuppressed/invalid_capability、notificationsは両方created。同tick参照・同eventId再送でAlert/通知/Commandは増えない。新しいobservedAtを与えて再評価しない。
+
+fixture.flowのオブジェクトstepはこの手順の機械可読な表現。operation=policies.save/automations.fireはinputRefの入力を使い、clock.tickはseconds個の通常tick（stepSeconds=1）、assertはexpected.boundariesのelapsedSeconds行を確認する。boundaryのalertCount/notificationCount/commandCountはこの新規Policy由来の全Unit合計。最終のFireResultと件数はexpected.resultsも併用する。アプリ試験は未実行。
+
+## IR104 業務通知の分類と重大度 — G120-002・G120-003
+
+IR95の生成時に次の表でNotificationの必須type/severityを決める。alertテンプレートだけは同名typeではなく起点Alertから分類し、sourceAlertIdを保持する（IR10）。他のtemplateはsourceAlertId=null。重大度の業務上の既定値はDEC-61の可逆的なデモ提案で、企業承認ではない。
+
+| templateKey | type | severity |
+|---|---|---|
+| alert | maintenance→cleaning_due; sensor/tamper/reconciliation_required→fault; quality→quality | sourceAlert.severity |
+| quality | quality | sourcePolicy.severity |
+| schedule_change | schedule_change | normal |
+| report_return | report_return | normal |
+| completion | completion | normal |
+| payment | payment | normal |
+| payment_reminder | payment_reminder | warning |
+| restriction | restriction | scheduled/requested/applied/release_requested→warning; released/cancelled→normal |
+| inquiry | inquiry | normal |
+| job_update | job_update | normal |
+| device_operation | device_operation | warning |
+
+Policy由来のalert/air_quality通知はSR28の入力severityを起点Alertから継承し、本表の業務通知既定値で上書きしない。qualityテンプレートはD08/SR21の品質通知であり、起点Policyのseverityを使う。restrictions.scheduleの予告とnotifications.previewも、対象の現在状態を使う同じ表を適用する。device_operation.failedは非同期のシステムイベント（IR59）なのでactor=system-demo、作成したMembershipはactor除外の対象にならず、現在閲覧可能なら通知先に含む。宛先の重複はIR95どおりMembershipごとに1件とする。
+
+## IR105 アレルゲン観測の変更通知 — G120-004
+
+IR98のallergen観測追加は、同じ保存遷移でChangeEvent.entityType='allergen_observation'を1件発行する。entityIdは新しいallergenObservations行のid、version=1、occurredAtは保存したデモ時計のnow、changedFields=['allergenObservation']。行のidは通常のRepository ID採番、createdAt=nowとし、同じDemoTrigger.eventIdの再送は行と変更イベントを増やさない。観測のobservedAtと作成時刻は区別する。
+
+events.subscribeのresourcesにallergen_observationを許可し、IR71の表に従いtelemetry.seriesだけをinvalidateする。公開範囲は当該Unitの現在閲覧scopeと購読unitIdsで判定し、scope外へ観測IDを出さない（D15）。データを含まないcursor_onlyの扱いは既存規則に従う。C07/A12はこのresourcesを購読し、最新観測を再取得する。古いobservedAtの観測を追加した場合も再取得するが、IR98の並び順で最新でなければ画面の表示値は変えない。IR83の同tick集約とSR14のページsnapshot規則は維持する。
+
+## IR106 通知fixtureの作成時scope版 — G120-005
+
+IR91によるdemoSeedおよびacceptancePatchesの通知行の正規化では、scopeVersionAtCreationが省略されている場合、全patch適用後のrecipientMembershipIdで引いたMembership.scopeVersionを設定する。これはfixtureの作成時snapshotであり、生成後にMembership.scopeVersionが変わっても既存通知の値は変更しない。明示したscopeVersionAtCreationは非負整数であることを検証して保持し、現在scopeVersionと一致するように書き換えない。
+
+宛先Membershipが存在しない、補完元scopeVersionが非負整数でない、または明示値が非負整数でない場合はfixture生成エラーとする。AT-C08-SRCのnotif-alert-insulation-a / notif-alert-unknown-aはcustomer-aのscopeVersion=1を補完する。実行時の通知生成ではIR95/D08どおり通知作成時の現在MembershipのscopeVersionを保存し、後の認可は現在scopeで判定する。validate_documents.pyはseedと全通知patchについて、明示値または補完元を検査する。

@@ -1,0 +1,268 @@
+{
+  "version": "0.21.0",
+  "spec_baseline_id": "02a1e39793df35f760afe9188e86141c8790cd7e92366efbddb7f62aff62e908",
+  "hash_algorithm": "sha256",
+  "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
+  "spec_files": [
+    {
+      "path": "00-prepare/PrepareDocument.md",
+      "sha256": "6ed2031253a86aa299870278b4b37d1655eaea6e89064b4847861000115b817d"
+    },
+    {
+      "path": "00-prepare/company-requirement-map.csv",
+      "sha256": "11561533d1b6128b0e3e4f5102570a968700f930094216ba973aba9204782230"
+    },
+    {
+      "path": "00-prepare/internal/decision-record-2026-09-16.md",
+      "sha256": "b1aeaae1c301a09a743e25462401cb53234204bfc6063df4589507a0c517013c"
+    },
+    {
+      "path": "00-prepare/internal/design-assumptions.md",
+      "sha256": "44ba41f6d6a30abeca7e2d6152c20a5fa980db17e266cf80454d850d08c0af13"
+    },
+    {
+      "path": "00-prepare/internal/review-decisions-016.json",
+      "sha256": "ea18b3af1786e61a346016debd881614d0fd160b4335e9758ffcb4655f26f28c"
+    },
+    {
+      "path": "00-prepare/internal/review-decisions-017.json",
+      "sha256": "fcddf169bfe9037a505616945c0bc1cdf33c8f317915f259b69f309636042906"
+    },
+    {
+      "path": "00-prepare/internal/review-decisions-018.json",
+      "sha256": "1691c53324b978b955e213512c6e405582286781bfc903391f9f3b1eb65a3d41"
+    },
+    {
+      "path": "00-prepare/internal/review-decisions-019.json",
+      "sha256": "e629742de2de6a904585fa360b275c4ddd9a5c4e0c068c5fd1f0d811d9e9b874"
+    },
+    {
+      "path": "00-prepare/internal/review-decisions-020.json",
+      "sha256": "2791f630bcf8280321df468c9ba41a3cbb1d2672c4b46f1d4201b03e30d7cd1d"
+    },
+    {
+      "path": "00-prepare/internal/review-decisions-021.json",
+      "sha256": "4a82f455538e79d9abd2779bdcee3945d14278e7d1149efe3f2bb9562f706e76"
+    },
+    {
+      "path": "00-prepare/reference-design-analysis.md",
+      "sha256": "37e81d80aa4606183d7533829d9ac58b8ec1b49aaccc9112ed08c24fe8e9be24"
+    },
+    {
+      "path": "00-prepare/requirement-origins.csv",
+      "sha256": "5f0b29537ca06dda6d7ab4ec3f52fb6a29ca935e78a347b7fcc268a72acd9f68"
+    },
+    {
+      "path": "00-prepare/sources/company-requirements-original.txt",
+      "sha256": "526927ffef80f32f2dce775414858013031d75313eeb96c4f89dabd582ee958f"
+    },
+    {
+      "path": "00-prepare/sources/original-handover.md",
+      "sha256": "930b541711deca7b7e1764b364953da879757482fba4217b142aff1be63a8080"
+    },
+    {
+      "path": "00-prepare/sources/production-instructions.md",
+      "sha256": "4dc1e01ebbd097d41c2bf4239fc4dc1c3dcb0272c7e704edcd1ec018321c1eb7"
+    },
+    {
+      "path": "00-prepare/sources/reference-style-evidence.json",
+      "sha256": "6a905fd59d5b83a4152a805135d08bef5598cae86f501bc5f207bb45f875cc66"
+    },
+    {
+      "path": "00-prepare/traceability.csv",
+      "sha256": "181608a80c49ff6c5d4c6d809ff6c8d44e891c6c164f1c35516a5c6245f82de2"
+    },
+    {
+      "path": "01-requirements/admin.md",
+      "sha256": "e32ca8ed19c28b221dc251c872ce9e3d65fec007df0a38ca442ae7013c4a02e3"
+    },
+    {
+      "path": "01-requirements/client.md",
+      "sha256": "213b1ceef09c80491fcacdf5a7f161e1e59740a94a15e1d53bbebdaca4a6072d"
+    },
+    {
+      "path": "01-requirements/common.md",
+      "sha256": "0707a944506cb30a07098985cc32274e7b179d7b07c192599ffaf43b5aafdd7a"
+    },
+    {
+      "path": "01-requirements/contractor.md",
+      "sha256": "218bbbe81f7e2801601eb057df891f2ffda1a6fabe0437d58d95918fe56fc851"
+    },
+    {
+      "path": "01-requirements/technician.md",
+      "sha256": "188f4b0544cef0168721ad6a023747ee9104e05581876e9b228eea606b128f01"
+    },
+    {
+      "path": "02-design/admin.md",
+      "sha256": "3685c38c9c858ec38938dc6fbfe2cac0c291dc93080ff6fd457b36f988457caf"
+    },
+    {
+      "path": "02-design/client.md",
+      "sha256": "26e2e45ccc53e70cdd04e1b8a37cf2cac331998f17ee0ed664e6ffeeb8f6efb0"
+    },
+    {
+      "path": "02-design/common.md",
+      "sha256": "218f2bc661a5bf467788a99cbdea1b9750613240eac0c83cbc3e579029edbea0"
+    },
+    {
+      "path": "02-design/contractor.md",
+      "sha256": "5f1eb57fb471fc7c4002a79026baa5b8c1bd39cf71b352284ce0b59841ced4fc"
+    },
+    {
+      "path": "02-design/deterministic-contracts.md",
+      "sha256": "ae2a35d1a19d65ca0a4709f0c8abe8daa03f4bd841e4b20bc52437b45c248629"
+    },
+    {
+      "path": "02-design/implementation-contracts.md",
+      "sha256": "8a0c6bbf79daeaaca161af2c9d7a9e65166da46821011bde003878ace821bdcb"
+    },
+    {
+      "path": "02-design/operation-catalog.csv",
+      "sha256": "874e246d18c35a87307c34a65b4f0b83c2dfb93801c7f69d6dbd05d26d5cf17b"
+    },
+    {
+      "path": "02-design/query-catalog.csv",
+      "sha256": "6c8d19a0c3b57a5415291fa05dec8958de5945141426aa74b1c7feda3eab7bc6"
+    },
+    {
+      "path": "02-design/review-resolution-contracts.md",
+      "sha256": "1f0912ef7db63fefb0d9da50a6e4d440489eb3452bd8b46dea225650828c27c2"
+    },
+    {
+      "path": "02-design/service-contracts.ts",
+      "sha256": "ed3e16734acfccd89d1fb01f426054d62865851e7b40235c07483f1b02e181cf"
+    },
+    {
+      "path": "02-design/strict-review-contracts.md",
+      "sha256": "c7dc94b8b8ff88246e63f868d3228c56d4e85b0b0ddd103470dcb8b2243fc5c4"
+    },
+    {
+      "path": "02-design/technician.md",
+      "sha256": "aa69c8decfef2d2c525eba547194236193f337784642396eb8218a86a9e22eb3"
+    },
+    {
+      "path": "02-design/write-version-catalog.csv",
+      "sha256": "037cbbef997b6cc17296afd567dd30aab64a8402686770f9d7cbfe65aa758bc6"
+    },
+    {
+      "path": "03-uiux/UIUXSpecification.md",
+      "sha256": "198aaf53e82afe5c19a25e389194829b797d7b5e285370957850bb65ab69a58b"
+    },
+    {
+      "path": "03-uiux/component-contracts.csv",
+      "sha256": "2c37d8a3e3fee1e68f17fd17f8496244b0a9edd4d58d9e89fbe5f7dde9a5b8f7"
+    },
+    {
+      "path": "03-uiux/screen-catalog.csv",
+      "sha256": "ebf2526bf0d4aadcbbe606499eaae9b03b490f44c81a9730b48a03d0e9612ae8"
+    },
+    {
+      "path": "04-agentic-sdlc/README.md",
+      "sha256": "04258e427e9067656c86b51d4433b62b225d9a78798dfeee3af6755894aaa844"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-convergence.csv",
+      "sha256": "383f1c2f637d4203d446b044a7ecea568fb1b774c8bc917b35284bc11f0a6acb"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-fixes.csv",
+      "sha256": "968ece667a233b900dbbfb4248ea213c8bca67325a9ace01ba8c037c9bef7c3d"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-independent-g1.csv",
+      "sha256": "d4f1ee09cd4b593098477635d325314ad10ad326e78c9f8ae6013b91ca27071a"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-independent.csv",
+      "sha256": "81ac2d05ed3499b2f49fa36db3762b5b2a92193390c374bbd7542cba2ff7a29c"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-loop.csv",
+      "sha256": "2b9d61b89d9e981e470b45841962f64740ab52d9710e8497d7db0d7a8de01ddd"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-projection.csv",
+      "sha256": "1c15c24dd3afe516b0d4917ac198dc7f51e3157b06e18f01ef238ab13f048087"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-rereview.csv",
+      "sha256": "e247ac0f37e5cfe2f9290b2f685aa5c98917c4c10b89fa2330b7c6004d820d6a"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-resolution.csv",
+      "sha256": "7239528a53fbeb88ddc092fc2cab4fce2ac86ec68848980660ff9a3f6b12618f"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-review-016.csv",
+      "sha256": "b37742b7b4f5e9eee89a323e0653d201d5d6d58f1de5ff8cd27556ddf3d725c7"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-review-017.csv",
+      "sha256": "c382ca318438b764bcc04897af2035811c4355d13caa3b5f22a20ecf0771f384"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-review-018.csv",
+      "sha256": "da0b206853034cc01eccdfd65bb614349143715d98ab636ab248801c67afd3c7"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-review-019.csv",
+      "sha256": "a9bd70f208b9aac184ae59aa82396d3bd66294dd452c4fa48911197ec8b2b229"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-review-020.csv",
+      "sha256": "e8006d5f5f7c6f64263a2739aa8cc4d61475372d03c3ec03ccea28f207837e9d"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-review-021.csv",
+      "sha256": "852cc49634cf1c500219d1e49687ce141d0878c462b1224d040127eba82f86f3"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-strict-review.csv",
+      "sha256": "fae128a2738dd3cce790ae63bbddf1bca5449529c444784721c53953cdf83334"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/design.md",
+      "sha256": "85cddd7b16f0ad55299c747dc4fd41b2d26f7738f55b9d42132a9b29a1bc46b8"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/implementation.md",
+      "sha256": "6382a55451a65512ab3d5622721404bde99ad2602ff95cf7b9a78d03a36b71fd"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/orchestration.md",
+      "sha256": "f843fe13cd02ab5dfafb3c966a764d85c9709aaaa9a51182fb97fd946b32c2ad"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/review.md",
+      "sha256": "5e70d5c52e410fb8a62c1169d7c4333072d0dd5da18741a875243568eb310b35"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/test.md",
+      "sha256": "3c5bcbc09c3a92f2e5053aa2e4aff2649df0a07f9580fbfcbb17159f174b95d5"
+    },
+    {
+      "path": "04-agentic-sdlc/fixture-contract.json",
+      "sha256": "d36bf6a8341dd18a7df75e4453d428bb7f6d8d98ab71a2f493697cb20a9a05ef"
+    },
+    {
+      "path": "04-agentic-sdlc/templates/artifacts.md",
+      "sha256": "c5f86be36137a3c047cee1b63a106acf5e0fe1d7225ed0f4d3b52c6d2d05627a"
+    },
+    {
+      "path": "04-agentic-sdlc/verification.md",
+      "sha256": "01ff35dfc2ea9c9611c86f5cd8235af2380c840258dd2f642e4c3882fbc68287"
+    },
+    {
+      "path": "README.md",
+      "sha256": "7abd1c638dc8f0549457d163593b2ed98dccc37fae938e32fee8f72a77c22e78"
+    },
+    {
+      "path": "tools/check_review_regressions.py",
+      "sha256": "9593d1007d07080f367b92b3ff401a022499c2d75b2ec2464520030f50d73c40"
+    },
+    {
+      "path": "tools/validate_documents.py",
+      "sha256": "93608f37eccaa38ee2027cfffce346fa2b094339dcdba5ace6d50548880788b7"
+    }
+  ]
+}

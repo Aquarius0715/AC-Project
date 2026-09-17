@@ -1,6 +1,6 @@
 ---
 document_id: REQ-COMMON
-version: 0.20.0
+version: 0.21.0
 status: draft
 owner: design-agent
 scope: frontend-demo-1A
@@ -12,7 +12,7 @@ scope: frontend-demo-1A
 
 この文書は、[企業要件の英語原文（SRC-06）](../00-prepare/sources/company-requirements-original.txt)をもとに、内容を整理し直したものです。この英語原文が、いちばん元になる資料(一次資料)です。情報は次の順番でたどれます。企業原文 → BIZ整理項目(企業の要望を分類した項目) → この文書のFR(機能要件) → 詳細設計・受入条件。各機能について、「企業からの要望」と「設計チームが補った部分」を分けて書きます。画面の項目、入力の制約、状態の変化、優先度は、フロントエンド(画面側)の実装案として示すものです。これらは、企業から詳しく承認をもらった内容ではありません。参考として示すモック画面は、見た目のデザインを考えるための参考資料です。機能要件と受入条件は、企業原文の目的に、制作方針と設計チームの補足を加えて、具体的にしたものです。
 
-**0.20.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.21.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 共通機能
 
@@ -171,4 +171,4 @@ FR-X01/X02はD09の30分セッション・en/ms固定文法、FR-X03/X05はD05/D
 
 0.9.0修正契約: [厳格レビュー修正契約](../02-design/strict-review-contracts.md)と[操作別版契約](../02-design/write-version-catalog.csv)を併読する。
 
-現行0.20.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.21.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。

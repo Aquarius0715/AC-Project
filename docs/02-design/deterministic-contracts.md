@@ -1,6 +1,6 @@
 ---
 document_id: DD-DETERMINISTIC
-version: 0.20.0
+version: 0.21.0
 status: accepted-demo-policy-under-review
 scope: frontend-demo-1A
 ---
@@ -220,4 +220,4 @@ plans.generateNextはid/occurrenceDate=保存済みnextDueAtとplanのexpectedVe
 
 SR17〜19は2026-09-16ユーザー承認済み。期間は暦日・完了分、offsetは同一記録で失敗段階だけ再試行、active制限中の契約編集は拒否する。詳細・優先規則はstrict-review-contracts.mdを適用する。
 
-現行0.20.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.21.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。

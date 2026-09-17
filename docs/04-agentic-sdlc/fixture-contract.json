@@ -1,5 +1,5 @@
 {
-  "version": "0.20.0",
+  "version": "0.21.0",
   "isDemo": true,
   "clock": "2026-09-14T01:00:00.000Z",
   "actors": [
@@ -3613,7 +3613,7 @@
             "metric": "co2",
             "value": 1100,
             "unit": "ppm",
-            "observedAt": "2026-09-14T00:59:00.000Z",
+            "observedAt": "2026-09-14T01:00:00.000Z",
             "quality": "valid"
           },
           {
@@ -3621,7 +3621,7 @@
             "metric": "co2",
             "value": 1100,
             "unit": "ppm",
-            "observedAt": "2026-09-14T00:59:00.000Z",
+            "observedAt": "2026-09-14T01:00:00.000Z",
             "quality": "valid"
           }
         ],
@@ -3644,8 +3644,91 @@
             "commands": 0,
             "notifications": "created"
           }
+        },
+        "boundaries": [
+          {
+            "elapsedSeconds": 0,
+            "alertCount": 0,
+            "notificationCount": 0,
+            "commandCount": 0
+          },
+          {
+            "elapsedSeconds": 59,
+            "alertCount": 0,
+            "notificationCount": 0,
+            "commandCount": 0
+          },
+          {
+            "elapsedSeconds": 60,
+            "alertCount": 2,
+            "notificationCount": 2,
+            "commandCount": 1
+          }
+        ]
+      },
+      "finalEvaluation": {
+        "eventId": "evt-a12-at-60",
+        "occurredAt": "2026-09-14T01:01:00.000Z",
+        "unitIds": [
+          "unit-online-rto",
+          "unit-non-rto"
+        ],
+        "facts": [
+          {
+            "unitId": "unit-online-rto",
+            "metric": "co2",
+            "value": 1100,
+            "unit": "ppm",
+            "observedAt": "2026-09-14T01:00:00.000Z",
+            "quality": "valid"
+          },
+          {
+            "unitId": "unit-non-rto",
+            "metric": "co2",
+            "value": 1100,
+            "unit": "ppm",
+            "observedAt": "2026-09-14T01:00:00.000Z",
+            "quality": "valid"
+          }
+        ],
+        "phase": "condition"
+      },
+      "flow": [
+        {
+          "operation": "policies.save",
+          "inputRef": "input"
+        },
+        {
+          "operation": "automations.fire",
+          "inputRef": "evaluation"
+        },
+        {
+          "operation": "assert",
+          "elapsedSeconds": 0
+        },
+        {
+          "operation": "clock.tick",
+          "seconds": 59,
+          "stepSeconds": 1
+        },
+        {
+          "operation": "assert",
+          "elapsedSeconds": 59
+        },
+        {
+          "operation": "clock.tick",
+          "seconds": 1,
+          "stepSeconds": 1
+        },
+        {
+          "operation": "assert",
+          "elapsedSeconds": 60
+        },
+        {
+          "operation": "automations.fire",
+          "inputRef": "finalEvaluation"
         }
-      }
+      ]
     },
     "AT-X02-B": {
       "clock": "2026-09-14T01:00:00.000Z",
@@ -4055,6 +4138,43 @@
         "operation": "jobs.review",
         "error": "FORBIDDEN",
         "jobStatus": "submitted"
+      }
+    },
+    "AT-G121-002": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [],
+      "trigger": {
+        "scenarioId": "AT-G121-002",
+        "eventId": "evt-g121-load-1",
+        "occurredAt": "2026-09-14T01:00:00.000Z",
+        "eventType": "load_alert",
+        "unitId": "unit-online-rto",
+        "causeCode": "insulation_loss",
+        "evidenceKind": "inferred",
+        "evidenceText": "Demo insulation",
+        "severity": "warning"
+      }
+    },
+    "AT-G121-004": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [],
+      "trigger": {
+        "scenarioId": "AT-G121-004",
+        "eventId": "evt-g121-allergen-1",
+        "occurredAt": "2026-09-14T01:00:00.000Z",
+        "eventType": "allergen",
+        "observation": {
+          "unitId": "unit-online-rto",
+          "availability": "available",
+          "substance": "Demo allergen",
+          "value": 20,
+          "unit": "ng/m³",
+          "sourceLabel": "Demo",
+          "observedAt": "2026-09-14T01:00:00.000Z",
+          "evidenceText": "Demo observation"
+        }
       }
     }
   },

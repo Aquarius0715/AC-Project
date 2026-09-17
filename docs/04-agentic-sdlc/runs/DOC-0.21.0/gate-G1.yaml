@@ -1,0 +1,28 @@
+gate_id: G1
+task_id: DOC-0.21.0
+gate_result: pass
+spec_baseline_id: 02a1e39793df35f760afe9188e86141c8790cd7e92366efbddb7f62aff62e908
+reviewed_working_tree_base_commit: 717c545cccff8ab11932fab016c854ff8526897f
+reviewed_target: uncommitted DOC-0.21.0 manifest files
+specification_editor: Codex root
+validator_editor: fixtures_review
+reviewer_agents: [contracts_review, ui_requirements_review]
+independent_post_correction_review: completed
+review_scope: DOC-0.20.0 G1 residual correction and affected 1A contracts, fixtures, acceptance and UI; no application execution
+counts: {blocker: 0, critical: 0, major: 0, minor: 0, question: 0}
+unresolved_findings: []
+resolved_findings: [G120-001, G120-002, G120-003, G120-004, G120-005, UI21-001]
+static_check: passed
+typescript_semantic_check: passed
+acceptance_input_type_check: passed
+validator_mutation_check: passed
+mutation_cases: 102
+baseline_integrity_check: passed
+spec_files: 65
+application_tests: not_run
+implementation_status: not_started
+production_connection_readiness: NOT_READY
+deployment_approval: false
+proposed_reversible_decisions: [DEC-60, DEC-61]
+reason: 独立した2担当が最終baselineと変更差分を確認し、全修正対象と追加指摘の解消を判定した。未解決指摘0件。仕様修正担当の自己確認を独立承認として扱っていない。
+evidence_paths: [review.md, findings.json, review-cycle.json, spec-manifest.json, static-check.json, validator-negative-checks.json, baseline-integrity-check.json, contract-type-examples-result.json, independent-g1/contracts-review.md, independent-g1/ui-review.md, independent-g1/review.md]

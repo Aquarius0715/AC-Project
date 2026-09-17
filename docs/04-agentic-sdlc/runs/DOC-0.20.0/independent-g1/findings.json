@@ -1,0 +1,136 @@
+{
+  "review_id": "INDEPENDENT-G1-DOC-0.20.0-CODEX",
+  "reviewed_commit": "717c545cccff8ab11932fab016c854ff8526897f",
+  "spec_baseline_id": "4f45da02ef91f0cf93075848d6ded3373878521740aa2f4047673eee709e4acc",
+  "reviewer": "Codex root with contracts_review, fixtures_review, ui_requirements_review independent review agents; not the Claude specification editor",
+  "gate_result": "fail",
+  "scope": "frontend-demo-1A; changed contracts and cross-document consistency; document review only",
+  "counts": {
+    "blocker": 0,
+    "critical": 0,
+    "major": 1,
+    "minor": 4,
+    "question": 0
+  },
+  "application_tests": "not_run",
+  "findings": [
+    {
+      "id": "G120-001",
+      "severity": "MAJOR",
+      "title": "空気環境方針の受入で60秒の継続条件が成立していない",
+      "locations": [
+        "docs/01-requirements/admin.md:324",
+        "docs/04-agentic-sdlc/fixture-contract.json:3590",
+        "docs/04-agentic-sdlc/fixture-contract.json:3603",
+        "docs/02-design/review-resolution-contracts.md:795",
+        "docs/02-design/deterministic-contracts.md:117"
+      ],
+      "requirement_ids": [
+        "FR-A12"
+      ],
+      "prior_findings": [
+        "G1-005",
+        "G1-009"
+      ],
+      "reproduction": "AT-A12-N / AT-G120-005のpatchを01:00Zで適用し、durationSeconds=60の新しいPolicyを保存。同tickにobservedAt=00:59ZのFactを初めてfireする。",
+      "problem": "通常の60秒tick、継続カウンタ、事前の方針評価を作らないまま通知createdを期待している。D08は条件の連続成立を必要とし、遅着した過去観測から過去Alertを新規発生させない。過去のobservedAtだけでは新規方針の継続成立を証明できない。IR97のセンサー追加は元のmissing_dataを解消するが、この不整合は残る。",
+      "impact": "正しい継続時間判定の実装が受入に失敗するか、受入に合わせた実装が継続時間を迂回する。少なくとも通知createdの期待値を一意に実現できない。",
+      "suggested_revision": "保存後の現在時刻で両設備へ有効なFactを投入し、60秒の評価経過を明記する。59秒と60秒の通知期待値、換気Commandの発生タイミングをD08/SR25と整合させ、fixture・AT-A12-N/B・AT-G120-005を同時更新する。",
+      "status": "open"
+    },
+    {
+      "id": "G120-002",
+      "severity": "MINOR",
+      "title": "Alert通知のtypeがIR95と正規DTOで矛盾する",
+      "locations": [
+        "docs/02-design/review-resolution-contracts.md:753",
+        "docs/02-design/review-resolution-contracts.md:769",
+        "docs/02-design/review-resolution-contracts.md:64",
+        "docs/02-design/service-contracts.ts:168"
+      ],
+      "requirement_ids": [
+        "FR-X07",
+        "FR-C08",
+        "FR-T07",
+        "FR-A05"
+      ],
+      "prior_findings": [
+        "G1-002"
+      ],
+      "reproduction": "demo.trigger(load_alert)でpolicyId=null、type=sensorのAlertを作り、IR95による通知を生成する。",
+      "problem": "IR95のtemplateKeyとtypeは同名という規則はtype=alertを要求するが、NotificationTypeにalertはない。IR10は同じ通知をtype=faultに写像する。IR72では実装側に矛盾の選択を委ねられない。",
+      "impact": "通知のDTO検証と故障分類・フィルターが一致しない。修正すべき既存写像は明確なためMINORとする。",
+      "suggested_revision": "alertテンプレートを同名規則の例外とし、IR10の分類とsourceAlertIdの規則を適用する。実際の生成通知のtype=faultを受入に追加する。",
+      "status": "open"
+    },
+    {
+      "id": "G120-003",
+      "severity": "MINOR",
+      "title": "業務通知のseverityが未定義",
+      "locations": [
+        "docs/02-design/review-resolution-contracts.md:753",
+        "docs/02-design/service-contracts.ts:110"
+      ],
+      "requirement_ids": [
+        "FR-X07",
+        "FR-P03",
+        "FR-C08"
+      ],
+      "prior_findings": [
+        "G1-002"
+      ],
+      "reproduction": "AT-P03-N / AT-G120-002でcontractor-aが割当を行い、4宛先へのschedule_change通知を生成する。",
+      "problem": "IR95は宛先・template・channel等を定めるが、必須のNotification.severityを定めない。参照先D08/D12にも非Alert業務通知の既定値はない。",
+      "impact": "normal/warning/criticalの選択が実装依存となり、表示色・重大度フィルター・既定の並び順が一意にならない。",
+      "suggested_revision": "業務イベント別のseverity、または既定値と例外を定める。Alertについては起点からの継承を明記し、受入で確認する。",
+      "status": "open"
+    },
+    {
+      "id": "G120-004",
+      "severity": "MINOR",
+      "title": "アレルゲン観測更新の変更イベントとQuery無効化が未定義",
+      "locations": [
+        "docs/02-design/review-resolution-contracts.md:804",
+        "docs/02-design/review-resolution-contracts.md:446",
+        "docs/02-design/service-contracts.ts:315"
+      ],
+      "requirement_ids": [
+        "FR-C07",
+        "FR-A12",
+        "NFR-05"
+      ],
+      "prior_findings": [
+        "G1-006"
+      ],
+      "reproduction": "C07/A12のtelemetry.seriesを取得済みにし、同じUnitにdemo.trigger(allergen)で新しい観測を追加する。",
+      "problem": "IR98が新たな保存先を定義したが、閉じたIR71の変更イベント表とChangeEntityTypeに対応項目がない。measurementへ写す規則もなく、telemetry.seriesの再取得を決められない。",
+      "impact": "保存済みの最新観測と、表示中の取得状態・値が食い違う可能性がある。",
+      "suggested_revision": "専用entityTypeを追加するか既存イベントへの写像を明記し、entityId/versionと対象Queryを定義する。キャッシュ済み画面が更新される受入を追加する。",
+      "status": "open"
+    },
+    {
+      "id": "G120-005",
+      "severity": "MINOR",
+      "title": "通知fixtureの必須scopeVersionAtCreationを補完する規則がない",
+      "locations": [
+        "docs/04-agentic-sdlc/fixture-contract.json:3095",
+        "docs/04-agentic-sdlc/fixture-contract.json:3114",
+        "docs/02-design/review-resolution-contracts.md:658",
+        "docs/02-design/review-resolution-contracts.md:668",
+        "docs/02-design/service-contracts.ts:110"
+      ],
+      "requirement_ids": [
+        "FR-C08",
+        "FR-X07"
+      ],
+      "prior_findings": [
+        "G1-027"
+      ],
+      "reproduction": "AT-C08-SRCのnotif-alert-insulation-a / notif-alert-unknown-aをIR91の規則だけで正規化してNotificationとして検証する。seed通知にも同じ省略がある。",
+      "problem": "必須numberのscopeVersionAtCreationが行になく、IR91の共通規則やNotification専用規則でも生成されない。null可能な項目や配列の補完対象でもない。",
+      "impact": "IR69/91に従うfixture生成は型検証で失敗する。値を暗黙に補う実装は規範にない推測を必要とする。",
+      "suggested_revision": "各行に作成時scopeVersionを明示するか、fixture生成時のrecipient Membershipから導出する規則を追加する。seedと全通知patchの必須項目検査を追加する。",
+      "status": "open"
+    }
+  ]
+}

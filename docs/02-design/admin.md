@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.20.0
+version: 0.21.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -17,7 +17,7 @@ scope: frontend-demo-1A
 
 各FR(機能要件)を満たすための処理と、テストで確認すべき条件(受入条件)を、この文書で決めます。参考にしているモック画面は、共通UIの見た目を考えるためだけに使います。
 
-**0.20.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.21.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 入力・責務
 
@@ -624,7 +624,7 @@ DD-A08: 請求を選択したらinvoices.getを必須取得し、InvoiceDetail.p
 
 A07の保存可否はContract.activeRestrictionIdsが空かつhasUnresolvedRecovery=false。A09の回復case解決で後継制限を解除しない。DeviceデモイベントのbindingIdはDeviceの取得値を使う（SR24/SR26）。
 
-現行0.20.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.21.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 A13/A14の境界はIR11のboundaryId（固定候補）とboundary（説明）を区別する。MRVは保存済み版の画面プレビューまででファイルexportは対象外（IR15）。
 

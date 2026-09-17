@@ -1,0 +1,20 @@
+gate_id: G1
+task_id: DOC-0.20.0
+reviewed_commit: 717c545cccff8ab11932fab016c854ff8526897f
+spec_baseline_id: 4f45da02ef91f0cf93075848d6ded3373878521740aa2f4047673eee709e4acc
+gate_result: fail
+reviewer: Codex independent review team (not Claude specification editor)
+scope: frontend-demo-1A
+counts: {blocker: 0, critical: 0, major: 1, minor: 4, question: 0}
+unresolved_findings: [G120-001, G120-002, G120-003, G120-004, G120-005]
+static_check: passed
+typescript_semantic_check: passed
+validator_mutation_check: passed
+mutation_cases: 84
+baseline_integrity_check: passed
+application_tests: not_run
+implementation_status: not_started
+production_connection_readiness: NOT_READY
+deployment_approval: false
+reason: AT-A12の継続時間前提が通知createdを満たさず、MAJOR 0件の合格条件を満たさない。通知・fixture・更新イベントにも残件あり。
+evidence_paths: [review.md, findings.json, static-check.json, validator-negative-checks.json, baseline-integrity-check.json]

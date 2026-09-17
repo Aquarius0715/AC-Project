@@ -1,4 +1,4 @@
-/** 0.20.0 / 1A frontend specification only; no implementation or HTTP contract.
+/** 0.21.0 / 1A frontend specification only; no implementation or HTTP contract.
  * Numeric/string constraints and policy guards: deterministic-contracts.md and strict-review-contracts.md and review-resolution-contracts.md (all sections).
  * Optional fields mean omitted input; output absence is explicit null.
  */
@@ -312,7 +312,7 @@ export type RepositoryCall = <K extends OperationName>(operation:K,context:Conte
 
 /** Subscription is synchronous and is not a Promise Repository operation. */
 /** IR71: fixed entity types; cursor_only carries no resource data. */
-export type ChangeEntityType = 'unit'|'device'|'measurement'|'command'|'diagnostic_run'|'device_operation'|'alert'|'notification'|'job'|'report'|'attachment'|'offer'|'assignment'|'plan'|'contract'|'invoice'|'payment'|'restriction'|'inquiry'|'automation'|'policy'|'consent'|'membership'|'organization'|'customer'|'property'|'space'|'capability'|'baseline'|'factor'|'mrv_report'|'offset_record'|'session'|'cursor_only';
+export type ChangeEntityType = 'unit'|'device'|'measurement'|'allergen_observation'|'command'|'diagnostic_run'|'device_operation'|'alert'|'notification'|'job'|'report'|'attachment'|'offer'|'assignment'|'plan'|'contract'|'invoice'|'payment'|'restriction'|'inquiry'|'automation'|'policy'|'consent'|'membership'|'organization'|'customer'|'property'|'space'|'capability'|'baseline'|'factor'|'mrv_report'|'offset_record'|'session'|'cursor_only';
 export type ChangeEvent = {generation:number;cursor:number;eventId:ID;entityType:ChangeEntityType;entityId:ID|null;version:number|null;occurredAt:Instant;changedFields:string[]};
 export type Subscribe = (context:Context,input:{afterCursor:number;resources:Exclude<ChangeEntityType,'cursor_only'>[];unitIds:ID[]},listener:(event:ChangeEvent)=>void)=>()=>void;
 export type AllergenObservation = {availability:'not_measured'|'unsupported'|'available';substance:string|null;value:number|null;unit:string|null;sourceLabel:string|null;observedAt:Instant|null;evidenceText:string|null};

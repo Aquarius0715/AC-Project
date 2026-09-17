@@ -1,0 +1,46 @@
+{
+  "task_id": "DOC-0.21.0",
+  "source_review": "../DOC-0.20.0/independent-g1/review.md",
+  "specification_editor": "Codex root",
+  "findings": [
+    {
+      "id": "G120-001",
+      "status": "resolved_independently_verified",
+      "acceptance_case": "AT-G121-001",
+      "contract": "IR103"
+    },
+    {
+      "id": "G120-002",
+      "status": "resolved_independently_verified",
+      "acceptance_case": "AT-G121-002",
+      "contract": "IR104"
+    },
+    {
+      "id": "G120-003",
+      "status": "resolved_independently_verified",
+      "acceptance_case": "AT-G121-003",
+      "contract": "IR104"
+    },
+    {
+      "id": "G120-004",
+      "status": "resolved_independently_verified",
+      "acceptance_case": "AT-G121-004",
+      "contract": "IR105"
+    },
+    {
+      "id": "G120-005",
+      "status": "resolved_independently_verified",
+      "acceptance_case": "AT-G121-005",
+      "contract": "IR106"
+    }
+  ],
+  "spec_baseline_id": "02a1e39793df35f760afe9188e86141c8790cd7e92366efbddb7f62aff62e908",
+  "additional_findings": [
+    {
+      "id": "UI21-001",
+      "status": "resolved_independently_verified",
+      "acceptance_case": "AT-G121-002",
+      "correction": "故障フィルターを既存の故障アイコン・ラベルへ修正"
+    }
+  ]
+}

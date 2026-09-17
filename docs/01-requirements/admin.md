@@ -1,6 +1,6 @@
 ---
 document_id: REQ-A
-version: 0.20.0
+version: 0.21.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # 管理者・HQ 要件定義書
 
-**0.20.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.21.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 目的と前提
 
@@ -321,9 +321,9 @@ CO₂・粉じん・湿度に加えて、アレルゲン(アレルギーの原�
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A12-N | automation.policy.manage権限あり。When: `acceptancePatches["AT-A12-N"]`（device-tamperにCO₂センサーを追加）を適用し、同じキーの`input`（co2 gte 1000、recoveryThreshold 900、durationSeconds 60、notify_and_ventilate、対象unit-online-rto・unit-non-rto、recipient hq-operator、enabled=true）で保存→automations.fire（occurredAt=01:00:00Z、両設備のco2=1100ppm、observedAt=00:59:00Z、valid） | ①Policyのversion=1 ②unit-online-rtoはresults=requested（ventilate low）でCommand1件・通知created、unit-non-rtoはresults=suppressed/invalid_capabilityで通知created（hq-operator宛の各1件） ③室内が改善したかどうかは、あとの測定まで表示しない |
+| AT-A12-N | hq-operator（automation.policy.manageあり）。`acceptancePatches["AT-A12-N"]`のinputを01:00Zで保存し、evaluation（両設備co2=1100 ppm、observedAt=occurredAt=01:00Z）でfire。flowどおり通常1秒tickを59回→さらに1回進め、01:01ZでfinalEvaluationの同tick結果を取得する（IR103）。simulator=false | ①Policy.version=1。開始・59秒時点は対象PolicyのAlert/Notification/Command各0件 ②60秒時点は各UnitにAlert1件・hq-operator宛通知1件（warning、inApp、simulated）。unit-online-rtoはrequested（ventilate low）でCommand1件、unit-non-rtoはsuppressed/invalid_capabilityでCommand0件 ③同tick再取得・再送で件数不変。室内の改善は後続測定まで未確認 |
 | AT-A12-E | ①ppmのしきい値にµg/m³を使う ②測定値がnull ③ventilation=falseなのにfan=true | ①VALIDATION ②判定には使わない ③送風で代用せず、Commandは0件 |
-| AT-A12-B | `acceptancePatches["AT-A12-N"]`で、換気対応1台・非対応1台に同じCO₂の方針を適用する | 対応している設備だけ換気を要求し、非対応の設備には通知のみを行う。保存前に、対象ごとの内容を表示する |
+| AT-A12-B | `acceptancePatches["AT-A12-N"]`とIR103の保存・現在Fact投入・60秒の通常tick経過を使い、換気対応1台・非対応1台に同じCO₂方針を適用する | 59秒までは通知・換気要求0件。60秒到達時は両台に通知し、対応設備だけ換気を要求する。保存前に対象ごとの内容を表示する |
 
 設計: [DD-A12](../02-design/admin.md#dd-a12-詳細)。親ケースAT-A12は、追跡表に登録されたN・E・Bのケースと、対象となるSRC・R01のすべてを確認して判定する。
 
@@ -425,7 +425,7 @@ CO₂・粉じん・湿度に加えて、アレルゲン(アレルギーの原�
 
 2026-09-16承認反映: FR-A07/A09: active制限中の契約編集は拒否し、取消/解除完了後に許可する（SR19）。FR-A15: failedの同一記録を新attemptで失敗段階だけ再試行し、償却失敗では購入済み参照を保持する（SR18）。
 
-現行0.20.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.21.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 0.15.0: FR-A06の品質確認はIR29の完了日時とIR31の全寄与者による自己承認禁止を適用する。
 

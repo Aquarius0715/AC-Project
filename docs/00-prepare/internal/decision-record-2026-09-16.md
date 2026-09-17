@@ -1,6 +1,6 @@
 ---
 document_id: DEC-12
-version: 0.20.0
+version: 0.21.0
 status: accepted-for-demo
 scope: frontend-demo-1A
 ---

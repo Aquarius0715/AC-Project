@@ -11,7 +11,7 @@ import subprocess
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN = ROOT / '04-agentic-sdlc/runs/DOC-0.20.0'
+RUN = ROOT / '04-agentic-sdlc/runs/DOC-0.21.0'
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--write-baseline', action='store_true', help='Rehash current documents after static checks; does not approve G1')
 parser.add_argument('--tsc', type=Path, help='Path to installed TypeScript lib/tsc.js; optional semantic check')
@@ -871,7 +871,7 @@ for key in sorted(referenced_keys - set(AP)):
 for key in sorted(case_keys - referenced_keys):
     fail('Acceptance patch not referenced by acceptance text (IR92) '+key)
 ir92 = resolution[resolution.index('## IR92 '):resolution.index('## IR93 ')] if '## IR92 ' in resolution and '## IR93 ' in resolution else ''
-listed = set(re.findall(r'AT-(?:[A-Z]\d\d|REV\d\d)-[A-Z0-9]+(?:\.\d)?', ir92.split('6. ')[1].split('\n')[0])) if '6. ' in ir92 else set()
+listed = set(re.findall(r'AT-(?:[A-Z]\d\d|REV\d\d|G\d{3})-[A-Z0-9]+(?:\.\d)?', ir92.split('6. ')[1].split('\n')[0])) if '6. ' in ir92 else set()
 if listed != case_keys:
     fail('IR92 acceptance patch case list differs from fixture: '+str(sorted(listed ^ case_keys)))
 def _instant(value):
@@ -889,6 +889,19 @@ def _expand(key, trail=()):
 series_keys = {'idPrefix','unitId','sensorId','metric','unit','boundaryId','from','to','stepSeconds','value','origin','quality','sequenceStart','skip'}
 METRIC_RANGE = {('temperature','°C'):(-50,100), ('humidity','%'):(0,100), ('co2','ppm'):(0,10000), ('pm25','µg/m³'):(0,1000), ('power','kW'):(0,100), ('vibration','mm/s'):(0,100), ('refrigerant_pressure','kPa'):(0,5000)}  # D07
 sensor_ids_all = {s['id'] for d in seed.get('devices', []) for s in d.get('sensors', [])}
+def validate_notification_scope(notifications, actors, label):
+    memberships = {a['membershipId']:a for a in actors}
+    for notification in notifications:
+        recipient = memberships.get(notification.get('recipientMembershipId'))
+        if recipient is None:
+            fail('Notification scope snapshot invalid (IR106) '+label+': recipient absent')
+            continue
+        value = notification.get('scopeVersionAtCreation', recipient.get('scopeVersion'))
+        # bool is an int subclass in Python but is not a JSON integer scope version.
+        if type(value) is not int or value < 0:
+            fail('Notification scope snapshot invalid (IR106) '+label+': '+notification['id'])
+
+validate_notification_scope(seed.get('notifications', []), fixture['actors'], 'seed')
 for key in sorted(k for k in AP if k.startswith('AT-') or k.startswith('shared:')):
     state = _copy.deepcopy(seed); actors = _copy.deepcopy(fixture['actors'])
     generated = []
@@ -920,9 +933,12 @@ for key in sorted(k for k in AP if k.startswith('AT-') or k.startswith('shared:'
             rows_.append({id_field:patch['id'], **patch['set']})
         else:
             unknown = set(patch['set']) - set(row)
+            if entity == 'notifications':
+                unknown.discard('scopeVersionAtCreation')  # optional seed field, required after IR106 normalization
             if unknown:
                 fail(f'Acceptance patch sets unknown fields (IR92) {key}: {sorted(unknown)}')
             row.update(patch['set'])
+    validate_notification_scope(state.get('notifications', []), actors, key)
     # IR97 1-3: fixture invariants hold after every patch set.
     for m in state['measurements']:
         low_high = METRIC_RANGE.get((m['metric'], m['unit']))
@@ -1017,6 +1033,125 @@ if 'switchMembership' not in next(c for c in components if c['component']=='AppS
     fail('AppShell role switch event absent (IR102)')
 report_020 = {'review_020_cases':len(review_020), 'proposed_decisions_020':sum(d['status']=='proposed' for d in decisions_020)}
 
+# 0.21.0 independent G1 corrections. These checks validate specification contracts,
+# not an implemented event bus or policy engine.
+def contract_section(number):
+    match = re.search(r'^## IR'+str(number)+r' .*?(?=^## |\Z)', resolution, re.M | re.S)
+    return match.group(0) if match else ''
+
+def contract_table(section):
+    return [[cell.strip().strip('`') for cell in line.strip().strip('|').split('|')]
+            for line in section.splitlines() if line.startswith('|')
+            and not re.match(r'^\|[\s:|-]+\|$', line)]
+
+change_type = re.search(r'export type ChangeEntityType = ([^;]+);', types)
+change_entities = set(re.findall(r"'([^']+)'", change_type.group(1))) if change_type else set()
+invalidation = {cells[0]:{op.strip() for op in cells[1].split(',')}
+                for cells in contract_table(contract_section(71)) if len(cells)==2}
+if 'allergen_observation' not in change_entities:
+    fail('Allergen change entity absent (IR105)')
+if invalidation.get('allergen_observation') != {'telemetry.series'}:
+    fail('Allergen query invalidation differs (IR105)')
+
+notification_rows = {cells[0]:cells[1:] for cells in contract_table(contract_section(104))
+                     if len(cells)==3 and cells[0]!='templateKey'}
+expected_notification_rows = {
+    'alert':['maintenance→cleaning_due; sensor/tamper/reconciliation_required→fault; quality→quality', 'sourceAlert.severity'],
+    'quality':['quality','sourcePolicy.severity'],
+    'payment_reminder':['payment_reminder','warning'],
+    'restriction':['restriction','scheduled/requested/applied/release_requested→warning; released/cancelled→normal'],
+    'device_operation':['device_operation','warning'],
+    **{key:[key,'normal'] for key in ['schedule_change','report_return','completion','payment','inquiry','job_update']},
+}
+if notification_rows != expected_notification_rows:
+    fail('Notification type or severity mapping differs (IR104)')
+notification_enum = re.search(r'export type NotificationType = ([^;]+);', types)
+notification_types = set(re.findall(r"'([^']+)'", notification_enum.group(1))) if notification_enum else set()
+for template, (classification, _) in notification_rows.items():
+    targets = {'cleaning_due','fault','quality'} if template=='alert' else {classification}
+    if not targets <= notification_types:
+        fail('Notification mapped type absent from DTO (IR104) '+template)
+for cells in contract_table(contract_section(95)):
+    if len(cells)==4 and cells[0]!='イベント' and cells[1] not in notification_rows:
+        fail('Business notification template unmapped (IR104) '+cells[1])
+for number, required in {
+    95:['templateKey=alertはIR10のAlert分類に従い、それ以外はtemplateKeyとtypeを同名にする'],
+    103:['保存前の履歴や遅着FactのobservedAtを開始時刻にしない', '新規保存ではカウンタを0から開始する', '成立前は通知suppressed/not_due'],
+    104:['device_operation.failedは非同期のシステムイベント', 'actor=system-demo'],
+    105:["ChangeEvent.entityType='allergen_observation'", '同じDemoTrigger.eventIdの再送は行と変更イベントを増やさない', 'C07/A12はこのresourcesを購読'],
+    106:['scopeVersionAtCreationが省略されている場合、全patch適用後のrecipientMembershipIdで引いたMembership.scopeVersionを設定する', '明示したscopeVersionAtCreationは非負整数であることを検証して保持し', '生成後にMembership.scopeVersionが変わっても既存通知の値は変更しない'],
+}.items():
+    for guard in required:
+        if guard not in contract_section(number):
+            fail(f'0.21 behavioral guard missing (IR{number}) '+guard)
+
+# Follow the fixture's sequence, checking elapsed time rather than accepting a
+# backdated observation as evidence of a duration already spent under the policy.
+a12 = AP.get('AT-A12-N', {})
+try:
+    duration = a12['input']['durationSeconds']
+    initial = a12['evaluation']; final = a12['finalEvaluation']
+    start = _instant(a12['clock'])
+    if duration != 60 or _instant(initial['occurredAt']) != start or any(_instant(f['observedAt']) != start for f in initial['facts']):
+        raise ValueError('initial observation is not at policy evaluation start')
+    if (set(initial['unitIds']) != set(a12['input']['unitIds'])
+            or {f['unitId'] for f in initial['facts']} != set(initial['unitIds'])
+            or final['facts'] != initial['facts'] or final['unitIds'] != initial['unitIds']
+            or initial['eventId'] == final['eventId']
+            or (_instant(final['occurredAt'])-start).total_seconds() != duration):
+        raise ValueError('final evaluation does not preserve the held facts and elapsed duration')
+    elapsed = 0; assertions = []; calls = []
+    for step in a12['flow']:
+        operation = step['operation']
+        if operation=='clock.tick':
+            if step.get('stepSeconds')!=1 or type(step.get('seconds')) is not int or step['seconds']<=0:
+                raise ValueError('clock must advance by ordinary one-second ticks')
+            elapsed += step['seconds']
+        elif operation=='assert':
+            if step['elapsedSeconds'] != elapsed:
+                raise ValueError('boundary assertion is at the wrong elapsed time')
+            assertions.append(elapsed)
+        elif operation in ('policies.save','automations.fire'):
+            calls.append((operation,step['inputRef'],elapsed))
+        else:
+            raise ValueError('unsupported duration flow operation')
+    if (elapsed != duration or assertions != [0,duration-1,duration]
+            or calls != [('policies.save','input',0),('automations.fire','evaluation',0),('automations.fire','finalEvaluation',duration)]):
+        raise ValueError('save, evaluate and boundary clock sequence differs')
+    expected_boundaries = [dict(elapsedSeconds=e, alertCount=a, notificationCount=n, commandCount=c)
+                           for e,a,n,c in [(0,0,0,0),(duration-1,0,0,0),(duration,2,2,1)]]
+    if a12['expected']['boundaries'] != expected_boundaries:
+        raise ValueError('policy-scoped boundary counts differ')
+except (KeyError, TypeError, ValueError) as error:
+    fail('A12 continuity fixture invalid (IR103): '+str(error))
+
+review_021_path = ROOT/'04-agentic-sdlc/acceptance-review-021.csv'
+review_021 = rows(str(review_021_path.relative_to(ROOT))) if review_021_path.exists() else []
+if unique(review_021, 'issue_id', '0.21 finding') != {f'G120-{i:03}' for i in range(1,6)}:
+    fail('0.21 review must cover G120-001 through G120-005')
+unique(review_021, 'case_id', '0.21 review case ID')
+for case in review_021:
+    path, _, fragment = case['contract'].partition('#')
+    if not (ROOT/path).is_file() or fragment not in anchors(ROOT/path):
+        fail('Broken 0.21 review contract '+case['case_id'])
+    if case['execution_status']!='not_run' or not all(case[k] for k in ['given','when','then']):
+        fail('Invalid 0.21 review acceptance '+case['case_id'])
+    if case['decision_status'] not in {'proposed','specified'} or not set(case['requirement_ids'].split(';')) <= expected:
+        fail('Invalid 0.21 review status or requirement '+case['case_id'])
+for row in trace:
+    wanted = {c['case_id'] for c in review_021 if row['requirement_id'] in c['requirement_ids'].split(';')}
+    if set(filter(None,row.get('review_021_case_ids','').split(';'))) != wanted:
+        fail('0.21 review trace drift '+row['requirement_id'])
+decisions_021_path = ROOT/'00-prepare/internal/review-decisions-021.json'
+decisions_021 = json.loads(decisions_021_path.read_text())['decisions'] if decisions_021_path.exists() else []
+if {d['id'] for d in decisions_021} != {'DEC-60','DEC-61'}:
+    fail('0.21 decisions must be DEC-60 and DEC-61')
+for decision in decisions_021:
+    if decision['status']!='proposed' or decision.get('decision_status')!='proposed' or decision.get('reversible') is not True or not all(decision.get(k) for k in ['proposed_by','proposed_at','owner','contract','issue_id']):
+        fail('0.21 proposed decision lacks provenance '+decision['id'])
+    if any('## '+section+' ' not in resolution for section in decision['contract'].split(';')) or decision['id'] not in resolution:
+        fail('0.21 decision contract absent '+decision['id'])
+
 typescript_check = 'not_run'
 if args.tsc:
     checked = subprocess.run(['node', str(args.tsc), '--strict', '--noEmit', '--target', 'ES2022', '--lib', 'ES2022,DOM', str(ROOT / '02-design/service-contracts.ts')], capture_output=True, text=True)
@@ -1037,7 +1172,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.20.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.21.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')
@@ -1055,5 +1190,6 @@ report['review_018_cases'] = len(review_018)
 report['proposed_decisions_018'] = sum(d['status']=='proposed' for d in decisions_018)
 report.update(report_019)
 report.update(report_020)
+report.update(review_021_cases=len(review_021), proposed_decisions_021=len(decisions_021))
 print(json.dumps(report,ensure_ascii=False,indent=2))
 sys.exit(1 if errors else 0)
