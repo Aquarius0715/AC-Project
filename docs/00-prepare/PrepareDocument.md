@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.19.0
+version: 0.20.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -234,6 +234,8 @@ updated: 2026-09-17
 1AではOPEN-01/02/07/08/09/10のデモ採用判断をDEC-12で完了とする。これらの商用確認とOPEN-03〜06/11の本番検討は残すが、1Aの未解決欠陥として数えない。独立AIレビューをG1とし、人および外部レビュアーによるデプロイ前の最終確認は別の必須工程とする。
 
 0.11.0技術修正は[DEC-15](internal/decision-record-2026-09-16.md#dec-15-再レビュー修正の技術的具体化0110)を参照。既存1A範囲の具体化であり独立承認は未取得。
+
+0.19.0の成果物に対する別エージェントの独立G1（G1-001〜031、判定FAIL）を受けて0.20.0で採用した可逆的な設計提案は[DEC-54〜59](internal/review-decisions-020.json)にPROPOSEDとして記録し、企業検収前にProduct Owner／Business／Security／UI/UX／IoT／QAが確認する（IR94〜102）。
 
 0.19.0の独立レビュー（REV19-001〜042）で採用した可逆的な設計提案は[DEC-42〜53](internal/review-decisions-019.json)にPROPOSEDとして記録し、企業検収前にProduct Owner／Business／Security／UI/UX／IoTが確認する（IR75〜93）。このうち管理ダッシュボードの「削減量の予想」の算出方法（DEC-44、案A）と作業窓終了時の扱い（DEC-50）は、2026-09-17のユーザー回答で1A仕様として確定した（企業の商用承認とは区別する）。
 

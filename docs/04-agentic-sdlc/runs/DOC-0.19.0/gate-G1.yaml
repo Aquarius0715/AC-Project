@@ -1,12 +1,12 @@
 gate_id: G1
 task_id: DOC-0.19.0
-gate_result: pending
+gate_result: fail  # 別エージェントの独立G1判定（independent-g1/gate-decision.yaml）。DOC-0.20.0で修正
 spec_baseline_id: 048ffcef25f8463bca33346f5bb1dd8dbb1fdad03b61132d1cfc5d17ebeb1ac2
 reviewed_target: DOC-0.18.0 working tree (uncommitted, no baseline)
 reviewer_agent: independent-review-opus-5 (本会話。DOC-0.18.0の修正担当セッションとは別)
 specification_editor: independent-review-opus-5 (本会話、同一エージェント)
 orchestrator: independent-review-opus-5 (本会話)
-independent_post_correction_review: requested  # 別エージェントへ依頼。判定結果は independent-g1/ に記録する
+independent_post_correction_review: completed  # 判定FAIL（MAJOR 12・MINOR 17・QUESTION 2）。independent-g1/ に記録
 self_rereview_after_correction: completed  # 1回目でREV19-037、3回目（受入前提の全件点検）でREV19-038〜042を検出し修正、最終回で未解決0件
 application_tests: not_run
 implementation_status: not_started

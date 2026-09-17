@@ -1,6 +1,6 @@
 ---
 document_id: REQ-A
-version: 0.19.0
+version: 0.20.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # 管理者・HQ 要件定義書
 
-**0.19.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.20.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 目的と前提
 
@@ -145,7 +145,7 @@ scope: frontend-demo-1A
 
 窓が開いている、または断熱が不足していることが原因と考えられる負荷の増加を通知する。対象の設備、時刻、根拠、確認・保守への導線もあわせて表示する。
 
-**追加受入条件 AT-A05-SRC**: 「窓が開いている疑いがある」「断熱不足の点検記録がある」「根拠がない」という3つのfixtureを用意する。それぞれ文言・根拠・時刻が異なり、既読にしても異常そのものは解消しない。
+**追加受入条件 AT-A05-SRC**: `acceptancePatches["AT-A05-SRC"]`（IR98）の「窓が開いている疑いがある」「断熱不足の点検記録がある」「根拠がない」という3つのfixtureを用意する。それぞれ文言・根拠・時刻が異なり、既読にしても異常そのものは解消しない。
 
 - **企業要望の根拠**: SRC-06 BIZ-08, BIZ-11, BIZ-17 — 異常を事前に、または発生した時点で把握し、すぐに通知する。振動・高温・冷媒の低下・微小な漏れ・フィルターの詰まりなどを早く見つける。生活パターンや天候に応じた運転を行い、開いた窓や断熱不足による負荷を通知する。
 - **設計補完の範囲**: しきい値の設定と異常の処理。
@@ -158,7 +158,7 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A05-N | alert.policy.manage権限あり。When: unitIds=[unit-online-rto]、metric=temperature、gte 30°C、duration=60秒、severity=warning、recipient=customer-a、channel=inAppで保存し、simulator=falseで合成値30°Cが60秒続く | ①Policyのversion=1 ②Alertが1件、Notificationのプレビューが1件作られる ③通知を既読にしてもAlertの状態は変わらない |
+| AT-A05-N | alert.policy.manage権限あり。When: `acceptancePatches["AT-A05-N"]`の`input`（name、unitIds=[unit-online-rto]、temperature gte 30、recoveryThreshold 28、durationSeconds 60、warning、recipient customer-a、inApp、cooldown 5、escalate 60、enabled=true）で保存し、simulator=falseでunit-online-rtoのtemperature 30.0°Cをdemo.triggerで投入して時計を60秒進める | ①Policyのversion=1 ②Alertが1件、customer-a宛のNotification（deliveryState=simulated）が1件作られる ③通知を既読にしてもAlertの状態は変わらない |
 | AT-A05-E | 宛先=[]、続く時間=0秒、回復のしきい値の向きが逆、という条件で保存する。しきい値の直前・一致、続く時間の直前・一致も確認する | 宛先0・続く時間0・回復の向きが逆はVALIDATIONとなり保存されない。gte(以上)のしきい値が100のとき、99では発火せず、100が指定秒数続いた時点で発火する。続く時間の直前では発火しない |
 | AT-A05-B | ①missing(欠測)またはstale(古いデータ) ②cooldown中に同じ重大度が再発する ③重大度が上がる | ①測定の判定には使わず、品質に関する通知になる ②通知は抑えられる ③新しい通知になる |
 
@@ -247,7 +247,7 @@ HQは、クライアントが選んだ模擬クレジットカード・模擬デ
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-A09-N | hq-restriction-manager、期限超過のinvoice-overdue-a、オンラインのunit-online-rtoとオフラインのunit-offline-rto。When: schedule(power_off)→実行時刻(executeAfter)に時計を進める(セッションはIR36により失効しない)→execute→オンライン機が応答→全額入金→restrictions.release→全機が応答 | ①scheduledになる ②requestedになり、Commandが2件できる ③1台がappliedになり、全体としてはrequestedのまま ④入金確認の遷移でrelease_requestedになりonline適用機にremove Commandが1件できる。続くreleaseは冪等で同じ状態を返しCommandを増やさない(IR35) ⑤releasedになる |
-| AT-A09-E | ①実行の直前に全件入金される ②猶予中 ③未通知 ④対応していない機器 ⑤一部がオフライン ⑥解除に失敗する ⑦解除要求のあとに遅れて適用の応答が届く | ①cancelledになり、Commandは0件 ②③④D01による単一エラー ⑤設備ごとに保留と表示される ⑥release_requestedのまま保持される ⑦appliedには戻らない |
+| AT-A09-E | ①実行の直前に全件入金される ②猶予中 ③予告の宛先となる顧客Membershipが0件（全対象Unitを閲覧できるclientがいない）でschedule（IR102） ④対応していない機器 ⑤一部がオフライン ⑥解除に失敗する ⑦解除要求のあとに遅れて適用の応答が届く | ①cancelledになり、Commandは0件 ②④D01による単一エラー ③VALIDATION（IR05）、Restriction 0件 ⑤設備ごとに保留と表示される ⑥release_requestedのまま保持される ⑦appliedには戻らない |
 | AT-A09-B | ①通知の期限の直前 ②期限と一致 ③HQの確認がない ④対象2台のうち一部だけ応答／全件応答 | ①拒否される ②実行できる ③要求は0件 ④一部応答ならrequested、全件成功ならapplied |
 
 **追加受入条件 AT-A09-R01（再訪・競合・役割横断）**
@@ -272,8 +272,8 @@ HQは、クライアントが選んだ模擬クレジットカード・模擬デ
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-A10-N | restriction.manage権限とoverride権限あり。When: appliedの状態でexempt(未来の期限)にする→override_release | ①exceptionが保存され、変更の前後が記録される ②release_requestedになり、Invoiceはunpaidのまま |
-| AT-A10-E | ①override権限なしで手動解除する ②理由が空 ③過去の日付を期限にする ④requested中にcancelする | ①FORBIDDEN ②③VALIDATION ④解除の流れに進み、適用の可能性を0とは推定しない |
-| AT-A10-B | hq-restriction-managerがrestriction-limited-aのstateをsubcaseごとにpatchして（IR92の4） ①scheduledの状態でcancelする ②requestedの状態でcancelする ③appliedの状態でexemptにする ④例外の期限に一致したあと | ①cancelledになる ②release_requestedになる ③exception属性を保存しrelease_requestedになる ④自動での再適用はない |
+| AT-A10-E | ①override権限なしで手動解除する ②理由が空 ③過去の日付を期限にする ④requested中にcancelする | ①FORBIDDEN ②③VALIDATION ④release_requested（releaseIntent.source=cancel、IR96）で解除の流れに進み、適用の可能性を0とは推定しない |
+| AT-A10-B | hq-restriction-managerが通常の操作で状態を作る（IR97の3） ①AT-C12-Nと同じscheduledのRestrictionをcancelする ②①をexecuteしたrequestedのRestrictionをcancelする ③seedのappliedのrestriction-limited-aをexemptにする ④③の例外期限まで時計を進めたあと | ①cancelledになる ②release_requestedになり、releaseIntent.source=cancel（IR96） ③exception属性を保存しrelease_requestedになる ④自動での再適用はない |
 
 設計: [DD-A10](../02-design/admin.md#dd-a10-詳細)。親ケースAT-A10は、追跡表に登録されたN・E・Bのケースと、対象となるSRC・R01のすべてを確認して判定する。
 
@@ -290,7 +290,7 @@ HQは、クライアントが選んだ模擬クレジットカード・模擬デ
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A11-N | automation.policy.manage権限あり。When: unitIds=[unit-online-rto]、condition=tariff gt 0.6 MYR/kWh、action=set_temperature 26、priority=60で保存し、合成イベントを評価する | ①Policyのversion=1 ②シミュレーションが、採用・抑止とその理由を返す ③実際の発火はCommandを経由する |
+| AT-A11-N | automation.policy.manage権限あり。When: `acceptancePatches["AT-A11-N"]`の`input`（name、unitIds=[unit-online-rto]、tariff gt 0.6 MYR_per_kWh、set_temperature 26、priority=60、timezone、enabled=true）で保存し、automations.simulate（occurredAt=now、facts=[unit-online-rtoのtariff 0.7 MYR_per_kWh、observedAt=now、valid]）で評価する | ①Policyのversion=1 ②シミュレーションが、採用・抑止とその理由を返す ③実際の発火はCommandを経由する |
 | AT-A11-E | HQと顧客のルールが競合する場合／同じpriorityのHQルールが2件ある場合／solarの値がnullで評価する場合 | HQのルールを採用し、顧客のルールは抑止する。同じpriorityのときはID順にし、いつも同じ結果になる。solar=nullのときはスキップの理由を表示し、そのルールのCommandは0件になる |
 | AT-A11-B | ①HQと顧客のルールが同時に成立する ②同じ階層でpriority=50と60 ③同じ値でID=a/b ④条件がnull | ①HQが採用される ②60が採用される ③aが採用される ④スキップされる |
 
@@ -308,7 +308,7 @@ HQは、クライアントが選んだ模擬クレジットカード・模擬デ
 
 CO₂・粉じん・湿度に加えて、アレルゲン(アレルギーの原因物質)の情報があるかどうかと、その出どころを表示する。まだ計測していないことを「検出されなかった」とは解釈しない。
 
-**追加受入条件 AT-A12-SRC**: 「未計測」「非対応」「合成した観測値」という3つのfixtureで表示を切り替え、未計測のときに0や「安全」と表示しない。数値の単位が欠けている場合は「不明」と表示する。
+**追加受入条件 AT-A12-SRC**: 「未計測」（unit-limited）「非対応」（unit-non-rto）「合成した観測値」（unit-online-rto）の3つのfixture（IR98）と単位欠落の`acceptancePatches["AT-A12-SRC.4"]`で表示を切り替え、未計測のときに0や「安全」と表示しない。数値の単位が欠けている場合は「不明」と表示する。
 
 - **企業要望の根拠**: SRC-06 BIZ-18, BIZ-19 — CO₂濃度、粉じん、湿度、アレルゲンなどを把握し、清掃・換気の案内を行う。CO₂が上昇したときに外気を取り入れるなどして、空気環境を改善する。
 - **設計補完の範囲**: 換気のルールと、データが欠けている場合の扱い。
@@ -321,9 +321,9 @@ CO₂・粉じん・湿度に加えて、アレルゲン(アレルギーの原�
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A12-N | automation.policy.manage権限あり。When: fixture.airPolicyNotificationInputの必須通知設定を入力し、metric=co2、threshold=1000ppm、responseMode=notify_and_ventilate、対象2台(換気対応のunit-online-rto・非対応のunit-non-rto)で保存→評価する | ①Policyのversion=1 ②対応している設備にはventilateのCommandが1件、対応していない設備には通知のみ ③室内が改善したかどうかは、あとの測定まで表示しない |
+| AT-A12-N | automation.policy.manage権限あり。When: `acceptancePatches["AT-A12-N"]`（device-tamperにCO₂センサーを追加）を適用し、同じキーの`input`（co2 gte 1000、recoveryThreshold 900、durationSeconds 60、notify_and_ventilate、対象unit-online-rto・unit-non-rto、recipient hq-operator、enabled=true）で保存→automations.fire（occurredAt=01:00:00Z、両設備のco2=1100ppm、observedAt=00:59:00Z、valid） | ①Policyのversion=1 ②unit-online-rtoはresults=requested（ventilate low）でCommand1件・通知created、unit-non-rtoはresults=suppressed/invalid_capabilityで通知created（hq-operator宛の各1件） ③室内が改善したかどうかは、あとの測定まで表示しない |
 | AT-A12-E | ①ppmのしきい値にµg/m³を使う ②測定値がnull ③ventilation=falseなのにfan=true | ①VALIDATION ②判定には使わない ③送風で代用せず、Commandは0件 |
-| AT-A12-B | 換気対応1台・非対応1台に、同じCO₂の方針を適用する | 対応している設備だけ換気を要求し、非対応の設備には通知のみを行う。保存前に、対象ごとの内容を表示する |
+| AT-A12-B | `acceptancePatches["AT-A12-N"]`で、換気対応1台・非対応1台に同じCO₂の方針を適用する | 対応している設備だけ換気を要求し、非対応の設備には通知のみを行う。保存前に、対象ごとの内容を表示する |
 
 設計: [DD-A12](../02-design/admin.md#dd-a12-詳細)。親ケースAT-A12は、追跡表に登録されたN・E・Bのケースと、対象となるSRC・R01のすべてを確認して判定する。
 
@@ -342,7 +342,7 @@ CO₂・粉じん・湿度に加えて、アレルゲン(アレルギーの原�
 |---|---|---|
 | AT-A13-N | energy.manage権限あり、`acceptancePatches["AT-A13-N"]`（unit-online-rtoの実績80kWh）。When: unitIds=[unit-online-rto]、期間[2026-09-14T00:00Z, 01:00Z)、boundaryId=ac_input_electricity、method=demo_fixed、基準100kWhを保存→実績80kWhと比較する | ①Baselineのversion=1 ②差は20kWh、20% ③補正モデルがまだない場合は「補正済み」と表示しない |
 | AT-A13-E | AT-C06-E.2〜.4と同じpatchで 基準が0／実績が欠けている／設備の集合や境界が一致しない／基準100と実績80、基準100と実績120で比較する | 基準0のときは割合はnullになる。実績が欠けている場合は品質の注記が付く。設備の集合・境界が違う場合は差を計算できない。100と80なら20kWh・20%、100と120ならDTO値-20kWh・-20%で表示は「増加 20.0 kWh／増加 20.0%」(IR68) |
-| AT-A13-B | ①同じ境界で100/80 ②100/120 ③基準のバージョンを更新する | ①20kWh/20% ②DTO -20kWh/-20%、表示「増加 20.0 kWh／増加 20.0%」 ③新しいバージョンになり、古いMRVは変わらない |
+| AT-A13-B | ①同じ境界で100/80（`acceptancePatches["AT-A13-N"]`） ②100/120（`acceptancePatches["AT-C06-E.3"]`の2台） ③基準のバージョンを更新する | ①20kWh/20% ②DTO -20kWh/-20%、表示「増加 20.0 kWh／増加 20.0%」 ③新しいバージョンになり、古いMRVは変わらない |
 
 設計: [DD-A13](../02-design/admin.md#dd-a13-詳細)。親ケースAT-A13は、追跡表に登録されたN・E・Bのケースと、対象となるSRC・R01のすべてを確認して判定する。
 
@@ -359,15 +359,15 @@ CO₂・粉じん・湿度に加えて、アレルゲン(アレルギーの原�
 
 - **利用開始条件**: mrv.manage権限があること。対象期間、設備、基準のバージョン、係数のバージョン、境界が選ばれていること。
 - **基本フロー**: 計算の条件を指定する → 測定・品質・計算結果をプレビューする → 根拠を確認する → ドラフトとして保存する → デモの確認履歴・報告のプレビューを表示する。
-- **業務規則 BR-A14**: 係数には、地域・年度・単位・出典が必須。確認した履歴はdemo_reviewed(デモ確認済み)とし、外部の正式な認証とは区別する。入力のバージョンが変わったら新しい報告バージョンを作り、古い結果はそのまま残す。
+- **業務規則 BR-A14**: 係数には、地域・年度・出典が必須（単位はkgCO₂e/kWh固定、IR88/IR102）。確認した履歴はdemo_reviewed(デモ確認済み)とし、外部の正式な認証とは区別する。入力のバージョンが変わったら新しい報告バージョンを作り、古い結果はそのまま残す。
 - **完了後の業務状態**: MRVReportに、係数・基準のスナップショット(その時点の内容)への参照と、計算結果・品質・確認履歴(reviewHistory)を保存する。プレビューしただけでは、確定した記録は作らない。
-- **境界条件・禁止事項**: 係数が欠けている、単位が合っていない、coverage(対象範囲)が0、同じ報告バージョンに重複して確認することを確認する。まだ検証していない値を「認証済み」と表示しない。
+- **境界条件・禁止事項**: 係数が欠けている、coverage(対象範囲)が0、同じ報告バージョンに重複して確認することを確認する。まだ検証していない値を「認証済み」と表示しない。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-A14-N | mrv.manage権限あり、`acceptancePatches["AT-A14-N"]`（実績80kWh、基準baseline-energy-100、係数factor-demo-2026）。When: organizationId=org-customer-a、unitIds=[unit-online-rto]、同じ期間で条件を指定→プレビュー→ドラフト保存→recordReview(確認記録) | ①プレビューしただけでは記録は0件 ②MRVReportがdraftになり、係数・基準のスナップショットが残る ③reviewHistoryが1件でき、status=demo_reviewedになる |
-| AT-A14-E | 係数がない／係数の単位が合っていない／coverage=0でプレビューする／同じバージョンに同じ確認を2回送る | 係数なし・単位不一致・coverage0はいずれも「算定未完了」となり、「認証済み」とは表示しない。同じバージョンへの同じ確認の再送は、既存の結果を返し、履歴は増やさない |
-| AT-A14-B | ①地域・年度・単位・出典がある ②ない ③入力バージョンを変えたあとで保存する | ①算定できる ②算定未完了になる ③新しい報告バージョンができ、古い結果は残る |
+| AT-A14-E | 係数がない／coverage=0でプレビューする／同じバージョンに同じ確認を2回送る | 係数なし・coverage0はいずれも「算定未完了」となり、「認証済み」とは表示しない。同じバージョンへの同じ確認の再送は、既存の結果を返し、履歴は増やさない |
+| AT-A14-B | ①地域・年度・出典がある ②ない ③入力バージョンを変えたあとで保存する | ①算定できる ②算定未完了になる ③新しい報告バージョンができ、古い結果は残る |
 
 **追加受入条件 AT-A14-R01（再訪・競合・役割横断）**
 
@@ -396,7 +396,7 @@ CO₂・粉じん・湿度に加えて、アレルゲン(アレルギーの原�
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A15-N | offset.manage権限あり。When: amountKg=1→見積もり→request→purchase_confirm→retire | ①quotedになる ②demo_requestedになる ③demo_purchasedになる ④demo_retiredになり、demoCertificateRef(証明参照)にDEMO-接頭辞がつく |
+| AT-A15-N | offset.manage権限あり、`acceptancePatches["AT-C13-N"]`。When: customerId=cust-a、purpose=Demo offset、period=[2026-09-14T00:00Z, 01:00Z)、unitIds=[unit-online-rto]、amountKg=1で見積もり→offsets.simulateでrequest（quoteId・quoteVersion）→purchase_confirm→retire（recordId・attemptId・eventId）。全イベントにdemoConfirmed=true | ①quotedになる ②demo_requestedになる ③demo_purchasedになる ④demo_retiredになり、demoCertificateRef(証明参照)にDEMO-接頭辞がつく |
 | AT-A15-E | ①未購入でretireする ②retireを二重に行う ③amountKg=0 ④期限切れの見積もり ⑤別テナントの記録を操作する ⑥購入に失敗する | ①②CONFLICT ③VALIDATION ④CONFLICT ⑤NOT_FOUND ⑥failedになり、直前の状態(previousState)を保持する |
 | AT-A15-B | ①quoted ②requested ③purchased ④retired ⑤failed | それぞれの段階のラベルが表示される。購入・確認・償却は別のイベントとして扱われる |
 
@@ -425,7 +425,7 @@ CO₂・粉じん・湿度に加えて、アレルゲン(アレルギーの原�
 
 2026-09-16承認反映: FR-A07/A09: active制限中の契約編集は拒否し、取消/解除完了後に許可する（SR19）。FR-A15: failedの同一記録を新attemptで失敗段階だけ再試行し、償却失敗では購入済み参照を保持する（SR18）。
 
-現行0.19.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.20.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 0.15.0: FR-A06の品質確認はIR29の完了日時とIR31の全寄与者による自己承認禁止を適用する。
 

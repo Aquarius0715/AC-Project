@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.19.0
+version: 0.20.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -15,7 +15,7 @@ scope: frontend-demo-1A
 
 設計の対象になる機能・画面項目・状態・例外は、企業原文と対応する要件をもとにします。各FR(機能要件)を満たすための処理と、受入条件(合格の基準)をこの文書で決めます。参考にしているモック画面は、共通UIの見た目を考えるためだけに使います。
 
-**0.19.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.20.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 1. 構成と責任
 
@@ -178,11 +178,11 @@ Payment(支払い)は、initiated(開始)→processing(処理中)→confirmed(�
 | scheduled | 原因になった請求がすべて入金確認された、または取消・猶予・例外になった | cancelled(取消) / scheduled(予定日を変える、または適用を保留し、理由をつける) |
 | requested | 対象設備から適用の応答がある | 全台成功ならapplied(適用済み)。一部が未応答ならrequestedのまま、設備ごとの状態を表示する |
 | requested | オフライン・失敗・期限切れ | requestedのまま、pendingReason(保留の理由)とcommandの結果を保持する。自動で成功にしたり、再送したりしない |
-| requested / applied | 原因になった請求がすべて入金確認された、猶予・例外が設定された、強制解除された、または権限のある人がrestrictions.releaseで明示要求した(IR35) | release_requested(解除要求)。同一遷移でD03の設備別解除評価を行い、適用済みのonline設備にremove Commandを作る。release_requestedへのrestrictions.releaseは冪等 |
+| requested / applied | 原因になった請求がすべて入金確認された、猶予・例外が設定された、強制解除された、取消された(IR96)、または権限のある人がrestrictions.releaseで明示要求した(IR35) | release_requested(解除要求)。同一遷移でD03の設備別解除評価を行い、適用済みのonline設備にremove Commandを作る。release_requestedへのrestrictions.releaseは冪等 |
 | release_requested | すべての対象で解除または確定未適用の証跡が得られた（D03） | released(解除済み) |
 | release_requested | オフライン・失敗 | 保留の表示。もう一度確認するか、はっきり再試行する |
 
-requested(要求済み)以降に取り消したときは、「まだ何も適用されていない」と決めつけず、解除の流れに進めます。applied(適用済み)のあとに猶予・例外になった場合も、必要なら解除の要求を作ります。解除を要求したあとに、遅れて届いた「適用できた」という応答で、状態をapplied(適用済み)に戻してはいけません。各設備の観測値と、解除の要求内容をもう一度照合します。override(強制的な変更)は、支払いの記録そのものは変更しません。
+requested(要求済み)以降に取り消したときは、「まだ何も適用されていない」と決めつけず、IR96の状態表どおり解除の流れに進めます。applied(適用済み)のあとに猶予・例外になった場合も、必要なら解除の要求を作ります。解除を要求したあとに、遅れて届いた「適用できた」という応答で、状態をapplied(適用済み)に戻してはいけません。各設備の観測値と、解除の要求内容をもう一度照合します。override(強制的な変更)は、支払いの記録そのものは変更しません。
 
 Command(命令)とRestriction(制限)、Job(依頼)とAlert(異常通知)、Invoice(請求)とPayment(支払い)は、それぞれ別の記録として扱います。イベントが起きたときに関連する記録を更新しますが、1つの状態にまとめてしまってはいけません。画面では、一部だけ成功した状態、保留中の状態、実際の反映状況を、それぞれ分かるように説明します。
 
@@ -234,4 +234,4 @@ APIのパス・HTTPの方式・データベース・サーバー側の認証や�
 
 0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
 
-現行0.19.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.20.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。

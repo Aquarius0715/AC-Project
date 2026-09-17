@@ -1,6 +1,6 @@
 ---
 document_id: DD-DETERMINISTIC
-version: 0.19.0
+version: 0.20.0
 status: accepted-demo-policy-under-review
 scope: frontend-demo-1A
 ---
@@ -90,7 +90,7 @@ archived資源の一覧・集計・候補からの除外と個別取得の投影
 
 業者の受諾前はIR25の設置物件住所を含むJobOfferSummaryだけ。受諾後の期間内は現場住所・入場案内と設備根拠だけを返す。顧客のメール・電話・担当者個人名は業者と外部技術者へ一切返さない。連絡はアプリのメモ／宛先roleによるpreviewのみ。期限後は一覧/詳細ともIR23の不変JobHistorySnapshotのみ。投影後のデータをUIへ返し、UIで隠すだけにしない。
 
-AssignmentのvalidFrom/UntilはscheduledStart/Endと同じ半開区間（作業窓。閲覧窓はIR49）。重複は既存start < newEnd AND newStart < existingEnd。接する枠は可。assigned/in_progress/rework_requested/on_holdで再割当または延長可能。外注はpartner.assignと現在有効なOffer、社内はHQ job.manage。Offer期限の延長はHQのjobs.extendAccessで同じ業者・job・未来until・理由を保存する（過去を遡って許可しない）。旧Assignmentは即時無効。状態は維持。期限切れでも管理者側の割当操作はでき、失効技術者側の変更だけを拒否する。
+AssignmentのvalidFrom/UntilはscheduledStart/Endと同じ半開区間（作業窓。閲覧窓はIR49）。重複は既存start < newEnd AND newStart < existingEnd（同じjobIdの置き換え対象のactive Assignmentは除外、IR102）。接する枠は可。assigned/in_progress/rework_requested/on_holdで再割当または延長可能。外注はpartner.assignと現在有効なOffer、社内はHQ job.manage。Offer期限の延長はHQのjobs.extendAccessで同じ業者・job・未来until・理由を保存する（過去を遡って許可しない）。旧Assignmentは即時無効。状態は維持。期限切れでも管理者側の割当操作はでき、失効技術者側の変更だけを拒否する。
 
 submitted→on_hold→resumeHoldではin_progressに戻し、提出版を不変に保った新draftを作る。reworkも新draft。差戻し後の割当変更も元作者を保存する。新担当が更新した項目だけauthorId/observedAtをRepositoryが更新する（SR07）。入力に作者を受け取らない。期限切れ提出はFORBIDDEN。on_hold/reworkの取消はHQ job.manage、理由必須。品質担当不在の外注をHQへ引き継ぐ場合はjobs.reviewのreviewMode=hq_escalationと理由を必須にし、同一userの自己承認はHQにも禁止する。
 
@@ -220,4 +220,4 @@ plans.generateNextはid/occurrenceDate=保存済みnextDueAtとplanのexpectedVe
 
 SR17〜19は2026-09-16ユーザー承認済み。期間は暦日・完了分、offsetは同一記録で失敗段階だけ再試行、active制限中の契約編集は拒否する。詳細・優先規則はstrict-review-contracts.mdを適用する。
 
-現行0.19.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.20.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。

@@ -1,6 +1,6 @@
 ---
 document_id: REQ-COMMON
-version: 0.19.0
+version: 0.20.0
 status: draft
 owner: design-agent
 scope: frontend-demo-1A
@@ -12,7 +12,7 @@ scope: frontend-demo-1A
 
 この文書は、[企業要件の英語原文（SRC-06）](../00-prepare/sources/company-requirements-original.txt)をもとに、内容を整理し直したものです。この英語原文が、いちばん元になる資料(一次資料)です。情報は次の順番でたどれます。企業原文 → BIZ整理項目(企業の要望を分類した項目) → この文書のFR(機能要件) → 詳細設計・受入条件。各機能について、「企業からの要望」と「設計チームが補った部分」を分けて書きます。画面の項目、入力の制約、状態の変化、優先度は、フロントエンド(画面側)の実装案として示すものです。これらは、企業から詳しく承認をもらった内容ではありません。参考として示すモック画面は、見た目のデザインを考えるための参考資料です。機能要件と受入条件は、企業原文の目的に、制作方針と設計チームの補足を加えて、具体的にしたものです。
 
-**0.19.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.20.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 共通機能
 
@@ -133,6 +133,34 @@ Capability(能力)は型番のバージョンに結びつけ、確認できて�
 
 通知の送り先は、発生したイベントと、今の業務上の担当範囲(scope)から選びます。顧客向けには、品質の確認が済んだ報告だけを公開し、社内での差し戻しのメモは表示しません。監査記録では、当時の実行主体・役割・対象・理由・結果・バージョン・相関ID(関連する記録をまとめる番号)を保持します。AT-X07では、通知を既読にしたあとも異常が残っていること、報告が受理される前と後で公開される内容が違うこと、サインアウトしたあとも過去の実行主体(actor)の記録が変わらないことを確認します。
 
+### 共通受入条件の具体値
+
+AT-X01〜X07のGiven・When・Thenは次の表を正とする（IR101）。書かれていない前提はIR92のとおりdemoSeedのままで、時計は2026-09-14T01:00:00.000Z、simulator=false（IR97の4）。
+
+| ID | Given / When | Then |
+|---|---|---|
+| AT-X01-N | 未認証で`/customer/units/unit-online-rto`を開く→customer-aでdemoSession.signIn→preferences.update(locale=ms、timezone=Asia/Kuala_Lumpur) | ①`/login?returnTo=%2Fcustomer%2Funits%2Funit-online-rto`へ移る ②signIn後にreturnTo先を表示（IR82） ③表示がマレー語になり、保存値のUTC時刻・単位・IDは変わらない |
+| AT-X01-E | ①customer-aでsignOut後にブラウザの「戻る」 ②demo.trigger(transport、operation=units.list、outcome=DELAY、delayMs=3000、retryAfterSeconds=null、remainingCalls=1)の遅延中にswitchMembership(hq-operator) ③auth.previewPasswordResetにa@example.comとb@example.com ④demoEmail=not-an-email ⑤returnTo=https://example.com/x でsignIn | ①/loginを表示し、旧画面の値を表示しない ②遅延した応答は旧viewEpochのため破棄し、HQ画面に顧客の一覧を表示しない（IR17） ③2件とも同じ`{messageKey:auth.reset_generic, deliveryState:preview}` ④VALIDATION ⑤returnToを無視してrole homeへ（IR82） |
+| AT-X01-B | customer-aのSessionで ①expiresAtの120秒前に到達 ②延長せずdemo.trigger(session_expired) ③未確認の音声changeを表示中にlocaleをmsへ変更 | ①延長の確認を表示（IR55） ②画面・Query・未保存draftを破棄して/loginへ（D09） ③未確認intentを破棄し、入力文は保持（D09） |
+| AT-X02-N | customer-aで「set Bedroom to 24 degrees」→確認 | ①voice.resolveIntentはchange（unitId=unit-online-rto、celsius=24、before=26）。property-home-bの同名Spaceはscope外で一致0件（IR65） ②確認前のCommand 0件 ③確認でcommands.createが1件（jobIdなし、expectedUnitVersion=7、IR09） |
+| AT-X02-E | ①customer-aで「set Bedroom to 31 degrees」→確認 ②customer-bで「set Living room to 24 degrees」 ③demo.trigger(microphone_denied) ④changeの確認を取り消す | ①commands.createがVALIDATION（Capability.temperatureは16〜30、D01順位7の機種候補）、Command 0件 ②scope外のSpaceは一致0件でunsupported、Command 0件 ③文字入力へ切り替え、Command 0件（D09） ④write 0件（IR09） |
+| AT-X02-B | `acceptancePatches["AT-X02-B"]`（unit-non-rtoをroom-1と同じ「Home A > 1F > Bedroom」に移し、表示名も「Bedroom AC」にする）。customer-aで ①「temperature Bedroom」 ②候補からunit-non-rtoを選ぶ ③selectedUnitId=unit-limitedを送る | ①candidates 2件。pathLabelが同じため各候補にunitIdを併記し、文字入力で選ばせる（IR101） ②temperature（unitId=unit-non-rto） ③NOT_FOUND（IR65） |
+| AT-X03-N | unit-online-rtoにdemo.trigger(device、deviceId=device-online-rto、bindingId=binding-online-rto、kind=communication_lost、sequence=2) | ①同じ設備に「オフライン」「最後に確認した電源: ON（2026-09-14T00:59:30Z）」「warning未解消（alert-window-a）」を別々の表示で同時に出し、稼働中と断定しない ②CO₂（ppm）と排出量（kgCO₂e）を別の指標・単位として表示する |
+| AT-X03-E | unit-online-rtoへdemo.trigger(telemetry)で ①humidity value=null ②power unit=W、value=1000 ③時計を2026-09-14T01:02:31Zへ進める（最新temperatureのobservedAtから181秒） | ①「未計測」と表示し0にしない ②suspect（unit_mismatch）で集計・制御から除く（IR12） ③staleとして最後の値・時刻・品質を表示（D07） |
+| AT-X03-B | unit-online-rtoへdemo.trigger(telemetry)で ①humidity=0 ②co2=10000 ③co2=10001 | ①「0%」 ②valid ③suspect（D07の範囲外） |
+| AT-X04-N | ①customer-aでunit-online-rto ②contractor-aでjob-contractor-a ③tech-external-aでjob-contractor-a ④hq-operatorで/admin | 各画面をsuccessで表示する |
+| AT-X04-E | ①customer-aで`/customer/units/unit-tenant-b`（別テナント） ②customer-aで`/customer/units/unit-other-customer`（同じテナントの別顧客） ③contractor-bでjobs.get(job-contractor-a)（別業者） ④tech-external-aでjob-contractor-aを表示中にdemo.trigger(qualification_revoked、demo_indoor)→表示中の画面から開始 ⑤`acceptancePatches["AT-X04-E.5"]`でtech-internal-aがjob-t07をstart→`shared:report-draft-all-normal`の入力でsaveDraft→submit→同じuserのhq-self-approverへswitchMembership→jobs.reviewで受理 ⑥tech-external-aがjob-contractor-aをstartした後、時計をassignment-contractor-aのvalidUntilと同じ2026-09-20T00:00:00.000Zへ進めてsaveDraft | ①②URLを維持したnot-found状態（IR57） ③NOT_FOUND ④開いたままの画面からのjobs.startはFORBIDDEN（資格失効は実行の都度再評価、SR03・D01順位4）、業務変更0件 ⑤FORBIDDEN（自己承認、D01順位4）、Jobはsubmittedのまま ⑥FORBIDDEN（errors.assignment_ended、作業窓は半開区間、IR94） |
+| AT-X04-B | ①hq-operatorがmembers.saveでtech-external-aのvalidUntilを2026-10-15へ変更（scopeVersion=2）した後、Repository試験で旧Context（scopeVersion=1）のcommands.create(jobId=job-contractor-a) ②①の代わりにpermissionsからcontrol.diagnoseを外した後（scopeVersion=2）、旧Contextのcommands.create ③時計をcustomer-aのMembership.validUntil（2026-10-01T00:00:00.000Z）へ進めた後のunits.list | ①CONFLICT（errors.scope_changed）、Command 0件 ②FORBIDDEN（認可を先に判定、D01順位4） ③UNAUTHENTICATED（errors.membership_inactive）、/loginへ（IR101） |
+| AT-X05-N | customer-aでunit-online-rtoにset_temperature 25→switchMembership(hq-operator)で同じ設備を開く | 同じcommandIdとUnit.versionを表示し、役割の切替で業務データをリセットしない |
+| AT-X05-E | ①demo.trigger(transport、operation=commands.create、outcome=DELAY、delayMs=3000、retryAfterSeconds=null、remainingCalls=1)で応答を遅らせている間にdemo.reset ②画面を再読み込み | ①遅れて届いた応答は旧generationのため破棄して表示しない（IR17）。新しいgenerationのCommandは0件 ②seedに戻り、Sessionはnullで/login、locale=en（D09） |
+| AT-X05-B | ①demo.resetを2回続けて実行 ②AT-X05-Nの操作中の外部ネットワーク要求を記録 | ①2回目もseedと同じIDとversion ②決済・通知・IoT・取引の外部オリジンへの要求0件 |
+| AT-X06-N | customer-aでunit-online-rto（ventilation-demo v3）の操作パネルを開く | 温度16〜30、mode cool/dry/fan、風量low/mid/high、換気を有効として表示 |
+| AT-X06-E | `acceptancePatches["AT-X06-B.1"]`でcustomer-aがUIを経由せずunit-non-rtoへcommands.create(set_temperature 25) | VALIDATION（D01順位7の機種候補）、Command 0件 |
+| AT-X06-B | ①`acceptancePatches["AT-X06-B.1"]`（温度非対応） ②`["AT-X06-B.2"]`（coolだけ） ③`["AT-X06-B.3"]`（送風だけ） ④seedのunit-non-rto（contract-general-aの一般保守） ⑤`["AT-X06-B.5"]`（restrictionEligible=falseのRTO契約contract-rto-x06）でhq-restriction-managerがrestrictions.schedule | ①温度操作をdisabledにして理由を表示 ②mode候補はcoolだけ ③mode候補はfanだけで温度操作はdisabled ④RTOの請求がなくても操作できる ⑤VALIDATION（fieldErrors.contractId、errors.restriction_ineligible、IR101）、Restriction 0件 |
+| AT-X07-N | customer-aでnotif-alert-window-aを既読にする | readAtを保存し、alert-window-aはopenのまま、summaries.getのalertCount=1のまま（IR51） |
+| AT-X07-E | AT-C09-Nの社内案件で、tech-internal-aの提出後にcustomer-aがjobs.get→hq-operatorがjobs.reviewで理由付きの差し戻し→tech-internal-aが再提出→hq-operatorが受理→customer-aがjobs.get | 受理前はreportRefsが空で本文を表示しない。受理後は受理版だけを表示し、差し戻しの理由は表示しない（IR42） |
+| AT-X07-B | customer-aでcommands.create→signOut→hq-operatorでaudit.list | 監査のactorId、actorRoleAtTime=client、correlationId、result=successがサインアウト後も変わらない |
+
 具体的なやり取りの内容については、[フロントエンド入出力契約](../02-design/implementation-contracts.md)を参照してください。非機能要件は、数値の目標と測定した環境をあわせて示して判定するものであり、ライブラリを導入しただけで達成したとは扱いません。
 
 ## 0.8.0で具体化した実装条件
@@ -143,4 +171,4 @@ FR-X01/X02はD09の30分セッション・en/ms固定文法、FR-X03/X05はD05/D
 
 0.9.0修正契約: [厳格レビュー修正契約](../02-design/strict-review-contracts.md)と[操作別版契約](../02-design/write-version-catalog.csv)を併読する。
 
-現行0.19.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.20.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。

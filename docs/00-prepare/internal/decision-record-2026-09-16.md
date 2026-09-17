@@ -1,6 +1,6 @@
 ---
 document_id: DEC-12
-version: 0.19.0
+version: 0.20.0
 status: accepted-for-demo
 scope: frontend-demo-1A
 ---
@@ -69,6 +69,10 @@ DEC-15の継続修正（0.12.0）: ユーザーの反復修正指示に基づき
 ## DEC-17/18 再レビューへのユーザー回答
 
 ユーザーが制限権限は2種類、案件一覧にはソート機能を設けデフォルトは業務順と回答した。詳細は[決定記録](review-decisions-016.json)。当初提示した業務順を採用し、既存の重大度・期限ソートも保持する。これは1A仕様決定であり、実装完了・独立G1・デプロイ承認ではない。
+
+## DEC-54〜59 独立G1（DOC-0.19.0）指摘の技術的具体化（0.20.0）
+
+状態: PROPOSED（可逆）。提案者: 独立レビュー兼修正担当AI（本会話）。別エージェントによる独立G1（[runs/DOC-0.19.0/independent-g1](../../04-agentic-sdlc/runs/DOC-0.19.0/independent-g1/review.md)、判定FAIL）の指摘G1-001〜031に対する修正で採用した。詳細は[review-decisions-020.json](review-decisions-020.json)と[修正契約IR94〜102](../../02-design/review-resolution-contracts.md#ir94-認可列の修飾語と技術者の書込み条件--g1-001g1-026g1-030)。技術者の書込み条件、業務イベントの通知、制限の取消、アレルゲン観測と空気環境の案内、点検部品と提出の検証、共通受入で必要な失敗の扱いを扱う。企業承認・商用確定ではなく、企業検収前にProduct Owner／Business／Security／UI/UX／IoT／QAが確認する。
 
 ## DEC-42〜53 独立レビュー（REV19）の技術的具体化（0.19.0）
 

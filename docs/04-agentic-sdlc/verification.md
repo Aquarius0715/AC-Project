@@ -1,6 +1,6 @@
 ---
 document_id: TEST-PLAN
-version: 0.19.0
+version: 0.20.0
 status: planned-not-executed
 owner: test-agent
 scope: frontend-demo-1A
@@ -101,7 +101,7 @@ scope: frontend-demo-1A
 
 ## 10. S08 施工業者と外部技術者のシナリオ
 
-前提: 顧客からの依頼、HQ、2つの業者、それぞれの技術者、有効な委託期間。操作: HQが業者aに依頼(offer)を出す→業者aが辞退する→HQが別の業者に再委託する→業者が受諾する→自社の技術者を割り当てる→技術者が作業内容を提出する→業者が差し戻す→再提出する→品質を確認して受理する→顧客とHQが完了を確認する。
+前提: hq-operatorがcustomer-bのunit-other-customerに作成した案件、contractor-a・contractor-b、tech-external-b（scopeにunit-other-customer）、有効な委託期間（IR94/IR102）。操作: HQがcontractor-aに依頼(offer)を出す→contractor-aが辞退する→HQがcontractor-bに再委託する→contractor-bが受諾する→tech-external-bを割り当てる→技術者が作業内容を提出する→業者が差し戻す→再提出する→品質を確認して受理する→顧客とHQが完了を確認する。
 
 期待する結果: offered(依頼中)/accepted(受諾済み)/assigned(割当済み)/in_progress(作業中)/submitted(提出済み)/rework_requested(差し戻し中)/completed(完了)という状態が、同じjobIdのもとで整合的に変化する。自社のチームの候補だけが表示される。品質を確認する人と、実際に作業する人は別である。連絡内容はプレビュー(送信前の確認)として扱う。業者は請求や制限を操作できない。
 

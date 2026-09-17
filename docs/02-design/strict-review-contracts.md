@@ -1,5 +1,5 @@
 ---
-version: 0.19.0
+version: 0.20.0
 scope: 1A frontend mock only
 status: specified_pending_independent_review
 ---
@@ -192,4 +192,4 @@ demo_fixedは利用者が有限かつ0以上のbaselineKWhと仮定/出典を入
 
 回復caseの生成/変更では所有Restriction.versionと対象Unit.versionを増分する。ContractのactiveRestrictionIds/hasUnresolvedRecoveryは派生投影で契約版を変えず、contractsのChangeEventはversion=null、changedFieldsに派生フィールド名を付けてinvalidateする。version=nullの購読通知は版比較で捨てず、現在scopeを確認して再取得する。case.commandIdsはCommandとの照合を担い、異なるcase/世代へのackを流用しない。
 
-現行0.19.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.20.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。

@@ -1,6 +1,6 @@
 ---
 agent_id: test-agent
-version: 0.19.0
+version: 0.20.0
 status: proposed-agent-profile
 scope: frontend-demo-1A
 ---

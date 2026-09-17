@@ -1,5 +1,5 @@
 {
-  "version": "0.19.0",
+  "version": "0.20.0",
   "isDemo": true,
   "clock": "2026-09-14T01:00:00.000Z",
   "actors": [
@@ -658,6 +658,7 @@
     "capabilities": [
       {
         "id": "ventilation-demo",
+        "tenantId": "tenant-a",
         "version": 3,
         "manufacturer": "DemoAir",
         "model": "SPL-200V",
@@ -724,6 +725,70 @@
       },
       {
         "id": "cap-split-std",
+        "tenantId": "tenant-a",
+        "version": 1,
+        "manufacturer": "DemoAir",
+        "model": "SPL-100",
+        "control": true,
+        "modeControl": true,
+        "fanControl": true,
+        "temperature": {
+          "min": 16,
+          "max": 30,
+          "step": 1
+        },
+        "modes": [
+          "cool",
+          "dry",
+          "fan"
+        ],
+        "fanLevels": [
+          "low",
+          "mid",
+          "high"
+        ],
+        "ventilation": false,
+        "ventilationLevels": [],
+        "sensors": [
+          {
+            "metric": "temperature",
+            "unit": "°C",
+            "staleAfterSeconds": 120,
+            "boundaryId": null
+          },
+          {
+            "metric": "humidity",
+            "unit": "%",
+            "staleAfterSeconds": 120,
+            "boundaryId": null
+          },
+          {
+            "metric": "co2",
+            "unit": "ppm",
+            "staleAfterSeconds": 120,
+            "boundaryId": null
+          },
+          {
+            "metric": "pm25",
+            "unit": "µg/m³",
+            "staleAfterSeconds": 120,
+            "boundaryId": null
+          },
+          {
+            "metric": "power",
+            "unit": "kW",
+            "staleAfterSeconds": 120,
+            "boundaryId": "ac_input_electricity"
+          }
+        ],
+        "firmwareCandidates": [
+          "v1",
+          "v2"
+        ]
+      },
+      {
+        "id": "cap-split-std-tb",
+        "tenantId": "tenant-b",
         "version": 1,
         "manufacturer": "DemoAir",
         "model": "SPL-100",
@@ -924,7 +989,7 @@
         "propertyId": "property-home-tb",
         "spaceId": "room-tb-1",
         "displayName": "Tenant B AC",
-        "modelId": "cap-split-std",
+        "modelId": "cap-split-std-tb",
         "capabilityVersion": 1,
         "installedAt": null,
         "serviceScope": [
@@ -1295,6 +1360,32 @@
         "boundaryId": "ac_input_electricity"
       }
     ],
+    "allergenObservations": [
+      {
+        "id": "allergen-online-rto-1",
+        "unitId": "unit-online-rto",
+        "availability": "available",
+        "substance": "House dust mite allergen (demo)",
+        "value": 12.0,
+        "unit": "µg/g",
+        "sourceLabel": "Demo observation (fictional)",
+        "observedAt": "2026-09-14T00:30:00.000Z",
+        "evidenceText": "Demo: synthetic allergen observation; not a health assessment.",
+        "createdAt": "2026-09-14T00:30:00.000Z"
+      },
+      {
+        "id": "allergen-non-rto-1",
+        "unitId": "unit-non-rto",
+        "availability": "unsupported",
+        "substance": null,
+        "value": null,
+        "unit": null,
+        "sourceLabel": null,
+        "observedAt": null,
+        "evidenceText": null,
+        "createdAt": "2026-09-01T00:00:00.000Z"
+      }
+    ],
     "contracts": [
       {
         "id": "contract-rto-a",
@@ -1625,11 +1716,13 @@
       "job-contractor-aは作業窓内（AT-T01-N、IR49）",
       "client Membershipごとにgranted=falseの位置情報同意（IR84）",
       "baseline-demo-tenant-aはtenant-aの非archived全5台と一致し、filtersなしの/adminで省エネ予想を表示（IR78）",
-      "排出係数factor-demo-2026（0.5 kgCO₂e/kWh）はdefaultEmissionFactorIdの実体（IR92）"
+      "排出係数factor-demo-2026（0.5 kgCO₂e/kWh）はdefaultEmissionFactorIdの実体（IR92）",
+      "allergenObservationsはunit-online-rtoにavailable、unit-non-rtoにunsupportedの各1行。他のUnitは行が無くnot_measured（IR98）",
+      "capabilitiesはtenantIdを持ち、unit-tenant-bはtenant-bのcap-split-std-tbを参照（IR101）"
     ]
   },
   "acceptancePatches": {
-    "note": "IR85/IR92: 受入GivenのseedへのpatchesをcaseIdごとに固定する。createDemoRepository({seed:'demoSeed',patches,simulator,clock})へ、includeを先に展開してから渡す。seriesはIR92の規則で測定行を生成する。",
+    "note": "IR85/IR92/IR97: 受入GivenのseedへのpatchesをcaseIdごとに固定する。createDemoRepository({seed:'demoSeed',patches,simulator,clock})へ、includeを先に展開してから渡す。seriesはIR92の規則で測定行を生成する。inputは保存操作の完全な入力（IR97の5）、bindAtUseは受入本文で決める値。",
     "AT-A01-N": {
       "clock": "2026-09-14T01:00:00.000Z",
       "simulator": false,
@@ -1829,7 +1922,7 @@
             "from": "2026-09-14T00:00:00.000Z",
             "to": "2026-09-14T01:00:00.000Z",
             "stepSeconds": 60,
-            "value": 120,
+            "value": 60,
             "origin": "measured",
             "quality": "valid",
             "sequenceStart": 1001,
@@ -1837,11 +1930,31 @@
           }
         },
         {
+          "entity": "measurements",
+          "series": {
+            "idPrefix": "m-energy-non-rto-power",
+            "unitId": "unit-non-rto",
+            "sensorId": "sensor-tamper-power",
+            "metric": "power",
+            "unit": "kW",
+            "boundaryId": "ac_input_electricity",
+            "from": "2026-09-14T00:00:00.000Z",
+            "to": "2026-09-14T01:00:00.000Z",
+            "stepSeconds": 60,
+            "value": 60,
+            "origin": "measured",
+            "quality": "valid",
+            "sequenceStart": 2001,
+            "skip": []
+          }
+        },
+        {
           "entity": "baselines",
-          "id": "baseline-energy-100",
+          "id": "baseline-energy-100-two-units",
           "set": {
             "tenantId": "tenant-a",
             "unitIds": [
+              "unit-non-rto",
               "unit-online-rto"
             ],
             "period": {
@@ -1868,15 +1981,17 @@
         "from": "2026-09-14T00:00:00.000Z",
         "to": "2026-09-14T01:00:00.000Z",
         "unitIds": [
+          "unit-non-rto",
           "unit-online-rto"
         ],
-        "baselineId": "baseline-energy-100"
+        "baselineId": "baseline-energy-100-two-units"
       },
       "expected": {
         "kWh": 120.0,
         "savedKWh": -20.0,
         "savingPercentage": -20.0
-      }
+      },
+      "description": "2台×60 kW×60 slot＝実績120 kWh、同じ2台の基準100 kWh（D07のpower範囲[0,100]を守る、IR97の1）"
     },
     "AT-C06-E.4": {
       "clock": "2026-09-14T01:00:00.000Z",
@@ -2104,13 +2219,6 @@
         },
         {
           "entity": "jobs",
-          "id": "job-contractor-a",
-          "set": {
-            "status": "submitted"
-          }
-        },
-        {
-          "entity": "jobs",
           "id": "job-p01-offered-b",
           "set": {
             "unitId": "unit-other-customer",
@@ -2160,7 +2268,13 @@
           "activeCount": 0,
           "reviewCount": 0
         }
-      }
+      },
+      "flow": [
+        "tech-external-a: jobs.start(job-contractor-a)",
+        "tech-external-a: jobs.saveDraft(shared:report-draft-all-normal.input, jobId=job-contractor-a)",
+        "tech-external-a: jobs.submit",
+        "contractor-a: jobs.list"
+      ]
     },
     "AT-P03-R01": {
       "clock": "2026-09-14T01:00:00.000Z",
@@ -2434,6 +2548,9 @@
     "AT-T07-N": {
       "clock": "2026-09-14T01:00:00.000Z",
       "simulator": false,
+      "include": [
+        "shared:tech-internal-a-job-online"
+      ],
       "patches": [
         {
           "entity": "policies",
@@ -2879,6 +2996,1065 @@
         "actor": "customer-a",
         "invoiceId": "invoice-general-b",
         "error": "NOT_FOUND"
+      }
+    },
+    "shared:tech-internal-a-job-online": {
+      "description": "tech-internal-aの作業窓内の担当案件（unit-online-rto、IR94）",
+      "patches": [
+        {
+          "entity": "jobs",
+          "id": "job-t07",
+          "set": {
+            "unitId": "unit-online-rto",
+            "type": "preventive",
+            "status": "assigned",
+            "symptom": "Demo: acceptance fixture job",
+            "contactWindow": null,
+            "requestedSlot": {
+              "startAt": "2026-09-14T00:30:00.000Z",
+              "endAt": "2026-09-14T08:00:00.000Z"
+            },
+            "scheduledSlot": {
+              "startAt": "2026-09-14T00:30:00.000Z",
+              "endAt": "2026-09-14T08:00:00.000Z"
+            },
+            "dueAt": "2026-09-14T08:00:00.000Z",
+            "contractorOrgId": null,
+            "assignmentId": "assignment-t07",
+            "alertIds": []
+          }
+        },
+        {
+          "entity": "assignments",
+          "id": "assignment-t07",
+          "set": {
+            "jobId": "job-t07",
+            "technicianMembershipId": "tech-internal-a",
+            "createdAt": "2026-09-14T00:20:00.000Z",
+            "scheduledStart": "2026-09-14T00:30:00.000Z",
+            "scheduledEnd": "2026-09-14T08:00:00.000Z",
+            "validFrom": "2026-09-14T00:30:00.000Z",
+            "validUntil": "2026-09-14T08:00:00.000Z",
+            "status": "active",
+            "reason": null
+          }
+        }
+      ]
+    },
+    "shared:load-cause-alerts": {
+      "description": "原因候補の3種（窓開放の疑い＝seedのalert-window-a、断熱不足の点検記録、根拠なし）。IR98",
+      "patches": [
+        {
+          "entity": "alerts",
+          "id": "alert-insulation-a",
+          "set": {
+            "unitId": "unit-online-rto",
+            "policyId": null,
+            "type": "sensor",
+            "severity": "warning",
+            "status": "open",
+            "causeCode": "insulation_loss",
+            "evidenceKind": "inspection",
+            "evidenceText": "Demo: inspection recorded worn insulation around the indoor unit piping (fictional).",
+            "observedAt": "2026-09-14T00:45:00.000Z",
+            "detectedAt": "2026-09-14T00:45:00.000Z",
+            "previousAlertId": null,
+            "evidenceIds": []
+          }
+        },
+        {
+          "entity": "alerts",
+          "id": "alert-unknown-a",
+          "set": {
+            "unitId": "unit-online-rto",
+            "policyId": null,
+            "type": "sensor",
+            "severity": "warning",
+            "status": "open",
+            "causeCode": "unknown",
+            "evidenceKind": "demo_observation",
+            "evidenceText": "Demo: cooling load rose; no cause evidence is available (fictional).",
+            "observedAt": "2026-09-14T00:48:00.000Z",
+            "detectedAt": "2026-09-14T00:48:00.000Z",
+            "previousAlertId": null,
+            "evidenceIds": []
+          }
+        }
+      ]
+    },
+    "AT-C08-SRC": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "include": [
+        "shared:load-cause-alerts"
+      ],
+      "patches": [
+        {
+          "entity": "notifications",
+          "id": "notif-alert-insulation-a",
+          "set": {
+            "recipientMembershipId": "customer-a",
+            "target": {
+              "kind": "unit",
+              "id": "unit-online-rto"
+            },
+            "templateKey": "alert",
+            "type": "fault",
+            "sourceAlertId": "alert-insulation-a",
+            "severity": "warning",
+            "channel": "inApp",
+            "deliveryState": "simulated",
+            "occurredAt": "2026-09-14T00:45:00.000Z",
+            "readAt": null
+          }
+        },
+        {
+          "entity": "notifications",
+          "id": "notif-alert-unknown-a",
+          "set": {
+            "recipientMembershipId": "customer-a",
+            "target": {
+              "kind": "unit",
+              "id": "unit-online-rto"
+            },
+            "templateKey": "alert",
+            "type": "fault",
+            "sourceAlertId": "alert-unknown-a",
+            "severity": "warning",
+            "channel": "inApp",
+            "deliveryState": "simulated",
+            "occurredAt": "2026-09-14T00:48:00.000Z",
+            "readAt": null
+          }
+        }
+      ],
+      "expected": {
+        "actor": "customer-a",
+        "alertIds": [
+          "alert-window-a",
+          "alert-insulation-a",
+          "alert-unknown-a"
+        ]
+      }
+    },
+    "AT-T07-SRC": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "include": [
+        "shared:load-cause-alerts",
+        "shared:tech-internal-a-job-online"
+      ],
+      "patches": [],
+      "expected": {
+        "actor": "tech-internal-a",
+        "jobId": "job-t07",
+        "alertIds": [
+          "alert-window-a",
+          "alert-insulation-a",
+          "alert-unknown-a"
+        ]
+      }
+    },
+    "AT-A05-SRC": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "include": [
+        "shared:load-cause-alerts"
+      ],
+      "patches": [],
+      "expected": {
+        "actor": "hq-operator",
+        "alertIds": [
+          "alert-window-a",
+          "alert-insulation-a",
+          "alert-unknown-a"
+        ]
+      }
+    },
+    "AT-C07-SRC.4": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "allergenObservations",
+          "id": "allergen-online-rto-unitless",
+          "set": {
+            "unitId": "unit-online-rto",
+            "availability": "available",
+            "substance": "House dust mite allergen (demo)",
+            "value": 12.0,
+            "unit": null,
+            "sourceLabel": "Demo observation (fictional)",
+            "observedAt": "2026-09-14T00:45:00.000Z",
+            "evidenceText": "Demo: synthetic allergen observation without unit (fictional).",
+            "createdAt": "2026-09-14T00:45:00.000Z"
+          }
+        }
+      ],
+      "expected": {
+        "actor": "customer-a",
+        "unitId": "unit-online-rto",
+        "unitDisplay": "不明"
+      }
+    },
+    "AT-A12-SRC.4": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "allergenObservations",
+          "id": "allergen-online-rto-unitless",
+          "set": {
+            "unitId": "unit-online-rto",
+            "availability": "available",
+            "substance": "House dust mite allergen (demo)",
+            "value": 12.0,
+            "unit": null,
+            "sourceLabel": "Demo observation (fictional)",
+            "observedAt": "2026-09-14T00:45:00.000Z",
+            "evidenceText": "Demo: synthetic allergen observation without unit (fictional).",
+            "createdAt": "2026-09-14T00:45:00.000Z"
+          }
+        }
+      ],
+      "expected": {
+        "actor": "hq-operator",
+        "unitId": "unit-online-rto",
+        "unitDisplay": "不明"
+      }
+    },
+    "shared:report-draft-all-normal": {
+      "description": "serviceScope=[indoor,outdoor,electrical]の18部品すべてnormalの完全な報告入力（IR100）。jobIdは受入本文の対象案件、reportIdは初回保存で省略",
+      "bindAtUse": [
+        "jobId",
+        "reportId"
+      ],
+      "input": {
+        "items": [
+          {
+            "componentGroup": "indoor",
+            "componentKey": "filter",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "indoor",
+            "componentKey": "evaporator_coil",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "indoor",
+            "componentKey": "blower_motor",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "indoor",
+            "componentKey": "blower_fan",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "indoor",
+            "componentKey": "drain_pipe",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "indoor",
+            "componentKey": "drain_pan",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "indoor",
+            "componentKey": "outlet",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "indoor",
+            "componentKey": "louver",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "outdoor",
+            "componentKey": "condenser_coil",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "outdoor",
+            "componentKey": "compressor",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "outdoor",
+            "componentKey": "fan",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "outdoor",
+            "componentKey": "blade",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "outdoor",
+            "componentKey": "refrigerant_pipe",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "electrical",
+            "componentKey": "thermostat",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "electrical",
+            "componentKey": "sensor",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "electrical",
+            "componentKey": "capacitor",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "electrical",
+            "componentKey": "contactor",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          },
+          {
+            "componentGroup": "electrical",
+            "componentKey": "wiring",
+            "result": "normal",
+            "reason": null,
+            "evidenceIds": []
+          }
+        ],
+        "measurements": [],
+        "parts": [],
+        "workText": "Demo: all components inspected; no issue found....",
+        "nextAction": {
+          "kind": "none"
+        },
+        "attachmentIds": []
+      },
+      "patches": []
+    },
+    "AT-T12-N": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "jobs",
+          "id": "job-t12",
+          "set": {
+            "unitId": "unit-non-rto",
+            "type": "preventive",
+            "status": "assigned",
+            "symptom": "Demo: acceptance fixture job",
+            "contactWindow": null,
+            "requestedSlot": {
+              "startAt": "2026-09-14T00:30:00.000Z",
+              "endAt": "2026-09-14T08:00:00.000Z"
+            },
+            "scheduledSlot": {
+              "startAt": "2026-09-14T00:30:00.000Z",
+              "endAt": "2026-09-14T08:00:00.000Z"
+            },
+            "dueAt": "2026-09-14T08:00:00.000Z",
+            "contractorOrgId": null,
+            "assignmentId": "assignment-t12",
+            "alertIds": []
+          }
+        },
+        {
+          "entity": "assignments",
+          "id": "assignment-t12",
+          "set": {
+            "jobId": "job-t12",
+            "technicianMembershipId": "tech-internal-a",
+            "createdAt": "2026-09-14T00:20:00.000Z",
+            "scheduledStart": "2026-09-14T00:30:00.000Z",
+            "scheduledEnd": "2026-09-14T08:00:00.000Z",
+            "validFrom": "2026-09-14T00:30:00.000Z",
+            "validUntil": "2026-09-14T08:00:00.000Z",
+            "status": "active",
+            "reason": null
+          }
+        }
+      ],
+      "expected": {
+        "actor": "tech-internal-a",
+        "deviceId": "device-tamper",
+        "jobId": "job-t12"
+      }
+    },
+    "AT-A05-N": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [],
+      "input": {
+        "name": "Demo high temperature A05",
+        "unitIds": [
+          "unit-online-rto"
+        ],
+        "timezone": "Asia/Kuala_Lumpur",
+        "enabled": true,
+        "priority": 50,
+        "kind": "alert",
+        "metric": "temperature",
+        "operator": "gte",
+        "threshold": 30,
+        "recoveryThreshold": 28,
+        "durationSeconds": 60,
+        "severity": "warning",
+        "recipientMembershipIds": [
+          "customer-a"
+        ],
+        "channels": [
+          "inApp"
+        ],
+        "escalateAfterMinutes": 60,
+        "cooldownMinutes": 5
+      },
+      "trigger": {
+        "scenarioId": "AT-A05-N",
+        "eventId": "evt-a05-telemetry-1",
+        "occurredAt": "2026-09-14T01:00:00.000Z",
+        "eventType": "telemetry",
+        "measurement": {
+          "unitId": "unit-online-rto",
+          "sensorId": "sensor-online-temperature",
+          "metric": "temperature",
+          "value": 30.0,
+          "unit": "°C",
+          "observedAt": "2026-09-14T01:00:00.000Z",
+          "receivedAt": "2026-09-14T01:00:00.000Z",
+          "origin": "measured",
+          "quality": "valid",
+          "eventId": "evt-a05-telemetry-1"
+        }
+      },
+      "advanceSeconds": 60,
+      "expected": {
+        "policyVersion": 1,
+        "alerts": 1,
+        "notifications": [
+          {
+            "recipientMembershipId": "customer-a",
+            "templateKey": "alert",
+            "channel": "inApp",
+            "deliveryState": "simulated"
+          }
+        ]
+      }
+    },
+    "AT-A11-N": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [],
+      "input": {
+        "name": "Demo tariff A11",
+        "unitIds": [
+          "unit-online-rto"
+        ],
+        "timezone": "Asia/Kuala_Lumpur",
+        "enabled": true,
+        "priority": 60,
+        "kind": "automation",
+        "condition": {
+          "type": "tariff",
+          "operator": "gt",
+          "value": 0.6,
+          "unit": "MYR_per_kWh"
+        },
+        "action": {
+          "kind": "set_temperature",
+          "celsius": 26
+        }
+      },
+      "evaluation": {
+        "eventId": "evt-a11-1",
+        "occurredAt": "2026-09-14T01:00:00.000Z",
+        "unitIds": [
+          "unit-online-rto"
+        ],
+        "facts": [
+          {
+            "unitId": "unit-online-rto",
+            "metric": "tariff",
+            "value": 0.7,
+            "unit": "MYR_per_kWh",
+            "observedAt": "2026-09-14T01:00:00.000Z",
+            "quality": "valid"
+          }
+        ],
+        "phase": "condition"
+      },
+      "expected": {
+        "policyVersion": 1,
+        "simulateSavesCommands": 0
+      }
+    },
+    "AT-A12-N": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "devices",
+          "id": "device-tamper",
+          "set": {
+            "sensors": [
+              {
+                "id": "sensor-tamper-temperature",
+                "deviceId": "device-tamper",
+                "metric": "temperature",
+                "unit": "°C",
+                "staleAfterSeconds": 120,
+                "boundaryId": null,
+                "calibratedAt": null
+              },
+              {
+                "id": "sensor-tamper-humidity",
+                "deviceId": "device-tamper",
+                "metric": "humidity",
+                "unit": "%",
+                "staleAfterSeconds": 120,
+                "boundaryId": null,
+                "calibratedAt": null
+              },
+              {
+                "id": "sensor-tamper-co2",
+                "deviceId": "device-tamper",
+                "metric": "co2",
+                "unit": "ppm",
+                "staleAfterSeconds": 120,
+                "boundaryId": null,
+                "calibratedAt": null
+              },
+              {
+                "id": "sensor-tamper-power",
+                "deviceId": "device-tamper",
+                "metric": "power",
+                "unit": "kW",
+                "staleAfterSeconds": 120,
+                "boundaryId": "ac_input_electricity",
+                "calibratedAt": null
+              }
+            ]
+          }
+        }
+      ],
+      "input": {
+        "name": "Demo CO2 A12",
+        "unitIds": [
+          "unit-online-rto",
+          "unit-non-rto"
+        ],
+        "timezone": "Asia/Kuala_Lumpur",
+        "enabled": true,
+        "priority": 50,
+        "kind": "air_quality",
+        "metric": "co2",
+        "operator": "gte",
+        "threshold": 1000,
+        "recoveryThreshold": 900,
+        "durationSeconds": 60,
+        "responseMode": "notify_and_ventilate",
+        "ventilationLevel": "low",
+        "recipientMembershipIds": [
+          "hq-operator"
+        ],
+        "severity": "warning",
+        "channels": [
+          "inApp"
+        ],
+        "cooldownMinutes": 5,
+        "escalateAfterMinutes": 60
+      },
+      "evaluation": {
+        "eventId": "evt-a12-1",
+        "occurredAt": "2026-09-14T01:00:00.000Z",
+        "unitIds": [
+          "unit-online-rto",
+          "unit-non-rto"
+        ],
+        "facts": [
+          {
+            "unitId": "unit-online-rto",
+            "metric": "co2",
+            "value": 1100,
+            "unit": "ppm",
+            "observedAt": "2026-09-14T00:59:00.000Z",
+            "quality": "valid"
+          },
+          {
+            "unitId": "unit-non-rto",
+            "metric": "co2",
+            "value": 1100,
+            "unit": "ppm",
+            "observedAt": "2026-09-14T00:59:00.000Z",
+            "quality": "valid"
+          }
+        ],
+        "phase": "condition"
+      },
+      "expected": {
+        "results": {
+          "unit-online-rto": {
+            "control": "requested",
+            "action": {
+              "kind": "ventilate",
+              "level": "low"
+            },
+            "commands": 1,
+            "notifications": "created"
+          },
+          "unit-non-rto": {
+            "control": "suppressed",
+            "reason": "invalid_capability",
+            "commands": 0,
+            "notifications": "created"
+          }
+        }
+      }
+    },
+    "AT-X02-B": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "spaces",
+          "id": "room-1b",
+          "set": {
+            "propertyId": "property-home-a",
+            "parentSpaceId": "floor-1",
+            "kind": "room",
+            "name": "Bedroom",
+            "archived": false
+          }
+        },
+        {
+          "entity": "units",
+          "id": "unit-non-rto",
+          "set": {
+            "spaceId": "room-1b",
+            "displayName": "Bedroom AC"
+          }
+        }
+      ],
+      "expected": {
+        "actor": "customer-a",
+        "candidates": [
+          "unit-non-rto",
+          "unit-online-rto"
+        ],
+        "samePathLabel": true
+      }
+    },
+    "AT-X06-B.1": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "capabilities",
+          "id": "cap-no-temperature",
+          "set": {
+            "tenantId": "tenant-a",
+            "manufacturer": "DemoAir",
+            "model": "SPL-100NT",
+            "control": true,
+            "modeControl": true,
+            "fanControl": true,
+            "temperature": null,
+            "modes": [
+              "cool",
+              "dry",
+              "fan"
+            ],
+            "fanLevels": [
+              "low",
+              "mid",
+              "high"
+            ],
+            "ventilation": false,
+            "ventilationLevels": [],
+            "sensors": [
+              {
+                "metric": "temperature",
+                "unit": "°C",
+                "staleAfterSeconds": 120,
+                "boundaryId": null
+              },
+              {
+                "metric": "humidity",
+                "unit": "%",
+                "staleAfterSeconds": 120,
+                "boundaryId": null
+              },
+              {
+                "metric": "co2",
+                "unit": "ppm",
+                "staleAfterSeconds": 120,
+                "boundaryId": null
+              },
+              {
+                "metric": "pm25",
+                "unit": "µg/m³",
+                "staleAfterSeconds": 120,
+                "boundaryId": null
+              },
+              {
+                "metric": "power",
+                "unit": "kW",
+                "staleAfterSeconds": 120,
+                "boundaryId": "ac_input_electricity"
+              }
+            ],
+            "firmwareCandidates": [
+              "v1",
+              "v2"
+            ],
+            "version": 1
+          }
+        },
+        {
+          "entity": "units",
+          "id": "unit-non-rto",
+          "set": {
+            "modelId": "cap-no-temperature",
+            "capabilityVersion": 1
+          }
+        }
+      ],
+      "expected": {
+        "unitId": "unit-non-rto",
+        "temperatureControl": "disabled"
+      }
+    },
+    "AT-X06-B.2": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "capabilities",
+          "id": "cap-cool-only",
+          "set": {
+            "tenantId": "tenant-a",
+            "manufacturer": "DemoAir",
+            "model": "SPL-100C",
+            "control": true,
+            "modeControl": true,
+            "fanControl": true,
+            "temperature": {
+              "min": 16,
+              "max": 30,
+              "step": 1
+            },
+            "modes": [
+              "cool"
+            ],
+            "fanLevels": [
+              "low",
+              "mid",
+              "high"
+            ],
+            "ventilation": false,
+            "ventilationLevels": [],
+            "sensors": [
+              {
+                "metric": "temperature",
+                "unit": "°C",
+                "staleAfterSeconds": 120,
+                "boundaryId": null
+              },
+              {
+                "metric": "humidity",
+                "unit": "%",
+                "staleAfterSeconds": 120,
+                "boundaryId": null
+              },
+              {
+                "metric": "co2",
+                "unit": "ppm",
+                "staleAfterSeconds": 120,
+                "boundaryId": null
+              },
+              {
+                "metric": "pm25",
+                "unit": "µg/m³",
+                "staleAfterSeconds": 120,
+                "boundaryId": null
+              },
+              {
+                "metric": "power",
+                "unit": "kW",
+                "staleAfterSeconds": 120,
+                "boundaryId": "ac_input_electricity"
+              }
+            ],
+            "firmwareCandidates": [
+              "v1",
+              "v2"
+            ],
+            "version": 1
+          }
+        },
+        {
+          "entity": "units",
+          "id": "unit-non-rto",
+          "set": {
+            "modelId": "cap-cool-only",
+            "capabilityVersion": 1
+          }
+        }
+      ],
+      "expected": {
+        "unitId": "unit-non-rto",
+        "modes": [
+          "cool"
+        ]
+      }
+    },
+    "AT-X06-B.3": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "capabilities",
+          "id": "cap-fan-only",
+          "set": {
+            "tenantId": "tenant-a",
+            "manufacturer": "DemoAir",
+            "model": "SPL-100F",
+            "control": true,
+            "modeControl": true,
+            "fanControl": true,
+            "temperature": null,
+            "modes": [
+              "fan"
+            ],
+            "fanLevels": [
+              "low",
+              "mid",
+              "high"
+            ],
+            "ventilation": false,
+            "ventilationLevels": [],
+            "sensors": [
+              {
+                "metric": "temperature",
+                "unit": "°C",
+                "staleAfterSeconds": 120,
+                "boundaryId": null
+              },
+              {
+                "metric": "humidity",
+                "unit": "%",
+                "staleAfterSeconds": 120,
+                "boundaryId": null
+              },
+              {
+                "metric": "co2",
+                "unit": "ppm",
+                "staleAfterSeconds": 120,
+                "boundaryId": null
+              },
+              {
+                "metric": "pm25",
+                "unit": "µg/m³",
+                "staleAfterSeconds": 120,
+                "boundaryId": null
+              },
+              {
+                "metric": "power",
+                "unit": "kW",
+                "staleAfterSeconds": 120,
+                "boundaryId": "ac_input_electricity"
+              }
+            ],
+            "firmwareCandidates": [
+              "v1",
+              "v2"
+            ],
+            "version": 1
+          }
+        },
+        {
+          "entity": "units",
+          "id": "unit-non-rto",
+          "set": {
+            "modelId": "cap-fan-only",
+            "capabilityVersion": 1
+          }
+        }
+      ],
+      "expected": {
+        "unitId": "unit-non-rto",
+        "modes": [
+          "fan"
+        ],
+        "temperatureControl": "disabled"
+      }
+    },
+    "AT-X06-B.5": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "contracts",
+          "id": "contract-rto-x06",
+          "set": {
+            "version": 1,
+            "customerId": "cust-a",
+            "customerOrgId": "org-customer-a",
+            "unitIds": [
+              "unit-non-rto"
+            ],
+            "planType": "rto",
+            "startAt": "2026-01-01T00:00:00.000Z",
+            "endAt": "2027-01-01T00:00:00.000Z",
+            "priceMinor": 8000,
+            "currency": "MYR",
+            "restrictionEligible": false,
+            "rulesVersion": null
+          }
+        },
+        {
+          "entity": "invoices",
+          "id": "invoice-x06",
+          "set": {
+            "version": 1,
+            "contractId": "contract-rto-x06",
+            "contractVersion": 1,
+            "amountMinor": 8000,
+            "currency": "MYR",
+            "period": {
+              "from": "2026-08-01T00:00:00.000Z",
+              "to": "2026-09-01T00:00:00.000Z"
+            },
+            "dueAt": "2026-09-10T00:00:00.000Z",
+            "status": "unpaid",
+            "paymentMethod": null,
+            "paymentStatus": null,
+            "paidAt": null
+          }
+        }
+      ],
+      "expected": {
+        "actor": "hq-restriction-manager",
+        "operation": "restrictions.schedule",
+        "contractId": "contract-rto-x06",
+        "error": "VALIDATION",
+        "messageKey": "errors.restriction_ineligible"
+      }
+    },
+    "AT-REV17-005": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "units",
+          "id": "unit-archive-demo",
+          "set": {
+            "version": 1,
+            "customerOrgId": "org-customer-a",
+            "propertyId": "property-home-a",
+            "spaceId": "room-2",
+            "displayName": "Spare AC (demo)",
+            "modelId": "cap-split-std",
+            "capabilityVersion": 1,
+            "installedAt": null,
+            "serviceScope": [
+              "indoor",
+              "outdoor",
+              "electrical"
+            ],
+            "archived": false,
+            "observedState": {
+              "power": null,
+              "celsius": null,
+              "mode": null,
+              "fanLevel": null,
+              "observedAt": null
+            },
+            "observedRestriction": null
+          }
+        }
+      ],
+      "expected": {
+        "actor": "hq-operator",
+        "unitId": "unit-archive-demo",
+        "archive": "success",
+        "dependencies": "none"
+      }
+    },
+    "AT-X04-E.5": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "include": [
+        "shared:tech-internal-a-job-online"
+      ],
+      "patches": [
+        {
+          "entity": "memberships",
+          "id": "hq-self-approver",
+          "set": {
+            "userId": "user-tech-internal-a",
+            "role": "admin",
+            "permissions": [
+              "job.manage"
+            ],
+            "tenantId": "tenant-a",
+            "validFrom": "2026-09-01T00:00:00.000Z",
+            "validUntil": "2026-10-01T00:00:00.000Z",
+            "organizationId": "org-operator-a",
+            "scopeVersion": 1,
+            "employment": null,
+            "scopes": [
+              {
+                "kind": "tenant",
+                "id": "tenant-a"
+              }
+            ],
+            "qualifications": [],
+            "displayName": "hq-self-approver"
+          }
+        }
+      ],
+      "expected": {
+        "actor": "hq-self-approver",
+        "operation": "jobs.review",
+        "error": "FORBIDDEN",
+        "jobStatus": "submitted"
       }
     }
   },

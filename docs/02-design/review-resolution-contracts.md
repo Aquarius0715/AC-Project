@@ -1,6 +1,6 @@
 ---
 document_id: DD-REVIEW-RESOLUTION
-version: 0.19.0
+version: 0.20.0
 status: self-reviewed-pending-independent-G1
 scope: frontend-demo-1A
 ---
@@ -81,7 +81,7 @@ AT-C01-N/AT-A01-Nの現時点設備KPI遷移先はscopeとpowerStateだけ。per
 
 ## IR14 現行版の識別
 
-現行仕様はREADMEが示す現行baseline（0.19.0ではDOC-0.19.0、IR75）のmanifest収録ファイル。front matter、現行実装基準と案内をその版に統一する。過去レビュー/DEC/変更履歴/旧runsは当時版のまま保持し、旧合格記録を現版の承認として利用しない。
+現行仕様はREADMEが示す現行baseline（0.20.0ではDOC-0.20.0、IR75）のmanifest収録ファイル。front matter、現行実装基準と案内をその版に統一する。過去レビュー/DEC/変更履歴/旧runsは当時版のまま保持し、旧合格記録を現版の承認として利用しない。
 
 ## IR15 MRV出力の範囲
 
@@ -233,7 +233,7 @@ UIのURLキーsortはfield:direction（例sort=status:asc、sort=dueAt:desc）�
 
 ## IR35 解除要求の起動経路とrestrictions.releaseの前提 — FRV-001
 
-解除要求（state=release_requested）の起動経路は次の3つだけとし、いずれも同じ内部遷移関数を使う。①入金確認: payments.confirm／payments.recordManual／payments.simulate(confirm)が原因請求（causeInvoiceIds）を全件paidにした同一遷移で、scheduledはcancelled、requested/appliedはrelease_requestedへ遷移し、releaseIntent={source:'payment',at:now,actorMembershipId}を保存する。②猶予・例外: restrictions.defer/exemptがrequested/appliedに対して行われた同一遷移でrelease_requestedへ遷移し、source='exception'。③強制解除: restrictions.overrideでsource='override'。
+解除要求（state=release_requested）の起動経路は次の①〜③とIR96の④取消（restrictions.cancel）だけとし、いずれも同じ内部遷移関数を使う。①入金確認: payments.confirm／payments.recordManual／payments.simulate(confirm)が原因請求（causeInvoiceIds）を全件paidにした同一遷移で、scheduledはcancelled、requested/appliedはrelease_requestedへ遷移し、releaseIntent={source:'payment',at:now,actorMembershipId}を保存する。②猶予・例外: restrictions.defer/exemptがrequested/appliedに対して行われた同一遷移でrelease_requestedへ遷移し、source='exception'。③強制解除: restrictions.overrideでsource='override'。
 
 release_requestedへ遷移した同一遷移で、perUnitごとにD03の解除評価を1回実行する。applyState=appliedかつonlineの設備にはremove_restriction Commandを作成しreleaseState=requested、not_sent/not_appliedはnot_required、sent_unknownはwaiting_reconcile、offlineのappliedはfailedではなくreleaseState=none/pendingReason=offlineとして明示retry(phase=release)を待つ。呼出者がclientでも解除Commandは作成される（Command.actorMembershipIdはRepositoryの内部主体'system-restriction'、監査のactorは入金確認の実行者）。
 
@@ -678,9 +678,9 @@ demoSeedとacceptancePatchesの行は省略形式で記述する。Repositoryは
 1. Givenに書かれたID（unit-online-rto、job-contractor-a等）はIR91で正規化したdemoSeedの行を指し、Givenに書かれた値だけをその行へ上書きする。書かれていない値はdemoSeedのまま。
 2. 対象が書かれていない場合の既定: 顧客の設備操作・監視・自動運転・方針の対象はunit-online-rto、換気非対応の設備はunit-non-rto、制限中の設備はunit-limited、オフライン設備はunit-offline-rto、顧客はcustomer-a、業者はcontractor-a、外注の技術者はtech-external-aとjob-contractor-a、社内の技術者はtech-internal-a、HQはhq-operator（制限・解除の操作はhq-restriction-manager）、請求はinvoice-overdue-a、制限はrestriction-limited-a。
 3. 「in_progress案件」「submitted報告」「受諾済み案件」など業務状態を表すGivenは、acceptancePatchesが無い限り、seedから通常の操作（jobs.start、jobs.saveDraft、jobs.submit、jobs.offer、jobs.accept等）を書かれた順に実行して作る。
-4. ①②…で状態を列挙するGiven（例: ①scheduled ②requested）は、規則2の対象の該当フィールドだけを各subcaseで独立にpatchする。
-5. fixture-contract.jsonの`acceptancePatches`は、キーがcase ID（subcaseは`.番号`）または`shared:`名で、値は`{clock, simulator, include?, patches, query?, expected?}`。includeに挙げた共有patchを先に展開してから自身のpatchesを適用する。patchは`{entity,id,set}`（IR91の12）か、測定系列の`{entity:'measurements', series:{idPrefix, unitId, sensorId, metric, unit, boundaryId, from, to, stepSeconds, value, origin, quality, sequenceStart, skip}}`。seriesは[from,to)のfrom+k×stepSecondsの各時刻（skipの[from,to)に入る時刻を除く）に、id=`idPrefix-k`、observedAt=receivedAt=その時刻、sequence=sequenceStart+kの行を作る。entityはdemoSeedの節名（membershipsはactors）。
-6. acceptancePatchesを持つcase: AT-A01-N（IR85）、AT-C06-N、AT-C06-E.2、AT-C06-E.3、AT-C06-E.4、AT-C08-N、AT-C10-E.1、AT-C13-N、AT-P01-N、AT-P03-R01、AT-P06-N、AT-P06-B、AT-T07-N、AT-T10-E.1、AT-T11-N、AT-A09-R01、AT-A13-N、AT-A14-N。受入本文はキーを明記する。
+4. ①②…で状態を列挙するGivenは、規則2の対象の該当フィールドだけを各subcaseで独立にpatchする。ただしIR97の3で通常の操作が必要な状態（Restriction.state、報告版を伴うJob.status、Payment/Invoiceの状態）はpatchせず、受入本文に書いた操作で作る。
+5. fixture-contract.jsonの`acceptancePatches`は、キーがcase ID（subcaseは`.番号`）または`shared:`名で、値は`{clock, simulator, include?, patches, query?, expected?, input?, evaluation?, trigger?, advanceSeconds?, flow?}`（`shared:`は`{description, patches, input?, bindAtUse?}`）。inputは保存操作の完全な入力、evaluationはEvaluationInput、triggerはDemoTrigger、flowは状態を作る通常操作の順序、bindAtUseは受入本文で決める値（IR97）。includeに挙げた共有patchを先に展開してから自身のpatchesを適用する。patchは`{entity,id,set}`（IR91の12）か、測定系列の`{entity:'measurements', series:{idPrefix, unitId, sensorId, metric, unit, boundaryId, from, to, stepSeconds, value, origin, quality, sequenceStart, skip}}`。seriesは[from,to)のfrom+k×stepSecondsの各時刻（skipの[from,to)に入る時刻を除く）に、id=`idPrefix-k`、observedAt=receivedAt=その時刻、sequence=sequenceStart+kの行を作る。entityはdemoSeedの節名（membershipsはactors）。
+6. acceptancePatchesを持つcase: AT-A01-N、AT-C06-N、AT-C06-E.2、AT-C06-E.3、AT-C06-E.4、AT-C08-N、AT-P01-N、AT-P03-R01、AT-P06-N、AT-P06-B、AT-T07-N、AT-T10-E.1、AT-T11-N、AT-A09-R01、AT-A13-N、AT-A14-N、AT-C13-N、AT-C10-E.1、AT-C08-SRC、AT-T07-SRC、AT-A05-SRC、AT-C07-SRC.4、AT-A12-SRC.4、AT-T12-N、AT-A05-N、AT-A11-N、AT-A12-N、AT-X02-B、AT-X06-B.1、AT-X06-B.2、AT-X06-B.3、AT-X06-B.5、AT-REV17-005、AT-X04-E.5。共有patch: shared:energy-actual-80、shared:tech-internal-a-job-online、shared:load-cause-alerts、shared:report-draft-all-normal。受入本文はキーを明記する。
 7. 電力量・排出量の受入（C06/C13/A13/A14、S05）は、fixture.energyの窓[2026-09-14T00:00Z, 01:00Z)とunitIds=[unit-online-rto]を使う。demoSeed.factorsのfactor-demo-2026（0.5 kgCO₂e/kWh）がfixture.defaultEmissionFactorIdの実体である。
 8. 同じ設備を対象に含む契約の期間重複は1Aでは拒否しない（現行規則の明文化。制限は設備ごとに進行中1件、DDC-08 §3）。
 
@@ -699,3 +699,176 @@ validate_documents.pyは、受入本文が参照するacceptancePatchesのキー
 | active Assignmentで作業窓開始前 | FORBIDDEN（errors.assignment_not_started、IR49/IR76） |
 
 外注案件（contractorOrgId≠null）の報告の受理・差戻しは受託業者のpartner.review保持者が行い、HQはjobs.reviewのreviewMode=hq_escalationと理由がある場合だけ行う（D06）。
+
+## IR94 認可列の修飾語と技術者の書込み条件 — G1-001・G1-026・G1-030
+
+操作カタログのauthorization列の修飾語は次の意味に限る（DEC-54）。複数Unitを持つ資源にはSR03の全対象Unit条件を常に重ねる。
+
+| 修飾語 | 意味 |
+|---|---|
+| public:demo-only / public:demo-panel-only | Session不要のデモ操作（IR60）。demo-panel-onlyは/demo画面からだけ呼ぶ |
+| authenticated:own-session / demo-account-switch | 有効Sessionの本人（D09）／デモアカウント切替 |
+| authenticated:recipient-only | Notification.recipientMembershipIdが現在Membership（IR58） |
+| authenticated:current-target-party / recipient-or-current-target-party | D08/D15の通知対象資源を現在scopeで閲覧できる当事者 |
+| authenticated:original-user-and-current-target-scope | D04のwrites.getResult条件 |
+| client:self / client:self-customer / client:control.execute[:self] | 自己customer組織のMembership.scopes内の資源（control.executeは権限も必須） |
+| client:own-membership | 自己Membershipの記録（Consent） |
+| client:accepted-report-only | 受理済みの報告版だけ |
+| client:self:customer-visibility / demo-event-only / event=request-or-retry / requested-only | JobNote visibility=customerだけ／IR59の顧客決済イベントだけ／SR22／IR56のrequestedだけ |
+| contractor:accepted-valid-offer / delegated | 自社Offerがacceptで、now∈[accessValidFrom, accessValidUntil)（IR23のsummary投影期間） |
+| contractor:offer-projection-or-delegated-history | IR23のoffer/summary/history投影 |
+| contractor:partner.accept:own-valid-offer:first-attempt | IR01/IR86 |
+| contractor:partner.assign:own-valid-offer / own-company | 自社の受諾済みOfferのaccess窓内／自社organizationのrole=technicianのMembershipだけ |
+| contractor:partner.review:own-offer / submitted | 自社受託案件の提出版 |
+| technician:assigned（読取） | 社内はMembership.scopes内のUnit（IR49(a)の案件起点読取を除く）、外部は自己Assignmentの閲覧窓∩scopes |
+| technician:assigned-history | IR23/IR24の投影 |
+| technician:*:assigned / assigned-valid-job / job-required（書込み） | 下表 |
+| admin:<permission> | 当該permissionを持ち管理scope内 |
+| admin:<permission>:scope-candidate-read-only | D12の補助読取 |
+| admin:<permission>:kind=… | Policy.kindごとの権限 |
+| admin:job.manage:internal-job / internal-or-escalation | contractorOrgId=nullの案件／外注ではjobs.reviewのreviewMode=hq_escalation（D06） |
+| admin:restriction.override:release-projection / release-intent-or-terminal-recovery-only | IR03 |
+| IR01:same-key-receipt… | IR01 |
+
+技術者の書込み（alerts.acknowledge/resolve、devices.*、commands.create、diagnosticRuns.create、jobs.start/saveDraft/submit/resumeRework、attachments.add）は、社内・外部を問わず次の表で判定する（SR03「内部技術者の書込みにも必要なAssignment条件を適用する」の具体化）。
+
+| 条件 | 結果 |
+|---|---|
+| 入力型にjobIdがある操作でjobIdを省略 | VALIDATION（fieldErrors.jobId、D01順位1） |
+| 入力jobIdのactive Assignmentが自己で、Job.unitId＝対象Unit、now∈作業窓 | 許可 |
+| 入力型にjobIdが無い操作（alerts.acknowledge/resolve、devices.addResponseNote） | 対象Unit（Alert.unitId、Deviceの現在unitId）に自己のactive Assignmentがあり、そのいずれかの作業窓内なら許可 |
+| 作業窓の開始前 | FORBIDDEN（errors.assignment_not_started、IR49） |
+| 作業窓の開始後に終了・revoked | FORBIDDEN（errors.assignment_ended、IR93） |
+| 入力jobIdの案件に自己のAssignmentが一度も無い、または作業窓開始前に取消でrevoked | NOT_FOUND（IR93） |
+| 入力型にjobIdが無い操作で、対象Unitに自己のAssignmentが一度も無い | 社内でunit scope内ならFORBIDDEN（errors.assignment_required、D01順位4）。scope外、または外部技術者はNOT_FOUND |
+
+devices.updateFirmwareは、要求時にDevice.connection≠onlineならD01順位8のOFFLINE（DeviceOperationを作らない）。作成後1秒の開始tickでonline以外になった場合だけIR67のfailed・failureCode=OFFLINEとする。devices.checkは接続確認のためconnectionにかかわらず受け付ける。
+
+jobs.assignとmembers.eligibleは、候補技術者のMembership.scopesがJob.unitIdを含む（unit/property/organization scopeの包含、SR03）ことを条件にする。含まない技術者は候補に出さず、直接指定はFORBIDDEN（errors.technician_out_of_scope）。members.eligibleとmembers.capacityはrole=technicianのMembershipだけを返す。contractorのmembers.listも自社organizationのrole=technicianだけを返し、HQのmembers.listは管理scope内の全roleを返す。
+
+## IR95 業務イベントの通知 — G1-002
+
+Policy由来のAlert・品質通知（SR21/SR28/D08）、制限予告（IR05）、督促（IR04）はそれぞれの節に従う。それ以外の業務イベントの通知は次の表だけで生成する（DEC-55）。表に無いイベント（IR48のOffer期限到来、閲覧、下書き保存、メモ、プレビュー等）は通知を作らない。
+
+共通規則: channel=inApp、deliveryState=simulated、宛先Membershipごとに1件、target・paramsはD08/D12、occurredAt=遷移のnow、イベントを起こした操作のMembership（actor）には送らない、宛先は現在scopeと有効期間で再判定し閲覧できないMembershipには作らない、同じイベントIDの再送で増やさない。templateKeyとtypeは同名（IR10）。
+
+| イベント | templateKey | target | 宛先 |
+|---|---|---|---|
+| job.requested（jobs.create、plans.generateNext） | job_update | job | 案件Unitを閲覧できる顧客のclient Membership、HQのjob.manage保持者 |
+| job.offered | job_update | job | Offer先業者のpartner.accept保持者、顧客client（表示は「手配中」） |
+| job.accepted | job_update | job | HQのjob.manage保持者、顧客client |
+| job.declined | job_update | job | HQのjob.manage保持者 |
+| job.assigned（初回・再割当・延長） | schedule_change | job | 新Assignmentの技術者、顧客client、HQのjob.manage保持者、外注なら受託業者のpartner.assign保持者 |
+| report.submitted | job_update | job | 外注は受託業者のpartner.review保持者、社内はHQのjob.manage保持者、顧客client（進捗だけ） |
+| report.returned | report_return | job | 担当技術者、HQのjob.manage保持者 |
+| job.completed | completion | job | 顧客client、HQのjob.manage保持者、担当技術者、外注なら受託業者のpartner.review保持者 |
+| job.cancelled / on_hold / resumed | job_update | job | 顧客client、担当技術者、外注なら受託業者のpartner.assign保持者、HQのjob.manage保持者 |
+| restriction.requested / applied / release_requested / released / cancelled | restriction | restriction | IR19の全対象Unitを閲覧できる顧客client、HQのrestriction.manage保持者 |
+| payment.confirmed（入金確認） | payment | invoice | 請求を閲覧できる顧客client、HQのbilling.manage保持者 |
+| inquiry.received / answered | inquiry | inquiry | receivedはHQのbilling.manage保持者、answeredは問い合わせ元顧客のclient |
+| policyの無いAlertのopen（device事象、IR98のload_alert、seed以外で生成されたもの） | alert | unit | 当該Unitを閲覧できる顧客client、HQのalert.resolve保持者、閲覧窓内の担当技術者 |
+| device_operation.failed | device_operation | device | 操作を作成したMembership、HQのdevice.manage保持者 |
+
+正規型のNotification.templateKeyとNotificationTypeにjob_updateとdevice_operationを追加する。seedの4 actorでは、例えばjob.assignedをcontractor-aが行うと、tech-external-a・customer-a・hq-operator・hq-restriction-managerに各1件（計4件）、actorのcontractor-aには0件となる。
+
+## IR96 制限の取消 — G1-003・G1-013
+
+restrictions.cancel（restriction.manage、reason必須）の結果は次の表だけで決める（DEC-56）。
+
+| 現在のstate | 結果 |
+|---|---|
+| scheduled | cancelled。Commandは作らず、予告通知の証跡は保持 |
+| requested / applied | release_requested。releaseIntent.source='cancel'で、IR35と同じ遷移内でD03の設備別解除評価を行う |
+| release_requested | 冪等に現在のRestrictionを返し、versionと監査（拒否を除く）を増やさない |
+| released / cancelled | CONFLICT（D01順位6） |
+
+IR35の解除要求の起動経路は、入金確認・猶予/例外・強制解除・取消（本節）の4つと、`restrictions.release`の明示要求（source='manual'）である。正規型のRestrictionに`releaseIntent:ReleaseIntent|null`（source、at、actorMembershipId）を追加し、RestrictionReleaseViewには`releaseIntent:{source,at}|null`を含める。client向け投影ではactorMembershipId='masked'（IR42）。A10でoverride専用者にreconcile/retry(phase=release)を表示するのは、releaseIntent.source='override'または未解決recoveryCasesがあるときだけ（IR03）。
+
+## IR97 受入fixtureの不変条件と入力オブジェクト — G1-004・G1-005・G1-009・G1-011・G1-019・G1-031
+
+1. patchやseriesで作る測定もD07の範囲とIR12の正規化規則を満たす。origin=measured・quality=validの値は範囲内でなければfixture欠陥として生成時に例外にする。AT-C06-E.3の実績120 kWhは、unit-online-rtoとunit-non-rtoの2台×60 kW×60 slotと、同じ2台の基準100 kWh（baseline-energy-100-two-units）で作る。
+2. AssignmentのpatchはscheduledStart=validFrom、scheduledEnd=validUntilを同値にする。そのAssignmentがJob.assignmentIdなら、Job.scheduledSlotも同じ枠にする。
+3. 状態フィールドだけのpatchは、他の資源と不変条件を持たない値（Notification.readAt等）に限る。Restriction.state、報告版を伴うJob.status（submitted/completed/rework_requested）、Payment/Invoiceの状態は通常の操作で作る。
+4. 受入試験は既定でsimulator=falseで開始する（DEC-58）。自動生成そのものを検証するAT-REV18-001、AT-REV19-003、AT-REV19-009だけsimulator=trueとする。
+5. 保存入力を伴う受入は、acceptancePatchesの`input`に正規型の完全な入力オブジェクトを置き、本文から参照する（AT-A05-N、AT-A11-N、AT-A12-N等）。UIやRepositoryが欠けた必須値を補わない（SR28）。
+6. 受入本文の「通知」「通知プレビュー」は、inAppの保存Notification（deliveryState=simulated）を指す。保存しないnotifications.previewは「プレビュー（保存0件）」と書く。
+7. AT-A12-N/Bは`acceptancePatches["AT-A12-N"]`でdevice-tamperにCO₂センサー（sensor-tamper-co2）を加え、同じキーの`evaluation`（両設備のco2=1100 ppm、observedAt=00:59:00Z、valid、occurredAt=01:00:00Z）でautomations.fireを行う。unit-non-rtoは換気非対応のため制御results=suppressed/invalid_capability、通知はcreated（SR25）。
+
+validate_documents.pyは1・2を全acceptancePatchesで検査し、受入計画CSV（acceptance-review-019/020）が参照するキーの存在も検査する。
+
+## IR98 アレルゲン観測と原因候補Alertのデモデータ — G1-006・G1-027
+
+アレルゲン観測（DEC-57）はdemoSeed.allergenObservationsの行（id、unitId、availability、substance、value、unit、sourceLabel、observedAt、evidenceText、createdAt）を取得元とする。telemetry.seriesの対象が1Unitのとき、そのUnitの行のうちobservedAt降順（nullは最後）、createdAt降順、id昇順の先頭をallergenObservationとして返す。行が無ければ{availability:'not_measured', 他はnull}、availability='unsupported'の行が先頭なら他の項目はnull。複数Unitの場合はnull（D12）。available行はsubstance・sourceLabel・observedAt・evidenceTextを必須とし、valueがあってunitがnullの行はそのまま返してUIは「不明」と表示する。
+
+DemoTriggerに次の2つを追加する（demo-only、IR60）。
+- `{eventType:'allergen', observation:{unitId, availability, substance, value, unit, sourceLabel, observedAt, evidenceText}}`: allergenObservationsに1行を追加する。
+- `{eventType:'load_alert', unitId, causeCode, evidenceKind, evidenceText, severity}`: policyId=null、type=sensor、status=openのAlertをobservedAt=detectedAt=nowで作る。IR66の同一事象キーとIR95の通知規則を適用する。
+
+demoSeedには、unit-online-rtoのavailable行（ダニ由来アレルゲンのデモ値）と、unit-non-rtoのunsupported行を置く。その他のUnitは行が無くnot_measuredとなる。
+
+受入のfixtureは次のとおり。
+- AT-C07-SRC/AT-A12-SRC: ①available＝unit-online-rto、②unsupported＝unit-non-rto、③not_measured＝unit-limited、④単位欠落＝`acceptancePatches["AT-C07-SRC.4"]`／`["AT-A12-SRC.4"]`。
+- AT-C08-SRC/AT-T07-SRC/AT-A05-SRC: 同名の`acceptancePatches`を使う。いずれも`shared:load-cause-alerts`（窓開放の疑い＝seedのalert-window-a、断熱不足の点検記録＝alert-insulation-a、根拠なし＝alert-unknown-a）をincludeし、AT-C08-SRCはcustomer-a宛の通知2件、AT-T07-SRCはtech-internal-aの担当案件（`shared:tech-internal-a-job-online`のjob-t07）を加える。
+
+## IR99 空気環境の案内表示 — G1-007
+
+C07（とA12の表示）は、対象1Unitの最新Measurementから次の案内を表示する。閾値はデモ値（DEC-09、DEC-57）で、健康上の判断を示さない。案内はCommandを作らない。
+
+| 指標と条件（quality=validの値だけを比較） | 案内キーと文言 |
+|---|---|
+| co2 ≥ 1000 ppmで、Capability.ventilation=trueかつventilationLevelsにlow | air.guidance.ventilate「換気を推奨」と換気要求ボタン |
+| co2 ≥ 1000 ppmで、換気非対応 | air.guidance.ventilate_manual「窓を開けるなど手動で換気してください」（D08） |
+| pm25 ≥ 35 µg/m³ | air.guidance.clean「フィルターの清掃・点検を推奨」 |
+| co2・pm25のうち少なくとも1つがvalidで、上のどれにも該当しない | air.guidance.none「現在の案内はありません」 |
+| co2とpm25のどちらもmissing/stale/suspect/センサーなし | air.guidance.unavailable「データが不足しているため案内できません」 |
+
+複数の条件に該当する場合はすべての案内を表示する。temperatureとhumidityは案内の対象にしない。
+
+## IR100 点検対象の部品集合と提出の検証 — G1-008
+
+UnitDetail.componentsは、ACUnit.serviceScopeの各グループの部品全件である（DEC-58）（indoor 8件、outdoor 5件、electrical 5件）。並び順はグループがindoor→outdoor→electrical、グループ内はDD-T04〜T06の列挙順。初回のjobs.saveDraftでは、UIがcomponentsの全件をresult=nullのInspectionItemInputとして送る。saveDraftは一部の部品だけの保存も受け付ける。
+
+jobs.submitは対象版を次のとおり検証し、違反があればVALIDATION（D01順位7）とし、違反した項目を全てfieldErrorsに入れる。
+1. itemsのcomponentKey集合が、提出時点のUnit.componentsと一致する（不足・余分はfieldErrors.items）。
+2. 全itemのresultがnullでない。
+3. resultがattention・not_inspected・not_applicableのitemはreasonが1〜1000文字。
+4. workTextは10〜4000文字。
+5. nextActionがnullでない（follow_upは未来日時とnote 1〜1000文字）。
+6. partsのquantityは1〜999。
+7. attachmentRefsが全てstatus=ready。
+8. measurementsのunitがmetricと一致する。
+
+作業中にHQがserviceScopeを変えた場合は、提出時点のcomponentsで判定する。受入の全入力は`acceptancePatches["shared:report-draft-all-normal"]`の`input`（18部品normal、workText 50文字、nextAction=none）を基準にし、各受入は差分だけを本文に書く。
+
+## IR101 共通受入条件の具体値と機種台帳のtenant — G1-025
+
+AT-X01〜X07のN/E/Bの具体値は、共通要件定義書の「共通受入条件の具体値」表を正とする。AT-X06の非対応機種は`acceptancePatches["AT-X06-B.1"]`〜`["AT-X06-B.3"]`（温度非対応、coolだけ、送風だけ）と`["AT-X06-B.5"]`（制限できないRTO）で作る。同名Spaceの候補は`["AT-X02-B"]`で作る。
+
+共通受入を一意にするため、次を定める（DEC-59）。
+- Context.scopeVersionは表示世代の照合用であり、Repositoryは認可に現在のMembershipだけを使う。Context.scopeVersionが現在値と異なる要求は、D01順位3〜4の認可結果（NOT_FOUND/FORBIDDEN）を先に決め、認可を通る場合はCONFLICT（messageKey=errors.scope_changed、D01順位6、副作用0）を返す。UIはsession.getでContextを更新し、IR17どおりQueryを破棄して再取得する。
+- Membershipがnow>=validUntilまたはnow<validFromになった後の要求はUNAUTHENTICATED（messageKey=errors.membership_inactive、D01順位2）とし、D09の期限時と同じく画面を破棄して/loginへ移る。有効期間外のMembershipへのdemoSession.signIn/switchMembershipはFORBIDDEN（errors.membership_inactive）。
+- restrictions.scheduleでContract.restrictionEligible=falseの契約を指定した場合はVALIDATION（fieldErrors.contractId、messageKey=errors.restriction_ineligible、D01順位7）。
+- voice.resolveIntentのcandidatesでpathLabelが同じ候補が複数ある場合、VoicePanelは各候補にunitIdを併記し、文字入力モードへ切り替えて選ばせる（FR-X02の「区別がつかない場合」）。自動で選ばない。
+- AT-X04-E⑤の自己承認は`acceptancePatches["AT-X04-E.5"]`（user-tech-internal-aの2つ目のMembership hq-self-approver、role=admin、job.manage）で作る。
+
+demoSeed.capabilitiesは所属tenantを明示する（tenantId）。tenant-bのunit-tenant-bはtenant-b用のcap-split-std-tbを参照する。別tenantの機種IDを参照する設備はfixture欠陥とする（IR91の1）。
+
+## IR102 軽微な明確化 — G1-010・G1-012・G1-014〜G1-024・G1-026〜G1-029
+
+- G1-010: AT-C04-E③とAT-FIX-019は時計をseedのまま（2026-09-14T01:00Z）とし、D09の366日検証でAmerica/New_Yorkの日曜02:30（2027-03-14は存在しない時刻）と日曜01:30（2026-11-01は曖昧な時刻）を検出してVALIDATION（D01順位7）とする。
+- G1-012: 旧受入計画は現行規範に合わせて修正する。AT-REV17-004の省略時dueAtは2026-09-15T04:00Z（IR74）。AT-REV17-005は依存の無い設備（acceptancePatches AT-REV17-005）で確認する。AT-REV17-014の既知route上のscope外IDは、URLを維持したnot-found状態と親一覧リンク（IR57）とし、未定義routeだけSCR-X-not-foundとする。AT-REV18-003は電源断の後にrestored(power)を送ってからtamperを確認する。IR81の旧記述検査は受入計画CSVにも適用する。
+- G1-014: SCR-C08はsummaries.get(kind=customer)を補助Queryに持ち、未対応アラート件数（alertCount、IR51）を未読件数と別に表示する。
+- G1-015: AT-C12-E①の「保留」は、remove Commandの作成から30秒未満はperUnit.releaseState=requested（表示「解除応答待ち（通信断）」）、30秒以降はfailed（集約はrelease_requestedのまま）とする。
+- G1-016: UX-05の「受け取る情報」は概要であり、propsの正はcomponent-contracts.csv（IR72の順位5）とする。
+- G1-017: SCR-P03のurl_selectionにjobIdを追加する。
+- G1-018: D06の確定重複の判定では、同じjobIdの置き換え対象のactive Assignmentを除外する。
+- G1-019: 状態の列挙を前提にする受入（AT-A10-B、AT-C12-B、AT-P01-Nのsubmitted）は、IR97の3により通常の操作で状態を作る。
+- G1-020: EmissionFactorの単位はkgCO₂e/kWhに固定（IR88）であり、BR-A14の必須項目は地域・年度・出典とする。AT-A14-Eから旧表記「係数の単位が合っていない」を削除する。
+- G1-021: AT-P05-B③は、理由の無いnot_inspectedを含む報告の提出がVALIDATIONとなり、品質確認の対象にならないことを確認する（IR100）。
+- G1-022: 位置情報の同意はpurpose=location_automationだけをモデル化する。旧表記の「一般的な利用の同意」は同意記録を持たない。AT-C05-B①は「位置同意granted=false」とする。
+- G1-023: AT-T12-E②の「古いheartbeat」は、communication_lost(sequence=5)の後に送るrestored(axis=connection、sequence=4)とする。SR20により状態に反映せず、offlineのままとする。
+- G1-024: AT-C13-N、AT-C09-N、AT-A15-N、AT-T10-N、AT-T11-Nの必須入力と手順を本文に明記する。
+- G1-026: S08は、customer-bのunit-other-customerの案件を使う。contractor-aが辞退してcontractor-bへ再委託し、tech-external-bを割り当てる（IR94のscope条件）。
+- G1-027: IR98のとおり。
+- G1-028: AppShellのeventにswitchMembership(demoMembershipId)を追加し、ShellContainerがdemoSession.switchMembershipを実行する。
+- G1-029: AT-A09-E③は「予告の宛先となる顧客Membershipが0件（全対象Unitを閲覧できるclientがいない）でschedule→VALIDATION（IR05）」とする。

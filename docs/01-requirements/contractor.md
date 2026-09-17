@@ -1,6 +1,6 @@
 ---
 document_id: REQ-P
-version: 0.19.0
+version: 0.20.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # 施工業者 要件定義書
 
-**0.19.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.20.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 目的と前提
 
@@ -74,7 +74,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-P01-N | `acceptancePatches["AT-P01-N"]`: contractor-aに未応答かつ期限内offered1、有効受諾期間内のaccepted1、submitted1（seedのjob-contractor-aをsubmittedへ）、contractor-bにoffered1。期間条件なし。When: ①`/partner`をstatus条件なしで取得 ②status=offeredへ変更 | ①一覧3件、offerCount=1／activeCount=1／reviewCount=1 ②一覧1件、offerCount=1／activeCount=0／reviewCount=0、bのofferなし ③閲覧後も未応答Offer decision=null |
+| AT-P01-N | `acceptancePatches["AT-P01-N"]`: contractor-aに未応答かつ期限内offered1、有効受諾期間内のaccepted1、submitted1（tech-external-aがjob-contractor-aをstart→`acceptancePatches["shared:report-draft-all-normal"]`の入力でsaveDraft→submit、IR97の3）、contractor-bにoffered1。期間条件なし。When: ①`/partner`をstatus条件なしで取得 ②status=offeredへ変更 | ①一覧3件、offerCount=1／activeCount=1／reviewCount=1 ②一覧1件、offerCount=1／activeCount=0／reviewCount=0、bのofferなし ③閲覧後も未応答Offer decision=null |
 | AT-P01-E | ①contractor-b宛offerのjobIdを直打ち ②委託期限後に自社履歴を開く | ①NOT_FOUND ②JobHistorySnapshot（自社決定・完了日）のみ、live値なし |
 | AT-P01-B | 同じofferを①受諾前 ②受諾後・期間内 ③委託失効後に開く | ①JobOfferSummary（設置物件の登録住所のみ参照、入場案内・telemetry・請求なし） ②JobDetail ③JobHistorySnapshot |
 
@@ -112,7 +112,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-P03-N | AT-P02-Nで受諾したjob-internal-a、tech-external-a（有資格・contractor-a、seedのassignment-contractor-aは2026-09-20T00:00Zまで）。When: 2026-09-21 10:00〜12:00（Asia/Kuala_Lumpur）で割当 | ①Assignment作成 ②scheduledSlot確定 ③Job assigned ④担当技術者へ通知プレビュー1件 |
+| AT-P03-N | AT-P02-Nで受諾したjob-internal-a、tech-external-a（有資格・contractor-a、seedのassignment-contractor-aは2026-09-20T00:00Zまで）。When: 2026-09-21 10:00〜12:00（Asia/Kuala_Lumpur）で割当 | ①Assignment作成 ②scheduledSlot確定 ③Job assigned ④tech-external-aにtemplateKey=schedule_changeの通知1件（inApp・simulated）。customer-a・hq-operator・hq-restriction-managerにも各1件、actorのcontractor-aには0件（IR95） |
 | AT-P03-E | ①contractor-bの技術者 ②無資格 ③委託期間外 ④in_progressで理由なし再割当 ⑤理由あり再割当 | ①NOT_FOUND ②FORBIDDEN ③VALIDATION（指定枠が委託期間に収まらない）、割当0件 ④VALIDATION ⑤成功、Jobはin_progress維持 |
 | AT-P03-B | ①非重複日程 ②同時間帯の確定重複 ③保存直前に候補の資格を失効 | ①成功 ②CONFLICT ③FORBIDDEN |
 
@@ -158,7 +158,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 |---|---|---|
 | AT-P05-N | tech-external-aがjob-contractor-aをstart→全点検項目を入力してsaveDraft（v1）→submitした報告、品質担当はcontractor-a（別user）。When: contractor-aがaccept | ①completed ②reviewHistoryがv1に紐付く ③顧客が報告本文を取得可 ④Alertはopen維持 |
 | AT-P05-E | ①作者と同userIdの別Membershipで受理 ②reportVersion=0で受理 ③return理由なし ④returnの後にv1でaccept | ①FORBIDDEN ②VALIDATION（versionは正整数） ③VALIDATION ④CONFLICT、rework_requested維持 |
-| AT-P05-B | ①全点検記録あり ②未点検あり理由あり ③未点検あり理由なし | ①②受理可 ③受理ボタン無効、VALIDATION |
+| AT-P05-B | ①全点検記録あり ②未点検あり理由あり ③未点検あり理由なしで技術者が提出 | ①②受理可 ③提出がVALIDATIONとなりsubmittedにならず、品質確認の対象に出ない（IR100） |
 
 **追加受入条件 AT-P05-R01（再訪・競合・役割横断）**
 
@@ -234,7 +234,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 0.9.0修正契約: [厳格レビュー修正契約](../02-design/strict-review-contracts.md)と[操作別版契約](../02-design/write-version-catalog.csv)を併読する。
 
-現行0.19.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.20.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 0.14.0: IR25に従い、受諾前住所は設備の設置物件から取得し、期限後の報告表示は報告有無・受理状態だけを凍結する。
 

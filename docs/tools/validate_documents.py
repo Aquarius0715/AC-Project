@@ -11,7 +11,7 @@ import subprocess
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN = ROOT / '04-agentic-sdlc/runs/DOC-0.19.0'
+RUN = ROOT / '04-agentic-sdlc/runs/DOC-0.20.0'
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--write-baseline', action='store_true', help='Rehash current documents after static checks; does not approve G1')
 parser.add_argument('--tsc', type=Path, help='Path to installed TypeScript lib/tsc.js; optional semantic check')
@@ -420,7 +420,7 @@ if not any(a['permissions']==['restriction.override'] for a in fixture['actors']
     fail('Override-only fixture missing')
 for path in markdown:
     text=path.read_text()
-    if re.search(r'^version: 0\.(?:8|9|1[0-8])\.0$',text,re.M) or re.search(r'\*\*0\.(?:8|9|1[0-8])\.0の実装基準',text) or re.search(r'現行0\.(?:1[0-8])\.0の追加契約',text) or 'IR01〜34を併読' in text or 'IR01〜44を併読' in text or 'IR01〜74を併読' in text:
+    if re.search(r'^version: 0\.(?:8|9|1[0-9])\.0$',text,re.M) or re.search(r'\*\*0\.(?:8|9|1[0-9])\.0の実装基準',text) or re.search(r'現行0\.(?:1[0-9])\.0の追加契約',text) or 'IR01〜34を併読' in text or 'IR01〜44を併読' in text or 'IR01〜74を併読' in text or 'IR01〜93を併読' in text:
         fail('Stale current version '+str(path.relative_to(ROOT)))
 
 # Re-review of 0.11.0: verify the changed contract paths and trace coverage.
@@ -720,13 +720,13 @@ if 'extendSession' not in next(c for c in components if c['component']=='AppShel
     fail('AppShell session extension event absent (IR55)')
 # IR72/IR81: superseded wording must not remain. The resolution contract is checked too,
 # except lines that explicitly quote what they replace.
-STALE_LITERALS = ['jobs/units/invoices/restrictionsなど', '利用者操作による延長なし', 'デモ用の時計から発生したイベントは`automations.fire`に渡し', 'RTO以外の契約は「契約なし・一般保守」', 'その人が使える画面へ戻します', '許可された画面へ戻します。', 'その人が見てよい画面へ戻します', 'tenantId(テナントID)、親ID', '即時〜300msの間で固定の設定', 'ホーム画面や一覧画面へ移動します', '| boundary / assumptions | 文字列/必須 | 1〜2000文字', '| ①②未対応件数に計上', 'version=3の後に2と重複3', 'assigned→submitted→completedと進む', 'seed遅延のときは専用の扱い']
-STALE_PATTERNS = [r'利用者操作による延長は(?:ない|なし)', r'型番を管理(?:する|できる)権限', r'環境(?:に関する)?policy(?:\(方針\))?を管理する権限', r'roomは表示名', r'顧客組織の数', r'20%増加|増加20%|増加率20%', r'→解除を要求する→', r'ホーム画面へ戻す', r'基準はIR63で自動選択', r'reportCategory=scope2_electricity']
-QUOTE_MARKERS = ('置換', '旧記述', '旧表現', '旧文', '旧表記')
-stale_targets = [p for p in markdown if p.parent.name in ['01-requirements','02-design','03-uiux']] + [ROOT/'04-agentic-sdlc/verification.md']
+STALE_LITERALS = ['jobs/units/invoices/restrictionsなど', '利用者操作による延長なし', 'デモ用の時計から発生したイベントは`automations.fire`に渡し', 'RTO以外の契約は「契約なし・一般保守」', 'その人が使える画面へ戻します', '許可された画面へ戻します。', 'その人が見てよい画面へ戻します', 'tenantId(テナントID)、親ID', '即時〜300msの間で固定の設定', 'ホーム画面や一覧画面へ移動します', '| boundary / assumptions | 文字列/必須 | 1〜2000文字', '| ①②未対応件数に計上', 'version=3の後に2と重複3', 'assigned→submitted→completedと進む', 'seed遅延のときは専用の扱い', '一般的な利用の同意', '①一般同意のみ', '係数の単位が合っていない', 'offline台はpending', '地域・年度・単位・出典', 'SCR-X-not-foundを表示。両者は同じ文言', 'clock2026-03-07']
+STALE_PATTERNS = [r'利用者操作による延長は(?:ない|なし)', r'型番を管理(?:する|できる)権限', r'環境(?:に関する)?policy(?:\(方針\))?を管理する権限', r'roomは表示名', r'顧客組織の数', r'20%増加|増加20%|増加率20%', r'→解除を要求する→', r'ホーム画面へ戻す', r'基準はIR63で自動選択', r'reportCategory=scope2_electricity', r'dueAt=2026-09-15 12:00Z', r'fanのみの設備は換気ボタン', r'2026-03-07／2026-10-31']
+QUOTE_MARKERS = ('置換', '旧記述', '旧表現', '旧文', '旧表記', '旧句')
+stale_targets = [p for p in markdown if p.parent.name in ['01-requirements','02-design','03-uiux']] + [ROOT/'04-agentic-sdlc/verification.md'] + sorted((ROOT/'04-agentic-sdlc').glob('acceptance-*.csv'))  # IR102: acceptance plans too
 for path in stale_targets:
     for line in path.read_text().splitlines():
-        if path.name == 'review-resolution-contracts.md' and any(marker in line for marker in QUOTE_MARKERS):
+        if (path.name == 'review-resolution-contracts.md' or path.suffix == '.csv') and any(marker in line for marker in QUOTE_MARKERS):
             continue
         for stale in STALE_LITERALS:
             if stale in line:
@@ -863,14 +863,15 @@ import copy as _copy
 from datetime import datetime as _dt, timedelta as _td
 AP = fixture.get('acceptancePatches', {})
 acceptance_text = ''.join((ROOT/f'01-requirements/{r}.md').read_text() for r in ['common','client','contractor','technician','admin']) + (ROOT/'04-agentic-sdlc/verification.md').read_text()
-referenced_keys = set(re.findall(r'\["((?:AT-|shared:)[^"]+)"\]', acceptance_text))
+acceptance_csv_text = ''.join(p.read_text() for p in sorted((ROOT/'04-agentic-sdlc').glob('acceptance-*.csv')))  # IR97
+referenced_keys = set(re.findall(r'\["((?:AT-|shared:)[^"]+)"\]', acceptance_text + acceptance_csv_text.replace('""','"'))) | set(re.findall(r'acceptancePatches (AT-[A-Za-z0-9.\-]*[A-Za-z0-9])', acceptance_csv_text))
 case_keys = {k for k in AP if k.startswith('AT-')}
 for key in sorted(referenced_keys - set(AP)):
     fail('Acceptance patch key missing (IR92) '+key)
 for key in sorted(case_keys - referenced_keys):
     fail('Acceptance patch not referenced by acceptance text (IR92) '+key)
 ir92 = resolution[resolution.index('## IR92 '):resolution.index('## IR93 ')] if '## IR92 ' in resolution and '## IR93 ' in resolution else ''
-listed = set(re.findall(r'AT-[A-Z]\d\d-[A-Z0-9]+(?:\.\d)?', ir92.split('6. ')[1].split('\n')[0])) if '6. ' in ir92 else set()
+listed = set(re.findall(r'AT-(?:[A-Z]\d\d|REV\d\d)-[A-Z0-9]+(?:\.\d)?', ir92.split('6. ')[1].split('\n')[0])) if '6. ' in ir92 else set()
 if listed != case_keys:
     fail('IR92 acceptance patch case list differs from fixture: '+str(sorted(listed ^ case_keys)))
 def _instant(value):
@@ -886,6 +887,7 @@ def _expand(key, trail=()):
         items += _expand(inc, trail+(key,))
     return items + AP[key].get('patches', [])
 series_keys = {'idPrefix','unitId','sensorId','metric','unit','boundaryId','from','to','stepSeconds','value','origin','quality','sequenceStart','skip'}
+METRIC_RANGE = {('temperature','°C'):(-50,100), ('humidity','%'):(0,100), ('co2','ppm'):(0,10000), ('pm25','µg/m³'):(0,1000), ('power','kW'):(0,100), ('vibration','mm/s'):(0,100), ('refrigerant_pressure','kPa'):(0,5000)}  # D07
 sensor_ids_all = {s['id'] for d in seed.get('devices', []) for s in d.get('sensors', [])}
 for key in sorted(k for k in AP if k.startswith('AT-') or k.startswith('shared:')):
     state = _copy.deepcopy(seed); actors = _copy.deepcopy(fixture['actors'])
@@ -921,6 +923,19 @@ for key in sorted(k for k in AP if k.startswith('AT-') or k.startswith('shared:'
             if unknown:
                 fail(f'Acceptance patch sets unknown fields (IR92) {key}: {sorted(unknown)}')
             row.update(patch['set'])
+    # IR97 1-3: fixture invariants hold after every patch set.
+    for m in state['measurements']:
+        low_high = METRIC_RANGE.get((m['metric'], m['unit']))
+        if m.get('origin','measured')=='measured' and m.get('quality','valid')=='valid' and m['value'] is not None and (low_high is None or not low_high[0] <= m['value'] <= low_high[1]):
+            fail(f"Acceptance measurement out of range (IR97) {key}: {m['id']}")
+    for a in state['assignments']:
+        job = next((j for j in state['jobs'] if j['id']==a['jobId']), None)
+        if a['scheduledStart']!=a['validFrom'] or a['scheduledEnd']!=a['validUntil'] or (job and job.get('assignmentId')==a['id'] and job.get('scheduledSlot')!={'startAt':a['scheduledStart'],'endAt':a['scheduledEnd']}):
+            fail(f"Assignment and job slot out of sync (IR97) {key}: {a['id']}")
+    for patch in AP.get(key, {}).get('patches', []):
+        fields = set(patch.get('set', {}))
+        if (patch.get('entity')=='restrictions' and 'state' in fields) or (patch.get('entity') in ('invoices','payments') and 'status' in fields and patch['id'] in {x['id'] for x in seed.get(patch['entity'], [])}) or (patch.get('entity')=='jobs' and fields=={'status'}):
+            fail(f"State-only patch must be created by operations (IR97) {key}: {patch['id']}")
     query = AP.get(key, {}).get('query'); expected_values = AP.get(key, {}).get('expected', {})
     if query and 'kWh' in expected_values:
         start, stop = _instant(query['from']), _instant(query['to'])
@@ -937,6 +952,70 @@ for required in ['受入Givenの解釈規則', '| 当該技術者にAssignment�
     if required not in resolution:
         fail('0.19 behavioral guard missing '+required)
 report_019 = {'review_019_cases':len(review_019), 'proposed_decisions_019':sum(d['status']=='proposed' for d in decisions_019)}
+
+# 0.20.0 independent G1 (G1-001..031) regression checks: document consistency only, not app behavior.
+review_020 = rows('04-agentic-sdlc/acceptance-review-020.csv')
+unique(review_020, 'case_id', '0.20 review case ID')
+if unique(review_020, 'issue_id', '0.20 finding') != {f'G1-{i:03}' for i in range(1,32)}:
+    fail('0.20 review must cover G1-001 through G1-031')
+for case in review_020:
+    path, _, fragment = case['contract'].partition('#')
+    if not (ROOT/path).is_file() or fragment not in anchors(ROOT/path):
+        fail('Broken 0.20 review contract '+case['case_id'])
+    if case['execution_status'] != 'not_run' or not all(case[k] for k in ['given','when','then']):
+        fail('Invalid 0.20 review acceptance '+case['case_id'])
+    if case['decision_status'] not in {'proposed','specified'}:
+        fail('Unknown 0.20 decision status '+case['case_id'])
+    if not set(case['requirement_ids'].split(';')) <= expected:
+        fail('Unknown 0.20 review requirement '+case['case_id'])
+for row in trace:
+    wanted = {c['case_id'] for c in review_020 if row['requirement_id'] in c['requirement_ids'].split(';')}
+    if set(filter(None, row.get('review_020_case_ids','').split(';'))) != wanted:
+        fail('0.20 review trace drift '+row['requirement_id'])
+decisions_020 = json.loads((ROOT/'00-prepare/internal/review-decisions-020.json').read_text())['decisions']
+if {d['id'] for d in decisions_020} != {f'DEC-{i}' for i in range(54,60)}:
+    fail('0.20 decisions must be DEC-54 through DEC-59')
+for decision in decisions_020:
+    if decision['status'] != 'proposed' or decision.get('decision_status') != 'proposed' or decision.get('reversible') is not True or not all(decision.get(k) for k in ['proposed_by','proposed_at','owner','contract','issue_id']):
+        fail('0.20 proposed decision lacks provenance '+decision['id'])
+    for section in decision['contract'].split(';'):
+        if '## '+section+' ' not in resolution:
+            fail('0.20 decision contract section absent '+decision['id'])
+    if decision['id'] not in resolution:
+        fail('0.20 decision not referenced by contract '+decision['id'])
+for required in ['| 入力型にjobIdが無い操作で、対象Unitに自己のAssignmentが一度も無い | 社内でunit scope内ならFORBIDDEN（errors.assignment_required、D01順位4）', '要求時にDevice.connection≠onlineならD01順位8のOFFLINE（DeviceOperationを作らない）', '含まない技術者は候補に出さず、直接指定はFORBIDDEN（errors.technician_out_of_scope）', 'members.eligibleとmembers.capacityはrole=technicianのMembershipだけを返す', '| job.assigned（初回・再割当・延長） | schedule_change | job |', 'イベントを起こした操作のMembership（actor）には送らない', "| requested / applied | release_requested。releaseIntent.source='cancel'", '| released / cancelled | CONFLICT（D01順位6） |', 'origin=measured・quality=validの値は範囲内でなければfixture欠陥', '受入試験は既定でsimulator=falseで開始する', '| co2 ≥ 1000 ppmで、Capability.ventilation=trueかつventilationLevelsにlow |', '| pm25 ≥ 35 µg/m³ | air.guidance.clean', 'indoor 8件、outdoor 5件、electrical 5件', '1. itemsのcomponentKey集合が、提出時点のUnit.componentsと一致する', '認可を通る場合はCONFLICT（messageKey=errors.scope_changed、D01順位6、副作用0）', 'UNAUTHENTICATED（messageKey=errors.membership_inactive、D01順位2）', 'VALIDATION（fieldErrors.contractId、messageKey=errors.restriction_ineligible、D01順位7）', '30秒以降はfailed（集約はrelease_requestedのまま）', '同じjobIdの置き換え対象のactive Assignmentを除外する']:
+    if required not in resolution:
+        fail('0.20 behavioral guard missing '+required)
+for pattern in [r"releaseIntent:ReleaseIntent\|null\}", r"export type ReleaseIntent = \{source:'payment'\|'exception'\|'override'\|'manual'\|'cancel';", r"'inquiry'\|'job_update'\|'device_operation';params:", r"\{eventType:'allergen';observation:\{unitId:ID\} & AllergenObservation\}", r"\{eventType:'load_alert';unitId:ID;"]:
+    if not re.search(pattern, types):
+        fail('0.20 DTO invariant missing '+pattern)
+if seed:
+    allergen = {(o['unitId'], o['availability']) for o in seed.get('allergenObservations', [])}
+    if allergen != {('unit-online-rto','available'), ('unit-non-rto','unsupported')}:
+        fail('Seed allergen observations differ (IR98)')
+    cap_tenant = {c['id']:c.get('tenantId') for c in seed['capabilities']}
+    for unit in seed['units']:
+        org = next(o for o in seed['organizations'] if o['id']==unit['customerOrgId'])
+        if cap_tenant.get(unit['modelId']) != org['tenantId']:
+            fail('Unit capability tenant mismatch (IR101) '+unit['id'])
+    draft = AP.get('shared:report-draft-all-normal', {}).get('input', {})
+    keys = [i['componentKey'] for i in draft.get('items', [])]
+    if len(keys) != 18 or len(set(keys)) != 18 or any(i['result']!='normal' for i in draft.get('items', [])) or len(draft.get('workText','')) != 50 or draft.get('nextAction') != {'kind':'none'}:
+        fail('Report draft input must cover 18 components (IR100)')
+    for key in ['AT-A05-N','AT-A11-N','AT-A12-N']:
+        policy_input = AP.get(key, {}).get('input', {})
+        if policy_input.get('enabled') is not True or not policy_input.get('unitIds') or 'kind' not in policy_input:
+            fail('Policy acceptance input incomplete (IR97) '+key)
+    if 'sensor-tamper-co2' not in json.dumps(AP.get('AT-A12-N', {})):
+        fail('AT-A12-N CO2 sensor patch absent (IR97)')
+common_req = (ROOT/'01-requirements/common.md').read_text()
+if '### 共通受入条件の具体値' not in common_req or any(f'| AT-X0{i}-{k} |' not in common_req for i in range(1,8) for k in 'NEB'):
+    fail('Common acceptance table absent (IR101)')
+if 'summaries.get' not in screen_by_id['SCR-C08']['operations'].split(';') or 'jobId' not in screen_by_id['SCR-P03']['url_selection'].split(','):
+    fail('IR102 screen contract missing (SCR-C08 summaries.get / SCR-P03 jobId)')
+if 'switchMembership' not in next(c for c in components if c['component']=='AppShell')['event']:
+    fail('AppShell role switch event absent (IR102)')
+report_020 = {'review_020_cases':len(review_020), 'proposed_decisions_020':sum(d['status']=='proposed' for d in decisions_020)}
 
 typescript_check = 'not_run'
 if args.tsc:
@@ -958,7 +1037,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.19.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.20.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')
@@ -975,5 +1054,6 @@ report['proposed_decisions'] = sum(d['status']=='proposed' for d in decisions_01
 report['review_018_cases'] = len(review_018)
 report['proposed_decisions_018'] = sum(d['status']=='proposed' for d in decisions_018)
 report.update(report_019)
+report.update(report_020)
 print(json.dumps(report,ensure_ascii=False,indent=2))
 sys.exit(1 if errors else 0)

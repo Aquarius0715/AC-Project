@@ -1,0 +1,30 @@
+{
+  "task_id": "DOC-0.20.0",
+  "task_status": "in_review",
+  "scope": "frontend-demo-1A-independent-g1-correction",
+  "reviewed_target": "DOC-0.19.0 independent G1 findings",
+  "spec_baseline_id": "4f45da02ef91f0cf93075848d6ded3373878521740aa2f4047673eee709e4acc",
+  "gate_result": "pending",
+  "unresolved_findings": [],
+  "resolved_findings": 29,
+  "answered_questions": 2,
+  "user_accepted_decisions": [
+    "DEC-44",
+    "DEC-50"
+  ],
+  "proposed_decisions": [
+    "DEC-54",
+    "DEC-55",
+    "DEC-56",
+    "DEC-57",
+    "DEC-58",
+    "DEC-59"
+  ],
+  "independent_post_correction_review": "to_be_requested",
+  "static_check": "passed",
+  "validator_mutation_check": "passed",
+  "typescript_semantic_check": "passed",
+  "application_tests": "not_run",
+  "production_connection_readiness": "NOT_READY",
+  "deployment_approval": false
+}

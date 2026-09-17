@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.19.0
+version: 0.20.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 この設計書は、機能・画面の項目・状態・例外を決めます。企業が書いた原文と、それに対応する要件をもとにします。各FR(機能要件)を満たす処理と、受け入れ条件を定義します。参考にするモック画面は、共通UIの見た目を検討するために使います。
 
-**0.19.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.20.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 入力・責務
 
@@ -91,7 +91,7 @@ scope: frontend-demo-1A
 |---|---|---|---|
 | unitId | ID/必須 | 担当内 | 設備 |
 | manufacturer / model / installedAt | 読取 | 未登録はnull表示 | 台帳 |
-| components / serviceScope | 読取 | 対象/対象外を明示 | 点検範囲 |
+| components / serviceScope | 読取 | components=serviceScopeの各グループの全部品（indoor 8、outdoor 5、electrical 5、IR100） | 点検範囲 |
 | capabilityVersion | 読取 | 操作候補の根拠 | 能力版 |
 
 **処理手順**
@@ -286,7 +286,7 @@ scope: frontend-demo-1A
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
 | workText | 文字列/提出時必須 | 10〜4000文字 | 実施内容 |
-| inspectionItems | 配列/提出時必須 | 対象全部に結果/理由 | チェックリスト |
+| inspectionItems | 配列/提出時必須 | 提出時点のUnit.componentsと同じ部品集合で全件にresult、attention等は理由（IR100） | チェックリスト |
 | photos | Attachment配列/任意 | JPEG/PNG、<=5MiB×10、readyのみ提出 | 写真 |
 | parts | 配列/任意 | name1〜120文字、quantity正整数<=999 | 交換部品 |
 | nextAction.kind | enum/必須 | none/follow_up | 次回対応 |
@@ -390,6 +390,6 @@ scope: frontend-demo-1A
 
 0.10.0: T12はDeviceEvent.alertIdsからalerts.getを取得しAlert.versionで確認する（SR23）。機器履歴は発生時scopeで絞る（SR24）。
 
-現行0.19.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.20.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 案件一覧とjobs.listのソートはIR34を適用する。URL sort未指定はstatus:asc。選択変更でcursorを破棄し、filterを保持して新snapshotの初頁から取得する。状態/重大度/期限の昇降順を選べる。

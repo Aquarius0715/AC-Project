@@ -1,6 +1,6 @@
 ---
 document_id: DD-P
-version: 0.19.0
+version: 0.20.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 この文書では、施工業者向け画面の機能・画面項目・状態・エラー(例外)を決めます。基準にするのは、企業の元の要件文書と、それに対応する要件です。各FR(機能要件)を満たすために必要な処理と、受け入れ条件(テストで確認する内容)を定義します。参考として用意したモック(見本画面)は、共通のUI(画面デザイン)の見た目を検討するためだけに使います。
 
-**0.19.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.20.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 入力・責務
 
@@ -207,7 +207,7 @@ scope: frontend-demo-1A
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
 | date | 日付/必須 | 初期デモ当日 | 予定対象日 |
-| qualification | 文字列/任意 | 資格台帳コード | 資格絞込 |
+| qualification | 文字列/任意 | 資格台帳コード。一覧・候補・稼働は自社のrole=technicianだけ（IR94） | 資格絞込 |
 | activeOnly | boolean/必須 | 初期true | 有効所属 |
 | members / slots | 読取 | 自社の必要な氏名・資格・期間・割当 | 予定 |
 
@@ -285,7 +285,7 @@ scope: frontend-demo-1A
 
 0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
 
-現行0.19.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.20.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 0.14.0: IR25に従い、受諾前住所は設備の設置物件から取得し、期限後の報告表示は報告有無・受理状態だけを凍結する。
 

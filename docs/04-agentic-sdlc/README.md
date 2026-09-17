@@ -1,6 +1,6 @@
 ---
 document_id: SDLC-001
-version: 0.19.0
+version: 0.20.0
 status: draft
 owner: orchestration-agent
 scope: frontend-demo-1A
@@ -100,7 +100,7 @@ G1で具体的に確認すること: 各機能について、開始条件、型�
 
 ## 8. 現行の引き渡し
 
-現行入力は[runs/DOC-0.19.0/spec-manifest.json](runs/DOC-0.19.0/spec-manifest.json)の全ファイル（IR75）。DOC-0.18.0はbaselineを作成せず中断した版であり、実装入力に使わない。静的検証は `python3 docs/tools/validate_documents.py`、検証器の変異テストは `python3 docs/tools/check_review_regressions.py` で、両方の成功を引継ぎ条件とする（IR73）。記述が食い違う場合の規範の優先順位はIR72。仕様が変わったらmanifestを再生成し、旧レビュー証跡を流用しない。自己レビューは独立G1の代用ではない。別主体のレビュー記録がない場合gate-G1はpendingを維持し、実装完了/試験合格を記録しない。
+現行入力は[runs/DOC-0.20.0/spec-manifest.json](runs/DOC-0.20.0/spec-manifest.json)の全ファイル（IR75）。DOC-0.18.0はbaselineを作成せず中断した版、DOC-0.19.0は独立G1で不合格となった版であり、実装入力に使わない。静的検証は `python3 docs/tools/validate_documents.py`、検証器の変異テストは `python3 docs/tools/check_review_regressions.py` で、両方の成功を引継ぎ条件とする（IR73）。記述が食い違う場合の規範の優先順位はIR72。仕様が変わったらmanifestを再生成し、旧レビュー証跡を流用しない。自己レビューは独立G1の代用ではない。別主体のレビュー記録がない場合gate-G1はpendingを維持し、実装完了/試験合格を記録しない。
 
 ## 9. 採用判断と最終確認の分離
 

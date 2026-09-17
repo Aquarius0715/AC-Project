@@ -1,6 +1,6 @@
 ---
 document_id: UX-COMMON
-version: 0.19.0
+version: 0.20.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 この文書は、4つの役割すべてに共通する、実装・操作・表示のルールを定める。ワイヤフレーム(画面のラフな下書き)や画面配置図は、この文書の対象外である。各画面の業務処理については[詳細設計](../02-design/common.md)を見てほしい。使用するライブラリは、DEC-02/03で決めた提案標準に従う。配色・書体・形状は、ユーザーが指定したLoyaltyページから取得したHTML/CSSに合わせる。根拠と、値を補正した箇所については[参考デザイン分析](../00-prepare/reference-design-analysis.md)を見てほしい。
 
-**0.19.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.20.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 企業要望と共通UIUXへの展開
 
@@ -132,7 +132,7 @@ shadcnの`--primary`/`--background`/`--card`/`--muted`/`--border`は、上記の
 
 ## UX-05. コンポーネントの共通契約
 
-| 共通コンポーネント | 受け取る情報 | ルール |
+| 共通コンポーネント | 受け取る情報（概要。propsの正はcomponent-contracts.csv、IR72の順位5、IR102） | ルール |
 |---|---|---|
 | AppShell / RoleNavigation | role(役割)、許可されたルート、表示名、appNameKey | ナビの表示と、サービスの利用可否の両方を確認する。現在いる場所はaria-currentで表現する。音声切替は権限のない役割ではdisabledと理由表示(IR44)。アプリ名は翻訳キーapp.name、demo-only操作の領域にはDEMOラベルを常時表示する(IR60/IR74) |
 | SessionExpiryDialog | session、now、extending、error | Session期限の120秒前にrole=alertdialogで表示し、初期focusは「延長する」。延長・サインアウトの実行はShellContainerが行う(IR55) |
@@ -200,7 +200,7 @@ PC向けのnav(ナビゲーション)は、1280px以上の画面幅では左側�
 
 2026-09-16承認反映: 期間プリセットはSR17を適用。offset再試行ボタンはfailedだけに表示し、購入/償却の失敗段階をラベルへ出す（SR18）。契約編集拒否理由と制限取消/解除への導線はSR19に従う。
 
-現行0.19.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.20.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 0.14.0: IR25に従い、受諾前住所は設備の設置物件から取得し、期限後の報告表示は報告有無・受理状態だけを凍結する。
 

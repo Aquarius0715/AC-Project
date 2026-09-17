@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTRACTS
-version: 0.19.0
+version: 0.20.0
 status: proposed-frontend-contract
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 この文書は、[共通詳細設計](common.md)の内容を、実装できる形の入力と出力に具体化したものです。各役割の詳細設計にあるフィールド表・業務規則と合わせて実装します。ここで決める値は、1A(このフェーズ)のデモ仕様です(DEC-09)。対象は、ブラウザの中だけで動く画面モデル・フォーム・モックサービス(模擬のサービス)です。データベース、サーバー側の処理、APIのendpoint、認証の方式は、この文書では定めません。ここで使う「保存」「一意」「監査」という言葉は、架空のデータをブラウザの中だけで扱う動作を指します。本番環境でデータが残ることや、安全であることを保証するものではありません。
 
-**0.19.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.20.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## DDC-01 フロントエンド共通型と表示整合
 
@@ -202,7 +202,7 @@ try {
 | device.fault / operation_failed | 担当技術者とHQに伝えます。顧客には、必要な概要だけを伝えます | 故障の原因や盗難を、確認しないまま決めつけません |
 | inquiry.received / answered | 顧客と、対応する権限を持つHQに伝えます | メールやWhatsAppを、実際には送信しません |
 
-アプリ内通知は、翻訳キーとparams(パラメーター)を保存し、選んでいる言語で表示します。メールやWhatsAppは、preview(プレビュー)またはsimulated(模擬)として扱い、実際に送信した実績としては扱いません。通知には、対象を参照するIDと、snapshot scope(通知時点の権限範囲)を持たせます。通知から画面へ遷移するときも、現在の権限を検証します。
+上表は公開範囲の概要です。生成の有無・templateKey・channel・宛先Membershipの決め方はIR95の表を正とします。アプリ内通知は、翻訳キーとparams(パラメーター)を保存し、選んでいる言語で表示します。メールやWhatsAppは、preview(プレビュー)またはsimulated(模擬)として扱い、実際に送信した実績としては扱いません。通知には、対象を参照するIDと、snapshot scope(通知時点の権限範囲)を持たせます。通知から画面へ遷移するときも、現在の権限を検証します。
 
 ## DDC-05 フロントエンド境界の完了条件
 
@@ -402,4 +402,4 @@ MRVの確認は、同じ`reportId`・`reportVersion`・同じコメントで再�
 
 0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
 
-現行0.19.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+現行0.20.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜102を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
