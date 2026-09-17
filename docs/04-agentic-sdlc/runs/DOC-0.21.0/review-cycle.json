@@ -1,0 +1,32 @@
+{
+  "task_id": "DOC-0.21.0",
+  "source_failure": {
+    "baseline": "DOC-0.20.0",
+    "record": "../DOC-0.20.0/independent-g1/review.md",
+    "major": 1,
+    "minor": 4
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "spec_baseline_id": "660c7855fdc3aaaf0bb3152d25788132ff838dd35067c87f7d9a28bf6e0ca802",
+      "contracts_result": "pass",
+      "ui_result": "pass_with_minor",
+      "unresolved_findings": [
+        "UI21-001"
+      ],
+      "action": "Correct acceptance presentation wording; no new filter added",
+      "evidence": "independent-g1/round-1/"
+    },
+    {
+      "round": 2,
+      "spec_baseline_id": "02a1e39793df35f760afe9188e86141c8790cd7e92366efbddb7f62aff62e908",
+      "contracts_result": "pass",
+      "ui_result": "pass",
+      "unresolved_findings": [],
+      "evidence": "independent-g1/"
+    }
+  ],
+  "final_gate_result": "pass",
+  "application_tests": "not_run"
+}

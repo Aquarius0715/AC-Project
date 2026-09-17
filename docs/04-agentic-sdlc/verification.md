@@ -1,6 +1,6 @@
 ---
 document_id: TEST-PLAN
-version: 0.17.0
+version: 0.21.0
 status: planned-not-executed
 owner: test-agent
 scope: frontend-demo-1A
@@ -37,7 +37,7 @@ scope: frontend-demo-1A
 | unit-online-rto / unit-offline-rto / unit-non-rto / unit-limited / unit-other-customer | 操作、一部だけの反映、一般保守、能力の違い、権限を超えた操作の確認 |
 | device-no-sensor / device-tamper / ventilation-demo | 未計測、取り外し専用イベント、換気機能の確認 |
 | invoice-overdue-a、job-internal-a、job-contractor-a | S02/S03/S08で使う固定ID |
-| clock=2026-09-14T01:00:00Z | 固定した時刻。期限の境界は±1ミリ秒と、ちょうど一致する時刻の両方を確認する |
+| clock=2026-09-14T01:00:00Z | reset/reload時の開始時刻（アプリでは実時間で進む、IR36）。単体・部品・受入の自動試験はIR69の時計注入で固定する。期限の境界は±1ミリ秒と、ちょうど一致する時刻の両方を確認する |
 
 権限の有効期間は`validFrom <= now < validUntil`、支払期限は`now > dueAt`のとき遅延、制限の開始は`now >= executeAfter`とする案である。スケジュールや猶予期間の境界も、同じルールで固定する。
 
@@ -61,7 +61,7 @@ scope: frontend-demo-1A
 
 ## 5. S03 支払いと運転制限のシナリオ
 
-前提: 支払期限を過ぎたinvoice(請求)、制限可能な契約、オンラインとオフラインの両方の対象設備、権限を持つHQ担当者。操作: 制限の予告を作成する→顧客が理由・期限・解除条件と通知プレビューを確認する→HQが期限より前に実行を試みる→デモ用の時計を進めて制限の適用を要求する→一部の設備だけが応答する→顧客が模擬決済を行う→入金を確認する(原因となった請求がすべてpaid(支払済み)になっているか照合する)→解除を要求する→設備が応答する。
+前提: 支払期限を過ぎたinvoice(請求)、制限可能な契約、オンラインとオフラインの両方の対象設備、権限を持つHQ担当者。操作: 制限の予告を作成する→顧客が理由・期限・解除条件と通知プレビューを確認する→HQが期限より前に実行を試みる→デモ用の時計を進めて制限の適用を要求する→一部の設備だけが応答する→顧客が模擬決済を行い入金確認に至る(原因となった請求がすべてpaid(支払済み)になった同じ遷移で解除要求が起動することを照合する、IR35)→明示のrestrictions.releaseが冪等に同じ状態を返すことを確認する→設備が応答する。
 
 期待する結果: 期限より前の実行は拒否される。制限の適用や解除は、適用は全機器の成功、解除は全機器のreleased/not_required証跡がそろうまでは完了扱いにしない。実際のカード番号の入力や外部への送信は発生しない。決済処理中は未入金の状態のままで、確認が済んで初めてpaidになる。送信済みで適用結果不明のオフライン設備は保留する。未配送が確定した設備はD03の証跡でnot_requiredとし、解除の永久待機にしない。監査ログには、操作した人、理由、時刻、対象、相関ID(関連する操作をつなぐID)が残る。
 
@@ -77,7 +77,7 @@ scope: frontend-demo-1A
 
 ## 7. S05 電力・排出量・MRVのシナリオ
 
-前提: 前述の基準100kWh・実績80kWhという仮データ。操作: 顧客とHQが、期間・設備・基準をそろえて比較する→MRV(測定・報告・検証)のプレビューを見る→模擬的にオフセットへ申し込み、償却の記録を行う。
+前提: 前述の基準100kWh・実績80kWhという仮データ（fixture-contract.jsonの`acceptancePatches["AT-C06-N"]`、窓[2026-09-14T00:00Z, 01:00Z)、係数factor-demo-2026、IR92）。操作: 顧客とHQが、期間・設備・基準をそろえて比較する→MRV(測定・報告・検証)のプレビューを見る→模擬的にオフセットへ申し込み、償却の記録を行う。
 
 期待する結果: 算定した値がfixture(固定データ)の期待値と一致し、条件・係数のバージョン・データの品質・推定値かデモ値かが表示される。データが欠測している場合はcoverage(カバー率)が下がり、基準値が0の場合は割合を計算しない。実績が120の場合はマイナスの削減量になる。MRVには「外部で検証済み」という表示をしない。オフセットについても、実際の証明書や実際の取引が発生したとは表示しない。
 
@@ -101,9 +101,9 @@ scope: frontend-demo-1A
 
 ## 10. S08 施工業者と外部技術者のシナリオ
 
-前提: 顧客からの依頼、HQ、2つの業者、それぞれの技術者、有効な委託期間。操作: HQが業者aに依頼(offer)を出す→業者aが辞退する→HQが別の業者に再委託する→業者が受諾する→自社の技術者を割り当てる→技術者が作業内容を提出する→業者が差し戻す→再提出する→品質を確認して受理する→顧客とHQが完了を確認する。
+前提: hq-operatorがcustomer-bのunit-other-customerに作成した案件、contractor-a・contractor-b、tech-external-b（scopeにunit-other-customer）、有効な委託期間（IR94/IR102）。操作: HQがcontractor-aに依頼(offer)を出す→contractor-aが辞退する→HQがcontractor-bに再委託する→contractor-bが受諾する→tech-external-bを割り当てる→技術者が作業内容を提出する→業者が差し戻す→再提出する→品質を確認して受理する→顧客とHQが完了を確認する。
 
-期待する結果: offered(依頼中)/accepted(受諾済み)/assigned(割当済み)/submitted(提出済み)/rework_requested(差し戻し中)/completed(完了)という状態が、同じjobIdのもとで整合的に変化する。自社のチームの候補だけが表示される。品質を確認する人と、実際に作業する人は別である。連絡内容はプレビュー(送信前の確認)として扱う。業者は請求や制限を操作できない。
+期待する結果: offered(依頼中)/accepted(受諾済み)/assigned(割当済み)/in_progress(作業中)/submitted(提出済み)/rework_requested(差し戻し中)/completed(完了)という状態が、同じjobIdのもとで整合的に変化する。自社のチームの候補だけが表示される。品質を確認する人と、実際に作業する人は別である。連絡内容はプレビュー(送信前の確認)として扱う。業者は請求や制限を操作できない。
 
 追加で確認すること: 他社・無資格・委託期間外の候補への割り当てが拒否されること。委託が失効した後は、既に開いている画面からの操作も拒否されること。担当を再割り当てした場合、前の担当者のアクセス権が失効すること。URLを直接入力する、またはRepositoryを直接呼び出すことで、他の案件や顧客の情報が漏れないこと。
 
@@ -213,3 +213,15 @@ HTTP 400/401/403/404/409/429/500は1Aでは実通信しない。DomainError VALI
 ## 0.16.0再レビューの追加検収
 
 [追加受入計画](acceptance-review-016.csv)を既存ATと合わせて検証する。DEC-17/18をユーザー回答で確定し、権限4パターンと全10状態・他sort・URL復元の期待値を定義した。全ケースのアプリ実行はnot_run。
+
+## 0.18.0厳格レビュー（REV18）の追加検収
+
+[追加受入計画](acceptance-review-018.csv)のAT-REV18-001〜048を既存ATと合わせて検証する。初期業務データは[fixture-contract.json](fixture-contract.json)のdemoSeedで、各ATのGivenはIR69のpatchesとして差分適用する。Givenで測定値・観測時刻を固定するcaseは最初にsimulator enabled=falseを与える（IR45）。Z/offsetの無い受入日時はAsia/Kuala_Lumpurのローカル時刻と読む（IR74）。全ケースのアプリ実行はnot_run。
+
+## 0.19.0独立レビュー（REV19）の追加検収
+
+[追加受入計画](acceptance-review-019.csv)のAT-REV19-001〜042を既存ATと合わせて検証する。demoSeedの省略形式はIR91の規則で正規DTOへ展開し、受入ごとの固定差分は[fixture-contract.json](fixture-contract.json)の`acceptancePatches`（IR85）を使う。作業窓の開始前・終了時の技術者画面（IR76/IR89）、シミュレーターの複写条件（IR77）、管理ダッシュボードの省エネ予想（IR78）、再取得中の表示（IR83）を含む。AT-REV18-013①の「permission-denied表示（開始時刻の案内）」はIR76のwork-not-started状態で判定し、AT-REV18-019はIR78のenergyForecastで判定する。全ケースのアプリ実行はnot_run。
+
+## 0.21.0 独立G1指摘の追加検収
+
+[AT-G121-001〜005](acceptance-review-021.csv)を既存受入と合わせて全件確認する。A12の継続時間はIR103の通常tickで59秒/60秒を分ける。通知のtype/severity、アレルゲンのQuery再取得、通知fixtureのscopeVersionAtCreationを含む。文書検証器・変異テストの成功はアプリ受入の実行結果ではない。

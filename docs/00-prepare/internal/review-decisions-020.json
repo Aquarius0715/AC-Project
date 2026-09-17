@@ -1,0 +1,130 @@
+{
+  "version": "0.20.0",
+  "scope": "frontend-demo-1A",
+  "review_id": "INDEPENDENT-G1-DOC-0.19.0-2026-09-17",
+  "note": "独立G1（runs/DOC-0.19.0/independent-g1、FAIL）の指摘G1-001〜031に対して修正担当が採用した可逆的な設計提案。README規約のPROPOSEDに相当し、1Aデモ実装は進行可能。企業承認・商用確定ではない。owner欄は企業検収前に確認する担当候補。",
+  "decisions": [
+    {
+      "id": "DEC-54",
+      "issue_id": "G1-001;G1-026;G1-030",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "技術者の書込みは社内・外部を問わず自己のactive Assignmentと作業窓を必須とし、候補・名簿はrole=technicianとscope包含で絞るか",
+      "selected": {
+        "technician_write": "own active assignment + work window (internal and external)",
+        "no_assignment_internal_in_scope": "FORBIDDEN errors.assignment_required",
+        "update_firmware_non_online": "OFFLINE at request, no DeviceOperation",
+        "assign_scope": "candidate scopes must contain Job.unitId else FORBIDDEN errors.technician_out_of_scope",
+        "members_projection": "eligible/capacity and contractor list: role=technician only"
+      },
+      "owner": "Security / Product Owner",
+      "contract": "IR94"
+    },
+    {
+      "id": "DEC-55",
+      "issue_id": "G1-002",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "業務イベント（依頼・委託・受諾・辞退・割当・提出・差し戻し・完了・取消・制限・入金・問い合わせ・機器操作失敗）の通知を固定表で生成するか",
+      "selected": {
+        "channel": "inApp simulated",
+        "per_recipient": 1,
+        "exclude_actor": true,
+        "job_assigned": "schedule_change",
+        "report_returned": "report_return",
+        "job_completed": "completion",
+        "others": "job_update",
+        "device_operation_failed": "device_operation"
+      },
+      "owner": "Product Owner / UI/UX",
+      "contract": "IR95"
+    },
+    {
+      "id": "DEC-56",
+      "issue_id": "G1-003;G1-013",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "制限の取消を状態ごとの表で決め、解除の起動元をreleaseIntentとして正規型に持つか",
+      "selected": {
+        "scheduled": "cancelled",
+        "requested_or_applied": "release_requested (releaseIntent.source='cancel')",
+        "release_requested": "idempotent",
+        "released_or_cancelled": "CONFLICT",
+        "override_only_buttons": "releaseIntent.source='override' or unresolved recoveryCases"
+      },
+      "owner": "Business / Security",
+      "contract": "IR96"
+    },
+    {
+      "id": "DEC-57",
+      "issue_id": "G1-006;G1-007;G1-027",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "アレルゲン観測をseedの観測行から返し、空気環境の案内をCO₂≥1000ppm・PM2.5≥35µg/m³のデモ閾値で表示するか",
+      "selected": {
+        "allergen_source": "demoSeed.allergenObservations (latest by observedAt, createdAt, id)",
+        "co2_ppm_gte": 1000,
+        "pm25_ugm3_gte": 35,
+        "guidance_creates_command": false,
+        "demo_triggers": [
+          "allergen",
+          "load_alert"
+        ]
+      },
+      "owner": "Product Owner / IoT",
+      "contract": "IR98;IR99"
+    },
+    {
+      "id": "DEC-58",
+      "issue_id": "G1-008;G1-031",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "点検部品をserviceScopeの全部品（8/5/5）とし、提出時に全件の結果を検証し、受入試験は既定でsimulator=falseとするか",
+      "selected": {
+        "components": "all components of serviceScope groups",
+        "submit_validation": "8 rules (IR100)",
+        "acceptance_simulator_default": false,
+        "simulator_true_cases": [
+          "AT-REV18-001",
+          "AT-REV19-003",
+          "AT-REV19-009"
+        ]
+      },
+      "owner": "Product Owner / QA",
+      "contract": "IR97;IR100"
+    },
+    {
+      "id": "DEC-59",
+      "issue_id": "G1-025",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "共通受入で必要な、旧Context・Membership有効期間外・制限不可契約・同じpathLabelの候補の扱いを定めるか",
+      "selected": {
+        "stale_scope_version": "authorization first, then CONFLICT errors.scope_changed",
+        "membership_inactive": "UNAUTHENTICATED errors.membership_inactive; signIn/switch FORBIDDEN",
+        "restriction_ineligible": "VALIDATION fieldErrors.contractId errors.restriction_ineligible",
+        "identical_path_label": "show unitId and switch to text input; never auto-select"
+      },
+      "owner": "Security / UI/UX",
+      "contract": "IR101"
+    }
+  ]
+}

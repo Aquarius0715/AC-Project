@@ -1,6 +1,6 @@
 ---
 document_id: DEC-12
-version: 0.17.0
+version: 0.21.0
 status: accepted-for-demo
 scope: frontend-demo-1A
 ---
@@ -62,6 +62,18 @@ DEC-15の継続修正（0.12.0）: ユーザーの反復修正指示に基づき
 
 別AIの独立レビューFRV-001〜025に対し、修正担当が[review-decisions-017.json](review-decisions-017.json)の6件をPROPOSEDとして採用した。解除要求の自動起動と`restrictions.release`の冪等性（IR35）、デモ時計ジャンプでセッション寿命を消費しない（IR36）、顧客起点案件のdueAt=希望枠終了（IR38）、顧客数の母集団（IR40）、1h/24h移動窓（IR41）、役割別投影の非公開項目（IR42）。いずれも既存1A範囲の技術的具体化であり、新たな企業承認・独立G1・実装完了ではない。
 
+## DEC-25〜41 厳格レビュー（REV18）の技術的具体化（0.18.0）
+
+2026-09-17、ユーザーの「レビュー結果が全てOKになるまでレビュー→修正のループを回してください」という指示に基づき、修正担当が[review-decisions-018.json](review-decisions-018.json)の17件をPROPOSEDとして採用した。既存1A範囲の技術的具体化であり、新たな企業承認・独立G1・実装完了ではない。範囲・業務責任を変える判断は含めず、変更時は同じIDの要件・設計・受入条件を更新する。
+
 ## DEC-17/18 再レビューへのユーザー回答
 
 ユーザーが制限権限は2種類、案件一覧にはソート機能を設けデフォルトは業務順と回答した。詳細は[決定記録](review-decisions-016.json)。当初提示した業務順を採用し、既存の重大度・期限ソートも保持する。これは1A仕様決定であり、実装完了・独立G1・デプロイ承認ではない。
+
+## DEC-54〜59 独立G1（DOC-0.19.0）指摘の技術的具体化（0.20.0）
+
+状態: PROPOSED（可逆）。提案者: 独立レビュー兼修正担当AI（本会話）。別エージェントによる独立G1（[runs/DOC-0.19.0/independent-g1](../../04-agentic-sdlc/runs/DOC-0.19.0/independent-g1/review.md)、判定FAIL）の指摘G1-001〜031に対する修正で採用した。詳細は[review-decisions-020.json](review-decisions-020.json)と[修正契約IR94〜102](../../02-design/review-resolution-contracts.md#ir94-認可列の修飾語と技術者の書込み条件--g1-001g1-026g1-030)。技術者の書込み条件、業務イベントの通知、制限の取消、アレルゲン観測と空気環境の案内、点検部品と提出の検証、共通受入で必要な失敗の扱いを扱う。企業承認・商用確定ではなく、企業検収前にProduct Owner／Business／Security／UI/UX／IoT／QAが確認する。
+
+## DEC-42〜53 独立レビュー（REV19）の技術的具体化（0.19.0）
+
+状態: PROPOSED（可逆）。ただしDEC-44（削減量の予想の算出方法、案A）とDEC-50（作業窓終了時の扱い）は2026-09-17のユーザー回答（「1に関して、Aで大丈夫です」「２に関して、現在の案で大丈夫です」）で確定。提案者: 独立レビュー兼修正担当AI（本会話）。企業承認・商用確定ではない。詳細は[review-decisions-019.json](review-decisions-019.json)と[修正契約IR75〜93](../../02-design/review-resolution-contracts.md#ir75-現行baselineと0180記録の扱い--rev19-001)。作業窓開始前の表示、シミュレーターの複写条件、管理ダッシュボードの省エネ予想、ログイン後の復帰先、再取得中の表示、同意の初期記録、期限切れOfferへの応答、理由系の文字数、作業窓終了の予告、機器操作中の制限Command、pending監査、連絡可能時間の入力案内を扱う。企業検収前にProduct Owner／Business／Security／UI/UX／IoTが確認する。

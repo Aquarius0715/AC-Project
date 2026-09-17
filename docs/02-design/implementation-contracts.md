@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTRACTS
-version: 0.17.0
+version: 0.21.0
 status: proposed-frontend-contract
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 この文書は、[共通詳細設計](common.md)の内容を、実装できる形の入力と出力に具体化したものです。各役割の詳細設計にあるフィールド表・業務規則と合わせて実装します。ここで決める値は、1A(このフェーズ)のデモ仕様です(DEC-09)。対象は、ブラウザの中だけで動く画面モデル・フォーム・モックサービス(模擬のサービス)です。データベース、サーバー側の処理、APIのendpoint、認証の方式は、この文書では定めません。ここで使う「保存」「一意」「監査」という言葉は、架空のデータをブラウザの中だけで扱う動作を指します。本番環境でデータが残ることや、安全であることを保証するものではありません。
 
-**0.17.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.21.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## DDC-01 フロントエンド共通型と表示整合
 
@@ -155,8 +155,8 @@ try {
 |---|---|---|
 | VALIDATION | エラーの概要と、項目ごとのエラー(fieldErrors)を表示し、最初のエラー欄にフォーカスを移します | 入力した値は保持したまま、修正できるようにします。無条件に再送はしません |
 | UNAUTHENTICATED | セッションを終了し、ログイン画面へ移動します | 古いscopeのQuery、画面内の未保存の下書きや写真、一時的なURLは破棄します。保存済みの報告やBlob(画像データ)は、DDC-08の規則に従って共有Repositoryに保持します |
-| FORBIDDEN | 操作できないことを示し、許可されているホーム画面や一覧画面へ移動します | 権限が変更されたときは、対象のデータを破棄します。繰り返し再試行することはしません |
-| NOT_FOUND | 対象が利用できないことを示し、一覧画面へ移動します | その対象が存在するかどうかが分かってしまうような詳細は表示しません |
+| FORBIDDEN | 操作できないことを示します。表示場所と遷移はIR57(primary queryはその場でpermission-denied、writeは画面遷移せず入力保持) | 権限が変更されたときは、対象のデータを破棄します。繰り返し再試行することはしません |
+| NOT_FOUND | 対象が利用できないことを示します。表示場所と遷移はIR57(primary queryはその場でnot-found、writeは画面遷移せず入力保持) | その対象が存在するかどうかが分かってしまうような詳細は表示しません |
 | CONFLICT | 変更が発生したことを説明し、最新のデータを取得して、差分を確認できるようにします | 自動的に上書きすることはありません。変更したい内容をあらためて確認してから、新しい要求として送ります |
 | OFFLINE（制御対象の機器がoffline） | 機器の最終通信時刻を表示し、保留中であることや、操作できないことを示します | 新しい制御操作はできません。すでに送信したものは、状態を照会します。自動的に成功したことにはしません |
 | UNAVAILABLE + messageKey=errors.network_disconnected（ネットワーク断の模擬、IR37） | 画面状態offlineとして最後の成功時刻と「更新停止」を表示します | 購読を解除し、再接続後に再snapshotで復帰します。機器offlineとは表示領域を分けます |
@@ -164,7 +164,7 @@ try {
 | RATE_LIMITED | 待つべき時間と、再試行の案内を表示します | モックの結果にあるretryAfterSeconds(再試行までの秒数)を表示します。通常どおり、フォームの入力値は保持します |
 | UNAVAILABLE | 画面内にエラーを表示し、再試行できるようにします | 読み取り用のサービスは、最大2回まで自動で再試行します。書き込み(write)は、利用者が明示的に再試行したときだけ行います |
 
-画面にエラーが出ているときに、KPI(指標)の値を0件や正常な値に置き換えてはいけません。前回の値を残す場合は、staleである(古い)ことと、前回成功した時刻をはっきり表示します。対象やroleが変わった場合は、前回の値を残しません。
+成功済みデータの再取得中・再取得失敗の表示と、購読イベントによる無効化の集約はIR83に従います。画面にエラーが出ているときに、KPI(指標)の値を0件や正常な値に置き換えてはいけません。前回の値を残す場合は、staleである(古い)ことと、前回成功した時刻をはっきり表示します。対象やroleが変わった場合は、前回の値を残しません。
 
 ## DDC-04 非同期・モック実行の基準
 
@@ -172,10 +172,10 @@ try {
 
 | 設定 | 1A既定値・挙動 |
 |---|---|
-| モック待機タイムアウト | 10秒です。モックの読み取りが成功するまでの時間は、即時〜300msの間で固定の設定を使います。試験(テスト)では、時計を注入して制御します |
+| モック待機タイムアウト | 10秒です。モックの読み取りの正常待機はfixture.defaultWaitMs=300msで固定します(IR74)。試験(テスト)では、時計を注入して制御します |
 | Command expiry | 要求してから30秒です(デモの仮の値)。送信と応答は、シナリオのイベントで制御します |
 | Telemetry stale | センサーごとに設定します。初期値(seed)は120秒です。境界の判定は「現在時刻 − 観測時刻 > staleAfterSeconds」です |
-| Offer期限 | 初期値(seed)では24時間後です。受諾できるのは「現在時刻 < offerExpiresAt」のときです |
+| Offer期限 | 初期値(seed)では24時間後です。受諾できるのは「現在時刻 < offerExpiresAt」のときです。未応答のまま到達すると案件はrequestedへ戻ります(IR48) |
 | 予告期間 | 初期値のルールでは24時間です。「executeAfter >= noticeAt + 24時間」となります。これは商用のルールではありません |
 | OffsetQuote有効期間 | デモでは15分です。申し込み時点で「現在時刻 < expiresAt」である必要があります |
 | write処理 | 共有メモリの遷移関数で、入力とバージョンを確認してから、状態と表示用の履歴をまとめて更新します。データベースのトランザクションは設計しません |
@@ -202,7 +202,7 @@ try {
 | device.fault / operation_failed | 担当技術者とHQに伝えます。顧客には、必要な概要だけを伝えます | 故障の原因や盗難を、確認しないまま決めつけません |
 | inquiry.received / answered | 顧客と、対応する権限を持つHQに伝えます | メールやWhatsAppを、実際には送信しません |
 
-アプリ内通知は、翻訳キーとparams(パラメーター)を保存し、選んでいる言語で表示します。メールやWhatsAppは、preview(プレビュー)またはsimulated(模擬)として扱い、実際に送信した実績としては扱いません。通知には、対象を参照するIDと、snapshot scope(通知時点の権限範囲)を持たせます。通知から画面へ遷移するときも、現在の権限を検証します。
+上表は公開範囲の概要です。生成の有無・templateKey・channel・宛先Membershipの決め方はIR95の表を正とします。アプリ内通知は、翻訳キーとparams(パラメーター)を保存し、選んでいる言語で表示します。メールやWhatsAppは、preview(プレビュー)またはsimulated(模擬)として扱い、実際に送信した実績としては扱いません。通知には、対象を参照するIDと、snapshot scope(通知時点の権限範囲)を持たせます。通知から画面へ遷移するときも、現在の権限を検証します。
 
 ## DDC-05 フロントエンド境界の完了条件
 
@@ -230,7 +230,7 @@ try {
 | 音声/テキストパネル | text:空、intent:未解決、target:未選択 | intent(意図)を解決し、対象の候補を出し、変更の場合は確認したうえで、既存のCommandの仕組みを使います。照会(問い合わせ)は読み取りのみです | 認識できない場合、同じ名前が複数ある場合、確認を取り消した場合は、いずれもCommandを0件のままにします |
 | /demo | scenarioId(1〜64文字のラベル)、eventType、clockAdvance、reset | 許可された合成イベントだけを使います。transport障害・ネットワーク断の注入はIR37、時計のジャンプはIR36。resetのときに、generation(世代番号)が更新されます | 任意のURL、スクリプト、実機宛てのデータは受け入れません |
 
-共通操作の論理的な契約は、`demoSession.signIn/signOut/switchMembership`、`auth.previewPasswordReset`、`preferences.get/update`、`voice.resolveIntent`、`notifications.list/markRead`、`demo.trigger/reset`です。demo・auth・voiceは、1A(このフェーズ)ではモック専用であり、実際の認証への接続仕様は対象外です。preferences(設定)は、あまり変わらない表示設定用のProviderに置き、業務Repositoryのデータや請求で使う通貨とは分けて扱います。
+共通操作の論理的な契約は、`demoSession.signIn/signOut/switchMembership/extend`、`auth.previewPasswordReset`、`preferences.get/update`、`voice.resolveIntent`、`notifications.list/markRead`、`demo.trigger/reset`です。demo・auth・voiceは、1A(このフェーズ)ではモック専用であり、実際の認証への接続仕様は対象外です。preferences(設定)は、あまり変わらない表示設定用のProviderに置き、業務Repositoryのデータや請求で使う通貨とは分けて扱います。
 
 ### 能力権限の名称と付与先
 
@@ -383,7 +383,7 @@ type RestrictionAction =
 
 資源の正規名は次のとおりです。ACUnit(設備・エアコン本体)、Device(機器・IoT機器)、MaintenanceJob(案件・顧客の依頼)、Offer(委託の申し出・HQから業者への依頼)、Assignment(割当)、Inquiry(顧客の問い合わせ)、Alert(異常)、Notification(通知)。「依頼」はJob、「委託」はOfferを指します。企業向けの文書(PrepareDocument)では正式名を使います。要件や設計本文にある「顧客」「業者」「HQ」は、同じ役割の略した呼び方として扱います。routeやenumの値を、表示名から推測してはいけません。preview/simulated/failedは`deliveryState`(配信状態)として表し、channelの値には混ぜません。UIに出てくる「RTO」「顧客」「HQ」は翻訳のためのラベルであり、保存用のenumとは分けて考えます。
 
-それぞれの`*Input`は、対応するDDの入力欄を、名前付きのプロパティとして持ちます。save(保存)操作では、新規の場合はidを省略し、既存の場合はidが必須です。既存のものを更新するときは`expectedVersion`が必須です。`PolicyInput`は`kind`を判別子にし、DD-A05・DD-A11・DD-A12を、それぞれ別のschemaにします。`AutomationInput`は、`schedule`(DD-C04)と`event`(DD-C05)を`kind`で区別し、共通して`id?`/`name`/`unitIds`/`timezone`/`enabled`/`priority`(既定値50)を持ちます。`event`の条件は、`occupancy={occupied:boolean}`、`location={event:arrival/departure}`、`pattern={localTime:HH:mm}`、`weather={metric:temperature,operator:gt/gte/lt/lte,value:number}`です。HQの条件は、`occupancy`は同じ形で、`tariff={operator,value,unit:MYR_per_kWh}`、`peak={active:boolean}`、`solar/battery={operator,value,unit:kW}`というデモに限ります。値が欠けている場合を、条件が成立したとは扱いません。
+それぞれの`*Input`は、対応するDDの入力欄を、名前付きのプロパティとして持ちます。save(保存)操作では、新規の場合はidを省略し、既存の場合はidが必須です。既存のものを更新するときは`expectedVersion`が必須です。`PolicyInput`は`kind`を判別子にし、DD-A05・DD-A11・DD-A12を、それぞれ別のschemaにします。`AutomationInput`は、`schedule`(DD-C04)と`event`(DD-C05)を`kind`で区別し、共通して`id?`/`name`/`unitIds`/`timezone`/`enabled`/`priority`(既定値50)を持ちます。`event`の条件は、`occupancy={occupied:boolean}`、`location={event:arrival/departure}`、`pattern={localTime:HH:mm}`(評価はIR52)、`weather={metric:temperature,operator:gt/gte/lt/lte,value:number}`です。HQの条件は、`occupancy`は同じ形で、`tariff={operator,value,unit:MYR_per_kWh}`、`peak={active:boolean}`、`solar/battery={operator,value,unit:kW}`というデモに限ります。値が欠けている場合を、条件が成立したとは扱いません。
 
 `ListQuery`のfilters/sort/defaultは[Query契約](query-catalog.csv)だけを許可リストとする。本文の検索項目名は表示ラベルであり、未登録のキーを追加してはならない。aliasは同表filter_mapping/sort_mappingで解決し、未知キーはVALIDATION。
 
@@ -402,4 +402,4 @@ MRVの確認は、同じ`reportId`・`reportVersion`・同じコメントで再�
 
 0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
 
-現行0.17.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+現行0.21.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。

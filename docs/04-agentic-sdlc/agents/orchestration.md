@@ -1,6 +1,6 @@
 ---
 agent_id: orchestration-agent
-version: 0.17.0
+version: 0.21.0
 status: proposed-agent-profile
 scope: frontend-demo-1A
 ---

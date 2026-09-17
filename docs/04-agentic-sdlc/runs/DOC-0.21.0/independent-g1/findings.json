@@ -1,0 +1,34 @@
+{
+  "task_id": "DOC-0.21.0",
+  "spec_baseline_id": "02a1e39793df35f760afe9188e86141c8790cd7e92366efbddb7f62aff62e908",
+  "gate_result": "pass",
+  "reviewers": [
+    "contracts_review",
+    "ui_requirements_review"
+  ],
+  "counts": {
+    "blocker": 0,
+    "critical": 0,
+    "major": 0,
+    "minor": 0,
+    "question": 0
+  },
+  "unresolved_findings": [],
+  "resolved_findings": [
+    "G120-001",
+    "G120-002",
+    "G120-003",
+    "G120-004",
+    "G120-005",
+    "UI21-001"
+  ],
+  "round_1_finding": {
+    "id": "UI21-001",
+    "severity": "MINOR",
+    "status": "resolved",
+    "problem": "AT-G121-002 referred to an undefined fault filter",
+    "correction": "Use existing fault icon and label",
+    "confirmed_against_baseline": "02a1e39793df35f760afe9188e86141c8790cd7e92366efbddb7f62aff62e908"
+  },
+  "application_tests": "not_run"
+}

@@ -1,0 +1,8 @@
+{
+  "scope": "static-types-only",
+  "command": "node <installed-typescript>/lib/tsc.js --strict --noEmit --target ES2022 --lib ES2022,DOM docs/04-agentic-sdlc/runs/DOC-0.21.0/contract-type-examples.ts",
+  "exit_code": 0,
+  "result": "passed",
+  "application_tests": "not_run",
+  "spec_baseline_id": "02a1e39793df35f760afe9188e86141c8790cd7e92366efbddb7f62aff62e908"
+}

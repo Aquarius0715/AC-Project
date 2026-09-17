@@ -1,6 +1,6 @@
 ---
 document_id: DD-C
-version: 0.17.0
+version: 0.21.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 この文書では、クライアント(お客様)向け画面の機能・画面項目・状態・エラー(例外)を決めます。基準にするのは、企業の元の要件文書と、それに対応する要件です。各FR(機能要件)を満たすために必要な処理と、受け入れ条件(テストで確認する内容)を定義します。参考として用意したモック(見本画面)は、共通のUI(画面デザイン)の見た目を検討するためだけに使います。
 
-**0.17.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.21.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 入力・責務
 
@@ -19,7 +19,7 @@ scope: frontend-demo-1A
 
 この文書に書くのは、フロントエンド(画面側)の項目・表示・モックの動作についての設計です。画面上での登録・割り当て・入金・利用制限・監査(記録の確認)は、すべて共有のモック用メモリ(見本用の一時的なデータ)の中で状態が変わるだけです。サーバー側の実装やデータベースの設計を依頼するものではありません。
 
-ルートパラメーター(URLに含まれる値)は、信頼できない入力として必ず検証します。表の中の「service名」は、共通のRepository(データを扱う共通の仕組み)が持つ処理名を指します。同じルートを持つ行は、同じ画面の中で役割分担している機能です。すべての行で、読み込み中(loading)・データなし(empty)・エラー(error)・権限なし(forbidden)・対象が見つからない(not-found)の5つの状態を用意します。再試行ボタンは、回復できるエラーのときだけ表示します。権限が足りない場合は、再試行させずに、その人が使える画面へ戻します。
+ルートパラメーター(URLに含まれる値)は、信頼できない入力として必ず検証します。表の中の「service名」は、共通のRepository(データを扱う共通の仕組み)が持つ処理名を指します。同じルートを持つ行は、同じ画面の中で役割分担している機能です。すべての行で、読み込み中(loading)・データなし(empty)・エラー(error)・権限なし(forbidden)・対象が見つからない(not-found)の5つの状態を用意します。再試行ボタンは、回復できるエラーのときだけ表示します。権限が足りない場合と対象が見つからない場合は、再試行ボタンを出さず、IR57に従って表示します。
 
 ## 画面・処理設計
 
@@ -32,7 +32,7 @@ scope: frontend-demo-1A
 | DD-C05 / FR-C05 | `/customer/automations` / `AutomationEditor` | `automations.save`、`automations.simulate`、`automations.fire`、`consents.get`、`consents.update`、`units.list`、`units.get` | 条件の種類ごとに入力項目を切り替えます(判別union)。位置情報を使う同意については、何のために使うかを説明します。デモでは実際の位置情報は取得せず、「帰宅」「外出」といったイベントを手入力します | 同意を拒否した場合や位置情報が使えない場合は、手動操作か時刻指定の方式に切り替えます。利用履歴から生活パターンを推定する機能は、デモであることを明示します |
 | DD-C06 / FR-C06 | `/customer/energy` / `EnergyExplorer` | `energy.summary`、`baselines.list`、`units.list` | 期間は「開始<終了」とし、最大366日までとします(仮の値)。通貨、料金のバージョン、比較する期間、データの信頼度を表示します | データが欠けている場合は、集計に使えたデータの割合も一緒に表示します。推計で補った値を、実測値として扱いません |
 | DD-C07 / FR-C07 | `/customer/air-quality` / `AirQuality` | `telemetry.series`、`units.get`、`commands.create`、`commands.get`、`units.list` | 指標(何を測るか)と期間を選びます。換気を要求する場合は、その設備が換気(ventilation)の機能を持っているかを別途確認します | センサーがない場合は「対応していません」と表示します。送風を、外の空気を取り込む換気として扱いません |
-| DD-C08 / FR-C08 | `/customer/alerts` / `AlertInbox` | `alerts.list`、`notifications.markRead`、`notifications.list` | 重要度や未読かどうかで絞り込みます。通知のID(notificationId)と異常のID(alertId)は別々のものとして扱います | データの取得に失敗したときに、「異常はありません」という正常な状態のサマリーを表示してはいけません |
+| DD-C08 / FR-C08 | `/customer/alerts` / `AlertInbox` | `alerts.list`、`notifications.markRead`、`notifications.list`、`summaries.get` | 重要度や未読かどうかで絞り込みます。通知のID(notificationId)と異常のID(alertId)は別々のものとして扱います | データの取得に失敗したときに、「異常はありません」という正常な状態のサマリーを表示してはいけません |
 | DD-C09 / FR-C09 | `/customer/maintenance` / `MaintenanceRequest` | `jobs.list`、`jobs.create`、`jobs.get`、`jobs.cancel`、`jobs.addNote`、`reports.get`、`attachments.getContent`、`units.list` | 設備ID(unitId)、種類、症状の説明(10〜2000文字)、これから先の希望日時を必須にします(仮の値)。この日時はあくまで「希望」であり、確定した予約ではありません | 同じ依頼が二重に送信されないようにします。希望の日時が使えない場合は、候補を選び直してもらいます。お客様が自分で取り消せるのは、まだ担当者が割り当てられていない依頼だけです |
 | DD-C10 / FR-C10 | `/customer/payments` / `BillingOverview` | `contracts.list`、`invoices.list` | 契約ID・請求状態で絞り込みます。金額は通貨の最小単位(例: 円やセントなど)で扱います | 自分が見てよい範囲を超えたデータは表示を拒否します。まだ請求が発生していない状態を、「支払いが滞っている」ように表示してはいけません |
 | DD-C11 / FR-C11 | `/customer/payments/:id` / `PaymentDemo` | `invoices.get`、`payments.simulate`、`notifications.preview`、`notifications.recipients` | 請求ID、デモ用の支払い方法、内容の確認を入力します。実際のカード番号などを入力する欄は作りません | 実際の送金は行いません。処理が終わっていないのに「完了しました」と表示してはいけません。再試行するときは、同じ冪等キー(重複防止用の識別子)を使います |
@@ -69,7 +69,7 @@ scope: frontend-demo-1A
 | propertyId | ID/任意 | 初期は自組織の全物件 | 対象物件 |
 | period | enum/必須 | today/7d/30d、初期today | 電力の集計期間 |
 | unitId | ID/任意 | 選択物件に属する設備のみ | 温湿度の対象 |
-| summary | 読取 | total/online/offline/unknown/alertCountとasOf | カード・表示時点 |
+| summary | 読取 | total/online/offline/unknown/powerOn/powerOff/powerUnknown/alertCount(critical/warningだけ、IR51)とasOf | カード・表示時点 |
 
 **処理手順**
 
@@ -109,7 +109,7 @@ scope: frontend-demo-1A
    - 1つの場所は、必ず1つの親にだけ所属します。
    - 親は同じ物件の中から選び、自分自身や自分の子孫を親にすることは禁止します。
    - 設備や子の場所が残っている場所は、アーカイブや削除ができません。先に移動先を案内します。
-3. 作成したIDとバージョンを取得し、ツリー表示とパンくずリストを更新します。設備の所属を変える操作はHQ台帳へ案内します。名前を変えても設備IDは変わりません。
+3. 作成したIDとバージョンを取得し、ツリー表示とパンくずリストを更新します。物件直下には空間未割当の設備グループ(IR62)を、KPIからの遷移ではpowerState/connections条件の設備一覧section(IR50)を表示します。設備の所属を変える操作はHQ台帳へ案内します。名前を変えても設備IDは変わりません。
 4. 更新の対象になるQuery: `properties / spaces / units / customer summary`。
 
 **境界条件・失敗時**: 名前が空、121文字、親が循環している、他の組織の親IDを指定した場合は、いずれも拒否します。CONFLICT(競合)が起きたときは、現在のバージョンを提示し、入力内容は消さずに残します。自動で上書きはしません。
@@ -143,7 +143,7 @@ scope: frontend-demo-1A
 3. Command(命令)を1件作成し、要求した値を別に表示します。機器が確認応答(acknowledged)を返した後にだけ、確認済み設定を更新します。失敗した場合も、要求内容と理由を履歴に残します。
 4. 更新の対象になるQuery: `commands / unit detail / telemetry summary / audit`。
 
-**境界条件・失敗時**: 16〜30度、1度刻みというデモ用の性能であれば、15度・31度・24.5度への変更は拒否します。設備がオフラインの場合、他のお客様の設備の場合、利用制限に違反する場合、機器の応答が遅れている場合のいずれも、成功として扱いません。
+**境界条件・失敗時**: 16〜30度、1度刻みというデモ用の性能であれば、15度・31度・24.5度への変更は拒否します。設備がオフラインの場合、他のお客様の設備の場合、利用制限に違反する場合、機器の応答が遅れている場合のいずれも、成功として扱いません。制限中の可否はIR46、接続・電源信号による拒否はIR47に従います。
 
 **検証**: 追跡表のAT-C03配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
 
@@ -174,7 +174,7 @@ scope: frontend-demo-1A
    - 終了時刻が開始時刻以下になる場合は、日をまたぐフラグがあるときだけ「翌日」として扱います。
    - 開始時刻と終了時刻が同じ場合は、「24時間運転」とは推定せずに拒否します。
    - 終了時の動作も必須の入力とし、黙って電源をOFFにはしません。
-3. Automation(自動運転ルール)に、タイムゾーン・開始/終了の動作・有効かどうか(enabled)を保存します。作成しただけでは、すぐに命令(Command)は送りません。デモ用の時計から発生したイベントは`automations.fire`に渡し、発火した時点であらためて権限を確認してからCommandを作ります(DDC-08 §6を参照)。
+3. Automation(自動運転ルール)に、タイムゾーン・開始/終了の動作・有効かどうか(enabled)を保存します。作成しただけでは、すぐに命令(Command)は送りません。デモ時計による開始・終了の発火はRepositoryの内部評価が行い、発火時点でownerの権限をあらためて確認してからCommandを作ります。画面はこの発火のためにautomations.fireを呼びません(IR54)。
 4. 更新の対象になるQuery: `automations / next-run preview / audit`。
 
 **境界条件・失敗時**: 曜日が0件、終了時の動作が未指定、あいまいな時刻や存在しない時刻(サマータイムの影響など)を指定した場合は、いずれも拒否します。ルールを停止した後に予約されていたイベントからは、新しい要求を作りません。
@@ -192,7 +192,7 @@ scope: frontend-demo-1A
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
 | condition.type | enum/必須 | occupancy/location/pattern/weather | 条件種別 |
-| condition（Condition型） | 判別union/必須 | 在室有無、arrival/departure、予定時刻、天候比較 | 条件内容 |
+| condition（Condition型） | 判別union/必須 | 在室有無、arrival/departure、予定時刻（patternの評価はIR52）、天候比較 | 条件内容 |
 | consentPurpose | enum/位置時必須 | location_automation | 利用目的 |
 | granted | boolean/位置時必須 | 初期false | 同意 |
 | action | UnitAction/必須 | 設備能力内 | 実行内容 |
@@ -203,7 +203,7 @@ scope: frontend-demo-1A
 
 1. 在室・帰宅/外出・生活パターン・天候のいずれかの条件を選びます。必要な同意を確認し、動作内容を保存します。最後に、模擬イベントを使って条件が一致するかどうかを確認します。
 2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 位置情報についての同意と、一般的な利用についての同意は別々に扱います。
+   - 位置情報の同意は目的location_automationだけで管理し、アプリ利用自体の同意は記録しません(IR102)。
    - 位置情報の取得は、このバージョン(1A)では合成イベントのみで行います。
    - 生活パターンの推定はデモ用のものであり、実際の個人の行動履歴は集めません。
    - 条件のデータが欠けている場合は、その条件が「成立した」とは扱いません。
@@ -241,7 +241,7 @@ scope: frontend-demo-1A
 3. 条件を変えると、URLとQueryのキーを更新します。この画面は表示だけで、契約の料金や排出係数そのものを変更することはありません。
 4. 更新の対象になるQuery: `energy(検索条件を変えたときだけ)`。
 
-**境界条件・失敗時**: 基準値100kWh、実績80kWh、単価0.5MYRの場合は、節約額10MYRと計算します。基準値が0の場合は削減率を出しません。実績が120kWhなら増加率20%と表示します。データが欠けている場合は、カバー率(coverage)と一緒に表示します。
+**境界条件・失敗時**: 基準値100kWh、実績80kWh、単価0.5MYRの場合は、節約額10MYRと計算します。基準値が0の場合は削減率を出しません。実績が120kWhならDTOは削減量-20kWh・削減率-20で、表示は「増加 20.0 kWh」「増加 20.0%」です(IR68/IR80)。データが欠けている場合は、カバー率(coverage)と一緒に表示します。
 
 **検証**: 追跡表のAT-C06配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
 
@@ -273,6 +273,7 @@ telemetry.seriesの空気環境の表示データに、allergenObservation(ア�
 2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
    - CO2はppm、PM2.5はµg/m³、温度は度、湿度は%で、それぞれ別々の系列として表示します。
    - 湿度が0の場合は「欠測」ではなく「測定値が0」として扱います。値がnullの場合が「欠測」です。
+   - 換気・清掃の案内はIR99の表（co2≥1000ppm、pm25≥35µg/m³、データ不足）で表示します。アレルゲン観測の取得元はIR98です。
    - 換気の機能がない場合は、手動での案内だけを表示します。
 3. 画面を見るだけでは業務状態は変わりません。換気を要求したときは、通常どおりCommandの履歴を作成します。ただし、その応答だけを見て、室内のCO2が下がったと推定してはいけません。
 4. 更新の対象になるQuery: `telemetry / commands(換気を要求したときだけ) / audit`。
@@ -291,16 +292,17 @@ alerts.listのAlert(異常データ)に、causeCode(原因コード。window_ope
 
 **一次資料との対応**: SRC-06 BIZ-08, BIZ-09, BIZ-17 → FR-C08 → DD-C08。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 「既読にする」ことと「異常が解消する」ことを分けて扱う方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
 
-対象: FR-C08 / 主な表示パターン: **UI-LIST**。この画面が使うサービス境界は`alerts.list, notifications.markRead, notifications.list`です。
+対象: FR-C08 / 主な表示パターン: **UI-LIST**。この画面が使うサービス境界は`alerts.list, notifications.markRead, notifications.list, summaries.get`です。
 
 **初期表示と前提**: そのお客様が見てよい範囲の通知と異常が取得できることを前提とします。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
 
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
-| severity | enum/任意 | critical/warning/all、初期all | 絞込 |
+| severity | enum/任意 | critical/warning/all、初期all（allはfilters.severityを省略、IR74） | 絞込 |
 | unreadOnly | boolean/必須 | 初期false | 未読 |
 | notificationId / alertId | 読取 | 別ID、関連なし通知も可 | 参照 |
 | readAt | 日時/null | 未読null | 既読状態 |
+| alertCount | 読取 | summaries.get(kind=customer)のcounts.alertCount（critical/warningの未対応、IR51）。未読件数と別に表示（IR102） | 未対応アラート件数 |
 
 **処理手順**
 
@@ -330,7 +332,7 @@ alerts.listのAlert(異常データ)に、causeCode(原因コード。window_ope
 | type | enum/必須 | periodic/reactive/preventive | 保守分類 |
 | symptom | 文字列/必須 | 10〜2000文字 | 症状 |
 | requestedStart / requestedEnd | ISO日時/必須 | 現在より未来、start<end | 希望枠 |
-| contactWindow | 文字列/任意 | 0〜200文字、実連絡先なし | 連絡可能時間 |
+| contactWindow | 文字列/任意 | 0〜200文字。'@'や連続7桁以上の数字はVALIDATION、公開範囲はIR64。入力欄に「時刻はHH:mm形式（例: Weekdays 09:00-18:00）」を表示(IR90) | 連絡可能時間 |
 | dueAt | 読取 | 顧客は入力不可。Repositoryが希望枠の終了時刻を保存(IR38) | 案件期限 |
 | cancelReason / note | 文字列/操作時必須 | 1〜1000 / 1〜2000文字 | 取消・調整依頼 |
 
@@ -483,6 +485,6 @@ offsets.previewの表示結果に、marketConcept(市場構想に関する情報
 
 2026-09-16承認反映: C01/C06の期間境界はSR17。C13のretryはA15と同じSR18に従い、offsets.listで現在版とattemptIdを得る。
 
-現行0.17.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+現行0.21.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 案件一覧とjobs.listのソートはIR34を適用する。URL sort未指定はstatus:asc。選択変更でcursorを破棄し、filterを保持して新snapshotの初頁から取得する。状態/重大度/期限の昇降順を選べる。

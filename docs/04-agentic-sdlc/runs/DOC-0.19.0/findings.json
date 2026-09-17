@@ -1,0 +1,310 @@
+{
+  "review_id": "INDEPENDENT-DOC-0.18.0-REV19-2026-09-17",
+  "target": "DOC-0.18.0 working tree (uncommitted, no baseline)",
+  "corrected_baseline": "048ffcef25f8463bca33346f5bb1dd8dbb1fdad03b61132d1cfc5d17ebeb1ac2",
+  "reviewer": "independent-review-opus-5 (this session; separate from REV18 editor)",
+  "specification_editor": "independent-review-opus-5 (same session as review)",
+  "initial_verdict": "NOT READY",
+  "post_correction_self_rereview": "round 1 found REV19-037; round 3 (user-directed acceptance audit) found REV19-038..042; final round no unresolved findings",
+  "independent_g1": "pending",
+  "user_accepted_decisions": [
+    "DEC-44",
+    "DEC-50"
+  ],
+  "findings": [
+    {
+      "id": "REV19-001",
+      "severity": "BLOCKER",
+      "status": "resolved",
+      "contract": "IR75",
+      "decision": null
+    },
+    {
+      "id": "REV19-002",
+      "severity": "CRITICAL",
+      "status": "resolved",
+      "contract": "IR76",
+      "decision": "DEC-42"
+    },
+    {
+      "id": "REV19-003",
+      "severity": "CRITICAL",
+      "status": "resolved",
+      "contract": "IR77",
+      "decision": "DEC-43"
+    },
+    {
+      "id": "REV19-004",
+      "severity": "CRITICAL",
+      "status": "resolved",
+      "contract": "IR78",
+      "decision": "DEC-44"
+    },
+    {
+      "id": "REV19-005",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR79",
+      "decision": null
+    },
+    {
+      "id": "REV19-006",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR80",
+      "decision": null
+    },
+    {
+      "id": "REV19-007",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR81",
+      "decision": null
+    },
+    {
+      "id": "REV19-008",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR82",
+      "decision": "DEC-45"
+    },
+    {
+      "id": "REV19-009",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR83",
+      "decision": "DEC-46"
+    },
+    {
+      "id": "REV19-010",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR84",
+      "decision": "DEC-47"
+    },
+    {
+      "id": "REV19-011",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR85",
+      "decision": null
+    },
+    {
+      "id": "REV19-012",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR86",
+      "decision": "DEC-48"
+    },
+    {
+      "id": "REV19-013",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR87",
+      "decision": "DEC-49"
+    },
+    {
+      "id": "REV19-014",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR88",
+      "decision": null
+    },
+    {
+      "id": "REV19-015",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR89",
+      "decision": "DEC-50"
+    },
+    {
+      "id": "REV19-016",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-017",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": "DEC-53"
+    },
+    {
+      "id": "REV19-018",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": "DEC-51"
+    },
+    {
+      "id": "REV19-019",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-020",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-021",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-022",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": "DEC-52"
+    },
+    {
+      "id": "REV19-023",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-024",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-025",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-026",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-027",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-028",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-029",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-030",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-031",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-032",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-033",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-034",
+      "severity": "QUESTION",
+      "status": "answered",
+      "contract": "IR78",
+      "decision": "DEC-44"
+    },
+    {
+      "id": "REV19-035",
+      "severity": "QUESTION",
+      "status": "answered",
+      "contract": "IR90",
+      "decision": null
+    },
+    {
+      "id": "REV19-036",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR91",
+      "decision": null
+    },
+    {
+      "id": "REV19-037",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR89",
+      "decision": null
+    },
+    {
+      "id": "REV19-038",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR92",
+      "decision": null
+    },
+    {
+      "id": "REV19-039",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR93",
+      "decision": null
+    },
+    {
+      "id": "REV19-040",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR92",
+      "decision": null
+    },
+    {
+      "id": "REV19-041",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR92",
+      "decision": null
+    },
+    {
+      "id": "REV19-042",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR92",
+      "decision": null
+    }
+  ]
+}

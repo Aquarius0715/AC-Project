@@ -11,7 +11,7 @@ import subprocess
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN = ROOT / '04-agentic-sdlc/runs/DOC-0.17.0'
+RUN = ROOT / '04-agentic-sdlc/runs/DOC-0.21.0'
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--write-baseline', action='store_true', help='Rehash current documents after static checks; does not approve G1')
 parser.add_argument('--tsc', type=Path, help='Path to installed TypeScript lib/tsc.js; optional semantic check')
@@ -112,15 +112,15 @@ opnames = unique(operations, 'operation', 'operation')
 opmap = {row['operation']: row for row in operations}
 types = (ROOT / '02-design/service-contracts.ts').read_text()
 typed = {name:(input_, result, mode) for name,input_,result,mode in re.findall(r"^  '([^']+)': \{input:(.*);result:(.*);mode:'(read|write)'\};$", types, re.M)}
-if set(typed) != opnames or len(operations) != 136:
-    fail('136 operation/TypeScript contract keys differ')
+if set(typed) != opnames or len(operations) != 137:
+    fail('137 operation/TypeScript contract keys differ')
 for row in operations:
     name = row['operation']
     if typed.get(name) != (row['input_contract'], row['result_contract'], row['mode']):
         fail('Contract drift: '+name)
     if not row['authorization'] or row['mode'] not in ['read', 'write']:
         fail('Missing mode/authorization '+name)
-    if row['frontend_execution'] not in ['mock-service', 'local-preference']:
+    if row['frontend_execution'] not in ['mock-service', 'local-preference', 'demo-only']:
         fail('Unexpected transport '+name)
     if row['result_contract'].startswith('Page<') and 'Query' not in row['input_contract']:
         fail('Unpageable Page '+name)
@@ -143,9 +143,15 @@ for screen in screens:
         for op in screen[field].split(';'):
             if op != 'none' and (op not in opmap or opmap[op]['mode'] != 'read'):
                 fail(f'{screen["screen_id"]}: non-read query {op}')
-    required_states = {'initial','loading','success','empty','error','offline','permission-denied'}
-    if not required_states <= set(screen['states'].split(';')):
-        fail('Missing UI states '+screen['screen_id'])
+    # IR90 (REV19-027): public screens without data queries have their own state sets.
+    public_states = {'SCR-X-login':'initial;loading;success;error;offline','SCR-X-forgot-password':'initial;loading;success;error;offline','SCR-X-demo':'initial;loading;success;error','SCR-X-forbidden':'success','SCR-X-not-found':'success'}
+    if screen['screen_id'] in public_states:
+        if screen['states'] != public_states[screen['screen_id']]:
+            fail('Public screen states differ from IR90 '+screen['screen_id'])
+    else:
+        required_states = {'initial','loading','success','empty','error','offline','permission-denied'}
+        if not required_states <= set(screen['states'].split(';')):
+            fail('Missing UI states '+screen['screen_id'])
 role_requirements = {x for x in expected if re.match(r'FR-[CPAT]', x)}
 if not role_requirements <= covered:
     fail('Screen requirement gaps '+str(sorted(role_requirements-covered)))
@@ -405,14 +411,16 @@ for sid, dependencies in {'SCR-A05':{'units.list','units.get'}, 'SCR-A08':{'invo
 a09=next(x for x in screens if x['screen_id']=='SCR-A09')
 if a09['primary_queries'] != 'restrictions.list' or 'restriction.override' not in a09['entry']:
     fail('Override-only list entry inaccessible')
-voice=next(x for x in components if x['component']=='VoicePanel')
-if not {'jobs.list','jobs.get','units.get','commands.create'} <= set(voice['api_dependency'].split(';')):
+voice=next((x for x in components if x['component']=='VoiceContainer'), None)
+if voice is None or not {'jobs.list','jobs.get','units.get','commands.create'} <= set(voice['api_dependency'].split(';')):
     fail('Voice command context dependencies missing')
+if not next(x for x in components if x['component']=='VoicePanel')['api_dependency'].startswith('none'):
+    fail('VoicePanel must be presentation only (IR90)')
 if not any(a['permissions']==['restriction.override'] for a in fixture['actors']):
     fail('Override-only fixture missing')
 for path in markdown:
     text=path.read_text()
-    if re.search(r'^version: 0\.(?:8|9|1[0-6])\.0$',text,re.M) or re.search(r'\*\*0\.(?:8|9|1[0-6])\.0の実装基準',text) or re.search(r'現行0\.(?:1[0-6])\.0の追加契約',text) or 'IR01〜34を併読' in text:
+    if re.search(r'^version: 0\.(?:8|9|1[0-9])\.0$',text,re.M) or re.search(r'\*\*0\.(?:8|9|1[0-9])\.0の実装基準',text) or re.search(r'現行0\.(?:1[0-9])\.0の追加契約',text) or 'IR01〜34を併読' in text or 'IR01〜44を併読' in text or 'IR01〜74を併読' in text or 'IR01〜93を併読' in text:
         fail('Stale current version '+str(path.relative_to(ROOT)))
 
 # Re-review of 0.11.0: verify the changed contract paths and trace coverage.
@@ -500,7 +508,7 @@ if "{hasReport:false;acceptance:'not_accepted'}" not in types:
 offer = re.search(r'export type JobOfferSummary = (.*);',types)[1]
 if 'siteAddress:string|null' not in offer or 'regionLabel:' in offer:
     fail('Offer must use nullable installation address')
-if "disabledReason:'capability_changed'|'unit_archived'|null" not in types:
+if "disabledReason:'capability_changed'|'unit_archived'|'consent_revoked'|null" not in types:
     fail('Rule disable reason absent')
 if typed['capabilities.save'][0] != 'Save<Capability> & {changeReason?:string}':
     fail('Capability creation reason must be optional')
@@ -653,6 +661,497 @@ for role in ['common','client','admin','technician','contractor']:
 if any(len(s['purpose']) < 8 or s['purpose'].endswith('（対応DD詳細の目的・フロー）') for s in screens):
     fail('Screen purpose is boilerplate')
 
+# 0.18.0 strict review (REV18) regression checks: document consistency only, not app behavior.
+review_018 = rows('04-agentic-sdlc/acceptance-review-018.csv')
+unique(review_018, 'case_id', '0.18 review case ID')
+if unique(review_018, 'issue_id', '0.18 finding') != {f'REV18-{i:03}' for i in range(1,49)}:
+    fail('0.18 review must cover REV18-001 through REV18-048')
+for case in review_018:
+    path, _, fragment = case['contract'].partition('#')
+    if not (ROOT/path).is_file() or fragment not in anchors(ROOT/path):
+        fail('Broken 0.18 review contract '+case['case_id'])
+    if case['execution_status'] != 'not_run' or not all(case[k] for k in ['given','when','then']):
+        fail('Invalid 0.18 review acceptance '+case['case_id'])
+    if case['decision_status'] not in {'proposed','specified'}:
+        fail('Unknown 0.18 decision status '+case['case_id'])
+    if not set(case['requirement_ids'].split(';')) <= expected:
+        fail('Unknown 0.18 review requirement '+case['case_id'])
+for row in trace:
+    wanted = {c['case_id'] for c in review_018 if row['requirement_id'] in c['requirement_ids'].split(';')}
+    if set(filter(None, row.get('review_018_case_ids','').split(';'))) != wanted:
+        fail('0.18 review trace drift '+row['requirement_id'])
+decisions_018 = json.loads((ROOT/'00-prepare/internal/review-decisions-018.json').read_text())['decisions']
+resolution = (ROOT/'02-design/review-resolution-contracts.md').read_text()
+if {d['id'] for d in decisions_018} != {f'DEC-{i}' for i in range(25,42)}:
+    fail('0.18 decisions must be DEC-25 through DEC-41')
+for decision in decisions_018:
+    if decision['status'] != decision.get('decision_status') or decision['status'] not in {'proposed','accepted'}:
+        fail('0.18 decision status invalid '+decision['id'])
+    if not all(decision.get(k) for k in ['proposed_by','proposed_at','owner','contract','issue_id']) or decision.get('reversible') is not True:
+        fail('0.18 proposed decision lacks provenance '+decision['id'])
+    if '## '+decision['contract']+' ' not in resolution:
+        fail('0.18 decision contract section absent '+decision['id'])
+demo_only = {'demo.advanceClock','demo.reset','demo.trigger','demoSession.signIn','demoSession.signOut','demoSession.switchMembership','demoSession.extend','auth.previewPasswordReset','payments.simulate','offsets.simulate','automations.fire'}
+if {r['operation'] for r in operations if r['frontend_execution']=='demo-only'} != demo_only:
+    fail('Demo-only operation set differs from IR60')
+for pattern in [r"\|\{eventType:'simulator';enabled:boolean\}", r"actorRoleAtTime:Role\|'system'", r"'units\.save': \{input:\{id\?:ID;customerOrgId:ID;propertyId:ID;spaceId:ID\|null;", r"'demoSession\.extend': \{input:Record<string,never>;result:Session;mode:'write'\}", r"export type ChangeEntityType = .*'cursor_only';", r"entityType:ChangeEntityType;", r"resources:Exclude<ChangeEntityType,'cursor_only'>\[\]", r"unassignedOnly\?:boolean"]:
+    if not re.search(pattern, types):
+        fail('0.18 DTO invariant missing '+pattern)
+if "eventType:'payment'" in types:
+    fail('Payment demo trigger must stay removed (IR59)')
+if 'unassignedOnly' not in query_by_operation['units.list']['allowed_filters'].split(','):
+    fail('Unassigned unit filter absent (IR62)')
+for sid, keys in {'SCR-C01':{'propertyId','unitId'}, 'SCR-C02':{'powerState','connections','unassignedOnly'}, 'SCR-A01':{'customerId','propertyId'}, 'SCR-A02':{'customerId','propertyId','powerState','connections'}, 'SCR-C08':{'severity','unreadOnly'}, 'SCR-C06':{'unitIds','baselineId'}, 'SCR-A16':{'actorId','targetId','correlationId','result'}}.items():
+    screen = next(x for x in screens if x['screen_id']==sid)
+    if not keys <= set(screen['url_selection'].split(',')):
+        fail('IR50 URL keys missing '+sid)
+iot_ops = {'units.get','units.list','telemetry.series','telemetry.summary','devices.get','devices.list','devices.events','commands.create','commands.get','diagnosticRuns.create','diagnosticRuns.get','diagnosticRuns.list','restrictions.forInvoice','restrictions.get','restrictions.list','admin.summary','summaries.get','alerts.list','alerts.get'}
+device_states = {'connecting','device-error','device-online','device-offline'}
+for screen in screens:
+    states = set(screen['states'].split(';'))
+    has_iot = bool(set(filter(None, screen['operations'].split(';'))) & iot_ops)
+    if has_iot and not device_states <= states:
+        fail('IoT screen lacks device states '+screen['screen_id'])
+    if not has_iot and states & device_states:
+        fail('Non-IoT screen lists device states '+screen['screen_id'])
+if not any(c['component']=='SessionExpiryDialog' for c in components):
+    fail('Session expiry dialog contract absent (IR55)')
+if 'extendSession' not in next(c for c in components if c['component']=='AppShell')['event']:
+    fail('AppShell session extension event absent (IR55)')
+# IR72/IR81: superseded wording must not remain. The resolution contract is checked too,
+# except lines that explicitly quote what they replace.
+STALE_LITERALS = ['jobs/units/invoices/restrictionsなど', '利用者操作による延長なし', 'デモ用の時計から発生したイベントは`automations.fire`に渡し', 'RTO以外の契約は「契約なし・一般保守」', 'その人が使える画面へ戻します', '許可された画面へ戻します。', 'その人が見てよい画面へ戻します', 'tenantId(テナントID)、親ID', '即時〜300msの間で固定の設定', 'ホーム画面や一覧画面へ移動します', '| boundary / assumptions | 文字列/必須 | 1〜2000文字', '| ①②未対応件数に計上', 'version=3の後に2と重複3', 'assigned→submitted→completedと進む', 'seed遅延のときは専用の扱い', '一般的な利用の同意', '①一般同意のみ', '係数の単位が合っていない', 'offline台はpending', '地域・年度・単位・出典', 'SCR-X-not-foundを表示。両者は同じ文言', 'clock2026-03-07']
+STALE_PATTERNS = [r'利用者操作による延長は(?:ない|なし)', r'型番を管理(?:する|できる)権限', r'環境(?:に関する)?policy(?:\(方針\))?を管理する権限', r'roomは表示名', r'顧客組織の数', r'20%増加|増加20%|増加率20%', r'→解除を要求する→', r'ホーム画面へ戻す', r'基準はIR63で自動選択', r'reportCategory=scope2_electricity', r'dueAt=2026-09-15 12:00Z', r'fanのみの設備は換気ボタン', r'2026-03-07／2026-10-31']
+QUOTE_MARKERS = ('置換', '旧記述', '旧表現', '旧文', '旧表記', '旧句')
+stale_targets = [p for p in markdown if p.parent.name in ['01-requirements','02-design','03-uiux']] + [ROOT/'04-agentic-sdlc/verification.md'] + sorted((ROOT/'04-agentic-sdlc').glob('acceptance-*.csv'))  # IR102: acceptance plans too
+for path in stale_targets:
+    for line in path.read_text().splitlines():
+        if (path.name == 'review-resolution-contracts.md' or path.suffix == '.csv') and any(marker in line for marker in QUOTE_MARKERS):
+            continue
+        for stale in STALE_LITERALS:
+            if stale in line:
+                fail(f'Superseded wording remains (IR72): {path.name}: {stale}')
+        for pattern in STALE_PATTERNS:
+            if re.search(pattern, line):
+                fail(f'Superseded wording remains (IR81): {path.name}: {pattern}')
+for required in ['UTC分境界（秒・ミリ秒=0）', '| set_power power=false | 許可 | 許可 |', '閲覧窓=[Assignment.createdAt, scheduledEnd)', 'offeredからrequestedへ戻し', 'severity∈{critical, warning}', 'disabledReason=consent_revoked', 'demoSession.extend', '| in_progress / submitted | 不可 | 不可（先にjobs.holdでon_hold） | CONFLICT |', 'items・total・未読件数から除外', 'DemoTriggerのpayment分岐は廃止', '| 1 | ユーザー確定の決定（DEC-12/13/16/17/18/44/50） |', 'errors.device_power_lost', '作成時刻の1秒後', '「増加 {絶対値}」', 'createDemoRepository', '土曜・日曜だけ', '| session | 全Query']:
+    if required not in resolution:
+        fail('0.18 behavioral guard missing '+required)
+seed = fixture.get('demoSeed', {})
+for key in ['organizations','customers','properties','spaces','capabilities','units','devices','measurements','contracts','invoices','restrictions','alerts','notifications','jobs','offers','assignments','simulator']:
+    if key not in seed:
+        fail('demoSeed section missing '+key)
+if seed:
+    unit_ids = {u['id'] for u in seed['units']}
+    if not {'unit-online-rto','unit-offline-rto','unit-non-rto','unit-limited','unit-other-customer'} <= unit_ids:
+        fail('demoSeed units differ from verification fixtures')
+    if any(c['customerId']=='cust-b' for c in seed['contracts']):
+        fail('customer-b must have zero contracts (AT-C10-N, IR61)')
+    if not any(u['id']=='unit-limited' and u['spaceId'] is None for u in seed['units']):
+        fail('Unassigned seed unit absent (IR62)')
+    if sum(a['status'] in ('open','acknowledged') and a['severity'] in ('critical','warning') for a in seed['alerts']) != 1:
+        fail('Seed alertCount must be 1 (AT-C01-N, IR51)')
+    if seed['simulator'].get('enabled') is not True:
+        fail('Seed simulator default must be enabled (IR45)')
+if 'iPadOS 17 Safari' not in (ROOT/'02-design/deterministic-contracts.md').read_text():
+    fail('Tablet environment absent from D10')
+if '**1A**は' not in (ROOT/'00-prepare/PrepareDocument.md').read_text():
+    fail('PrepareDocument lacks 1A/1B definition')
+if f"{len(operations)}個のローカルサービス操作" not in (ROOT/'02-design/common.md').read_text():
+    fail('Common operation count drift (0.18)')
+if 'review-resolution-contracts.md#ir72-' not in (ROOT/'README.md').read_text():
+    fail('README precedence link absent (IR72)')
+
+# 0.19.0 independent review (REV19) regression checks: document consistency only, not app behavior.
+review_019 = rows('04-agentic-sdlc/acceptance-review-019.csv')
+unique(review_019, 'case_id', '0.19 review case ID')
+if unique(review_019, 'issue_id', '0.19 finding') != {f'REV19-{i:03}' for i in range(1,43)}:
+    fail('0.19 review must cover REV19-001 through REV19-042')
+for case in review_019:
+    path, _, fragment = case['contract'].partition('#')
+    if not (ROOT/path).is_file() or fragment not in anchors(ROOT/path):
+        fail('Broken 0.19 review contract '+case['case_id'])
+    if case['execution_status'] != 'not_run' or not all(case[k] for k in ['given','when','then']):
+        fail('Invalid 0.19 review acceptance '+case['case_id'])
+    if case['decision_status'] not in {'proposed','specified','accepted'}:
+        fail('Unknown 0.19 decision status '+case['case_id'])
+    if not set(case['requirement_ids'].split(';')) <= expected:
+        fail('Unknown 0.19 review requirement '+case['case_id'])
+for row in trace:
+    wanted = {c['case_id'] for c in review_019 if row['requirement_id'] in c['requirement_ids'].split(';')}
+    if set(filter(None, row.get('review_019_case_ids','').split(';'))) != wanted:
+        fail('0.19 review trace drift '+row['requirement_id'])
+decisions_019 = json.loads((ROOT/'00-prepare/internal/review-decisions-019.json').read_text())['decisions']
+if {d['id'] for d in decisions_019} != {f'DEC-{i}' for i in range(42,54)}:
+    fail('0.19 decisions must be DEC-42 through DEC-53')
+for decision in decisions_019:
+    if decision['status'] != decision.get('decision_status') or decision['status'] not in {'proposed','accepted'}:
+        fail('0.19 decision status invalid '+decision['id'])
+    if not all(decision.get(k) for k in ['proposed_by','proposed_at','owner','contract','issue_id']) or decision.get('reversible') is not True:
+        fail('0.19 proposed decision lacks provenance '+decision['id'])
+    if decision['status']=='accepted' and not all(decision.get(k) for k in ['decided_by','decided_at','answer']):
+        fail('0.19 accepted decision lacks provenance '+decision['id'])
+if {d['id'] for d in decisions_019 if d['status']=='accepted'} != {'DEC-44','DEC-50'}:
+    fail('0.19 user-accepted decisions must be DEC-44 and DEC-50')
+    if '## '+decision['contract']+' ' not in resolution:
+        fail('0.19 decision contract section absent '+decision['id'])
+for required in ['状態`work-not-started`で表示する', 'origin=measured、quality=valid、value≠nullの場合だけ', 'predictedBaselineKWh = baselineKWh ÷ (|U|×baselineMinutes) × expectedUnitMinutes', '利用者操作による延長はIR55のdemoSession.extendだけで行う', '`/login?returnTo=<encodeURIComponent(pathname+search)>`', 'skeleton（loading）へ戻さず', 'granted=false、grantedAt=null、revokedAt=null、version=1のConsent', 'messageKey=errors.offer_expired', 'DDの表記にかかわらずtrim後1〜1000', '| gridRegion | summary.factorSnapshot.region |', 'scheduledEnd−15分', 'Job.scheduledSlot=[新AssignmentのscheduledStart, scheduledEnd)', '| device_operation | devices.operations, devices.calibrations, devices.get, units.get |', 'normal < warning < critical', '存在しなければsetを新しい行として']:
+    if required not in resolution:
+        fail('0.19 behavioral guard missing '+required)
+for pattern in [r"energyForecast:EnergyForecast;", r"export type EnergyForecast = \{period:Range;", r"sequence\?:number;eventId:ID\};"]:
+    if not re.search(pattern, types):
+        fail('0.19 DTO invariant missing '+pattern)
+screen_by_id = {x['screen_id']:x for x in screens}
+if 'returnTo' not in screen_by_id['SCR-X-login']['url_selection'].split(','):
+    fail('Login returnTo URL key absent (IR82)')
+for sid in ['SCR-T02','SCR-T04','SCR-T07','SCR-T10','SCR-T11']:
+    if 'work-not-started' not in screen_by_id[sid]['states'].split(';'):
+        fail('Work-not-started state absent '+sid)
+for sid, keys in {'SCR-A13':{'unitIds','baselineId'}, 'SCR-A11':{'policyId'}, 'SCR-A12':{'policyId'}}.items():
+    if not keys <= set(screen_by_id[sid]['url_selection'].split(',')):
+        fail('IR90 URL keys missing '+sid)
+for name in ['KpiCard','VoiceContainer']:
+    if not any(c['component']==name for c in components):
+        fail('IR90 component contract missing '+name)
+if 'refreshing' not in (ROOT/'02-design/deterministic-contracts.md').read_text():
+    fail('Refreshing state absent from D10 (IR83)')
+if seed:
+    consents = {c['membershipId']:c for c in seed.get('consents', [])}
+    for actor in fixture['actors']:
+        if actor['role']=='client' and not (actor['membershipId'] in consents and consents[actor['membershipId']]['granted'] is False and consents[actor['membershipId']]['version']==1):
+            fail('Initial consent absent (IR84) '+actor['membershipId'])
+    if any('sensorMetrics' in d or 'sensors' not in d for d in seed['devices']):
+        fail('Seed devices must list explicit sensors (IR91)')
+    sensor_ids = {s['id'] for d in seed['devices'] for s in d['sensors']}
+    if any(m['sensorId'] not in sensor_ids for m in seed['measurements']):
+        fail('Seed measurement references unknown sensor (IR91)')
+    tenant_units = sorted(u['id'] for u in seed['units'] if not u['archived'] and next(o for o in seed['organizations'] if o['id']==u['customerOrgId'])['tenantId']=='tenant-a')
+    if not any(b['id']=='baseline-demo-tenant-a' and sorted(b['unitIds'])==tenant_units and b['method']=='demo_fixed' and b['boundaryId']=='ac_input_electricity' for b in seed['baselines']):
+        fail('Seed forecast baseline absent or mismatched (IR78)')
+    # IR85: recompute the SR27 power classification for the fixed AT-A01-N patch set.
+    patch_case = fixture.get('acceptancePatches', {}).get('AT-A01-N')
+    if not patch_case:
+        fail('AT-A01-N acceptance patches absent (IR85)')
+    else:
+        import copy
+        from datetime import datetime
+        state = copy.deepcopy(seed)
+        for patch in patch_case['patches']:
+            rows_ = state[patch['entity']]
+            row = next((r for r in rows_ if r['id']==patch['id']), None)
+            if row is None:
+                rows_.append({'id':patch['id'], **patch['set']})
+            else:
+                row.update(patch['set'])
+        now = datetime.fromisoformat(patch_case['clock'].replace('Z','+00:00'))
+        counts = {'on':0,'off':0,'unknown':0}
+        for unit in state['units']:
+            org = next(o for o in state['organizations'] if o['id']==unit['customerOrgId'])
+            if org['tenantId']!='tenant-a' or unit['archived']:
+                continue
+            device = next((d for d in state['devices'] if d['unitId']==unit['id']), None)
+            obs = unit['observedState']
+            power = sorted([m for m in state['measurements'] if m['unitId']==unit['id'] and m['metric']=='power'], key=lambda m:(m['observedAt'], m['sequence']), reverse=True)
+            fresh = lambda at: at is not None and 0 <= (now-datetime.fromisoformat(at.replace('Z','+00:00'))).total_seconds() <= 120
+            ok = device and device['connection']=='online' and isinstance(obs['power'], bool) and fresh(obs['observedAt']) and power and power[0]['origin']=='measured' and power[0]['quality']=='valid' and power[0]['value'] is not None and fresh(power[0]['observedAt'])
+            counts['on' if ok and obs['power'] else 'off' if ok else 'unknown'] += 1
+        exp = patch_case['expected']
+        if (counts['on'],counts['off'],counts['unknown']) != (exp['powerOn'],exp['powerOff'],exp['powerUnknown']):
+            fail('AT-A01-N patches do not produce the expected classification (IR85): '+str(counts))
+# IR92: acceptance patches referenced by acceptance text must exist and apply to demoSeed sections.
+import copy as _copy
+from datetime import datetime as _dt, timedelta as _td
+AP = fixture.get('acceptancePatches', {})
+acceptance_text = ''.join((ROOT/f'01-requirements/{r}.md').read_text() for r in ['common','client','contractor','technician','admin']) + (ROOT/'04-agentic-sdlc/verification.md').read_text()
+acceptance_csv_text = ''.join(p.read_text() for p in sorted((ROOT/'04-agentic-sdlc').glob('acceptance-*.csv')))  # IR97
+referenced_keys = set(re.findall(r'\["((?:AT-|shared:)[^"]+)"\]', acceptance_text + acceptance_csv_text.replace('""','"'))) | set(re.findall(r'acceptancePatches (AT-[A-Za-z0-9.\-]*[A-Za-z0-9])', acceptance_csv_text))
+case_keys = {k for k in AP if k.startswith('AT-')}
+for key in sorted(referenced_keys - set(AP)):
+    fail('Acceptance patch key missing (IR92) '+key)
+for key in sorted(case_keys - referenced_keys):
+    fail('Acceptance patch not referenced by acceptance text (IR92) '+key)
+ir92 = resolution[resolution.index('## IR92 '):resolution.index('## IR93 ')] if '## IR92 ' in resolution and '## IR93 ' in resolution else ''
+listed = set(re.findall(r'AT-(?:[A-Z]\d\d|REV\d\d|G\d{3})-[A-Z0-9]+(?:\.\d)?', ir92.split('6. ')[1].split('\n')[0])) if '6. ' in ir92 else set()
+if listed != case_keys:
+    fail('IR92 acceptance patch case list differs from fixture: '+str(sorted(listed ^ case_keys)))
+def _instant(value):
+    return _dt.fromisoformat(value.replace('Z','+00:00'))
+def _expand(key, trail=()):
+    if key in trail or key not in AP:
+        fail('Acceptance patch include unresolved (IR92) '+key)
+        return []
+    items = []
+    for inc in AP[key].get('include', []):
+        if not inc.startswith('shared:'):
+            fail('Acceptance patch include must be shared (IR92) '+inc)
+        items += _expand(inc, trail+(key,))
+    return items + AP[key].get('patches', [])
+series_keys = {'idPrefix','unitId','sensorId','metric','unit','boundaryId','from','to','stepSeconds','value','origin','quality','sequenceStart','skip'}
+METRIC_RANGE = {('temperature','°C'):(-50,100), ('humidity','%'):(0,100), ('co2','ppm'):(0,10000), ('pm25','µg/m³'):(0,1000), ('power','kW'):(0,100), ('vibration','mm/s'):(0,100), ('refrigerant_pressure','kPa'):(0,5000)}  # D07
+sensor_ids_all = {s['id'] for d in seed.get('devices', []) for s in d.get('sensors', [])}
+def validate_notification_scope(notifications, actors, label):
+    memberships = {a['membershipId']:a for a in actors}
+    for notification in notifications:
+        recipient = memberships.get(notification.get('recipientMembershipId'))
+        if recipient is None:
+            fail('Notification scope snapshot invalid (IR106) '+label+': recipient absent')
+            continue
+        value = notification.get('scopeVersionAtCreation', recipient.get('scopeVersion'))
+        # bool is an int subclass in Python but is not a JSON integer scope version.
+        if type(value) is not int or value < 0:
+            fail('Notification scope snapshot invalid (IR106) '+label+': '+notification['id'])
+
+validate_notification_scope(seed.get('notifications', []), fixture['actors'], 'seed')
+for key in sorted(k for k in AP if k.startswith('AT-') or k.startswith('shared:')):
+    state = _copy.deepcopy(seed); actors = _copy.deepcopy(fixture['actors'])
+    generated = []
+    for patch in _expand(key):
+        entity = patch.get('entity')
+        rows_ = actors if entity == 'memberships' else state.get(entity)
+        if not isinstance(rows_, list):
+            fail(f'Acceptance patch entity invalid (IR92) {key}: {entity}')
+            continue
+        if 'series' in patch:
+            spec = patch['series']
+            if entity != 'measurements' or set(spec) != series_keys or spec['sensorId'] not in sensor_ids_all:
+                fail(f'Acceptance series patch invalid (IR92) {key}')
+                continue
+            at = _instant(spec['from']); end = _instant(spec['to']); k = 0
+            while at < end:
+                skipped = any(_instant(s['from']) <= at < _instant(s['to']) for s in spec['skip'])
+                if not skipped:
+                    row = {'id':f"{spec['idPrefix']}-{k}", 'unitId':spec['unitId'], 'sensorId':spec['sensorId'], 'metric':spec['metric'], 'value':spec['value'], 'unit':spec['unit'], 'observedAt':at.isoformat().replace('+00:00','Z'), 'origin':spec['origin'], 'quality':spec['quality'], 'boundaryId':spec['boundaryId']}
+                    rows_.append(row); generated.append(row)
+                at += _td(seconds=spec['stepSeconds']); k += 1
+            continue
+        if not isinstance(patch.get('set'), dict) or not patch.get('id'):
+            fail(f'Acceptance patch row invalid (IR92) {key}')
+            continue
+        id_field = 'membershipId' if entity == 'memberships' else 'id'
+        row = next((r for r in rows_ if r.get(id_field) == patch['id']), None)
+        if row is None:
+            rows_.append({id_field:patch['id'], **patch['set']})
+        else:
+            unknown = set(patch['set']) - set(row)
+            if entity == 'notifications':
+                unknown.discard('scopeVersionAtCreation')  # optional seed field, required after IR106 normalization
+            if unknown:
+                fail(f'Acceptance patch sets unknown fields (IR92) {key}: {sorted(unknown)}')
+            row.update(patch['set'])
+    validate_notification_scope(state.get('notifications', []), actors, key)
+    # IR97 1-3: fixture invariants hold after every patch set.
+    for m in state['measurements']:
+        low_high = METRIC_RANGE.get((m['metric'], m['unit']))
+        if m.get('origin','measured')=='measured' and m.get('quality','valid')=='valid' and m['value'] is not None and (low_high is None or not low_high[0] <= m['value'] <= low_high[1]):
+            fail(f"Acceptance measurement out of range (IR97) {key}: {m['id']}")
+    for a in state['assignments']:
+        job = next((j for j in state['jobs'] if j['id']==a['jobId']), None)
+        if a['scheduledStart']!=a['validFrom'] or a['scheduledEnd']!=a['validUntil'] or (job and job.get('assignmentId')==a['id'] and job.get('scheduledSlot')!={'startAt':a['scheduledStart'],'endAt':a['scheduledEnd']}):
+            fail(f"Assignment and job slot out of sync (IR97) {key}: {a['id']}")
+    for patch in AP.get(key, {}).get('patches', []):
+        fields = set(patch.get('set', {}))
+        if (patch.get('entity')=='restrictions' and 'state' in fields) or (patch.get('entity') in ('invoices','payments') and 'status' in fields and patch['id'] in {x['id'] for x in seed.get(patch['entity'], [])}) or (patch.get('entity')=='jobs' and fields=={'status'}):
+            fail(f"State-only patch must be created by operations (IR97) {key}: {patch['id']}")
+    query = AP.get(key, {}).get('query'); expected_values = AP.get(key, {}).get('expected', {})
+    if query and 'kWh' in expected_values:
+        start, stop = _instant(query['from']), _instant(query['to'])
+        slots = [m for m in state['measurements'] if m['unitId'] in query['unitIds'] and m['metric']=='power' and m['origin']=='measured' and m['quality']=='valid' and start <= _instant(m['observedAt']) < stop and _instant(m['observedAt']).second == 0]
+        kwh = sum(m['value'] for m in slots) / 60
+        minutes = int((stop-start).total_seconds() // 60) * len(query['unitIds'])
+        if abs(kwh - expected_values['kWh']) > 1e-9:
+            fail(f'Acceptance energy patch kWh mismatch (IR92) {key}: {kwh}')
+        if 'coverage' in expected_values and abs(len(slots)/minutes - expected_values['coverage']) > 1e-9:
+            fail(f'Acceptance energy patch coverage mismatch (IR92) {key}')
+if not any(fct['id']==fixture.get('defaultEmissionFactorId') and fct['kgCO2ePerKWh']==fixture['energy']['factorKgPerKWh'] for fct in seed.get('factors', [])):
+    fail('Default emission factor absent from demoSeed (IR92)')
+for required in ['受入Givenの解釈規則', '| 当該技術者にAssignmentが一度も無い（例: requestedで未割当のjob-internal-a） | NOT_FOUND（順位3） |', 'errors.assignment_ended', '同じ設備を対象に含む契約の期間重複は1Aでは拒否しない']:
+    if required not in resolution:
+        fail('0.19 behavioral guard missing '+required)
+report_019 = {'review_019_cases':len(review_019), 'proposed_decisions_019':sum(d['status']=='proposed' for d in decisions_019)}
+
+# 0.20.0 independent G1 (G1-001..031) regression checks: document consistency only, not app behavior.
+review_020 = rows('04-agentic-sdlc/acceptance-review-020.csv')
+unique(review_020, 'case_id', '0.20 review case ID')
+if unique(review_020, 'issue_id', '0.20 finding') != {f'G1-{i:03}' for i in range(1,32)}:
+    fail('0.20 review must cover G1-001 through G1-031')
+for case in review_020:
+    path, _, fragment = case['contract'].partition('#')
+    if not (ROOT/path).is_file() or fragment not in anchors(ROOT/path):
+        fail('Broken 0.20 review contract '+case['case_id'])
+    if case['execution_status'] != 'not_run' or not all(case[k] for k in ['given','when','then']):
+        fail('Invalid 0.20 review acceptance '+case['case_id'])
+    if case['decision_status'] not in {'proposed','specified'}:
+        fail('Unknown 0.20 decision status '+case['case_id'])
+    if not set(case['requirement_ids'].split(';')) <= expected:
+        fail('Unknown 0.20 review requirement '+case['case_id'])
+for row in trace:
+    wanted = {c['case_id'] for c in review_020 if row['requirement_id'] in c['requirement_ids'].split(';')}
+    if set(filter(None, row.get('review_020_case_ids','').split(';'))) != wanted:
+        fail('0.20 review trace drift '+row['requirement_id'])
+decisions_020 = json.loads((ROOT/'00-prepare/internal/review-decisions-020.json').read_text())['decisions']
+if {d['id'] for d in decisions_020} != {f'DEC-{i}' for i in range(54,60)}:
+    fail('0.20 decisions must be DEC-54 through DEC-59')
+for decision in decisions_020:
+    if decision['status'] != 'proposed' or decision.get('decision_status') != 'proposed' or decision.get('reversible') is not True or not all(decision.get(k) for k in ['proposed_by','proposed_at','owner','contract','issue_id']):
+        fail('0.20 proposed decision lacks provenance '+decision['id'])
+    for section in decision['contract'].split(';'):
+        if '## '+section+' ' not in resolution:
+            fail('0.20 decision contract section absent '+decision['id'])
+    if decision['id'] not in resolution:
+        fail('0.20 decision not referenced by contract '+decision['id'])
+for required in ['| 入力型にjobIdが無い操作で、対象Unitに自己のAssignmentが一度も無い | 社内でunit scope内ならFORBIDDEN（errors.assignment_required、D01順位4）', '要求時にDevice.connection≠onlineならD01順位8のOFFLINE（DeviceOperationを作らない）', '含まない技術者は候補に出さず、直接指定はFORBIDDEN（errors.technician_out_of_scope）', 'members.eligibleとmembers.capacityはrole=technicianのMembershipだけを返す', '| job.assigned（初回・再割当・延長） | schedule_change | job |', 'イベントを起こした操作のMembership（actor）には送らない', "| requested / applied | release_requested。releaseIntent.source='cancel'", '| released / cancelled | CONFLICT（D01順位6） |', 'origin=measured・quality=validの値は範囲内でなければfixture欠陥', '受入試験は既定でsimulator=falseで開始する', '| co2 ≥ 1000 ppmで、Capability.ventilation=trueかつventilationLevelsにlow |', '| pm25 ≥ 35 µg/m³ | air.guidance.clean', 'indoor 8件、outdoor 5件、electrical 5件', '1. itemsのcomponentKey集合が、提出時点のUnit.componentsと一致する', '認可を通る場合はCONFLICT（messageKey=errors.scope_changed、D01順位6、副作用0）', 'UNAUTHENTICATED（messageKey=errors.membership_inactive、D01順位2）', 'VALIDATION（fieldErrors.contractId、messageKey=errors.restriction_ineligible、D01順位7）', '30秒以降はfailed（集約はrelease_requestedのまま）', '同じjobIdの置き換え対象のactive Assignmentを除外する']:
+    if required not in resolution:
+        fail('0.20 behavioral guard missing '+required)
+for pattern in [r"releaseIntent:ReleaseIntent\|null\}", r"export type ReleaseIntent = \{source:'payment'\|'exception'\|'override'\|'manual'\|'cancel';", r"'inquiry'\|'job_update'\|'device_operation';params:", r"\{eventType:'allergen';observation:\{unitId:ID\} & AllergenObservation\}", r"\{eventType:'load_alert';unitId:ID;"]:
+    if not re.search(pattern, types):
+        fail('0.20 DTO invariant missing '+pattern)
+if seed:
+    allergen = {(o['unitId'], o['availability']) for o in seed.get('allergenObservations', [])}
+    if allergen != {('unit-online-rto','available'), ('unit-non-rto','unsupported')}:
+        fail('Seed allergen observations differ (IR98)')
+    cap_tenant = {c['id']:c.get('tenantId') for c in seed['capabilities']}
+    for unit in seed['units']:
+        org = next(o for o in seed['organizations'] if o['id']==unit['customerOrgId'])
+        if cap_tenant.get(unit['modelId']) != org['tenantId']:
+            fail('Unit capability tenant mismatch (IR101) '+unit['id'])
+    draft = AP.get('shared:report-draft-all-normal', {}).get('input', {})
+    keys = [i['componentKey'] for i in draft.get('items', [])]
+    if len(keys) != 18 or len(set(keys)) != 18 or any(i['result']!='normal' for i in draft.get('items', [])) or len(draft.get('workText','')) != 50 or draft.get('nextAction') != {'kind':'none'}:
+        fail('Report draft input must cover 18 components (IR100)')
+    for key in ['AT-A05-N','AT-A11-N','AT-A12-N']:
+        policy_input = AP.get(key, {}).get('input', {})
+        if policy_input.get('enabled') is not True or not policy_input.get('unitIds') or 'kind' not in policy_input:
+            fail('Policy acceptance input incomplete (IR97) '+key)
+    if 'sensor-tamper-co2' not in json.dumps(AP.get('AT-A12-N', {})):
+        fail('AT-A12-N CO2 sensor patch absent (IR97)')
+common_req = (ROOT/'01-requirements/common.md').read_text()
+if '### 共通受入条件の具体値' not in common_req or any(f'| AT-X0{i}-{k} |' not in common_req for i in range(1,8) for k in 'NEB'):
+    fail('Common acceptance table absent (IR101)')
+if 'summaries.get' not in screen_by_id['SCR-C08']['operations'].split(';') or 'jobId' not in screen_by_id['SCR-P03']['url_selection'].split(','):
+    fail('IR102 screen contract missing (SCR-C08 summaries.get / SCR-P03 jobId)')
+if 'switchMembership' not in next(c for c in components if c['component']=='AppShell')['event']:
+    fail('AppShell role switch event absent (IR102)')
+report_020 = {'review_020_cases':len(review_020), 'proposed_decisions_020':sum(d['status']=='proposed' for d in decisions_020)}
+
+# 0.21.0 independent G1 corrections. These checks validate specification contracts,
+# not an implemented event bus or policy engine.
+def contract_section(number):
+    match = re.search(r'^## IR'+str(number)+r' .*?(?=^## |\Z)', resolution, re.M | re.S)
+    return match.group(0) if match else ''
+
+def contract_table(section):
+    return [[cell.strip().strip('`') for cell in line.strip().strip('|').split('|')]
+            for line in section.splitlines() if line.startswith('|')
+            and not re.match(r'^\|[\s:|-]+\|$', line)]
+
+change_type = re.search(r'export type ChangeEntityType = ([^;]+);', types)
+change_entities = set(re.findall(r"'([^']+)'", change_type.group(1))) if change_type else set()
+invalidation = {cells[0]:{op.strip() for op in cells[1].split(',')}
+                for cells in contract_table(contract_section(71)) if len(cells)==2}
+if 'allergen_observation' not in change_entities:
+    fail('Allergen change entity absent (IR105)')
+if invalidation.get('allergen_observation') != {'telemetry.series'}:
+    fail('Allergen query invalidation differs (IR105)')
+
+notification_rows = {cells[0]:cells[1:] for cells in contract_table(contract_section(104))
+                     if len(cells)==3 and cells[0]!='templateKey'}
+expected_notification_rows = {
+    'alert':['maintenance→cleaning_due; sensor/tamper/reconciliation_required→fault; quality→quality', 'sourceAlert.severity'],
+    'quality':['quality','sourcePolicy.severity'],
+    'payment_reminder':['payment_reminder','warning'],
+    'restriction':['restriction','scheduled/requested/applied/release_requested→warning; released/cancelled→normal'],
+    'device_operation':['device_operation','warning'],
+    **{key:[key,'normal'] for key in ['schedule_change','report_return','completion','payment','inquiry','job_update']},
+}
+if notification_rows != expected_notification_rows:
+    fail('Notification type or severity mapping differs (IR104)')
+notification_enum = re.search(r'export type NotificationType = ([^;]+);', types)
+notification_types = set(re.findall(r"'([^']+)'", notification_enum.group(1))) if notification_enum else set()
+for template, (classification, _) in notification_rows.items():
+    targets = {'cleaning_due','fault','quality'} if template=='alert' else {classification}
+    if not targets <= notification_types:
+        fail('Notification mapped type absent from DTO (IR104) '+template)
+for cells in contract_table(contract_section(95)):
+    if len(cells)==4 and cells[0]!='イベント' and cells[1] not in notification_rows:
+        fail('Business notification template unmapped (IR104) '+cells[1])
+for number, required in {
+    95:['templateKey=alertはIR10のAlert分類に従い、それ以外はtemplateKeyとtypeを同名にする'],
+    103:['保存前の履歴や遅着FactのobservedAtを開始時刻にしない', '新規保存ではカウンタを0から開始する', '成立前は通知suppressed/not_due'],
+    104:['device_operation.failedは非同期のシステムイベント', 'actor=system-demo'],
+    105:["ChangeEvent.entityType='allergen_observation'", '同じDemoTrigger.eventIdの再送は行と変更イベントを増やさない', 'C07/A12はこのresourcesを購読'],
+    106:['scopeVersionAtCreationが省略されている場合、全patch適用後のrecipientMembershipIdで引いたMembership.scopeVersionを設定する', '明示したscopeVersionAtCreationは非負整数であることを検証して保持し', '生成後にMembership.scopeVersionが変わっても既存通知の値は変更しない'],
+}.items():
+    for guard in required:
+        if guard not in contract_section(number):
+            fail(f'0.21 behavioral guard missing (IR{number}) '+guard)
+
+# Follow the fixture's sequence, checking elapsed time rather than accepting a
+# backdated observation as evidence of a duration already spent under the policy.
+a12 = AP.get('AT-A12-N', {})
+try:
+    duration = a12['input']['durationSeconds']
+    initial = a12['evaluation']; final = a12['finalEvaluation']
+    start = _instant(a12['clock'])
+    if duration != 60 or _instant(initial['occurredAt']) != start or any(_instant(f['observedAt']) != start for f in initial['facts']):
+        raise ValueError('initial observation is not at policy evaluation start')
+    if (set(initial['unitIds']) != set(a12['input']['unitIds'])
+            or {f['unitId'] for f in initial['facts']} != set(initial['unitIds'])
+            or final['facts'] != initial['facts'] or final['unitIds'] != initial['unitIds']
+            or initial['eventId'] == final['eventId']
+            or (_instant(final['occurredAt'])-start).total_seconds() != duration):
+        raise ValueError('final evaluation does not preserve the held facts and elapsed duration')
+    elapsed = 0; assertions = []; calls = []
+    for step in a12['flow']:
+        operation = step['operation']
+        if operation=='clock.tick':
+            if step.get('stepSeconds')!=1 or type(step.get('seconds')) is not int or step['seconds']<=0:
+                raise ValueError('clock must advance by ordinary one-second ticks')
+            elapsed += step['seconds']
+        elif operation=='assert':
+            if step['elapsedSeconds'] != elapsed:
+                raise ValueError('boundary assertion is at the wrong elapsed time')
+            assertions.append(elapsed)
+        elif operation in ('policies.save','automations.fire'):
+            calls.append((operation,step['inputRef'],elapsed))
+        else:
+            raise ValueError('unsupported duration flow operation')
+    if (elapsed != duration or assertions != [0,duration-1,duration]
+            or calls != [('policies.save','input',0),('automations.fire','evaluation',0),('automations.fire','finalEvaluation',duration)]):
+        raise ValueError('save, evaluate and boundary clock sequence differs')
+    expected_boundaries = [dict(elapsedSeconds=e, alertCount=a, notificationCount=n, commandCount=c)
+                           for e,a,n,c in [(0,0,0,0),(duration-1,0,0,0),(duration,2,2,1)]]
+    if a12['expected']['boundaries'] != expected_boundaries:
+        raise ValueError('policy-scoped boundary counts differ')
+except (KeyError, TypeError, ValueError) as error:
+    fail('A12 continuity fixture invalid (IR103): '+str(error))
+
+review_021_path = ROOT/'04-agentic-sdlc/acceptance-review-021.csv'
+review_021 = rows(str(review_021_path.relative_to(ROOT))) if review_021_path.exists() else []
+if unique(review_021, 'issue_id', '0.21 finding') != {f'G120-{i:03}' for i in range(1,6)}:
+    fail('0.21 review must cover G120-001 through G120-005')
+unique(review_021, 'case_id', '0.21 review case ID')
+for case in review_021:
+    path, _, fragment = case['contract'].partition('#')
+    if not (ROOT/path).is_file() or fragment not in anchors(ROOT/path):
+        fail('Broken 0.21 review contract '+case['case_id'])
+    if case['execution_status']!='not_run' or not all(case[k] for k in ['given','when','then']):
+        fail('Invalid 0.21 review acceptance '+case['case_id'])
+    if case['decision_status'] not in {'proposed','specified'} or not set(case['requirement_ids'].split(';')) <= expected:
+        fail('Invalid 0.21 review status or requirement '+case['case_id'])
+for row in trace:
+    wanted = {c['case_id'] for c in review_021 if row['requirement_id'] in c['requirement_ids'].split(';')}
+    if set(filter(None,row.get('review_021_case_ids','').split(';'))) != wanted:
+        fail('0.21 review trace drift '+row['requirement_id'])
+decisions_021_path = ROOT/'00-prepare/internal/review-decisions-021.json'
+decisions_021 = json.loads(decisions_021_path.read_text())['decisions'] if decisions_021_path.exists() else []
+if {d['id'] for d in decisions_021} != {'DEC-60','DEC-61'}:
+    fail('0.21 decisions must be DEC-60 and DEC-61')
+for decision in decisions_021:
+    if decision['status']!='proposed' or decision.get('decision_status')!='proposed' or decision.get('reversible') is not True or not all(decision.get(k) for k in ['proposed_by','proposed_at','owner','contract','issue_id']):
+        fail('0.21 proposed decision lacks provenance '+decision['id'])
+    if any('## '+section+' ' not in resolution for section in decision['contract'].split(';')) or decision['id'] not in resolution:
+        fail('0.21 decision contract absent '+decision['id'])
+
 typescript_check = 'not_run'
 if args.tsc:
     checked = subprocess.run(['node', str(args.tsc), '--strict', '--noEmit', '--target', 'ES2022', '--lib', 'ES2022,DOM', str(ROOT / '02-design/service-contracts.ts')], capture_output=True, text=True)
@@ -673,7 +1172,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.17.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.21.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')
@@ -687,5 +1186,10 @@ report['pending_business_decisions'] += sum(d['status']=='pending_user' for d in
 report['review_016_cases'] = len(review_016_cases)
 report['review_017_cases'] = len(review_017)
 report['proposed_decisions'] = sum(d['status']=='proposed' for d in decisions_017)
+report['review_018_cases'] = len(review_018)
+report['proposed_decisions_018'] = sum(d['status']=='proposed' for d in decisions_018)
+report.update(report_019)
+report.update(report_020)
+report.update(review_021_cases=len(review_021), proposed_decisions_021=len(decisions_021))
 print(json.dumps(report,ensure_ascii=False,indent=2))
 sys.exit(1 if errors else 0)

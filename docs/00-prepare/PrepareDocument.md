@@ -1,10 +1,10 @@
 ---
 document_id: PREP-001
-version: 0.17.0
+version: 0.21.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
-updated: 2026-09-16
+updated: 2026-09-17
 ---
 
 # AC Project 企業要件整理・フロントエンド設計準備資料
@@ -30,6 +30,8 @@ updated: 2026-09-16
 ### 1.3 今回の対象
 
 **今回作成するのは、フロントエンドのみの設計ドキュメントです。** 画面に表示する情報、入力項目、操作の流れ、状態の変化、共通デザイン、デモデータの扱いを定義します。将来のAPI接続に備え、画面とデータ取得を分離する方針を残します。
+
+開発段階の呼び方は次のとおりです。**1A**は企業原文のPhase 1（分離型エアコン）のうち、クリック可能なフロントエンドデモです。**1B**は同じPhase 1の、機器・ファームウェア・本番API接続を含む全体ソリューションです。**Phase 2**はHVACへの拡張です。今回の文書は1Aだけを対象とします。
 
 実機制御、機器・センサーの選定、ファームウェア、実決済・実通知、炭素取引、API・DB・サーバーの設計は対象外です。画面内の入金・制限・通知・機器応答は合成データによるデモとして扱います。本資料の「参考モック」と、これから設計する「今回のフロントエンドデモ」は別のものです。
 
@@ -233,6 +235,14 @@ updated: 2026-09-16
 
 0.11.0技術修正は[DEC-15](internal/decision-record-2026-09-16.md#dec-15-再レビュー修正の技術的具体化0110)を参照。既存1A範囲の具体化であり独立承認は未取得。
 
+0.19.0の成果物に対する別エージェントの独立G1（G1-001〜031、判定FAIL）を受けて0.20.0で採用した可逆的な設計提案は[DEC-54〜59](internal/review-decisions-020.json)にPROPOSEDとして記録し、企業検収前にProduct Owner／Business／Security／UI/UX／IoT／QAが確認する（IR94〜102）。
+
+0.19.0の独立レビュー（REV19-001〜042）で採用した可逆的な設計提案は[DEC-42〜53](internal/review-decisions-019.json)にPROPOSEDとして記録し、企業検収前にProduct Owner／Business／Security／UI/UX／IoTが確認する（IR75〜93）。このうち管理ダッシュボードの「削減量の予想」の算出方法（DEC-44、案A）と作業窓終了時の扱い（DEC-50）は、2026-09-17のユーザー回答で1A仕様として確定した（企業の商用承認とは区別する）。
+
+0.18.0の厳格レビュー（REV18-001〜048）で採用した可逆的な設計提案は[DEC-25〜41](internal/review-decisions-018.json)にPROPOSEDとして記録し、企業検収前にProduct Owner／Business／Security／UI/UX／IoTが確認する（IR45〜74）。
+
 0.17.0の独立レビュー（FRV）で採用した可逆的な設計提案は[DEC-19〜24](internal/review-decisions-017.json)にPROPOSEDとして記録し、企業検収前にProduct Owner／Business／Security／UI/UXが確認する（IR35〜44）。
 
 0.16.0再レビューの[DEC-17/18](internal/review-decisions-016.json)はユーザー回答により確定。制限操作はrestriction.manage/overrideの2権限、案件一覧はソート機能を備え、デフォルトは業務順の昇順とする。具体的な比較順・UI・受入条件はIR34を参照。旧G1の合格は修正後baselineに適用しない。
+
+0.21.0: DOC-0.20.0の独立G1指摘G120-001〜005をIR103〜106で修正。継続時間と通知重大度の可逆的なデモ提案は[DEC-60〜61](internal/review-decisions-021.json)。[受入計画](../04-agentic-sdlc/acceptance-review-021.csv)を追跡表へ反映し、新baselineに対して独立G1を再判定する。判定は[現行gate](../04-agentic-sdlc/runs/DOC-0.21.0/gate-G1.yaml)を参照。

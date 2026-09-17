@@ -1,5 +1,5 @@
 ---
-version: 0.17.0
+version: 0.21.0
 scope: 1A frontend mock only
 status: specified_pending_independent_review
 ---
@@ -13,7 +13,7 @@ JobOfferSummary.jobVersionは投影元MaintenanceJob.versionそのもの。Offer
 
 ## SR02 書込みの版契約
 
-write-version-catalog.csvは全writeとその入力分岐を列挙する。requiredは主資源の取得結果versionをoptions.expectedVersionに入れ、omitは指定禁止。入力に独立した版がある場合はinput_versionsの全条件も照合する。新規作成したい資源の未存在版は要求しない。scheduleは選択したContractのexpectedContractVersion、offset申込は保存したquoteVersionを照合する。Invoice作成はcontractVersionを使う。新規reportはJobに既存draftがあればCONFLICTで二重作成しない。consents.getは初回からgranted=falseの版付きConsentを返す。
+write-version-catalog.csvは全writeとその入力分岐を列挙する。requiredは主資源の取得結果versionをoptions.expectedVersionに入れ、omitは指定禁止。入力に独立した版がある場合はinput_versionsの全条件も照合する。新規作成したい資源の未存在版は要求しない。scheduleは選択したContractのexpectedContractVersion、offset申込は保存したquoteVersionを照合する。Invoice作成はcontractVersionを使う。新規reportはJobに既存draftがあればCONFLICTで二重作成しない。consents.getは初回からgranted=falseの版付きConsentを返す（その記録の出所はIR84のdemoSeed/Membership作成時の初期記録）。
 
 devices.addResponseNoteはDeviceEvent.versionを用いる（Device.versionではない）。devices.calibrate/check/bind/updateFirmwareはDevice.version。payments.recordManualはInvoice.version、confirmはPayment.version。notifications.markReadはNotification.version。idempotencyの再送はD04に従い、元入力・版を変えない。再読取後に業務判断を変更した要求は新しいキー。表のread_sourceは版の供給元であり、更新時は全関連状態も同一transactionで再検証する。
 
@@ -192,4 +192,4 @@ demo_fixedは利用者が有限かつ0以上のbaselineKWhと仮定/出典を入
 
 回復caseの生成/変更では所有Restriction.versionと対象Unit.versionを増分する。ContractのactiveRestrictionIds/hasUnresolvedRecoveryは派生投影で契約版を変えず、contractsのChangeEventはversion=null、changedFieldsに派生フィールド名を付けてinvalidateする。version=nullの購読通知は版比較で捨てず、現在scopeを確認して再取得する。case.commandIdsはCommandとの照合を担い、異なるcase/世代へのackを流用しない。
 
-現行0.17.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+現行0.21.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。

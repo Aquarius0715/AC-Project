@@ -1,0 +1,517 @@
+{
+  "scope": "document-validator-mutations-only",
+  "application_tests": "not_run",
+  "results": [
+    {
+      "case": "accepted_decision_provenance_missing",
+      "detected": true,
+      "expected_diagnostic": "Accepted review decision lacks provenance"
+    },
+    {
+      "case": "status_order_missing_state",
+      "detected": true,
+      "expected_diagnostic": "Job status order differs from accepted decision or enum"
+    },
+    {
+      "case": "default_sort_reverts_to_due_date",
+      "detected": true,
+      "expected_diagnostic": "Default job sort is not business order"
+    },
+    {
+      "case": "four_permission_requirement_returns",
+      "detected": true,
+      "expected_diagnostic": "Restriction requirement still demands four permissions"
+    },
+    {
+      "case": "job_list_unit_set_missing",
+      "detected": true,
+      "expected_diagnostic": "Job list/summary shared filters differ"
+    },
+    {
+      "case": "audit_device_candidates_missing",
+      "detected": true,
+      "expected_diagnostic": "Audit device selection dependency absent"
+    },
+    {
+      "case": "audit_primary_read_missing",
+      "detected": true,
+      "expected_diagnostic": "Audit primary read absent"
+    },
+    {
+      "case": "review_ui_availability_missing",
+      "detected": true,
+      "expected_diagnostic": "Report review availability absent"
+    },
+    {
+      "case": "stale_handoff_baseline",
+      "detected": true,
+      "expected_diagnostic": "Current handoff baseline mismatch"
+    },
+    {
+      "case": "job_completed_time_missing",
+      "detected": true,
+      "expected_diagnostic": "Job completion timestamp source absent"
+    },
+    {
+      "case": "report_contributors_missing",
+      "detected": true,
+      "expected_diagnostic": "Report revision contributors absent"
+    },
+    {
+      "case": "filtered_kpi_old_expectation",
+      "detected": true,
+      "expected_diagnostic": "Filtered partner KPI acceptance mismatch"
+    },
+    {
+      "case": "contributor_deny_missing",
+      "detected": true,
+      "expected_diagnostic": "Contributing reviewer denial absent"
+    },
+    {
+      "case": "severity_resolved_included",
+      "detected": true,
+      "expected_diagnostic": "Job severity source and ranking absent"
+    },
+    {
+      "case": "history_free_text",
+      "detected": true,
+      "expected_diagnostic": "Report history must not expose free text"
+    },
+    {
+      "case": "absent_report_accepted",
+      "detected": true,
+      "expected_diagnostic": "Absent report cannot be accepted"
+    },
+    {
+      "case": "address_missing_null",
+      "detected": true,
+      "expected_diagnostic": "Offer must use nullable installation address"
+    },
+    {
+      "case": "disabled_reason_missing",
+      "detected": true,
+      "expected_diagnostic": "Rule disable reason absent"
+    },
+    {
+      "case": "stale_operation_count",
+      "detected": true,
+      "expected_diagnostic": "Common operation count drift"
+    },
+    {
+      "case": "unsafe_job_receipt",
+      "detected": true,
+      "expected_diagnostic": "Job receipt contains unexpected fields"
+    },
+    {
+      "case": "caller_notice_time",
+      "detected": true,
+      "expected_diagnostic": "Notice time must not be caller controlled"
+    },
+    {
+      "case": "override_apply_permission",
+      "detected": true,
+      "expected_diagnostic": "Override retry must be release only"
+    },
+    {
+      "case": "missing_view_epoch",
+      "detected": true,
+      "expected_diagnostic": "Resolution DTO invariant missing Session"
+    },
+    {
+      "case": "unknown_raw_unit_unrepresentable",
+      "detected": true,
+      "expected_diagnostic": "Resolution DTO invariant missing RawMeasurement"
+    },
+    {
+      "case": "missing_notification_type",
+      "detected": true,
+      "expected_diagnostic": "Resolution DTO invariant missing Notification"
+    },
+    {
+      "case": "missing_actual_boundary",
+      "detected": true,
+      "expected_diagnostic": "Energy boundary source missing EnergySummary"
+    },
+    {
+      "case": "override_entry_blocked",
+      "detected": true,
+      "expected_diagnostic": "Override-only list entry inaccessible"
+    },
+    {
+      "case": "release_sort_field_missing",
+      "detected": true,
+      "expected_diagnostic": "Release list sort field absent updatedAt"
+    },
+    {
+      "case": "reminder_read_gate_missing",
+      "detected": true,
+      "expected_diagnostic": "Reminder preview authorization absent"
+    },
+    {
+      "case": "inspection_operation_typo",
+      "detected": true,
+      "expected_diagnostic": "Inspection normalization operation invalid"
+    },
+    {
+      "case": "notice_recipient_scope_missing",
+      "detected": true,
+      "expected_diagnostic": "Convergence behavioral guard missing \u5168\u5bfe\u8c61Unit\u3092\u95b2\u89a7\u3067\u304d\u308b\u5b9b\u5148"
+    },
+    {
+      "case": "job_history_list_missing",
+      "detected": true,
+      "expected_diagnostic": "Expired job list projection absent"
+    },
+    {
+      "case": "offer_severity_disclosure",
+      "detected": true,
+      "expected_diagnostic": "Offer public search fields absent"
+    },
+    {
+      "case": "internal_history_null_missing",
+      "detected": true,
+      "expected_diagnostic": "Internal technician history must allow null contractor"
+    },
+    {
+      "case": "payment_trigger_reintroduced",
+      "detected": true,
+      "expected_diagnostic": "Payment demo trigger must stay removed"
+    },
+    {
+      "case": "simulator_trigger_missing",
+      "detected": true,
+      "expected_diagnostic": "0.18 DTO invariant missing"
+    },
+    {
+      "case": "demo_only_flag_removed",
+      "detected": true,
+      "expected_diagnostic": "Demo-only operation set differs from IR60"
+    },
+    {
+      "case": "unassigned_filter_missing",
+      "detected": true,
+      "expected_diagnostic": "Unassigned unit filter absent"
+    },
+    {
+      "case": "session_dialog_missing",
+      "detected": true,
+      "expected_diagnostic": "Session expiry dialog contract absent"
+    },
+    {
+      "case": "superseded_wording_returns",
+      "detected": true,
+      "expected_diagnostic": "Superseded wording remains"
+    },
+    {
+      "case": "restriction_table_weakened",
+      "detected": true,
+      "expected_diagnostic": "0.18 behavioral guard missing"
+    },
+    {
+      "case": "extension_denial_returns",
+      "detected": true,
+      "expected_diagnostic": "Superseded wording remains (IR81)"
+    },
+    {
+      "case": "model_permission_variant_returns",
+      "detected": true,
+      "expected_diagnostic": "Superseded wording remains (IR81)"
+    },
+    {
+      "case": "environment_policy_variant_returns",
+      "detected": true,
+      "expected_diagnostic": "Superseded wording remains (IR81)"
+    },
+    {
+      "case": "room_display_name_returns",
+      "detected": true,
+      "expected_diagnostic": "Superseded wording remains (IR81)"
+    },
+    {
+      "case": "customer_organization_count_returns",
+      "detected": true,
+      "expected_diagnostic": "Superseded wording remains (IR81)"
+    },
+    {
+      "case": "negative_saving_old_label_returns",
+      "detected": true,
+      "expected_diagnostic": "Superseded wording remains (IR81)"
+    },
+    {
+      "case": "s03_explicit_release_required_returns",
+      "detected": true,
+      "expected_diagnostic": "Superseded wording remains (IR81)"
+    },
+    {
+      "case": "simulator_copies_estimates",
+      "detected": true,
+      "expected_diagnostic": "0.19 behavioral guard missing"
+    },
+    {
+      "case": "forecast_type_missing",
+      "detected": true,
+      "expected_diagnostic": "0.19 DTO invariant missing"
+    },
+    {
+      "case": "login_return_to_missing",
+      "detected": true,
+      "expected_diagnostic": "Login returnTo URL key absent"
+    },
+    {
+      "case": "work_not_started_state_missing",
+      "detected": true,
+      "expected_diagnostic": "Work-not-started state absent"
+    },
+    {
+      "case": "initial_consent_granted",
+      "detected": true,
+      "expected_diagnostic": "Initial consent absent"
+    },
+    {
+      "case": "kpi_patch_expectation_wrong",
+      "detected": true,
+      "expected_diagnostic": "AT-A01-N patches do not produce"
+    },
+    {
+      "case": "seed_sensor_metrics_returns",
+      "detected": true,
+      "expected_diagnostic": "Seed devices must list explicit sensors"
+    },
+    {
+      "case": "public_screen_states_regress",
+      "detected": true,
+      "expected_diagnostic": "Public screen states differ"
+    },
+    {
+      "case": "voice_panel_fetches",
+      "detected": true,
+      "expected_diagnostic": "VoicePanel must be presentation only"
+    },
+    {
+      "case": "calibration_invalidation_missing",
+      "detected": true,
+      "expected_diagnostic": "0.19 behavioral guard missing"
+    },
+    {
+      "case": "acceptance_patch_key_missing",
+      "detected": true,
+      "expected_diagnostic": "Acceptance patch key missing"
+    },
+    {
+      "case": "default_factor_value_changed",
+      "detected": true,
+      "expected_diagnostic": "Default emission factor absent"
+    },
+    {
+      "case": "energy_series_value_changed",
+      "detected": true,
+      "expected_diagnostic": "Acceptance energy patch kWh mismatch"
+    },
+    {
+      "case": "technician_start_codes_weakened",
+      "detected": true,
+      "expected_diagnostic": "0.19 behavioral guard missing"
+    },
+    {
+      "case": "internal_technician_write_without_assignment",
+      "detected": true,
+      "expected_diagnostic": "0.20 behavioral guard missing"
+    },
+    {
+      "case": "firmware_offline_creates_operation",
+      "detected": true,
+      "expected_diagnostic": "0.20 behavioral guard missing"
+    },
+    {
+      "case": "assigned_notification_template_changed",
+      "detected": true,
+      "expected_diagnostic": "0.20 behavioral guard missing"
+    },
+    {
+      "case": "cancel_applied_becomes_cancelled",
+      "detected": true,
+      "expected_diagnostic": "0.20 behavioral guard missing"
+    },
+    {
+      "case": "release_intent_type_missing",
+      "detected": true,
+      "expected_diagnostic": "0.20 DTO invariant missing"
+    },
+    {
+      "case": "air_guidance_threshold_changed",
+      "detected": true,
+      "expected_diagnostic": "0.20 behavioral guard missing"
+    },
+    {
+      "case": "stale_scope_rule_weakened",
+      "detected": true,
+      "expected_diagnostic": "0.20 behavioral guard missing"
+    },
+    {
+      "case": "fixture_measurement_out_of_range",
+      "detected": true,
+      "expected_diagnostic": "Acceptance measurement out of range (IR97)"
+    },
+    {
+      "case": "fixture_assignment_job_desync",
+      "detected": true,
+      "expected_diagnostic": "Assignment and job slot out of sync (IR97)"
+    },
+    {
+      "case": "report_input_component_missing",
+      "detected": true,
+      "expected_diagnostic": "Report draft input must cover 18 components (IR100)"
+    },
+    {
+      "case": "policy_input_disabled",
+      "detected": true,
+      "expected_diagnostic": "Policy acceptance input incomplete (IR97)"
+    },
+    {
+      "case": "capability_tenant_mismatch",
+      "detected": true,
+      "expected_diagnostic": "Unit capability tenant mismatch (IR101)"
+    },
+    {
+      "case": "allergen_seed_changed",
+      "detected": true,
+      "expected_diagnostic": "Seed allergen observations differ (IR98)"
+    },
+    {
+      "case": "a12_co2_sensor_patch_missing",
+      "detected": true,
+      "expected_diagnostic": "AT-A12-N CO2 sensor patch absent (IR97)"
+    },
+    {
+      "case": "common_acceptance_table_missing",
+      "detected": true,
+      "expected_diagnostic": "Common acceptance table absent (IR101)"
+    },
+    {
+      "case": "g1_case_coverage_missing",
+      "detected": true,
+      "expected_diagnostic": "0.20 review must cover G1-001 through G1-031"
+    },
+    {
+      "case": "decision_059_missing",
+      "detected": true,
+      "expected_diagnostic": "0.20 decisions must be DEC-54 through DEC-59"
+    },
+    {
+      "case": "general_consent_wording_returns",
+      "detected": true,
+      "expected_diagnostic": "Superseded wording remains"
+    },
+    {
+      "case": "csv_due_at_old_expectation_returns",
+      "detected": true,
+      "expected_diagnostic": "Superseded wording remains"
+    },
+    {
+      "case": "csv_patch_key_missing",
+      "detected": true,
+      "expected_diagnostic": "Acceptance patch key missing"
+    },
+    {
+      "case": "c08_summary_dependency_missing",
+      "detected": true,
+      "expected_diagnostic": "IR102 screen contract missing"
+    },
+    {
+      "case": "app_shell_switch_event_missing",
+      "detected": true,
+      "expected_diagnostic": "AppShell role switch event absent"
+    },
+    {
+      "case": "notification_alert_exception_removed",
+      "detected": true,
+      "expected_diagnostic": "0.21 behavioral guard missing (IR95)"
+    },
+    {
+      "case": "a12_backdated_first_fact",
+      "detected": true,
+      "expected_diagnostic": "A12 continuity fixture invalid"
+    },
+    {
+      "case": "a12_one_tick_short",
+      "detected": true,
+      "expected_diagnostic": "A12 continuity fixture invalid"
+    },
+    {
+      "case": "a12_jump_instead_of_ticks",
+      "detected": true,
+      "expected_diagnostic": "A12 continuity fixture invalid"
+    },
+    {
+      "case": "a12_boundary_fires_early",
+      "detected": true,
+      "expected_diagnostic": "A12 continuity fixture invalid"
+    },
+    {
+      "case": "a12_start_counter_backdated",
+      "detected": true,
+      "expected_diagnostic": "0.21 behavioral guard missing (IR103)"
+    },
+    {
+      "case": "notification_alert_type_same_name",
+      "detected": true,
+      "expected_diagnostic": "Notification type or severity mapping differs"
+    },
+    {
+      "case": "notification_job_severity_wrong",
+      "detected": true,
+      "expected_diagnostic": "Notification type or severity mapping differs"
+    },
+    {
+      "case": "notification_release_severity_wrong",
+      "detected": true,
+      "expected_diagnostic": "Notification type or severity mapping differs"
+    },
+    {
+      "case": "notification_failed_device_severity_wrong",
+      "detected": true,
+      "expected_diagnostic": "Notification type or severity mapping differs"
+    },
+    {
+      "case": "notification_job_type_removed",
+      "detected": true,
+      "expected_diagnostic": "Notification mapped type absent from DTO"
+    },
+    {
+      "case": "allergen_entity_removed",
+      "detected": true,
+      "expected_diagnostic": "Allergen change entity absent"
+    },
+    {
+      "case": "allergen_series_invalidation_removed",
+      "detected": true,
+      "expected_diagnostic": "Allergen query invalidation differs"
+    },
+    {
+      "case": "allergen_replay_dedup_removed",
+      "detected": true,
+      "expected_diagnostic": "0.21 behavioral guard missing (IR105)"
+    },
+    {
+      "case": "notification_scope_default_rule_removed",
+      "detected": true,
+      "expected_diagnostic": "0.21 behavioral guard missing (IR106)"
+    },
+    {
+      "case": "notification_scope_explicit_negative",
+      "detected": true,
+      "expected_diagnostic": "Notification scope snapshot invalid"
+    },
+    {
+      "case": "notification_scope_default_invalid",
+      "detected": true,
+      "expected_diagnostic": "Notification scope snapshot invalid"
+    },
+    {
+      "case": "g121_case_coverage_missing",
+      "detected": true,
+      "expected_diagnostic": "0.21 review must cover G120-001 through G120-005"
+    }
+  ],
+  "passed": true
+}

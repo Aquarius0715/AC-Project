@@ -17,7 +17,7 @@ AT-FIX-015,REV-015,D11,現baseline manifestと仕様集合,検証script実行後
 AT-FIX-016,REV-016,D09,初期locale en,msへ切替し主要画面と既存通知を再描画,en/ms辞書で表示、ja選択肢なし。単位/ID/UTC不変,not_run,
 AT-FIX-017,REV-017,D07,"humidity101%,co2-1,observedAt>receivedAt,null,0の独立入力",受信正規化・自動発火・集計,前三者suspectで除外、null missing、0 valid。NaNはnull/suspectでInfinityも同じ,not_run,
 AT-FIX-018,REV-018,D07,snapshot cursor10後、subscribe開始前にevent11発生,afterCursor10で購読、11重複、version旧イベント、reset,11を1回適用、旧version/旧generation拒否。解除後callback0,not_run,
-AT-FIX-019,REV-019,D09,"clock2026-03-07,America/New_York日曜02:30",週次保存、別fixture UTCでenabled=false保存後trueへ更新,DST不存在VALIDATION。UTC falseでは発火0、true後nextRuns8件,not_run,
+AT-FIX-019,REV-019,D09,clockはseedのまま（2026-09-14T01:00Z）、America/New_York、日曜02:30（2027-03-14は存在しない）／日曜01:30（2026-11-01は曖昧）（IR102）,週次保存、別fixture UTCでenabled=false保存後trueへ更新,DST不存在VALIDATION。UTC falseでは発火0、true後nextRuns8件,not_run,
 AT-FIX-020,REV-020,D05,有効担当job/unit、別unit既存Deviceあり,device登録→bind→別unitへ再bindを試行,登録targetUnitId/createdByMembershipId、unitIdはbindまでnull。2台目active bindingはCONFLICT。旧履歴unitId不変,not_run,
 AT-FIX-021,REV-021,D06,submitted報告version3、on_hold、担当期限切れ,HQが有効枠へ再割当、resumeHold→新担当が編集,submitted v3不変、新draft生成、旧担当write FORBIDDEN、項目の元作者保存,not_run,
 AT-FIX-022,REV-022,D10/D13,同じjob/reportのinspectionにdirty値,測定タブ→Back→別job、離脱確認cancel,同jobタブでdraft保持、cancelで元URL/draft保持。primary失敗は全体、secondary失敗は局所,not_run,

@@ -1,6 +1,6 @@
 ---
 document_id: REQ-C
-version: 0.17.0
+version: 0.21.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # クライアント 要件定義書
 
-**0.17.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.21.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 目的と前提
 
@@ -79,8 +79,8 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C01-N | customer-a、property-home-a配下にunit-online-rto（power ON、室温28.0°C、湿度60%、最終観測00:59:30Z）とunit-non-rto（power OFF）。両設備はconnection=online、power観測/最新power Measurementはfixture.powerClassificationのfresh条件を満たす。openアラート1件。When: `/customer?propertyId=property-home-a&period=today`を開き、稼働カードから一覧へ遷移して戻る | ①稼働カード「稼働1 / 停止1 / 不明0」、異常1件。設備未選択時の室温欄は「設備を選択」で平均値なし ②電力カードにasOf=00:59:30Z ③一覧のURLには同じpropertyIdとpowerState=onが残りperiodは送らない。戻ると元のperiodも復元 ④Repositoryへの書込み0件 |
-| AT-C01-E | ①unit-online-rtoの最新telemetry value=nullにする ②`/customer?unitId=unit-other-customer`を開く ③units.listをUNAVAILABLEにする | ①「稼働0 / 停止1 / 不明1」。正常台数へ加算しない ②NOT_FOUND・対象利用不可表示。他顧客の値も集計0件という成功結果も返さない ③KPIはerror表示と再試行。0件や前回値を正常として表示しない |
+| AT-C01-N | customer-a、property-home-a配下にunit-online-rto（power ON、室温28.0°C、湿度60%、最終観測00:59:30Z）とunit-non-rto（power OFF）。両設備はconnection=online、power観測/最新power Measurementはfixture.powerClassificationのfresh条件を満たす。openアラート1件。When: `/customer?propertyId=property-home-a&period=today`を開き、稼働カードから一覧へ遷移して戻る | ①稼働カード「稼働1 / 停止1 / 不明0」、異常1件。設備未選択時の室温欄は「設備を選択」で平均値なし ②電力カードにasOf=00:59:30Z ③遷移先は`/customer/properties?propertyId=property-home-a&powerState=on`(IR50)でperiodは送らない。戻ると元のperiodも復元 ④Repositoryへの書込み0件 |
+| AT-C01-E | ①simulator=falseでsensor-online-powerの最新測定をvalue=null・quality=missingにする ②`/customer?unitId=unit-other-customer`を開く ③units.listをUNAVAILABLEにする | ①「稼働0 / 停止1 / 不明1」。正常台数へ加算しない ②NOT_FOUND・対象利用不可表示。他顧客の値も集計0件という成功結果も返さない ③KPIはerror表示と再試行。0件や前回値を正常として表示しない |
 | AT-C01-B | ①room-1=28.0°C、room-2=24.0°Cで設備未選択 ②unitId=room-1の設備を選択 ③period=7dへ変更 | ①代表温度を表示しない（26.0°Cが画面に出ない） ②室温28.0°Cと観測時刻 ③電力量は7日間[from,to)の積算値、現在電力の時刻は最新観測時刻のまま |
 
 設計: [DD-C01](../02-design/client.md#dd-c01-詳細)。親ケースAT-C01は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
@@ -98,9 +98,9 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C02-N | customer-a、物件0件。When: kind=home・name=自宅を作成→floor「1F」→room「寝室」（parent=1F）を追加→寝室を「主寝室」へ改名 | ①Property1件・Space2件、各id・version=1 ②パンくず「自宅 > 1F > 主寝室」 ③改名後version=2、配下unitのidは不変 ④設備の所属変更ボタンは非表示、HQ台帳への案内文 |
+| AT-C02-N | customer-a（seedのproperty-home-a/property-office-aはそのまま）。When: kind=home・name=自宅を新規作成→floor「1F」→room「寝室」（parent=1F）を追加→寝室を「主寝室」へ改名 | ①新規作成したProperty1件・Space2件、各id・version=1（物件一覧は既存2件と合わせて3件） ②パンくず「自宅 > 1F > 主寝室」 ③改名後version=2、配下unitのidは不変 ④設備の所属変更ボタンは非表示、HQ台帳への案内文 |
 | AT-C02-E | ①name=空／121文字 ②parentSpaceId=自身／子孫／customer-bの物件のspace ③version=1で表示中に別操作でversion=2にしてから保存 | ①VALIDATION、fieldErrors.name、保存0件 ②自身・子孫はVALIDATION、他組織はNOT_FOUND、保存0件 ③CONFLICT、現在版version=2を提示し入力値を保持、自動上書きなし |
-| AT-C02-B | ①1Fの親を同物件の2Fへ変更 ②設備ありの主寝室をアーカイブ ③子場所あり1Fをアーカイブ ④空の「倉庫」をアーカイブ | ①成功、version+1 ②③CONFLICTと「先に移動先を選択」案内、状態不変 ④成功、以後のURL直打ちはnot-found |
+| AT-C02-B | ①property-home-aに新規作成したfloor「2F」を親として、seedのfloor-1（1F）の親を変更 ②設備（unit-online-rto）があるroom-1をアーカイブ ③子場所があるfloor-1をアーカイブ ④新規作成した空のspace「倉庫」をアーカイブ | ①成功、version+1 ②③CONFLICTと「先に移動先を選択」案内、状態不変 ④成功、以後のURL直打ちはnot-found |
 
 設計: [DD-C02](../02-design/client.md#dd-c02-詳細)。親ケースAT-C02は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -113,13 +113,13 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 - **基本フロー**: 室温と、今確認できている設定を見る → 電源・温度・モード・風量を編集する → 変える対象と内容を確認する → 「要求を受け付けた」「送信した」「機器から応答があった」の順に確認する。
 - **業務規則 BR-C03**: 1回の確認送信は1つの操作(1Action)として扱い、電源・温度・モード・風量はそれぞれ別々に変更する。温度は、その機種で決められた最小値・最大値・刻み幅の範囲でしか選べない。モードと風量は、あらかじめ決められた候補からしか選べない。電源をOFFにする要求を送っても、機器が測っている温度の値を0にはしない。同じ設備に対して、前の要求への応答待ち(pending)の間に別の要求を出すことはできない。
 - **完了後の業務状態**: Command(操作の指示)を1件作り、要求した値と今の設定を別々に表示する。機器から`acknowledged`(受け取った)という応答が来たあとで、初めて設定を更新する。失敗した場合も、要求の内容と理由を履歴に残す。
-- **境界条件・禁止事項**: 例えば16〜30°C・1°C刻みの機種なら、15°C、31°C、24.5°Cのような範囲外・刻み違いの値は拒否する。設備がオフラインのとき、他の顧客の設備、契約の制限を超える要求、応答が遅れた場合は、いずれも成功として扱わない。
+- **境界条件・禁止事項**: 例えば16〜30°C・1°C刻みの機種なら、15°C、31°C、24.5°Cのような範囲外・刻み違いの値は拒否する。設備がオフラインのとき、他の顧客の設備、契約の制限を超える要求、応答が遅れた場合は、いずれも成功として扱わない。制限中に許可される操作はIR46の表、接続による拒否はIR47に従う。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-C03-N | customer-a、unit-online-rto（能力16〜30°C/1°C、modes cool/dry/fan、fan low/mid/high、確認済み設定26°C、室温28°C、version=7）。When: 温度24を入力→確認→送信→/demoでsent→acknowledged | ①Command1件 status=requested、要求24°Cと確認済み26°Cを別欄 ②sentで「機器応答待ち」 ③acknowledged後のみ確認済み24°C、室温28°Cは不変 ④履歴に同一commandIdでrequested→sent→acknowledged |
 | AT-C03-E | ①温度15／31／24.5 ②unit-offline-rto ③unit-other-customer ④unit-limited（制限下限24°C）へ22 ⑤acknowledgedを要求から30秒+1msに送る | ①VALIDATION、Command0件 ②OFFLINE、Command0件 ③NOT_FOUND ④FORBIDDEN（制限違反）、Command0件 ⑤status=expired、確認済み26°Cのまま、遅延応答は履歴に「期限後」として記録 |
-| AT-C03-B | ①power=false ②温度16と30を順に送る ③mode=dry、fan=highを順に送る ④requested中に温度25を送る | ①Command action=set_power、温度測定値28°Cは不変 ②各1件受付（min/max） ③各1件、1送信=1Action ④送信ボタン無効、直接呼出しはCONFLICT |
+| AT-C03-B | ①power=false ②温度16と30を順に送る ③mode=dry、fan=highを順に送る（各要求をacknowledgedにしてから次を送る） ④requested中に温度25を送る | ①Command action=set_power、温度測定値28°Cは不変 ②各1件受付（min/max） ③各1件、1送信=1Action ④送信ボタン無効、直接呼出しはCONFLICT |
 
 設計: [DD-C03](../02-design/client.md#dd-c03-詳細)。親ケースAT-C03は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -137,7 +137,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-C04-N | unit-online-rto、timezone=Asia/Kuala_Lumpur。When: weekdays=[1,3]、18:00〜22:00、start=set_temperature 25°C、end=set_power OFF、enabled=trueで保存→デモ時計を月曜18:00へ→22:00へ | ①Automation1件、次回=2026-09-14 18:00+08:00 ②保存時点でCommand0件 ③18:00でCommand1件（set_temperature 25）、再認可を監査に記録 ④22:00でCommand1件（set_power false） |
-| AT-C04-E | ①weekdays=[] ②endAction省略 ③clockを2026-03-07／2026-10-31に設定し、timezone=America/New_York、日曜02:30／01:30の週次ルールを保存する（D09の366日検証） ④enabled=falseへ停止後に開始イベント | ①②VALIDATION、保存0件 ③VALIDATION（存在しない時刻／曖昧な時刻） ④Command0件 |
+| AT-C04-E | ①weekdays=[] ②endAction省略 ③時計はseedのまま（2026-09-14T01:00Z）でtimezone=America/New_York、日曜02:30（2027-03-14は存在しない）／日曜01:30（2026-11-01は曖昧）の週次ルールを保存する（D09の366日検証、IR102） ④enabled=falseへ停止後に開始イベント | ①②VALIDATION、保存0件 ③VALIDATION（存在しない時刻／曖昧な時刻） ④Command0件 |
 | AT-C04-B | ①月23:00〜火01:00、endsNextDay=true ②同時間帯でendsNextDay=false ③start=end=10:00 | ①保存成功、終了は翌日01:00と表示 ②VALIDATION（終了<=開始） ③VALIDATION、24時間運転と解釈しない |
 
 設計: [DD-C04](../02-design/client.md#dd-c04-詳細)。親ケースAT-C04は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
@@ -149,15 +149,15 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 - **利用開始条件**: 自動運転の対象と条件の種類を選べること。位置情報を使う条件の場合は、その目的ごとに同意が必要。
 - **基本フロー**: 在室しているか、帰宅・外出したか、生活パターン、天気のいずれかの条件を選ぶ → 必要な同意を確認する → 動作を保存する → テスト用のイベントを発生させて、条件に合うか合わないかを確認する。
-- **業務規則 BR-C05**: 位置情報を使うための同意と、一般的な利用の同意は分けて扱う。位置情報の取得は、このフェーズ(1A)では作り込んだテスト用のイベントだけで再現する。生活パターンはデモ用の推定であり、個人の実際の行動履歴は集めない。条件のデータが取れていない場合、それを「条件が成立した」とはみなさない。
-- **完了後の業務状態**: 同意を取り消すと、その条件のルールは無効(disabled)になる。ただし、すでに出した操作の指示(Command)を「取り消した」とは表示しない。手動での操作は、権限がある範囲で引き続きできる。
+- **業務規則 BR-C05**: 位置情報の同意は目的location_automationだけで管理し、アプリを使うこと自体の同意は記録しない(IR102)。位置情報の取得は、このフェーズ(1A)では作り込んだテスト用のイベントだけで再現する。生活パターンはデモ用の推定であり、個人の実際の行動履歴は集めない。条件のデータが取れていない場合、それを「条件が成立した」とはみなさない。
+- **完了後の業務状態**: 同意を取り消すと、その条件のルールは無効(enabled=false、disabledReason=consent_revoked)になり、再同意しても自動では有効にならない(IR53)。ただし、すでに出した操作の指示(Command)を「取り消した」とは表示しない。手動での操作は、権限がある範囲で引き続きできる。
 - **境界条件・禁止事項**: 同意がない状態では、位置情報を使う条件を有効にできない。同意を取り消したあとに帰宅のイベントが起きても、操作の指示は作られない。天気のデータが取れていないときは、その理由を表示して処理をスキップする。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C05-N | 位置同意なし。When: location_automation同意→condition=location arrival、action=set_temperature 24°Cを保存→/demoでarrival→同意取消→arrival | ①Consent granted=true、grantedAt保存 ②Automation enabled=true ③1回目arrivalでCommand1件 ④取消後ルールはdisabled、2回目arrivalでCommand0件、既存Commandの状態は不変 |
-| AT-C05-E | ①位置同意なしでlocation条件をenabled=trueで保存 ②同意取消後にarrival ③weather条件でvalue=null | ①VALIDATION、保存0件 ②Command0件 ③skipReason=missing_data表示、Command0件 |
-| AT-C05-B | 同じarrivalイベントを ①一般同意のみ ②位置同意あり ③位置同意取消済み ④condition欠測 で評価 | ①③④Command0件と理由表示 ②Command1件 |
+| AT-C05-N | 位置同意なし（seedのconsent granted=false）、対象unit-online-rto。When: location_automation同意→condition=location arrival、action=set_temperature 24°Cを保存→/demoでarrival→同意取消→arrival | ①Consent granted=true、grantedAt保存 ②Automation enabled=true ③1回目arrivalでCommand1件 ④取消後ルールはdisabled、2回目arrivalでCommand0件、既存Commandの状態は不変 |
+| AT-C05-E | 対象unit-online-rto。①位置同意なしでlocation条件をenabled=trueで保存 ②同意取消後にarrival ③weather条件でvalue=null | ①VALIDATION、保存0件 ②Command0件 ③skipReason=missing_data表示、Command0件 |
+| AT-C05-B | unit-online-rtoのlocationルールに同じarrivalイベントを ①位置同意granted=false ②位置同意あり ③位置同意取消済み ④condition欠測 で評価 | ①③④Command0件と理由表示 ②Command1件 |
 
 設計: [DD-C05](../02-design/client.md#dd-c05-詳細)。親ケースAT-C05は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -170,12 +170,12 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 - **基本フロー**: 期間と設備を選ぶ → 電力量と見積もりの料金を見る → 比較の基準となる条件を開く → 比較結果とデータの質を確認する。
 - **業務規則 BR-C06**: 表示できる期間は最大366日。集計する期間は開始日を含み終了日を含まない([from,to))範囲とする。料金や排出係数(CO₂排出量を計算するための係数)のバージョンを表示する。比較の基準と実績で、対象の設備の組み合わせや計算範囲が違う場合は、差を計算しない。金額は最後に通貨の桁数(小数点以下)で丸める。
 - **完了後の業務状態**: 条件を変えると、URLと検索条件(Query key)が更新される。この画面は表示するだけで、契約の料金や排出係数そのものは変更しない。
-- **境界条件・禁止事項**: 例えば、比較の基準100kWh、実績80kWh、単価0.5MYR(マレーシアリンギット)なら、節約額は10MYRになる。基準が0の場合は削減率を出さない。実績が120の場合は「20%増加」と表示する。データが取れていない場合は、その割合(coverage)も合わせて表示する。
+- **境界条件・禁止事項**: 例えば、比較の基準100kWh、実績80kWh、単価0.5MYR(マレーシアリンギット)なら、節約額は10MYRになる。基準が0の場合は削減率を出さない(「算定不可」)。実績が120の場合はDTOの削減率が-20で、表示は「増加 20.0%」「増加 20.0 kWh」になる(IR68/IR80)。データが取れていない場合は、その割合(coverage)も合わせて表示する。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C06-N | 基準100kWh、実績80kWh、単価0.5MYR/kWh、from=2026-09-01 to=2026-09-08。When: 表示→基準条件を展開 | ①電力量80.0kWh、推定料金40.00MYR、tariffVersion表示 ②削減量20.0kWh、削減率20.0%、節約10.00MYR ③coverage=100% ④URLに`from`・`to`・`unitIds` |
-| AT-C06-E | 基準100・実績80kWh・単価0.5MYRで照会する／基準0・実績120・欠測ありを個別に照会する | 100/80なら節約10MYR。基準0は削減率null、実績120は増加20%。欠測はcoverageを下げるが有効値は表示し、画面全体を拒否しない。 |
+| AT-C06-N | `acceptancePatches["AT-C06-N"]`（IR92: unit-online-rtoの実績80kWh、demo_fixed基準100kWh、単価0.5MYR/kWh、custom期間[2026-09-14T00:00Z, 01:00Z)）。When: 表示→基準条件を展開 | ①電力量80.0kWh、推定料金40.00MYR、tariffVersion表示 ②削減量20.0kWh、削減率20.0%、節約10.00MYR ③coverage=100% ④URLに`from`・`to`・`unitIds` |
+| AT-C06-E | 個別caseとして照会する: .1 AT-C06-Nと同じ（基準100・実績80） .2 `acceptancePatches["AT-C06-E.2"]`（基準0） .3 `["AT-C06-E.3"]`（unit-online-rto・unit-non-rtoの2台、基準100・実績120） .4 `["AT-C06-E.4"]`（00:10〜00:15Zの5slot欠測） | 100/80なら節約10MYR。基準0は削減率null(「算定不可」)、実績120はsavingPercentage=-20で表示「増加 20.0%」(IR80)。欠測はcoverageを下げるが有効値は表示し、画面全体を拒否しない。 |
 | AT-C06-B | ①366日 ②366日+1ms ③同じ設備集合・同じ算定境界 ④異なる設備集合 | ①成功 ②VALIDATION ③差分表示 ④差分null、理由「算定境界不一致」 |
 
 設計: [DD-C06](../02-design/client.md#dd-c06-詳細)。親ケースAT-C06は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
@@ -186,7 +186,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 CO₂・ほこり・湿度に加えて、アレルゲン(アレルギーの原因物質)の情報があるかどうかと、そのデータの出どころを表示する。データが取れていないことを、「アレルゲンなし」と解釈してはいけない。
 
-**追加受入条件 AT-C07-SRC**: 「データが取れていない」「対応していない」「作り込んだ観測データ」の3つのfixture(テスト用データ)で、表示を切り替えて確認する。データが取れていないときに、0や「安全」と表示してはいけない。数値に単位が付いていない場合は「不明」と表示する。
+**追加受入条件 AT-C07-SRC**: 「データが取れていない」（unit-limited、観測行なし）「対応していない」（unit-non-rto）「作り込んだ観測データ」（unit-online-rto）の3つのfixture(テスト用データ、IR98)と、単位欠落の`acceptancePatches["AT-C07-SRC.4"]`で、表示を切り替えて確認する。データが取れていないときに、0や「安全」と表示してはいけない。数値に単位が付いていない場合は「不明」と表示する。
 
 - **企業要望の根拠**: SRC-06 BIZ-18, BIZ-19 — CO₂濃度、ほこり、湿度、アレルゲンなどを把握し、清掃や換気の案内をしたい。CO₂が増えたときに外気を取り入れるなどして、空気の状態を改善したい。
 - **設計補完の範囲**: 換気機能があるかどうかの判定と、データが取れていないときの表示方法。
@@ -199,9 +199,9 @@ CO₂・ほこり・湿度に加えて、アレルゲン(アレルギーの原�
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C07-N | room-1: CO₂=1000ppm、PM2.5=12µg/m³、温度28°C、湿度60%、ventilation-demo対応。When: 表示→換気要求を確認送信→acknowledged | ①4系列を単位付きで別表示 ②案内「換気を推奨」 ③Command1件 kind=ventilate ④応答後もCO₂表示は1000ppmのまま（推定低下を表示しない） |
-| AT-C07-E | CO₂=null、PM2.5=12µg/m³で表示する／fanのみ対応の設備で換気要求する | CO₂は未計測、PM2.5は12µg/m³を表示。fanのみの設備は換気ボタンを無効にし、直接要求も拒否、Command0件。 |
-| AT-C07-B | ①湿度=0 ②湿度=null ③換気非対応設備を表示 | ①「0%」 ②「未計測」 ③換気ボタンdisabled、非対応理由と手動換気案内文 |
+| AT-C07-N | room-1: CO₂=1000ppm、PM2.5=12µg/m³、温度28°C、湿度60%、ventilation-demo対応。When: 表示→換気要求を確認送信→acknowledged | ①4系列を単位付きで別表示 ②案内「換気を推奨」（co2≥1000ppm、IR99） ③Command1件 kind=ventilate ④応答後もCO₂表示は1000ppmのまま（推定低下を表示しない） |
+| AT-C07-E | unit-online-rtoのCO₂=null、PM2.5=12µg/m³で表示する／換気非対応（cap-split-std）のunit-non-rtoで換気要求する | CO₂は未計測、PM2.5は12µg/m³を表示し、案内は「現在の案内はありません」（IR99）。換気非対応の設備は換気ボタンを無効にし、直接のcommands.create(ventilate)もVALIDATION（D01順位7の機種候補）、Command0件。 |
+| AT-C07-B | unit-online-rtoで①湿度=0 ②湿度=null ③換気非対応のunit-non-rtoを表示 ④CO₂=999ppm・PM2.5=12 ⑤CO₂=1000ppm ⑥PM2.5=35µg/m³ ⑦CO₂とPM2.5がともにnull | ①「0%」 ②「未計測」 ③換気ボタンdisabled、非対応理由と手動換気案内文 ④「現在の案内はありません」 ⑤「換気を推奨」 ⑥「フィルターの清掃・点検を推奨」 ⑦「データが不足しているため案内できません」（IR99） |
 
 設計: [DD-C07](../02-design/client.md#dd-c07-詳細)。親ケースAT-C07は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -211,7 +211,7 @@ CO₂・ほこり・湿度に加えて、アレルゲン(アレルギーの原�
 
 窓が開いていることや断熱不足が原因で負荷が増えていることを、原因の候補として通知する。対象の設備、時刻、根拠(データ)、確認や保守への導線(進み方)を表示する。
 
-**追加受入条件 AT-C08-SRC**: 「窓が開いている疑いがある」「断熱不足の点検記録がある」「根拠がない」という3つのfixture(テスト用データ)で確認する。それぞれ文言・根拠・時刻が異なる。通知を既読にしても、異常そのものは消えない。
+**追加受入条件 AT-C08-SRC**: `acceptancePatches["AT-C08-SRC"]`（IR98: alert-window-a、alert-insulation-a、alert-unknown-aとcustomer-a宛の通知）の3つのfixture(テスト用データ)で確認する。それぞれ文言・根拠・時刻が異なる。通知を既読にしても、異常そのものは消えない。
 
 - **企業要望の根拠**: SRC-06 BIZ-08, BIZ-09, BIZ-17 — 異常を事前に、または起きたときに気づけるよう、リアルタイムで通知したい。赤・オレンジ・緑の色と通知で知らせたい。生活パターンや天気に合わせて運転し、窓の開けっぱなしや断熱不足による負荷にも気づけるようにしたい。
 - **設計補完の範囲**: 「読んだこと」と「異常が解消したこと」を分けて扱う方法。
@@ -220,13 +220,13 @@ CO₂・ほこり・湿度に加えて、アレルゲン(アレルギーの原�
 - **基本フロー**: 重要度や未読かどうかで絞り込む → 通知の本文を開く → 設備の詳しい根拠、または保守の依頼画面に移動する → 通知だけを既読にする。
 - **業務規則 BR-C08**: `critical`(緊急)と`warning`(注意)は、対応する順番を決めるものである。`normal`(正常)は健康状態のまとめであり、対応していないアラートではない。清掃・交換の予定通知と、異常が発生した通知は、種類(type)で区別する。
 - **完了後の業務状態**: 既読にした時刻をNotification(通知)に保存する。Alert(警告)の状態(status)は変えない。前の画面に戻ると、絞り込み条件やページの位置は元に戻る。
-- **境界条件・禁止事項**: データの取得に失敗したときに、「異常は0件」と表示してはいけない。通知先の設備が利用できなくなった場合は、詳しい情報は出さずに「利用できません」とだけ表示する。
+- **境界条件・禁止事項**: データの取得に失敗したときに、「異常は0件」と表示してはいけない。通知先の設備が利用できなくなった場合は、リンクを開いた時点で詳しい情報は出さずに「利用できません」とだけ表示し、再取得した一覧からはその通知を除外する(IR58)。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C08-N | customer-aにcritical1・warning1・normal1の通知、causeCode=window_openのAlert。When: unreadOnly=true→criticalを開く→設備へ遷移→戻る→既読にする | ①3件、critical先頭 ②遷移先URLがunit-online-rto ③戻るとunreadOnlyが復元 ④readAt保存、Alert.status=openのまま |
-| AT-C08-E | ①notifications.listをUNAVAILABLEにする ②通知対象unitの閲覧権を失効させてからリンクを開く | ①error表示、「異常0件」を表示しない ②「利用できません」表示、設備名・値なし |
-| AT-C08-B | ①critical ②warning ③normal ④type=cleaning_due ⑤type=fault を開く | ①②未対応件数に計上 ③計上しない（健康サマリー） ④⑤別アイコン・別ラベル |
+| AT-C08-N | `acceptancePatches["AT-C08-N"]`: customer-aの未読通知がcritical1（追加）・warning1（seedのnotif-alert-window-a、causeCode=window_openのAlert）・normal1（追加）、seedの制限予告通知は既読。When: unreadOnly=true→criticalを開く→設備へ遷移→戻る→既読にする | ①3件、critical先頭 ②遷移先URLがunit-online-rto ③戻るとunreadOnlyが復元 ④readAt保存、Alert.status=openのまま |
+| AT-C08-E | ①notifications.listをUNAVAILABLEにする ②表示済みの一覧でunit-online-rto宛通知を残したまま、hq-operatorがmembers.saveでcustomer-aのscopesを[{kind:property,id:property-office-a}]へ変更し、そのリンクを開く | ①error表示、「異常0件」を表示しない ②「利用できません」表示、設備名・値なし |
+| AT-C08-B | customer-a宛・target=unit-online-rtoの通知をsubcaseごとに1件patchで追加し開く（IR92の4）: ①critical ②warning ③normal（各起点Alertも同じ重大度） ④type=cleaning_due ⑤type=fault | ①②の起点Alertは未対応アラート件数（Summary.counts.alertCount、IR51）に計上 ③severity=normalの起点Alertは計上しない（健康サマリー） ④⑤別アイコン・別ラベル |
 
 設計: [DD-C08](../02-design/client.md#dd-c08-詳細)。親ケースAT-C08は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -243,9 +243,9 @@ CO₂・ほこり・湿度に加えて、アレルゲン(アレルギーの原�
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C09-N | unit-online-rto。When: type=reactive、症状20文字、希望枠2026-09-15 10:00〜12:00を送信→HQ割当→技術者提出→受理 | ①jobId返却、status=requested、希望枠は「希望」表示 ②assigned後に確定日程 ③受理前は報告本文非表示 ④completedで報告閲覧可、同じjobId |
+| AT-C09-N | unit-online-rto。When: type=reactive、症状20文字、希望枠2026-09-15 10:00〜12:00（Asia/Kuala_Lumpur、=02:00Z〜04:00Z）を送信→hq-operatorがtech-internal-aを同じ枠に割当→時計を2026-09-15T02:00Zへ進める→tech-internal-aがstart→`acceptancePatches["shared:report-draft-all-normal"]`の入力でsaveDraft→submit→hq-operatorが受理（社内案件） | ①jobId返却、status=requested、希望枠は「希望」表示 ②assigned後に確定日程 ③受理前は報告本文非表示 ④completedで報告閲覧可、同じjobId |
 | AT-C09-E | ①症状9／2001文字 ②希望枠が過去 ③unitIdなし ④jobs.createをUNAVAILABLE ⑤同じidempotencyKeyで2回送信 | ①②③VALIDATION、案件0件 ④error表示、症状入力を保持 ⑤案件1件 |
-| AT-C09-B | ①requestedで取消 ②assignedで取消 ③assignedで調整メモ ④受理前／受理後に報告取得 | ①cancelled、cancelReason保存 ②CONFLICT、状態不変 ③JobNote visibility=customer 1件 ④受理前FORBIDDEN、受理後取得可 |
+| AT-C09-B | ①requestedのjob-internal-aを取消 ②assignedのjob-contractor-aを取消 ③job-contractor-aに調整メモ ④AT-C09-Nの流れで提出した案件の報告を受理前／受理後に取得 | ①cancelled、cancelReason保存 ②CONFLICT、状態不変 ③JobNote visibility=customer 1件 ④受理前FORBIDDEN、受理後取得可 |
 
 設計: [DD-C09](../02-design/client.md#dd-c09-詳細)。親ケースAT-C09は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -257,14 +257,14 @@ CO₂・ほこり・湿度に加えて、アレルゲン(アレルギーの原�
 - **利用開始条件**: 自分の組織の契約が0件以上あること。見るだけであれば、支払いの操作は必要ない。
 - **基本フロー**: 契約を選ぶ → 対象の設備・期間・プランを確認する → 請求金額・支払期限・入金の状態を見る → 請求の詳細画面に進む。
 - **業務規則 BR-C10**: 契約が終わったことと、設備が使えなくなることは同じ意味ではない。請求書(Invoice)の遅延は、支払期限と未入金の残額から判断する。支払いが処理中(processing)のときは、「支払い済み(paid)」とはしない。
-- **完了後の業務状態**: この画面は見るだけで、何も変更しない。RTO以外の契約は「契約なし・一般保守」と表示し、監視画面に戻れるようにする。
+- **完了後の業務状態**: この画面は見るだけで、何も変更しない。契約が0件の顧客だけ「契約なし・一般保守」と表示し、監視画面に戻れるようにする。general/energy/environment契約は種別・期間・請求を表示する(IR61)。
 - **境界条件・禁止事項**: 顧客Aが、顧客Bの請求書ID(invoiceId)を指定しても、その情報は取得できない。支払い済み(paid)の請求書には、「支払いを始める」ボタンを表示しない。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C10-N | contract-rto-a（unit-online-rto、planType=rto）、invoice-overdue-a 120.00MYR dueAt=2026-09-10 unpaid。When: 契約選択→請求詳細。customer-bでも開く | ①契約と設備の紐付け表示 ②120.00 MYR、期限、「未入金・期限超過」 ③請求詳細へ遷移 ④customer-bは「契約なし／一般保守」と監視画面への導線 |
-| AT-C10-E | ①customer-aでcustomer-bのinvoiceIdを開く ②paid請求を開く | ①NOT_FOUND ②支払い開始ボタンなし |
-| AT-C10-B | ①now=dueAt ②dueAt+1ms ③processing ④paid ⑤契約終了済み設備 | ①遅延なし ②遅延 ③「処理中」（paidではない） ④paid ⑤設備は監視・操作可 |
+| AT-C10-N | contract-rto-a（unit-online-rto、planType=rto）、invoice-overdue-a 120.00MYR dueAt=2026-09-10 unpaid。When: 契約選択→請求詳細。契約0件のcustomer-bでも開く | ①契約と設備の紐付け表示 ②120.00 MYR、期限、「未入金・期限超過」 ③請求詳細へ遷移 ④customer-bは「契約なし／一般保守」と監視画面への導線 |
+| AT-C10-E | ①`acceptancePatches["AT-C10-E.1"]`のcust-bの請求invoice-general-bをcustomer-aで開く ②hq-operatorがpayments.recordManualで全額入金したinvoice-overdue-aを開く | ①NOT_FOUND ②支払い開始ボタンなし |
+| AT-C10-B | invoice-overdue-aで ①reset直後にclockをdueAt（2026-09-10T00:00Z、IR36）へ設定 ②dueAt+1ms ③customer-aのpayments.simulate(initiate→processing) ④recordManual後 ⑤contract-rto-aのendAtを2026-09-13T00:00Zへpatchした対象設備unit-online-rto | ①遅延なし ②遅延 ③「処理中」（paidではない） ④paid ⑤設備は監視・操作可 |
 
 設計: [DD-C10](../02-design/client.md#dd-c10-詳細)。親ケースAT-C10は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -306,9 +306,9 @@ WhatsApp・メールの案内から、テスト用のクレジットカード、
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C12-N | Restriction scheduled（invoice-overdue-a、unit-online-rto＋unit-offline-rto、executeAfter=2026-09-15 01:00Z）。When: 表示→問い合わせ送信 | ①予告・理由・2台・executeAfter表示 ②解除条件「原因請求全件の入金」 ③Inquiry received、外部送信0件 ④Restriction不変 |
-| AT-C12-E | ①解除要求後に1台をofflineにする ②顧客でrestrictions.overrideを直接呼ぶ | ①release_requested、offline台はpending、released表示なし ②FORBIDDEN、状態不変 |
-| AT-C12-B | ①scheduled ②requested ③applied ④release_requested ⑤released ⑥requestedで1台のみ応答 | ①〜⑤それぞれ別ラベル ⑥集約はrequested、設備別に「反映済み／保留」を表示 |
+| AT-C12-N | hq-restriction-managerがrestrictions.schedule（contract-rto-a、causeInvoiceIds=[invoice-overdue-a]、unitIds=[unit-offline-rto,unit-online-rto]、policy=power_off、executeAfter=2026-09-15T01:00Z）で作ったRestriction（scheduled）。When: 表示→問い合わせ送信 | ①予告・理由・2台・executeAfter表示 ②解除条件「原因請求全件の入金」 ③Inquiry received、外部送信0件 ④Restriction不変 |
+| AT-C12-E | ①AT-C11-Nの入金確認でrestriction-limited-aがrelease_requestedになった後、unit-limitedへdemo.trigger(device communication_lost) ②customer-aでrestrictions.overrideを直接呼ぶ | ①release_requested。remove Command作成から30秒未満はperUnit.releaseState=requested（表示「解除応答待ち（通信断）」）、30秒以降はfailed（IR102）。released表示なし ②FORBIDDEN、状態不変 |
+| AT-C12-B | 通常の操作で状態を作る（IR97の3）: ①AT-C12-NのRestriction（scheduled） ②①の時計をexecuteAfterへ進めてexecute（requested） ③seedのrestriction-limited-a（applied） ④AT-C11-Nの入金確認後のrestriction-limited-a（release_requested） ⑤④のremove Commandをsent→acknowledged（released） ⑥②のRestrictionでunit-online-rtoだけ応答 | ①〜⑤それぞれ別ラベル ⑥集約はrequested、設備別に「反映済み／保留」を表示 |
 
 **追加受入条件 AT-C12-R01（再訪・競合・役割横断）**
 
@@ -337,7 +337,7 @@ WhatsApp・メールの案内から、テスト用のクレジットカード、
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-C13-N | 実績40kgCO₂e、削減10kgCO₂e表示中。When: amountKg=1→見積→申込→記録を開く | ①OffsetQuote quoted、expiresAt=now+15分 ②見積のみではOffsetRecord0件 ③申込でdemo_requested 1件 ④証明欄「未発行」、marketConcept=future_concept |
+| AT-C13-N | `acceptancePatches["AT-C13-N"]`で実績40kgCO₂e、削減10kgCO₂eを表示中（係数factor-demo-2026、IR92）。When: purpose=Demo offset、period=[2026-09-14T00:00Z, 01:00Z)、unitIds=[unit-online-rto]、amountKg=1で見積→demoConfirmed=trueで申込→記録を開く | ①OffsetQuote quoted、expiresAt=now+15分 ②見積のみではOffsetRecord0件 ③申込でdemo_requested 1件 ④証明欄「未発行」、marketConcept=future_concept |
 | AT-C13-E | ①amountKg=0／-1 ②失効見積で申込 ③customer-bの算定結果で申込 ④模擬償却記録を開く | ①VALIDATION ②CONFLICT（失効） ③NOT_FOUND ④「デモ償却」表示、「認証済み」文言なし |
 | AT-C13-B | ①省エネ20kWh表示 ②見積のみ ③申込後 ④係数なし | ①残高欄なし ②記録0件 ③記録1件 ④排出量「算定不可」、申込ボタン無効 |
 
@@ -348,6 +348,6 @@ WhatsApp・メールの案内から、テスト用のクレジットカード、
 
 2026-09-16承認反映: FR-C01/C06: today/7d/30dは表示timezoneの暦日と完了分を使用する（SR17）。FR-C13: 模擬offsetの失敗再試行は同一記録・失敗段階のみ（SR18）。
 
-現行0.17.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+現行0.21.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 案件一覧には状態（業務順）・重大度・期限の昇順/降順ソートを設ける。デフォルトは状態の業務順（IR34）。全対象を並べ替えてからページ分割し、言語切替では順序を変えない。受入はAT-REV16-005を併用する。

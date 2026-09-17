@@ -1,0 +1,306 @@
+{
+  "version": "0.18.0",
+  "scope": "frontend-demo-1A",
+  "review_id": "STRICT-DOC-0.17.0-REV18-2026-09-17",
+  "note": "本レビューで修正担当が採用した可逆的な設計提案。README規約のPROPOSEDに相当し、1Aデモ実装は進行可能。企業承認・商用確定ではない。owner欄は企業検収前に確認する担当候補。",
+  "decisions": [
+    {
+      "id": "DEC-25",
+      "issue_id": "REV18-001",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "デモ時計の分境界ごとにonline Deviceの合成測定値と生存信号を自動生成するか（乱数なし・前回値の複写）",
+      "selected": {
+        "simulator_default": "enabled",
+        "interval": "UTC minute boundary",
+        "value": "copy latest per sensor",
+        "no_backfill_on_jump": true
+      },
+      "owner": "Product Owner / Frontend",
+      "contract": "IR45"
+    },
+    {
+      "id": "DEC-26",
+      "issue_id": "REV18-002",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "制限中の操作可否をtemperature_limitは下限未満の温度だけ禁止、power_offは電源OFF以外を全て禁止とするか",
+      "selected": {
+        "temperature_limit": "only set_temperature below minimum is forbidden",
+        "power_off": "only set_power false allowed"
+      },
+      "owner": "Business / Product Owner",
+      "contract": "IR46"
+    },
+    {
+      "id": "DEC-27",
+      "issue_id": "REV18-003",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "取り外し検知は制御を止めず、電源信号断と接続online以外はOFFLINEとするか",
+      "selected": {
+        "tamper_blocks_control": false,
+        "power_signal_off": "OFFLINE",
+        "non_online_connection": "OFFLINE"
+      },
+      "owner": "IoT / Security",
+      "contract": "IR47"
+    },
+    {
+      "id": "DEC-28",
+      "issue_id": "REV18-004",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "未応答Offerの期限到来で案件をrequestedへ戻し、通知は出さないか",
+      "selected": {
+        "on_offer_expiry": "job returns to requested",
+        "notification": "none"
+      },
+      "owner": "Product Owner",
+      "contract": "IR48"
+    },
+    {
+      "id": "DEC-29",
+      "issue_id": "REV18-005",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "技術者に割当作成から予定終了まで読取専用で案件を見せ、操作は予定枠内だけ許可するか",
+      "selected": {
+        "view_window": "[assignment.createdAt, scheduledEnd)",
+        "work_window": "[scheduledStart, scheduledEnd)"
+      },
+      "owner": "Security / Product Owner",
+      "contract": "IR49"
+    },
+    {
+      "id": "DEC-30",
+      "issue_id": "REV18-007",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "未対応アラート件数からseverity=normalを除くか",
+      "selected": {
+        "alertCount": "open/acknowledged and critical/warning"
+      },
+      "owner": "Product Owner / UI/UX",
+      "contract": "IR51"
+    },
+    {
+      "id": "DEC-31",
+      "issue_id": "REV18-008",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "生活パターン条件を毎日の固定時刻で成立する合成条件とするか",
+      "selected": {
+        "pattern": "daily local time in rule timezone",
+        "learning": false
+      },
+      "owner": "Product Owner",
+      "contract": "IR52"
+    },
+    {
+      "id": "DEC-32",
+      "issue_id": "REV18-009",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "位置情報の同意撤回で該当ルールをenabled=false・consent_revokedとし、再同意で自動復帰しないか",
+      "selected": {
+        "on_revoke": "disable with consent_revoked",
+        "on_regrant": "stay disabled"
+      },
+      "owner": "Security / Product Owner",
+      "contract": "IR53"
+    },
+    {
+      "id": "DEC-33",
+      "issue_id": "REV18-011",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "セッション期限の120秒前に予告し、利用者が何度でも30分延長できるようにするか",
+      "selected": {
+        "warning_before_seconds": 120,
+        "extend_minutes": 30,
+        "extend_limit": null
+      },
+      "owner": "Security / UI/UX",
+      "contract": "IR55"
+    },
+    {
+      "id": "DEC-34",
+      "issue_id": "REV18-012",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "HQはrequested/offered/accepted/assigned/on_hold/rework_requestedから取消でき、in_progress/submittedは先に保留が必要とするか",
+      "selected": {
+        "hq_cancel_states": [
+          "requested",
+          "offered",
+          "accepted",
+          "assigned",
+          "on_hold",
+          "rework_requested"
+        ],
+        "hold_required_states": [
+          "in_progress",
+          "submitted"
+        ]
+      },
+      "owner": "Product Owner",
+      "contract": "IR56"
+    },
+    {
+      "id": "DEC-35",
+      "issue_id": "REV18-019",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "管理ダッシュボードの削減量に、設備集合・境界・分数が一致する最新の基準を自動で使うか",
+      "selected": {
+        "baseline_selection": "exact unit set, ac_input_electricity, same minutes, latest",
+        "fallback": "null with baseline_unavailable"
+      },
+      "owner": "Product Owner / Business",
+      "contract": "IR63"
+    },
+    {
+      "id": "DEC-36",
+      "issue_id": "REV18-020",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "連絡可能時間の文字列で'@'と連続7桁以上の数字を拒否し、担当者と受託業者にも表示するか",
+      "selected": {
+        "reject": [
+          "@",
+          "7+ consecutive digits"
+        ],
+        "visible_to": [
+          "client",
+          "hq",
+          "assigned technician",
+          "accepted contractor"
+        ]
+      },
+      "owner": "Security",
+      "contract": "IR64"
+    },
+    {
+      "id": "DEC-37",
+      "issue_id": "REV18-021",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "音声の部屋名をSpace名の完全一致で照合し、設備の表示名とは照合しないか",
+      "selected": {
+        "room_match": "Space.name exact",
+        "unit_displayName": false
+      },
+      "owner": "UI/UX",
+      "contract": "IR65"
+    },
+    {
+      "id": "DEC-38",
+      "issue_id": "REV18-024",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "負の削減量を全roleで「増加 {絶対値}」と表示するか",
+      "selected": {
+        "negative": "増加 {abs}",
+        "zero": "増減なし 0.0",
+        "null": "算定不可"
+      },
+      "owner": "UI/UX",
+      "contract": "IR68"
+    },
+    {
+      "id": "DEC-39",
+      "issue_id": "REV18-027",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "作業可能時間の休日を土日だけとし、祝日カレンダーを持たないか",
+      "selected": {
+        "holidays": [
+          "Saturday",
+          "Sunday"
+        ],
+        "public_holidays": []
+      },
+      "owner": "Business",
+      "contract": "IR70"
+    },
+    {
+      "id": "DEC-40",
+      "issue_id": "REV18-047",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "マレー語の文言を実装Agentの下書きとし、企業検収前に人が確認するか",
+      "selected": {
+        "ms_text": "agent draft with unreviewed flag",
+        "review_before": "company acceptance"
+      },
+      "owner": "Business / UI/UX",
+      "contract": "IR74"
+    },
+    {
+      "id": "DEC-41",
+      "issue_id": "REV18-048",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "修正担当AI（本会話）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "アプリ名を中立の翻訳キーapp.nameとし、参考サイトの名称・ロゴを使わないか",
+      "selected": {
+        "en": "AC Monitoring Demo",
+        "ms": "Demo Pemantauan AC",
+        "reference_brand": false
+      },
+      "owner": "Product Owner / Business",
+      "contract": "IR74"
+    }
+  ]
+}

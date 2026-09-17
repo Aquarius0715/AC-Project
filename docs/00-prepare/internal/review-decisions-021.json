@@ -1,0 +1,44 @@
+{
+  "version": "0.21.0",
+  "scope": "frontend-demo-1A",
+  "review_id": "INDEPENDENT-G1-DOC-0.20.0-CODEX",
+  "note": "G120-001〜005の修正で必要な可逆的なデモ具体化。企業承認を表さない。",
+  "decisions": [
+    {
+      "id": "DEC-60",
+      "issue_id": "G120-001",
+      "contract": "IR103",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "Codex specification correction agent",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "継続成立の開始とair_quality換気候補の起動時点を一意にする",
+      "selected": {
+        "duration_origin": "first eligible current-tick evaluation after save",
+        "air_quality_candidate": "eligible only once duration condition holds; notification and control independently evaluated"
+      },
+      "owner": "Product Owner / QA"
+    },
+    {
+      "id": "DEC-61",
+      "issue_id": "G120-003",
+      "contract": "IR104",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "Codex specification correction agent",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "業務通知の重大度を決める",
+      "selected": {
+        "default": "normal",
+        "payment_reminder": "warning",
+        "restriction": "scheduled/requested/applied/release_requested warning; released/cancelled normal",
+        "device_operation": "warning",
+        "alert": "sourceAlert.severity",
+        "quality": "sourcePolicy.severity"
+      },
+      "owner": "Product Owner / UI/UX"
+    }
+  ]
+}

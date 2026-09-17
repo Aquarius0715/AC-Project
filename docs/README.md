@@ -1,6 +1,6 @@
 # AC Project フロントエンド開発ドキュメント
 
-版: 0.17.0 / 作成日: 2026-09-14 / 更新日: 2026-09-16 / 状態: レビュー用ドラフト / 言語: 日本語
+版: 0.21.0 / 作成日: 2026-09-14 / 更新日: 2026-09-17 / 状態: レビュー用ドラフト / 言語: 日本語
 
 対象はSplit Unit ACの監視・操作・保守・契約に関するクリック可能なフロントエンドデモ（1A）。今回作成する文書はフロントエンド設計のみ。API仕様・HTTP契約・DB・サーバー処理・本番運用は設計対象外。将来のAPI接続はフロント側interfaceの差替え口だけを定義する。アプリ実装も今回の作業には含まない。
 
@@ -30,6 +30,7 @@
 - `MUST` / `SHOULD` / `MAY`: 必須 / 推奨 / 任意。P0・P1はいずれも1A完了対象で、P0を先に実装する。P2は本番・将来拡張。
 - ID接頭辞: `FR-C/P/T/A`=4役割、`FR-X`=共通、`NFR`=非機能、`DD`=設計、`UX`=共通UI、`AT`=受入テスト、`DEC/OPEN`=意思決定・未決。
 - 各役割の要件行は1つの検証単位。表の受入条件に行頭のIDから作る`AT-*`を付与する（例: FR-C01 → AT-C01）。S01〜S08は役割横断の追加検証。
+- 同じ論点で仕様の記述が食い違う場合の規範の優先順位は[IR72](02-design/review-resolution-contracts.md#ir72-規範の優先順位--rev18-029)の表に従う。実装で選ばず文書欠陥として報告する。
 - 優先順位: 原記録で確認できる最新の制作指示 → 企業原文 SRC-06 → 原文から整理した要件 → 原記録未収録の制作方針（4役割等。可逆的な範囲で現行基準として維持、OPEN-10で企業確認） → 共通契約・役割別設計。参考モックは外観設計の参考資料。衝突は黙って上書きせず、影響IDを記録する。
 - 承認者欄が空欄のものは未承認。SRC-02の過去原指示は未収録であり、[確認状態](00-prepare/sources/production-instructions.md)を参照する。実装／テスト／レビューエージェントは自分で業務承認を作らない。
 
@@ -50,7 +51,7 @@
 
 0.8.0（2026-09-16）: 厳格レビュー36件への修正。1Aの認可・発火仲裁・制限復旧・支払試行・数値・状態・表示安全性を[確定契約](02-design/deterministic-contracts.md)で具体化し、[正規DTO](02-design/service-contracts.ts)、131操作、47画面、Component/Query契約を追加。受入条件と元文書の矛盾を修正。AT-FIX-001〜036は追加試験計画でありアプリ実行結果ではない。
 
-現行baselineは[DOC-0.17.0](04-agentic-sdlc/runs/DOC-0.17.0/spec-manifest.json)。DOC-0.7.0は旧版の記録であり、現在の実装入力として使用しない。検証は `python3 docs/tools/validate_documents.py`。文書修正者による自己再レビューと、別主体によるG1承認は区別する。本番接続はD11の成果物確定までNOT READY。
+現行baselineは[DOC-0.21.0](04-agentic-sdlc/runs/DOC-0.21.0/spec-manifest.json)。DOC-0.7.0〜0.20.0は旧版の記録であり、現在の実装入力として使用しない（DOC-0.18.0はbaseline未作成、DOC-0.19.0とDOC-0.20.0は独立G1で不合格、IR75）。検証は `python3 docs/tools/validate_documents.py` と `python3 docs/tools/check_review_regressions.py` の両方（IR73）。文書修正者による自己再レビューと、別主体によるG1承認は区別する。本番接続はD11の成果物確定までNOT READY。
 
 0.9.0（2026-09-16）: STRICT-DOC-0.8.0の指摘21件の修正仕様を反映。期間・offset失敗・制限中契約編集の3件は2026-09-16ユーザー承認済み。G1はpendingで、旧版の承認は流用しない。詳細は[修正契約](02-design/strict-review-contracts.md)。
 
@@ -71,3 +72,11 @@
 0.16.0の判定記録は[runs/DOC-0.16.0](04-agentic-sdlc/runs/DOC-0.16.0/review.md)に当時版として保持する。
 
 0.17.0（2026-09-16）: 別AIによる独立レビュー（FRV-001〜025、CRITICAL 2・MAJOR 8・MINOR 15）を反映。解除要求の起動経路とreleaseの冪等性、デモ時計ジャンプとセッション寿命、transport障害・ネットワーク断の注入、顧客起点案件の期限、archived資源の可視性、顧客数の母集団、1h/24hプリセット、役割別投影の非公開項目、Device登録時のSensor生成、表示書式・翻訳fallback・描画例外を[IR35〜44](02-design/review-resolution-contracts.md)で確定。SCR-X-not-foundとComponent契約9件を追加（48画面・66 Component）。採用した設計提案は[DEC-19〜24](00-prepare/internal/review-decisions-017.json)（PROPOSED、可逆）。[現行レビュー報告（13項目）](04-agentic-sdlc/runs/DOC-0.17.0/review.md)・[判定表](04-agentic-sdlc/runs/DOC-0.17.0/traceability-matrix.csv)・[受入計画15件](04-agentic-sdlc/acceptance-review-017.csv)を参照。修正後の再確認は修正担当と同一エージェントによる自己再レビューであり、独立G1は[gate記録](04-agentic-sdlc/runs/DOC-0.17.0/gate-G1.yaml)のとおりpending。アプリ試験は未実施。
+
+0.18.0（2026-09-17）: 厳格レビューREV18-001〜048（BLOCKER 2・CRITICAL 4・MAJOR 24・MINOR 16・QUESTION 2）を反映。生存シミュレーター、制限中の操作表、設備接続の導出、Offer期限、技術者の閲覧窓/作業窓、KPI遷移とURL許可キー、件数定義、生活パターン、同意撤回、発火経路、セッション延長、取消表、FORBIDDEN/NOT_FOUND表示、通知一覧、決済確定の単一経路、demo-only操作、非RTO表示、空間未割当、省エネ基準、連絡可能時間、音声照合、Alert回復、機器操作の開始、負値表示、demoSeed、休日、変更イベント、規範の優先順位、検証器の変異テストを[IR45〜74](02-design/review-resolution-contracts.md)で確定した。137操作・48画面・67 Component。採用した設計提案は[DEC-25〜41](00-prepare/internal/review-decisions-018.json)（PROPOSED、可逆）。[指摘一覧](04-agentic-sdlc/runs/DOC-0.18.0/review.md)・[受入計画48件](04-agentic-sdlc/acceptance-review-018.csv)。修正の途中で作業が中断し、自己再レビューとbaseline作成は行われなかった（[gate記録](04-agentic-sdlc/runs/DOC-0.18.0/gate-G1.yaml)はnot_evaluated、IR75）。未完了分は0.19.0で引き継いだ。アプリ試験は未実施。
+
+0.19.0（2026-09-17）: 中断したDOC-0.18.0の作業ツリーに対する独立レビューREV19-001〜042（BLOCKER 1・CRITICAL 3・MAJOR 16・MINOR 20・QUESTION 2。037は修正後の自己再レビュー、038〜042はユーザー指示による受入前提の全件点検で検出）を反映。引継ぎbaselineの作成と検証器の修復、作業窓開始前の技術者画面（work-not-started）、シミュレーターの複写条件、管理ダッシュボードの省エネ予想（energyForecast）、セッション延長の記述統一、C06の負値表示、旧記述検出の正規表現化、ログイン後の復帰先、再取得中の表示、同意の初期記録、KPI受入のseed差分、期限切れOfferへの応答、理由系の文字数、MRV表示項目の対応、作業窓終了の予告、demoSeedの正規化規則、再割当時の日程更新、受入Givenの解釈規則とseed差分、技術者の作業開始の失敗コードほかを[IR75〜93](02-design/review-resolution-contracts.md)で確定した。137操作・48画面・69 Component。採用した設計提案は[DEC-42〜53](00-prepare/internal/review-decisions-019.json)（PROPOSED、可逆）。省エネ予想の算出方法（DEC-44）と作業窓終了時の扱い（DEC-50）は2026-09-17のユーザー回答で確定。[レビュー報告](04-agentic-sdlc/runs/DOC-0.19.0/review.md)・[判定表](04-agentic-sdlc/runs/DOC-0.19.0/traceability-matrix.csv)・[受入計画42件](04-agentic-sdlc/acceptance-review-019.csv)。修正後の再確認は修正担当と同一セッションの自己再レビュー。その後の別エージェントによる独立G1は[判定記録](04-agentic-sdlc/runs/DOC-0.19.0/independent-g1/review.md)のとおり不合格（MAJOR 12・MINOR 17・QUESTION 2）で、0.20.0で修正した。アプリ試験は未実施。
+
+0.20.0（2026-09-17）: DOC-0.19.0に対する別エージェントの独立G1（G1-001〜031、MAJOR 12・MINOR 17・QUESTION 2、判定FAIL）を反映。認可列の修飾語と技術者の書込み条件、業務イベントの通知、制限の取消とreleaseIntent、受入fixtureの不変条件と入力オブジェクト、アレルゲン観測と原因候補Alertのデモデータ、空気環境の案内表示、点検部品の集合と提出の検証、共通受入AT-X01〜X07の具体値、旧受入計画の期待値の修正ほかを[IR94〜102](02-design/review-resolution-contracts.md)で確定した。137操作・48画面・69 Component。採用した設計提案は[DEC-54〜59](00-prepare/internal/review-decisions-020.json)（PROPOSED、可逆）。[レビュー報告](04-agentic-sdlc/runs/DOC-0.20.0/review.md)・[判定表](04-agentic-sdlc/runs/DOC-0.20.0/traceability-matrix.csv)・[受入計画31件](04-agentic-sdlc/acceptance-review-020.csv)。独立G1の再判定は[判定記録](04-agentic-sdlc/runs/DOC-0.20.0/independent-g1/review.md)のとおりFAIL（MAJOR 1・MINOR 4）。アプリ試験は未実施。
+
+0.21.0（2026-09-17）: DOC-0.20.0の独立G1指摘G120-001〜005を修正。A12の60秒継続境界、通知分類と重大度、アレルゲン観測の変更イベント、通知fixtureの作成時scope版を[IR103〜106](02-design/review-resolution-contracts.md)で定義。[DEC-60〜61](00-prepare/internal/review-decisions-021.json)は可逆的なデモ提案。[受入計画5件](04-agentic-sdlc/acceptance-review-021.csv)と[修正報告](04-agentic-sdlc/runs/DOC-0.21.0/review.md)を追加。最新の独立G1判定は[gate記録](04-agentic-sdlc/runs/DOC-0.21.0/gate-G1.yaml)を参照（自己レビューとは別）。アプリ実装・動作試験は未実施。

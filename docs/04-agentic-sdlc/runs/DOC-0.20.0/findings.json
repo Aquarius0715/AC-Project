@@ -1,0 +1,269 @@
+{
+  "review_id": "G1-FIX-DOC-0.19.0-2026-09-17",
+  "target": "DOC-0.19.0（commit 0505446）に対する独立G1の指摘",
+  "source_review": "runs/DOC-0.19.0/independent-g1/review.md",
+  "corrected_baseline": "DOC-0.20.0",
+  "reviewer": "独立G1レビュー担当AI（別エージェント）",
+  "specification_editor": "修正担当AI（本会話、Opus 5）",
+  "initial_verdict": "FAIL",
+  "post_correction_self_rereview": "completed（自己再レビュー。G1判定ではない）",
+  "independent_g1": "pending",
+  "proposed_decisions": [
+    "DEC-54",
+    "DEC-55",
+    "DEC-56",
+    "DEC-57",
+    "DEC-58",
+    "DEC-59"
+  ],
+  "findings": [
+    {
+      "id": "G1-001",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR94",
+      "decision": "DEC-54",
+      "acceptance_case": "AT-G120-001"
+    },
+    {
+      "id": "G1-002",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR95",
+      "decision": "DEC-55",
+      "acceptance_case": "AT-G120-002"
+    },
+    {
+      "id": "G1-003",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR96",
+      "decision": "DEC-56",
+      "acceptance_case": "AT-G120-003"
+    },
+    {
+      "id": "G1-004",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR97",
+      "decision": null,
+      "acceptance_case": "AT-G120-004"
+    },
+    {
+      "id": "G1-005",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR97",
+      "decision": null,
+      "acceptance_case": "AT-G120-005"
+    },
+    {
+      "id": "G1-006",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR98",
+      "decision": "DEC-57",
+      "acceptance_case": "AT-G120-006"
+    },
+    {
+      "id": "G1-007",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR99",
+      "decision": "DEC-57",
+      "acceptance_case": "AT-G120-007"
+    },
+    {
+      "id": "G1-008",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR100",
+      "decision": "DEC-58",
+      "acceptance_case": "AT-G120-008"
+    },
+    {
+      "id": "G1-009",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR97",
+      "decision": null,
+      "acceptance_case": "AT-G120-009"
+    },
+    {
+      "id": "G1-010",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR102",
+      "decision": null,
+      "acceptance_case": "AT-G120-010"
+    },
+    {
+      "id": "G1-011",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR97",
+      "decision": null,
+      "acceptance_case": "AT-G120-011"
+    },
+    {
+      "id": "G1-012",
+      "severity": "MAJOR",
+      "status": "resolved",
+      "contract": "IR102",
+      "decision": null,
+      "acceptance_case": "AT-G120-012"
+    },
+    {
+      "id": "G1-013",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR96",
+      "decision": "DEC-56",
+      "acceptance_case": "AT-G120-013"
+    },
+    {
+      "id": "G1-014",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR102",
+      "decision": null,
+      "acceptance_case": "AT-G120-014"
+    },
+    {
+      "id": "G1-015",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR102",
+      "decision": null,
+      "acceptance_case": "AT-G120-015"
+    },
+    {
+      "id": "G1-016",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR102",
+      "decision": null,
+      "acceptance_case": "AT-G120-016"
+    },
+    {
+      "id": "G1-017",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR102",
+      "decision": null,
+      "acceptance_case": "AT-G120-017"
+    },
+    {
+      "id": "G1-018",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR102",
+      "decision": null,
+      "acceptance_case": "AT-G120-018"
+    },
+    {
+      "id": "G1-019",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR97",
+      "decision": null,
+      "acceptance_case": "AT-G120-019"
+    },
+    {
+      "id": "G1-020",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR102",
+      "decision": null,
+      "acceptance_case": "AT-G120-020"
+    },
+    {
+      "id": "G1-021",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR100",
+      "decision": "DEC-58",
+      "acceptance_case": "AT-G120-021"
+    },
+    {
+      "id": "G1-022",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR102",
+      "decision": null,
+      "acceptance_case": "AT-G120-022"
+    },
+    {
+      "id": "G1-023",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR102",
+      "decision": null,
+      "acceptance_case": "AT-G120-023"
+    },
+    {
+      "id": "G1-024",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR102",
+      "decision": null,
+      "acceptance_case": "AT-G120-024"
+    },
+    {
+      "id": "G1-025",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR101",
+      "decision": "DEC-59",
+      "acceptance_case": "AT-G120-025"
+    },
+    {
+      "id": "G1-026",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR94",
+      "decision": "DEC-54",
+      "acceptance_case": "AT-G120-026"
+    },
+    {
+      "id": "G1-027",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR98",
+      "decision": "DEC-57",
+      "acceptance_case": "AT-G120-027"
+    },
+    {
+      "id": "G1-028",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR102",
+      "decision": null,
+      "acceptance_case": "AT-G120-028"
+    },
+    {
+      "id": "G1-029",
+      "severity": "MINOR",
+      "status": "resolved",
+      "contract": "IR102",
+      "decision": null,
+      "acceptance_case": "AT-G120-029"
+    },
+    {
+      "id": "G1-030",
+      "severity": "QUESTION",
+      "status": "answered",
+      "contract": "IR94",
+      "decision": "DEC-54",
+      "acceptance_case": "AT-G120-030"
+    },
+    {
+      "id": "G1-031",
+      "severity": "QUESTION",
+      "status": "answered",
+      "contract": "IR97",
+      "decision": "DEC-58",
+      "acceptance_case": "AT-G120-031"
+    }
+  ]
+}

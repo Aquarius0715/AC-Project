@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.17.0
+version: 0.21.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -17,7 +17,7 @@ scope: frontend-demo-1A
 
 各FR(機能要件)を満たすための処理と、テストで確認すべき条件(受入条件)を、この文書で決めます。参考にしているモック画面は、共通UIの見た目を考えるためだけに使います。
 
-**0.17.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.21.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 入力・責務
 
@@ -37,21 +37,21 @@ scope: frontend-demo-1A
 - forbidden(権限なし)
 - not-found(見つからない)
 
-再試行のボタンは、回復できるエラーのときだけ用意します。権限が足りないときは、再試行させず、その人が見てよい画面へ戻します。
+再試行のボタンは、回復できるエラーのときだけ用意します。権限が足りないときと対象が見つからないときは、再試行ボタンを出さず、IR57に従って表示します。
 
 ## 画面・処理設計
 
 | 設計ID / 要件 | ルート / 主コンポーネント | 取得・操作契約 | 入力・処理・検証 | 異常系と禁止事項 |
 |---|---|---|---|---|
 | DD-A01 / FR-A01 | `/admin` / `AdminOverview` | `admin.summary` | 組織・期間を指定する。稼働率は「対象台数」と「状態が不明な台数」を両方表示する | 状態が測れていない設備を、自動的に「非稼働」や「正常」に分類してはいけない |
-| DD-A02 / FR-A02 | `/admin/units` / `AssetRegistry` | `organizations.list`、`organizations.save`、`customers.list`、`customers.save`、`properties.save`、`spaces.save`、`units.save`、`units.archive`、`units.list`、`units.get`、`properties.list`、`spaces.list`、`capabilities.list`、`units.delete`、`commands.create`、`commands.get`、`diagnosticRuns.list`、`diagnosticRuns.get` | 名称は1〜120文字で必須。tenantId(テナントID)、親ID、メーカー/型番、形式(split)、設置日も入力する | 使用中の場所は削除できない。関連する設備を先に移動する必要がある。削除よりアーカイブ(使用停止扱い)を優先する |
+| DD-A02 / FR-A02 | `/admin/units` / `AssetRegistry` | `organizations.list`、`organizations.save`、`customers.list`、`customers.save`、`properties.save`、`spaces.save`、`units.save`、`units.archive`、`units.list`、`units.get`、`properties.list`、`spaces.list`、`capabilities.list`、`units.delete`、`commands.create`、`commands.get`、`diagnosticRuns.list`、`diagnosticRuns.get` | 名称は1〜120文字で必須。親ID、型番(modelId)、形式(split)、設置日を入力する。tenantIdは入力せずSessionから決める(IR74) | 使用中の場所は削除できない。関連する設備を先に移動する必要がある。削除よりアーカイブ(使用停止扱い)を優先する |
 | DD-A03 / FR-A03 | `/admin/settings/access` / `AccessManager` | `members.list`、`members.save`、`organizations.list` | identity.manage(権限管理)の権限、membershipId(所属ID)、role(役割)、scope(担当範囲)、有効期間(validFrom/Until)を扱う。HQの権限は機能ごとに分ける | 外部の人に「期限なし」の割当をしてはいけない(デモ用の方針)。自分自身に強い権限を勝手に付与できないようにする |
 | DD-A04 / FR-A04 | `/admin/devices` / `DeviceRegistry` | `capabilities.list`、`capabilities.save`、`devices.list`、`devices.get`、`devices.register`、`devices.bind`、`devices.check`、`devices.calibrate`、`devices.updateFirmware`、`units.list`、`units.get`、`devices.calibrations`、`devices.operations` | 温度範囲はmin(最小)<=max(最大)、step(刻み幅)>0にする。許可するmode(運転モード)/fan(風量)を指定し、ventilation(換気機能があるか)も明示する | 今あるコマンドと合わない能力変更をするときは、影響を必ず表示する。対応している機能を勝手に推測してはいけない |
 | DD-A05 / FR-A05 | `/admin/alerts` / `AlertPolicyEditor` | `alerts.list`、`policies.save`、`notifications.preview`、`policies.list`、`policies.get`、`alerts.get`、`alerts.acknowledge`、`alerts.resolve`、`notifications.recipients`, units.list, units.get | 単位を揃える。上限・下限、継続時間(0より大きい数)、通知先を必須にする。しきい値の数値はデモ用の仮の値 | 通知を既読にしただけでは、異常(アラート)は解消したことにならない。外部への送信は「プレビュー(確認用の見た目)」だけにする |
 | DD-A06 / FR-A06 | `/admin/jobs` / `MaintenanceCoordinator` | `jobs.list`、`jobs.create`、`jobs.offer`、`jobs.assign`、`jobs.review`、`jobs.saveCost`、`jobs.hold`、`jobs.resumeHold`、`jobs.cancel`、`plans.save`、`plans.generateNext`、`jobs.get`、`reports.get`、`attachments.getContent`、`members.eligible`、`organizations.list`、`jobs.extendAccess`、`plans.list`、`plans.get`、`units.list` | 保守の種別・対象・期日を入力する。社内担当か外注かを選ぶ。費用は0以上の金額と通貨をセットで入力する。外注は、業者が依頼を受けてから自社の担当者に割り当てる | 業者が依頼を辞退したときは、別の業者に依頼し直す。「作業完了」と「異常の解消」は別々に判断する。実際の業者への報酬送金はおこなわない |
 | DD-A07 / FR-A07 | `/admin/billing/contracts` / `ContractEditor` | `contracts.list`、`contracts.save`、`customers.list`、`units.list` | 契約の種別、customerId(顧客ID)、unitIds(対象設備ID)、期間、料金を入力する。「制限できるかどうか」は契約ごとの属性として持つ | 一般保守の契約にRTO制限(遠隔で止める制限)を誤って適用してはいけない。確定した請求に影響する変更は、新しいバージョンとして作る |
 | DD-A08 / FR-A08 | `/admin/billing` / `BillingManager` | `invoices.list`、`invoices.create`、`payments.confirm`、`notifications.preview`、`inquiries.list`、`inquiries.answer`、`payments.recordManual`、`contracts.list`、`invoices.get`、`notifications.recipients`, invoices.remind | billing.manage(請求管理)の権限、契約、金額、期限、入金の参照IDを扱う。手動で入金確認するときは理由を必須にする | 同じ入金の参照番号を二重に計上してはいけない。入金確認は、画面遷移しただけで自動的に完了させてはいけない |
-| DD-A09 / FR-A09 | `/admin/restrictions` / `RestrictionManager` | `restrictions.schedule`、`restrictions.execute`、`restrictions.release`、`commands.get`、`restrictions.list`、`restrictions.get`、`restrictions.retry`、`restrictions.reconcile`、`contracts.list`、`invoices.list`、`units.list`、`units.get` | restriction.manage(制限管理)の権限、契約、設備、理由、予告期限、制限の内容を入力する。実行の直前にもう一度確認して、条件が変わっていないかチェックする | 入金済み・猶予中・例外扱い・非対応設備のときは実行を拒否する。失敗したときや期限切れのときは、「まだ反映されていない」状態のままにしておく |
+| DD-A09 / FR-A09 | `/admin/restrictions` / `RestrictionManager` | `restrictions.schedule`、`restrictions.execute`、`restrictions.release`、`commands.get`、`restrictions.list`、`restrictions.get`、`restrictions.retry`、`restrictions.reconcile`、`contracts.list`、`invoices.list`、`units.list`、`units.get` | restriction.manage(制限管理)の権限、契約、設備、理由、予告期限、制限の内容を入力する。実行の直前にもう一度確認して、条件が変わっていないかチェックする | 入金済み・猶予中・例外扱い・非対応設備のときは実行を拒否する。適用中に許可される設備操作はIR46の表に従う。失敗したときや期限切れのときは、「まだ反映されていない」状態のままにしておく |
 | DD-A10 / FR-A10 | `/admin/restrictions/:id` / `RestrictionException` | `restrictions.defer`、`restrictions.exempt`、`restrictions.cancel`、`restrictions.override`、`audit.list`、`restrictions.get`、`restrictions.retry`、`restrictions.reconcile`, restrictions.list | override(強制的な変更)の権限、理由、期限を扱う。実行の要求中に取消がぶつかったときは状況を確認し、必要なら「解除」の要求に切り替える | 支払い状態を、手動解除に合わせて勝手に書き換えてはいけない。履歴は削除できない |
 | DD-A11 / FR-A11 | `/admin/settings/automation` / `ControlPolicy` | `policies.save`、`automations.simulate`、`automations.fire`、`policies.list`、`policies.get`、`units.list`、`units.get` | 対象設備、優先順位、イベント(きっかけ)、動作、止める条件を入力する。契約上の制限や安全に関する能力を優先する | データが取得できていないときは、自動での実行を止める。外部の電力設備に対して、実際の指令は送らない |
 | DD-A12 / FR-A12 | `/admin/settings/air-quality` / `AirPolicy` | `policies.save`、`automations.simulate`、`automations.fire`、`telemetry.series`、`policies.list`、`policies.get`、`units.get`、`commands.get`、`notifications.recipients`、`units.list` | ppm(気体濃度の単位)、µg/m³(微粒子濃度の単位)、°C(温度)、%(湿度など)の単位を、それぞれ対応する指標に固定する | 「健康・安全を保証する」という表示はしない。送風の機能だけで、換気の指令を出してはいけない |
@@ -89,15 +89,16 @@ scope: frontend-demo-1A
 |---|---|---|---|
 | customerId / propertyId | ID/任意 | 管理しているテナント内のもの | 対象を絞る |
 | customerCount | 読取 | Customer.statusとOrganization.statusがともにactiveな件数(IR40) | 顧客数 |
-| from / to | 日時/必須 | 最大366日 | 期間 |
+| from / to | 日時/必須 | today/7d/30d/customのプリセット(SR17)から決める。最大366日(IR74) | 期間 |
 | counts / rates | 読取 | 分子/分母/不明な台数(unknownCount)/取得時刻(asOf) | 稼働状況 |
 | amountsByCurrency | 読取配列 | 通貨ごとに分ける | 未入金額 |
-| energySummary | 読取 | 期間と品質つき | 省エネの概要 |
+| energySummary | 読取 | 期間の実績と品質。削減系はnull（比較はA13） | 省エネの実績 |
+| energyForecast | 読取 | IR78: 対象設備集合と一致するdemo_fixed基準を按分した予想。null表示は「対象設備なし／基準未設定／算定不可」 | 削減量の予想 |
 
 **処理手順**
 
 1. 顧客・拠点・期間を絞り込みます。次に、顧客数・設備・稼働・異常・保守・請求・電力の状況を確認します。KPI(指標)の数値から、同じ条件の一覧画面に進めます。
-2. 読み取りや操作にあたって、次の業務ルールを適用します。稼働率は、「今の状態がわかる設備」のうち、電源が入っている(powerOn)割合とします。全設備の数と、状態が不明な設備の数は必ず一緒に表示します。顧客数は、稼働中(active)の顧客組織の数です。請求の遅延は、未入金の金額をもとに判断します。
+2. 読み取りや操作にあたって、次の業務ルールを適用します。稼働率は、「今の状態がわかる設備」のうち、電源が入っている(powerOn)割合とします。全設備の数と、状態が不明な設備の数は必ず一緒に表示します。顧客数はIR40の定義（CustomerとOrganizationがともにactiveなCustomerの件数）です。請求の遅延は、未入金の金額をもとに判断します。
 3. この画面は閲覧のみです。ダッシュボード画面と、そこから遷移した一覧画面とで、期間・範囲・定義がずれないようにします。
 4. 更新する対象のQuery: `admin summary（関連イベントが起きたとき）`。
 
@@ -118,7 +119,7 @@ scope: frontend-demo-1A
 | organization.name / customer.name | 文字列/必須 | 1〜120文字 | 顧客台帳 |
 | property.kind / name | enum・文字列/必須 | home(住宅)/office(オフィス)、1〜120文字 | 物件 |
 | space.parentSpaceId / kind | ID・enum | 同じ物件内、親子関係が循環しないこと | 階層 |
-| unit.modelId / spaceId | ID/必須 | 有効な型番、顧客内の場所であること | 設備 |
+| unit.modelId / spaceId | modelIdはID/必須、spaceIdはID/null | 有効な型番。spaceIdは同じ物件の場所、nullは空間未割当(IR62) | 設備 |
 | unit.type / installedAt | enum・日付/type必須・installedAtはnull可 | split(セパレート形式)、未来の設置完了日は不可、nullは「未登録」(IR44) | 形式・設置日 |
 | serviceScope | enum配列/必須 | 対象になる点検グループ | 保守の範囲 |
 | changeReason | 文字列/移設などのとき必須 | 1〜1000文字 | 変更した理由 |
@@ -150,7 +151,7 @@ scope: frontend-demo-1A
 | employment | enum/技術者のとき必須 | internal(社内)/external(社外) | 勤務区分 |
 | permissions | enum配列/必須 | roleごとに許可された範囲の中から選ぶ | 能力(できること) |
 | scopes | ScopeRef配列/必須 | SR03のrole別種別。空は業務対象0件 | 対象範囲 |
-| validFrom / validUntil | 日時/条件により必須 | 社外の人は終了日(until)が必須 | 有効期間 |
+| validFrom / validUntil | validFromは日時/必須、validUntilは日時/null | 社外の技術者だけvalidUntilが必須(IR74) | 有効期間 |
 | reason | 文字列/必須 | 1〜1000文字 | 変更理由 |
 
 **処理手順**
@@ -170,7 +171,7 @@ scope: frontend-demo-1A
 
 対象: FR-A04 / 主な表示パターン: **UI-LIST / UI-FORM**。画面のサービス境界は`capabilities.list, capabilities.save, devices.list, devices.get, devices.register, devices.bind, devices.check, devices.calibrate, devices.updateFirmware, units.list, units.get, devices.calibrations, devices.operations`です。
 
-**初期表示と前提**: device.manage(設備管理)の権限、または型番を管理できる権限があること。能力の値はデモ用の台帳として管理します。表示の順番は、ルート・条件の検証 → session scope(セッションの担当範囲)の確認 → 必要なQueryの取得、です。「まだ取得していない状態」と「0件だった状態」は分けて扱います。
+**初期表示と前提**: device.manage(設備管理)の権限があること(IR74)。能力の値はデモ用の台帳として管理します。表示の順番は、ルート・条件の検証 → session scope(セッションの担当範囲)の確認 → 必要なQueryの取得、です。「まだ取得していない状態」と「0件だった状態」は分けて扱います。
 
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
@@ -248,12 +249,13 @@ causeCodeとevidenceKindは必須です。根拠が取得できていないと�
 
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
-| unitId / type / dueAt | 必須 | split(形式)、periodic(定期)/reactive(都度)/preventive(予防)、期限はrequestedEnd以上。HQだけが指定でき省略時はrequestedEnd(IR38) | 依頼内容 |
+| unitId / type | 必須 | 対象設備（split形式）、periodic(定期)/reactive(都度)/preventive(予防) | 依頼内容 |
+| dueAt | 日時/任意 | requestedEnd以上。HQだけが指定でき、省略時はrequestedEnd(IR38) | 期限 |
 | deliveryMode | enum/必須 | internal(社内)/contractor(外注) | 実施区分 |
 | assigneeId / contractorOrgId | ID/条件により必須 | 区分に合ったものを指定 | 委託先・担当者 |
 | recurrence | 構造体/定期のとき任意 | monthly(毎月)、間隔1〜12か月、次回日、明示操作ごとに次の1回だけ生成し次回日を更新（D16） | 定期計画 |
 | costLines | 配列/任意 | kind=estimate(見積)/actual(実績)、金額(amountMinor)>=0、通貨、説明 | 費用 |
-| reviewDecision / reason | 条件により必須 | accept(承認)/return(差し戻し)、中断・取消のときも理由が必須 | 品質確認・例外の理由 |
+| reviewDecision / reason | 条件により必須 | accept(承認)/return(差し戻し)、中断・取消のときも理由が必須。取消できる状態はIR56 | 品質確認・例外の理由 |
 
 **処理手順**
 
@@ -325,7 +327,7 @@ paymentStatus(支払い状況)は、最新の模擬Payment(支払い記録)の�
 |---|---|---|---|
 | contractId / period | 必須 | 契約期間内の請求期間 | 請求内容 |
 | amountMinor / currency | 必須 | 正の整数。契約の通貨と一致すること | 金額 |
-| dueAt | 日時/必須 | 請求作成時より未来(seed遅延のときは専用の扱い) | 期限 |
+| dueAt | 日時/必須 | nowより後だけ。期限超過の請求はdemoSeedまたはdemo.advanceClockで作る(IR90) | 期限 |
 | paymentReference | 文字列/確認時必須 | 1〜128文字。テナント内で重複しないこと | 入金の参照番号 |
 | confirmedAmountMinor | 整数/確認時必須 | 請求の全額と一致すること | 確認した金額 |
 | reason | 文字列/手動確認時必須 | 1〜1000文字 | 確認の根拠 |
@@ -384,13 +386,13 @@ paymentStatus(支払い状況)は、最新の模擬Payment(支払い記録)の�
 | restrictionId | ID/必須 | 管理できる範囲内 | 対象 |
 | action | enum/必須 | defer(猶予)/exempt(例外)/cancel(取消)/override_release(強制解除)。対応する操作は次の通りです。defer→`restrictions.defer`(until(期限)が必須)、exempt→`restrictions.exempt`(until(期限)が必須)、cancel→`restrictions.cancel`、override_release→`restrictions.override`(restriction.override(強制解除)の権限が必須)。理由(reason)はどの操作でも必須です | 例外の操作 |
 | until | ISO日時/猶予・例外のとき必須 | 今より未来の日時 | 有効期限 |
-| reason | 文字列/必須 | 1〜2000文字 | 例外の根拠 |
+| reason | 文字列/必須 | 1〜1000文字(IR87) | 例外の根拠 |
 | expectedVersion | 整数/必須 | もう一度取得したあとのバージョン | 競合の確認用 |
 
 **処理手順**
 
 1. 対象の今の状態と、機器への反映状況を照会します。猶予・例外・取消・手動解除のどれかを選びます。理由・期限・影響を確認してから保存します。設備ごとの結果を追います。
-2. 読み取りや操作にあたって、次の業務ルールを適用します。適用される前に取り消せばcancelled(取消)になります。適用の要求を出したあとの取消は、反映されたかどうかわからなくても解除の流れに進めます。例外や猶予の期限が切れても、自動で再適用はせず、もう一度条件を確認する必要があります。
+2. 読み取りや操作にあたって、次の業務ルールを適用します。取消の結果はIR96の状態表に従います（scheduledはcancelled、requested/appliedはreleaseIntent.source=cancelでrelease_requested、release_requestedは冪等、released/cancelledはCONFLICT）。例外や猶予の期限が切れても、自動で再適用はせず、もう一度条件を確認する必要があります。
 3. 例外・猶予の変更前後の内容と期限、解除の理由・実行した人を記録します。手動解除をしても、Invoice(請求)の未入金は解消されません。
 4. 更新する対象のQuery: `restrictions / commands / audit / notifications`。
 
@@ -412,9 +414,7 @@ paymentStatus(支払い状況)は、最新の模擬Payment(支払い記録)の�
 | condition.type | enum/必須 | occupancy(在室)/tariff(料金)/peak(ピーク)/solar(太陽光)/battery(蓄電池) | 条件の種類 |
 | condition（Condition型） | 判別union(条件により形が変わる値)/必須 | 料金のしきい値・時間帯・出力など、単位つき | 判定する値 |
 | action | UnitAction(設備への動作)/必須 | 能力・制限の範囲内 | 動作の内容 |
-| priority | 整数/必須 | 0〜100。大きい値ほど優先 | 優先順位 |
-| enabled | boolean(はい/いいえ)/必須 | 初期値はfalse(無効) | 有効化するか |
-| timezone / enabled / priority | 必須 | IANA名 / boolean / 整数0〜100。新規UIはPreferences.timezone / false / 50を表示 | IR07共通入力 |
+| timezone / enabled / priority | 必須 | IANA名 / boolean / 整数0〜100（大きい値ほど優先）。新規UIはPreferences.timezone / false / 50を表示 | IR07共通入力 |
 
 **処理手順**
 
@@ -445,11 +445,11 @@ substance(物質名)・value(数値)・unit(単位)・observedAt(観測時刻)�
 
 対象: FR-A12 / 主な表示パターン: **UI-FORM / UI-ANALYSIS**。画面のサービス境界は`policies.save, automations.simulate, automations.fire, telemetry.series, policies.list, policies.get, units.get, commands.get, notifications.recipients, units.list`です。
 
-**初期表示と前提**: 環境に関するpolicy(方針)を管理する権限があること。機器に、対象のmetric(指標)と換気能力の定義があること。表示の順番は、ルート・条件の検証 → session scope(セッションの担当範囲)の確認 → 必要なQueryの取得、です。「まだ取得していない状態」と「0件だった状態」は分けて扱います。
+**初期表示と前提**: automation.policy.manageの権限があること(IR74)。機器に、対象のmetric(指標)と換気能力の定義があること。表示の順番は、ルート・条件の検証 → session scope(セッションの担当範囲)の確認 → 必要なQueryの取得、です。「まだ取得していない状態」と「0件だった状態」は分けて扱います。
 
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
-| unitIds / metric | 必須 | 対応するセンサーがあること | 対象 |
+| unitIds / metric | 必須 | 各UnitのCapability.sensorsと現bindingのDevice.sensorsの両方にmetricがあること（IR21/IR43） | 対象 |
 | threshold / recoveryThreshold | number/必須 | 指標ごとに単位が固定 | 発火・回復の条件 |
 | durationSeconds | 整数/必須 | 1〜86400 | 続く時間(秒) |
 | responseMode | enum/必須 | notify_only(通知のみ)/notify_and_ventilate(通知と換気) | 対応方法 |
@@ -482,9 +482,11 @@ substance(物質名)・value(数値)・unit(単位)・observedAt(観測時刻)�
 |---|---|---|---|
 | unitIds / period | 必須 | 同じ比較対象の集合、最大366日 | 対象 |
 | method | enum/必須 | demo_fixed(デモの固定値)/demo_period_comparison(デモの期間比較) | 基準の方法 |
-| baselineKWh | number/必須 | 0以上。仮のデータであることを表示 | 基準値 |
-| boundary / assumptions | 文字列/必須 | 1〜2000文字 | 算定の範囲・前提条件 |
-| version / source | 必須 | 変更されないバージョン、デモの出典 | 根拠 |
+| baselineKWh | number/demo_fixedのとき必須 | 0以上。仮のデータであることを表示。demo_period_comparisonでは入力しない(SR29) | 基準値 |
+| boundaryId | enum/必須 | ac_input_electricity/whole_building_electricity(IR11) | 算定境界ID |
+| boundary | 文字列/必須 | 1〜500文字(IR11) | 算定の範囲の説明 |
+| assumptions | 文字列/必須 | 1〜2000文字 | 前提条件 |
+| source | 文字列/必須 | デモの出典。versionは入力せずRepositoryが採番 | 根拠 |
 
 **処理手順**
 
@@ -493,7 +495,7 @@ substance(物質名)・value(数値)・unit(単位)・observedAt(観測時刻)�
 3. 基準を保存するときは、新しいバージョンを作ります。すでにあるMRVレポートの基準バージョンは、あとから変更しません。
 4. 更新する対象のQuery: `baselines / energy / audit`。
 
-**境界条件・失敗時**: 基準値が0のとき、実績が欠けているとき、設備の集合が違うとき、算定範囲が違うときの動きを確認します。例: 基準100・実績80なら「20kWh・20%削減」、基準100・実績120なら「-20kWh・-20%」(増加)と表示します。
+**境界条件・失敗時**: 基準値が0のとき、実績が欠けているとき、設備の集合が違うとき、算定範囲が違うときの動きを確認します。例: 基準100・実績80なら「削減 20.0 kWh・削減 20.0%」、基準100・実績120ならDTO値は-20kWh・-20%で、表示は「増加 20.0 kWh」「増加 20.0%」です(IR68)。
 
 **検証**: 追跡表のAT-A13の項目(N/E/B・該当するSRC/R01)と、対応するSシナリオで確認します。
 
@@ -503,13 +505,13 @@ substance(物質名)・value(数値)・unit(単位)・observedAt(観測時刻)�
 
 レポート画面のデータに、次の項目を追加します。
 
-- reportCategory=scope2_electricity(電力の使用に関するデモ集計であることを示す分類)
-- organizationId、period(期間)、siteIds(対象拠点)
-- gridRegion(電力系統の地域)
-- factorValue(係数の値)、factorUnit(係数の単位)、factorYear(係数の年度)、factorVersion(係数のバージョン)
+- reportCategory(Scope 2の電力デモ集計であることの表示)、organizationId、period(期間)、siteIds(対象拠点)
+- gridRegion(電力系統の地域)、factorValue(係数の値)、factorUnit(係数の単位)、factorYear(係数の年度)、factorVersion(係数のバージョン)
 - boundaryDescription(算定範囲の説明)、coverageRatio(カバー率)
 
-係数・単位・地域・対象範囲のどれかが足りない場合は「算定未完了」として扱い、0で埋めてはいけません。省エネの量と、電力にともなう排出量は、別々の欄に分けます。画面と保存済み版のプレビューには、「デモ・未検証」という表示を残します。
+これらは表示ラベルであり、DTOにフィールドを追加しない。各項目の取得元はIR88の対応表に従う。
+
+係数・地域・対象範囲のどれかが足りない場合は「算定未完了」として扱い、0で埋めてはいけません。省エネの量と、電力にともなう排出量は、別々の欄に分けます。画面と保存済み版のプレビューには、「デモ・未検証」という表示を残します。
 
 検証: AT-A14-SRC。同じ使用量でも係数のバージョンを変えると、換算結果とバージョンが変わることを確認します。係数が欠けているときは「算定未完了」と表示し、期間外・対象外の拠点を混ぜないことを確認します。
 
@@ -524,17 +526,17 @@ substance(物質名)・value(数値)・unit(単位)・observedAt(観測時刻)�
 | unitIds / from / to | 必須 | 管理できる範囲内。開始日は終了日より前 | 対象 |
 | baselineId / factorId / boundary | 必須 | バージョンつき、変更されない参照 | 算定条件 |
 | factor.region / year / kgCO2ePerKWh / source | 必須 | 年度は整数、係数は0以上、出典にデモであることを明示 | 係数 |
-| reviewComment | 文字列/確認時必須 | 1〜2000文字 | デモ確認のコメント |
+| reviewComment | 文字列/確認時必須 | 1〜1000文字(IR87) | デモ確認のコメント |
 | reportVersion | 整数/更新時必須 | 今のバージョン | 競合の確認用 |
 
 **処理手順**
 
 1. 算定条件を指定します。測定・品質・計算結果をプレビューします。根拠を確認します。ドラフト(下書き)として保存します。デモ確認の履歴と報告のプレビューを表示します。
-2. 読み取りや操作にあたって、次の業務ルールを適用します。係数の地域・年度・単位・出典は必須です。確認した履歴はdemo_reviewed(デモ確認済み)として扱い、外部の認証とは区別します。入力のバージョンが変わったら、新しい報告バージョンを作り、古い結果はそのまま残します。
+2. 読み取りや操作にあたって、次の業務ルールを適用します。係数の地域・年度・出典は必須です（単位はkgCO₂e/kWh固定、IR102）。確認した履歴はdemo_reviewed(デモ確認済み)として扱い、外部の認証とは区別します。入力のバージョンが変わったら、新しい報告バージョンを作り、古い結果はそのまま残します。
 3. MRVReport(MRVの報告)に、係数・基準の当時のスナップショット参照、算定結果・品質・reviewHistory(確認履歴)を保存します。プレビューを見ただけでは、確定した記録は作りません。
 4. 更新する対象のQuery: `mrv / review history / audit`。
 
-**境界条件・失敗時**: 係数が欠けているとき、単位が合わないとき、coverage(カバー率)が0のとき、同じ報告バージョンに重複して確認したときの動きを確認します。未検証の値が「認証済み」に見えないようにします。
+**境界条件・失敗時**: 係数が欠けているとき、coverage(カバー率)が0のとき、同じ報告バージョンに重複して確認したときの動きを確認します。未検証の値が「認証済み」に見えないようにします。
 
 **検証**: 追跡表のAT-A14の項目(N/E/B・該当するSRC/R01)と、対応するSシナリオで確認します。
 
@@ -591,14 +593,14 @@ substance(物質名)・value(数値)・unit(単位)・observedAt(観測時刻)�
 |---|---|---|---|
 | from / to | ISO日時/必須 | 最大366日 | 検索する期間 |
 | actorId / targetId / correlationId | ID/任意 | 管理できる範囲内 | 絞り込み |
-| result | enum/任意 | success(成功)/denied(拒否)/failed(失敗)/pending(保留) | 結果 |
+| result | enum/任意 | success(成功)/denied(拒否)/failed(失敗)/pending(保留、結果待ちの受付。確定時に同じcorrelationIdで追記、IR90) | 結果 |
 | cursor / limit | 文字列・整数 | 初期値25件、最大100件 | ページ送り |
 | before / after / reason | 読取 | 機密な部分はマスク済み | 変更前後の内容・理由 |
 
 **処理手順**
 
 1. 期間・実行した人・対象・結果・相関IDで検索します。履歴の詳細を開きます。関連するCommand(命令)・Job(依頼)・Restriction(制限)の状態と照合します。
-2. 読み取りや操作にあたって、次の業務ルールを適用します。監査は「成功」「拒否」「失敗」を分けて表示します。before/after(変更前後の内容)は、秘密の情報や連絡先をマスクします。記録の追加はRepositoryの業務イベントだけが行います。この画面からの追加・編集・削除はできません。ブラウザの中だけのデモなので、記録が改ざんされないことまでは保証しません。
+2. 読み取りや操作にあたって、次の業務ルールを適用します。監査は「成功」「拒否」「失敗」「保留」を分けて表示します。before/after(変更前後の内容)は、秘密の情報や連絡先をマスクします。記録の追加はRepositoryの業務イベントだけが行います。この画面からの追加・編集・削除はできません。ブラウザの中だけのデモなので、記録が改ざんされないことまでは保証しません。
 3. この画面は閲覧のみです。検索条件はURLに保持しますが、機密な本文はURLに入れません。
 4. 更新する対象のQuery: `なし（監査参照）`。
 
@@ -622,7 +624,7 @@ DD-A08: 請求を選択したらinvoices.getを必須取得し、InvoiceDetail.p
 
 A07の保存可否はContract.activeRestrictionIdsが空かつhasUnresolvedRecovery=false。A09の回復case解決で後継制限を解除しない。DeviceデモイベントのbindingIdはDeviceの取得値を使う（SR24/SR26）。
 
-現行0.17.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+現行0.21.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 A13/A14の境界はIR11のboundaryId（固定候補）とboundary（説明）を区別する。MRVは保存済み版の画面プレビューまででファイルexportは対象外（IR15）。
 
