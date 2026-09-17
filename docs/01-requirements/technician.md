@@ -1,6 +1,6 @@
 ---
 document_id: REQ-T
-version: 0.17.0
+version: 0.19.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # 技術者 要件定義書
 
-**0.17.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.19.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 目的と前提
 
@@ -70,7 +70,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 - **企業要望の根拠**: SRC-06 BIZ-04, BIZ-08 — 顧客、社内・外部の技術者、管理者・本社(HQ)が見やすいダッシュボード(状況を一目で見る画面)がほしい。異常を事前に、または起きたときに気づけるよう、リアルタイムで通知したい。
 - **設計補完の範囲**: 担当している期間によって、見える範囲を変える。
 
-- **利用開始条件**: 社内の技術者は自分の担当範囲、社外の技術者は自社かつ個別に割り当てられた作業期間の情報だけを取得できる。
+- **利用開始条件**: 社内の技術者は自分の担当範囲、社外の技術者は自社かつ個別に割り当てられた作業期間の情報だけを取得できる。作業開始前の担当案件は閲覧窓で読取専用に表示し(画面状態work-not-started、IR76)、操作は作業窓だけで行う(IR49)。
 - **基本フロー**: 今日または指定した期間の担当案件を開く → 異常の重要度・期限・進捗で並べ替える → 設備の詳細、または作業の画面に進む。
 - **業務規則 BR-T01**: 「対応していない件数」とは、まだ担当が決まっていない(requested)全件ではなく、自分が担当していてまだ手を付けていない案件のこと。社内の技術者が広く見られる場合も、所属している組織(テナント)と担当範囲を超えては見られない。
 - **完了後の業務状態**: この画面は見るだけで、何も変わらない。予定が0件のときは、「何もない状態」と、履歴を見るための案内を表示する。
@@ -98,7 +98,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
 | AT-T02-N | 担当内unit-online-rto（メーカー・型番・installedAt登録済み、capabilityVersion=3）。When: 台帳を開く | ①場所・型番・構成・設置日・保守範囲 ②capabilityVersion=3 ③書込み0件 |
-| AT-T02-E | ①installedAt=nullの台帳 ②tech-external-aで非割当unitId | ①「未登録」表示、現在日を補わない ②NOT_FOUND |
+| AT-T02-E | ①tech-internal-aでinstalledAt=nullのunit-non-rtoの台帳 ②tech-external-aで非割当のunit-other-customer | ①「未登録」表示、現在日を補わない ②NOT_FOUND |
 | AT-T02-B | ①能力登録済み ②未登録 | ①候補表示 ②「未登録」、典型値なし |
 
 設計: [DD-T02](../02-design/technician.md#dd-t02-詳細)。親ケースAT-T02は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
@@ -116,8 +116,8 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-T03-N | unit-online-rto、staleAfterSeconds=120。When: metric=temperature、24h(IR41の移動窓[to-1440分,to))で表示→/demoでevent version=4を発火→通信断 | ①系列と最新値が同じeventId／版 ②発火後に最新値更新 ③通信断で「更新停止」表示、購読解除 |
-| AT-T03-E | ①version=3の後に2と重複3を送る ②通信断にする | ①値が逆行しない、重複は無視 ②最後の値と時刻を残し「リアルタイム」表示なし |
+| AT-T03-N | unit-online-rto、staleAfterSeconds=120。When: metric=temperature、24h(IR41の移動窓[to-1440分,to))で表示→/demoでsequence=4のtelemetryを発火→通信断 | ①系列と最新値が同じeventId／版 ②発火後に最新値更新 ③通信断で「更新停止」表示、購読解除 |
+| AT-T03-E | ①sequence=3の後にsequence=2と重複sequence=3を送る(IR74) ②通信断にする | ①値が逆行しない、重複は無視 ②最後の値と時刻を残し「リアルタイム」表示なし |
 | AT-T03-B | ①観測から120秒 ②120秒+1ms ③系列途中にnull | ①valid ②stale ③欠測区間を線で連結しない |
 
 設計: [DD-T03](../02-design/technician.md#dd-t03-詳細)。親ケースAT-T03は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
@@ -135,7 +135,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-T04-N | in_progress案件、indoor 8部品。When: filter=attention（理由あり、写真1枚）、他7部品normalでドラフト保存→提出 | ①ドラフト保存でreportVersion=1 ②提出成功、8部品の結果・作者・観測時刻が版に紐付く ③センサー推定は別根拠として残る |
+| AT-T04-N | tech-external-aがjob-contractor-aをstartしたin_progress案件、indoor 8部品。When: filter=attention（理由あり、写真1枚）、他7部品normalでドラフト保存→提出 | ①ドラフト保存でreportVersion=1 ②提出成功、8部品の結果・作者・観測時刻が版に紐付く ③センサー推定は別根拠として残る |
 | AT-T04-E | 提出時に ①result=null 1部品 ②測定に単位なし ③not_inspected理由なし ④本人の閲覧scope内だが別案件のattachmentId | 各VALIDATION、提出0件 |
 | AT-T04-B | indoor 8部品を ①normal ②attention（理由あり） ③not_inspected（理由あり） ④not_applicable（理由あり） ⑤null で保存／提出 | ①〜④ドラフト保存可・提出可 ⑤ドラフト保存可・提出はVALIDATION。初期値はnullで「normal」が既定選択されない |
 
@@ -154,7 +154,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-T05-N | in_progress案件、outdoor 5部品。When: compressor=attention（理由あり）、他4部品normalでドラフト保存→提出 | ①ドラフト保存でreportVersion=1 ②提出成功、5部品の結果・作者・観測時刻が版に紐付く ③センサー推定は別根拠として残る |
+| AT-T05-N | tech-external-aがjob-contractor-aをstartしたin_progress案件、outdoor 5部品。When: compressor=attention（理由あり）、他4部品normalでドラフト保存→提出 | ①ドラフト保存でreportVersion=1 ②提出成功、5部品の結果・作者・観測時刻が版に紐付く ③センサー推定は別根拠として残る |
 | AT-T05-E | 提出時に ①result=null 1部品 ②測定に単位なし ③not_inspected理由なし ④本人の閲覧scope内だが別案件のattachmentId | 各VALIDATION、提出0件 |
 | AT-T05-B | outdoor 5部品を ①normal ②attention（理由あり） ③not_inspected（理由あり） ④not_applicable（理由あり） ⑤null で保存／提出 | ①〜④ドラフト保存可・提出可 ⑤ドラフト保存可・提出はVALIDATION。初期値はnull |
 
@@ -173,7 +173,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-T06-N | in_progress案件、electrical 5部品。When: capacitor=attention（理由あり、測定値付き）、他4部品normalでドラフト保存→提出 | ①ドラフト保存でreportVersion=1 ②提出成功、5部品の結果・作者・観測時刻が版に紐付く ③測定値にunit・observedAt・origin=inspection |
+| AT-T06-N | tech-external-aがjob-contractor-aをstartしたin_progress案件、electrical 5部品。When: capacitor=attention（理由あり、測定値付き）、他4部品normalでドラフト保存→提出 | ①ドラフト保存でreportVersion=1 ②提出成功、5部品の結果・作者・観測時刻が版に紐付く ③測定値にunit・observedAt・origin=inspection |
 | AT-T06-E | 提出時に ①result=null 1部品 ②測定に単位なし ③not_inspected理由なし ④本人の閲覧scope内だが別案件のattachmentId | 各VALIDATION、提出0件 |
 | AT-T06-B | electrical 5部品を ①normal ②attention（理由あり） ③not_inspected（理由あり） ④not_applicable（理由あり） ⑤null で保存／提出 | ①〜④ドラフト保存可・提出可 ⑤ドラフト保存可・提出はVALIDATION。初期値はnull |
 
@@ -198,7 +198,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-T07-N | unit-online-rtoにopen Alert（evidenceKind=inferred）。When: 根拠を開く→acknowledge→再測定で回復条件成立 | ①計測／推定／点検が区別表示 ②acknowledged、acknowledgedAt・主体 ③resolved、resolvedAt ④再発は新alertIdでpreviousAlertId |
+| AT-T07-N | `acceptancePatches["AT-T07-N"]`: unit-online-rtoにpolicy-temp-a（temperature gte 30°C、recoveryThreshold 28°C、duration 60秒）由来のopen Alert（alert-temp-a）、根拠は計測・推定・点検の3件。tech-internal-aで操作。When: 根拠を開く→acknowledge→28°C未満の再測定を60秒継続→同じ条件を再び60秒満たす | ①計測／推定／点検が区別表示 ②acknowledged、acknowledgedAt・主体 ③resolved、resolvedAt ④再発は新alertIdでpreviousAlertId=元のID（IR66） |
 | AT-T07-E | ①未解消AlertのJobだけcompletedにする ②heartbeat途絶だけを与える | ①Alert.status不変 ②盗難表示なし、connection=offlineのみ |
 | AT-T07-B | ①確信度なしの推定 ②alert.resolveあり理由付き ③権限なし ④再測定で回復 | ①確率数値なし ②resolved ③FORBIDDEN ④resolved |
 
@@ -217,8 +217,8 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-T08-N | assigned案件、期間内。When: start→編集→submit→HQがreturn→resumeRework→submit | ①in_progress、startedAt ②submitted、reportVersion=1 ③rework_requested ④in_progressへ戻り新版v2で提出 |
-| AT-T08-E | ①requested／cancelled／on_holdでstart ②担当期限外でsubmit ③in_progressでsubmitをUNAVAILABLE | ①CONFLICT ②FORBIDDEN ③in_progressとドラフト保持 |
+| AT-T08-N | assignedのjob-contractor-a（作業窓内）、tech-external-a。When: start→編集→submit→contractor-aがreturn（外注案件の品質確認、IR93）→resumeRework→submit | ①in_progress、startedAt ②submitted、reportVersion=1 ③rework_requested ④in_progressへ戻り新版v2で提出 |
+| AT-T08-E | ①requestedで未割当のjob-internal-aをstart／HQがjob-contractor-aを取消した後にstart／start後にHQがjobs.holdしたon_holdのjob-contractor-aをstart ②担当期限外でsubmit ③in_progressでsubmitをUNAVAILABLE | ①NOT_FOUND／FORBIDDEN（errors.assignment_ended）／CONFLICT（IR93） ②FORBIDDEN ③in_progressとドラフト保持 |
 | AT-T08-B | ①assignedでstart ②submittedで編集 ③rework_requestedでresumeRework | ①in_progress ②読取専用、保存不可 ③in_progress |
 
 設計: [DD-T08](../02-design/technician.md#dd-t08-詳細)。親ケースAT-T08は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
@@ -230,13 +230,13 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 - **利用開始条件**: 「作業中(in_progress)」または「やり直し作業中」であること。点検項目と下書き(ドラフト)を取得できていること。
 - **基本フロー**: 点検・測定値・写真・交換した部品・作業内容・次回の対応を入力する → 下書きを保存する → 提出前にチェックする → 報告のバージョンを確定する。
-- **業務規則 BR-T09**: 報告には、作成者とバージョンの情報を残す。画像はJPEGまたはPNG形式で、1枚あたり5MiB以下、最大10枚まで。部品の数量は正の整数で入力する。次回の対応は「なし(none)」か、日時・内容をはっきり書く。サーバーから情報を再取得しても、まだ保存していない編集中の内容(dirty)は消さない。
+- **業務規則 BR-T09**: 報告には、作成者とバージョンの情報を残す。画像はJPEGまたはPNG形式で、1枚あたり5MiB以下、最大10枚まで。部品の数量は正の整数で入力する。次回の対応は「なし(none)」か、日時・内容をはっきり書く。作業窓の中でサーバーから情報を再取得しても、まだ保存していない編集中の内容(dirty)は消さない。作業窓の終了15分前に予告し、終了時は未保存の入力を破棄して通知する(IR89)。
 - **完了後の業務状態**: 保存に成功すると、下書きのバージョンが更新される。提出すると、確定した報告のバージョン(reportVersion)を案件(Job)に結びつける。写真を削除すると、一時的な画像データ(object URL)を解放する。
 - **境界条件・禁止事項**: 本文が9文字以下、または4001文字以上のとき、部品の数量が0のときは、提出を拒否する。偽のファイル形式、11枚目の画像、5MiBを超える画像は、追加自体を拒否する。画像の処理に失敗した場合は「失敗(failed)」と表示し、失敗した写真が残ったままでは提出できない。すでに保存済みの本文や画像は、そのまま残す。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-T09-N | in_progress案件。When: 本文50文字、写真JPEG 1枚、部品1点、nextAction=noneでドラフト保存→提出 | ①初回本文保存はdraft version=1。写真追加後は版+1、Attachment status=ready。最新reports.getの版で提出 ②提出でreportVersion固定、JobにreportRefs ③写真削除でobject URL解放 |
+| AT-T09-N | tech-external-aがjob-contractor-aをstartしたin_progress案件。When: 本文50文字、写真JPEG 1枚、部品1点、nextAction=noneでドラフト保存→提出 | ①初回本文保存はdraft version=1。写真追加後は版+1、Attachment status=ready。最新reports.getの版で提出 ②提出でreportVersion固定、JobにreportRefs ③写真削除でobject URL解放 |
 | AT-T09-E | ①本文9／4001文字 ②偽MIME ③11枚目 ④5MiB+1byte ⑤部品数量0 ⑥failed写真が残る | ①⑤⑥提出VALIDATION ②③④追加拒否 全ケースで保存済み本文・画像は保持 |
 | AT-T09-B | ①5MiBちょうどのJPEG／PNG各10枚 ②数量1 ③nextAction=follow_up（未来日時・内容） ④dirty中にreports.get再取得 | ①追加可 ②提出可 ③提出可 ④dirty値が保持される |
 
@@ -255,8 +255,8 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-T10-N | 担当期間内、control.diagnose、unit-online-rto online。When: 通常診断set_mode=cool（理由付き）→試運転duration=5・endAction=power OFF開始→開始応答→終了時刻→終了応答 | ①Command1件（jobId・reason付き） ②DiagnosticRun awaiting_start→running、endAt=startedAt+5分 ③end_requested、終了Command1件 ④completed、「停止済み」表示 |
-| AT-T10-E | ①制限下限未満の温度 ②担当期間外 ③durationMinutes=16 ④reason空 ⑤終了応答なし | ①FORBIDDEN ②FORBIDDEN ③④VALIDATION ⑤end_failed、「停止済み」表示なし |
+| AT-T10-N | tech-external-a、job-contractor-a（作業窓内）、control.diagnose、unit-online-rto online。When: 通常診断set_mode=cool（理由付き）→試運転duration=5・endAction=power OFF開始→開始応答→終了時刻→終了応答 | ①Command1件（jobId・reason付き） ②DiagnosticRun awaiting_start→running、endAt=startedAt+5分 ③end_requested、終了Command1件 ④completed、「停止済み」表示 |
+| AT-T10-E | ①`acceptancePatches["AT-T10-E.1"]`でtech-internal-aがunit-limited（下限24°C）の担当案件job-t10-limitedに23°Cを要求 ②〜⑤はtech-external-a・job-contractor-aで ②担当期間外 ③durationMinutes=16 ④reason空 ⑤終了応答なし | ①FORBIDDEN ②FORBIDDEN ③④VALIDATION ⑤end_failed、「停止済み」表示なし |
 | AT-T10-B | ①未完了Commandあり ②FW更新中 ③終了時計到来のみ ④終了応答到来 | ①②CONFLICT ③end_requested（停止済みではない） ④completed |
 
 **追加受入条件 AT-T10-R01（再訪・競合・役割横断）**
@@ -280,8 +280,8 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-T11-N | device.maintain、担当unit。When: serial ac-001登録→紐付け→check→校正（同単位）→FW v2更新→成功イベント | ①Device作成、serial=AC-001 ②bind成功 ③DeviceOperation succeeded ④CalibrationRecord追加、既存測定値不変 ⑤firmwareVersion=v2 |
-| AT-T11-E | ①「ac-001 」を再登録 ②他設備へ理由なし再紐付け ③offlineで更新 ④校正単位不一致 ⑤FW失敗イベント | ①CONFLICT ②VALIDATION ③OFFLINE ④VALIDATION ⑤failed、旧版保持 |
+| AT-T11-N | `acceptancePatches["AT-T11-N"]`: 機器が未紐付のunit-t11-newとその担当案件job-t11をtech-internal-a（device.maintain）に用意。When: serial ac-001登録→紐付け→check→校正（同単位）→FW v2更新→成功イベント | ①Device作成、serial=AC-001 ②bind成功 ③DeviceOperation succeeded ④CalibrationRecord追加、既存測定値不変 ⑤firmwareVersion=v2 |
+| AT-T11-E | tech-internal-aで ①AT-T11-Nの登録後に「ac-001 」を再登録 ②他設備へ理由なし再紐付け ③device-offline-rtoで更新 ④校正単位不一致 ⑤FW失敗イベント | ①CONFLICT ②VALIDATION ③OFFLINE ④VALIDATION ⑤failed、旧版保持 |
 | AT-T11-B | ①小文字／大文字serial ②校正前後の測定履歴 ③対応／非対応FW | ①同一判定 ②履歴追記、既存値不変 ③対応のみ選択可 |
 
 **追加受入条件 AT-T11-R01（再訪・競合・役割横断）**
@@ -299,13 +299,13 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 - **利用開始条件**: 担当している機器(Device)について、イベント(発生した出来事)を見る権限があること。
 - **基本フロー**: 「通信が切れた」「電源が切れた」「取り外しを検知した」を、それぞれ別々に模擬(シミュレーション)で発生させる → 通知を確認する → 対応のメモを書く → 復旧・確認の内容を記録する。
-- **業務規則 BR-T12**: 「接続の状態(connection)」と「取り外しの検知(tamper)」は、別々に管理する。電源が切れたと判定するのは、電源専用の信号のデモがあるときだけ。心拍信号(heartbeat)がないというだけで、「電源が切れた」と決めつけない。
+- **業務規則 BR-T12**: 「接続の状態(connection)」と「取り外しの検知(tamper)」は、別々に管理する。根拠の種類(evidenceSource)は事象の種類から決まる(IR74)。電源が切れたと判定するのは、電源専用の信号のデモがあるときだけ。心拍信号(heartbeat)がないというだけで、「電源が切れた」と決めつけない。
 - **完了後の業務状態**: 検知した時刻・観測した根拠・対応内容・復旧した時刻は、それぞれ別のイベントとして保存する。通知を確認しても、機器の実際の物理的な状態は変わらない。
 - **境界条件・禁止事項**: 通信が再接続しても、まだ確認していない取り外し(tamper)のアラートは消えない。順番が入れ替わって届いた古い心拍信号(heartbeat)によって、「オンライン」に戻してはいけない。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-T12-N | device-tamper。When: communication_lost→power_lost→tamper→responseNote→restored | ①3事象を別イベント、occurredAt ②responseNoteで物理状態不変 ③restoredAt保存、tamperアラートは残る |
+| AT-T12-N | tech-internal-a（device-tamperのunit-non-rtoは担当scope内）、device-tamper。When: communication_lost→power_lost→tamper→responseNote→restored | ①3事象を別イベント、occurredAt ②responseNoteで物理状態不変 ③restoredAt保存、tamperアラートは残る |
 | AT-T12-E | ①tamper未確認のまま通信復旧 ②新しい通信断の後に古いheartbeat | ①tamperアラート残存 ②offlineのまま |
 | AT-T12-B | ①heartbeat途絶 ②power_signal断 ③tamper_signal | ①offlineのみ ②電源断 ③tamper、それぞれ独立 |
 
@@ -314,6 +314,6 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 0.9.0修正契約: [厳格レビュー修正契約](../02-design/strict-review-contracts.md)と[操作別版契約](../02-design/write-version-catalog.csv)を併読する。
 
-現行0.17.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+現行0.19.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 案件一覧には状態（業務順）・重大度・期限の昇順/降順ソートを設ける。デフォルトは状態の業務順（IR34）。全対象を並べ替えてからページ分割し、言語切替では順序を変えない。受入はAT-REV16-005を併用する。

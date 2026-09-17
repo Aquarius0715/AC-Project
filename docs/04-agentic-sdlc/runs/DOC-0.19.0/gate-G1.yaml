@@ -1,0 +1,25 @@
+gate_id: G1
+task_id: DOC-0.19.0
+gate_result: pending
+spec_baseline_id: 048ffcef25f8463bca33346f5bb1dd8dbb1fdad03b61132d1cfc5d17ebeb1ac2
+reviewed_target: DOC-0.18.0 working tree (uncommitted, no baseline)
+reviewer_agent: independent-review-opus-5 (本会話。DOC-0.18.0の修正担当セッションとは別)
+specification_editor: independent-review-opus-5 (本会話、同一エージェント)
+orchestrator: independent-review-opus-5 (本会話)
+independent_post_correction_review: requested  # 別エージェントへ依頼。判定結果は independent-g1/ に記録する
+self_rereview_after_correction: completed  # 1回目でREV19-037、3回目（受入前提の全件点検）でREV19-038〜042を検出し修正、最終回で未解決0件
+application_tests: not_run
+implementation_status: not_started
+production_connection_readiness: NOT_READY
+deployment_approval: false
+unresolved_findings: []
+resolved_findings: [REV19-001, REV19-002, REV19-003, REV19-004, REV19-005, REV19-006, REV19-007, REV19-008, REV19-009, REV19-010, REV19-011, REV19-012, REV19-013, REV19-014, REV19-015, REV19-016, REV19-017, REV19-018, REV19-019, REV19-020, REV19-021, REV19-022, REV19-023, REV19-024, REV19-025, REV19-026, REV19-027, REV19-028, REV19-029, REV19-030, REV19-031, REV19-032, REV19-033, REV19-036, REV19-037, REV19-038, REV19-039, REV19-040, REV19-041, REV19-042]
+answered_questions: [REV19-034, REV19-035]
+user_accepted_decisions: [DEC-44, DEC-50]
+pending_business_decisions: []
+proposed_reversible_decisions: [DEC-42, DEC-43, DEC-45, DEC-46, DEC-47, DEC-48, DEC-49, DEC-51, DEC-52, DEC-53]
+traceability: {OK: 64, INCOMPLETE: 0, MISSING: 0, CONFLICT: 0}
+static_check: passed
+validator_mutation_check: passed  # 62 mutations
+typescript_semantic_check: passed
+evidence_paths: [review.md, findings.json, traceability-matrix.csv, static-check.json, validator-negative-checks.json, spec-manifest.json]

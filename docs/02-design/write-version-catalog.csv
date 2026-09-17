@@ -21,6 +21,7 @@ demo.trigger,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指
 demoSession.signIn,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
 demoSession.signOut,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
 demoSession.switchMembership,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
+demoSession.extend,all,none,none,omit,none,IR55; expired session UNAUTHENTICATED; no business effect
 devices.addResponseNote,all,device event,devices.events,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
 devices.bind,all,device,devices.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
 devices.calibrate,all,device,devices.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0

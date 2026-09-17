@@ -1,6 +1,6 @@
 ---
 agent_id: review-agent
-version: 0.17.0
+version: 0.19.0
 status: proposed-agent-profile
 scope: frontend-demo-1A
 ---

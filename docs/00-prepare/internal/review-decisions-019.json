@@ -1,0 +1,214 @@
+{
+  "version": "0.19.0",
+  "scope": "frontend-demo-1A",
+  "review_id": "INDEPENDENT-DOC-0.18.0-REV19-2026-09-17",
+  "note": "本レビューで修正担当が採用した可逆的な設計提案。README規約のPROPOSEDに相当し、1Aデモ実装は進行可能。企業承認・商用確定ではない。owner欄は企業検収前に確認する担当候補。",
+  "decisions": [
+    {
+      "id": "DEC-42",
+      "issue_id": "REV19-002",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "作業窓の開始前は技術者画面でunits.get等を呼ばず、状態work-not-startedで案件を読取表示するか",
+      "selected": {
+        "before_scheduled_start": "jobs.get only; units.get disabled",
+        "unit_page_forbidden": "work-not-started with start time"
+      },
+      "owner": "Security / UI/UX",
+      "contract": "IR76"
+    },
+    {
+      "id": "DEC-43",
+      "issue_id": "REV19-003",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "生存シミュレーターはmeasured/valid/非nullの最新値だけを複写し、デモ投入のsequenceは省略時に自動採番するか",
+      "selected": {
+        "copy_condition": "origin=measured, quality=valid, value!=null",
+        "sequence": "optional, latest+1"
+      },
+      "owner": "IoT / Product Owner",
+      "contract": "IR77"
+    },
+    {
+      "id": "DEC-44",
+      "issue_id": "REV19-004",
+      "status": "accepted",
+      "decision_status": "accepted",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "管理ダッシュボードの『削減量の予想』を、対象設備集合と一致する仮定基準の按分と有効slot平均からの外挿で算出し、seedに既定の仮定基準を置くか",
+      "selected": {
+        "forecast": "prorated demo_fixed baseline minus extrapolated valid-slot average",
+        "seed_baseline": "baseline-demo-tenant-a 2592 kWh / 30 days / 5 units",
+        "labels": {
+          "no_units": "対象設備なし",
+          "baseline_unavailable": "基準未設定",
+          "other_null": "算定不可"
+        }
+      },
+      "owner": "Product Owner / Business",
+      "contract": "IR78",
+      "decided_by": "本会話のユーザー",
+      "decided_at": "2026-09-17",
+      "decided_at_precision": "day",
+      "answer": "Aで大丈夫です",
+      "source": "ユーザー回答:「1に関して、Aで大丈夫です」"
+    },
+    {
+      "id": "DEC-45",
+      "issue_id": "REV19-008",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "未認証時のログイン後の復帰先をURLクエリreturnToで受け渡し、不正値は無視するか",
+      "selected": {
+        "transport": "/login?returnTo=encodeURIComponent(path+search)",
+        "invalid": "removed and ignored"
+      },
+      "owner": "Frontend / Security",
+      "contract": "IR82"
+    },
+    {
+      "id": "DEC-46",
+      "issue_id": "REV19-009",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "再取得中は表示データを保持してaria-busyの更新中表示とし、同じ1秒tickの購読イベントによる無効化をkeyごとに1回へまとめるか",
+      "selected": {
+        "refetch_display": "keep data, aria-busy, no skeleton",
+        "coalesce": "per query key per 1s tick"
+      },
+      "owner": "UI/UX / Frontend",
+      "contract": "IR83"
+    },
+    {
+      "id": "DEC-47",
+      "issue_id": "REV19-010",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "位置情報同意の初期記録をseedと顧客Membership作成時に作るか",
+      "selected": {
+        "seed": "granted=false version=1 per client membership",
+        "members_save": "creates initial consent"
+      },
+      "owner": "Security / Product Owner",
+      "contract": "IR84"
+    },
+    {
+      "id": "DEC-48",
+      "issue_id": "REV19-012",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "期限切れの未応答Offerへの受諾・辞退をCONFLICT(errors.offer_expired)、案件の個別取得をNOT_FOUNDとするか",
+      "selected": {
+        "accept_decline_after_expiry": "CONFLICT errors.offer_expired",
+        "jobs_get_after_expiry": "NOT_FOUND"
+      },
+      "owner": "Product Owner / Security",
+      "contract": "IR86"
+    },
+    {
+      "id": "DEC-49",
+      "issue_id": "REV19-013",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "理由系入力（reason/resolutionReason/reviewComment等）の上限を1000文字に統一するか",
+      "selected": {
+        "reason_fields_max": 1000
+      },
+      "owner": "UI/UX / Product Owner",
+      "contract": "IR87"
+    },
+    {
+      "id": "DEC-50",
+      "issue_id": "REV19-015",
+      "status": "accepted",
+      "decision_status": "accepted",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "作業窓の終了15分前に予告し、終了時は未保存入力を破棄して通知し、HQ/業者には再割当が必要な表示を出すか",
+      "selected": {
+        "warning_before_minutes": 15,
+        "on_end": "discard unsaved input with notice",
+        "hq_contractor_badge": "assigned/in_progress and scheduledSlot.endAt<=now"
+      },
+      "owner": "Product Owner / UI/UX",
+      "contract": "IR89",
+      "decided_by": "本会話のユーザー",
+      "decided_at": "2026-09-17",
+      "decided_at_precision": "day",
+      "answer": "現在の案で大丈夫です",
+      "source": "ユーザー回答:「２に関して、現在の案で大丈夫です」"
+    },
+    {
+      "id": "DEC-51",
+      "issue_id": "REV19-018",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "機器操作（check/firmware）中の設備への制限Commandを未配送意図として保留するか",
+      "selected": {
+        "restriction_command_during_device_operation": "delivery=not_sent, pendingReason=device_operation_running"
+      },
+      "owner": "IoT / Business",
+      "contract": "IR90"
+    },
+    {
+      "id": "DEC-52",
+      "issue_id": "REV19-022",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "非同期の受付監査をpendingで記録し、確定時に同じcorrelationIdで結果を追記するか",
+      "selected": {
+        "pending_audit": "accepted async operations",
+        "finalize": "append success/failed"
+      },
+      "owner": "Security / Product Owner",
+      "contract": "IR90"
+    },
+    {
+      "id": "DEC-53",
+      "issue_id": "REV19-017",
+      "status": "proposed",
+      "decision_status": "proposed",
+      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_at": "2026-09-17",
+      "reversible": true,
+      "question": "連絡可能時間の判定規則を維持し、HH:mm形式の入力案内を表示するか",
+      "selected": {
+        "rule": "unchanged (IR64)",
+        "hint": "Weekdays 09:00-18:00"
+      },
+      "owner": "UI/UX / Security",
+      "contract": "IR90"
+    }
+  ]
+}

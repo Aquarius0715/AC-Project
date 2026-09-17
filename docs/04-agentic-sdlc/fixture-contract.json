@@ -1,5 +1,5 @@
 {
-  "version": "0.17.0",
+  "version": "0.19.0",
   "isDemo": true,
   "clock": "2026-09-14T01:00:00.000Z",
   "actors": [
@@ -485,5 +485,2402 @@
       "reset"
     ],
     "memoryRetention": "until reset; long-running capacity deferred"
-  }
+  },
+  "demoSeed": {
+    "note": "IR69: 初期業務データの正。ここに無い業務記録をRepositoryが補わない。受入GivenはこのseedへのpatchesとしてIR69のfactoryで適用する。値はすべて架空。 省略した共通項目・null・配列・派生値はIR91の正規化規則で補い、正規DTO schemaで検証する。",
+    "simulator": {
+      "enabled": true,
+      "contract": "IR45"
+    },
+    "tenants": [
+      "tenant-a",
+      "tenant-b"
+    ],
+    "organizations": [
+      {
+        "id": "org-customer-a",
+        "tenantId": "tenant-a",
+        "kind": "customer",
+        "name": "Demo Customer A",
+        "status": "active"
+      },
+      {
+        "id": "org-customer-b",
+        "tenantId": "tenant-a",
+        "kind": "customer",
+        "name": "Demo Customer B",
+        "status": "active"
+      },
+      {
+        "id": "org-contractor-a",
+        "tenantId": "tenant-a",
+        "kind": "contractor",
+        "name": "Demo Contractor A",
+        "status": "active"
+      },
+      {
+        "id": "org-contractor-b",
+        "tenantId": "tenant-a",
+        "kind": "contractor",
+        "name": "Demo Contractor B",
+        "status": "active"
+      },
+      {
+        "id": "org-operator-a",
+        "tenantId": "tenant-a",
+        "kind": "operator",
+        "name": "Demo HQ",
+        "status": "active"
+      },
+      {
+        "id": "org-customer-tb",
+        "tenantId": "tenant-b",
+        "kind": "customer",
+        "name": "Demo Customer Tenant B",
+        "status": "active"
+      }
+    ],
+    "customers": [
+      {
+        "id": "cust-a",
+        "tenantId": "tenant-a",
+        "organizationId": "org-customer-a",
+        "name": "Demo Customer A",
+        "status": "active",
+        "serviceProfile": "rto"
+      },
+      {
+        "id": "cust-b",
+        "tenantId": "tenant-a",
+        "organizationId": "org-customer-b",
+        "name": "Demo Customer B",
+        "status": "active",
+        "serviceProfile": "general"
+      },
+      {
+        "id": "cust-tb",
+        "tenantId": "tenant-b",
+        "organizationId": "org-customer-tb",
+        "name": "Demo Customer Tenant B",
+        "status": "active",
+        "serviceProfile": "general"
+      }
+    ],
+    "properties": [
+      {
+        "id": "property-home-a",
+        "customerOrgId": "org-customer-a",
+        "kind": "home",
+        "name": "Home A",
+        "address": "1 Demo Street, Kuala Lumpur (fictional)",
+        "accessInstructions": "Ring the demo bell (fictional)",
+        "archived": false
+      },
+      {
+        "id": "property-office-a",
+        "customerOrgId": "org-customer-a",
+        "kind": "office",
+        "name": "Office A",
+        "address": "2 Demo Avenue, Kuala Lumpur (fictional)",
+        "accessInstructions": null,
+        "archived": false
+      },
+      {
+        "id": "property-home-b",
+        "customerOrgId": "org-customer-b",
+        "kind": "home",
+        "name": "Home B",
+        "address": null,
+        "accessInstructions": null,
+        "archived": false
+      },
+      {
+        "id": "property-home-tb",
+        "customerOrgId": "org-customer-tb",
+        "kind": "home",
+        "name": "Home TB",
+        "address": null,
+        "accessInstructions": null,
+        "archived": false
+      }
+    ],
+    "spaces": [
+      {
+        "id": "floor-1",
+        "propertyId": "property-home-a",
+        "parentSpaceId": null,
+        "kind": "floor",
+        "name": "1F"
+      },
+      {
+        "id": "room-1",
+        "propertyId": "property-home-a",
+        "parentSpaceId": "floor-1",
+        "kind": "room",
+        "name": "Bedroom"
+      },
+      {
+        "id": "room-2",
+        "propertyId": "property-home-a",
+        "parentSpaceId": "floor-1",
+        "kind": "room",
+        "name": "Living room"
+      },
+      {
+        "id": "floor-office-1",
+        "propertyId": "property-office-a",
+        "parentSpaceId": null,
+        "kind": "floor",
+        "name": "Office 1F"
+      },
+      {
+        "id": "room-office-1",
+        "propertyId": "property-office-a",
+        "parentSpaceId": "floor-office-1",
+        "kind": "room",
+        "name": "Meeting room"
+      },
+      {
+        "id": "room-b-1",
+        "propertyId": "property-home-b",
+        "parentSpaceId": null,
+        "kind": "room",
+        "name": "Bedroom"
+      },
+      {
+        "id": "room-tb-1",
+        "propertyId": "property-home-tb",
+        "parentSpaceId": null,
+        "kind": "room",
+        "name": "Bedroom"
+      }
+    ],
+    "capabilities": [
+      {
+        "id": "ventilation-demo",
+        "version": 3,
+        "manufacturer": "DemoAir",
+        "model": "SPL-200V",
+        "control": true,
+        "modeControl": true,
+        "fanControl": true,
+        "temperature": {
+          "min": 16,
+          "max": 30,
+          "step": 1
+        },
+        "modes": [
+          "cool",
+          "dry",
+          "fan"
+        ],
+        "fanLevels": [
+          "low",
+          "mid",
+          "high"
+        ],
+        "ventilation": true,
+        "ventilationLevels": [
+          "low",
+          "mid",
+          "high"
+        ],
+        "sensors": [
+          {
+            "metric": "temperature",
+            "unit": "°C",
+            "staleAfterSeconds": 120,
+            "boundaryId": null
+          },
+          {
+            "metric": "humidity",
+            "unit": "%",
+            "staleAfterSeconds": 120,
+            "boundaryId": null
+          },
+          {
+            "metric": "co2",
+            "unit": "ppm",
+            "staleAfterSeconds": 120,
+            "boundaryId": null
+          },
+          {
+            "metric": "pm25",
+            "unit": "µg/m³",
+            "staleAfterSeconds": 120,
+            "boundaryId": null
+          },
+          {
+            "metric": "power",
+            "unit": "kW",
+            "staleAfterSeconds": 120,
+            "boundaryId": "ac_input_electricity"
+          }
+        ],
+        "firmwareCandidates": [
+          "v1",
+          "v2"
+        ]
+      },
+      {
+        "id": "cap-split-std",
+        "version": 1,
+        "manufacturer": "DemoAir",
+        "model": "SPL-100",
+        "control": true,
+        "modeControl": true,
+        "fanControl": true,
+        "temperature": {
+          "min": 16,
+          "max": 30,
+          "step": 1
+        },
+        "modes": [
+          "cool",
+          "dry",
+          "fan"
+        ],
+        "fanLevels": [
+          "low",
+          "mid",
+          "high"
+        ],
+        "ventilation": false,
+        "ventilationLevels": [],
+        "sensors": [
+          {
+            "metric": "temperature",
+            "unit": "°C",
+            "staleAfterSeconds": 120,
+            "boundaryId": null
+          },
+          {
+            "metric": "humidity",
+            "unit": "%",
+            "staleAfterSeconds": 120,
+            "boundaryId": null
+          },
+          {
+            "metric": "co2",
+            "unit": "ppm",
+            "staleAfterSeconds": 120,
+            "boundaryId": null
+          },
+          {
+            "metric": "pm25",
+            "unit": "µg/m³",
+            "staleAfterSeconds": 120,
+            "boundaryId": null
+          },
+          {
+            "metric": "power",
+            "unit": "kW",
+            "staleAfterSeconds": 120,
+            "boundaryId": "ac_input_electricity"
+          }
+        ],
+        "firmwareCandidates": [
+          "v1",
+          "v2"
+        ]
+      }
+    ],
+    "units": [
+      {
+        "id": "unit-online-rto",
+        "version": 7,
+        "customerOrgId": "org-customer-a",
+        "propertyId": "property-home-a",
+        "spaceId": "room-1",
+        "displayName": "Bedroom AC",
+        "modelId": "ventilation-demo",
+        "capabilityVersion": 3,
+        "installedAt": "2025-06-01T00:00:00.000Z",
+        "serviceScope": [
+          "indoor",
+          "outdoor",
+          "electrical"
+        ],
+        "archived": false,
+        "observedState": {
+          "power": true,
+          "celsius": 26,
+          "mode": "cool",
+          "fanLevel": "mid",
+          "observedAt": "2026-09-14T00:59:30.000Z"
+        },
+        "observedRestriction": null
+      },
+      {
+        "id": "unit-non-rto",
+        "version": 1,
+        "customerOrgId": "org-customer-a",
+        "propertyId": "property-home-a",
+        "spaceId": "room-2",
+        "displayName": "Living room AC",
+        "modelId": "cap-split-std",
+        "capabilityVersion": 1,
+        "installedAt": null,
+        "serviceScope": [
+          "indoor",
+          "outdoor",
+          "electrical"
+        ],
+        "archived": false,
+        "observedState": {
+          "power": false,
+          "celsius": 26,
+          "mode": "cool",
+          "fanLevel": "low",
+          "observedAt": "2026-09-14T00:59:30.000Z"
+        },
+        "observedRestriction": null
+      },
+      {
+        "id": "unit-offline-rto",
+        "version": 1,
+        "customerOrgId": "org-customer-a",
+        "propertyId": "property-office-a",
+        "spaceId": "room-office-1",
+        "displayName": "Meeting room AC",
+        "modelId": "cap-split-std",
+        "capabilityVersion": 1,
+        "installedAt": "2025-07-01T00:00:00.000Z",
+        "serviceScope": [
+          "indoor",
+          "outdoor",
+          "electrical"
+        ],
+        "archived": false,
+        "observedState": {
+          "power": true,
+          "celsius": 25,
+          "mode": "cool",
+          "fanLevel": "mid",
+          "observedAt": "2026-09-14T00:30:00.000Z"
+        },
+        "observedRestriction": null
+      },
+      {
+        "id": "unit-limited",
+        "version": 2,
+        "customerOrgId": "org-customer-a",
+        "propertyId": "property-office-a",
+        "spaceId": null,
+        "displayName": "Lobby AC",
+        "modelId": "cap-split-std",
+        "capabilityVersion": 1,
+        "installedAt": "2025-07-01T00:00:00.000Z",
+        "serviceScope": [
+          "indoor",
+          "outdoor",
+          "electrical"
+        ],
+        "archived": false,
+        "observedState": {
+          "power": true,
+          "celsius": 24,
+          "mode": "cool",
+          "fanLevel": "mid",
+          "observedAt": "2026-09-14T00:59:30.000Z"
+        },
+        "observedRestriction": {
+          "restrictionId": "restriction-limited-a",
+          "rulesVersion": "demo-v1",
+          "policy": {
+            "kind": "temperature_limit",
+            "minimumCoolingSetpoint": 24
+          },
+          "observedAt": "2026-09-13T00:00:20.000Z"
+        }
+      },
+      {
+        "id": "unit-other-customer",
+        "version": 1,
+        "customerOrgId": "org-customer-b",
+        "propertyId": "property-home-b",
+        "spaceId": "room-b-1",
+        "displayName": "Bedroom AC B",
+        "modelId": "cap-split-std",
+        "capabilityVersion": 1,
+        "installedAt": null,
+        "serviceScope": [
+          "indoor"
+        ],
+        "archived": false,
+        "observedState": {
+          "power": null,
+          "celsius": null,
+          "mode": null,
+          "fanLevel": null,
+          "observedAt": null
+        },
+        "observedRestriction": null
+      },
+      {
+        "id": "unit-tenant-b",
+        "version": 1,
+        "customerOrgId": "org-customer-tb",
+        "propertyId": "property-home-tb",
+        "spaceId": "room-tb-1",
+        "displayName": "Tenant B AC",
+        "modelId": "cap-split-std",
+        "capabilityVersion": 1,
+        "installedAt": null,
+        "serviceScope": [
+          "indoor"
+        ],
+        "archived": false,
+        "observedState": {
+          "power": null,
+          "celsius": null,
+          "mode": null,
+          "fanLevel": null,
+          "observedAt": null
+        },
+        "observedRestriction": null
+      }
+    ],
+    "devices": [
+      {
+        "id": "device-online-rto",
+        "unitId": "unit-online-rto",
+        "bindingId": "binding-online-rto",
+        "serial": "AC-DEMO-0001",
+        "connection": "online",
+        "lastSeenAt": "2026-09-14T00:59:30.000Z",
+        "firmwareVersion": "v1",
+        "powerSignal": "on",
+        "tamper": "clear",
+        "targetUnitId": "unit-online-rto",
+        "createdByMembershipId": "system-demo",
+        "sensors": [
+          {
+            "id": "sensor-online-temperature",
+            "deviceId": "device-online-rto",
+            "metric": "temperature",
+            "unit": "°C",
+            "staleAfterSeconds": 120,
+            "boundaryId": null,
+            "calibratedAt": null
+          },
+          {
+            "id": "sensor-online-humidity",
+            "deviceId": "device-online-rto",
+            "metric": "humidity",
+            "unit": "%",
+            "staleAfterSeconds": 120,
+            "boundaryId": null,
+            "calibratedAt": null
+          },
+          {
+            "id": "sensor-online-co2",
+            "deviceId": "device-online-rto",
+            "metric": "co2",
+            "unit": "ppm",
+            "staleAfterSeconds": 120,
+            "boundaryId": null,
+            "calibratedAt": null
+          },
+          {
+            "id": "sensor-online-pm25",
+            "deviceId": "device-online-rto",
+            "metric": "pm25",
+            "unit": "µg/m³",
+            "staleAfterSeconds": 120,
+            "boundaryId": null,
+            "calibratedAt": null
+          },
+          {
+            "id": "sensor-online-power",
+            "deviceId": "device-online-rto",
+            "metric": "power",
+            "unit": "kW",
+            "staleAfterSeconds": 120,
+            "boundaryId": "ac_input_electricity",
+            "calibratedAt": null
+          }
+        ]
+      },
+      {
+        "id": "device-tamper",
+        "unitId": "unit-non-rto",
+        "bindingId": "binding-tamper",
+        "serial": "AC-DEMO-0002",
+        "connection": "online",
+        "lastSeenAt": "2026-09-14T00:59:30.000Z",
+        "firmwareVersion": "v1",
+        "powerSignal": "on",
+        "tamper": "clear",
+        "targetUnitId": "unit-non-rto",
+        "createdByMembershipId": "system-demo",
+        "sensors": [
+          {
+            "id": "sensor-tamper-temperature",
+            "deviceId": "device-tamper",
+            "metric": "temperature",
+            "unit": "°C",
+            "staleAfterSeconds": 120,
+            "boundaryId": null,
+            "calibratedAt": null
+          },
+          {
+            "id": "sensor-tamper-humidity",
+            "deviceId": "device-tamper",
+            "metric": "humidity",
+            "unit": "%",
+            "staleAfterSeconds": 120,
+            "boundaryId": null,
+            "calibratedAt": null
+          },
+          {
+            "id": "sensor-tamper-power",
+            "deviceId": "device-tamper",
+            "metric": "power",
+            "unit": "kW",
+            "staleAfterSeconds": 120,
+            "boundaryId": "ac_input_electricity",
+            "calibratedAt": null
+          }
+        ]
+      },
+      {
+        "id": "device-offline-rto",
+        "unitId": "unit-offline-rto",
+        "bindingId": "binding-offline-rto",
+        "serial": "AC-DEMO-0003",
+        "connection": "offline",
+        "lastSeenAt": "2026-09-14T00:30:00.000Z",
+        "firmwareVersion": "v1",
+        "powerSignal": "unknown",
+        "tamper": "clear",
+        "targetUnitId": "unit-offline-rto",
+        "createdByMembershipId": "system-demo",
+        "sensors": [
+          {
+            "id": "sensor-offline-temperature",
+            "deviceId": "device-offline-rto",
+            "metric": "temperature",
+            "unit": "°C",
+            "staleAfterSeconds": 120,
+            "boundaryId": null,
+            "calibratedAt": null
+          },
+          {
+            "id": "sensor-offline-power",
+            "deviceId": "device-offline-rto",
+            "metric": "power",
+            "unit": "kW",
+            "staleAfterSeconds": 120,
+            "boundaryId": "ac_input_electricity",
+            "calibratedAt": null
+          }
+        ]
+      },
+      {
+        "id": "device-limited",
+        "unitId": "unit-limited",
+        "bindingId": "binding-limited",
+        "serial": "AC-DEMO-0004",
+        "connection": "online",
+        "lastSeenAt": "2026-09-14T00:59:30.000Z",
+        "firmwareVersion": "v1",
+        "powerSignal": "on",
+        "tamper": "clear",
+        "targetUnitId": "unit-limited",
+        "createdByMembershipId": "system-demo",
+        "sensors": [
+          {
+            "id": "sensor-limited-temperature",
+            "deviceId": "device-limited",
+            "metric": "temperature",
+            "unit": "°C",
+            "staleAfterSeconds": 120,
+            "boundaryId": null,
+            "calibratedAt": null
+          },
+          {
+            "id": "sensor-limited-power",
+            "deviceId": "device-limited",
+            "metric": "power",
+            "unit": "kW",
+            "staleAfterSeconds": 120,
+            "boundaryId": "ac_input_electricity",
+            "calibratedAt": null
+          }
+        ]
+      },
+      {
+        "id": "device-no-sensor",
+        "unitId": "unit-other-customer",
+        "bindingId": "binding-no-sensor",
+        "serial": "AC-DEMO-0005",
+        "connection": "online",
+        "lastSeenAt": "2026-09-14T00:59:30.000Z",
+        "firmwareVersion": "v1",
+        "powerSignal": "on",
+        "tamper": "clear",
+        "targetUnitId": "unit-other-customer",
+        "createdByMembershipId": "system-demo",
+        "sensors": []
+      }
+    ],
+    "measurements": [
+      {
+        "id": "m-sensor-online-temperature-1",
+        "unitId": "unit-online-rto",
+        "sensorId": "sensor-online-temperature",
+        "metric": "temperature",
+        "value": 28.0,
+        "unit": "°C",
+        "observedAt": "2026-09-14T00:59:30.000Z",
+        "receivedAt": "2026-09-14T00:59:30.000Z",
+        "origin": "measured",
+        "quality": "valid",
+        "sequence": 1,
+        "boundaryId": null
+      },
+      {
+        "id": "m-sensor-online-humidity-1",
+        "unitId": "unit-online-rto",
+        "sensorId": "sensor-online-humidity",
+        "metric": "humidity",
+        "value": 60,
+        "unit": "%",
+        "observedAt": "2026-09-14T00:59:30.000Z",
+        "receivedAt": "2026-09-14T00:59:30.000Z",
+        "origin": "measured",
+        "quality": "valid",
+        "sequence": 1,
+        "boundaryId": null
+      },
+      {
+        "id": "m-sensor-online-co2-1",
+        "unitId": "unit-online-rto",
+        "sensorId": "sensor-online-co2",
+        "metric": "co2",
+        "value": 800,
+        "unit": "ppm",
+        "observedAt": "2026-09-14T00:59:30.000Z",
+        "receivedAt": "2026-09-14T00:59:30.000Z",
+        "origin": "measured",
+        "quality": "valid",
+        "sequence": 1,
+        "boundaryId": null
+      },
+      {
+        "id": "m-sensor-online-pm25-1",
+        "unitId": "unit-online-rto",
+        "sensorId": "sensor-online-pm25",
+        "metric": "pm25",
+        "value": 12,
+        "unit": "µg/m³",
+        "observedAt": "2026-09-14T00:59:30.000Z",
+        "receivedAt": "2026-09-14T00:59:30.000Z",
+        "origin": "measured",
+        "quality": "valid",
+        "sequence": 1,
+        "boundaryId": null
+      },
+      {
+        "id": "m-sensor-online-power-1",
+        "unitId": "unit-online-rto",
+        "sensorId": "sensor-online-power",
+        "metric": "power",
+        "value": 1.0,
+        "unit": "kW",
+        "observedAt": "2026-09-14T00:59:30.000Z",
+        "receivedAt": "2026-09-14T00:59:30.000Z",
+        "origin": "measured",
+        "quality": "valid",
+        "sequence": 1,
+        "boundaryId": "ac_input_electricity"
+      },
+      {
+        "id": "m-sensor-tamper-temperature-1",
+        "unitId": "unit-non-rto",
+        "sensorId": "sensor-tamper-temperature",
+        "metric": "temperature",
+        "value": 27.0,
+        "unit": "°C",
+        "observedAt": "2026-09-14T00:59:30.000Z",
+        "receivedAt": "2026-09-14T00:59:30.000Z",
+        "origin": "measured",
+        "quality": "valid",
+        "sequence": 1,
+        "boundaryId": null
+      },
+      {
+        "id": "m-sensor-tamper-humidity-1",
+        "unitId": "unit-non-rto",
+        "sensorId": "sensor-tamper-humidity",
+        "metric": "humidity",
+        "value": 58,
+        "unit": "%",
+        "observedAt": "2026-09-14T00:59:30.000Z",
+        "receivedAt": "2026-09-14T00:59:30.000Z",
+        "origin": "measured",
+        "quality": "valid",
+        "sequence": 1,
+        "boundaryId": null
+      },
+      {
+        "id": "m-sensor-tamper-power-1",
+        "unitId": "unit-non-rto",
+        "sensorId": "sensor-tamper-power",
+        "metric": "power",
+        "value": 0.0,
+        "unit": "kW",
+        "observedAt": "2026-09-14T00:59:30.000Z",
+        "receivedAt": "2026-09-14T00:59:30.000Z",
+        "origin": "measured",
+        "quality": "valid",
+        "sequence": 1,
+        "boundaryId": "ac_input_electricity"
+      },
+      {
+        "id": "m-sensor-offline-temperature-1",
+        "unitId": "unit-offline-rto",
+        "sensorId": "sensor-offline-temperature",
+        "metric": "temperature",
+        "value": 29.0,
+        "unit": "°C",
+        "observedAt": "2026-09-14T00:30:00.000Z",
+        "receivedAt": "2026-09-14T00:30:00.000Z",
+        "origin": "measured",
+        "quality": "valid",
+        "sequence": 1,
+        "boundaryId": null
+      },
+      {
+        "id": "m-sensor-offline-power-1",
+        "unitId": "unit-offline-rto",
+        "sensorId": "sensor-offline-power",
+        "metric": "power",
+        "value": 1.0,
+        "unit": "kW",
+        "observedAt": "2026-09-14T00:30:00.000Z",
+        "receivedAt": "2026-09-14T00:30:00.000Z",
+        "origin": "measured",
+        "quality": "valid",
+        "sequence": 1,
+        "boundaryId": "ac_input_electricity"
+      },
+      {
+        "id": "m-sensor-limited-temperature-1",
+        "unitId": "unit-limited",
+        "sensorId": "sensor-limited-temperature",
+        "metric": "temperature",
+        "value": 25.5,
+        "unit": "°C",
+        "observedAt": "2026-09-14T00:59:30.000Z",
+        "receivedAt": "2026-09-14T00:59:30.000Z",
+        "origin": "measured",
+        "quality": "valid",
+        "sequence": 1,
+        "boundaryId": null
+      },
+      {
+        "id": "m-sensor-limited-power-1",
+        "unitId": "unit-limited",
+        "sensorId": "sensor-limited-power",
+        "metric": "power",
+        "value": 1.0,
+        "unit": "kW",
+        "observedAt": "2026-09-14T00:59:30.000Z",
+        "receivedAt": "2026-09-14T00:59:30.000Z",
+        "origin": "measured",
+        "quality": "valid",
+        "sequence": 1,
+        "boundaryId": "ac_input_electricity"
+      }
+    ],
+    "contracts": [
+      {
+        "id": "contract-rto-a",
+        "version": 1,
+        "customerId": "cust-a",
+        "customerOrgId": "org-customer-a",
+        "unitIds": [
+          "unit-limited",
+          "unit-offline-rto",
+          "unit-online-rto"
+        ],
+        "planType": "rto",
+        "startAt": "2026-01-01T00:00:00.000Z",
+        "endAt": "2027-01-01T00:00:00.000Z",
+        "priceMinor": 12000,
+        "currency": "MYR",
+        "restrictionEligible": true,
+        "rulesVersion": "demo-v1"
+      },
+      {
+        "id": "contract-general-a",
+        "version": 1,
+        "customerId": "cust-a",
+        "customerOrgId": "org-customer-a",
+        "unitIds": [
+          "unit-non-rto"
+        ],
+        "planType": "general",
+        "startAt": "2026-01-01T00:00:00.000Z",
+        "endAt": "2027-01-01T00:00:00.000Z",
+        "priceMinor": 5000,
+        "currency": "MYR",
+        "restrictionEligible": false,
+        "rulesVersion": null
+      }
+    ],
+    "invoices": [
+      {
+        "id": "invoice-overdue-a",
+        "version": 1,
+        "contractId": "contract-rto-a",
+        "contractVersion": 1,
+        "amountMinor": 12000,
+        "currency": "MYR",
+        "period": {
+          "from": "2026-08-01T00:00:00.000Z",
+          "to": "2026-09-01T00:00:00.000Z"
+        },
+        "dueAt": "2026-09-10T00:00:00.000Z",
+        "status": "unpaid",
+        "paymentMethod": null,
+        "paymentStatus": null,
+        "paidAt": null
+      }
+    ],
+    "payments": [],
+    "restrictions": [
+      {
+        "id": "restriction-limited-a",
+        "version": 3,
+        "contractId": "contract-rto-a",
+        "contractVersion": 1,
+        "causeInvoiceIds": [
+          "invoice-overdue-a"
+        ],
+        "unitIds": [
+          "unit-limited"
+        ],
+        "rulesVersion": "demo-v1",
+        "noticeAt": "2026-09-12T00:00:00.000Z",
+        "executeAfter": "2026-09-13T00:00:00.000Z",
+        "reason": "Demo: invoice overdue since 2026-09-10",
+        "policy": {
+          "kind": "temperature_limit",
+          "minimumCoolingSetpoint": 24
+        },
+        "state": "applied",
+        "exception": null,
+        "graceUntil": null,
+        "noticeNotificationIds": [
+          "notif-restriction-limited-a"
+        ],
+        "perUnit": [
+          {
+            "unitId": "unit-limited",
+            "applyState": "applied",
+            "releaseState": "none",
+            "applyCommandIds": [
+              "cmd-limited-apply"
+            ],
+            "releaseCommandIds": [],
+            "observedAt": "2026-09-13T00:00:20.000Z",
+            "pendingReason": null
+          }
+        ],
+        "recoveryCases": []
+      }
+    ],
+    "commands": [
+      {
+        "id": "cmd-limited-apply",
+        "unitId": "unit-limited",
+        "actorMembershipId": "system-restriction",
+        "action": {
+          "kind": "apply_restriction",
+          "restrictionId": "restriction-limited-a",
+          "rulesVersion": "demo-v1",
+          "policy": {
+            "kind": "temperature_limit",
+            "minimumCoolingSetpoint": 24
+          }
+        },
+        "status": "acknowledged",
+        "delivery": "sent",
+        "requestedAt": "2026-09-13T00:00:00.000Z",
+        "sentAt": "2026-09-13T00:00:05.000Z",
+        "acknowledgedAt": "2026-09-13T00:00:20.000Z",
+        "expiresAt": "2026-09-13T00:00:30.000Z"
+      }
+    ],
+    "alerts": [
+      {
+        "id": "alert-window-a",
+        "unitId": "unit-online-rto",
+        "policyId": null,
+        "type": "sensor",
+        "severity": "warning",
+        "status": "open",
+        "causeCode": "window_open",
+        "evidenceKind": "inferred",
+        "evidenceText": "Demo: cooling load rose while the outdoor temperature was stable.",
+        "observedAt": "2026-09-14T00:50:00.000Z",
+        "detectedAt": "2026-09-14T00:50:00.000Z",
+        "previousAlertId": null
+      }
+    ],
+    "notifications": [
+      {
+        "id": "notif-alert-window-a",
+        "recipientMembershipId": "customer-a",
+        "target": {
+          "kind": "unit",
+          "id": "unit-online-rto"
+        },
+        "templateKey": "alert",
+        "type": "fault",
+        "sourceAlertId": "alert-window-a",
+        "severity": "warning",
+        "channel": "inApp",
+        "deliveryState": "simulated",
+        "occurredAt": "2026-09-14T00:50:00.000Z",
+        "readAt": null
+      },
+      {
+        "id": "notif-restriction-limited-a",
+        "recipientMembershipId": "customer-a",
+        "target": {
+          "kind": "restriction",
+          "id": "restriction-limited-a"
+        },
+        "templateKey": "restriction",
+        "type": "restriction",
+        "sourceAlertId": null,
+        "severity": "warning",
+        "channel": "inApp",
+        "deliveryState": "simulated",
+        "occurredAt": "2026-09-12T00:00:00.000Z",
+        "readAt": null
+      }
+    ],
+    "jobs": [
+      {
+        "id": "job-internal-a",
+        "version": 1,
+        "unitId": "unit-online-rto",
+        "type": "reactive",
+        "status": "requested",
+        "symptom": "Demo: filter check requested",
+        "contactWindow": "Weekdays after 18:00",
+        "requestedSlot": {
+          "startAt": "2026-09-15T02:00:00.000Z",
+          "endAt": "2026-09-15T04:00:00.000Z"
+        },
+        "scheduledSlot": null,
+        "dueAt": "2026-09-15T04:00:00.000Z",
+        "contractorOrgId": null,
+        "assignmentId": null,
+        "alertIds": [
+          "alert-window-a"
+        ]
+      },
+      {
+        "id": "job-contractor-a",
+        "version": 4,
+        "unitId": "unit-online-rto",
+        "type": "preventive",
+        "status": "assigned",
+        "symptom": "Demo: preventive maintenance",
+        "contactWindow": null,
+        "requestedSlot": {
+          "startAt": "2026-09-14T00:00:00.000Z",
+          "endAt": "2026-09-14T08:00:00.000Z"
+        },
+        "scheduledSlot": {
+          "startAt": "2026-09-14T00:00:00.000Z",
+          "endAt": "2026-09-20T00:00:00.000Z"
+        },
+        "dueAt": "2026-09-20T00:00:00.000Z",
+        "contractorOrgId": "org-contractor-a",
+        "assignmentId": "assignment-contractor-a",
+        "alertIds": []
+      }
+    ],
+    "offers": [
+      {
+        "id": "offer-contractor-a",
+        "jobId": "job-contractor-a",
+        "contractorOrgId": "org-contractor-a",
+        "termsVersion": "terms-demo-v1",
+        "offeredAt": "2026-09-13T00:00:00.000Z",
+        "offerExpiresAt": "2026-09-14T00:00:00.000Z",
+        "accessValidFrom": "2026-09-13T00:00:00.000Z",
+        "accessValidUntil": "2026-09-21T00:00:00.000Z",
+        "decision": "accept",
+        "decidedBy": "user-contractor-a",
+        "decidedAt": "2026-09-13T01:00:00.000Z",
+        "declineReason": null
+      }
+    ],
+    "assignments": [
+      {
+        "id": "assignment-contractor-a",
+        "jobId": "job-contractor-a",
+        "technicianMembershipId": "tech-external-a",
+        "createdAt": "2026-09-13T02:00:00.000Z",
+        "scheduledStart": "2026-09-14T00:00:00.000Z",
+        "scheduledEnd": "2026-09-20T00:00:00.000Z",
+        "validFrom": "2026-09-14T00:00:00.000Z",
+        "validUntil": "2026-09-20T00:00:00.000Z",
+        "status": "active",
+        "reason": null
+      }
+    ],
+    "consents": [
+      {
+        "id": "consent-customer-a-location",
+        "tenantId": "tenant-a",
+        "version": 1,
+        "createdAt": "2026-09-01T00:00:00.000Z",
+        "updatedAt": "2026-09-01T00:00:00.000Z",
+        "membershipId": "customer-a",
+        "purpose": "location_automation",
+        "granted": false,
+        "grantedAt": null,
+        "revokedAt": null
+      },
+      {
+        "id": "consent-customer-b-location",
+        "tenantId": "tenant-a",
+        "version": 1,
+        "createdAt": "2026-09-01T00:00:00.000Z",
+        "updatedAt": "2026-09-01T00:00:00.000Z",
+        "membershipId": "customer-b",
+        "purpose": "location_automation",
+        "granted": false,
+        "grantedAt": null,
+        "revokedAt": null
+      }
+    ],
+    "automations": [],
+    "policies": [],
+    "plans": [],
+    "baselines": [
+      {
+        "id": "baseline-demo-tenant-a",
+        "tenantId": "tenant-a",
+        "version": 1,
+        "createdAt": "2026-09-01T00:00:00.000Z",
+        "updatedAt": "2026-09-01T00:00:00.000Z",
+        "unitIds": [
+          "unit-limited",
+          "unit-non-rto",
+          "unit-offline-rto",
+          "unit-online-rto",
+          "unit-other-customer"
+        ],
+        "period": {
+          "from": "2026-08-01T00:00:00.000Z",
+          "to": "2026-08-31T00:00:00.000Z"
+        },
+        "method": "demo_fixed",
+        "baselineKWh": 2592,
+        "quality": {
+          "kind": "modeled",
+          "coverage": null,
+          "expectedSlots": null,
+          "validSlots": null,
+          "sourceSnapshot": null
+        },
+        "boundaryId": "ac_input_electricity",
+        "boundary": "AC unit input electricity only (demo assumption)",
+        "assumptions": "Demo assumption: 0.72 kW average per unit over August 2026 (fictional)",
+        "source": "1A demo fixed baseline (fictional)"
+      }
+    ],
+    "factors": [
+      {
+        "id": "factor-demo-2026",
+        "tenantId": "tenant-a",
+        "version": 1,
+        "createdAt": "2026-09-01T00:00:00.000Z",
+        "updatedAt": "2026-09-01T00:00:00.000Z",
+        "region": "Demo region (fictional)",
+        "year": 2026,
+        "kgCO2ePerKWh": 0.5,
+        "source": "1A demo fixed; not a real regional factor",
+        "isDemo": true
+      }
+    ],
+    "mrvReports": [],
+    "offsetRecords": [],
+    "inquiries": [],
+    "consistency": [
+      "customer-bは契約0件（AT-C10-N④、IR61）",
+      "unit-limitedは空間未割当（IR62）でrestriction-limited-a適用中（AT-C03-E④、AT-C11-N④）",
+      "unit-other-customerはSensor無しで稼働unknown（device-no-sensor）",
+      "alert-window-aはwarningでalertCount=1（AT-C01-N、IR51）",
+      "job-contractor-aは作業窓内（AT-T01-N、IR49）",
+      "client Membershipごとにgranted=falseの位置情報同意（IR84）",
+      "baseline-demo-tenant-aはtenant-aの非archived全5台と一致し、filtersなしの/adminで省エネ予想を表示（IR78）",
+      "排出係数factor-demo-2026（0.5 kgCO₂e/kWh）はdefaultEmissionFactorIdの実体（IR92）"
+    ]
+  },
+  "acceptancePatches": {
+    "note": "IR85/IR92: 受入GivenのseedへのpatchesをcaseIdごとに固定する。createDemoRepository({seed:'demoSeed',patches,simulator,clock})へ、includeを先に展開してから渡す。seriesはIR92の規則で測定行を生成する。",
+    "AT-A01-N": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "devices",
+          "id": "device-offline-rto",
+          "set": {
+            "connection": "online",
+            "lastSeenAt": "2026-09-14T00:59:30.000Z",
+            "powerSignal": "on"
+          }
+        },
+        {
+          "entity": "units",
+          "id": "unit-offline-rto",
+          "set": {
+            "observedState": {
+              "power": false,
+              "celsius": 25,
+              "mode": "cool",
+              "fanLevel": "mid",
+              "observedAt": "2026-09-14T00:59:30.000Z"
+            }
+          }
+        },
+        {
+          "entity": "measurements",
+          "id": "m-sensor-offline-power-2",
+          "set": {
+            "unitId": "unit-offline-rto",
+            "sensorId": "sensor-offline-power",
+            "metric": "power",
+            "value": 0.0,
+            "unit": "kW",
+            "observedAt": "2026-09-14T00:59:30.000Z",
+            "receivedAt": "2026-09-14T00:59:30.000Z",
+            "origin": "measured",
+            "quality": "valid",
+            "sequence": 2,
+            "boundaryId": "ac_input_electricity"
+          }
+        }
+      ],
+      "expected": {
+        "powerOn": 2,
+        "powerOff": 2,
+        "powerUnknown": 1,
+        "operatingRate": 50.0,
+        "customerCount": 2,
+        "amountsByCurrency": [
+          {
+            "amountMinor": 12000,
+            "currency": "MYR"
+          }
+        ]
+      }
+    },
+    "shared:energy-actual-80": {
+      "description": "unit-online-rtoのpower 80 kWを2026-09-14T00:00Z〜01:00Zの各分境界にmeasured/validで置く（fixture.energy）",
+      "patches": [
+        {
+          "entity": "measurements",
+          "series": {
+            "idPrefix": "m-energy-online-power",
+            "unitId": "unit-online-rto",
+            "sensorId": "sensor-online-power",
+            "metric": "power",
+            "unit": "kW",
+            "boundaryId": "ac_input_electricity",
+            "from": "2026-09-14T00:00:00.000Z",
+            "to": "2026-09-14T01:00:00.000Z",
+            "stepSeconds": 60,
+            "value": 80,
+            "origin": "measured",
+            "quality": "valid",
+            "sequenceStart": 1001,
+            "skip": []
+          }
+        }
+      ]
+    },
+    "AT-C06-N": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "include": [
+        "shared:energy-actual-80"
+      ],
+      "patches": [
+        {
+          "entity": "baselines",
+          "id": "baseline-energy-100",
+          "set": {
+            "tenantId": "tenant-a",
+            "unitIds": [
+              "unit-online-rto"
+            ],
+            "period": {
+              "from": "2026-09-14T00:00:00.000Z",
+              "to": "2026-09-14T01:00:00.000Z"
+            },
+            "method": "demo_fixed",
+            "baselineKWh": 100,
+            "quality": {
+              "kind": "modeled",
+              "coverage": null,
+              "expectedSlots": null,
+              "validSlots": null,
+              "sourceSnapshot": null
+            },
+            "boundaryId": "ac_input_electricity",
+            "boundary": "AC unit input electricity only (demo assumption)",
+            "assumptions": "Demo assumption for acceptance (fictional)",
+            "source": "1A acceptance fixture (fictional)"
+          }
+        }
+      ],
+      "query": {
+        "from": "2026-09-14T00:00:00.000Z",
+        "to": "2026-09-14T01:00:00.000Z",
+        "unitIds": [
+          "unit-online-rto"
+        ],
+        "baselineId": "baseline-energy-100"
+      },
+      "expected": {
+        "kWh": 80.0,
+        "amountMinor": 4000,
+        "savedKWh": 20.0,
+        "savingPercentage": 20.0,
+        "savedAmountMinor": 1000,
+        "coverage": 1,
+        "emissionsKg": 40.0,
+        "savedEmissionsKg": 10.0
+      }
+    },
+    "AT-C06-E.2": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "include": [
+        "shared:energy-actual-80"
+      ],
+      "patches": [
+        {
+          "entity": "baselines",
+          "id": "baseline-energy-0",
+          "set": {
+            "tenantId": "tenant-a",
+            "unitIds": [
+              "unit-online-rto"
+            ],
+            "period": {
+              "from": "2026-09-14T00:00:00.000Z",
+              "to": "2026-09-14T01:00:00.000Z"
+            },
+            "method": "demo_fixed",
+            "baselineKWh": 0,
+            "quality": {
+              "kind": "modeled",
+              "coverage": null,
+              "expectedSlots": null,
+              "validSlots": null,
+              "sourceSnapshot": null
+            },
+            "boundaryId": "ac_input_electricity",
+            "boundary": "AC unit input electricity only (demo assumption)",
+            "assumptions": "Demo assumption for acceptance (fictional)",
+            "source": "1A acceptance fixture (fictional)"
+          }
+        }
+      ],
+      "query": {
+        "from": "2026-09-14T00:00:00.000Z",
+        "to": "2026-09-14T01:00:00.000Z",
+        "unitIds": [
+          "unit-online-rto"
+        ],
+        "baselineId": "baseline-energy-0"
+      },
+      "expected": {
+        "savingPercentage": null
+      }
+    },
+    "AT-C06-E.3": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "measurements",
+          "series": {
+            "idPrefix": "m-energy-online-power",
+            "unitId": "unit-online-rto",
+            "sensorId": "sensor-online-power",
+            "metric": "power",
+            "unit": "kW",
+            "boundaryId": "ac_input_electricity",
+            "from": "2026-09-14T00:00:00.000Z",
+            "to": "2026-09-14T01:00:00.000Z",
+            "stepSeconds": 60,
+            "value": 120,
+            "origin": "measured",
+            "quality": "valid",
+            "sequenceStart": 1001,
+            "skip": []
+          }
+        },
+        {
+          "entity": "baselines",
+          "id": "baseline-energy-100",
+          "set": {
+            "tenantId": "tenant-a",
+            "unitIds": [
+              "unit-online-rto"
+            ],
+            "period": {
+              "from": "2026-09-14T00:00:00.000Z",
+              "to": "2026-09-14T01:00:00.000Z"
+            },
+            "method": "demo_fixed",
+            "baselineKWh": 100,
+            "quality": {
+              "kind": "modeled",
+              "coverage": null,
+              "expectedSlots": null,
+              "validSlots": null,
+              "sourceSnapshot": null
+            },
+            "boundaryId": "ac_input_electricity",
+            "boundary": "AC unit input electricity only (demo assumption)",
+            "assumptions": "Demo assumption for acceptance (fictional)",
+            "source": "1A acceptance fixture (fictional)"
+          }
+        }
+      ],
+      "query": {
+        "from": "2026-09-14T00:00:00.000Z",
+        "to": "2026-09-14T01:00:00.000Z",
+        "unitIds": [
+          "unit-online-rto"
+        ],
+        "baselineId": "baseline-energy-100"
+      },
+      "expected": {
+        "kWh": 120.0,
+        "savedKWh": -20.0,
+        "savingPercentage": -20.0
+      }
+    },
+    "AT-C06-E.4": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "measurements",
+          "series": {
+            "idPrefix": "m-energy-online-power",
+            "unitId": "unit-online-rto",
+            "sensorId": "sensor-online-power",
+            "metric": "power",
+            "unit": "kW",
+            "boundaryId": "ac_input_electricity",
+            "from": "2026-09-14T00:00:00.000Z",
+            "to": "2026-09-14T01:00:00.000Z",
+            "stepSeconds": 60,
+            "value": 80,
+            "origin": "measured",
+            "quality": "valid",
+            "sequenceStart": 1001,
+            "skip": [
+              {
+                "from": "2026-09-14T00:10:00.000Z",
+                "to": "2026-09-14T00:15:00.000Z"
+              }
+            ]
+          }
+        },
+        {
+          "entity": "baselines",
+          "id": "baseline-energy-100",
+          "set": {
+            "tenantId": "tenant-a",
+            "unitIds": [
+              "unit-online-rto"
+            ],
+            "period": {
+              "from": "2026-09-14T00:00:00.000Z",
+              "to": "2026-09-14T01:00:00.000Z"
+            },
+            "method": "demo_fixed",
+            "baselineKWh": 100,
+            "quality": {
+              "kind": "modeled",
+              "coverage": null,
+              "expectedSlots": null,
+              "validSlots": null,
+              "sourceSnapshot": null
+            },
+            "boundaryId": "ac_input_electricity",
+            "boundary": "AC unit input electricity only (demo assumption)",
+            "assumptions": "Demo assumption for acceptance (fictional)",
+            "source": "1A acceptance fixture (fictional)"
+          }
+        }
+      ],
+      "query": {
+        "from": "2026-09-14T00:00:00.000Z",
+        "to": "2026-09-14T01:00:00.000Z",
+        "unitIds": [
+          "unit-online-rto"
+        ],
+        "baselineId": "baseline-energy-100"
+      },
+      "expected": {
+        "kWh": 73.33333333333333,
+        "coverage": 0.9166666666666666,
+        "savedKWh": null,
+        "savingPercentage": null
+      }
+    },
+    "AT-C08-N": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "alerts",
+          "id": "alert-c08-critical",
+          "set": {
+            "unitId": "unit-online-rto",
+            "policyId": null,
+            "type": "sensor",
+            "severity": "critical",
+            "status": "open",
+            "causeCode": "unknown",
+            "evidenceKind": "demo_observation",
+            "evidenceText": "Demo: high temperature observed (fictional)",
+            "observedAt": "2026-09-14T00:55:00.000Z",
+            "detectedAt": "2026-09-14T00:55:00.000Z",
+            "previousAlertId": null
+          }
+        },
+        {
+          "entity": "notifications",
+          "id": "notif-c08-critical",
+          "set": {
+            "recipientMembershipId": "customer-a",
+            "target": {
+              "kind": "unit",
+              "id": "unit-online-rto"
+            },
+            "templateKey": "alert",
+            "type": "fault",
+            "sourceAlertId": "alert-c08-critical",
+            "severity": "critical",
+            "channel": "inApp",
+            "deliveryState": "simulated",
+            "occurredAt": "2026-09-14T00:55:00.000Z",
+            "readAt": null
+          }
+        },
+        {
+          "entity": "notifications",
+          "id": "notif-c08-normal",
+          "set": {
+            "recipientMembershipId": "customer-a",
+            "target": {
+              "kind": "unit",
+              "id": "unit-online-rto"
+            },
+            "templateKey": "quality",
+            "type": "quality",
+            "sourceAlertId": null,
+            "severity": "normal",
+            "channel": "inApp",
+            "deliveryState": "simulated",
+            "occurredAt": "2026-09-14T00:40:00.000Z",
+            "readAt": null
+          }
+        },
+        {
+          "entity": "notifications",
+          "id": "notif-restriction-limited-a",
+          "set": {
+            "readAt": "2026-09-12T01:00:00.000Z"
+          }
+        }
+      ],
+      "expected": {
+        "unreadOnlyIds": [
+          "notif-c08-critical",
+          "notif-alert-window-a",
+          "notif-c08-normal"
+        ]
+      }
+    },
+    "AT-P01-N": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "jobs",
+          "id": "job-p01-offered-a",
+          "set": {
+            "unitId": "unit-non-rto",
+            "type": "preventive",
+            "status": "offered",
+            "symptom": "Demo: acceptance fixture job",
+            "contactWindow": null,
+            "requestedSlot": {
+              "startAt": "2026-09-14T02:00:00.000Z",
+              "endAt": "2026-09-14T04:00:00.000Z"
+            },
+            "scheduledSlot": null,
+            "dueAt": "2026-09-14T04:00:00.000Z",
+            "contractorOrgId": "org-contractor-a",
+            "assignmentId": null,
+            "alertIds": []
+          }
+        },
+        {
+          "entity": "offers",
+          "id": "offer-p01-offered-a",
+          "set": {
+            "jobId": "job-p01-offered-a",
+            "contractorOrgId": "org-contractor-a",
+            "termsVersion": "terms-demo-v1",
+            "offeredAt": "2026-09-14T00:30:00.000Z",
+            "offerExpiresAt": "2026-09-15T01:00:00.000Z",
+            "accessValidFrom": "2026-09-14T01:00:00.000Z",
+            "accessValidUntil": "2026-09-22T00:00:00.000Z",
+            "decision": null,
+            "decidedBy": null,
+            "decidedAt": null,
+            "declineReason": null
+          }
+        },
+        {
+          "entity": "jobs",
+          "id": "job-p01-accepted-a",
+          "set": {
+            "unitId": "unit-offline-rto",
+            "type": "reactive",
+            "status": "accepted",
+            "symptom": "Demo: acceptance fixture job",
+            "contactWindow": null,
+            "requestedSlot": {
+              "startAt": "2026-09-14T03:00:00.000Z",
+              "endAt": "2026-09-14T05:00:00.000Z"
+            },
+            "scheduledSlot": null,
+            "dueAt": "2026-09-14T05:00:00.000Z",
+            "contractorOrgId": "org-contractor-a",
+            "assignmentId": null,
+            "alertIds": []
+          }
+        },
+        {
+          "entity": "offers",
+          "id": "offer-p01-accepted-a",
+          "set": {
+            "jobId": "job-p01-accepted-a",
+            "contractorOrgId": "org-contractor-a",
+            "termsVersion": "terms-demo-v1",
+            "offeredAt": "2026-09-14T00:30:00.000Z",
+            "offerExpiresAt": "2026-09-15T01:00:00.000Z",
+            "accessValidFrom": "2026-09-14T00:30:00.000Z",
+            "accessValidUntil": "2026-09-22T00:00:00.000Z",
+            "decision": "accept",
+            "decidedBy": "user-contractor-a",
+            "decidedAt": "2026-09-14T00:40:00.000Z",
+            "declineReason": null
+          }
+        },
+        {
+          "entity": "jobs",
+          "id": "job-contractor-a",
+          "set": {
+            "status": "submitted"
+          }
+        },
+        {
+          "entity": "jobs",
+          "id": "job-p01-offered-b",
+          "set": {
+            "unitId": "unit-other-customer",
+            "type": "reactive",
+            "status": "offered",
+            "symptom": "Demo: acceptance fixture job",
+            "contactWindow": null,
+            "requestedSlot": {
+              "startAt": "2026-09-14T02:00:00.000Z",
+              "endAt": "2026-09-14T04:00:00.000Z"
+            },
+            "scheduledSlot": null,
+            "dueAt": "2026-09-14T04:00:00.000Z",
+            "contractorOrgId": "org-contractor-b",
+            "assignmentId": null,
+            "alertIds": []
+          }
+        },
+        {
+          "entity": "offers",
+          "id": "offer-p01-offered-b",
+          "set": {
+            "jobId": "job-p01-offered-b",
+            "contractorOrgId": "org-contractor-b",
+            "termsVersion": "terms-demo-v1",
+            "offeredAt": "2026-09-14T00:30:00.000Z",
+            "offerExpiresAt": "2026-09-15T01:00:00.000Z",
+            "accessValidFrom": "2026-09-14T01:00:00.000Z",
+            "accessValidUntil": "2026-09-22T00:00:00.000Z",
+            "decision": null,
+            "decidedBy": null,
+            "decidedAt": null,
+            "declineReason": null
+          }
+        }
+      ],
+      "expected": {
+        "all": {
+          "items": 3,
+          "offerCount": 1,
+          "activeCount": 1,
+          "reviewCount": 1
+        },
+        "offered": {
+          "items": 1,
+          "offerCount": 1,
+          "activeCount": 0,
+          "reviewCount": 0
+        }
+      }
+    },
+    "AT-P03-R01": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "memberships",
+          "id": "tech-external-a2",
+          "set": {
+            "userId": "user-tech-external-a2",
+            "role": "technician",
+            "permissions": [
+              "control.diagnose",
+              "device.maintain",
+              "alert.resolve"
+            ],
+            "tenantId": "tenant-a",
+            "validFrom": "2026-09-01T00:00:00.000Z",
+            "validUntil": "2026-10-01T00:00:00.000Z",
+            "organizationId": "org-contractor-a",
+            "scopeVersion": 1,
+            "employment": "external",
+            "scopes": [
+              {
+                "kind": "unit",
+                "id": "unit-online-rto"
+              },
+              {
+                "kind": "unit",
+                "id": "unit-offline-rto"
+              },
+              {
+                "kind": "unit",
+                "id": "unit-non-rto"
+              },
+              {
+                "kind": "unit",
+                "id": "unit-limited"
+              }
+            ],
+            "qualifications": [
+              {
+                "code": "demo_indoor",
+                "validFrom": "2026-09-01T00:00:00.000Z",
+                "validUntil": "2026-10-01T00:00:00.000Z",
+                "revokedAt": null
+              },
+              {
+                "code": "demo_outdoor",
+                "validFrom": "2026-09-01T00:00:00.000Z",
+                "validUntil": "2026-10-01T00:00:00.000Z",
+                "revokedAt": null
+              },
+              {
+                "code": "demo_electrical",
+                "validFrom": "2026-09-01T00:00:00.000Z",
+                "validUntil": "2026-10-01T00:00:00.000Z",
+                "revokedAt": null
+              }
+            ],
+            "displayName": "tech-external-a2"
+          }
+        }
+      ]
+    },
+    "AT-P06-N": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "memberships",
+          "id": "tech-external-a2",
+          "set": {
+            "userId": "user-tech-external-a2",
+            "role": "technician",
+            "permissions": [
+              "control.diagnose",
+              "device.maintain",
+              "alert.resolve"
+            ],
+            "tenantId": "tenant-a",
+            "validFrom": "2026-09-01T00:00:00.000Z",
+            "validUntil": "2026-10-01T00:00:00.000Z",
+            "organizationId": "org-contractor-a",
+            "scopeVersion": 1,
+            "employment": "external",
+            "scopes": [
+              {
+                "kind": "unit",
+                "id": "unit-online-rto"
+              },
+              {
+                "kind": "unit",
+                "id": "unit-offline-rto"
+              },
+              {
+                "kind": "unit",
+                "id": "unit-non-rto"
+              },
+              {
+                "kind": "unit",
+                "id": "unit-limited"
+              }
+            ],
+            "qualifications": [
+              {
+                "code": "demo_indoor",
+                "validFrom": "2026-09-01T00:00:00.000Z",
+                "validUntil": "2026-10-01T00:00:00.000Z",
+                "revokedAt": null
+              },
+              {
+                "code": "demo_outdoor",
+                "validFrom": "2026-09-01T00:00:00.000Z",
+                "validUntil": "2026-10-01T00:00:00.000Z",
+                "revokedAt": null
+              },
+              {
+                "code": "demo_electrical",
+                "validFrom": "2026-09-01T00:00:00.000Z",
+                "validUntil": "2026-10-01T00:00:00.000Z",
+                "revokedAt": null
+              }
+            ],
+            "displayName": "tech-external-a2"
+          }
+        }
+      ],
+      "expected": {
+        "date": "2026-09-15",
+        "members": [
+          "tech-external-a",
+          "tech-external-a2"
+        ]
+      }
+    },
+    "AT-P06-B": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "memberships",
+          "id": "tech-external-a2",
+          "set": {
+            "userId": "user-tech-external-a2",
+            "role": "technician",
+            "permissions": [
+              "control.diagnose",
+              "device.maintain",
+              "alert.resolve"
+            ],
+            "tenantId": "tenant-a",
+            "validFrom": "2026-09-01T00:00:00.000Z",
+            "validUntil": "2026-10-01T00:00:00.000Z",
+            "organizationId": "org-contractor-a",
+            "scopeVersion": 1,
+            "employment": "external",
+            "scopes": [
+              {
+                "kind": "unit",
+                "id": "unit-online-rto"
+              },
+              {
+                "kind": "unit",
+                "id": "unit-offline-rto"
+              },
+              {
+                "kind": "unit",
+                "id": "unit-non-rto"
+              },
+              {
+                "kind": "unit",
+                "id": "unit-limited"
+              }
+            ],
+            "qualifications": [
+              {
+                "code": "demo_indoor",
+                "validFrom": "2026-09-01T00:00:00.000Z",
+                "validUntil": "2026-10-01T00:00:00.000Z",
+                "revokedAt": null
+              },
+              {
+                "code": "demo_outdoor",
+                "validFrom": "2026-09-01T00:00:00.000Z",
+                "validUntil": "2026-10-01T00:00:00.000Z",
+                "revokedAt": null
+              },
+              {
+                "code": "demo_electrical",
+                "validFrom": "2026-09-01T00:00:00.000Z",
+                "validUntil": "2026-10-01T00:00:00.000Z",
+                "revokedAt": null
+              }
+            ],
+            "displayName": "tech-external-a2"
+          }
+        },
+        {
+          "entity": "jobs",
+          "id": "job-p06-assigned",
+          "set": {
+            "unitId": "unit-non-rto",
+            "type": "preventive",
+            "status": "assigned",
+            "symptom": "Demo: acceptance fixture job",
+            "contactWindow": null,
+            "requestedSlot": {
+              "startAt": "2026-09-15T02:00:00.000Z",
+              "endAt": "2026-09-15T06:00:00.000Z"
+            },
+            "scheduledSlot": {
+              "startAt": "2026-09-15T02:00:00.000Z",
+              "endAt": "2026-09-15T06:00:00.000Z"
+            },
+            "dueAt": "2026-09-15T06:00:00.000Z",
+            "contractorOrgId": "org-contractor-a",
+            "assignmentId": "assignment-p06",
+            "alertIds": []
+          }
+        },
+        {
+          "entity": "offers",
+          "id": "offer-p06-assigned",
+          "set": {
+            "jobId": "job-p06-assigned",
+            "contractorOrgId": "org-contractor-a",
+            "termsVersion": "terms-demo-v1",
+            "offeredAt": "2026-09-14T00:30:00.000Z",
+            "offerExpiresAt": "2026-09-14T00:50:00.000Z",
+            "accessValidFrom": "2026-09-14T00:30:00.000Z",
+            "accessValidUntil": "2026-09-22T00:00:00.000Z",
+            "decision": "accept",
+            "decidedBy": "user-contractor-a",
+            "decidedAt": "2026-09-14T00:40:00.000Z",
+            "declineReason": null
+          }
+        },
+        {
+          "entity": "assignments",
+          "id": "assignment-p06",
+          "set": {
+            "jobId": "job-p06-assigned",
+            "technicianMembershipId": "tech-external-a2",
+            "createdAt": "2026-09-14T00:45:00.000Z",
+            "scheduledStart": "2026-09-15T02:00:00.000Z",
+            "scheduledEnd": "2026-09-15T06:00:00.000Z",
+            "validFrom": "2026-09-15T02:00:00.000Z",
+            "validUntil": "2026-09-15T06:00:00.000Z",
+            "status": "active",
+            "reason": null
+          }
+        }
+      ],
+      "expected": {
+        "2026-09-15": {
+          "tech-external-a2": {
+            "availableMinutes": 480,
+            "assignedMinutes": 240,
+            "utilization": 50.0
+          }
+        },
+        "2026-09-19": {
+          "tech-external-a2": {
+            "availableMinutes": null,
+            "utilization": null
+          }
+        }
+      }
+    },
+    "AT-T07-N": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "policies",
+          "id": "policy-temp-a",
+          "set": {
+            "kind": "alert",
+            "name": "Demo high temperature",
+            "unitIds": [
+              "unit-online-rto"
+            ],
+            "ownerMembershipId": "hq-operator",
+            "createdByUserId": "user-hq-operator",
+            "timezone": "Asia/Kuala_Lumpur",
+            "enabled": true,
+            "priority": 50,
+            "disabledReason": null,
+            "metric": "temperature",
+            "operator": "gte",
+            "threshold": 30,
+            "recoveryThreshold": 28,
+            "durationSeconds": 60,
+            "severity": "warning",
+            "recipientMembershipIds": [
+              "hq-operator"
+            ],
+            "channels": [
+              "inApp"
+            ],
+            "escalateAfterMinutes": 60,
+            "cooldownMinutes": 5
+          }
+        },
+        {
+          "entity": "measurements",
+          "id": "m-t07-measured",
+          "set": {
+            "unitId": "unit-online-rto",
+            "sensorId": "sensor-online-temperature",
+            "metric": "temperature",
+            "value": 30.5,
+            "unit": "°C",
+            "observedAt": "2026-09-14T00:57:00.000Z",
+            "receivedAt": "2026-09-14T00:57:00.000Z",
+            "origin": "measured",
+            "quality": "valid",
+            "sequence": 2,
+            "boundaryId": null
+          }
+        },
+        {
+          "entity": "measurements",
+          "id": "m-t07-estimated",
+          "set": {
+            "unitId": "unit-online-rto",
+            "sensorId": "sensor-online-temperature",
+            "metric": "temperature",
+            "value": 30.8,
+            "unit": "°C",
+            "observedAt": "2026-09-14T00:57:30.000Z",
+            "receivedAt": "2026-09-14T00:57:30.000Z",
+            "origin": "estimated",
+            "quality": "valid",
+            "sequence": 3,
+            "boundaryId": null
+          }
+        },
+        {
+          "entity": "measurements",
+          "id": "m-t07-inspection",
+          "set": {
+            "unitId": "unit-online-rto",
+            "sensorId": "inspection-item-t07",
+            "metric": "temperature",
+            "value": 30.2,
+            "unit": "°C",
+            "observedAt": "2026-09-14T00:56:00.000Z",
+            "receivedAt": "2026-09-14T00:56:00.000Z",
+            "origin": "inspection",
+            "quality": "valid",
+            "sequence": 1,
+            "boundaryId": null
+          }
+        },
+        {
+          "entity": "alerts",
+          "id": "alert-temp-a",
+          "set": {
+            "unitId": "unit-online-rto",
+            "policyId": "policy-temp-a",
+            "type": "sensor",
+            "severity": "warning",
+            "status": "open",
+            "causeCode": "unknown",
+            "evidenceKind": "demo_observation",
+            "evidenceText": "Demo: temperature at or above 30°C for 60 seconds (fictional)",
+            "observedAt": "2026-09-14T00:58:00.000Z",
+            "detectedAt": "2026-09-14T00:58:00.000Z",
+            "previousAlertId": null,
+            "evidenceIds": [
+              "m-t07-measured",
+              "m-t07-estimated",
+              "m-t07-inspection"
+            ]
+          }
+        }
+      ]
+    },
+    "AT-T10-E.1": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "jobs",
+          "id": "job-t10-limited",
+          "set": {
+            "unitId": "unit-limited",
+            "type": "reactive",
+            "status": "assigned",
+            "symptom": "Demo: acceptance fixture job",
+            "contactWindow": null,
+            "requestedSlot": {
+              "startAt": "2026-09-14T00:30:00.000Z",
+              "endAt": "2026-09-14T03:00:00.000Z"
+            },
+            "scheduledSlot": {
+              "startAt": "2026-09-14T00:30:00.000Z",
+              "endAt": "2026-09-14T03:00:00.000Z"
+            },
+            "dueAt": "2026-09-14T03:00:00.000Z",
+            "contractorOrgId": null,
+            "assignmentId": "assignment-t10-limited",
+            "alertIds": []
+          }
+        },
+        {
+          "entity": "assignments",
+          "id": "assignment-t10-limited",
+          "set": {
+            "jobId": "job-t10-limited",
+            "technicianMembershipId": "tech-internal-a",
+            "createdAt": "2026-09-14T00:20:00.000Z",
+            "scheduledStart": "2026-09-14T00:30:00.000Z",
+            "scheduledEnd": "2026-09-14T03:00:00.000Z",
+            "validFrom": "2026-09-14T00:30:00.000Z",
+            "validUntil": "2026-09-14T03:00:00.000Z",
+            "status": "active",
+            "reason": null
+          }
+        }
+      ],
+      "expected": {
+        "actor": "tech-internal-a",
+        "command": {
+          "jobId": "job-t10-limited",
+          "action": {
+            "kind": "set_temperature",
+            "celsius": 23
+          }
+        },
+        "error": "FORBIDDEN",
+        "messageKey": "errors.restriction_active"
+      }
+    },
+    "AT-T11-N": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "units",
+          "id": "unit-t11-new",
+          "set": {
+            "version": 1,
+            "customerOrgId": "org-customer-a",
+            "propertyId": "property-office-a",
+            "spaceId": "room-office-1",
+            "displayName": "New Meeting room AC",
+            "modelId": "ventilation-demo",
+            "capabilityVersion": 3,
+            "installedAt": "2025-08-01T00:00:00.000Z",
+            "serviceScope": [
+              "indoor",
+              "outdoor",
+              "electrical"
+            ],
+            "archived": false,
+            "observedState": {
+              "power": null,
+              "celsius": null,
+              "mode": null,
+              "fanLevel": null,
+              "observedAt": null
+            },
+            "observedRestriction": null
+          }
+        },
+        {
+          "entity": "jobs",
+          "id": "job-t11",
+          "set": {
+            "unitId": "unit-t11-new",
+            "type": "preventive",
+            "status": "assigned",
+            "symptom": "Demo: acceptance fixture job",
+            "contactWindow": null,
+            "requestedSlot": {
+              "startAt": "2026-09-14T00:30:00.000Z",
+              "endAt": "2026-09-14T08:00:00.000Z"
+            },
+            "scheduledSlot": {
+              "startAt": "2026-09-14T00:30:00.000Z",
+              "endAt": "2026-09-14T08:00:00.000Z"
+            },
+            "dueAt": "2026-09-14T08:00:00.000Z",
+            "contractorOrgId": null,
+            "assignmentId": "assignment-t11",
+            "alertIds": []
+          }
+        },
+        {
+          "entity": "assignments",
+          "id": "assignment-t11",
+          "set": {
+            "jobId": "job-t11",
+            "technicianMembershipId": "tech-internal-a",
+            "createdAt": "2026-09-14T00:20:00.000Z",
+            "scheduledStart": "2026-09-14T00:30:00.000Z",
+            "scheduledEnd": "2026-09-14T08:00:00.000Z",
+            "validFrom": "2026-09-14T00:30:00.000Z",
+            "validUntil": "2026-09-14T08:00:00.000Z",
+            "status": "active",
+            "reason": null
+          }
+        },
+        {
+          "entity": "memberships",
+          "id": "tech-internal-a",
+          "set": {
+            "scopes": [
+              {
+                "kind": "unit",
+                "id": "unit-online-rto"
+              },
+              {
+                "kind": "unit",
+                "id": "unit-offline-rto"
+              },
+              {
+                "kind": "unit",
+                "id": "unit-non-rto"
+              },
+              {
+                "kind": "unit",
+                "id": "unit-limited"
+              },
+              {
+                "kind": "unit",
+                "id": "unit-t11-new"
+              }
+            ]
+          }
+        }
+      ],
+      "expected": {
+        "actor": "tech-internal-a",
+        "unitId": "unit-t11-new",
+        "jobId": "job-t11"
+      }
+    },
+    "AT-A09-R01": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "invoices",
+          "id": "invoice-b-a",
+          "set": {
+            "version": 1,
+            "contractId": "contract-rto-a",
+            "contractVersion": 1,
+            "amountMinor": 5000,
+            "currency": "MYR",
+            "period": {
+              "from": "2026-07-01T00:00:00.000Z",
+              "to": "2026-08-01T00:00:00.000Z"
+            },
+            "dueAt": "2026-09-11T00:00:00.000Z",
+            "status": "unpaid",
+            "paymentMethod": null,
+            "paymentStatus": null,
+            "paidAt": null
+          }
+        },
+        {
+          "entity": "restrictions",
+          "id": "restriction-limited-a",
+          "set": {
+            "causeInvoiceIds": [
+              "invoice-b-a",
+              "invoice-overdue-a"
+            ]
+          }
+        }
+      ]
+    },
+    "AT-A13-N": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "include": [
+        "shared:energy-actual-80"
+      ],
+      "patches": [],
+      "expected": {
+        "savedKWh": 20.0,
+        "savingPercentage": 20.0
+      }
+    },
+    "AT-A14-N": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "include": [
+        "shared:energy-actual-80"
+      ],
+      "patches": [
+        {
+          "entity": "baselines",
+          "id": "baseline-energy-100",
+          "set": {
+            "tenantId": "tenant-a",
+            "unitIds": [
+              "unit-online-rto"
+            ],
+            "period": {
+              "from": "2026-09-14T00:00:00.000Z",
+              "to": "2026-09-14T01:00:00.000Z"
+            },
+            "method": "demo_fixed",
+            "baselineKWh": 100,
+            "quality": {
+              "kind": "modeled",
+              "coverage": null,
+              "expectedSlots": null,
+              "validSlots": null,
+              "sourceSnapshot": null
+            },
+            "boundaryId": "ac_input_electricity",
+            "boundary": "AC unit input electricity only (demo assumption)",
+            "assumptions": "Demo assumption for acceptance (fictional)",
+            "source": "1A acceptance fixture (fictional)"
+          }
+        }
+      ],
+      "expected": {
+        "coverage": 1,
+        "incomplete": false,
+        "emissionsKg": 40.0
+      }
+    },
+    "AT-C13-N": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "include": [
+        "shared:energy-actual-80"
+      ],
+      "patches": [
+        {
+          "entity": "baselines",
+          "id": "baseline-energy-100",
+          "set": {
+            "tenantId": "tenant-a",
+            "unitIds": [
+              "unit-online-rto"
+            ],
+            "period": {
+              "from": "2026-09-14T00:00:00.000Z",
+              "to": "2026-09-14T01:00:00.000Z"
+            },
+            "method": "demo_fixed",
+            "baselineKWh": 100,
+            "quality": {
+              "kind": "modeled",
+              "coverage": null,
+              "expectedSlots": null,
+              "validSlots": null,
+              "sourceSnapshot": null
+            },
+            "boundaryId": "ac_input_electricity",
+            "boundary": "AC unit input electricity only (demo assumption)",
+            "assumptions": "Demo assumption for acceptance (fictional)",
+            "source": "1A acceptance fixture (fictional)"
+          }
+        }
+      ],
+      "expected": {
+        "emissionsKg": 40.0,
+        "savedEmissionsKg": 10.0
+      }
+    },
+    "AT-C10-E.1": {
+      "clock": "2026-09-14T01:00:00.000Z",
+      "simulator": false,
+      "patches": [
+        {
+          "entity": "contracts",
+          "id": "contract-general-b",
+          "set": {
+            "version": 1,
+            "customerId": "cust-b",
+            "customerOrgId": "org-customer-b",
+            "unitIds": [
+              "unit-other-customer"
+            ],
+            "planType": "general",
+            "startAt": "2026-01-01T00:00:00.000Z",
+            "endAt": "2027-01-01T00:00:00.000Z",
+            "priceMinor": 5000,
+            "currency": "MYR",
+            "restrictionEligible": false,
+            "rulesVersion": null
+          }
+        },
+        {
+          "entity": "invoices",
+          "id": "invoice-general-b",
+          "set": {
+            "version": 1,
+            "contractId": "contract-general-b",
+            "contractVersion": 1,
+            "amountMinor": 5000,
+            "currency": "MYR",
+            "period": {
+              "from": "2026-08-01T00:00:00.000Z",
+              "to": "2026-09-01T00:00:00.000Z"
+            },
+            "dueAt": "2026-09-20T00:00:00.000Z",
+            "status": "unpaid",
+            "paymentMethod": null,
+            "paymentStatus": null,
+            "paidAt": null
+          }
+        }
+      ],
+      "expected": {
+        "actor": "customer-a",
+        "invoiceId": "invoice-general-b",
+        "error": "NOT_FOUND"
+      }
+    }
+  },
+  "seedCreatedAt": "2026-09-01T00:00:00.000Z"
 }

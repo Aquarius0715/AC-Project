@@ -1,6 +1,6 @@
 ---
 document_id: REQ-A
-version: 0.17.0
+version: 0.19.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # 管理者・HQ 要件定義書
 
-**0.17.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.19.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 目的と前提
 
@@ -29,7 +29,7 @@ scope: frontend-demo-1A
 
 | 要件ID | 優先 | 状態・根拠 | 要件 | 受入条件 |
 |---|---|---|---|---|
-| FR-A01 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-04, BIZ-08 | 全体ダッシュボード | 顧客数・設備数・稼働率・異常・保守・未払い・電力・削減量の予想を表示する。割合の計算に使った分母と、対象期間も確認できる。 |
+| FR-A01 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-04, BIZ-08 | 全体ダッシュボード | 顧客数・設備数・稼働率・異常・保守・未払い・電力・削減量の予想(按分した仮定基準による予想、IR78)を表示する。割合の計算に使った分母と、対象期間も確認できる。 |
 | FR-A02 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-07 | 組織・場所・設備台帳 | 顧客→物件→エリア/階/部屋→設備の順で、作成・編集できる。親子の対応が合わない登録は拒否する。 |
 | FR-A03 | P0 | 設計補完（企業目的に対応） / BIZ-04 | 4役割とスコープ管理 | 4つの役割と、技術者が社内か外部かの区別、委託期間、担当範囲、操作できる内容を設定する。権限の変更は、開いたままの古い画面にも反映される。 |
 | FR-A04 | P1 | 企業原文 SRC-06＋設計補完 / BIZ-06, BIZ-20 | 型番・IoT能力台帳 | メーカー名、型番、操作できる機能、センサー、FW(機器を動かす基本ソフト)を管理する。対応していない操作は選べなくする。 |
@@ -41,10 +41,10 @@ scope: frontend-demo-1A
 | FR-A10 | P0 | 設計補完（企業目的に対応） / BIZ-21 | 猶予・例外・手動解除・監査 | 猶予・例外・取り消しはrestriction.manage、強制解除はrestriction.overrideの2種類の権限で認可する。理由、操作した人、変更の前後の状態をあとから追跡できる。 |
 | FR-A11 | P1 | 企業原文 SRC-06＋設計補完 / BIZ-14, BIZ-16, BIZ-17 | 自動運転方針 | 人が部屋にいるかどうか、時間帯ごとの電気料金、電力使用のピーク調整、太陽光・蓄電池の模擬データをもとにした制御案を確認できる。 |
 | FR-A12 | P1 | 企業原文 SRC-06＋設計補完 / BIZ-18, BIZ-19 | 空気環境方針 | 指標ごとにしきい値と通知のルールを設定し、換気に対応した設備には模擬の換気要求を出せる。対応していない設備には通知だけを行う。 |
-| FR-A13 | P1 | 企業原文 SRC-06＋設計補完 / BIZ-23, BIZ-25 | 省エネ分析 | 実績と、条件をそろえた比較基準との差、削減率、データの品質、期間、基準のバージョンを表示する。削減量がマイナスの場合もそのまま表示する。 |
+| FR-A13 | P1 | 企業原文 SRC-06＋設計補完 / BIZ-23, BIZ-25 | 省エネ分析 | 実績と、条件をそろえた比較基準との差、削減率、データの品質、期間、基準のバージョンを表示する。削減量がマイナスの場合も0に丸めず「増加」として表示する(IR68)。 |
 | FR-A14 | P1 | 企業原文 SRC-06＋設計補完 / BIZ-25 | Digital MRVデモ | 測定データ、計算方法、係数(換算に使う数値)、データの品質、確認した履歴を含む、レポートのプレビューを作成する。 |
 | FR-A15 | P1 | 企業原文 SRC-06＋設計補完 / BIZ-24, BIZ-26 | オフセットデモ | 模擬の見積もり、購入の申し込み、償却(使い切った記録)、証明情報の状態を、それぞれ分けて表示する。 |
-| FR-A16 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-20 | 異常操作・監査 | 改ざんの疑い、通信の異常、拒否されたイベント、操作の履歴を絞り込んで表示し、相関ID(関連する記録をまとめる番号)で追跡できる。 |
+| FR-A16 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-20 | 異常操作・監査 | 改ざんの疑い、通信の異常、拒否されたイベント、操作の履歴を絞り込んで表示し、相関ID(関連する記録をまとめる番号)で追跡できる。結果は成功・拒否・失敗・保留の4分類(IR90)。 |
 
 ## 業務境界・依存関係
 
@@ -70,15 +70,15 @@ scope: frontend-demo-1A
 
 - **利用開始条件**: HQのMembership(所属情報)に、対象テナントの集計を見る権限があること。
 - **基本フロー**: 顧客・拠点・期間を絞り込む → 顧客数、設備、稼働状況、異常、保守、請求、電力を確認する → KPI(指標)から、同じ条件の一覧画面に進む。
-- **業務規則 BR-A01**: 稼働率は、最新の状態がわかる有効な設備のうち、電源が入っている(powerOn)割合とする。あわせて、設備の総数と、状態が不明な設備の数も必ず表示する。顧客数は、Customer.statusと対応するOrganization.statusがともにactiveなCustomer(1Aでは組織と1対1)の件数とする(IR40)。請求の遅れは、未入金の金額をもとに判断する。
+- **業務規則 BR-A01**: 稼働率は、最新の状態がわかる有効な設備のうち、電源が入っている(powerOn)割合とする。あわせて、設備の総数と、状態が不明な設備の数も必ず表示する。顧客数は、Customer.statusと対応するOrganization.statusがともにactiveなCustomer(1Aでは組織と1対1)の件数とする(IR40)。請求の遅れは、未入金の金額をもとに判断する。異常の件数はcritical/warningの未解消アラートだけを数え(IR51)、削減量の予想は対象設備集合と一致する仮定基準を按分して算出し、基準がなければ「基準未設定」と表示する(IR78)。
 - **完了後の業務状態**: 閲覧のみで、データは変更しない。ダッシュボードと、そこから移動した先の一覧画面で、期間・対象範囲・数値の定義がそろっている。
 - **境界条件・禁止事項**: 状態が不明な設備を、稼働率の計算の分母にこっそり含めない。通貨が違うデータは合算せず、通貨ごとに分けて表示する。データが0件のときは、割合を計算できない、と表示する。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A01-N | hq-operatorが、tenant-aで電源ON2台・OFF2台・状態不明1台の設備を確認する状況。active(稼働中)な顧客が2件、期限超過の未入金が120.00MYRある。When: `/admin`を今日の日付で開き、設備のKPIから一覧画面へ進む | ①稼働率は50%(分母4台)。全5台のうち1台が状態不明であることもあわせて表示される ②顧客数は2 ③未入金は120.00MYR ④一覧画面のURLには対象範囲と選択powerStateが入り、periodは送らない。戻ると元の期間を復元する |
+| AT-A01-N | hq-operator。Given: fixture-contract.jsonの`acceptancePatches["AT-A01-N"]`(IR85)をdemoSeedへ適用し、tenant-aの設備を電源ON2台・OFF2台・状態不明1台にする。active(稼働中)な顧客が2件、期限超過の未入金が120.00MYRある(seedのまま)。When: `/admin`を今日の日付で開き、設備のKPIから一覧画面へ進む | ①稼働率は50.0%(分母4台)。全5台のうち1台が状態不明であることもあわせて表示される ②顧客数は2 ③未入金は120.00MYR ④一覧画面のURLには対象範囲と選択powerStateが入り、periodは送らない。戻ると元の期間を復元する ⑤省エネカードは「予想（按分した仮定基準・デモ）」のラベル付きで表示される(IR78) |
 | AT-A01-E | ①状態不明の設備がある ②未入金にMYRとUSDが混ざっている ③設備が0件、という3つの条件で集計画面を開く | 状態不明の台数は別に表示し、稼働率の分母には含めない。MYRとUSDはそれぞれの通貨ごとに合計する。設備0件のときの割合は「算定不可(null)」とする。 |
-| AT-A01-B | ①電源ON2台・OFF2台・状態不明1台 ②稼働中(active)と停止中(inactive)の顧客が混ざる ③期限超過の未入金 | ①稼働率50%、状態不明1台も表示 ②顧客数はactiveのみ計上 ③未入金額をもとに判断 |
+| AT-A01-B | ①`acceptancePatches["AT-A01-N"]`適用後の電源ON2台・OFF2台・状態不明1台 ②稼働中(active)と停止中(inactive)の顧客が混ざる ③期限超過の未入金 | ①稼働率50%、状態不明1台も表示 ②顧客数はactiveのみ計上 ③未入金額をもとに判断 |
 
 設計: [DD-A01](../02-design/admin.md#dd-a01-詳細)。親ケースAT-A01は、追跡表に登録されたN・E・Bのケースと、対象となるSRC・R01のすべてを確認して判定する。
 
@@ -125,7 +125,7 @@ scope: frontend-demo-1A
 - **企業要望の根拠**: SRC-06 BIZ-06, BIZ-20 — HVAC(空調設備全般)を第2段階の対象とし、メーカーや分離型・中央空調・カセット型などへ対応を広げる。小型で低価格な、空調内に設置する機器やFW(基本ソフト)、取り外しや盗難への対策と通知を行う。
 - **設計補完の範囲**: 機種の能力とIoT台帳の編集。
 
-- **利用開始条件**: device.manage、または型番を管理する権限を持つこと。能力の値はデモ用の台帳として管理する。
+- **利用開始条件**: device.manage権限を持つこと(IR74)。能力の値はデモ用の台帳として管理する。
 - **基本フロー**: 型番を登録する → 温度・モード・風量・センサー・換気・FWの候補を設定する → 影響を受ける設備を確認する → 新しい能力のバージョンを保存する。
 - **業務規則 BR-A04**: 確認できていない能力はfalse/unknown(未確認)として扱う。対応するmode(運転モード)を、製品カテゴリから勝手に推測しない。すでにある自動運転ルールが新しい能力に合わなくなった場合、そのルールを停止して理由を表示する。
 - **完了後の業務状態**: Capability(能力)のバージョンを更新し、Unit(設備)の操作候補に反映する。まだ完了していないCommand(操作要求)の内容はそのまま履歴として残し、勝手に新しい能力の内容へ書き換えない。
@@ -158,7 +158,7 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A05-N | alert.policy.manage権限あり。When: metric=temperature、gte 30°C、duration=60秒、severity=warning、recipient=customer-a、channel=inAppで保存し、合成値30°Cが60秒続く | ①Policyのversion=1 ②Alertが1件、Notificationのプレビューが1件作られる ③通知を既読にしてもAlertの状態は変わらない |
+| AT-A05-N | alert.policy.manage権限あり。When: unitIds=[unit-online-rto]、metric=temperature、gte 30°C、duration=60秒、severity=warning、recipient=customer-a、channel=inAppで保存し、simulator=falseで合成値30°Cが60秒続く | ①Policyのversion=1 ②Alertが1件、Notificationのプレビューが1件作られる ③通知を既読にしてもAlertの状態は変わらない |
 | AT-A05-E | 宛先=[]、続く時間=0秒、回復のしきい値の向きが逆、という条件で保存する。しきい値の直前・一致、続く時間の直前・一致も確認する | 宛先0・続く時間0・回復の向きが逆はVALIDATIONとなり保存されない。gte(以上)のしきい値が100のとき、99では発火せず、100が指定秒数続いた時点で発火する。続く時間の直前では発火しない |
 | AT-A05-B | ①missing(欠測)またはstale(古いデータ) ②cooldown中に同じ重大度が再発する ③重大度が上がる | ①測定の判定には使わず、品質に関する通知になる ②通知は抑えられる ③新しい通知になる |
 
@@ -171,13 +171,13 @@ scope: frontend-demo-1A
 
 - **利用開始条件**: job.manage権限があること。対象設備と、社内・外注の選択肢がわかっていること。
 - **基本フロー**: 保守の種別・対象設備・期限を登録する → 社内に直接割り当てるか、業者に委託する → 日程と進み具合を追う → 品質確認と費用の実績を記録する。
-- **業務規則 BR-A06**: 社内の場合はHQが担当と日程を決める。外注の場合は、業者がoffer(依頼)を受け入れたあとに自社へ割り当てる。定期計画の繰り返し設定は、次にいつ発生するかを表示し、同じ計画・同じ回の案件は1件だけにする。
+- **業務規則 BR-A06**: 社内の場合はHQが担当と日程を決める。外注の場合は、業者がoffer(依頼)を受け入れたあとに自社へ割り当てる。定期計画の繰り返し設定は、次にいつ発生するかを表示し、同じ計画・同じ回の案件は1件だけにする。未応答の依頼の期限到来はIR48、取消できる状態はIR56に従う。
 - **完了後の業務状態**: Job(案件)、Assignment(割り当て)、Offer(依頼)、費用の明細、品質の履歴を、同じjobIdにまとめる。作業が完了しても、それだけでAlertが解消したとは判断しない。
 - **境界条件・禁止事項**: 辞退したあとの再委託、確定した予定の重複、期限超過、品質による差し戻しを確認する。見積もりの通貨と実績の通貨が違う場合は、変換せず別々に集計する。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A06-N | job.manage権限あり。When: reactive(事後)案件を作成→contractor-aへoffer→受諾→業者に割り当て→提出→承認→費用の実績を記録 | ①同じjobIdで、requested→offered→accepted→assigned→submitted→completedと進む ②costLines(費用明細)が保存される ③Alertの解消は別に判断する |
+| AT-A06-N | job.manage権限あり。When: unit-non-rtoのreactive(事後)案件を作成→contractor-aへoffer（offerExpiresAt=2026-09-15T01:00Z、accessValidFrom=2026-09-14T01:00Z、accessValidUntil=2026-09-22T00:00Z）→contractor-aが受諾→tech-external-aを2026-09-21 10:00〜12:00（Asia/Kuala_Lumpur）に割当→時計を2026-09-21T02:00Zへ進めて技術者がstart→submit→contractor-aが承認→HQが費用の実績を記録 | ①同じjobIdで、requested→offered→accepted→assigned→in_progress→submitted→completedと進む ②costLines(費用明細)が保存される ③Alertの解消は別に判断する |
 | AT-A06-E | 辞退後に再委託する／確定した日程を重複させる／期限を超える／報告を差し戻す／見積もりMYRと実績USDを入力する | 辞退後は新しいofferIdでrequested→offeredとなる。確定日程の重複は保存できない。期限超過は状態を勝手に変えず、注意として表示する。差し戻しはrework_requestedになる。見積もりと実績は通貨ごとに集計する |
 | AT-A06-B | ①internalでHQが割り当てる ②contractorが受諾後に割り当てる ③同じ計画・同じ予定日で2回生成する | ①assignedになる ②acceptedのあとassignedになる ③2回目はCONFLICTとなり、案件は1件のまま |
 
@@ -196,8 +196,8 @@ scope: frontend-demo-1A
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A07-N | contract.manage権限あり。When: planType=rto、unit-online-rto、restrictionEligible=true、rulesVersion=demo-v1で保存→請求を発行→改版する | ①契約のversion=1 ②請求はversion=1を参照する ③改版でversion=2になり、既存の請求は元のバージョンのまま |
-| AT-A07-E | ①customer-bの設備 ②期間が逆転している ③料金がマイナス ④generalで制限を有効にする ⑤契約のない設備を監視する | ①②③④D01による単一エラー ⑤監視は可能 |
+| AT-A07-N | contract.manage権限あり。When: customerId=cust-b、unitIds=[unit-other-customer]、planType=rto、restrictionEligible=true、rulesVersion=demo-v1で保存→請求を発行→改版する | ①契約のversion=1 ②請求はversion=1を参照する ③改版でversion=2になり、既存の請求は元のバージョンのまま |
+| AT-A07-E | ①customerId=cust-aの契約にcust-bのunit-other-customer ②期間が逆転している ③料金がマイナス ④generalで制限を有効にする ⑤契約のない設備を監視する | ①②③④D01による単一エラー ⑤監視は可能 |
 | AT-A07-B | ①general(一般保守) ②制限できないrto ③制限できるrto ④請求発行後に改版する | ①②制限の対象外 ③対象になる ④古い請求は変わらない |
 
 設計: [DD-A07](../02-design/admin.md#dd-a07-詳細)。親ケースAT-A07は、追跡表に登録されたN・E・Bのケースと、対象となるSRC・R01のすべてを確認して判定する。
@@ -221,7 +221,7 @@ HQは、クライアントが選んだ模擬クレジットカード・模擬デ
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A08-N | billing.manageあり、期限超過unpaid請求。When: preview→invoices.remind→模擬決済確定→paid後に再督促 | ①preview保存0件 ②明示操作で顧客通知1件・Invoice版+1 ③Payment confirmed/Invoice paid、scheduled制限はcancelled・requested/appliedはrelease_requested ④paid後の新規督促はCONFLICT・追加通知0件 |
+| AT-A08-N | billing.manageあり、期限超過unpaid請求。When: invoice-overdue-aでpreview→invoices.remind→customer-aがpayments.simulate（initiate→processing→confirm）で模擬決済確定→paid後に再督促 | ①preview保存0件 ②明示操作で顧客通知1件・Invoice版+1 ③Payment confirmed/Invoice paid、scheduled制限はcancelled・requested/appliedはrelease_requested ④paid後の新規督促はCONFLICT・追加通知0件 |
 | AT-A08-E | ①金額が一致しない ②通貨が一致しない ③同じ参照番号を別のinvoiceに使う ④paidの請求に再請求する ⑤督促の直前に入金がある | ①②VALIDATION ③CONFLICT ④CONFLICT ⑤督促を中止する |
 | AT-A08-B | ①全額入金 ②不足額の入金 ③同じinvoice・参照番号で再確認する ④期限内・期限超過・paidの請求に督促する | ①confirmedになる ②VALIDATIONになる ③同じ結果を返す ④期限超過のものだけが対象になる |
 
@@ -240,7 +240,7 @@ HQは、クライアントが選んだ模擬クレジットカード・模擬デ
 
 - **利用開始条件**: restriction.manage権限、制限できるRTO契約、未入金の状態、対象設備の能力確認がそろっていること。
 - **基本フロー**: 予告の理由・対象・内容・時刻を入力する → 顧客向けのプレビューを見る → 実行の開始時に、請求・猶予・例外をもう一度確認する → 設備ごとに適用を要求する → 入金後の解除要求と、機器の応答を追う。
-- **業務規則 BR-A09**: 解除要求は入金確認・猶予/例外・強制解除の遷移で自動的に起動し、`restrictions.release`は未入金かつ猶予/例外なしでは拒否、release_requestedでは冪等とする(IR35)。予告理由(reason)は顧客に表示される文言として入力する(IR42)。画面上で期限が来ても、自動では実際に機器を止めない。1Aでは、HQがはっきり確認したうえで、模擬の要求を出す。対象のすべての設備が応答するまでは、applied(適用済み)やreleased(解除済み)にしない。停止と、温度の制限は別のpolicy(方針)として扱う。
+- **業務規則 BR-A09**: 解除要求は入金確認・猶予/例外・強制解除の遷移で自動的に起動し、`restrictions.release`は未入金かつ猶予/例外なしでは拒否、release_requestedでは冪等とする(IR35)。予告理由(reason)は顧客に表示される文言として入力する(IR42)。画面上で期限が来ても、自動では実際に機器を止めない。1Aでは、HQがはっきり確認したうえで、模擬の要求を出す。対象のすべての設備が応答するまでは、applied(適用済み)やreleased(解除済み)にしない。停止と、温度の制限は別のpolicy(方針)として扱う。適用中に許可される操作はIR46の表で決まる。
 - **完了後の業務状態**: Restriction(制限)と、設備ごとのCommand(操作要求)を作成する。原因となった請求(causeInvoiceIds)がすべて入金確認された場合、scheduledならcancelledに、requested・appliedならrelease_requestedにする。1件でも未入金が残っていれば、状態は維持する。
 - **境界条件・禁止事項**: 実行の直前に原因の請求がすべて入金済みになった場合は、cancelledとし、適用の要求は作らない。猶予中・例外中、通知していない場合、対応していない機器も、適用できない。一部の設備がオフラインの場合、全体をappliedとはせず、設備ごとの保留を表示する。解除に失敗した場合はrelease_requestedのままにし、遅れて届いた適用の応答でappliedに戻さない。
 
@@ -254,7 +254,7 @@ HQは、クライアントが選んだ模擬クレジットカード・模擬デ
 
 | 受入ID | Given / When | Then |
 |---|---|---|
-| AT-A09-R01 | 同じ契約の未入金請求a・bを原因とする制限があり、aだけ入金したあとbも入金する | aだけ入金した時点では制限を維持し、残り件数は1のまま。すべてpaidになった時点で解除を要求する。power_offの解除後もOFFのまま、温度制限の解除後も今の設定を保つ。適用済み設備はremove成功、未配送/未適用確定設備はnot_requiredの証跡を必要とし、全台の証跡でreleasedにする |
+| AT-A09-R01 | `acceptancePatches["AT-A09-R01"]`: restriction-limited-aの原因をinvoice-overdue-aとinvoice-b-aの2件にする。invoice-overdue-aだけ入金したあとinvoice-b-aも入金する | aだけ入金した時点では制限を維持し、残り件数は1のまま。すべてpaidになった時点で解除を要求する。power_offの解除後もOFFのまま、温度制限の解除後も今の設定を保つ。適用済み設備はremove成功、未配送/未適用確定設備はnot_requiredの証跡を必要とし、全台の証跡でreleasedにする |
 
 設計: [DD-A09](../02-design/admin.md#dd-a09-詳細)。親ケースAT-A09は、追跡表に登録されたN・E・B・R01のケースと、対象となるSRCのすべてを確認して判定する。
 
@@ -273,7 +273,7 @@ HQは、クライアントが選んだ模擬クレジットカード・模擬デ
 |---|---|---|
 | AT-A10-N | restriction.manage権限とoverride権限あり。When: appliedの状態でexempt(未来の期限)にする→override_release | ①exceptionが保存され、変更の前後が記録される ②release_requestedになり、Invoiceはunpaidのまま |
 | AT-A10-E | ①override権限なしで手動解除する ②理由が空 ③過去の日付を期限にする ④requested中にcancelする | ①FORBIDDEN ②③VALIDATION ④解除の流れに進み、適用の可能性を0とは推定しない |
-| AT-A10-B | ①scheduledの状態でcancelする ②requestedの状態でcancelする ③appliedの状態でexemptにする ④例外の期限に一致したあと | ①cancelledになる ②release_requestedになる ③exception属性を保存しrelease_requestedになる ④自動での再適用はない |
+| AT-A10-B | hq-restriction-managerがrestriction-limited-aのstateをsubcaseごとにpatchして（IR92の4） ①scheduledの状態でcancelする ②requestedの状態でcancelする ③appliedの状態でexemptにする ④例外の期限に一致したあと | ①cancelledになる ②release_requestedになる ③exception属性を保存しrelease_requestedになる ④自動での再適用はない |
 
 設計: [DD-A10](../02-design/admin.md#dd-a10-詳細)。親ケースAT-A10は、追跡表に登録されたN・E・Bのケースと、対象となるSRC・R01のすべてを確認して判定する。
 
@@ -290,7 +290,7 @@ HQは、クライアントが選んだ模擬クレジットカード・模擬デ
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A11-N | automation.policy.manage権限あり。When: condition=tariff gt 0.6 MYR/kWh、action=set_temperature 26、priority=60で保存し、合成イベントを評価する | ①Policyのversion=1 ②シミュレーションが、採用・抑止とその理由を返す ③実際の発火はCommandを経由する |
+| AT-A11-N | automation.policy.manage権限あり。When: unitIds=[unit-online-rto]、condition=tariff gt 0.6 MYR/kWh、action=set_temperature 26、priority=60で保存し、合成イベントを評価する | ①Policyのversion=1 ②シミュレーションが、採用・抑止とその理由を返す ③実際の発火はCommandを経由する |
 | AT-A11-E | HQと顧客のルールが競合する場合／同じpriorityのHQルールが2件ある場合／solarの値がnullで評価する場合 | HQのルールを採用し、顧客のルールは抑止する。同じpriorityのときはID順にし、いつも同じ結果になる。solar=nullのときはスキップの理由を表示し、そのルールのCommandは0件になる |
 | AT-A11-B | ①HQと顧客のルールが同時に成立する ②同じ階層でpriority=50と60 ③同じ値でID=a/b ④条件がnull | ①HQが採用される ②60が採用される ③aが採用される ④スキップされる |
 
@@ -313,7 +313,7 @@ CO₂・粉じん・湿度に加えて、アレルゲン(アレルギーの原�
 - **企業要望の根拠**: SRC-06 BIZ-18, BIZ-19 — CO₂濃度、粉じん、湿度、アレルゲンなどを把握し、清掃・換気の案内を行う。CO₂が上昇したときに外気を取り入れるなどして、空気環境を改善する。
 - **設計補完の範囲**: 換気のルールと、データが欠けている場合の扱い。
 
-- **利用開始条件**: 環境policyを管理する権限があること。機器に、対象の指標(metric)と換気能力の定義があること。
+- **利用開始条件**: automation.policy.manage権限があること(IR74)。機器に、対象の指標(metric)と換気能力の定義があること。
 - **基本フロー**: 指標・しきい値・続く時間や回復の条件を設定する → 通知だけか換気の要求も出すかを選ぶ → 対象の能力を確認する → 模擬で評価する。
 - **業務規則 BR-A12**: 換気を自動で要求できるのは、ventilation=trueの対象だけ。それ以外は通知のみとし、保存する前に、対象ごとにどんな動作をするか表示する。
 - **完了後の業務状態**: 環境policyのバージョンと、通知のプレビューを保存する。要求を出す場合は機器の応答を追い、室内環境が実際に改善したかは、あとの測定で確認する。
@@ -321,7 +321,7 @@ CO₂・粉じん・湿度に加えて、アレルゲン(アレルギーの原�
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A12-N | 環境policyの権限あり。When: fixture.airPolicyNotificationInputの必須通知設定を入力し、metric=co2、threshold=1000ppm、responseMode=notify_and_ventilate、対象2台(換気対応1台・非対応1台)で保存→評価する | ①Policyのversion=1 ②対応している設備にはventilateのCommandが1件、対応していない設備には通知のみ ③室内が改善したかどうかは、あとの測定まで表示しない |
+| AT-A12-N | automation.policy.manage権限あり。When: fixture.airPolicyNotificationInputの必須通知設定を入力し、metric=co2、threshold=1000ppm、responseMode=notify_and_ventilate、対象2台(換気対応のunit-online-rto・非対応のunit-non-rto)で保存→評価する | ①Policyのversion=1 ②対応している設備にはventilateのCommandが1件、対応していない設備には通知のみ ③室内が改善したかどうかは、あとの測定まで表示しない |
 | AT-A12-E | ①ppmのしきい値にµg/m³を使う ②測定値がnull ③ventilation=falseなのにfan=true | ①VALIDATION ②判定には使わない ③送風で代用せず、Commandは0件 |
 | AT-A12-B | 換気対応1台・非対応1台に、同じCO₂の方針を適用する | 対応している設備だけ換気を要求し、非対応の設備には通知のみを行う。保存前に、対象ごとの内容を表示する |
 
@@ -336,13 +336,13 @@ CO₂・粉じん・湿度に加えて、アレルゲン(アレルギーの原�
 - **基本フロー**: 基準にする対象・期間・方法を指定する → 比較条件を確認する → 実績との差を表示する → 品質・根拠を詳しく確認する。
 - **業務規則 BR-A13**: 基準には、対象の設備の集合、境界、期間の条件、モデルのバージョンを保持する。気象などによる補正のモデルがまだない場合は、「補正済み」とは表示しない。削減量がマイナスでも、0に丸めない。
 - **完了後の業務状態**: 基準を保存するたびに新しいバージョンになる。すでにあるMRVレポートの基準バージョンは、さかのぼって変更しない。
-- **境界条件・禁止事項**: 基準が0、実績が欠けている、設備の集合が違う、計算の境界が違う場合を確認する。基準100・実績80なら20kWh・20%の削減、基準100・実績120なら-20kWh・-20%になる。
+- **境界条件・禁止事項**: 基準が0、実績が欠けている、設備の集合が違う、計算の境界が違う場合を確認する。基準100・実績80なら20kWh・20%の削減、基準100・実績120ならDTO値は-20kWh・-20%で、表示は「増加 20.0 kWh」「増加 20.0%」になる(IR68)。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A13-N | energy.manage権限あり。When: 基準100kWh、境界を記入し、バージョンを保存→実績80kWhと比較する | ①Baselineのversion=1 ②差は20kWh、20% ③補正モデルがまだない場合は「補正済み」と表示しない |
-| AT-A13-E | 基準が0／実績が欠けている／設備の集合や境界が一致しない／基準100と実績80、基準100と実績120で比較する | 基準0のときは割合はnullになる。実績が欠けている場合は品質の注記が付く。設備の集合・境界が違う場合は差を計算できない。100と80なら20kWh・20%、100と120なら-20kWh・-20%になる |
-| AT-A13-B | ①同じ境界で100/80 ②100/120 ③基準のバージョンを更新する | ①20kWh/20% ②-20kWh/-20% ③新しいバージョンになり、古いMRVは変わらない |
+| AT-A13-N | energy.manage権限あり、`acceptancePatches["AT-A13-N"]`（unit-online-rtoの実績80kWh）。When: unitIds=[unit-online-rto]、期間[2026-09-14T00:00Z, 01:00Z)、boundaryId=ac_input_electricity、method=demo_fixed、基準100kWhを保存→実績80kWhと比較する | ①Baselineのversion=1 ②差は20kWh、20% ③補正モデルがまだない場合は「補正済み」と表示しない |
+| AT-A13-E | AT-C06-E.2〜.4と同じpatchで 基準が0／実績が欠けている／設備の集合や境界が一致しない／基準100と実績80、基準100と実績120で比較する | 基準0のときは割合はnullになる。実績が欠けている場合は品質の注記が付く。設備の集合・境界が違う場合は差を計算できない。100と80なら20kWh・20%、100と120ならDTO値-20kWh・-20%で表示は「増加 20.0 kWh／増加 20.0%」(IR68) |
+| AT-A13-B | ①同じ境界で100/80 ②100/120 ③基準のバージョンを更新する | ①20kWh/20% ②DTO -20kWh/-20%、表示「増加 20.0 kWh／増加 20.0%」 ③新しいバージョンになり、古いMRVは変わらない |
 
 設計: [DD-A13](../02-design/admin.md#dd-a13-詳細)。親ケースAT-A13は、追跡表に登録されたN・E・Bのケースと、対象となるSRC・R01のすべてを確認して判定する。
 
@@ -365,7 +365,7 @@ CO₂・粉じん・湿度に加えて、アレルゲン(アレルギーの原�
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-A14-N | mrv.manage権限あり。When: 条件を指定→プレビュー→ドラフト保存→recordReview(確認記録) | ①プレビューしただけでは記録は0件 ②MRVReportがdraftになり、係数・基準のスナップショットが残る ③reviewHistoryが1件でき、status=demo_reviewedになる |
+| AT-A14-N | mrv.manage権限あり、`acceptancePatches["AT-A14-N"]`（実績80kWh、基準baseline-energy-100、係数factor-demo-2026）。When: organizationId=org-customer-a、unitIds=[unit-online-rto]、同じ期間で条件を指定→プレビュー→ドラフト保存→recordReview(確認記録) | ①プレビューしただけでは記録は0件 ②MRVReportがdraftになり、係数・基準のスナップショットが残る ③reviewHistoryが1件でき、status=demo_reviewedになる |
 | AT-A14-E | 係数がない／係数の単位が合っていない／coverage=0でプレビューする／同じバージョンに同じ確認を2回送る | 係数なし・単位不一致・coverage0はいずれも「算定未完了」となり、「認証済み」とは表示しない。同じバージョンへの同じ確認の再送は、既存の結果を返し、履歴は増やさない |
 | AT-A14-B | ①地域・年度・単位・出典がある ②ない ③入力バージョンを変えたあとで保存する | ①算定できる ②算定未完了になる ③新しい報告バージョンができ、古い結果は残る |
 
@@ -409,7 +409,7 @@ CO₂・粉じん・湿度に加えて、アレルゲン(アレルギーの原�
 
 - **利用開始条件**: audit.read権限があること。管理するテナントの範囲を超えず、機微な情報を含まない監査データ(projection)であること。
 - **基本フロー**: 期間・主体(操作した人)・対象・結果・相関IDで検索する → 履歴の詳細を開く → 関連するCommand・Job・Restrictionの状態と照らし合わせる。
-- **業務規則 BR-A16**: 監査記録では、成功・拒否・失敗を分けて扱う。変更の前後(before/after)は、秘密情報や連絡先をマスク(隠す)する。記録の追加はRepositoryの業務イベントだけが行い、監査画面に追加・編集・削除機能は提供しない。ブラウザ内で動くデモなので、改ざんを完全に防ぐ保証はしない。
+- **業務規則 BR-A16**: 監査記録では、成功・拒否・失敗・保留(結果待ちの受付、IR90)を分けて扱う。変更の前後(before/after)は、秘密情報や連絡先をマスク(隠す)する。記録の追加はRepositoryの業務イベントだけが行い、監査画面に追加・編集・削除機能は提供しない。ブラウザ内で動くデモなので、改ざんを完全に防ぐ保証はしない。
 - **完了後の業務状態**: 閲覧のみで、データは変更しない。検索条件はURLに保持するが、機密の本文はURLに含めない。
 - **境界条件・禁止事項**: 相関ID検索は認可済み集合に限定し、他テナントの相関IDと存在しない相関IDは同じ成功空集合を返す。削除API相当の呼び出し、期間が逆転している検索は拒否する。役割を切り替えたあとで、過去の操作の実行主体が別人に書き換わってはいけない。
 
@@ -425,7 +425,7 @@ CO₂・粉じん・湿度に加えて、アレルゲン(アレルギーの原�
 
 2026-09-16承認反映: FR-A07/A09: active制限中の契約編集は拒否し、取消/解除完了後に許可する（SR19）。FR-A15: failedの同一記録を新attemptで失敗段階だけ再試行し、償却失敗では購入済み参照を保持する（SR18）。
 
-現行0.17.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+現行0.19.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 0.15.0: FR-A06の品質確認はIR29の完了日時とIR31の全寄与者による自己承認禁止を適用する。
 

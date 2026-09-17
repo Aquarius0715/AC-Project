@@ -1,6 +1,6 @@
 ---
 document_id: DD-DETERMINISTIC
-version: 0.17.0
+version: 0.19.0
 status: accepted-demo-policy-under-review
 scope: frontend-demo-1A
 ---
@@ -38,7 +38,7 @@ Command仲裁単位は設備（異なるActionでも同一unitでは一つ）。
 
 FireResult/SimulationResultは正規DTOに従う。結果はunitId昇順。制御のsimulated結果はdecision=selected/suppressedとしCommandを作らない。両結果は独立したnotifications配列も返す（正規DTO/SR21）。複数設備の一部失敗は他設備の要求を取り消さない。unitIdの重複はVALIDATION。1tick/1unitにCommandは最大1件。同じtenant/eventId/phaseの再送はキーが違っても既存結果を返す。異なるfactsで同じeventIdはCONFLICT。
 
-予定終了も独立Action。停止／同意取消後の予定イベントは抑止し、過去のCommandを取消とは扱わない。手動操作がpendingなら自動発火はbusyとして抑止し後刻自動再送しない。確定済みの手動設定は次回正当な発火で変更可能。
+予定・生活パターンの時計発火はIR54の内部評価、生活パターン条件の成立はIR52。予定終了も独立Action。停止／同意取消後の予定イベントは抑止し、過去のCommandを取消とは扱わない。手動操作がpendingなら自動発火はbusyとして抑止し後刻自動再送しない。確定済みの手動設定は次回正当な発火で変更可能。
 
 ## D03 制限の設備別回復
 
@@ -82,7 +82,7 @@ unit単位でCommand(requested/sent)、DiagnosticRun(awaiting_start/running/end_
 
 devices.registerはunitIdとjobId（技術者のみ必須）を受け、targetUnitIdとして予約する。unitIdはbindまでnull。未紐付を返せるのは作成Membershipとdevice.manageのHQのみ。登録時に対象の担当を検証する。Unitにactive Deviceは最大1件。SensorはDevice内metricごとに1件、複数同metricは1Aでは拒否。serialの正規化一意性はtenant内。bindは両unitのscope、理由、排他、未解決tamperなし、SR24のactive制限/回復caseなしを照合する。旧bindingは終了時刻を付けて保持し、Telemetry/Alert/CommandのunitIdは書換えない。新bindingで新sensorIdを発行する。履歴の発生時binding/Unit/customerを保持し、SR24で行単位に認可する。
 
-接続はunknown/connecting/online/offline/error。checkのrunningでconnecting、成功でonline、明示接続失敗でerror、通信途絶でoffline。FW失敗はoperation errorであり接続状態を勝手に変えない。powerSignalはunknown/on/off、tamperはclear/detectedの別軸。画面はtamper注意、operation失敗、connection、last-known電源を併記する。未知値を正常色にしない。
+接続はunknown/connecting/online/offline/error（ACUnitの接続はDeviceからの派生値でIR47、operationの開始はIR67）。checkのrunningでconnecting、成功でonline、明示接続失敗でerror、通信途絶でoffline。FW失敗はoperation errorであり接続状態を勝手に変えない。powerSignalはunknown/on/off、tamperはclear/detectedの別軸。画面はtamper注意、operation失敗、connection、last-known電源を併記する。未知値を正常色にしない。
 
 archived資源の一覧・集計・候補からの除外と個別取得の投影はIR39。units.archiveはactive Job、active Device binding、進行中Restriction/Command/run/operation、未終了ContractがあればCONFLICT。関連の履歴だけなら可。有効Automationは同じ遷移内でdisabledにし理由unit_archivedを記録。アーカイブ後は新操作不可、監査・完了報告は元のscopeで履歴閲覧可。units.deleteは参照が一件もない未使用Unitだけ物理削除可能。履歴参照があればCONFLICT。Property/Spaceは配下Space/Unitが1件でも残ればarchive不可。顧客の無効化もactive Unit/Contract/JobがあればCONFLICT。同一顧客内の移設だけIDは不変、versionは+1。IR02により既存IDの顧客変更および別tenantへの移管は禁止。
 
@@ -90,7 +90,7 @@ archived資源の一覧・集計・候補からの除外と個別取得の投影
 
 業者の受諾前はIR25の設置物件住所を含むJobOfferSummaryだけ。受諾後の期間内は現場住所・入場案内と設備根拠だけを返す。顧客のメール・電話・担当者個人名は業者と外部技術者へ一切返さない。連絡はアプリのメモ／宛先roleによるpreviewのみ。期限後は一覧/詳細ともIR23の不変JobHistorySnapshotのみ。投影後のデータをUIへ返し、UIで隠すだけにしない。
 
-AssignmentのvalidFrom/UntilはscheduledStart/Endと同じ半開区間。重複は既存start < newEnd AND newStart < existingEnd。接する枠は可。assigned/in_progress/rework_requested/on_holdで再割当または延長可能。外注はpartner.assignと現在有効なOffer、社内はHQ job.manage。Offer期限の延長はHQのjobs.extendAccessで同じ業者・job・未来until・理由を保存する（過去を遡って許可しない）。旧Assignmentは即時無効。状態は維持。期限切れでも管理者側の割当操作はでき、失効技術者側の変更だけを拒否する。
+AssignmentのvalidFrom/UntilはscheduledStart/Endと同じ半開区間（作業窓。閲覧窓はIR49）。重複は既存start < newEnd AND newStart < existingEnd。接する枠は可。assigned/in_progress/rework_requested/on_holdで再割当または延長可能。外注はpartner.assignと現在有効なOffer、社内はHQ job.manage。Offer期限の延長はHQのjobs.extendAccessで同じ業者・job・未来until・理由を保存する（過去を遡って許可しない）。旧Assignmentは即時無効。状態は維持。期限切れでも管理者側の割当操作はでき、失効技術者側の変更だけを拒否する。
 
 submitted→on_hold→resumeHoldではin_progressに戻し、提出版を不変に保った新draftを作る。reworkも新draft。差戻し後の割当変更も元作者を保存する。新担当が更新した項目だけauthorId/observedAtをRepositoryが更新する（SR07）。入力に作者を受け取らない。期限切れ提出はFORBIDDEN。on_hold/reworkの取消はHQ job.manage、理由必須。品質担当不在の外注をHQへ引き継ぐ場合はjobs.reviewのreviewMode=hq_escalationと理由を必須にし、同一userの自己承認はHQにも禁止する。
 
@@ -104,7 +104,7 @@ Telemetryの系列キーはtenantId/unitId/sensorId/metric。sensorIdは必須�
 
 全Page読取はcursor/limitを持つ。既定25、最大100。cursorはqueryの正規化条件、scopeVersion、snapshotVersion、offsetを束縛し、条件変更はVALIDATION、業務更新ではsnapshotを変更せず取得開始時の不変snapshotを読み続ける（SR14）。失効cursorはCONFLICT。並び順の最後のキーは常にid asc。notificationsはseverity critical→warning→normal、occurredAt desc、id asc。jobsのUI選択sortはseverity/dueAt/statusのasc/desc、telemetryはobservedAt asc、sensorId asc、id asc。テレメトリー1000点は100点×10ページで取得し、欠けたページを正常グラフとしない。
 
-KPIは専用summaries.getで全検索対象を集計し、現在ページから計算しない。kind=customer/partner/technicianをroleと一致させる。scope外は件数にも含めない。partner countsはoffered、accepted+assigned+in_progress、submitted、dueAt<nowかつ未完了でそれぞれoffer/active/review/overdue。technicianは担当Unit distinct数、assigned数、未完了かつ期限超過数。customer/adminの稼働分類はSR27のeffectivePowerStateを共通使用し、customerはopen/acknowledged Alert数も返す。必要な最新telemetry欠測時はunknown（C01条件）。admin.summaryのbilling値はbilling.manage保持者のみ、非保持者はamountsByCurrency=null、billingVisibility=forbidden（0ではない）。
+KPIは専用summaries.getで全検索対象を集計し、現在ページから計算しない。kind=customer/partner/technicianをroleと一致させる。scope外は件数にも含めない。partner countsはoffered、accepted+assigned+in_progress、submitted、dueAt<nowかつ未完了でそれぞれoffer/active/review/overdue。technicianは担当Unit distinct数、assigned数、未完了かつ期限超過数。customer/adminの稼働分類はSR27のeffectivePowerStateを共通使用し、customerはopen/acknowledgedかつseverity=critical/warningのAlert数も返す（IR51）。必要な最新telemetry欠測時はunknown（C01条件）。admin.summaryのbilling値はbilling.manage保持者のみ、非保持者はamountsByCurrency=null、billingVisibility=forbidden（0ではない）。
 
 members.capacityはdateの作業可能区間（seed09:00–17:00 Asia/Kuala_Lumpur、休日は空）と割当区間の和集合の交差分数を返す。分母0／未設定はnull。確定割当のみ分子に含める。4h/8h=50.0%。
 
@@ -114,7 +114,7 @@ members.capacityはdateの作業可能区間（seed09:00–17:00 Asia/Kuala_Lump
 
 ## D08 アラート・通知・表示安全性
 
-閾値評価は観測時刻で順序付けた1秒tick。quality validの値のみ、保持はsensor stale期限まで。threshold条件が連続durationSeconds成立して初回open。missing/suspect/stale/通信断で継続カウンタを0にし品質通知を1件作る（同じunit/metric/品質は回復まで追加しない）。遅着した過去観測では過去Alertを新規発生／解除しない。gt/gteのrecoveryThresholdはthreshold未満、lt/lteはthreshold超。回復条件も同じdurationSeconds連続で自動resolved、未確認openからの自動resolvedも許可しrecovery evidenceを保存する。手動resolveは権限・理由・根拠ID必須。cooldownは同じunit/policy/重大度の通知間隔に適用し、Alert履歴は抑制しない。重大度上昇はcooldownを無視して1通知。acknowledged以前にescalateAfterMinutesが経過したらHQのalert.policy.manage保持者へ1回。宛先が0ならAlert.deliveryFailuresへDeliveryFailureを保存する。Notificationは0件、失敗の公開範囲はSR12とし、ダミーの宛先を作らない。
+閾値評価は観測時刻で順序付けた1秒tick。quality validの値のみ、保持はsensor stale期限まで。threshold条件が連続durationSeconds成立して初回open。missing/suspect/stale/通信断で継続カウンタを0にし品質通知を1件作る（同じunit/metric/品質は回復まで追加しない）。遅着した過去観測では過去Alertを新規発生／解除しない。gt/gteのrecoveryThresholdはthreshold未満、lt/lteはthreshold超。回復条件も同じdurationSeconds連続で自動resolved（policyId≠nullのAlertだけ、IR66）、未確認openからの自動resolvedも許可しrecovery evidenceを保存する。手動resolveは権限・理由・根拠ID必須。cooldownは同じunit/policy/重大度の通知間隔に適用し、Alert履歴は抑制しない。重大度上昇はcooldownを無視して1通知。acknowledged以前にescalateAfterMinutesが経過したらHQのalert.policy.manage保持者へ1回。宛先が0ならAlert.deliveryFailuresへDeliveryFailureを保存する。Notificationは0件、失敗の公開範囲はSR12とし、ダミーの宛先を作らない。
 
 AirPolicyはoperator=gte固定（高CO₂等へのデモ）、ventilationLevel=low固定、recoveryThreshold<threshold。他方向はalert policyで通知のみ。ventilation=trueかつventilationLevelsにlowを含む機器だけCommandを作る。非対応は換気ボタンdisabled、理由と手動案内を表示する。通知だけの機器もpolicy保存可能。通知先はrecipientMembershipIds（Customer IDは渡さない）。全air_qualityは通知評価し、換気候補だけを別仲裁する（SR25）。通知設定はSR28の必須入力を用いる。
 
@@ -132,11 +132,11 @@ invoiceId/jobId等の関連は権限付きRepositoryで解決し、対象が複�
 
 ## D09 セッション・言語・音声・予定
 
-Sessionは`userId,membershipId,tenantId,role,permissions,scopeVersion,generation,viewEpoch,issuedAt,expiresAt`。寿命はデモ時計で30分、利用者操作による延長なし。demo.advanceClockのジャンプは寿命を消費せずexpiresAtを同じ差分だけずらす(IR36)。期限時に画面／Query／未保存draft／object URLを破棄し/loginへ。Repositoryの受理済み業務イベントは継続。signIn時のreturnToが現在roleで許可ならそこへ、それ以外はrole home。switchMembershipは同じデモuserのMembershipか、デモ専用アカウント切替による別userを明示し、業務の自己承認はuserIdで判定する。
+Sessionは`userId,membershipId,tenantId,role,permissions,scopeVersion,generation,viewEpoch,issuedAt,expiresAt`。寿命はデモ時計で30分。延長はIR55のdemoSession.extendだけで、期限120秒前に予告する。demo.advanceClockのジャンプは寿命を消費せずexpiresAtを同じ差分だけずらす(IR36)。期限時に画面／Query／未保存draft／object URLを破棄し/loginへ。Repositoryの受理済み業務イベントは継続。signIn時のreturnToが現在roleで許可ならそこへ、それ以外はrole home。switchMembershipは同じデモuserのMembershipか、デモ専用アカウント切替による別userを明示し、業務の自己承認はuserIdで判定する。
 
 preferencesはlocale=en|ms、timezone（IANA）、currency=MYR固定read-only。通貨切替UIは作らない。契約がUSDならMoney.currency=USDで表示し換算しない。変更可能なのはlocale/zoneのみ。role変更とlogoutでpreferencesを保持、reload/resetではen/Asia/Kuala_Lumpurへ戻す。reload/resetはsessionもnullとしログインへ。タブ間同期／永続化は対象外、ヘッダーに「このタブのみ・再読み込みで初期化」を常時表示する。dirty値があれば通常離脱とreloadに破棄確認、role変更/logout/期限では保護のため破棄して通知する。
 
-音声・テキストは実マイクを使用しない固定文法。文字数1〜200 Unicode code point、trimしASCII大文字小文字だけ無視。enは`temperature <room>`、`set <room> to <integer> degrees`、`help`、msは`suhu <room>`、`tetapkan <room> kepada <integer> darjah`、`bantuan`。整数は10進、roomは表示名の完全一致、候補はscope内だけ。結果はunsupported、help(messageKey)、candidates([{unitId,pathLabel}])、temperature(unitId,measurement)、change(unitId,celsius,before,expectedVersion)の判別union。helpは操作説明の読取のみでInquiryを生成しない。同名は候補選択後resolveを再実行。権限なしは対象不存在として返す。言語変更は未確認intentを破棄し入力文保持、フォーム入力は保持、通知は新辞書で再描画。確認取消／マイク拒否の合成イベントはCommand0件。
+音声・テキストは実マイクを使用しない固定文法。文字数1〜200 Unicode code point、trimしASCII大文字小文字だけ無視。enは`temperature <room>`、`set <room> to <integer> degrees`、`help`、msは`suhu <room>`、`tetapkan <room> kepada <integer> darjah`、`bantuan`。整数は10進、roomの照合対象と候補の作り方はIR65（Space.nameの完全一致）、候補はscope内だけ。結果はunsupported、help(messageKey)、candidates([{unitId,pathLabel}])、temperature(unitId,measurement)、change(unitId,celsius,before,expectedVersion)の判別union。helpは操作説明の読取のみでInquiryを生成しない。同名は候補選択後resolveを再実行。権限なしは対象不存在として返す。言語変更は未確認intentを破棄し入力文保持、フォーム入力は保持、通知は新辞書で再描画。確認取消／マイク拒否の合成イベントはCommand0件。
 
 週次予定の有効化はsave(enabled=true)による明示操作。新規フォーム既定false、確認画面でON選択後の一回のsaveも許可。start/endは1Actionずつ。次回previewは`automations.nextRuns`で次の8 occurrenceを返す。DST検証は保存時nowから366日以内の全occurrenceを列挙し、一件でも存在しない／二重解釈のlocal日時があればVALIDATION。検証済み期間外の実行時にも同じ検証をし、不正ならその回をskipして警告、他の時刻に移動しない。テストはclockを該当DST日の前日にして同じ曜日/HH:mmを保存する。zone表示変更は保存済みautomation timezoneを変更しない。end<=startはendsNextDay必須、start=endは常に拒否。endsNextDay=trueかつend>startは24時間超なので拒否。
 
@@ -144,9 +144,9 @@ preferencesはlocale=en|ms、timezone（IANA）、currency=MYR固定read-only。
 
 画面カタログのScreen IDはroute単位。DDが同routeを共有する場合は同Screenのsection。URLの選択ID・tabはcatalogに固定、初期tabはoverview（作業画面はinspection）。formはjobId/reportIdをkey、タブ移動では同フォームを維持しdirty値を破棄しない。対象ID変更／別routeはdirty確認。更新成功後はmutationのresult.versionを受けて関連Queryをinvalidate、pendingのCommandは成功toastにしない。
 
-画面の優先順位: unauthenticated→forbidden/not-found→必須Query error→initial/loading→empty/success。offline/stale/device connecting/errorは成功データへ重ねる状態であり別画面へ遷移しない。必須Queryはscope、編集対象本体、能力、現制限。補助は履歴、添付、グラフ。補助失敗はパネル内retry。能力／制限不取得で制御disabled。通知・ダッシュボードは全対象のprimary Queryを必須とする。common componentsはpresentationだけでRepositoryを呼ばない。各pageのpropsは`{context,routeParams,searchParams,navigate}`、stateはURL/Query/RHF/local dialog、eventsはcatalogのread/write、error/loading/emptyはこの優先表。ConfirmActionDialogはcancel/confirm、初期focus=cancel、送信中confirm disabled。
+画面の優先順位: unauthenticated→forbidden/not-found/work-not-started（IR76）→必須Query error→initial/loading→empty/success。成功済みデータの再取得中はrefreshing、再取得失敗はstaleとして成功データへ重ねる（IR83）。offline/stale/device connecting/errorは成功データへ重ねる状態であり別画面へ遷移しない。必須Queryはscope、編集対象本体、能力、現制限。補助は履歴、添付、グラフ。補助失敗はパネル内retry。能力／制限不取得で制御disabled。通知・ダッシュボードは全対象のprimary Queryを必須とする。common componentsはpresentationだけでRepositoryを呼ばない。各pageのpropsは`{context,routeParams,searchParams,navigate}`、stateはURL/Query/RHF/local dialog、eventsはcatalogのread/write、error/loading/emptyはこの優先表。ConfirmActionDialogはcancel/confirm、初期focus=cancel、送信中confirm disabled。
 
-1A対応環境はWindows 11 Chrome/Edge、macOS 14 Safari/Chrome、iOS 17 Safari、Android 14 Chrome。ブラウザ版は実装開始時に各OSで取得可能な安定版一つを採用して検証environment.jsonに実測版を固定する（現時点で架空の版を書かない）。性能の基準端末はApple M1 8GB以上、macOS、Chrome、production build、1440×900、他タブなし。100Unit/1000sample、cold初回5回・warm10回の最大値を測る。操作一覧は一覧filter、pagination、詳細表示、温度確認dialog、form submitの5種。入力から最初のloading/disabled/結果DOM描画まで200ms以内。正常待機300msを含む一覧全表示は2秒以内。意図的slow=3000msは初動200msと継続loadingを判定し、2秒条件からだけ除外。12000ms fixtureは10秒timeout表示を判定する。
+1A対応環境はWindows 11 Chrome/Edge、macOS 14 Safari/Chrome、iPadOS 17 Safari（タブレット幅768/1024）、iOS 17 Safari、Android 14 Chrome。ブラウザ版は実装開始時に各OSで取得可能な安定版一つを採用して検証environment.jsonに実測版を固定する（現時点で架空の版を書かない）。性能の基準端末はApple M1 8GB以上、macOS、Chrome、production build、1440×900、他タブなし。100Unit/1000sample、cold初回5回・warm10回の最大値を測る。操作一覧は一覧filter、pagination、詳細表示、温度確認dialog、form submitの5種。入力から最初のloading/disabled/結果DOM描画まで200ms以内。正常待機300msを含む一覧全表示は2秒以内。意図的slow=3000msは初動200msと継続loadingを判定し、2秒条件からだけ除外。12000ms fixtureは10秒timeout表示を判定する。
 
 a11y検収は全roleのS01〜S08に含まれる主要操作、キーボードのみ、NVDA+Windows ChromeとVoiceOver+Safari、英語・マレー語。自動axeのcritical/serious未解決0、手動でラベル／focus復帰／エラー関連／200%拡大／色以外の識別を全件確認。WCAG全適合を試験前に主張しない。幅360/768/1024/1279/1280/1440で全Screenを確認。コントラストと44px操作領域はUX-04/06の値を使用する。
 
@@ -154,11 +154,11 @@ a11y検収は全roleのS01〜S08に含まれる主要操作、キーボードの
 
 1Aの範囲・業務方針はDEC-12で採用済み。詳細なデモ値は本番へ昇格させない。本番はNOT READY。Backend/IoT/Securityの実担当者未指名は公開・実接続のゲートで解決すべき事項であり、デモ値を商用値へ昇格させない。OPENには決定責任の役割、期限（本番設計開始前／企業検収前）、対象FR、デモ暫定方針を記録する。
 
-本番着手の必要成果物: HTTP endpoint/method/request/response/status/error一覧、認証/session/token/CSRF契約、サーバー認可表、DBの識別子・version・整合性責任、機器の受理／配送／適用／再照合イベント、再試行と冪等性、Backend停止／機器offlineの回復、ログとPII保持、SLAとテスト環境。これらは本書で捏造しない。実機の時間付き操作の主体はブラウザから独立して設計し、ブラウザ終了・Backend停止時の終了責任をIoT/Backendが決定する。成果物未確定なら本番ゲートはblocked、1Aゲートと分離する。
+本番着手の必要成果物: HTTP endpoint/method/request/response/status/error一覧、HTTP状態・通信例外（400/401/403/404/409/429/5xx/timeout/offline）からDomainErrorへの写像表（IR90）、認証/session/token/CSRF契約、サーバー認可表、DBの識別子・version・整合性責任、機器の受理／配送／適用／再照合イベント、再試行と冪等性、Backend停止／機器offlineの回復、ログとPII保持、SLAとテスト環境。demo-only操作（IR60）の置換先も含む。これらは本書で捏造しない。実機の時間付き操作の主体はブラウザから独立して設計し、ブラウザ終了・Backend停止時の終了責任をIoT/Backendが決定する。成果物未確定なら本番ゲートはblocked、1Aゲートと分離する。
 
 ## D12 フィールド・補助読取・編集版の共通規則
 
-正規のDTO/入力/結果はservice-contracts.ts、操作固有の文字数・数値は各DDのフィールド表。IDはDDC-01、InstantはUTCのミリ秒精度へ正規化、Versionは正整数。入力の未知フィールドはVALIDATION。DTOのnullを省略しない。各DDに規定のない名前は1〜120文字、理由/changeReason/reason/resolutionReason/reviewComment/purposeはtrim後1〜1000 Unicode code point、ID配列は重複なし1〜100件。空が意味を持つreport.items/parts/measurements/attachments、permissions/scopes、query unitIdsは空を許可。自由文は改行LFへ正規化しHTMLを実行しない。安全整数でない金額・非有限数値はVALIDATION。文字数は正規化後に検証する。
+正規のDTO/入力/結果はservice-contracts.ts、操作固有の文字数・数値は各DDのフィールド表。IDはDDC-01、InstantはUTCのミリ秒精度へ正規化、Versionは正整数。入力の未知フィールドはVALIDATION。DTOのnullを省略しない。各DDに規定のない名称欄は1〜120文字。理由系（reason/cancelReason/declineReason/changeReason/resolutionReason/reviewComment/purpose）はDDの記載にかかわらずtrim後1〜1000 Unicode code point（IR87）。ID配列は重複なし1〜100件。空が意味を持つreport.items/parts/measurements/attachments、permissions/scopes、query unitIdsは空を許可。自由文は改行LFへ正規化しHTMLを実行しない。安全整数でない金額・非有限数値はVALIDATION。文字数は正規化後に検証する。
 
 writeOptions.expectedVersionの完全な操作別指定はwrite-version-catalog.csvを正とする。以下は要約。新規restrictions.schedule/offsets.preview、offsets.simulate(event=request)はoptions版不要（requestはinput.quoteVersionを照合）。writeOptions.expectedVersionは更新する主資源の現在版。saveの新規(id省略)、create/register、auth/preferences/demo操作、automations.fireには不要。例外と分岐は操作別版契約を参照する。commands.create/diagnosticRuns.createはinputのexpectedUnitVersion（runはexpectedJobVersionも）を必須としoptions版は不要。jobs.saveDraftは既存report版（新規は不要）、jobs.submit/reviewはjob版に加えinputのreportVersion、restriction更新操作（schedule以外）はrestriction版、devices操作はdevice版（addResponseNoteだけDeviceEvent版）、attachments.addはreport版を使う。payments.simulate initiateはInvoice版、後続イベントはPayment版、instructionsはInvoice版。イベントによる内部更新は新しいsnapshot内でversionを照合し、外部UIの古いcontextを流用しない。updatedAtが同時刻でもversionは単調増加する。
 
@@ -220,4 +220,4 @@ plans.generateNextはid/occurrenceDate=保存済みnextDueAtとplanのexpectedVe
 
 SR17〜19は2026-09-16ユーザー承認済み。期間は暦日・完了分、offsetは同一記録で失敗段階だけ再試行、active制限中の契約編集は拒否する。詳細・優先規則はstrict-review-contracts.mdを適用する。
 
-現行0.17.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+現行0.19.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。

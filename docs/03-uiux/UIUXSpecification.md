@@ -1,6 +1,6 @@
 ---
 document_id: UX-COMMON
-version: 0.17.0
+version: 0.19.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 この文書は、4つの役割すべてに共通する、実装・操作・表示のルールを定める。ワイヤフレーム(画面のラフな下書き)や画面配置図は、この文書の対象外である。各画面の業務処理については[詳細設計](../02-design/common.md)を見てほしい。使用するライブラリは、DEC-02/03で決めた提案標準に従う。配色・書体・形状は、ユーザーが指定したLoyaltyページから取得したHTML/CSSに合わせる。根拠と、値を補正した箇所については[参考デザイン分析](../00-prepare/reference-design-analysis.md)を見てほしい。
 
-**0.17.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.19.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 企業要望と共通UIUXへの展開
 
@@ -58,7 +58,7 @@ scope: frontend-demo-1A
 | 入力値・変更されたかどうか(dirty)・入力検証・送信状態 | React Hook Form | 各入力項目を、それぞれuseStateで再度管理すること、独自のエラー辞書を作ること |
 | ダイアログの開閉のような、短い間だけ使う局所的な状態 | コンポーネント内のuseState、必要ならuseReducer | 画面全体のContextに格納すること |
 | 絞り込んだ結果・合計・ボタンを有効にするかの判定 | 描画時にその場で計算する純粋な関数 | 計算した結果を、Effectで別のstateに保存すること |
-| テーマ・言語(locale)・セッション・Repositoryへの参照 | ライブラリのProvider、または小さなContext | テレメトリー(利用状況の記録)など、頻繁に更新される値を、巨大なContextに混ぜること |
+| テーマ・言語(locale)・セッション・Repositoryへの参照 | ライブラリのProvider、または小さなContext | テレメトリー(センサーの測定値、Measurement)など、頻繁に更新される値を、巨大なContextに混ぜること |
 | 共有するデモ用の業務データ | mock Repositoryの内部 | 画面ごとにseed(初期データ)を変えること、Contextを疑似データベースとして使うこと |
 
 Effect(副作用)は、外部のシステムと同期する必要があるときだけに限定する。何かのイベントをきっかけに保存する処理は、イベントハンドラーやmutation(更新処理)の中で行い、依存配列を隠して動作を分かりにくくしない。React公式のドキュメントも、不要なEffectは避けるべきだという考え方を説明している。[React公式: You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect)
@@ -134,12 +134,15 @@ shadcnの`--primary`/`--background`/`--card`/`--muted`/`--border`は、上記の
 
 | 共通コンポーネント | 受け取る情報 | ルール |
 |---|---|---|
-| AppShell / RoleNavigation | role(役割)、許可されたルート、表示名 | ナビの表示と、サービスの利用可否の両方を確認する。現在いる場所はaria-currentで表現する。音声切替は権限のない役割ではdisabledと理由表示(IR44) |
+| AppShell / RoleNavigation | role(役割)、許可されたルート、表示名、appNameKey | ナビの表示と、サービスの利用可否の両方を確認する。現在いる場所はaria-currentで表現する。音声切替は権限のない役割ではdisabledと理由表示(IR44)。アプリ名は翻訳キーapp.name、demo-only操作の領域にはDEMOラベルを常時表示する(IR60/IR74) |
+| SessionExpiryDialog | session、now、extending、error | Session期限の120秒前にrole=alertdialogで表示し、初期focusは「延長する」。延長・サインアウトの実行はShellContainerが行う(IR55) |
 | ErrorBoundary | fallback、correlationId | 描画時の未捕捉例外を全画面errorとして表示し、白画面にしない(IR44) |
+| KpiCard | label(表示名)、value(件数)/null、denominator(分母)/null、unknownCount(不明件数)/null、asOf(時点)、href(同条件の一覧) | 件数KPIを4役割で共通化する。nullは「算定不可」、0は「0」。取得失敗時に0へ置き換えない(IR90) |
 | MetricCard / TelemetryValue | value(値)/null、unit(単位)、origin(出所)、quality(データの品質)、observedAt(観測時刻)、isDemo(デモかどうか) | 未計測の場合は「— 未計測」と表示する。デモであること・推定であること・更新時刻を隠さない |
 | StatusBadge | domain(分類)、status(状態)、labelKey(表示名のキー) | 設備・通信・案件・請求の状態名は、それぞれ別の辞書で管理する。色だけで区別しない |
 | DataTable | columns(列)、rows(行)、sort(並び替え)、pagination(ページ分割)、rowAction(行の操作) | キーボードでもモバイルでも操作できるようにする。件数が多い表はページングする。行をクリックする操作だけに頼らない |
 | TimeSeriesChart / EnergyChart | series(系列)、unit(単位)、quality(データの品質)、period(期間) | 欠測を線でつなげない。数値の表と凡例を併せて表示する。2軸を使う場合は単位を明示する |
+| VoiceContainer / VoicePanel | Container: context、locale、routeJobId / Panel: intent、候補、案件候補、理由、確認状態 | 取得・送信はVoiceContainer(feature hook)が行い、VoicePanelは表示とeventだけを持つ(IR09/IR90) |
 | CommandPanel | capability(能力)、observedState(観測された状態)、pendingCommand(処理中の操作)、permission(権限) | 要求中の状態を、成功トーストで上書きしない。対応できない理由を表示する |
 | ConfirmActionDialog | target(対象)、action(操作内容)、impact(影響)、reason(理由)、onConfirm(確定時の処理) | 制限・解除・試運転・ファームウェア更新・音声設定の変更など共通して使う。初期フォーカスは安全な選択肢に置く |
 | AsyncBoundary / EmptyState | status(状態)、messageKey(メッセージのキー)、retryAction(再試行の操作) | 持続的なエラーを、一時的なトーストだけで済ませない |
@@ -151,11 +154,11 @@ UI primitives(基本部品)は、業務用のRepositoryを直接呼び出さな�
 
 グラフや状態を示すカードは、概要から根拠・詳細へと段階的に確認できるようにする。期間・組織・単位は、常に分かる位置に表示する。成功・保留・失敗の状態を明確にし、エラーには次にすべき行動を添える。破壊的な操作の直後に「元に戻す」ボタンを出す場合も、実際に取り消せる操作のときだけにする。
 
-英語・マレー語のキー、複数形の扱い、長い翻訳文をきちんと検証する。msに欠けたキーはenへfallbackし、両方欠ければキー文字列を表示する。en/msのキー集合の一致はlintで検査する(IR44)。locale tagはen-MY/ms-MY、金額は「120.00 MYR」の順、温度は小数1桁、丸めは十進の四捨五入とする(IR44)。時刻はIntl.DateTimeFormat、金額はIntl.NumberFormatを使って整形し、予約にはタイムゾーンを表示する。言語を変更しても、測定単位や、保存するUTC(協定世界時)の値を勝手に変えない。音声によるデモは、文字起こし・対象・操作内容を確認したうえで、通常のCommand(操作)として処理する。
+英語・マレー語のキー、複数形の扱い、長い翻訳文をきちんと検証する。ms辞書の文言は実装Agentの下書きとして未確認フラグを付け、企業検収前にBusiness/UI/UXが確認する(IR74)。msに欠けたキーはenへfallbackし、両方欠ければキー文字列を表示する。en/msのキー集合の一致はlintで検査する(IR44)。locale tagはen-MY/ms-MY、金額は「120.00 MYR」の順、温度は小数1桁、丸めは十進の四捨五入とする(IR44)。時刻はIntl.DateTimeFormat、金額はIntl.NumberFormatを使って整形し、予約にはタイムゾーンを表示する。言語を変更しても、測定単位や、保存するUTC(協定世界時)の値を勝手に変えない。音声によるデモは、文字起こし・対象・操作内容を確認したうえで、通常のCommand(操作)として処理する。
 
 WCAG 2.2 AAという基準を設計の目標とする。通常の文字はコントラスト比4.5:1以上、大きな文字は3:1以上とし、操作対象が見分けられるか、フォーカスの位置が見えるかを検証する。これは「基準に適合していると保証するもの」ではなく、実装時に検査するための基準である。[W3C公式クイックリファレンス](https://www.w3.org/WAI/WCAG22/quickref/)
 
-このプロジェクトでの操作領域の目標は44×44pxである。キーボードだけで主要なシナリオを完了できるようにし、Dialog(ダイアログ)を閉じたときは呼び出し元にフォーカスを戻す。重大なエラーは、適切なlive region(読み上げ対象の領域)で通知し、テレメトリー(利用状況データ)の更新のたびに読み上げさせない。ブラウザの200%拡大、360px幅、スクリーンリーダーでの操作も確認する。
+このプロジェクトでの操作領域の目標は44×44pxである。キーボードだけで主要なシナリオを完了できるようにし、Dialog(ダイアログ)を閉じたときは呼び出し元にフォーカスを戻す。重大なエラーは、適切なlive region(読み上げ対象の領域)で通知し、テレメトリー(センサーの測定値、Measurement)の更新のたびに読み上げさせない。表示中のデータの再取得中はaria-busyと「更新中」表示にとどめ、skeletonへ戻さない(IR83)。ブラウザの200%拡大、360px幅、スクリーンリーダーでの操作も確認する。
 
 ## UX-07. UIレビューの合格条件
 
@@ -197,7 +200,7 @@ PC向けのnav(ナビゲーション)は、1280px以上の画面幅では左側�
 
 2026-09-16承認反映: 期間プリセットはSR17を適用。offset再試行ボタンはfailedだけに表示し、購入/償却の失敗段階をラベルへ出す（SR18）。契約編集拒否理由と制限取消/解除への導線はSR19に従う。
 
-現行0.17.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+現行0.19.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 0.14.0: IR25に従い、受諾前住所は設備の設置物件から取得し、期限後の報告表示は報告有無・受理状態だけを凍結する。
 
@@ -208,5 +211,9 @@ P01/T01の一覧・集計条件はIR26で共通化する。C04/C05/A04の停止�
 P05/A06の受理・差戻しボタンはWorkReport.reviewAvailabilityに従って無効化し、理由を表示する。直接呼出しはIR31でも拒否する。
 
 0.16.0: A16の必須監査Query・機器候補選択・URL復元・権限付き関連リンクはIR33。P01/T01の一覧・集計のunitIdsはIR32。
+
+0.18.0: KPIからの一覧遷移とURL許可キーはIR50、FORBIDDEN/NOT_FOUNDの表示はIR57、制限中の操作候補はIR46、機器の接続表示はIR47、セッション延長ダイアログはIR55、負の削減量の表示はIR68。機器状態（connecting/device-*）は設備・機器・測定・制御・制限・集計を読むScreenだけに適用する(IR74)。
+
+0.19.0: 作業窓開始前の技術者画面はwork-not-started（IR76）、成功済みデータの再取得中はデータを保持してaria-busyの「更新中」（IR83）、件数KPIはKpiCard、音声の取得・送信はVoiceContainer、公開画面の状態集合と通知一覧の空表示はIR90、管理ダッシュボードの省エネ予想の表示はIR78、作業窓終了の予告と「作業窓終了・再割当が必要」の表示はIR89。
 
 案件一覧のソートはIR34。状態（業務順）・重大度・期限の項目と昇順/降順を選択でき、初期値は状態の業務順（昇順）。URL復元・cursor初期化・loading/error・キーボード操作・aria-sortを共通DataTableへ適用する。制限操作の表示はrestriction.manage/overrideの2権限で分ける。

@@ -1,0 +1,16 @@
+gate_id: G1
+task_id: DOC-0.18.0
+gate_result: not_evaluated
+spec_baseline_id: null
+interrupted: true
+reviewer_agent: strict-review-fable-5.1 (earlier session)
+specification_editor: strict-review-fable-5.1 (earlier session, same agent)
+self_rereview_after_correction: not_performed
+independent_post_correction_review: performed_in DOC-0.19.0 (REV19)
+application_tests: not_run
+implementation_status: not_started
+production_connection_readiness: NOT_READY
+deployment_approval: false
+superseded_by: DOC-0.19.0
+note: 修正反映後、実行記録の作成前にセッションが中断した。spec-manifestは作成していない。実装入力に使用しない（IR75）。
+evidence_paths: [review.md, findings.json]

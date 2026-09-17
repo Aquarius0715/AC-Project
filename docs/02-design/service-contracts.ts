@@ -1,4 +1,4 @@
-/** 0.17.0 / 1A frontend specification only; no implementation or HTTP contract.
+/** 0.19.0 / 1A frontend specification only; no implementation or HTTP contract.
  * Numeric/string constraints and policy guards: deterministic-contracts.md and strict-review-contracts.md and review-resolution-contracts.md (all sections).
  * Optional fields mean omitted input; output absence is explicit null.
  */
@@ -93,7 +93,7 @@ export type DeviceEvent = Entity & DeviceHistoryScope & {alertIds:ID[];deviceId:
 export type CalibrationRecord = Entity & DeviceHistoryScope & {deviceId:ID;sensorId:ID;metric:Metric;unit:UnitSymbol;referenceValue:number;measuredValue:number;calibratedAt:Instant;actorId:ID;isDemo:true};
 export type Condition = {type:'occupancy';occupied:boolean}|{type:'location';event:'arrival'|'departure'}|{type:'pattern';localTime:string}|{type:'weather';metric:'temperature';operator:Compare;value:number}|{type:'tariff';operator:Compare;value:number;unit:'MYR_per_kWh'}|{type:'peak';active:boolean}|{type:'solar'|'battery';operator:Compare;value:number;unit:'kW'};
 export type Compare = 'gt'|'gte'|'lt'|'lte';
-export type RuleBase = Entity & {name:string;unitIds:ID[];ownerMembershipId:ID;createdByUserId:ID;timezone:string;enabled:boolean;priority:number;disabledReason:'capability_changed'|'unit_archived'|null};
+export type RuleBase = Entity & {name:string;unitIds:ID[];ownerMembershipId:ID;createdByUserId:ID;timezone:string;enabled:boolean;priority:number;disabledReason:'capability_changed'|'unit_archived'|'consent_revoked'|null};
 export type Automation = RuleBase & ({kind:'schedule';weekdays:number[];startLocal:string;endLocal:string;endsNextDay:boolean;startAction:UnitAction;endAction:UnitAction}|{kind:'event';condition:Condition;action:UnitAction});
 export type Policy = RuleBase & ({kind:'automation';condition:Condition;action:UnitAction}|{kind:'alert';metric:Metric;operator:Compare;threshold:number;recoveryThreshold:number;durationSeconds:number;severity:'warning'|'critical';recipientMembershipIds:ID[];channels:Channel[];escalateAfterMinutes:number;cooldownMinutes:number}|{kind:'air_quality';metric:Metric;operator:'gte';threshold:number;recoveryThreshold:number;durationSeconds:number;responseMode:'notify_only'|'notify_and_ventilate';ventilationLevel:'low';recipientMembershipIds:ID[];severity:'warning'|'critical';channels:Channel[];cooldownMinutes:number;escalateAfterMinutes:number});
 export type Consent = Entity & {membershipId:ID;purpose:'location_automation';granted:boolean;grantedAt:Instant|null;revokedAt:Instant|null};
@@ -107,7 +107,7 @@ export type Channel = 'inApp'|'email'|'whatsapp';
 export type Target = {kind:'unit'|'job'|'invoice'|'restriction'|'device'|'inquiry';id:ID};
 export type Notification = Entity & {sourceAlertId:ID|null;type:NotificationType;recipientMembershipId:ID;scopeVersionAtCreation:number;target:Target;templateKey:'alert'|'quality'|'schedule_change'|'report_return'|'completion'|'payment'|'payment_reminder'|'restriction'|'inquiry';params:{targetName:string;at:Instant;status:string;reason:string|null;amountMinor:number|null;currency:Currency|null;method:PaymentMethod|null;message:string|null};channel:Channel;deliveryState:'preview'|'simulated'|'failed';severity:Severity;occurredAt:Instant;readAt:Instant|null};
 export type NotificationPreview = Notification;
-export type AuditView = Entity & {actorId:ID;actorRoleAtTime:Role;action:string;targetRef:{kind:string;id:ID};previousVersion:number|null;nextVersion:number|null;occurredAt:Instant;correlationId:ID;result:'success'|'denied'|'failed'|'pending';maskedBefore:Record<string,string|null>;maskedAfter:Record<string,string|null>;reason:string|null};
+export type AuditView = Entity & {actorId:ID;actorRoleAtTime:Role|'system';action:string;targetRef:{kind:string;id:ID};previousVersion:number|null;nextVersion:number|null;occurredAt:Instant;correlationId:ID;result:'success'|'denied'|'failed'|'pending';maskedBefore:Record<string,string|null>;maskedAfter:Record<string,string|null>;reason:string|null};
 export type EnergyBaseline = Entity & {unitIds:ID[];period:Range;method:'demo_fixed'|'demo_period_comparison';baselineKWh:number|null;quality:BaselineQuality;boundaryId:EnergyBoundaryId;boundary:string;assumptions:string;source:string};
 export type EmissionFactor = Entity & {region:string;year:number;kgCO2ePerKWh:number;source:string;isDemo:true};
 export type EnergySummary = {period:Range;unitIds:ID[];totals:{kWh:number|null;amountMinor:number|null;savedKWh:number|null;deltaKWh:number|null;savingPercentage:number|null;savedAmountMinor:number|null;emissionsKg:number|null;savedEmissionsKg:number|null};currency:Currency;baselineRef:{id:ID;version:number}|null;factorRef:{id:ID;version:number}|null;baselineSnapshot:EnergyBaseline|null;factorSnapshot:EmissionFactor|null;tariffVersion:ID;boundaryId:EnergyBoundaryId;boundary:string;coverage:number|null;qualityWarnings:string[]};
@@ -118,7 +118,9 @@ export type OffsetQuote = Entity & {customerId:ID;purpose:string;amountKg:number
 export type OffsetAttempt = {id:ID;stage:'purchase'|'retirement';status:'pending'|'succeeded'|'failed';startedAt:Instant;completedAt:Instant|null};
 export type OffsetRecord = Entity & {quoteId:ID;customerId:ID;amountKg:number;attempts:OffsetAttempt[];currentAttemptId:ID|null;state:'demo_requested'|'demo_purchased'|'demo_retired'|'failed';previousState:OffsetRecord['state']|null;purchaseRef:ID|null;retirementRef:ID|null;demoCertificateRef:ID|null;eventHistory:AuditView[];isDemo:true};
 export type TelemetrySummary = {measurements:Measurement[];asOf:Instant;energy:EnergySummary|null};
-export type AdminSummary = {customerCount:number;total:number;online:number;offline:number;unknown:number;powerOn:number;powerOff:number;powerUnknown:number;operatingRate:number|null;alertCount:number;jobCounts:Record<JobStatus,number>;overdueInvoiceCount:number|null;amountsByCurrency:Money[]|null;billingVisibility:'allowed'|'forbidden';energySummary:EnergySummary|null;asOf:Instant};
+export type AdminSummary = {customerCount:number;total:number;online:number;offline:number;unknown:number;powerOn:number;powerOff:number;powerUnknown:number;operatingRate:number|null;alertCount:number;jobCounts:Record<JobStatus,number>;overdueInvoiceCount:number|null;amountsByCurrency:Money[]|null;billingVisibility:'allowed'|'forbidden';energySummary:EnergySummary|null;energyForecast:EnergyForecast;asOf:Instant};
+/** IR78: prorated modeled-baseline forecast for the admin dashboard only; comparisons stay in energy.summary. */
+export type EnergyForecast = {period:Range;unitIds:ID[];basis:'prorated_modeled_baseline';baselineRef:{id:ID;version:number}|null;baselineSnapshot:EnergyBaseline|null;expectedUnitMinutes:number;validUnitMinutes:number;actualKWhOnValidSlots:number|null;predictedBaselineKWh:number|null;predictedActualKWh:number|null;forecastSavedKWh:number|null;forecastSavingPercentage:number|null;qualityWarnings:('actual_unavailable'|'baseline_unavailable'|'modeled_baseline'|'no_units'|'partial_coverage'|'prorated_forecast')[]};
 export type Summary = {kind:'customer'|'partner'|'technician';counts:{total:number;online:number;offline:number;unknown:number;powerOn:number;powerOff:number;powerUnknown:number;alertCount:number;offerCount:number;activeCount:number;reviewCount:number;scheduledCount:number;inProgressCount:number;overdueCount:number;assignedCount:number};asOf:Instant};
 export type Capacity = {membershipId:ID;date:string;availableSlots:Slot[];assignedSlots:Slot[];availableMinutes:number|null;assignedMinutes:number;utilization:number|null};
 export type ResolvedIntent = {kind:'unsupported'}|{kind:'help';messageKey:'voice.help'}|{kind:'candidates';candidates:{unitId:ID;pathLabel:string}[]}|{kind:'temperature';unitId:ID;measurement:Measurement|null}|{kind:'change';unitId:ID;celsius:number;before:ObservedState;expectedVersion:number};
@@ -126,7 +128,7 @@ export type ResetPreview = {messageKey:'auth.reset_generic';deliveryState:'previ
 export type ArchivedResource = {id:ID;version:number;archived:true};
 export type DemoGeneration = {generation:number};
 export type DemoEvent = {eventId:ID;generation:number;occurredAt:Instant;type:string};
-export type Query = {cursor?:string;limit?:number;sort?:{field:'id'|'version'|'name'|'status'|'createdAt'|'updatedAt'|'severity'|'dueAt'|'observedAt'|'occurredAt';direction:'asc'|'desc'};filters?:{customerId?:ID;propertyId?:ID;spaceId?:ID;unitId?:ID;unitIds?:ID[];jobId?:ID;contractId?:ID;invoiceId?:ID;restrictionId?:ID;organizationId?:ID;membershipId?:ID;kind?:string;status?:string;statuses?:string[];overdueOnly?:boolean;includeDescendants?:boolean;connections?:Connection[];powerState?:'on'|'off'|'unknown';severity?:Severity;enabled?:boolean;unreadOnly?:boolean;from?:Instant;to?:Instant;date?:string;qualification?:QualificationCode;activeOnly?:boolean;actorId?:ID;targetId?:ID;correlationId?:ID;result?:AuditView['result']}};
+export type Query = {cursor?:string;limit?:number;sort?:{field:'id'|'version'|'name'|'status'|'createdAt'|'updatedAt'|'severity'|'dueAt'|'observedAt'|'occurredAt';direction:'asc'|'desc'};filters?:{customerId?:ID;propertyId?:ID;spaceId?:ID;unitId?:ID;unitIds?:ID[];jobId?:ID;contractId?:ID;invoiceId?:ID;restrictionId?:ID;organizationId?:ID;membershipId?:ID;kind?:string;status?:string;statuses?:string[];overdueOnly?:boolean;includeDescendants?:boolean;connections?:Connection[];powerState?:'on'|'off'|'unknown';unassignedOnly?:boolean;severity?:Severity;enabled?:boolean;unreadOnly?:boolean;from?:Instant;to?:Instant;date?:string;qualification?:QualificationCode;activeOnly?:boolean;actorId?:ID;targetId?:ID;correlationId?:ID;result?:AuditView['result']}};
 export type Save<T> = Omit<T,keyof Entity|'ownerMembershipId'|'createdByUserId'> & {id?:ID};
 export type BlobInput = {name:string;mime:'image/jpeg'|'image/png';size:number;bytes:Uint8Array};
 
@@ -137,7 +139,7 @@ export type ScheduledOccurrence = {automationId:ID;phase:'schedule_start'|'sched
 export type DeletedResource = {id:ID;deleted:true};
 export type WriteResult = {state:'not_received'|'pending'}|{state:'succeeded';operation:string;resourceIds:ID[];result:WriteResultData}|{state:'failed';error:DomainError};
 export type WriteResultData = { [K in keyof OperationContracts]: OperationContracts[K]['mode'] extends 'write' ? OperationContracts[K]['result'] : never }[keyof OperationContracts];
-export type DemoTrigger = {scenarioId:string;eventId:ID;occurredAt:Instant} & ({eventType:'command_sent'|'command_ack'|'command_fail';commandId:ID;sequence:number}|{eventType:'telemetry';measurement:RawMeasurement}|({eventType:'device';deviceId:ID;bindingId:ID|null;sequence:number} & ({kind:'communication_lost'|'power_lost'|'tamper'}|{kind:'restored';recovery:DeviceRecovery}))|{eventType:'qualification_revoked';membershipId:ID;qualification:QualificationCode}|{eventType:'payment';paymentId:ID;result:'processing'|'confirm'|'fail';paymentReference:string}|{eventType:'operation';operationId:ID;result:'succeeded'|'failed'}|{eventType:'automation';event:EvaluationInput}|{eventType:'network';connected:boolean}|{eventType:'session_expired'|'microphone_denied'}|{eventType:'restriction_observation';restrictionId:ID;unitId:ID;observed:ObservedRestriction;sequence:number}|{eventType:'transport';operation:OperationName;outcome:'UNAVAILABLE'|'TIMEOUT'|'RATE_LIMITED'|'DELAY';retryAfterSeconds:number|null;delayMs:number|null;remainingCalls:number});
+export type DemoTrigger = {scenarioId:string;eventId:ID;occurredAt:Instant} & ({eventType:'command_sent'|'command_ack'|'command_fail';commandId:ID;sequence:number}|{eventType:'telemetry';measurement:RawMeasurement}|({eventType:'device';deviceId:ID;bindingId:ID|null;sequence:number} & ({kind:'communication_lost'|'power_lost'|'tamper'}|{kind:'restored';recovery:DeviceRecovery}))|{eventType:'qualification_revoked';membershipId:ID;qualification:QualificationCode}|{eventType:'operation';operationId:ID;result:'succeeded'|'failed'}|{eventType:'automation';event:EvaluationInput}|{eventType:'network';connected:boolean}|{eventType:'simulator';enabled:boolean}|{eventType:'session_expired'|'microphone_denied'}|{eventType:'restriction_observation';restrictionId:ID;unitId:ID;observed:ObservedRestriction;sequence:number}|{eventType:'transport';operation:OperationName;outcome:'UNAVAILABLE'|'TIMEOUT'|'RATE_LIMITED'|'DELAY';retryAfterSeconds:number|null;delayMs:number|null;remainingCalls:number});
 
 export type ScopeRef = {kind:'tenant'|'organization'|'property'|'unit';id:ID};
 export type QualificationCode = 'demo_indoor'|'demo_outdoor'|'demo_electrical';
@@ -159,7 +161,7 @@ export type NotificationOutcome = {unitId:ID;policyId:ID;decision:'created'|'sup
 
 export type EnergyBoundaryId = 'ac_input_electricity'|'whole_building_electricity';
 export type MeasurementIssue = 'unit_mismatch'|'non_finite'|'out_of_range'|'invalid_time';
-export type RawMeasurement = {unitId:ID;sensorId:ID;metric:Metric;value:number|null;unit:string;observedAt:Instant;receivedAt:Instant;origin:Measurement['origin'];quality:Quality;sequence:number;eventId:ID};
+export type RawMeasurement = {unitId:ID;sensorId:ID;metric:Metric;value:number|null;unit:string;observedAt:Instant;receivedAt:Instant;origin:Measurement['origin'];quality:Quality;sequence?:number;eventId:ID}; // IR77: omitted sequence = latest+1
 export type JobDecisionReceipt = {jobId:ID;jobVersion:number;offerId:ID;decision:'accept'|'decline'};
 export type NotificationType = 'cleaning_due'|'fault'|'quality'|'schedule_change'|'report_return'|'completion'|'payment'|'payment_reminder'|'restriction'|'inquiry';
 export type InvoiceReminderReceipt = {invoiceId:ID;invoiceVersion:number;notificationId:ID};
@@ -202,6 +204,7 @@ export type OperationContracts = {
   'demoSession.signIn': {input:{demoActorId:ID;returnTo?:string};result:Session;mode:'write'};
   'demoSession.signOut': {input:Record<string,never>;result:undefined;mode:'write'};
   'demoSession.switchMembership': {input:{demoMembershipId:ID};result:Session;mode:'write'};
+  'demoSession.extend': {input:Record<string,never>;result:Session;mode:'write'};
   'devices.addResponseNote': {input:{deviceId:ID;eventId:ID;responseNote:string};result:DeviceEvent;mode:'write'};
   'devices.bind': {input:{deviceId:ID;unitId:ID;jobId?:ID;reason:string};result:Device;mode:'write'};
   'devices.calibrate': {input:{deviceId:ID;sensorId:ID;metric:Metric;unit:UnitSymbol;referenceValue:number;measuredValue:number;calibratedAt:Instant;jobId?:ID};result:CalibrationRecord;mode:'write'};
@@ -298,7 +301,7 @@ export type OperationContracts = {
   'units.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'units.get': {input:{id:ID;jobId?:ID};result:UnitDetail;mode:'read'};
   'units.list': {input:Query;result:Page<UnitSummary>;mode:'read'};
-  'units.save': {input:{id?:ID;customerOrgId:ID;propertyId:ID;spaceId:ID;displayName:string;modelId:ID;type:'split';installedAt:Instant|null;serviceScope:ACUnit['serviceScope'];changeReason?:string};result:ACUnit;mode:'write'};
+  'units.save': {input:{id?:ID;customerOrgId:ID;propertyId:ID;spaceId:ID|null;displayName:string;modelId:ID;type:'split';installedAt:Instant|null;serviceScope:ACUnit['serviceScope'];changeReason?:string};result:ACUnit;mode:'write'};
   'voice.resolveIntent': {input:{text:string;locale:Locale;selectedUnitId?:ID};result:ResolvedIntent;mode:'read'};
   'writes.getResult': {input:{operation:string;idempotencyKey:ID};result:WriteResult;mode:'read'};
 };
@@ -306,8 +309,10 @@ export type OperationName = keyof OperationContracts;
 export type RepositoryCall = <K extends OperationName>(operation:K,context:Context|null,input:OperationContracts[K]['input'],options:OperationContracts[K]['mode'] extends 'write' ? WriteOptions : {signal?:AbortSignal})=>Promise<ServiceResult<OperationContracts[K]['result']>>;
 
 /** Subscription is synchronous and is not a Promise Repository operation. */
-export type ChangeEvent = {generation:number;cursor:number;eventId:ID;entityType:string;entityId:ID|null;version:number|null;occurredAt:Instant;changedFields:string[]};
-export type Subscribe = (context:Context,input:{afterCursor:number;resources:string[];unitIds:ID[]},listener:(event:ChangeEvent)=>void)=>()=>void;
+/** IR71: fixed entity types; cursor_only carries no resource data. */
+export type ChangeEntityType = 'unit'|'device'|'measurement'|'command'|'diagnostic_run'|'device_operation'|'alert'|'notification'|'job'|'report'|'attachment'|'offer'|'assignment'|'plan'|'contract'|'invoice'|'payment'|'restriction'|'inquiry'|'automation'|'policy'|'consent'|'membership'|'organization'|'customer'|'property'|'space'|'capability'|'baseline'|'factor'|'mrv_report'|'offset_record'|'session'|'cursor_only';
+export type ChangeEvent = {generation:number;cursor:number;eventId:ID;entityType:ChangeEntityType;entityId:ID|null;version:number|null;occurredAt:Instant;changedFields:string[]};
+export type Subscribe = (context:Context,input:{afterCursor:number;resources:Exclude<ChangeEntityType,'cursor_only'>[];unitIds:ID[]},listener:(event:ChangeEvent)=>void)=>()=>void;
 export type AllergenObservation = {availability:'not_measured'|'unsupported'|'available';substance:string|null;value:number|null;unit:string|null;sourceLabel:string|null;observedAt:Instant|null;evidenceText:string|null};
 export type AirSeries = Page<Measurement> & {allergenObservation:AllergenObservation|null};
 

@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.17.0
+version: 0.19.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,13 +11,13 @@ scope: frontend-demo-1A
 
 この設計書は、機能・画面の項目・状態・例外を決めます。企業が書いた原文と、それに対応する要件をもとにします。各FR(機能要件)を満たす処理と、受け入れ条件を定義します。参考にするモック画面は、共通UIの見た目を検討するために使います。
 
-**0.17.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.19.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 入力・責務
 
 一次資料(最初の情報源)は[企業要件原文(SRC-06)](../00-prepare/sources/company-requirements-original.txt)です。この原文を整理し直した要件をもとに、画面・入力・状態・受け入れ条件を設計します。入力として使う資料は[役割別要件](../01-requirements/technician.md)と[共通要件](../01-requirements/common.md)です。必ず読む資料は[共通詳細設計](common.md)と[UIUX仕様書](../03-uiux/UIUXSpecification.md)です。この先は、フロントエンド(画面側)の項目・表示・モック(模擬)動作の設計を説明します。画面上で行う登録・割当・入金・制限・監査は、すべて共有モックメモリ(画面が共有して使う仮のデータ)の状態遷移(状態の変化)です。サーバーの実装やデータベース設計を求めるものではありません。
 
-ルートパラメーター(URLに含まれる値)は、信頼できない入力として扱い、必ず検証します。表にあるservice名は、共通Repository(データを扱う共通の仕組み)が持つ論理的な操作名です。同じルートを持つ行は、同じ画面の中で機能を分担しています。すべての行で、loading(読み込み中)・empty(データなし)・error(エラー)・forbidden(権限なし)・not-found(見つからない)の表示を実装します。再試行ボタンは、回復できるエラーのときだけ表示します。権限が足りないときは、許可された画面へ戻します。
+ルートパラメーター(URLに含まれる値)は、信頼できない入力として扱い、必ず検証します。表にあるservice名は、共通Repository(データを扱う共通の仕組み)が持つ論理的な操作名です。同じルートを持つ行は、同じ画面の中で機能を分担しています。すべての行で、loading(読み込み中)・empty(データなし)・error(エラー)・forbidden(権限なし)・not-found(見つからない)の表示を実装します。再試行ボタンは、回復できるエラーのときだけ表示します。権限が足りないときと対象が見つからないときは、再試行ボタンを出さず、IR57に従って表示します。
 
 ## 画面・処理設計
 
@@ -63,9 +63,9 @@ scope: frontend-demo-1A
 
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
-| from / to | 日付/必須 | 初期今日、最大366日 | 予定 |
-| status | enum/任意 | assigned/in_progress/submitted/completed | 進捗 |
-| severity | enum/任意 | critical/warning/all | 優先 |
+| from / to | 日付/必須 | 初期今日、最大366日。YYYY-MM-DDの表示timezone暦日をUTC Instantへ変換（IR74） | 予定 |
+| status | enum/任意 | assigned/in_progress/on_hold/submitted/rework_requested/completed/all（allはstatus省略、IR90） | 進捗 |
+| severity | enum/任意 | critical/warning/all（allはfilters.severityを省略、IR74） | 優先 |
 | summary | 読取 | 担当設備数・未着手・期限超過 | 担当範囲の集計 |
 
 **処理手順**
@@ -75,7 +75,7 @@ scope: frontend-demo-1A
 3. この画面は参照のみです。予定が0件のときは、空の状態であることを示し、過去の履歴を見るための導線を用意します。
 4. 更新対象になるQueryは`jobs / assignments / alerts`です。
 
-**境界条件・失敗時**: 外部の技術者の担当期限が終わると、その設備のライブ(現在の)情報を非表示にします。別の技術者が担当する案件IDを直接URLに入力しても、作業を開始することはできません。
+**境界条件・失敗時**: 外部の技術者の担当期限が終わると、その設備のライブ(現在の)情報を非表示にします。作業開始前の担当案件は閲覧窓で読取専用に表示し、作業窓の開始前の操作はFORBIDDENです(IR49)。別の技術者が担当する案件IDを直接URLに入力しても、作業を開始することはできません。
 
 **検証**: 追跡表にあるAT-T01の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
 
@@ -234,7 +234,7 @@ scope: frontend-demo-1A
 |---|---|---|---|
 | alertId | ID/必須 | 担当設備の事象 | 対象 |
 | evidenceIds | 読取配列 | telemetry/inspectionを識別 | 根拠 |
-| resolutionReason | 文字列/解消時必須 | 1〜2000文字 | 解消判断 |
+| resolutionReason | 文字列/解消時必須 | 1〜1000文字(IR87) | 解消判断 |
 | resolutionEvidenceIds | ID配列/解消時 | 再測定IDまたは確認記録 | 検証 |
 | expectedVersion | 整数/必須 | 最新Alert版 | 競合 |
 
@@ -245,7 +245,7 @@ scope: frontend-demo-1A
 3. 検知・確認・解消それぞれの時刻と、行った人を記録します。同じ異常が再発した場合は、新しいalertId(異常のID)を作り、前の事象と関連付けます。
 4. 更新対象のQueryは`alerts / alert events / customer summary / admin summary / audit`です。
 
-**境界条件・失敗時**: 作業(Job)が完了しただけでは、`resolved`(解消済み)にはしません。通信が切れているという根拠だけで、盗難と決めつけません。取り外しは、専用の別の事象として分けて扱います。
+**境界条件・失敗時**: 作業(Job)が完了しただけでは、`resolved`(解消済み)にはしません。再測定による自動解消はpolicyを持つAlertだけで、それ以外は理由付きの手動解消です(IR66)。通信が切れているという根拠だけで、盗難と決めつけません。取り外しは、専用の別の事象として分けて扱います。
 
 **検証**: 追跡表にあるAT-T07の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
 
@@ -271,7 +271,7 @@ scope: frontend-demo-1A
 3. 開始時刻・提出時刻・`reportVersion`(報告のバージョン)を保存します。完了とするかどうかは、品質担当のreview(確認)によって決まります。
 4. 更新対象のQueryは`jobs / reports / job events / notifications / audit`です。
 
-**境界条件・失敗時**: 割り当てられていない場合、取消済みの場合、`on_hold`(保留中)の場合、期限外の場合は、開始や提出を拒否します。提出に失敗した場合は、`in_progress`(進行中)の状態とドラフトをそのまま残します。
+**境界条件・失敗時**: 割り当てられていない場合、取消済みの場合、`on_hold`(保留中)の場合、期限外の場合は、開始や提出を拒否します。作業窓の開始前はwork-not-started状態で案件を読取表示し(IR76)、終了15分前の予告と終了時の未保存入力の破棄はIR89に従います。提出に失敗した場合は、`in_progress`(進行中)の状態とドラフトをそのまま残します。
 
 **検証**: 追跡表にあるAT-T08の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
 
@@ -295,7 +295,7 @@ scope: frontend-demo-1A
 **処理手順**
 
 1. 点検結果・測定値・写真・交換部品・作業内容の本文・次回の対応を入力します。ドラフトを保存します。提出前のチェックを行います。報告のバージョンを確定します。
-2. 報告には、作成者とバージョンを記録します。画像はJPEGまたはPNGで、1枚5MiB以下、最大10枚までです。数量は正の整数です。次回対応は`none`(なし)か、日時と内容をはっきり指定するかのどちらかです。サービスからデータを再取得しても、まだ保存していない変更(dirty)内容を消してはいけません。
+2. 報告には、作成者とバージョンを記録します。画像はJPEGまたはPNGで、1枚5MiB以下、最大10枚までです。数量は正の整数です。次回対応は`none`(なし)か、日時と内容をはっきり指定するかのどちらかです。作業窓の中でサービスからデータを再取得しても、まだ保存していない変更(dirty)内容を消してはいけません。作業窓の終了時はIR89に従い破棄して通知します。
 3. 保存に成功したら、draft(下書き)のバージョンを更新します。提出時は、その時点で固定した`reportVersion`をJobに結び付けます。写真を削除するときは、object URL(一時的な画像URL)を解放します。
 4. 更新対象のQueryは`draft / attachments / reports`で、提出時には`jobs`も対象になります。
 
@@ -326,7 +326,7 @@ scope: frontend-demo-1A
 3. 通常の診断は`commands.create`を使います。試運転は`diagnosticRuns.create`を使い、jobId・理由・durationMinutes(実行時間)・endAction(終了時の動作)を共有メモリに保存します。開始のCommandと終了のCommandは`runId`で結び付けます。終了予定の時刻と、実際の終了応答は分けて表示します。終了に失敗した場合は、注意として記録を残します。
 4. 更新対象のQueryは`commands / unit detail / audit`です。
 
-**境界条件・失敗時**: 制限温度を回避しようとする操作、担当期間外の操作、16分以上の試運転、理由の入力がない操作は、すべて拒否します。終了の応答がない限り、停止済みとは表示しません。
+**境界条件・失敗時**: 制限温度を回避しようとする操作、担当期間外の操作、16分以上の試運転、理由の入力がない操作は、すべて拒否します。制限中の可否はIR46、接続・電源信号による拒否はIR47に従います。終了の応答がない限り、停止済みとは表示しません。
 
 **検証**: 追跡表にあるAT-T10の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
 
@@ -352,7 +352,7 @@ scope: frontend-demo-1A
 
 1. シリアル番号(serial)を登録します。設備と紐付けます。接続を確認します。校正値と参照値を記録します。対応しているファームウェアの候補を選んで更新します。進行状況と結果を確認します。
 2. シリアル番号は、前後の空白を除き大文字に揃えたうえで、重複していないか判定します。校正は履歴として追加するだけで、既存の測定値を書き換えることはありません。ファームウェアは、対応しているバージョンの一覧からのみ選べます。URLやバイナリデータを自由に入力させることはしません。
-3. `Device`(機器)、`CalibrationRecord`(校正記録)、`DeviceOperation`(機器操作の記録)を保存します。`firmwareVersion`(ファームウェアのバージョン)が更新されるのは、結果が`succeeded`(成功)のときだけです。更新中の制御要求はCONFLICTとして拒否します。排他はD05に従います。
+3. `Device`(機器)、`CalibrationRecord`(校正記録)、`DeviceOperation`(機器操作の記録)を保存します。`firmwareVersion`(ファームウェアのバージョン)が更新されるのは、結果が`succeeded`(成功)のときだけです。queuedからrunningへの開始とconnectingの表示はIR67に従います。更新中の制御要求はCONFLICTとして拒否します。排他はD05に従います。
 4. 更新対象のQueryは`devices / operations / calibrations / capabilities / audit`です。
 
 **境界条件・失敗時**: シリアル番号の重複、別の設備への無断での再紐付け、単位の不一致は、いずれも拒否し、台帳は変更しません。オフラインのときは、ファームウェアの更新を開始しません。ファームウェアの更新に失敗した場合は`failed`(失敗)と表示し、古いバージョンをそのまま保持します。
@@ -371,7 +371,7 @@ scope: frontend-demo-1A
 |---|---|---|---|
 | deviceId | ID/必須 | 担当内 | 対象 |
 | eventType | enum/デモ制御必須 | communication_lost/power_lost/tamper/restored | 事象 |
-| evidenceSource | enum/必須 | heartbeat/power_signal/tamper_signal | 根拠 |
+| evidenceSource | enum/読取 | heartbeat/power_signal/tamper_signal。eventTypeから導出（IR74） | 根拠 |
 | responseNote | 文字列/対応時必須 | 1〜1000文字 | 確認内容 |
 | occurredAt / restoredAt | 読取 | デモ時計由来 | 検知・復旧 |
 
@@ -390,6 +390,6 @@ scope: frontend-demo-1A
 
 0.10.0: T12はDeviceEvent.alertIdsからalerts.getを取得しAlert.versionで確認する（SR23）。機器履歴は発生時scopeで絞る（SR24）。
 
-現行0.17.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+現行0.19.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 案件一覧とjobs.listのソートはIR34を適用する。URL sort未指定はstatus:asc。選択変更でcursorを破棄し、filterを保持して新snapshotの初頁から取得する。状態/重大度/期限の昇降順を選べる。

@@ -1,6 +1,6 @@
 ---
 document_id: REQ-P
-version: 0.17.0
+version: 0.19.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # 施工業者 要件定義書
 
-**0.17.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.19.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 目的と前提
 
@@ -74,7 +74,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-P01-N | contractor-aに未応答かつ期限内offered1、有効受諾期間内のaccepted1・submitted1、contractor-bにoffered1。全件は選択期間内。When: ①`/partner`をstatus条件なしで取得 ②status=offeredへ変更 | ①一覧3件、offerCount=1／activeCount=1／reviewCount=1 ②一覧1件、offerCount=1／activeCount=0／reviewCount=0、bのofferなし ③閲覧後も未応答Offer decision=null |
+| AT-P01-N | `acceptancePatches["AT-P01-N"]`: contractor-aに未応答かつ期限内offered1、有効受諾期間内のaccepted1、submitted1（seedのjob-contractor-aをsubmittedへ）、contractor-bにoffered1。期間条件なし。When: ①`/partner`をstatus条件なしで取得 ②status=offeredへ変更 | ①一覧3件、offerCount=1／activeCount=1／reviewCount=1 ②一覧1件、offerCount=1／activeCount=0／reviewCount=0、bのofferなし ③閲覧後も未応答Offer decision=null |
 | AT-P01-E | ①contractor-b宛offerのjobIdを直打ち ②委託期限後に自社履歴を開く | ①NOT_FOUND ②JobHistorySnapshot（自社決定・完了日）のみ、live値なし |
 | AT-P01-B | 同じofferを①受諾前 ②受諾後・期間内 ③委託失効後に開く | ①JobOfferSummary（設置物件の登録住所のみ参照、入場案内・telemetry・請求なし） ②JobDetail ③JobHistorySnapshot |
 
@@ -85,7 +85,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 - **企業要望の根拠**: SRC-06 BIZ-12 — 定期点検、故障後の対応、予防のための保全をしたい。RTO以外の一般的な保守にも使いたい。
 - **設計補完の範囲**: 受諾・辞退の手順。施工業者を独立させることはSRC-02という制作方針で決めたことであり、企業からの原文にある独立した役割ではありません。
 
-- **利用開始条件**: 自社宛てに依頼(offered)が来ていること。依頼の期限(offerExpiresAt)より前であること。本社(HQ)がまだ取り消していないこと。
+- **利用開始条件**: 自社宛てに依頼(offered)が来ていること。依頼の期限(offerExpiresAt)より前であること。本社(HQ)がまだ取り消していないこと。未応答のまま期限が来た依頼は、案件がrequestedへ戻り自社の一覧から消える(IR48)。期限後の受諾・辞退はCONFLICT(errors.offer_expired)、案件の個別取得はNOT_FOUND(IR86)。
 - **基本フロー**: 案件の最小限の情報と委託の条件を確認する → 受諾するか、理由を付けて辞退する → 本社と自社の両方の画面の表示を更新する。
 - **業務規則 BR-P02**: 受諾することと、技術者を割り当てることや予約を確定することは別のことである。辞退した場合は「まだ担当が決まっていない状態(requested)」に戻し、辞退した人・理由・依頼番号(offerId)を記録に残す。もう一度委託する場合は、新しい依頼番号を発行する。
 - **完了後の業務状態**: 受諾すると`accepted`(受諾済み)になり、必要な設備を見る権限を、委託の期間内だけ開く。辞退した場合は、詳しい情報を見る権限は与えない。
@@ -93,7 +93,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-P02-N | contractor-a宛offer、offerExpiresAt=2026-09-15 01:00Z。When: accept | ①Job accepted、Offer decision=accept、decidedBy保存 ②HQ一覧でaccepted ③対象設備が期間内で閲覧可 |
+| AT-P02-N | hq-operatorがjob-internal-aをcontractor-aへoffer（offerExpiresAt=2026-09-15T01:00Z、accessValidFrom=2026-09-14T01:00Z、accessValidUntil=2026-09-22T00:00Z）。When: contractor-aがaccept | ①Job accepted、Offer decision=accept、decidedBy保存 ②HQ一覧でaccepted ③対象設備が期間内で閲覧可 |
 | AT-P02-E | ①now=offerExpiresAtで受諾／辞退 ②表示後にHQが取消→旧版で受諾 | ①CONFLICT、再取得案内、状態不変 ②CONFLICT、cancelled維持 |
 | AT-P02-B | ①accept ②decline（理由あり） ③辞退後の再委託 | ①accepted ②requested、declineReason・offerId保持、設備閲覧権なし ③新offerId |
 
@@ -107,12 +107,12 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 - **利用開始条件**: 受諾済みの案件で、自社の担当割り当てを管理する権限を持っていること。
 - **基本フロー**: 希望の日時の枠と委託の期間を確認する → 自社の、資格があり空いている有効な技術者を探す → 作業の開始・終了の時刻を指定する → 割り当てを確認する → 日程と担当者を共有する。
 - **業務規則 BR-P03**: 候補を探す段階だけで権限の判定を済ませず、保存する直前にもう一度、所属・資格・期間を確認し直す。予定が重なる場合は警告を出す。同じ時間帯にすでに確定した予定がある場合は、このフェーズ(1A)では保存を拒否する。
-- **完了後の業務状態**: 最初の割り当てでは、Assignment(割り当て)を作り、日程(scheduledSlot)を確定し、案件を「担当決定(assigned)」にする。担当を変更する場合は、元の「担当決定」または「作業中(in_progress)」の状態を保ったまま、古い割り当てを無効にする。もとの報告の作成者はそのままにして、変更した理由を記録する。
+- **完了後の業務状態**: 最初の割り当てでは、Assignment(割り当て)を作り、日程(scheduledSlot)を確定し、案件を「担当決定(assigned)」にする。担当を変更する場合は、元の「担当決定」または「作業中(in_progress)」の状態を保ったまま、古い割り当てを無効にし、案件の日程(scheduledSlot)と割り当てIDを新しい割り当てに合わせて更新する(IR89)。もとの報告の作成者はそのままにして、変更した理由を記録する。
 - **境界条件・禁止事項**: 他社の技術者、資格のない技術者、委託の期間外への割り当ては拒否する。作業中の担当変更は、理由がなければ保存できない。変更前の技術者は、変更後すぐに操作できなくなる。
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-P03-N | accepted案件、tech-external-a（有資格・contractor-a）。When: 2026-09-15 10:00〜12:00で割当 | ①Assignment作成 ②scheduledSlot確定 ③Job assigned ④担当技術者へ通知プレビュー1件 |
+| AT-P03-N | AT-P02-Nで受諾したjob-internal-a、tech-external-a（有資格・contractor-a、seedのassignment-contractor-aは2026-09-20T00:00Zまで）。When: 2026-09-21 10:00〜12:00（Asia/Kuala_Lumpur）で割当 | ①Assignment作成 ②scheduledSlot確定 ③Job assigned ④担当技術者へ通知プレビュー1件 |
 | AT-P03-E | ①contractor-bの技術者 ②無資格 ③委託期間外 ④in_progressで理由なし再割当 ⑤理由あり再割当 | ①NOT_FOUND ②FORBIDDEN ③VALIDATION（指定枠が委託期間に収まらない）、割当0件 ④VALIDATION ⑤成功、Jobはin_progress維持 |
 | AT-P03-B | ①非重複日程 ②同時間帯の確定重複 ③保存直前に候補の資格を失効 | ①成功 ②CONFLICT ③FORBIDDEN |
 
@@ -120,7 +120,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then |
 |---|---|---|
-| AT-P03-R01 | in_progressで技術者aからbへ理由付き再割当 | Jobはin_progressのまま、旧担当aの変更を拒否。bは新draft版で継続し、旧版・元作者は不変。 |
+| AT-P03-R01 | `acceptancePatches["AT-P03-R01"]`でcontractor-aの2人目tech-external-a2を追加。tech-external-aがjob-contractor-aをstartしたin_progressで、tech-external-aからtech-external-a2へ理由付き再割当 | Jobはin_progressのまま、旧担当aの変更を拒否。bは新draft版で継続し、旧版・元作者は不変。 |
 
 設計: [DD-P03](../02-design/contractor.md#dd-p03-詳細)。親ケースAT-P03は追跡表に登録したN/E/B・R01および該当SRCの全件で判定する。
 
@@ -156,7 +156,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-P05-N | submitted report v1（作者tech-external-a）、品質担当は別user。When: accept | ①completed ②reviewHistoryがv1に紐付く ③顧客が報告本文を取得可 ④Alertはopen維持 |
+| AT-P05-N | tech-external-aがjob-contractor-aをstart→全点検項目を入力してsaveDraft（v1）→submitした報告、品質担当はcontractor-a（別user）。When: contractor-aがaccept | ①completed ②reviewHistoryがv1に紐付く ③顧客が報告本文を取得可 ④Alertはopen維持 |
 | AT-P05-E | ①作者と同userIdの別Membershipで受理 ②reportVersion=0で受理 ③return理由なし ④returnの後にv1でaccept | ①FORBIDDEN ②VALIDATION（versionは正整数） ③VALIDATION ④CONFLICT、rework_requested維持 |
 | AT-P05-B | ①全点検記録あり ②未点検あり理由あり ③未点検あり理由なし | ①②受理可 ③受理ボタン無効、VALIDATION |
 
@@ -181,9 +181,9 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 | 受入ID | Given / When | Then（観測可能な結果） |
 |---|---|---|
-| AT-P06-N | contractor-aに技術者2名。When: date=2026-09-15、activeOnly=true | ①2名の割当と空き枠 ②他社0名 ③書込み0件 |
+| AT-P06-N | `acceptancePatches["AT-P06-N"]`でcontractor-aの技術者を2名（tech-external-a、tech-external-a2）にする。When: date=2026-09-15、activeOnly=true | ①2名の割当と空き枠 ②他社0名 ③書込み0件 |
 | AT-P06-E | ①URLの会社IDをcontractor-bへ ②失効した技術者を候補に選ぶ | ①NOT_FOUND ②候補に表示されず、直接指定はFORBIDDEN |
-| AT-P06-B | ①作業可能8h・割当4h ②分母未設定 ③他社技術者 | ①50% ②「—」 ③非表示 |
+| AT-P06-B | `acceptancePatches["AT-P06-B"]`: ①tech-external-a2のdate=2026-09-15（作業可能8h・割当4h） ②date=2026-09-19（土曜で作業可能区間なし） ③contractor-bのtech-external-b | ①50% ②「—」 ③非表示 |
 
 設計: [DD-P06](../02-design/contractor.md#dd-p06-詳細)。親ケースAT-P06は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
 
@@ -234,7 +234,7 @@ fixture(テスト用の決まったデータ)の名前は、[検証計画](../04
 
 0.9.0修正契約: [厳格レビュー修正契約](../02-design/strict-review-contracts.md)と[操作別版契約](../02-design/write-version-catalog.csv)を併読する。
 
-現行0.17.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+現行0.19.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 0.14.0: IR25に従い、受諾前住所は設備の設置物件から取得し、期限後の報告表示は報告有無・受理状態だけを凍結する。
 

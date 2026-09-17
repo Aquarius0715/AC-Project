@@ -1,6 +1,6 @@
 ---
 document_id: DD-P
-version: 0.17.0
+version: 0.19.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 この文書では、施工業者向け画面の機能・画面項目・状態・エラー(例外)を決めます。基準にするのは、企業の元の要件文書と、それに対応する要件です。各FR(機能要件)を満たすために必要な処理と、受け入れ条件(テストで確認する内容)を定義します。参考として用意したモック(見本画面)は、共通のUI(画面デザイン)の見た目を検討するためだけに使います。
 
-**0.17.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.19.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
 
 ## 入力・責務
 
@@ -19,7 +19,7 @@ scope: frontend-demo-1A
 
 この文書に書くのは、フロントエンド(画面側)の項目・表示・モックの動作についての設計です。画面上での登録・割り当て・入金・利用制限・監査(記録の確認)は、すべて共有のモック用メモリ(見本用の一時的なデータ)の中で状態が変わるだけです。サーバー側の実装やデータベースの設計を依頼するものではありません。
 
-ルートパラメーター(URLに含まれる値)は、信頼できない入力として必ず検証します。表の中の「service名」は、共通のRepository(データを扱う共通の仕組み)が持つ処理名を指します。同じルートを持つ行は、同じ画面の中で役割分担している機能です。すべての行で、読み込み中(loading)・データなし(empty)・エラー(error)・権限なし(forbidden)・対象が見つからない(not-found)の5つの状態を用意します。再試行ボタンは、回復できるエラーのときだけ表示します。権限が足りない場合は、再試行させずに、その人が使える画面へ戻します。
+ルートパラメーター(URLに含まれる値)は、信頼できない入力として必ず検証します。表の中の「service名」は、共通のRepository(データを扱う共通の仕組み)が持つ処理名を指します。同じルートを持つ行は、同じ画面の中で役割分担している機能です。すべての行で、読み込み中(loading)・データなし(empty)・エラー(error)・権限なし(forbidden)・対象が見つからない(not-found)の5つの状態を用意します。再試行ボタンは、回復できるエラーのときだけ表示します。権限が足りない場合と対象が見つからない場合は、再試行ボタンを出さず、IR57に従って表示します。
 
 ## 画面・処理設計
 
@@ -61,8 +61,8 @@ scope: frontend-demo-1A
 
 | フィールド | 型・必須性 | 初期値・制約 | 用途 |
 |---|---|---|---|
-| status | enum/任意 | offered/accepted/assigned/in_progress/submitted/all | 絞込 |
-| from / to | 日付/任意 | 最大366日 | 日程範囲 |
+| status | enum/任意 | offered/accepted/assigned/in_progress/on_hold/submitted/rework_requested/completed/all（allはstatus省略、IR90） | 絞込 |
+| from / to | 日付/任意 | 最大366日。YYYY-MM-DDの表示timezone暦日をUTC Instantへ変換（IR74） | 日程範囲 |
 | contractorOrgId | セッション由来 | 入力不可 | 自社境界 |
 | summary | 読取 | offerCount/activeCount/reviewCount/overdueCount/asOf | 概要 |
 
@@ -105,7 +105,7 @@ scope: frontend-demo-1A
 3. 受諾するとaccepted(受諾済み)になり、委託期間内に限って、必要な設備の閲覧権限が開きます。辞退した場合は、詳しい閲覧権限は付与しません。
 4. 更新の対象になるQuery: `jobs / offers / partner summary / admin summary / notifications / audit`。
 
-**境界条件・失敗時**: 期限とちょうど同じ時刻に操作した場合は、辞退も受諾もできず、あらためてデータを取り直します。受諾しようとした直前にHQが取り消した場合はCONFLICT(競合)として扱い、自動で上書きはしません。
+**境界条件・失敗時**: 期限とちょうど同じ時刻に操作した場合は、辞退も受諾もできず、あらためてデータを取り直します。受諾しようとした直前にHQが取り消した場合はCONFLICT(競合)として扱い、自動で上書きはしません。未応答のまま期限が来た依頼は、案件がrequestedへ戻ります(IR48)。期限後の受諾・辞退はCONFLICT(errors.offer_expired)で、案件の個別取得はNOT_FOUNDです(IR86)。
 
 **検証**: 追跡表のAT-P02配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
 
@@ -131,10 +131,10 @@ scope: frontend-demo-1A
 2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
    - 候補を検索した時点では権限の判定を終わらせず、保存する直前にあらためて所属・資格・期間を確認します。
    - 予定が重なっている場合は警告を出します。同じ時間帯にすでに確定している予定と重なる場合は、このバージョン(1A)では保存を拒否します。
-3. 初めて割り当てるときは、Assignment(割り当て記録)を作成し、scheduledSlot(予定枠)を確定し、Jobの状態をassigned(割り当て済み)にします。担当を変更する場合は、元のassigned/in_progress(進行中)という状態は維持したまま、以前の割り当てを無効にします。元の報告の作成者はそのまま維持し、変更した理由を保存します。
+3. 初めて割り当てるときは、Assignment(割り当て記録)を作成し、scheduledSlot(予定枠)を確定し、Jobの状態をassigned(割り当て済み)にします。担当を変更する場合は、元のassigned/in_progress(進行中)という状態は維持したまま、以前の割り当てを無効にし、Job.scheduledSlotとassignmentIdを新しい割り当てへ更新します(IR89)。元の報告の作成者はそのまま維持し、変更した理由を保存します。
 4. 更新の対象になるQuery: `jobs / assignments / eligible members / schedule / notifications / audit`。
 
-**境界条件・失敗時**: 他社の技術者、資格を持たない人、委託期間外の割り当ては拒否します。作業中の担当変更は、理由がなければ保存できません。以前の技術者は、その時点で変更の操作ができなくなります。
+**境界条件・失敗時**: 他社の技術者、資格を持たない人、委託期間外の割り当ては拒否します。作業中の担当変更は、理由がなければ保存できません。以前の技術者は、その時点で変更の操作ができなくなります。予定枠の終了を過ぎてもassigned/in_progressの案件には「作業窓終了・再割当が必要」を表示し、jobs.assignで延長します(IR89)。
 
 **検証**: 追跡表のAT-P03配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
 
@@ -179,7 +179,7 @@ scope: frontend-demo-1A
 |---|---|---|---|
 | jobId / reportVersion | ID・整数/必須 | submittedの現在版 | 対象 |
 | decision | enum/必須 | accept/return | 品質判断 |
-| reason | 文字列/差戻し時必須 | 1〜2000文字 | 指摘 |
+| reason | 文字列/差戻し時必須 | 1〜1000文字(IR87) | 指摘 |
 | reviewerId | セッション由来 | IR31のreviewAvailabilityを表示し、Repositoryが対象版寄与者のuserIdと照合 | 責任者 |
 
 **処理手順**
@@ -238,7 +238,7 @@ scope: frontend-demo-1A
 | templateKey | enum/必須 | schedule_change/report_return/completion | 文面 |
 | message | 文字列/必須 | 1〜2000文字 | 連絡内容 |
 | visibility | enum/必須 | internal/customer、初期internal | 公開範囲 |
-| recipientRole | enum/必須 | hq/assigned_technician/customer_contact | 宛先 |
+| recipientRole | enum/必須 | hq/assigned_technician/customer_contact。notifications.recipientsのroleへhq→admin、assigned_technician→technician、customer_contact→clientとして渡す(IR90) | 宛先 |
 | channel | enum/必須 | inApp/email/whatsapp(deliveryState=preview) | 連絡手段 |
 
 **処理手順**
@@ -285,7 +285,7 @@ scope: frontend-demo-1A
 
 0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
 
-現行0.17.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜44を併読する。同じ論点の旧記述より優先する。
+現行0.19.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜93を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
 
 0.14.0: IR25に従い、受諾前住所は設備の設置物件から取得し、期限後の報告表示は報告有無・受理状態だけを凍結する。
 

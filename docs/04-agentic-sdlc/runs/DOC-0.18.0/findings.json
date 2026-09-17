@@ -1,0 +1,300 @@
+{
+  "review_id": "STRICT-DOC-0.17.0-REV18-2026-09-17",
+  "target_baseline": "654be5e4973d1defe98cc875c8d585e292d58796b7205517b5a82e1b41b4d8df",
+  "corrected_baseline": null,
+  "reviewer": "strict-review-fable-5.1 (earlier session; interrupted)",
+  "initial_verdict": "NOT READY",
+  "post_correction_self_rereview": "not_performed (session interrupted before run records and self re-review)",
+  "independent_g1": "not_evaluated",
+  "note": "指摘データは中断したセッションの記録から回収した。修正内容の検証と引継ぎは独立レビューREV19（DOC-0.19.0）で実施した（IR75）。",
+  "findings": [
+    {
+      "id": "REV18-001",
+      "severity": "BLOCKER",
+      "status": "corrected_unverified",
+      "contract": "IR45"
+    },
+    {
+      "id": "REV18-002",
+      "severity": "BLOCKER",
+      "status": "corrected_unverified",
+      "contract": "IR46"
+    },
+    {
+      "id": "REV18-003",
+      "severity": "CRITICAL",
+      "status": "corrected_unverified",
+      "contract": "IR47"
+    },
+    {
+      "id": "REV18-004",
+      "severity": "CRITICAL",
+      "status": "corrected_unverified",
+      "contract": "IR48"
+    },
+    {
+      "id": "REV18-005",
+      "severity": "CRITICAL",
+      "status": "corrected_unverified",
+      "contract": "IR49"
+    },
+    {
+      "id": "REV18-006",
+      "severity": "CRITICAL",
+      "status": "corrected_unverified",
+      "contract": "IR50"
+    },
+    {
+      "id": "REV18-007",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR51"
+    },
+    {
+      "id": "REV18-008",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR52"
+    },
+    {
+      "id": "REV18-009",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR53"
+    },
+    {
+      "id": "REV18-010",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR54"
+    },
+    {
+      "id": "REV18-011",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR55"
+    },
+    {
+      "id": "REV18-012",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR56"
+    },
+    {
+      "id": "REV18-013",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR57"
+    },
+    {
+      "id": "REV18-014",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR58"
+    },
+    {
+      "id": "REV18-015",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR59"
+    },
+    {
+      "id": "REV18-016",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR60"
+    },
+    {
+      "id": "REV18-017",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR61"
+    },
+    {
+      "id": "REV18-018",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR62"
+    },
+    {
+      "id": "REV18-019",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR63"
+    },
+    {
+      "id": "REV18-020",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR64"
+    },
+    {
+      "id": "REV18-021",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR65"
+    },
+    {
+      "id": "REV18-022",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR66"
+    },
+    {
+      "id": "REV18-023",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR67"
+    },
+    {
+      "id": "REV18-024",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR68"
+    },
+    {
+      "id": "REV18-025",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-026",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR69"
+    },
+    {
+      "id": "REV18-027",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR70"
+    },
+    {
+      "id": "REV18-028",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR71"
+    },
+    {
+      "id": "REV18-029",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR72"
+    },
+    {
+      "id": "REV18-030",
+      "severity": "MAJOR",
+      "status": "corrected_unverified",
+      "contract": "IR73"
+    },
+    {
+      "id": "REV18-031",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-032",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-033",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-034",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-035",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-036",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-037",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-038",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-039",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-040",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-041",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-042",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-043",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-044",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-045",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-046",
+      "severity": "MINOR",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-047",
+      "severity": "QUESTION",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    },
+    {
+      "id": "REV18-048",
+      "severity": "QUESTION",
+      "status": "corrected_unverified",
+      "contract": "IR74"
+    }
+  ]
+}

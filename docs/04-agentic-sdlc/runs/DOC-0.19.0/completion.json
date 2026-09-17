@@ -1,0 +1,20 @@
+{
+  "task_id": "DOC-0.19.0",
+  "task_status": "in_review",
+  "scope": "frontend-demo-1A-independent-review-and-correction",
+  "reviewed_target": "DOC-0.18.0 working tree",
+  "spec_baseline_id": "048ffcef25f8463bca33346f5bb1dd8dbb1fdad03b61132d1cfc5d17ebeb1ac2",
+  "gate_result": "pending",
+  "unresolved_findings": [],
+  "resolved_findings": 40,
+  "answered_questions": 2,
+  "user_accepted_decisions": ["DEC-44","DEC-50"],
+  "proposed_decisions": ["DEC-42","DEC-43","DEC-45","DEC-46","DEC-47","DEC-48","DEC-49","DEC-51","DEC-52","DEC-53"],
+  "independent_post_correction_review": "requested",
+  "static_check": "passed",
+  "validator_mutation_check": "passed",
+  "typescript_semantic_check": "passed",
+  "application_tests": "not_run",
+  "production_connection_readiness": "NOT_READY",
+  "deployment_approval": false
+}
