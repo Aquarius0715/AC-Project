@@ -40,7 +40,7 @@
       "id": "UI21-001",
       "status": "resolved_independently_verified",
       "acceptance_case": "AT-G121-002",
-      "correction": "故障フィルターを既存の故障アイコン・ラベルへ修正"
+      "correction": "Replaced the fault filter with the existing fault icon and label"
     }
   ]
 }

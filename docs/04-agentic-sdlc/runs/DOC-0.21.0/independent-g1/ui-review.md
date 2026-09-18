@@ -9,7 +9,7 @@
 
 ## Final delta verification
 
-The first-round evidence and manifest for baseline `660c7855fdc3aaaf0bb3152d25788132ff838dd35067c87f7d9a28bf6e0ca802` are preserved under `round-1/`. Independently compared both manifest maps: only `04-agentic-sdlc/acceptance-review-021.csv` changed. Replacing the final phrase 「故障アイコン・ラベルで表示」 with its former phrase 「故障フィルターで表示」 reproduces that file's exact previous SHA-256. Thus this is solely the requested acceptance wording correction; all other previously reviewed specification content is byte-for-byte unchanged. Independently rehashed all 65 final files and the canonical manifest: all match the final baseline. UI21-001 is resolved; the revised assertion agrees with IR10 and AT-C08-B and requires no invented filter.
+The first-round evidence and manifest for baseline `660c7855fdc3aaaf0bb3152d25788132ff838dd35067c87f7d9a28bf6e0ca802` are preserved under `round-1/`. Independently compared both manifest maps: only `04-agentic-sdlc/acceptance-review-021.csv` changed. Replacing the final phrase "display with a fault icon and label" with its former phrase "display with a fault filter" reproduces that file's exact previous SHA-256. Thus this is solely the requested acceptance wording correction; all other previously reviewed specification content is byte-for-byte unchanged. Independently rehashed all 65 final files and the canonical manifest: all match the final baseline. UI21-001 is resolved; the revised assertion agrees with IR10 and AT-C08-B and requires no invented filter.
 
 ## Corrections verified by reading the contracts
 
@@ -25,10 +25,10 @@ All five AT-G121 cases are included in verification.md and corresponding traceab
 
 - Location: `docs/04-agentic-sdlc/acceptance-review-021.csv:3` (AT-G121-002, Then).
 - Related contracts: `docs/02-design/query-catalog.csv:2` and `:20`; `docs/02-design/client.md:309`; `docs/01-requirements/client.md:229` (AT-C08-B).
-- First-round evidence: AT-G121-002 required 「故障フィルターで表示」. Neither notifications.list nor alerts.list permits a type/fault filter. C08 defines severity and unread filtering; the existing type acceptance requires distinct icons and labels.
+- First-round evidence: AT-G121-002 required "display with a fault filter". Neither notifications.list nor alerts.list permits a type/fault filter. C08 defines severity and unread filtering; the existing type acceptance requires distinct icons and labels.
 - Reproduction: create the specified load_alert and attempt to fulfill the new Then by sending notifications.list filters.type=fault. D12 rejects the unknown filter as VALIDATION; implementing a local filter would invent an unspecified feature and potentially filter only the current page.
 - Impact: the final presentation assertion cannot be performed as written, although the underlying type=fault DTO correction is valid. This is a limited acceptance wording issue, not a need to expand the UI.
-- Suggested correction: replace 「故障フィルターで表示」 with 「故障アイコン・ラベルで表示」, matching IR10 and AT-C08-B. Alternatively, explicitly specify a new filter across all affected catalogs if that is intended.
+- Suggested correction: replace "display with a fault filter" with "display with a fault icon and label", matching IR10 and AT-C08-B. Alternatively, explicitly specify a new filter across all affected catalogs if that is intended.
 - Status: resolved at final baseline `02a1e39793df35f760afe9188e86141c8790cd7e92366efbddb7f62aff62e908`; exact wording correction and unchanged surrounding content independently verified.
 
 ## Limits

@@ -7,242 +7,242 @@ scope: frontend-only
 updated: 2026-09-17
 ---
 
-# AC Project 企業要件整理・フロントエンド設計準備資料
+# AC Project Company Requirements and Frontend Design Preparation
 
-**PrepareDocument｜企業ご確認用｜2026年9月15日**
+**PrepareDocument | For company review | September 15, 2026**
 
-## 1. 本資料の目的と前提
+## 1. Purpose and assumptions
 
-本資料は、企業から提示されたオリジナル要件を整理・分析し、その要件を満たすフロントエンドの表示・入力・操作・状態・受入条件へ展開するための準備資料です。企業の要望、ドキュメント作成者の制作方針、実現のための設計補完を区別して記載します。
+This document organizes and analyzes the company's original requirements. It prepares for turning them into frontend displays, inputs, actions, states, and acceptance criteria. It separates company requests, the document authors' production instructions, and added design details.
 
-### 1.1 企業から提示された要件
+### 1.1 Requirements provided by the company
 
-企業の構想は、空調の状態監視・遠隔操作・保守を軸に、省エネ、空気環境、RTO（分割支払い等を経て所有するサービス）の支払い管理、炭素排出量・オフセットまで扱うサービスです。顧客、社内・外部技術者、管理者/HQに、それぞれ視覚的に分かりやすい画面を提供することが求められています。
+The company plans a service centered on AC monitoring, remote control, and maintenance. It also covers energy savings, air quality, payment management for RTO (a service that transfers ownership after installment payments), carbon emissions, and offsets. Customers, internal and external technicians, and administrators/HQ each need clear visual screens.
 
-原文では、分離型エアコンを第1段階とし、まずクリック可能なUI/UXを作り、その後に機器・ファームウェアを含む全体ソリューションへ進む順序が示されています。HVAC（空調・換気等の設備）や機種・メーカーの対応拡大は後続の構想です。原文には明示的な機能要望に加え、実現方法を問う質問や期待する効果も含まれています。
+The original text places split AC units in Phase 1: first build a clickable UI/UX, then develop the complete solution, including devices and firmware. HVAC (heating, ventilation, and air conditioning) and support for more models and brands are later plans. The original text includes explicit feature requests, questions about how to achieve them, and expected benefits.
 
-根拠は、今回提示された[企業要件の英語原文](sources/company-requirements-original.txt)です。原文は変更せず保存しています。
+The source is the [original company requirements in English](sources/company-requirements-original.txt) provided for this project. The original is stored unchanged.
 
-### 1.2 参考モックアプリ
+### 1.2 Reference mock app
 
-[Aconland Mudah Milikの顧客Loyaltyページ](https://aconland-mudah-milik.vercel.app/customer/loyalty)は、配色・書体・カード・ナビゲーション等のデザイン参考資料です。画面に必要な機能・情報・操作の流れは、企業の要件と利用者の業務目的から定義します。
+The [Aconland Mudah Milik customer Loyalty page](https://aconland-mudah-milik.vercel.app/customer/loyalty) is a design reference for colors, fonts, cards, and navigation. Required features, information, and action flows come from company requirements and user tasks.
 
-### 1.3 今回の対象
+### 1.3 Current scope
 
-**今回作成するのは、フロントエンドのみの設計ドキュメントです。** 画面に表示する情報、入力項目、操作の流れ、状態の変化、共通デザイン、デモデータの扱いを定義します。将来のAPI接続に備え、画面とデータ取得を分離する方針を残します。
+**The deliverables are frontend design documents only.** They define displayed information, input fields, action flows, state changes, shared design, and demo data handling. They retain the principle of separating screens from data access for future API connections.
 
-開発段階の呼び方は次のとおりです。**1A**は企業原文のPhase 1（分離型エアコン）のうち、クリック可能なフロントエンドデモです。**1B**は同じPhase 1の、機器・ファームウェア・本番API接続を含む全体ソリューションです。**Phase 2**はHVACへの拡張です。今回の文書は1Aだけを対象とします。
+The development stages are as follows. **1A** is the clickable frontend demo within the original Phase 1 (split AC units). **1B** is the complete solution in the same Phase 1, including devices, firmware, and production API connections. **Phase 2** extends to HVAC. These documents cover only 1A.
 
-実機制御、機器・センサーの選定、ファームウェア、実決済・実通知、炭素取引、API・DB・サーバーの設計は対象外です。画面内の入金・制限・通知・機器応答は合成データによるデモとして扱います。本資料の「参考モック」と、これから設計する「今回のフロントエンドデモ」は別のものです。
+Real device control, device and sensor selection, firmware, real payments and notifications, carbon trading, and API, database, and server design are out of scope. Payment receipts, restrictions, notifications, and device responses on screen use synthetic demo data. The existing reference mock and the new frontend demo are separate products.
 
-## 2. 要件の整理方法と出所の区分
+## 2. How requirements and sources are organized
 
-原文の記述を、利用者、監視・保守、操作・自動運転、支払い、省エネ・環境、将来拡張の観点で整理しました。重複する要望はまとめ、実現方法が未確定な記述は、実装済みの能力や保証値に置き換えずに残しています。
+The original text is organized by users, monitoring and maintenance, control and automation, payments, energy and environment, and future expansion. Repeated requests are combined. Items with an unconfirmed implementation method remain unconfirmed; they are not presented as working capabilities or guaranteed values.
 
-| 出所の表示 | 意味 | 本資料での扱い |
+| Source label | Meaning | Treatment here |
 |---|---|---|
-| **企業原文** | 今回企業から提示された英語要望 | 要求内容の根拠。実現性検証済み・詳細承認済みという意味ではありません |
-| **制作方針（ドキュメント作成者指定）** | 4役割への分割、フロントエンド限定、参考デザイン準拠などの制作指示 | 企業原文に追加された制作条件として区別します |
-| **参考モックの観察** | 公開画面・HTML/CSSまたは既存調査記録から把握した内容 | 配色・書体・形状等のデザイン参考資料 |
-| **設計補完（設計提案）** | 業務の進め方、画面上の補完、デモ値、技術選択 | 企業要望を実現するための案。企業原文の明示要求とは区別します |
+| **Company original** | English requests provided by the company | The basis for requirements; not proof of feasibility or detailed approval |
+| **Production instructions (from the document authors)** | Instructions such as four roles, frontend only, and matching the reference design | Separate from the original company requirements |
+| **Reference mock observations** | Findings from public screens, HTML/CSS, or previous research records | Design references for colors, fonts, and shapes |
+| **Added design details (design proposal)** | Workflows, screen details, demo values, and technical choices | Proposals to meet company requests, separate from explicit original requests |
 
-要件は企業原文の記述から整理し、各要件を画面項目・操作・状態・例外・受入条件まで具体化します。参考資料の採用有無にかかわらず、原文にある要求の対応先を追跡できる構成とします。
+Requirements start from the original text and expand into screen fields, actions, states, exceptions, and acceptance criteria. Every original request can be traced to its coverage, whether or not a reference design is used.
 
-「設計補完」と「設計提案」は、企業要望を具体化するために本書で補った案を指します。要件ごとの出所ラベルは次の規則で判定します。**「企業原文 SRC-06＋設計補完」**は、原文がその機能・対象・操作を直接述べており、画面項目や規則だけを補った要件（例: 部品点検、遠隔操作、契約と支払い制限）。**「設計補完（企業目的に対応）」**は、原文が目的だけを述べ、画面・役割・管理機能そのものを作成者が新設した要件（例: 権限管理、作業報告フォーム、技術者の試運転、猶予・例外）。**「制作方針 SRC-02＋設計補完」**は、企業原文にない制作指示（4役割化）に基づく要件。同じBIZを根拠にする要件同士でラベルが異なる場合は、[要件別の出所表](requirement-origins.csv)のoriginal_phrases列で原文の直接言及の有無を示します。利用者名はクライアント（顧客）、施工業者、技術者（社内・外部）、管理者（HQ）の4役割です。後続文書でも同じ区分を使用します。
+“Added design details” and “design proposal” mean ideas added here to make company requests concrete. Source labels follow these rules. **“Company original SRC-06 + added design details”** means the original directly names the feature, target, or action, while only screen details or rules are added (for example, component inspections, remote control, and contracts and payment restrictions). **“Added design details (supporting a company goal)”** means the original gives only a goal, while the authors add the screen, role, or management feature (for example, access management, work report forms, technician test runs, and grace periods or exceptions). **“Production instructions SRC-02 + added design details”** means the requirement comes from an instruction absent from the original, such as using four roles. If requirements based on the same BIZ have different labels, the original_phrases column in the [requirement source table](requirement-origins.csv) shows whether the original mentions the feature directly. The four roles are client (customer), contractor, technician (internal or external), and administrator (HQ). Later documents use the same groups.
 
-## 3. 企業要件の整理結果
+## 3. Organized company requirements
 
-以下のBIZ番号は本資料で付与した整理番号です。企業が原文で指定した番号ではありません。全行の出所は**企業原文（SRC-06）**で、「今回の画面での扱い」は原文をフロントエンドへ落とし込むための整理・提案です。
+The BIZ numbers below are assigned by this document, not by the company. Every row comes from the **company original (SRC-06)**. “Treatment in this frontend” describes how the original is organized and proposed for the frontend.
 
-### 3.1 利用者・対象・監視
+### 3.1 Users, targets, and monitoring
 
-| 整理ID | 企業からの要望 | 今回の画面での扱い | 整理上の留意点 |
+| Group ID | Company request | Treatment in this frontend | Notes |
 |---|---|---|---|
-| BIZ-01 | サインイン、サインアウト、パスワード再設定 | 利用開始・終了・再設定の画面とデモ操作 | FR-X01で画面・操作・受入条件を定義 |
-| BIZ-02 | 任意の言語を選べる表示 | 言語切替と翻訳可能な画面構成。初期言語の範囲は別途設定 | 初期の英語・マレー語は設計提案 |
-| BIZ-03 | 音声AIで応答できること | 音声入力・応答のデモとテキスト代替。温度照会・機器操作への展開は設計提案 | 原文は機器変更操作までは明記していない。実音声接続は対象外 |
-| BIZ-04 | 顧客、社内/外部技術者、管理者/HQの視覚的なダッシュボード | 利用者ごとに必要な指標・状態・次の操作を表示 | 施工業者の独立はドキュメント作成者の制作方針 |
-| BIZ-05 | 分離型エアコンを先行し、最初にクリック可能なUI/UX、その後に全体ソリューション | 分離型を対象とした画面・操作・模擬状態を設計 | 今回の成果物はフロントエンド文書 |
-| BIZ-06 | HVACを第2段階とし、メーカーや分離型・中央空調・カセット型等へ対応拡大 | 機器種別・型番・対応機能を区別する画面設計 | 全メーカー対応の実証は対象外 |
-| BIZ-07 | 自宅/オフィス、エリア・階・部屋・スペース別の管理 | 場所階層から設備を選び、状態を確認する | 登録・編集の詳細手順は設計補完 |
-| BIZ-08 | 異常を事前または発生時に把握し、リアルタイム通知する | 測定値・異常・更新時刻・対応導線を合成データで表示 | 検知可能項目と精度は未確定 |
-| BIZ-09 | 赤・オレンジ・緑のシグナルと通知 | 重要度を色・文字・アイコンで表示 | 各色の具体的な意味づけは設計提案 |
-| BIZ-10 | 室内機、室外機、電気・制御部品の状態把握 | 部品別の状態・根拠・点検記録。対象部品は下表に整理 | 点検入力の形式・承認手順は設計補完 |
+| BIZ-01 | Sign in, sign out, and reset passwords | Entry, exit, and reset screens with demo actions | FR-X01 defines screens, actions, and acceptance criteria |
+| BIZ-02 | Display in a chosen language | Language switching and translatable screens; initial languages defined separately | Initial English and Malay support is a design proposal |
+| BIZ-03 | Voice AI responses | Demo voice input and responses, with text fallback; temperature queries and device control are design proposals | The original does not explicitly request device changes through voice. Real voice integration is out of scope |
+| BIZ-04 | Visual dashboards for customers, internal/external technicians, and administrators/HQ | Show each role's metrics, states, and next actions | A separate contractor role is the document authors' production instruction |
+| BIZ-05 | Start with split AC units and clickable UI/UX, then build the full solution | Design screens, actions, and simulated states for split units | Current deliverables are frontend documents |
+| BIZ-06 | HVAC in Phase 2, with support for more brands, split units, central AC, and cassette units | Distinguish device types, models, and supported features | Proving support for every brand is out of scope |
+| BIZ-07 | Manage homes/offices by area, floor, room, and space | Select units from a location hierarchy and check their status | Registration and editing steps are added design details |
+| BIZ-08 | Detect faults before or when they occur and notify in real time | Show readings, alerts, update times, and next actions using synthetic data | Detectable conditions and accuracy are unconfirmed |
+| BIZ-09 | Red, orange, and green signals and notifications | Show severity using colors, text, and icons | The exact meaning of each color is a design proposal |
+| BIZ-10 | Check indoor, outdoor, electrical, and control components | Component status, evidence, and inspection records; components listed below | Inspection input and approval flows are added design details |
 
-### 3.2 保守・操作・空気環境
+### 3.2 Maintenance, control, and air quality
 
-| 整理ID | 企業からの要望 | 今回の画面での扱い | 整理上の留意点 |
+| Group ID | Company request | Treatment in this frontend | Notes |
 |---|---|---|---|
-| BIZ-11 | 振動・高温・冷媒低下、微小漏れ、フィルター詰まり等の早期把握 | 異常の疑い・根拠データ・保守案内をデモ表示 | 微小漏れ等の検知能力は要検証 |
-| BIZ-12 | 定期・事後・予防保全。RTO以外の一般保守にも利用 | 保守依頼・作業進捗・結果を役割横断で確認 | 受付・割当・品質確認の責任は設計補完 |
-| BIZ-13 | スマートサーモスタット等で温度を確認し、離れた場所から設定を変更 | 室温と設定温度を分け、変更要求と応答をデモ表示 | モード・風量等の細かい操作項目は機種能力に応じた提案 |
-| BIZ-14 | スケジュール、帰宅前冷房、無人時の自動停止 | 曜日・時間帯・在室条件の設定と模擬発火 | 時間の上限・競合優先順は設計提案 |
-| BIZ-15 | GPSに応じて外出時に冷房を抑え、帰宅時に再開 | 外出/帰宅イベントによる自動運転デモ | 位置取得の同意と取消は設計上の補完 |
-| BIZ-16 | 安い時間帯の予冷、ピーク料金回避、太陽光・蓄電池との連携 | 料金・ピーク・太陽光/蓄電池の条件と結果を模擬表示 | 外部データ・機器への実接続は対象外 |
-| BIZ-17 | 生活パターンや天候に応じた運転、開いた窓や断熱不足に起因する負荷への通知 | 自動運転条件・負荷異常の案内を整理 | C08/T07/A05で窓開放・断熱不足の原因候補と根拠を表示 |
-| BIZ-18 | CO₂濃度、粉じん、湿度、アレルゲン等の把握と清掃・換気案内 | 指標・単位・値・品質・案内を区別して表示 | C07/A12でアレルゲンの取得状態・根拠・未計測を区別 |
-| BIZ-19 | CO₂上昇時に外気導入等を行い、空気環境を改善 | 対応換気設備がある場合の要求デモ、ない場合の利用者案内 | 送風と外気導入を区別。健康安全の保証ではない |
-| BIZ-20 | 小型・低価格で空調内に設置する機器、FW、取り外し・盗難への対策と通知 | 機器情報・接続・更新・取り外し検知のデモ | 寸法・価格・検知方式は未確定。登録・校正手順は設計提案 |
+| BIZ-11 | Early detection of vibration, high temperature, low refrigerant, tiny leaks, and clogged filters | Demo suspected faults, supporting data, and maintenance guidance | Detection of tiny leaks and similar conditions needs verification |
+| BIZ-12 | Scheduled, reactive, and preventive maintenance, including general maintenance outside RTO | View requests, work progress, and results across roles | Intake, assignment, and quality review responsibilities are added design details |
+| BIZ-13 | Check temperature with smart thermostats and change settings remotely | Separate room and set temperatures; demo change requests and responses | Detailed controls such as mode and fan speed depend on model capabilities |
+| BIZ-14 | Scheduling, cooling before arrival, and automatic stop when empty | Set weekdays, time slots, and occupancy conditions; simulate triggers | Time limits and conflict priorities are design proposals |
+| BIZ-15 | Reduce cooling when away and resume on return using GPS | Demo automation from away/home events | Location consent and withdrawal are added design details |
+| BIZ-16 | Pre-cool at low rates, avoid peak rates, and connect solar/battery systems | Simulate tariff, peak, solar/battery conditions and results | Real external data and device connections are out of scope |
+| BIZ-17 | Adapt operation to routines and weather; notify about load from open windows or poor insulation | Define automation conditions and abnormal load guidance | C08/T07/A05 show open windows and poor insulation as possible causes with evidence |
+| BIZ-18 | Monitor CO₂, dust, humidity, and allergens; advise cleaning and ventilation | Distinguish metrics, units, values, quality, and guidance | C07/A12 separate allergen data availability, evidence, and not measured |
+| BIZ-19 | Improve air quality with fresh air intake when CO₂ rises | Demo requests for supported ventilation equipment; otherwise guide the user | Distinguish fan circulation from fresh air intake; no health or safety guarantee |
+| BIZ-20 | Small, low-cost devices inside AC units, firmware, and removal/theft protection and alerts | Demo device details, connectivity, updates, and removal detection | Size, cost, and detection methods are unconfirmed; registration and calibration are design proposals |
 
-### 3.3 支払い・省エネ・環境価値
+### 3.3 Payments, energy savings, and environmental value
 
-| 整理ID | 企業からの要望 | 今回の画面での扱い | 整理上の留意点 |
+| Group ID | Company request | Treatment in this frontend | Notes |
 |---|---|---|---|
-| BIZ-21 | RTO等の未払い時に管理者が冷房を抑制・停止する | 支払い状態、制限理由・予定・適用/解除のデモ表示 | 予告・猶予・例外・入金後解除の詳細は設計補完 |
-| BIZ-22 | WhatsApp/メールとカード決済・支払い手順への導線 | 通知プレビュー、模擬クレジット/デビットカード・支払い案内 | C11/A08で模擬クレジット・デビット・支払い手順を区別 |
-| BIZ-23 | 電力と電気代を可視化し、通常運転と比較。10〜20%以上の無駄削減への期待 | 基準と実績、推定料金・削減量・比較条件の表示 | 原文の数値は期待値であり効果保証・受入基準ではない |
-| BIZ-24 | 希望者が炭素オフセット・交換プラットフォームを利用する | 排出量・任意申込・模擬購入/償却記録への導線 | 制度・プラットフォーム・実取引は未確定 |
-| BIZ-25 | 基準比較、測定・報告・検証、地域排出係数による企業向け排出報告とクレジット創出への展望 | 算定条件・品質・根拠・レポートのプレビュー | A14でScope 2の対象期間・組織・地域係数・算定境界を表示 |
-| BIZ-26 | 削減価値のトークン化、分散台帳、マイクロオフセット、市場取引、リアルタイム炭素市場API | 将来構想として保持。今回の模擬オフセット記録とは区別 | C13/A15で将来連携構想を表示する設計提案。実取引・接続方式は対象外 |
+| BIZ-21 | Let administrators reduce or stop cooling for unpaid RTO and similar bills | Demo payment states, restriction reasons, schedules, application, and release | Notice, grace periods, exceptions, and release after payment are added design details |
+| BIZ-22 | WhatsApp/email links to card payments and payment instructions | Notification previews, demo credit/debit cards, and payment guidance | C11/A08 distinguish demo credit, debit, and payment instructions |
+| BIZ-23 | Visualize power use and cost; compare with normal use; expect 10–20% or more waste reduction | Show baseline, actual use, estimated cost, savings, and comparison conditions | Original percentages are expectations, not guarantees or acceptance criteria |
+| BIZ-24 | Optional use of a carbon offset/exchange platform | Links to emissions, optional requests, and demo purchase/retirement records | Schemes, platforms, and real transactions are unconfirmed |
+| BIZ-25 | Baseline comparison, measurement/reporting/verification, regional emission factors, corporate emissions reporting, and future credit creation | Preview calculation conditions, quality, evidence, and reports | A14 shows Scope 2 period, organization, regional factors, and calculation boundary |
+| BIZ-26 | Tokenize savings, distributed ledgers, micro-offsets, trading, and real-time carbon market APIs | Keep as a future concept, separate from current demo offset records | C13/A15 propose showing future integration concepts; real trading and connection methods are out of scope |
 
-### 3.4 原文で挙げられた対象部品
+### 3.4 Components named in the original
 
-| 分類 | 企業原文にある部品 | フロントエンドでの整理 |
+| Category | Components in the company original | Frontend treatment |
 |---|---|---|
-| 室内機 | エアフィルター、蒸発器コイル、送風モーター・ファン、ドレン配管・パン、吹出口・ルーバー | 部品別の状態、点検内容、根拠を確認する画面 |
-| 室外機 | 凝縮器コイル、コンプレッサー、ファン・羽根、冷媒配管 | 異常の疑い、測定情報、点検記録の表示 |
-| 電気・制御 | サーモスタット、スマートサーモスタット/センサーの検討、コンデンサー・接触器、配線 | 温度確認・設定と電気/制御系の点検記録 |
+| Indoor unit | Air filters, evaporator coils, blower motors/fans, drain pipes/pans, outlets/louvers | Screens for component status, inspections, and evidence |
+| Outdoor unit | Condenser coils, compressors, fans/blades, refrigerant pipes | Suspected faults, readings, and inspection records |
+| Electrical/control | Thermostats, possible smart thermostats/sensors, capacitors/contactors, wiring | Temperature checks/settings and electrical/control inspection records |
 
-挙げられた部品を、状態確認・点検記録の画面で扱う対象として整理します。画面では、測定値・診断結果・点検結果を区別して表示する方針を提案します。
+These components are the targets of status and inspection screens. The proposal distinguishes measurements, diagnostic results, and inspection results.
 
-### 3.5 企業原文から要件・設計への展開
+### 3.5 From company text to requirements and design
 
-企業の英語原文を一次資料として、BIZ-01〜26から共通・4役割の要件を整理し、画面項目・操作・状態・例外・受入条件へ展開しました。[企業要望対応表](company-requirement-map.csv)では原文の記述位置から要件へ、[要件別の出所・設計補完表](requirement-origins.csv)では各要件から原文と補完内容へ遡れます。参考モックは外観設計の参考資料として扱います。
+Using the original English text as the primary source, BIZ-01–26 are expanded into common and four-role requirements, screen fields, actions, states, exceptions, and acceptance criteria. The [company request map](company-requirement-map.csv) traces source locations to requirements. The [requirement sources and added design details](requirement-origins.csv) traces requirements back to original text and additions. The reference mock guides appearance.
 
-窓開放・断熱不足の通知、アレルゲン情報、クレジット／デビットの区別、Scope 2報告は、今回の要件・詳細設計に明記しました。トークン化・市場連携は企業の将来構想として保持し、今回の画面では構想と未接続状態を説明する案としています。実取引・市場API仕様は今回の設計対象外です。
+Open-window/poor-insulation alerts, allergen data, credit/debit distinctions, and Scope 2 reporting are explicit in current requirements and detailed designs. Tokenization and market integration remain future company concepts; current screens propose explaining the concepts and the lack of a connection. Real trading and market API specifications are out of scope.
 
-## 4. 利用者別の整理と制作方針
+## 4. Users and production instructions
 
-| 利用者 | 想定する主な利用 | 出所 | 補足 |
+| User | Main intended use | Source | Notes |
 |---|---|---|---|
-| クライアント | 利用設備の状態・温度・費用・空気環境・保守・支払いを確認 | 企業原文 | 個別の保守予約・確認手順は設計提案を含みます |
-| 技術者（社内・外部） | 担当設備の監視、異常確認、点検、作業記録 | 企業原文 | 社内/外部の区分は原文に明記。割当・期間による表示制限は設計提案です |
-| 管理者/HQ | 全体状況、保守、支払い、運転制限、省エネ・環境情報を管理 | 企業原文 | 猶予・例外・解除・監査の詳細は業務補完の提案です |
-| 施工業者 | 受託案件、自社技術者の割当、日程、品質確認を管理 | 制作方針（ドキュメント作成者指定）＋設計提案 | 原文は独立した第4役割としては定義していません。業者管理担当と現場技術者を分離する制作方針です |
+| Client | Check unit status, temperature, cost, air quality, maintenance, and payments | Company original | Individual booking and confirmation steps include design proposals |
+| Technician (internal/external) | Monitor assigned units, check faults, inspect, and record work | Company original | The original distinguishes internal/external technicians. Assignment and time-based access limits are design proposals |
+| Administrator/HQ | Manage overall status, maintenance, payments, operating restrictions, energy, and environmental data | Company original | Grace periods, exceptions, release, and audit details are proposed workflow additions |
+| Contractor | Manage accepted jobs, own technicians, schedules, and quality reviews | Production instructions (document authors) + design proposal | The original does not define a separate fourth role. Production instructions separate contractor managers from field technicians |
 
-4役割に分けることで、会社としての案件管理と現場での作業を区別します。社内案件はHQから技術者へ、外注案件はHQから施工業者を経て技術者へ進む流れを提案します。これは企業が原文で承認した詳細業務フローという扱いにはしません。
+Four roles separate company-level job management from field work. The proposed flow is HQ → technician for internal jobs, and HQ → contractor → technician for outsourced jobs. This is not a detailed workflow approved by the company in the original text.
 
-## 5. デザイン参考資料の位置づけ
+## 5. Role of the design reference
 
-参考ページから取得したHTML/CSSの配色・書体・余白・形状を、共通UIの検討に使用します。取得範囲と視覚値は[参考デザイン分析](reference-design-analysis.md)に記録しています。企業原文から定義した情報・操作を分かりやすく提示できるよう、各画面の構成を設計します。
+Colors, fonts, spacing, and shapes from the reference page's HTML/CSS guide shared UI design. The [reference design analysis](reference-design-analysis.md) records what was retrieved and the visual values. Screen layouts aim to clearly present information and actions defined from company requirements.
 
-## 6. 今回のフロントエンドへの反映方針
+## 6. How requirements apply to this frontend
 
-### 6.1 画面・操作の対象
+### 6.1 Screens and actions
 
-| 対象 | 今回表現する内容 | 主な出所 |
+| Area | What this phase shows | Main source |
 |---|---|---|
-| 共通利用・ダッシュボード | 利用開始/終了、言語、音声導線、役割別の概要 | 企業原文＋4役割化の制作方針 |
-| 設備・場所・監視 | 自宅/オフィス、場所、階層、設備、値・単位・更新時刻・異常 | 企業原文 |
-| 操作・自動運転 | 温度変更、スケジュール、在室・帰宅・天候等の条件と結果 | 企業原文＋入力や状態の設計提案 |
-| 保守 | 依頼、手配、担当作業、報告、結果の役割横断デモ | 企業原文＋受付/割当/品質確認の設計提案 |
-| 支払い・制限 | 支払い案内、模擬決済、制限理由・適用/解除の状態 | 企業原文＋予告/例外/解除手順の設計提案 |
-| 空気環境・エネルギー | 換気案内、電力・費用・基準比較・推定排出量 | 企業原文＋算定条件/品質表示の設計提案 |
-| IoT・環境報告 | 接続・取り外し検知、機器応答、MRV・任意オフセットのデモ | 企業原文＋画面操作の設計提案 |
+| Common use/dashboards | Sign in/out, language, voice entry, role summaries | Company original + four-role production instruction |
+| Units/locations/monitoring | Home/office, locations, hierarchy, units, values, units of measure, update times, alerts | Company original |
+| Control/automation | Temperature changes, schedules, occupancy/arrival/weather conditions and results | Company original + proposed input/state details |
+| Maintenance | Cross-role demo of requests, arrangements, assigned work, reports, and results | Company original + proposed intake/assignment/quality review |
+| Payments/restrictions | Payment guidance, simulated payments, restriction reasons, application/release states | Company original + proposed notice/exception/release flows |
+| Air quality/energy | Ventilation guidance, power, cost, baseline comparisons, estimated emissions | Company original + proposed calculation conditions/quality displays |
+| IoT/environmental reporting | Demo connections, removal detection, device responses, MRV, and optional offsets | Company original + proposed screen actions |
 
-### 6.2 デザインの反映
+### 6.2 Applying the design
 
-ドキュメント作成者指定に基づき、Loyaltyページの取得HTML/CSSに合わせます。主色は青（#005BEA）、背景は薄青（#F8FBFF）、本文色は濃紺（#0D2238）、英数字の本文フォントはPlus Jakarta Sansを基準とします。白いカードと、概要・明細・履歴の情報整理を共通化します。
+As instructed by the document authors, the design follows the retrieved Loyalty page HTML/CSS. The primary color is blue (#005BEA), the background light blue (#F8FBFF), and body text dark navy (#0D2238). Plus Jakarta Sans is the base font for Latin letters and numbers. White cards and the arrangement of summaries, details, and history are shared.
 
-小さい文字や操作領域は業務画面の読みやすさ・操作性のために補正し、参考値と補正値を分けて記録しています。これは企業原文で指定されたブランド要件ではなく、**参考モックに合わせる制作方針**です。詳細は[デザイン分析](reference-design-analysis.md)と[UIUX仕様書](../03-uiux/UIUXSpecification.md)を参照します。
+Small text and controls are adjusted for readability and usability in work screens. Reference and adjusted values are recorded separately. This is a **production instruction to match the reference mock**, not a brand requirement in the company original. See the [design analysis](reference-design-analysis.md) and [UIUX specification](../03-uiux/UIUXSpecification.md).
 
-### 6.3 企業要件と区別する設計上の仮定
+### 6.3 Design assumptions separate from company requirements
 
-| 決定ID | 仮定・方針 | 出所・状態 |
+| Decision ID | Assumption/policy | Source/status |
 |---|---|---|
-| DEC-01 | 施工業者が受諾・自社割当・品質確認を担う | 設計提案。4役割への分割自体は制作方針 |
-| DEC-04 | 初期デモの表示言語を英語（初期選択）・マレー語とする | 設計提案。企業原文の多言語構想を2言語へ限定した承認ではありません |
-| DEC-05 | デモの通貨・時間帯をMYR・クアラルンプールとする | 設計提案。対象市場の確定ではありません |
-| DEC-06 | 参考Loyaltyのデザインを基準にする | 制作方針（ドキュメント作成者指定） |
-| DEC-07 | デモ内で役割を切り替えても同じデータを共有し、再読込で初期化する | フロントエンドの設計提案 |
-| DEC-08 | 音声のやり取りをシミュレーションで表現する | 今回のフロントエンド対象に合わせた設計提案 |
-| DEC-09 | 入力上限、応答待ち時間、予定重複、公開範囲等の具体値・細則 | 設計提案。企業の正式な運用ルールではありません |
+| DEC-01 | Contractors accept jobs, assign their own staff, and review quality | Design proposal; splitting into four roles is a production instruction |
+| DEC-04 | Initial demo languages are English (default) and Malay | Design proposal, not company approval to limit multilingual support to two languages |
+| DEC-05 | Use MYR and Kuala Lumpur time in the demo | Design proposal, not a confirmed target market |
+| DEC-06 | Base the design on the reference Loyalty page | Production instruction from document authors |
+| DEC-07 | Share the same data across role switches; reset on reload | Frontend design proposal |
+| DEC-08 | Simulate voice interactions | Design proposal suited to this frontend scope |
+| DEC-09 | Specific input limits, response timeouts, schedule conflicts, visibility, and other details | Design proposal, not official company operating rules |
 
-**DEC-10（設計提案）**: 再割当で作業状態を維持し、制限は予告時に固定した原因請求がすべて入金済みになってから解除します。解除時に自動で電源をONにしたり以前の設定温度へ戻したりしません。手動入金・試運転の終了確認・保存済み報告の再表示も1Aデモとして具体化します。企業の商用ルールの承認を意味しません。詳細は[入出力契約DDC-08](../02-design/implementation-contracts.md#ddc-08-複数資源再訪役割横断の契約)を参照します。
+**DEC-10 (design proposal)**: Preserve work status on reassignment. Release restrictions only after all cause invoices fixed at notice time are paid. Release does not automatically power units on or restore previous set temperatures. Manual payment recording, test-run end confirmation, and viewing saved reports are specified for the 1A demo. This does not mean company approval of commercial rules. See [input/output contract DDC-08](../02-design/implementation-contracts.md#ddc-08-multi-resource-revisit-and-cross-role-contracts).
 
-開発手法・ライブラリ等（DEC-02・03を含む）は[開発者向け補足](internal/design-assumptions.md)へ分離しています。企業原文の要望として扱いません。
+Development methods and libraries (including DEC-02/03) are in [developer notes](internal/design-assumptions.md), separate from original company requests.
 
-## 7. 確認事項と設計上の留意点
+## 7. Questions and design considerations
 
-### 7.1 フロントエンドの内容を具体化する際の確認事項
+### 7.1 Questions when defining the frontend
 
-| 管理ID | 内容 | 現在の整理 |
+| Tracking ID | Topic | Current treatment |
 |---|---|---|
-| OPEN-01 | 施工業者・技術者・HQ・顧客の作業確認責任 | 受託/割当/品質確認は提案としてデモ化。正式責任とは区別 |
-| OPEN-02 | 初期言語、市場、通貨、支払い制限の案内内容 | 設定可能なデモ値を使用。企業原文の多言語対応や商用条件を確定したものではない |
-| OPEN-07 | ブランド素材、読みやすさ、表示端末 | 参考デザイン準拠を基本とし、操作性の補正を明示 |
-| OPEN-08 | 窓開放・断熱不足、アレルゲンの表現 | 専用表示と受入条件をC07/C08/T07/A05/A12に定義。表現案への業務確認を残す |
-| OPEN-09 | クレジット/デビットの区別、Scope 2報告、トークン化・市場取引の表示範囲 | カード区分・Scope 2・市場構想の表示をC11/A08/A14/C13/A15に定義。実取引条件は将来検討 |
-| OPEN-10 | 施工業者を独立した第4役割とすること | 企業原文は利用者を顧客・技術者（社内/第三者）・管理者の3種と記述。4役割化は制作方針（原記録未収録）に基づく提案。影響: FR-P01〜08、権限マトリクスの施工業者列、S08。統合する場合は外部技術者側へ受諾・割当・品質確認を移す |
+| OPEN-01 | Work verification responsibilities of contractors, technicians, HQ, and customers | Demo acceptance/assignment/quality review as proposals, separate from official responsibilities |
+| OPEN-02 | Initial languages, market, currency, and payment restriction notices | Use configurable demo values; do not finalize multilingual support or commercial conditions |
+| OPEN-07 | Brand assets, readability, and display devices | Follow the reference design and state usability adjustments |
+| OPEN-08 | Open-window/poor-insulation and allergen displays | Dedicated displays and acceptance criteria in C07/C08/T07/A05/A12; business review of wording remains |
+| OPEN-09 | Credit/debit distinctions, Scope 2 reports, and tokenization/market trading displays | Card types, Scope 2, and market concepts defined in C11/A08/A14/C13/A15; real trading conditions remain future work |
+| OPEN-10 | Contractor as a separate fourth role | The company original names three user types: customer, technician (internal/third party), and administrator. Four roles are proposed under production instructions (original message not archived). Affects FR-P01–08, the contractor column in the permission matrix, and S08. If merged, move acceptance, assignment, and quality review to external technicians |
 
-### 7.2 将来の全体ソリューションで検討する事項
+### 7.2 Questions for the future full solution
 
-| 管理ID | 原文に関係する検討事項 | 今回との境界 |
+| Tracking ID | Topic related to the original | Boundary of this phase |
 |---|---|---|
-| OPEN-03 | センサー、検知精度、機種能力、小型化・価格・設置・FW | 機器設計は対象外。フロントエンドは合成値と対応/非対応の表示 |
-| OPEN-04 | 実認証、データの管理範囲、外部連携 | サーバー・API・DB設計は対象外。画面側の切替・表示範囲だけ定義 |
-| OPEN-05 | 決済・通知・位置・天候・料金のサービス連携 | 実送信・決済は対象外。プレビューとデモ操作で表現 |
-| OPEN-06 | 排出係数、MRVの方法、検証、クレジット発行・取引制度、連携先 | 実算定の認証・発行・取引は対象外。条件と模擬記録を表示 |
+| OPEN-03 | Sensors, detection accuracy, model capabilities, size, cost, installation, and firmware | Device design is out of scope; frontend uses synthetic values and supported/unsupported labels |
+| OPEN-04 | Real authentication, data access scope, external integrations | Server/API/database design is out of scope; only screen switching and visibility are defined |
+| OPEN-05 | Payment, notification, location, weather, and tariff service integrations | No real sending or payment; show previews and demo actions |
+| OPEN-06 | Emission factors, MRV, verification, credit issuance/trading schemes, and partners | No certification of real calculations, issuance, or trading; show conditions and simulated records |
 
-省エネの10〜20%以上という数値は期待する効果です。微小冷媒漏れやアレルゲン等の検知、健康上の安全性、削減量からのクレジット発行・トークン化は、原文にある構想・質問と、実証済みの能力を区別します。室内CO₂濃度と電力由来のCO₂排出量も異なる指標として扱います。
+Energy waste reduction of 10–20% or more is an expected benefit. Distinguish original concepts and questions from proven capabilities for tiny refrigerant leaks, allergen detection, health safety, credit issuance from savings, and tokenization. Indoor CO₂ concentration and power-related CO₂ emissions are separate metrics.
 
-将来の技術・商用条件が未確定でも、今回の画面設計は仮定を明示して進められます。これらの確定をフロントエンド文書作成の前提条件にはしません。
+Screen design can proceed with clear assumptions even while future technical and commercial conditions remain open. Their confirmation is not a prerequisite for frontend documentation.
 
-## 8. 後続ドキュメントとの関係
+## 8. Relationship to later documents
 
-本資料の整理結果をもとに、役割別の要件定義書では「何を表示・操作できるか」、詳細設計書では「項目・操作・状態・例外をどう扱うか」、共通UIUX仕様書では「見せ方と実装上の共通規則」を定義します。
+Based on this document, role requirements define what users can see and do; detailed designs define how fields, actions, states, and exceptions work; and the shared UIUX specification defines presentation and common implementation rules.
 
-- [要件定義書：共通](../01-requirements/common.md)および[クライアント](../01-requirements/client.md)・[施工業者](../01-requirements/contractor.md)・[技術者](../01-requirements/technician.md)・[管理者](../01-requirements/admin.md)
-- [詳細設計書：共通](../02-design/common.md)と役割別設計（[一覧](../README.md)）
-- [共通UIUX仕様書](../03-uiux/UIUXSpecification.md)
+- [Common requirements](../01-requirements/common.md), plus [client](../01-requirements/client.md), [contractor](../01-requirements/contractor.md), [technician](../01-requirements/technician.md), and [administrator](../01-requirements/admin.md)
+- [Common detailed design](../02-design/common.md) and role designs ([index](../README.md))
+- [Shared UIUX specification](../03-uiux/UIUXSpecification.md)
 
-役割別のFR番号は本プロジェクトの管理番号です。内容は企業原文から再整理し、制作方針と設計補完を分けています。詳細設計はこの要件に対応し、UIUX仕様書は企業要望に基づく操作・表示規則と参考モック由来の外観規則を区別します。
+Role FR numbers are project tracking IDs. Their content reorganizes the original company text and separates production instructions from added design details. Detailed designs map to these requirements. The UIUX specification separates company-based interaction/display rules from reference-mock appearance rules.
 
-## 9. 出典・確認範囲
+## 9. Sources and review coverage
 
-| 出典ID | 資料 | 位置づけ |
+| Source ID | Material | Role |
 |---|---|---|
-| SRC-06 | [企業要件原文](sources/company-requirements-original.txt)、2026-09-15受領 | 企業の要望を確認する一次資料。BIZ-01〜26の根拠 |
-| SRC-02 | [制作指示の記録と確認状態](sources/production-instructions.md) | 過去の指示要約。原指示メッセージは未収録。4役割等は現行の制作基準として維持するが、原記録確認済みとは扱わない |
-| SRC-01 | [既存引き継ぎ資料](sources/original-handover.md) | 過去の参考モック調査を確認する二次資料。企業要求の一次根拠には使用しない |
-| SRC-04 | 上記引き継ぎ資料の参考サイト調査記録 | 過去の参考サイト調査記録。製品の機能要件を定める資料としては使用しない |
-| SRC-05 | [Loyaltyページ](https://aconland-mudah-milik.vercel.app/customer/loyalty)と[デザイン分析](reference-design-analysis.md) | 2026-09-14のHTML/CSS等の直接確認。デザイン参考値の取得記録 |
-| SRC-03 | 開発作業環境の初期確認 | 内部管理情報。企業要件・参考モックの機能の根拠には使用しない |
+| SRC-06 | [Original company requirements](sources/company-requirements-original.txt), received 2026-09-15 | Primary source for company requests; basis of BIZ-01–26 |
+| SRC-02 | [Production instruction record and verification status](sources/production-instructions.md) | Summary of earlier instructions; original messages not archived. Four roles and similar instructions remain the current production baseline, but the original record is not verified |
+| SRC-01 | [Existing handover](sources/original-handover.md) | Secondary source for earlier reference-mock research; not primary evidence of company requirements |
+| SRC-04 | Reference-site research in that handover | Earlier reference research, not a source of product feature requirements |
+| SRC-05 | [Loyalty page](https://aconland-mudah-milik.vercel.app/customer/loyalty) and [design analysis](reference-design-analysis.md) | Direct HTML/CSS review on 2026-09-14; record of visual reference values |
+| SRC-03 | Initial development environment check | Internal information; not evidence of company requirements or reference-mock features |
 
-この資料は要件と対応方針のご確認用です。企業による詳細仕様の承認、開発完了、実機接続済み、第三者検証済みを示すものではありません。
+This document is for reviewing requirements and proposed coverage. It does not indicate company approval of detailed specifications, completed development, real device connections, or third-party verification.
 
-## 10. 決定責任・期限
+## 10. Decision owners and deadlines
 
-1Aデモ仕様は2026-09-16のユーザー回答（[DEC-12](internal/decision-record-2026-09-16.md)）により採用済み。ドキュメント作成者・1A仕様の最終判断者は北野正樹（Masaki Kitano）と若井悠馬（Yuma Wakai）。商用承認とは分ける。詳細設計の具体化はDEC-11。下表の未決事項をAIが商用確定として扱ってはならない。「企業検収前」はデモを業務要件として承認する直前、「本番設計開始前」は1BのAPI/機器接続設計の開始前を意味する。以下のWho Should Decideは商用・本番側の責任を示す。1A側の最終判断者は上記2名で指定済み。本番技術担当者の指名は本番設計開始前に行う。
+The 1A demo specification was adopted through the user response on 2026-09-16 ([DEC-12](internal/decision-record-2026-09-16.md)). The document authors and final 1A decision makers are Masaki Kitano and Yuma Wakai. This is separate from commercial approval. DEC-11 covers detailed design refinement. AI must not treat the open items below as commercially final. “Before company acceptance” means just before approving the demo as business requirements. “Before production design starts” means before 1B API/device connection design starts. “Who Should Decide” below names commercial/production responsibilities. The two final 1A decision makers are already named above. Production technical owners must be named before production design starts.
 
-| ID | Who Should Decide | 期限/ゲート | 関連要件 | 1Aの決定済み提案 |
+| ID | Who Should Decide | Deadline/gate | Related requirements | Adopted 1A proposal |
 |---|---|---|---|---|
-| OPEN-01 | Product Owner / Business | 企業検収前 | FR-P03/P05/T09/A06 | D06の割当・品質確認・HQ引継ぎ |
-| OPEN-02 | Product Owner / UI/UX / Business | 企業検収前 | FR-X01/C11/A09 | en/ms・MYR表示・D03/D09のデモ条件 |
-| OPEN-03 | IoT | 本番設計開始前 | FR-T11/T12/A04 | D05/D07の模擬接続・合成値 |
-| OPEN-04 | Backend / Security / IoT | 本番設計開始前 | FR-X04、NFR03/05/06 | D11。本番API/DB/認証はNOT DEFINED |
-| OPEN-05 | Backend / Business / Security | 本番設計開始前 | FR-C05/C11、FR-X07 | 実送信/課金/位置取得なし |
-| OPEN-06 | Business / Product Owner | 本番設計開始前 | FR-C06/C13/A13/A14/A15 | D07の固定仮係数・模擬記録 |
-| OPEN-07 | UI/UX / Product Owner | 企業検収前 | NFR01/02/04 | D10の検収環境・UIUX token |
-| OPEN-08 | IoT / Product Owner | 企業検収前 | FR-C07/C08/T07/A05/A12 | 根拠/未計測を表示し能力を保証しない |
-| OPEN-09 | Business / Product Owner | 企業検収前 | FR-C11/C13/A08/A14/A15 | カード情報なし、Scope 2デモ、将来市場は未接続 |
-| OPEN-10 | Product Owner / Business | 企業検収前 | FR-P01〜08、FR-X04 | 4役割の可逆的提案を維持 |
-| OPEN-11 | Backend / IoT | 本番設計開始前 | FR-T10/C04/A09 | 1A時計だけ。本番の終了操作の実行主体・障害復旧はNOT DEFINED |
+| OPEN-01 | Product Owner / Business | Before company acceptance | FR-P03/P05/T09/A06 | D06 assignment, quality review, and HQ handover |
+| OPEN-02 | Product Owner / UI/UX / Business | Before company acceptance | FR-X01/C11/A09 | en/ms, MYR display, D03/D09 demo conditions |
+| OPEN-03 | IoT | Before production design starts | FR-T11/T12/A04 | D05/D07 simulated connections and synthetic values |
+| OPEN-04 | Backend / Security / IoT | Before production design starts | FR-X04, NFR03/05/06 | D11; production API/database/authentication NOT DEFINED |
+| OPEN-05 | Backend / Business / Security | Before production design starts | FR-C05/C11, FR-X07 | No real sending, charging, or location collection |
+| OPEN-06 | Business / Product Owner | Before production design starts | FR-C06/C13/A13/A14/A15 | D07 fixed provisional factors and simulated records |
+| OPEN-07 | UI/UX / Product Owner | Before company acceptance | NFR01/02/04 | D10 acceptance environment and UIUX tokens |
+| OPEN-08 | IoT / Product Owner | Before company acceptance | FR-C07/C08/T07/A05/A12 | Show evidence/not measured; no capability guarantee |
+| OPEN-09 | Business / Product Owner | Before company acceptance | FR-C11/C13/A08/A14/A15 | No card data, Scope 2 demo, future market not connected |
+| OPEN-10 | Product Owner / Business | Before company acceptance | FR-P01–08, FR-X04 | Keep reversible four-role proposal |
+| OPEN-11 | Backend / IoT | Before production design starts | FR-T10/C04/A09 | 1A clock only; production owner of end actions and failure recovery NOT DEFINED |
 
-本番API未定義と企業承認未了は、1Aの実装を推測で補う理由にならない。本番接続の実装ゲートはNOT READY。1Aの独立G1と分離して管理する。
+Undefined production APIs and pending company approval do not justify guessing 1A behavior. The production connection implementation gate is NOT READY and is managed separately from the independent 1A G1 gate.
 
-1AではOPEN-01/02/07/08/09/10のデモ採用判断をDEC-12で完了とする。これらの商用確認とOPEN-03〜06/11の本番検討は残すが、1Aの未解決欠陥として数えない。独立AIレビューをG1とし、人および外部レビュアーによるデプロイ前の最終確認は別の必須工程とする。
+For 1A, DEC-12 completes demo adoption decisions for OPEN-01/02/07/08/09/10. Their commercial review and production topics OPEN-03–06/11 remain open but do not count as unresolved 1A defects. Independent AI review is G1. Final review by people and external reviewers before deployment is a separate required step.
 
-0.11.0技術修正は[DEC-15](internal/decision-record-2026-09-16.md#dec-15-再レビュー修正の技術的具体化0110)を参照。既存1A範囲の具体化であり独立承認は未取得。
+For 0.11.0 technical fixes, see [DEC-15](internal/decision-record-2026-09-16.md#dec-15-technical-details-of-re-review-fixes-0110). They refine the existing 1A scope and have no separate approval.
 
-0.19.0の成果物に対する別エージェントの独立G1（G1-001〜031、判定FAIL）を受けて0.20.0で採用した可逆的な設計提案は[DEC-54〜59](internal/review-decisions-020.json)にPROPOSEDとして記録し、企業検収前にProduct Owner／Business／Security／UI/UX／IoT／QAが確認する（IR94〜102）。
+Reversible design proposals adopted in 0.20.0 after another agent's independent G1 review of 0.19.0 (G1-001–031, FAIL) are recorded as PROPOSED in [DEC-54–59](internal/review-decisions-020.json). Product Owner / Business / Security / UI/UX / IoT / QA must review them before company acceptance (IR94–102).
 
-0.19.0の独立レビュー（REV19-001〜042）で採用した可逆的な設計提案は[DEC-42〜53](internal/review-decisions-019.json)にPROPOSEDとして記録し、企業検収前にProduct Owner／Business／Security／UI/UX／IoTが確認する（IR75〜93）。このうち管理ダッシュボードの「削減量の予想」の算出方法（DEC-44、案A）と作業窓終了時の扱い（DEC-50）は、2026-09-17のユーザー回答で1A仕様として確定した（企業の商用承認とは区別する）。
+Reversible proposals adopted in the 0.19.0 independent review (REV19-001–042) are recorded as PROPOSED in [DEC-42–53](internal/review-decisions-019.json). Product Owner / Business / Security / UI/UX / IoT must review them before company acceptance (IR75–93). The admin dashboard's estimated savings calculation (DEC-44, option A) and handling at the end of work windows (DEC-50) were confirmed as 1A specifications by the user response on 2026-09-17, separate from company commercial approval.
 
-0.18.0の厳格レビュー（REV18-001〜048）で採用した可逆的な設計提案は[DEC-25〜41](internal/review-decisions-018.json)にPROPOSEDとして記録し、企業検収前にProduct Owner／Business／Security／UI/UX／IoTが確認する（IR45〜74）。
+Reversible proposals adopted in the 0.18.0 strict review (REV18-001–048) are recorded as PROPOSED in [DEC-25–41](internal/review-decisions-018.json). Product Owner / Business / Security / UI/UX / IoT must review them before company acceptance (IR45–74).
 
-0.17.0の独立レビュー（FRV）で採用した可逆的な設計提案は[DEC-19〜24](internal/review-decisions-017.json)にPROPOSEDとして記録し、企業検収前にProduct Owner／Business／Security／UI/UXが確認する（IR35〜44）。
+Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded as PROPOSED in [DEC-19–24](internal/review-decisions-017.json). Product Owner / Business / Security / UI/UX must review them before company acceptance (IR35–44).
 
-0.16.0再レビューの[DEC-17/18](internal/review-decisions-016.json)はユーザー回答により確定。制限操作はrestriction.manage/overrideの2権限、案件一覧はソート機能を備え、デフォルトは業務順の昇順とする。具体的な比較順・UI・受入条件はIR34を参照。旧G1の合格は修正後baselineに適用しない。
+[DEC-17/18](internal/review-decisions-016.json) from the 0.16.0 re-review were confirmed by the user response. Restriction actions use two permissions, restriction.manage/override. Job lists support sorting, with ascending business order as the default. See IR34 for comparison order, UI, and acceptance criteria. The earlier G1 pass does not apply to the revised baseline.
 
-0.21.0: DOC-0.20.0の独立G1指摘G120-001〜005をIR103〜106で修正。継続時間と通知重大度の可逆的なデモ提案は[DEC-60〜61](internal/review-decisions-021.json)。[受入計画](../04-agentic-sdlc/acceptance-review-021.csv)を追跡表へ反映し、新baselineに対して独立G1を再判定する。判定は[現行gate](../04-agentic-sdlc/runs/DOC-0.21.0/gate-G1.yaml)を参照。
+0.21.0: Independent G1 findings G120-001–005 for DOC-0.20.0 are fixed in IR103–106. Reversible demo proposals for duration and notification severity are in [DEC-60–61](internal/review-decisions-021.json). The [acceptance plan](../04-agentic-sdlc/acceptance-review-021.csv) is included in traceability, and independent G1 is reassessed for the new baseline. See the [current gate](../04-agentic-sdlc/runs/DOC-0.21.0/gate-G1.yaml) for the result.

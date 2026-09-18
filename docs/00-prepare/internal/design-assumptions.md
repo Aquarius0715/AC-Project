@@ -6,45 +6,45 @@ scope: frontend-only
 updated: 2026-09-17
 ---
 
-# 開発者向け補足：仮定・技術選択
+# Developer notes: assumptions and technical choices
 
-企業への説明は[PrepareDocument](../PrepareDocument.md)を正とする。本ファイルは設計・実装エージェント向けの補足であり、企業原文の要求や企業による承認の記録ではない。最新の企業原文はSRC-06、開発範囲の指定はSRC-02として区別する。
+[PrepareDocument](../PrepareDocument.md) is authoritative for explanations to the company. This file supports design and implementation agents; it is not a record of original company requirements or company approval. The latest company original is SRC-06; development scope instructions are SRC-02.
 
-## 技術選択とデモの仮定
+## Technical choices and demo assumptions
 
 
-| ID | 状態 | 内容・理由 | 変更時の影響 |
+| ID | Status | Details/reason | Impact of a change |
 |---|---|---|---|
-| DEC-01 | PROPOSED | 施工業者は受託と自社人員・品質を担当。HQの委託範囲内のみ再割当 | FR-P全件、S02/S08、MaintenanceJob |
-| DEC-02 | PROPOSED | 新規SPAはReact + TypeScript + Vite + React Router。SSRが必要なら再検討 | 共通設計・ビルド。依存版は実装開始時に互換性を確認・固定 |
-| DEC-03 | PROPOSED | 「reactForms」をReact Hook Formと解釈。Zod、shadcn/ui、Lucide、TanStack Queryを利用 | UIUX・フォーム・データ境界 |
-| DEC-04 | PROPOSED | 英語（en）・マレー語（ms）を初期デモ言語とし、英語を初期選択。追加言語・提供順序は未確定 | 翻訳キーとAT-X01/X02 |
-| DEC-05 | PROPOSED | デモ通貨MYR、表示時間帯Asia/Kuala_Lumpur。言語・表示時間帯は変更可能。通貨はMYR固定のデモ値（請求は元通貨のまま） | 市場決定ではない。金額・時刻整形 |
-| DEC-06 | 制作方針（ドキュメント作成者指定） | 顧客LoyaltyのHTML/CSSのデザインに合わせる。主色#005BEA、Plus Jakarta Sans、14pxカード。旧独立配色案を廃止 | [デザイン分析](../reference-design-analysis.md)とUIUXに根拠を記録。a11y補正はADAPTとして明示 |
-| DEC-07 | PROPOSED | 共有メモリのデモRepository。再読込でseedに戻る。同一タブの役割切替で保持 | デモ操作説明、テスト。永続化・複数タブ同期は対象外 |
-| DEC-08 | PROPOSED | 音声は文字起こし・応答のシミュレーションが標準。実マイク不要 | FR-X02、同意・拒否デモ |
-| DEC-09 | PROPOSED | 49機能の入力・業務細則・出力・失敗を具体化。デモの時間/上限/受諾前projection/確定予定重複拒否等は[実装契約](../../02-design/implementation-contracts.md)と各DDを正とする | 本番の承認を意味しない。変更時は同じIDの要件・設計・AT-N/E/Bを更新 |
-| DEC-10 | PROPOSED | 1Aの再訪・複数資源・競合を具体化。再割当は状態維持、手動入金はinvoice起点、制限は原因請求全件入金で解除、解除は元の電源/温度を復元しない。試運転・画像は共有モックへ保持 | [DDC-08](../../02-design/implementation-contracts.md#ddc-08-複数資源再訪役割横断の契約)、AT-*-R01、該当FR/DD。企業の正式ルールではない |
-| DEC-11 | PROPOSED（今回の修正指示による可逆的デモ設計） | 36件の指摘へのデモ仕様具体化。正規DTO・認可・仲裁・復旧・数値・画面・検証条件 | [確定契約](../../02-design/deterministic-contracts.md)、操作／画面カタログ。商用承認・本番契約は含まない |
+| DEC-01 | PROPOSED | Contractors manage accepted work, own staff, and quality. Reassignment stays within HQ's delegated scope | All FR-P, S02/S08, MaintenanceJob |
+| DEC-02 | PROPOSED | New SPA: React + TypeScript + Vite + React Router. Reconsider if SSR is needed | Shared design/build; check compatibility and pin dependency versions when implementation starts |
+| DEC-03 | PROPOSED | Interpret “reactForms” as React Hook Form. Use Zod, shadcn/ui, Lucide, and TanStack Query | UIUX, forms, data boundary |
+| DEC-04 | PROPOSED | Initial demo languages: English (en, default) and Malay (ms). Extra languages and rollout order are unconfirmed | Translation keys and AT-X01/X02 |
+| DEC-05 | PROPOSED | Demo currency MYR; display timezone Asia/Kuala_Lumpur. Language/timezone can change. Currency is fixed demo MYR (invoices keep original currency) | Not a market decision; money/time formatting |
+| DEC-06 | Production instruction (document authors) | Match customer Loyalty HTML/CSS: #005BEA primary, Plus Jakarta Sans, 14px cards. Remove the earlier separate color proposal | Evidence in [design analysis](../reference-design-analysis.md) and UIUX; mark accessibility adjustments as ADAPT |
+| DEC-07 | PROPOSED | Shared in-memory demo Repository. Reload resets to seed; role switches in one tab preserve data | Demo instructions/tests; persistence and multi-tab sync are out of scope |
+| DEC-08 | PROPOSED | Default voice behavior simulates transcription and responses; no real microphone needed | FR-X02, consent/refusal demo |
+| DEC-09 | PROPOSED | Define inputs, business rules, outputs, and failures for 49 features. [Implementation contracts](../../02-design/implementation-contracts.md) and each DD govern demo times, limits, pre-acceptance projections, and rejection of overlapping confirmed schedules | Not production approval; changes update requirements, design, and AT-N/E/B with the same ID |
+| DEC-10 | PROPOSED | Define 1A revisits, multiple resources, and conflicts. Preserve state on reassignment; manual payments start from invoices; release restrictions after all cause invoices are paid; do not restore previous power/temperature on release. Keep test runs and images in shared mocks | [DDC-08](../../02-design/implementation-contracts.md#ddc-08-multi-resource-revisit-and-cross-role-contracts), AT-*-R01, related FR/DD; not official company rules |
+| DEC-11 | PROPOSED (reversible demo design under current correction instructions) | Define demo details for 36 findings: canonical DTOs, authorization, arbitration, recovery, numbers, screens, and checks | [Deterministic contracts](../../02-design/deterministic-contracts.md), operation/screen catalogs; excludes commercial approval and production contracts |
 
-| DEC-19〜24 | PROPOSED | 0.17.0独立レビューFRVの技術的具体化（IR35〜44）。解除起動経路、時計ジャンプ、案件期限、顧客数、プリセット、投影 | [決定記録](review-decisions-017.json)。可逆、企業承認ではない |
-| DEC-25〜41 | PROPOSED | 0.18.0厳格レビューREV18の技術的具体化（IR45〜74）。生存シミュレーター、制限中の操作表、接続の導出、Offer期限、閲覧窓/作業窓、件数定義、生活パターン、同意撤回、セッション延長、取消表、省エネ基準の自動選択、連絡可能時間、音声照合、負値表示、休日、翻訳確認、アプリ名 | [決定記録](review-decisions-018.json)。可逆、企業承認ではない |
-| DEC-42〜53 | PROPOSED（DEC-44/50はユーザー確定） | 0.19.0独立レビューREV19の技術的具体化（IR75〜93）。作業窓開始前の表示、シミュレーターの複写条件、省エネ予想、ログイン後の復帰先、再取得中の表示、同意の初期記録、期限切れOfferへの応答、理由系の文字数、作業窓終了の予告、機器操作中の制限Command、pending監査、連絡可能時間の入力案内 | [決定記録](review-decisions-019.json) |
-| DEC-54〜59 | PROPOSED | 0.20.0独立G1指摘G1-001〜031の技術的具体化（IR94〜102）。技術者の書込み条件、業務イベントの通知、制限の取消、アレルゲン観測と空気環境の案内、点検部品と提出の検証、共通受入で必要な失敗の扱い | [決定記録](review-decisions-020.json) |
-| DEC-60〜61 | PROPOSED | 0.21.0独立G1修正。継続時間の起点・換気候補の成立時点と業務通知の重大度（IR103/104） | [決定記録](review-decisions-021.json) |
-| DEC-12 | ACCEPTED FOR 1A | 今回はモックのみ。提示業務ルール採用、商用承認と分離。最終判断者は北野正樹（Masaki Kitano）・若井悠馬（Yuma Wakai）。別AI独立レビュー、人/外部によるデプロイ前最終確認 | [ユーザーの決定記録](decision-record-2026-09-16.md)。本番契約を推測で埋めない |
+| DEC-19–24 | PROPOSED | Technical details from 0.17.0 independent FRV review (IR35–44): release triggers, clock jumps, job deadlines, customer counts, presets, projections | [Decision record](review-decisions-017.json); reversible, not company approval |
+| DEC-25–41 | PROPOSED | Technical details from 0.18.0 strict REV18 review (IR45–74): heartbeat simulator, allowed actions under restrictions, derived connectivity, Offer expiry, view/work windows, counts, routines, consent withdrawal, session extensions, cancellation table, automatic savings baseline selection, contact hours, voice matching, negative values, non-working days, translation review, app name | [Decision record](review-decisions-018.json); reversible, not company approval |
+| DEC-42–53 | PROPOSED (DEC-44/50 confirmed by user) | Technical details from 0.19.0 independent REV19 review (IR75–93): pre-work-window display, simulator copy rules, estimated savings, post-login return, refetch display, initial consent, expired Offer responses, reason lengths, work-window end warning, restriction Commands during device operations, pending audits, contact-hour input hints | [Decision record](review-decisions-019.json) |
+| DEC-54–59 | PROPOSED | Technical details from 0.20.0 independent G1 findings G1-001–031 (IR94–102): technician write conditions, business event notifications, restriction cancellation, allergen observations/air-quality guidance, inspection components/submission validation, failures needed for common acceptance | [Decision record](review-decisions-020.json) |
+| DEC-60–61 | PROPOSED | 0.21.0 independent G1 fixes: duration start, ventilation candidate eligibility, and business notification severity (IR103/104) | [Decision record](review-decisions-021.json) |
+| DEC-12 | ACCEPTED FOR 1A | Mocks only. Adopt proposed business rules separately from commercial approval. Final decision makers: Masaki Kitano and Yuma Wakai. Independent review by another AI; final human/external review before deployment | [User decision record](decision-record-2026-09-16.md); do not guess missing production contracts |
 
-PROPOSEDの項目は人による業務承認済みではない。DEC-06は過去の制作指示要約に記録されている。原指示メッセージは未収録であり、[指示の確認状態](../sources/production-instructions.md)を参照する。可逆的な1Aは提案基準で進行できる。
+PROPOSED items have no human business approval. DEC-06 is recorded in a summary of past production instructions. The original message is not archived; see [instruction verification status](../sources/production-instructions.md). Reversible 1A work can proceed using proposed specifications.
 
 
-## 確認範囲の記録
+## Record of review coverage
 
-参考モックのLoyaltyページは2026-09-14にHTML・参照CSS・公開コードの一部を取得した。他の画面は既存引き継ぎ資料の調査記録が根拠で、同じ深さの再確認を行っていない。初回取得時の環境制約は調査上の事情であり、参考アプリの機能不足を示すものではない。参照値は[デザイン分析](../reference-design-analysis.md)と[抽出証跡](../sources/reference-style-evidence.json)を参照。
+HTML, linked CSS, and some public code for the reference Loyalty page were retrieved on 2026-09-14. Other screens rely on earlier handover research and were not rechecked to the same depth. Environment limits during the initial retrieval describe research conditions, not missing reference-app features. See [design analysis](../reference-design-analysis.md) and [extracted evidence](../sources/reference-style-evidence.json) for reference values.
 
-## 原文との対応の読み方
+## How to read links to the original
 
-FRは企業要件原文（SRC-06）から再整理した管理番号です。[要件別の出所表](../requirement-origins.csv)で原文の記述位置と設計補完を確認します。例えば担当割当、報告承認、入金確認、FW校正・登録の詳しい手順は、企業の監視・保守という目的を実現するための設計補完を含む。
+FR numbers are tracking IDs reorganized from the company original (SRC-06). Use the [requirement source table](../requirement-origins.csv) to check original locations and added design details. Assignment, report approval, payment confirmation, and detailed firmware/calibration/registration procedures include design details added to meet the company's monitoring and maintenance goals.
 
-画面での赤/オレンジ/緑の意味づけ、同意取得、値の品質区分、状態遷移の名称・時間値は、企業目的を支えるフロントエンド提案として扱う。企業原文中の検討質問や期待値を、検証済み能力や達成保証へ変換しない。
+Screen meanings of red/orange/green, consent, data quality groups, state-transition names, and time values are frontend proposals supporting company goals. Do not turn questions or expected benefits in the original into verified capabilities or guaranteed results.
 
-DEC-12の採用判断は、上記の提案のうち同決定記録に列挙したデモ方針を確定する。従来のPROPOSEDという出所ラベルは商用承認済みを意味しないため保持するが、デモ採用の再確認は不要。
+DEC-12 confirms adoption of the demo policies listed in that decision record. Earlier PROPOSED source labels remain because they do not mean commercial approval; demo adoption does not need to be confirmed again.

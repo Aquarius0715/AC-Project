@@ -7,17 +7,17 @@ consumers: [implementation-agent, test-agent, review-agent]
 scope: frontend-demo-1A
 ---
 
-# 共通詳細設計書
+# Common Detailed Design
 
-入力として使うもの: [共通要件](../01-requirements/common.md)、[PrepareDocument](../00-prepare/PrepareDocument.md)。実装で使う細かい入出力・エラー・デモ時間の値は[フロントエンド入出力契約](implementation-contracts.md)を、すべての論理操作(処理の名前の一覧)は[操作カタログ](operation-catalog.csv)を、あわせて読んでください。この文書が決めるのは、ブラウザ側の画面データ・モックサービス(仮のデータ処理)・表示状態だけです。APIのパス、データベース、認証サーバー、バックエンド(サーバー側)の業務処理は、この文書の対象ではありません。
+Inputs: [Common Requirements](../01-requirements/common.md) and [PrepareDocument](../00-prepare/PrepareDocument.md). Also read the [Frontend Input and Output Contract](implementation-contracts.md) for exact inputs, outputs, errors, and demo timing, and the [Operation Catalog](operation-catalog.csv) for all logical operations (named processes). This document defines only browser screen data, mock services (simulated data processing), and display states. API paths, databases, authentication servers, and backend business processing are outside its scope.
 
-この文書の業務目的は、[企業要件原文](../00-prepare/sources/company-requirements-original.txt)から整理したBIZ項目と、[共通要件](../01-requirements/common.md)にもとづきます。型・Repository(データを取り出す仕組み)・キャッシュ(一時保存)・権限ガード(アクセス制限)・モック状態は、その目的をフロントエンドで実現するための設計案です。将来、実際のAPIを導入するときは、表示用データへの変換をadapter(変換の仕組み)にまとめます。サーバー側の認証・データベース・通信の取り決めは、この文書では決めません。
+The business goals in this document come from the BIZ items drawn from the [Original Company Requirements](../00-prepare/sources/company-requirements-original.txt) and the [Common Requirements](../01-requirements/common.md). Types, repositories (data access interfaces), caches (temporary storage), permission guards (access limits), and mock states are proposed frontend designs to meet these goals. When a real API is added, adapters will handle conversion to display data. This document does not define server authentication, databases, or communication contracts.
 
-設計の対象になる機能・画面項目・状態・例外は、企業原文と対応する要件をもとにします。各FR(機能要件)を満たすための処理と、受入条件(合格の基準)をこの文書で決めます。参考にしているモック画面は、共通UIの見た目を考えるためだけに使います。
+The features, screen fields, states, and exceptions in this design follow the original company requirements and their linked requirements. This document defines the processing and acceptance criteria for each FR (functional requirement). Reference mock screens are used only to guide the appearance of the shared UI.
 
-**0.21.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**Implementation baseline for 0.21.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
 
-## 1. 構成と責任
+## 1. Structure and Responsibilities
 
 ```text
 src/
@@ -27,75 +27,75 @@ src/
   domain/             entities, policies, transitions, repository-contracts
   infrastructure/
     mock/             repository, fixtures, scenario-clock, event-bus
-    adapters/         外部データへの差替え口（今回はinterfaceのみ）
+    adapters/         replacement point for external data (interface only in this phase)
   shared/
-    ui/               shadcnベースのUI primitives
-    components/       StatusBadge, MetricCard等の共通業務表示
+    ui/               shadcn-based UI primitives
+    components/       shared business displays such as StatusBadge and MetricCard
     styles/           tokens.css
     config/           demo-settings, locale-settings
     i18n/             en, ms
 tests/                unit, component, contract, e2e
 ```
 
-データの依存する向きは、`page(画面) → feature hook(機能ごとの処理) → Repository interface(取り出し方の約束事) → injected adapter(差し込む変換の仕組み)`という順番です。domain(業務のルールを扱う層)は、React・HTTP通信・モックのどれにも依存しません。ページから、fetch(通信)・mock seed(初期データ)・localStorageを直接使ってはいけません。composition-root(組み立て役)だけが、どのadapterを使うかを選びます。
+Data dependencies run in this order: `page → feature hook → Repository interface → injected adapter`. The domain layer (business rules) depends on neither React, HTTP, nor mocks. Pages must not use fetch, mock seeds (initial data), or localStorage directly. Only the composition-root selects the adapter.
 
-画面遷移も同じ考え方で扱います。pageやfeature hookは、React Router固有のAPI(`useNavigate`、`useParams`、`useLocation`等)を直接呼びません。代わりに`shared`配下に置く小さなNavigation interface(例: `navigateTo(routeKey, params)`、`getParam(name)`)を経由し、React Routerへの実装はcomposition-root側だけが知ります。これはRepositoryパターンと同じ「取り出し方の約束事と実装を分ける」目的で、将来ルーターを差し替える場合の変更範囲をNavigation interfaceの実装だけに閉じるためです。
+Screen navigation follows the same approach. Pages and feature hooks must not call React Router APIs (`useNavigate`, `useParams`, `useLocation`, etc.) directly. Instead, they use a small Navigation interface under `shared` (for example, `navigateTo(routeKey, params)` and `getParam(name)`). Only the composition-root knows its React Router implementation. As with the Repository pattern, this separates the interface from its implementation, so a future router change affects only the Navigation interface implementation.
 
-いま提案している構成(PROPOSED)は、TypeScript(strictモード)、React、Vite、React Routerです。サーバー側でHTMLを組み立てる必要(SSR)がないので、SPA(1つのページで動くアプリ)として作ります。URLを直接開く「ディープリンク」に対応するには、将来、ホスティング側でSPA用のフォールバック設定が必要です。使うライブラリのバージョンは、実装を始めるときに互換性を確認し、lockfile(バージョン固定ファイル)に固定します。アプリを起動するコマンドはまだ作っておらず、この文書では「動作確認済み」とは書きません。
+The proposed stack (PROPOSED) is TypeScript (strict mode), React, Vite, and React Router. The app will be an SPA (single-page application) because server-side HTML rendering (SSR) is not required. Direct URL access (deep links) will require an SPA fallback setting on the future hosting service. At implementation start, check library version compatibility and fix versions in a lockfile. App startup commands do not exist yet, so this document does not claim that the app has been tested.
 
-## 2. 共通ルートと画面状態
+## 2. Shared Routes and Screen States
 
-| ルート | 責務 |
+| Route | Responsibility |
 |---|---|
-| /login | 架空のアカウントと4つの役割を選ぶ画面。「本物の認証ではない」ことを表示する |
-| /forgot-password | メールの形式を確認したあと、「そのメールが存在するかどうか」は教えない案内を出す。送信はプレビューのみ |
-| /settings/preferences | 言語、表示するタイムゾーン、デモ通貨MYRの読取表示、同意の設定 |
-| /notifications | 自分の担当範囲内の通知一覧と既読の管理。業務の状態そのものとは別 |
-| /demo | シナリオの切り替え、失敗イベントの発生、デモ用の時計、リセット。デモ専用の画面 |
-| /forbidden | アクセスできないときの表示。自動では遷移せず、role homeへのリンクを表示する(IR57) |
-| `*`（未定義のルート） | ページが見つからないときの表示（SCR-X-not-found）。D01のnot-found文言と同じ。自動では遷移せず、role homeへのリンクを表示する(IR57) |
+| /login | Select a fictional account and one of four roles. Show that this is not real authentication |
+| /forgot-password | Check the email format, then show a message that does not reveal whether the email exists. Sending is a preview only |
+| /settings/preferences | Language, display timezone, read-only demo currency MYR, and consent settings |
+| /notifications | List notifications within the user's scope and manage read status. Keep this separate from business state |
+| /demo | Switch scenarios, trigger failures, control the demo clock, and reset. Demo-only screen |
+| /forbidden | Show access denial. Do not redirect automatically; show a link to the role home (IR57) |
+| `*` (undefined routes) | Show page not found (SCR-X-not-found), using the D01 not-found text. Do not redirect automatically; show a link to the role home (IR57) |
 
-共通ヘッダーには、言語切り替え・通知・音声/テキストの切り替え・サインアウトを置きます。デモ用の役割切り替えは、専用のメニューにして、通常業務での「ユーザー変更」とは分けます。
+The shared header contains language selection, notifications, voice/text switching, and sign-out. Demo role switching has its own menu, separate from changing users in normal business use.
 
-画面の状態表示は次のようにします。
+Use the following screen states.
 
-- loading(読み込み中): 骨組みだけの表示
-- empty(データなし): 説明と、その人が次にできる操作
-- error(エラー): 再試行のボタン
-- offline(通信できない): 最後に更新した時刻と、操作できない理由
-- stale(古いデータ): 「これは古い値です」という注記
-- refreshing(再取得中): 表示中のデータを保持したまま「更新中」とaria-busyを示し、skeletonに戻さない(IR83)
-- work-not-started(作業窓の開始前): 技術者の案件を読取表示し、開始時刻と無効な操作を示す(IR76)
-- 描画例外: 共通ErrorBoundaryがcorrelationId付きの全画面errorを表示し、白画面にしない(IR44)
+- loading: Show a skeleton.
+- empty: Show an explanation and the next action the user can take.
+- error: Show a retry button.
+- offline: Show the last update time and why actions are unavailable.
+- stale: Note that the value is old.
+- refreshing: Keep current data visible, show “Refreshing” and aria-busy, and do not return to a skeleton (IR83).
+- work-not-started (before the work window): Show technician jobs as read-only, with the start time and disabled actions (IR76).
+- Rendering exception: The shared ErrorBoundary shows a full-screen error with correlationId, rather than a blank screen (IR44).
 
-見る権限がないだけなのに、empty(データなし)のふりをして誤魔化してはいけません。FORBIDDEN・NOT_FOUNDの表示場所と遷移はIR57に従います。404(見つからない)と403(権限なし)は、「本当は存在するかどうか」を悟られない同じような文言にそろえます。
+Do not show an empty state to hide a lack of viewing permission. Follow IR57 for where to show FORBIDDEN and NOT_FOUND and how to navigate. Use similar wording for 404 (not found) and 403 (forbidden), so the message does not reveal whether the resource exists.
 
-## 3. フロントエンドの画面・モック用モデル
+## 3. Frontend Screen and Mock Models
 
-以下はデータベースのテーブル定義ではありません。「保存」「履歴」と書いているものは、すべて同じブラウザのタブの中にある「共有モックメモリ」という仮データの置き場に保持することを指します。
+The following are not database table definitions. “Save” and “history” always mean keeping data in shared mock memory within the same browser tab.
 
-共通の決まりは次のとおりです。
+Apply these common rules.
 
-- `id: string`(識別番号)、`tenantId: string`(テナントの識別番号)
-- 時刻はすべてISO 8601形式のUTC(協定世界時)
-- 変わりうるデータには`version: number`(バージョン番号)をつける
-- デモ用のIDも、あとから値を変えない
+- `id: string` (identifier), `tenantId: string` (tenant identifier).
+- All times use UTC in ISO 8601 format.
+- Mutable data has `version: number` (version number).
+- Demo IDs must also remain unchanged after creation.
 
-null(値がない)と「未登録」は、schema(データの形式ルール)で意味を分けます。知らないenum(選択肢の値)が来たときは、D01に従いUNAVAILABLEとして扱います。
+The schema distinguishes null (no value) from “not registered.” Treat unknown enum values as UNAVAILABLE under D01.
 
-| エンティティ | 主なフィールドと関係 |
+| Entity | Main fields and relationships |
 |---|---|
-| User / Membership | userId、organizationId、role(client/contractor/technician/admin)、employment(internal/external/null)、permissions[]、scopes[]、validFrom、validUntil。Userにひとつのroleだけを直接書き込まない |
-| Organization / Customer | name、kind(customer/contractor/operator)、status / organizationId、serviceProfile。顧客のIDとUserのIDを分け、作成するときも管理しているテナントの中に限る |
-| ContractorOrganization / Assignment | contractorOrgId、jobId、technicianMembershipId、delegatedScope、validFrom/Until、status。委託した側のtenantと、受託した会社のIDを分ける |
-| Property / Space | customerOrgId、kind(home/office)、name / propertyId、parentSpaceId、kind(area/floor/room/space)。親子の階層が循環しないようにする |
-| ACUnit / Capability | spaceId(nullは空間未割当、IR62)、connection/lastSeenAt(Deviceからの派生、IR47)、manufacturer、model、type(split)、installedAt、serviceScope / temperature(min,max,step)、modes[]、fanLevels[]、ventilation、control、sensors[] |
+| User / Membership | userId, organizationId, role(client/contractor/technician/admin), employment(internal/external/null), permissions[], scopes[], validFrom, validUntil. Do not store a single role directly on User |
+| Organization / Customer | name, kind(customer/contractor/operator), status / organizationId, serviceProfile. Keep customer IDs separate from User IDs, and create customers only within the managed tenant |
+| ContractorOrganization / Assignment | contractorOrgId, jobId, technicianMembershipId, delegatedScope, validFrom/Until, status. Keep the delegating tenant separate from the receiving company's ID |
+| Property / Space | customerOrgId, kind(home/office), name / propertyId, parentSpaceId, kind(area/floor/room/space). Prevent cycles in the parent-child hierarchy |
+| ACUnit / Capability | spaceId(null means no space assigned, IR62), connection/lastSeenAt(derived from Device, IR47), manufacturer, model, type(split), installedAt, serviceScope / temperature(min,max,step), modes[], fanLevels[], ventilation, control, sensors[] |
 | Device / Sensor | unitId、serial、connection(online/offline/unknown/connecting/error)、lastSeenAt、firmwareVersion / deviceId、metric、unit、calibrationAt、staleAfterSeconds |
 | Telemetry | unitId、sensorId、metric、value:number\|null、unit、observedAt、receivedAt、origin(measured/estimated/inspection)、quality(valid/missing/stale/suspect)、isDemo |
-| Command | unitId、actorId、action:UnitActionまたは内部のRestrictionAction、diagnosticRunId?、status、requestedAt、sentAt?、acknowledgedAt?、expiresAt、failureCode?、idempotencyKey(重複防止のキー)、expectedVersion、correlationId |
-| Alert | unitId、type、severity(critical/warning/normal)、status、evidenceIds[]、detectedAt、acknowledgedAt?、resolvedAt?、resolutionReason?。normal(正常)は健康サマリーにも使う。open(未対応)のアラートを、勝手に正常へ変えてはいけない |
+| Command | unitId, actorId, action:UnitAction or internal RestrictionAction, diagnosticRunId?, status, requestedAt, sentAt?, acknowledgedAt?, expiresAt, failureCode?, idempotencyKey(key to prevent duplicates), expectedVersion, correlationId |
+| Alert | unitId, type, severity(critical/warning/normal), status, evidenceIds[], detectedAt, acknowledgedAt?, resolvedAt?, resolutionReason?. normal is also used in health summaries. Do not change an open alert to normal without a valid basis |
 | MaintenanceJob | unitId、alertIds[]、type(periodic/reactive/preventive)、status、contractorOrgId?、assignmentId?、requestedSlot、scheduledSlot?、dueAt、reportVersion?、draftReportRef?、costs[] |
-| WorkReport / InspectionItem / Attachment | jobId、authorId、version、items[]、measurements[]、replacementParts[]、workText、nextAction、submittedAt? / componentGroup、componentKey、result、reason?、evidenceIds[] / jobId、reportId、blobId、name、mime、size、status(previewUrl(プレビュー用URL)は画面上でだけ作る) |
+| WorkReport / InspectionItem / Attachment | jobId, authorId, version, items[], measurements[], replacementParts[], workText, nextAction, submittedAt? / componentGroup, componentKey, result, reason?, evidenceIds[] / jobId, reportId, blobId, name, mime, size, status(previewUrl is created only in the screen) |
 | Contract / Invoice / Payment | customerOrgId、unitIds[]、planType、period、rulesVersion / contractId、amountMinor、currency、dueAt、status / invoiceId、amountMinor、method?、status、externalRef?、confirmedAt? |
 | Restriction | contractId、causeInvoiceIds[]、unitIds[]、rulesVersion、noticeAt、executeAfter、reason、policy、state、applyCommandIds[]、releaseCommandIds[]、exception?、graceUntil? |
 | Automation / Consent | unitIds[]、condition(discriminated union)、action、priority、timezone、enabled / purpose、granted、grantedAt?、revokedAt? |
@@ -103,13 +103,13 @@ null(値がない)と「未登録」は、schema(データの形式ルール)で
 | EnergyBaseline / EmissionFactor | unitIds[]、period、method、version、kWh、boundary / region、year、kgCO2ePerKWh、source、version、isDemo |
 | MRVReport / OffsetRecord | period、baselineId、factorId、boundary、coverage、totals、evidenceIds[]、reviewHistory[]、status(draft/demo_reviewed) / amountKg、state(quoted/demo_requested/demo_purchased/demo_retired/failed)、demoCertificateRef?、isDemo |
 
-上の表は、共通データの要約です。企業原文を補ってできた「原因の候補」「アレルゲン」「支払い方法」「Scope 2」「市場構想」の項目は、[表示モデルの補完](implementation-contracts.md#ddc-原文補完-企業要望に対応する表示モデル)と、それぞれ対応するDD(詳細設計)を合わせて確認してください。Invoice(請求)の表示データは、Payment(支払い記録)からpaymentMethod(支払い方法)/paymentStatus(支払い状況)を計算して出すもので、同じ情報を二重に保存しません。
+The table above summarizes shared data. For the added fields for “possible causes,” “allergens,” “payment methods,” “Scope 2,” and “market concept,” read [Display Model Additions](implementation-contracts.md#ddc-source-additions-display-models-for-company-requests) and the relevant DD (detailed design). Invoice display data derives paymentMethod/paymentStatus from Payment records; do not store the same information twice.
 
-Telemetry(測定データ)の`isDemo`は、「測定した」か「推定した」かとは別の区分です。デモの「実測」も、実は作り物の値であることが伝わるように表示します。連絡先・写真は架空のものだけを使います。画像そのものは、共有モックの中にあるBlobストア(画像データの置き場)に保存し、Attachment(添付ファイル)はblobId(画像データの識別番号)で参照します。画面が作るobject URL(一時的な画像表示用のURL)は、画面から離れたとき・役割を切り替えたとき・サインアウトしたときに解放(revoke)し、もう一度表示するときは権限を確認したうえで作り直します。提出済みのBlob(画像データ)は、サインアウトでは消さず、reset(リセット)のときに解放します。詳しくは入出力契約DDC-08を参照してください。
+Telemetry's `isDemo` is separate from whether data is measured or estimated. Even demo “measured” values must be clearly marked as fictional. Use only fictional contacts and photos. Store images in the shared mock Blob store, and reference them from Attachment using blobId. Revoke screen-created object URLs when leaving a screen, switching roles, or signing out. Check permission before recreating them for display. Keep submitted Blobs on sign-out and release them on reset. See input/output contract DDC-08 for details.
 
-## 4. フロントエンドのデータサービス境界
+## 4. Frontend Data Service Boundaries
 
-`page(画面) → feature hook(機能ごとの処理) → Repository interface(取り出し方の約束事) → mock adapter(仮データへの変換)`という順で分けます。ここでいうRepositoryは、フロントエンドから呼び出す非同期のサービスをまとめた考え方であり、データベースへのアクセス層ではありません。今回作るのは、このinterface(約束事)と、共有メモリを使うmock adapter(仮データの変換部分)だけです。
+Separate layers in this order: `page → feature hook → Repository interface → mock adapter`. Repository here means a group of asynchronous services called by the frontend, not a database access layer. This phase builds only the interface and a mock adapter using shared memory.
 
 ```ts
 interface CommandRepository {
@@ -120,118 +120,118 @@ interface CommandRepository {
 }
 ```
 
-`DemoViewContext`は、今選んでいる架空のユーザー・役割・見られる範囲を表します。`DemoWriteOptions`は、同じデモ操作を二重に実行しないためのキーと、変更前のバージョンを持ちます。これらは、本番の認証方法やサーバー側の権限の仕組みを決めるものではありません。具体的な項目は、[フロントエンド入出力契約](implementation-contracts.md)を見てください。
+`DemoViewContext` describes the selected fictional user, role, and visible scope. `DemoWriteOptions` carries a key to prevent duplicate demo actions and the version before the change. These do not define production authentication or server permissions. See the [Frontend Input and Output Contract](implementation-contracts.md) for the fields.
 
-[操作カタログ](operation-catalog.csv)には、画面が必要とする137個のローカルサービス操作と、それぞれの入力・戻り値・使われる画面をまとめています。URL、HTTPのメソッド、データベースのテーブル、サーバー側のトランザクションは、ここでは決めません。
+The [Operation Catalog](operation-catalog.csv) lists the 137 local service operations needed by the screens, with their inputs, return values, and screens that use them. It does not define URLs, HTTP methods, database tables, or server transactions.
 
-モック操作の成功はServiceResult<T>、失敗はDomainErrorのrejectです。受付中は成功DTO内のCommand.status等で表し、Promiseの独自pending応答型は作りません。
+Successful mock operations return ServiceResult<T>; failures reject with DomainError. Pending processing is shown through Command.status or similar fields in the success DTO. Do not create a custom pending Promise response type.
 
-画面は、返ってきたDomainError(業務エラーの種類)に応じて、表示・入力内容の保持・再読み込みのどれをするか決めます。遅れて届いた古い応答は、操作IDと表示の世代(バージョン)で判定して無視します。役割を切り替える前の値を、あとから描画してはいけません。
+The screen uses the returned DomainError to decide what to display, whether to keep inputs, and whether to reload. Use the operation ID and view generation to detect and ignore old responses that arrive late. Never render values from before a role switch afterward.
 
-将来、実際のAPIが用意されたときも、画面が使うinterface(約束事)はそのまま残し、新しいadapter(変換の仕組み)で外部からの応答を画面用のデータに変換する方針です。外部契約が確定するまでは差替えだけで接続可能とは保証しません。実際のAPI仕様・認証方式・通信の取り決めは、今回は決めません。
+When a real API becomes available, keep the interface used by screens and use a new adapter to convert external responses to display data. Until the external contract is fixed, adapter replacement alone is not guaranteed to be enough. Real API specifications, authentication methods, and communication contracts are outside this phase.
 
-## 5. 状態遷移と整合性
+## 5. State Transitions and Consistency
 
-### コマンド
+### Commands
 
-| 現状態 | イベント・ガード(条件) | 次状態 / 表示 |
+| Current state | Event and guard (condition) | Next state / display |
 |---|---|---|
-| 未作成 | 権限・能力・契約上の制限・オンラインかどうかを確認してから送信する | requested(要求済み) / 「要求を受け付けました」と表示。この時点では確認済みの値は変えない |
-| requested | 配信イベントが起きる | sent(送信済み) / 「機器の応答待ち」と表示 |
-| requested / sent | はっきりした失敗、または応答が期限内に来ない | failed(失敗) / expired(期限切れ)。要求した値を、勝手に確認済みの値にコピーしない |
-| sent | 一致する成功の応答が、期限内に届く | acknowledged(確認済み)。応答にもとづく設定値だけを更新する |
-| failed / expired | ユーザーが状態をもう一度確認してから、再試行する | 新しい要求を作る。古いCommand(命令)は履歴として残す |
+| Not created | Check permissions, capabilities, contract restrictions, and online status before sending | requested / Show “Request accepted.” Do not change confirmed values yet |
+| requested | A delivery event occurs | sent / Show “Waiting for device response” |
+| requested / sent | An explicit failure occurs, or no response arrives before the deadline | failed / expired. Do not copy requested values to confirmed values |
+| sent | A matching success response arrives before the deadline | acknowledged. Update only settings confirmed by the response |
+| failed / expired | The user checks the state again and retries | Create a new request. Keep the old Command in history |
 
-期限が過ぎたあとに届いた応答は、「遅れて届いたイベント」として履歴に記録します。状態を黙って成功に書き換えてはいけません。本当の状態は、もう一度確認してから別に表示します。通信が切れている間は新しい要求を拒否します。送信したあとに通信が切れた場合は、期限が来るまで応答を待ちます。
+Record responses received after the deadline as late events in history. Do not silently change the state to success. Check the actual state again and display it separately. Reject new requests while offline. If the connection is lost after sending, wait for the response until the deadline.
 
-### 保守案件（施工業者を分けて扱う）
+### Maintenance Jobs (Separate Contractor Handling)
 
-| 現状態 | 許可される人・イベント | 次状態 |
+| Current state | Authorized person or event | Next state |
 |---|---|---|
-| requested(依頼済み) | HQが社内の担当者に割り当てる | assigned(割当済み) |
-| requested | HQが外部の業者に委託する | offered(委託の申し出) |
-| offered | 対象の業者が、期間内に受諾または辞退する | accepted(受諾) / requested(辞退の履歴を残す) |
-| offered | 未応答のままofferExpiresAtに到達する(IR48) | requested(Offerは期限切れとして保持) |
-| accepted | 業者が、自社の有効な技術者に割り当てる | assigned |
-| assigned | 担当の技術者が、期間内に作業を開始する | in_progress(作業中) |
-| assigned / in_progress | HQ(社内の場合)、または受託した業者(外注の場合)が、理由をつけて担当を変える | 状態はそのまま。古い割当は無効にし、新しい割当を作る。作業の途中経過の記録は、もとの作成者のまま残す |
-| in_progress | 担当者が、必要な報告を提出する | submitted(提出済み) |
-| submitted | 業者の品質担当(外注の場合)、またはHQ(社内の場合)が確認する | completed(完了) / rework_requested(やり直し依頼) |
-| rework_requested | 担当者が、やり直し作業を開始する(`jobs.resumeRework`) | in_progress(前の報告バージョンは残す) |
-| requested | 保守を依頼したクライアント、またはHQが理由をつけて取り消す(IR56) | cancelled(取消) |
-| offered / accepted / assigned | HQが理由をつけて取り消す | cancelled。関連する割当も無効にする |
-| in_progress / submitted | HQが理由をつけて中断する | on_hold(保留)。自動的に完了や取消にはしない。この2状態からの直接の取消はCONFLICT(IR56) |
-| on_hold | HQが今の状況を確認して再開する(`jobs.resumeHold`、理由が必須)、または終了する | in_progress / cancelled(理由と未完了の記録が必須) |
+| requested | HQ assigns an internal staff member | assigned |
+| requested | HQ offers the job to an external contractor | offered |
+| offered | The selected contractor accepts or declines within the valid period | accepted / requested (keep the decline in history) |
+| offered | offerExpiresAt is reached without a response (IR48) | requested (keep the Offer as expired) |
+| accepted | The contractor assigns an active technician from its own company | assigned |
+| assigned | The assigned technician starts work within the valid period | in_progress |
+| assigned / in_progress | HQ (internal work) or the receiving contractor (outsourced work) changes the assignee with a reason | Keep the state. Invalidate the old assignment and create a new one. Keep the original author on work-in-progress records |
+| in_progress | The assignee submits the required report | submitted |
+| submitted | The contractor's quality reviewer (outsourced work) or HQ (internal work) reviews it | completed / rework_requested |
+| rework_requested | The assignee starts rework (`jobs.resumeRework`) | in_progress (keep the previous report version) |
+| requested | The client who requested maintenance or HQ cancels with a reason (IR56) | cancelled |
+| offered / accepted / assigned | HQ cancels with a reason | cancelled. Invalidate related assignments too |
+| in_progress / submitted | HQ pauses work with a reason | on_hold. Do not automatically complete or cancel it. Direct cancellation from either state returns CONFLICT (IR56) |
+| on_hold | HQ checks the current situation and resumes (`jobs.resumeHold`, reason required) or ends the work | in_progress / cancelled (reason and incomplete-work record required) |
 
-completed(完了)になったあとの追加作業は、新しいjobId(依頼ID)を作って別の依頼として扱います。担当を変えたあとの新しい担当者は、今のdraft(下書き)から新しい報告バージョンを作って作業を続け、古いバージョンや各点検のもとの作成者は変更しません。外注の報告を、自分で自分の作業を承認することはできません。同じuserId(ユーザーID)の人が、Membership(所属)を切り替えて別の担当者として承認することも禁止します。施工業者の品質担当がいないときは、HQにエスカレーション(引き上げて対応)します。顧客が正式に最終承認する仕組みは、OPEN-01でまだ決まっていないため、今回(1A)では結果を見ることと問い合わせまでにとどめます。
+Additional work after completed is a separate request with a new jobId. After reassignment, the new assignee creates a new report version from the current draft and continues work. Do not change old versions or the original author of each inspection. Authors cannot approve their own outsourced reports, including by switching Membership while keeping the same userId. If the contractor has no quality reviewer, escalate to HQ. Formal final customer approval remains undecided in OPEN-01, so phase 1A supports only viewing results and making inquiries.
 
-Alert(異常通知)は、open(未対応)→acknowledged(確認済み)→resolved(解消)という順に進みます。D08の継続回復(policyId≠nullのAlertだけ、IR66)または許可された手動解消ではopen→resolvedも許可します。同じ事象の判定と前のAlertとの関連付けはIR66に従います。resolved(解消)のあとにまた同じ異常が起きたときは、新しいAlertとして作り、previousAlertId(前のAlertとの関連)で紐づけます。resolved(解消)にするには、もう一度測定して条件を満たすか、HQまたは許可された診断者が理由をつけて確認する必要があります。Job(依頼)がcompleted(完了)になっただけで、自動的にresolved(解消)へは進めません。
+Alert moves through open → acknowledged → resolved. Direct open → resolved is also allowed for sustained recovery under D08 (only Alerts with policyId≠null, IR66) or authorized manual resolution. Follow IR66 to identify the same event and link earlier Alerts. If the same problem returns after resolved, create a new Alert linked by previousAlertId. Resolution requires a new measurement that meets the conditions, or confirmation with a reason by HQ or an authorized diagnostician. A Job reaching completed alone must not automatically resolve an Alert.
 
-### 支払い・制限
+### Payments and Restrictions
 
-Payment(支払い)は、initiated(開始)→processing(処理中)→confirmed(確認済み)/failed(失敗)という順に進みます。Offset(排出量の相殺)は、quoted(見積済み)→demo_requested(申込済み)→demo_purchased(購入済み)→demo_retired(償却済み)という順に進み、失敗したときはfailed(失敗)として直前の状態を記録します。購入する前の償却や、二重の償却は拒否します。Invoice(請求)は、unpaid(未入金)→processing(処理中)→paid(支払い済み、入金確認時)という順に進みます。失敗したときはunpaid(未入金)に戻します。遅延しているかどうかは、dueAt(期限)と未入金額から計算します。今回(1A)は、分割払いと返金を対象にせず、1B(次の段階)で決めることとします。
+Payment moves through initiated → processing → confirmed/failed. Offset moves through quoted → demo_requested → demo_purchased → demo_retired. On failure, set failed and record the previous state. Reject retirement before purchase and duplicate retirement. Invoice moves through unpaid → processing → paid (when payment is confirmed). On failure, return to unpaid. Derive overdue status from dueAt and the unpaid amount. Installments and refunds are outside phase 1A and will be defined in phase 1B.
 
-| 現状態 | イベント・ガード(条件) | 次状態 / 注意点 |
+| Current state | Event and guard (condition) | Next state / notes |
 |---|---|---|
-| 未作成 | 制限できる契約であること、未払いであること、権限、理由、予告があること | scheduled(予定) |
-| scheduled | 期限が来て、猶予や例外がなく、未払いであることをもう一度確認する | requested(要求済み)、設備ごとに適用のCommand(命令)を作る |
-| scheduled | 原因になった請求がすべて入金確認された、または取消・猶予・例外になった | cancelled(取消) / scheduled(予定日を変える、または適用を保留し、理由をつける) |
-| requested | 対象設備から適用の応答がある | 全台成功ならapplied(適用済み)。一部が未応答ならrequestedのまま、設備ごとの状態を表示する |
-| requested | オフライン・失敗・期限切れ | requestedのまま、pendingReason(保留の理由)とcommandの結果を保持する。自動で成功にしたり、再送したりしない |
-| requested / applied | 原因になった請求がすべて入金確認された、猶予・例外が設定された、強制解除された、取消された(IR96)、または権限のある人がrestrictions.releaseで明示要求した(IR35) | release_requested(解除要求)。同一遷移でD03の設備別解除評価を行い、適用済みのonline設備にremove Commandを作る。release_requestedへのrestrictions.releaseは冪等 |
-| release_requested | すべての対象で解除または確定未適用の証跡が得られた（D03） | released(解除済み) |
-| release_requested | オフライン・失敗 | 保留の表示。もう一度確認するか、はっきり再試行する |
+| Not created | The contract permits restrictions; payment is unpaid; permission, reason, and prior notice exist | scheduled |
+| scheduled | The deadline arrives; recheck that there is no grace period or exception and payment is still unpaid | requested; create an apply Command for each unit |
+| scheduled | All cause invoices have confirmed payment, or cancellation, grace, or an exception applies | cancelled / scheduled (change the date or pause application, with a reason) |
+| requested | Target units acknowledge application | applied if all succeed. If some have not responded, keep requested and show each unit's state |
+| requested | Offline, failure, or expiry | Keep requested, pendingReason, and command results. Do not mark success or resend automatically |
+| requested / applied | All cause invoices have confirmed payment; grace or an exception is set; forced release or cancellation occurs (IR96); or an authorized person explicitly calls restrictions.release (IR35) | release_requested. In the same transition, evaluate each unit for release under D03 and create a remove Command for online units with applied restrictions. restrictions.release is idempotent in release_requested |
+| release_requested | Evidence confirms release or definite non-application for every target (D03) | released |
+| release_requested | Offline or failure | Show pending. Recheck or explicitly retry |
 
-requested(要求済み)以降に取り消したときは、「まだ何も適用されていない」と決めつけず、IR96の状態表どおり解除の流れに進めます。applied(適用済み)のあとに猶予・例外になった場合も、必要なら解除の要求を作ります。解除を要求したあとに、遅れて届いた「適用できた」という応答で、状態をapplied(適用済み)に戻してはいけません。各設備の観測値と、解除の要求内容をもう一度照合します。override(強制的な変更)は、支払いの記録そのものは変更しません。
+When cancelling from requested onward, follow the IR96 state table for release; do not assume nothing has been applied. If grace or an exception is added after applied, create a release request when needed. After release is requested, a late apply-success response must not return the state to applied. Reconcile each unit's observed values with the release request again. An override does not change payment records.
 
-Command(命令)とRestriction(制限)、Job(依頼)とAlert(異常通知)、Invoice(請求)とPayment(支払い)は、それぞれ別の記録として扱います。イベントが起きたときに関連する記録を更新しますが、1つの状態にまとめてしまってはいけません。画面では、一部だけ成功した状態、保留中の状態、実際の反映状況を、それぞれ分かるように説明します。
+Keep Command and Restriction, Job and Alert, and Invoice and Payment as separate records. Update related records on events, but do not merge their states. The screen must clearly explain partial success, pending status, and actual device application separately.
 
-### デバイス・自動運転
+### Devices and Automation
 
-ファームウェア更新の処理(Operation)は、queued(順番待ち)→running(実行中)→succeeded(成功)/failed(失敗)という順に進みます。オンラインであること・能力・対象のバージョンを確認し、succeeded(成功)したときだけfirmwareVersion(ファームウェアのバージョン)を更新します。校正(キャリブレーション)は、参照した値・単位・時刻・作業者をセットにした履歴として残します。制御の操作と更新が同時に起きたときは、デモの方針として、更新中の制御操作は拒否します。
+A firmware update Operation moves through queued → running → succeeded/failed. Check online status, capabilities, and the target version. Update firmwareVersion only on succeeded. Keep calibration history with the reference value, unit, time, and operator. If control and an update overlap, the demo policy rejects control actions during the update.
 
-自動運転が優先する順番は、次のとおりです。
+Automation follows this priority order.
 
-1. 機器の能力・制限・例外の適用結果
-2. HQの方針
-3. 顧客のルール
+1. Device capabilities and the result of applying restrictions and exceptions.
+2. HQ policy.
+3. Customer rules.
 
-同じ層の中では、priority(優先度)の数値が大きいほうを優先し、同じ値ならID順(小さいほうから)にします(DEC-09)。条件のデータが取得できていないとき、または同意が取り消されているときは、自動運転を発火させません。最終的にはどの経路でも同じCommand policy(命令のルール)を経由するため、音声操作や自動運転を使って制限を迂回することはできません。
+Within one level, a higher priority number wins; ties use ascending ID order (DEC-09). Do not trigger automation when condition data is unavailable or consent has been withdrawn. Every path ultimately passes through the same Command policy, so voice actions and automation cannot bypass restrictions.
 
-## 6. Queryとデモ状態
+## 6. Queries and Demo State
 
-Query(データ取得)のキーは、`[repositoryInstanceId, generation, viewEpoch, tenantId, membershipId, scopeVersion, resource, id, normalizedFilters, normalizedSort, cursor, limit]`という組み合わせです。役割を切り替えたとき、またはサインアウトしたときは、古いリクエストと購読を中断し、キャッシュ(一時保存データ)を消してから、次の画面を表示します。権限が変わったときは、scopeVersion(担当範囲のバージョン)を更新します。
+Query keys combine `[repositoryInstanceId, generation, viewEpoch, tenantId, membershipId, scopeVersion, resource, id, normalizedFilters, normalizedSort, cursor, limit]`. On role switch or sign-out, cancel old requests and subscriptions and clear the cache before showing the next screen. Update scopeVersion when permissions change.
 
-モックのRepository(データ管理の仕組み)は、同じブラウザタブの中に1つだけ存在します。正規化されたMap(データの一覧)とイベントの列を持ち、画面のuseState(画面ごとの状態)には複製しません。更新のイベントが起きたら、IR71の対応表にある読取操作のQueryだけを無効化して取り直します。例えば、S02という報告完了のシナリオでは、job(依頼)と履歴を更新しますが、Alert(異常通知)の解消は別のイベントが来るまで待ちます。
+Only one mock Repository exists per browser tab. It holds normalized Maps and an event sequence; do not copy these into screen useState. On an update event, invalidate and refetch only the read-operation Queries listed in IR71. For example, report-completion scenario S02 updates the job and history, but waits for a separate event before resolving an Alert.
 
-デモ時計はseed時刻から実時間と同じ速さで進み、分境界ごとにIR45の生存シミュレーターが合成測定値と生存信号を生成し、`demo.advanceClock`で前方へジャンプします。ジャンプはセッション寿命を消費しません(IR36)。画面を再読み込みすると、最初のデモデータ(seed)に戻ります(DEC-07)。ログアウトすると、閲覧していたキャッシュや、まだ保存していない写真は消えますが、みんなで共有している架空の業務データは残ります。リセットの操作をすると、デモ用の時計・遅延の処理・購読・画像のURL・キャッシュ・業務データを、まとめて最初の状態に戻します。リセットする前に起きた「遅れて届くイベント」は、世代番号を使って無視します。
+The demo clock runs from the seed time at real-time speed. At each minute boundary, the IR45 liveness simulator generates synthetic measurements and heartbeat signals. `demo.advanceClock` jumps forward without consuming session lifetime (IR36). Reloading the screen restores the initial demo seed (DEC-07). Sign-out clears viewed caches and unsaved photos but keeps shared fictional business data. Reset returns the demo clock, delayed work, subscriptions, image URLs, caches, and business data to their initial state. Use generation numbers to ignore late events from before reset.
 
-時計・IDの生成・成功や失敗の結果は、あとから差し替えられるようにします。乱数や実際の時刻に依存するテストは避けます。失敗・通信断・機器の取り外し・支払い・応答は、/demo画面からはっきり発生させられるようにします。初期業務データの正はfixture-contract.jsonのdemoSeed、テストの差分適用はIR69です。テスト用に、次の架空データを用意します。
+Make clocks, ID generation, and success/failure results replaceable. Avoid tests that depend on random values or real time. The /demo screen must explicitly trigger failures, connection loss, device removal, payments, and responses. fixture-contract.json's demoSeed is the source of truth for initial business data; IR69 defines test overlays. Provide the following fictional test data.
 
-- テナント: 2つ
-- クライアント: 2つ
-- 施工業者: 2つ
-- 社内の技術者: 1人、社外の技術者: 2人
-- HQ: 通常権限と、制限操作の権限がある人、それぞれのMembership(所属情報)
+- Tenants: 2.
+- Clients: 2.
+- Contractors: 2.
+- Internal technicians: 1; external technicians: 2.
+- HQ: Memberships for both normal permissions and restriction-operation permissions.
 
-## 7. 算定・単位・データ品質
+## 7. Calculations, Units, and Data Quality
 
-- 電力量[kWh]は、電力[kW]を時間で積み上げた値です。デモで時系列データから計算するときは、サンプルの間隔と、欠けているデータを除く条件を決めておきます。W(ワット)からの変換をするときは、その旨をはっきり示します。
-- 推定の料金は「電力量×仮の単価」です。時間帯ごとに料金が違う場合は、それぞれの区間を合計します。税金や基本料金を含まないデモの場合は、その範囲を表示します。
-- 排出量[kgCO₂e]は「kWh×係数[kgCO₂e/kWh]」です。係数の地域・年度・バージョン・出典と、算定の範囲は必須です。仮の係数を、公的な実際の値であるかのように表示してはいけません。
-- 削減量は「比較条件をそろえた基準−実績」です。削減率は「差÷基準×100」で、基準が0のときは計算できません。マイナスの値は「増加」として表示します。
-- coverage(カバー率)は「有効なサンプル数÷期待するサンプル数」です。期待する数が0のときは「未算定」とします。品質に問題があるときは、集計とレポートにその旨を注記します。欠けているデータを0として埋めてはいけません。
-- 室内のCO₂濃度[ppm]は、上に書いた排出量の計算には使いません。省エネ率の期待値は、保証された値ではありません。
+- Energy [kWh] is power [kW] accumulated over time. For demo calculations from time-series data, define sample intervals and rules for excluding missing data. Clearly state any conversion from W (watts).
+- Estimated cost is energy × a fictional unit price. If rates vary by time, add the costs for each interval. State when the demo excludes taxes or fixed charges.
+- Emissions [kgCO₂e] are kWh × factor [kgCO₂e/kWh]. The factor's region, year, version, source, and calculation boundary are required. Do not present a fictional factor as an official real value.
+- Reduction is baseline under matching comparison conditions − actual result. Reduction rate is difference ÷ baseline × 100; it is undefined when the baseline is 0. Show negative reductions as increases.
+- coverage is valid sample count ÷ expected sample count. If the expected count is 0, show “Not calculated.” Note quality issues in summaries and reports. Do not fill missing data with 0.
+- Indoor CO₂ concentration [ppm] is not used in the emissions calculation above. Expected energy savings are not guaranteed values.
 
-## 8. 将来APIへつなぐために残すもの
+## 8. Interfaces Kept for a Future API
 
-- 画面が必要とする入力・戻り値のTypeScriptの型と、非同期のinterface(約束事)。
-- 外部から来たデータを画面用のデータに変換する、adapter(変換の仕組み)の差し替え口。
-- UIが扱うloading(読み込み中)/error(エラー)/empty(データなし)/pending(保留)/confirmed(確認済み)の状態と、役割を切り替えたときに表示を破棄するルール。
-- 作り物の応答を使った、フロントエンドの検証方法。
+- TypeScript types for screen inputs and return values, and asynchronous interfaces.
+- Replaceable adapters that convert external data to display data.
+- UI loading/error/empty/pending/confirmed states, and rules for discarding views on role changes.
+- Frontend verification using simulated responses.
 
-APIのパス・HTTPの方式・データベース・サーバー側の認証や認可・実際の決済・実際の通知・実際の機器制御は、この文書の設計対象ではありません。これらがまだ決まっていないことは、今回のフロントエンド文書を完成させる妨げにはなりません。
+API paths, HTTP methods, databases, server authentication and authorization, real payments, real notifications, and real device control are outside this document's design scope. Their open status does not prevent completion of these frontend documents.
 
-0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
+0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-現行0.21.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+Additional contracts for current version 0.21.0: Read IR01–106 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

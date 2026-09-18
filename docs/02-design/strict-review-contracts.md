@@ -3,193 +3,193 @@ version: 0.21.0
 scope: 1A frontend mock only
 status: specified_pending_independent_review
 ---
-# 厳格レビュー修正契約
+# Strict Review Correction Contracts
 
-対象レビューは STRICT-DOC-0.8.0-2026-09-16。旧REV/INDとは別の指摘番号である。以下はその修正契約で、同じ論点の旧記述に優先する。正規型は[service-contracts.ts](service-contracts.ts)、操作別の版要件は[write-version-catalog.csv](write-version-catalog.csv)。本番通信・認証・決済・IoTを追加するものではない。SR17〜19はユーザーの「3点とも推奨案でよい」により2026-09-16に確定した。この段落は0.9.0時点の経緯。現行G1はdocs索引が示すbaselineのgate記録で判断し、過去判定を流用しない。
+Applies to review STRICT-DOC-0.8.0-2026-09-16, with issue IDs separate from old REV/IND. These correction contracts override older text on the same topic. Canonical types: [service-contracts.ts](service-contracts.ts); operation version requirements: [write-version-catalog.csv](write-version-catalog.csv). No production communication, authentication, payment, or IoT is added. SR17–19 were finalized on 2026-09-16 when the user accepted all three recommendations. This paragraph describes version 0.9.0 history. Judge current G1 from the baseline gate record named in the docs index, not old decisions.
 
-## SR01 受諾前の競合検出
+## SR01 Conflict Detection Before Acceptance
 
-JobOfferSummary.jobVersionは投影元MaintenanceJob.versionそのもの。Offer.versionやtermsVersionではない。jobs.accept/declineはこの値をoptions.expectedVersionに渡す。更新済みならCONFLICT、再取得して条件を再表示し、改めて確認する。期限切れ・対象外のofferはD01/D06どおり拒否する。
+JobOfferSummary.jobVersion is the source MaintenanceJob.version, not Offer.version or termsVersion. Pass it as options.expectedVersion to jobs.accept/decline. If changed, return CONFLICT, refetch/re-display terms, and reconfirm. Reject expired/out-of-scope offers under D01/D06.
 
-## SR02 書込みの版契約
+## SR02 Write Version Contracts
 
-write-version-catalog.csvは全writeとその入力分岐を列挙する。requiredは主資源の取得結果versionをoptions.expectedVersionに入れ、omitは指定禁止。入力に独立した版がある場合はinput_versionsの全条件も照合する。新規作成したい資源の未存在版は要求しない。scheduleは選択したContractのexpectedContractVersion、offset申込は保存したquoteVersionを照合する。Invoice作成はcontractVersionを使う。新規reportはJobに既存draftがあればCONFLICTで二重作成しない。consents.getは初回からgranted=falseの版付きConsentを返す（その記録の出所はIR84のdemoSeed/Membership作成時の初期記録）。
+write-version-catalog.csv lists every write and input branch. required means put the primary resource's fetched version in options.expectedVersion; omit means it is prohibited. Check all input_versions conditions for independent input versions. Do not require a nonexistent version for new resources. schedule checks selected Contract.expectedContractVersion; offset requests check saved quoteVersion; Invoice creation uses contractVersion. New reports conflict if Job already has a draft. consents.get returns a versioned Consent with granted=false from the first read (initial record source: IR84 demoSeed/Membership creation).
 
-devices.addResponseNoteはDeviceEvent.versionを用いる（Device.versionではない）。devices.calibrate/check/bind/updateFirmwareはDevice.version。payments.recordManualはInvoice.version、confirmはPayment.version。notifications.markReadはNotification.version。idempotencyの再送はD04に従い、元入力・版を変えない。再読取後に業務判断を変更した要求は新しいキー。表のread_sourceは版の供給元であり、更新時は全関連状態も同一transactionで再検証する。
+devices.addResponseNote uses DeviceEvent.version, not Device.version. calibrate/check/bind/updateFirmware use Device.version. payments.recordManual uses Invoice.version; confirm uses Payment.version. notifications.markRead uses Notification.version. Idempotent resends follow D04 and keep original input/version. Changed business decisions after rereading require a new key. read_source identifies version source; recheck all related state in the same transaction on update.
 
-## SR03 スコープの型と包含
+## SR03 Scope Types and Containment
 
-Membership.scopesはScopeRefの配列。空配列は業務資源へのアクセス0件を意味し、全件許可として解釈しない。tenantは当該tenantの全資源、organizationは当該組織の資源、propertyは配下Space/Unit、unitはそのUnitを含む。Space階層はPropertyの所属を変えない。関連job/device/reportは所属Unit、invoice/contractはcustomer組織と全対象Unit、notificationは本人宛てという追加条件で判定する。invoice/contractは全対象Unitを読める場合だけ返し、一部Unitだけのscopeでは明細を返さない。集合内は和集合、tenant・role・permission・所有組織・有効期間・委託・担当条件の間は積集合。複数Unitを持つ書込みは全Unitが許可範囲内でなければ副作用0で拒否する。
+Membership.scopes is ScopeRef[]. Empty means zero business-resource access, never all access. tenant contains all tenant resources; organization its resources; property its Space/Unit descendants; unit that Unit. Space hierarchy does not change Property ownership. Related job/device/report access follows their Unit; invoice/contract follows customer organization and all target Units; notification also requires own recipient. Return invoice/contract only if every target Unit is readable, not partial-scope details. Scope entries form a union; tenant/role/permission/owning organization/valid period/delegation/assignment conditions form an intersection. Multi-unit writes require all Units allowed, otherwise reject with zero side effects.
 
-adminだけが自tenantのtenant scopeを持てる。clientは自己customer organizationまたはそのproperty/unitだけ。contractorは自己contractor organizationだけで、資源の到達範囲は自社Offer/受託Jobから計算し、顧客組織全体に展開しない。technicianはproperty/unitだけで、外部技術者はさらに自社受託と自己Assignmentの積集合。内部技術者の書込みにも必要なAssignment条件を適用する。受諾前の限定Offer投影と期限後の自己JobHistorySnapshot以外には委託期限の例外はない。空scopeではこれらも返さない。
+Only admin may hold tenant scope for its own tenant. client may hold only its customer organization or its properties/units. contractor may hold only its own contractor organization; derive resource reach from company Offers/accepted Jobs, never the whole customer organization. technician may hold property/unit only; external technicians additionally intersect company delegation and own Assignment. Apply required Assignment conditions to internal-technician writes too. No delegation-expiry exceptions except limited pre-acceptance Offer projections and own post-expiry JobHistorySnapshot. Empty scope returns neither.
 
-members.saveはscope種別とID実体・組織関係を検証し、不正な組合せはVALIDATION。role allowlistはDDC-07。role/permissions/scopes/有効期間変更でscopeVersionを増分し、旧contextとキャッシュを失効させる。委託・担当・資格の失効は読取/実行の都度再評価する。一覧は認可後の集合でtotalを計算し、個別対象外はNOT_FOUND。本人のsession/preferences/logoutは空scopeでも使用可能。
+members.save validates scope types, actual IDs, and organization relationships; invalid combinations return VALIDATION. Role allowlist is DDC-07. Role/permission/scope/validity changes increment scopeVersion and invalidate old contexts/caches. Recheck delegation, assignment, and qualification expiry on every read/action. Compute list total after authorization; individual out-of-scope targets return NOT_FOUND. Own session/preferences/logout work with empty scope.
 
-## SR04 画面の取得順と候補
+## SR04 Screen Fetch Order and Candidates
 
-screen-catalogのprimary/secondaryは同時実行の指示ではない。session→候補一覧→選択ID→個別詳細→依存読取の順で有効化する。未選択は選択案内、候補0件はempty。URLで指定したIDが不可視ならnot-foundで止め、別候補に置換しない。各APIのpermissionがないsectionは呼び出さない。
+Screen-catalog primary/secondary does not mean concurrent execution. Enable session→candidate list→selected ID→detail→dependent reads in order. No selection shows guidance; zero candidates shows empty. Invisible URL IDs stop at not-found; never replace with another candidate. Do not call sections whose API permissions are absent.
 
-| 画面 | 供給元と依存関係 |
+| Screen | Sources and dependencies |
 | --- | --- |
-| T04 | jobs.get→unitId→units.get。能力・部品・点検schemaを取得後フォーム生成 |
-| A09 | contracts.list→contract選択。invoices.list(contractId)とunits.list(unitIds)を取得。各units.getで能力確認、Contract.versionをscheduleへ渡す |
-| A14 | organizations.list(kind=customer)で選んだorganizationId→units.list(filters.organizationId)、baselines.list、factors.list→条件選択→mrv.preview。reportId選択後mrv.versions/mrv.get(reportVersion) |
-| T10/A02 | Unit選択→diagnosticRuns.list→diagnosticRuns.get。HQは読取専用のrun履歴 |
-| T11/A04 | devices.list→devices.get→devices.events/calibrations/operations。紐付け候補はunits.list→units.get、T11のjobId候補はjobs.listから当該Unitの有効担当Job |
-| A07/A15 | customers.list→customer選択→units.list。A15のquoteIdはoffsets.preview応答からのみ取得 |
-| C04/A11 | units.list→units.get→能力に応じたルール入力 |
-| C06/C07/C09/C13/A06/A12/A13 | units.listの認可済み候補だけを対象選択に利用 |
-| A03 | organizations.list→組織選択、members.list→membership編集。新規userIdはfixture actorsの公開demo userId/displayNameだけ（本番ユーザー検索ではない） |
+| T04 | jobs.get→unitId→units.get. Build form after fetching capabilities, components, and inspection schema |
+| A09 | contracts.list→select contract. Fetch invoices.list(contractId) and units.list(unitIds), check capabilities with units.get, and pass Contract.version to schedule |
+| A14 | Select organizationId from organizations.list(kind=customer)→units.list(filters.organizationId), baselines.list, factors.list→select conditions→mrv.preview. After selecting reportId, use mrv.versions/mrv.get(reportVersion) |
+| T10/A02 | Select Unit→diagnosticRuns.list→diagnosticRuns.get. HQ run history is read-only |
+| T11/A04 | devices.list→devices.get→devices.events/calibrations/operations. Binding candidates: units.list→units.get. T11 jobId candidates: active assigned Jobs for the Unit from jobs.list |
+| A07/A15 | customers.list→select customer→units.list. A15 quoteId comes only from offsets.preview response |
+| C04/A11 | units.list→units.get→capability-based rule inputs |
+| C06/C07/C09/C13/A06/A12/A13 | Use only authorized units.list candidates for target selection |
+| A03 | organizations.list→select organization; members.list→edit membership. New userId options are only public demo userId/displayName from fixture actors, not production user search |
 
-全画面で書込み後は返された資源を反映し、関連一覧・集計をinvalidateする。複数ページ取得中の更新はSR14でまとめる。
+After writes, every screen applies the returned resource and invalidates related lists/summaries. SR14 governs updates during multi-page fetching.
 
-## SR05 論理制限と観測値
+## SR05 Logical Restrictions and Observations
 
-UnitDetail.effectiveControlPolicyはRepositoryが当該Unitの制御可否判定に使う論理policyを投影する。billing金額・原因請求・契約詳細は含めない。予定/通知/猶予のみはunrestricted。実行要求からはrestricted/requested、適用ack後はapplied、解除要求後はrelease_requested。Commandのfailed/expiredや通信断だけで論理制限を解除しない。解除ackまたはそのUnitのnot_required確定後はunrestricted。複数Unitの一部解除成功はそのUnitだけを解除し、Restriction全体のreleasedとは区別する。observedRestrictionは最後の実測、pendingCommandsは実行途上、effectiveControlPolicyは現在の操作判定として別々に表示する。UIとRepositoryは同じpolicyで拒否理由を返す。
+UnitDetail.effectiveControlPolicy projects the logical policy Repository uses to decide control eligibility. Exclude billing amounts, cause invoices, and contract details. Schedule/notice/grace alone is unrestricted. From execute request use restricted/requested; after apply acknowledgement, applied; after release request, release_requested. Command failed/expired or disconnection alone does not lift logical restrictions. Release acknowledgement or confirmed not_required for that Unit makes it unrestricted. Partial multi-unit release clears only successful Units, separately from aggregate Restriction released. Show observedRestriction as last observation, pendingCommands as work in progress, and effectiveControlPolicy as current eligibility. UI and Repository return denial reasons from the same policy.
 
-## SR06 絞り込みとKPI遷移
+## SR06 Filters and KPI Navigation
 
-query-catalogが各操作のallowlist。未知キー/不正enum/空statuses/空connectionsはVALIDATION。複数filterはAND、statuses/connections内はOR。statusとstatusesの併用は禁止。units.listのstatus(connection alias)とconnectionsの併用も禁止。includeDescendantsはspaceId必須、未指定false。trueなら選択Spaceと全子孫Spaceに属すUnit、falseなら直接所属だけ。spaceIdとpropertyIdの所属不整合はVALIDATION。
+query-catalog defines each operation allowlist. Unknown keys, invalid enums, empty statuses/connections return VALIDATION. Filters combine with AND; values within statuses/connections use OR. Do not combine status and statuses, or units.list status (connection alias) and connections. includeDescendants requires spaceId and defaults false. true includes Units in selected Space and all descendants; false includes direct members only. Inconsistent spaceId/propertyId returns VALIDATION.
 
-jobs.customerId/propertyIdはJob.unitId→Unit→Property/customerの結合。invoices.customerIdはContract.customerId、propertyIdは契約対象Unitのうち1台以上が当該Propertyに属すこと。alertsもUnit経由。overdueOnly=trueはjobsではnow>dueAtかつcompleted/cancelled以外、invoicesではnow>dueAtかつ未入金、false/省略は絞らない。境界now=dueAtは未超過。from/toは半開区間で各queryの日時軸を使う。
+jobs.customerId/propertyId joins Job.unitId→Unit→Property/customer. invoices.customerId is Contract.customerId; propertyId matches when at least one contract Unit belongs to that Property. alerts also joins through Unit. overdueOnly=true means now>dueAt and not completed/cancelled for jobs, or unpaid for invoices. false/omitted adds no filter. now=dueAt is not overdue. from/to uses half-open intervals on each query's time axis.
 
-partnerの業務件数はIR23の現在有効JobSummaryだけを対象とし、scheduledCountはstatuses=[accepted,assigned]、inProgressは[in_progress]、activeは[accepted,assigned,in_progress]。admin jobCountsは該当status。接続unknown KPIはconnections=[unknown,connecting,error]、online/offlineは単一値。powerOn/OffはpowerState=on/off、unknownも含め全てSR27のeffectivePowerStateを使う。集計のcustomer/property条件を遷移URLへ引き継ぐ。jobとenergyだけに集計期間を引き継ぎ、現在設備/alert/未入金KPIには期間を付けない。C10 overdueはoverdueOnly=true、allは省略。
+Partner business counts include only active IR23 JobSummary: scheduledCount uses statuses=[accepted,assigned], inProgress=[in_progress], active=[accepted,assigned,in_progress]. Admin jobCounts uses the relevant status. Connection-unknown KPI uses connections=[unknown,connecting,error]; online/offline use single values. powerOn/Off use powerState=on/off; all power states, including unknown, use SR27 effectivePowerState. Carry customer/property filters to destination URLs. Carry periods only for job/energy, not current-unit/alert/unpaid KPIs. C10 overdue maps to overdueOnly=true; all omits it.
 
-## SR07 点検入力と著者情報
+## SR07 Inspection Inputs and Authors
 
-WorkReportDraftはInspectionItemInput/InspectionMeasurementInputを受け取る。Entity、author、受信時刻、品質等をUIから組み立てない。Repositoryが実行sessionとclockで生成し、未知フィールドはVALIDATION。InspectionItem.idは初回保存時に生成し、同一report/componentKeyの編集と版更新で維持する。componentKey重複は禁止。Measurement.sensorIdは対応するInspectionItem.id。測定入力componentKeyの項目が同一draftに存在しなければVALIDATION。
+WorkReportDraft takes InspectionItemInput/InspectionMeasurementInput. UI must not construct Entity, author, receipt time, or quality. Repository generates them from execution session/clock; unknown fields return VALIDATION. Generate InspectionItem.id on first save and preserve it across same report/componentKey edits and versions. Reject duplicate componentKey. Measurement.sensorId is the corresponding InspectionItem.id. Missing measurement componentKey in the same draft returns VALIDATION.
 
-測定id省略は新規、既存idは当該report内のみ編集可能。他reportのIDはNOT_FOUND。新規measurementはorigin=inspection、receivedAt=now、unitId=Job.unitId、version=1、eventId/sequenceはRepository採番。qualityはD07の数値/単位/欠測規則から算出する。変更した項目だけauthorId/observedAtを実行者/保存時刻に更新し、未変更の著者を保持する。提出済み版は不変。写真参照は同一reportに属すAttachmentのみ。
+Omitted measurement id creates new; existing IDs edit only within that report. Other-report IDs return NOT_FOUND. New measurements have origin=inspection, receivedAt=now, unitId=Job.unitId, version=1; Repository assigns eventId/sequence. Derive quality under D07 number/unit/missing rules. Update authorId/observedAt to actor/save time only on changed items, retaining unchanged authors. Submitted versions are immutable. Photo references must be Attachments in the same report.
 
-## SR08 履歴取得
+## SR08 History Reads
 
-devices.calibrations/operationsはdeviceIdとQueryを必須とするPage読取。devices.eventsと同じ認可済みDeviceの範囲に加え、各履歴の発生時scopeをSR24で照合する。diagnosticRuns.listはunitId必須、jobId指定時はAND。技術者は自己担当の範囲、HQはjob.manageまたはcontrol.executeでlist/getを読める。run読取許可は技術者向け診断write許可を追加しない。履歴は空・ページング・失敗・再読取を実装し、現在の最新状態だけで過去操作を上書きしない。
+devices.calibrations/operations are Page reads requiring deviceId and Query. Besides the same authorized Device scope as devices.events, check event-time history scope under SR24. diagnosticRuns.list requires unitId; optional jobId adds AND. Technicians use own assignment scope; HQ may list/get with job.manage or control.execute. Permission to read a run does not grant technician diagnostic writes. Support empty/paging/failure/refetch for history; never overwrite past actions with only latest state.
 
-## SR09 計算根拠と旧版
+## SR09 Calculation Evidence and Old Versions
 
-EnergySummaryはbaselineRef/factorRefとともに計算時の完全なbaselineSnapshot/factorSnapshotを返す。未選択baselineは両方null。factorはMRVConditionsで選択された版、通常energy.summaryはfixture.defaultEmissionFactorIdの読取開始時点の版を使う。参照とsnapshotのid/version不一致は禁止。係数が見つからない場合はfactor両方null、排出量系はnull、qualityWarningsにfactor_missing。後からマスターを変更しても保存済みMRVのsummaryを再計算しない。
+EnergySummary returns complete calculation-time baselineSnapshot/factorSnapshot with baselineRef/factorRef. If no baseline is selected, baselineRef and baselineSnapshot are both null. Use the factor version chosen in MRVConditions; normal energy.summary uses fixture.defaultEmissionFactorId's version at read start. Reference/snapshot id/version must match. Missing factor makes both factor fields and emission values null, with factor_missing in qualityWarnings. Later master-data changes do not recalculate saved MRV summaries.
 
-mrv.saveDraftの新規/更新はその時点の条件・係数・基準線・計算結果を新しい版として保存。旧版は保持し、mrv.versionsは当該reportの全保存版をversionでページング、mrv.get(reportVersion)で旧版を読める。省略時は最新版。旧版はreadonlyで編集・reviewの対象外。recordReviewは最新版とinput/options両版が一致した場合だけ新しい版を生成し、従前版を変えない。レビュー履歴のreportVersionはレビュー対象だった版。監査は生成した新しい版も記録する。
+New/updated mrv.saveDraft saves current conditions, factors, baselines, and results as a new version. Keep old versions. mrv.versions pages all saved report versions by version; mrv.get(reportVersion) reads old versions, defaulting to latest if omitted. Old versions are read-only and cannot be edited/reviewed. recordReview creates a new version only when latest and both input/options versions match, leaving the old version unchanged. Review-history reportVersion is the reviewed version. Audit also records the newly generated version.
 
-## SR10 受入条件の整合
+## SR10 Acceptance-Criteria Consistency
 
-AT-A02-Bはactive依存がある設備のarchiveをCONFLICTとし、履歴だけの場合はarchive可。AT-A09-R01は全Unitがremove ackまたは未送信等のnot_requiredで初めてreleased。AT-C01-Eは他顧客の個別取得/書込みをNOT_FOUND、scopeで絞られた一覧は成功空集合とし区別する。実行証跡がない受入条件はnot_runを維持する。
+AT-A02-B expects archive CONFLICT for active dependencies but permits history-only archive. AT-A09-R01 becomes released only after every Unit has remove acknowledgement or not_required evidence such as no send. AT-C01-E distinguishes NOT_FOUND for other-customer individual reads/writes from successful empty scoped lists. Acceptance criteria without execution evidence remain not_run.
 
-## SR11 URL選択値
+## SR11 URL Selection Values
 
-screen-catalog.url_selectionを画面固有キーのallowlistとし、共通filter/sort/期間キーと合わせる。C02のpropertyId→spaceId、T11のdeviceId/unitId/jobId、A14のreportId/reportVersionを復元する。reportVersionは正の整数でreportId必須。deviceとunit/jobの関係不整合、propertyとspace不整合はVALIDATION。IDは不透明文字列としてdecodeし実体認可する。URLに秘密・請求明細・未保存フォーム本文を含めない。未知キーは除去、既知キーの不正値はエラー表示し勝手な選択へ変えない。A15のquoteIdは生成済みの自scope内quoteだけで、復元時の申込はquoteVersionを保持できる同一セッションだけ。再読込でQuoteが未取得なら再previewを要求し、URLだけから版や条件を生成しない。
+Use screen-catalog.url_selection as the screen-specific key allowlist with common filter/sort/period keys. Restore C02 propertyId→spaceId, T11 deviceId/unitId/jobId, A14 reportId/reportVersion. reportVersion is a positive integer requiring reportId. Device/unit/job or property/space inconsistency returns VALIDATION. Decode IDs as opaque strings and authorize actual resources. URLs must not contain secrets, billing details, or unsaved form text. Remove unknown keys; show errors for invalid known values without choosing replacements. A15 quoteId must be an existing scoped quote; restored requests require the same session retaining quoteVersion. If reload has no Quote, require a new preview; do not derive versions/conditions from URL alone.
 
-## SR12 宛先なし通知
+## SR12 Notifications Without Recipients
 
-Notificationは実在recipientMembershipId必須のまま。宛先0件の場合はNotificationを作らず、発生元Alert.deliveryFailuresにDeliveryFailureを1件保存する。重複キーはalertId/eventId/policyId/reasonで、再送して増やさない。deliveryState=failed、reason=no_recipient。HQのalert policy管理者のみがこの配列を参照でき、他roleのAlert投影は空配列。個別recipientの識別情報を含めない。自動再配信は1Aでは行わない。新しい業務イベントは改めて現在宛先を評価する。通知専用policyの失敗はSR21のfailureIdsにも同じIDを返す。
+Notification still requires a real recipientMembershipId. With zero recipients, create no Notification and append one DeliveryFailure to source Alert.deliveryFailures. Deduplicate by alertId/eventId/policyId/reason; resends add none. deliveryState=failed, reason=no_recipient. Only HQ alert-policy managers see this array; other-role Alert projections use empty arrays. Include no individual recipient identifiers. No automatic redelivery in phase 1A. New business events reevaluate current recipients. Notification-only policy failures return the same ID in SR21 failureIds.
 
-## SR13 デモ資格
+## SR13 Demo Qualifications
 
-QualificationCodeはdemo_indoor/demo_outdoor/demo_electrical。ACUnit.serviceScopeの各要素に対応する全資格が必要。JobOfferSummary.requiredQualificationsはその集合を重複除去しcode昇順で返す。Job.typeによる資格追加はない。fixture-contractのqualificationRequirementsとactors.qualificationsを初期値とする。各Grantは[validFrom,validUntil)、revokedAt到達後は無効。members.eligible/assignは予定開始から終了まで全資格が有効である候補だけ。実行中でも書込み時点の資格を再評価し、失効後はFORBIDDENで副作用0。既存担当履歴は削除しない。members.saveは資格付与UIを含まない。demo.trigger(qualification_revoked)は当該membership/codeのrevokedAtをclockで設定して変更イベントを発行する。任意資格文字列はVALIDATION。このデモ資格を公的資格として表示しない。
+QualificationCode is demo_indoor/demo_outdoor/demo_electrical. Require every qualification matching ACUnit.serviceScope. JobOfferSummary.requiredQualifications returns that deduplicated set sorted by code. Job.type adds none. Initialize from fixture-contract qualificationRequirements and actors.qualifications. Grants use [validFrom,validUntil) and expire at revokedAt. members.eligible/assign includes only candidates whose qualifications remain valid for the entire scheduled work. Recheck qualifications on writes even during work; after expiry return FORBIDDEN with zero side effects. Keep assignment history. members.save has no qualification-grant UI. demo.trigger(qualification_revoked) sets membership/code revokedAt from clock and emits change. Arbitrary qualification strings return VALIDATION. Do not present these as official qualifications.
 
-## SR14 ページング中の更新
+## SR14 Updates During Paging
 
-初回読取で認可済み集合の不変snapshotを作成し、cursorをgeneration/tenant/membership/scopeVersion/query/snapshotVersion/offsetへ束縛する。後続ページは業務更新が起きても同じ集合・total・値を返す。meta.snapshotAt/eventCursorも初回snapshotの値を保持する。snapshotはresetまで保持する。毎ページsession/期限/認可を再確認し、失効したscopeのsnapshotを返さない。条件変更はVALIDATION、reset/存在しないsnapshotはCONFLICTで初頁へ戻す。MRV旧版一覧はversionが一意キー、それ以外は既存queryの決定的tie-breakを使う。
+The first read creates an immutable authorized-set snapshot; cursor binds generation/tenant/membership/scopeVersion/query/snapshotVersion/offset. Later pages keep the same set, total, values, and initial meta.snapshotAt/eventCursor despite business updates. Keep snapshots until reset. Recheck session/expiry/authorization on every page; never return expired-scope snapshots. Condition changes return VALIDATION. Reset/nonexistent snapshots return CONFLICT and restart page one. MRV old-version lists use unique version keys; others use existing deterministic query tie-breaks.
 
-複数ページの一括グラフ取得中は購読invalidateを保留し、完了時点のsnapshotを表示する。更新通知は「更新あり」1件にまとめ、取得完了後に高々1回の再取得を行う。その再取得中に来た更新は次の明示更新までバッジを残す。無限自動再読込で描画を阻害しない。scope/role切替は例外として即中止・破棄。途中エラーは不完全なグラフを正常表示しない。
+While fetching multi-page charts, defer subscription invalidation and show the completed snapshot. Combine notices into one “Updates available” indicator and refetch at most once after completion. Updates during that refetch leave a badge until the next explicit refresh. Avoid endless automatic refetch that prevents rendering. Scope/role changes immediately cancel/discard as exceptions. Mid-fetch errors must not show an incomplete chart as normal.
 
-## SR15 A15の権限
+## SR15 A15 Permissions
 
-A15の閲覧・preview・simulateはoffset.manage。mrv.manageだけでA15に入れない。MRVとoffsetのpermissionは独立し、操作カタログと画面ガードを一致させる。
+A15 view/preview/simulate requires offset.manage. mrv.manage alone does not grant access. MRV and offset permissions are independent; align operation catalog and screen guards.
 
-## SR16 規範文書の範囲
+## SR16 Normative Document Scope
 
-実装入力はdeterministic-contractsの全章（D01〜D16）、本書全章、review-resolution-contractsの全章、型と各CSV。D11までを読んで完了とする旧案内は無効。SR17〜19も確定契約として適用する。
+Implementation inputs include every deterministic-contracts chapter (D01–D16), every chapter here and in review-resolution-contracts, types, and all CSVs. Old guidance to stop at D11 is invalid. SR17–19 also apply as fixed contracts.
 
-## SR17 期間プリセット
+## SR17 Period Presets
 
-2026-09-16ユーザー承認。todayは表示timezoneの当日00:00から現在の完了分までの半開区間。toはdemo clockをUTCの分境界へ切り捨てる。7d/30dは今日を含む暦日で、fromは表示timezoneの6日前/29日前の00:00。固定168/720時間を引かず、IANA timezoneの暦日演算を使う。日開始が存在しない地域ではその日の最初の有効時刻、重複する場合は早い方を採用する。zone変更では選択済みfrom/toのUTC値を保持し、ラベルだけ変える。プリセットを改めて選択した場合は現在zone/clockで再計算する。ライブ更新では期間を自動でずらさず、明示更新時に選択中プリセットを再適用する。custom範囲は更新でも保持する。
+User-approved 2026-09-16. today is the half-open range from 00:00 today in display timezone through completed minutes now. Floor demo clock to a UTC minute for to. 7d/30d include today as calendar days; from is 00:00 six/twenty-nine days earlier in display timezone. Use IANA calendar arithmetic, not fixed 168/720-hour subtraction. If day start does not exist, use its first valid time; if ambiguous, use the earlier time. Zone changes preserve selected UTC from/to and change labels only. Reselecting a preset recalculates with current zone/clock. Live updates do not shift the period; explicit refresh reapplies the selected preset. Custom ranges stay fixed on refresh.
 
-当日最初の1分でfrom=toなら「完了した測定区間なし」を表示し、集計を呼ばない。0件を消費0と表示しない。timezone/期間をURLへ保存し、再訪時は保存UTC範囲を使用する。例: Asia/Kuala_Lumpur、now=2026-09-14T01:00:45Zならtoday=[2026-09-13T16:00:00Z,2026-09-14T01:00:00Z)、7dのfrom=2026-09-07T16:00:00Z、30dのfrom=2026-08-15T16:00:00Z。端数45秒を含めない。DSTのある日の暦日を24時間固定として扱わない。
+If from=to in the day's first minute, show “No completed measurement interval” and do not call summaries. Zero records must not appear as zero consumption. Save timezone/range in URL and reuse saved UTC ranges on revisit. Example: Asia/Kuala_Lumpur, now=2026-09-14T01:00:45Z gives today=[2026-09-13T16:00:00Z,2026-09-14T01:00:00Z), 7d from=2026-09-07T16:00:00Z, 30d from=2026-08-15T16:00:00Z. Exclude the extra 45 seconds. Do not treat DST calendar days as fixed 24 hours.
 
-## SR18 offset失敗と再試行
+## SR18 Offset Failure and Retry
 
-2026-09-16ユーザー承認。同一OffsetRecordにattemptsを保持し、Repositoryが各attemptのIDを生成する。stageはpurchase/retirement、statusはpending/succeeded/failed。申込でpurchase attemptを1件作りstate=demo_requested。purchase_confirm成功時にpurchaseRefを一度だけ生成し、同時にretirement attemptを作りstate=demo_purchased。retire成功時はretirementRef/demoCertificateRefを生成しstate=demo_retired、currentAttemptId=null。現在pendingのattemptだけが成功/失敗イベントの対象となる。failed時はcurrentAttemptIdを失敗attemptのIDとして保持し、retry成功時に新IDへ切り替える。pendingのcompletedAtはnull、終端時は処理clockを保存する。
+User-approved 2026-09-16. Keep attempts in the same OffsetRecord; Repository generates each attempt ID. stage=purchase/retirement; status=pending/succeeded/failed. A request creates one purchase attempt and state=demo_requested. Successful purchase_confirm generates purchaseRef once, creates a retirement attempt, and sets demo_purchased. Successful retire creates retirementRef/demoCertificateRef, sets demo_retired, and currentAttemptId=null. Only the current pending attempt accepts success/failure events. On failed, retain that attempt as currentAttemptId; successful retry switches to a new ID. pending completedAt=null; terminal completedAt uses processing clock.
 
-| 現状態 | event | 次状態と副作用 |
+| Current state | Event | Next state and side effects |
 | --- | --- | --- |
-| demo_requested | purchase_confirm | purchase成功、retirement待機、demo_purchased |
-| demo_requested | fail | purchase失敗、failed、previousState=demo_requested |
-| demo_purchased | retire | retirement成功、demo_retired |
-| demo_purchased | fail | retirement失敗、failed、previousState=demo_purchased、purchaseRef保持 |
-| failed / purchase失敗 | retry | 新purchase attempt、demo_requested、旧attemptはfailedのまま |
-| failed / retirement失敗 | retry | 新retirement attempt、demo_purchased、購入済み参照は不変 |
+| demo_requested | purchase_confirm | Purchase succeeds; retirement pending; demo_purchased |
+| demo_requested | fail | Purchase fails; failed; previousState=demo_requested |
+| demo_purchased | retire | Retirement succeeds; demo_retired |
+| demo_purchased | fail | Retirement fails; failed; previousState=demo_purchased; keep purchaseRef |
+| failed / purchase failure | retry | New purchase attempt; demo_requested; old attempt remains failed |
+| failed / retirement failure | retry | New retirement attempt; demo_purchased; purchased reference unchanged |
 
-retryは新しいidempotencyKey、最新OffsetRecord.version、失敗したcurrentAttemptIdを要求する。再見積・再申込・再購入はしない。成功/失敗イベントもattemptIdとeventIdを必須とする。古いattempt、異なるstage、終端からの遷移はCONFLICT、副作用0。failedのまま届く遅延成功を成功へ変えない。同一record/eventIdの同一内容再送は認可後に記録済み結果を返し、異内容はCONFLICT。未処理イベントは版を照合する。通常の同一キー再送はD04を適用する。retryの別キー二重要求は古い版または非failed状態によりCONFLICT。全attemptとイベント履歴は削除しない。previousStateは直前に実際に遷移したstateを記録する。UIはfailedでだけ「失敗段階を再試行」を表示し、購入/償却どちらかを明示する。これは模擬取引であり実決済は発生しない。
+Retry requires new idempotencyKey, latest OffsetRecord.version, and failed currentAttemptId. Do not create a new quote, request, or purchase. Success/failure events also require attemptId/eventId. Old attempts, wrong stages, or transitions from terminal states return CONFLICT with zero side effects. Late success while failed must not change it to success. Repeating record/eventId with identical content returns stored results after authorization; different content returns CONFLICT. New events check version. Same-key retries follow D04. Duplicate retry with another key conflicts on old version or nonfailed state. Keep all attempts/event history. previousState records the actual immediately preceding state. UI shows “Retry failed stage” only in failed and identifies purchase/retirement. These are simulated trades with no real payment.
 
-## SR19 制限中の契約編集
+## SR19 Contract Editing During Restrictions
 
-2026-09-16ユーザー承認。Contract.activeRestrictionIdsは読取時点の当該契約のactive制限ID集合で、新規時は空。契約版ではなく制限の状態から導出し、制限変更の購読でcontracts.listをinvalidateする。A07はこの集合が非空、またはhasUnresolvedRecovery=trueなら保存を無効化し、権限のある利用者にだけ制限詳細への導線を出す。Repositoryは読取結果を信用せず保存時に再検証する。contracts.save(idあり)は同一契約のRestrictionにscheduled/requested/applied/release_requestedが1件でもあればCONFLICT。対象設備・適格性・rulesVersionだけでなく全編集を拒否する。猶予/免除期間やCommand失敗/期限切れでもactiveと扱い、契約・制限・Commandを変更しない。予告はcancel、適用済み/結果不明はD03のreconcile/releaseを用い、全関連Restrictionがcancelled/releasedになってから契約を再取得し、新キー・最新契約版で変更する。契約変更から自動取消/解除を起動しない。
+User-approved 2026-09-16. Contract.activeRestrictionIds derives current active restriction IDs at read time, empty for new contracts. Derive from restriction state, not contract version; restriction subscriptions invalidate contracts.list. A07 disables save when this set is nonempty or hasUnresolvedRecovery=true, offering restriction-detail navigation only to authorized users. Repository rechecks on save. contracts.save(id present) returns CONFLICT if any same-contract Restriction is scheduled/requested/applied/release_requested. Reject all edits, not only units/eligibility/rulesVersion. Grace/exemption and Command failure/expiry still count as active; change no Contract/Restriction/Command. Cancel notices, use D03 reconcile/release for applied/unknown results, then refetch contract after all related Restrictions are cancelled/released and edit with new key/latest contract version. Contract changes do not automatically cancel/release restrictions.
 
-scheduleはexpectedContractVersionを現在Contract.versionと照合し、その値をRestriction.contractVersionとして保存する。executeとapply retryは保存契約版/対象設備/適格性/rulesVersionを照合し、不一致はCONFLICTで再確認を求める。release/reconcileは解除を妨げないよう保存済みpolicy/rulesVersionで進める。contracts.saveとscheduleは同一transactionの現状態で互いの条件を確認する。先にschedule成功なら編集拒否、先に編集成功なら古い版のschedule拒否。新規契約作成はこの既存契約編集制約の対象外。
+schedule checks expectedContractVersion against current Contract.version and saves it as Restriction.contractVersion. execute/apply retry checks saved contract version, units, eligibility, and rulesVersion; mismatch returns CONFLICT requiring confirmation. release/reconcile uses saved policy/rulesVersion so release is not blocked. contracts.save and schedule check each other's conditions in the same transaction's current state. Schedule first blocks edit; edit first blocks old-version schedule. New contract creation is outside this existing-contract edit restriction.
 
-## SR20 復旧イベント
+## SR20 Recovery Events
 
-restoredはDeviceRecovery必須、その他DeviceEventはrecovery=null。axisはconnection/power/tamper、sourceEventIdは同一device・同じaxisの現在未復旧障害IDでなければCONFLICT。通信復旧はconnectionだけonline、電源復旧はpowerだけon、tamper復旧は観測tamperだけclearにする。他axisを変更しない。sequenceはdevice/binding/axisごとに単調増加し、過去sequenceは履歴の重複抑止後状態に反映しない。同一eventId異内容はCONFLICT。restoredAtは参照した障害だけに記録する。tamperの観測復旧だけではAlertをresolvedにせず、既存の人による解決フローを使う。
+restored requires DeviceRecovery; other DeviceEvents have recovery=null. axis=connection/power/tamper. sourceEventId must be the current unresolved fault for the same device/axis or return CONFLICT. Connection recovery changes only connection to online; power recovery only power to on; tamper recovery only observed tamper to clear. Other axes stay unchanged. sequence increases per device/binding/axis; after history deduplication, old sequences do not affect state. Same eventId with different content returns CONFLICT. Set restoredAt only on the referenced fault. Observed tamper recovery alone does not resolve Alert; use existing human resolution.
 
-## SR21 通知専用ルールと制御競合
+## SR21 Notification-Only Rules and Control Conflicts
 
-alertと全air_qualityをpolicy/unitごとに通知評価する。alertとnotify_onlyには制御候補がなく、notify_and_ventilateだけ追加の換気候補を作る（SR25）。制御は従来どおり1tick/1unitにCommand最大1件。通知対象だけの場合は制御resultsをsuppressed/no_control_actionとし、notificationsでselected/createdを返す。priorityの高い通知専用ルールで低い制御ルールを抑止しない。
+Evaluate alert and all air_quality notifications per policy/unit. alert/notify_only have no control candidate; only notify_and_ventilate adds ventilation candidates (SR25). Control remains at most one Command per tick/unit. Notification-only targets return control results suppressed/no_control_action and notifications selected/created. High-priority notification-only rules do not suppress lower control rules.
 
-simulateはnotifications:NotificationDecision[]を返し、Command/Alert/Notificationを保存しない。fireはnotifications:NotificationOutcome[]を返す。unitId/policyId昇順。対象policyがなければ空配列。条件不成立not_due、データ不良quality、無効disabled、所有者失効owner_forbidden、既存cooldownはsuppressed。宛先0件はfailed/no_recipientとSR12のAlert失敗記録、宛先ありはcreatedとnotificationIds。Notification生成はD08の宛先/channelとcooldown規則に従う。policyのイベント起点Alertを一意に作成/再利用する。全結果はeventId再送で保持して再生成しない。Command failureは通知成功を取り消さず、通知失敗も制御成功を取り消さない。
+simulate returns notifications:NotificationDecision[] without saving Command/Alert/Notification. fire returns notifications:NotificationOutcome[]. Sort by unitId/policyId ascending; no target policies means empty. Suppress unmatched conditions as not_due, poor data as quality, disabled rules as disabled, and expired owners as owner_forbidden. Also suppress while cooldown is active. Zero recipients returns failed/no_recipient plus SR12 Alert failure records; valid recipients return created and notificationIds. Generate under D08 recipient/channel/cooldown rules. Uniquely create/reuse each policy event's source Alert. eventId retries keep all results without regeneration. Command failure does not undo notification success; notification failure does not undo control success.
 
-## SR22 offsetの分岐別認可 — REREV-001
+## SR22 Offset Authorization by Branch — REREV-001
 
-clientは自己customerのrequestとfailed記録のretryだけを許可する。adminはoffset.manageで管理scope内の全eventを許可する。clientのpurchase_confirm/retire/failはFORBIDDEN、他顧客recordはNOT_FOUND。retryはSR18の現在失敗attempt・最新record版・新キーを必要とし、購入/償却の確定を起こさない。再試行後も確定イベントはHQが明示的に模擬入力する。C13は自己記録だけ、A15は管理scopeだけに再試行ボタンを表示する。
+Clients may only request for their own customer and retry failed own records. Admin with offset.manage may use all events within managed scope. Client purchase_confirm/retire/fail returns FORBIDDEN; other-customer records return NOT_FOUND. Retry requires SR18 current failed attempt, latest record version, and new key; it does not finalize purchase/retirement. HQ still explicitly simulates confirmation events afterward. C13 retry buttons cover only own records; A15 only managed scope.
 
-## SR23 T12のアラート参照 — REREV-002
+## SR23 T12 Alert References — REREV-002
 
-DeviceEvent.alertIdsは、そのイベントを根拠として生成されたAlert IDの認可済み集合。イベント発生とAlert生成を同じ遷移内で結び、0件なら空配列、複数ならid昇順で表示する。devices.events→利用者がeventを選択→alertIdsごとのalerts.get→利用者が対象Alertを選択→alerts.acknowledge(alertId, options.expectedVersion=Alert.version)の順。DeviceEvent.versionを流用しない。Alertのstatus=openのみ確認可、acknowledged/resolvedは現在状態を表示し再確認ボタンを出さない。表示後競合はCONFLICTで再取得、失効/削除はNOT_FOUNDで当該操作を止める。対応メモは引き続きDeviceEvent版を使う。復旧イベントのalertIdsは元障害の許可済み関連を引き継ぐが、アラートを自動解消しない。
+DeviceEvent.alertIds is the authorized set of Alerts generated from that event. Link event and Alert creation in one transition. Zero gives []; multiple IDs display ascending. Flow: devices.events→select event→alerts.get for each alertId→select Alert→alerts.acknowledge(alertId, options.expectedVersion=Alert.version). Do not reuse DeviceEvent.version. Only open Alerts allow acknowledgement; acknowledged/resolved shows current state without an acknowledge-again button. Post-display conflict returns CONFLICT/refetch; expiry/deletion returns NOT_FOUND and stops that action. Response notes still use DeviceEvent version. Recovery-event alertIds inherit authorized source-fault links without auto-resolution.
 
-## SR24 Device履歴の発生時scope — REREV-003
+## SR24 Event-Time Scope for Device History — REREV-003
 
-DeviceOperation/DeviceEvent/CalibrationRecordにDeviceHistoryScopeを必須保存する。bindingId、unitIdAtOccurrence、customerOrgIdAtOccurrenceは生成時点の不変値。devices.get/listはDevice.bindingIdを返し、未bindはnull。DemoControlsは取得した現在bindingIdをイベント入力へ使う。bindはDeviceBindingを保存しDevice.bindingIdを新IDへ更新、旧binding.unboundAtを閉じる。binding前のイベント/操作はtargetUnitIdとそのcustomerを保存しbindingId=null。校正はbinding済みのみ許可。元/先Unitにactive Restriction・未解決recoveryCases・進行中Command/run/operationがあれば付替えを拒否し、開始した操作の発生時所属を途中で変えない。
+Require DeviceHistoryScope on DeviceOperation/DeviceEvent/CalibrationRecord. bindingId, unitIdAtOccurrence, customerOrgIdAtOccurrence are immutable creation-time values. devices.get/list returns Device.bindingId, null before binding. DemoControls uses fetched current bindingId in event inputs. bind saves DeviceBinding, assigns new Device.bindingId, and closes old binding.unboundAt. Pre-binding events/operations save targetUnitId/customer with bindingId=null. Calibration requires binding. Reject rebinding if source/destination Unit has active Restriction, unresolved recoveryCases, or active Command/run/operation; do not change an operation's event-time ownership midway.
 
-全履歴読取は「現在Deviceへの読取許可 AND 発生時Unit/customerへの現在の読取許可」の積集合。技術者には発生時Unitの有効担当条件も適用する。権限変更・移設・再移設のいずれでも履歴の所属を書き換えない。同一Unitの別customerへの移設はIR02で禁止する。Deviceを別顧客の別Unitへ付け替えた場合はcustomerOrgIdAtOccurrenceも比較する。行の認可を先に行い、残った行だけでtotal/sort/Pageを作る。認可不可の行ID・件数・著者も漏らさない。HQのtenant scopeは管理対象内の履歴を取得できる。
+All history reads require current Device read permission AND current read permission for event-time Unit/customer. Technicians also require active assignment to the event-time Unit. Permission changes and relocations never rewrite history ownership. IR02 forbids moving the same Unit to another customer. If a Device is rebound to another customer's other Unit, compare customerOrgIdAtOccurrence too. Authorize rows before total/sort/Page; disclose no denied row IDs/counts/authors. HQ tenant scope may read managed history.
 
-devices.getのcalibrationRefs/activeOperationも同じ規則で投影する。DeviceEvent.alertIdsはAlert自身の現在scopeとも照合する。addResponseNoteは現在Deviceと当該イベントの発生時scopeの両方を照合し、対象外はNOT_FOUND。復旧は現bindingの未復旧sourceEventIdだけ。旧bindingのイベントにはrestoredを送れずCONFLICTとする。DemoTrigger.deviceはbindingIdを必須にし、存在する同一Deviceのbindingだけ受け付け、別DeviceのbindingはVALIDATION（未bind期間はnull）。現bindingと異なるイベントはそのbindingの履歴へ保存するだけで現状態/Alert/通知を変更しない。未来時刻の予約イベントも配送時のbinding一致を再確認する。旧bindingのrestoredは現復旧として受理せずCONFLICT。新bindingではconnection/powerの観測をunknown（tamperはbind前clear必須）、lastSeenAt=nullとし、旧heartbeat/観測から新しいUnitをonlineにしない。sequenceの比較単位をdevice/binding/axisとし、旧bindingの記録は現状態に反映しない。
+Project devices.get calibrationRefs/activeOperation under the same rules. Also check DeviceEvent.alertIds against each Alert's current scope. addResponseNote checks current Device and event-time scope; out-of-scope returns NOT_FOUND. Recovery targets only unresolved sourceEventId of the current binding. restored for old-binding events returns CONFLICT. DemoTrigger.device requires bindingId for an existing binding of the same Device; another Device's binding returns VALIDATION (null before binding). Events for noncurrent bindings only save history, changing no current state/Alert/Notification. Scheduled future events recheck binding at delivery. Old-binding restored is not current recovery and returns CONFLICT. New binding starts connection/power observations unknown, lastSeenAt=null; tamper must be clear before bind. Old heartbeats/observations must not make the new Unit online. Compare sequences per device/binding/axis; old-binding records do not affect current state.
 
-## SR25 通知と換気の独立結果 — REREV-004
+## SR25 Independent Notification and Ventilation Results — REREV-004
 
-通知候補はalertと全air_quality。通知の成立条件はenabled・ownerのpolicy権限とscope・指標の有効品質・閾値/継続時間。通知は換気能力・制御制限・Command busy・仲裁の勝敗を条件にしない。notify_and_ventilateだけが追加のventilate候補を生成し、その候補は能力・制限・online・排他・優先順位でD02仲裁する。通知設定と宛先はSR28/D08を使用する。
+Notification candidates are alert and all air_quality. Conditions are enabled, owner's policy permission/scope, valid metric quality, and threshold/duration. Ventilation capability, control restrictions, busy Commands, and arbitration results do not determine notification eligibility. Only notify_and_ventilate creates an extra ventilate candidate, arbitrated under D02 capabilities/restrictions/online/exclusion/priority. Notification settings/recipients follow SR28/D08.
 
-通知成立・換気非対応ならnotifications=created、制御results=suppressed/invalid_capability。busyならsuppressed/busy、制限ならsuppressed/restricted。制御候補自体がないnotify_onlyだけのUnitはno_control_action。他の制御ruleが勝てばresultsはそのruleのrequested、当該air_quality通知は独立してcreated。全候補不成立時のreasonは、候補ID順で先頭の除外理由、候補自体がなければno_matchとする。複数通知policyはpolicyごとに結果を返す。simulateは同じsnapshotで通知のenabled/閾値/品質/宛先/channel/cooldownを判定し、通知可能ならselected、cooldown等はsuppressed、宛先0ならfailed/no_recipientを返す。fireのcreatedはsimulateのselectedに対応する。simulateではAlert/失敗証跡/通知/Commandを一切保存しない。simulate後に条件が変わればfireは再評価するため結果が変わり得る。
+If notification matches but ventilation is unsupported, notifications=created and control results=suppressed/invalid_capability; busy gives suppressed/busy, restricted gives suppressed/restricted. A notify_only Unit without any control candidate uses no_control_action. If another control rule wins, results shows that rule requested while air_quality notification independently shows created. If all candidates fail, use the first exclusion reason in candidate-ID order; if no candidates exist, use no_match. Return results per notification policy. simulate checks enabled/threshold/quality/recipients/channels/cooldown on the same snapshot: eligible=selected, cooldown etc.=suppressed, no recipients=failed/no_recipient. fire.created corresponds to simulate.selected. simulate saves no Alerts, failure evidence, Notifications, or Commands. fire reevaluates, so changed conditions after simulate may change results.
 
-## SR26 終端制限の矛盾観測と回復 — REREV-005
+## SR26 Contradictory Terminal-Restriction Observations and Recovery — REREV-005
 
-released/cancelledのRestrictionが新しいdevice sequenceで再観測されても、元Restriction.stateは終端のまま保持する。元Restriction.recoveryCasesに、unit/観測restrictionId/rulesVersion/successorRestrictionIdと証跡eventを持つpending記録を作り、同じunit/observedRestrictionId/observedRulesVersionの未解決caseがあれば同caseの最新観測を更新し、旧観測を監査履歴へ残す。resolved済みなら新caseを作る。同Unitの異なる旧IDのcaseは別記録とする。reconciliation_required Alertを1件作る。current active restrictionは増やさず、1Unit最大1件を維持する。UnitDetail.controlAvailability=blocked/reconciliation_requiredを返し、通常手動・診断・自動制御をCONFLICT（自動評価はsuppressed/reconciliation_required）にする。effectiveControlPolicyは後継の論理policyを保持し、観測された旧policyと混同しない。
+If a released/cancelled Restriction is observed again with a new device sequence, keep its terminal state. Add a pending recoveryCase on the original Restriction with unit, observed restrictionId/rulesVersion, successorRestrictionId, and evidence event. If an unresolved case for the same unit/observedRestrictionId/observedRulesVersion exists, update its latest observation and keep the old observation in audit history. A resolved case requires a new case; different old IDs on one Unit use separate cases. Create one reconciliation_required Alert. Do not add active restrictions; keep the one-per-Unit limit. Return UnitDetail.controlAvailability=blocked/reconciliation_required; ordinary manual/diagnostic/automatic control returns CONFLICT (automation: suppressed/reconciliation_required). effectiveControlPolicy keeps the successor logical policy, separate from observed old policy.
 
-HQ restriction.manageは旧Restrictionを選択し、既存restrictions.reconcile(restrictionId,unitIds)を新キー・旧Restriction最新versionで実行する。通常の認可と設備排他に加え、30秒以内の現観測を再読取する。現観測が旧ID/rulesVersionと一致し、online、未完了Command/run/operationなしなら、その旧IDを指定したremove_restriction Commandを作りcase=removing。Command IDはcase.commandIdsへ追加する。観測がnullまたは正当な後継IDならCommand0でcase=resolvedとする。別の未知IDならCONFLICT、古い観測はTIMEOUT、offlineはOFFLINEでpendingを保持する。後継IDのremoveを旧caseから生成しない。
+HQ with restriction.manage selects the old Restriction and calls existing restrictions.reconcile(restrictionId,unitIds) with new key/latest old-Restriction version. Besides normal authorization/exclusion, reread observations no older than 30 seconds. If observation matches old ID/rulesVersion, device is online, and no unfinished Command/run/operation exists, create remove_restriction for that old ID, set case=removing, and append Command ID to case.commandIds. If observation is null or valid successor ID, create zero Commands and set resolved. Another unknown ID returns CONFLICT; old observation TIMEOUT; offline OFFLINE, keeping pending. Never generate successor removal from an old case.
 
-removeの期限内ackかつその旧IDの除去確認でcase=resolved。ack処理でも対象IDを比較し、現観測が後継IDなら後継を消さず旧caseだけ解決する。failed/expiredはcase=pendingへ戻し、明示reconcileで新Commandを作る。未送信の後継applyは矛盾観測時にcancelledとして確定し、送信済みは結果確定/30秒失効まで待つ（その間新Commandは作らない）。後継がscheduledなら予定を維持、requested/appliedなら当該Unitをnot_applied・集約requestedとして明示retry(apply)を求める。release_requestedはその状態を維持し旧case解決後に通常reconcileでnot_required/解除を判定する。回復後の再適用は最新予告条件を再検証する。case解決でInvoice/契約の保存フィールドを変更しない。Unitの全caseがresolvedになって初めてcontrolAvailability=availableへ戻すが、後継effectiveControlPolicyの制限は保持する。後継ID観測を確定した場合はその後継のD03証跡を更新する（明示apply retryの前に再取得して重複applyを防ぐ）。
+Resolve a case only after timely remove acknowledgement and confirmed removal of that old ID. Check IDs again during acknowledgement; if current observation is successor ID, preserve successor and resolve only the old case. failed/expired returns case to pending; explicit reconcile creates a new Command. Contradictory observations cancel unsent successor applies; sent applies wait for final result/30-second expiry, with no new Commands while waiting. Keep scheduled successors scheduled. For requested/applied successors, set this Unit not_applied and aggregate requested, requiring explicit retry(apply). Keep release_requested; after old-case resolution, normal reconcile determines not_required/release. Revalidate latest notice conditions before reapplication. Case resolution changes no stored Invoice/Contract fields. Only when all Unit cases resolve, return controlAvailability=available, while keeping successor effectiveControlPolicy restrictions. Confirmed successor observations update its D03 evidence; refetch before explicit apply retry to avoid duplicates.
 
-未解決caseがあるUnitの新規schedule、当該Unitを含むContractの編集、Unit archiveはCONFLICT。Contract.hasUnresolvedRecoveryは対象Unitのいずれかに未解決caseがあるときtrueの派生値で、case変更の購読でcontracts.listをinvalidateする。非管理画面へ旧顧客/旧制限の識別子を返さない。A07はこの値でも保存を無効化する。A09は既存get/listのrecoveryCasesを表示し、旧記録のreconcile→Command状態→再照会を提供する。権限のない制御画面には理由だけを公開する。reset以外ではcase/Command履歴を消さない。
+Unresolved Unit cases block new schedule, edits to Contracts containing that Unit, and Unit archive with CONFLICT. Contract.hasUnresolvedRecovery derives true when any target Unit has unresolved cases; subscriptions invalidate contracts.list on case changes. Nonmanagement screens must not receive old-customer/restriction IDs. A07 also disables save for this flag. A09 shows recoveryCases through existing get/list and offers old-record reconcile→Command state→requery. Control screens without permission see only the reason. Keep case/Command history except on reset.
 
-## SR27 稼働分類の共通関数 — REREV-006
+## SR27 Shared Power-State Classification — REREV-006
 
-UnitSummary.effectivePowerStateをKPIとunits.list(powerState)の共通分類とする。読取snapshotAtをnowとして、connection=online、observedState.powerがboolean、observedAtが未来でなく120秒以内、かつ最新power Measurementがorigin=measuredかつquality=valid・value非null・D07のsensor stale期限内であるときだけbooleanをon/offへ写像する。それ以外はunknown。必要powerセンサー/測定がない場合もunknown。複数候補はobservedAt降順、sequence降順、id昇順の先頭とし、古いvalid値へfallbackしない。電力量のkW値をON/OFFそのものには変換しない。
+Use UnitSummary.effectivePowerState for both KPI and units.list(powerState). With read snapshotAt as now, map observedState.power boolean to on/off only when connection=online, observation is not future and at most 120 seconds old, and latest power Measurement is origin=measured, quality=valid, nonnull value, within D07 sensor stale limit. Otherwise unknown, including missing required power sensor/measurement. Choose candidates by observedAt desc, sequence desc, id asc; never fall back to older valid values. Do not convert energy kW readings directly to ON/OFF.
 
-customer/adminとも同じ分類でpowerOn/powerOffを数える。通信unknown件数は別軸の既存unknownであり混同しない。全件total=powerOn+powerOff+powerUnknown。Summary.countsとAdminSummaryのpowerUnknownが稼働不明、unknownは通信unknown/connecting/errorの件数。C01/A01の「稼働/停止/不明」カードはpowerOn/powerOff/powerUnknownから作る。KPI遷移先もこの分類で絞り、分割取得はSR14のsnapshotを使う。KPI表示後に業務更新があれば新snapshotで件数が変わり得ることを更新時刻で示す。Command送信中でも観測を上書きせず、要求値を別表示する。
+Customer/admin count powerOn/powerOff with the same classification. Connection unknown remains a separate axis. total=powerOn+powerOff+powerUnknown. Summary.counts/AdminSummary.powerUnknown means unknown operation; unknown means connection unknown/connecting/error. C01/A01 operating/stopped/unknown cards use powerOn/powerOff/powerUnknown. KPI destinations filter by this classification; paging uses SR14 snapshots. Show update times so later business updates may explain changed counts in new snapshots. Pending Commands do not overwrite observations; show requested values separately.
 
-## SR28 AirPolicyの通知設定 — REREV-007
+## SR28 AirPolicy Notification Settings — REREV-007
 
-air_qualityにもalertと同じseverity/channels/cooldownMinutes/escalateAfterMinutesを必須入力として持たせる。severity=warning/critical、channelsはinApp/email/whatsappの重複なし非空配列、両時間は整数1〜1440。新規フォームはこれらを未選択とし、入力が揃うまで保存不可。既存policyの編集は取得値を使用する。必須値をRepositoryやUIが勝手な数値で補完しない。
+air_quality requires the same severity/channels/cooldownMinutes/escalateAfterMinutes inputs as alert. severity=warning/critical; channels is a nonempty unique array of inApp/email/whatsapp; both times are integers from 1–1440. New forms leave them unselected and disable save until complete. Existing-policy edits use fetched values. Neither UI nor Repository may invent required defaults.
 
-A12はA05と同じ通知設定セクションを使用し、全Unit/選択channelで通知可能なMembershipの共通集合からrecipientMembershipIdsを選ぶ。channelを変更した場合は候補を取り直し、適格でなくなった選択に修正を要求する。保存時にも再評価。閾値成立時のAlert/Notificationは設定severityで生成し、1recipient/channelに1件。複数channelの一部だけ宛先0になった場合は許可されたchannelの通知を作り、失敗分は同policy/eventのDeliveryFailure1件へ集約する。NotificationOutcomeはfailed/no_recipient、notificationIdsに成功分、failureIdsに失敗記録を返す。UIは成功分があれば「一部通知失敗」、なければ「通知失敗」。simulateもfailed/no_recipientだが保存しない。宛先0の失敗をcooldownの成功時刻として数えず、通知が1件以上作られた場合だけそのpolicy/unit/severityの時刻を更新する。重大度上昇とエスカレーションのD08規則は維持する。email/whatsappは模擬preview、inAppはsimulated。cooldownはpolicy/unit/severityの最後の通知作成時刻からの経過が指定分数以上で解除される。初回は通知可能。エスカレーションはD08の未確認条件を満たすときだけ1回、HQ alert.policy.manage保持者へ設定channelで模擬生成する。宛先0の失敗はSR12。
+A12 shares A05 notification settings. Choose recipientMembershipIds from the intersection of Memberships eligible for all Units/selected channels. Channel changes refetch candidates and require correction of no-longer-eligible selections. Recheck on save. On threshold match, generate configured-severity Alert/Notifications, one per recipient/channel. If only some channels lack recipients, create permitted-channel notifications and combine failures into one DeliveryFailure per policy/event. NotificationOutcome returns failed/no_recipient, successful notificationIds, and failureIds. UI says “Some notifications failed” when some succeeded, otherwise “Notification failed.” simulate also returns failed/no_recipient but saves nothing. Zero-recipient failure does not advance successful cooldown time; update policy/unit/severity time only if at least one notification was created. Keep D08 severity-increase/escalation rules. email/whatsapp are simulated previews; inApp is simulated. Cooldown ends when elapsed time since last notification creation reaches configured minutes. First notification is allowed. Escalation occurs once only under D08 unacknowledged conditions, simulating configured channels to HQ alert.policy.manage holders. No-recipient failure follows SR12.
 
-## SR29 基準品質の保存と比較 — REREV-008
+## SR29 Saving and Comparing Baseline Quality — REREV-008
 
-baselines.saveはBaselineInputだけを受け、quality/metadataを利用者入力から受け取らない。demo_period_comparisonではbaselineKWh入力も禁止し、Repositoryが保存時の同一snapshotにおけるIR08/IR11に従う実測・境界一致のD07対象slotから値・validSlots・expectedSlots・coverageを計算する。unitIdsは重複なし非空、periodは正のUTC分区間・最大366日。expectedSlots>0、coverage=validSlots/expectedSlots。0有効slotならbaselineKWh=null。quality.kind=measured、sourceSnapshot={generation,eventCursor,snapshotAt}を保存する。後着データでも保存済み版を再計算しない。再算定は最新versionで明示保存して新しい版を作る。
+baselines.save accepts only BaselineInput, not user-supplied quality/metadata. demo_period_comparison also forbids baselineKWh input. At save, Repository calculates value, validSlots, expectedSlots, and coverage from same-snapshot D07 slots with measured origin and matching boundary under IR08/IR11. unitIds must be nonempty/unique; period must be a positive UTC-minute range up to 366 days. expectedSlots>0; coverage=validSlots/expectedSlots. Zero valid slots gives baselineKWh=null. Save quality.kind=measured and sourceSnapshot={generation,eventCursor,snapshotAt}. Late data does not recalculate saved versions. Explicit save with latest version recalculates into a new version.
 
-demo_fixedは利用者が有限かつ0以上のbaselineKWhと仮定/出典を入力するデモモデル。quality.kind=modeled、coverage/slot数/sourceSnapshotはnullとし、実測coverage100%とは偽装しない。既存の100kWh対80kWhの例はこの固定モデル。比較結果には「仮定基準との比較」を表示し、実測済み/保証された削減と表示しない。
+demo_fixed is a demo model with user-entered finite nonnegative baselineKWh, assumptions, and source. Save quality.kind=modeled; coverage/slot counts/sourceSnapshot=null. Never disguise it as measured coverage of 100%. The 100 kWh versus 80 kWh example uses this fixed model. Label comparisons “Comparison with assumed baseline,” not measured/guaranteed reductions.
 
-比較可能条件は同一設備集合・境界・同じ期間分数、実績coverage=1、基準はmeasuredならcoverage=1、modeledなら明示されたデモ仮定で非null値を持つこと。満たさなければ差分/率/削減料金/削減排出量はnull。実績そのものは表示可能。baseline0の率はnull。modeled時はqualityWarningsへmodeled_baselineを必ず含める。MRV.summary.baselineSnapshotへ品質もコピーし旧版を固定する。実測基準が不完全ならMRV.incomplete=trueでdemo_reviewed不可。modeledを含むレポートはデモ仮定として表示し、実測MRV検証済みと呼ばない。
+Comparison requires matching unit set/boundary/minute count, actual coverage=1, and either measured baseline coverage=1 or explicitly stated demo assumptions with nonnull modeled value. Otherwise differences/rates/cost savings/emission reductions are null; actual results may display. A baseline of 0 gives a null rate. Modeled baselines always add modeled_baseline to qualityWarnings. Copy quality into MRV.summary.baselineSnapshot and freeze old versions. Incomplete measured baselines set MRV.incomplete=true and prevent demo_reviewed. Reports with modeled baselines are demo assumptions, not verified measured MRV.
 
-回復caseの生成/変更では所有Restriction.versionと対象Unit.versionを増分する。ContractのactiveRestrictionIds/hasUnresolvedRecoveryは派生投影で契約版を変えず、contractsのChangeEventはversion=null、changedFieldsに派生フィールド名を付けてinvalidateする。version=nullの購読通知は版比較で捨てず、現在scopeを確認して再取得する。case.commandIdsはCommandとの照合を担い、異なるcase/世代へのackを流用しない。
+Creating/changing a recovery case increments owning Restriction.version and target Unit.version. Contract.activeRestrictionIds/hasUnresolvedRecovery are derived projections and do not change contract version. Emit contracts ChangeEvent with version=null and derived field names in changedFields to invalidate. Do not discard version=null subscription events through version comparison; recheck current scope and refetch. case.commandIds matches Commands; never reuse acknowledgements for other cases/generations.
 
-現行0.21.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+Additional contracts for current version 0.21.0: Read IR01–106 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

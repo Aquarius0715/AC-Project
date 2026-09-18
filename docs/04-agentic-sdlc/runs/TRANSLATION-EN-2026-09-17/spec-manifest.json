@@ -1,0 +1,268 @@
+{
+  "version": "0.21.0",
+  "spec_baseline_id": "2bd7a7b86c339d70a4312977b170b23fa0d0fa18635f48305ae455c56930e8d0",
+  "hash_algorithm": "sha256",
+  "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
+  "spec_files": [
+    {
+      "path": "00-prepare/PrepareDocument.md",
+      "sha256": "4cf14a41b98b74801617be32d5d3605499b6fadf39652a4be58856e7c719599a"
+    },
+    {
+      "path": "00-prepare/company-requirement-map.csv",
+      "sha256": "70c868ca1862a0d62f04543fd9350323f7d2be749137730e5c7abff94404e9e1"
+    },
+    {
+      "path": "00-prepare/internal/decision-record-2026-09-16.md",
+      "sha256": "5d4e0bc632b653e80ac2eec2c3cb948d1235a09a19192b48b836e859dc98fb41"
+    },
+    {
+      "path": "00-prepare/internal/design-assumptions.md",
+      "sha256": "e942c74bdf0eed78e67f04fb14fcf19fde861058a1861400b026b76cdb4022e3"
+    },
+    {
+      "path": "00-prepare/internal/review-decisions-016.json",
+      "sha256": "491a3eb42c01cf9820fe257978d3073ae5c6cfbc7be22ec8d19ae1fd55a1d267"
+    },
+    {
+      "path": "00-prepare/internal/review-decisions-017.json",
+      "sha256": "1dcdb4821bf7424917ed643184474adec130027af2ecef97849879645e4fe812"
+    },
+    {
+      "path": "00-prepare/internal/review-decisions-018.json",
+      "sha256": "17fbdb81bef6cb53500d226bed5b6dec8da38fd40a3786d64b528c8e2dacc7a5"
+    },
+    {
+      "path": "00-prepare/internal/review-decisions-019.json",
+      "sha256": "0a7a014d4136fc67dbde1c6ae9d6385c49ba0aeb1425f982307d6e467e16fb41"
+    },
+    {
+      "path": "00-prepare/internal/review-decisions-020.json",
+      "sha256": "e5f0fd771e89369b4b8c96a31f00eb10784ae656c13e9b267acb08a89ad54d7f"
+    },
+    {
+      "path": "00-prepare/internal/review-decisions-021.json",
+      "sha256": "9aaefc6623c91c1ca59c4bc935303ac2e4b989f466bd0b0848df4ae681a7944f"
+    },
+    {
+      "path": "00-prepare/reference-design-analysis.md",
+      "sha256": "55dd2156b7bc490f3485f13fb999bdbd692a472a7e408a388835ea8dfe0dd9a7"
+    },
+    {
+      "path": "00-prepare/requirement-origins.csv",
+      "sha256": "f1fbb748f5fc5ca77d60af2e836c84c5142cd8e440cad958a8ccaaae3dfb4145"
+    },
+    {
+      "path": "00-prepare/sources/company-requirements-original.txt",
+      "sha256": "526927ffef80f32f2dce775414858013031d75313eeb96c4f89dabd582ee958f"
+    },
+    {
+      "path": "00-prepare/sources/original-handover.md",
+      "sha256": "d47ca6afe4e5b9c9a1b2f96ef2170c51eb947e5c83990e82f80aaec323ef55eb"
+    },
+    {
+      "path": "00-prepare/sources/production-instructions.md",
+      "sha256": "44c0fceab1306a9d73c4a10a4ccbaee41398a4243848b75d1bbb9cba03760019"
+    },
+    {
+      "path": "00-prepare/sources/reference-style-evidence.json",
+      "sha256": "6a905fd59d5b83a4152a805135d08bef5598cae86f501bc5f207bb45f875cc66"
+    },
+    {
+      "path": "00-prepare/traceability.csv",
+      "sha256": "d0e8b184443f90cf467e8afdc7d4754484e6c07f6761e1fb8ba7cec75df3a562"
+    },
+    {
+      "path": "01-requirements/admin.md",
+      "sha256": "a64c1b56861f2227af9aba913d6332a60f81372cd0107a3cde85c5e6c4b61abf"
+    },
+    {
+      "path": "01-requirements/client.md",
+      "sha256": "a66374eb01b472bdfb522d2150faa253d59644580a5bfa801ae8173f4b95b1e4"
+    },
+    {
+      "path": "01-requirements/common.md",
+      "sha256": "25bbecd903f24b0a4888ba87e87d2ba72552f3b2e5674947b43d1f07ad106775"
+    },
+    {
+      "path": "01-requirements/contractor.md",
+      "sha256": "5aaf588c8d7c850878cd76f2acd89d0dcfe27d98cc924579dd54c59d0dbd5cd3"
+    },
+    {
+      "path": "01-requirements/technician.md",
+      "sha256": "2803c98420f34e4d773cae021b9a9b89f247d2db62ea9ac2e99cd60b1678ccfd"
+    },
+    {
+      "path": "02-design/admin.md",
+      "sha256": "9bc909b58ca2d3d124395196cc21db37a710f82ce69bebedc1331979f0bc41a9"
+    },
+    {
+      "path": "02-design/client.md",
+      "sha256": "8ac63cf146af67133450b9e0931c16ee09de9f7a3a95fadc2f7268f965908087"
+    },
+    {
+      "path": "02-design/common.md",
+      "sha256": "ef96089995207a357fe3cc4edb665d33705b70444aab7da89caf879ed6fe7a6f"
+    },
+    {
+      "path": "02-design/contractor.md",
+      "sha256": "4e7639bffda6547542cdf64e80a6e271768e5a3e3c7b8441fc35f60021031f6c"
+    },
+    {
+      "path": "02-design/deterministic-contracts.md",
+      "sha256": "938647544697f0aaa77ba36cfc0ba715be90a9d43f461034fd56ea61fec355a8"
+    },
+    {
+      "path": "02-design/implementation-contracts.md",
+      "sha256": "ef65ed9daf66303daec2d7e537142dc56d0988217420d85c5bf6334ee3bef458"
+    },
+    {
+      "path": "02-design/operation-catalog.csv",
+      "sha256": "5219b27eb7e203bf3abed187210f8d54a91cc9e9eaaf0a6609bf2482fb27ca95"
+    },
+    {
+      "path": "02-design/query-catalog.csv",
+      "sha256": "7d12982b53ccdf3b334b95aac7bdcab10d13ff0b36ec20ac0c29e04713f8fbd4"
+    },
+    {
+      "path": "02-design/review-resolution-contracts.md",
+      "sha256": "8c17ee8797f2e9284c4ff8e77b95ae948f3bdce8cb7dd3906cf87ecf3cbbb9b8"
+    },
+    {
+      "path": "02-design/service-contracts.ts",
+      "sha256": "ed3e16734acfccd89d1fb01f426054d62865851e7b40235c07483f1b02e181cf"
+    },
+    {
+      "path": "02-design/strict-review-contracts.md",
+      "sha256": "658dda4292656849b01d710cf7f29ad8988d56efce50fe78d5b87c749d5810aa"
+    },
+    {
+      "path": "02-design/technician.md",
+      "sha256": "a06fccf3bbaff451a0cbbe0a297084285b034c1e15adb74e1cc96f280c6ec7c4"
+    },
+    {
+      "path": "02-design/write-version-catalog.csv",
+      "sha256": "c92d1f1f8d0104b7dbb577540812ce64487ed8c3c4eae56b6b1c90b85f77c33e"
+    },
+    {
+      "path": "03-uiux/UIUXSpecification.md",
+      "sha256": "d6b2747b094a6e19178e4be77de0029d3955500ff1b2255b3a6508003ff37c4f"
+    },
+    {
+      "path": "03-uiux/component-contracts.csv",
+      "sha256": "31749268bdb601b62844ee51d48817a3b2559a71a7efa4407184f4ca83d40e98"
+    },
+    {
+      "path": "03-uiux/screen-catalog.csv",
+      "sha256": "9623ee4b96f92ed468c9e08313fea70236008b98b64fbcec3b3c22ea441f9dca"
+    },
+    {
+      "path": "04-agentic-sdlc/README.md",
+      "sha256": "6d153e7e242a8619b6764fd369192e3fab312375ac0a230c887438c74f1146a8"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-convergence.csv",
+      "sha256": "4a1d4a4775752467cc92f02b823789d7081f74b31bc382e07a23c3bc5e2ebc6f"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-fixes.csv",
+      "sha256": "be1358edcc5c1fe7eea83ea3df9742a77803059d7162d4952ae47f8e91e30863"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-independent-g1.csv",
+      "sha256": "aae44e1f98e05764ef9120b12acf50d22d8e63902af1086c158a8e5884cb603b"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-independent.csv",
+      "sha256": "1621d97cb79dfca68d53e4f9c00d56e75e7e8d6a324b62cd5f9e3d37c8ec6048"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-loop.csv",
+      "sha256": "1365ee2889f995c3c755e8283eb0f4efaee9a55a864b3f5eafb896a8160afded"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-projection.csv",
+      "sha256": "c8a5996eee78579f946ea76b3ea16a6799d897bb459a9f791170b0b85e37a05e"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-rereview.csv",
+      "sha256": "07ce058d8c2505471bc3cf6e50f62e591a9e1765971c47f9858e0c0cff56007f"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-resolution.csv",
+      "sha256": "e2f6c41d6ce19ca9c4baa3a927e75d3cc1e3baf351c236eaac0e34804510fd89"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-review-016.csv",
+      "sha256": "24930d9d338fbbfd6745d0bed6d7b835f1817976b336e76f29092c9aff908a63"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-review-017.csv",
+      "sha256": "18a9b03e6c0d5aeb2454b74c0c519908e9080f81ef4282b17b0904f14d217490"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-review-018.csv",
+      "sha256": "3db05bc736e8eeaaa326ca0816fd56abc68b23db91c2054f783d820e4e496dc5"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-review-019.csv",
+      "sha256": "9a85bb49c73e5ab9dac8a6b639f3d5471035207e12fb054220a9b30cecaa10ec"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-review-020.csv",
+      "sha256": "1c5bee44857d521a2789f23677b10a781cb1e461e8659ca3575c3bc5efb40442"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-review-021.csv",
+      "sha256": "282468c0c6fe52d7bc516c7a2ab9bbcbdf6ce447f1389282aeda1de3539959ba"
+    },
+    {
+      "path": "04-agentic-sdlc/acceptance-strict-review.csv",
+      "sha256": "de75d2d6c522d560876c2a1eb209513ac612e01c7ddc6533ff926d419bba40a9"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/design.md",
+      "sha256": "0aa7a846e902afa4cca5478e014b0fd47660fface4049e9946558685445c9022"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/implementation.md",
+      "sha256": "4132e977ba48ec982b144585a8114f63def0823b0bfaccf5e1b9216925eddc2e"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/orchestration.md",
+      "sha256": "3c1ef3436c6cd9617fe50f83017ce0f347bf34e3283160f1c6a632e2b523b102"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/review.md",
+      "sha256": "e2c878c220b764eab69311b471c0ee36aae7a874dd9b6b3012a5f25ecb7a239e"
+    },
+    {
+      "path": "04-agentic-sdlc/agents/test.md",
+      "sha256": "b0ad068ea1c45746c80ccacc5bbbff33ed93916645e24f7c5dab80febebc26f4"
+    },
+    {
+      "path": "04-agentic-sdlc/fixture-contract.json",
+      "sha256": "adbb4c00f7aa24585601de318d6ae6c0fd21f708471a6ee2ae6691de2e157484"
+    },
+    {
+      "path": "04-agentic-sdlc/templates/artifacts.md",
+      "sha256": "529ed410886d021478826639301ee5b75cb506ad34732e5751de32aabc5945b7"
+    },
+    {
+      "path": "04-agentic-sdlc/verification.md",
+      "sha256": "afb50e477b5b2c754e3a0632b643ea8e5ca403913118a6196b6c18313249554e"
+    },
+    {
+      "path": "README.md",
+      "sha256": "382cb3a1c28e8aac8f9599112a235fa249a3a9021ef615032c6fa1fe42544af2"
+    },
+    {
+      "path": "tools/check_review_regressions.py",
+      "sha256": "8d7f10767803681fbb4a8ded04a6d480195a5160e6b3da45a08d2a722e05c43e"
+    },
+    {
+      "path": "tools/validate_documents.py",
+      "sha256": "e7b776d236c0053723f7af9beabd17b563ff6add3925df2cc43234114dd57920"
+    }
+  ]
+}

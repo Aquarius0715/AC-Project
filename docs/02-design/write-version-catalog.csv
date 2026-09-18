@@ -1,95 +1,95 @@
 operation,branch,version_target,read_source,expected_version,input_versions,conflict_behavior
-alerts.acknowledge,all,alerts,alerts.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-alerts.resolve,all,alerts,alerts.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-attachments.add,all,report,reports.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-automations.fire,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-automations.save,id omitted,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-automations.save,id present,automations,automations.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-baselines.save,id omitted,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-baselines.save,id present,baselines,baselines.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-capabilities.save,id omitted,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-capabilities.save,id present,capabilities,capabilities.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-commands.create,all,none,units.get,omit,expectedUnitVersion=UnitDetail.version,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-consents.update,all,consent,consents.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-contracts.save,id omitted,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-contracts.save,id present,contracts,contracts.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-customers.save,id omitted,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-customers.save,id present,customers,customers.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-demo.advanceClock,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-demo.reset,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-demo.trigger,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-demoSession.signIn,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-demoSession.signOut,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-demoSession.switchMembership,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
+alerts.acknowledge,all,alerts,alerts.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+alerts.resolve,all,alerts,alerts.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+attachments.add,all,report,reports.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+automations.fire,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+automations.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+automations.save,id present,automations,automations.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+baselines.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+baselines.save,id present,baselines,baselines.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+capabilities.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+capabilities.save,id present,capabilities,capabilities.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+commands.create,all,none,units.get,omit,expectedUnitVersion=UnitDetail.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+consents.update,all,consent,consents.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+contracts.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+contracts.save,id present,contracts,contracts.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+customers.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+customers.save,id present,customers,customers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+demo.advanceClock,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+demo.reset,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+demo.trigger,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+demoSession.signIn,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+demoSession.signOut,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+demoSession.switchMembership,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 demoSession.extend,all,none,none,omit,none,IR55; expired session UNAUTHENTICATED; no business effect
-devices.addResponseNote,all,device event,devices.events,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-devices.bind,all,device,devices.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-devices.calibrate,all,device,devices.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-devices.check,all,device,devices.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-devices.register,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-devices.updateFirmware,all,device,devices.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-diagnosticRuns.create,all,none,units.get;jobs.get,omit,expectedUnitVersion=UnitDetail.version;expectedJobVersion=JobDetail.version,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-factors.save,id omitted,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-factors.save,id present,factors,factors.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-inquiries.answer,all,inquiries,inquiries.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-inquiries.create,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-invoices.create,all,none,contracts.list,omit,contractVersion=Contract.version,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.accept,all,job,jobs.get;jobs.list,required,none; options.expectedVersion=JobOfferSummary.jobVersion,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.addNote,all,job,jobs.get;jobs.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.assign,all,job,jobs.get;jobs.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.cancel,all,job,jobs.get;jobs.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.create,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.decline,all,job,jobs.get;jobs.list,required,none; options.expectedVersion=JobOfferSummary.jobVersion,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.extendAccess,all,job,jobs.get;jobs.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.hold,all,job,jobs.get;jobs.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.offer,all,job,jobs.get;jobs.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.resumeHold,all,job,jobs.get;jobs.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.resumeRework,all,job,jobs.get;jobs.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.review,all,job,jobs.get;reports.get,required,reportVersion=WorkReport.version,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.saveCost,all,job,jobs.get;jobs.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.saveDraft,reportId omitted,none,jobs.get,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.saveDraft,reportId present,report,reports.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.start,all,job,jobs.get;jobs.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-jobs.submit,all,job,jobs.get;reports.get,required,reportVersion=WorkReport.version,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-members.save,id omitted,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-members.save,id present,members,members.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-mrv.recordReview,all,mrv,mrv.get,required,reportVersion=MRVReport.version,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-mrv.saveDraft,id omitted,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-mrv.saveDraft,id present,mrv,mrv.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-notifications.markRead,all,notifications,notifications.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-offsets.preview,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-offsets.simulate,event=request,none,offsets.preview,omit,quoteVersion=OffsetQuote.version,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-offsets.simulate,event=purchase_confirm|retire|fail,offset record,offsets.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-offsets.simulate,event=retry,offset record,offsets.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-organizations.save,id omitted,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-organizations.save,id present,organizations,organizations.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-payments.confirm,all,payment,invoices.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-payments.recordManual,all,invoice,invoices.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-payments.simulate,event=initiate|instructions,invoice,invoices.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-payments.simulate,event=processing|confirm|fail,payment,invoices.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-plans.generateNext,all,plan,plans.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-plans.save,id omitted,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-plans.save,id present,plans,plans.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-policies.save,id omitted,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-policies.save,id present,policies,policies.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-preferences.update,all,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-properties.archive,all,properties,properties.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-properties.save,id omitted,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-properties.save,id present,properties,properties.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-restrictions.cancel,all,restrictions,restrictions.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-restrictions.defer,all,restrictions,restrictions.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-restrictions.execute,all,restrictions,restrictions.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-restrictions.exempt,all,restrictions,restrictions.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-restrictions.override,all,restrictions,restrictions.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-restrictions.reconcile,all,restrictions,restrictions.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-restrictions.release,all,restrictions,restrictions.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-restrictions.retry,all,restrictions,restrictions.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-restrictions.schedule,all,none,contracts.list,omit,expectedContractVersion=Contract.version,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-spaces.archive,all,spaces,spaces.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-spaces.save,id omitted,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-spaces.save,id present,spaces,spaces.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-units.archive,all,units,units.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-units.delete,all,units,units.get,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-units.save,id omitted,none,none,omit,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
-units.save,id present,units,units.list,required,none,D01; 不一致CONFLICT; 欠落/不要版指定VALIDATION;副作用0
+devices.addResponseNote,all,device event,devices.events,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+devices.bind,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+devices.calibrate,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+devices.check,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+devices.register,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+devices.updateFirmware,all,device,devices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+diagnosticRuns.create,all,none,units.get;jobs.get,omit,expectedUnitVersion=UnitDetail.version;expectedJobVersion=JobDetail.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+factors.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+factors.save,id present,factors,factors.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+inquiries.answer,all,inquiries,inquiries.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+inquiries.create,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+invoices.create,all,none,contracts.list,omit,contractVersion=Contract.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.accept,all,job,jobs.get;jobs.list,required,none; options.expectedVersion=JobOfferSummary.jobVersion,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.addNote,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.assign,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.cancel,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.create,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.decline,all,job,jobs.get;jobs.list,required,none; options.expectedVersion=JobOfferSummary.jobVersion,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.extendAccess,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.hold,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.offer,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.resumeHold,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.resumeRework,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.review,all,job,jobs.get;reports.get,required,reportVersion=WorkReport.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.saveCost,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.saveDraft,reportId omitted,none,jobs.get,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.saveDraft,reportId present,report,reports.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.start,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+jobs.submit,all,job,jobs.get;reports.get,required,reportVersion=WorkReport.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+members.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+members.save,id present,members,members.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+mrv.recordReview,all,mrv,mrv.get,required,reportVersion=MRVReport.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+mrv.saveDraft,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+mrv.saveDraft,id present,mrv,mrv.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+notifications.markRead,all,notifications,notifications.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+offsets.preview,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+offsets.simulate,event=request,none,offsets.preview,omit,quoteVersion=OffsetQuote.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+offsets.simulate,event=purchase_confirm|retire|fail,offset record,offsets.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+offsets.simulate,event=retry,offset record,offsets.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+organizations.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+organizations.save,id present,organizations,organizations.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+payments.confirm,all,payment,invoices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+payments.recordManual,all,invoice,invoices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+payments.simulate,event=initiate|instructions,invoice,invoices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+payments.simulate,event=processing|confirm|fail,payment,invoices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+plans.generateNext,all,plan,plans.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+plans.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+plans.save,id present,plans,plans.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+policies.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+policies.save,id present,policies,policies.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+preferences.update,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+properties.archive,all,properties,properties.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+properties.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+properties.save,id present,properties,properties.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+restrictions.cancel,all,restrictions,restrictions.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+restrictions.defer,all,restrictions,restrictions.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+restrictions.execute,all,restrictions,restrictions.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+restrictions.exempt,all,restrictions,restrictions.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+restrictions.override,all,restrictions,restrictions.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+restrictions.reconcile,all,restrictions,restrictions.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+restrictions.release,all,restrictions,restrictions.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+restrictions.retry,all,restrictions,restrictions.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+restrictions.schedule,all,none,contracts.list,omit,expectedContractVersion=Contract.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+spaces.archive,all,spaces,spaces.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+spaces.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+spaces.save,id present,spaces,spaces.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+units.archive,all,units,units.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+units.delete,all,units,units.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+units.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+units.save,id present,units,units.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 invoices.remind,all,invoice,invoices.get,required,none,IR04; paid/processing/not overdue or version conflict: no effects

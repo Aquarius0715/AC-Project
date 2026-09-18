@@ -1,65 +1,65 @@
 requirement_id,requirement,prepare,detailed_design,uiux,api,error_handling,testable,status_before_fix,status_after_fix,rev19_ids
-FR-C01,監視ダッシュボード(状況を一目で見る画面),BIZ-04;BIZ-08,DD-C01,SCR-C01,operation-catalog (Repository),D01/D04/IR37/IR77/IR83/IR90/IR92,AT-C01-N;AT-C01-E;AT-C01-B,CONFLICT,OK,REV19-003;REV19-009;REV19-025;REV19-042
-FR-C02,場所の階層管理,BIZ-07,DD-C02,SCR-C02,operation-catalog (Repository),D01/D04/IR37/IR92,AT-C02-N;AT-C02-E;AT-C02-B,CONFLICT,OK,REV19-038
-FR-C03,遠隔操作(離れた場所からの操作),BIZ-13,DD-C03,SCR-C03,operation-catalog (Repository),D01/D04/IR37,AT-C03-N;AT-C03-E;AT-C03-B,OK,OK,
-FR-C04,スケジュール運転・帰宅前冷房,BIZ-14,DD-C04,SCR-C04,operation-catalog (Repository),D01/D04/IR37,AT-C04-N;AT-C04-E;AT-C04-B,OK,OK,
-FR-C05,同意付きの自動運転,BIZ-14;BIZ-15;BIZ-17,DD-C05,SCR-C04,operation-catalog (Repository),D01/D04/IR37/IR84/IR92,AT-C05-N;AT-C05-E;AT-C05-B,CONFLICT,OK,REV19-010;REV19-042
-FR-C06,電力・電気代の比較,BIZ-16;BIZ-23,DD-C06,SCR-C06,operation-catalog (Repository),D01/D04/IR37/IR80/IR90/IR92,AT-C06-N;AT-C06-E;AT-C06-B,CONFLICT,OK,REV19-006;REV19-030;REV19-040;REV19-041
-FR-C07,空気の状態(空気環境),BIZ-18;BIZ-19,DD-C07,SCR-C07,operation-catalog (Repository),D01/D04/IR37/IR92,AT-C07-N;AT-C07-E;AT-C07-B,INCOMPLETE,OK,REV19-042
-FR-C08,異常・点検の通知,BIZ-08;BIZ-09;BIZ-17,DD-C08,SCR-C08,operation-catalog (Repository),D01/D04/IR37/IR90/IR92,AT-C08-N;AT-C08-E;AT-C08-B,CONFLICT,OK,REV19-023;REV19-038;REV19-042
-FR-C09,保守の依頼・予約・履歴,BIZ-12,DD-C09,SCR-C09,operation-catalog (Repository),D01/D04/IR37/IR89/IR90/IR92,AT-C09-N;AT-C09-E;AT-C09-B,INCOMPLETE,OK,REV19-017;REV19-037;REV19-042
-FR-C10,契約・請求の確認,BIZ-21,DD-C10,SCR-C10,operation-catalog (Repository),D01/D04/IR37/IR92,AT-C10-N;AT-C10-E;AT-C10-B,INCOMPLETE,OK,REV19-042
-FR-C11,支払い案内・決済のデモ,BIZ-22,DD-C11,SCR-C11,operation-catalog (Repository),D01/D04/IR37,AT-C11-N;AT-C11-E;AT-C11-B,OK,OK,
-FR-C12,運転制限の説明,BIZ-21,DD-C12,SCR-C11,operation-catalog (Repository),D01/D04/IR37/IR92,AT-C12-N;AT-C12-E;AT-C12-B;AT-C12-R01,INCOMPLETE,OK,REV19-042
-FR-C13,排出量・オフセットへの案内,BIZ-23;BIZ-24;BIZ-25;BIZ-26,DD-C13,SCR-C13,operation-catalog (Repository),D01/D04/IR37/IR90/IR92,AT-C13-N;AT-C13-E;AT-C13-B,CONFLICT,OK,REV19-030;REV19-040;REV19-041
-FR-P01,受託の状況を見るダッシュボード,BIZ-04;BIZ-12,DD-P01,SCR-P01,operation-catalog (Repository),D01/D04/IR37/IR90/IR92,AT-P01-N;AT-P01-E;AT-P01-B,CONFLICT,OK,REV19-020;REV19-025;REV19-038
-FR-P02,案件の受諾・辞退,BIZ-12,DD-P02,SCR-P02,operation-catalog (Repository),D01/D04/IR37/IR86/IR92,AT-P02-N;AT-P02-E;AT-P02-B,CONFLICT,OK,REV19-012;REV19-042
-FR-P03,日程と自社技術者の割り当て,BIZ-12,DD-P03,SCR-P03,operation-catalog (Repository),D01/D04/IR37/IR89/IR92,AT-P03-N;AT-P03-E;AT-P03-B;AT-P03-R01,CONFLICT,OK,REV19-015;REV19-037;REV19-038
-FR-P04,対象設備と異常の根拠の閲覧,BIZ-12,DD-P04,SCR-P04,operation-catalog (Repository),D01/D04/IR37,AT-P04-N;AT-P04-E;AT-P04-B,OK,OK,
-FR-P05,報告の品質確認・差し戻し,BIZ-12,DD-P05,SCR-P05,operation-catalog (Repository),D01/D04/IR37/IR87/IR92/IR93,AT-P05-N;AT-P05-E;AT-P05-B;AT-P05-R01,CONFLICT,OK,REV19-013;REV19-039;REV19-042
-FR-P06,自社の作業者・稼働状況の閲覧,BIZ-12,DD-P06,SCR-P06,operation-catalog (Repository),D01/D04/IR37/IR92,AT-P06-N;AT-P06-E;AT-P06-B,CONFLICT,OK,REV19-038
-FR-P07,案件の連絡・履歴,BIZ-12;BIZ-20,DD-P07,SCR-P07,operation-catalog (Repository),D01/D04/IR37/IR90,AT-P07-N;AT-P07-E;AT-P07-B;AT-P07-R01,INCOMPLETE,OK,REV19-032
-FR-P08,委託・作業期間の境界,BIZ-12,DD-P08,SCR-P01;SCR-P02;SCR-P03;SCR-P04;SCR-P05;SCR-P06;SCR-P07,operation-catalog (Repository),D01/D04/IR37/IR86,AT-P08-N;AT-P08-E;AT-P08-B,CONFLICT,OK,REV19-012
-FR-T01,担当の状況を見るダッシュボード,BIZ-04;BIZ-08,DD-T01,SCR-T01,operation-catalog (Repository),D01/D04/IR37/IR76/IR90,AT-T01-N;AT-T01-E;AT-T01-B,CONFLICT,OK,REV19-002;REV19-020;REV19-025
-FR-T02,設備台帳(設備の情報の一覧),BIZ-06;BIZ-07;BIZ-10,DD-T02,SCR-T02,operation-catalog (Repository),D01/D04/IR37/IR92,AT-T02-N;AT-T02-E;AT-T02-B,INCOMPLETE,OK,REV19-042
-FR-T03,時系列監視(時間の流れで見る監視),BIZ-08;BIZ-11,DD-T03,SCR-T02,operation-catalog (Repository),D01/D04/IR37/IR77/IR83,AT-T03-N;AT-T03-E;AT-T03-B,CONFLICT,OK,REV19-003;REV19-009
-FR-T04,室内機の点検,BIZ-10,DD-T04,SCR-T04,operation-catalog (Repository),D01/D04/IR37/IR76/IR92,AT-T04-N;AT-T04-E;AT-T04-B,CONFLICT,OK,REV19-002;REV19-042
-FR-T05,室外機の点検,BIZ-10,DD-T05,SCR-T04,operation-catalog (Repository),D01/D04/IR37,AT-T05-N;AT-T05-E;AT-T05-B,OK,OK,
-FR-T06,電気・制御部分の点検,BIZ-10,DD-T06,SCR-T04,operation-catalog (Repository),D01/D04/IR37,AT-T06-N;AT-T06-E;AT-T06-B,OK,OK,
-FR-T07,異常の根拠,BIZ-08;BIZ-11;BIZ-17,DD-T07,SCR-T07,operation-catalog (Repository),D01/D04/IR37/IR87,AT-T07-N;AT-T07-E;AT-T07-B,CONFLICT,OK,REV19-013
-FR-T08,定期点検・故障対応・予防保全,BIZ-12,DD-T08,SCR-T04,operation-catalog (Repository),D01/D04/IR37/IR76/IR89/IR93,AT-T08-N;AT-T08-E;AT-T08-B,CONFLICT,OK,REV19-002;REV19-015;REV19-039
-FR-T09,作業報告,BIZ-12,DD-T09,SCR-T04,operation-catalog (Repository),D01/D04/IR37/IR89,AT-T09-N;AT-T09-E;AT-T09-B,INCOMPLETE,OK,REV19-015
-FR-T10,遠隔診断・試運転,BIZ-13,DD-T10,SCR-T10,operation-catalog (Repository),D01/D04/IR37/IR76/IR93,AT-T10-N;AT-T10-E;AT-T10-B;AT-T10-R01,CONFLICT,OK,REV19-002;REV19-039
-FR-T11,IoT機器のライフサイクル管理,BIZ-20,DD-T11,SCR-T11,operation-catalog (Repository),D01/D04/IR37/IR90/IR92,AT-T11-N;AT-T11-E;AT-T11-B;AT-T11-R01,CONFLICT,OK,REV19-018;REV19-021;REV19-038
-FR-T12,IoT機器の異常,BIZ-20,DD-T12,SCR-T12,operation-catalog (Repository),D01/D04/IR37/IR92,AT-T12-N;AT-T12-E;AT-T12-B,INCOMPLETE,OK,REV19-042
-FR-A01,全体ダッシュボード,BIZ-04;BIZ-08,DD-A01,SCR-A01,operation-catalog (Repository),D01/D04/IR37/IR77/IR78/IR83/IR85/IR90,AT-A01-N;AT-A01-E;AT-A01-B,CONFLICT,OK,REV19-003;REV19-004;REV19-009;REV19-011;REV19-016;REV19-025;REV19-034
-FR-A02,組織・場所・設備台帳,BIZ-07,DD-A02,SCR-A02,operation-catalog (Repository),D01/D04/IR37,AT-A02-N;AT-A02-E;AT-A02-B,OK,OK,
-FR-A03,4役割とスコープ管理,BIZ-04,DD-A03,SCR-A03,operation-catalog (Repository),D01/D04/IR37,AT-A03-N;AT-A03-E;AT-A03-B,OK,OK,
-FR-A04,型番・IoT能力台帳,BIZ-06;BIZ-20,DD-A04,SCR-A04,operation-catalog (Repository),D01/D04/IR37/IR90,AT-A04-N;AT-A04-E;AT-A04-B,CONFLICT,OK,REV19-016
-FR-A05,アラート・通知方針,BIZ-08;BIZ-11;BIZ-17,DD-A05,SCR-A05,operation-catalog (Repository),D01/D04/IR37/IR92,AT-A05-N;AT-A05-E;AT-A05-B,INCOMPLETE,OK,REV19-042
-FR-A06,保守計画と品質・費用,BIZ-12,DD-A06,SCR-A06,operation-catalog (Repository),D01/D04/IR37/IR89/IR90/IR92,AT-A06-N;AT-A06-E;AT-A06-B,CONFLICT,OK,REV19-015;REV19-031;REV19-037;REV19-038
-FR-A07,契約プラン,BIZ-21,DD-A07,SCR-A07,operation-catalog (Repository),D01/D04/IR37/IR92,AT-A07-N;AT-A07-E;AT-A07-B,INCOMPLETE,OK,REV19-042
-FR-A08,請求・入金・督促,BIZ-21;BIZ-22,DD-A08,SCR-A08,operation-catalog (Repository),D01/D04/IR37/IR90/IR92,AT-A08-N;AT-A08-E;AT-A08-B;AT-A08-R01,INCOMPLETE,OK,REV19-019;REV19-042
-FR-A09,予告・制限・入金後解除,BIZ-21,DD-A09,SCR-A09,operation-catalog (Repository),D01/D04/IR37/IR90,AT-A09-N;AT-A09-E;AT-A09-B;AT-A09-R01,CONFLICT,OK,REV19-016;REV19-018;REV19-033
-FR-A10,猶予・例外・手動解除・監査,BIZ-21,DD-A10,SCR-A10,operation-catalog (Repository),D01/D04/IR37/IR87,AT-A10-N;AT-A10-E;AT-A10-B,CONFLICT,OK,REV19-013
-FR-A11,自動運転方針,BIZ-14;BIZ-16;BIZ-17,DD-A11,SCR-A11,operation-catalog (Repository),D01/D04/IR37/IR90/IR92,AT-A11-N;AT-A11-E;AT-A11-B;AT-A11-R01,INCOMPLETE,OK,REV19-029;REV19-031;REV19-042
-FR-A12,空気環境方針,BIZ-18;BIZ-19,DD-A12,SCR-A12,operation-catalog (Repository),D01/D04/IR37/IR90/IR92,AT-A12-N;AT-A12-E;AT-A12-B,CONFLICT,OK,REV19-016;REV19-029;REV19-042
-FR-A13,省エネ分析,BIZ-23;BIZ-25,DD-A13,SCR-A13,operation-catalog (Repository),D01/D04/IR37/IR78/IR90/IR92,AT-A13-N;AT-A13-E;AT-A13-B,CONFLICT,OK,REV19-004;REV19-029;REV19-041
-FR-A14,Digital MRVデモ,BIZ-25,DD-A14,SCR-A14,operation-catalog (Repository),D01/D04/IR37/IR87/IR88/IR92,AT-A14-N;AT-A14-E;AT-A14-B;AT-A14-R01,CONFLICT,OK,REV19-013;REV19-014;REV19-040;REV19-041
-FR-A15,オフセットデモ,BIZ-24;BIZ-26,DD-A15,SCR-A15,operation-catalog (Repository),D01/D04/IR37,AT-A15-N;AT-A15-E;AT-A15-B,OK,OK,
-FR-A16,異常操作・監査,BIZ-20,DD-A16,SCR-A16,operation-catalog (Repository),D01/D04/IR37/IR90,AT-A16-N;AT-A16-E;AT-A16-B,INCOMPLETE,OK,REV19-022;REV19-033
-FR-X01,サインイン・サインアウト、パスワードの再設定、デモ役割の選択、表示言語の選択,BIZ-01;BIZ-02,DD-COMMON,SCR-X-login;SCR-X-forgot-password;SCR-X-settings-preferences,operation-catalog (Repository),D01/D04/IR37/IR79/IR82/IR90,AT-X01,CONFLICT,OK,REV19-005;REV19-008;REV19-027
-FR-X02,選んだ言語で、音声による状態確認・操作・ヘルプ(操作説明)ができる。文字入力でも同じことができる,BIZ-03,DD-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37/IR90,AT-X02,CONFLICT,OK,REV19-016;REV19-024
-FR-X03,重要度、実測値・推定値・点検結果、データの品質、単位を区別して表示する,BIZ-09;BIZ-18,DD-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37/IR77/IR90,AT-X03,CONFLICT,OK,REV19-003;REV19-023
-FR-X04,テナント、役割、担当範囲、期間、能力に応じて、見られる・操作できる内容を制限する,BIZ-04,DD-COMMON,SCR-X-forbidden;SCR-X-not-found,operation-catalog (Repository),D01/D04/IR37/IR76/IR90,AT-X04,CONFLICT,OK,REV19-002;REV19-016;REV19-030
-FR-X05,共有のデモデータ、データのリセット、実際の処理との違いをはっきりさせる,BIZ-05,DD-COMMON,SCR-X-demo,operation-catalog (Repository),D01/D04/IR37/IR77/IR91,AT-X05,CONFLICT,OK,REV19-003;REV19-036
-FR-X06,対応している機能と、非RTO(RTO契約以外)の扱いを区別する,BIZ-05;BIZ-06;BIZ-12;BIZ-19,DD-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37,AT-X06,OK,OK,
-FR-X07,通知・履歴・監査の仕組みを用意する,BIZ-08;BIZ-20;BIZ-22,DD-COMMON,SCR-X-notifications,operation-catalog (Repository),D01/D04/IR37/IR82/IR90,AT-X07,INCOMPLETE,OK,REV19-008;REV19-026
-NFR-01,アクセシビリティ（キーボード・WCAG 2.2 AA目標）,BIZ-05,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37/IR79/IR83/IR90,AT-NFR01,CONFLICT,OK,REV19-005;REV19-009;REV19-028
-NFR-02,レスポンシブ（360〜1440px・200%拡大）,BIZ-05,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37,AT-NFR02,OK,OK,
-NFR-03,架空データ・機密非出力・危険操作の確認,BIZ-05,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37,AT-NFR03,OK,OK,
-NFR-04,性能目標（200ms/2秒）,BIZ-05,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37,AT-NFR04,OK,OK,
-NFR-05,状態表示・二重登録防止・入力保持,BIZ-05,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37/IR76/IR83/IR90,AT-NFR05,CONFLICT,OK,REV19-002;REV19-009;REV19-021;REV19-027;REV19-028
-NFR-06,非同期interfaceとモック差替え,BIZ-05,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37/IR90,AT-NFR06,INCOMPLETE,OK,REV19-024;REV19-035
-NFR-07,型・lint・build・単体/E2E試験と証跡,BIZ-05,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37/IR75/IR81/IR91,AT-NFR07,INCOMPLETE,OK,REV19-001;REV19-007;REV19-036
-NFR-08,翻訳キー・Intl・UTC保存,BIZ-02,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37,AT-NFR08,OK,OK,
+FR-C01,Monitoring dashboard (status at a glance),BIZ-04;BIZ-08,DD-C01,SCR-C01,operation-catalog (Repository),D01/D04/IR37/IR77/IR83/IR90/IR92,AT-C01-N;AT-C01-E;AT-C01-B,CONFLICT,OK,REV19-003;REV19-009;REV19-025;REV19-042
+FR-C02,Location hierarchy management,BIZ-07,DD-C02,SCR-C02,operation-catalog (Repository),D01/D04/IR37/IR92,AT-C02-N;AT-C02-E;AT-C02-B,CONFLICT,OK,REV19-038
+FR-C03,Remote control (operation from another location),BIZ-13,DD-C03,SCR-C03,operation-catalog (Repository),D01/D04/IR37,AT-C03-N;AT-C03-E;AT-C03-B,OK,OK,
+FR-C04,Scheduled operation and cooling before returning home,BIZ-14,DD-C04,SCR-C04,operation-catalog (Repository),D01/D04/IR37,AT-C04-N;AT-C04-E;AT-C04-B,OK,OK,
+FR-C05,Automatic operation with consent,BIZ-14;BIZ-15;BIZ-17,DD-C05,SCR-C04,operation-catalog (Repository),D01/D04/IR37/IR84/IR92,AT-C05-N;AT-C05-E;AT-C05-B,CONFLICT,OK,REV19-010;REV19-042
+FR-C06,Compare power use and electricity costs,BIZ-16;BIZ-23,DD-C06,SCR-C06,operation-catalog (Repository),D01/D04/IR37/IR80/IR90/IR92,AT-C06-N;AT-C06-E;AT-C06-B,CONFLICT,OK,REV19-006;REV19-030;REV19-040;REV19-041
+FR-C07,Air conditions (air environment),BIZ-18;BIZ-19,DD-C07,SCR-C07,operation-catalog (Repository),D01/D04/IR37/IR92,AT-C07-N;AT-C07-E;AT-C07-B,INCOMPLETE,OK,REV19-042
+FR-C08,Alert and inspection notifications,BIZ-08;BIZ-09;BIZ-17,DD-C08,SCR-C08,operation-catalog (Repository),D01/D04/IR37/IR90/IR92,AT-C08-N;AT-C08-E;AT-C08-B,CONFLICT,OK,REV19-023;REV19-038;REV19-042
+FR-C09,"Maintenance requests, bookings, and history",BIZ-12,DD-C09,SCR-C09,operation-catalog (Repository),D01/D04/IR37/IR89/IR90/IR92,AT-C09-N;AT-C09-E;AT-C09-B,INCOMPLETE,OK,REV19-017;REV19-037;REV19-042
+FR-C10,View contracts and invoices,BIZ-21,DD-C10,SCR-C10,operation-catalog (Repository),D01/D04/IR37/IR92,AT-C10-N;AT-C10-E;AT-C10-B,INCOMPLETE,OK,REV19-042
+FR-C11,Payment guidance and payment demo,BIZ-22,DD-C11,SCR-C11,operation-catalog (Repository),D01/D04/IR37,AT-C11-N;AT-C11-E;AT-C11-B,OK,OK,
+FR-C12,Explain operation restrictions,BIZ-21,DD-C12,SCR-C11,operation-catalog (Repository),D01/D04/IR37/IR92,AT-C12-N;AT-C12-E;AT-C12-B;AT-C12-R01,INCOMPLETE,OK,REV19-042
+FR-C13,Emissions and offset guidance,BIZ-23;BIZ-24;BIZ-25;BIZ-26,DD-C13,SCR-C13,operation-catalog (Repository),D01/D04/IR37/IR90/IR92,AT-C13-N;AT-C13-E;AT-C13-B,CONFLICT,OK,REV19-030;REV19-040;REV19-041
+FR-P01,Contracted-work status dashboard,BIZ-04;BIZ-12,DD-P01,SCR-P01,operation-catalog (Repository),D01/D04/IR37/IR90/IR92,AT-P01-N;AT-P01-E;AT-P01-B,CONFLICT,OK,REV19-020;REV19-025;REV19-038
+FR-P02,Accept or decline jobs,BIZ-12,DD-P02,SCR-P02,operation-catalog (Repository),D01/D04/IR37/IR86/IR92,AT-P02-N;AT-P02-E;AT-P02-B,CONFLICT,OK,REV19-012;REV19-042
+FR-P03,Schedule and assign company technicians,BIZ-12,DD-P03,SCR-P03,operation-catalog (Repository),D01/D04/IR37/IR89/IR92,AT-P03-N;AT-P03-E;AT-P03-B;AT-P03-R01,CONFLICT,OK,REV19-015;REV19-037;REV19-038
+FR-P04,View target equipment and alert evidence,BIZ-12,DD-P04,SCR-P04,operation-catalog (Repository),D01/D04/IR37,AT-P04-N;AT-P04-E;AT-P04-B,OK,OK,
+FR-P05,Report quality review and return for correction,BIZ-12,DD-P05,SCR-P05,operation-catalog (Repository),D01/D04/IR37/IR87/IR92/IR93,AT-P05-N;AT-P05-E;AT-P05-B;AT-P05-R01,CONFLICT,OK,REV19-013;REV19-039;REV19-042
+FR-P06,View company workers and availability,BIZ-12,DD-P06,SCR-P06,operation-catalog (Repository),D01/D04/IR37/IR92,AT-P06-N;AT-P06-E;AT-P06-B,CONFLICT,OK,REV19-038
+FR-P07,Job communication and history,BIZ-12;BIZ-20,DD-P07,SCR-P07,operation-catalog (Repository),D01/D04/IR37/IR90,AT-P07-N;AT-P07-E;AT-P07-B;AT-P07-R01,INCOMPLETE,OK,REV19-032
+FR-P08,Boundaries of contracted access and work periods,BIZ-12,DD-P08,SCR-P01;SCR-P02;SCR-P03;SCR-P04;SCR-P05;SCR-P06;SCR-P07,operation-catalog (Repository),D01/D04/IR37/IR86,AT-P08-N;AT-P08-E;AT-P08-B,CONFLICT,OK,REV19-012
+FR-T01,Assigned-work status dashboard,BIZ-04;BIZ-08,DD-T01,SCR-T01,operation-catalog (Repository),D01/D04/IR37/IR76/IR90,AT-T01-N;AT-T01-E;AT-T01-B,CONFLICT,OK,REV19-002;REV19-020;REV19-025
+FR-T02,Equipment register (list of equipment information),BIZ-06;BIZ-07;BIZ-10,DD-T02,SCR-T02,operation-catalog (Repository),D01/D04/IR37/IR92,AT-T02-N;AT-T02-E;AT-T02-B,INCOMPLETE,OK,REV19-042
+FR-T03,Time-series monitoring (monitoring over time),BIZ-08;BIZ-11,DD-T03,SCR-T02,operation-catalog (Repository),D01/D04/IR37/IR77/IR83,AT-T03-N;AT-T03-E;AT-T03-B,CONFLICT,OK,REV19-003;REV19-009
+FR-T04,Indoor unit inspection,BIZ-10,DD-T04,SCR-T04,operation-catalog (Repository),D01/D04/IR37/IR76/IR92,AT-T04-N;AT-T04-E;AT-T04-B,CONFLICT,OK,REV19-002;REV19-042
+FR-T05,Outdoor unit inspection,BIZ-10,DD-T05,SCR-T04,operation-catalog (Repository),D01/D04/IR37,AT-T05-N;AT-T05-E;AT-T05-B,OK,OK,
+FR-T06,Electrical and control component inspection,BIZ-10,DD-T06,SCR-T04,operation-catalog (Repository),D01/D04/IR37,AT-T06-N;AT-T06-E;AT-T06-B,OK,OK,
+FR-T07,Alert evidence,BIZ-08;BIZ-11;BIZ-17,DD-T07,SCR-T07,operation-catalog (Repository),D01/D04/IR37/IR87,AT-T07-N;AT-T07-E;AT-T07-B,CONFLICT,OK,REV19-013
+FR-T08,"Regular inspections, fault response, and preventive maintenance",BIZ-12,DD-T08,SCR-T04,operation-catalog (Repository),D01/D04/IR37/IR76/IR89/IR93,AT-T08-N;AT-T08-E;AT-T08-B,CONFLICT,OK,REV19-002;REV19-015;REV19-039
+FR-T09,Work reports,BIZ-12,DD-T09,SCR-T04,operation-catalog (Repository),D01/D04/IR37/IR89,AT-T09-N;AT-T09-E;AT-T09-B,INCOMPLETE,OK,REV19-015
+FR-T10,Remote diagnostics and test runs,BIZ-13,DD-T10,SCR-T10,operation-catalog (Repository),D01/D04/IR37/IR76/IR93,AT-T10-N;AT-T10-E;AT-T10-B;AT-T10-R01,CONFLICT,OK,REV19-002;REV19-039
+FR-T11,IoT device lifecycle management,BIZ-20,DD-T11,SCR-T11,operation-catalog (Repository),D01/D04/IR37/IR90/IR92,AT-T11-N;AT-T11-E;AT-T11-B;AT-T11-R01,CONFLICT,OK,REV19-018;REV19-021;REV19-038
+FR-T12,IoT device alerts,BIZ-20,DD-T12,SCR-T12,operation-catalog (Repository),D01/D04/IR37/IR92,AT-T12-N;AT-T12-E;AT-T12-B,INCOMPLETE,OK,REV19-042
+FR-A01,Overall dashboard,BIZ-04;BIZ-08,DD-A01,SCR-A01,operation-catalog (Repository),D01/D04/IR37/IR77/IR78/IR83/IR85/IR90,AT-A01-N;AT-A01-E;AT-A01-B,CONFLICT,OK,REV19-003;REV19-004;REV19-009;REV19-011;REV19-016;REV19-025;REV19-034
+FR-A02,"Organization, location, and equipment registers",BIZ-07,DD-A02,SCR-A02,operation-catalog (Repository),D01/D04/IR37,AT-A02-N;AT-A02-E;AT-A02-B,OK,OK,
+FR-A03,Four roles and scope management,BIZ-04,DD-A03,SCR-A03,operation-catalog (Repository),D01/D04/IR37,AT-A03-N;AT-A03-E;AT-A03-B,OK,OK,
+FR-A04,Model and IoT capability register,BIZ-06;BIZ-20,DD-A04,SCR-A04,operation-catalog (Repository),D01/D04/IR37/IR90,AT-A04-N;AT-A04-E;AT-A04-B,CONFLICT,OK,REV19-016
+FR-A05,Alert and notification policies,BIZ-08;BIZ-11;BIZ-17,DD-A05,SCR-A05,operation-catalog (Repository),D01/D04/IR37/IR92,AT-A05-N;AT-A05-E;AT-A05-B,INCOMPLETE,OK,REV19-042
+FR-A06,"Maintenance plans, quality, and costs",BIZ-12,DD-A06,SCR-A06,operation-catalog (Repository),D01/D04/IR37/IR89/IR90/IR92,AT-A06-N;AT-A06-E;AT-A06-B,CONFLICT,OK,REV19-015;REV19-031;REV19-037;REV19-038
+FR-A07,Contract plans,BIZ-21,DD-A07,SCR-A07,operation-catalog (Repository),D01/D04/IR37/IR92,AT-A07-N;AT-A07-E;AT-A07-B,INCOMPLETE,OK,REV19-042
+FR-A08,"Billing, payment receipts, and reminders",BIZ-21;BIZ-22,DD-A08,SCR-A08,operation-catalog (Repository),D01/D04/IR37/IR90/IR92,AT-A08-N;AT-A08-E;AT-A08-B;AT-A08-R01,INCOMPLETE,OK,REV19-019;REV19-042
+FR-A09,"Advance notice, restrictions, and release after payment",BIZ-21,DD-A09,SCR-A09,operation-catalog (Repository),D01/D04/IR37/IR90,AT-A09-N;AT-A09-E;AT-A09-B;AT-A09-R01,CONFLICT,OK,REV19-016;REV19-018;REV19-033
+FR-A10,"Deferrals, exemptions, manual release, and audit",BIZ-21,DD-A10,SCR-A10,operation-catalog (Repository),D01/D04/IR37/IR87,AT-A10-N;AT-A10-E;AT-A10-B,CONFLICT,OK,REV19-013
+FR-A11,Automatic operation policies,BIZ-14;BIZ-16;BIZ-17,DD-A11,SCR-A11,operation-catalog (Repository),D01/D04/IR37/IR90/IR92,AT-A11-N;AT-A11-E;AT-A11-B;AT-A11-R01,INCOMPLETE,OK,REV19-029;REV19-031;REV19-042
+FR-A12,Air environment policies,BIZ-18;BIZ-19,DD-A12,SCR-A12,operation-catalog (Repository),D01/D04/IR37/IR90/IR92,AT-A12-N;AT-A12-E;AT-A12-B,CONFLICT,OK,REV19-016;REV19-029;REV19-042
+FR-A13,Energy-saving analysis,BIZ-23;BIZ-25,DD-A13,SCR-A13,operation-catalog (Repository),D01/D04/IR37/IR78/IR90/IR92,AT-A13-N;AT-A13-E;AT-A13-B,CONFLICT,OK,REV19-004;REV19-029;REV19-041
+FR-A14,Digital MRV demo,BIZ-25,DD-A14,SCR-A14,operation-catalog (Repository),D01/D04/IR37/IR87/IR88/IR92,AT-A14-N;AT-A14-E;AT-A14-B;AT-A14-R01,CONFLICT,OK,REV19-013;REV19-014;REV19-040;REV19-041
+FR-A15,Offset demo,BIZ-24;BIZ-26,DD-A15,SCR-A15,operation-catalog (Repository),D01/D04/IR37,AT-A15-N;AT-A15-E;AT-A15-B,OK,OK,
+FR-A16,Abnormal operations and audit,BIZ-20,DD-A16,SCR-A16,operation-catalog (Repository),D01/D04/IR37/IR90,AT-A16-N;AT-A16-E;AT-A16-B,INCOMPLETE,OK,REV19-022;REV19-033
+FR-X01,"Sign in, sign out, reset password, select demo role, and select display language",BIZ-01;BIZ-02,DD-COMMON,SCR-X-login;SCR-X-forgot-password;SCR-X-settings-preferences,operation-catalog (Repository),D01/D04/IR37/IR79/IR82/IR90,AT-X01,CONFLICT,OK,REV19-005;REV19-008;REV19-027
+FR-X02,"Use the selected language for voice status checks, operations, and help (operating instructions). The same actions are available through text input.",BIZ-03,DD-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37/IR90,AT-X02,CONFLICT,OK,REV19-016;REV19-024
+FR-X03,"Clearly distinguish severity, measured and estimated values, inspection results, data quality, and units.",BIZ-09;BIZ-18,DD-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37/IR77/IR90,AT-X03,CONFLICT,OK,REV19-003;REV19-023
+FR-X04,"Limit what users can view and operate based on tenant, role, assigned scope, period, and capability.",BIZ-04,DD-COMMON,SCR-X-forbidden;SCR-X-not-found,operation-catalog (Repository),D01/D04/IR37/IR76/IR90,AT-X04,CONFLICT,OK,REV19-002;REV19-016;REV19-030
+FR-X05,"Clearly distinguish shared demo data, data reset, and real processing.",BIZ-05,DD-COMMON,SCR-X-demo,operation-catalog (Repository),D01/D04/IR37/IR77/IR91,AT-X05,CONFLICT,OK,REV19-003;REV19-036
+FR-X06,Distinguish supported features and handling of non-RTO contracts (contracts other than RTO).,BIZ-05;BIZ-06;BIZ-12;BIZ-19,DD-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37,AT-X06,OK,OK,
+FR-X07,"Provide notification, history, and audit mechanisms.",BIZ-08;BIZ-20;BIZ-22,DD-COMMON,SCR-X-notifications,operation-catalog (Repository),D01/D04/IR37/IR82/IR90,AT-X07,INCOMPLETE,OK,REV19-008;REV19-026
+NFR-01,Accessibility (keyboard; WCAG 2.2 AA target),BIZ-05,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37/IR79/IR83/IR90,AT-NFR01,CONFLICT,OK,REV19-005;REV19-009;REV19-028
+NFR-02,Responsive layout (360–1440px; 200% zoom),BIZ-05,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37,AT-NFR02,OK,OK,
+NFR-03,"Fictional data, no sensitive output, and confirmation of risky actions",BIZ-05,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37,AT-NFR03,OK,OK,
+NFR-04,Performance targets (200ms/2 seconds),BIZ-05,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37,AT-NFR04,OK,OK,
+NFR-05,"State display, duplicate-submission prevention, and input retention",BIZ-05,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37/IR76/IR83/IR90,AT-NFR05,CONFLICT,OK,REV19-002;REV19-009;REV19-021;REV19-027;REV19-028
+NFR-06,Asynchronous interfaces and mock replacement,BIZ-05,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37/IR90,AT-NFR06,INCOMPLETE,OK,REV19-024;REV19-035
+NFR-07,"Type checks, lint, build, unit/E2E tests, and evidence",BIZ-05,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37/IR75/IR81/IR91,AT-NFR07,INCOMPLETE,OK,REV19-001;REV19-007;REV19-036
+NFR-08,"Translation keys, Intl, and UTC storage",BIZ-02,DD-COMMON;UX-COMMON,UX-COMMON,operation-catalog (Repository),D01/D04/IR37,AT-NFR08,OK,OK,

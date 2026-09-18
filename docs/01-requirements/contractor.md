@@ -7,237 +7,237 @@ consumers: [implementation-agent, test-agent, review-agent]
 scope: frontend-demo-1A
 ---
 
-# 施工業者 要件定義書
+# Contractor requirements
 
-**0.21.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.21.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
-## 目的と前提
+## Purpose and assumptions
 
-この文書は、[企業からの要望の英語原文（SRC-06）](../00-prepare/sources/company-requirements-original.txt)をもとに作りました。企業からの要望を、まず「BIZ」という整理項目にまとめます。次に、その内容をこの文書の「FR」(機能要件)に落とし込みます。最後に、詳しい設計と受入条件(合格の基準)につなげます。この流れで、内容を最初から最後まで追いかけられるようにしています。
+This document is based on the [original company requests in English (SRC-06)](../00-prepare/sources/company-requirements-original.txt). Company requests are first grouped into BIZ items, then into this document's FR (functional requirements), and finally into detailed designs and acceptance criteria. This provides end-to-end traceability.
 
-各機能の説明では、「企業からの要望」の部分と「作る側で補った部分」を分けて書きます。画面に出す項目、入力できる範囲、状態の移り変わり、優先度は、フロントエンド(画面側)の実装案として示します。これらは企業がまだ詳しく確認していない内容も含みます。参考として載せているモック(見本画面)は、見た目のデザインを考えるための参考資料にすぎません。機能要件と受入条件は、企業原文の目的に、作る側の方針や補足を加えて、より具体的にしたものです。
+Each feature separates company requests from added design details. Screen fields, allowed inputs, state transitions, and priorities are frontend implementation proposals, including details the company has not yet reviewed. Reference mock screens guide appearance only. Requirements and acceptance criteria make the original goals more concrete through production policies and design additions.
 
-この文書が対象にするのは、利用者が画面(フロントエンド)で確認・入力・操作できる範囲だけです。登録・請求・入金・機器の操作・通知などは、本物の処理ではなく、モック(見本の動き)で再現します。サーバー側の実際の処理、データの保存、本物の認証(ログインの確認)は、この文書の対象に含みません。
+This document covers only what users can view, enter, and do in the frontend. Registration, billing, receipts, device actions, and notifications are simulated by mocks. Real server processing, storage, and authentication are out of scope.
 
-このシステムの目的は、施工業者が請け負った範囲の案件を受け付け、自社の技術者・日程・作業の品質を管理できるようにすることです。ここで書く具体的な業務内容は、DEC-01という決定事項に基づく提案です。「施工業者」を独立した役割として扱うこと自体は、企業からの原文には書かれていない、作る側で決めた方針です。この方針のもとになった元の指示はまだ記録として残っていません([確認状態](../00-prepare/sources/production-instructions.md)を参照)。企業への確認は、OPEN-10という未決事項として管理しています。
+The goal is to let contractors accept jobs within their delegated scope and manage their own technicians, schedules, and work quality. These detailed workflows are proposals under DEC-01. A separate contractor role is a production policy absent from the company original. The original instruction behind it is not archived ([verification status](../00-prepare/sources/production-instructions.md)). Company confirmation is tracked as OPEN-10.
 
-読む前に必ず目を通してほしい文書: [PrepareDocument](../00-prepare/PrepareDocument.md)、[共通要件](common.md)。認証、言語、音声、権限、通知、非機能要件(性能や安全性など)は、共通要件に書かれた内容をすべてこの文書にも適用します。
+Required reading: [PrepareDocument](../00-prepare/PrepareDocument.md) and [common requirements](common.md). All common authentication, language, voice, permission, notification, and non-functional requirements apply.
 
-優先度「P0」は、システムの土台となる中心的な流れです。「P1」も、このフェーズ(1A)で完成させる対象に含みます。各行の受入条件は、`AT-P番号`という番号で検証します。この文書では、「企業の要望に対応している部分」と「画面デザインや仮の数値として提案している部分」を分けて示します。
+P0 means the core foundational flow. P1 is also required for completion in phase 1A. Each row is verified under its `AT-P` number. This document separates coverage of company requests from proposed screen design and provisional values.
 
-## 機能要件と受入条件
+## Functional requirements and acceptance criteria
 
-| 要件ID | 優先 | 状態・根拠 | 要件 | 受入条件 |
+| Requirement ID | Priority | Status/basis | Requirement | Acceptance criteria |
 |---|---|---|---|---|
-| FR-P01 | P0 | 制作方針 SRC-02＋設計補完 / BIZ-04, BIZ-12 | 受託の状況を見るダッシュボード | 自社への依頼、受諾待ちの件数、期限、進捗を表示する。他社の案件は集計にも含めない。 |
-| FR-P02 | P0 | 制作方針 SRC-02＋設計補完 / BIZ-12 | 案件の受諾・辞退 | 本社(HQ)からの依頼(offer)を受諾または辞退できる。結果は本社の画面にも反映される。辞退した理由は記録に残す。 |
-| FR-P03 | P0 | 制作方針 SRC-02＋設計補完 / BIZ-12 | 日程と自社技術者の割り当て | 受諾した案件に、自社の有効な技術者を割り当てる。作業できる期間を限定する。期間外や他社の技術者への割り当ては拒否する。 |
-| FR-P04 | P0 | 制作方針 SRC-02＋設計補完 / BIZ-12 | 対象設備と異常の根拠の閲覧 | 受託した案件に必要な、場所、型番、通信状況、異常、履歴だけを見られる。顧客の請求内容は表示しない。 |
-| FR-P05 | P0 | 制作方針 SRC-02＋設計補完 / BIZ-12 | 報告の品質確認・差し戻し | 技術者が提出した報告を確認する。必須の記録が抜けている場合は、理由を付けて差し戻す。問題なければ受理して完了履歴に入れる。 |
-| FR-P06 | P1 | 制作方針 SRC-02＋設計補完 / BIZ-12 | 自社の作業者・稼働状況の閲覧 | 自社の技術者の資格・担当・予定を確認できる。他のユーザーへの権限付与や、他社の情報を見ることはできない。 |
-| FR-P07 | P1 | 制作方針 SRC-02＋設計補完 / BIZ-12, BIZ-20 | 案件の連絡・履歴 | 日程変更・差し戻し・完了についての通知の見本(プレビュー)と、案件の履歴を確認できる。実際には送信しない。 |
-| FR-P08 | P0 | 制作方針 SRC-02＋設計補完 / BIZ-12 | 委託・作業期間の境界 | 他社の案件、期間外の設備、請求内容の変更、制限の変更については、URLを直接操作したりサービスを直接呼び出したりしても拒否できるようにする。 |
+| FR-P01 | P0 | Production instructions SRC-02 + added design details / BIZ-04, BIZ-12 | Accepted-work dashboard | Show own company's offers, pending acceptance count, deadlines, and progress. Exclude other companies' jobs even from totals. |
+| FR-P02 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | Accept/decline jobs | Accept or decline HQ offers; reflect results in HQ screens and record decline reasons. |
+| FR-P03 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | Schedules and own technician assignments | Assign active own-company technicians to accepted jobs with limited work periods. Reject out-of-period or other-company assignments. |
+| FR-P04 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | View target units and alert evidence | View only locations, models, connectivity, alerts, and history needed for accepted jobs. Hide customer billing. |
+| FR-P05 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | Report quality review/rework | Review submitted technician reports. Return missing required records with a reason, or accept and add to completion history. |
+| FR-P06 | P1 | Production instructions SRC-02 + added design details / BIZ-12 | View own workers and availability | View own technicians' qualifications, assignments, and schedules. Cannot grant permissions or view other companies' data. |
+| FR-P07 | P1 | Production instructions SRC-02 + added design details / BIZ-12, BIZ-20 | Job communication/history | View schedule-change, rework, and completion notification previews and job history. No real sending. |
+| FR-P08 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | Delegation/work-period boundaries | Reject other-company jobs, out-of-period units, billing changes, and restriction changes even through direct URLs/service calls. |
 
-## 業務境界・依存関係
+## Business boundaries and dependencies
 
-誰が何をしてよいかは、[共通要件の権限マトリクス(表)](common.md)だけを基準にする。「画面を見てよい権限」と「変更してよい権限」は別々に分ける。サービスを呼び出す直前にも、もう一度権限を確認する。設備の性能、作業できる期間、契約の条件が変わったときは、古い画面に残っている許可をそのまま使わない。
+The [common permission matrix](common.md) is the sole authority for who can do what. Separate viewing from changing permissions. Recheck immediately before service calls. If capabilities, work periods, or contract conditions change, do not reuse old screen permissions.
 
-本物の機器操作、外部への通知、本物の決済、API認証(サーバーとのやり取りの本人確認)は、次のフェーズ(1B)で扱う。このフェーズ(1A)では、操作できるふりをするシミュレーション(模擬動作)を用意する。成功する場合だけでなく、拒否・失敗・データ欠けの場合も再現する。
+Real device control, external notifications, payments, and API authentication belong to phase 1B. Phase 1A simulates actions, including rejection, failure, and missing data as well as success.
 
-## 完了条件
+## Completion criteria
 
-- FR-P(この文書の機能要件)と、当てはまるFR-X・NFR(非機能要件)をすべて満たすこと。まだ作っていない部分を「対象外」に書き換えて、完成したことにしてはいけない。
-- [詳細設計](../02-design/contractor.md)に書かれた画面・サービス・エラー処理と、この文書の受入条件が対応していること。
-- [検証計画](../04-agentic-sdlc/verification.md)に沿って、AT-P(この文書の受入条件の番号)をすべて確認し、当てはまる場面の証拠を残すこと。
-- 判断がまだ決まっていない業務内容は、PrepareDocumentの「OPEN」という未決事項の一覧に戻し、モックで仮に決めた内容として報告すること。
+- Meet all FR-P and applicable FR-X/NFR requirements. Do not relabel unfinished work as out of scope to claim completion.
+- Map acceptance criteria to screens, services, and error handling in the [detailed design](../02-design/contractor.md).
+- Verify every AT-P under the [verification plan](../04-agentic-sdlc/verification.md) and retain applicable scenario evidence.
+- Return undecided business questions to PrepareDocument's OPEN list and report provisional mock decisions.
 
-## 機能別ユースケース・業務規則（0.6.0）
+## Feature use cases and business rules (0.6.0)
 
-上の表は目次にあたるものです。ここから先は、各要件について「業務をいつ始められるか」「どんな手順で進むか」「どんな結果になるか」「合格の条件は何か」を詳しく説明します。
+The table above is an index. The following sections explain entry conditions, steps, results, and acceptance criteria for each requirement.
 
-受入行の①②…はそのセル内の観測項目番号です。Givenの独立条件とThenの結果は記述内容で対応付け、複数assertionとcase IDを混同しません。失敗コードはD01の原因別優先表で一意に決定します。
+Numbers ①②… in acceptance cells identify observations within that cell. Match independent Given conditions to Then results by meaning; do not confuse multiple assertions with case IDs. D01's cause-based priority table determines one failure code.
 
-fixture(テスト用の決まったデータ)の名前は、[検証計画](../04-agentic-sdlc/verification.md)で決めた固定のfixtureを使います。
+Use the fixed fixtures named in the [verification plan](../04-agentic-sdlc/verification.md).
 
-企業からの原文には書かれていない、細かいしきい値や運用のルールは、DEC-09という決定事項として、このフェーズ(1A)向けの提案として扱います。本番で確定したルールと混同しないでください。
+Detailed thresholds and operating rules absent from the company original are phase 1A proposals under DEC-09, not confirmed production rules.
 
-### FR-P01 受託ダッシュボード
+### FR-P01 Accepted-work dashboard
 
-- **企業要望の根拠**: SRC-06 BIZ-04, BIZ-12 — 顧客、社内・外部の技術者、管理者・本社(HQ)が見やすいダッシュボード(状況を一目で見る画面)がほしい。定期点検、故障後の対応、予防のための保全をしたい。RTO(分割払いで所有権が移る契約)以外の一般的な保守にも使いたい。
-- **設計補完の範囲**: 受託案件のダッシュボード。施工業者を独立した存在として扱うことは、SRC-02という制作方針で決めたことであり、企業からの原文にある独立した役割ではありません。
+- **Company request basis**: SRC-06 BIZ-04, BIZ-12 — Clear dashboards for customers, internal/external technicians, and administrators/HQ; scheduled, reactive, and preventive maintenance, including general non-RTO maintenance.
+- **Added design details**: Dashboard for accepted jobs. The separate contractor role comes from production instruction SRC-02, not an independent role in the company original.
 
-- **利用開始条件**: 有効な施工業者としてのMembership(利用資格)があること。本社(HQ)からの依頼(offer)は、受諾する前でも案件の概要は見られる。
-- **基本フロー**: 自社の「受諾待ち」「予定」「進行中」「品質確認待ち」の件数を集計する → 状態を選んで案件の一覧を見る → 対象の案件の操作画面に進む。
-- **業務規則 BR-P01**: 受諾する前に見られるのは、案件の種類・エアコンに紐づく設置物件の登録住所・必要な資格・日程の候補までの情報。設備の詳しい数値や入場案内は、受諾したあとで、かつ作業できる期間内に限って見られる。
-- **完了後の業務状態**: 画面を見るだけでは、案件を受諾したことにはならない。集計の件数(KPI)と一覧に出す対象は、同じ検索条件でそろえる。
-- **境界条件・禁止事項**: 他社への依頼(offer)は件数に含めない。委託の期間が終わって設備が見られなくなっても、自社の受諾・辞退の履歴の最小限の記録は確認できる。
+- **Entry conditions**: Active contractor Membership. Before accepting an HQ offer, the job summary is visible.
+- **Main flow**: Count own pending acceptance, scheduled, active, and awaiting-quality-review jobs → select a status to view the list → open the job action screen.
+- **Business rule BR-P01**: Before acceptance, show only job type, the registered address of the AC's installation property, required qualifications, and candidate schedules. Detailed unit readings and entry instructions require acceptance and a valid work period.
+- **Resulting business state**: Viewing does not accept a job. KPI counts and listed targets use the same filters.
+- **Boundaries/prohibitions**: Exclude other companies' offers from counts. After delegation expires and unit access ends, retain minimal own acceptance/decline history.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-P01-N | `acceptancePatches["AT-P01-N"]`: contractor-aに未応答かつ期限内offered1、有効受諾期間内のaccepted1、submitted1（tech-external-aがjob-contractor-aをstart→`acceptancePatches["shared:report-draft-all-normal"]`の入力でsaveDraft→submit、IR97の3）、contractor-bにoffered1。期間条件なし。When: ①`/partner`をstatus条件なしで取得 ②status=offeredへ変更 | ①一覧3件、offerCount=1／activeCount=1／reviewCount=1 ②一覧1件、offerCount=1／activeCount=0／reviewCount=0、bのofferなし ③閲覧後も未応答Offer decision=null |
-| AT-P01-E | ①contractor-b宛offerのjobIdを直打ち ②委託期限後に自社履歴を開く | ①NOT_FOUND ②JobHistorySnapshot（自社決定・完了日）のみ、live値なし |
-| AT-P01-B | 同じofferを①受諾前 ②受諾後・期間内 ③委託失効後に開く | ①JobOfferSummary（設置物件の登録住所のみ参照、入場案内・telemetry・請求なし） ②JobDetail ③JobHistorySnapshot |
+| AT-P01-N | `acceptancePatches["AT-P01-N"]`: contractor-a has one unanswered unexpired offered job, one accepted job within its access period, and one submitted job (tech-external-a starts job-contractor-a → saveDraft with `acceptancePatches["shared:report-draft-all-normal"]` → submit, IR97 item 3); contractor-b has one offered job. No period filter. When: ① Get `/partner` without status filter ② Change to status=offered | ① Three rows, offerCount=1/activeCount=1/reviewCount=1 ② One row, offerCount=1/activeCount=0/reviewCount=0; no b offer ③ Unanswered Offer decision remains null after viewing |
+| AT-P01-E | ① Directly enter jobId of an offer to contractor-b ② Open own history after delegation expiry | ① NOT_FOUND ② Only JobHistorySnapshot (own decision/completion date), no live values |
+| AT-P01-B | Open the same offer ① Before acceptance ② After acceptance within the period ③ After delegation expiry | ① JobOfferSummary (registered installation-property address only; no entry instructions/telemetry/billing) ② JobDetail ③ JobHistorySnapshot |
 
-設計: [DD-P01](../02-design/contractor.md#dd-p01-詳細)。親ケースAT-P01は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-P01](../02-design/contractor.md#dd-p01-details). Assess parent AT-P01 using all N/E/B and applicable SRC/R01 cases in traceability.
 
-### FR-P02 案件受諾・辞退
+### FR-P02 Accept/decline jobs
 
-- **企業要望の根拠**: SRC-06 BIZ-12 — 定期点検、故障後の対応、予防のための保全をしたい。RTO以外の一般的な保守にも使いたい。
-- **設計補完の範囲**: 受諾・辞退の手順。施工業者を独立させることはSRC-02という制作方針で決めたことであり、企業からの原文にある独立した役割ではありません。
+- **Company request basis**: SRC-06 BIZ-12 — Scheduled, reactive, and preventive maintenance, including general non-RTO maintenance.
+- **Added design details**: Acceptance/decline steps. The separate contractor role comes from production instruction SRC-02, not the company original.
 
-- **利用開始条件**: 自社宛てに依頼(offered)が来ていること。依頼の期限(offerExpiresAt)より前であること。本社(HQ)がまだ取り消していないこと。未応答のまま期限が来た依頼は、案件がrequestedへ戻り自社の一覧から消える(IR48)。期限後の受諾・辞退はCONFLICT(errors.offer_expired)、案件の個別取得はNOT_FOUND(IR86)。
-- **基本フロー**: 案件の最小限の情報と委託の条件を確認する → 受諾するか、理由を付けて辞退する → 本社と自社の両方の画面の表示を更新する。
-- **業務規則 BR-P02**: 受諾することと、技術者を割り当てることや予約を確定することは別のことである。辞退した場合は「まだ担当が決まっていない状態(requested)」に戻し、辞退した人・理由・依頼番号(offerId)を記録に残す。もう一度委託する場合は、新しい依頼番号を発行する。
-- **完了後の業務状態**: 受諾すると`accepted`(受諾済み)になり、必要な設備を見る権限を、委託の期間内だけ開く。辞退した場合は、詳しい情報を見る権限は与えない。
-- **境界条件・禁止事項**: 期限とちょうど同じ時刻に受諾・辞退しようとした場合は、いったん拒否して情報を取り直させる。受諾しようとした直前に本社が取り消していた場合(競合、CONFLICT)は、自動的に上書きしない。
+- **Entry conditions**: An offered job addressed to own company, before offerExpiresAt, not cancelled by HQ. An unanswered expired offer returns the job to requested and removes it from the contractor list (IR48). Acceptance/decline after expiry returns CONFLICT(errors.offer_expired); individual job reads return NOT_FOUND (IR86).
+- **Main flow**: Check minimal job details and delegation terms → accept or decline with a reason → update HQ and contractor displays.
+- **Business rule BR-P02**: Acceptance does not assign a technician or confirm a booking. Decline returns the job to requested and records actor, reason, and offerId. A new offer receives a new offerId.
+- **Resulting business state**: Acceptance sets `accepted` and grants needed unit access only during the delegated period. Decline grants no detailed access.
+- **Boundaries/prohibitions**: Reject acceptance/decline exactly at expiry and require refetch. If HQ cancelled just before acceptance (CONFLICT), do not overwrite automatically.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-P02-N | hq-operatorがjob-internal-aをcontractor-aへoffer（offerExpiresAt=2026-09-15T01:00Z、accessValidFrom=2026-09-14T01:00Z、accessValidUntil=2026-09-22T00:00Z）。When: contractor-aがaccept | ①Job accepted、Offer decision=accept、decidedBy保存 ②HQ一覧でaccepted ③対象設備が期間内で閲覧可 |
-| AT-P02-E | ①now=offerExpiresAtで受諾／辞退 ②表示後にHQが取消→旧版で受諾 | ①CONFLICT、再取得案内、状態不変 ②CONFLICT、cancelled維持 |
-| AT-P02-B | ①accept ②decline（理由あり） ③辞退後の再委託 | ①accepted ②requested、declineReason・offerId保持、設備閲覧権なし ③新offerId |
+| AT-P02-N | hq-operator offers job-internal-a to contractor-a (offerExpiresAt=2026-09-15T01:00Z, accessValidFrom=2026-09-14T01:00Z, accessValidUntil=2026-09-22T00:00Z). When: contractor-a accepts | ① Job accepted, Offer decision=accept, decidedBy saved ② HQ list shows accepted ③ Target unit viewable within period |
+| AT-P02-E | ① Accept/decline at now=offerExpiresAt ② HQ cancels after display → accept using old version | ① CONFLICT, refetch guidance, unchanged state ② CONFLICT, remains cancelled |
+| AT-P02-B | ① accept ② decline with reason ③ Re-offer after decline | ① accepted ② requested, declineReason/offerId retained, no unit viewing permission ③ New offerId |
 
-設計: [DD-P02](../02-design/contractor.md#dd-p02-詳細)。親ケースAT-P02は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-P02](../02-design/contractor.md#dd-p02-details). Assess parent AT-P02 using all N/E/B and applicable SRC/R01 cases in traceability.
 
-### FR-P03 日程と自社技術者割当
+### FR-P03 Schedules and own technician assignments
 
-- **企業要望の根拠**: SRC-06 BIZ-12 — 定期点検、故障後の対応、予防のための保全をしたい。RTO以外の一般的な保守にも使いたい。
-- **設計補完の範囲**: 自社担当の割り当てと資格の確認。施工業者を独立させることはSRC-02という制作方針で決めたことであり、企業からの原文にある独立した役割ではありません。
+- **Company request basis**: SRC-06 BIZ-12 — Scheduled, reactive, and preventive maintenance, including general non-RTO maintenance.
+- **Added design details**: Own-staff assignment and qualification checks. The separate contractor role comes from production instruction SRC-02, not the company original.
 
-- **利用開始条件**: 受諾済みの案件で、自社の担当割り当てを管理する権限を持っていること。
-- **基本フロー**: 希望の日時の枠と委託の期間を確認する → 自社の、資格があり空いている有効な技術者を探す → 作業の開始・終了の時刻を指定する → 割り当てを確認する → 日程と担当者を共有する。
-- **業務規則 BR-P03**: 候補を探す段階だけで権限の判定を済ませず、保存する直前にもう一度、所属・資格・期間を確認し直す。予定が重なる場合は警告を出す。同じ時間帯にすでに確定した予定がある場合は、このフェーズ(1A)では保存を拒否する。
-- **完了後の業務状態**: 最初の割り当てでは、Assignment(割り当て)を作り、日程(scheduledSlot)を確定し、案件を「担当決定(assigned)」にする。担当を変更する場合は、元の「担当決定」または「作業中(in_progress)」の状態を保ったまま、古い割り当てを無効にし、案件の日程(scheduledSlot)と割り当てIDを新しい割り当てに合わせて更新する(IR89)。もとの報告の作成者はそのままにして、変更した理由を記録する。
-- **境界条件・禁止事項**: 他社の技術者、資格のない技術者、委託の期間外への割り当ては拒否する。作業中の担当変更は、理由がなければ保存できない。変更前の技術者は、変更後すぐに操作できなくなる。
+- **Entry conditions**: Accepted job and permission to manage own assignments.
+- **Main flow**: Check requested slot/delegation period → find active, qualified, available own-company technicians → set work start/end → confirm assignment → share schedule/assignee.
+- **Business rule BR-P03**: Recheck membership, qualifications, and period just before saving, not only during candidate search. Warn on overlapping schedules. Phase 1A rejects saving when a confirmed schedule already occupies the same time.
+- **Resulting business state**: First assignment creates Assignment, confirms scheduledSlot, and sets Job to `assigned`. Reassignment preserves `assigned` or `in_progress`, disables the old assignment, and updates the job's scheduledSlot/assignment ID to the new assignment (IR89). Preserve original report authorship and record the change reason.
+- **Boundaries/prohibitions**: Reject other-company, unqualified, and out-of-delegation-period assignments. Reassignment during work requires a reason. The previous technician loses action access immediately.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-P03-N | AT-P02-Nで受諾したjob-internal-a、tech-external-a（有資格・contractor-a、seedのassignment-contractor-aは2026-09-20T00:00Zまで）。When: 2026-09-21 10:00〜12:00（Asia/Kuala_Lumpur）で割当 | ①Assignment作成 ②scheduledSlot確定 ③Job assigned ④tech-external-aにtemplateKey=schedule_changeの通知1件（inApp・simulated）。customer-a・hq-operator・hq-restriction-managerにも各1件、actorのcontractor-aには0件（IR95） |
-| AT-P03-E | ①contractor-bの技術者 ②無資格 ③委託期間外 ④in_progressで理由なし再割当 ⑤理由あり再割当 | ①NOT_FOUND ②FORBIDDEN ③VALIDATION（指定枠が委託期間に収まらない）、割当0件 ④VALIDATION ⑤成功、Jobはin_progress維持 |
-| AT-P03-B | ①非重複日程 ②同時間帯の確定重複 ③保存直前に候補の資格を失効 | ①成功 ②CONFLICT ③FORBIDDEN |
+| AT-P03-N | job-internal-a accepted in AT-P02-N; tech-external-a (qualified, contractor-a; seed assignment-contractor-a lasts until 2026-09-20T00:00Z). When: Assign 2026-09-21 10:00–12:00 (Asia/Kuala_Lumpur) | ① Assignment created ② scheduledSlot confirmed ③ Job assigned ④ One templateKey=schedule_change notification to tech-external-a (inApp, simulated); one each to customer-a, hq-operator, hq-restriction-manager; zero to actor contractor-a (IR95) |
+| AT-P03-E | ① contractor-b technician ② Unqualified ③ Outside delegation period ④ Reassign in_progress without reason ⑤ Reassign with reason | ① NOT_FOUND ② FORBIDDEN ③ VALIDATION (slot outside delegation period), zero assignments ④ VALIDATION ⑤ Success, Job remains in_progress |
+| AT-P03-B | ① Non-overlapping schedule ② Overlap with confirmed schedule ③ Candidate qualification revoked just before save | ① Success ② CONFLICT ③ FORBIDDEN |
 
-**追加受入条件 AT-P03-R01（再訪・競合・役割横断）**
+**Additional acceptance AT-P03-R01 (revisit, conflict, cross-role)**
 
-| 受入ID | Given / When | Then |
+| Acceptance ID | Given / When | Then |
 |---|---|---|
-| AT-P03-R01 | `acceptancePatches["AT-P03-R01"]`でcontractor-aの2人目tech-external-a2を追加。tech-external-aがjob-contractor-aをstartしたin_progressで、tech-external-aからtech-external-a2へ理由付き再割当 | Jobはin_progressのまま、旧担当aの変更を拒否。bは新draft版で継続し、旧版・元作者は不変。 |
+| AT-P03-R01 | `acceptancePatches["AT-P03-R01"]` adds second contractor-a technician tech-external-a2. After tech-external-a starts job-contractor-a (in_progress), reassign from tech-external-a to tech-external-a2 with a reason | Job stays in_progress; reject changes by old assignee a. New assignee b continues in a new draft version; old versions/original author stay unchanged. |
 
-設計: [DD-P03](../02-design/contractor.md#dd-p03-詳細)。親ケースAT-P03は追跡表に登録したN/E/B・R01および該当SRCの全件で判定する。
+Design: [DD-P03](../02-design/contractor.md#dd-p03-details). Assess parent AT-P03 using all N/E/B/R01 and applicable SRC cases in traceability.
 
-### FR-P04 対象設備と異常根拠閲覧
+### FR-P04 View target units and alert evidence
 
-- **企業要望の根拠**: SRC-06 BIZ-12 — 定期点検、故障後の対応、予防のための保全をしたい。RTO以外の一般的な保守にも使いたい。
-- **設計補完の範囲**: 対象の設備と異常の根拠を、必要な範囲だけ見られるようにする。施工業者を独立させることはSRC-02という制作方針で決めたことであり、企業からの原文にある独立した役割ではありません。
+- **Company request basis**: SRC-06 BIZ-12 — Scheduled, reactive, and preventive maintenance, including general non-RTO maintenance.
+- **Added design details**: Access only needed target units/alert evidence. The separate contractor role comes from production instruction SRC-02, not the company original.
 
-- **利用開始条件**: 受諾済みで有効な委託に、対象の設備が含まれていること。
-- **基本フロー**: 案件から設備を開く → 場所・型番・保守の範囲・通信の状態・異常の根拠を見る → 案件の画面に戻る。
-- **業務規則 BR-P04**: 診断に必要な値だけを、見るだけ(読み取り専用)の形で表示する。請求、支払い、他の契約、全顧客の履歴は取得しない。製品番号(serial)や場所の情報は、必要な範囲だけに限る。
-- **完了後の業務状態**: この画面では業務は何も更新されない。委託が終わったあとは、顧客の設備の今の値(live値)は表示せず、自社の案件履歴の最小限の参照だけに戻す。
-- **境界条件・禁止事項**: 画面を開いたまま期限を過ぎても、次にデータを取りに行くときには拒否し、キャッシュ(一時的な保存データ)は破棄する。監視の値を見られることを、操作の権限があることだと扱ってはいけない。
+- **Entry conditions**: Target unit belongs to an accepted, valid delegation.
+- **Main flow**: Open unit from job → view location/model/maintenance scope/connectivity/alert evidence → return to job.
+- **Business rule BR-P04**: Show only readings needed for diagnosis, read-only. Do not retrieve billing, payments, other contracts, or all customer history. Limit serial/location details to what is needed.
+- **Resulting business state**: No business update. After delegation ends, remove live customer-unit values and return to minimal own-job history references.
+- **Boundaries/prohibitions**: If the screen stays open past expiry, reject the next read and clear cache. Viewing monitoring values does not grant control permission.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-P04-N | accepted案件内のunit-online-rto。When: 案件から設備を開く | ①場所・型番・保守範囲・connection・alert根拠 ②請求・支払い・連絡先の項目なし ③制御ボタンなし ④書込み0件 |
-| AT-P04-E | 画面を開いたままnow=validUntilにして再読取 | FORBIDDEN、キャッシュ破棄、JobHistorySnapshotへ |
-| AT-P04-B | ①期間内 ②期間終了後 | ①live値・観測時刻 ②最小参照のみ |
+| AT-P04-N | unit-online-rto in an accepted job. When: Open unit from job | ① Location/model/maintenance scope/connection/alert evidence ② No billing/payment/contact fields ③ No control buttons ④ Zero writes |
+| AT-P04-E | Keep screen open, set now=validUntil, read again | FORBIDDEN, clear cache, show JobHistorySnapshot |
+| AT-P04-B | ① Within period ② After period | ① Live values/observation time ② Minimal references only |
 
-設計: [DD-P04](../02-design/contractor.md#dd-p04-詳細)。親ケースAT-P04は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-P04](../02-design/contractor.md#dd-p04-details). Assess parent AT-P04 using all N/E/B and applicable SRC/R01 cases in traceability.
 
-### FR-P05 報告品質確認・差戻し
+### FR-P05 Report quality review and rework
 
-- **企業要望の根拠**: SRC-06 BIZ-12 — 定期点検、故障後の対応、予防のための保全をしたい。RTO以外の一般的な保守にも使いたい。
-- **設計補完の範囲**: 報告の品質確認と差し戻しの方法。施工業者を独立させることはSRC-02という制作方針で決めたことであり、企業からの原文にある独立した役割ではありません。
+- **Company request basis**: SRC-06 BIZ-12 — Scheduled, reactive, and preventive maintenance, including general non-RTO maintenance.
+- **Added design details**: Report quality review/rework. The separate contractor role comes from production instruction SRC-02, not the company original.
 
-- **利用開始条件**: 提出済み(submitted)の状態にある、自社が委託された案件であること。品質を確認する担当者は、報告を作った技術者本人とは別の人であること。
-- **基本フロー**: 提出された点検内容・写真・測定値・作業内容・次回の対応を確認する → 受理するか、理由を書いて差し戻す → 技術者・顧客・本社(HQ)に結果を伝える。
-- **業務規則 BR-P05**: 受理するためには、必須の点検記録と根拠がそろっていることが必要。「点検していない」「対象外」とされた理由が正しいかどうかも確認する。品質確認の担当者は、技術者が書いた元の記録を書き換えない。
-- **完了後の業務状態**: 受理すると`completed`(完了)、差し戻すと`rework_requested`(やり直し依頼)になる。品質確認の履歴は、その報告のバージョンに結びつける。完了しても、アラート(警告)が自動で消えるわけではない。
-- **境界条件・禁止事項**: 自分で作った報告を自分で承認すること、古いバージョンの報告への操作、理由を書かない差し戻しは、いずれも拒否する。差し戻したあとに、古い受理の操作が届いても、完了扱いにはしない。
+- **Entry conditions**: Own delegated job in submitted state. Quality reviewer must be a different person from the report author.
+- **Main flow**: Review submitted inspections/photos/readings/work/next actions → accept or return with reason → inform technician/customer/HQ.
+- **Business rule BR-P05**: Acceptance requires all mandatory inspection records/evidence, including valid reasons for not inspected/not applicable. Reviewers do not rewrite original technician records.
+- **Resulting business state**: Accept → `completed`; return → `rework_requested`. Link review history to report version. Completion does not automatically resolve alerts.
+- **Boundaries/prohibitions**: Reject self-approval, actions on old report versions, and returns without reasons. A stale acceptance arriving after a return must not complete the job.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-P05-N | tech-external-aがjob-contractor-aをstart→全点検項目を入力してsaveDraft（v1）→submitした報告、品質担当はcontractor-a（別user）。When: contractor-aがaccept | ①completed ②reviewHistoryがv1に紐付く ③顧客が報告本文を取得可 ④Alertはopen維持 |
-| AT-P05-E | ①作者と同userIdの別Membershipで受理 ②reportVersion=0で受理 ③return理由なし ④returnの後にv1でaccept | ①FORBIDDEN ②VALIDATION（versionは正整数） ③VALIDATION ④CONFLICT、rework_requested維持 |
-| AT-P05-B | ①全点検記録あり ②未点検あり理由あり ③未点検あり理由なしで技術者が提出 | ①②受理可 ③提出がVALIDATIONとなりsubmittedにならず、品質確認の対象に出ない（IR100） |
+| AT-P05-N | tech-external-a starts job-contractor-a → fills every inspection item and saveDraft (v1) → submits. Reviewer contractor-a has a different user. When: contractor-a accepts | ① completed ② reviewHistory linked to v1 ③ Customer can retrieve report body ④ Alert remains open |
+| AT-P05-E | ① Accept through another Membership with author's userId ② Accept reportVersion=0 ③ Return without reason ④ Accept v1 after return | ① FORBIDDEN ② VALIDATION (version must be positive integer) ③ VALIDATION ④ CONFLICT, remains rework_requested |
+| AT-P05-B | ① All inspection records present ② Not-inspected items with reasons ③ Technician submits not-inspected items without reasons | ①② Can accept ③ Submission returns VALIDATION, never becomes submitted, not listed for quality review (IR100) |
 
-**追加受入条件 AT-P05-R01（再訪・競合・役割横断）**
+**Additional acceptance AT-P05-R01 (revisit, conflict, cross-role)**
 
-| 受入ID | Given / When | Then |
+| Acceptance ID | Given / When | Then |
 |---|---|---|
-| AT-P05-R01 | 技術者が写真付き報告を提出→サインアウト→業者品質担当で再ログイン | reports.getとattachments.getContentから同じ写真・報告版を再表示する。顧客は受理前に本文取得不可、受理後は取得可。 |
+| AT-P05-R01 | Technician submits report with photos → signs out → contractor quality reviewer signs in | reports.get and attachments.getContent redisplay the same photos/report version. Customer cannot retrieve body before acceptance but can afterward. |
 
-設計: [DD-P05](../02-design/contractor.md#dd-p05-詳細)。親ケースAT-P05は追跡表に登録したN/E/B・R01および該当SRCの全件で判定する。
+Design: [DD-P05](../02-design/contractor.md#dd-p05-details). Assess parent AT-P05 using all N/E/B/R01 and applicable SRC cases in traceability.
 
-### FR-P06 自社作業者・稼働閲覧
+### FR-P06 View own workers and availability
 
-- **企業要望の根拠**: SRC-06 BIZ-12 — 定期点検、故障後の対応、予防のための保全をしたい。RTO以外の一般的な保守にも使いたい。
-- **設計補完の範囲**: 自社の作業者・資格・稼働状況を見る方法。施工業者を独立させることはSRC-02という制作方針で決めたことであり、企業からの原文にある独立した役割ではありません。
+- **Company request basis**: SRC-06 BIZ-12 — Scheduled, reactive, and preventive maintenance, including general non-RTO maintenance.
+- **Added design details**: Own workers, qualifications, and availability views. The separate contractor role comes from production instruction SRC-02, not the company original.
 
-- **利用開始条件**: 自社の作業者の一覧を読む権限があること。ユーザーを新しく作る権限は含まない。
-- **基本フロー**: 日付・資格・有効か失効かを選ぶ → 自社の技術者の割り当てと空いている枠を確認する → 対象の案件への割り当てに進む。
-- **業務規則 BR-P06**: 稼働率は、「割り当てられた時間」を「その期間に作業できる時間として設定された時間」で割って計算する。例えば作業できる時間が8時間で割り当てが4時間なら50%になる。分母(作業できる時間)が決まっていない場合は、割合は出さない。個人の位置情報の追跡や、他社の予定は表示しない。
-- **完了後の業務状態**: 見るだけでは、所属や資格は変わらない。所属を変えたい場合は、本社(HQ)に調整を依頼する。
-- **境界条件・禁止事項**: URLに書かれた会社IDを書き換えて、他社の名簿を取得することはできない。失効した技術者を、割り当ての候補として選ぶことはできない。
+- **Entry conditions**: Permission to read own-company roster; no user creation permission included.
+- **Main flow**: Select date/qualification/active or expired → view own technicians' assignments/free slots → proceed to job assignment.
+- **Business rule BR-P06**: Utilization = assigned hours / configured available hours for the period. For example, 4 assigned hours out of 8 available = 50%. If available hours are undefined, show no percentage. Do not show personal location tracking or other-company schedules.
+- **Resulting business state**: Viewing does not change membership/qualifications. Ask HQ to coordinate membership changes.
+- **Boundaries/prohibitions**: Changing company ID in the URL cannot retrieve another company's roster. Expired technicians cannot be selected for assignment.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-P06-N | `acceptancePatches["AT-P06-N"]`でcontractor-aの技術者を2名（tech-external-a、tech-external-a2）にする。When: date=2026-09-15、activeOnly=true | ①2名の割当と空き枠 ②他社0名 ③書込み0件 |
-| AT-P06-E | ①URLの会社IDをcontractor-bへ ②失効した技術者を候補に選ぶ | ①NOT_FOUND ②候補に表示されず、直接指定はFORBIDDEN |
-| AT-P06-B | `acceptancePatches["AT-P06-B"]`: ①tech-external-a2のdate=2026-09-15（作業可能8h・割当4h） ②date=2026-09-19（土曜で作業可能区間なし） ③contractor-bのtech-external-b | ①50% ②「—」 ③非表示 |
+| AT-P06-N | `acceptancePatches["AT-P06-N"]` gives contractor-a two technicians (tech-external-a, tech-external-a2). When: date=2026-09-15, activeOnly=true | ① Assignments/free slots for two people ② Zero other-company people ③ Zero writes |
+| AT-P06-E | ① Change URL company ID to contractor-b ② Select expired technician | ① NOT_FOUND ② Not listed; direct selection FORBIDDEN |
+| AT-P06-B | `acceptancePatches["AT-P06-B"]`: ① tech-external-a2, date=2026-09-15 (8h available/4h assigned) ② date=2026-09-19 (Saturday, no available intervals) ③ contractor-b's tech-external-b | ① 50% ② “—” ③ Hidden |
 
-設計: [DD-P06](../02-design/contractor.md#dd-p06-詳細)。親ケースAT-P06は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-P06](../02-design/contractor.md#dd-p06-details). Assess parent AT-P06 using all N/E/B and applicable SRC/R01 cases in traceability.
 
-### FR-P07 案件連絡・履歴
+### FR-P07 Job communication and history
 
-- **企業要望の根拠**: SRC-06 BIZ-12, BIZ-20 — 定期点検、故障後の対応、予防のための保全をしたい。RTO以外の一般的な保守にも使いたい。小型・低価格で空調の中に設置する機器について、ファームウェア(機器を動かすソフト)の更新や、取り外し・盗難への対策と通知をしたい。
-- **設計補完の範囲**: 案件の連絡と異常の共有方法。施工業者を独立させることはSRC-02という制作方針で決めたことであり、企業からの原文にある独立した役割ではありません。
+- **Company request basis**: SRC-06 BIZ-12, BIZ-20 — Scheduled, reactive, preventive, and general non-RTO maintenance; firmware updates and removal/theft protection/notifications for small low-cost in-unit devices.
+- **Added design details**: Job communication and alert sharing. The separate contractor role comes from production instruction SRC-02, not the company original.
 
-- **利用開始条件**: 自社の案件について、連絡や履歴を見る権限があること。
-- **基本フロー**: 案件の履歴を開く → 日程調整・品質連絡のテンプレート(定型文)を選ぶ → メモの内容と宛先の役割を確認する → アプリ内の記録と、外部送信の見本(プレビュー)を作る。
-- **業務規則 BR-P07**: 実際には送信しない。顧客の履歴(jobs.events)からはvisibility=internalのメモを含むイベント自体を除外する(IR42)。宛先は、その案件に関わる本社(HQ)・担当の技術者・顧客の窓口だけに限る。社内向けの品質についてのメモは、初期設定では顧客には見せない。
-- **完了後の業務状態**: メモ(Note)を、作成者と公開範囲の情報とともに保存する。見本(プレビュー)を作っただけでは、「送信済み(deliveryState=sent)」の状態には変えない。
-- **境界条件・禁止事項**: 自由に入力したメールの宛先、他の案件への宛先、顧客の請求内容の転記は拒否する。保存に失敗しても、書いたメモの内容は消さずに残す。
+- **Entry conditions**: Permission to view communication/history for own jobs.
+- **Main flow**: Open job history → choose schedule/quality template → confirm note and recipient role → create in-app record and external-send preview.
+- **Business rule BR-P07**: No real sending. Exclude entire events containing visibility=internal notes from customer jobs.events (IR42). Recipients are limited to involved HQ, assigned technician, and customer contact. Internal quality notes are hidden from customers by default.
+- **Resulting business state**: Save Note with author and visibility. Creating a preview does not set deliveryState=sent.
+- **Boundaries/prohibitions**: Reject free-form email recipients, recipients from other jobs, and copied customer billing details. Preserve note text on save failure.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-P07-N | job-contractor-a。When: template=schedule_change、recipient=hq、visibility=internal、channel=emailでプレビュー | ①JobNote保存、authorId ②NotificationPreview deliveryState=preview ③顧客画面にNote非表示 |
-| AT-P07-E | ①任意メール宛先 ②他案件の宛先 ③請求レコード参照params ④保存失敗 | ①②③D01による単一エラー ④メモ本文を保持 |
-| AT-P07-B | ①internal ②customer ③許可宛先 ④外部自由宛先 | ①顧客非表示 ②顧客表示 ③プレビュー生成 ④拒否 |
+| AT-P07-N | job-contractor-a. When: Preview template=schedule_change, recipient=hq, visibility=internal, channel=email | ① JobNote saved with authorId ② NotificationPreview deliveryState=preview ③ Note hidden from customer |
+| AT-P07-E | ① Arbitrary email recipient ② Other-job recipient ③ Billing-record reference params ④ Save failure | ①②③ One error per D01 ④ Preserve note body |
+| AT-P07-B | ① internal ② customer ③ Allowed recipient ④ Free-form external recipient | ① Hidden from customer ② Visible to customer ③ Preview created ④ Rejected |
 
-**追加受入条件 AT-P07-R01（再訪・競合・役割横断）**
+**Additional acceptance AT-P07-R01 (revisit, conflict, cross-role)**
 
-| 受入ID | Given / When | Then |
+| Acceptance ID | Given / When | Then |
 |---|---|---|
-| AT-P07-R01 | 案件a/bがありjobId=aへメモを保存して再訪する | aの履歴だけに作者・公開範囲付きメモがある。bに追加0件。jobId省略はVALIDATION。 |
+| AT-P07-R01 | Jobs a/b exist; save note to jobId=a and revisit | Note with author/visibility appears only in a's history. Zero additions to b. Missing jobId returns VALIDATION. |
 
-設計: [DD-P07](../02-design/contractor.md#dd-p07-詳細)。親ケースAT-P07は追跡表に登録したN/E/B・R01および該当SRCの全件で判定する。
+Design: [DD-P07](../02-design/contractor.md#dd-p07-details). Assess parent AT-P07 using all N/E/B/R01 and applicable SRC cases in traceability.
 
-### FR-P08 委託・期間の境界
+### FR-P08 Delegation and period boundaries
 
-- **企業要望の根拠**: SRC-06 BIZ-12 — 定期点検、故障後の対応、予防のための保全をしたい。RTO以外の一般的な保守にも使いたい。
-- **設計補完の範囲**: 委託先と担当期間にもとづくアクセス制限。施工業者を独立させることはSRC-02という制作方針で決めたことであり、企業からの原文にある独立した役割ではありません。
+- **Company request basis**: SRC-06 BIZ-12 — Scheduled, reactive, and preventive maintenance, including general non-RTO maintenance.
+- **Added design details**: Access limits by contractor and assignment period. The separate contractor role comes from production instruction SRC-02, not the company original.
 
-- **利用開始条件**: 施工業者としてアクセスする、すべての画面(route)とデータ操作(Repository操作)が対象。
-- **基本フロー**: Membership(利用資格)を確認する → 自社への依頼・委託・期間を確認する → 必要最小限のデータだけを返す → 操作の直前にもう一度確認する。
-- **業務規則 BR-P08**: 今の値(live値)が見られる設備は、受諾済みで、かつ作業できる期間内のものだけ。委託が終わったあとの履歴は、自社の受諾・辞退・作業についての最小限の記録のみで、「過去にアクセスしたことがある」ことを理由に顧客のデータを全部返してはいけない。
-- **完了後の業務状態**: 拒否した場合は、業務は何も変わらない。監査(記録の確認)には、秘密の情報は含めず、拒否した理由のコードだけを記録する。ログインし直す(session切替)と、古い検索条件(Query)は破棄する。
-- **境界条件・禁止事項**: 他社の案件番号(jobId)、期限とちょうど同じ時刻、まだ受諾していない設備、請求の変更、制限の操作は、それぞれ拒否する。禁止されたデータは、応答の中にも含めない。
+- **Entry conditions**: Applies to all contractor routes and Repository operations.
+- **Main flow**: Check Membership → own offer/delegation/period → return minimum required data → recheck just before action.
+- **Business rule BR-P08**: Live unit access requires acceptance and a valid work period. After delegation ends, history contains only minimal own acceptance/decline/work records. Previous access never justifies returning all customer data.
+- **Resulting business state**: Rejection makes no business changes. Audit records only a reason code, without secret data. Session switching clears old Queries.
+- **Boundaries/prohibitions**: Reject other-company jobId, exact expiry time, unaccepted units, billing changes, and restriction actions. Responses must not contain forbidden data.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-P08-N | contractor-a session。When: 全route・Repository操作 | ①最小projection ②操作直前に再確認 ③拒否時の業務変更0件 |
-| AT-P08-E | ①他社jobId ②now=validUntil ③未受諾設備 ④invoices.create ⑤restrictions.schedule | 各D01による単一エラー、監査に理由コード、応答に禁止データなし |
-| AT-P08-B | ①未受諾 ②期間内受諾済み ③期間失効 | ①JobOfferSummary ②JobDetail＋live設備 ③JobHistorySnapshotのみ |
+| AT-P08-N | contractor-a session. When: All routes/Repository operations | ① Minimal projection ② Recheck before action ③ Zero business changes on rejection |
+| AT-P08-E | ① Other-company jobId ② now=validUntil ③ Unaccepted unit ④ invoices.create ⑤ restrictions.schedule | One error each under D01, audit reason code, no forbidden response data |
+| AT-P08-B | ① Unaccepted ② Accepted within period ③ Expired period | ① JobOfferSummary ② JobDetail + live unit ③ JobHistorySnapshot only |
 
-設計: [DD-P08](../02-design/contractor.md#dd-p08-詳細)。親ケースAT-P08は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-P08](../02-design/contractor.md#dd-p08-details). Assess parent AT-P08 using all N/E/B and applicable SRC/R01 cases in traceability.
 
 
-0.9.0修正契約: [厳格レビュー修正契約](../02-design/strict-review-contracts.md)と[操作別版契約](../02-design/write-version-catalog.csv)を併読する。
+0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 
-現行0.21.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+Additional current 0.21.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–106. They override older text on the same issues; use IR72 for conflict priority.
 
-0.14.0: IR25に従い、受諾前住所は設備の設置物件から取得し、期限後の報告表示は報告有無・受理状態だけを凍結する。
+0.14.0: Under IR25, the pre-acceptance address comes from the unit's installation property. After expiry, freeze only report existence/acceptance status.
 
-0.15.0: FR-P01の一覧・集計はIR26/IR30、FR-P05の自己承認禁止はIR31の提出版全寄与者で判定する。
+0.15.0: FR-P01 lists/counts follow IR26/IR30. FR-P05 self-approval checks all contributors to the submitted version under IR31.
 
-案件一覧には状態（業務順）・重大度・期限の昇順/降順ソートを設ける。デフォルトは状態の業務順（IR34）。全対象を並べ替えてからページ分割し、言語切替では順序を変えない。受入はAT-REV16-005を併用する。
+Job lists support ascending/descending sorting by status (business order), severity, and deadline. Default: status in business order (IR34). Sort all results before pagination; language changes do not change order. Also use AT-REV16-005 for acceptance.

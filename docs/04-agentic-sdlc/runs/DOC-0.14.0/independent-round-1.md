@@ -1,130 +1,130 @@
-# DOC-0.14.0 独立レビュー Round 1
+# DOC-0.14.0 Independent Review Round 1
 
-Reviewer: `/root/independent_review`。修正担当: `/root`。IoT/非同期/制限・決済の補助独立レビュー: `/root/state_review`。
-対象: 1Aフロントエンドモックの仕様文書。baseline: `f8e6cdd8387f1e623f69616518f41108e55ae9cd5f7ec4b223be5776238f4096`。実装・アプリ試験・本番接続は評価対象外。
+Reviewer: `/root/independent_review`. Correction author: `/root`. Supporting independent review of IoT/asynchronous behavior/restrictions and payments: `/root/state_review`.
+Scope: Specification documents for the 1A frontend mock. baseline: `f8e6cdd8387f1e623f69616518f41108e55ae9cd5f7ec4b223be5776238f4096`. Implementation, application testing, and production connections are outside the assessment scope.
 
 ## 1. Executive Review Summary
 
-G1: **changes_requested**。6件（CRITICAL 1 / MAJOR 3 / MINOR 2）。再割当後の自己承認判定、案件重大度・完了日時の生成規則、絞込後の受入期待値に不足がある。今回の住所取得元、期限後の報告3状態、停止理由、機種保存理由の分岐は、下記の関連不整合を除き型・操作・UI契約で整合している。
+G1: **changes_requested**. Six findings (CRITICAL 1 / MAJOR 3 / MINOR 2). Gaps remain in self-approval checks after reassignment, rules for generating job severity and completion timestamps, and acceptance expectations after filtering. The address source, three post-expiry report states, disabled reasons, and branches for model-save reasons are consistent across types, operations, and UI contracts, apart from the related inconsistencies below.
 
-既存の自己レビュー合格・静的検証合格を独立合格の代用にしていない。Prepare/DEC-12〜16、共通・全役割要件と設計、D/SR/IR、正規型、操作・版・Query・画面・Componentのカタログ、追跡表を照合した。補助担当は制限の部分解除、旧bindingイベント、遅延ack、決済試行排他等を別途照合し、新規指摘0件。
+Existing self-review passes and static validation passes were not used in place of independent approval. Reviewed Prepare/DEC-12–16, common and all-role requirements and designs, D/SR/IR, canonical types, operation/version/Query/screen/Component catalogs, and traceability tables. The supporting reviewer separately checked partial restriction release, old-binding events, late acknowledgments, payment-attempt exclusivity, and related cases, finding zero new issues.
 
 ## 2. BLOCKER Issues
 
-検出なし。
+None found.
 
 ## 3. CRITICAL Issues
 
-### IRV-006 — 再割当された報告の編集者を自己承認判定から除外できる
+### IRV-006 — Editors of reassigned reports can be excluded from self-approval checks
 
-- Document / Location: `02-design/contractor.md` DD-P05 reviewerId、`deterministic-contracts.md` D06、`strict-review-contracts.md` SR07、FR-P05。
-- Problem: DD-P05はreport.authorIdとの不一致だけを要求する。一方、再割当は元作者を保存し、新担当が更新した項目だけ作者を更新する。本文・写真等の追加編集者も含めた版単位の自己承認判定がない。
-- Why it matters: DEC-12の別人による品質確認を満たせない。
-- Example Failure: T1作成→T2へ再割当→T2が編集・提出→T2が別Membershipの品質担当/HQで受理。T2 != 元のreport.authorIdなので通過する。
-- Required Fix: 提出版の作成・編集寄与userIdをRepositoryが記録し、自己承認拒否へ使う。元作者・項目作者履歴を維持し、別Membership/HQでも同じ判定にする。
-- Suggested Revision: 版の内部寄与者集合を継承し、実内容変更者だけを追加。本文・測定・写真も対象。無編集の閲覧/割当を寄与としない。寄与者の受理・差戻しはFORBIDDEN、第三者だけ許可する受入例を追加する。
+- Document / Location: `02-design/contractor.md` DD-P05 reviewerId, `deterministic-contracts.md` D06, `strict-review-contracts.md` SR07, FR-P05.
+- Problem: DD-P05 only requires the reviewer to differ from report.authorId. Reassignment preserves the original author and changes field authors only for fields updated by the new assignee. There is no version-level self-approval check covering additional editors of text, photos, and other content.
+- Why it matters: This fails DEC-12's requirement for quality review by another person.
+- Example Failure: T1 creates → reassigned to T2 → T2 edits and submits → T2 accepts as a quality reviewer/HQ through another Membership. It passes because T2 != the original report.authorId.
+- Required Fix: The Repository must record the userIds that created or edited the submitted version and use them to reject self-approval. Preserve original-author and field-author history, and apply the same check across Memberships and for HQ.
+- Suggested Revision: Inherit the version's internal contributor set and add only users who actually changed content, including text, measurements, and photos. Viewing or assignment without editing is not a contribution. Contributors' accept/return-for-correction actions must return FORBIDDEN. Add acceptance examples that allow only a third party.
 
 ## 4. MAJOR Issues
 
-### IRV-001 — 状態絞込後のKPI受入条件がIR26と矛盾
+### IRV-001 — KPI acceptance criteria after status filtering conflict with IR26
 
-- Document / Location: `01-requirements/contractor.md` AT-P01-N、IR26。
-- Problem: status=offered後もactiveCount=1/reviewCount=1を要求するが、IR26は集計にも同じAND条件を適用する。
-- Why it matters: 正しい実装が既存必須テストで失敗する。
-- Example Failure: offered/accepted/submittedが各1件。offeredだけの一覧に対し、集計は1/0/0と1/1/1の二通りになる。
-- Required Fix: 条件変更前後を明記し、絞込後の期待値を修正。
-- Suggested Revision: 無条件はoffer/active/review=1/1/1、status=offered後は1/0/0、一覧1件。受諾期間・fixture時刻も明示する。
+- Document / Location: `01-requirements/contractor.md` AT-P01-N, IR26.
+- Problem: The criterion requires activeCount=1/reviewCount=1 even after status=offered, but IR26 applies the same AND conditions to summaries.
+- Why it matters: A correct implementation fails an existing required test.
+- Example Failure: One offered, one accepted, and one submitted job. For the offered-only list, the summary has two possible results: 1/0/0 and 1/1/1.
+- Required Fix: Clearly state before/after filter conditions and correct the filtered expectations.
+- Suggested Revision: Without conditions, offer/active/review=1/1/1. After status=offered, use 1/0/0 and one list item. Also specify the acceptance period and fixture time.
 
-### IRV-004 — 履歴の完了日時の生成元が未定義
+### IRV-004 — The source of the historical completion timestamp is undefined
 
-- Document / Location: `02-design/review-resolution-contracts.md` IR23、`service-contracts.ts` MaintenanceJob/JobHistorySnapshot。
-- Problem: completedAtを凍結し期間検索へ使うが、元Jobに項目がなく、完了操作から生成する規則もない。
-- Why it matters: 履歴の期間検索と表示日時を一意に実装できない。
-- Example Failure: 提出日・受理日・費用更新日が違う案件で、実装者ごとに履歴の検索対象日が変わる。
-- Required Fix: 完了日時の保存または不変完了イベントからの導出を定義する。
-- Suggested Revision: jobs.review accept成功時のRepository nowを保存し、それ以前はnull。後続の費用・メモ更新で変えず、終了時にその値を凍結する。
+- Document / Location: `02-design/review-resolution-contracts.md` IR23, `service-contracts.ts` MaintenanceJob/JobHistorySnapshot.
+- Problem: completedAt is frozen and used for date-range searches, but the source Job has no such field and no rule generates it from the completion operation.
+- Why it matters: Historical date-range searches and displayed timestamps cannot be implemented unambiguously.
+- Example Failure: A job has different submission, acceptance, and cost-update dates. Each implementer chooses a different date for history searches.
+- Required Fix: Define storage of the completion timestamp or derive it from an immutable completion event.
+- Suggested Revision: Save Repository now when jobs.review accept succeeds; use null before then. Later cost or note updates do not change it. Freeze that value when access ends.
 
-### IRV-005 — 公開中の案件重大度の計算規則が未定義
+### IRV-005 — Rules for calculating visible job severity are undefined
 
-- Document / Location: `service-contracts.ts` JobSummary.severity、DD-P01/T01、IR23/26。
-- Problem: 必須severityの取得元・複数アラート集約・resolvedの扱い・0件時の値が定義されていない。
-- Why it matters: 表示、filter、sort、KPIの期待値を固定できない。
-- Example Failure: 同Unitにresolved criticalとopen warningがありJob.alertIdsが空の場合、critical/warning/normalが実装者により分かれる。
-- Required Fix: 既存の「設備の緊急度」と整合する認可済み取得集合・集約規則を明示する。offer/historyの未公開nullは維持する。
-- Suggested Revision: 対象設備の可視な未解消アラートから決定する等、採用した技術規則を明記し、0件・混在・解消・scope外のテストを追加する。normalを設備の安全保証と呼ばない。
+- Document / Location: `service-contracts.ts` JobSummary.severity, DD-P01/T01, IR23/26.
+- Problem: The required severity has no defined source, multi-alert aggregation rule, handling of resolved alerts, or value when there are no alerts.
+- Why it matters: Expected display, filter, sort, and KPI results cannot be fixed.
+- Example Failure: A Unit has a resolved critical alert and an open warning alert, while Job.alertIds is empty. Implementers choose critical, warning, or normal.
+- Required Fix: Specify the authorized source set and aggregation rule consistent with the existing equipment urgency concept. Preserve undisclosed null values for offer/history.
+- Suggested Revision: State the chosen technical rule, such as deriving severity from visible unresolved alerts on the target unit. Add tests for zero alerts, mixed alerts, resolved alerts, and out-of-scope alerts. Do not describe normal as a guarantee of equipment safety.
 
 ## 5. MINOR Issues
 
-### IRV-002 — 住所の非公開という旧記述
+### IRV-002 — Old wording says addresses are private
 
-- Document / Location: `02-design/admin.md` DD-A02 property.address/accessInstructions表。
-- Problem: 住所と入場案内を合わせて「まだ依頼を受けていない業者には非公開」と記載。
-- Why it matters: DEC-16/IR25に反する入力欄説明が残る。IR25の優先により最終判断は解決できるが、局所実装で誤る。
-- Example Failure: 住所も空にして受諾前画面へ返す。
-- Required Fix / Suggested Revision: 登録住所は自社Offerに投影、入場案内は有効受託期間内のみ、と分離する。
+- Document / Location: `02-design/admin.md` DD-A02 property.address/accessInstructions table.
+- Problem: The address and entry instructions are jointly described as private to contractors that have not yet accepted the job.
+- Why it matters: Field guidance that conflicts with DEC-16/IR25 remains. IR25's priority resolves the final decision, but a local implementation can still be wrong.
+- Example Failure: The address is also cleared in the response to the pre-acceptance screen.
+- Required Fix / Suggested Revision: Separate the rules: project the registered address into the company's own Offer; show entry instructions only during the valid contracted period.
 
-### IRV-003 — SDLC入口が旧baselineを指す
+### IRV-003 — The SDLC entry points to an old baseline
 
-- Document / Location: `04-agentic-sdlc/README.md` 現行入力の案内（rootによる発見を独立確認）。
-- Problem: 文書版0.14.0なのに現行入力リンクがDOC-0.13.0/spec-manifest.json。
-- Why it matters: 次のAgentが誤った版を固定する。
-- Example Failure: 住所・期限後要約修正を含まないbaselineを実装証跡へ記録する。
-- Required Fix / Suggested Revision: 現行manifestへのリンクと節名を統一。旧runsは履歴として維持。
+- Document / Location: `04-agentic-sdlc/README.md` current-input guidance (independently confirmed after root found it).
+- Problem: The document version is 0.14.0, but the current-input link points to DOC-0.13.0/spec-manifest.json.
+- Why it matters: The next Agent pins the wrong version.
+- Example Failure: Implementation evidence records a baseline without the address and post-expiry summary corrections.
+- Required Fix / Suggested Revision: Align the current-manifest link and section name. Keep old runs as history.
 
 ## 6. Open Questions
 
-新規の商用判断を要求しない。上記は承認済み1A要件の具体化・整合修正として差し戻す。IR18の継続運用容量候補はdeferredを維持する。
+No new commercial decisions are requested. Return the above as clarifications and consistency corrections for the approved 1A requirements. The potential continuous-operation capacity requirement in IR18 remains deferred.
 
 ## 7. Cross-document Inconsistencies
 
-IRV-001/002/003/006。優先する修正契約があっても、矛盾した受入期待値をそのまま合格にしない。
+IRV-001/002/003/006. Even when a correction contract takes priority, do not pass contradictory acceptance expectations unchanged.
 
 ## 8. Missing Requirements
 
-新機能の追加要求なし。IRV-004/005/006は既存必須出力・既存自己承認禁止の実装契約不足。
+No new features are requested. IRV-004/005/006 concern missing implementation contracts for existing required outputs and the existing self-approval ban.
 
 ## 9. Edge Cases Not Defined
 
-上記の複数編集者、完了後の別更新、複数/解消済みアラートを要修正。通信timeout/切断、セッション・担当失効、並行版更新、二重送信、空一覧、ページング中失効、欠測/stale、言語切替、reload/戻るの既存契約は確認済み。HTTP 400/401/403/404/409/429/500そのものは1A対象外で、対応するDomainErrorを模擬する。
+The multiple-editor, post-completion update, and multiple/resolved-alert cases above need correction. Existing contracts were checked for communication timeout/disconnection, session/assignment expiry, concurrent version updates, duplicate submissions, empty lists, expiry during pagination, missing/stale data, language switching, and reload/back navigation. HTTP 400/401/403/404/409/429/500 themselves are outside 1A scope; the corresponding DomainErrors are simulated.
 
 ## 10. Traceability Matrix
 
-64要件の独立判定は [independent-round-1-traceability.csv](independent-round-1-traceability.csv)。既存追跡表の参照情報を引き継ぎ、本レビューの意味判定でStatusを付けた。既存の構造上のOKを独立合格の根拠にはしていない。本レビュー時点の要修正行は下表。記載外の要件は文書レビュー上のOKであり、アプリ試験合格ではない。
+Independent assessments of 64 requirements are in [independent-round-1-traceability.csv](independent-round-1-traceability.csv). Reference information was carried over from the existing traceability table; Status reflects this review's semantic assessment. Existing structural OK results were not used as the basis for independent approval. Rows requiring correction at the time of this review are below. Requirements not listed are OK in the document review, not passed application tests.
 
 | Requirement ID | Requirement | Prepare | Detailed Design | UI/UX | API | Error Handling | Testable | Status |
 |---|---|---|---|---|---|---|---|---|
-| FR-P01 | 受託集計 | BIZ-04/12 | DD-P01/IR23/26 | P01 | jobs.list/summaries.get | D01/D04 | AT-P01-N矛盾 | CONFLICT |
-| FR-P05 | 品質確認 | DEC-12/BIZ-12 | DD-P05/D06/SR07 | P05 | jobs.review | 自己承認再割当不足 | 複数編集者追加必要 | INCOMPLETE |
-| FR-P08 | 期限後公開 | DEC-16/BIZ-12 | IR23/25 | P08 | jobs.get/list | D01/IR24 | completedAt未定義 | INCOMPLETE |
-| FR-T01 | 担当集計 | BIZ-04/08 | DD-T01/IR26 | T01 | jobs.list/summaries.get | D01/D04 | severity未定義 | INCOMPLETE |
-| FR-T09 | 報告版・編集者 | BIZ-12 | D06/SR07/DD-T09 | T04 | jobs.saveDraft/submit | D01 | 自己承認との結合不足 | INCOMPLETE |
-| FR-A02 | 住所入力 | DEC-16/BIZ-07 | DD-A02/IR25 | A02 | properties.save | D01 | 旧文言矛盾 | CONFLICT |
-| FR-A06 | HQ品質確認 | DEC-12/BIZ-12 | DD-A06 | A06 | jobs.review | 自己承認再割当不足 | 複数編集者追加必要 | INCOMPLETE |
-| FR-X04 | 認可 | DEC-12 | D01/D06/SR07 | 共通guard | jobs.review | 自己承認再割当不足 | 追加必要 | INCOMPLETE |
+| FR-P01 | Contractor job summary | BIZ-04/12 | DD-P01/IR23/26 | P01 | jobs.list/summaries.get | D01/D04 | AT-P01-N conflict | CONFLICT |
+| FR-P05 | Quality review | DEC-12/BIZ-12 | DD-P05/D06/SR07 | P05 | jobs.review | Incomplete self-approval checks after reassignment | Multi-editor cases needed | INCOMPLETE |
+| FR-P08 | Post-expiry visibility | DEC-16/BIZ-12 | IR23/25 | P08 | jobs.get/list | D01/IR24 | completedAt undefined | INCOMPLETE |
+| FR-T01 | Assignment summary | BIZ-04/08 | DD-T01/IR26 | T01 | jobs.list/summaries.get | D01/D04 | severity undefined | INCOMPLETE |
+| FR-T09 | Report versions and editors | BIZ-12 | D06/SR07/DD-T09 | T04 | jobs.saveDraft/submit | D01 | Insufficient connection to self-approval checks | INCOMPLETE |
+| FR-A02 | Address input | DEC-16/BIZ-07 | DD-A02/IR25 | A02 | properties.save | D01 | Conflicting old wording | CONFLICT |
+| FR-A06 | HQ quality review | DEC-12/BIZ-12 | DD-A06 | A06 | jobs.review | Incomplete self-approval checks after reassignment | Multi-editor cases needed | INCOMPLETE |
+| FR-X04 | Authorization | DEC-12 | D01/D06/SR07 | Common guard | jobs.review | Incomplete self-approval checks after reassignment | Additional cases needed | INCOMPLETE |
 
 ## 11. Undefined Decisions
 
 | ID | Decision Needed | Related Document | Why Needed | Who Should Decide |
 |---|---|---|---|---|
-| IRV-004/005/006 | 既存出力・認可の技術具体化 | 正規型/D06/IR | 実装者による補完防止 | Frontend設計→独立Review |
-| OPEN-03〜06/11 | 本番API/機器/認証/外部連携/終了責任 | Prepare/D11 | 1B着手条件 | Backend / IoT / Security / Business |
-| REV-018 | 長時間容量保証 | IR18 | 1A規模外 | Product Owner / Frontend |
+| IRV-004/005/006 | Technical details of existing outputs and authorization | Canonical types/D06/IR | Prevent implementers from filling gaps independently | Frontend design → independent Review |
+| OPEN-03–06/11 | Production APIs/devices/authentication/external integration/termination responsibility | Prepare/D11 | Conditions for starting 1B | Backend / IoT / Security / Business |
+| REV-018 | Long-running capacity guarantee | IR18 | Beyond 1A scale | Product Owner / Frontend |
 
 ## 12. Implementation Readiness
 
-| 観点 | 判定 | 根拠 |
+| Area | Assessment | Basis |
 |---|---|---|
-| Requirements completeness | CONDITIONALLY READY | 既存出力・自己承認の具体化待ち |
+| Requirements completeness | CONDITIONALLY READY | Awaiting details for existing outputs and self-approval |
 | Cross-document consistency | NOT READY | IRV-001/002/003/006 |
-| UI/UX completeness | CONDITIONALLY READY | 重大度・履歴日時の規則待ち |
-| Frontend architecture | READY | Repository/Query/RHF/URL/世代の責任分離あり |
-| API contract readiness | CONDITIONALLY READY | 1A Repositoryのみ。IRV-004/005/006修正待ち。本番HTTPはNOT READY |
-| Error handling | READY | D01/D04/D10/IR17/24の拒否・復旧・描画規則 |
-| Authentication / Authorization | NOT READY | IRV-006の自己承認抜け |
-| IoT state handling | READY | 補助独立照合で新規指摘なし。模擬状態のみ |
-| Testability | CONDITIONALLY READY | IRV-001の矛盾と追加境界例待ち |
-| Agentic SDLC handoff readiness | NOT READY | G1 changes_requested、旧baseline案内 |
+| UI/UX completeness | CONDITIONALLY READY | Awaiting severity and historical timestamp rules |
+| Frontend architecture | READY | Responsibilities are separated for Repository/Query/RHF/URL/generations |
+| API contract readiness | CONDITIONALLY READY | 1A Repository only. Awaiting IRV-004/005/006 corrections. Production HTTP is NOT READY |
+| Error handling | READY | Rejection, recovery, and rendering rules in D01/D04/D10/IR17/24 |
+| Authentication / Authorization | NOT READY | Self-approval gap in IRV-006 |
+| IoT state handling | READY | No new findings in the independent supporting check. Simulated states only |
+| Testability | CONDITIONALLY READY | Awaiting correction of IRV-001 and additional boundary examples |
+| Agentic SDLC handoff readiness | NOT READY | G1 changes_requested; guidance points to an old baseline |
 
 ## 13. Required Actions Before Implementation
 
-6件を修正し、現行manifestと静的・型検証の証跡を更新して同じ独立担当へ再提出する。修正後の再確認前にG1をpassedへ変更しない。アプリ試験はnot_run、実装・本番・デプロイ承認は別工程。
+Correct the six findings, update the current manifest and static/type validation evidence, and resubmit to the same independent reviewers. Do not change G1 to passed before the corrections are rechecked. Application tests are not_run; implementation, production, and deployment approval belong to separate phases.

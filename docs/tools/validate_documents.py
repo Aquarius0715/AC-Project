@@ -11,7 +11,7 @@ import subprocess
 from urllib.parse import unquote
 
 ROOT = Path(__file__).resolve().parents[1]
-RUN = ROOT / '04-agentic-sdlc/runs/DOC-0.21.0'
+RUN = ROOT / '04-agentic-sdlc/runs/TRANSLATION-EN-2026-09-17'
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--write-baseline', action='store_true', help='Rehash current documents after static checks; does not approve G1')
 parser.add_argument('--tsc', type=Path, help='Path to installed TypeScript lib/tsc.js; optional semantic check')
@@ -187,10 +187,10 @@ for role in ['client','contractor','technician','admin']:
             cells = line.split('|')
             top[cells[1].split('/')[0].strip()] = re.findall(r'[a-zA-Z]+\.[a-zA-Z]+', cells[3])
     for did, ops in top.items():
-        section = re.search(r'### '+did+r' 詳細(.*?)(?=\n### |\Z)', text, re.S)
+        section = re.search(r'### '+did+r' Details(.*?)(?=\n### |\Z)', text, re.S)
         if not section:
             fail('Missing detail section '+did); continue
-        found = re.findall(r'(?:サービス境界は|サービスの範囲は)`([^`]*)`', section.group(1))
+        found = re.findall(r'Service boundary: `([^`]*)`', section.group(1))
         if not found or [o.strip() for o in found[0].split(',')] != ops:
             fail('Detail service boundary drift '+did)
 fixes = rows('04-agentic-sdlc/acceptance-fixes.csv')
@@ -215,7 +215,7 @@ for actor in fixture['actors']:
 for path in markdown:
     if path.parent.name not in ['01-requirements','02-design','03-uiux']:
         continue
-    for forbidden in ['i18n/en,ja','日英の切り替え','IDとバージョンは変わらない','9文字未満','RTO(遠隔制限','RTO(遠隔操作対応']:
+    for forbidden in ['Switch between Japanese and English', 'IDs and versions do not change', 'fewer than 9 characters', 'RTO (remote restriction', 'RTO (remote control support', 'i18n/en,ja','日英の切り替え','IDとバージョンは変わらない','9文字未満','RTO(遠隔制限','RTO(遠隔操作対応']:
         if forbidden in path.read_text():
             fail(f'Reintroduced contradiction: {path.name}: {forbidden}')
 
@@ -420,7 +420,7 @@ if not any(a['permissions']==['restriction.override'] for a in fixture['actors']
     fail('Override-only fixture missing')
 for path in markdown:
     text=path.read_text()
-    if re.search(r'^version: 0\.(?:8|9|1[0-9])\.0$',text,re.M) or re.search(r'\*\*0\.(?:8|9|1[0-9])\.0の実装基準',text) or re.search(r'現行0\.(?:1[0-9])\.0の追加契約',text) or 'IR01〜34を併読' in text or 'IR01〜44を併読' in text or 'IR01〜74を併読' in text or 'IR01〜93を併読' in text:
+    if re.search(r'(?:Implementation baseline for|Additional current|Additional contracts for current version) 0\.(?:8|9|1[0-9])\.0', text) or re.search(r'Read IR01[–~-](?:34|44|74|93)\b', text) or re.search(r'^version: 0\.(?:8|9|1[0-9])\.0$',text,re.M) or re.search(r'\*\*0\.(?:8|9|1[0-9])\.0の実装基準',text) or re.search(r'現行0\.(?:1[0-9])\.0の追加契約',text) or 'IR01〜34を併読' in text or 'IR01〜44を併読' in text or 'IR01〜74を併読' in text or 'IR01〜93を併読' in text:
         fail('Stale current version '+str(path.relative_to(ROOT)))
 
 # Re-review of 0.11.0: verify the changed contract paths and trace coverage.
@@ -448,9 +448,9 @@ for name in ['notifications.preview','notifications.recipients']:
     if 'payment_reminder:admin:billing.manage:overdue-unpaid-only' not in opmap[name]['authorization']:
         fail('Reminder preview authorization absent '+name)
 resolution=(ROOT/'02-design/review-resolution-contracts.md').read_text()
-if 'reports.saveDraft' in resolution or 'jobs.saveDraftのInspectionMeasurementInput' not in resolution:
+if 'reports.saveDraft' in resolution or 'jobs.saveDraft InspectionMeasurementInput' not in resolution:
     fail('Inspection normalization operation invalid')
-for required in ['同キー再送とwrites.getResult', '全対象Unitを閲覧できる宛先', '観測', '同一入力内のunitId/metric重複']:
+for required in ['Same-key retries of acceptance/decline and writes.getResult', 'can read the Contract and all target Units of the Restriction', 'observation', 'Duplicate unitId/metric pairs within one input']:
     if required not in resolution:
         fail('Convergence behavioral guard missing '+required)
 
@@ -481,7 +481,7 @@ if 'contractorOrgId:ID|null' not in re.search(r'export type JobHistorySnapshot =
 jq=next(q for q in queries if q['operation']=='jobs.list')
 if 'projection first' not in jq['filter_mapping'] or 'no hidden Job fields' not in jq['sort_mapping']:
     fail('Job query projection guard absent')
-if 'snapshot全体を無効化しCONFLICT' not in resolution:
+if 'invalidate the whole snapshot and return CONFLICT' not in resolution:
     fail('Snapshot projection downgrade guard absent')
 
 # 0.14.0: approved publication boundary and loop findings.
@@ -515,7 +515,7 @@ if typed['capabilities.save'][0] != 'Save<Capability> & {changeReason?:string}':
 sq = next(q for q in queries if q['operation']=='summaries.get')
 if not {'status','statuses','severity','overdueOnly'} <= set(sq['allowed_filters'].split(',')):
     fail('Job summary filter parity absent')
-if f"{len(operations)}個のローカルサービス操作" not in (ROOT/'02-design/common.md').read_text():
+if f"{len(operations)} local service operations" not in (ROOT/'02-design/common.md').read_text():
     fail('Common operation count drift')
 
 # Independent G1 round fixes (document assertions, not app behavior tests).
@@ -546,12 +546,12 @@ if 'reviewAvailability:ReviewAvailability' not in re.search(r'export type WorkRe
     fail('Report review availability absent')
 if 'ReportRevisionProvenance = {reportId:ID;reportVersion:number;contributorUserIds:ID[]}' not in types:
     fail('Report revision contributors absent')
-if '現在Session.userIdが含まれる場合' not in resolution or 'accept/returnともFORBIDDEN' not in resolution:
+if 'If it includes current Session.userId' not in resolution or 'both accept and return yield FORBIDDEN' not in resolution:
     fail('Contributing reviewer denial absent')
 if 'status=open/acknowledged' not in resolution or 'critical>warning>normal' not in resolution:
     fail('Job severity source and ranking absent')
 p01 = next(line for line in (ROOT/'01-requirements/contractor.md').read_text().splitlines() if line.startswith('| AT-P01-N |'))
-if '①一覧3件、offerCount=1／activeCount=1／reviewCount=1' not in p01 or '②一覧1件、offerCount=1／activeCount=0／reviewCount=0' not in p01:
+if '① Three rows, offerCount=1/activeCount=1/reviewCount=1' not in p01 or '② One row, offerCount=1/activeCount=0/reviewCount=0' not in p01:
     fail('Filtered partner KPI acceptance mismatch')
 
 # Cross-contract checks introduced by the 0.16.0 review.
@@ -566,7 +566,7 @@ if not {'devices.list', 'devices.events'} <= set(audit_screen['operations'].spli
     fail('Audit device selection dependency absent')
 if 'audit.list' not in audit_screen['primary_queries'].split(';'):
     fail('Audit primary read absent')
-if 'totalが不明なとき' in (ROOT/'02-design/implementation-contracts.md').read_text():
+if any(wording in (ROOT/'02-design/implementation-contracts.md').read_text() for wording in ['totalが不明なとき', 'when total is unknown']):
     fail('Page total contradicts exact snapshot count')
 decisions_016 = json.loads((ROOT/'00-prepare/internal/review-decisions-016.json').read_text())['decisions']
 review_016_cases = rows('04-agentic-sdlc/acceptance-review-016.csv')
@@ -611,7 +611,7 @@ accepted_permissions = next(d for d in decisions_016 if d['id']=='DEC-17')
 if accepted_permissions['status']=='accepted':
     if accepted_permissions['selected']['permissions']!=['restriction.manage','restriction.override']:
         fail('Restriction decision must retain two permissions')
-    if 'それぞれ独立した権限' in (ROOT/'01-requirements/admin.md').read_text():
+    if 'four separate permissions' in (ROOT/'01-requirements/admin.md').read_text():
         fail('Restriction requirement still demands four permissions')
 
 # 0.17.0 independent review (FRV) regression checks: document consistency only.
@@ -652,13 +652,13 @@ for name in ['AppShell','RoleNavigation','ErrorBoundary','AsyncBoundary','EmptyS
 for name in ['telemetry.series','telemetry.summary']:
     if 'expectedVersion' in opmap[name]['ui_validation']:
         fail('Read operation demands expectedVersion '+name)
-for required in ['release_requestedの場合は冪等', 'ジャンプはセッション寿命を消費しない', "messageKey:'errors.network_disconnected'", 'dueAt=requestedEndを保存', 'archived=trueは、全一覧', '1対1', '[to-1440分,to)', "actorId='masked'", 'Capability.sensorsの同metric定義から複写', "'en-MY'"]:
+for required in ['If already release_requested, idempotently return', 'advanceClock jumps do not consume it', "messageKey:'errors.network_disconnected'", 'saves dueAt=requestedEnd', 'with archived=true from all lists', 'one-to-one', '[to-1440 minutes,to)', "actorId='masked'", 'copying unit/staleAfterSeconds/boundaryId from the matching Capability.sensors definition', "'en-MY'"]:
     if required not in resolution:
         fail('0.17 behavioral guard missing '+required)
 for role in ['common','client','admin','technician','contractor']:
-    if '原則不可' in (ROOT/f'01-requirements/{role}.md').read_text():
+    if any(wording in (ROOT/f'01-requirements/{role}.md').read_text() for wording in ['原則不可', 'generally not allowed']):
         fail('Vague permission wording remains '+role)
-if any(len(s['purpose']) < 8 or s['purpose'].endswith('（対応DD詳細の目的・フロー）') for s in screens):
+if any(len(s['purpose']) < 8 or s['purpose'].endswith(('（対応DD詳細の目的・フロー）', '(purpose and flow of the related DD details)')) for s in screens):
     fail('Screen purpose is boilerplate')
 
 # 0.18.0 strict review (REV18) regression checks: document consistency only, not app behavior.
@@ -720,9 +720,9 @@ if 'extendSession' not in next(c for c in components if c['component']=='AppShel
     fail('AppShell session extension event absent (IR55)')
 # IR72/IR81: superseded wording must not remain. The resolution contract is checked too,
 # except lines that explicitly quote what they replace.
-STALE_LITERALS = ['jobs/units/invoices/restrictionsなど', '利用者操作による延長なし', 'デモ用の時計から発生したイベントは`automations.fire`に渡し', 'RTO以外の契約は「契約なし・一般保守」', 'その人が使える画面へ戻します', '許可された画面へ戻します。', 'その人が見てよい画面へ戻します', 'tenantId(テナントID)、親ID', '即時〜300msの間で固定の設定', 'ホーム画面や一覧画面へ移動します', '| boundary / assumptions | 文字列/必須 | 1〜2000文字', '| ①②未対応件数に計上', 'version=3の後に2と重複3', 'assigned→submitted→completedと進む', 'seed遅延のときは専用の扱い', '一般的な利用の同意', '①一般同意のみ', '係数の単位が合っていない', 'offline台はpending', '地域・年度・単位・出典', 'SCR-X-not-foundを表示。両者は同じ文言', 'clock2026-03-07']
-STALE_PATTERNS = [r'利用者操作による延長は(?:ない|なし)', r'型番を管理(?:する|できる)権限', r'環境(?:に関する)?policy(?:\(方針\))?を管理する権限', r'roomは表示名', r'顧客組織の数', r'20%増加|増加20%|増加率20%', r'→解除を要求する→', r'ホーム画面へ戻す', r'基準はIR63で自動選択', r'reportCategory=scope2_electricity', r'dueAt=2026-09-15 12:00Z', r'fanのみの設備は換気ボタン', r'2026-03-07／2026-10-31']
-QUOTE_MARKERS = ('置換', '旧記述', '旧表現', '旧文', '旧表記', '旧句')
+STALE_LITERALS = ['① general consent only', 'jobs/units/invoices/restrictions, etc.', 'No extension through user action', 'Pass events from the demo clock to `automations.fire`', 'Non-RTO contracts show "No contract / General maintenance"', 'Return to a screen the user can use', 'Return to an allowed screen.', 'Return to a screen the user may view', 'tenantId (tenant ID), parent ID', 'fixed between immediate and 300 ms', 'Navigate to the home or list screen', '| boundary / assumptions | string/required | 1–2000 characters', '| ①② Count as unresolved', 'version=3 followed by 2 and duplicate 3', 'progress assigned→submitted→completed', 'special handling for seed delay', 'general usage consent', '① general consent only', 'factor units do not match', 'offline units are pending', 'region, year, unit, and source', 'Show SCR-X-not-found. Both use the same wording', 'clock2026-03-07']
+STALE_PATTERNS = [r'No extension through user action', r'room matches the display name', r'Increase20%', '[Nn]o extension through user action', 'permission to manage model numbers', 'permission to manage environmental polic(?:y|ies)', 'room matches the display name', 'number of customer organizations', '20% increase|Increase20%|Increase rate20%', '→ request release →', 'return to the home screen', 'baseline is selected automatically under IR63', r'reportCategory=scope2_electricity', r'dueAt=2026-09-15 12:00Z', 'fan-only equipment has a ventilation button', '2026-03-07 / 2026-10-31']
+QUOTE_MARKERS = ('replace', 'old forms', 'obsolete wording', 'old expression', 'old text', 'replaces', 'replaced', 'old wording', 'No outdated', '置換', '旧記述', '旧表現', '旧文', '旧表記', '旧句')
 stale_targets = [p for p in markdown if p.parent.name in ['01-requirements','02-design','03-uiux']] + [ROOT/'04-agentic-sdlc/verification.md'] + sorted((ROOT/'04-agentic-sdlc').glob('acceptance-*.csv'))  # IR102: acceptance plans too
 for path in stale_targets:
     for line in path.read_text().splitlines():
@@ -734,7 +734,7 @@ for path in stale_targets:
         for pattern in STALE_PATTERNS:
             if re.search(pattern, line):
                 fail(f'Superseded wording remains (IR81): {path.name}: {pattern}')
-for required in ['UTC分境界（秒・ミリ秒=0）', '| set_power power=false | 許可 | 許可 |', '閲覧窓=[Assignment.createdAt, scheduledEnd)', 'offeredからrequestedへ戻し', 'severity∈{critical, warning}', 'disabledReason=consent_revoked', 'demoSession.extend', '| in_progress / submitted | 不可 | 不可（先にjobs.holdでon_hold） | CONFLICT |', 'items・total・未読件数から除外', 'DemoTriggerのpayment分岐は廃止', '| 1 | ユーザー確定の決定（DEC-12/13/16/17/18/44/50） |', 'errors.device_power_lost', '作成時刻の1秒後', '「増加 {絶対値}」', 'createDemoRepository', '土曜・日曜だけ', '| session | 全Query']:
+for required in ['UTC minute boundary (seconds and milliseconds both 0)', '| set_power power=false | Allowed | Allowed |', 'viewing window is [Assignment.createdAt, scheduledEnd)', 'return Job.status from offered to requested', 'severity∈{critical, warning}', 'disabledReason=consent_revoked', 'demoSession.extend', '| in_progress / submitted | Not allowed | Not allowed (first use jobs.hold to set on_hold) | CONFLICT |', 'Exclude notifications for unreadable targets from items, total, and unread counts', 'Remove the payment branch from DemoTrigger', '| 1 | User-confirmed decisions (DEC-12/13/16/17/18/44/50) |', 'errors.device_power_lost', 'one second after creation', '"Increase {absolute value}"', 'createDemoRepository', 'Nonworking days are only Saturday/Sunday', '| session | All Queries']:
     if required not in resolution:
         fail('0.18 behavioral guard missing '+required)
 seed = fixture.get('demoSeed', {})
@@ -755,9 +755,9 @@ if seed:
         fail('Seed simulator default must be enabled (IR45)')
 if 'iPadOS 17 Safari' not in (ROOT/'02-design/deterministic-contracts.md').read_text():
     fail('Tablet environment absent from D10')
-if '**1A**は' not in (ROOT/'00-prepare/PrepareDocument.md').read_text():
+if '**1A** is' not in (ROOT/'00-prepare/PrepareDocument.md').read_text():
     fail('PrepareDocument lacks 1A/1B definition')
-if f"{len(operations)}個のローカルサービス操作" not in (ROOT/'02-design/common.md').read_text():
+if f"{len(operations)} local service operations" not in (ROOT/'02-design/common.md').read_text():
     fail('Common operation count drift (0.18)')
 if 'review-resolution-contracts.md#ir72-' not in (ROOT/'README.md').read_text():
     fail('README precedence link absent (IR72)')
@@ -795,7 +795,7 @@ if {d['id'] for d in decisions_019 if d['status']=='accepted'} != {'DEC-44','DEC
     fail('0.19 user-accepted decisions must be DEC-44 and DEC-50')
     if '## '+decision['contract']+' ' not in resolution:
         fail('0.19 decision contract section absent '+decision['id'])
-for required in ['状態`work-not-started`で表示する', 'origin=measured、quality=valid、value≠nullの場合だけ', 'predictedBaselineKWh = baselineKWh ÷ (|U|×baselineMinutes) × expectedUnitMinutes', '利用者操作による延長はIR55のdemoSession.extendだけで行う', '`/login?returnTo=<encodeURIComponent(pathname+search)>`', 'skeleton（loading）へ戻さず', 'granted=false、grantedAt=null、revokedAt=null、version=1のConsent', 'messageKey=errors.offer_expired', 'DDの表記にかかわらずtrim後1〜1000', '| gridRegion | summary.factorSnapshot.region |', 'scheduledEnd−15分', 'Job.scheduledSlot=[新AssignmentのscheduledStart, scheduledEnd)', '| device_operation | devices.operations, devices.calibrations, devices.get, units.get |', 'normal < warning < critical', '存在しなければsetを新しい行として']:
+for required in ['screen-catalog state `work-not-started`', 'has origin=measured, quality=valid, and value≠null', 'predictedBaselineKWh = baselineKWh ÷ (|U|×baselineMinutes) × expectedUnitMinutes', 'User-triggered extension is only through IR55 demoSession.extend', '`/login?returnTo=<encodeURIComponent(pathname+search)>`', 'Do not return to skeleton (loading)', 'granted=false, grantedAt=null, revokedAt=null, version=1', 'messageKey=errors.offer_expired', 'require 1–1000 Unicode code points after trimming, regardless of DD wording', '| gridRegion | summary.factorSnapshot.region |', 'scheduledEnd−15 minutes', 'Job.scheduledSlot to [new Assignment.scheduledStart, scheduledEnd)', '| device_operation | devices.operations, devices.calibrations, devices.get, units.get |', 'normal < warning < critical', 'Otherwise, normalize set as a new row']:
     if required not in resolution:
         fail('0.19 behavioral guard missing '+required)
 for pattern in [r"energyForecast:EnergyForecast;", r"export type EnergyForecast = \{period:Range;", r"sequence\?:number;eventId:ID\};"]:
@@ -964,7 +964,7 @@ for key in sorted(k for k in AP if k.startswith('AT-') or k.startswith('shared:'
             fail(f'Acceptance energy patch coverage mismatch (IR92) {key}')
 if not any(fct['id']==fixture.get('defaultEmissionFactorId') and fct['kgCO2ePerKWh']==fixture['energy']['factorKgPerKWh'] for fct in seed.get('factors', [])):
     fail('Default emission factor absent from demoSeed (IR92)')
-for required in ['受入Givenの解釈規則', '| 当該技術者にAssignmentが一度も無い（例: requestedで未割当のjob-internal-a） | NOT_FOUND（順位3） |', 'errors.assignment_ended', '同じ設備を対象に含む契約の期間重複は1Aでは拒否しない']:
+for required in ['Interpreting acceptance Given', '| The technician has never had an Assignment (for example, unassigned job-internal-a in requested) | NOT_FOUND (priority 3) |', 'errors.assignment_ended', '1A does not reject overlapping contract periods that include the same equipment']:
     if required not in resolution:
         fail('0.19 behavioral guard missing '+required)
 report_019 = {'review_019_cases':len(review_019), 'proposed_decisions_019':sum(d['status']=='proposed' for d in decisions_019)}
@@ -999,7 +999,7 @@ for decision in decisions_020:
             fail('0.20 decision contract section absent '+decision['id'])
     if decision['id'] not in resolution:
         fail('0.20 decision not referenced by contract '+decision['id'])
-for required in ['| 入力型にjobIdが無い操作で、対象Unitに自己のAssignmentが一度も無い | 社内でunit scope内ならFORBIDDEN（errors.assignment_required、D01順位4）', '要求時にDevice.connection≠onlineならD01順位8のOFFLINE（DeviceOperationを作らない）', '含まない技術者は候補に出さず、直接指定はFORBIDDEN（errors.technician_out_of_scope）', 'members.eligibleとmembers.capacityはrole=technicianのMembershipだけを返す', '| job.assigned（初回・再割当・延長） | schedule_change | job |', 'イベントを起こした操作のMembership（actor）には送らない', "| requested / applied | release_requested。releaseIntent.source='cancel'", '| released / cancelled | CONFLICT（D01順位6） |', 'origin=measured・quality=validの値は範囲内でなければfixture欠陥', '受入試験は既定でsimulator=falseで開始する', '| co2 ≥ 1000 ppmで、Capability.ventilation=trueかつventilationLevelsにlow |', '| pm25 ≥ 35 µg/m³ | air.guidance.clean', 'indoor 8件、outdoor 5件、electrical 5件', '1. itemsのcomponentKey集合が、提出時点のUnit.componentsと一致する', '認可を通る場合はCONFLICT（messageKey=errors.scope_changed、D01順位6、副作用0）', 'UNAUTHENTICATED（messageKey=errors.membership_inactive、D01順位2）', 'VALIDATION（fieldErrors.contractId、messageKey=errors.restriction_ineligible、D01順位7）', '30秒以降はfailed（集約はrelease_requestedのまま）', '同じjobIdの置き換え対象のactive Assignmentを除外する']:
+for required in ['| Operation without jobId in its input type; the user has never had an Assignment for the target Unit | For internal technicians within unit scope: FORBIDDEN (errors.assignment_required, D01 priority 4)', 'If Device.connection≠online when devices.updateFirmware is requested, return D01 priority-8 OFFLINE (do not create a DeviceOperation)', 'Omit technicians who fail this condition from candidates; direct selection returns FORBIDDEN (errors.technician_out_of_scope)', 'members.eligible and members.capacity return only role=technician Memberships', '| job.assigned (initial assignment, reassignment, extension) | schedule_change | job |', 'Do not send to the Membership (actor) that performed the triggering operation', "| requested / applied | release_requested. Set releaseIntent.source='cancel'", '| released / cancelled | CONFLICT (D01 priority 6) |', 'Values with origin=measured and quality=valid must be in range; otherwise throw a fixture-defect exception', 'Acceptance tests start with simulator=false by default', '| co2 ≥ 1000 ppm, Capability.ventilation=true, and ventilationLevels includes low |', '| pm25 ≥ 35 µg/m³ | air.guidance.clean', '8 indoor, 5 outdoor, and 5 electrical', '1. The items componentKey set matches Unit.components at submission time', 'If authorized, return CONFLICT (messageKey=errors.scope_changed, D01 priority 6, zero side effects)', 'UNAUTHENTICATED (messageKey=errors.membership_inactive, D01 priority 2)', 'VALIDATION (fieldErrors.contractId, messageKey=errors.restriction_ineligible, D01 priority 7)', 'At 30 seconds or later it is failed (aggregate remains release_requested)', 'exclude the active Assignment being replaced for the same jobId']:
     if required not in resolution:
         fail('0.20 behavioral guard missing '+required)
 for pattern in [r"releaseIntent:ReleaseIntent\|null\}", r"export type ReleaseIntent = \{source:'payment'\|'exception'\|'override'\|'manual'\|'cancel';", r"'inquiry'\|'job_update'\|'device_operation';params:", r"\{eventType:'allergen';observation:\{unitId:ID\} & AllergenObservation\}", r"\{eventType:'load_alert';unitId:ID;"]:
@@ -1025,7 +1025,7 @@ if seed:
     if 'sensor-tamper-co2' not in json.dumps(AP.get('AT-A12-N', {})):
         fail('AT-A12-N CO2 sensor patch absent (IR97)')
 common_req = (ROOT/'01-requirements/common.md').read_text()
-if '### 共通受入条件の具体値' not in common_req or any(f'| AT-X0{i}-{k} |' not in common_req for i in range(1,8) for k in 'NEB'):
+if '### Concrete common acceptance criteria' not in common_req or any(f'| AT-X0{i}-{k} |' not in common_req for i in range(1,8) for k in 'NEB'):
     fail('Common acceptance table absent (IR101)')
 if 'summaries.get' not in screen_by_id['SCR-C08']['operations'].split(';') or 'jobId' not in screen_by_id['SCR-P03']['url_selection'].split(','):
     fail('IR102 screen contract missing (SCR-C08 summaries.get / SCR-P03 jobId)')
@@ -1072,14 +1072,14 @@ for template, (classification, _) in notification_rows.items():
     if not targets <= notification_types:
         fail('Notification mapped type absent from DTO (IR104) '+template)
 for cells in contract_table(contract_section(95)):
-    if len(cells)==4 and cells[0]!='イベント' and cells[1] not in notification_rows:
+    if len(cells)==4 and cells[0]!='Event' and cells[1] not in notification_rows:
         fail('Business notification template unmapped (IR104) '+cells[1])
 for number, required in {
-    95:['templateKey=alertはIR10のAlert分類に従い、それ以外はtemplateKeyとtypeを同名にする'],
-    103:['保存前の履歴や遅着FactのobservedAtを開始時刻にしない', '新規保存ではカウンタを0から開始する', '成立前は通知suppressed/not_due'],
-    104:['device_operation.failedは非同期のシステムイベント', 'actor=system-demo'],
-    105:["ChangeEvent.entityType='allergen_observation'", '同じDemoTrigger.eventIdの再送は行と変更イベントを増やさない', 'C07/A12はこのresourcesを購読'],
-    106:['scopeVersionAtCreationが省略されている場合、全patch適用後のrecipientMembershipIdで引いたMembership.scopeVersionを設定する', '明示したscopeVersionAtCreationは非負整数であることを検証して保持し', '生成後にMembership.scopeVersionが変わっても既存通知の値は変更しない'],
+    95:['templateKey=alert follows IR10 Alert classification; all other templates use the same name for templateKey and type'],
+    103:["Do not use pre-save history or a late Fact's observedAt as the start time", 'A new save starts the counter at 0', 'Before it is met, notifications are suppressed/not_due'],
+    104:['device_operation.failed is an asynchronous system event', 'actor=system-demo'],
+    105:["ChangeEvent.entityType='allergen_observation'", 'A retry with the same DemoTrigger.eventId adds neither a row nor a change event', 'C07/A12 subscribes to this resource'],
+    106:['if scopeVersionAtCreation is omitted, set it from Membership.scopeVersion found through recipientMembershipId after all patches are applied', 'Validate an explicit scopeVersionAtCreation as a nonnegative integer and keep it', 'Later Membership.scopeVersion changes do not alter existing notification values'],
 }.items():
     for guard in required:
         if guard not in contract_section(number):

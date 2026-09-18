@@ -12,5 +12,5 @@ implementation_status: not_started
 production_connection_readiness: NOT_READY
 deployment_approval: false
 superseded_by: DOC-0.19.0
-note: 修正反映後、実行記録の作成前にセッションが中断した。spec-manifestは作成していない。実装入力に使用しない（IR75）。
+note: The session was interrupted after corrections were applied and before execution records were created. No spec-manifest was created. Do not use this as implementation input (IR75).
 evidence_paths: [review.md, findings.json]

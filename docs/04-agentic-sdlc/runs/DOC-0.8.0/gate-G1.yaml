@@ -1,4 +1,4 @@
-# 1A文書引渡し。独立AIの最終再レビュー証跡に基づく判定。
+# 1A document handover. Decision based on evidence from the final independent AI review.
 gate_id: G1
 task_id: DOC-0.8.0
 gate_result: passed
@@ -13,8 +13,8 @@ typescript_contract_check: passed
 typescript_version: 5.9.3
 demo_policy_decision: DEC-12
 document_authors_and_demo_decision_owners:
-  - 北野正樹（Masaki Kitano）
-  - 若井悠馬（Yuma Wakai）
+  - Masaki Kitano
+  - Yuma Wakai
 human_and_external_predeployment_review: pending
 production_contract_status: not_defined_out_of_scope
 evidence_paths:
@@ -22,7 +22,7 @@ evidence_paths:
   - static-check.json
   - validator-negative-checks.json
 notes:
-  - 今回は1Aモックデモの文書まで。実装・デプロイを承認した記録ではない
-  - 独立レビューIND-001〜007は修正後に別AIが解消を確認
-  - 既知の未解決1A指摘0件。欠陥が将来も存在しない保証ではない
-  - 商用条件・本番API/IoTは後続工程。デプロイ前は人および外部レビュアーが最終確認
+  - This work covers only documents for the 1A mock demo. This record does not approve implementation or deployment
+  - After corrections, another AI confirmed that independent review findings IND-001–007 were resolved
+  - There are zero known unresolved 1A findings. This does not guarantee that no defects will be found in the future
+  - Commercial terms and production APIs/IoT belong to later phases. Humans and external reviewers perform the final review before deployment

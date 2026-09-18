@@ -368,7 +368,7 @@
       "sourceSnapshot": null
     }
   },
-  "note": "各試験はreset後に開始し、境界試験の時計/権限/状態はGivenで上書き。権限不足caseは対象permissionだけを除く。userIdは自己承認試験だけ同一へ上書き。Scope関係はverification §2と対応AT。これはアプリseed実装ではなく検証fixture仕様。",
+  "note": "Each test starts after reset. Override clock/permissions/states in Given for boundary tests. For insufficient-permission cases, remove only the target permission. Set identical userId only in self-approval tests. Scope relationships follow verification §2 and the matching AT. This specifies test fixtures, not an application seed implementation.",
   "qualificationRequirements": {
     "indoor": "demo_indoor",
     "outdoor": "demo_outdoor",
@@ -420,7 +420,7 @@
     ],
     "cooldownMinutes": 5,
     "escalateAfterMinutes": 60,
-    "note": "受入Givenの明示入力例。新規フォームの既定値ではない"
+    "note": "Explicit input example for acceptance Given; not the default for a new form"
   },
   "powerClassification": {
     "snapshotAt": "2026-09-14T01:00:00.000Z",
@@ -487,7 +487,7 @@
     "memoryRetention": "until reset; long-running capacity deferred"
   },
   "demoSeed": {
-    "note": "IR69: 初期業務データの正。ここに無い業務記録をRepositoryが補わない。受入GivenはこのseedへのpatchesとしてIR69のfactoryで適用する。値はすべて架空。 省略した共通項目・null・配列・派生値はIR91の正規化規則で補い、正規DTO schemaで検証する。",
+    "note": "IR69: Authoritative initial business data. The Repository must not add business records absent here. Apply acceptance Given as seed patches through the IR69 factory. All values are fictional. Fill omitted common fields, nulls, arrays, and derived values using IR91 normalization, then validate against canonical DTO schemas.",
     "simulator": {
       "enabled": true,
       "contract": "IR45"
@@ -1709,20 +1709,20 @@
     "offsetRecords": [],
     "inquiries": [],
     "consistency": [
-      "customer-bは契約0件（AT-C10-N④、IR61）",
-      "unit-limitedは空間未割当（IR62）でrestriction-limited-a適用中（AT-C03-E④、AT-C11-N④）",
-      "unit-other-customerはSensor無しで稼働unknown（device-no-sensor）",
-      "alert-window-aはwarningでalertCount=1（AT-C01-N、IR51）",
-      "job-contractor-aは作業窓内（AT-T01-N、IR49）",
-      "client Membershipごとにgranted=falseの位置情報同意（IR84）",
-      "baseline-demo-tenant-aはtenant-aの非archived全5台と一致し、filtersなしの/adminで省エネ予想を表示（IR78）",
-      "排出係数factor-demo-2026（0.5 kgCO₂e/kWh）はdefaultEmissionFactorIdの実体（IR92）",
-      "allergenObservationsはunit-online-rtoにavailable、unit-non-rtoにunsupportedの各1行。他のUnitは行が無くnot_measured（IR98）",
-      "capabilitiesはtenantIdを持ち、unit-tenant-bはtenant-bのcap-split-std-tbを参照（IR101）"
+      "customer-b has zero contracts (AT-C10-N④, IR61)",
+      "unit-limited has no assigned space (IR62) and restriction-limited-a is applied (AT-C03-E④, AT-C11-N④)",
+      "unit-other-customer has no Sensor and unknown operation status (device-no-sensor)",
+      "alert-window-a is warning with alertCount=1 (AT-C01-N, IR51)",
+      "job-contractor-a is within its work window (AT-T01-N, IR49)",
+      "Location consent with granted=false for every client Membership (IR84)",
+      "baseline-demo-tenant-a matches all five non-archived tenant-a units; /admin without filters shows an energy-saving forecast (IR78)",
+      "Emission factor factor-demo-2026 (0.5 kgCO₂e/kWh) is the record referenced by defaultEmissionFactorId (IR92)",
+      "allergenObservations has one available row for unit-online-rto and one unsupported row for unit-non-rto. Other Units have no row and are not_measured (IR98)",
+      "capabilities have tenantId; unit-tenant-b references tenant-b cap-split-std-tb (IR101)"
     ]
   },
   "acceptancePatches": {
-    "note": "IR85/IR92/IR97: 受入GivenのseedへのpatchesをcaseIdごとに固定する。createDemoRepository({seed:'demoSeed',patches,simulator,clock})へ、includeを先に展開してから渡す。seriesはIR92の規則で測定行を生成する。inputは保存操作の完全な入力（IR97の5）、bindAtUseは受入本文で決める値。",
+    "note": "IR85/IR92/IR97: Fix acceptance Given seed patches by caseId. Expand include first, then pass to createDemoRepository({seed:'demoSeed',patches,simulator,clock}). series generates measurement rows under IR92. input is the full save-operation input (IR97 §5); bindAtUse values are defined in the acceptance text.",
     "AT-A01-N": {
       "clock": "2026-09-14T01:00:00.000Z",
       "simulator": false,
@@ -1782,7 +1782,7 @@
       }
     },
     "shared:energy-actual-80": {
-      "description": "unit-online-rtoのpower 80 kWを2026-09-14T00:00Z〜01:00Zの各分境界にmeasured/validで置く（fixture.energy）",
+      "description": "Place unit-online-rto power 80 kW at every minute boundary from 2026-09-14T00:00Z to 01:00Z with measured/valid (fixture.energy)",
       "patches": [
         {
           "entity": "measurements",
@@ -1991,7 +1991,7 @@
         "savedKWh": -20.0,
         "savingPercentage": -20.0
       },
-      "description": "2台×60 kW×60 slot＝実績120 kWh、同じ2台の基準100 kWh（D07のpower範囲[0,100]を守る、IR97の1）"
+      "description": "Two units × 60 kW × 60 slots = actual 120 kWh; baseline 100 kWh for the same two units (within D07 power range [0,100]; IR97 §1)"
     },
     "AT-C06-E.4": {
       "clock": "2026-09-14T01:00:00.000Z",
@@ -2999,7 +2999,7 @@
       }
     },
     "shared:tech-internal-a-job-online": {
-      "description": "tech-internal-aの作業窓内の担当案件（unit-online-rto、IR94）",
+      "description": "Assigned job for tech-internal-a within its work window (unit-online-rto, IR94)",
       "patches": [
         {
           "entity": "jobs",
@@ -3042,7 +3042,7 @@
       ]
     },
     "shared:load-cause-alerts": {
-      "description": "原因候補の3種（窓開放の疑い＝seedのalert-window-a、断熱不足の点検記録、根拠なし）。IR98",
+      "description": "Three possible-cause types: suspected open window (seed alert-window-a), poor-insulation inspection record, and no evidence. IR98",
       "patches": [
         {
           "entity": "alerts",
@@ -3194,7 +3194,7 @@
       "expected": {
         "actor": "customer-a",
         "unitId": "unit-online-rto",
-        "unitDisplay": "不明"
+        "unitDisplay": "Unknown"
       }
     },
     "AT-A12-SRC.4": {
@@ -3220,11 +3220,11 @@
       "expected": {
         "actor": "hq-operator",
         "unitId": "unit-online-rto",
-        "unitDisplay": "不明"
+        "unitDisplay": "Unknown"
       }
     },
     "shared:report-draft-all-normal": {
-      "description": "serviceScope=[indoor,outdoor,electrical]の18部品すべてnormalの完全な報告入力（IR100）。jobIdは受入本文の対象案件、reportIdは初回保存で省略",
+      "description": "Complete report input with all 18 components normal for serviceScope=[indoor,outdoor,electrical] (IR100). jobId is the target job in the acceptance text; omit reportId on first save",
       "bindAtUse": [
         "jobId",
         "reportId"

@@ -1,135 +1,135 @@
 # 1. Executive Review Summary
 
-**独立G1: PASS（1Aフロントエンドモック設計の実装引渡しはREADY）。未解決指摘0件。**
+**Independent G1: PASS (the 1A frontend mock design is READY for implementation handover). Zero unresolved findings.**
 
-最終入力はDOC-0.16.0、spec_baseline_id=`fe251845299c3b5d0a9d493683be3e70076111af3b290b8b01a8fa2f7450e0b2`。レビュー担当は仕様修正者`/root`とは別実行の`/root/independent_g1_016`。レビュー担当は仕様ファイルを編集せず、指摘を修正者へ戻し、修正後の実物を再確認した。旧版の合格や自己レビューを承認根拠として流用していない。
+Final input: DOC-0.16.0, spec_baseline_id=`fe251845299c3b5d0a9d493683be3e70076111af3b290b8b01a8fa2f7450e0b2`. Reviewer `/root/independent_g1_016` ran separately from specification author `/root`. The reviewer did not edit specification files, returned findings to the author, and checked the actual corrected files. Previous-version passes and self-reviews were not reused as approval evidence.
 
-今回の追加指摘はG1R-001（MINOR、決定記録の出所metadata不足）1件。修正・独立再確認済み。既存REV-001〜007は解消を確認した。権限2種類と、案件のソート機能・既定業務順が要件、契約、型、Query、URL、画面、Component、受入計画で一致する。
+One additional finding was raised: G1R-001 (MINOR, missing source metadata in decision records). It was corrected and independently rechecked. Existing REV-001–007 were confirmed resolved. The two permissions and the job sorting feature/default business order agree across requirements, contracts, types, Queries, URLs, screens, Components, and acceptance plans.
 
-55ファイル全件のSHA-256とcanonical JSONからのbaselineを独立計算し一致。静的検証およびTypeScript strict検証を独立実行して成功。これに加えて認可・投影・sort・ページング・状態・再送・期限の反例を文書間で照合した。アプリ実装、動作・性能・a11y試験は**not_run**。本番接続・デプロイは**NOT READY**であり、G1の対象に含めない。
+Independently calculated SHA-256 for all 55 files and the baseline from canonical JSON; all matched. Independently ran static validation and TypeScript strict successfully. Also checked authorization, projection, sort, pagination, state, retry, and deadline counterexamples across documents. Application implementation and runtime/performance/a11y tests are **not_run**. Production connections/deployment are **NOT READY** and outside G1 scope.
 
 # 2. BLOCKER Issues
 
-未解決0件。REV-001: FR-A10一覧・詳細、Permission、操作カタログ、IR03/34、A09/A10、AT-REV16-001で2権限に統一。manageのみ／overrideのみ／両方／なしを照合し、暗黙の相互付与はない。override専用者には限定したread投影と解除追跡経路があり、適用操作を付与しない。
+Zero unresolved. REV-001: FR-A10's list and details, Permission, operation catalog, IR03/34, A09/A10, and AT-REV16-001 agree on two permissions. Checked manage only, override only, both, and neither; neither permission implicitly grants the other. Override-only users have a limited read projection and release-tracking path without permission to apply restrictions.
 
 # 3. CRITICAL Issues
 
-未解決0件。REV-004: audit.listは認可済み集合へ検索条件を適用。他テナントcorrelationIdと不存在IDは同じ成功空集合となり、個別getのNOT_FOUNDと区別される。AT-A16-EとAT-REV16-004の期待値も一致する。
+Zero unresolved. REV-004: audit.list applies search conditions to the authorized set. Another tenant's correlationId and a nonexistent ID both return a successful empty set, distinct from NOT_FOUND on individual get. AT-A16-E and AT-REV16-004 expectations also agree.
 
 # 4. MAJOR Issues
 
-未解決0件。
+Zero unresolved.
 
-| 対象 | 独立照合した契約と反例 | 判定 |
+| Item | Contracts and counterexamples independently checked | Assessment |
 |---|---|---|
-| REV-002 | IR32/26/23、jobs.listとsummaries.getのunitIds。空配列、unitIdとのAND、不公開offer/historyの非一致 | resolved |
-| REV-003 | IR33、A16、画面/Component/操作カタログ。audit必須、devices候補→明示選択→events、無権限Commandリンクは追加readなし | resolved |
-| REV-005 | DEC-18、JOB_STATUS_ORDER、Query、IR34、全jobs.list画面、AT-REV16-005。全10状態・逆順・同値ID・公開/凍結状態・null末尾 | resolved |
+| REV-002 | IR32/26/23; unitIds in jobs.list and summaries.get. Empty arrays, AND with unitId, and no match for undisclosed offer/history | resolved |
+| REV-003 | IR33, A16, screen/Component/operation catalogs. Required audit; devices candidates→explicit selection→events; unauthorized Command links cause no additional read | resolved |
+| REV-005 | DEC-18, JOB_STATUS_ORDER, Query, IR34, all jobs.list screens, AT-REV16-005. All 10 states, reverse order, ID tie-breaks, public/frozen states, nulls last | resolved |
 
-sort変更時にfilterを維持しcursorを捨てる、URLの不正/空/重複sortを拒否する、Back/Forwardで復元する、Query keyにsortと閲覧世代を含める条件を確認した。sortは全snapshotに適用してから分割し、summaries.getへ渡さない。KPIの意味や状態遷移自体をソートにより変更しない。
+Verified that sort changes preserve filters and discard cursors, invalid/empty/duplicate URL sort values are rejected, Back/Forward restores state, and Query keys include sort and view generation. Apply sort to the full snapshot before pagination; do not pass it to summaries.get. Sorting does not change KPI meaning or state transitions.
 
 # 5. MINOR Issues
 
-未解決0件。REV-006のPage.totalは認可・投影・filter後の非負整数であり、未取得はinitial/loadingとして分離。REV-007は現行manifestのgateを判定先とし、READMEの固定pending/未実施記述も判定先へのリンクに改められた。
+Zero unresolved. REV-006 defines Page.total as a nonnegative integer after authorization/projection/filtering; data not yet retrieved is represented separately by initial/loading. REV-007 uses the current manifest's gate as the decision source. Fixed pending/not-performed statements in README were replaced with links to that source.
 
-## G1R-001 — accepted決定の出所metadataが実行schemaを満たさない
+## G1R-001 — Source metadata for accepted decisions does not meet the execution schema
 
 - **Issue ID:** G1R-001
 - **Severity:** MINOR
-- **Document:** docs/00-prepare/internal/review-decisions-016.json、docs/04-agentic-sdlc/templates/artifacts.md
-- **Location:** DEC-17/18のacceptedレコード、テンプレート「状態schema」「人への判断依頼・決定記録」
-- **Problem:** 初回レビュー時のレコードにstatus/selected/sourceはあったが、acceptedに必要なdecided_by・決定日・answerと実行schemaのdecision_statusがなかった。
-- **Why it matters:** 機械的な引渡しで、担当候補ownerと実際の決定者、設計側の選択値と実際のユーザー回答を区別できない。
-- **Example Failure:** Product Owner / Securityというownerを実際の承認者として読み替えたり、acceptedの必須metadataを検査する次工程が記録を不完全と判定する。
-- **Required Fix:** 会話の実回答に基づく決定者、判明する精度の決定日、回答原文、decision_statusを記録する。未提供の氏名や時刻を創作しない。
-- **Suggested Revision:** decided_by=本会話のユーザー、decided_at=2026-09-16、decided_at_precision=day、answer=各回答原文、decision_status=accepted。status aliasを残す場合は一致を検証する。
+- **Document:** docs/00-prepare/internal/review-decisions-016.json, docs/04-agentic-sdlc/templates/artifacts.md
+- **Location:** Accepted DEC-17/18 records; template sections “State schema” and “Requests for human decisions and decision records”
+- **Problem:** At the initial review, the records had status/selected/source but lacked decided_by, the decision date, and answer required for accepted records, as well as decision_status from the execution schema.
+- **Why it matters:** A machine-based handover cannot distinguish a candidate owner from the actual decision-maker or a design-side selected value from the actual user answer.
+- **Example Failure:** Product Owner / Security in owner is read as the actual approver, or the next phase's accepted-metadata check marks the record incomplete.
+- **Required Fix:** Record the decision-maker, the decision date at the known precision, the original answer, and decision_status based on the actual conversation answer. Do not invent names or times that were not provided.
+- **Suggested Revision:** decided_by=user in this conversation, decided_at=2026-09-16, decided_at_precision=day, answer=each original answer, decision_status=accepted. If the status alias is retained, verify that it agrees.
 - **Finding status:** resolved
-- **再確認:** 最終baselineのDEC-17/18で上記を確認。ユーザーの決定内容自体は変更されていない。検証器にprovenance必須・status一致検査が追加され、型付き静的検証も成功した。修正者は/root、再確認者は/root/independent_g1_016。
+- **Recheck:** Confirmed the above in DEC-17/18 in the final baseline. The user decisions themselves are unchanged. Required provenance and status-agreement checks were added to the validator, and typed static validation also passed. Correction author: /root. Rechecker: /root/independent_g1_016.
 
 # 6. Open Questions
 
-今回の1A設計引渡しを阻害する追加質問なし。DEC-17/18はユーザー回答に基づくaccepted。業務順の具体的順位はIR34の実装契約として固定され、表示順位と状態遷移許可を区別している。
+No additional questions block this 1A design handover. DEC-17/18 are accepted based on the user answers. Specific business-order ranks are fixed in the IR34 implementation contract, which distinguishes display order from permitted state transitions.
 
 # 7. Cross-document Inconsistencies
 
-修正後の追加不整合は検出しなかった。
+No additional inconsistencies were found after correction.
 
-| 照合軸 | 根拠 |
+| Check axis | Basis |
 |---|---|
-| Requirement Missing | 64要件の出所・設計・UI・操作・受入対応を静的照合。重点対象はFR-A10/A16、P01/P03/P06/T01/C09/A06、FR-X04 |
-| Design / UI Without Requirement | 2権限は既存FR-A10の矛盾解消。sortは今回のユーザー指示。A16候補readは既存監査機能の遂行経路 |
-| UI Without API | APIは1A Repository。監査機器選択、Commandリンク解決、制限専用read、jobs.listの入力に対応操作あり |
-| Data Model Gap | Page.total、Query.unitIds/sort、Jobの3投影、JOB_STATUS_ORDER、RestrictionReleaseViewと正規型を照合 |
-| Terminology Conflict | DeviceとUnit、Command応答とJob完了、閲覧世代とRepository世代、重大度nullとnormalを区別 |
-| Handoff consistency | 現行manifestと判定証跡をbaselineで固定。旧passedを現行承認にしない |
+| Requirement Missing | Statically checked source/design/UI/operation/acceptance mappings for 64 requirements. Focus: FR-A10/A16, P01/P03/P06/T01/C09/A06, FR-X04 |
+| Design / UI Without Requirement | Two permissions resolve an existing FR-A10 conflict. Sorting follows the current user instruction. A16 candidate reads provide a path for the existing audit feature |
+| UI Without API | API means the 1A Repository. Operations exist for audit device selection, Command link resolution, restriction-only reads, and jobs.list inputs |
+| Data Model Gap | Compared Page.total, Query.unitIds/sort, the three Job projections, JOB_STATUS_ORDER, and RestrictionReleaseView with canonical types |
+| Terminology Conflict | Distinguished Device from Unit, Command response from Job completion, view generation from Repository generation, and null severity from normal |
+| Handoff consistency | Current manifest and decision evidence pinned to the baseline. An old passed result is not current approval |
 
-同論点ではIR契約が旧DD/D/SR記述に優先する既定ルールを適用した。単独の画面DDだけで実装せず、manifest一式を引き渡す。
+Applied the existing rule that IR contracts take priority over old DD/D/SR text on the same topic. Hand over the full manifest; do not implement from a screen DD alone.
 
 # 8. Missing Requirements
 
-今回のレビューで追加の必須1A要件欠落は検出しなかった。企業原文SRC-06→BIZ対応表→FR出所表を確認し、企業要望と制作方針/設計補完の区別を維持した。独立した施工業者役割やデモの詳細条件を企業原文そのものとは扱わない。
+This review found no additional missing required 1A requirements. Checked company source SRC-06→BIZ mapping→FR source table and preserved the distinction between company requests and production guidance/design additions. A separate contractor role and detailed demo conditions are not treated as the company's original text.
 
-長時間メモリ容量はIR18のdeferred候補。本番API・認証・DB・IoT・実決済/通知・ブラウザ停止後の終了責任はD11/OPENの後続課題。これらを1Aへ無断追加せず、本番READYとも扱わない。
+Long-running memory capacity is a deferred candidate under IR18. Production APIs/authentication/DB/IoT/real payments and notifications/responsibility for termination after the browser stops are later D11/OPEN issues. Do not add them to 1A without authorization or treat them as production READY.
 
 # 9. Edge Cases Not Defined
 
-以下は文書上の反例照合結果であり、アプリでの試験結果ではない。
+The following are document counterexample checks, not application test results.
 
-| 境界・反例 | 定義と期待値 |
+| Boundary/counterexample | Definition and expected result |
 |---|---|
-| manageなし・overrideのみ | IR03/34。限定投影、強制解除と限定した解除追跡のみ。defer/exempt/cancel拒否 |
-| 他tenant相関ID／不存在 | IR33。同じ成功0件。監査必須read失敗は正常0件にしない |
-| events未選択／候補失敗／不可視URL | IR33。呼出し0回／局所retry／not-found。別機器への置換なし |
-| 状態descの同値／dueAtとseverity null | IR34。同値ID asc、nullは両方向末尾 |
-| 2頁目直前にOffer/Assignment終了 | IR24/SR14。旧snapshot全体CONFLICT、viewEpoch更新、初頁から凍結投影 |
-| 同一状態の非公開Job更新 | IR23/34。offer/historyの公開値が変わらなければ件数・順序に影響させない |
-| ソート変更後の遅い応答／A→B→A | IR17/34。旧key/世代の描画を拒否。新一覧を旧応答で上書きしない |
-| 通常制御offlineと制限の未配送 | D03。前者は0件、後者は未配送意図を記録し、適用済みと表示しない |
-| 制限解除時sent_unknown・遅延ack | D03/SR26。再照合まで保留、終端をactiveへ戻さず回復caseで追跡 |
-| write timeout・再送・権限失効 | D01/D04/IR03。結果確認→同じ意図で再送、現在認可と投影を再適用 |
-| session期限／reload／タブ | D09/IR17。閲覧破棄、受理済み業務は継続、reloadはseedへ、タブ間非同期 |
-| 不明単位・欠測・古いセンサー | D07/IR08/12/16/22。suspect/null・積算除外、旧validへのfallbackなし |
-| 試運転終了時計のみ／FW遅延成功 | D04/05とAT-T10/T11。実停止や更新成功を捏造しない |
-| 報告共同編集者の別Membership承認 | IR31。userIdの寄与者集合でFORBIDDEN、UIもreviewAvailabilityで無効化 |
-| HTTPコード・実機回復 | 1A対象外。D11の本番契約はNOT DEFINED/NOT READY |
+| No manage; override only | IR03/34. Limited projection, forced release, and limited release tracking only. Reject defer/exempt/cancel |
+| Another tenant's correlation ID / nonexistent ID | IR33. Both succeed with zero results. A failed required audit read is not treated as a successful empty result |
+| No events selection / candidate failure / invisible URL | IR33. Zero calls / local retry / not-found. No substitution with another device |
+| Equal states under desc / null dueAt and severity | IR34. ID asc for ties; nulls last in both directions |
+| Offer/Assignment ends just before page 2 | IR24/SR14. Entire old snapshot returns CONFLICT; update viewEpoch; retrieve frozen projections from page 1 |
+| Non-public Job update with the same state | IR23/34. No count/order changes if the public offer/history values are unchanged |
+| Late response after sort change / A→B→A | IR17/34. Reject rendering from an old key/generation. An old response does not overwrite the new list |
+| Normal control while offline versus undelivered restriction | D03. The former creates zero records; the latter records undelivered intent and is not shown as applied |
+| sent_unknown/late ack during restriction release | D03/SR26. Keep pending until reconciliation; do not restore a terminal state to active; track with a recovery case |
+| Write timeout / retry / permission expiry | D01/D04/IR03. Check result → retry the same intent; reapply current authorization and projection |
+| Session expiry / reload / tabs | D09/IR17. Discard the view; continue accepted business processing; reload returns to seed; tabs are not synchronized |
+| Unknown units / missing or stale sensors | D07/IR08/12/16/22. suspect/null and excluded from integration; no fallback to older valid data |
+| Test-run end by clock alone / late FW success | D04/05 and AT-T10/T11. Do not invent real stopping or update success |
+| Report co-editor approves through another Membership | IR31. Contributor userId set gives FORBIDDEN; UI is also disabled through reviewAvailability |
+| HTTP codes / real-device recovery | Outside 1A. D11 production contracts are NOT DEFINED/NOT READY |
 
-追加の未定義1A境界は検出しなかった。既存ATの遠隔制御・予定/DST・電力比較・依頼・委託期限・自己承認・試運転・FW更新を標本照合し、IRでの優先定義も適用した。
+No additional undefined 1A boundaries were found. Sampled existing ATs for remote control, schedules/DST, power comparisons, requests, contracted-access expiry, self-approval, test runs, and FW updates, applying priority definitions in IR.
 
 # 10. Traceability Matrix
 
-[64要件の既存対応表](traceability-matrix.csv)と[仕様追跡表](../../../00-prepare/traceability.csv)を参照。独立実行の静的検証で64要件、182受入束、49役割詳細、136操作、47画面、57Component、35Query契約、93版分岐を確認した。IR32〜34の変更対象は要件から型/Query/UI/ATまで意味照合した。
+See the [existing mapping table for 64 requirements](traceability-matrix.csv) and [specification traceability table](../../../00-prepare/traceability.csv). Independently run static validation confirmed 64 requirements, 182 acceptance bundles, 49 role details, 136 operations, 47 screens, 57 Components, 35 Query contracts, and 93 version branches. Changes in IR32–34 were checked semantically from requirements through types/Queries/UI/AT.
 
-表のOKは文書上の対応がある意味。全64要件の全subcaseを実行した意味でも、各機能の実装正しさを証明した意味でもない。意味レビューは本報告で列挙した変更箇所と関連リスク・既存AT標本を対象とした。
+OK in the table means a document mapping exists. It does not mean every subcase of all 64 requirements was executed or prove implementation correctness for each feature. The semantic review covered the changes, related risks, and sampled existing ATs listed in this report.
 
 # 11. Undefined Decisions
 
-| ID | Decision Needed / 状態 | Related Document | Why Needed | Who Should Decide |
+| ID | Decision Needed / Status | Related Document | Why Needed | Who Should Decide |
 |---|---|---|---|---|
-| DEC-17/18 | 解消、ユーザー回答を記録済み | 決定JSON/IR34 | 2権限と既定業務順を固定 | 本会話のユーザー（回答済み） |
-| IR18 | 長時間保持容量、deferred | IR18 | 保証範囲拡張時に必要 | Product Owner / Frontend |
-| OPEN-03〜06/11 | 本番機器・API・認証・連携・終了責任 | D11/Prepare | 本番へ進むための後続成果物 | Backend / IoT / Security / Business |
+| DEC-17/18 | Resolved; user answers recorded | Decision JSON/IR34 | Fix two permissions and default business order | User in this conversation (answered) |
+| IR18 | Long-term retention capacity, deferred | IR18 | Needed when expanding the supported scope | Product Owner / Frontend |
+| OPEN-03–06/11 | Production devices/APIs/authentication/integrations/termination responsibility | D11/Prepare | Later deliverables required to proceed to production | Backend / IoT / Security / Business |
 
-1A判断者はDEC-12を参照。G1判定は業務承認やデプロイ承認を代行しない。
+See DEC-12 for 1A decision-makers. G1 does not replace business or deployment approval.
 
 # 12. Implementation Readiness
 
-| 観点 | 1A設計判定 | 根拠 |
+| Area | 1A Design Assessment | Basis |
 |---|---|---|
-| Requirements completeness | READY | 今回の判断待ち0、変更対象の受入条件あり |
-| Cross-document consistency | READY | 既存7件と追加metadata指摘を修正確認 |
-| UI/UX completeness | READY | sort/URL/loading/error/empty/権限別導線とアクセシビリティ条件 |
-| Frontend architecture | READY | Repository、Query、RHF、Navigation、世代の責任分離 |
-| API contract readiness | READY | 1Aローカル契約。実HTTPはNOT READY |
-| Error handling | READY | D01/D04、相関ID、無効URL、snapshot、再送 |
-| Authentication / Authorization | READY | 1A模擬認証と2権限・scope・投影。実認証は対象外 |
-| IoT state handling | READY | 模擬要求/観測/回復と排他。実機適合を保証しない |
-| Testability | READY | 具体的な順位・拒否・件数・境界の期待値を定義 |
-| Agentic SDLC handoff readiness | READY | 本baselineへの別主体G1判定あり。gate記録はオーケストレーターが反映 |
+| Requirements completeness | READY | Zero pending decisions in this work; acceptance criteria cover the changes |
+| Cross-document consistency | READY | Corrections confirmed for the existing seven findings and the additional metadata finding |
+| UI/UX completeness | READY | sort/URL/loading/error/empty/permission-specific navigation and accessibility conditions |
+| Frontend architecture | READY | Responsibilities separated for Repository, Query, RHF, Navigation, and generations |
+| API contract readiness | READY | 1A local contracts. Real HTTP is NOT READY |
+| Error handling | READY | D01/D04, correlation IDs, invalid URLs, snapshots, retries |
+| Authentication / Authorization | READY | 1A mock authentication, two permissions, scope, and projections. Real authentication is outside scope |
+| IoT state handling | READY | Simulated requests/observations/recovery and exclusivity. Does not guarantee real-device compatibility |
+| Testability | READY | Specific expected orders, rejections, counts, and boundaries defined |
+| Agentic SDLC handoff readiness | READY | G1 decision by another reviewer for this baseline. Orchestrator updates the gate record |
 
 # 13. Required Actions Before Implementation
 
-仕様修正の未解決事項なし。オーケストレーターは本報告・結果JSONに基づき、同じbaselineのgate-G1をpassedへ更新する。manifestを変更した場合は本判定を自動流用せず再評価する。
+No unresolved specification corrections remain. The orchestrator updates gate-G1 for the same baseline to passed based on this report and the result JSON. If the manifest changes, reassess instead of automatically reusing this decision.
 
-実装時は全manifest入力と既存/追加ATを渡し、アプリ試験はnot_runから開始する。性能・a11y・ブラウザ動作とデプロイ前の人/外部レビューは後続工程。本報告はそれらの合格証跡ではない。
+At implementation, hand over all manifest inputs and existing/additional ATs; application tests start as not_run. Performance, a11y, browser behavior, and human/external review before deployment are later phases. This report is not evidence that they passed.
 
-独立実行コマンド: `python3 docs/tools/validate_documents.py --tsc /private/tmp/ac-typescript-check/package/lib/tsc.js`（exit 0、errors=[]、typescript_semantic_check=passed）。hash検証は検証器と別のPython処理で全55ファイルとcanonical JSONを計算し、不一致0・pathの一意な整列を確認した。
+Independently executed command: `python3 docs/tools/validate_documents.py --tsc /private/tmp/ac-typescript-check/package/lib/tsc.js` (exit 0, errors=[], typescript_semantic_check=passed). Hash checks used a separate Python process from the validator to calculate all 55 files and canonical JSON; zero mismatches, with unique sorted paths confirmed.

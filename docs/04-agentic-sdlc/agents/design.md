@@ -5,55 +5,55 @@ status: proposed-agent-profile
 scope: frontend-demo-1A
 ---
 
-# 設計エージェントへの指示
+# Instructions for the Design Agent
 
-全員に共通する規則は[実行規約 §7](../README.md#7-全エージェント共通の規則各役割の仕様文書から参照される)と[成果物テンプレート](../templates/artifacts.md)を見てほしい。このファイルには、設計エージェントだけに関わる内容だけを書く。
+See [Execution rules §7](../README.md#7-rules-shared-by-all-agents-referenced-by-role-profiles) and the [artifact templates](../templates/artifacts.md) for shared rules. This file contains only rules specific to the design agent.
 
-## ミッション
+## Mission
 
-Prepare(準備工程)で行った分析をもとに、要件・画面・データ・画面遷移・受入条件(合格の条件)を具体的に決める。
+Use the Prepare analysis to define concrete requirements, screens, data, navigation, and acceptance criteria.
 
-## 入力
+## Inputs
 
-- PrepareDocument、共通要件、担当する役割の要件、既存の詳細設計、UIUX仕様
-- 企業からの原文とBIZ対応表、デザイン参考資料、DEC/OPEN台帳(決定事項と未決事項の記録)
+- PrepareDocument, common requirements, assigned role requirements, existing detailed design, UIUX specification
+- Company original text and BIZ map, design references, DEC/OPEN decision and open-issue logs
 
-## Skills(必要な能力・進め方)
+## Skills (required abilities and approach)
 
-| Skill名 | 期待する能力 |
+| Skill | Expected ability |
 |---|---|
-| requirements-analysis | 企業原文の記述、BIZ整理項目、4つの役割ごとのFR(機能要件)、受入条件が対応していることを保つ |
-| frontend-domain-design | 機器の状態、コマンド、請求、制限を、それぞれ独立したモデルと状態遷移表として設計する |
-| frontend-service-design | 画面のモデル、モックサービス(仮のサービス)の入力と戻り値、エラーの組み合わせ、将来の切り替えポイントを設計する。API・DB・サーバーの仕様は作らない |
-| ui-system-design | 共通ライブラリ、フォーム、token(共通の値)、状態管理、アクセシビリティ(利用しやすさ)を統一する |
+| requirements-analysis | Keep the company original text, organized BIZ items, functional requirements (FR) for four roles, and acceptance criteria aligned |
+| frontend-domain-design | Design device states, commands, invoices, and restrictions as separate models and state transition tables |
+| frontend-service-design | Design screen models, mock service inputs/results, error combinations, and future replacement points. Do not define API, database, or server specifications |
+| ui-system-design | Standardize shared libraries, forms, tokens, state management, and accessibility |
 
-## 作業手順
+## Procedure
 
-1. タスクの根拠を「企業原文」「制作方針」「設計での補完」「OPEN(未決事項)」の4つに分け、PrepareDocument §2の判定規則に従って出所ラベルを付ける。
-2. 画面ごとに、表示する情報・入力項目・能力や期間の制約・処理内容・異常系(エラー時の動き)を定義する。更新操作については、対象IDを含む完全な入出力の形を決める。
-3. 複数の役割で共有するデータと状態遷移は、共通設計にまとめる。名前は正式名称(DDC-08§5)を使う。
-4. 受入条件は「fixtureの値」と「観測できる期待値」をペアで書く。要件の本文をそのまま繰り返さない。要件・設計・受入条件(AT)のつながりを追跡表に反映する。
-5. レビューで指摘を受けたら、影響するすべての役割の文書とCSVファイルを同じタイミングで更新する。
+1. Classify the task basis as company original, production policy, added design details, or OPEN issues. Apply source labels using PrepareDocument §2.
+2. For each screen, define displayed information, inputs, capability/time limits, processing, and error behavior. For updates, define complete input/output shapes, including target IDs.
+3. Put data and state transitions shared across roles in the common design. Use canonical names (DDC-08 §5).
+4. Write acceptance criteria as pairs of fixture values and observable expected results. Do not simply repeat the requirement text. Record requirement/design/AT links in the traceability matrix.
+5. When addressing review findings, update all affected role documents and CSV files together.
 
-## 出力と次工程
+## Outputs and handoff
 
-- 更新したPrepare/要件/詳細設計/UIUXと追跡表・カタログ
-- 型・スキーマ・操作契約の案、仮定と未決事項、実装エージェントへの引き継ぎ
+- Updated Prepare, requirements, detailed design, UIUX, traceability matrices, and catalogs
+- Proposed types, schemas, and operation contracts; assumptions and open issues; handoff to the implementation agent
 
-## この役割だけのガードレール(守るべき制約)
+## Role-specific guardrails
 
-- 閲覧できなかったサイトや、まだ選んでいない機器の能力を勝手に決めない。
-- 法務・健康・炭素認証・実際の機器施工についての専門的な判断を、仕様としてでっち上げない。
-- 「APIが既にある」という前提や、画面の状態だけで成功したことにする設計を採用しない。
-- 出所ラベルを、根拠がないのに「企業原文」側に寄せない。
+- Do not invent details from inaccessible sites or capabilities of devices not yet selected.
+- Do not fabricate expert judgments about law, health, carbon certification, or real device installation as specifications.
+- Do not assume an API already exists or define success based only on UI state.
+- Do not label content as company original without evidence.
 
-## 人に判断してもらうべきこと(ヒューマンエスカレーション)
+## Human escalation
 
-- 業者や顧客への正式な承認、制限ルールの決定はプロダクト責任者に相談する。
-- 認可(権限)に関する契約はセキュリティ担当・API担当に、センサーの能力についてはIoT担当に相談する。
+- Consult the product owner about formal contractor/customer approvals and restriction rules.
+- Consult security/API owners about authorization contracts and the IoT owner about sensor capabilities.
 
-## 完了の条件
+## Completion criteria
 
-対象の要件について、画面・モデル・操作・権限・異常系・受入条件がすべて揃っていること。受入条件を見るだけで、実装を読まなくても期待値が分かること。未決事項が特定の範囲に絞られていること。
+Every assigned requirement has screens, models, operations, permissions, error cases, and acceptance criteria. Expected results can be understood from the acceptance criteria without reading implementation. Open issues have a clearly limited scope.
 
-0.9.0ではstrict-review-contracts.md、write-version-catalog.csv、acceptance-strict-review.csvも必須入力。SR17〜19は2026-09-16ユーザー承認済みの契約を適用する。独立レビュー/G1承認とは区別する。
+In 0.9.0, strict-review-contracts.md, write-version-catalog.csv, and acceptance-strict-review.csv are also required inputs. Apply the SR17–19 contracts approved by the user on 2026-09-16. Keep this approval separate from independent review/G1 approval.

@@ -7,313 +7,313 @@ consumers: [implementation-agent, test-agent, review-agent]
 scope: frontend-demo-1A
 ---
 
-# 技術者 要件定義書
+# Technician requirements
 
-**0.21.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**0.21.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
-## 目的と前提
+## Purpose and assumptions
 
-この文書は、[企業からの要望の英語原文（SRC-06）](../00-prepare/sources/company-requirements-original.txt)をもとに作りました。企業からの要望を、まず「BIZ」という整理項目にまとめます。次に、その内容をこの文書の「FR」(機能要件)に落とし込みます。最後に、詳しい設計と受入条件(合格の基準)につなげます。この流れで、内容を最初から最後まで追いかけられるようにしています。
+This document is based on the [original company requests in English (SRC-06)](../00-prepare/sources/company-requirements-original.txt). Company requests are first grouped into BIZ items, then into this document's FR (functional requirements), and finally into detailed designs and acceptance criteria. This provides end-to-end traceability.
 
-各機能の説明では、「企業からの要望」の部分と「作る側で補った部分」を分けて書きます。画面に出す項目、入力できる範囲、状態の移り変わり、優先度は、フロントエンド(画面側)の実装案として示します。これらは企業がまだ詳しく確認していない内容も含みます。参考として載せているモック(見本画面)は、見た目のデザインを考えるための参考資料にすぎません。機能要件と受入条件は、企業原文の目的に、作る側の方針や補足を加えて、より具体的にしたものです。
+Each feature separates company requests from added design details. Screen fields, allowed inputs, state transitions, and priorities are frontend implementation proposals, including details the company has not yet reviewed. Reference mock screens guide appearance only. Requirements and acceptance criteria make the original goals more concrete through production policies and design additions.
 
-この文書が対象にするのは、利用者が画面(フロントエンド)で確認・入力・操作できる範囲だけです。登録・請求・入金・機器の操作・通知などは、本物の処理ではなく、モック(見本の動き)で再現します。サーバー側の実際の処理、データの保存、本物の認証(ログインの確認)は、この文書の対象に含みません。
+This document covers only what users can view, enter, and do in the frontend. Registration, billing, receipts, device actions, and notifications are simulated by mocks. Real server processing, storage, and authentication are out of scope.
 
-このシステムの目的は、社内や社外の技術者が、それぞれ担当する範囲の中で、監視、診断、点検、IoT機器(インターネットにつながる機器)の保守を行えるようにすることです。
+The goal is to let internal and external technicians monitor, diagnose, inspect, and maintain IoT devices within their assigned scope.
 
-読む前に必ず目を通してほしい文書: [PrepareDocument](../00-prepare/PrepareDocument.md)、[共通要件](common.md)。認証、言語、音声、権限、通知、非機能要件(性能や安全性など)は、共通要件に書かれた内容をすべてこの文書にも適用します。
+Required reading: [PrepareDocument](../00-prepare/PrepareDocument.md) and [common requirements](common.md). All common authentication, language, voice, permission, notification, and non-functional requirements apply.
 
-優先度「P0」は、システムの土台となる中心的な流れです。「P1」も、このフェーズ(1A)で完成させる対象に含みます。各行の受入条件は、`AT-T番号`という番号で検証します。この文書では、「企業の要望に対応している部分」と「画面デザインや仮の数値として提案している部分」を分けて示します。
+P0 means the core foundational flow. P1 is also required for completion in phase 1A. Each row is verified under its `AT-T` number. This document separates coverage of company requests from proposed screen design and provisional values.
 
-## 機能要件と受入条件
+## Functional requirements and acceptance criteria
 
-| 要件ID | 優先 | 状態・根拠 | 要件 | 受入条件 |
+| Requirement ID | Priority | Status/basis | Requirement | Acceptance criteria |
 |---|---|---|---|---|
-| FR-T01 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-04, BIZ-08 | 担当の状況を見るダッシュボード | 担当している設備、重要度、対応していない件数、予定、進捗を表示する。社内と社外でアクセスできる範囲の違いを確認する。 |
-| FR-T02 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-06, BIZ-07, BIZ-10 | 設備台帳(設備の情報の一覧) | 場所、メーカー、型番、構成、設置日、保守できる範囲を確認する。 |
-| FR-T03 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-08, BIZ-11 | 時系列監視(時間の流れで見る監視) | センサーの値、電力、運転状況、通信状況、データを取得した時刻を表示する。デモ用のイベントで更新すると、同じ設備の値が変わることを確認する。 |
-| FR-T04 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-10 | 室内機の点検 | フィルター、蒸発器、送風モーター・ファン、ドレン配管・受け皿(パン)、吹き出し口・ルーバー(風向き板)のすべての項目について、点検結果または「点検していない理由」を記録する。 |
-| FR-T05 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-10 | 室外機の点検 | 凝縮器、コンプレッサー、ファン・羽根、冷媒の配管のすべての項目について、点検の記録を残す。 |
-| FR-T06 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-10 | 電気・制御部分の点検 | サーモスタット(温度調整器)、センサー、コンデンサー、接触器、配線のすべての項目について、記録を残す。 |
-| FR-T07 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-08, BIZ-11, BIZ-17 | 異常の根拠 | 「疑いがある」「測定で分かった」「現場で点検して分かった」のどの区分かを示し、根拠となる値や履歴を見せる。作業を完了しただけでは、「解決済み(resolved)」にはならない。 |
-| FR-T08 | P0 | 企業原文 SRC-06＋設計補完 / BIZ-12 | 定期点検・故障対応・予防保全 | 担当している案件を開始し、報告を提出し、差し戻された場合はやり直して再提出できる。顧客や本社(HQ)から見える進捗と、内容が一致するようにする。 |
-| FR-T09 | P0 | 設計補完（企業目的に対応） / BIZ-12 | 作業報告 | チェックリスト、写真、測定値、交換した部品、作業内容、次回の対応を保存・提出できる。必須項目が抜けている場合は、その項目を分かるように表示する。 |
-| FR-T10 | P0 | 設計補完（企業目的に対応） / BIZ-13 | 遠隔診断・試運転 | 担当できる期間、機器の性能、権限のすべてを満たす場合だけ、設定の変更や試運転ができる。「確認した」から「応答があった」までを区別して表示する。 |
-| FR-T11 | P1 | 設計補完（企業目的に対応） / BIZ-20 | IoT機器のライフサイクル管理 | 機器の登録、設備との結びつけ、接続の確認、校正、ファームウェア(機器を動かすソフト)の更新を、シミュレーション(模擬動作)で再現する。進行状況・失敗・履歴が見えるようにする。 |
-| FR-T12 | P1 | 企業原文 SRC-06＋設計補完 / BIZ-20 | IoT機器の異常 | 通信が切れたとき、電源が切れたとき、取り外されたときを、それぞれ別々に再現・確認できるようにする。復旧した時刻と、対応の履歴を残す。 |
+| FR-T01 | P0 | Company original SRC-06 + added design details / BIZ-04, BIZ-08 | Assigned-work dashboard | Show assigned units, severity, unhandled counts, schedules, and progress. Verify different internal/external access scopes. |
+| FR-T02 | P0 | Company original SRC-06 + added design details / BIZ-06, BIZ-07, BIZ-10 | Unit register | View location, brand, model, configuration, installation date, and maintenance scope. |
+| FR-T03 | P0 | Company original SRC-06 + added design details / BIZ-08, BIZ-11 | Time-series monitoring | Show sensor readings, power, operation, connectivity, and data times. Demo updates change values for the same unit. |
+| FR-T04 | P0 | Company original SRC-06 + added design details / BIZ-10 | Indoor inspection | Record a result or reason for not inspecting every filter, evaporator, blower motor/fan, drain pipe/pan, outlet, and louver. |
+| FR-T05 | P0 | Company original SRC-06 + added design details / BIZ-10 | Outdoor inspection | Record inspections for every condenser, compressor, fan/blade, and refrigerant pipe. |
+| FR-T06 | P0 | Company original SRC-06 + added design details / BIZ-10 | Electrical/control inspection | Record every thermostat, sensor, capacitor, contactor, and wiring item. |
+| FR-T07 | P0 | Company original SRC-06 + added design details / BIZ-08, BIZ-11, BIZ-17 | Alert evidence | Distinguish suspected, measured, and on-site inspection findings with evidence/history. Completing work alone does not resolve alerts. |
+| FR-T08 | P0 | Company original SRC-06 + added design details / BIZ-12 | Scheduled/reactive/preventive maintenance | Start assigned jobs, submit reports, and rework/resubmit after return. Match progress shown to customers/HQ. |
+| FR-T09 | P0 | Added design details (supporting a company goal) / BIZ-12 | Work reports | Save/submit checklists, photos, readings, replaced parts, work details, and next actions. Clearly identify missing required fields. |
+| FR-T10 | P0 | Added design details (supporting a company goal) / BIZ-13 | Remote diagnostics/test runs | Allow settings/test runs only within assignment period, capabilities, and permissions. Distinguish confirmation through response. |
+| FR-T11 | P1 | Added design details (supporting a company goal) / BIZ-20 | IoT device lifecycle | Simulate registration, unit binding, connection checks, calibration, and firmware updates with visible progress, failure, and history. |
+| FR-T12 | P1 | Company original SRC-06 + added design details / BIZ-20 | IoT faults | Separately reproduce/check communication loss, power loss, and removal. Keep recovery times and response history. |
 
-## 業務境界・依存関係
+## Business boundaries and dependencies
 
-誰が何をしてよいかは、[共通要件の権限マトリクス(表)](common.md)だけを基準にする。「画面を見てよい権限」と「変更してよい権限」は別々に分ける。サービスを呼び出す直前にも、もう一度権限を確認する。設備の性能、作業できる期間、契約の条件が変わったときは、古い画面に残っている許可をそのまま使わない。
+The [common permission matrix](common.md) is the sole authority for who can do what. Separate viewing from changing permissions. Recheck immediately before service calls. If capabilities, work periods, or contract conditions change, do not reuse old screen permissions.
 
-本物の機器操作、外部への通知、本物の決済、API認証(サーバーとのやり取りの本人確認)は、次のフェーズ(1B)で扱う。このフェーズ(1A)では、操作できるふりをするシミュレーション(模擬動作)を用意する。成功する場合だけでなく、拒否・失敗・データ欠けの場合も再現する。
+Real device control, external notifications, payments, and API authentication belong to phase 1B. Phase 1A simulates actions, including rejection, failure, and missing data as well as success.
 
-## 完了条件
+## Completion criteria
 
-- FR-T(この文書の機能要件)と、当てはまるFR-X・NFR(非機能要件)をすべて満たすこと。まだ作っていない部分を「対象外」に書き換えて、完成したことにしてはいけない。
-- [詳細設計](../02-design/technician.md)に書かれた画面・サービス・エラー処理と、この文書の受入条件が対応していること。
-- [検証計画](../04-agentic-sdlc/verification.md)に沿って、AT-T(この文書の受入条件の番号)をすべて確認し、当てはまる場面の証拠を残すこと。
-- 判断がまだ決まっていない業務内容は、PrepareDocumentの「OPEN」という未決事項の一覧に戻し、モックで仮に決めた内容として報告すること。
+- Meet all FR-T and applicable FR-X/NFR requirements. Do not relabel unfinished work as out of scope to claim completion.
+- Map acceptance criteria to screens, services, and error handling in the [detailed design](../02-design/technician.md).
+- Verify every AT-T under the [verification plan](../04-agentic-sdlc/verification.md) and retain applicable scenario evidence.
+- Return undecided business questions to PrepareDocument's OPEN list and report provisional mock decisions.
 
-## 機能別ユースケース・業務規則（0.6.0）
+## Feature use cases and business rules (0.6.0)
 
-上の表は目次にあたるものです。ここから先は、各要件について「業務をいつ始められるか」「どんな手順で進むか」「どんな結果になるか」「合格の条件は何か」を詳しく説明します。
+The table above is an index. The following sections explain entry conditions, steps, results, and acceptance criteria for each requirement.
 
-受入行の①②…はそのセル内の観測項目番号です。Givenの独立条件とThenの結果は記述内容で対応付け、複数assertionとcase IDを混同しません。失敗コードはD01の原因別優先表で一意に決定します。
+Numbers ①②… in acceptance cells identify observations within that cell. Match independent Given conditions to Then results by meaning; do not confuse multiple assertions with case IDs. D01's cause-based priority table determines one failure code.
 
-fixture(テスト用の決まったデータ)の名前は、[検証計画](../04-agentic-sdlc/verification.md)で決めた固定のfixtureを使います。
+Use the fixed fixtures named in the [verification plan](../04-agentic-sdlc/verification.md).
 
-企業からの原文には書かれていない、細かいしきい値や運用のルールは、DEC-09という決定事項として、このフェーズ(1A)向けの提案として扱います。本番で確定したルールと混同しないでください。
+Detailed thresholds and operating rules absent from the company original are phase 1A proposals under DEC-09, not confirmed production rules.
 
-### FR-T01 担当ダッシュボード
+### FR-T01 Assigned-work dashboard
 
-- **企業要望の根拠**: SRC-06 BIZ-04, BIZ-08 — 顧客、社内・外部の技術者、管理者・本社(HQ)が見やすいダッシュボード(状況を一目で見る画面)がほしい。異常を事前に、または起きたときに気づけるよう、リアルタイムで通知したい。
-- **設計補完の範囲**: 担当している期間によって、見える範囲を変える。
+- **Company request basis**: SRC-06 BIZ-04, BIZ-08 — Clear dashboards for customers, internal/external technicians, and administrators/HQ; real-time notifications of faults before or when they occur.
+- **Added design details**: Visibility based on assignment period.
 
-- **利用開始条件**: 社内の技術者は自分の担当範囲、社外の技術者は自社かつ個別に割り当てられた作業期間の情報だけを取得できる。作業開始前の担当案件は閲覧窓で読取専用に表示し(画面状態work-not-started、IR76)、操作は作業窓だけで行う(IR49)。
-- **基本フロー**: 今日または指定した期間の担当案件を開く → 異常の重要度・期限・進捗で並べ替える → 設備の詳細、または作業の画面に進む。
-- **業務規則 BR-T01**: 「対応していない件数」とは、まだ担当が決まっていない(requested)全件ではなく、自分が担当していてまだ手を付けていない案件のこと。社内の技術者が広く見られる場合も、所属している組織(テナント)と担当範囲を超えては見られない。
-- **完了後の業務状態**: この画面は見るだけで、何も変わらない。予定が0件のときは、「何もない状態」と、履歴を見るための案内を表示する。
-- **境界条件・禁止事項**: 社外の技術者の担当期限が終わると、その設備の今の値(live値)は見えなくなる。他の技術者の案件番号をURLに直接入力しても、作業は開始できない。
+- **Entry conditions**: Internal technicians read their assigned scope; external technicians read only their company's individually assigned work periods. Before work starts, show assigned jobs read-only within the viewing window (work-not-started, IR76); actions require the work window (IR49).
+- **Main flow**: Open assigned jobs for today/selected period → sort by severity/deadline/progress → open unit details or work screen.
+- **Business rule BR-T01**: Unstarted count means own assigned jobs not yet started, not all requested jobs. Broad internal access still cannot exceed tenant and assigned scope.
+- **Resulting business state**: Read-only; no changes. With zero jobs, show an empty state and link to history.
+- **Boundaries/prohibitions**: External technicians lose live unit access at assignment expiry. Directly entering another technician's job URL cannot start work.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-T01-N | tech-external-a: job-contractor-a assigned（validUntil=2026-09-20）、他技術者のrequested1件。When: `/technician` today | ①担当1件、未着手1 ②他人のrequestedは非表示 ③書込み0件 |
-| AT-T01-E | ①now=validUntilで外部担当画面 ②tech-external-aが別技術者だけのjobIdでstart | ①当該live設備を非表示 ②NOT_FOUND |
-| AT-T01-B | ①自分のassigned ②他人のrequested ③社内scope外 ④外部割当期間外 | ①表示 ②③④非表示 |
+| AT-T01-N | tech-external-a: assigned job-contractor-a (validUntil=2026-09-20); one requested job for another technician. When: `/technician` today | ① One assigned job, one unstarted ② Other person's requested job hidden ③ Zero writes |
+| AT-T01-E | ① External technician screen at now=validUntil ② tech-external-a starts a jobId assigned only to another technician | ① Live unit hidden ② NOT_FOUND |
+| AT-T01-B | ① Own assigned job ② Other person's requested job ③ Outside internal scope ④ Outside external assignment period | ① Visible ②③④ Hidden |
 
-設計: [DD-T01](../02-design/technician.md#dd-t01-詳細)。親ケースAT-T01は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-T01](../02-design/technician.md#dd-t01-details). Assess parent AT-T01 using all N/E/B and applicable SRC/R01 cases in traceability.
 
-### FR-T02 設備台帳
+### FR-T02 Unit register
 
-- **企業要望の根拠**: SRC-06 BIZ-06, BIZ-07, BIZ-10 — Split Unit ACを第1段階とし、HVAC(空調設備)は第2段階で扱い、メーカー・機種の対応を広げたい。自宅・オフィス、エリア・階・部屋・スペースごとに管理したい。室内機、室外機、電気・制御部品の状態を把握したい。
-- **設計補完の範囲**: 設備台帳に載せる項目と、見るときの手順。
+- **Company request basis**: SRC-06 BIZ-06, BIZ-07, BIZ-10 — Split Unit AC in Phase 1, HVAC in Phase 2, and more brands/models; management by home/office/area/floor/room/space; indoor/outdoor/electrical/control component status.
+- **Added design details**: Unit register fields and viewing steps.
 
-- **利用開始条件**: 対象の設備について、見る権限のある担当関係にあること。
-- **基本フロー**: 案件から台帳を開く → 設置場所・型番・構成・設置日・保守できる範囲を確認する → 診断や作業に進む。
-- **業務規則 BR-T02**: 機種の性能は、そのバージョン(capability版)を表示する。登録されていない項目や分からない項目は「未登録」と表示し、他の似た機種の値で勝手に補わない。
-- **完了後の業務状態**: この画面は見るだけ。技術者は、メーカーの台帳・顧客の所属・請求の内容を変更できない。
-- **境界条件・禁止事項**: 台帳に設置日が入っていない場合、今日の日付を勝手に入れてはいけない。社外の技術者が、自分が割り当てられていない設備を見ようとしても、情報は返さない。
+- **Entry conditions**: An assignment relationship granting target-unit viewing permission.
+- **Main flow**: Open register from job → check location/model/configuration/installation date/maintenance scope → proceed to diagnosis/work.
+- **Business rule BR-T02**: Show the capability version. Label unknown/unregistered fields “Not registered”; do not fill them from similar models.
+- **Resulting business state**: Read-only. Technicians cannot change manufacturer records, customer membership, or billing.
+- **Boundaries/prohibitions**: Do not fill missing installation dates with today's date. Return no data when external technicians request unassigned units.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-T02-N | 担当内unit-online-rto（メーカー・型番・installedAt登録済み、capabilityVersion=3）。When: 台帳を開く | ①場所・型番・構成・設置日・保守範囲 ②capabilityVersion=3 ③書込み0件 |
-| AT-T02-E | ①tech-internal-aでinstalledAt=nullのunit-non-rtoの台帳 ②tech-external-aで非割当のunit-other-customer | ①「未登録」表示、現在日を補わない ②NOT_FOUND |
-| AT-T02-B | ①能力登録済み ②未登録 | ①候補表示 ②「未登録」、典型値なし |
+| AT-T02-N | In-scope unit-online-rto (brand/model/installedAt registered, capabilityVersion=3). When: Open register | ① Location/model/configuration/installation date/maintenance scope ② capabilityVersion=3 ③ Zero writes |
+| AT-T02-E | ① tech-internal-a opens unit-non-rto with installedAt=null ② tech-external-a opens unassigned unit-other-customer | ① “Not registered,” no current-date fallback ② NOT_FOUND |
+| AT-T02-B | ① Registered capability ② Unregistered | ① Show choices ② “Not registered,” no assumed typical values |
 
-設計: [DD-T02](../02-design/technician.md#dd-t02-詳細)。親ケースAT-T02は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-T02](../02-design/technician.md#dd-t02-details). Assess parent AT-T02 using all N/E/B and applicable SRC/R01 cases in traceability.
 
-### FR-T03 時系列監視
+### FR-T03 Time-series monitoring
 
-- **企業要望の根拠**: SRC-06 BIZ-08, BIZ-11 — 異常を事前に、または起きたときに気づけるよう、リアルタイムで通知したい。振動・高温・冷媒の減少、わずかな漏れ、フィルターの詰まりなどを早く見つけたい。
-- **設計補完の範囲**: どのデータの系列を見るかの選び方と、データの質の表示方法。
+- **Company request basis**: SRC-06 BIZ-08, BIZ-11 — Real-time fault notifications before/at occurrence; early detection of vibration, high temperature, low refrigerant, tiny leaks, and clogged filters.
+- **Added design details**: Series selection and data quality display.
 
-- **利用開始条件**: 対象の設備のtelemetry(センサーなどのデータ)を見る権限があること。センサーがなくても、通信の情報は表示できる。
-- **基本フロー**: 見たい指標と期間を選ぶ → センサー・電力・運転状況・通信状況の値と時刻を確認する → デモ用の更新イベントで値が変わることを確認する → 通信が切れたときは、更新が止まっていることに気づけるようにする。
-- **業務規則 BR-T03**: 期間プリセットは1h/24h/7d/customで、1h/24hは固定長の移動窓、7dは暦日(IR41)。「観測した時刻」と「受け取った時刻」は分けて扱う。決められた秒数(staleAfterSeconds)を超えてデータが更新されていない場合は「古い(stale)」とみなす。古いイベントで、新しい値を上書きしてはいけない。データの系列ごとに単位は固定し、データが取れていない区間をつなげて表示しない。
-- **完了後の業務状態**: 最新の値とグラフ(時系列)は、同じイベントID・同じバージョンで整合させる。画面から離れたり、見る範囲(scope)を変えたりすると、データの購読(受信)を止める。
-- **境界条件・禁止事項**: イベントの順番が入れ替わったり、重複したりしても、値が逆戻りしないようにする。通信が切れているときも、最後に受け取った値は時刻付きで残せるが、「リアルタイム」とは表示しない。
+- **Entry conditions**: Permission to view target telemetry. Connectivity can be shown even without sensors.
+- **Main flow**: Choose metric/period → check sensor/power/operation/connectivity values and times → observe demo update events → make stopped updates clear after communication loss.
+- **Business rule BR-T03**: Presets: 1h/24h/7d/custom. 1h/24h are fixed rolling windows; 7d uses calendar days (IR41). Separate observation and receipt times. Data older than staleAfterSeconds is stale. Old events cannot overwrite new values. Each series has fixed units; do not connect gaps in missing data.
+- **Resulting business state**: Latest value and chart agree on event ID/version. Stop subscriptions on navigation away or scope change.
+- **Boundaries/prohibitions**: Reordered/duplicate events must not move values backward. Offline last-known values may remain with timestamps, but must not be labeled real-time.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-T03-N | unit-online-rto、staleAfterSeconds=120。When: metric=temperature、24h(IR41の移動窓[to-1440分,to))で表示→/demoでsequence=4のtelemetryを発火→通信断 | ①系列と最新値が同じeventId／版 ②発火後に最新値更新 ③通信断で「更新停止」表示、購読解除 |
-| AT-T03-E | ①sequence=3の後にsequence=2と重複sequence=3を送る(IR74) ②通信断にする | ①値が逆行しない、重複は無視 ②最後の値と時刻を残し「リアルタイム」表示なし |
-| AT-T03-B | ①観測から120秒 ②120秒+1ms ③系列途中にnull | ①valid ②stale ③欠測区間を線で連結しない |
+| AT-T03-N | unit-online-rto, staleAfterSeconds=120. When: Show metric=temperature, 24h (IR41 rolling window [to−1440 minutes,to)) → trigger sequence=4 telemetry in /demo → communication loss | ① Series/latest value share eventId/version ② Latest value updates after event ③ “Updates stopped” on communication loss; unsubscribe |
+| AT-T03-E | ① Send sequence=3, then sequence=2 and duplicate sequence=3 (IR74) ② Disconnect | ① No value rollback; ignore duplicate ② Retain last value/time without real-time label |
+| AT-T03-B | ① 120 seconds after observation ② 120 seconds+1ms ③ null inside series | ① valid ② stale ③ No line across gap |
 
-設計: [DD-T03](../02-design/technician.md#dd-t03-詳細)。親ケースAT-T03は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-T03](../02-design/technician.md#dd-t03-details). Assess parent AT-T03 using all N/E/B and applicable SRC/R01 cases in traceability.
 
-### FR-T04 室内機点検
+### FR-T04 Indoor inspection
 
-- **企業要望の根拠**: SRC-06 BIZ-10 — 室内機、室外機、電気・制御部品の状態を把握したい。
-- **設計補完の範囲**: 点検フォームの作り方と、点検していない場合の理由の書き方。
+- **Company request basis**: SRC-06 BIZ-10 — Understand indoor, outdoor, electrical, and control component status.
+- **Added design details**: Inspection forms and reasons for not inspecting.
 
-- **利用開始条件**: 有効な担当案件が「作業中(in_progress)」であること。保守できる範囲と、部品ごとの点検対象が取得できていること。
-- **基本フロー**: 部品ごとに点検結果を選ぶ → 必要な所見・測定値・写真を関連付ける → 「点検していない」「対象外」の場合は理由を書く → 下書き(ドラフト)または報告として保存する。
-- **業務規則 BR-T04**: 対象のグループは室内機(indoor)で、項目はフィルター(filter)、蒸発器(evaporator_coil)、送風モーター(blower_motor)、送風ファン(blower_fan)、ドレン配管(drain_pipe)、ドレン受け皿(drain_pan)、吹き出し口(outlet)、ルーバー(louver)。最初の結果は空(null)にしておき、点検しないまま提出する場合は、はっきりと「点検していない(not_inspected)」と選んで理由を書く必要がある。設備にその部品が存在しない場合は「対象外(not_applicable)」として理由を書く。
-- **完了後の業務状態**: 点検結果は、報告のバージョン・作成者・観測した時刻と結びつけて保存する。センサーによる推定は別の根拠として残し、現地の点検結果でセンサーの元データを上書きしない。
-- **境界条件・禁止事項**: 未入力、単位のない測定値、「点検していない」に理由がないこと、他の案件の写真を使うことは、いずれも拒否する。「正常」をあらかじめ選んだ状態にして、点検せずに完了扱いにすることはできない。
+- **Entry conditions**: Active assigned job in_progress, with maintenance scope and component targets loaded.
+- **Main flow**: Select each component result → link required findings/readings/photos → give reasons for not inspected/not applicable → save draft or report.
+- **Business rule BR-T04**: Group: indoor; components: filter, evaporator_coil, blower_motor, blower_fan, drain_pipe, drain_pan, outlet, louver. Initial results are null. To submit without inspection, explicitly select not_inspected and give a reason. If the unit lacks the component, select not_applicable with a reason.
+- **Resulting business state**: Save results linked to report version, author, and observation time. Keep sensor estimates as separate evidence; on-site inspection does not overwrite original sensor data.
+- **Boundaries/prohibitions**: Reject missing inputs, readings without units, not_inspected without reason, and photos from other jobs. Do not preselect normal to allow completion without inspection.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-T04-N | tech-external-aがjob-contractor-aをstartしたin_progress案件（unit-online-rtoは18部品、IR100）。When: `acceptancePatches["shared:report-draft-all-normal"]`の入力からfilterをattention（理由あり）に変えてsaveDraft→写真1枚をattachments.add→最新版をsubmit | ①最初の保存でreportVersion=1 ②提出成功、indoor 8部品を含む18部品の結果・作者・観測時刻が版に紐付く ③センサー推定は別根拠として残る |
-| AT-T04-E | 提出時に ①result=null 1部品 ②測定に単位なし ③not_inspected理由なし ④本人の閲覧scope内だが別案件のattachmentId | 各VALIDATION、提出0件 |
-| AT-T04-B | indoor 8部品を ①normal ②attention（理由あり） ③not_inspected（理由あり） ④not_applicable（理由あり） ⑤null で保存／提出 | ①〜④ドラフト保存可・提出可 ⑤ドラフト保存可・提出はVALIDATION。初期値はnullで「normal」が既定選択されない |
+| AT-T04-N | tech-external-a starts job-contractor-a (in_progress; unit-online-rto has 18 components, IR100). When: In `acceptancePatches["shared:report-draft-all-normal"]`, change filter to attention with a reason → saveDraft → add one photo with attachments.add → submit latest version | ① First save: reportVersion=1 ② Submission succeeds; results/author/observation times for 18 components including 8 indoor components are linked to the version ③ Sensor estimates remain separate evidence |
+| AT-T04-E | On submission: ① One component result=null ② Reading without unit ③ not_inspected without reason ④ attachmentId visible within own scope but from another job | Each returns VALIDATION; zero submissions |
+| AT-T04-B | Save/submit 8 indoor components as ① normal ② attention with reason ③ not_inspected with reason ④ not_applicable with reason ⑤ null | ①–④ Draft save/submission allowed ⑤ Draft save allowed, submission VALIDATION. Initial value is null; normal is not preselected |
 
-設計: [DD-T04](../02-design/technician.md#dd-t04-詳細)。親ケースAT-T04は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-T04](../02-design/technician.md#dd-t04-details). Assess parent AT-T04 using all N/E/B and applicable SRC/R01 cases in traceability.
 
-### FR-T05 室外機点検
+### FR-T05 Outdoor inspection
 
-- **企業要望の根拠**: SRC-06 BIZ-10 — 室内機、室外機、電気・制御部品の状態を把握したい。
-- **設計補完の範囲**: 点検フォームの作り方と、点検していない場合の理由の書き方。
+- **Company request basis**: SRC-06 BIZ-10 — Understand indoor, outdoor, electrical, and control component status.
+- **Added design details**: Inspection forms and reasons for not inspecting.
 
-- **利用開始条件**: 有効な担当案件が「作業中(in_progress)」であること。保守できる範囲と、部品ごとの点検対象が取得できていること。
-- **基本フロー**: 部品ごとに点検結果を選ぶ → 必要な所見・測定値・写真を関連付ける → 「点検していない」「対象外」の場合は理由を書く → 下書き(ドラフト)または報告として保存する。
-- **業務規則 BR-T05**: 対象のグループは室外機(outdoor)で、項目は凝縮器(condenser_coil)、コンプレッサー(compressor)、ファン(fan)、羽根(blade)、冷媒配管(refrigerant_pipe)。最初の結果は空(null)にしておき、点検しないまま提出する場合は、はっきりと「点検していない(not_inspected)」と選んで理由を書く必要がある。設備にその部品が存在しない場合は「対象外(not_applicable)」として理由を書く。
-- **完了後の業務状態**: 点検結果は、報告のバージョン・作成者・観測した時刻と結びつけて保存する。センサーによる推定は別の根拠として残し、現地の点検結果でセンサーの元データを上書きしない。
-- **境界条件・禁止事項**: 未入力、単位のない測定値、「点検していない」に理由がないこと、他の案件の写真を使うことは、いずれも拒否する。「正常」をあらかじめ選んだ状態にして、点検せずに完了扱いにすることはできない。
+- **Entry conditions**: Active assigned job in_progress, with maintenance scope and component targets loaded.
+- **Main flow**: Select each component result → link required findings/readings/photos → give reasons for not inspected/not applicable → save draft or report.
+- **Business rule BR-T05**: Group: outdoor; components: condenser_coil, compressor, fan, blade, refrigerant_pipe. Initial results are null. To submit without inspection, explicitly select not_inspected and give a reason. If the unit lacks the component, select not_applicable with a reason.
+- **Resulting business state**: Save results linked to report version, author, and observation time. Keep sensor estimates as separate evidence; on-site inspection does not overwrite original sensor data.
+- **Boundaries/prohibitions**: Reject missing inputs, readings without units, not_inspected without reason, and photos from other jobs. Do not preselect normal to allow completion without inspection.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-T05-N | tech-external-aがjob-contractor-aをstartしたin_progress案件。When: `acceptancePatches["shared:report-draft-all-normal"]`の入力からcompressorをattention（理由あり）に変えてsaveDraft→submit | ①保存でreportVersion=1 ②提出成功、outdoor 5部品を含む18部品の結果・作者・観測時刻が版に紐付く ③センサー推定は別根拠として残る |
-| AT-T05-E | 提出時に ①result=null 1部品 ②測定に単位なし ③not_inspected理由なし ④本人の閲覧scope内だが別案件のattachmentId | 各VALIDATION、提出0件 |
-| AT-T05-B | outdoor 5部品を ①normal ②attention（理由あり） ③not_inspected（理由あり） ④not_applicable（理由あり） ⑤null で保存／提出 | ①〜④ドラフト保存可・提出可 ⑤ドラフト保存可・提出はVALIDATION。初期値はnull |
+| AT-T05-N | tech-external-a starts job-contractor-a (in_progress). When: In `acceptancePatches["shared:report-draft-all-normal"]`, change compressor to attention with a reason → saveDraft → submit | ① First save: reportVersion=1 ② Submission succeeds; results/author/observation times for 18 components including 5 outdoor components are linked to the version ③ Sensor estimates remain separate evidence |
+| AT-T05-E | On submission: ① One component result=null ② Reading without unit ③ not_inspected without reason ④ attachmentId visible within own scope but from another job | Each returns VALIDATION; zero submissions |
+| AT-T05-B | Save/submit 5 outdoor components as ① normal ② attention with reason ③ not_inspected with reason ④ not_applicable with reason ⑤ null | ①–④ Draft save/submission allowed ⑤ Draft save allowed, submission VALIDATION. Initial value is null |
 
-設計: [DD-T05](../02-design/technician.md#dd-t05-詳細)。親ケースAT-T05は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-T05](../02-design/technician.md#dd-t05-details). Assess parent AT-T05 using all N/E/B and applicable SRC/R01 cases in traceability.
 
-### FR-T06 電気・制御点検
+### FR-T06 Electrical/control inspection
 
-- **企業要望の根拠**: SRC-06 BIZ-10 — 室内機、室外機、電気・制御部品の状態を把握したい。
-- **設計補完の範囲**: 点検フォームの作り方と、点検していない場合の理由の書き方。
+- **Company request basis**: SRC-06 BIZ-10 — Understand indoor, outdoor, electrical, and control component status.
+- **Added design details**: Inspection forms and reasons for not inspecting.
 
-- **利用開始条件**: 有効な担当案件が「作業中(in_progress)」であること。保守できる範囲と、部品ごとの点検対象が取得できていること。
-- **基本フロー**: 部品ごとに点検結果を選ぶ → 必要な所見・測定値・写真を関連付ける → 「点検していない」「対象外」の場合は理由を書く → 下書き(ドラフト)または報告として保存する。
-- **業務規則 BR-T06**: 対象のグループは電気・制御(electrical)で、項目はサーモスタット(thermostat)、センサー(sensor)、コンデンサー(capacitor)、接触器(contactor)、配線(wiring)。最初の結果は空(null)にしておき、点検しないまま提出する場合は、はっきりと「点検していない(not_inspected)」と選んで理由を書く必要がある。設備にその部品が存在しない場合は「対象外(not_applicable)」として理由を書く。
-- **完了後の業務状態**: 点検結果は、報告のバージョン・作成者・観測した時刻と結びつけて保存する。センサーによる推定は別の根拠として残し、現地の点検結果でセンサーの元データを上書きしない。
-- **境界条件・禁止事項**: 未入力、単位のない測定値、「点検していない」に理由がないこと、他の案件の写真を使うことは、いずれも拒否する。「正常」をあらかじめ選んだ状態にして、点検せずに完了扱いにすることはできない。
+- **Entry conditions**: Active assigned job in_progress, with maintenance scope and component targets loaded.
+- **Main flow**: Select each component result → link required findings/readings/photos → give reasons for not inspected/not applicable → save draft or report.
+- **Business rule BR-T06**: Group: electrical; components: thermostat, sensor, capacitor, contactor, wiring. Initial results are null. To submit without inspection, explicitly select not_inspected and give a reason. If the unit lacks the component, select not_applicable with a reason.
+- **Resulting business state**: Save results linked to report version, author, and observation time. Keep sensor estimates as separate evidence; on-site inspection does not overwrite original sensor data.
+- **Boundaries/prohibitions**: Reject missing inputs, readings without units, not_inspected without reason, and photos from other jobs. Do not preselect normal to allow completion without inspection.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-T06-N | tech-external-aがjob-contractor-aをstartしたin_progress案件。When: `acceptancePatches["shared:report-draft-all-normal"]`の入力からcapacitorをattention（理由あり）に変え、capacitorの測定（metric=vibration、value=2.5、unit=mm/s）を加えてsaveDraft→submit | ①保存でreportVersion=1 ②提出成功、electrical 5部品を含む18部品の結果・作者・観測時刻が版に紐付く ③測定値にunit・observedAt・origin=inspection |
-| AT-T06-E | 提出時に ①result=null 1部品 ②測定に単位なし ③not_inspected理由なし ④本人の閲覧scope内だが別案件のattachmentId | 各VALIDATION、提出0件 |
-| AT-T06-B | electrical 5部品を ①normal ②attention（理由あり） ③not_inspected（理由あり） ④not_applicable（理由あり） ⑤null で保存／提出 | ①〜④ドラフト保存可・提出可 ⑤ドラフト保存可・提出はVALIDATION。初期値はnull |
+| AT-T06-N | tech-external-a starts job-contractor-a (in_progress). When: In `acceptancePatches["shared:report-draft-all-normal"]`, change capacitor to attention with a reason and add capacitor reading (metric=vibration, value=2.5, unit=mm/s) → saveDraft → submit | ① First save: reportVersion=1 ② Submission succeeds; results/author/observation times for 18 components including 5 electrical components are linked to the version ③ Reading has unit, observedAt, origin=inspection |
+| AT-T06-E | On submission: ① One component result=null ② Reading without unit ③ not_inspected without reason ④ attachmentId visible within own scope but from another job | Each returns VALIDATION; zero submissions |
+| AT-T06-B | Save/submit 5 electrical components as ① normal ② attention with reason ③ not_inspected with reason ④ not_applicable with reason ⑤ null | ①–④ Draft save/submission allowed ⑤ Draft save allowed, submission VALIDATION. Initial value is null |
 
-設計: [DD-T06](../02-design/technician.md#dd-t06-詳細)。親ケースAT-T06は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-T06](../02-design/technician.md#dd-t06-details). Assess parent AT-T06 using all N/E/B and applicable SRC/R01 cases in traceability.
 
-### FR-T07 異常根拠
+### FR-T07 Alert evidence
 
-**原文から具体化する要件 — 窓の開けっぱなし・断熱不足による負荷の通知（BIZ-17）**
+**Requirement made concrete from the original — Load notifications for open windows/poor insulation (BIZ-17)**
 
-窓が開いていることや断熱不足が原因で負荷が増えていることを、原因の候補として通知する。対象の設備、時刻、根拠(データ)、確認や保守への導線(進み方)を表示する。
+Notify about open windows or poor insulation as possible causes of increased load. Show target unit, time, supporting data, and links to checking/maintenance.
 
-**追加受入条件 AT-T07-SRC**: `acceptancePatches["AT-T07-SRC"]`（IR98、tech-internal-aの担当案件付き）の3つのfixture(テスト用データ)で確認する。それぞれ文言・根拠・時刻が異なる。通知を既読にしても、異常そのものは消えない。
+**Additional acceptance AT-T07-SRC**: Check three fixtures in `acceptancePatches["AT-T07-SRC"]` (IR98, with an assigned job for tech-internal-a). Each has different wording, evidence, and time. Reading the notification does not clear the alert.
 
-- **企業要望の根拠**: SRC-06 BIZ-08, BIZ-11, BIZ-17 — 異常を事前に、または起きたときに気づけるよう、リアルタイムで通知したい。振動・高温・冷媒の減少、わずかな漏れ、フィルターの詰まりなどを早く見つけたい。生活パターンや天気に合わせて運転し、窓の開けっぱなしや断熱不足による負荷にも気づけるようにしたい。
-- **設計補完の範囲**: 原因の候補・根拠・解消する手順。
+- **Company request basis**: SRC-06 BIZ-08, BIZ-11, BIZ-17 — Real-time fault notifications before/at occurrence; early detection of vibration, high temperature, low refrigerant, tiny leaks, and clogged filters; adapt to routines/weather and identify load from open windows/poor insulation.
+- **Added design details**: Possible causes, evidence, and resolution steps.
 
-- **利用開始条件**: 担当している設備に、異常または診断すべき疑いがあること。
-- **基本フロー**: 異常の一覧から根拠を開く → 「測定した値」「推定した値」「現地で点検した結果」と履歴を確認する → 確認済みにする → 必要であれば、もう一度測定するか、理由を付けて解消する。
-- **業務規則 BR-T07**: 推定に確信が持てない場合は、数値としての確率を出さない。「確認した」という操作は`acknowledged`と呼ぶ。解消するには、もう一度測定して設定した条件を満たすか、`alert.resolve`(警告を解消する)権限と理由が必要。
-- **完了後の業務状態**: 検知・確認・解消の、それぞれの時刻と行った人を記録する。同じ問題が再発した場合は、新しいアラートID(alertId)を発行し、前の事象と関連付ける。
-- **境界条件・禁止事項**: 案件(Job)を完了しただけでは「解消済み(resolved)」にはしない。通信が切れているという根拠だけで、盗難と決めつけてはいけない。「取り外し」専用の事象とは分けて扱う。
+- **Entry conditions**: Assigned unit has an alert or suspected issue to diagnose.
+- **Main flow**: Open evidence from alert list → check measured/estimated/inspection results and history → acknowledge → if needed, remeasure or resolve with a reason.
+- **Business rule BR-T07**: Do not show numeric probability when estimate confidence is unknown. Confirmation is `acknowledged`. Resolution requires remeasurement meeting configured recovery conditions, or `alert.resolve` permission and a reason.
+- **Resulting business state**: Record detection/acknowledgment/resolution times and actors. Recurrence gets a new alertId linked to the previous event.
+- **Boundaries/prohibitions**: Completing a Job does not set resolved. Communication loss alone does not prove theft; keep it separate from removal events.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-T07-N | `acceptancePatches["AT-T07-N"]`: unit-online-rtoにpolicy-temp-a（temperature gte 30°C、recoveryThreshold 28°C、duration 60秒）由来のopen Alert（alert-temp-a）、根拠は計測・推定・点検の3件。includeの`shared:tech-internal-a-job-online`でtech-internal-aの担当案件job-t07（作業窓内）を加え、tech-internal-aで操作（IR94）。When: 根拠を開く→acknowledge→28°C未満の再測定を60秒継続→同じ条件を再び60秒満たす | ①計測／推定／点検が区別表示 ②acknowledged、acknowledgedAt・主体 ③resolved、resolvedAt ④再発は新alertIdでpreviousAlertId=元のID（IR66） |
-| AT-T07-E | ①未解消AlertのJobだけcompletedにする ②heartbeat途絶だけを与える | ①Alert.status不変 ②盗難表示なし、connection=offlineのみ |
-| AT-T07-B | ①確信度なしの推定 ②alert.resolveあり理由付き ③権限なし ④再測定で回復 | ①確率数値なし ②resolved ③FORBIDDEN ④resolved |
+| AT-T07-N | `acceptancePatches["AT-T07-N"]`: unit-online-rto has open alert-temp-a from policy-temp-a (temperature gte 30°C, recoveryThreshold 28°C, duration 60 seconds), with three evidence records: measured/estimated/inspection. Include `shared:tech-internal-a-job-online` to add assigned job-t07 within its work window; act as tech-internal-a (IR94). When: Open evidence → acknowledge → keep remeasurement below 28°C for 60 seconds → meet the same alert condition again for 60 seconds | ① Distinct measured/estimated/inspection display ② acknowledged with acknowledgedAt/actor ③ resolved with resolvedAt ④ Recurrence has new alertId, previousAlertId=original ID (IR66) |
+| AT-T07-E | ① Complete only the Job of an unresolved Alert ② Supply only missing heartbeat | ① Alert.status unchanged ② No theft label, only connection=offline |
+| AT-T07-B | ① Estimate without confidence ② alert.resolve permission and reason ③ No permission ④ Remeasurement shows recovery | ① No numeric probability ② resolved ③ FORBIDDEN ④ resolved |
 
-設計: [DD-T07](../02-design/technician.md#dd-t07-詳細)。親ケースAT-T07は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-T07](../02-design/technician.md#dd-t07-details). Assess parent AT-T07 using all N/E/B and applicable SRC/R01 cases in traceability.
 
-### FR-T08 定期・事後・予防保全
+### FR-T08 Scheduled, reactive, and preventive maintenance
 
-- **企業要望の根拠**: SRC-06 BIZ-12 — 定期点検、故障後の対応、予防のための保全をしたい。RTO以外の一般的な保守にも使いたい。
-- **設計補完の範囲**: 「開始」「提出」「再提出」の状態の管理方法。
+- **Company request basis**: SRC-06 BIZ-12 — Scheduled, reactive, and preventive maintenance, including general non-RTO maintenance.
+- **Added design details**: Start, submit, and resubmit state management.
 
-- **利用開始条件**: 「担当決定(assigned)」の案件を担当していて、有効な期間内であること。定期点検・故障後の対応・予防保全は、同じ作業の状態モデルを使う。
-- **基本フロー**: 担当と予定を確認する → 作業を開始する → 報告を編集する → 提出する → 品質確認を待つ → 差し戻された場合は、やり直して再提出する。
-- **業務規則 BR-T08**: 作業を開始できるのは「担当決定(assigned)」のときだけ。差し戻された後の再開は「やり直し依頼(rework_requested)」の状態から。提出済み(submitted)の間は、提出したバージョンは見るだけ(読み取り専用)になる。顧客の承認を、技術者が代わりに行うことはできない。
-- **完了後の業務状態**: 開始時刻・提出時刻・報告のバージョン(reportVersion)を保存する。完了かどうかは、品質確認の担当者のレビューで決まる。
-- **境界条件・禁止事項**: まだ担当が決まっていない、取り消された、保留中(on_hold)、期限外のいずれかの状態での「開始」「提出」は拒否する。提出に失敗した場合は、「作業中(in_progress)」の状態とドラフト(下書き)の内容を保持する。
+- **Entry conditions**: Own assigned job within the valid period. Scheduled/reactive/preventive maintenance share one work-state model.
+- **Main flow**: Check assignment/schedule → start → edit report → submit → await quality review → rework/resubmit if returned.
+- **Business rule BR-T08**: Start only from assigned; resume rework from rework_requested. Submitted versions are read-only. Technicians cannot approve on behalf of customers.
+- **Resulting business state**: Save start/submission times and reportVersion. The quality reviewer decides completion.
+- **Boundaries/prohibitions**: Reject start/submit when unassigned, cancelled, on_hold, or outside the valid period. Submission failure retains in_progress and draft content.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-T08-N | assignedのjob-contractor-a（作業窓内）、tech-external-a。When: start→`acceptancePatches["shared:report-draft-all-normal"]`の入力でsaveDraft→submit→contractor-aがreturn（外注案件の品質確認、IR93）→resumeRework→submit | ①in_progress、startedAt ②submitted、reportVersion=1 ③rework_requested ④in_progressへ戻り新版v2で提出 |
-| AT-T08-E | ①requestedで未割当のjob-internal-aをstart／HQがjob-contractor-aを取消した後にstart／start後にHQがjobs.holdしたon_holdのjob-contractor-aをstart ②担当期限外でsubmit ③in_progressでsubmitをUNAVAILABLE | ①NOT_FOUND／FORBIDDEN（errors.assignment_ended）／CONFLICT（IR93） ②FORBIDDEN ③in_progressとドラフト保持 |
-| AT-T08-B | ①assignedでstart ②submittedで編集 ③rework_requestedでresumeRework | ①in_progress ②読取専用、保存不可 ③in_progress |
+| AT-T08-N | tech-external-a, assigned job-contractor-a within work window. When: start → saveDraft with `acceptancePatches["shared:report-draft-all-normal"]` → submit → contractor-a returns (outsourced quality review, IR93) → resumeRework → submit | ① in_progress, startedAt ② submitted, reportVersion=1 ③ rework_requested ④ Back to in_progress, submit new v2 |
+| AT-T08-E | ① Start unassigned requested job-internal-a / start after HQ cancels job-contractor-a / start job-contractor-a after starting and HQ jobs.hold sets on_hold ② Submit outside assignment period ③ UNAVAILABLE on submit in_progress | ① NOT_FOUND / FORBIDDEN (errors.assignment_ended) / CONFLICT (IR93) ② FORBIDDEN ③ Retain in_progress/draft |
+| AT-T08-B | ① Start assigned ② Edit submitted ③ resumeRework from rework_requested | ① in_progress ② Read-only, cannot save ③ in_progress |
 
-設計: [DD-T08](../02-design/technician.md#dd-t08-詳細)。親ケースAT-T08は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-T08](../02-design/technician.md#dd-t08-details). Assess parent AT-T08 using all N/E/B and applicable SRC/R01 cases in traceability.
 
-### FR-T09 作業報告
+### FR-T09 Work reports
 
-- **企業要望の根拠**: SRC-06 BIZ-12 — 定期点検、故障後の対応、予防のための保全をしたい。RTO以外の一般的な保守にも使いたい。
-- **設計補完の範囲**: 写真・交換した部品・報告のバージョンの管理方法。
+- **Company request basis**: SRC-06 BIZ-12 — Scheduled, reactive, and preventive maintenance, including general non-RTO maintenance.
+- **Added design details**: Photos, replaced parts, and report versions.
 
-- **利用開始条件**: 「作業中(in_progress)」または「やり直し作業中」であること。点検項目と下書き(ドラフト)を取得できていること。
-- **基本フロー**: 点検・測定値・写真・交換した部品・作業内容・次回の対応を入力する → 下書きを保存する → 提出前にチェックする → 報告のバージョンを確定する。
-- **業務規則 BR-T09**: 報告には、作成者とバージョンの情報を残す。画像はJPEGまたはPNG形式で、1枚あたり5MiB以下、最大10枚まで。部品の数量は正の整数で入力する。次回の対応は「なし(none)」か、日時・内容をはっきり書く。作業窓の中でサーバーから情報を再取得しても、まだ保存していない編集中の内容(dirty)は消さない。作業窓の終了15分前に予告し、終了時は未保存の入力を破棄して通知する(IR89)。
-- **完了後の業務状態**: 保存に成功すると、下書きのバージョンが更新される。提出すると、確定した報告のバージョン(reportVersion)を案件(Job)に結びつける。写真を削除すると、一時的な画像データ(object URL)を解放する。
-- **境界条件・禁止事項**: 本文が9文字以下、または4001文字以上のとき、部品の数量が0のときは、提出を拒否する。偽のファイル形式、11枚目の画像、5MiBを超える画像は、追加自体を拒否する。画像の処理に失敗した場合は「失敗(failed)」と表示し、失敗した写真が残ったままでは提出できない。すでに保存済みの本文や画像は、そのまま残す。
+- **Entry conditions**: in_progress or rework in progress; inspection fields and draft loaded.
+- **Main flow**: Enter inspections/readings/photos/replaced parts/work/next actions → save draft → validate before submission → finalize report version.
+- **Business rule BR-T09**: Keep author/version. Images: JPEG/PNG, at most 5MiB each and 10 images. Part quantities are positive integers. Next action is explicitly none or a date/time and description. Refetch during the work window preserves dirty input. Warn 15 minutes before the work window ends; at the end, discard unsaved input with a notice (IR89).
+- **Resulting business state**: Successful save updates draft version. Submission links finalized reportVersion to Job. Deleting a photo releases its object URL.
+- **Boundaries/prohibitions**: Reject submission with body ≤9 or ≥4001 characters or part quantity 0. Reject adding false file types, an 11th image, or images over 5MiB. Mark failed image processing as failed; submission is blocked while failed photos remain. Preserve already saved text/images.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-T09-N | tech-external-aがjob-contractor-aをstartしたin_progress案件。When: `acceptancePatches["shared:report-draft-all-normal"]`の入力（18部品normal、本文50文字、nextAction=none）に部品1点を加えてsaveDraft→写真JPEG 1枚をattachments.add→最新版をsubmit | ①初回本文保存はdraft version=1。写真追加後は版+1、Attachment status=ready。最新reports.getの版で提出 ②提出でreportVersion固定、JobにreportRefs ③写真削除でobject URL解放 |
-| AT-T09-E | ①本文9／4001文字 ②偽MIME ③11枚目 ④5MiB+1byte ⑤部品数量0 ⑥failed写真が残る | ①⑤⑥提出VALIDATION ②③④追加拒否 全ケースで保存済み本文・画像は保持 |
-| AT-T09-B | ①5MiBちょうどのJPEG／PNG各10枚 ②数量1 ③nextAction=follow_up（未来日時・内容） ④dirty中にreports.get再取得 | ①追加可 ②提出可 ③提出可 ④dirty値が保持される |
+| AT-T09-N | tech-external-a starts job-contractor-a (in_progress). When: Add one part to `acceptancePatches["shared:report-draft-all-normal"]` (18 normal components, 50-character body, nextAction=none) → saveDraft → attachments.add one JPEG → submit latest version | ① First body save: draft version=1; photo addition increments version by 1, Attachment status=ready; submit version from latest reports.get ② Submission fixes reportVersion and Job.reportRefs ③ Deleting photo releases object URL |
+| AT-T09-E | ① Body 9/4001 characters ② False MIME ③ 11th image ④ 5MiB+1byte ⑤ Part quantity 0 ⑥ Failed photo remains | ①⑤⑥ Submission VALIDATION ②③④ Addition rejected; preserve saved text/images in every case |
+| AT-T09-B | ① Ten JPEG/PNG images exactly 5MiB each ② Quantity 1 ③ nextAction=follow_up with future date/time and content ④ reports.get refetch while dirty | ① Can add ② Can submit ③ Can submit ④ Dirty input retained |
 
-設計: [DD-T09](../02-design/technician.md#dd-t09-詳細)。親ケースAT-T09は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-T09](../02-design/technician.md#dd-t09-details). Assess parent AT-T09 using all N/E/B and applicable SRC/R01 cases in traceability.
 
-### FR-T10 遠隔診断・試運転
+### FR-T10 Remote diagnostics and test runs
 
-- **企業要望の根拠**: SRC-06 BIZ-13 — スマートサーモスタット(スマート温度調整機器)などで温度を確認し、離れた場所から設定を変えたい。
-- **設計補完の範囲**: 技術者が操作できる権限と、試運転の手順。
+- **Company request basis**: SRC-06 BIZ-13 — Check temperature with smart thermostats and change settings remotely.
+- **Added design details**: Technician control permissions and test-run steps.
 
-- **利用開始条件**: 担当できる期間内であること、`control.diagnose`(診断のための操作)機能があること、機器がオンラインであること、契約の制限を超えないこと。
-- **基本フロー**: 今の状態と担当案件を確認する → 診断の操作・試運転の時間・理由を指定する → 確認する → Command(操作の指示)の応答と履歴を見る。
-- **業務規則 BR-T10**: ファームウェア(機器を動かすソフト)の更新中や、応答待ちのCommandがあるときは、開始できない。試運転を終えるときも、終了のCommandに対する応答が必要で、ブラウザのタイマーが終わっただけでは、実際に停止したとは扱わない。
-- **完了後の業務状態**: 通常の診断では、理由と案件番号(jobId)を付けたCommandを作る。試運転では、時間と終了時の動作を保持するDiagnosticRun(診断実行の記録)と、開始・終了それぞれのCommandを作る。終了の予定時刻と、実際に終了した応答は別々に表示し、終了に失敗した場合は注意として記録に残す。
-- **境界条件・禁止事項**: 制限温度を超える操作、担当できる期間外での操作、16分の試運転、理由のない操作は、いずれも拒否する。終了の応答がない限り、「停止済み」とは表示しない。
+- **Entry conditions**: Within assignment period, `control.diagnose` capability, device online, and no breach of contract restrictions.
+- **Main flow**: Check current state/assigned job → specify diagnostic action, duration, reason → confirm → view Command response/history.
+- **Business rule BR-T10**: Cannot start during firmware updates or while a Command awaits response. Ending a test run also needs an end-Command response; a browser timer ending does not prove physical shutdown.
+- **Resulting business state**: Normal diagnostics create a Command with reason/jobId. A test run creates a DiagnosticRun holding duration/end action, plus start/end Commands. Show scheduled end separately from actual end response; record end failures as warnings.
+- **Boundaries/prohibitions**: Reject actions beyond restricted temperatures, outside assignment periods, 16-minute test runs, or missing reasons. Do not show “Stopped” without an end response.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-T10-N | tech-external-a、job-contractor-a（作業窓内）、control.diagnose、unit-online-rto online。When: jobId=job-contractor-aで通常診断set_mode=cool（理由付き）→そのCommandをsent→acknowledged→試運転startAction=set_power true・endAction=set_power false・duration=5を開始→開始応答→終了時刻→終了応答 | ①Command1件（jobId・reason付き） ②DiagnosticRun awaiting_start→running、endAt=startedAt+5分 ③end_requested、終了Command1件 ④completed、「停止済み」表示 |
-| AT-T10-E | ①`acceptancePatches["AT-T10-E.1"]`でtech-internal-aがunit-limited（下限24°C）の担当案件job-t10-limitedに23°Cを要求 ②〜⑤はtech-external-a・job-contractor-aで ②担当期間外 ③durationMinutes=16 ④reason空 ⑤終了応答なし | ①FORBIDDEN ②FORBIDDEN ③④VALIDATION ⑤end_failed、「停止済み」表示なし |
-| AT-T10-B | ①未完了Commandあり ②FW更新中 ③終了時計到来のみ ④終了応答到来 | ①②CONFLICT ③end_requested（停止済みではない） ④completed |
+| AT-T10-N | tech-external-a, job-contractor-a within work window, control.diagnose, unit-online-rto online. When: Normal diagnostic set_mode=cool with jobId=job-contractor-a and reason → Command sent→acknowledged → start test run with startAction=set_power true, endAction=set_power false, duration=5 → start response → end time → end response | ① One Command with jobId/reason ② DiagnosticRun awaiting_start→running, endAt=startedAt+5 minutes ③ end_requested, one end Command ④ completed, “Stopped” |
+| AT-T10-E | ① With `acceptancePatches["AT-T10-E.1"]`, tech-internal-a requests 23°C for assigned job-t10-limited on unit-limited (minimum 24°C) ②–⑤ tech-external-a/job-contractor-a: ② Outside assignment period ③ durationMinutes=16 ④ Empty reason ⑤ No end response | ① FORBIDDEN ② FORBIDDEN ③④ VALIDATION ⑤ end_failed, no “Stopped” |
+| AT-T10-B | ① Unfinished Command ② Firmware updating ③ End time reached only ④ End response received | ①② CONFLICT ③ end_requested, not stopped ④ completed |
 
-**追加受入条件 AT-T10-R01（再訪・競合・役割横断）**
+**Additional acceptance AT-T10-R01 (revisit, conflict, cross-role)**
 
-| 受入ID | Given / When | Then |
+| Acceptance ID | Given / When | Then |
 |---|---|---|
-| AT-T10-R01 | 開始応答時刻01:00:05、duration=5、endAction=OFF。画面離脱・役割切替後に01:05:05へ進める | 終了Commandは1件、元Membershipで再認可。終了応答までは停止済みでない。応答後completed。途中失効ならend_blockedで要求0件。reset後の旧イベントは反映0件。 |
+| AT-T10-R01 | Start response at 01:00:05, duration=5, endAction=OFF. Leave screen/switch roles, then advance to 01:05:05 | One end Command, reauthorize original Membership. Not stopped until end response; afterward completed. If authorization expired, end_blocked and zero requests. Old post-reset events apply zero changes. |
 
-設計: [DD-T10](../02-design/technician.md#dd-t10-詳細)。親ケースAT-T10は追跡表に登録したN/E/B・R01および該当SRCの全件で判定する。
+Design: [DD-T10](../02-design/technician.md#dd-t10-details). Assess parent AT-T10 using all N/E/B/R01 and applicable SRC cases in traceability.
 
-### FR-T11 IoTライフサイクル
+### FR-T11 IoT lifecycle
 
-- **企業要望の根拠**: SRC-06 BIZ-20 — 小型・低価格で空調の中に設置する機器について、ファームウェア(機器を動かすソフト)の更新や、取り外し・盗難への対策と通知をしたい。
-- **設計補完の範囲**: 登録・校正・更新の模擬(シミュレーション)手順。
+- **Company request basis**: SRC-06 BIZ-20 — Firmware updates and removal/theft protection/notifications for small low-cost devices inside AC units.
+- **Added design details**: Simulated registration, calibration, and update steps.
 
-- **利用開始条件**: `device.maintain`(機器の保守)権限があり、対象の設備を有効に担当していること。登録・校正・更新は、いずれもモック(見本の動き)。
-- **基本フロー**: 製品番号(serial)を登録する → 設備と結びつける → 接続を確認する → 校正した値と参照を記録する → 対応するファームウェアの候補を選んで更新する → 進行状況・結果を確認する。
-- **業務規則 BR-T11**: 製品番号は、前後の空白を取り除き、大文字にそろえて、同じものかどうかを判定する。登録時のsensorTypesは対象設備の機種能力(Capability.sensors)にあるmetricだけを許し、単位・stale秒・境界は能力定義から複写する(IR43)。校正をすると履歴が追加されるが、すでにある測定値は書き換えない。ファームウェアは、対応するバージョンの一覧からしか選べない。URLやファイルそのものを自由に入力させることはしない。
-- **完了後の業務状態**: 機器(Device)、校正の記録(CalibrationRecord)、機器の操作履歴(DeviceOperation)を保存する。更新が成功(succeeded)した場合だけ、ファームウェアのバージョン(firmwareVersion)を更新する。更新中は、同時に別の操作をすることはできない。
-- **境界条件・禁止事項**: 製品番号の重複、別の設備への無断の結びつけ直し、単位が合わないことは、いずれも拒否し、台帳は変更しない。オフラインの状態では、ファームウェアの更新を開始しない。ファームウェアの更新に失敗した場合は「失敗(failed)」と表示し、古いバージョンのまま保持する。
+- **Entry conditions**: `device.maintain` permission and valid target-unit assignment. Registration/calibration/updates are all mocks.
+- **Main flow**: Register serial → bind unit → check connection → record calibration values/reference → select supported firmware version → update → view progress/result.
+- **Business rule BR-T11**: Trim serial and uppercase before comparing uniqueness. Registration sensorTypes allows only metrics in target Capability.sensors; copy units, stale seconds, and boundaries from capability (IR43). Calibration appends history without changing existing readings. Firmware must come from supported version choices; no free-form URL/file input.
+- **Resulting business state**: Save Device, CalibrationRecord, and DeviceOperation history. Update firmwareVersion only on succeeded. Block concurrent actions during updates.
+- **Boundaries/prohibitions**: Reject duplicate serials, unauthorized rebindings, and unit mismatches without changing the register. Do not start firmware updates offline. Failed updates show failed and retain the old version.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-T11-N | `acceptancePatches["AT-T11-N"]`: 機器が未紐付のunit-t11-newとその担当案件job-t11をtech-internal-a（device.maintain）に用意。When: jobId=job-t11、unitId=unit-t11-newでserial ac-001・sensorTypes=[temperature, power]を登録→unit-t11-newへ紐付け→check→開始tick後にdemo.trigger(operation succeeded)→temperatureを同単位で校正→FW v2更新→開始tick後に成功イベント | ①Device作成、serial=AC-001 ②bind成功 ③DeviceOperation succeeded ④CalibrationRecord追加、既存測定値不変 ⑤firmwareVersion=v2 |
-| AT-T11-E | tech-internal-aで ①AT-T11-Nの登録後に「ac-001 」を再登録 ②他設備へ理由なし再紐付け ③AT-T11-Nで紐付けた機器にdemo.trigger(communication_lost)を送った後、jobId=job-t11でupdateFirmware ④校正単位不一致 ⑤FW失敗イベント | ①CONFLICT ②VALIDATION ③DomainError OFFLINE、DeviceOperation 0件（IR94） ④VALIDATION ⑤failed、旧版保持 |
-| AT-T11-B | ①小文字／大文字serial ②校正前後の測定履歴 ③対応／非対応FW | ①同一判定 ②履歴追記、既存値不変 ③対応のみ選択可 |
+| AT-T11-N | `acceptancePatches["AT-T11-N"]`: unbound unit-t11-new and assigned job-t11 for tech-internal-a with device.maintain. When: Register serial ac-001, sensorTypes=[temperature, power], jobId=job-t11, unitId=unit-t11-new → bind unit-t11-new → check → after start tick, demo.trigger(operation succeeded) → calibrate temperature in same unit → update FW v2 → success event after start tick | ① Device created, serial=AC-001 ② Bind succeeds ③ DeviceOperation succeeded ④ CalibrationRecord added, existing readings unchanged ⑤ firmwareVersion=v2 |
+| AT-T11-E | tech-internal-a: ① After AT-T11-N, register “ac-001 ” again ② Rebind another unit without reason ③ After demo.trigger(communication_lost) on AT-T11-N's bound device, updateFirmware with jobId=job-t11 ④ Calibration unit mismatch ⑤ Firmware failure event | ① CONFLICT ② VALIDATION ③ DomainError OFFLINE, zero DeviceOperations (IR94) ④ VALIDATION ⑤ failed, old version retained |
+| AT-T11-B | ① Lower/uppercase serial ② Reading history before/after calibration ③ Supported/unsupported firmware | ① Same identity ② Append history, existing values unchanged ③ Only supported versions selectable |
 
-**追加受入条件 AT-T11-R01（再訪・競合・役割横断）**
+**Additional acceptance AT-T11-R01 (revisit, conflict, cross-role)**
 
-| 受入ID | Given / When | Then |
+| Acceptance ID | Given / When | Then |
 |---|---|---|
-| AT-T11-R01 | 機器a/bが同じFW候補v2を持つ。deviceId=aで更新し、成功イベントを送る | aだけv2、bは旧版。deviceId省略はVALIDATION、対象外IDは拒否。 |
+| AT-T11-R01 | Devices a/b share FW candidate v2. Update deviceId=a and send success event | Only a becomes v2; b keeps old version. Missing deviceId returns VALIDATION; out-of-scope ID rejected. |
 
-設計: [DD-T11](../02-design/technician.md#dd-t11-詳細)。親ケースAT-T11は追跡表に登録したN/E/B・R01および該当SRCの全件で判定する。
+Design: [DD-T11](../02-design/technician.md#dd-t11-details). Assess parent AT-T11 using all N/E/B/R01 and applicable SRC cases in traceability.
 
-### FR-T12 IoT異常
+### FR-T12 IoT faults
 
-- **企業要望の根拠**: SRC-06 BIZ-20 — 小型・低価格で空調の中に設置する機器について、ファームウェアの更新や、取り外し・盗難への対策と通知をしたい。
-- **設計補完の範囲**: 通信が切れたとき・電源が切れたときと、取り外しを見分ける方法。
+- **Company request basis**: SRC-06 BIZ-20 — Firmware updates and removal/theft protection/notifications for small low-cost devices inside AC units.
+- **Added design details**: Distinguish communication loss, power loss, and removal.
 
-- **利用開始条件**: 担当している機器(Device)について、イベント(発生した出来事)を見る権限があること。
-- **基本フロー**: 「通信が切れた」「電源が切れた」「取り外しを検知した」を、それぞれ別々に模擬(シミュレーション)で発生させる → 通知を確認する → 対応のメモを書く → 復旧・確認の内容を記録する。
-- **業務規則 BR-T12**: 「接続の状態(connection)」と「取り外しの検知(tamper)」は、別々に管理する。根拠の種類(evidenceSource)は事象の種類から決まる(IR74)。電源が切れたと判定するのは、電源専用の信号のデモがあるときだけ。心拍信号(heartbeat)がないというだけで、「電源が切れた」と決めつけない。
-- **完了後の業務状態**: 検知した時刻・観測した根拠・対応内容・復旧した時刻は、それぞれ別のイベントとして保存する。通知を確認しても、機器の実際の物理的な状態は変わらない。
-- **境界条件・禁止事項**: 通信が再接続しても、まだ確認していない取り外し(tamper)のアラートは消えない。順番が入れ替わって届いた古い心拍信号(heartbeat)によって、「オンライン」に戻してはいけない。
+- **Entry conditions**: Permission to view assigned Device events.
+- **Main flow**: Simulate communication loss, power loss, and removal separately → check notifications → write response note → record recovery/confirmation.
+- **Business rule BR-T12**: Manage connection and tamper separately. Event type determines evidenceSource (IR74). Classify power loss only with a dedicated demo power signal; missing heartbeat alone is not proof of power loss.
+- **Resulting business state**: Save detection time, observed evidence, response, and recovery time as separate events. Acknowledging notifications does not change physical device state.
+- **Boundaries/prohibitions**: Reconnection does not clear unacknowledged tamper alerts. Old out-of-order heartbeats cannot restore online state.
 
-| 受入ID | Given / When | Then（観測可能な結果） |
+| Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-T12-N | `acceptancePatches["AT-T12-N"]`でunit-non-rtoの担当案件job-t12をtech-internal-aに割り当てる（作業窓内、IR94）。device-tamper。When: communication_lost→power_lost→tamper→responseNote→restored | ①3事象を別イベント、occurredAt ②responseNoteで物理状態不変 ③restoredAt保存、tamperアラートは残る |
-| AT-T12-E | `acceptancePatches["AT-T12-N"]`で ①tamper未確認のまま通信復旧 ②communication_lost(sequence=5)の後にrestored(axis=connection、sequence=4)を送る（IR102） | ①tamperアラート残存 ②offlineのまま |
-| AT-T12-B | ①heartbeat途絶 ②power_signal断 ③tamper_signal | ①offlineのみ ②電源断 ③tamper、それぞれ独立 |
+| AT-T12-N | `acceptancePatches["AT-T12-N"]` assigns unit-non-rto job-t12 to tech-internal-a within work window (IR94). device-tamper. When: communication_lost→power_lost→tamper→responseNote→restored | ① Three separate events with occurredAt ② responseNote leaves physical state unchanged ③ restoredAt saved, tamper alert remains |
+| AT-T12-E | With `acceptancePatches["AT-T12-N"]`: ① Restore communication while tamper is unacknowledged ② After communication_lost(sequence=5), send restored(axis=connection, sequence=4) (IR102) | ① Tamper alert remains ② Remains offline |
+| AT-T12-B | ① Missing heartbeat ② Lost power_signal ③ tamper_signal | ① Offline only ② Power loss ③ Tamper; each independent |
 
-設計: [DD-T12](../02-design/technician.md#dd-t12-詳細)。親ケースAT-T12は追跡表に登録したN/E/Bおよび該当SRC/R01の全件で判定する。
+Design: [DD-T12](../02-design/technician.md#dd-t12-details). Assess parent AT-T12 using all N/E/B and applicable SRC/R01 cases in traceability.
 
 
-0.9.0修正契約: [厳格レビュー修正契約](../02-design/strict-review-contracts.md)と[操作別版契約](../02-design/write-version-catalog.csv)を併読する。
+0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 
-現行0.21.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+Additional current 0.21.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–106. They override older text on the same issues; use IR72 for conflict priority.
 
-案件一覧には状態（業務順）・重大度・期限の昇順/降順ソートを設ける。デフォルトは状態の業務順（IR34）。全対象を並べ替えてからページ分割し、言語切替では順序を変えない。受入はAT-REV16-005を併用する。
+Job lists support ascending/descending sorting by status (business order), severity, and deadline. Default: status in business order (IR34). Sort all results before pagination; language changes do not change order. Also use AT-REV16-005 for acceptance.

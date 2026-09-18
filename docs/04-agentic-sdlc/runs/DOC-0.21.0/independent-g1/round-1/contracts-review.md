@@ -1,31 +1,31 @@
-# DOC-0.21.0 独立G1契約再レビュー
+# DOC-0.21.0 Independent G1 Contract Re-review
 
-- レビュー担当: contracts_review（仕様修正に参加していない別エージェント）
-- 対象: 親commit `717c545` の未コミット作業ツリー、DOC-0.21.0
+- Reviewer: contracts_review (a separate agent who did not edit the specifications)
+- Target: Uncommitted working tree based on parent commit `717c545`, DOC-0.21.0
 - spec_baseline_id: `660c7855fdc3aaaf0bb3152d25788132ff838dd35067c87f7d9a28bf6e0ca802`
-- 判定: **PASS（下記の担当範囲）**。新規指摘0件。
-- 仕様ファイルは変更していない。本ファイルのみレビュー証跡として追加。
+- Decision: **PASS for the scope below**. Zero new findings.
+- No specification files changed. Only this review evidence file was added.
 
-## 独立確認
+## Independent checks
 
-manifestのspec_filesを指定のJSON正規化でSHA-256再計算し、上記baselineと一致した。全対象ファイルのバイト列からSHA-256を再計算し、不一致0件を確認した。
+Recomputed SHA-256 for manifest spec_files using the specified JSON normalization; it matched the baseline above. Recomputed every target file's hash from its bytes and found zero mismatches.
 
-修正対象G120-001〜005と変更の影響を、IR95・IR103〜106、正規DTO、D02/D07/D08/D12/D15、SR21/SR25/SR28、IR10/IR21/IR45/IR54/IR71/IR83/IR91/IR98、A12本文、fixture、acceptance-review-020/021と照合した。validate_documents.pyの追加検証箇所も読んだ。修正担当による静的検査成功の報告は、ここでの独立実行結果としては数えていない。
+Checked findings G120-001–005 and the impact of their corrections against IR95/IR103–106, canonical DTOs, D02/D07/D08/D12/D15, SR21/SR25/SR28, IR10/IR21/IR45/IR54/IR71/IR83/IR91/IR98, A12 text, fixtures, and acceptance-review-020/021. Also read the added validate_documents.py checks. The editors' reported static-check success is not counted as an independent execution here.
 
-| 指摘 | 判定 | 根拠 |
+| Finding | Result | Evidence |
 |---|---|---|
-| G120-001 | 解消 | IR103とAT-A12-NのflowはPolicy保存後に現在時刻のFactを投入し、通常1秒tickを59回と1回進める。elapsed=0/59では対象Policy由来の副作用0、60で初めて成立する。observedAtは01:00Zで固定、01:01ZでもTTL120秒以内。simulator=falseなので自動測定で上書きされない。接続状態はIR45により時間経過だけではofflineにならない。seedに競合Policy/Automationはなく、対象Unitに進行中Commandもない。 |
-| G120-002 | 解消 | IR95の同名規則にalertの例外が入り、IR104でsensor/tamper/reconciliation_required→fault、maintenance→cleaning_due、quality→qualityを明示。sourceAlertId保持と正規NotificationTypeが整合する。 |
-| G120-003 | 解消 | IR104が必須severityを全templateに定義。Policy由来は設定severityを保持し、業務通知既定値で上書きしない。restrictionの段階別値、preview、非同期device_operation.failedのactor除外も具体化した。 |
-| G120-004 | 解消 | IR105、ChangeEntityType、Subscribe、IR71の対応表にallergen_observationがそろう。追加保存と同一遷移のイベント、scope、再送、最新観測選択、C07/A12の再取得を規定。 |
-| G120-005 | 解消 | IR106とIR91で欠落scopeVersionAtCreationを全patch適用後の宛先Membershipから補完。明示0を保持し、不正値/不存在宛先を拒否。生成後のMembership更新では過去snapshotを書き換えない。 |
+| G120-001 | Resolved | IR103 and AT-A12-N flow save the Policy, supply current-time Facts, then advance ordinary one-second ticks 59 times and once more. At elapsed=0/59, the Policy causes no side effects; it first matches at 60. observedAt stays 01:00Z and remains within TTL120 seconds at 01:01Z. simulator=false prevents automatic measurements from overwriting it. Under IR45, elapsed time alone does not make the connection offline. The seed has no competing Policy/Automation or ongoing Command on the target Unit. |
+| G120-002 | Resolved | IR95 adds the alert exception to the same-name rule. IR104 explicitly maps sensor/tamper/reconciliation_required→fault, maintenance→cleaning_due, quality→quality. Preserved sourceAlertId and canonical NotificationType agree. |
+| G120-003 | Resolved | IR104 defines required severity for every template. Policy notifications keep configured severity, without replacement by business-notification defaults. It also defines restriction-stage values, previews, and actor exclusion for asynchronous device_operation.failed. |
+| G120-004 | Resolved | IR105, ChangeEntityType, Subscribe, and the IR71 table all include allergen_observation. They define saving and an event in the same transition, scope, retries, latest-observation selection, and C07/A12 refetch. |
+| G120-005 | Resolved | IR106/IR91 fill missing scopeVersionAtCreation from the recipient Membership after all patches. Keep explicit 0; reject invalid values/nonexistent recipients. Later Membership updates do not rewrite historical snapshots. |
 
-## 時間評価と同tickの重点確認
+## Focused checks of time evaluation and the same tick
 
-IR103のfinalEvaluationはoccurredAtだけを01:01Zとし、保持Factと同じobservedAt/value/quality、phase=conditionを送る。D02の「異なるfactsまたは追加phaseはCONFLICT」に該当せず、IR54の内部評価済み同tick結果を参照する。ここで再評価してbusy/cooldownへ変える要求ではない。SR25の換気非対応と通知成立の独立性も維持され、対象Policyのcreated通知は両Unit、Commandは対応Unitだけとなる。
+IR103 finalEvaluation changes only occurredAt to 01:01Z, retaining the stored Fact's observedAt/value/quality and sending phase=condition. It does not violate D02's rule that different facts or an added phase cause CONFLICT; it retrieves the same-tick result already evaluated internally under IR54. It does not request reevaluation that would change the result to busy/cooldown. SR25's independence of unsupported ventilation and successful notification also remains: the Policy creates notifications for both Units, but a Command only for the supported Unit.
 
-IR104のseverityは業務デモの設計補完（DEC-61）であり企業承認とはされていない。IR103の時間境界具体化もDEC-60の提案として記録され、本番判断を追加していない。
+IR104 severity is an added business-demo design detail (DEC-61), not company approval. IR103 time boundaries are also recorded as the DEC-60 proposal, adding no production decisions.
 
-## 限界
+## Limits
 
-これは文書とfixture契約の独立レビューであり、アプリ実装・ブラウザ・Repository実行試験は未実行。全既存要件を今回全面再レビューしたという判定ではない。静的検査・TypeScript・変異検査の実行証跡および他担当範囲を統合した最終G1判定は親レビューで行う。企業検収、本番Security/IoT/APIの承認を意味しない。
+This is an independent review of documents and fixture contracts. Application implementation, browser, and Repository execution tests have not been run. It is not a full re-review of every existing requirement. The parent review combines static, TypeScript, and mutation execution evidence with other reviewers' scopes for the final G1 decision. It does not mean company acceptance or production Security/IoT/API approval.

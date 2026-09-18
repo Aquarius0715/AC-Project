@@ -7,484 +7,484 @@ consumers: [implementation-agent, test-agent, review-agent]
 scope: frontend-demo-1A
 ---
 
-# クライアント 詳細設計書
+# Client Detailed Design
 
-この文書では、クライアント(お客様)向け画面の機能・画面項目・状態・エラー(例外)を決めます。基準にするのは、企業の元の要件文書と、それに対応する要件です。各FR(機能要件)を満たすために必要な処理と、受け入れ条件(テストで確認する内容)を定義します。参考として用意したモック(見本画面)は、共通のUI(画面デザイン)の見た目を検討するためだけに使います。
+This document defines client (customer) screen features, fields, states, and errors (exceptions). It follows the original company requirements and their linked requirements. It defines the processing and acceptance criteria (what tests check) needed for each FR (functional requirement). Reference mock screens are used only to guide the shared UI appearance.
 
-**0.21.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**Implementation baseline for 0.21.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
 
-## 入力・責務
+## Inputs and Responsibilities
 
-一次資料(いちばんもとになる資料)は[企業要件原文(SRC-06)](../00-prepare/sources/company-requirements-original.txt)です。この原文を整理し直した要件をもとに、画面・入力項目・状態・受け入れ条件を設計します。参考にする入力資料は、[役割別要件](../01-requirements/client.md)と[共通要件](../01-requirements/common.md)です。設計前に必ず読むべき資料は、[共通詳細設計](common.md)と[UIUX仕様書](../03-uiux/UIUXSpecification.md)です。
+The primary source is the [Original Company Requirements (SRC-06)](../00-prepare/sources/company-requirements-original.txt). Screens, inputs, states, and acceptance criteria follow the requirements reorganized from this source. Inputs are the [Role Requirements](../01-requirements/client.md) and [Common Requirements](../01-requirements/common.md). Read the [Common Detailed Design](common.md) and [UIUX Specification](../03-uiux/UIUXSpecification.md) before designing.
 
-この文書に書くのは、フロントエンド(画面側)の項目・表示・モックの動作についての設計です。画面上での登録・割り当て・入金・利用制限・監査(記録の確認)は、すべて共有のモック用メモリ(見本用の一時的なデータ)の中で状態が変わるだけです。サーバー側の実装やデータベースの設計を依頼するものではありません。
+This document designs frontend fields, displays, and mock behavior. Registration, assignment, payment receipt, restrictions, and audit on the screen only change state in shared mock memory (temporary example data). This does not request server implementation or database design.
 
-ルートパラメーター(URLに含まれる値)は、信頼できない入力として必ず検証します。表の中の「service名」は、共通のRepository(データを扱う共通の仕組み)が持つ処理名を指します。同じルートを持つ行は、同じ画面の中で役割分担している機能です。すべての行で、読み込み中(loading)・データなし(empty)・エラー(error)・権限なし(forbidden)・対象が見つからない(not-found)の5つの状態を用意します。再試行ボタンは、回復できるエラーのときだけ表示します。権限が足りない場合と対象が見つからない場合は、再試行ボタンを出さず、IR57に従って表示します。
+Always validate route parameters (values in URLs) as untrusted input. “Service name” in the table means an operation in the shared Repository (data service). Rows with the same route describe different functions on one screen. Every row supports loading, empty, error, forbidden, and not-found states. Show retry only for recoverable errors. For forbidden and not-found, follow IR57 and do not show retry.
 
-## 画面・処理設計
+## Screen and Process Design
 
-| 設計ID / 要件 | ルート / 主コンポーネント | 取得・操作契約 | 入力・処理・検証 | 異常系と禁止事項 |
+| Design ID / requirement | Route / main component | Read and action contracts | Input, processing, validation | Errors and prohibited actions |
 |---|---|---|---|---|
-| DD-C01 / FR-C01 | `/customer` / `Overview` | `units.list`、`telemetry.summary`、`alerts.list`、`summaries.get` | 物件と期間で絞り込みます。絞り込み条件はURLに保存し、自分が見てよい設備だけを集計します | 「データがない」状態と「値が0」の状態を区別して表示します。値が古い場合は、更新時刻も一緒に表示します |
-| DD-C02 / FR-C02 | `/customer/properties` / `PropertyExplorer` | `properties.list`、`properties.save`、`properties.archive`、`spaces.list`、`spaces.save`、`spaces.archive`、`units.list` | 自分の組織が持つ物件の種類・名前・階層構造を作成・編集できます。親の場所IDが循環している場合や、他の物件を親に指定した場合は拒否します。設備の性能やメーカー台帳の編集はHQ(本部)だけが行えます | 設備が残っている場所は削除できません。削除した対象のURLを開くと、not-found(見つからない)と表示します。パンくずリスト(現在地を示すリンク)から上の階層へ戻れます |
-| DD-C03 / FR-C03 | `/customer/units/:id` / `UnitControl` | `units.get`、`commands.create`、`commands.get` | 設備の性能に応じて、温度の最小値・最大値・刻み幅、モード、風量の候補を作ります。内容を確認した後に変更(mutation)を実行します。現在の室温と設定値は、別々の欄に表示します | 拒否・期限切れ・失敗の理由を画面に表示します。その後、あらためて状態を確認してから、手動で再試行します |
-| DD-C04 / FR-C04 | `/customer/automations` / `AutomationEditor` | `automations.list`、`automations.save`、`automations.simulate`、`automations.fire`、`automations.nextRuns`、`units.list`、`units.get` | 曜日を1つ以上、開始/終了時刻、タイムゾーン、対象設備、動作の指定を必須にします。日をまたぐ設定は、その旨を明示的に確認します | 条件が重複している場合は警告を出し、優先順位を表示します。利用制限中は、自動運転が発火しても実行を拒否し、理由を表示します |
-| DD-C05 / FR-C05 | `/customer/automations` / `AutomationEditor` | `automations.save`、`automations.simulate`、`automations.fire`、`consents.get`、`consents.update`、`units.list`、`units.get` | 条件の種類ごとに入力項目を切り替えます(判別union)。位置情報を使う同意については、何のために使うかを説明します。デモでは実際の位置情報は取得せず、「帰宅」「外出」といったイベントを手入力します | 同意を拒否した場合や位置情報が使えない場合は、手動操作か時刻指定の方式に切り替えます。利用履歴から生活パターンを推定する機能は、デモであることを明示します |
-| DD-C06 / FR-C06 | `/customer/energy` / `EnergyExplorer` | `energy.summary`、`baselines.list`、`units.list` | 期間は「開始<終了」とし、最大366日までとします(仮の値)。通貨、料金のバージョン、比較する期間、データの信頼度を表示します | データが欠けている場合は、集計に使えたデータの割合も一緒に表示します。推計で補った値を、実測値として扱いません |
-| DD-C07 / FR-C07 | `/customer/air-quality` / `AirQuality` | `telemetry.series`、`units.get`、`commands.create`、`commands.get`、`units.list` | 指標(何を測るか)と期間を選びます。換気を要求する場合は、その設備が換気(ventilation)の機能を持っているかを別途確認します | センサーがない場合は「対応していません」と表示します。送風を、外の空気を取り込む換気として扱いません |
-| DD-C08 / FR-C08 | `/customer/alerts` / `AlertInbox` | `alerts.list`、`notifications.markRead`、`notifications.list`、`summaries.get` | 重要度や未読かどうかで絞り込みます。通知のID(notificationId)と異常のID(alertId)は別々のものとして扱います | データの取得に失敗したときに、「異常はありません」という正常な状態のサマリーを表示してはいけません |
-| DD-C09 / FR-C09 | `/customer/maintenance` / `MaintenanceRequest` | `jobs.list`、`jobs.create`、`jobs.get`、`jobs.cancel`、`jobs.addNote`、`reports.get`、`attachments.getContent`、`units.list` | 設備ID(unitId)、種類、症状の説明(10〜2000文字)、これから先の希望日時を必須にします(仮の値)。この日時はあくまで「希望」であり、確定した予約ではありません | 同じ依頼が二重に送信されないようにします。希望の日時が使えない場合は、候補を選び直してもらいます。お客様が自分で取り消せるのは、まだ担当者が割り当てられていない依頼だけです |
-| DD-C10 / FR-C10 | `/customer/payments` / `BillingOverview` | `contracts.list`、`invoices.list` | 契約ID・請求状態で絞り込みます。金額は通貨の最小単位(例: 円やセントなど)で扱います | 自分が見てよい範囲を超えたデータは表示を拒否します。まだ請求が発生していない状態を、「支払いが滞っている」ように表示してはいけません |
-| DD-C11 / FR-C11 | `/customer/payments/:id` / `PaymentDemo` | `invoices.get`、`payments.simulate`、`notifications.preview`、`notifications.recipients` | 請求ID、デモ用の支払い方法、内容の確認を入力します。実際のカード番号などを入力する欄は作りません | 実際の送金は行いません。処理が終わっていないのに「完了しました」と表示してはいけません。再試行するときは、同じ冪等キー(重複防止用の識別子)を使います |
-| DD-C12 / FR-C12 | `/customer/payments/:id` / `RestrictionNotice` | `restrictions.forInvoice`、`commands.get`、`inquiries.create`、`inquiries.list` | 利用制限の内容は閲覧のみです。問い合わせを作る導線と、支払いへ進む導線を用意します。対象の設備と、適用しているルールのバージョンを表示します | オフラインのときは処理を保留します。お客様が自分で強制的に制限を解除する機能は用意しません |
-| DD-C13 / FR-C13 | `/customer/energy/offsets` / `OffsetPreview` | `energy.summary`、`offsets.preview`、`offsets.simulate`、`offsets.list`、`units.list` | 希望する量(0より大きい値)、対象期間、デモでの確認を入力します。実際の取引や認証を証明する番号は発行しません | 実際に減らせたCO2の量と、すでに使った(償却済みの)クレジットを別々に表示します。失敗した場合は、同じ申し込みを重複して作らないようにします |
+| DD-C01 / FR-C01 | `/customer` / `Overview` | `units.list`, `telemetry.summary`, `alerts.list`, `summaries.get` | Filter by property and period. Store filters in the URL and summarize only permitted units | Distinguish missing data from 0. Show update time for old values |
+| DD-C02 / FR-C02 | `/customer/properties` / `PropertyExplorer` | `properties.list`, `properties.save`, `properties.archive`, `spaces.list`, `spaces.save`, `spaces.archive`, `units.list` | Create and edit property types, names, and hierarchies in the user's organization. Reject cyclic parent space IDs and parents from other properties. Only HQ edits unit capabilities and manufacturer register data | Do not delete spaces containing units. Deleted URLs show not-found. Breadcrumbs return to parent levels |
+| DD-C03 / FR-C03 | `/customer/units/:id` / `UnitControl` | `units.get`, `commands.create`, `commands.get` | Build temperature min/max/step, mode, and fan options from capabilities. Mutate after confirmation. Show room temperature separately from settings | Show rejection, expiry, and failure reasons. Recheck state before manual retry |
+| DD-C04 / FR-C04 | `/customer/automations` / `AutomationEditor` | `automations.list`, `automations.save`, `automations.simulate`, `automations.fire`, `automations.nextRuns`, `units.list`, `units.get` | Require at least one weekday, start/end times, timezone, target units, and actions. Explicitly confirm overnight settings | Warn on overlapping conditions and show priorities. Reject triggered automation under restrictions and show the reason |
+| DD-C05 / FR-C05 | `/customer/automations` / `AutomationEditor` | `automations.save`, `automations.simulate`, `automations.fire`, `consents.get`, `consents.update`, `units.list`, `units.get` | Change fields by condition type (discriminated union). Explain the purpose of location consent. The demo does not collect real location; users enter arrival/departure events | If consent is denied or location unavailable, use manual or scheduled control. Clearly label lifestyle-pattern inference as a demo |
+| DD-C06 / FR-C06 | `/customer/energy` / `EnergyExplorer` | `energy.summary`, `baselines.list`, `units.list` | Require start<end and at most 366 days (provisional). Show currency, tariff version, comparison period, and data reliability | Show usable data coverage when data is missing. Do not treat estimated replacements as measurements |
+| DD-C07 / FR-C07 | `/customer/air-quality` / `AirQuality` | `telemetry.series`, `units.get`, `commands.create`, `commands.get`, `units.list` | Select metric and period. Separately check ventilation capability before requesting ventilation | Show “Unsupported” when no sensor exists. Fan circulation is not outdoor-air ventilation |
+| DD-C08 / FR-C08 | `/customer/alerts` / `AlertInbox` | `alerts.list`, `notifications.markRead`, `notifications.list`, `summaries.get` | Filter by severity or unread status. Keep notificationId separate from alertId | Do not show a healthy “No alerts” summary when fetching fails |
+| DD-C09 / FR-C09 | `/customer/maintenance` / `MaintenanceRequest` | `jobs.list`, `jobs.create`, `jobs.get`, `jobs.cancel`, `jobs.addNote`, `reports.get`, `attachments.getContent`, `units.list` | Require unitId, type, symptom description (10–2000 characters), and future requested times (provisional). Requested times are not confirmed bookings | Prevent duplicate requests. Ask users to reselect unavailable times. Customers may cancel only requests with no assignee yet |
+| DD-C10 / FR-C10 | `/customer/payments` / `BillingOverview` | `contracts.list`, `invoices.list` | Filter by contract ID and invoice state. Store amounts in minor currency units (such as yen or cents) | Deny data outside permitted scope. Do not present “No invoices yet” as overdue payment |
+| DD-C11 / FR-C11 | `/customer/payments/:id` / `PaymentDemo` | `invoices.get`, `payments.simulate`, `notifications.preview`, `notifications.recipients` | Enter invoice ID, demo payment method, and confirmation. Provide no real card-number fields | Do not transfer real money. Do not show completion before processing ends. Reuse the same idempotency key on retry |
+| DD-C12 / FR-C12 | `/customer/payments/:id` / `RestrictionNotice` | `restrictions.forInvoice`, `commands.get`, `inquiries.create`, `inquiries.list` | Restrictions are read-only. Provide inquiry and payment paths. Show target units and applied rule version | Hold processing when offline. Provide no customer forced-release feature |
+| DD-C13 / FR-C13 | `/customer/energy/offsets` / `OffsetPreview` | `energy.summary`, `offsets.preview`, `offsets.simulate`, `offsets.list`, `units.list` | Enter requested quantity (>0), period, and demo confirmation. Issue no proof numbers for real trades or certification | Show actual CO2 reductions separately from retired credits. Prevent duplicate requests after failure |
 
-## 実装の共通手順
+## Shared Implementation Steps
 
-1. セッション(ログイン情報)と、見てよい範囲(スコープ)を確認します。ID・URLの絞り込み条件は、スキーマ(データの形式ルール)で検証します。
-2. Query(データ取得の仕組み)を通じてモックサービスを呼び出し、画面用のデータとして受け取ります。
-3. フォームにはReact Hook Formと共通のスキーマを使います。設備の性能や期間などの検証も、このスキーマで行います。
-4. 変更(mutation)を実行する直前に、対象データのバージョン・権限・現在の状態を照合します。影響が大きい操作は、対象と理由を確認画面で表示します。
-5. Repositoryを使って共有のデモ用データを変更し、相関ID(処理を追跡するための番号)付きのイベントを発行します。関係するQueryを無効化して、最新データを取り直します。
-6. 応答を待っている間は、待っていることが分かる表示を続けます。成功・拒否・失敗はそれぞれ別に表示します。フォームの送信に失敗した場合は、入力した内容を消さずに残します。
+1. Check the session and permitted scope. Validate IDs and URL filters against schemas (data format rules).
+2. Call mock services through Queries and receive display data.
+3. Use React Hook Form and shared schemas for forms. The schemas also validate unit capabilities and periods.
+4. Immediately before a mutation, check the target version, permissions, and current state. For major actions, show the target and reason in a confirmation view.
+5. Change shared demo data through the Repository and emit an event with a correlation ID (tracking ID). Invalidate related Queries and fetch fresh data.
+6. Keep a pending indicator visible while awaiting a response. Show success, denial, and failure separately. Keep form inputs when submission fails.
 
-## テストへの引き渡し
+## Handoff to Testing
 
-各設計ID(DD-C番号)について、同じ番号のAT-C(受け入れ条件)、この文書の表にある異常系、権限のない直接呼び出しをテストで確認します。テストデータと、複数の役割にまたがるシナリオは、[検証計画](../04-agentic-sdlc/verification.md)を正式な基準とします。この設計書に書いた文字数などの例を変更する場合は、スキーマ・文書・境界値のテストを同時に更新します。
+For each design ID (DD-C number), test the matching AT-C acceptance criteria, error cases in the table, and unauthorized direct calls. The [Verification Plan](../04-agentic-sdlc/verification.md) is the source of truth for test data and cross-role scenarios. If example limits such as character counts change, update the schema, document, and boundary tests together.
 
-## 機能別詳細仕様(0.6.0)
+## Detailed Feature Specifications (0.6.0)
 
-入力フォームの値はRHF(React Hook Form)で保持し、スキーマで検証します。読み取り専用の画面には、フォームの検証を求めません。監査記録・通知・共通のエラー表示は、入出力契約DDC-03/09に従います。読み取り専用の値は、Queryの単一の取得元(source)から表示します。共通の型・ページング・時間・エラーの扱いは、[実装契約](implementation-contracts.md)を正式な基準とし、以下ではそれぞれの画面の個別条件を追加で示します。見た目に関する値は、[UIUX](../03-uiux/UIUXSpecification.md) UX-04/08にあるtoken(色やサイズなどの基本値)とpattern(定型パターン)を使います。
+Keep form values in RHF (React Hook Form) and validate them with schemas. Read-only screens do not need form validation. Follow input/output contract DDC-03/09 for audit records, notifications, and shared error displays. Show read-only values from a single Query source. The [Implementation Contracts](implementation-contracts.md) define shared types, paging, time, and error handling; the following adds screen-specific conditions. Use the tokens (base colors, sizes, etc.) and patterns in [UIUX](../03-uiux/UIUXSpecification.md) UX-04/08 for appearance.
 
-### DD-C01 詳細
+### DD-C01 Details
 
-**一次資料との対応**: SRC-06 BIZ-04, BIZ-08 → FR-C01 → DD-C01。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 集計する範囲と、データが欠けているときの表示方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-04, BIZ-08 → FR-C01 → DD-C01. Source category: original company requirements SRC-06 + design additions. Design additions: summary scope and missing-data display. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-C01 / 主な表示パターン: **UI-OVERVIEW**。この画面が使うサービス境界は`units.list, telemetry.summary, alerts.list, summaries.get`です。
+Scope: FR-C01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `units.list, telemetry.summary, alerts.list, summaries.get`.
 
-**初期表示と前提**: 自分の組織に、利用できる設備が登録されていることを前提とします。設備が0件でも画面自体は開けます。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: Available units are registered in the user's organization; the screen also opens with zero units. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| propertyId | ID/任意 | 初期は自組織の全物件 | 対象物件 |
-| period | enum/必須 | today/7d/30d、初期today | 電力の集計期間 |
-| unitId | ID/任意 | 選択物件に属する設備のみ | 温湿度の対象 |
-| summary | 読取 | total/online/offline/unknown/powerOn/powerOff/powerUnknown/alertCount(critical/warningだけ、IR51)とasOf | カード・表示時点 |
+| propertyId | ID/optional | Default: all properties in the user's organization | Target property |
+| period | enum/required | today/7d/30d; default: today | Energy summary period |
+| unitId | ID/optional | Only units in the selected property | Temperature/humidity target |
+| summary | Read-only | total/online/offline/unknown/powerOn/powerOff/powerUnknown/alertCount (critical/warning only, IR51) and asOf | Cards and display timestamp |
 
-**処理手順**
+**Steps**
 
-1. 対象の物件と期間を選びます。次に、稼働状況・室温・湿度・空気の状態・電力・異常件数を確認します。最後に、状態カードから該当する設備の一覧や詳細を開きます。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 違う部屋の室温を平均して、代表の温度として扱いません。
-   - 温度・湿度は、選んだ設備または部屋ごとの測定地点で表示します。
-   - 電力量はその期間の合計、現在の電力は最新の観測時刻の値を表示します。
-3. 画面を見るだけでは、業務の状態は変わりません。絞り込み条件はURLに保存し、「戻る」操作で復元します。
-4. 更新の対象になるQuery: `units / telemetry / alerts(購読しているイベントが来たときだけ)`。
+1. Select property and period. Check operating state, room temperature, humidity, air quality, power, and alert counts. Open relevant unit lists or details from status cards.
+2. Apply the following business rules to both reads and actions.
+   - Do not average different rooms' temperatures into a representative temperature.
+   - Show temperature and humidity for the selected unit or each room's measurement point.
+   - Show total energy for the period and current power at the latest observation time.
+3. Viewing does not change business state. Keep filters in the URL and restore them on Back.
+4. Queries to update: `units / telemetry / alerts (only on subscribed events)`.
 
-**境界条件・失敗時**: 1台だけ計測できていない場合、その台数は「正常」に加えず「不明」の台数として数えます。検索条件に他のお客様の設備IDを指定しても、その設備は集計に含めません。
+**Boundary cases and failures**: If one unit cannot be measured, count it as unknown rather than normal. Do not include another customer's unit in summaries even if its ID is supplied as a filter.
 
-**検証**: 追跡表のAT-C01配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-C01 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-C02 詳細
+### DD-C02 Details
 
-**一次資料との対応**: SRC-06 BIZ-07 → FR-C02 → DD-C02。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 階層の編集ルールと削除ルール。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-07 → FR-C02 → DD-C02. Source category: original company requirements SRC-06 + design additions. Design additions: hierarchy editing and deletion rules. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-C02 / 主な表示パターン: **UI-LIST / UI-FORM**。この画面が使うサービス境界は`properties.list, properties.save, properties.archive, spaces.list, spaces.save, spaces.archive, units.list`です。
+Scope: FR-C02 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `properties.list, properties.save, properties.archive, spaces.list, spaces.save, spaces.archive, units.list`.
 
-**初期表示と前提**: 自分の組織が持つ物件を編集する権限があることを前提とします。設備台帳の性能編集は、HQ(本部)だけに限られます。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: The user may edit properties owned by their organization. Only HQ may edit capabilities in the unit register. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| property.name | 文字列/必須 | trim後1〜120文字 | 物件名 |
-| property.kind | enum/必須 | home/office、初期未選択 | 分類 |
-| space.name | 文字列/必須 | 1〜120文字 | 階・部屋名 |
-| space.kind | enum/必須 | area/floor/room/space | 階層種別 |
-| parentSpaceId | ID/null | rootはnull、同一物件、循環不可 | 親 |
-| expectedVersion | 整数/更新時必須 | 取得版 | 競合検出 |
+| property.name | string/required | 1–120 characters after trim | Property name |
+| property.kind | enum/required | home/office; initially unselected | Type |
+| space.name | string/required | 1–120 characters | Floor/room name |
+| space.kind | enum/required | area/floor/room/space | Hierarchy type |
+| parentSpaceId | ID/null | null for root; same property; no cycles | Parent |
+| expectedVersion | integer/required on update | Fetched version | Conflict detection |
 
-**処理手順**
+**Steps**
 
-1. 自宅またはオフィスの物件を作ります。次に、必要なエリア・階・部屋を追加します。場所を選んで、その中の設備を確認します。最後に、名前や分類を編集します。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 1つの場所は、必ず1つの親にだけ所属します。
-   - 親は同じ物件の中から選び、自分自身や自分の子孫を親にすることは禁止します。
-   - 設備や子の場所が残っている場所は、アーカイブや削除ができません。先に移動先を案内します。
-3. 作成したIDとバージョンを取得し、ツリー表示とパンくずリストを更新します。物件直下には空間未割当の設備グループ(IR62)を、KPIからの遷移ではpowerState/connections条件の設備一覧section(IR50)を表示します。設備の所属を変える操作はHQ台帳へ案内します。名前を変えても設備IDは変わりません。
-4. 更新の対象になるQuery: `properties / spaces / units / customer summary`。
+1. Create a home or office property. Add needed areas, floors, and rooms. Select a space to view its units, then edit names or types.
+2. Apply the following business rules to both reads and actions.
+   - Each space belongs to only one parent.
+   - Select a parent in the same property. A space cannot be its own parent or have a descendant as parent.
+   - Do not archive or delete a space that still contains units or child spaces. First guide the user to move them.
+3. Receive the created ID and version, then update the tree and breadcrumbs. Directly under a property, show units with no assigned space (IR62). For navigation from KPIs, show the unit-list section filtered by powerState/connections (IR50). Direct unit reassignment to the HQ register. Renaming does not change unit IDs.
+4. Queries to update: `properties / spaces / units / customer summary`。
 
-**境界条件・失敗時**: 名前が空、121文字、親が循環している、他の組織の親IDを指定した場合は、いずれも拒否します。CONFLICT(競合)が起きたときは、現在のバージョンを提示し、入力内容は消さずに残します。自動で上書きはしません。
+**Boundary cases and failures**: Reject empty or 121-character names, parent cycles, and parent IDs from other organizations. On CONFLICT, show the current version and keep inputs. Do not overwrite automatically.
 
-**検証**: 追跡表のAT-C02配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-C02 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-C03 詳細
+### DD-C03 Details
 
-**一次資料との対応**: SRC-06 BIZ-13 → FR-C03 → DD-C03。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: モード・風量・応答状態の扱い。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-13 → FR-C03 → DD-C03. Source category: original company requirements SRC-06 + design additions. Design additions: modes, fan levels, and acknowledgement states. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-C03 / 主な表示パターン: **UI-DETAIL**。この画面が使うサービス境界は`units.get, commands.create, commands.get`です。
+Scope: FR-C03 / Main display pattern: **UI-DETAIL**. Service boundary: `units.get, commands.create, commands.get`.
 
-**初期表示と前提**: 有効なMembership(組織への所属情報)があり、対象設備を操作する権限(control能力)を持ち、その設備がオンラインで、契約上の利用制限の範囲内であることを前提とします。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: Active Membership, permission to control the unit (control capability), online unit, and compliance with contract restrictions. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| power | boolean/変更時 | 初期は確認済み値 | 電源 |
-| targetTemperature | number/変更時 | capability.min/max/stepに一致 | 設定温度°C |
-| mode / fanLevel | enum/変更時 | 対応候補のみ | モード・風量 |
-| unitVersion | 整数/必須 | 取得時version | 現在状態の照合 |
-| idempotencyKey | UUID/必須 | 確認送信時作成、同じ意思の再送で保持 | 重複防止 |
+| power | boolean/on change | Initially confirmed value | Power |
+| targetTemperature | number/on change | Matches capability.min/max/step | Set temperature °C |
+| mode / fanLevel | enum/on change | Supported options only | Mode / fan level |
+| unitVersion | integer/required | Version at fetch | Current-state check |
+| idempotencyKey | UUID/required | Create on confirmed send; keep for retries of the same intent | Duplicate prevention |
 
-**処理手順**
+**Steps**
 
-1. 室温と現在確認済みの設定を見ます。次に、電源・温度・モード・風量を編集します。変更内容を確認し、要求の受付・送信・機器からの応答を順に確認します。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 1回の確認送信を1つのAction(操作)とし、電源・温度・モード・風量はそれぞれ別々に変更します。
-   - 温度は機種ごとの最小値・最大値・刻み幅の範囲内、モードと風量は一覧にある候補から選びます。
-   - 電源をOFFにする要求を送っても、機器の温度測定値を0にはしません。
-   - 同じ設備に対する要求が処理待ち(pending)の間は、同じ設備への新しい要求を操作できないようにします。
-3. Command(命令)を1件作成し、要求した値を別に表示します。機器が確認応答(acknowledged)を返した後にだけ、確認済み設定を更新します。失敗した場合も、要求内容と理由を履歴に残します。
-4. 更新の対象になるQuery: `commands / unit detail / telemetry summary / audit`。
+1. View room temperature and current confirmed settings. Edit power, temperature, mode, or fan level. Confirm the change and follow request acceptance, sending, and device acknowledgement.
+2. Apply the following business rules to both reads and actions.
+   - Each confirmed submission is one Action. Change power, temperature, mode, and fan level separately.
+   - Temperature must match the model's min/max/step; choose mode and fan level from listed options.
+   - A power-OFF request does not set measured temperature to 0.
+   - Disable new requests to a unit while a request for that unit is pending.
+3. Create one Command and show the requested value separately. Update confirmed settings only after the device returns acknowledged. Keep the request and reason in history even on failure.
+4. Queries to update: `commands / unit detail / telemetry summary / audit`。
 
-**境界条件・失敗時**: 16〜30度、1度刻みというデモ用の性能であれば、15度・31度・24.5度への変更は拒否します。設備がオフラインの場合、他のお客様の設備の場合、利用制限に違反する場合、機器の応答が遅れている場合のいずれも、成功として扱いません。制限中の可否はIR46、接続・電源信号による拒否はIR47に従います。
+**Boundary cases and failures**: For demo capability 16–30 degrees in 1-degree steps, reject 15, 31, and 24.5 degrees. Offline units, other customers' units, restriction violations, and late acknowledgements are not successes. Follow IR46 for actions under restrictions and IR47 for connection/power-signal rejection.
 
-**検証**: 追跡表のAT-C03配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-C03 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-C04 詳細
+### DD-C04 Details
 
-**一次資料との対応**: SRC-06 BIZ-14 → FR-C04 → DD-C04。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 曜日入力と時間の重複に関するルール。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-14 → FR-C04 → DD-C04. Source category: original company requirements SRC-06 + design additions. Design additions: weekdays and time-overlap rules. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-C04 / 主な表示パターン: **UI-LIST / UI-FORM**。この画面が使うサービス境界は`automations.list, automations.save, automations.simulate, automations.fire, automations.nextRuns, units.list, units.get`です。
+Scope: FR-C04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `automations.list, automations.save, automations.simulate, automations.fire, automations.nextRuns, units.list, units.get`.
 
-**初期表示と前提**: 対象の設備がスケジュール制御に対応していることを前提とします。表示と保存に使うタイムゾーンを確定できることも前提です。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: Target units support schedule control, and a timezone can be fixed for display and storage. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| name | 文字列/必須 | 1〜120文字 | ルール名 |
-| unitIds | ID配列/必須 | 1〜50、利用範囲内 | 対象 |
-| weekdays | 整数配列/必須 | ISO1〜7、重複不可 | 曜日 |
-| startLocal / endLocal | HH:mm/必須 | 同時刻不可 | 時間帯 |
-| endsNextDay | boolean/必須 | 初期false | 日跨ぎ |
-| timezone | IANA文字列/必須 | 初期表示設定、存在するzone | 実行基準 |
-| startAction / endAction | UnitAction/必須 | 能力に適合 | 開始・終了動作 |
-| enabled | boolean/必須 | 新規false、確認画面で明示ONにしたsaveはtrue可 | 運転開始の意思 |
+| name | string/required | 1–120 characters | Rule name |
+| unitIds | ID array/required | 1–50; within permitted scope | Targets |
+| weekdays | integer array/required | ISO 1–7; no duplicates | Weekdays |
+| startLocal / endLocal | HH:mm/required | Cannot be equal | Time range |
+| endsNextDay | boolean/required | Default: false | Overnight |
+| timezone | IANA string/required | Default: display setting; valid zone | Execution timezone |
+| startAction / endAction | UnitAction/required | Supported by capabilities | Start/end actions |
+| enabled | boolean/required | New: false; save may use true if explicitly switched ON in confirmation | Intent to enable |
 
-**処理手順**
+**Steps**
 
-1. 曜日・運転時間帯・設定を入力します。次に、次に実行される予定を確認します。保存または停止を選び、デモ用の時計で開始・終了のイベントが正しく発火するかを確認します。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 曜日は「開始する日」の曜日として扱います。
-   - 終了時刻が開始時刻以下になる場合は、日をまたぐフラグがあるときだけ「翌日」として扱います。
-   - 開始時刻と終了時刻が同じ場合は、「24時間運転」とは推定せずに拒否します。
-   - 終了時の動作も必須の入力とし、黙って電源をOFFにはしません。
-3. Automation(自動運転ルール)に、タイムゾーン・開始/終了の動作・有効かどうか(enabled)を保存します。作成しただけでは、すぐに命令(Command)は送りません。デモ時計による開始・終了の発火はRepositoryの内部評価が行い、発火時点でownerの権限をあらためて確認してからCommandを作ります。画面はこの発火のためにautomations.fireを呼びません(IR54)。
-4. 更新の対象になるQuery: `automations / next-run preview / audit`。
+1. Enter weekdays, operating hours, and settings. Check upcoming runs. Save or disable, and use the demo clock to check start/end events.
+2. Apply the following business rules to both reads and actions.
+   - Weekdays refer to the start day.
+   - Treat an end time at or before start as next day only with the overnight flag.
+   - Reject equal start/end times; do not infer 24-hour operation.
+   - Require an end action; do not silently turn power OFF.
+3. Save timezone, start/end actions, and enabled in Automation. Creation alone does not send a Command. The Repository evaluates demo-clock start/end triggers internally, rechecks owner permissions at trigger time, and creates Commands. Screens do not call automations.fire for these triggers (IR54).
+4. Queries to update: `automations / next-run preview / audit`。
 
-**境界条件・失敗時**: 曜日が0件、終了時の動作が未指定、あいまいな時刻や存在しない時刻(サマータイムの影響など)を指定した場合は、いずれも拒否します。ルールを停止した後に予約されていたイベントからは、新しい要求を作りません。
+**Boundary cases and failures**: Reject zero weekdays, missing end actions, and ambiguous or nonexistent times (such as daylight-saving changes). After disabling a rule, its scheduled events must not create new requests.
 
-**検証**: 追跡表のAT-C04配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-C04 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-C05 詳細
+### DD-C05 Details
 
-**一次資料との対応**: SRC-06 BIZ-14, BIZ-15, BIZ-17 → FR-C05 → DD-C05。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 同意の取り消しと、条件同士の優先順位。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-14, BIZ-15, BIZ-17 → FR-C05 → DD-C05. Source category: original company requirements SRC-06 + design additions. Design additions: withdrawing consent and condition priority. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-C05 / 主な表示パターン: **UI-FORM**。この画面が使うサービス境界は`automations.save, automations.simulate, automations.fire, consents.get, consents.update, units.list, units.get`です。
+Scope: FR-C05 / Main display pattern: **UI-FORM**. Service boundary: `automations.save, automations.simulate, automations.fire, consents.get, consents.update, units.list, units.get`.
 
-**初期表示と前提**: 自動運転の対象と条件の種類を選べる状態であることを前提とします。位置情報を使う条件の場合は、目的ごとの同意が必要です。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: Automation targets and condition types can be selected. Location conditions require purpose-specific consent. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| condition.type | enum/必須 | occupancy/location/pattern/weather | 条件種別 |
-| condition（Condition型） | 判別union/必須 | 在室有無、arrival/departure、予定時刻（patternの評価はIR52）、天候比較 | 条件内容 |
-| consentPurpose | enum/位置時必須 | location_automation | 利用目的 |
-| granted | boolean/位置時必須 | 初期false | 同意 |
-| action | UnitAction/必須 | 設備能力内 | 実行内容 |
-| priority | 整数/必須 | 0〜100、初期50 | 同順位調整 |
-| simulationEvent | 合成event/任意 | isDemo=true | 動作確認 |
+| condition.type | enum/required | occupancy/location/pattern/weather | Condition type |
+| condition (Condition type) | discriminated union/required | Occupancy, arrival/departure, scheduled time (pattern evaluation: IR52), weather comparison | Condition details |
+| consentPurpose | enum/required for location | location_automation | Purpose |
+| granted | boolean/required for location | Default: false | Consent |
+| action | UnitAction/required | Within unit capabilities | Action |
+| priority | integer/required | 0–100; default: 50 | Priority within a level |
+| simulationEvent | synthetic event/optional | isDemo=true | Behavior check |
 
-**処理手順**
+**Steps**
 
-1. 在室・帰宅/外出・生活パターン・天候のいずれかの条件を選びます。必要な同意を確認し、動作内容を保存します。最後に、模擬イベントを使って条件が一致するかどうかを確認します。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 位置情報の同意は目的location_automationだけで管理し、アプリ利用自体の同意は記録しません(IR102)。
-   - 位置情報の取得は、このバージョン(1A)では合成イベントのみで行います。
-   - 生活パターンの推定はデモ用のものであり、実際の個人の行動履歴は集めません。
-   - 条件のデータが欠けている場合は、その条件が「成立した」とは扱いません。
-3. 同意を取り消すと、該当する条件のルールはdisabled(無効)になります。ただし、すでに発行済みのCommandを「取り消した」とは表示しません。手動操作は、権限がある範囲で引き続き行えます。
-4. 更新の対象になるQuery: `consents / automations / simulation results / audit`。
+1. Select occupancy, arrival/departure, lifestyle pattern, or weather conditions. Check required consent and save actions. Use simulated events to check condition matches.
+2. Apply the following business rules to both reads and actions.
+   - Manage location consent only for location_automation; do not record consent to use the app itself (IR102).
+   - Phase 1A uses only synthetic events for location data.
+   - Lifestyle-pattern inference is a demo; do not collect real personal behavior histories.
+   - Missing condition data does not count as a match.
+3. Withdrawing consent disables related condition rules. Do not show already issued Commands as cancelled. Manual actions remain available within permissions.
+4. Queries to update: `consents / automations / simulation results / audit`。
 
-**境界条件・失敗時**: 同意がない状態では、位置情報を使う条件を有効にできません。同意を取り消した後に帰宅イベントが起きても、命令(コマンド)は0件です。天候データが欠けている場合は、スキップした理由を表示します。
+**Boundary cases and failures**: Location conditions cannot be enabled without consent. After consent withdrawal, an arrival event creates zero Commands. Show why evaluation was skipped if weather data is missing.
 
-**検証**: 追跡表のAT-C05配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-C05 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-C06 詳細
+### DD-C06 Details
 
-**一次資料との対応**: SRC-06 BIZ-16, BIZ-23 → FR-C06 → DD-C06。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 比較する期間・料金のバージョン・データ品質の表示方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-16, BIZ-23 → FR-C06 → DD-C06. Source category: original company requirements SRC-06 + design additions. Design additions: comparison periods, tariff versions, and data quality. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-C06 / 主な表示パターン: **UI-ANALYSIS**。この画面が使うサービス境界は`energy.summary, baselines.list, units.list`です。
+Scope: FR-C06 / Main display pattern: **UI-ANALYSIS**. Service boundary: `energy.summary, baselines.list, units.list`.
 
-**初期表示と前提**: 自分の組織の設備について、期間ごとのデータがあることを前提とします。基準値や料金が設定されていなくても、実績データだけは閲覧できます。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: Period data exists for the organization's units. Actual data remains viewable without a configured baseline or tariff. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| from / to | ISO日時/必須 | from<to、最大366日 | 集計区間 |
-| unitIds | ID配列/必須 | 自組織、重複除去 | 設備集合 |
-| baselineId | ID/任意 | 同境界の有効版 | 基準 |
-| tariffVersion | 読取 | 算定結果に付随 | 仮単価の版 |
-| coverage / totals | 読取 | kWh/amountMinor/差分、null許可 | 比較表示 |
+| from / to | ISO datetime/required | from<to; maximum 366 days | Summary interval |
+| unitIds | ID array/required | Own organization; remove duplicates | Unit set |
+| baselineId | ID/optional | Active version with matching boundary | Baseline |
+| tariffVersion | Read-only | Included with calculation result | Fictional unit-price version |
+| coverage / totals | Read-only | kWh/amountMinor/difference; null allowed | Comparison |
 
-**処理手順**
+**Steps**
 
-1. 期間と設備を選びます。電力量と、推定される料金を確認します。基準値の条件を展開して詳しく見て、比較結果とデータの品質を確認します。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 期間は最大366日までとします。
-   - 集計の範囲は「開始以上、終了未満([from, to))」とし、使った料金や排出係数のバージョンを表示します。
-   - 基準値と実績値で対象の設備や算定範囲が違う場合は、差分を計算しません。
-   - 金額は最後に通貨の桁数に合わせて丸めます。
-3. 条件を変えると、URLとQueryのキーを更新します。この画面は表示だけで、契約の料金や排出係数そのものを変更することはありません。
-4. 更新の対象になるQuery: `energy(検索条件を変えたときだけ)`。
+1. Select period and units. Check energy and estimated cost. Expand baseline conditions, then check comparisons and data quality.
+2. Apply the following business rules to both reads and actions.
+   - Periods are at most 366 days.
+   - Aggregate over [from, to), including start and excluding end. Show tariff and emission-factor versions used.
+   - Do not calculate differences when baseline and actual results cover different units or calculation boundaries.
+   - Round money to the currency's decimal places only at the end.
+3. Changing conditions updates the URL and Query key. This screen only displays data; it does not change contract tariffs or emission factors.
+4. Queries to update: `energy (only when search conditions change)`.
 
-**境界条件・失敗時**: 基準値100kWh、実績80kWh、単価0.5MYRの場合は、節約額10MYRと計算します。基準値が0の場合は削減率を出しません。実績が120kWhならDTOは削減量-20kWh・削減率-20で、表示は「増加 20.0 kWh」「増加 20.0%」です(IR68/IR80)。データが欠けている場合は、カバー率(coverage)と一緒に表示します。
+**Boundary cases and failures**: A 100kWh baseline, 80kWh actual use, and 0.5MYR unit price produce 10MYR savings. Do not show a reduction rate for baseline 0. For actual use 120kWh, the DTO has reduction -20kWh and reduction rate -20; display “Increase 20.0 kWh” and “Increase 20.0%” (IR68/IR80). Show missing data with coverage.
 
-**検証**: 追跡表のAT-C06配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-C06 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-C07 詳細
+### DD-C07 Details
 
-**アレルゲンを含む空気環境の表示・処理設計(BIZ-18)**
+**Air Quality Display and Processing, Including Allergens (BIZ-18)**
 
-telemetry.seriesの空気環境の表示データに、allergenObservation(アレルゲンの観測情報)を追加します。availability(取得できたかどうか)は、available(取得済み)/not_measured(未計測)/unsupported(非対応)の3種類です。substance(物質名)・value(数値)・unit(単位)・observedAt(観測時刻)・sourceLabel(出典)は、値が取得できたときだけ表示します。availableの場合は、根拠と時刻を必ず表示します。数値がある場合は単位も必ず表示します。情報が不完全な場合は「不明」として扱います。PM2.5の値から、アレルゲンの量を計算することはしません。CO2はppm(単位)で表示し、電力による排出量は別画面でkgCO2eとして表示します。換気の機能がない設備では、案内文だけを表示します。
+Add allergenObservation to telemetry.series air-quality display data. availability is available/not_measured/unsupported. Show substance, value, unit, observedAt, and sourceLabel only when data is available. For available, always show evidence and time; a number also requires a unit. Treat incomplete information as unknown. Do not derive allergen quantity from PM2.5. Show CO2 in ppm; show electricity-related emissions separately in kgCO2e. For units without ventilation capability, show guidance only.
 
-検証: AT-C07-SRC。未計測・非対応・合成観測という3つのfixture(テスト用データ)で表示が正しく切り替わることを確認します。未計測のときに「0」や「安全です」と表示してはいけません。数値はあるのに単位がない場合は「不明」として扱います。
+Verification: AT-C07-SRC. Check display switching with not-measured, unsupported, and synthetic-observation fixtures. Do not show “0” or “Safe” for unmeasured data. A number without a unit is unknown.
 
-**一次資料との対応**: SRC-06 BIZ-18, BIZ-19 → FR-C07 → DD-C07。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 換気機能の判定方法と、データが欠けているときの表示方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-18, BIZ-19 → FR-C07 → DD-C07. Source category: original company requirements SRC-06 + design additions. Design additions: checking ventilation capability and displaying missing data. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-C07 / 主な表示パターン: **UI-ANALYSIS**。この画面が使うサービス境界は`telemetry.series, units.get, commands.create, commands.get, units.list`です。
+Scope: FR-C07 / Main display pattern: **UI-ANALYSIS**. Service boundary: `telemetry.series, units.get, commands.create, commands.get, units.list`.
 
-**初期表示と前提**: 空気環境用のセンサーがあるかどうかと、換気の機能があるかどうかを取得できることを前提とします。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: Air-quality sensor availability and ventilation capability can be fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| spaceId / unitId | ID/いずれか必須 | 有効な対象。telemetry.seriesへはunitIdsまたはspaceIdで渡す | 測定場所 |
-| metric | enum/必須 | co2/pm25/temperature/humidity | 表示指標 |
-| period | enum/必須 | 1h/24h/7d/custom、初期24h。1h/24hは[to-60分,to)/[to-1440分,to)の移動窓、7dはSR17暦日、toはUTC分境界(IR41) | 時系列 |
-| value / quality / observedAt | 読取 | nullと0を区別 | 測定根拠 |
-| ventilationAction | UnitAction/任意 | ventilation能力時のみ | 換気要求 |
+| spaceId / unitId | ID/one required | Valid target. Pass unitIds or spaceId to telemetry.series | Measurement location |
+| metric | enum/required | co2/pm25/temperature/humidity | Display metric |
+| period | enum/required | 1h/24h/7d/custom; default: 24h. 1h/24h use rolling [to-60 minutes,to)/[to-1440 minutes,to) windows; 7d uses SR17 calendar days; to is a UTC minute boundary (IR41) | Time series |
+| value / quality / observedAt | Read-only | Distinguish null from 0 | Measurement evidence |
+| ventilationAction | UnitAction/optional | Only with ventilation capability | Ventilation request |
 
-**処理手順**
+**Steps**
 
-1. 部屋と指標を選びます。値・単位・データ品質を確認します。換気や清掃の案内を見て、換気の機能がある場合だけ、確認画面を経て換気を要求します。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - CO2はppm、PM2.5はµg/m³、温度は度、湿度は%で、それぞれ別々の系列として表示します。
-   - 湿度が0の場合は「欠測」ではなく「測定値が0」として扱います。値がnullの場合が「欠測」です。
-   - 換気・清掃の案内はIR99の表（co2≥1000ppm、pm25≥35µg/m³、データ不足）で表示します。アレルゲン観測の取得元はIR98です。
-   - 換気の機能がない場合は、手動での案内だけを表示します。
-3. 画面を見るだけでは業務状態は変わりません。換気を要求したときは、通常どおりCommandの履歴を作成します。ただし、その応答だけを見て、室内のCO2が下がったと推定してはいけません。
-4. 更新の対象になるQuery: `telemetry / commands(換気を要求したときだけ) / audit`。
+1. Select a room or unit. Check CO2, PM2.5, temperature, humidity, and their observation times. Read ventilation/cleaning guidance; only when ventilation capability exists, request it through confirmation.
+2. Apply the following business rules to both reads and actions.
+   - Show CO2 in ppm, PM2.5 in µg/m³, temperature in degrees, and humidity in %, as separate series.
+   - Humidity 0 is a measured zero, not missing data. null means missing.
+   - Follow the IR99 table for ventilation/cleaning guidance (co2≥1000ppm, pm25≥35µg/m³, insufficient data). IR98 defines the allergen observation source.
+   - Without ventilation capability, show only manual guidance.
+3. Viewing does not change business state. Ventilation requests create normal Command history, but acknowledgement alone does not imply reduced indoor CO2.
+4. Queries to update: `telemetry / commands (only on ventilation requests) / audit`.
 
-**境界条件・失敗時**: CO2のデータが欠けていても、PM2.5の値は表示できます。送風(fan)の機能しかない設備に対しては、換気(ventilation)の命令を作りません。
+**Boundary cases and failures**: PM2.5 values remain displayable when CO2 data is missing. Do not create ventilation Commands for units with only fan capability.
 
-**検証**: 追跡表のAT-C07配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-C07 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-C08 詳細
+### DD-C08 Details
 
-**窓の開けっぱなしや断熱不足による負荷を知らせる通知の表示・処理設計(BIZ-17)**
+**Display and Processing for Load Alerts from Open Windows or Poor Insulation (BIZ-17)**
 
-alerts.listのAlert(異常データ)に、causeCode(原因コード。window_open(窓が開いている)/insulation_loss(断熱不足)/unknown(不明))、evidenceKind(根拠の種類。demo_observation(デモの観測)/inferred(推定)/inspection(点検))、evidenceText(根拠の説明文)、observedAt(観測時刻)を追加します。causeCodeとevidenceKindは必ず入力し、根拠が取得できない場合はunknown(不明)にします。「電気代が2倍になる」のような具体的な数値を、決まった値として表示することはしません。推定の場合は「疑いがあります」、点検で確認した場合は「点検記録」と表示します。通知の詳細画面から、同じ設備(unitId)の情報や保守依頼の画面へ移動できるようにします。
+Add causeCode (window_open/insulation_loss/unknown), evidenceKind (demo_observation/inferred/inspection), evidenceText, and observedAt to Alert from alerts.list. causeCode and evidenceKind are required; use unknown if evidence is unavailable. Do not hard-code specific claims such as “Electricity cost doubles.” Label inference “Suspected” and inspected findings “Inspection record.” From notification details, allow navigation to the same unitId or its maintenance request screen.
 
-検証: AT-C08-SRC。窓が開いている疑い・断熱不足の点検記録・根拠がない場合、という3つのfixture(テスト用データ)を用意します。それぞれで文言・根拠・時刻が異なることを確認します。既読にしても、異常そのものは解消しないことを確認します。
+Verification: AT-C08-SRC. Prepare three fixtures: suspected open window, inspection record of poor insulation, and no evidence. Check that wording, evidence, and time differ. Marking read does not resolve the alert itself.
 
-**一次資料との対応**: SRC-06 BIZ-08, BIZ-09, BIZ-17 → FR-C08 → DD-C08。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 「既読にする」ことと「異常が解消する」ことを分けて扱う方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-08, BIZ-09, BIZ-17 → FR-C08 → DD-C08. Source category: original company requirements SRC-06 + design additions. Design addition: keeping read status separate from alert resolution. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-C08 / 主な表示パターン: **UI-LIST**。この画面が使うサービス境界は`alerts.list, notifications.markRead, notifications.list, summaries.get`です。
+Scope: FR-C08 / Main display pattern: **UI-LIST**. Service boundary: `alerts.list, notifications.markRead, notifications.list, summaries.get`.
 
-**初期表示と前提**: そのお客様が見てよい範囲の通知と異常が取得できることを前提とします。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: Notifications and alerts within the customer's permitted scope can be fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| severity | enum/任意 | critical/warning/all、初期all（allはfilters.severityを省略、IR74） | 絞込 |
-| unreadOnly | boolean/必須 | 初期false | 未読 |
-| notificationId / alertId | 読取 | 別ID、関連なし通知も可 | 参照 |
-| readAt | 日時/null | 未読null | 既読状態 |
-| alertCount | 読取 | summaries.get(kind=customer)のcounts.alertCount（critical/warningの未対応、IR51）。未読件数と別に表示（IR102） | 未対応アラート件数 |
+| severity | enum/optional | critical/warning/all; default: all (all means omit filters.severity, IR74) | Filter |
+| unreadOnly | boolean/required | Default: false | Unread |
+| notificationId / alertId | Read-only | Separate IDs; notifications may have no linked alert | Reference |
+| readAt | datetime/null | null when unread | Read state |
+| alertCount | Read-only | summaries.get(kind=customer).counts.alertCount (unresolved critical/warning, IR51). Show separately from unread count (IR102) | Unresolved alert count |
 
-**処理手順**
+**Steps**
 
-1. 重要度や未読かどうかで絞り込みます。通知の本文を開き、設備の根拠情報や保守依頼の画面へ移動します。最後に、通知だけを既読にします。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - critical(重大)とwarning(警告)は、対応する優先順位を示します。
-   - normal(通常)は健康に関するお知らせであり、まだ対応していない異常ではありません。
-   - 清掃や交換の予定を知らせる通知と、異常が発生したことを知らせる通知は、種類(type)で区別します。
-3. 既読にした時刻をNotification(通知)に保存します。Alert(異常)そのものの状態(status)は変えません。別の画面から戻ってきたときは、絞り込み条件とページの位置を復元します。
-4. 更新の対象になるQuery: `notifications / unread count`。
+1. Filter by severity or unread status. Open notification text, then unit evidence or maintenance requests. Finally, mark only the notification as read.
+2. Apply the following business rules to both reads and actions.
+   - critical and warning indicate response priority.
+   - normal is a health notice, not an unresolved problem.
+   - Use type to distinguish cleaning/replacement reminders from problem alerts.
+3. Save read time on Notification. Do not change Alert.status. Restore filters and page position when returning from another screen.
+4. Queries to update: `notifications / unread count`。
 
-**境界条件・失敗時**: データの取得に失敗したときに、「異常は0件です」と表示してはいけません。通知が指す設備が使えなくなっている場合は、詳しい情報は表示せずに「利用できません」とだけ表示します。
+**Boundary cases and failures**: Do not show zero alerts after a fetch failure. If the referenced unit is unavailable, show only “Unavailable” without details.
 
-**検証**: 追跡表のAT-C08配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-C08 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-C09 詳細
+### DD-C09 Details
 
-**一次資料との対応**: SRC-06 BIZ-12 → FR-C09 → DD-C09。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 予約・取り消し・案件の進み具合の扱い方。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-12 → FR-C09 → DD-C09. Source category: original company requirements SRC-06 + design additions. Design additions: booking, cancellation, and job progress. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-C09 / 主な表示パターン: **UI-LIST / UI-FORM / UI-DETAIL**。この画面が使うサービス境界は`jobs.list, jobs.create, jobs.get, jobs.cancel, jobs.addNote, reports.get, attachments.getContent, units.list`です。
+Scope: FR-C09 / Main display pattern: **UI-LIST / UI-FORM / UI-DETAIL**. Service boundary: `jobs.list, jobs.create, jobs.get, jobs.cancel, jobs.addNote, reports.get, attachments.getContent, units.list`.
 
-**初期表示と前提**: 依頼の対象が、自分の組織の有効な設備であることを前提とします。RTO(契約の種類の一種)があるかどうかは、依頼できるかどうかの判断には使いません。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: The requested unit is active and belongs to the user's organization. An RTO contract is not required to request maintenance. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| unitId | ID/必須 | 自設備、archived不可 | 対象 |
-| type | enum/必須 | periodic/reactive/preventive | 保守分類 |
-| symptom | 文字列/必須 | 10〜2000文字 | 症状 |
-| requestedStart / requestedEnd | ISO日時/必須 | 現在より未来、start<end | 希望枠 |
-| contactWindow | 文字列/任意 | 0〜200文字。'@'や連続7桁以上の数字はVALIDATION、公開範囲はIR64。入力欄に「時刻はHH:mm形式（例: Weekdays 09:00-18:00）」を表示(IR90) | 連絡可能時間 |
-| dueAt | 読取 | 顧客は入力不可。Repositoryが希望枠の終了時刻を保存(IR38) | 案件期限 |
-| cancelReason / note | 文字列/操作時必須 | 1〜1000 / 1〜2000文字 | 取消・調整依頼 |
+| unitId | ID/required | Own unit; not archived | Target |
+| type | enum/required | periodic/reactive/preventive | Maintenance type |
+| symptom | string/required | 10–2000 characters | Symptoms |
+| requestedStart / requestedEnd | ISO datetime/required | Future times; start<end | Requested slot |
+| contactWindow | string/optional | 0–200 characters. '@' or 7+ consecutive digits returns VALIDATION; visibility follows IR64. Show “Use HH:mm for times (example: Weekdays 09:00-18:00)” (IR90) | Contact hours |
+| dueAt | Read-only | Customer cannot enter it. Repository saves the requested slot's end time (IR38) | Job deadline |
+| cancelReason / note | string/required for action | 1–1000 / 1–2000 characters | Cancellation / adjustment request |
 
-**処理手順**
+**Steps**
 
-1. 設備・保守の種類・症状・希望日時を入力します。内容を確認し、受付番号を受け取ります。一覧画面から、確定した日程・進み具合・過去の報告を確認します。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 希望した日時は、確定した予約ではありません。
-   - お客様が自分で取り消せるのは、requested(まだ担当者が決まっていない)状態の依頼だけです。
-   - assigned(担当者決定)以降の状態では、お客様は「調整してほしい」というメモを送れますが、作業予定や担当者を直接変更することはできません。
-3. 同じjobId(案件番号)を、HQ・施工業者・技術者が共通で参照します。担当者が未割り当てのまま取り消した場合は、cancelled(取り消し)と理由を記録します。提出済みの報告は、品質確認が終わってからお客様に公開します。
-4. 更新の対象になるQuery: `jobs / job events / admin summary / notifications`。
+1. Enter unit, maintenance type, symptoms, and preferred dates. Confirm and receive a request number. From the list, view confirmed schedules, progress, and past reports.
+2. Apply the following business rules to both reads and actions.
+   - Requested times are not confirmed bookings.
+   - Customers may cancel only requested jobs (no assignee yet).
+   - From assigned onward, customers may send adjustment notes but cannot directly change schedules or assignees.
+3. HQ, contractors, and technicians share the same jobId. Cancellation before assignment records cancelled and the reason. Publish submitted reports to customers after quality review.
+4. Queries to update: `jobs / job events / admin summary / notifications`。
 
-**境界条件・失敗時**: 症状の説明が9文字や2001文字の場合、希望日時が過去の場合、設備が指定されていない場合は、いずれも拒否します。通信に失敗しても、入力した症状の内容は消さずに保持します。二重に送信しても、案件が2件に増えないようにします。
+**Boundary cases and failures**: Reject 9- or 2001-character symptom descriptions, past requested times, and missing units. Keep symptom text after communication failure. Duplicate submission must not create two jobs.
 
-**検証**: 追跡表のAT-C09配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-C09 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-C10 詳細
+### DD-C10 Details
 
-**一次資料との対応**: SRC-06 BIZ-21 → FR-C10 → DD-C10。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 契約一覧と請求状態の表示方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-21 → FR-C10 → DD-C10. Source category: original company requirements SRC-06 + design additions. Design additions: contract lists and invoice states. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-C10 / 主な表示パターン: **UI-LIST / UI-DETAIL**。この画面が使うサービス境界は`contracts.list, invoices.list`です。
+Scope: FR-C10 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary: `contracts.list, invoices.list`.
 
-**初期表示と前提**: 自分の組織の契約が0件以上あることを前提とします。閲覧するだけであれば、支払いの操作は不要です。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: The organization has zero or more contracts. Viewing does not require payment actions. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| contractId | ID/任意 | 自組織のみ | 契約選択 |
-| status | enum/任意 | all/unpaid/processing/paid/overdue（UI値。overdueはoverdueOnly=trueへ、allはstatus省略へ変換） | 請求絞込 |
-| amountMinor / currency | 読取 | 整数、通貨セット | 金額 |
-| dueAt / paidAt | 読取 | UTC→表示zone | 期限・入金日 |
-| planType / unitIds | 読取 | rto/general/energy/environment | 適用契約 |
+| contractId | ID/optional | Own organization only | Contract selection |
+| status | enum/optional | all/unpaid/processing/paid/overdue (UI values: map overdue to overdueOnly=true; all means omit status) | Invoice filter |
+| amountMinor / currency | Read-only | Integer with currency | Amount |
+| dueAt / paidAt | Read-only | UTC → display zone | Due/payment date |
+| planType / unitIds | Read-only | rto/general/energy/environment | Applicable contract |
 
-**処理手順**
+**Steps**
 
-1. 契約を選びます。対象の設備・期間・プランの内容を確認します。請求金額・期限・入金状態を確認し、請求の詳細画面へ進みます。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 契約が終了していることと、設備が使えなくなることは、同じ意味ではありません。
-   - Invoice(請求)が遅延しているかどうかは、期限と未入金の残額から判断します。支払い処理中(payment processing)であっても、支払い済み(paid)とはしません。
-3. 非RTOのgeneral/energy/environment契約は契約種別・期間・請求を表示します。この画面は閲覧のみです。契約が0件の場合だけ「契約なし・一般保守」と表示し、監視画面への戻り先を用意します。
-4. 更新の対象になるQuery: `contracts / invoices(閲覧のみ)`。
+1. Select a contract. Check units, period, and plan. Check invoice amount, due date, and payment state, then open invoice details.
+2. Apply the following business rules to both reads and actions.
+   - Contract expiry does not itself mean a unit is unavailable.
+   - Determine invoice overdue status from the deadline and unpaid balance. Payment processing is not paid.
+3. For non-RTO general/energy/environment contracts, show contract type, period, and invoices. This screen is read-only. Only when there are zero contracts, show “No contract — general maintenance” with a path back to monitoring.
+4. Queries to update: `contracts / invoices (read-only)`.
 
-**境界条件・失敗時**: お客様Bの請求ID(invoiceId)を、お客様Aが指定しても取得できません。支払い済み(paid)の請求に、「支払いを開始する」ボタンは表示しません。
+**Boundary cases and failures**: Customer A cannot fetch customer B's invoiceId. Do not show “Start payment” for paid invoices.
 
-**検証**: 追跡表のAT-C10配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-C10 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-C11 詳細
+### DD-C11 Details
 
-**カードの種類や案内方法を選ぶ画面の表示・処理設計(BIZ-22)**
+**Card Type and Payment Instruction Selection (BIZ-22)**
 
-画面のpaymentChoiceはdemo_credit_card/demo_debit_card/demo_instructionsです。カードはpayments.simulate(event=initiate)のmethodへカード2種だけを渡します。demo_instructions選択時はevent=instructionsとinvoiceId/demoConfirmedだけを渡し、Paymentを作らずInvoiceの方法・状態も変更しません。クレジットカードとデビットカードは同じ状態の流れを使い、選んだ種類を確認画面と支払い結果の両方に保持します。支払い手順を見るだけでは、paid(支払い済み)の状態には進みません。notifications.previewでは、請求ID・案内する連絡手段・選んだ支払い方法を表示します。実際のカード情報や銀行情報を入力する欄は作りません。
+The screen's paymentChoice is demo_credit_card/demo_debit_card/demo_instructions. Pass only the two card choices as method to payments.simulate(event=initiate). For demo_instructions, pass event=instructions with only invoiceId/demoConfirmed; do not create Payment or change Invoice method/state. Credit and debit cards use the same state flow; keep the selected type in confirmation and results. Viewing instructions alone does not set paid. notifications.preview shows invoice ID, contact channel, and selected payment method. Provide no real card or bank information fields.
 
-検証: AT-C11-SRC。それぞれのカードの種類で、処理中・成功・失敗の各状態を再現します。履歴に記録される種類が、実際に選んだ種類と一致することを確認します。支払い手順を開いただけでは、未入金のままであることを確認します。
+Verification: AT-C11-SRC. Reproduce processing, success, and failure for each card type. Check that history records the selected type. Opening payment instructions alone leaves the invoice unpaid.
 
-**一次資料との対応**: SRC-06 BIZ-22 → FR-C11 → DD-C11。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 決済の状態と、通知プレビューの扱い方。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-22 → FR-C11 → DD-C11. Source category: original company requirements SRC-06 + design additions. Design additions: payment states and notification previews. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-C11 / 主な表示パターン: **UI-DETAIL / UI-FORM**。この画面が使うサービス境界は`invoices.get, payments.simulate, notifications.preview, notifications.recipients`です。
+Scope: FR-C11 / Main display pattern: **UI-DETAIL / UI-FORM**. Service boundary: `invoices.get, payments.simulate, notifications.preview, notifications.recipients`.
 
-**初期表示と前提**: 未払いの請求があり、現在の金額が分かり、これがデモ用の決済であることが確認できることを前提とします。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: An unpaid invoice exists, its current amount is known, and the user can confirm this is a demo payment. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| invoiceId | ID/必須 | 未払い請求 | 対象 |
-| paymentChoice | UI enum/必須 | demo_credit_card/demo_debit_card/demo_instructions | カードはinitiate.method、案内はinstructionsイベントへ変換 |
-| channel | enum/プレビュー時 | email/whatsapp | 案内 |
-| demoConfirmed | boolean/必須 | 初期false | 模擬処理確認 |
-| outcome | enum/デモ制御側 | processing/confirmed/failed | 試験用イベント。通常フォームと分離 |
+| invoiceId | ID/required | Unpaid invoice | Target |
+| paymentChoice | UI enum/required | demo_credit_card/demo_debit_card/demo_instructions | Map cards to initiate.method; instructions to the instructions event |
+| channel | enum/for preview | email/whatsapp | Instructions |
+| demoConfirmed | boolean/required | Default: false | Confirm simulation |
+| outcome | enum/demo controls | processing/confirmed/failed | Test event, separate from normal form |
 
-**処理手順**
+**Steps**
 
-1. 通知のプレビューを確認します。デモ用のカードまたは支払い手順を選びます。デモ決済を開始し、処理中・失敗・入金確認のイベントを確認します。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - カード番号・CVV(セキュリティコード)・有効期限を入力させることはしません。
-   - 画面が切り替わっただけでは、入金確認とはしません。
-   - 処理中(processing)の間は、新しい支払いの意思を受け付けません。
-3. Payment(支払い記録)を作成し、確認イベントが来た後にInvoice(請求)をpaid(支払い済み)にします。結果と参照IDを履歴に表示します。利用制限を解除する要求へは進めますが、応答が来る前に「解除済み」とは表示しません。
-4. 更新の対象になるQuery: `payments / invoices / restrictions / notifications / audit`。
+1. Check the notification preview. Choose a demo card or payment instructions. Start demo payment and observe processing, failure, and payment-confirmation events.
+2. Apply the following business rules to both reads and actions.
+   - Do not request card number, CVV, or expiry date.
+   - Screen navigation alone does not confirm payment.
+   - Do not accept a new payment intent during processing.
+3. Create Payment; mark Invoice paid only after a confirmation event. Show result and reference ID in history. A restriction-release request may start, but do not show released before acknowledgement.
+4. Queries to update: `payments / invoices / restrictions / notifications / audit`。
 
-**境界条件・失敗時**: 二重クリックや、同じ参照番号での確認操作があっても、二重に計上しません。決済に失敗した場合は、元の未入金の状態と、支払いを再試行する導線を残します。
+**Boundary cases and failures**: Double clicks or confirmation with the same reference must not double-count payment. On payment failure, keep the unpaid state and a retry path.
 
-**検証**: 追跡表のAT-C11配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-C11 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-C12 詳細
+### DD-C12 Details
 
-**一次資料との対応**: SRC-06 BIZ-21 → FR-C12 → DD-C12。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: 事前予告・猶予期間・解除保留の扱い方。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-21 → FR-C12 → DD-C12. Source category: original company requirements SRC-06 + design additions. Design additions: advance notice, grace periods, and pending release. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-C12 / 主な表示パターン: **UI-DETAIL**。この画面が使うサービス境界は`restrictions.forInvoice, commands.get, inquiries.create, inquiries.list`です。
+Scope: FR-C12 / Main display pattern: **UI-DETAIL**. Service boundary: `restrictions.forInvoice, commands.get, inquiries.create, inquiries.list`.
 
-**初期表示と前提**: 自分の契約に関係する利用制限の情報であることを前提とします。制限がない状態も、正常な「空の状態」として扱います。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: Restriction information relates to the user's contracts. No restriction is a valid empty state. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| invoiceId | route ID/必須 | 請求閲覧範囲内 | 関連制限検索 |
-| restrictionId / rulesVersion | 読取 | 請求との関連を照合 | 根拠 |
-| noticeAt / executeAfter / graceUntil | 読取 | 表示timezone付き | 予定 |
-| perUnitStates | 読取配列 | 適用/解除のCommand別 | 反映状況 |
-| message | 文字列/問い合わせ時必須 | 1〜2000文字 | 調整依頼 |
+| invoiceId | route ID/required | Within invoice read scope | Find related restrictions |
+| restrictionId / rulesVersion | Read-only | Check invoice relationship | Basis |
+| noticeAt / executeAfter / graceUntil | Read-only | With display timezone | Schedule |
+| perUnitStates | Read-only array | By apply/release Command | Application status |
+| message | string/required for inquiry | 1–2000 characters | Adjustment request |
 
-**処理手順**
+**Steps**
 
-1. 事前予告・理由・対象設備・予定日を確認します。猶予期間や例外、解除の条件を見ます。最後に、支払いへ進むか、調整の問い合わせを行います。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 「制限される予定」「制限を適用する要求」「設備ごとの反映結果」「解除の要求」「解除済み」を、それぞれ別々に表示します。
-   - 一部の設備だけ反映されている場合は、設備ごとの状態を表示します。まとめたバッジだけで詳細を隠してはいけません。
-3. この画面では制限そのものは変更せず、支払いや問い合わせに関連するIDを渡すだけです。問い合わせはアプリ内のデモ受付であり、実際に外部へ送信することはありません。
-4. 更新の対象になるQuery: `inquiries / inquiry events(送信したときだけ)`。
+1. Check advance notice, reason, target units, and scheduled date. Review grace periods, exceptions, and release conditions. Proceed to payment or request an adjustment.
+2. Apply the following business rules to both reads and actions.
+   - Show scheduled restriction, apply request, per-unit result, release request, and released separately.
+   - For partial application, show each unit's state. A summary badge must not hide details.
+3. This screen does not change restrictions; it only passes relevant IDs to payment or inquiry actions. Inquiries are accepted in the demo app and are not sent externally.
+4. Queries to update: `inquiries / inquiry events (only on submission)`.
 
-**境界条件・失敗時**: オフラインで適用結果が不明の設備が残っていれば「解除済み」とはしません。D03の確定未適用はnot_requiredです。お客様がURLの書き換えやサービスの直接呼び出しで、制限を上書き(override)することはできません。
+**Boundary cases and failures**: Do not show released if offline units still have unknown application results. Confirmed non-application under D03 is not_required. Customers cannot override restrictions by changing URLs or calling services directly.
 
-**検証**: 追跡表のAT-C12配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-C12 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-C13 詳細
+### DD-C13 Details
 
-**炭素市場への将来の連携についての表示・処理設計(BIZ-26)**
+**Display and Processing for Future Carbon-Market Integration (BIZ-26)**
 
-offsets.previewの表示結果に、marketConcept(市場構想に関する情報)を追加します。stage(段階)は必ずfuture_concept(将来の構想)、providerLabel(提供元)は「未選定」、verificationStatus(検証状態)は「unverified(未検証)」、ledgerStatus(台帳の状態)は「not_connected(未接続)」とします。省エネ量、推定した削減排出量、デモでの模擬購入・償却記録は、それぞれ別のものとして表示します。市場価格・実際のトークン残高・売買を実行するボタンは作りません。連携先や検証の条件がまだ決まっていないことを、画面上で説明します。UIはRepositoryから返ってくる非同期の結果を表示するだけにし、将来データの取得先(adapter)を後から追加できる作りにします。
+Add marketConcept to offsets.preview results. stage is always future_concept, providerLabel is “Not selected,” verificationStatus is “unverified,” and ledgerStatus is “not_connected.” Display energy savings, estimated emission reductions, and demo purchase/retirement records separately. Provide no market prices, real token balances, or trade-execution buttons. Explain that integration partners and verification conditions are undecided. The UI only displays asynchronous Repository results, allowing a future data adapter to be added later.
 
-検証: AT-C13-SRC。オフセット(排出権)を選択しなければ、申し込みが作られないことを確認します。市場構想の画面を開いても、残高・実証明・取引結果が生成されないことと、デモの模擬償却とは違う状態が表示されることを確認します。
+Verification: AT-C13-SRC. Without selecting an offset, no request is created. Opening the market-concept screen generates no balance, real proof, or trade result, and displays a state distinct from simulated demo retirement.
 
-**一次資料との対応**: SRC-06 BIZ-23, BIZ-24, BIZ-25, BIZ-26 → FR-C13 → DD-C13。出所区分: 企業原文 SRC-06+設計での補足。ここで新しく具体化した設計上の補足: デモの申し込み・償却の状態・市場構想の表示方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-23, BIZ-24, BIZ-25, BIZ-26 → FR-C13 → DD-C13. Source category: original company requirements SRC-06 + design additions. Design additions: demo requests, retirement states, and market-concept display. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-C13 / 主な表示パターン: **UI-ANALYSIS / UI-FORM**。この画面が使うサービス境界は`energy.summary, offsets.preview, offsets.simulate, offsets.list, units.list`です。
+Scope: FR-C13 / Main display pattern: **UI-ANALYSIS / UI-FORM**. Service boundary: `energy.summary, offsets.preview, offsets.simulate, offsets.list, units.list`.
 
-**初期表示と前提**: 自分の組織に、算定の対象になる期間があることを前提とします。オフセット(排出権)の利用は任意です。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: The organization has a period eligible for calculation. Offsets are optional. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| period / unitIds | 必須 | 算定条件と同一 | 対象 |
-| amountKg | number/必須 | 0より大、最大100000、小数3桁(仮) | 希望量kgCO₂e |
-| quoteId / quoteVersion | ID/申込時必須 | 取得済み模擬見積 | 確認対象 |
-| demoConfirmed | boolean/必須 | 初期false | 実購入ではない確認 |
+| period / unitIds | Required | Same as calculation conditions | Target |
+| amountKg | number/required | >0, maximum 100000, 3 decimal places (provisional) | Requested kgCO₂e |
+| quoteId / quoteVersion | ID/required on request | Fetched simulated quote | Confirmation target |
+| demoConfirmed | boolean/required | Default: false | Confirm this is not a real purchase |
 
-**処理手順**
+**Steps**
 
-1. 推定した排出量・削減量と条件を確認します。希望する量を入力し、デモの見積もりを取得します。内容を確認した後にデモの申し込みを行い、模擬記録を確認します。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 電力の削減結果から、取引できる残高を作ることはしません。
-   - 希望する量は正の数だけとし、係数のデータが欠けている場合は排出量を計算できません。
-   - 申し込み自体は、実際の外部購入を意味しません。
-3. OffsetRecord(オフセット記録)は、demo_requested(デモでの申し込み)として保存します。見積もりを取っただけでは、申し込みの記録は作りません。証明欄には、「DEMO-」で始まる参照番号を表示するか、何も発行しません。
-4. 更新の対象になるQuery: `offsets / audit`。
+1. Check estimated emissions, reductions, and conditions. Enter quantity and get a demo quote. Confirm, submit a demo request, and view the simulated record.
+2. Apply the following business rules to both reads and actions.
+   - Do not create tradable balances from electricity savings.
+   - Quantity must be positive. Missing emission-factor data prevents emissions calculation.
+   - A request does not mean a real external purchase.
+3. Save OffsetRecord as demo_requested. A quote alone does not create a request. In the proof field, show a reference starting with “DEMO-” or issue none.
+4. Queries to update: `offsets / audit`。
 
-**境界条件・失敗時**: 希望する量が0や負の値の場合、見積もりの有効期限が切れている場合、別のお客様の算定結果を指定した場合は、いずれも拒否します。デモの模擬償却と、外部の実際の認証を、同じ言葉で表示してはいけません。
+**Boundary cases and failures**: Reject zero/negative quantities, expired quotes, and another customer's calculation results. Use distinct wording for simulated demo retirement and real external certification.
 
-**検証**: 追跡表のAT-C13配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-C13 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-条件フォームはCondition型のtype判別unionへ変換する。occupancyは{type,occupied}、locationは{type,event}、patternは{type,localTime}、weatherは{type,metric:"temperature",operator,value}、tariffは{type,operator,value,unit:"MYR_per_kWh"}、peakは{type,active}、solar/batteryは{type,operator,value,unit:"kW"}。paramsという追加wrapperは送らない。天候の評価Fact.metricはweather_temperatureとし、室温temperatureのFactとは混同しない。
+Convert condition forms to the Condition type's discriminated union. occupancy is {type,occupied}, location is {type,event}, pattern is {type,localTime}, weather is {type,metric:"temperature",operator,value}, tariff is {type,operator,value,unit:"MYR_per_kWh"}, peak is {type,active}, and solar/battery is {type,operator,value,unit:"kW"}. Do not send an extra params wrapper. Use weather_temperature for weather Fact.metric; do not confuse it with the room-temperature Fact temperature.
 
-0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
+0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-2026-09-16承認反映: C01/C06の期間境界はSR17。C13のretryはA15と同じSR18に従い、offsets.listで現在版とattemptIdを得る。
+2026-09-16 approved updates: C01/C06 period boundaries follow SR17. C13 retry follows SR18 like A15; get the current version and attemptId through offsets.list.
 
-現行0.21.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+Additional contracts for current version 0.21.0: Read IR01–106 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
-案件一覧とjobs.listのソートはIR34を適用する。URL sort未指定はstatus:asc。選択変更でcursorを破棄し、filterを保持して新snapshotの初頁から取得する。状態/重大度/期限の昇降順を選べる。
+Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

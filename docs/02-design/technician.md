@@ -7,389 +7,389 @@ consumers: [implementation-agent, test-agent, review-agent]
 scope: frontend-demo-1A
 ---
 
-# 技術者 詳細設計書
+# Technician Detailed Design
 
-この設計書は、機能・画面の項目・状態・例外を決めます。企業が書いた原文と、それに対応する要件をもとにします。各FR(機能要件)を満たす処理と、受け入れ条件を定義します。参考にするモック画面は、共通UIの見た目を検討するために使います。
+This design defines features, screen fields, states, and exceptions based on the original company document and its linked requirements. It defines the processing and acceptance criteria for each FR (functional requirement). Reference mock screens guide the shared UI appearance.
 
-**0.21.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**Implementation baseline for 0.21.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
 
-## 入力・責務
+## Inputs and Responsibilities
 
-一次資料(最初の情報源)は[企業要件原文(SRC-06)](../00-prepare/sources/company-requirements-original.txt)です。この原文を整理し直した要件をもとに、画面・入力・状態・受け入れ条件を設計します。入力として使う資料は[役割別要件](../01-requirements/technician.md)と[共通要件](../01-requirements/common.md)です。必ず読む資料は[共通詳細設計](common.md)と[UIUX仕様書](../03-uiux/UIUXSpecification.md)です。この先は、フロントエンド(画面側)の項目・表示・モック(模擬)動作の設計を説明します。画面上で行う登録・割当・入金・制限・監査は、すべて共有モックメモリ(画面が共有して使う仮のデータ)の状態遷移(状態の変化)です。サーバーの実装やデータベース設計を求めるものではありません。
+The primary source is the [Original Company Requirements (SRC-06)](../00-prepare/sources/company-requirements-original.txt). Screens, inputs, states, and acceptance criteria follow the requirements reorganized from this source. Inputs are the [Role Requirements](../01-requirements/technician.md) and [Common Requirements](../01-requirements/common.md). Required reading is the [Common Detailed Design](common.md) and [UIUX Specification](../03-uiux/UIUXSpecification.md). The following describes frontend fields, displays, and mock behavior. Registration, assignment, payment receipt, restrictions, and audit on the screen are state changes in shared mock memory. This does not request server implementation or database design.
 
-ルートパラメーター(URLに含まれる値)は、信頼できない入力として扱い、必ず検証します。表にあるservice名は、共通Repository(データを扱う共通の仕組み)が持つ論理的な操作名です。同じルートを持つ行は、同じ画面の中で機能を分担しています。すべての行で、loading(読み込み中)・empty(データなし)・error(エラー)・forbidden(権限なし)・not-found(見つからない)の表示を実装します。再試行ボタンは、回復できるエラーのときだけ表示します。権限が足りないときと対象が見つからないときは、再試行ボタンを出さず、IR57に従って表示します。
+Treat route parameters as untrusted input and always validate them. Service names in the table are logical operations in the shared Repository. Rows with the same route describe different functions on one screen. Every row supports loading, empty, error, forbidden, and not-found displays. Show retry only for recoverable errors. For forbidden and not-found, follow IR57 and do not show retry.
 
-## 画面・処理設計
+## Screen and Process Design
 
-| 設計ID / 要件 | ルート / 主コンポーネント | 取得・操作契約 | 入力・処理・検証 | 異常系と禁止事項 |
+| Design ID / requirement | Route / main component | Read and action contracts | Input, processing, validation | Errors and prohibited actions |
 |---|---|---|---|---|
-| DD-T01 / FR-T01 | `/technician` / `TechnicianOverview` | `jobs.list`、`alerts.list`、`summaries.get` | 期間と重要度でしぼり込みます。割当と期限をサービスで確認します | 自分が担当していない他の案件は、検索結果や集計に出しません |
-| DD-T02 / FR-T02 | `/technician/units/:id` / `DiagnosticUnit` | `units.get`、`devices.list` | 設備IDと対応できる機能を見ます。保守の範囲外であることは、はっきり示します | 台帳に登録されていない場合と、通信が切れている場合を区別します |
-| DD-T03 / FR-T03 | `/technician/units/:id` / `TelemetryPanel` | `telemetry.series`、`telemetry.summary` | 指標(見る項目)と期間を選びます。データの購読(継続的な取得)はRepositoryを通します。1A(このフェーズ)では、あらかじめ決まったイベントだけを使います | 古い値をリアルタイムの値として表示しません。データの流れ(ストリーム)が切れたときは、もう一度取得し直します |
-| DD-T04 / FR-T04 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`、`jobs.saveDraft`、`jobs.submit`、`reports.get`、`units.get` | 部品ごとに、正常/要対応/未点検/対象外のいずれかを選びます。所見(気づいた点)と測定の根拠も記録します。「正常」を初期値にはしません | 対象外や未点検を選んだ場合は、理由の入力が必須です。デモ(模擬)の診断結果を、実際の測定結果として置き換えてはいけません |
-| DD-T05 / FR-T05 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`、`jobs.saveDraft`、`jobs.submit`、`reports.get`、`units.get` | 室外機も共通のschema(データ構造)を使いますが、部品グループは分けて管理します | センサーを選んでいないのに、微小な漏れを検知できると言い切る文言は認めません |
-| DD-T06 / FR-T06 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`、`jobs.saveDraft`、`jobs.submit`、`reports.get`、`units.get` | 測定値には数値・単位・観測時刻・点検した人を記録します。操作手順や施工の指示は、この設計書では扱いません | 測定していないのに、それを0や正常として保存してはいけません |
-| DD-T07 / FR-T07 | `/technician/units/:id/alerts` / `DiagnosticEvidence` | `alerts.list`、`alerts.get`、`alerts.acknowledge`、`alerts.resolve` | 確認(acknowledge)は確認済みの状態にするところまでです。解消するには、再測定するか、権限を持つ人が理由を記録する必要があります | 通信が切れただけで盗難と決めつけません。取り外しの検知は別の事象として扱います |
-| DD-T08 / FR-T08 | `/technician/jobs/:id` / `JobWorkspace` | `jobs.get`、`jobs.submit`、`reports.get`、`jobs.start`、`jobs.resumeRework`、`units.get` | 有効な割当と、開始できる条件を確認します。提出後は品質確認を待つ状態になります | 割当が失効・取消された後の提出は拒否します。送信に失敗した場合は、ドラフト(下書き)を残します |
-| DD-T09 / FR-T09 | `/technician/jobs/:id` / `ReportEditor` | `jobs.get`、`jobs.saveDraft`、`jobs.submit`、`reports.get`、`attachments.add`、`attachments.getContent`、`units.get` | 報告の本文は10〜4000文字です。写真はJPEGまたはPNGで1枚5MiB以下、最大10枚(仮の値)です。部品は数量が0より大きい必要があります | ドラフトは途中の状態のままでも保存できます。提出時にはschemaを検証します。画像の処理に失敗した場合は選び直しますが、本文はそのまま残します |
-| DD-T10 / FR-T10 | `/technician/units/:id/control` / `DiagnosticControl` | `commands.create`、`commands.get`、`diagnosticRuns.create`、`diagnosticRuns.get`、`units.get`、`jobs.get`、`diagnosticRuns.list` | `control.diagnose`という権限、設備の能力、理由、試運転の時間(1〜15分、仮の値)を確認します | 契約上の制限を、試運転を使って回避してはいけません。期限が切れても自動で再送はしません |
-| DD-T11 / FR-T11 | `/technician/devices` / `DeviceMaintenance` | `devices.list`、`devices.register`、`devices.bind`、`devices.check`、`devices.calibrate`、`devices.updateFirmware`、`devices.get`、`units.list`、`units.get`、`jobs.list`、`devices.calibrations`、`devices.operations` | シリアル番号は重複しないようにします。unitId(設備ID)とセンサーの種類も指定します。校正では単位・参照値・日時を入力します。ファームウェアは対応版の中から選びます | 通信が切れているときは更新を開始できません。更新に失敗した場合、新しいバージョンが反映済みだと表示してはいけません |
-| DD-T12 / FR-T12 | `/technician/devices/:id` / `DeviceEvents` | `devices.get`、`devices.events`、`alerts.get`、`alerts.acknowledge`、`devices.addResponseNote` | eventType(イベントの種類)と、検知した根拠を表示します。取り外しは専用の模擬イベントで表します | 通信が復旧しても、取り外しのアラートを自動では消しません |
+| DD-T01 / FR-T01 | `/technician` / `TechnicianOverview` | `jobs.list`, `alerts.list`, `summaries.get` | Filter by period and severity. Check assignments and deadlines in the service | Exclude jobs assigned to others from results and summaries |
+| DD-T02 / FR-T02 | `/technician/units/:id` / `DiagnosticUnit` | `units.get`, `devices.list` | View unit ID and supported features. Clearly identify items outside maintenance scope | Distinguish unregistered units from disconnected units |
+| DD-T03 / FR-T03 | `/technician/units/:id` / `TelemetryPanel` | `telemetry.series`, `telemetry.summary` | Select metric and period. Subscribe through the Repository. Phase 1A uses only predefined events | Do not show old values as live. Refetch when the stream disconnects |
+| DD-T04 / FR-T04 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Select normal/needs attention/not inspected/not applicable for each component. Record findings and measurement evidence. Do not default to normal | Require reasons for not applicable or not inspected. Do not replace actual measurements with demo diagnosis results |
+| DD-T05 / FR-T05 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Outdoor units use the shared schema with a separate component group | Do not claim detection of tiny leaks without a selected sensor |
+| DD-T06 / FR-T06 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Record each measurement's value, unit, observation time, and inspector. Operating procedures and installation instructions are outside this design | Do not save an unmeasured value as 0 or normal |
+| DD-T07 / FR-T07 | `/technician/units/:id/alerts` / `DiagnosticEvidence` | `alerts.list`, `alerts.get`, `alerts.acknowledge`, `alerts.resolve` | Acknowledgement only marks the alert as acknowledged. Resolution requires remeasurement or a reason recorded by an authorized person | Do not infer theft from connection loss alone. Treat removal detection as a separate event |
+| DD-T08 / FR-T08 | `/technician/jobs/:id` / `JobWorkspace` | `jobs.get`, `jobs.submit`, `reports.get`, `jobs.start`, `jobs.resumeRework`, `units.get` | Check active assignment and start conditions. Submission enters quality-review waiting state | Reject submission after assignment expiry or cancellation. Keep the draft if sending fails |
+| DD-T09 / FR-T09 | `/technician/jobs/:id` / `ReportEditor` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `attachments.add`, `attachments.getContent`, `units.get` | Report body: 10–4000 characters. Photos: JPEG/PNG, at most 5MiB each, at most 10 (provisional). Part quantities must be greater than 0 | Drafts may be incomplete. Validate the schema on submission. Reselect images after processing failure, while keeping text |
+| DD-T10 / FR-T10 | `/technician/units/:id/control` / `DiagnosticControl` | `commands.create`, `commands.get`, `diagnosticRuns.create`, `diagnosticRuns.get`, `units.get`, `jobs.get`, `diagnosticRuns.list` | Check `control.diagnose` permission, unit capabilities, reason, and test-run duration (1–15 minutes, provisional) | Do not use test runs to bypass contract restrictions. Do not automatically resend after expiry |
+| DD-T11 / FR-T11 | `/technician/devices` / `DeviceMaintenance` | `devices.list`, `devices.register`, `devices.bind`, `devices.check`, `devices.calibrate`, `devices.updateFirmware`, `devices.get`, `units.list`, `units.get`, `jobs.list`, `devices.calibrations`, `devices.operations` | Serial numbers must be unique. Set unitId and sensor types. Enter unit, reference value, and date/time for calibration. Choose supported firmware versions | Do not start updates offline. Do not show the new version as applied after update failure |
+| DD-T12 / FR-T12 | `/technician/devices/:id` / `DeviceEvents` | `devices.get`, `devices.events`, `alerts.get`, `alerts.acknowledge`, `devices.addResponseNote` | Show eventType and detection evidence. Use a dedicated simulated event for removal | Restored communication does not automatically clear removal alerts |
 
-## 実装の共通手順
+## Shared Implementation Steps
 
-1. セッション(ログイン情報)とスコープ(権限の範囲)を確認します。ID・URLのフィルター(絞り込み条件)は、schemaで検証します。
-2. Query(データ取得の仕組み)を通して、モックサービスを呼び出します。結果は、画面用のモデルとして受け取ります。
-3. フォームは、React Hook Formと共通schemaを使って作ります。能力や期間などの検証も、あわせて適用します。
-4. データを変更(mutation)する直前に、対象のversion(版数)・権限・現在の状態を確認します。影響の大きい操作では、対象と理由もあわせて確認します。
-5. Repositoryを使って、共有しているデモ用の状態を変更します。相関ID(処理を追跡するためのID)を付けたイベントを発行します。関係するQueryは無効化(再取得が必要な状態に)します。
-6. 応答を待っている間は、待っていることを画面に表示し続けます。成功・拒否・失敗は、それぞれ別に表示します。フォームの送信に失敗しても、入力した内容は残します。
+1. Check the session and permission scope. Validate IDs and URL filters against schemas.
+2. Call mock services through Queries and receive screen models.
+3. Build forms with React Hook Form and shared schemas. Also validate capabilities and periods.
+4. Immediately before a mutation, check the target version, permissions, and current state. For major actions, also confirm the target and reason.
+5. Change shared demo state through the Repository. Emit events with a correlation ID for tracking. Invalidate related Queries so they can be refetched.
+6. Keep a waiting indicator visible while awaiting a response. Show success, denial, and failure separately. Keep form inputs when submission fails.
 
-## テストへの引き渡し
+## Handoff to Testing
 
-設計ID DD-Tの番号ごとに、同じ番号のAT-T(受け入れ条件)を検証します。あわせて、上の表にある異常系と、権限のない呼び出しについても検証します。テストデータと、複数の役割にまたがるシナリオは、[検証計画](../04-agentic-sdlc/verification.md)を正式なものとします。設計で示した文字数などの例を変更するときは、schema・文書・境界値のテストを同時に更新してください。
+For each DD-T number, verify the matching AT-T acceptance criteria, the error cases above, and unauthorized calls. The [Verification Plan](../04-agentic-sdlc/verification.md) is the source of truth for test data and cross-role scenarios. If example limits such as character counts change, update schemas, documents, and boundary tests together.
 
-## 機能別詳細仕様（0.6.0）
+## Detailed Feature Specifications (0.6.0)
 
-入力フォームの値は、RHF(React Hook Form)で保持し、schemaで検証します。読み取り専用の画面では、フォームの検証を求めません。監査・通知・共通のエラーは、入出力契約のDDC-03とDDC-09に従います。読み取り専用(read-only)の値は、Queryという単一の情報源から表示します。共通の型・ページング(ページ分け)・時間・エラーの扱いは、[実装契約](implementation-contracts.md)を正式なものとし、その上にこの先の個別条件を重ねます。見た目に関する値は、[UIUX](../03-uiux/UIUXSpecification.md)のUX-04とUX-08にあるtoken(値の単位)とpattern(型)を使います。
+Keep form values in RHF (React Hook Form) and validate them with schemas. Read-only screens do not require form validation. Follow input/output contracts DDC-03 and DDC-09 for audit, notifications, and shared errors. Display read-only values from a single Query source. The [Implementation Contracts](implementation-contracts.md) define shared types, paging, time, and error handling; the following adds individual conditions. Use the tokens and patterns in [UIUX](../03-uiux/UIUXSpecification.md) UX-04 and UX-08 for appearance.
 
-### DD-T01 詳細
+### DD-T01 Details
 
-**一次資料との対応**: SRC-06のBIZ-04とBIZ-08から、FR-T01を経て、DD-T01につながります。出所区分(情報の出どころ): 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、担当期間によって表示する範囲を決めることです。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
+**Source mapping**: SRC-06 BIZ-04, BIZ-08 → FR-T01 → DD-T01. Source category: original company requirements SRC-06 + design additions. Design addition: view scope based on assignment period. Field types, required status, defaults, and action order are implementation proposals.
 
-対象はFR-T01です。主な表示pattern(画面の型)は**UI-OVERVIEW**です。この画面が使うサービスの範囲は`jobs.list, alerts.list, summaries.get`です。
+Scope: FR-T01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.list, alerts.list, summaries.get`.
 
-**初期表示と前提**: 社内の技術者は、自分の担当範囲を見られます。社外の技術者は、自分の会社かつ個別に割り当てられた案件と、作業期間を取得できます。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
+**Initial view and prerequisites**: Internal technicians can view their assigned scope. External technicians can fetch jobs assigned individually within their company and their work periods. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| from / to | 日付/必須 | 初期今日、最大366日。YYYY-MM-DDの表示timezone暦日をUTC Instantへ変換（IR74） | 予定 |
-| status | enum/任意 | assigned/in_progress/on_hold/submitted/rework_requested/completed/all（allはstatus省略、IR90） | 進捗 |
-| severity | enum/任意 | critical/warning/all（allはfilters.severityを省略、IR74） | 優先 |
-| summary | 読取 | 担当設備数・未着手・期限超過 | 担当範囲の集計 |
+| from / to | date/required | Default: today; maximum 366 days. Convert YYYY-MM-DD calendar dates in the display timezone to UTC Instants (IR74) | Schedule |
+| status | enum/optional | assigned/in_progress/on_hold/submitted/rework_requested/completed/all (all means omit status, IR90) | Progress |
+| severity | enum/optional | critical/warning/all (all means omit filters.severity, IR74) | Priority |
+| summary | Read-only | Assigned unit count, not started, overdue | Assigned-scope summary |
 
-**処理手順**
+**Steps**
 
-1. 今日、または指定した期間の担当案件を開きます。次に、異常の重要度・期限・進捗で並べ替えます。そこから、設備の詳細画面か作業画面へ進みます。
-2. 読み取りや操作のときは、次の業務条件を適用します。「未対応」とは、requested(依頼済み)の案件すべてではなく、自分が担当していてまだ着手していない案件のことです。社内の人が複数案件を横断して見る場合も、所属しているテナント(組織の区画)と担当範囲を超えて見ることはできません。
-3. この画面は参照のみです。予定が0件のときは、空の状態であることを示し、過去の履歴を見るための導線を用意します。
-4. 更新対象になるQueryは`jobs / assignments / alerts`です。
+1. Open assigned jobs for today or the selected period. Sort by alert severity, deadline, and progress. Open unit details or the work screen.
+2. Apply these business conditions to reads and actions. “Not addressed” means jobs assigned to the user that have not started, not all requested jobs. Internal users viewing multiple jobs must still stay within their tenant and assigned scope.
+3. This screen is read-only. For zero scheduled jobs, show an empty state and a way to view past history.
+4. Queries to update: `jobs / assignments / alerts`.
 
-**境界条件・失敗時**: 外部の技術者の担当期限が終わると、その設備のライブ(現在の)情報を非表示にします。作業開始前の担当案件は閲覧窓で読取専用に表示し、作業窓の開始前の操作はFORBIDDENです(IR49)。別の技術者が担当する案件IDを直接URLに入力しても、作業を開始することはできません。
+**Boundary cases and failures**: Hide live unit information when an external technician's assignment expires. Before work starts, show assigned jobs as read-only within the viewing window; actions before the work window return FORBIDDEN (IR49). Directly entering another technician's job ID must not allow work to start.
 
-**検証**: 追跡表にあるAT-T01の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
+**Verification**: Check the traceability entries under AT-T01 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-T02 詳細
+### DD-T02 Details
 
-**一次資料との対応**: SRC-06のBIZ-06、BIZ-07、BIZ-10から、FR-T02を経て、DD-T02につながります。出所区分: 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、設備台帳の項目と、それを見る手順です。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
+**Source mapping**: SRC-06 BIZ-06, BIZ-07, BIZ-10 → FR-T02 → DD-T02. Source category: original company requirements SRC-06 + design additions. Design addition: unit register fields and viewing steps. Field types, required status, defaults, and action order are implementation proposals.
 
-対象はFR-T02です。主な表示patternは**UI-DETAIL**です。この画面が使うサービスの範囲は`units.get, devices.list`です。
+Scope: FR-T02 / Main display pattern: **UI-DETAIL**. Service boundary: `units.get, devices.list`.
 
-**初期表示と前提**: 見ようとしている設備について、閲覧できる担当関係があることが前提です。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
+**Initial view and prerequisites**: An assignment relationship grants read access to the unit. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| unitId | ID/必須 | 担当内 | 設備 |
-| manufacturer / model / installedAt | 読取 | 未登録はnull表示 | 台帳 |
-| components / serviceScope | 読取 | components=serviceScopeの各グループの全部品（indoor 8、outdoor 5、electrical 5、IR100） | 点検範囲 |
-| capabilityVersion | 読取 | 操作候補の根拠 | 能力版 |
+| unitId | ID/required | Within assignment | Unit |
+| manufacturer / model / installedAt | Read-only | Show null for unregistered values | Register |
+| components / serviceScope | Read-only | components=all components in each serviceScope group (indoor 8, outdoor 5, electrical 5, IR100) | Inspection scope |
+| capabilityVersion | Read-only | Basis for available actions | Capability version |
 
-**処理手順**
+**Steps**
 
-1. 案件から設備台帳を開きます。設置場所・型番・構成・設置日・保守範囲を確認します。そこから診断や作業へ進みます。
-2. 機種の能力は、capability(能力)のバージョンとして表示します。登録されていない項目や不明な項目は「未登録」と表示し、よくある機種の値で勝手に補いません。
-3. この画面は参照のみです。技術者は、メーカーの台帳・顧客の所属・請求情報を変更しません。
-4. 更新対象のQueryはありません(読み取りのみ)。
+1. Open the unit register from the job. Check installation location, model, configuration, installation date, and maintenance scope. Continue to diagnosis or work.
+2. Show model capabilities with their capability version. Show unregistered or unknown fields as “Not registered”; do not fill them with common model values.
+3. This screen is read-only. Technicians do not change manufacturer register data, customer memberships, or billing data.
+4. No Queries are updated (read-only).
 
-**境界条件・失敗時**: 台帳に設置日が記録されていない場合、現在の日付で補ってはいけません。外部の技術者が、自分に割り当てられていない設備を参照しようとしても、情報は返しません。
+**Boundary cases and failures**: Do not fill an absent installation date with today's date. Return no information when an external technician requests an unassigned unit.
 
-**検証**: 追跡表にあるAT-T02の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
+**Verification**: Check the traceability entries under AT-T02 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-T03 詳細
+### DD-T03 Details
 
-**一次資料との対応**: SRC-06のBIZ-08、BIZ-11から、FR-T03を経て、DD-T03につながります。出所区分: 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、データの系列(グラフの種類など)の選び方と、データの品質の表示方法です。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
+**Source mapping**: SRC-06 BIZ-08, BIZ-11 → FR-T03 → DD-T03. Source category: original company requirements SRC-06 + design additions. Design addition: choosing data series and displaying data quality. Field types, required status, defaults, and action order are implementation proposals.
 
-対象はFR-T03です。主な表示patternは**UI-DETAIL**と**UI-ANALYSIS**です。この画面が使うサービスの範囲は`telemetry.series, telemetry.summary`です。
+Scope: FR-T03 / Main display pattern: **UI-DETAIL** and **UI-ANALYSIS**. Service boundary: `telemetry.series, telemetry.summary`.
 
-**初期表示と前提**: 対象の設備について、telemetry(計測データ)を見る権限があることが前提です。センサーがなくても、通信情報だけは表示できます。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
+**Initial view and prerequisites**: The user may view the target unit's telemetry. Connection information can be shown even without sensors. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| unitId / metric | 必須 | 担当内・センサー対応 | 対象系列 |
-| period / from / to | enum・ISO日時/必須 | 1h/24h/7d/custom、初期24h。1h/24hは移動窓、7dは暦日、customは最大366日(IR41) | 期間 |
-| observedAt / receivedAt | 読取 | UTC | 鮮度 |
-| staleAfterSeconds | 読取 | sensor policy由来、デモ120秒 | stale判定 |
-| eventId / version | 読取 | 重複・順序制御 | 更新根拠 |
+| unitId / metric | Required | Within assignment; supported sensor | Target series |
+| period / from / to | enum and ISO datetime/required | 1h/24h/7d/custom; default: 24h. 1h/24h are rolling windows, 7d uses calendar days, custom is at most 366 days (IR41) | Period |
+| observedAt / receivedAt | Read-only | UTC | Freshness |
+| staleAfterSeconds | Read-only | From sensor policy; demo: 120 seconds | Stale check |
+| eventId / version | Read-only | Duplicate and ordering control | Update basis |
 
-**処理手順**
+**Steps**
 
-1. 指標(見たい項目)と期間を選びます。センサー・電力・運転・通信それぞれの値と時刻を確認します。デモの更新イベントによって値が変わります。通信が切れたときは、更新が止まっていることを画面で認識できるようにします。
-2. 観測時刻(現地で測った時刻)と受信時刻(サーバーが受け取った時刻)は分けて扱います。staleAfterSeconds(古いとみなすまでの秒数)を超えたら、staleとして扱います。古いイベントで、最新の値を上書きしてはいけません。系列(グラフ)の単位は固定し、データが欠けている部分をつなげて表示しません。
-3. 最新値と時系列のグラフは、同じeventId(イベントID)とバージョンで整合させます。画面を離れたときや、scope(権限の範囲)が変わったときは、データの購読を解除します。
-4. 更新対象のQueryは`telemetry / unit summary`です。
+1. Select metric and period. Check sensor, power, operation, and connection values and their times. Demo update events change values. Make stopped updates clear when communication is lost.
+2. Keep observation time (measured on site) separate from receipt time (received by the server). Mark data stale after staleAfterSeconds. Do not overwrite current values with older events. Keep series units fixed and leave gaps where data is missing.
+3. Keep latest values and time-series charts consistent using the same eventId and version. Unsubscribe when leaving the screen or changing scope.
+4. Queries to update: `telemetry / unit summary`.
 
-**境界条件・失敗時**: イベントの順序が入れ替わったり、重複したりしても、値が逆戻りすることはありません。通信が切れているときも、最後に受け取った値は時刻付きで残せますが、それをリアルタイムの値として表示してはいけません。
+**Boundary cases and failures**: Reordered or duplicate events must not roll values back. While offline, the last received value may remain with its timestamp, but must not be shown as live.
 
-**検証**: 追跡表にあるAT-T03の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
+**Verification**: Check the traceability entries under AT-T03 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-T04 詳細
+### DD-T04 Details
 
-**一次資料との対応**: SRC-06のBIZ-10から、FR-T04を経て、DD-T04につながります。出所区分: 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、点検フォームと、未点検のときの理由の扱いです。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
+**Source mapping**: SRC-06 BIZ-10 → FR-T04 → DD-T04. Source category: original company requirements SRC-06 + design additions. Design addition: inspection forms and reasons for skipped inspections. Field types, required status, defaults, and action order are implementation proposals.
 
-対象はFR-T04です。主な表示patternは**UI-FORM**です。この画面が使うサービスの範囲は`jobs.get, jobs.saveDraft, jobs.submit, reports.get, units.get`です。
+Scope: FR-T04 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, jobs.saveDraft, jobs.submit, reports.get, units.get`.
 
-**初期表示と前提**: 有効な担当案件が`in_progress`(進行中)の状態であることが前提です。保守の範囲と、部品ごとの点検対象は、すでに取得済みです。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
+**Initial view and prerequisites**: The user has an active assigned job in `in_progress`. Maintenance scope and target components have already been fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| componentGroup | enum/必須 | indoor固定 | 分類 |
-| componentKey | enum/必須 | 上記部品キー | 対象 |
-| result | enum/null | 初期null、normal/attention/not_inspected/not_applicable | 点検結果 |
-| reason | 文字列/条件必須 | attention等は1〜1000文字 | 根拠/未点検理由 |
-| measurements | Measurement配列/任意 | value+unit+observedAt+origin=inspection | 実地測定 |
-| attachmentIds | ID配列/任意 | 同じjobに属する画像のみ | 証跡 |
+| componentGroup | enum/required | Fixed: indoor | Group |
+| componentKey | enum/required | Component keys above | Target |
+| result | enum/null | Default: null; normal/attention/not_inspected/not_applicable | Inspection result |
+| reason | string/conditionally required | 1–1000 characters for attention and similar results | Evidence / reason for no inspection |
+| measurements | Measurement array/optional | value+unit+observedAt+origin=inspection | On-site measurements |
+| attachmentIds | ID array/optional | Only images from the same job | Evidence |
 
-**処理手順**
+**Steps**
 
-1. 対象の部品ごとに、点検結果を選びます。必要に応じて、所見・測定値・写真を関連付けます。未点検や対象外を選んだ場合は、理由を記入します。ドラフト、または報告として保存します。
-2. 対象のグループは`indoor`(室内機)です。項目は`filter / evaporator_coil / blower_motor / blower_fan / drain_pipe / drain_pan / outlet / louver`です。初期の結果は`null`(未入力)です。未点検のまま提出するなら、`not_inspected`であることをはっきり選び、理由も入力する必要があります。設備にその部品が存在しない場合は、`not_applicable`を選び、理由を記録します。
-3. 点検結果は、報告のバージョン・作成者・観測時刻と結び付けます。センサーによる推定値は、別の根拠として残します。現地での点検結果によって、元のセンサーデータを上書きしてはいけません。
-4. 更新対象のQueryは`report draft / inspection items`です。
+1. Select an inspection result for each target component. Link findings, measurements, and photos as needed. Enter a reason for not inspected or not applicable. Save as a draft or report.
+2. The target group is `indoor`. Components are `filter / evaporator_coil / blower_motor / blower_fan / drain_pipe / drain_pan / outlet / louver`. The initial result is `null` (not entered). To submit without inspection, explicitly choose `not_inspected` and enter a reason. If the unit has no such component, choose `not_applicable` and record a reason.
+3. Link inspection results to the report version, author, and observation time. Keep sensor estimates as separate evidence. Do not overwrite original sensor data with on-site inspection results.
+4. Queries to update: `report draft / inspection items`.
 
-**境界条件・失敗時**: 未入力のまま、単位のない測定値、未点検なのに理由がない場合、他の案件の写真を参照しようとした場合は、いずれも拒否します。「正常」を初期状態のまま選ばせて、実際には何も点検していないのに完了扱いにしてはいけません。
+**Boundary cases and failures**: Reject missing entries, measurements without units, not-inspected results without reasons, and photos from other jobs. Never default to normal and treat uninspected work as complete.
 
-**検証**: 追跡表にあるAT-T04の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
+**Verification**: Check the traceability entries under AT-T04 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-T05 詳細
+### DD-T05 Details
 
-**一次資料との対応**: SRC-06のBIZ-10から、FR-T05を経て、DD-T05につながります。出所区分: 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、点検フォームと、未点検のときの理由の扱いです。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
+**Source mapping**: SRC-06 BIZ-10 → FR-T05 → DD-T05. Source category: original company requirements SRC-06 + design additions. Design addition: inspection forms and reasons for skipped inspections. Field types, required status, defaults, and action order are implementation proposals.
 
-対象はFR-T05です。主な表示patternは**UI-FORM**です。この画面が使うサービスの範囲は`jobs.get, jobs.saveDraft, jobs.submit, reports.get, units.get`です。
+Scope: FR-T05 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, jobs.saveDraft, jobs.submit, reports.get, units.get`.
 
-**初期表示と前提**: 有効な担当案件が`in_progress`(進行中)の状態であることが前提です。保守の範囲と、部品ごとの点検対象は、すでに取得済みです。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
+**Initial view and prerequisites**: The user has an active assigned job in `in_progress`. Maintenance scope and target components have already been fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| componentGroup | enum/必須 | outdoor固定 | 分類 |
-| componentKey | enum/必須 | 上記部品キー | 対象 |
-| result | enum/null | 初期null、normal/attention/not_inspected/not_applicable | 点検結果 |
-| reason | 文字列/条件必須 | attention等は1〜1000文字 | 根拠/未点検理由 |
-| measurements | Measurement配列/任意 | value+unit+observedAt+origin=inspection | 実地測定 |
-| attachmentIds | ID配列/任意 | 同じjobに属する画像のみ | 証跡 |
+| componentGroup | enum/required | Fixed: outdoor | Group |
+| componentKey | enum/required | Component keys above | Target |
+| result | enum/null | Default: null; normal/attention/not_inspected/not_applicable | Inspection result |
+| reason | string/conditionally required | 1–1000 characters for attention and similar results | Evidence / reason for no inspection |
+| measurements | Measurement array/optional | value+unit+observedAt+origin=inspection | On-site measurements |
+| attachmentIds | ID array/optional | Only images from the same job | Evidence |
 
-**処理手順**
+**Steps**
 
-1. 対象の部品ごとに、点検結果を選びます。必要に応じて、所見・測定値・写真を関連付けます。未点検や対象外を選んだ場合は、理由を記入します。ドラフト、または報告として保存します。
-2. 対象のグループは`outdoor`(室外機)です。項目は`condenser_coil / compressor / fan / blade / refrigerant_pipe`です。初期の結果は`null`(未入力)です。未点検のまま提出するなら、`not_inspected`であることをはっきり選び、理由も入力する必要があります。設備にその部品が存在しない場合は、`not_applicable`を選び、理由を記録します。
-3. 点検結果は、報告のバージョン・作成者・観測時刻と結び付けます。センサーによる推定値は、別の根拠として残します。現地での点検結果によって、元のセンサーデータを上書きしてはいけません。
-4. 更新対象のQueryは`report draft / inspection items`です。
+1. Select an inspection result for each target component. Link findings, measurements, and photos as needed. Enter a reason for not inspected or not applicable. Save as a draft or report.
+2. The target group is `outdoor`. Components are `condenser_coil / compressor / fan / blade / refrigerant_pipe`. The initial result is `null` (not entered). To submit without inspection, explicitly choose `not_inspected` and enter a reason. If the unit has no such component, choose `not_applicable` and record a reason.
+3. Link inspection results to the report version, author, and observation time. Keep sensor estimates as separate evidence. Do not overwrite original sensor data with on-site inspection results.
+4. Queries to update: `report draft / inspection items`.
 
-**境界条件・失敗時**: 未入力のまま、単位のない測定値、未点検なのに理由がない場合、他の案件の写真を参照しようとした場合は、いずれも拒否します。「正常」を初期状態のまま選ばせて、実際には何も点検していないのに完了扱いにしてはいけません。
+**Boundary cases and failures**: Reject missing entries, measurements without units, not-inspected results without reasons, and photos from other jobs. Never default to normal and treat uninspected work as complete.
 
-**検証**: 追跡表にあるAT-T05の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
+**Verification**: Check the traceability entries under AT-T05 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-T06 詳細
+### DD-T06 Details
 
-**一次資料との対応**: SRC-06のBIZ-10から、FR-T06を経て、DD-T06につながります。出所区分: 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、点検フォームと、未点検のときの理由の扱いです。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
+**Source mapping**: SRC-06 BIZ-10 → FR-T06 → DD-T06. Source category: original company requirements SRC-06 + design additions. Design addition: inspection forms and reasons for skipped inspections. Field types, required status, defaults, and action order are implementation proposals.
 
-対象はFR-T06です。主な表示patternは**UI-FORM**です。この画面が使うサービスの範囲は`jobs.get, jobs.saveDraft, jobs.submit, reports.get, units.get`です。
+Scope: FR-T06 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, jobs.saveDraft, jobs.submit, reports.get, units.get`.
 
-**初期表示と前提**: 有効な担当案件が`in_progress`(進行中)の状態であることが前提です。保守の範囲と、部品ごとの点検対象は、すでに取得済みです。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
+**Initial view and prerequisites**: The user has an active assigned job in `in_progress`. Maintenance scope and target components have already been fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| componentGroup | enum/必須 | electrical固定 | 分類 |
-| componentKey | enum/必須 | 上記部品キー | 対象 |
-| result | enum/null | 初期null、normal/attention/not_inspected/not_applicable | 点検結果 |
-| reason | 文字列/条件必須 | attention等は1〜1000文字 | 根拠/未点検理由 |
-| measurements | Measurement配列/任意 | value+unit+observedAt+origin=inspection | 実地測定 |
-| attachmentIds | ID配列/任意 | 同じjobに属する画像のみ | 証跡 |
+| componentGroup | enum/required | Fixed: electrical | Group |
+| componentKey | enum/required | Component keys above | Target |
+| result | enum/null | Default: null; normal/attention/not_inspected/not_applicable | Inspection result |
+| reason | string/conditionally required | 1–1000 characters for attention and similar results | Evidence / reason for no inspection |
+| measurements | Measurement array/optional | value+unit+observedAt+origin=inspection | On-site measurements |
+| attachmentIds | ID array/optional | Only images from the same job | Evidence |
 
-**処理手順**
+**Steps**
 
-1. 対象の部品ごとに、点検結果を選びます。必要に応じて、所見・測定値・写真を関連付けます。未点検や対象外を選んだ場合は、理由を記入します。ドラフト、または報告として保存します。
-2. 対象のグループは`electrical`(電気系統)です。項目は`thermostat / sensor / capacitor / contactor / wiring`です。初期の結果は`null`(未入力)です。未点検のまま提出するなら、`not_inspected`であることをはっきり選び、理由も入力する必要があります。設備にその部品が存在しない場合は、`not_applicable`を選び、理由を記録します。
-3. 点検結果は、報告のバージョン・作成者・観測時刻と結び付けます。センサーによる推定値は、別の根拠として残します。現地での点検結果によって、元のセンサーデータを上書きしてはいけません。
-4. 更新対象のQueryは`report draft / inspection items`です。
+1. Select an inspection result for each target component. Link findings, measurements, and photos as needed. Enter a reason for not inspected or not applicable. Save as a draft or report.
+2. The target group is `electrical`. Components are `thermostat / sensor / capacitor / contactor / wiring`. The initial result is `null` (not entered). To submit without inspection, explicitly choose `not_inspected` and enter a reason. If the unit has no such component, choose `not_applicable` and record a reason.
+3. Link inspection results to the report version, author, and observation time. Keep sensor estimates as separate evidence. Do not overwrite original sensor data with on-site inspection results.
+4. Queries to update: `report draft / inspection items`.
 
-**境界条件・失敗時**: 未入力のまま、単位のない測定値、未点検なのに理由がない場合、他の案件の写真を参照しようとした場合は、いずれも拒否します。「正常」を初期状態のまま選ばせて、実際には何も点検していないのに完了扱いにしてはいけません。
+**Boundary cases and failures**: Reject missing entries, measurements without units, not-inspected results without reasons, and photos from other jobs. Never default to normal and treat uninspected work as complete.
 
-**検証**: 追跡表にあるAT-T06の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
+**Verification**: Check the traceability entries under AT-T06 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-T07 詳細
+### DD-T07 Details
 
-**窓が開いていること・断熱が不足していることによる負荷の通知(BIZ-17)**
+**Load Alerts Caused by Open Windows or Poor Insulation (BIZ-17)**
 
-`alerts.list`が返す`Alert`に、`causeCode`(原因コード。`window_open` / `insulation_loss` / `unknown`のいずれか)、`evidenceKind`(根拠の種類。`demo_observation` / `inferred` / `inspection`のいずれか)、`evidenceText`(根拠の説明文)、`observedAt`(観測時刻)を追加します。`causeCode`と`evidenceKind`は必須です。根拠が取得できていない場合は`unknown`とし、「2倍になった」のような具体的な数値を決め打ちで表示してはいけません。推定による表示は「疑い」、点検による結果は「点検記録」と表示します。通知の詳細画面から、同じunitId(設備ID)を持つ設備の画面や、保守依頼の画面へ移動できます。
+Add `causeCode` (`window_open` / `insulation_loss` / `unknown`), `evidenceKind` (`demo_observation` / `inferred` / `inspection`), `evidenceText` (evidence description), and `observedAt` (observation time) to the `Alert` returned by `alerts.list`. `causeCode` and `evidenceKind` are required. If evidence is unavailable, use `unknown`; do not hard-code claims such as “doubled.” Label inferred results “Suspected” and inspection results “Inspection record.” From notification details, users can open the unit with the same unitId or the maintenance request screen.
 
-検証: AT-T07-SRCでは、次の3つのfixture(テスト用データ)を使います。窓が開いている疑いがある場合、断熱不足の点検記録がある場合、根拠がない場合です。それぞれ文言・根拠・時刻が異なります。また、既読にしただけでは異常は解消しません。
+Verification: AT-T07-SRC uses three fixtures: suspected open window, inspection record of poor insulation, and no evidence. Each has different wording, evidence, and time. Marking a notification read alone does not resolve the alert.
 
-**一次資料との対応**: SRC-06のBIZ-08、BIZ-11、BIZ-17から、FR-T07を経て、DD-T07につながります。出所区分: 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、原因の候補と根拠、そして解消の手順です。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
+**Source mapping**: SRC-06 BIZ-08, BIZ-11, BIZ-17 → FR-T07 → DD-T07. Source category: original company requirements SRC-06 + design additions. Design addition: possible causes, evidence, and resolution steps. Field types, required status, defaults, and action order are implementation proposals.
 
-対象はFR-T07です。主な表示patternは**UI-DETAIL**です。この画面が使うサービスの範囲は`alerts.list, alerts.get, alerts.acknowledge, alerts.resolve`です。
+Scope: FR-T07 / Main display pattern: **UI-DETAIL**. Service boundary: `alerts.list, alerts.get, alerts.acknowledge, alerts.resolve`.
 
-**初期表示と前提**: 担当している設備に、異常または診断すべき疑いがあることが前提です。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
+**Initial view and prerequisites**: An assigned unit has an alert or a suspected issue to diagnose. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| alertId | ID/必須 | 担当設備の事象 | 対象 |
-| evidenceIds | 読取配列 | telemetry/inspectionを識別 | 根拠 |
-| resolutionReason | 文字列/解消時必須 | 1〜1000文字(IR87) | 解消判断 |
-| resolutionEvidenceIds | ID配列/解消時 | 再測定IDまたは確認記録 | 検証 |
-| expectedVersion | 整数/必須 | 最新Alert版 | 競合 |
+| alertId | ID/required | Event on an assigned unit | Target |
+| evidenceIds | Read-only array | Identify telemetry/inspection | Evidence |
+| resolutionReason | string/required on resolution | 1–1000 characters (IR87) | Resolution decision |
+| resolutionEvidenceIds | ID array/on resolution | Remeasurement IDs or confirmation record | Verification |
+| expectedVersion | integer/required | Latest Alert version | Conflict |
 
-**処理手順**
+**Steps**
 
-1. 異常の一覧から、根拠を開きます。計測値・推定・現地点検の結果と、その履歴を確認します。確認済みの状態にします。必要であれば、再測定や、理由を付けた解消の操作に進みます。
-2. 推定に確信度の情報がない場合、勝手に数値の確率を作り出してはいけません。確認の操作をすると、状態は`acknowledged`(確認済み)になります。解消するには、再測定して条件を満たすか、`alert.resolve`という権限を持つ人が理由とともに解消する必要があります。
-3. 検知・確認・解消それぞれの時刻と、行った人を記録します。同じ異常が再発した場合は、新しいalertId(異常のID)を作り、前の事象と関連付けます。
-4. 更新対象のQueryは`alerts / alert events / customer summary / admin summary / audit`です。
+1. Open evidence from the alert list. Check measured values, estimates, on-site inspection results, and their history. Acknowledge the alert. If needed, proceed to remeasurement or resolution with a reason.
+2. Do not invent a numerical probability if an estimate has no confidence information. Acknowledgement sets `acknowledged`. Resolution requires a remeasurement that meets conditions, or a person with `alert.resolve` permission to resolve it with a reason.
+3. Record detection, acknowledgement, and resolution times and actors. For recurrence, create a new alertId linked to the previous event.
+4. Queries to update: `alerts / alert events / customer summary / admin summary / audit`.
 
-**境界条件・失敗時**: 作業(Job)が完了しただけでは、`resolved`(解消済み)にはしません。再測定による自動解消はpolicyを持つAlertだけで、それ以外は理由付きの手動解消です(IR66)。通信が切れているという根拠だけで、盗難と決めつけません。取り外しは、専用の別の事象として分けて扱います。
+**Boundary cases and failures**: Job completion alone does not set `resolved`. Automatic resolution through remeasurement applies only to Alerts with a policy; others require manual resolution with a reason (IR66). Connection loss alone does not prove theft. Treat removal as its own distinct event.
 
-**検証**: 追跡表にあるAT-T07の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
+**Verification**: Check the traceability entries under AT-T07 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-T08 詳細
+### DD-T08 Details
 
-**一次資料との対応**: SRC-06のBIZ-12から、FR-T08を経て、DD-T08につながります。出所区分: 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、開始・提出・再提出という状態の扱いです。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
+**Source mapping**: SRC-06 BIZ-12 → FR-T08 → DD-T08. Source category: original company requirements SRC-06 + design additions. Design addition: start, submit, and resubmit states. Field types, required status, defaults, and action order are implementation proposals.
 
-対象はFR-T08です。主な表示patternは**UI-DETAIL**です。この画面が使うサービスの範囲は`jobs.get, jobs.submit, reports.get, jobs.start, jobs.resumeRework, units.get`です。
+Scope: FR-T08 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get, jobs.submit, reports.get, jobs.start, jobs.resumeRework, units.get`.
 
-**初期表示と前提**: `assigned`(割り当て済み)の案件を担当していて、有効期間内であることが前提です。定期点検・事後対応・予防保全のいずれも、同じ作業状態のモデルを使います。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
+**Initial view and prerequisites**: The user is assigned an `assigned` job within the valid period. Periodic, reactive, and preventive maintenance use the same work-state model. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| jobId | ID/必須 | 有効担当 | 対象 |
-| startConfirmed | boolean/開始時必須 | 初期false | 対象確認 |
-| reportVersion | 整数/提出時必須 | 現在draft版 | 提出物 |
-| expectedVersion | 整数/必須 | 現在job版 | 状態競合 |
+| jobId | ID/required | Active assignment | Target |
+| startConfirmed | boolean/required at start | Default: false | Target confirmation |
+| reportVersion | integer/required on submission | Current draft version | Submission |
+| expectedVersion | integer/required | Current job version | State conflict |
 
-**処理手順**
+**Steps**
 
-1. 担当と予定を確認します。作業を開始します。報告を編集します。提出します。品質確認を待ちます。差し戻された場合は、再作業して再提出します。
-2. 作業を開始できるのは`assigned`の状態のときです。差し戻し後に再開できるのは`rework_requested`の状態のときです。`submitted`(提出済み)になった後、提出したバージョンは読み取り専用になります。顧客の承認を、技術者が代わりに行うことはできません。
-3. 開始時刻・提出時刻・`reportVersion`(報告のバージョン)を保存します。完了とするかどうかは、品質担当のreview(確認)によって決まります。
-4. 更新対象のQueryは`jobs / reports / job events / notifications / audit`です。
+1. Check assignment and schedule. Start work, edit the report, submit, and wait for quality review. If returned, perform rework and resubmit.
+2. Work can start from `assigned`; rework can resume from `rework_requested`. After `submitted`, the submitted version is read-only. Technicians cannot approve on behalf of customers.
+3. Save start time, submission time, and `reportVersion`. The quality review determines completion.
+4. Queries to update: `jobs / reports / job events / notifications / audit`.
 
-**境界条件・失敗時**: 割り当てられていない場合、取消済みの場合、`on_hold`(保留中)の場合、期限外の場合は、開始や提出を拒否します。作業窓の開始前はwork-not-started状態で案件を読取表示し(IR76)、終了15分前の予告と終了時の未保存入力の破棄はIR89に従います。提出に失敗した場合は、`in_progress`(進行中)の状態とドラフトをそのまま残します。
+**Boundary cases and failures**: Reject start and submission if unassigned, cancelled, `on_hold`, or outside the valid period. Before the work window, show the job read-only in work-not-started state (IR76). Follow IR89 for the 15-minute end warning and discarding unsaved inputs at the end. If submission fails, keep `in_progress` and the draft.
 
-**検証**: 追跡表にあるAT-T08の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
+**Verification**: Check the traceability entries under AT-T08 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-T09 詳細
+### DD-T09 Details
 
-**一次資料との対応**: SRC-06のBIZ-12から、FR-T09を経て、DD-T09につながります。出所区分: 設計側で補った内容です(企業の目的に対応するもの)。この節で具体化する設計補完の内容は、写真・交換部品・報告のバージョンの管理方法です。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
+**Source mapping**: SRC-06 BIZ-12 → FR-T09 → DD-T09. Source category: design additions supporting company goals. Design addition: managing photos, replacement parts, and report versions. Field types, required status, defaults, and action order are implementation proposals.
 
-対象はFR-T09です。主な表示patternは**UI-FORM**です。この画面が使うサービスの範囲は`jobs.get, jobs.saveDraft, jobs.submit, reports.get, attachments.add, attachments.getContent, units.get`です。
+Scope: FR-T09 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, jobs.saveDraft, jobs.submit, reports.get, attachments.add, attachments.getContent, units.get`.
 
-**初期表示と前提**: `in_progress`(進行中)、または再作業中であることが前提です。点検項目とドラフトは、すでに取得済みです。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
+**Initial view and prerequisites**: Work is `in_progress` or rework is underway. Inspection items and the draft have been fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| workText | 文字列/提出時必須 | 10〜4000文字 | 実施内容 |
-| inspectionItems | 配列/提出時必須 | 提出時点のUnit.componentsと同じ部品集合で全件にresult、attention等は理由（IR100） | チェックリスト |
-| photos | Attachment配列/任意 | JPEG/PNG、<=5MiB×10、readyのみ提出 | 写真 |
-| parts | 配列/任意 | name1〜120文字、quantity正整数<=999 | 交換部品 |
-| nextAction.kind | enum/必須 | none/follow_up | 次回対応 |
-| nextAction.date / note | 日時・文字列/条件必須 | follow_up時に未来日時と1〜1000文字 | 次回計画 |
+| workText | string/required on submission | 10–4000 characters | Work performed |
+| inspectionItems | array/required on submission | Same component set as Unit.components at submission, result for every item, reasons for attention and similar results (IR100) | Checklist |
+| photos | Attachment array/optional | JPEG/PNG, <=5MiB×10; submit only ready items | Photos |
+| parts | array/optional | name: 1–120 characters; quantity: positive integer <=999 | Replacement parts |
+| nextAction.kind | enum/required | none/follow_up | Next action |
+| nextAction.date / note | datetime and string/conditionally required | Future date/time and 1–1000 characters for follow_up | Follow-up plan |
 
-**処理手順**
+**Steps**
 
-1. 点検結果・測定値・写真・交換部品・作業内容の本文・次回の対応を入力します。ドラフトを保存します。提出前のチェックを行います。報告のバージョンを確定します。
-2. 報告には、作成者とバージョンを記録します。画像はJPEGまたはPNGで、1枚5MiB以下、最大10枚までです。数量は正の整数です。次回対応は`none`(なし)か、日時と内容をはっきり指定するかのどちらかです。作業窓の中でサービスからデータを再取得しても、まだ保存していない変更(dirty)内容を消してはいけません。作業窓の終了時はIR89に従い破棄して通知します。
-3. 保存に成功したら、draft(下書き)のバージョンを更新します。提出時は、その時点で固定した`reportVersion`をJobに結び付けます。写真を削除するときは、object URL(一時的な画像URL)を解放します。
-4. 更新対象のQueryは`draft / attachments / reports`で、提出時には`jobs`も対象になります。
+1. Enter inspection results, measurements, photos, replacement parts, work text, and next actions. Save the draft, run pre-submission checks, and finalize the report version.
+2. Record the author and version. Images are JPEG/PNG, at most 5MiB each, up to 10. Quantities are positive integers. Next action is either `none` or an explicit date/time and description. Refetching service data during the work window must not erase unsaved (dirty) changes. At window end, discard and notify under IR89.
+3. On successful save, update the draft version. On submission, link the fixed `reportVersion` to the Job. Revoke object URLs when deleting photos.
+4. Queries to update: `draft / attachments / reports`; also `jobs` on submission.
 
-**境界条件・失敗時**: 本文が9文字以下、または4001文字以上の場合、部品の数量が0の場合は、提出を拒否します。偽装されたMIMEタイプ、11枚目の画像、5MiBを超える画像は、追加を拒否します。画像の処理に失敗した場合は`failed`(失敗)と表示し、失敗した写真が残っている間は提出できません。保存済みの本文と画像は、そのまま保持されます。
+**Boundary cases and failures**: Reject submission for text of 9 or fewer or 4001 or more characters, or part quantity 0. Reject spoofed MIME types, an 11th image, or images over 5MiB. Show `failed` for image processing failures; submission is blocked while failed photos remain. Keep saved text and images.
 
-**検証**: 追跡表にあるAT-T09の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
+**Verification**: Check the traceability entries under AT-T09 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-T10 詳細
+### DD-T10 Details
 
-**一次資料との対応**: SRC-06のBIZ-13から、FR-T10を経て、DD-T10につながります。出所区分: 設計側で補った内容です(企業の目的に対応するもの)。この節で具体化する設計補完の内容は、技術者の操作権限と、試運転の手順です。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
+**Source mapping**: SRC-06 BIZ-13 → FR-T10 → DD-T10. Source category: design additions supporting company goals. Design addition: technician control permissions and test-run steps. Field types, required status, defaults, and action order are implementation proposals.
 
-対象はFR-T10です。主な表示patternは**UI-DETAIL**と**UI-FORM**です。この画面が使うサービスの範囲は`commands.create, commands.get, diagnosticRuns.create, diagnosticRuns.get, units.get, jobs.get, diagnosticRuns.list`です。
+Scope: FR-T10 / Main display pattern: **UI-DETAIL** and **UI-FORM**. Service boundary: `commands.create, commands.get, diagnosticRuns.create, diagnosticRuns.get, units.get, jobs.get, diagnosticRuns.list`.
 
-**初期表示と前提**: 担当期間内であること、`control.diagnose`という能力を持つこと、機器がonline(通信可能)であることが前提です。契約上の制限を超えないことも前提です。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
+**Initial view and prerequisites**: Within the assignment period, with `control.diagnose` capability, the device online, and no contract restriction exceeded. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| jobId / unitId | ID/必須 | 一致する担当 | 根拠 |
-| action | UnitAction/必須 | 能力・制限内 | 診断動作 |
-| durationMinutes | 整数/試運転必須 | 1〜15、初期5。開始応答から計時 | 試運転時間 |
-| reason | 文字列/必須 | 1〜1000文字 | 操作理由 |
-| endAction | UnitAction/試運転必須 | 能力内、確認ダイアログに表示 | 終了動作 |
+| jobId / unitId | ID/required | Matching assignment | Basis |
+| action | UnitAction/required | Within capabilities and restrictions | Diagnostic action |
+| durationMinutes | integer/required for test run | 1–15; default: 5. Count from start acknowledgement | Test-run duration |
+| reason | string/required | 1–1000 characters | Action reason |
+| endAction | UnitAction/required for test run | Within capabilities; show in confirmation dialog | End action |
 
-**処理手順**
+**Steps**
 
-1. 現在の状態と、担当している案件を確認します。診断の操作・試運転の時間・理由を指定します。内容を確認します。Command(命令)の応答と履歴を見ます。
-2. ファームウェア(FW)の更新中や、まだ終わっていないCommandがあるときは、新しい操作を開始できません。試運転を終わらせるときも、終了のCommandに対する応答が必要です。ブラウザ側のタイマーが終わっただけでは、実際に停止したとは扱いません。
-3. 通常の診断は`commands.create`を使います。試運転は`diagnosticRuns.create`を使い、jobId・理由・durationMinutes(実行時間)・endAction(終了時の動作)を共有メモリに保存します。開始のCommandと終了のCommandは`runId`で結び付けます。終了予定の時刻と、実際の終了応答は分けて表示します。終了に失敗した場合は、注意として記録を残します。
-4. 更新対象のQueryは`commands / unit detail / audit`です。
+1. Check current state and assigned job. Set diagnostic action, test-run duration, and reason. Confirm the details, then view Command acknowledgements and history.
+2. Do not start a new action during firmware (FW) updates or while a Command is unfinished. Ending a test run also requires an end-Command acknowledgement. A browser timer ending alone does not prove the device has stopped.
+3. Use `commands.create` for normal diagnosis. Use `diagnosticRuns.create` for test runs and save jobId, reason, durationMinutes, and endAction in shared memory. Link start and end Commands by `runId`. Show scheduled end time separately from actual end acknowledgement. Record failed endings as warnings.
+4. Queries to update: `commands / unit detail / audit`.
 
-**境界条件・失敗時**: 制限温度を回避しようとする操作、担当期間外の操作、16分以上の試運転、理由の入力がない操作は、すべて拒否します。制限中の可否はIR46、接続・電源信号による拒否はIR47に従います。終了の応答がない限り、停止済みとは表示しません。
+**Boundary cases and failures**: Reject attempts to bypass temperature limits, actions outside the assignment period, test runs of 16 minutes or more, and missing reasons. Follow IR46 for actions under restrictions and IR47 for rejection based on connection/power signals. Do not show stopped without an end acknowledgement.
 
-**検証**: 追跡表にあるAT-T10の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
+**Verification**: Check the traceability entries under AT-T10 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-T11 詳細
+### DD-T11 Details
 
-**一次資料との対応**: SRC-06のBIZ-20から、FR-T11を経て、DD-T11につながります。出所区分: 設計側で補った内容です(企業の目的に対応するもの)。この節で具体化する設計補完の内容は、登録・校正・更新を模擬する手順です。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
+**Source mapping**: SRC-06 BIZ-20 → FR-T11 → DD-T11. Source category: design additions supporting company goals. Design addition: simulated registration, calibration, and update steps. Field types, required status, defaults, and action order are implementation proposals.
 
-対象はFR-T11です。主な表示patternは**UI-LIST**、**UI-FORM**、**UI-DETAIL**です。この画面が使うサービスの範囲は`devices.list, devices.register, devices.bind, devices.check, devices.calibrate, devices.updateFirmware, devices.get, units.list, units.get, jobs.list, devices.calibrations, devices.operations`です。
+Scope: FR-T11 / Main display pattern: **UI-LIST**, **UI-FORM**, **UI-DETAIL**. Service boundary: `devices.list, devices.register, devices.bind, devices.check, devices.calibrate, devices.updateFirmware, devices.get, units.list, units.get, jobs.list, devices.calibrations, devices.operations`.
 
-**初期表示と前提**: `device.maintain`という権限と、対象設備を有効に担当していることが前提です。登録・校正・更新は、いずれもモック(模擬)の動作です。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
+**Initial view and prerequisites**: `device.maintain` permission and an active assignment for the unit are required. Registration, calibration, and updates are mock operations. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| serial | 文字列/登録必須 | 英数ハイフン3〜64文字、正規化後一意 | 識別子 |
-| sensorTypes | Metric配列/登録必須 | 重複なし、空可。対象設備のCapability.sensorsにあるmetricのみ。単位/stale秒/境界は能力から複写(IR43) | 生成するセンサー |
-| unitId | ID/紐付け必須 | 担当・登録済み | 対象 |
-| metric / unit | enum/校正必須 | センサー能力の組合せ | 測定種別 |
-| referenceValue / measuredValue | number/校正必須 | 有限値、同じ単位 | 校正根拠 |
-| calibratedAt | ISO日時/必須 | 未来不可 | 校正時刻 |
-| firmwareVersion | enum/更新必須 | 対応候補・現行版以外 | 目標版 |
+| serial | string/required for registration | 3–64 letters, digits, or hyphens; unique after normalization | Identifier |
+| sensorTypes | Metric array/required for registration | No duplicates; may be empty. Only metrics in the unit's Capability.sensors. Copy units, stale seconds, and bounds from capability (IR43) | Sensors to create |
+| unitId | ID/required for binding | Assigned and registered | Target |
+| metric / unit | enum/required for calibration | Sensor capability combination | Measurement type |
+| referenceValue / measuredValue | number/required for calibration | Finite values, same unit | Calibration basis |
+| calibratedAt | ISO datetime/required | Cannot be in the future | Calibration time |
+| firmwareVersion | enum/required for update | Supported candidate other than current version | Target version |
 
-**処理手順**
+**Steps**
 
-1. シリアル番号(serial)を登録します。設備と紐付けます。接続を確認します。校正値と参照値を記録します。対応しているファームウェアの候補を選んで更新します。進行状況と結果を確認します。
-2. シリアル番号は、前後の空白を除き大文字に揃えたうえで、重複していないか判定します。校正は履歴として追加するだけで、既存の測定値を書き換えることはありません。ファームウェアは、対応しているバージョンの一覧からのみ選べます。URLやバイナリデータを自由に入力させることはしません。
-3. `Device`(機器)、`CalibrationRecord`(校正記録)、`DeviceOperation`(機器操作の記録)を保存します。`firmwareVersion`(ファームウェアのバージョン)が更新されるのは、結果が`succeeded`(成功)のときだけです。queuedからrunningへの開始とconnectingの表示はIR67に従います。更新中の制御要求はCONFLICTとして拒否します。排他はD05に従います。
-4. 更新対象のQueryは`devices / operations / calibrations / capabilities / audit`です。
+1. Register the serial number. Bind it to a unit, check the connection, and record calibration and reference values. Select supported firmware and update it. Check progress and result.
+2. Trim serial numbers and convert to uppercase before checking uniqueness. Calibration only adds history; it does not rewrite existing measurements. Firmware can only be selected from supported versions. Do not allow free-entry URLs or binary data.
+3. Save `Device`, `CalibrationRecord`, and `DeviceOperation`. Update `firmwareVersion` only when the result is `succeeded`. Follow IR67 for queued → running and the connecting display. Reject control requests during updates as CONFLICT. Follow D05 for mutual exclusion.
+4. Queries to update: `devices / operations / calibrations / capabilities / audit`.
 
-**境界条件・失敗時**: シリアル番号の重複、別の設備への無断での再紐付け、単位の不一致は、いずれも拒否し、台帳は変更しません。オフラインのときは、ファームウェアの更新を開始しません。ファームウェアの更新に失敗した場合は`failed`(失敗)と表示し、古いバージョンをそのまま保持します。
+**Boundary cases and failures**: Reject duplicate serial numbers, unauthorized rebinding to another unit, and unit mismatches, without changing the register. Do not start firmware updates offline. Show `failed` on update failure and keep the old version.
 
-**検証**: 追跡表にあるAT-T11の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
+**Verification**: Check the traceability entries under AT-T11 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-T12 詳細
+### DD-T12 Details
 
-**一次資料との対応**: SRC-06のBIZ-20から、FR-T12を経て、DD-T12につながります。出所区分: 企業原文SRC-06に、設計側で補った内容を加えたものです。この節で具体化する設計補完の内容は、通信断・電源断・取り外しをどう区別するかです。フィールドの型・必須かどうか・初期値・操作の順番は、実装への提案です。
+**Source mapping**: SRC-06 BIZ-20 → FR-T12 → DD-T12. Source category: original company requirements SRC-06 + design additions. Design addition: distinguishing communication loss, power loss, and removal. Field types, required status, defaults, and action order are implementation proposals.
 
-対象はFR-T12です。主な表示patternは**UI-DETAIL**と**UI-TIMELINE**です。この画面が使うサービスの範囲は`devices.get, devices.events, alerts.get, alerts.acknowledge, devices.addResponseNote`です。
+Scope: FR-T12 / Main display pattern: **UI-DETAIL** and **UI-TIMELINE**. Service boundary: `devices.get, devices.events, alerts.get, alerts.acknowledge, devices.addResponseNote`.
 
-**初期表示と前提**: 担当しているDevice(機器)について、イベントを見る権限があることが前提です。取得の順番は、ルート/条件の検証→session scope(セッションの権限範囲)の確認→必要なQueryの取得、です。まだ取得できていない状態と、0件の状態は区別して表示します。
+**Initial view and prerequisites**: The user may view events for the assigned Device. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| deviceId | ID/必須 | 担当内 | 対象 |
-| eventType | enum/デモ制御必須 | communication_lost/power_lost/tamper/restored | 事象 |
-| evidenceSource | enum/読取 | heartbeat/power_signal/tamper_signal。eventTypeから導出（IR74） | 根拠 |
-| responseNote | 文字列/対応時必須 | 1〜1000文字 | 確認内容 |
-| occurredAt / restoredAt | 読取 | デモ時計由来 | 検知・復旧 |
+| deviceId | ID/required | Within assignment | Target |
+| eventType | enum/required for demo controls | communication_lost/power_lost/tamper/restored | Event |
+| evidenceSource | enum/read-only | heartbeat/power_signal/tamper_signal. Derived from eventType (IR74) | Evidence |
+| responseNote | string/required for response | 1–1000 characters | Confirmation details |
+| occurredAt / restoredAt | Read-only | From demo clock | Detection / recovery |
 
-**処理手順**
+**Steps**
 
-1. 通信断・電源断・取り外しの検知を、それぞれ別々に模擬的に発生させます。通知を確認します。対応メモを記入します。復旧や確認を記録します。
-2. 接続(connection)状態と、不正な取り外し(tamper)の状態は、別々に管理します。電源断と判定するのは、電源専用の信号によるデモがあるときだけです。heartbeat(定期的な生存確認)がないというだけで、電源断と決めつけません。
-3. 検知時刻・観測の根拠・対応内容・復旧時刻は、それぞれ別のイベントとして保存します。通知を確認する操作は、機器の物理的な状態を変えません。
-4. 更新対象のQueryは`devices / alerts / device events / notifications / audit`です。
+1. Simulate communication loss, power loss, and removal detection separately. Check notifications, enter response notes, and record recovery or confirmation.
+2. Manage connection and tamper states separately. Identify power loss only when the demo provides a dedicated power signal. Missing heartbeats alone do not prove power loss.
+3. Save detection time, observation evidence, response details, and recovery time as separate events. Acknowledging a notification does not change the device's physical state.
+4. Queries to update: `devices / alerts / device events / notifications / audit`.
 
-**境界条件・失敗時**: 通信が再接続しても、まだ確認していないtamper(不正な取り外し)のアラートは消えません。順序が入れ替わって届いた古いheartbeatによって、online(通信可能)の状態に戻すことはありません。
+**Boundary cases and failures**: Reconnection does not clear unacknowledged tamper alerts. An old heartbeat received out of order must not restore online state.
 
-**検証**: 追跡表にあるAT-T12の下位項目(N・E・B、および該当するSRC/R01)と、対応するSシナリオで検証します。
+**Verification**: Check the traceability entries under AT-T12 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
+0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-0.10.0: T12はDeviceEvent.alertIdsからalerts.getを取得しAlert.versionで確認する（SR23）。機器履歴は発生時scopeで絞る（SR24）。
+0.10.0: T12 fetches alerts.get using DeviceEvent.alertIds and acknowledges using Alert.version (SR23). Filter device history by scope at event time (SR24).
 
-現行0.21.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+Additional contracts for current version 0.21.0: Read IR01–106 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
-案件一覧とjobs.listのソートはIR34を適用する。URL sort未指定はstatus:asc。選択変更でcursorを破棄し、filterを保持して新snapshotの初頁から取得する。状態/重大度/期限の昇降順を選べる。
+Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

@@ -7,288 +7,288 @@ consumers: [implementation-agent, test-agent, review-agent]
 scope: frontend-demo-1A
 ---
 
-# 施工業者 詳細設計書
+# Contractor Detailed Design
 
-この文書では、施工業者向け画面の機能・画面項目・状態・エラー(例外)を決めます。基準にするのは、企業の元の要件文書と、それに対応する要件です。各FR(機能要件)を満たすために必要な処理と、受け入れ条件(テストで確認する内容)を定義します。参考として用意したモック(見本画面)は、共通のUI(画面デザイン)の見た目を検討するためだけに使います。
+This document defines contractor screen features, fields, states, and errors (exceptions). It follows the original company requirements and their linked requirements. It defines the processing and acceptance criteria (what tests check) needed for each FR (functional requirement). Reference mock screens are used only to guide the shared UI appearance.
 
-**0.21.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**Implementation baseline for 0.21.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
 
-## 入力・責務
+## Inputs and Responsibilities
 
-一次資料(いちばんもとになる資料)は[企業要件原文(SRC-06)](../00-prepare/sources/company-requirements-original.txt)です。この原文を整理し直した要件をもとに、画面・入力項目・状態・受け入れ条件を設計します。参考にする入力資料は、[役割別要件](../01-requirements/contractor.md)と[共通要件](../01-requirements/common.md)です。設計前に必ず読むべき資料は、[共通詳細設計](common.md)と[UIUX仕様書](../03-uiux/UIUXSpecification.md)です。
+The primary source is the [Original Company Requirements (SRC-06)](../00-prepare/sources/company-requirements-original.txt). Screens, inputs, states, and acceptance criteria follow the requirements reorganized from this source. Inputs are the [Role Requirements](../01-requirements/contractor.md) and [Common Requirements](../01-requirements/common.md). Read the [Common Detailed Design](common.md) and [UIUX Specification](../03-uiux/UIUXSpecification.md) before designing.
 
-この文書に書くのは、フロントエンド(画面側)の項目・表示・モックの動作についての設計です。画面上での登録・割り当て・入金・利用制限・監査(記録の確認)は、すべて共有のモック用メモリ(見本用の一時的なデータ)の中で状態が変わるだけです。サーバー側の実装やデータベースの設計を依頼するものではありません。
+This document designs frontend fields, displays, and mock behavior. Registration, assignment, payment receipt, restrictions, and audit on the screen only change state in shared mock memory (temporary example data). This does not request server implementation or database design.
 
-ルートパラメーター(URLに含まれる値)は、信頼できない入力として必ず検証します。表の中の「service名」は、共通のRepository(データを扱う共通の仕組み)が持つ処理名を指します。同じルートを持つ行は、同じ画面の中で役割分担している機能です。すべての行で、読み込み中(loading)・データなし(empty)・エラー(error)・権限なし(forbidden)・対象が見つからない(not-found)の5つの状態を用意します。再試行ボタンは、回復できるエラーのときだけ表示します。権限が足りない場合と対象が見つからない場合は、再試行ボタンを出さず、IR57に従って表示します。
+Always validate route parameters (values in URLs) as untrusted input. “Service name” in the table means an operation in the shared Repository (data service). Rows with the same route describe different functions on one screen. Every row supports loading, empty, error, forbidden, and not-found states. Show retry only for recoverable errors. For forbidden and not-found, follow IR57 and do not show retry.
 
-## 画面・処理設計
+## Screen and Process Design
 
-| 設計ID / 要件 | ルート / 主コンポーネント | 取得・操作契約 | 入力・処理・検証 | 異常系と禁止事項 |
+| Design ID / requirement | Route / main component | Read and action contracts | Input, processing, validation | Errors and prohibited actions |
 |---|---|---|---|---|
-| DD-P01 / FR-P01 | `/partner` / `PartnerOverview` | `jobs.list`、`jobs.get`、`summaries.get` | 委託先の組織ID(contractorOrgId)は、セッション(ログイン情報)から取得します。期限を過ぎている案件と、設備の緊急度は、別々に表示します | 案件が0件の場合は「空の状態」として表示します。アクセス権が失効したときは、それ以前の集計結果を消します |
-| DD-P02 / FR-P02 | `/partner/jobs/:id` / `PartnerJob` | `jobs.get`、`jobs.accept`、`jobs.decline` | 受諾できるのは、有効期間内で自社宛てのofferだけです。辞退する場合は理由(1〜1000文字、仮)を必須にします | 期限切れ・HQ(本部)による取り消し・他の人による更新があった場合は、CONFLICT(競合)として扱い、データを取り直します。辞退しても案件自体は消しません |
-| DD-P03 / FR-P03 | `/partner/schedule` / `AssignmentEditor` | `jobs.list`、`members.eligible`、`jobs.assign` | 技術者ID、作業の開始/終了時刻、必要な資格を入力します。作業期間が委託期間内に収まっているかを検証します | すでに確定している予定と時間が重なる場合は保存を拒否し、日程を調整し直します。作業開始後に担当を変更する場合は理由を必須にし、以前のアクセス権を取り消します |
-| DD-P04 / FR-P04 | `/partner/units/:id` / `PartnerUnit` | `units.get`、`alerts.list`、`telemetry.summary` | 設備IDから、有効な受託案件を照らし合わせます。現場住所・入場案内は、必要最小限だけ表示します | 受託期間が終わった後に直接URLを開いても拒否します。遠隔で操作するボタンは用意しません |
-| DD-P05 / FR-P05 | `/partner/jobs/:id/review` / `QualityReview` | `jobs.get`、`jobs.review`、`reports.get`、`attachments.getContent` | 提出済みの報告だけを対象にします。「受理」または「差し戻し」を選び、理由は差し戻しの場合に必須です。改訂前のレポートも保持します | 技術者が書いた元の報告を上書きすることはできません。作業した本人が、自分の作業の品質を承認することもできません |
-| DD-P06 / FR-P06 | `/partner/team` / `TeamCapacity` | `members.list`、`jobs.list`、`members.capacity` | 自社の範囲だけに限定した、日付や資格での絞り込みができます。資格はデモ用の架空の属性です | 所属が失効している候補者は割り当てられません。新しいユーザーの登録はHQに引き継ぎます |
-| DD-P07 / FR-P07 | `/partner/history` / `PartnerHistory` | `jobs.events`、`jobs.addNote`、`notifications.preview`、`notifications.recipients` | jobId(案件番号)とテンプレートを選びます。メモは1〜2000文字(仮)、宛先は権限のある相手の中から選びます | 自由入力での外部の宛先は使えません。お客様の請求に関する機密情報を、テンプレートに含めてはいけません |
-| DD-P08 / FR-P08 | `/partner/*` / `PartnerAccessGuard` | `jobs.get`、`session.get` | 各操作の直前に、受託しているかどうかと期間を毎回検証します。期限の判定はデモ用の時計を基準にします | 期限を過ぎた瞬間に、画面を表示したままでも次の操作は拒否し、キャッシュ(一時保存データ)を破棄します |
+| DD-P01 / FR-P01 | `/partner` / `PartnerOverview` | `jobs.list`, `jobs.get`, `summaries.get` | Get contractorOrgId from the session. Show overdue jobs separately from unit urgency | Show an empty state for zero jobs. Clear previous summaries when access expires |
+| DD-P02 / FR-P02 | `/partner/jobs/:id` / `PartnerJob` | `jobs.get`, `jobs.accept`, `jobs.decline` | Accept only an offer addressed to the user's company within its valid period. Declining requires a reason (1–1000 characters, provisional) | Treat expiry, HQ cancellation, or another person's update as CONFLICT and refetch. Declining does not delete the job |
+| DD-P03 / FR-P03 | `/partner/schedule` / `AssignmentEditor` | `jobs.list`, `members.eligible`, `jobs.assign` | Enter technician ID, work start/end times, and required qualifications. Validate that the work period fits within the delegation period | Reject saving if a confirmed schedule overlaps, and reschedule. Reassignment after work starts requires a reason and revokes previous access |
+| DD-P04 / FR-P04 | `/partner/units/:id` / `PartnerUnit` | `units.get`, `alerts.list`, `telemetry.summary` | Match the unit ID to a valid accepted job. Show only the necessary site address and entry instructions | Reject direct URLs after the delegation period ends. Provide no remote-control buttons |
+| DD-P05 / FR-P05 | `/partner/jobs/:id/review` / `QualityReview` | `jobs.get`, `jobs.review`, `reports.get`, `attachments.getContent` | Review only submitted reports. Select “Accept” or “Return”; a return requires a reason. Keep earlier report revisions | Do not overwrite the technician's original report or allow people to approve their own work |
+| DD-P06 / FR-P06 | `/partner/team` / `TeamCapacity` | `members.list`, `jobs.list`, `members.capacity` | Filter by date or qualification within the user's company. Qualifications are fictional demo attributes | Do not assign candidates with expired memberships. Refer new user registration to HQ |
+| DD-P07 / FR-P07 | `/partner/history` / `PartnerHistory` | `jobs.events`, `jobs.addNote`, `notifications.preview`, `notifications.recipients` | Select jobId and a template. Notes are 1–2000 characters (provisional); select only authorized recipients | Do not allow free-entry external recipients or include confidential customer billing data in templates |
+| DD-P08 / FR-P08 | `/partner/*` / `PartnerAccessGuard` | `jobs.get`, `session.get` | Recheck accepted delegation and its period immediately before every action. Use the demo clock for expiry | Once expired, reject the next action and discard cached data even if the screen remains open |
 
-## 実装の共通手順
+## Shared Implementation Steps
 
-1. セッション(ログイン情報)と、見てよい範囲(スコープ)を確認します。ID・URLの絞り込み条件は、スキーマ(データの形式ルール)で検証します。
-2. Query(データ取得の仕組み)を通じてモックサービスを呼び出し、画面用のデータとして受け取ります。
-3. フォームにはReact Hook Formと共通のスキーマを使います。設備の性能や期間などの検証も、このスキーマで行います。
-4. 変更(mutation)を実行する直前に、対象データのバージョン・権限・現在の状態を照合します。影響が大きい操作は、対象と理由を確認画面で表示します。
-5. Repositoryを使って共有のデモ用データを変更し、相関ID(処理を追跡するための番号)付きのイベントを発行します。関係するQueryを無効化して、最新データを取り直します。
-6. 応答を待っている間は、待っていることが分かる表示を続けます。成功・拒否・失敗はそれぞれ別に表示します。フォームの送信に失敗した場合は、入力した内容を消さずに残します。
+1. Check the session and permitted scope. Validate IDs and URL filters against schemas (data format rules).
+2. Call mock services through Queries and receive display data.
+3. Use React Hook Form and shared schemas for forms. The schemas also validate unit capabilities and periods.
+4. Immediately before a mutation, check the target version, permissions, and current state. For major actions, show the target and reason in a confirmation view.
+5. Change shared demo data through the Repository and emit an event with a correlation ID (tracking ID). Invalidate related Queries and fetch fresh data.
+6. Keep a pending indicator visible while awaiting a response. Show success, denial, and failure separately. Keep form inputs when submission fails.
 
-## テストへの引き渡し
+## Handoff to Testing
 
-各設計ID(DD-P番号)について、同じ番号のAT-P(受け入れ条件)、この文書の表にある異常系、権限のない直接呼び出しをテストで確認します。テストデータと、複数の役割にまたがるシナリオは、[検証計画](../04-agentic-sdlc/verification.md)を正式な基準とします。この設計書に書いた文字数などの例を変更する場合は、スキーマ・文書・境界値のテストを同時に更新します。
+For each design ID (DD-P number), test the matching AT-P acceptance criteria, error cases in the table, and unauthorized direct calls. The [Verification Plan](../04-agentic-sdlc/verification.md) is the source of truth for test data and cross-role scenarios. If example limits such as character counts change, update the schema, document, and boundary tests together.
 
-## 機能別詳細仕様(0.6.0)
+## Detailed Feature Specifications (0.6.0)
 
-入力フォームの値はRHF(React Hook Form)で保持し、スキーマで検証します。読み取り専用の画面には、フォームの検証を求めません。監査記録・通知・共通のエラー表示は、入出力契約DDC-03/09に従います。読み取り専用の値は、Queryの単一の取得元(source)から表示します。共通の型・ページング・時間・エラーの扱いは、[実装契約](implementation-contracts.md)を正式な基準とし、以下ではそれぞれの画面の個別条件を追加で示します。見た目に関する値は、[UIUX](../03-uiux/UIUXSpecification.md) UX-04/08にあるtoken(色やサイズなどの基本値)とpattern(定型パターン)を使います。
+Keep form values in RHF (React Hook Form) and validate them with schemas. Read-only screens do not need form validation. Follow input/output contract DDC-03/09 for audit records, notifications, and shared error displays. Show read-only values from a single Query source. The [Implementation Contracts](implementation-contracts.md) define shared types, paging, time, and error handling; the following adds screen-specific conditions. Use the tokens (base colors, sizes, etc.) and patterns in [UIUX](../03-uiux/UIUXSpecification.md) UX-04/08 for appearance.
 
-### DD-P01 詳細
+### DD-P01 Details
 
-**一次資料との対応**: SRC-06 BIZ-04, BIZ-12 → FR-P01 → DD-P01。出所区分: 制作方針 SRC-02+設計での補足。ここで新しく具体化した設計上の補足: 受託案件のダッシュボード。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-04, BIZ-12 → FR-P01 → DD-P01. Source category: development policy SRC-02 + design additions. Design additions defined here: dashboard for delegated jobs. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-P01 / 主な表示パターン: **UI-OVERVIEW**。この画面が使うサービス境界は`jobs.list, jobs.get, summaries.get`です。
+Scope: FR-P01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.list, jobs.get, summaries.get`.
 
-**初期表示と前提**: 有効な施工業者としてのMembership(組織への所属情報)があることを前提とします。HQ(本部)からのofferは、受諾する前でも案件の概要を閲覧できます。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: An active contractor Membership is required. HQ offer summaries can be viewed before acceptance. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| status | enum/任意 | offered/accepted/assigned/in_progress/on_hold/submitted/rework_requested/completed/all（allはstatus省略、IR90） | 絞込 |
-| from / to | 日付/任意 | 最大366日。YYYY-MM-DDの表示timezone暦日をUTC Instantへ変換（IR74） | 日程範囲 |
-| contractorOrgId | セッション由来 | 入力不可 | 自社境界 |
-| summary | 読取 | offerCount/activeCount/reviewCount/overdueCount/asOf | 概要 |
+| status | enum/optional | offered/accepted/assigned/in_progress/on_hold/submitted/rework_requested/completed/all (all means omit status, IR90) | Filter |
+| from / to | date/optional | Maximum 366 days. Convert YYYY-MM-DD calendar dates in the display timezone to UTC Instants (IR74) | Schedule range |
+| contractorOrgId | From session | Cannot be entered | Company boundary |
+| summary | Read-only | offerCount/activeCount/reviewCount/overdueCount/asOf | Overview |
 
-**処理手順**
+**Steps**
 
-1. 自社の「受諾待ち」「予定」「進行中」「品質確認待ち」の案件数を集計します。状態を選んで案件一覧を開き、対象案件の担当画面へ進みます。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 受諾する前は、案件の種類・エアコンに紐づく設置物件の登録住所・必要な資格・日程の候補までという、最小限の情報だけを表示します。
-   - 詳しい設備の値や入場案内は、受諾した後で、かつ委託期間内のときだけ見られます。
-3. 画面を見るだけでは、受諾したことにはなりません。KPI(件数などの指標)と一覧に表示する対象は、同じ検索条件で揃えます。
-4. 更新の対象になるQuery: `jobs / partner summary(イベントが起きたとき)`。
+1. Count the company's jobs awaiting acceptance, scheduled, in progress, and awaiting quality review. Select a state to open its job list, then open the target job's management screen.
+2. Apply the following business rules to both reads and actions.
+   - Before acceptance, show only the job type, registered address of the property where the AC unit is installed, required qualifications, and possible dates.
+   - Detailed unit values and entry instructions are visible only after acceptance and within the delegation period.
+3. Viewing a screen does not accept an offer. Use the same search conditions for KPIs (counts and other indicators) and list entries.
+4. Queries to update: `jobs / partner summary (on events)`.
 
-**境界条件・失敗時**: 他社宛てのofferは件数に含めません。委託期間が終わって設備の閲覧が閉じられても、自社が受諾・辞退した記録の最小限の履歴は確認できます。
+**Boundary cases and failures**: Exclude offers addressed to other companies from counts. After delegation ends and unit access closes, keep minimum history of the company's acceptance and decline records visible.
 
-**検証**: 追跡表のAT-P01配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-P01 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-P02 詳細
+### DD-P02 Details
 
-**一次資料との対応**: SRC-06 BIZ-12 → FR-P02 → DD-P02。出所区分: 制作方針 SRC-02+設計での補足。ここで新しく具体化した設計上の補足: 受諾・辞退の手順。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-12 → FR-P02 → DD-P02. Source category: development policy SRC-02 + design additions. Design additions defined here: acceptance and decline steps. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-P02 / 主な表示パターン: **UI-DETAIL**。この画面が使うサービス境界は`jobs.get, jobs.accept, jobs.decline`です。
+Scope: FR-P02 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get, jobs.accept, jobs.decline`.
 
-**初期表示と前提**: 自社宛てにoffered(提示)されていて、offerExpiresAt(有効期限)より前で、HQによってまだ取り消されていないことを前提とします。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: The offer is addressed to the user's company, is before offerExpiresAt, and has not been cancelled by HQ. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| jobId / offerId | ID/必須 | 最新の自社宛て offer | 判断対象 |
-| decision | enum/必須 | accept/decline | 判断 |
-| reason | 文字列/辞退時必須 | 1〜1000文字 | 辞退理由 |
-| expectedVersion | 整数/必須 | 表示した案件版 | 競合検出 |
-| termsVersion | 読取・送信時必須 | 委託条件版 | 確認根拠 |
+| jobId / offerId | ID/required | Latest offer addressed to the user's company | Decision target |
+| decision | enum/required | accept/decline | Decision |
+| reason | string/required for decline | 1–1000 characters | Decline reason |
+| expectedVersion | integer/required | Displayed job version | Conflict detection |
+| termsVersion | Read-only/required on submission | Delegation terms version | Basis for confirmation |
 
-**処理手順**
+**Steps**
 
-1. 案件の最小限の情報と委託条件を確認します。受諾するか、理由を添えて辞退するかを選びます。HQと自社、両方の画面の状態表示を更新します。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 受諾することと、技術者を割り当てることや確定した予約を作ることは、別のことです。
-   - 辞退した場合はrequested(依頼中)の状態に戻し、辞退した人・理由・offerIdを記録に残します。
-   - もう一度委託する場合は、新しいofferIdを発行します。
-3. 受諾するとaccepted(受諾済み)になり、委託期間内に限って、必要な設備の閲覧権限が開きます。辞退した場合は、詳しい閲覧権限は付与しません。
-4. 更新の対象になるQuery: `jobs / offers / partner summary / admin summary / notifications / audit`。
+1. Check minimum job information and delegation terms. Choose acceptance or decline with a reason. Update state displays for both HQ and the contractor.
+2. Apply the following business rules to both reads and actions.
+   - Acceptance is separate from assigning a technician or creating a confirmed booking.
+   - On decline, return to requested and record who declined, the reason, and offerId.
+   - Issue a new offerId when offering the job again.
+3. Acceptance sets accepted and opens necessary unit read access only within the delegation period. Declining grants no detailed read access.
+4. Queries to update: `jobs / offers / partner summary / admin summary / notifications / audit`.
 
-**境界条件・失敗時**: 期限とちょうど同じ時刻に操作した場合は、辞退も受諾もできず、あらためてデータを取り直します。受諾しようとした直前にHQが取り消した場合はCONFLICT(競合)として扱い、自動で上書きはしません。未応答のまま期限が来た依頼は、案件がrequestedへ戻ります(IR48)。期限後の受諾・辞退はCONFLICT(errors.offer_expired)で、案件の個別取得はNOT_FOUNDです(IR86)。
+**Boundary cases and failures**: At the exact expiry time, neither acceptance nor decline is allowed; refetch data. If HQ cancels immediately before acceptance, return CONFLICT and do not overwrite automatically. An unanswered expired offer returns the job to requested (IR48). Acceptance or decline after expiry returns CONFLICT(errors.offer_expired); fetching the individual job returns NOT_FOUND (IR86).
 
-**検証**: 追跡表のAT-P02配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-P02 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-P03 詳細
+### DD-P03 Details
 
-**一次資料との対応**: SRC-06 BIZ-12 → FR-P03 → DD-P03。出所区分: 制作方針 SRC-02+設計での補足。ここで新しく具体化した設計上の補足: 自社担当者の割り当てと資格の確認。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-12 → FR-P03 → DD-P03. Source category: development policy SRC-02 + design additions. Design additions defined here: assigning company staff and checking qualifications. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-P03 / 主な表示パターン: **UI-LIST / UI-FORM**。この画面が使うサービス境界は`jobs.list, members.eligible, jobs.assign`です。
+Scope: FR-P03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `jobs.list, members.eligible, jobs.assign`.
 
-**初期表示と前提**: すでに受諾した案件で、自社の割り当てを管理する権限があることを前提とします。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: The job is accepted, and the user has permission to manage assignments for their company. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| jobId | ID/必須 | acceptedまたは再割当可能状態 | 対象 |
-| technicianMembershipId | ID/必須 | 自社かつ有効・資格一致 | 担当 |
-| startAt / endAt | ISO日時/必須 | start<end、委託期間内、確定重複なし | 作業枠 |
-| reason | 文字列/再割当時必須 | 1〜1000文字 | 変更理由 |
-| expectedVersion | 整数/必須 | 最新取得版 | 競合 |
+| jobId | ID/required | accepted or a state that allows reassignment | Target |
+| technicianMembershipId | ID/required | Same company, active, matching qualifications | Assignee |
+| startAt / endAt | ISO datetime/required | start<end, within delegation period, no confirmed overlap | Work slot |
+| reason | string/required on reassignment | 1–1000 characters | Change reason |
+| expectedVersion | integer/required | Latest fetched version | Conflict |
 
-**処理手順**
+**Steps**
 
-1. 希望する日時と委託期間を確認します。自社の有効な技術者の中から、資格と空き時間が合う人を検索します。作業の開始・終了時刻を指定し、割り当てを確認して、日程と担当者を共有します。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 候補を検索した時点では権限の判定を終わらせず、保存する直前にあらためて所属・資格・期間を確認します。
-   - 予定が重なっている場合は警告を出します。同じ時間帯にすでに確定している予定と重なる場合は、このバージョン(1A)では保存を拒否します。
-3. 初めて割り当てるときは、Assignment(割り当て記録)を作成し、scheduledSlot(予定枠)を確定し、Jobの状態をassigned(割り当て済み)にします。担当を変更する場合は、元のassigned/in_progress(進行中)という状態は維持したまま、以前の割り当てを無効にし、Job.scheduledSlotとassignmentIdを新しい割り当てへ更新します(IR89)。元の報告の作成者はそのまま維持し、変更した理由を保存します。
-4. 更新の対象になるQuery: `jobs / assignments / eligible members / schedule / notifications / audit`。
+1. Check the requested dates and delegation period. Search active company technicians for matching qualifications and availability. Set work start/end times, confirm the assignment, and share the schedule and assignee.
+2. Apply the following business rules to both reads and actions.
+   - Candidate search does not finalize authorization. Recheck membership, qualifications, and period immediately before saving.
+   - Warn about overlapping schedules. In phase 1A, reject saving if a confirmed schedule overlaps the same time slot.
+3. For the first assignment, create an Assignment, confirm scheduledSlot, and set the Job to assigned. On reassignment, keep the original assigned/in_progress state, invalidate the old assignment, and update Job.scheduledSlot and assignmentId to the new assignment (IR89). Keep the original report author and save the change reason.
+4. Queries to update: `jobs / assignments / eligible members / schedule / notifications / audit`.
 
-**境界条件・失敗時**: 他社の技術者、資格を持たない人、委託期間外の割り当ては拒否します。作業中の担当変更は、理由がなければ保存できません。以前の技術者は、その時点で変更の操作ができなくなります。予定枠の終了を過ぎてもassigned/in_progressの案件には「作業窓終了・再割当が必要」を表示し、jobs.assignで延長します(IR89)。
+**Boundary cases and failures**: Reject technicians from other companies, unqualified people, and assignments outside the delegation period. Reassignment during work requires a reason. The previous technician immediately loses write access. For jobs still assigned/in_progress after the scheduled slot ends, show “Work window ended; reassignment required” and extend through jobs.assign (IR89).
 
-**検証**: 追跡表のAT-P03配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-P03 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-P04 詳細
+### DD-P04 Details
 
-**一次資料との対応**: SRC-06 BIZ-12 → FR-P04 → DD-P04。出所区分: 制作方針 SRC-02+設計での補足。ここで新しく具体化した設計上の補足: 対象設備と異常の根拠を、範囲を限定して閲覧させる方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-12 → FR-P04 → DD-P04. Source category: development policy SRC-02 + design additions. Design additions defined here: limited access to target units and alert evidence. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-P04 / 主な表示パターン: **UI-DETAIL**。この画面が使うサービス境界は`units.get, alerts.list, telemetry.summary`です。
+Scope: FR-P04 / Main display pattern: **UI-DETAIL**. Service boundary: `units.get, alerts.list, telemetry.summary`.
 
-**初期表示と前提**: すでに受諾していて有効な委託の中に、対象の設備が含まれていることを前提とします。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: The unit belongs to an accepted, active delegation. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| unitId | route ID/必須 | 有効受託案件から解決 | 設備 |
-| jobId | query ID/必須 | 該当委託を識別 | 閲覧根拠 |
-| unit / capability | 読取 | 型番・保守範囲 | 台帳 |
-| telemetry / evidence | 読取 | 時刻・品質付き | 異常根拠 |
+| unitId | route ID/required | Resolve from an active accepted job | Unit |
+| jobId | query ID/required | Identify the relevant delegation | Access basis |
+| unit / capability | Read-only | Model and maintenance scope | Register |
+| telemetry / evidence | Read-only | With timestamps and quality | Alert evidence |
 
-**処理手順**
+**Steps**
 
-1. 案件から設備の画面を開きます。場所・型番・保守範囲・通信状態・異常の根拠を確認します。確認が終わったら案件の画面へ戻ります。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 診断に必要な値だけを、読み取り専用で表示します。
-   - 請求・支払い・他の契約・すべてのお客様の履歴は取得しません。
-   - シリアル番号や場所の情報は、必要な範囲だけに限定します。
-3. この画面では業務データは更新しません。委託が終わった後は、お客様の設備のリアルタイムの値は表示せず、自社の案件履歴の最小限の情報だけを表示します。
-4. 更新の対象になるQuery: `なし(読取)`。
+1. Open the unit screen from the job. Check location, model, maintenance scope, connection state, and alert evidence. Return to the job screen afterward.
+2. Apply the following business rules to both reads and actions.
+   - Show only values needed for diagnosis, as read-only.
+   - Do not fetch invoices, payments, other contracts, or the customer's full history.
+   - Limit serial numbers and location information to what is needed.
+3. This screen does not update business data. After delegation ends, show only minimum company job history, without the customer's live unit values.
+4. Queries to update: `none (read-only)`.
 
-**境界条件・失敗時**: 画面を開いたまま期限を過ぎても、次の要求は拒否し、キャッシュを破棄します。監視データを見られることを、「操作の権限がある」とは扱いません。
+**Boundary cases and failures**: If the period expires while the screen remains open, reject the next request and discard the cache. Permission to view monitoring data does not grant control permission.
 
-**検証**: 追跡表のAT-P04配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-P04 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-P05 詳細
+### DD-P05 Details
 
-**一次資料との対応**: SRC-06 BIZ-12 → FR-P05 → DD-P05。出所区分: 制作方針 SRC-02+設計での補足。ここで新しく具体化した設計上の補足: 報告の品質確認と差し戻しの方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-12 → FR-P05 → DD-P05. Source category: development policy SRC-02 + design additions. Design additions defined here: report quality review and return for rework. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-P05 / 主な表示パターン: **UI-DETAIL / UI-FORM**。この画面が使うサービス境界は`jobs.get, jobs.review, reports.get, attachments.getContent`です。
+Scope: FR-P05 / Main display pattern: **UI-DETAIL / UI-FORM**. Service boundary: `jobs.get, jobs.review, reports.get, attachments.getContent`.
 
-**初期表示と前提**: submitted(提出済み)の状態にある自社の委託案件であることを前提とします。レビュー担当者は、報告を書いた本人とは別の人にします。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: The company's delegated job is submitted. The reviewer must differ from the report author. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| jobId / reportVersion | ID・整数/必須 | submittedの現在版 | 対象 |
-| decision | enum/必須 | accept/return | 品質判断 |
-| reason | 文字列/差戻し時必須 | 1〜1000文字(IR87) | 指摘 |
-| reviewerId | セッション由来 | IR31のreviewAvailabilityを表示し、Repositoryが対象版寄与者のuserIdと照合 | 責任者 |
+| jobId / reportVersion | ID and integer/required | Current submitted version | Target |
+| decision | enum/required | accept/return | Quality decision |
+| reason | string/required on return | 1–1000 characters (IR87) | Findings |
+| reviewerId | From session | Display reviewAvailability under IR31; Repository checks userId against contributors to the target version | Responsible reviewer |
 
-**処理手順**
+**Steps**
 
-1. 提出された報告の点検内容・写真・測定値・作業内容・次回の対応を確認します。受理するか、理由を添えて差し戻すかを記入します。結果を、技術者・お客様・HQへ共有します。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 受理できるのは、必要な点検の記録と根拠がそろっている場合だけです。
-   - 「未点検」や「対象外」とされている項目の理由が妥当かどうかを確認します。
-   - レビュー担当者は、技術者が書いた元の記録を編集しません。
-3. 受理した場合はcompleted(完了)、差し戻した場合はrework_requested(再作業依頼)にします。レビューの履歴を、対象の報告のバージョンに結び付けます。完了にしても、Alert(異常)は自動では解消しません。
-4. 更新の対象になるQuery: `jobs / reports / job events / notifications / audit`。
+1. Review the submitted inspections, photos, measurements, work details, and next actions. Enter acceptance or return with a reason. Share the result with the technician, customer, and HQ.
+2. Apply the following business rules to both reads and actions.
+   - Accept only when required inspection records and evidence are complete.
+   - Check whether reasons for “Not inspected” or “Not applicable” items are valid.
+   - Reviewers do not edit the technician's original records.
+3. Set completed on acceptance and rework_requested on return. Link review history to the target report version. Completion does not automatically resolve Alerts.
+4. Queries to update: `jobs / reports / job events / notifications / audit`.
 
-**境界条件・失敗時**: 自分で自分の報告を承認すること、古いreportVersion(報告のバージョン)への操作、空の差し戻し理由は、いずれも拒否します。差し戻した後に古い「受理」の操作が届いても、completed(完了)にはしません。
+**Boundary cases and failures**: Reject self-approval, actions on old reportVersion values, and empty return reasons. A late old acceptance action after a return must not set completed.
 
-**検証**: 追跡表のAT-P05配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-P05 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-P06 詳細
+### DD-P06 Details
 
-**一次資料との対応**: SRC-06 BIZ-12 → FR-P06 → DD-P06。出所区分: 制作方針 SRC-02+設計での補足。ここで新しく具体化した設計上の補足: 自社の作業者・資格・稼働状況の閲覧方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-12 → FR-P06 → DD-P06. Source category: development policy SRC-02 + design additions. Design additions defined here: viewing company workers, qualifications, and capacity. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-P06 / 主な表示パターン: **UI-LIST**。この画面が使うサービス境界は`members.list, jobs.list, members.capacity`です。
+Scope: FR-P06 / Main display pattern: **UI-LIST**. Service boundary: `members.list, jobs.list, members.capacity`.
 
-**初期表示と前提**: 自社の作業者一覧を読む権限があることを前提とします。新しいユーザーを作る権限は含みません。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: The user has permission to read the company worker list. This does not include creating users. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| date | 日付/必須 | 初期デモ当日 | 予定対象日 |
-| qualification | 文字列/任意 | 資格台帳コード。一覧・候補・稼働は自社のrole=technicianだけ（IR94） | 資格絞込 |
-| activeOnly | boolean/必須 | 初期true | 有効所属 |
-| members / slots | 読取 | 自社の必要な氏名・資格・期間・割当 | 予定 |
+| date | date/required | Default: current demo date | Schedule date |
+| qualification | string/optional | Qualification register code. Lists, candidates, and capacity include only role=technician in the user's company (IR94) | Qualification filter |
+| activeOnly | boolean/required | Default: true | Active membership |
+| members / slots | Read-only | Necessary company names, qualifications, periods, and assignments | Schedule |
 
-**処理手順**
+**Steps**
 
-1. 日付・資格・所属が有効かどうかを選びます。自社の技術者の割り当て状況と空き枠を確認します。対象案件の割り当て画面へ進みます。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 稼働率は、「割り当てられた時間」を「その期間に設定されている作業可能時間」で割って計算します。例えば作業可能時間が8時間の設定で4時間割り当てられていれば50%です。作業可能時間(分母)が設定されていない場合は、割合そのものを表示しません。
-   - 個人の位置情報の追跡や、他社の予定は表示しません。
-3. この画面は閲覧だけで、所属や資格を更新することはありません。所属を変更したい場合は、HQへ調整を依頼します。
-4. 更新の対象になるQuery: `members / assignments(閲覧)`。
+1. Select date, qualification, and membership validity. Check company technicians' assignments and free slots. Open the target job's assignment screen.
+2. Apply the following business rules to both reads and actions.
+   - Utilization is assigned time divided by configured available work time for the period. For example, 4 assigned hours out of 8 available hours is 50%. If available time (the denominator) is not configured, do not show a percentage.
+   - Do not show personal location tracking or other companies' schedules.
+3. This screen is read-only and does not update memberships or qualifications. Ask HQ to arrange membership changes.
+4. Queries to update: `members / assignments (read-only)`.
 
-**境界条件・失敗時**: URLに含まれる会社IDを書き換えても、他社の名簿は取得できません。所属が失効した技術者は、割り当ての候補として選べません。
+**Boundary cases and failures**: Editing the company ID in the URL must not reveal another company's roster. Technicians with expired memberships cannot be selected for assignment.
 
-**検証**: 追跡表のAT-P06配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-P06 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-P07 詳細
+### DD-P07 Details
 
-**一次資料との対応**: SRC-06 BIZ-12, BIZ-20 → FR-P07 → DD-P07。出所区分: 制作方針 SRC-02+設計での補足。ここで新しく具体化した設計上の補足: 案件についての連絡と、異常情報の共有方法。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-12, BIZ-20 → FR-P07 → DD-P07. Source category: development policy SRC-02 + design additions. Design additions defined here: job communication and sharing alert information. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-P07 / 主な表示パターン: **UI-TIMELINE / UI-FORM**。この画面が使うサービス境界は`jobs.events, jobs.addNote, notifications.preview, notifications.recipients`です。
+Scope: FR-P07 / Main display pattern: **UI-TIMELINE / UI-FORM**. Service boundary: `jobs.events, jobs.addNote, notifications.preview, notifications.recipients`.
 
-**初期表示と前提**: 自社の案件について、連絡と履歴を閲覧する権限があることを前提とします。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: The user may view communication and history for company jobs. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| jobId | ID/必須 | 自社案件 | 対象 |
-| templateKey | enum/必須 | schedule_change/report_return/completion | 文面 |
-| message | 文字列/必須 | 1〜2000文字 | 連絡内容 |
-| visibility | enum/必須 | internal/customer、初期internal | 公開範囲 |
-| recipientRole | enum/必須 | hq/assigned_technician/customer_contact。notifications.recipientsのroleへhq→admin、assigned_technician→technician、customer_contact→clientとして渡す(IR90) | 宛先 |
-| channel | enum/必須 | inApp/email/whatsapp(deliveryState=preview) | 連絡手段 |
+| jobId | ID/required | Company job | Target |
+| templateKey | enum/required | schedule_change/report_return/completion | Message template |
+| message | string/required | 1–2000 characters | Message content |
+| visibility | enum/required | internal/customer; default: internal | Visibility |
+| recipientRole | enum/required | hq/assigned_technician/customer_contact. Map to notifications.recipients role as hq→admin, assigned_technician→technician, customer_contact→client (IR90) | Recipient |
+| channel | enum/required | inApp/email/whatsapp(deliveryState=preview) | Contact channel |
 
-**処理手順**
+**Steps**
 
-1. 案件の履歴を開きます。日程調整または品質についての連絡テンプレートを選びます。メモの内容と宛先の役割を確認し、アプリ内の記録と、外部送信のプレビューを作成します。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 実際の送信は行いません。
-   - 宛先は、その案件のHQ・担当技術者・お客様窓口のいずれかに限ります。
-   - 社内向けの品質メモは、初期状態ではお客様には非公開にします。
-3. Note(メモ)は、作成者と公開範囲を付けて保存します。プレビューを操作しただけでは、deliveryState(送信状態)をsent(送信済み)には変えません。
-4. 更新の対象になるQuery: `job notes / job events / notification previews / audit`。
+1. Open job history. Select a schedule or quality communication template. Check the note and recipient role, then create an in-app record and an external-send preview.
+2. Apply the following business rules to both reads and actions.
+   - Do not send actual messages.
+   - Recipients are limited to the job's HQ, assigned technician, or customer contact.
+   - Internal quality notes are hidden from customers by default.
+3. Save the Note with its author and visibility. Preview actions alone must not change deliveryState to sent.
+4. Queries to update: `job notes / job events / notification previews / audit`.
 
-**境界条件・失敗時**: 自由入力のメール宛先、別の案件の宛先、お客様の請求情報を転記することは、いずれも拒否します。保存に失敗しても、書いたメモの内容は消さずに残します。
+**Boundary cases and failures**: Reject free-entry email addresses, recipients from other jobs, and copied customer billing data. Keep written notes if saving fails.
 
-**検証**: 追跡表のAT-P07配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-P07 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-### DD-P08 詳細
+### DD-P08 Details
 
-**一次資料との対応**: SRC-06 BIZ-12 → FR-P08 → DD-P08。出所区分: 制作方針 SRC-02+設計での補足。ここで新しく具体化した設計上の補足: 委託先と担当期間にもとづくアクセス制限。項目の型・必須かどうか・初期値・操作の順番は、実装時の提案です。
+**Source mapping**: SRC-06 BIZ-12 → FR-P08 → DD-P08. Source category: development policy SRC-02 + design additions. Design additions defined here: access limits based on contractor and assignment period. Field types, required status, defaults, and action order are implementation proposals.
 
-対象: FR-P08 / 主な表示パターン: **すべてのパターンで使うGuard(見張り役)**。この画面が使うサービス境界は`jobs.get, session.get`です。
+Scope: FR-P08 / Main display pattern: **Guard shared by all patterns**. Service boundary: `jobs.get, session.get`.
 
-**初期表示と前提**: 施工業者としてアクセスする、すべてのルートとRepository(データを扱う共通の仕組み)の操作が対象です。 表示の順番は、ルート/条件の検証 → セッションのスコープ確認 → 必要なQueryの取得、です。「まだ取得できていない」状態と「0件だった」状態を区別します。
+**Initial view and prerequisites**: Applies to every route and Repository operation accessed as a contractor. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
-| フィールド | 型・必須性 | 初期値・制約 | 用途 |
+| Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| membershipId / scopeVersion | セッション由来/必須 | 有効role=contractor | 主体 |
-| jobId / tenantId | 入力・モック内照合 | 組織/委託が一致 | 対象 |
-| validFrom / validUntil | 読取 | from<=now<until | 期間 |
-| action | operation enum/必須 | roleのallowlist | 操作 |
+| membershipId / scopeVersion | From session/required | Active role=contractor | Actor |
+| jobId / tenantId | Input and mock lookup | Organization/delegation match | Target |
+| validFrom / validUntil | Read-only | from<=now<until | Period |
+| action | operation enum/required | Role allowlist | Action |
 
-**処理手順**
+**Steps**
 
-1. Membership(所属情報)を確認します。自社のoffer・委託・期間を確認し、必要最小限のデータだけを返します。操作する直前には、あらためて確認をやり直します。
-2. 読み取り・操作それぞれについて、次の業務ルールを適用します。
-   - 設備のリアルタイムの値は、受諾済みでかつ委託期間内のときだけ見られます。
-   - 委託期間が失効した後の履歴は、自社が受諾・辞退・作業を行った最小限の記録だけです。過去にアクセスできたことを理由に、お客様のデータを全件返すことはしません。
-3. アクセスを拒否した場合は、業務データは何も変更しません。監査記録には、秘密の情報を含めずに、拒否した理由のコードだけを記録します。セッションを切り替えたときは、以前のQueryのデータを破棄します。
-4. 更新の対象になるQuery: `scopeを変更したときに、以前のキャッシュをすべて`。
+1. Check Membership. Check the company's offer, delegation, and period, and return only the minimum needed data. Recheck immediately before an action.
+2. Apply the following business rules to both reads and actions.
+   - Live unit values are visible only after acceptance and within the delegation period.
+   - After delegation expires, history contains only minimum records of the company's acceptance, decline, and work. Past access does not justify returning all customer data.
+3. Access denial changes no business data. Audit records contain only a denial reason code, with no confidential information. Discard previous Query data when switching sessions.
+4. Queries to update: `all previous caches on scope change`.
 
-**境界条件・失敗時**: 他社のjobId、期限とちょうど同じ時刻、まだ受諾していない設備、請求内容の変更、利用制限の操作は、それぞれ拒否し、禁止されているデータを応答に含めません。
+**Boundary cases and failures**: Reject other companies' jobIds, access at the exact expiry time, units not yet accepted, billing changes, and restriction actions. Never include forbidden data in responses.
 
-**検証**: 追跡表のAT-P08配下(N/E/B・該当SRC/R01)と該当するSシナリオで確認します。
+**Verification**: Check the traceability entries under AT-P08 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
-0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
+0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-現行0.21.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+Additional contracts for current version 0.21.0: Read IR01–106 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
-0.14.0: IR25に従い、受諾前住所は設備の設置物件から取得し、期限後の報告表示は報告有無・受理状態だけを凍結する。
+0.14.0: Under IR25, get the pre-acceptance address from the unit's installation property. After expiry, freeze only report presence and acceptance state for report display.
 
-0.15.0: DD-P01の設備重大度はIR30、DD-P05の完了日時はIR29、共同編集版の自己承認禁止はIR31を適用する。
+0.15.0: Apply IR30 to DD-P01 unit severity, IR29 to DD-P05 completion time, and IR31 to the ban on self-approval of jointly edited versions.
 
-案件一覧とjobs.listのソートはIR34を適用する。URL sort未指定はstatus:asc。選択変更でcursorを破棄し、filterを保持して新snapshotの初頁から取得する。状態/重大度/期限の昇降順を選べる。
+Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

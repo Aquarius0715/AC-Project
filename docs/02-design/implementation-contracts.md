@@ -7,36 +7,36 @@ consumers: [implementation-agent, test-agent, review-agent]
 scope: frontend-demo-1A
 ---
 
-# フロントエンド入出力契約・モック動作
+# Frontend Input and Output Contracts and Mock Behavior
 
-この文書は、[共通詳細設計](common.md)の内容を、実装できる形の入力と出力に具体化したものです。各役割の詳細設計にあるフィールド表・業務規則と合わせて実装します。ここで決める値は、1A(このフェーズ)のデモ仕様です(DEC-09)。対象は、ブラウザの中だけで動く画面モデル・フォーム・モックサービス(模擬のサービス)です。データベース、サーバー側の処理、APIのendpoint、認証の方式は、この文書では定めません。ここで使う「保存」「一意」「監査」という言葉は、架空のデータをブラウザの中だけで扱う動作を指します。本番環境でデータが残ることや、安全であることを保証するものではありません。
+This document turns the [Common Detailed Design](common.md) into implementable inputs and outputs. Implement it together with each role's field tables and business rules. Values here define the phase 1A demo (DEC-09). Scope is browser-only screen models, forms, and mock services. This document does not define databases, server processing, API endpoints, or authentication. “Save,” “unique,” and “audit” refer to handling fictional data only in the browser, not guarantees of production persistence or security.
 
-**0.21.0の実装基準**: [確定契約](deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**Implementation baseline for 0.21.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
 
-## DDC-01 フロントエンド共通型と表示整合
+## DDC-01 Shared Frontend Types and Display Consistency
 
-| 型 | 値・制約 | 保存・表示 |
+| Type | Values and constraints | Storage and display |
 |---|---|---|
-| EntityId | 1〜128文字で、英数字・ハイフン・アンダースコアだけを使います。中身に意味を持たせない不透明な値(opaque)です | 作成時に生成され、その後は変わりません。URLから受け取った値だけでは、権限があるとは判断しません |
-| Version | 1以上の整数 | 更新するたびに1ずつ増えます。フォームを表示したときのバージョンを`expectedVersion`として使います |
-| Instant | タイムゾーン付きのISO 8601形式です。保存はUTC(協定世界時)で行います | ローカルの時刻文字列を、そのままは保存しません |
-| DateRange | from < to、最大366日、[from,to) | 366日という上限は、デモ用UIの上限です。将来のAPIの実装で決める制限とは別のものです |
-| Money | amountMinorは0以上の整数、currencyはISOの通貨コードです | JavaScriptの安全な整数の範囲内で扱います。デモで使うMYR(マレーシアリンギット)は小数点以下2桁です。通貨が異なる金額は合算できません |
-| Percentage | number/null | 分母が0のときはnullにします。表示するときは、小数点以下1桁に丸めます。マイナスの削減率もそのまま保持します |
-| Measurement | metric, value:number/null, unit, observedAt, receivedAt, origin, quality, isDemo | NaN/Infinityは正規DTOへ通さずvalue=null/quality=suspectへ正規化します。nullは「値がない」ことを表し、0は「測定値が0だった」ことを表します。実測・推定・点検の区別と、デモかどうかの区別は、それぞれ独立しています |
-| ResourceRef | tenantId, entityId, version | 参照先が、同じテナント(組織の区画)にあり、許可された範囲(scope)にあることを、Repositoryで確認します |
-| ListQuery | cursor?, limit=25, sort, filters | limit(件数)は1〜100の範囲です。sortとfiltersは、操作(operation)ごとに決めた許可リスト(allowlist)の中からだけ使えます。知らないキーを指定すると、検証エラーになります |
-| Page<T> | items:T[], nextCursor:string/null, total:number, snapshotVersion:number | totalは認可・投影・filter適用後のsnapshot全件数を非負整数で返します。0件はtotal=0です。1AのPageに件数不明状態はなく、未取得はUIのinitial/loadingで表します。 |
+| EntityId | 1–128 letters, digits, hyphens, or underscores; opaque, with no encoded meaning | Generated at creation and immutable. A URL value alone does not prove permission |
+| Version | Integer >=1 | Increases by 1 on each update. Use the version shown in the form as `expectedVersion` |
+| Instant | ISO 8601 with timezone; stored in UTC | Do not store local time strings unchanged |
+| DateRange | from < to, maximum 366 days, [from,to) | 366 days is a demo UI limit, separate from future API limits |
+| Money | amountMinor: nonnegative integer; currency: ISO currency code | Within JavaScript safe-integer range. Demo MYR uses 2 decimal places. Do not sum different currencies |
+| Percentage | number/null | null for denominator 0. Round display to 1 decimal place. Keep negative reduction rates |
+| Measurement | metric, value:number/null, unit, observedAt, receivedAt, origin, quality, isDemo | Normalize NaN/Infinity to value=null/quality=suspect before the canonical DTO. null means absent; 0 means measured zero. Measured/estimated/inspection and demo status are independent |
+| ResourceRef | tenantId, entityId, version | Repository checks that the reference is in the same tenant and permitted scope |
+| ListQuery | cursor?, limit=25, sort, filters | limit: 1–100. sort and filters use only each operation's allowlist. Unknown keys cause validation errors |
+| Page<T> | items:T[], nextCursor:string/null, total:number, snapshotVersion:number | total is the nonnegative snapshot count after authorization, projection, and filtering. Empty means total=0. Phase 1A Page has no unknown-count state; UI initial/loading means not fetched |
 
-表示用に丸めた値を、次の計算にそのまま使い回してはいけません。金額の計算では、最後の段階で通貨のminor unit(最小単位)に四捨五入するのが、デモでの方針です。浮動小数点の計算で途中の丸め誤差が出ないように、共通の計算関数を使い、デモの期待値でテストします。単位の変換は、mapper(変換処理)や計算関数にまとめます。
+Do not reuse rounded display values in later calculations. The demo rounds money to the currency's minor unit only at the final step. Use shared calculation functions to avoid intermediate floating-point rounding errors and test against demo expected values. Keep unit conversions in mappers or calculation functions.
 
-### 共通操作型
+### Shared Operation Types
 
-正規の型定義は[service-contracts.ts](service-contracts.ts)。DemoViewContext=Context、DemoWriteOptions=WriteOptions、EntityId=ID、Version=number、DateRange=Rangeという別名だけを許可する。本文のフィールド表は責務の説明であり、省略可能性や完全なDTOを定める表ではない。入力・出力の全フィールド、null、判別unionは型定義を参照する。共通値制約はDDC-01/03、決定順序・非同期・投影は[確定契約](deterministic-contracts.md)による。矛盾を見つけた場合は実装で選ばず文書を修正する。
+[service-contracts.ts](service-contracts.ts) is the canonical type definition. Only these aliases are allowed: DemoViewContext=Context, DemoWriteOptions=WriteOptions, EntityId=ID, Version=number, DateRange=Range. Field tables explain responsibilities; they do not define optionality or complete DTOs. Refer to the types for all input/output fields, nulls, and discriminated unions. DDC-01/03 define common value constraints; [Deterministic Contracts](deterministic-contracts.md) define decision order, asynchronous behavior, and projections. Fix document conflicts instead of choosing during implementation.
 
-1回の手動確認は1Action。複数設備の自動発火と制限は設備別の結果を返す。
+One manual confirmation is one Action. Multi-unit automation triggers and restrictions return per-unit results.
 
-### 画面からモックサービスへ渡す値・戻り値の例
+### Example Inputs and Outputs Between Screens and Mock Services
 
 ```json
 {
@@ -80,9 +80,9 @@ scope: frontend-demo-1A
 }
 ```
 
-画面は`commands.create`を呼び出します。モックは`requested`(依頼済み)という状態を返します。要求した時点の室温28度と、確認済みの設定温度26度を保持し、合成した成功イベントの後で、設定温度を24度へ更新します。HTTPの送信や、実際の機器への接続は行いません。
+The screen calls `commands.create`. The mock returns `requested`. Keep room temperature 28 degrees and confirmed setpoint 26 degrees as they were at request time; update the setpoint to 24 degrees after a synthetic success event. Do not send HTTP requests or connect to real equipment.
 
-失敗したときは、成功したかのような値を返しません。次の属性を持つ`DomainError`でPromiseをreject(拒否)します。以下は、エラーが記録される例です。
+On failure, do not return values that imply success. Reject the Promise with `DomainError` carrying the following attributes. This is an example recorded error.
 
 ```json
 {
@@ -96,202 +96,202 @@ scope: frontend-demo-1A
 }
 ```
 
-すべてのサービスで、成功時の型は`Promise<ServiceResult<T>>`です。操作カタログにある`result_contract`は、この包み(ServiceResult)の中にあるTの部分を表します。戻り値がない操作(void操作)でも、`ServiceResult<void>`を返します。失敗した場合に、失敗オブジェクトをresolve(成功扱い)することはありません。Query hook(データ取得の仕組み)は、成功したときの`result.data`を表示用のデータとして使い、catchした`DomainError`はDDC-03の規則へ渡します。ローカルの設定を変更する操作も、同じ非同期の規約に合わせます。
+Every service succeeds with `Promise<ServiceResult<T>>`. The operation catalog's `result_contract` describes T inside ServiceResult. Even void operations return `ServiceResult<void>`. Never resolve a failure object as success. Query hooks use successful `result.data` for display and pass caught `DomainError` to DDC-03 handling. Local preference changes use the same asynchronous convention.
 
 ```ts
 try {
   const result = await commands.create(context, input, options);
-  showRequestedCommand(result.data); // requestedを表示し、機器成功とはしない
+  showRequestedCommand(result.data); // Show requested, not device success
 } catch (error) {
-  showDomainError(asDomainError(error)); // 未知例外はUNAVAILABLEへ正規化
+  showDomainError(asDomainError(error)); // Normalize unknown exceptions to UNAVAILABLE
 }
 ```
 
-`CONFLICT`(競合)が起きた場合は、最新のデータを取得し、利用者に確認してもらった上で、新しい意思として送り直します。機器の応答を待っている間、同じ意思を通信の都合で再送する場合は、元の冪等キー(idempotencyKey)をそのまま使います。
+On `CONFLICT`, fetch current data, ask the user to confirm, and submit a new intent. When resending the same intent for transport reasons while awaiting a device response, reuse its original idempotencyKey.
 
-## DDC-02 読取projection・関連取得
+## DDC-02 Read Projections and Related Fetches
 
-同じエンティティ(データの対象)でも、役割によって必要なフィールドだけを返します。UI側で隠すために、いったん全顧客のデータをブラウザへ送るようなことはしません。以下のprojection(絞り込んだ表示形式)は、モックでも同じように適用します。
+Return only fields needed by each role, even for the same entity. Do not send all customers' data to the browser just to hide it in the UI. Apply these projections in mocks too.
 
-| projection | 必須応答フィールド | 除外・関連の解決 |
+| Projection | Required response fields | Exclusions and related lookups |
 |---|---|---|
-| UnitSummary | id, version, customerOrgId, propertyId, spaceId, displayName, modelId, capabilityVersion, connection, observedState, latestMeasurements, activeAlertCount | 契約金額や顧客の連絡先は含めません |
-| UnitDetail | UnitSummary＋installedAt, components, serviceScope, capabilities, lastSeenAt, pendingCommandIds | capability(能力)と、観測された設定・要求された設定は、別々のプロパティに分けます |
-| JobOfferSummary | jobId, offerId, type, siteAddress, requiredQualifications, requestedSlot, dueAt, offerExpiresAt, termsVersion | 受諾前は設置物件の登録住所をsiteAddressへ投影します。入場案内・ライブのtelemetry(計測データ)・顧客の請求情報は返しません |
-| JobSummary | id, version, unitId, type, status, dueAt, requestedSlot, scheduledSlot, assignmentId, severity, isDemo | 内部向けのメモや顧客の請求情報は含めません。まだ受諾していない外注については、JobOfferSummaryを使います |
-| JobDetail | id, version, unitId, type, status, requestedSlot, scheduledSlot, assignment, offer, draftReportRef, reportRefs（reportId/reportVersion）, costs, eventCursor | 顧客に対しては、内部向けメモや未受理の報告は含めません。費用は、顧客向けに表示してよいと許可されたものだけを含めます |
-| JobHistorySnapshot | jobId, type, status, contractorOrgId, completedAt, ownDecisionEvents, redactedReportSummary | 外部の権限が失効した後は、ライブの設備参照・顧客の個人情報・新しい制御の操作はできません |
-| InvoiceDetail | id, version, contractId, contractVersion, amountMinor, currency, dueAt, status/paymentStatus, paymentRefs, restrictionIds | 戻り値にカード情報は含めません。制限に関する情報は、restrictionIdsまたはforInvoiceを使って取得します |
-| RestrictionDetail | id, version, contractId, causeInvoiceIds, rulesVersion, state, reason, executeAfter, graceUntil, exception, perUnit, events | 設備ごとに、Command(命令)のID・状態・最後に確認した時刻を持ちます |
-| DeviceDetail | id, version, unitId, serial, connection, lastSeenAt, sensors, calibrationRefs, firmwareVersion, activeOperation | offline(オフライン)、電源断、tamper(不正な取り外し)は、それぞれ別の軸として扱います |
-| EnergySummary | period, unitIds, totals, baselineRef, factorRef, tariffVersion, boundary, coverage, qualityWarnings | totalsの中で、まだ計算できていない値はnullにします。丸める前の計算値と、表示する桁数は分けて扱います |
-| AuditView | id, actorId, actorRoleAtTime, action, targetRef, occurredAt, correlationId, result, maskedBefore, maskedAfter, reason | 現在のMembership(所属)の名前で、過去の行為者の名前を上書きしてはいけません |
+| UnitSummary | id, version, customerOrgId, propertyId, spaceId, displayName, modelId, capabilityVersion, connection, observedState, latestMeasurements, activeAlertCount | Exclude contract amounts and customer contacts |
+| UnitDetail | UnitSummary + installedAt, components, serviceScope, capabilities, lastSeenAt, pendingCommandIds | Keep capabilities, observed settings, and requested settings in separate properties |
+| JobOfferSummary | jobId, offerId, type, siteAddress, requiredQualifications, requestedSlot, dueAt, offerExpiresAt, termsVersion | Before acceptance, project the installation property's registered address to siteAddress. Exclude entry instructions, live telemetry, and customer billing |
+| JobSummary | id, version, unitId, type, status, dueAt, requestedSlot, scheduledSlot, assignmentId, severity, isDemo | Exclude internal notes and customer billing. Use JobOfferSummary for unaccepted outsourced offers |
+| JobDetail | id, version, unitId, type, status, requestedSlot, scheduledSlot, assignment, offer, draftReportRef, reportRefs (reportId/reportVersion), costs, eventCursor | For customers, exclude internal notes and unaccepted reports. Include only costs approved for customer display |
+| JobHistorySnapshot | jobId, type, status, contractorOrgId, completedAt, ownDecisionEvents, redactedReportSummary | After external access expires, no live unit access, customer personal information, or new control actions |
+| InvoiceDetail | id, version, contractId, contractVersion, amountMinor, currency, dueAt, status/paymentStatus, paymentRefs, restrictionIds | Return no card data. Fetch restrictions through restrictionIds or forInvoice |
+| RestrictionDetail | id, version, contractId, causeInvoiceIds, rulesVersion, state, reason, executeAfter, graceUntil, exception, perUnit, events | Each unit has Command ID, state, and last confirmed time |
+| DeviceDetail | id, version, unitId, serial, connection, lastSeenAt, sensors, calibrationRefs, firmwareVersion, activeOperation | Treat offline, power loss, and tamper as separate dimensions |
+| EnergySummary | period, unitIds, totals, baselineRef, factorRef, tariffVersion, boundary, coverage, qualityWarnings | Uncalculable totals are null. Keep unrounded calculation values separate from display precision |
+| AuditView | id, actorId, actorRoleAtTime, action, targetRef, occurredAt, correlationId, result, maskedBefore, maskedAfter, reason | Do not replace historical actor names with current Membership names |
 
-### 追加モデル
+### Additional Models
 
-| モデル | 項目・責務 |
+| Model | Fields and responsibilities |
 |---|---|
 | Offer | id, jobId, contractorOrgId, termsVersion, offeredAt, offerExpiresAt, accessValidFrom, accessValidUntil, decision, decidedBy, decidedAt, declineReason |
-| Assignment | id, jobId, technicianMembershipId, validFrom, validUntil, scheduledStart, scheduledEnd, status, reason。期間が終了すると、ライブの権限は失効します |
-| MaintenancePlan | id, unitId, recurrence, nextDueAt, generatedOccurrences。1A(このフェーズ)では、月単位で、次回の1回分だけをはっきり生成します。計画のIDと予定日の組み合わせで、重複を防ぎます |
-| JobNote | id, jobId, authorId, visibility(internal/customer), message, createdAt。初期状態は内部向けです。通知の本文も、同じ公開範囲に従います |
-| Inquiry | id, customerId, invoiceId?, restrictionId?, subjectType, message, state(received/answered), reply?, createdAt。デモでは、アプリ内での受付のみです |
-| CalibrationRecord | id, deviceId, sensorId, metric, unit, referenceValue, measuredValue, calibratedAt, actorId, isDemo。過去の履歴には追記するだけで、書き換えません |
+| Assignment | id, jobId, technicianMembershipId, validFrom, validUntil, scheduledStart, scheduledEnd, status, reason. Live access expires when the period ends |
+| MaintenancePlan | id, unitId, recurrence, nextDueAt, generatedOccurrences. Phase 1A explicitly generates only the next monthly occurrence. Prevent duplicates using plan ID and scheduled date |
+| JobNote | id, jobId, authorId, visibility(internal/customer), message, createdAt. Default: internal. Notification text follows the same visibility |
+| Inquiry | id, customerId, invoiceId?, restrictionId?, subjectType, message, state(received/answered), reply?, createdAt. Demo accepts inquiries only in-app |
+| CalibrationRecord | id, deviceId, sensorId, metric, unit, referenceValue, measuredValue, calibratedAt, actorId, isDemo. Append history; never rewrite it |
 | DeviceOperation | id, deviceId, kind(check/calibrate/firmware), status(queued/running/succeeded/failed), targetVersion?, failureCode?, startedAt?, finishedAt? |
-| OffsetQuote | id, version, amountKg, estimatedAmountMinor?, currency?, expiresAt, provider=unselected, scheme=demo, isDemo。料金がまだ決まっていない場合、金額はnullにします |
-| OffsetRecord | quoteId, amountKg, state, previousState?, purchaseRef?, retirementRef?, demoCertificateRef?, eventHistory。すべてデモ上の償却(retirement)としてのみ扱います |
+| OffsetQuote | id, version, amountKg, estimatedAmountMinor?, currency?, expiresAt, provider=unselected, scheme=demo, isDemo. Amount is null if price is undecided |
+| OffsetRecord | quoteId, amountKg, state, previousState?, purchaseRef?, retirementRef?, demoCertificateRef?, eventHistory. All retirement is demo-only |
 
-## DDC-03 入力検証・表示・失敗
+## DDC-03 Input Validation, Display, and Failures
 
-| 検証時点 | 処理 |
+| Validation point | Processing |
 |---|---|
-| URL読込 | ID・enum(列挙値)・日付を検証します。入力が不正な場合はD01に従い、resource IDはnot-found、filter/日付/enumはVALIDATIONの条件修正画面にします。自動的に別の顧客のデータに解決することはありません |
-| フィールドblur/submit | 役割ごとの表にある、必須項目・形式・文字数・大小関係を検証します。文字数は、前後の空白を除いた後のUnicodeコードポイントで数えます |
-| mutation直前 | actor(行為者)・tenant・role(役割)・scope・期間・現在のstatus・capability・契約・expectedVersionを、あらためて確認します |
-| adapter応答 | DTOのschemaを検証します。知らないenum値はUNAVAILABLEとして扱います。内部の生の例外を、そのまま画面に表示することはありません |
-| 更新通知 | entityId・version・eventIdの組み合わせで、重複したイベントや古いイベントを除きます。欠番や通信の切断があった場合は、あらためて取得し直します |
+| URL load | Validate IDs, enums, and dates. Under D01, invalid resource IDs show not-found; invalid filters/dates/enums show a VALIDATION condition-correction screen. Never automatically resolve to another customer's data |
+| Field blur/submit | Validate required fields, formats, character limits, and ordering constraints in role tables. Count Unicode code points after trimming leading/trailing whitespace |
+| Immediately before mutation | Recheck actor, tenant, role, scope, period, current status, capability, contract, and expectedVersion |
+| Adapter response | Validate DTO schema. Unknown enums are UNAVAILABLE. Never show raw internal exceptions |
+| Update notification | Use entityId/version/eventId to remove duplicate or old events. Refetch after missing sequence numbers or disconnection |
 
-| モックが返すDomainError | UI動作 | 入力・再試行 |
+| Mock DomainError | UI behavior | Inputs and retry |
 |---|---|---|
-| VALIDATION | エラーの概要と、項目ごとのエラー(fieldErrors)を表示し、最初のエラー欄にフォーカスを移します | 入力した値は保持したまま、修正できるようにします。無条件に再送はしません |
-| UNAUTHENTICATED | セッションを終了し、ログイン画面へ移動します | 古いscopeのQuery、画面内の未保存の下書きや写真、一時的なURLは破棄します。保存済みの報告やBlob(画像データ)は、DDC-08の規則に従って共有Repositoryに保持します |
-| FORBIDDEN | 操作できないことを示します。表示場所と遷移はIR57(primary queryはその場でpermission-denied、writeは画面遷移せず入力保持) | 権限が変更されたときは、対象のデータを破棄します。繰り返し再試行することはしません |
-| NOT_FOUND | 対象が利用できないことを示します。表示場所と遷移はIR57(primary queryはその場でnot-found、writeは画面遷移せず入力保持) | その対象が存在するかどうかが分かってしまうような詳細は表示しません |
-| CONFLICT | 変更が発生したことを説明し、最新のデータを取得して、差分を確認できるようにします | 自動的に上書きすることはありません。変更したい内容をあらためて確認してから、新しい要求として送ります |
-| OFFLINE（制御対象の機器がoffline） | 機器の最終通信時刻を表示し、保留中であることや、操作できないことを示します | 新しい制御操作はできません。すでに送信したものは、状態を照会します。自動的に成功したことにはしません |
-| UNAVAILABLE + messageKey=errors.network_disconnected（ネットワーク断の模擬、IR37） | 画面状態offlineとして最後の成功時刻と「更新停止」を表示します | 購読を解除し、再接続後に再snapshotで復帰します。機器offlineとは表示領域を分けます |
-| TIMEOUT | 処理がまだ確定していないことと、相関ID(処理を追跡するID)を表示します | 書き込み(write)は、writes.getResultでキーから状態を照会し、その後は同じ冪等キー・初回payloadで再試行します。元の処理が実行されなかったと決めつけません |
-| RATE_LIMITED | 待つべき時間と、再試行の案内を表示します | モックの結果にあるretryAfterSeconds(再試行までの秒数)を表示します。通常どおり、フォームの入力値は保持します |
-| UNAVAILABLE | 画面内にエラーを表示し、再試行できるようにします | 読み取り用のサービスは、最大2回まで自動で再試行します。書き込み(write)は、利用者が明示的に再試行したときだけ行います |
+| VALIDATION | Show error summary and fieldErrors; focus the first invalid field | Keep inputs for correction; do not resend unconditionally |
+| UNAUTHENTICATED | End the session and go to login | Discard old-scope Queries, unsaved screen drafts/photos, and temporary URLs. Keep saved reports and Blobs in shared Repository under DDC-08 |
+| FORBIDDEN | Show action denied. Follow IR57: primary query shows permission-denied in place; writes keep the screen and inputs | Discard target data when permissions change. Do not retry repeatedly |
+| NOT_FOUND | Show unavailable. Follow IR57: primary query shows not-found in place; writes keep the screen and inputs | Do not reveal details that disclose existence |
+| CONFLICT | Explain the change, fetch current data, and allow comparison | Never overwrite automatically. Reconfirm intent and send a new request |
+| OFFLINE (target device offline) | Show device last-contact time and pending/unavailable actions | No new controls. Query existing sends; do not assume success |
+| UNAVAILABLE + messageKey=errors.network_disconnected (simulated network loss, IR37) | Show screen offline, last-success time, and “Updates stopped” | Unsubscribe and recover with a fresh snapshot after reconnection. Separate this from the device-offline display |
+| TIMEOUT | Show unresolved processing and correlation ID | For writes, query writes.getResult by key, then retry with the same idempotency key and original payload. Do not assume the original never ran |
+| RATE_LIMITED | Show waiting time and retry guidance | Show mock retryAfterSeconds. Keep form inputs as usual |
+| UNAVAILABLE | Show an in-screen error and allow retry | Automatically retry reads at most twice. Retry writes only on explicit user action |
 
-成功済みデータの再取得中・再取得失敗の表示と、購読イベントによる無効化の集約はIR83に従います。画面にエラーが出ているときに、KPI(指標)の値を0件や正常な値に置き換えてはいけません。前回の値を残す場合は、staleである(古い)ことと、前回成功した時刻をはっきり表示します。対象やroleが変わった場合は、前回の値を残しません。
+Follow IR83 for refreshing/failure after successful data and for batching subscription invalidations. Never replace KPI values with zero or healthy values on errors. If keeping previous values, mark stale and show last-success time. Do not keep them after target or role changes.
 
-## DDC-04 非同期・モック実行の基準
+## DDC-04 Asynchronous and Mock Execution Rules
 
-デモで使う仮の値(時間・上限・枚数・期間)は、この節とDDC-01で定義します。要件や各DDに同じ数値が書かれている場合は、この節を正式なものとします。値を変更するときは、まずこの節を更新し、同じ変更を他の箇所にも反映してそろえます。
+This section and DDC-01 define demo timing, limits, counts, and periods. If requirements or individual DDs repeat values, this section is authoritative. Change it first, then align every other occurrence.
 
-| 設定 | 1A既定値・挙動 |
+| Setting | Phase 1A default and behavior |
 |---|---|
-| モック待機タイムアウト | 10秒です。モックの読み取りの正常待機はfixture.defaultWaitMs=300msで固定します(IR74)。試験(テスト)では、時計を注入して制御します |
-| Command expiry | 要求してから30秒です(デモの仮の値)。送信と応答は、シナリオのイベントで制御します |
-| Telemetry stale | センサーごとに設定します。初期値(seed)は120秒です。境界の判定は「現在時刻 − 観測時刻 > staleAfterSeconds」です |
-| Offer期限 | 初期値(seed)では24時間後です。受諾できるのは「現在時刻 < offerExpiresAt」のときです。未応答のまま到達すると案件はrequestedへ戻ります(IR48) |
-| 予告期間 | 初期値のルールでは24時間です。「executeAfter >= noticeAt + 24時間」となります。これは商用のルールではありません |
-| OffsetQuote有効期間 | デモでは15分です。申し込み時点で「現在時刻 < expiresAt」である必要があります |
-| write処理 | 共有メモリの遷移関数で、入力とバージョンを確認してから、状態と表示用の履歴をまとめて更新します。データベースのトランザクションは設計しません |
-| invalidate | 操作(operation)が触れたentityと、関連する集計は、scope付きのQuery keyで無効化します。UI側で手動でデータをコピーすることはしません |
-| role変更 | 進行中のリクエスト(pending request)は中止(abort)します。古いQueryは取り除きます。新しいscopeのセッションを取得してから、画面を描画します。遅れて届いた古い応答は、IR17のRepository instance/generationとviewEpoch(閲覧世代)によって破棄します |
-| reload/reset | DEC-07に従います。reload(再読み込み)では初期値(seed)に戻ります。role(役割)の切り替えでは、同じタブの業務データは保持します。reset(リセット)では、時計・object URLを初期化し、世代番号は+1にします |
+| Mock wait timeout | 10 seconds. Normal read wait is fixed at fixture.defaultWaitMs=300 ms (IR74). Control tests with an injected clock |
+| Command expiry | 30 seconds after request (fictional demo value). Scenario events control sending and acknowledgement |
+| Telemetry stale | Per sensor; seed: 120 seconds. Stale when now − observedAt > staleAfterSeconds |
+| Offer expiry | Seed: 24 hours later. Accept only while now < offerExpiresAt. Unanswered expiry returns the job to requested (IR48) |
+| Notice period | Seed rule: 24 hours; executeAfter >= noticeAt + 24 hours. Not a commercial rule |
+| OffsetQuote validity | Demo: 15 minutes. Request requires now < expiresAt |
+| Write processing | Shared-memory transition functions check input/version, then update state and display history together. No database transactions are designed |
+| Invalidate | Invalidate affected entities and related summaries using scoped Query keys. Do not manually copy data in UI |
+| Role change | Abort pending requests and remove old Queries. Fetch the new-scope session before rendering. Discard late responses using IR17 Repository instance/generation and viewEpoch |
+| Reload/reset | Follow DEC-07. Reload restores seed. Role switches preserve tab business data. Reset initializes clock/object URLs and increments generation by 1 |
 
-通常の顧客や診断からのコマンドは、同じ設備に対してまだ完了していない要求がある間は、競合する新しい要求を拒否します。入金後の解除は、別の調整処理として扱います。まず解除したいという意思を保持し、D03の設備別証跡で未配送・未適用・適用済み・結果不明を判定します。適用済みだけに解除Commandを送り、未適用確定はnot_requiredとします。適用と解除を、未確定のまま同時に送ることはありません。
+For normal customer/diagnostic Commands, reject conflicting new requests while the same unit has an unfinished request. Post-payment release is separate coordination: keep release intent, then use D03 per-unit evidence to distinguish undelivered, unapplied, applied, and unknown results. Send release Commands only for applied units; confirmed unapplied units are not_required. Never send apply and release concurrently while unresolved.
 
-`AbortController`は、通信や画面への反映を途中で中断するためのものです。すでに受理された機器の処理や決済処理を取り消すこととは、混同しないでください。将来、外部処理を取り消す仕様が必要になった場合は、API側の仕様が決まった後で、adapter(接続部分)に対応させます。
+`AbortController` stops communication or screen updates; it does not cancel already accepted device or payment processing. If future external cancellation is needed, implement it in the adapter after the API contract is defined.
 
-## 通知と公開範囲
+## Notifications and Visibility
 
-| 起点イベント | 宛先と公開内容 | 発生させない変更 |
+| Trigger event | Recipients and visible content | Changes that must not occur |
 |---|---|---|
-| alert.opened / severity_changed | 顧客とHQ(本部)に通知します。担当がいる場合は、有効な技術者にも通知します。業者には、受諾済みの設備についての必要な概要だけを伝えます | 既読にしても、アラートは解消しません |
-| job.requested | 顧客には受け付けたことを伝え、HQには新規の依頼として伝えます | 希望した時間枠を、そのまま予約確定にはしません |
-| job.offered / accepted / declined | オファーを受けた業者とHQに伝えます。顧客には「手配中」という段階までしか伝えません | 受諾する前に、詳しい顧客情報を公開することはありません |
-| job.assigned / schedule_changed | 顧客・HQ・担当技術者・受託業者に、確定した日程と必要な情報を伝えます | 別の会社の技術者には通知しません |
-| report.submitted / returned | 品質担当・作成した技術者・HQに伝えます。顧客には進捗だけを伝えます | 内部向けの報告や内部メモは、顧客に公開しません |
-| job.completed | 顧客・HQ・受託業者・担当技術者に、受理済みの報告を伝えます | アラートを自動では解消しません |
-| restriction.scheduled / changed | 対象の顧客と、権限を持つHQに、理由・予定・対象・解除条件を伝えます | 業者や技術者には、請求の詳細を渡しません |
-| payment.confirmed | 顧客と、billing(請求)の権限を持つHQに伝えます。関連する解除のイベントも伝えます | 応答がないまま、解除済みとして扱うことはありません |
-| device.fault / operation_failed | 担当技術者とHQに伝えます。顧客には、必要な概要だけを伝えます | 故障の原因や盗難を、確認しないまま決めつけません |
-| inquiry.received / answered | 顧客と、対応する権限を持つHQに伝えます | メールやWhatsAppを、実際には送信しません |
+| alert.opened / severity_changed | Notify customer and HQ, plus active assigned technicians. Contractors receive only necessary summaries for accepted units | Marking read does not resolve alerts |
+| job.requested | Tell the customer it was received and HQ that it is a new request | Requested slots are not confirmed bookings |
+| job.offered / accepted / declined | Notify the offered contractor and HQ. Customers see only “Being arranged” | Do not expose detailed customer information before acceptance |
+| job.assigned / schedule_changed | Share confirmed schedule and necessary information with customer, HQ, assigned technician, and accepted contractor | Do not notify other companies' technicians |
+| report.submitted / returned | Notify quality reviewer, authoring technician, and HQ. Customer sees progress only | Do not expose internal reports or notes to customers |
+| job.completed | Share accepted reports with customer, HQ, accepted contractor, and assigned technician | Do not automatically resolve alerts |
+| restriction.scheduled / changed | Tell affected customer and authorized HQ the reason, schedule, targets, and release conditions | Do not share billing details with contractors or technicians |
+| payment.confirmed | Notify customer and HQ with billing permission, including related release events | Do not mark released without acknowledgement |
+| device.fault / operation_failed | Notify assigned technician and HQ; give customer only necessary summary | Do not assume a fault cause or theft without checking |
+| inquiry.received / answered | Notify customer and authorized HQ handler | Do not send real email or WhatsApp messages |
 
-上表は公開範囲の概要です。生成の有無・templateKey・channel・宛先Membershipの決め方はIR95の表を正とします。アプリ内通知は、翻訳キーとparams(パラメーター)を保存し、選んでいる言語で表示します。メールやWhatsAppは、preview(プレビュー)またはsimulated(模擬)として扱い、実際に送信した実績としては扱いません。通知には、対象を参照するIDと、snapshot scope(通知時点の権限範囲)を持たせます。通知から画面へ遷移するときも、現在の権限を検証します。
+The table summarizes visibility. IR95 is authoritative for whether to generate notifications, templateKey, channel, and recipient Membership selection. In-app notifications store translation keys and params and render in the selected language. Email/WhatsApp are preview or simulated, never actual delivery records. Notifications carry a target reference ID and snapshot scope at notification time. Recheck current permissions when navigating from a notification.
 
-## DDC-05 フロントエンド境界の完了条件
+## DDC-05 Frontend Boundary Completion Criteria
 
-- [操作カタログ](operation-catalog.csv)にある各操作を、対応する画面の入力の型・戻り値・モックの結果に対応させます。
-- UIは、モックの実体に直接依存しません。サービスのinterface(窓口)を通して、データを取得したり変更したりします。
-- 成功・受付中・失敗・競合・閲覧不可、それぞれの合成した結果を使って、画面が期待どおりに表示され、回復することを検証します。
-- 将来、実際のAPIに接続するときは、adapter(接続部分)の差替え境界を設けます。ただし差替えだけで本番接続が成立するという保証はしません。D11の本番契約を先に確定します。HTTP adapterの実装や検証、本番用の認証、サーバー側の処理設計は、今回の完了条件には含めません。
+- Map each [Operation Catalog](operation-catalog.csv) operation to screen input types, return values, and mock results.
+- UI accesses and changes data through service interfaces, without direct dependency on mock implementations.
+- Use synthetic success, accepted/pending, failure, conflict, and access-denied results to verify expected display and recovery.
+- Provide an adapter replacement boundary for a future real API. Replacement alone does not guarantee production connectivity; define D11 production contracts first. HTTP adapter implementation/testing, production authentication, and server processing design are outside these completion criteria.
 
-## DDC-06 画面構成とローカル状態
+## DDC-06 Screen Structure and Local State
 
-それぞれのrole page(役割ごとの画面)は、共通のShell(枠組み)とUI patternを使います。pageは、URL・Query hook・フォームを組み立てる役割を持ち、primitive(部品)がRepositoryを直接importすることはありません。RHFのフォームは、対象のIDをkeyとして別々に分離します。queryを再取得しても、まだ保存していない入力(dirty値)を自動でresetすることはありません。
+Each role page uses shared Shell and UI patterns. Pages compose URLs, Query hooks, and forms; primitives do not import Repository directly. Keep RHF forms separate using target ID as key. Refetching must not automatically reset unsaved dirty values.
 
-ダイアログが開いているかどうか、選んでいるタブなど、短い時間だけ使う状態(state)は、最も近いcomponent(部品)が持ちます。対象・期間・一覧のページに関する情報はURLに、観測値や履歴はQueryに、業務データはRepositoryに、それぞれ1か所だけで保持します。意味のあるフィルターは、戻る操作をしたときに復元できるようにします。画面をまたいで、不要なContextを追加することはしません。
+Keep short-lived state, such as open dialogs and selected tabs, in the nearest component. Store targets/periods/list pages in URL, observations/history in Query, and business data in Repository, each in one place. Restore meaningful filters on Back. Do not add unnecessary cross-screen Context.
 
-一括で取得するデータの取得に失敗した場合は、ページ全体のエラーとして表示します。独立した補助的なパネルだけが失敗した場合は、そのパネルの中だけでエラーを表示します。例えば、設備の基本情報の取得には成功したが、履歴の取得だけ失敗した場合は、設備の参照は続けたまま、履歴だけを再試行します。ただし、操作できるかどうかを判定するために必要なcapability(能力)や制限の情報が取得できない場合は、操作を有効にしません。
+If the main grouped data fetch fails, show a page error. If an independent support panel fails, show an error only there. For example, keep unit details visible if only history fails, and retry history alone. Do not enable actions if capability or restriction data needed for eligibility is unavailable.
 
-## DDC-07 共通画面の項目・処理
+## DDC-07 Shared Screen Fields and Processing
 
-| 画面/操作 | 入力・初期値 | 処理と完了 | 失敗・取消 |
+| Screen/action | Inputs and defaults | Processing and completion | Failure/cancellation |
 |---|---|---|---|
-| /login | demoActorId:未選択、returnTo:任意相対route | モックのセッションに、既知のactor(利用者)のMembership(所属)を設定し、その役割のホーム画面へ移動します。実際のメールアドレスやパスワードは不要です | 選択していない場合や、知らないactorの場合は拒否します。外部のURLが指定されたreturnToは破棄します |
-| /forgot-password | demoEmail:空、形式・最大254文字 | 登録されているアドレスでも、されていないアドレスでも、「該当する場合は案内を表示します」という同じデモの完了メッセージを表示します | 実際にメールは送信しません。形式が不正な場合は、項目のエラーとして表示します |
-| /settings/preferences | locale=en、zone=Asia/Kuala_Lumpur、currency=MYR（read-only） | locale(言語設定)はすぐに反映されます。zone(タイムゾーン)は表示設定です。currencyはMYR固定のデモ表示属性で編集しません。請求はMoney.currencyで表示し換算しません。データや契約上の通貨は変わりません | 対応していないlocaleや、不正なIANAタイムゾーンは拒否します |
-| 共通通知 | unreadOnly=false、cursor=null、limit25 | scope内の通知を、Page(ページ単位)で表示します。既読にする操作(mutation)ができます。参照IDから、関連する画面へ移動できます | scopeが失効したリンクは、安全な「利用できません」という表示にします |
-| 音声/テキストパネル | text:空、intent:未解決、target:未選択 | intent(意図)を解決し、対象の候補を出し、変更の場合は確認したうえで、既存のCommandの仕組みを使います。照会(問い合わせ)は読み取りのみです | 認識できない場合、同じ名前が複数ある場合、確認を取り消した場合は、いずれもCommandを0件のままにします |
-| /demo | scenarioId(1〜64文字のラベル)、eventType、clockAdvance、reset | 許可された合成イベントだけを使います。transport障害・ネットワーク断の注入はIR37、時計のジャンプはIR36。resetのときに、generation(世代番号)が更新されます | 任意のURL、スクリプト、実機宛てのデータは受け入れません |
+| /login | demoActorId: unselected; returnTo: optional relative route | Set a known actor's Membership in the mock session and open its role home. No real email or password needed | Reject missing/unknown actors. Discard external returnTo URLs |
+| /forgot-password | demoEmail: empty; valid format, at most 254 characters | Show the same demo completion message for registered and unregistered addresses: “Instructions will be shown if applicable” | Send no real email. Invalid format shows a field error |
+| /settings/preferences | locale=en, zone=Asia/Kuala_Lumpur, currency=MYR (read-only) | Apply locale immediately. zone is a display setting. currency is a fixed MYR demo display attribute. Show invoices with Money.currency without conversion. Data/contract currencies do not change | Reject unsupported locale or invalid IANA timezone |
+| Shared notifications | unreadOnly=false, cursor=null, limit=25 | Show scoped notifications as Pages. Allow mark-read mutations and navigation via reference IDs | Expired-scope links show a safe “Unavailable” message |
+| Voice/text panel | text: empty; intent: unresolved; target: unselected | Resolve intent and target candidates; confirm changes and use existing Command handling. Queries are read-only | Unrecognized input, duplicate names, or cancelled confirmation create zero Commands |
+| /demo | scenarioId (1–64-character label), eventType, clockAdvance, reset | Use only allowed synthetic events. IR37 covers transport/network fault injection; IR36 covers clock jumps. Reset updates generation | Reject arbitrary URLs, scripts, and real-device payloads |
 
-共通操作の論理的な契約は、`demoSession.signIn/signOut/switchMembership/extend`、`auth.previewPasswordReset`、`preferences.get/update`、`voice.resolveIntent`、`notifications.list/markRead`、`demo.trigger/reset`です。demo・auth・voiceは、1A(このフェーズ)ではモック専用であり、実際の認証への接続仕様は対象外です。preferences(設定)は、あまり変わらない表示設定用のProviderに置き、業務Repositoryのデータや請求で使う通貨とは分けて扱います。
+Shared logical operations are `demoSession.signIn/signOut/switchMembership/extend`, `auth.previewPasswordReset`, `preferences.get/update`, `voice.resolveIntent`, `notifications.list/markRead`, and `demo.trigger/reset`. demo/auth/voice are mock-only in phase 1A; real authentication integration is outside scope. Keep preferences in a Provider for infrequently changed display settings, separate from business Repository data and invoice currencies.
 
-### 能力権限の名称と付与先
+### Permission Names and Eligible Roles
 
-| 能力 | 付与可能な役割・制約 |
+| Capability | Eligible roles and constraints |
 |---|---|
-| control.execute | 顧客とHQに付与できます。利用・管理できる範囲と、契約・機器の能力の範囲内に限られます |
-| control.diagnose / device.maintain | 技術者が、有効に担当している範囲内で使えます。外部の技術者は、作業期間内に限られます。解消するには、理由と根拠が必須です |
-| dashboard.read / asset.manage | HQの台帳閲覧／変更。asset.manageだけでも管理対象設備を読取可能。操作カタログの補助読取規則を適用 |
-| alert.resolve | 技術者の有効担当範囲とHQ。理由・根拠ID必須 |
-| job.manage / contract.manage / billing.manage | HQに付与できます。対象のテナント内に限られます |
-| partner.accept / partner.assign / partner.review | 施工業者に付与できます。自社が委託した分だけです。reviewでは、同じuserIdによる自己承認は拒否します |
-| identity.manage / device.manage | HQに付与できます。同じテナント内に限られます。自分自身に高い権限を付与することはできず、別の人が変更する必要があります |
-| alert.policy.manage / automation.policy.manage / energy.manage | HQに付与できます。管理している対象の方針や分析に使います |
-| restriction.manage / restriction.override | HQの中でも独立した能力です。通常のHQには、自動では付与しません |
-| mrv.manage / offset.manage / audit.read | HQが個別に持つ能力です。顧客向けの分析や記録の閲覧とは分けて扱います |
+| control.execute | Customer and HQ, within permitted use/management scope and contract/device capabilities |
+| control.diagnose / device.maintain | Technicians within active assignments; external technicians only during the work period. Resolution requires reason and evidence |
+| dashboard.read / asset.manage | HQ registry reading/writing. asset.manage alone may read managed units. Apply operation-catalog support-read rules |
+| alert.resolve | Technicians within active assignments and HQ. Reason and evidence IDs required |
+| job.manage / contract.manage / billing.manage | HQ, within the target tenant |
+| partner.accept / partner.assign / partner.review | Contractors, only for their company's delegations. Reject self-approval by the same userId |
+| identity.manage / device.manage | HQ, within the same tenant. Users cannot increase their own permissions; another person must make the change |
+| alert.policy.manage / automation.policy.manage / energy.manage | HQ, for policies/analysis of managed targets |
+| restriction.manage / restriction.override | Independent HQ capabilities, not automatically granted to normal HQ |
+| mrv.manage / offset.manage / audit.read | Separate HQ capabilities, distinct from customer analysis/record viewing |
 
-role(役割)による候補の許可リスト(allowlist)と、permission(権限)の両方を判定します。知らない能力名は許可しません。「付与できること」と「最初から付与されていること」は別です。初期値(seed)の各actorには、明示的に決めた能力の集合だけを与えます。
+Check both the role allowlist and permission. Reject unknown capability names. Eligibility for a permission is not a default grant. Give each seed actor only explicitly defined capabilities.
 
-### 補助操作の入力
+### Support Operation Inputs
 
-Inquiry(問い合わせ)を作成するには、`invoiceId`または`restrictionId`、`subjectType`、`message`(1〜2000文字)が必要です。HQが回答するには、`inquiryId`、`reply`(1〜2000文字)、`expectedVersion`を使い、状態を`received`から`answered`に変えます。顧客は、その返信を読み取ることができます。閉じる操作は、1A(このフェーズ)では任意であり、実装していない場合は表示しません。
+Creating Inquiry requires `invoiceId` or `restrictionId`, `subjectType`, and `message` (1–2000 characters). HQ answers with `inquiryId`, `reply` (1–2000 characters), and `expectedVersion`, moving `received` to `answered`. Customers can read replies. Closing is optional in phase 1A; do not show it if unimplemented.
 
-MRVのdraft(下書き)は、`mrv.saveDraft`を呼び出します。初回は、モックが新しいIDを返します。編集するときは、保持しているIDとバージョンを使って更新します。通信先や、データを保存する方式は、この文書では定めません。
+Call `mrv.saveDraft` for MRV drafts. The first call returns a new mock ID. Edit with the retained ID and version. This document does not define communication destinations or storage methods.
 
-監視や制御に必要なデータ取得と、操作カタログには、補助的なgetやlistの操作も含めます。UIに編集ボタンを置く場合は、対象のdetail(詳細)を読み取る契約と、保存する契約を対にします。
+Include support get/list operations in monitoring/control data fetches and the operation catalog. Every UI edit button needs both a detail-read contract and a save contract.
 
-## DDC-原文補完. 企業要望に対応する表示モデル
+## DDC-Source Additions. Display Models for Company Requests
 
-一次資料(最初の情報源)はSRC-06です。以下は、フロントエンドの表示のために拡張した内容であり、APIの通信仕様ではありません。詳細・必須かどうか・値が欠けているときの処理は、それぞれのDDを正式なものとします。
+The primary source is SRC-06. These are frontend display extensions, not API transport specifications. The relevant DD defines details, required fields, and missing-value handling.
 
-| 既存の論理操作・結果 | 表示用拡張 | 利用設計 |
+| Existing logical operation/result | Display extension | Design using it |
 |---|---|---|
-| alerts.list / Alert | causeCode、evidenceKind、evidenceText、observedAt | DD-C08、DD-T07、DD-A05 |
-| telemetry.series / 空気環境モデル | allergenObservationの取得状態・対象物質・値・単位・出典・観測時刻 | DD-C07、DD-A12 |
-| payments.simulate / Payment、invoices.list / 請求表示モデル | `Payment.method`を、Invoice表示モデルの`paymentMethod`へ変換します。Payment.methodは`demo_credit_card` / `demo_debit_card`のみです。`demo_instructions`は画面上の選択肢であり、instructionsイベントによる通知previewだけを返します。Invoice.paymentMethodを変更しません。未選択や手動確認のときはnullにします。処理中や失敗の場合でも、種別はそのまま保持します | DD-C11、DD-A08 |
-| MRVレポートプレビュー | Scope 2分類、組織・期間・拠点・地域係数・算定境界・品質 | DD-A14 |
-| offsets.preview / OffsetQuote | marketConcept: future_concept・未選定・未検証・未接続 | DD-C13、DD-A15 |
+| alerts.list / Alert | causeCode, evidenceKind, evidenceText, observedAt | DD-C08, DD-T07, DD-A05 |
+| telemetry.series / air-quality model | allergenObservation availability, substance, value, unit, source, observation time | DD-C07, DD-A12 |
+| payments.simulate / Payment, invoices.list / invoice display model | Map `Payment.method` to display `paymentMethod`. Payment.method allows only `demo_credit_card` / `demo_debit_card`. `demo_instructions` is a UI choice returning only a notification preview through the instructions event; it does not change Invoice.paymentMethod. Unselected/manual confirmation uses null. Keep the type during processing and failure | DD-C11, DD-A08 |
+| MRV report preview | Scope 2 category, organization, period, sites, regional factor, calculation boundary, quality | DD-A14 |
+| offsets.preview / OffsetQuote | marketConcept: future_concept, not selected, unverified, not connected | DD-C13, DD-A15 |
 
-上で説明した表示の変換処理は、feature(機能)ごとの純粋関数にまとめます。mock adapterは、正常・欠落・失敗、それぞれの合成した結果を返します。実際のAPIを導入するときは、adapterがこの画面モデルへ変換します。画面から、外部のAPIへ直接接続することはありません。
+Keep display mappings above in feature-specific pure functions. Mock adapters return synthetic normal, missing, and failed results. Future real API adapters map into these screen models; screens do not call external APIs directly.
 
-## DDC-08 複数資源・再訪・役割横断の契約
+## DDC-08 Multi-Resource, Revisit, and Cross-Role Contracts
 
-以下は、DEC-10に基づく1A(このフェーズ)の設計提案です。企業の商用ルールを確定するものではありません。それぞれのDDの入出力と、事後条件に適用します。すべての操作は、はっきり指定した資源のIDと、現在の`DemoViewContext`で認可します。画面が「今選択しているID」を、暗黙のうちに参照することはしません。カタログにある入力に加えて、サービスの第1引数には`context`を渡します。最後の引数であるread options（`{signal?: AbortSignal}`）には、`AbortSignal`を渡すことができます。更新用の`DemoWriteOptions`は第3引数で渡します。
+These are phase 1A design proposals under DEC-10, not final commercial business rules. They apply to DD inputs, outputs, and postconditions. Authorize every operation with explicit resource IDs and current `DemoViewContext`; do not implicitly use a screen's selected ID. In addition to catalog inputs, pass `context` first. Final read options (`{signal?: AbortSignal}`) may carry AbortSignal. Pass mutation `DemoWriteOptions` as the third argument.
 
-### 1. 読取・履歴・添付
+### 1. Reads, History, and Attachments
 
-| 操作 | 読取・更新の意味 | 権限・再訪時の扱い |
+| Operation | Read/write meaning | Permissions and revisits |
 |---|---|---|
-| policies.list/get | `Policy`は、id・version・kind(alert/automation/air_quality)・unitIds・enabledと、対応するDDの入力項目を持ちます。`get`は、保存されている現在のバージョンを返します | `alert`の場合は`alert.policy.manage`、`automation`と`air_quality`の場合は`automation.policy.manage`という権限が必要です。対象の範囲内でだけ閲覧・更新できます。再び訪れたときは、`get`でフォームを初期化します |
-| jobs.get | `draftReportRef`と`reportRefs`は、それぞれ`reportId`と`reportVersion`の組です。まだ作成していないdraftはnullになります | 技術者が最初にdraftを作るときは、`jobId`を付けて`saveDraft`を呼び出し、IDを生成します。既存のdraftを再開するときは、`reports.get`を使います |
-| reports.get | `jobId`・`reportId`・`reportVersion`のすべてが一致する`WorkReport`を返します。items/measurements/parts/workText/nextAction/attachmentRefsと、作成者・バージョン・提出や受理の情報を含みます | 有効に担当している人は、自分の案件のdraftや提出版を見られます。品質担当は提出版を見られます。顧客は、受理済みのバージョンだけを見られます。過去のバージョンは変更されません。外部への委託が失効した後は、JobHistorySnapshotだけが見られ、本文の取得は拒否されます |
-| attachments.add | 作成済みのdraftの`jobId`と`reportId`に、JPEGまたはPNGを追加します。MIMEタイプ・内容・サイズ・枚数を検証し、Blob(画像データ)と`Attachment`を、同じモックの中で保持します | 技術者が有効に担当していて、かつ編集できるdraftのときだけ追加できます。`Attachment`は、id/jobId/reportId/blobId/name/mime/size/statusを持ちます |
-| attachments.getContent | 指定した`reportVersion`に結び付いている`attachmentId`のBlob(画像データ)を返します。URLは返しません | `reports.get`と同じ公開の判定基準を使います。画面側で`URL.createObjectURL`を使って一時的なURLを作り、離脱や切替でrevoke(解放)します。再び訪れたときは、あらためて取得・再生成します |
-| inquiries.list | 顧客には、自分の`invoiceId`や`restrictionId`に結び付いている`Inquiry`を返します。HQには、`billing.manage`の権限で管理できる範囲のものを返します | 顧客は、received/answeredの状態とreply(返信)を見られます。回答の通知にあるtarget.idから、同じ請求の画面を開き、inquiryIdで対象を選びます。別の顧客の回答を返すことはありません |
-| devices.addResponseNote | `deviceId`と`eventId`に、`responseNote`(1〜1000文字)を、作成者・時刻・相関IDを付けて追記します | `device.maintain`の権限と、有効な担当であることが必要です。確認のメモを追加しても、接続状態やtamper(不正な取り外し)の状態は変わりません。復旧は、`/demo`の独立したイベントとして扱います |
+| policies.list/get | `Policy` includes id, version, kind(alert/automation/air_quality), unitIds, enabled, and relevant DD inputs. `get` returns the current saved version | `alert` requires `alert.policy.manage`; `automation`/`air_quality` require `automation.policy.manage`. Read/write only within scope. Initialize revisited forms through `get` |
+| jobs.get | `draftReportRef` and `reportRefs` each pair `reportId` with `reportVersion`. An uncreated draft is null | To create the first draft, technician calls `saveDraft` with `jobId` to generate an ID. Resume existing drafts through `reports.get` |
+| reports.get | Return `WorkReport` matching `jobId`, `reportId`, and `reportVersion`. Include items/measurements/parts/workText/nextAction/attachmentRefs, author, version, submission, and acceptance data | Active assignees see their job's draft/submitted versions; quality reviewers see submitted versions; customers see accepted versions only. Past versions are immutable. After external delegation expires, only JobHistorySnapshot is visible; deny report body fetches |
+| attachments.add | Add JPEG/PNG to an existing draft's `jobId`/`reportId`. Validate MIME, content, size, and count; keep Blob and `Attachment` in the same mock | Requires active technician assignment and editable draft. `Attachment` has id/jobId/reportId/blobId/name/mime/size/status |
+| attachments.getContent | Return the Blob for `attachmentId` linked to the specified `reportVersion`, not a URL | Same visibility rules as `reports.get`. Screen creates temporary URLs using `URL.createObjectURL`, revokes on leave/switch, and refetches/recreates on revisit |
+| inquiries.list | Customers receive `Inquiry` linked to their own `invoiceId`/`restrictionId`; HQ receives those within `billing.manage` scope | Customers see received/answered and reply. Open the same invoice through answer-notification target.id, then select inquiryId. Never return another customer's reply |
+| devices.addResponseNote | Append `responseNote` (1–1000 characters) to `deviceId`/`eventId` with author, time, and correlation ID | Requires `device.maintain` and active assignment. Notes do not change connection or tamper state. Recovery is a separate `/demo` event |
 
-画像の本体は、共有Repositoryの`Map<blobId, Blob>`に保持します。サインアウトや役割の切り替えをしても、共有しているBlobを消すことはありません。まだ保存していない、ローカルで選んだだけの画像は、画面を離れるときに破棄できます。draftから写真を削除する操作は、`jobs.saveDraft`の`attachmentIds`の差分で表します。提出済みの旧バージョンから参照されているBlobは、残しておきます。どこからも参照されなくなったBlobは解放します。resetのときは、すべてのBlobとすべての一時URLを解放します。提出に失敗しても、本文や保存済みの画像が失われることはありません。
+Keep image bodies in shared Repository `Map<blobId, Blob>`. Sign-out and role switching do not delete shared Blobs. Locally selected unsaved images may be discarded on leave. Remove draft photos through differences in `jobs.saveDraft.attachmentIds`. Keep Blobs referenced by older submitted versions; release unreferenced Blobs. Reset releases all Blobs and temporary URLs. Submission failure must not lose text or saved images.
 
-`WorkReportDraft`の入力は、jobId、reportId(初回はなし)、items（InspectionItemInput）、measurements（InspectionMeasurementInput）、parts、workText、nextAction、attachmentIdsです。初回の応答には、reportIdとversionが返されます。更新するときは、`expectedVersion`が必須です。ドラフトの間は、まだ完了していない項目があっても構いません。提出(submit)のときに、それぞれのDDにある必須項目を検証します。提出済みのバージョンや、過去のバージョンを直接編集することはありません。再作業や再割当のときは、過去のバージョンを参照して、新しいdraftのバージョンを作ります。過去のバージョンと、それぞれの記録の作成者は、そのまま維持します。
+`WorkReportDraft` inputs are jobId, reportId (absent initially), items (InspectionItemInput), measurements (InspectionMeasurementInput), parts, workText, nextAction, and attachmentIds. The first response returns reportId/version; updates require `expectedVersion`. Drafts may be incomplete. Submit validates each DD's required fields. Never directly edit submitted/past versions. Rework or reassignment creates a new draft version referencing the old one, preserving past versions and each record's author.
 
-### 2. 試運転
+### 2. Test Runs
 
 ```ts
 type CreateDiagnosticRunInput = {
@@ -299,8 +299,8 @@ type CreateDiagnosticRunInput = {
   unitId: string;
   startAction: UnitAction;
   endAction: UnitAction;
-  durationMinutes: number; // 整数1〜15
-  reason: string;          // 1〜1000文字
+  durationMinutes: number; // Integer 1–15
+  reason: string;          // 1–1000 characters
   expectedUnitVersion: number;
   expectedJobVersion: number;
 };
@@ -317,37 +317,37 @@ type DiagnosticRun = {
 };
 ```
 
-通常の1回だけの診断操作は`commands.create`を使います。時間を指定した試運転は、`diagnosticRuns.create`がrunと開始のCommandを作り、`get`が同じrunを返します。`create`のときには、両方のactionについて、能力・制限・`control.diagnose`・有効な担当・online(通信可能)であること・ファームウェアが更新中でないことを検証します。同じ設備で、進行中のrun(`awaiting_start`/`running`/`end_requested`)があるか、まだ完了していないCommandがある場合は、`CONFLICT`になります。`start_failed`/`end_failed`/`end_blocked`は、履歴として残る終了状態であり、状態をあらためて確認した後に、明示的な復旧操作を行うことは妨げません。開始と終了のCommandは、どちらも`diagnosticRunId`を持ちます。
+Use `commands.create` for one-off diagnostic actions. For timed test runs, `diagnosticRuns.create` creates the run and start Command; `get` returns that run. At creation, validate both actions for capabilities, restrictions, `control.diagnose`, active assignment, online status, and no firmware update. An active run (`awaiting_start`/`running`/`end_requested`) or unfinished Command on the same unit causes `CONFLICT`. `start_failed`/`end_failed`/`end_blocked` are terminal history states; after rechecking state, explicit recovery actions remain allowed. Start and end Commands both carry `diagnosticRunId`.
 
-| 現状態 | イベント | 次状態・結果 |
+| Current state | Event | Next state and result |
 |---|---|---|
-| awaiting_start | 開始Commandが期限内acknowledged | `running`(実行中)になります。`startedAt`は応答した時刻です。`endAt`は`startedAt + durationMinutes`です |
-| awaiting_start | 開始失敗・30秒期限超過 | `start_failed`(開始失敗)になります。終了のタイマーは動きません。開始済みとは表示しません |
-| running | now>=endAt、元の担当・権限・現能力・制限・onlineを再確認して終了要求 | `end_requested`(終了要求中)になります。`endAction`のCommandを1件作成します |
-| running | 終了時に担当失効・権限剥奪・能力/制限変更・FW競合 | `end_blocked`(終了ブロック)になります。要求は0件のままで、「未停止・要確認」という注意を、HQと技術者へ表示します |
-| running | 終了時にoffline | `end_failed`(終了失敗)になります。「未停止・要確認」という表示と、再照会するための導線を出します。成功したという表示はしません |
-| end_requested | 終了Commandの期限内acknowledged | `completed`(完了)になります。応答した`endAction`の観測値を表示します。「停止済み」と表示するのは、`endAction`が電源OFFの場合だけです |
-| end_requested | 失敗・期限超過 | `end_failed`(終了失敗)になります。終了を確認できなかったことと、Commandの履歴を保持します |
+| awaiting_start | Start Command acknowledged before deadline | `running`; `startedAt` is acknowledgement time; `endAt` is `startedAt + durationMinutes` |
+| awaiting_start | Start failure or 30-second expiry | `start_failed`; do not start the end timer or show started |
+| running | now>=endAt; recheck original assignment, permissions, current capabilities, restrictions, and online status, then request end | `end_requested`; create one `endAction` Command |
+| running | At end: assignment expiry, permission removal, capability/restriction change, or FW conflict | `end_blocked`; create zero requests and warn HQ/technician “Not stopped; check required” |
+| running | Offline at end | `end_failed`; show “Not stopped; check required” and a requery path, not success |
+| end_requested | End Command acknowledged before deadline | `completed`; display observed values from the acknowledged `endAction`. Show “Stopped” only if `endAction` is power OFF |
+| end_requested | Failure or expiry | `end_failed`; retain unconfirmed ending and Command history |
 
-`create`のときには、「現在時刻 + 30秒 + duration < 担当のvalidUntil」であることを求め、通常の実行中に担当期限が切れてしまう予定は拒否します。それでも、途中で権限が失効したり剥奪されたりした場合は、終了のときにあらためて判定します。終了できなくなった場合の復旧は、現在の権限を満たしている担当が、明示的な診断操作を行うことで行います。自動での再送はしません。過去のrunの失敗履歴を、後から`completed`に書き換えることはありません。
+At `create`, require now + 30 seconds + duration < assignment.validUntil. Reject schedules expected to outlast assignment. Still recheck at end if permissions expire or are removed during the run. An assignee with current permission recovers through an explicit diagnostic action. Do not resend automatically or rewrite old failed runs as `completed`.
 
-タイマーは、画面が持つのではなく、共有しているモック時計の購読として保持します。サインアウト・画面を離れる・役割の切り替えは、閲覧のための要求だけを中断します。すでに受理されたrunの業務イベントは、そのまま続きます。実行の主体は、作成時のMembership(所属)を使って現在の権限を再評価します。切り替え先の主体に置き換えることはしません。resetのときは、Repositoryのgeneration(世代番号)を変えるだけで、過去のrunと過去のイベントを破棄します。
+Keep timers as subscriptions to the shared mock clock, not screen-owned timers. Sign-out, navigation away, and role switching abort only viewing requests; accepted run business events continue. Re-evaluate current permissions using the Membership from creation, never the switched-to actor. Reset changes Repository generation and discards old runs and events.
 
-### 3. 手動入金と複数請求
+### 3. Manual Payments and Multiple Invoices
 
-- `payments.confirm(paymentId, ...)`は、既存の`processing`(処理中)のPaymentを`confirmed`(確定済み)にします。`payments.recordManual(invoiceId, ...)`は、Paymentがないか、失敗の履歴だけがある`unpaid`(未入金)の請求に対して、`method=null`の`confirmed`なPaymentを新しく作成します。どちらの操作にも`billing.manage`の権限が必要です。
-- `recordManual`の金額は、請求の全額でなければなりません。通貨は、請求の通貨と一致させます。`reason`は1〜1000文字、`paymentReference`は1〜128文字です。すでに`initiated`または`processing`のPaymentがある場合は`CONFLICT`とし、結果が確定した後にあらためて照会します。`paid`(支払い済み)の請求に対して、新しい入金を作ることはありません。
-- 同じtenant・invoice・referenceで、同じ金額・通貨の確認が再び来た場合は、`expectedVersion`の判定より先に、既存の成功結果をそのまま返します。参照(reference)を別の請求に流用したり、同じ参照で金額を変えたりした場合は`CONFLICT`になります。新しい意思として別のキーを使っても、二重の入金は拒否します。
-- Paymentの`confirmed`、Invoiceの`paid`、監査・通知・関連する制限の評価は、同じモックの遷移処理でまとめて更新します。顧客のカード決済が成功したイベントも、同じ確定用の関数を使います。決済のシミュレーションと手動での確認が競合した場合は、どちらか一方だけが確定します。
-- Invoiceの`paymentMethod`と`paymentStatus`は、最新のPaymentの`method`と`status`から導き出します。カード決済が失敗した後に手動入金が確定した場合、現在の方法(method)はnullになりますが、過去のカードの種別は履歴に残ります。`paymentRefs`は、id・version・method・status・reference・confirmedAtを、表示に必要な範囲で返します。
+- `payments.confirm(paymentId, ...)` confirms an existing `processing` Payment. `payments.recordManual(invoiceId, ...)` creates a new `confirmed` Payment with `method=null` for an `unpaid` invoice with no Payment or only failed history. Both require `billing.manage`.
+- `recordManual` requires the full invoice amount and matching currency. `reason`: 1–1000 characters; `paymentReference`: 1–128. If an `initiated` or `processing` Payment exists, return `CONFLICT` and requery after its result is final. Never create a new payment for a `paid` invoice.
+- Repeated confirmation with the same tenant/invoice/reference and matching amount/currency returns existing success before checking `expectedVersion`. Reusing a reference for another invoice or changing its amount returns `CONFLICT`. A new intent/key does not allow duplicate payment.
+- Update Payment `confirmed`, Invoice `paid`, audit, notifications, and related restriction evaluation together in one mock transition. Successful customer card events use the same finalization function. If simulated payment and manual confirmation compete, only one finalizes.
+- Derive Invoice `paymentMethod`/`paymentStatus` from the latest Payment `method`/`status`. If manual payment succeeds after card failure, current method becomes null while old card type remains in history. `paymentRefs` returns id, version, method, status, reference, and confirmedAt as needed for display.
 
-制限を作成するときの`causeInvoiceIds`は、同じ契約にある、期限を超過していてかつ未入金の請求をすべて列挙します。空の集合は拒否します。作成時には、モック側で再計算し、入力した集合と一致することを確認したうえで、以後はその内容を固定します。契約・顧客・通貨を照合し、別の契約の請求を混ぜることはありません。`restrictions.forInvoice`は、この集合に含まれているかどうかで検索します。
+On restriction creation, `causeInvoiceIds` lists all overdue unpaid invoices in the same contract. Reject an empty set. Recalculate in the mock, verify the input set matches, then freeze it. Match contract, customer, and currency; never mix contracts. `restrictions.forInvoice` searches membership in this set.
 
-原因となった請求のすべてが`paid`(支払い済み)になったときだけ、自動的に`scheduled`を`cancelled`に、`requested`/`applied`を`release_requested`に進めます。1件だけ入金があった場合は、適用の状態をそのまま維持し、原因請求のうち未入金の件数を表示します。`processing`(処理中)は`paid`とは扱いません。後から発行した請求を、既存の予告に自動で追加することはありません。
+Only when every cause invoice is `paid`, automatically move `scheduled` to `cancelled` and `requested`/`applied` to `release_requested`. One payment alone keeps application state and shows the remaining unpaid cause count. `processing` is not `paid`. Do not automatically add later invoices to existing notices.
 
-1A(このフェーズ)では、1つの設備につき、進行中の制限(scheduled/requested/applied/release_requested)を1件だけに限定します。重なる新しい`schedule`は`CONFLICT`として拒否します。既存の制限が`cancelled`または`released`になった後であれば、新しい原因請求に対して、別のIDで予告を作ることができます。手動での解除には`restriction.override`、適用後の猶予や例外にともなう解除には`restriction.manage`という権限で許可する、という提案です。どちらの場合も、Invoiceを変更することはありません。release(解除)の操作は、未入金が残っていて猶予・例外もない場合はFORBIDDENとし、release_requestedでは冪等に現在状態を返します(IR35)。例外操作の権限経路とは混同しないでください。
+Phase 1A allows one active restriction (scheduled/requested/applied/release_requested) per unit. Reject overlapping new `schedule` as `CONFLICT`. After the existing restriction becomes `cancelled` or `released`, a new cause set may have a new notice ID. Proposed permissions: `restriction.override` for manual release; `restriction.manage` for release due to grace/exception after application. Neither changes Invoice. release with unpaid invoices and no grace/exception returns FORBIDDEN; in release_requested it idempotently returns current state (IR35). Keep this distinct from exception-operation permission paths.
 
-### 4. 制限Commandと解除の観測値
+### 4. Restriction Commands and Release Observations
 
 ```ts
 type RestrictionPolicy =
@@ -360,46 +360,46 @@ type RestrictionAction =
       rulesVersion: string };
 ```
 
-`RestrictionAction`は、共有モックのrestriction(制限)の遷移処理だけが作る内部用のactionです。`commands.create`、音声操作、顧客のautomation(自動化)、診断からは受け付けません。`Command.action`は、`UnitAction`か`RestrictionAction`のどちらかです。機器の確認状態には、`observedRestriction: {restrictionId, rulesVersion, policy} | null`と、確認した時刻を持たせます。これは、通常の設定値とは分けて扱います。
+`RestrictionAction` is an internal action created only by shared mock restriction transitions. Reject it through `commands.create`, voice, customer automation, or diagnosis. `Command.action` is `UnitAction` or `RestrictionAction`. Device confirmed state holds `observedRestriction: {restrictionId, rulesVersion, policy} | null` and confirmation time, separately from ordinary settings.
 
-| 応答したaction | 確認済みの状態変化 | 変化させない値 |
+| Acknowledged action | Confirmed state change | Values kept unchanged |
 |---|---|---|
-| temperature_limit適用 | `observedRestriction`へ保存します。設定温度が下限未満であれば、下限まで上げます。下限以上であれば、そのまま維持します | 電源の状態と室温は変更しません |
-| power_off適用 | `observedRestriction`へ保存し、確認済みの電源をOFFにします | 設定温度と室温は変更しません |
-| remove_restriction | 対象のIDとバージョンの`observedRestriction`をnullにします。通常操作の可否をSR05/SR26で再計算します。後継制限や未解決caseがあれば制限を維持します | 自動でONにしたり、適用前の温度に戻したりすることはしません。解除した時点の電源と設定温度を、そのまま維持します |
+| Apply temperature_limit | Save to `observedRestriction`. Raise a setpoint below the minimum to the minimum; otherwise keep it | Power state and room temperature |
+| Apply power_off | Save to `observedRestriction` and set confirmed power OFF | Setpoint and room temperature |
+| remove_restriction | Set `observedRestriction` for the target ID/version to null. Recalculate ordinary action eligibility under SR05/SR26. Keep restrictions if a successor or unresolved case exists | Do not turn ON automatically or restore the pre-application temperature. Keep power and setpoint as they are at release |
 
-応答が来る前は、観測値を変更しません。ただし、適用要求中や解除要求中であっても、通常操作のpolicy(方針)では制限を保持し、回避されないようにします。解除は、同じ`restrictionId`・バージョン・Command IDへの成功応答と、観測値がnullであることの両方を照合して、設備ごとの完了とします。すべての設備でreleasedまたはnot_requiredの証跡が揃ったときだけ集約`released`になります。適用要求がまだ確定していない場合は、解除したいという意思だけを保持しておき、D03に従い結果を照会し、適用済みなら`remove`、未適用確定なら`not_required`とします。遅れて届いた適用のイベントによって、`release_requested`を`applied`に戻すことはありません。
+Do not change observations before acknowledgement. Ordinary action policy still enforces restrictions during apply/release requests to prevent bypass. Per-unit release completion requires both success for the same restrictionId/version/Command ID and a null observation. Aggregate state becomes `released` only with released or not_required evidence for every unit. If apply is unresolved, keep release intent and query under D03; use `remove` if applied or `not_required` if confirmed unapplied. Late apply events never return `release_requested` to `applied`.
 
-### 5. 用語と入力型の共通規則
+### 5. Shared Terminology and Input-Type Rules
 
-正式な名前は、`UnitAction`、`parentSpaceId`、`planType=rto`、`channel=inApp/email/whatsapp`、証明の参照に使う接頭辞`DEMO-`です。役割を表す識別子は、次の表を正式なものとし、それ以外はすべて翻訳のためのラベルです。
+Canonical names are `UnitAction`, `parentSpaceId`, `planType=rto`, `channel=inApp/email/whatsapp`, and proof-reference prefix `DEMO-`. The table defines canonical role identifiers; other names are translated display labels.
 
-| 役割 | role enum | route prefix | permission prefix | 組織kind | 日本語正式名（略記） | 英語表示 |
+| Role | role enum | route prefix | permission prefix | Organization kind | Formal role name (short form) | English display |
 |---|---|---|---|---|---|---|
-| クライアント | client | /customer | control.* | customer | クライアント（顧客） | Client |
-| 施工業者 | contractor | /partner | partner.* | contractor | 施工業者（業者） | Contractor |
-| 技術者 | technician | /technician | control.diagnose, device.maintain, alert.resolve | contractor または operator | 技術者（社内/外部） | Technician |
-| 管理者 | admin | /admin | job/contract/billing/identity/device/restriction/mrv/offset/audit/*.policy | operator | 管理者（HQ） | Admin / HQ |
+| Client | client | /customer | control.* | customer | Client (customer) | Client |
+| Contractor | contractor | /partner | partner.* | contractor | Contractor | Contractor |
+| Technician | technician | /technician | control.diagnose, device.maintain, alert.resolve | contractor or operator | Technician (internal/external) | Technician |
+| Administrator | admin | /admin | job/contract/billing/identity/device/restriction/mrv/offset/audit/*.policy | operator | Administrator (HQ) | Admin / HQ |
 
-資源の正規名は次のとおりです。ACUnit(設備・エアコン本体)、Device(機器・IoT機器)、MaintenanceJob(案件・顧客の依頼)、Offer(委託の申し出・HQから業者への依頼)、Assignment(割当)、Inquiry(顧客の問い合わせ)、Alert(異常)、Notification(通知)。「依頼」はJob、「委託」はOfferを指します。企業向けの文書(PrepareDocument)では正式名を使います。要件や設計本文にある「顧客」「業者」「HQ」は、同じ役割の略した呼び方として扱います。routeやenumの値を、表示名から推測してはいけません。preview/simulated/failedは`deliveryState`(配信状態)として表し、channelの値には混ぜません。UIに出てくる「RTO」「顧客」「HQ」は翻訳のためのラベルであり、保存用のenumとは分けて考えます。
+Canonical resources: ACUnit (AC equipment), Device (IoT device), MaintenanceJob (customer work request), Offer (HQ delegation offer to a contractor), Assignment, Inquiry (customer inquiry), Alert, and Notification. “Request” means Job; “delegation” means Offer. Company-facing PrepareDocument uses formal names. “Customer,” “contractor,” and “HQ” in requirements/designs are short role names. Never infer routes or enum values from labels. preview/simulated/failed are `deliveryState`, not channel values. UI “RTO,” “customer,” and “HQ” are translated labels separate from stored enums.
 
-それぞれの`*Input`は、対応するDDの入力欄を、名前付きのプロパティとして持ちます。save(保存)操作では、新規の場合はidを省略し、既存の場合はidが必須です。既存のものを更新するときは`expectedVersion`が必須です。`PolicyInput`は`kind`を判別子にし、DD-A05・DD-A11・DD-A12を、それぞれ別のschemaにします。`AutomationInput`は、`schedule`(DD-C04)と`event`(DD-C05)を`kind`で区別し、共通して`id?`/`name`/`unitIds`/`timezone`/`enabled`/`priority`(既定値50)を持ちます。`event`の条件は、`occupancy={occupied:boolean}`、`location={event:arrival/departure}`、`pattern={localTime:HH:mm}`(評価はIR52)、`weather={metric:temperature,operator:gt/gte/lt/lte,value:number}`です。HQの条件は、`occupancy`は同じ形で、`tariff={operator,value,unit:MYR_per_kWh}`、`peak={active:boolean}`、`solar/battery={operator,value,unit:kW}`というデモに限ります。値が欠けている場合を、条件が成立したとは扱いません。
+Each `*Input` carries the corresponding DD inputs as named properties. For save, omit id on creation and require it for existing records. Updates require `expectedVersion`. `PolicyInput` uses `kind` to distinguish DD-A05, DD-A11, and DD-A12 schemas. `AutomationInput.kind` distinguishes `schedule` (DD-C04) and `event` (DD-C05), with shared `id?`/`name`/`unitIds`/`timezone`/`enabled`/`priority` (default 50). Event conditions: `occupancy={occupied:boolean}`, `location={event:arrival/departure}`, `pattern={localTime:HH:mm}` (IR52 evaluation), `weather={metric:temperature,operator:gt/gte/lt/lte,value:number}`. HQ occupancy uses the same form; its demo-only conditions are `tariff={operator,value,unit:MYR_per_kWh}`, `peak={active:boolean}`, and `solar/battery={operator,value,unit:kW}`. Missing values never count as matched conditions.
 
-`ListQuery`のfilters/sort/defaultは[Query契約](query-catalog.csv)だけを許可リストとする。本文の検索項目名は表示ラベルであり、未登録のキーを追加してはならない。aliasは同表filter_mapping/sort_mappingで解決し、未知キーはVALIDATION。
+Use only the [Query Contract](query-catalog.csv) allowlist for `ListQuery` filters/sort/defaults. Search names in prose are display labels; do not add unregistered keys. Resolve aliases through filter_mapping/sort_mapping; unknown keys return VALIDATION.
 
 
-### 6. 自動運転・方針の発火
+### 6. Triggering Automation and Policies
 
-発火・simulateの入力はEvaluationInput、結果はSimulationResult/FireResult。D02の同一snapshot・全候補仲裁・owner主体・設備別結果・event重複処理を適用する。単一ruleだけを評価して他の方針を迂回する旧入力は廃止する。simulateはCommand/監査/通知を生成しない。fireは呼出者の認可を行い、評価内の抑止とは区別する。
+Trigger/simulate input is EvaluationInput; results are SimulationResult/FireResult. Apply D02's same-snapshot evaluation, arbitration of all candidates, owner actor, per-unit results, and event deduplication. Retire old single-rule inputs that bypass other policies. simulate creates no Commands/audit/notifications. fire authorizes the caller separately from suppression within evaluation.
 
-## DDC-09 共通の監査・試験規則
+## DDC-09 Shared Audit and Test Rules
 
-業務上の変更は、action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAtを記録します。データの取得に成功しただけでは、業務の履歴を増やしません。アクセスが拒否された場合は、内容をマスク(伏せた状態)にして記録します。通知先や公開のタイミングは、この文書の「通知と公開範囲」に従います。読み取り専用の画面では、mutation(データ変更)は行いません。フォームの有無にかかわらず全Repository入力を検証します。保存する直前の認可の確認とバージョンの照合、失敗したときの回復方法は、DDC-03の規則を共通して適用します。
+Business changes record action / actorMembershipId / targetId / previousVersion / nextVersion / correlationId / result / occurredAt. Successful reads do not add business history. Record access denials with masked content. Recipients and publication timing follow “Notifications and Visibility.” Read-only screens do not mutate. Validate all Repository inputs, with or without forms. Apply DDC-03 shared rules for authorization/version checks immediately before saving and failure recovery.
 
-MRVの確認は、同じ`reportId`・`reportVersion`・同じコメントで再送された場合は、既存の結果をそのまま返し、履歴は追加しません。異なるコメントで、同じ確認済みのバージョンを変更しようとした場合は`CONFLICT`になります。バージョンが変わった後の報告は、あらためて確認します。
+MRV review resubmission with the same `reportId`, `reportVersion`, and comment returns the existing result without adding history. A different comment on the same reviewed version returns `CONFLICT`. A new report version requires a new review.
 
-顧客のメモは`visibility=customer`だけを指定できます。業者のメモは`internal`か`customer`のどちらかを指定できます。画面のrecipientRoleは宛先絞り込み用の表示値です。`notifications.preview`には、対象jobの現在の関係者から選択したrecipientMembershipIdを渡します。複数候補なら必須選択、0件なら送信不可です。`internal`の場合は、`customer_contact`(顧客の連絡先)への公開を拒否します。任意のアドレスや、請求レコードの参照を書き写すことは許可しません。自由な文章の内容を完全に自動で検出できる、という保証はしません。デモでは、架空のデータだけを使用します。
+Customer notes allow only `visibility=customer`; contractor notes allow `internal` or `customer`. UI recipientRole is a recipient-filter label. Pass `notifications.preview` a recipientMembershipId selected from current job participants. Multiple candidates require selection; zero candidates prevents sending. `internal` forbids disclosure to `customer_contact`. Do not allow arbitrary addresses or copied billing-record references. Do not claim complete automatic detection of free-text content. Use only fictional demo data.
 
-0.9.0修正契約: [厳格レビュー修正契約](strict-review-contracts.md)と[操作別版契約](write-version-catalog.csv)を併読する。
+0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-現行0.21.0の追加契約: [再レビュー修正契約](review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+Additional contracts for current version 0.21.0: Read IR01–106 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

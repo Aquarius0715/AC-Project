@@ -1,25 +1,25 @@
-# DOC-0.21.0 独立G1最終判定
+# DOC-0.21.0 Final Independent G1 Decision
 
-**PASS — 未解決指摘0件。**
+**PASS — zero unresolved findings.**
 
-対象は親コミット`717c545`に対する未コミットのDOC-0.21.0仕様。最終baselineは`02a1e39793df35f760afe9188e86141c8790cd7e92366efbddb7f62aff62e908`。仕様修正担当はCodex root、検証器修正担当はfixtures_review。独立判定は修正に参加していない[契約担当](contracts-review.md)と[UI・要件担当](ui-review.md)が行い、本記録はその結果を統合したもの。
+The target is the uncommitted DOC-0.21.0 specification based on parent commit `717c545`. Final baseline: `02a1e39793df35f760afe9188e86141c8790cd7e92366efbddb7f62aff62e908`. Codex root edited the specifications; fixtures_review edited the validator. The [contract reviewer](contracts-review.md) and [UI/requirements reviewer](ui-review.md), neither involved in corrections, made independent decisions. This record combines their results.
 
-## 修正と再レビュー
+## Corrections and re-review
 
-1. DOC-0.20.0のG120-001〜005を修正。A12の継続時間、通知分類・重大度、アレルゲン変更イベント、通知fixtureの作成時scope版を契約・入力・受入条件・追跡表へ反映した。
-2. 初回の独立再レビューでは元の5件の解消を確認し、新しい受入文言のMINOR 1件（UI21-001）を検出した。「故障フィルター」を既存の「故障アイコン・ラベル」に修正した。
-3. 新しいbaselineで両担当が全65ファイルのhash一致と変更差分を独立確認し、PASS、未解決指摘0件と判定した。前候補との差分は受入CSVの文言1箇所だけで、初回証跡は[round-1](round-1/ui-review.md)に保持した。
+1. Fixed DOC-0.20.0 findings G120-001–005. Applied A12 duration, notification classification/severity, allergen change events, and notification-fixture creation-time scope versions to contracts, inputs, acceptance criteria, and traceability.
+2. The first independent re-review confirmed that the original five findings were resolved and found one new MINOR wording issue (UI21-001). Replaced "fault filter" with the existing "fault icon and label."
+3. Both reviewers independently checked all 65 file hashes and changes against the new baseline, deciding PASS with zero unresolved findings. Only one acceptance CSV phrase differs from the previous candidate. First-round evidence remains in [round-1](round-1/ui-review.md).
 
-## 検証
+## Validation
 
-- [静的検証とTypeScript strict](../static-check.json): 成功。
-- [変異テスト](../validator-negative-checks.json): 102/102検出。既存84件と追加18件。
-- [受入入力の型検査](../contract-type-examples-result.json): 完全なPolicy/Fire/Trigger入力が正規DTOと一致。
-- [baseline整合](../baseline-integrity-check.json): 65ファイルとbaseline SHA-256が一致。
-- [サイクル記録](../review-cycle.json)、[最終gate](../gate-G1.yaml)、[完了記録](../completion.json)。
+- [Static checks and TypeScript strict](../static-check.json): passed.
+- [Mutation tests](../validator-negative-checks.json): 102/102 detected, comprising 84 existing and 18 new cases.
+- [Acceptance input type checks](../contract-type-examples-result.json): complete Policy/Fire/Trigger inputs match canonical DTOs.
+- [Baseline integrity](../baseline-integrity-check.json): all 65 files and the baseline SHA-256 match.
+- [Cycle record](../review-cycle.json), [final gate](../gate-G1.yaml), [completion record](../completion.json).
 
-## 範囲と残る確認
+## Scope and remaining checks
 
-判定対象はDOC-0.20.0で残った指摘と、その修正が影響する1A仕様の整合性。全旧受入subcaseを今回実行した、または既存全仕様を全面再レビューしたという主張ではない。アプリ実装・動作試験は未着手/未実行。企業検収前のPROPOSED確認（DEC-60/61を含む）、本番接続D11、デプロイ前の人・外部レビューは別工程。G1合格を企業承認やデプロイ許可として扱わない。
+This decision covers remaining DOC-0.20.0 findings and consistency of the 1A specifications affected by their corrections. It does not claim that all older acceptance subcases were executed or that all existing specifications were fully re-reviewed. Application implementation/tests are not started/not run. Review of PROPOSED items before company acceptance (including DEC-60/61), production connection D11, and human/external review before deployment are separate stages. G1 pass is not company approval or deployment permission.
 
-仕様・レビュー資料のコミットとpushは実施していない。
+The specifications and review materials have not been committed or pushed.

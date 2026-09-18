@@ -1,17 +1,17 @@
-# 独立G1レビュー報告 DOC-0.19.0（2026-09-17）
+# Independent G1 Review Report DOC-0.19.0 (2026-09-17)
 
-- レビュー主体: 独立G1レビュー担当AI（別エージェント。DOC-0.19.0の修正担当・自己再レビュー担当とは別の実行）
-- 対象: リポジトリ `/Users/ji1wxs/PraditaProjects/AC_Project`、ブランチ `docs/0.19.0-independent-review`、コミット `0505446`
-- spec_baseline_id: `048ffcef25f8463bca33346f5bb1dd8dbb1fdad03b61132d1cfc5d17ebeb1ac2`（[spec-manifest](../spec-manifest.json)、61ファイル）
-- 範囲: 1A（クリック可能なフロントエンドのモックデモ）。API/HTTP・DB・サーバー・実機・実決済はDEC-12/D11により本番未決事項として扱い、本判定の阻害項目に数えていない。
-- 判定根拠は現行baselineの文書本文だけとし、修正担当の自己レビュー記録（../review.md）は判定後にヘッダーだけ参照した。過去版（runs/DOC-0.17.0以前、05-document-review）の指摘は参照・再掲していない。
-- アプリは未実装であり、アプリ試験は実行していない（not_run）。
+- Reviewer: Independent G1 review AI (another Agent, running separately from the DOC-0.19.0 correction author/self-reviewer)
+- Target: Repository `/Users/ji1wxs/PraditaProjects/AC_Project`, branch `docs/0.19.0-independent-review`, commit `0505446`
+- spec_baseline_id: `048ffcef25f8463bca33346f5bb1dd8dbb1fdad03b61132d1cfc5d17ebeb1ac2` ([spec-manifest](../spec-manifest.json), 61 files)
+- Scope: 1A, a clickable frontend mock demo. APIs/HTTP, DB, servers, real devices, and real payments are pending production matters under DEC-12/D11 and are not counted as blockers for this decision.
+- The decision uses only the current baseline's document text. Only the header of the correction author's self-review (../review.md) was read after the decision. Findings from past versions (runs/DOC-0.17.0 and earlier, 05-document-review) were neither consulted nor repeated.
+- The application is not implemented; application tests were not run (not_run).
 
-## 1. 判定サマリー
+## 1. Decision Summary
 
-**G1判定: FAIL**
+**G1 decision: FAIL**
 
-| Severity | 件数 |
+| Severity | Count |
 |---|---|
 | BLOCKER | 0 |
 | CRITICAL | 0 |
@@ -19,50 +19,50 @@
 | MINOR | 17 |
 | QUESTION | 2 |
 
-両検証器（`validate_documents.py`、`check_review_regressions.py`）は成功し、manifestのSHA-256とbaseline IDも独立に再計算して一致した。カタログ間の機械的な整合（正規型137操作と操作カタログ、write 76操作と版カタログ、Query入力を持つread 35操作とQueryカタログ、画面カタログの操作参照、IR71の無効化表の操作名）にも不一致はなかった。
+Both validators (validate_documents.py and check_review_regressions.py) passed. Independently recalculated manifest SHA-256 values and baseline ID also matched. Mechanical catalog consistency checks found no differences: 137 canonical operations versus operation catalog, 76 writes versus version catalog, 35 Query-input reads versus Query catalog, screen operation references, and operation names in the IR71 invalidation table.
 
-一方で、文書本文の突き合わせにより、実装Agent・テストAgentが推測なしに進められない欠陥をMAJORとして12件検出した。要点は次のとおり。
+However, cross-document review found 12 MAJOR defects that prevent implementation and test Agents from proceeding without guesses:
 
-1. **G1-001** 社内技術者が案件（jobId）を持たずに行う書込み（alerts.acknowledge、devices.addResponseNote/calibrate/updateFirmware等）の認可が、操作カタログの`assigned-valid-job`・SR03と、AT-T07-N/AT-T12-N/AT-T11-E③/AT-REV19-021で食い違う。カタログ認可列の修飾語（assigned、assigned-valid-job、job-required等）の定義も無い。
-2. **G1-002** 業務イベント（案件の依頼・委託・受諾・割当、報告の提出・差戻し・完了、入金確認、機器障害等）で生成する通知のtemplateKey/type/channel/deliveryState/宛先Membershipが未定義で、templateKeyのenumにも対応値が無い。AT-P03-N④が依存する。
-3. **G1-003** requested/appliedの制限に対する`restrictions.cancel`の結果が、IR35（解除要求の起動経路は3つだけ）と、DD-A10・common.md §5・AT-A10-B②/E④（取消で解除要求へ進む）で矛盾する。
-4. **G1-004** AT-C06-E.3（およびAT-A13-E/B、AT-REV18-024、AT-REV19-041）のfixtureが120 kWのpower測定をquality=validで置いており、D07の合成値範囲power/kW:[0,100]とIR12の範囲外→suspect規則に反する。
-5. **G1-005** AT-A12-N/Bの「換気非対応設備には通知のみ」は、seedのunit-non-rto（device-tamper）にCO₂センサーが無いため、IR21/SR25の規則上成立しない。
-6. **G1-006** allergenObservation（BIZ-18）の取得元データ・導出規則・fixture投入経路が無く、AT-C07-SRC/AT-A12-SRCを作れない。
-7. **G1-007** 顧客の空気環境画面の「換気を推奨」「清掃の案内」を出す条件が未定義で、AT-C07-N②を判定できない。
-8. **G1-008** 報告提出時に必須となる点検項目集合（UnitDetail.componentsの導出）が未定義で、AT-T04/T05/T06/T08/T09-Nの「提出成功」の前提入力（他グループの点検結果、workText、nextAction）が欠けている。
-9. **G1-009** AT-A05-Nの保存入力に必須項目（name、recoveryThreshold、cooldownMinutes、escalateAfterMinutes）とenabledが無く、IR07の新規既定enabled=falseでは期待結果（Alert/通知の生成）に到達しない。
-10. **G1-010** AT-C04-E③とAT-FIX-019が時計を2026-03-07／2026-10-31に置くが、seedの全actorのMembership有効期間は[2026-09-01, 2026-10-01)で、期待値VALIDATIONが一意に決まらない。
-11. **G1-011** AT-REV19-015はAssignment.scheduledEndだけをpatchするが、IR89の「作業窓終了・再割当が必要」表示はJob.scheduledSlot.endAtで判定するため、期待結果が出ない。
-12. **G1-012** verification.mdが実施を求める旧受入計画（AT-REV17-004/005/014、AT-REV18-003）の期待値が、現行のIR57/IR74/D05/IR47とseedに矛盾する。
+1. **G1-001:** Authorization for internal-technician writes without jobId (alerts.acknowledge, devices.addResponseNote/calibrate/updateFirmware, etc.) conflicts between assigned-valid-job/SR03 and AT-T07-N/AT-T12-N/AT-T11-E③/AT-REV19-021. Catalog qualifiers such as assigned, assigned-valid-job, and job-required are undefined.
+2. **G1-002:** Business-event notifications (job requests/offers/acceptance/assignment, report submission/return/completion, payment confirmation, device faults, etc.) lack templateKey/type/channel/deliveryState/recipient Membership rules. The templateKey enum also lacks matching values. AT-P03-N④ depends on this.
+3. **G1-003:** restrictions.cancel on requested/applied conflicts between IR35's three release-start paths and DD-A10/common.md §5/AT-A10-B②/E④, which start release on cancellation.
+4. **G1-004:** AT-C06-E.3 fixtures (also AT-A13-E/B, AT-REV18-024, AT-REV19-041) mark 120kW as valid, violating D07 power/kW [0,100] and IR12 out-of-range→suspect.
+5. **G1-005:** AT-A12-N/B notification-only behavior for unsupported ventilation cannot hold under IR21/SR25 because seeded unit-non-rto/device-tamper has no CO₂ Sensor.
+6. **G1-006:** allergenObservation (BIZ-18) has no source data, derivation, or fixture input path, so AT-C07-SRC/AT-A12-SRC cannot be built.
+7. **G1-007:** Conditions for customer air-screen ventilation/cleaning guidance are undefined; AT-C07-N② cannot be assessed.
+8. **G1-008:** Required inspection sets on submission (UnitDetail.components derivation) are undefined. AT-T04/T05/T06/T08/T09-N lacks other-group inspections, workText, and nextAction needed for success.
+9. **G1-009:** AT-A05-N omits name/recoveryThreshold/cooldownMinutes/escalateAfterMinutes and enabled. IR07 default enabled=false cannot produce the expected Alerts/notifications.
+10. **G1-010:** AT-C04-E③/AT-FIX-019 use 2026-03-07/2026-10-31 outside all seeded Membership validity [2026-09-01,2026-10-01), leaving expected VALIDATION ambiguous.
+11. **G1-011:** AT-REV19-015 patches only Assignment.scheduledEnd, while IR89's window-ended/reassignment display uses Job.scheduledSlot.endAt, so the result cannot appear.
+12. **G1-012:** Older acceptance plans required by verification.md (AT-REV17-004/005/014, AT-REV18-003) conflict with current IR57/IR74/D05/IR47 and seed.
 
-## 2. 検証器の実行結果
+## 2. Validator Results
 
-リポジトリ直下で実行した。どちらも終了コード0。
+Executed from the repository root. Both exited with code 0.
 
 ### 2.1 `python3 docs/tools/validate_documents.py`
 
-- 終了コード: 0
+- Exit code: 0
 - `errors`: `[]`
-- `baseline`: `048ffcef25f8463bca33346f5bb1dd8dbb1fdad03b61132d1cfc5d17ebeb1ac2`、`spec_files`: 61
-- 件数: requirements 64、acceptance_bundles 182、role_details 49、operations 137、screens 48、components 69、query_contracts 35、write_version_branches 94、review_019_cases 42、proposed_decisions_019 10、pending_business_decisions 0
-- `application_tests`: not_run、`typescript_semantic_check`: not_run（検証器自身はTypeScript検査を実行しない）
+- `baseline`: `048ffcef25f8463bca33346f5bb1dd8dbb1fdad03b61132d1cfc5d17ebeb1ac2`, `spec_files`: 61
+- Counts: requirements 64, acceptance_bundles 182, role_details 49, operations 137, screens 48, components 69, query_contracts 35, write_version_branches 94, review_019_cases 42, proposed_decisions_019 10, pending_business_decisions 0
+- `application_tests`: not_run; `typescript_semantic_check`: not_run (the validator itself does not run TypeScript checks)
 
 ### 2.2 `python3 docs/tools/check_review_regressions.py`
 
-- 終了コード: 0
-- 変異ケース 62件すべてで `detected: true`、`passed: true`
+- Exit code: 0
+- All 62 mutation cases had `detected: true` and `passed: true`.
 
-### 2.3 本レビューで追加した独立確認
+### 2.3 Additional Independent Checks
 
-- manifestの61ファイルのSHA-256を再計算し全件一致。manifest記載の正規化規則で`spec_files`をJSON化したSHA-256は`048ffcef…1ac2`で一致。manifest外のdocsファイルは`.gitkeep`だけ（runs・05-document-reviewを除く）。
-- `service-contracts.ts`をscratchpadへ複製し、TypeScript 5.8.3の`tsc --strict --noEmit --target es2022 --lib es2022,dom`で検査し終了コード0（仕様ファイルは変更していない）。
-- 観察（仕様の指摘には数えない）: `runs/DOC-0.19.0/static-check.json`は`typescript_semantic_check: "passed"`と記録しているが、`validate_documents.py`の実際の出力は`not_run`である。自己レビュー側で別途tscを実行した結果を手で記入したと推測されるが、証跡ファイルと検証器出力の出所が一致していない。
-- 検証器の実行前後で`git status`は変化なし。
+- Recalculated SHA-256 for all 61 manifest files; all matched. SHA-256 of spec_files JSON using the manifest's normalization rules matched `048ffcef…1ac2`. Only `.gitkeep` was outside the manifest among docs files, excluding runs and 05-document-review.
+- Copied service-contracts.ts to a scratchpad and checked it with TypeScript 5.8.3 using `tsc --strict --noEmit --target es2022 --lib es2022,dom`; exit 0. Specification files were unchanged.
+- Observation (not counted as a specification finding): runs/DOC-0.19.0/static-check.json records typescript_semantic_check=passed, but actual validate_documents.py output is not_run. The self-reviewer presumably inserted a separately run tsc result manually; the evidence file and validator output have different provenance.
+- git status was unchanged before and after validator execution.
 
-## 3. 指摘一覧
+## 3. Findings
 
-各指摘の引用行番号はコミット`0505446`のファイルに対するもの。`01-requirements/*.md`を「要件」、`02-design/<role>.md`を「設計」と略記する場合がある。
+Quoted line numbers refer to files at commit `0505446`. “Requirements” may abbreviate 01-requirements/*.md and “Design” may abbreviate 02-design/<role>.md.
 
 ### 3.1 MAJOR
 
@@ -70,145 +70,145 @@
 
 - Severity: MAJOR
 - Issue ID: G1-001
-- Document: 02-design/operation-catalog.csv、02-design/strict-review-contracts.md（SR03）、02-design/review-resolution-contracts.md（IR49/IR67）、02-design/implementation-contracts.md（DDC-07/DDC-08）、01-requirements/technician.md、04-agentic-sdlc/acceptance-review-019.csv
-- Location: operation-catalog.csv:3（alerts.acknowledge）、:20（commands.create）、:35（devices.addResponseNote）、:37（devices.calibrate）、:45（devices.updateFirmware）／strict-review-contracts.md:24／review-resolution-contracts.md:343, 345, 430／implementation-contracts.md:240, 288／deterministic-contracts.md:21, 25, 83／technician.md:201（AT-T07-N）, :284（AT-T11-E③）, :308（AT-T12-N）／acceptance-review-019.csv:22（AT-REV19-021）
-- Problem: 操作カタログの認可列は、技術者について`technician:alert.resolve:assigned`（alerts.acknowledge/resolve）、`technician:device.maintain:assigned-valid-job`（devices.addResponseNote/bind/calibrate/check/updateFirmware/register）、`technician:control.diagnose:job-required`（commands.create）を定めるが、`assigned`／`assigned-valid-job`／`job-required`等の修飾語の定義はカタログ以外のどの文書にも無い（全文検索で該当なし）。SR03は「内部技術者の書込みにも必要なAssignment条件を適用する」とし、DDC-08はaddResponseNoteに「有効な担当であること」を要求する。一方IR49は「社内技術者のunit scopeによる設備読取はSR03どおりだが、案件に紐づく書込みは作業窓内でなければFORBIDDEN」と、jobIdを伴う書込みだけを明示する。これに対し、AT-T12-N（tech-internal-aがdevice-tamperにresponseNote）、AT-T07-N（tech-internal-aがalert-temp-aをacknowledge。acceptancePatchesにJob/Assignmentなし）、AT-REV19-021（tech-internal-aがdevice-online-rtoをcalibrate）は、担当案件の無い社内技術者の書込み成功を期待する。AT-T11-E③（tech-internal-aがdevice-offline-rtoのFW更新、unit-offline-rtoの担当案件なし）は`OFFLINE`を期待するが、案件必須ならD01順位4のFORBIDDENが先になり、案件不要でもIR67ではupdateFirmwareはqueuedで作成され1秒後に`failed/failureCode=OFFLINE`になるため、DomainError OFFLINEか操作記録のfailureCodeかも決まらない。
-- Why it matters: Repository側の認可行列（Role別アクセス範囲）が決まらない。IR72の順位ではSR03/カタログがATより上位だが、`assigned`の意味自体が未定義のため上位規範でも解消できない。P0のFR-T07を含む技術者フローの受入が実装方針によって合否が反転する。
-- Example Failure: 実装Aはカタログの`assigned-valid-job`に従い、案件の無いtech-internal-aのaddResponseNoteをFORBIDDENにしてAT-T12-N②が失敗する。実装Bはunit scopeだけで許可し、AT-T12-Nは通るが、カタログ契約テスト（案件必須）とSR03に反する。AT-T11-E③はAではFORBIDDEN、BではwriteがDeviceOperationを返して1秒後にfailed/OFFLINEとなり、どちらも「OFFLINE」という期待値と照合方法が一致しない。
-- Required Fix: 操作カタログ認可列の修飾語を凡例として定義する。技術者の書込みについて「社内/外部 × jobIdあり/なし × 作業窓内/外」の可否表を1か所に置き、alerts.acknowledge/resolve、devices.*、commands.create、diagnosticRuns.createに適用する。AT-T07-N/T12-N/T11-E③/AT-REV19-021をその表に合わせ、必要ならacceptancePatchesにJob/Assignmentを追加する。AT-T11-E③の観測対象（DomainErrorかDeviceOperation.failureCodeか）を明記する。
-- Suggested Revision: IR94として「`client:self`=自己customer組織scope、`contractor:accepted-valid-offer`=IR23のsummary投影期間、`technician:assigned`=社内はMembership.scopes内、外部は自己Assignmentの閲覧窓、`technician:*:assigned-valid-job`=入力jobIdが有効Assignmentの作業窓内（社内技術者がjobIdを省略した場合はunit scope内で許可／不可のいずれかを明記）」を定め、AT-T11-E③のThenを「DeviceOperation.status=failed、failureCode=OFFLINE、firmwareVersion不変（IR67）」へ変更する。
+- Document: 02-design/operation-catalog.csv, 02-design/strict-review-contracts.md (SR03), 02-design/review-resolution-contracts.md (IR49/IR67), 02-design/implementation-contracts.md (DDC-07/DDC-08), 01-requirements/technician.md, 04-agentic-sdlc/acceptance-review-019.csv
+- Location: operation-catalog.csv:3 (alerts.acknowledge), :20 (commands.create), :35 (devices.addResponseNote), :37 (devices.calibrate), :45 (devices.updateFirmware) / strict-review-contracts.md:24 / review-resolution-contracts.md:343, 345, 430 / implementation-contracts.md:240, 288 / deterministic-contracts.md:21, 25, 83 / technician.md:201 (AT-T07-N), :284 (AT-T11-E③), :308 (AT-T12-N) / acceptance-review-019.csv:22 (AT-REV19-021)
+- Problem: The operation catalog defines technician:alert.resolve:assigned for alerts.acknowledge/resolve, technician:device.maintain:assigned-valid-job for devices.addResponseNote/bind/calibrate/check/updateFirmware/register, and technician:control.diagnose:job-required for commands.create. However, assigned/assigned-valid-job/job-required and other qualifiers are undefined outside the catalog (no matches in a full-text search). SR03 applies required Assignment conditions to internal technicians' writes, and DDC-08 requires a valid assignment for addResponseNote. IR49 explicitly discusses only writes with jobId: internal unit-scope reads follow SR03, while job-linked writes outside the work window are FORBIDDEN. In contrast, AT-T12-N (tech-internal-a notes on device-tamper), AT-T07-N (tech-internal-a acknowledges alert-temp-a, with no Job/Assignment patch), and AT-REV19-021 (tech-internal-a calibrates device-online-rto) expect success without assigned jobs. AT-T11-E③ expects OFFLINE for tech-internal-a updating device-offline-rto firmware with no job on unit-offline-rto. If a job is required, D01 priority-4 FORBIDDEN comes first. Even without a job requirement, IR67 creates a queued operation that becomes failed/failureCode=OFFLINE one second later, leaving DomainError versus operation failureCode unclear.
+- Why it matters: The Repository role-access matrix is unsettled. IR72 ranks SR03/catalog above ATs, but even those rules cannot resolve undefined assigned semantics. Technician acceptance, including P0 FR-T07, passes or fails depending on implementation choices.
+- Example Failure: Implementation A follows assigned-valid-job and returns FORBIDDEN for tech-internal-a addResponseNote without a job, failing AT-T12-N②. B allows unit scope alone and passes that case but violates job-required catalog tests and SR03. AT-T11-E③ gives FORBIDDEN in A, while B returns DeviceOperation then failed/OFFLINE after one second; neither clearly matches the unspecified OFFLINE observation.
+- Required Fix: Define catalog authorization qualifiers in a legend. Put an internal/external × jobId present/absent × inside/outside work-window matrix in one place for alerts.acknowledge/resolve, devices.*, commands.create, and diagnosticRuns.create. Align AT-T07-N/T12-N/T11-E③/AT-REV19-021, adding Job/Assignment patches if needed. State whether AT-T11-E③ observes DomainError or DeviceOperation.failureCode.
+- Suggested Revision: Define IR94: client:self means own-customer organization scope; contractor:accepted-valid-offer means the IR23 summary-projection period; technician:assigned means Membership.scopes for internal staff and own Assignment viewing window for external staff; technician:*:assigned-valid-job means input jobId is within a valid Assignment work window. Explicitly allow or reject internal technicians omitting jobId within unit scope. Change AT-T11-E③ Then to DeviceOperation.status=failed, failureCode=OFFLINE, firmwareVersion unchanged (IR67).
 
 #### G1-002
 
 - Severity: MAJOR
 - Issue ID: G1-002
-- Document: 02-design/implementation-contracts.md（通知と公開範囲）、02-design/service-contracts.ts、02-design/deterministic-contracts.md（D08/D12）、02-design/review-resolution-contracts.md（IR10）、01-requirements/contractor.md
-- Location: implementation-contracts.md:190-205／service-contracts.ts:108（Notification.templateKey）、:166（NotificationType）／review-resolution-contracts.md:64（IR10）、:32（IR04）、:36（IR05）、:337（IR48）／deterministic-contracts.md:121-129, 169／strict-review-contracts.md:183（SR28）／contractor.md:115（AT-P03-N④）／fixture-contract.json actors（admin 3件）
-- Problem: 通知が生成される条件と内容が定義されているのは、Policy由来のAlert（SR21/SR28）、制限予告（IR05）、督促（IR04）だけである。implementation-contracts.mdの「通知と公開範囲」表はjob.requested/offered/accepted/declined/assigned/schedule_changed、report.submitted/returned、job.completed、payment.confirmed、device.fault/operation_failed、inquiry.received/answeredで「顧客・HQ・担当技術者…に伝えます」と宛先の種類を述べるだけで、templateKey、Notification.type、channel、deliveryState（preview/simulated）、宛先となるMembershipの選び方（例:「HQ」はfixtureのadmin 3件のうちどれか）を定めない。さらにtemplateKeyのenum（alert/quality/schedule_change/report_return/completion/payment/payment_reminder/restriction/inquiry）には依頼・委託・受諾・割当・機器障害に対応する値が無く、表どおりの通知を正規型で表現できない。D08の通知リンク表はjob/device/inquiry宛の通知を前提にしている。
-- Why it matters: FR-X07（P0）の通知の仕組みのうち業務イベント由来の部分が「UIはあるがデータ定義が無い」状態で、実装Agentが件数・宛先・文面キーを推測することになる。受入の期待件数も決まらない。
-- Example Failure: AT-P03-N④「担当技術者へ通知プレビュー1件」について、実装Aはschedule_change/inApp/simulatedのNotificationを顧客・admin 3件・技術者・業者に計6件保存し、実装Bは技術者宛のpreviewだけを返す。テストAgentはどちらが正しいか判定できない。
-- Required Fix: 業務イベントごとに、生成の有無、templateKey、type、channel、deliveryState、target、宛先Membershipの選定規則（permission・scope条件）、件数を表で定める。enumに不足する値を追加するか、既存値への写像を明記する。AT-P03-N④をその表に合わせる。
-- Suggested Revision: 「job.assigned: templateKey=schedule_change、type=schedule_change、channel=inApp、deliveryState=simulated、target={kind:job}、宛先=当該Assignmentの技術者Membership 1件＋顧客のclient Membership（全対象Unit閲覧可）＋job.manageを持つadmin」のような行をイベントごとに追加し、生成しないイベント（例: IR48の期限到来）も列挙する。
+- Document: 02-design/implementation-contracts.md (Notifications and visibility), 02-design/service-contracts.ts, 02-design/deterministic-contracts.md (D08/D12), 02-design/review-resolution-contracts.md (IR10), 01-requirements/contractor.md
+- Location: implementation-contracts.md:190-205 / service-contracts.ts:108 (Notification.templateKey), :166 (NotificationType) / review-resolution-contracts.md:64 (IR10), :32 (IR04), :36 (IR05), :337 (IR48) / deterministic-contracts.md:121-129, 169 / strict-review-contracts.md:183 (SR28) / contractor.md:115 (AT-P03-N④) / fixture-contract.json actors (three admins)
+- Problem: Notification generation conditions and contents exist only for Policy Alerts (SR21/SR28), restriction notices (IR05), and reminders (IR04). The implementation-contracts notification/visibility table lists recipient categories for job.requested/offered/accepted/declined/assigned/schedule_changed, report.submitted/returned, job.completed, payment.confirmed, device.fault/operation_failed, and inquiry.received/answered, but does not define templateKey, Notification.type, channel, deliveryState (preview/simulated), or recipient Membership selection (for example, which of three fixture admins counts as HQ). The templateKey enum (alert/quality/schedule_change/report_return/completion/payment/payment_reminder/restriction/inquiry) has no values for requests, offers, acceptance, assignment, or device faults, so canonical types cannot express the table. D08 notification links assume job/device/inquiry targets.
+- Why it matters: The business-event part of P0 FR-X07 has UI but no data definition. Implementation Agents must guess counts, recipients, and message keys; expected acceptance counts are also unsettled.
+- Example Failure: For AT-P03-N④'s one notification preview to the assigned technician, implementation A saves six schedule_change/inApp/simulated Notifications for the customer, three admins, technician, and contractor. B returns only a technician preview. The Test Agent cannot choose.
+- Required Fix: For each business event, define whether to generate, templateKey/type/channel/deliveryState/target, recipient Membership permission/scope selection, and counts. Add missing enum values or map existing ones. Align AT-P03-N④.
+- Suggested Revision: Add rows such as job.assigned: templateKey=schedule_change, type=schedule_change, channel=inApp, deliveryState=simulated, target={kind:job}, recipients=one assigned technician Membership plus customer client Memberships able to view all target Units plus admins with job.manage. Also list events that generate nothing, such as IR48 expiry.
 
 #### G1-003
 
 - Severity: MAJOR
 - Issue ID: G1-003
-- Document: 02-design/review-resolution-contracts.md（IR35）、02-design/admin.md（DD-A10）、02-design/common.md §5、01-requirements/admin.md（FR-A10）、02-design/service-contracts.ts
-- Location: review-resolution-contracts.md:236, 238, 240／設計admin.md:55, 395／02-design/common.md:181, 185／要件admin.md:268（BR-A10）, :275（AT-A10-E④）, :276（AT-A10-B②）／strict-review-contracts.md:127（SR19）／service-contracts.ts:84, 281
-- Problem: IR35は「解除要求（state=release_requested）の起動経路は次の3つだけ」（入金確認、defer/exempt、override）とし、別途`restrictions.release`（source='manual'）を定める。`restrictions.cancel`は含まれない。一方、DD-A10は「適用の要求を出したあとの取消は、反映されたかどうかわからなくても解除の流れに進めます」、common.md §5本文は「requested以降に取り消したときは…解除の流れに進めます」とし、AT-A10-B②は「requestedの状態でcancelする→release_requestedになる」、AT-A10-E④は「requested中にcancelする→解除の流れに進み」を期待する。同じcommon.md §5の状態表（:181）のrequested/applied→release_requestedの起動条件にはcancelが無い。cancelによる遷移のreleaseIntent.source、D03の設備別解除評価の実行有無、applied/release_requestedでのcancelの結果（CONFLICTか）はどこにも無い。SR19は「予告はcancel、適用済み/結果不明はreconcile/release」とcancelを予告段階に限る読み方をしている。
-- Why it matters: IR72の順位ではIR35（順位2）がDD（順位7）・AT（順位8）に優先し、requestedへのcancelはrelease_requestedを起こさないことになるが、その場合の結果が未定義である。制限の解除はFR-A09/A10（P0）の中核で、Command生成の有無に直結する。
-- Example Failure: 実装AはIR35に従いrequestedへのcancelをCONFLICTにしてAT-A10-B②が失敗する。実装BはDD-A10に従いrelease_requestedへ遷移させ、remove Commandを作るが、releaseIntent.sourceに定義外の値を入れる。
-- Required Fix: `restrictions.cancel`の状態別の遷移表（scheduled/requested/applied/release_requested/released/cancelled）を定め、IR35の起動経路一覧にcancelを加えるか、requested/appliedでのcancelを拒否してreleaseへ誘導するかを一意にする。DD-A10、common.md §5、FR-A10、AT-A10-B/Eを同じ内容に揃える。
-- Suggested Revision: IR35に「④取消: restrictions.cancelがrequested/appliedに対して行われた同一遷移でrelease_requestedへ遷移し、releaseIntent.source='cancel'。scheduledはcancelled、release_requestedは冪等に現在状態、released/cancelledはCONFLICT」を追加する。
+- Document: 02-design/review-resolution-contracts.md (IR35), 02-design/admin.md (DD-A10), 02-design/common.md §5, 01-requirements/admin.md (FR-A10), 02-design/service-contracts.ts
+- Location: review-resolution-contracts.md:236, 238, 240 / Design admin.md:55, 395 / 02-design/common.md:181, 185 / Requirements admin.md:268 (BR-A10), :275 (AT-A10-E④), :276 (AT-A10-B②) / strict-review-contracts.md:127 (SR19) / service-contracts.ts:84, 281
+- Problem: IR35 says release_requested has only three start paths (payment confirmation, defer/exempt, override), and separately defines restrictions.release with source=manual. restrictions.cancel is absent. DD-A10 says cancellation after application is requested proceeds to release even if application is unknown; common.md §5 says cancellation from requested onward proceeds to release. AT-A10-B② expects requested cancel→release_requested; AT-A10-E④ also expects release flow. Yet the same common.md §5 state table (:181) omits cancel from requested/applied→release_requested triggers. releaseIntent.source for cancel, whether D03 per-unit release evaluation runs, and cancel results in applied/release_requested (CONFLICT or otherwise) are missing. SR19 appears to limit cancel to notice stage: cancel notices, reconcile/release applied or unknown results.
+- Why it matters: IR72 ranks IR35 (2) above DD (7) and AT (8), implying requested cancel does not trigger release_requested, but then its result is undefined. Release is central to P0 FR-A09/A10 and directly controls Command creation.
+- Example Failure: A follows IR35 and returns CONFLICT for requested cancel, failing AT-A10-B②. B follows DD-A10 and creates release_requested/remove Command but uses an undefined releaseIntent.source.
+- Required Fix: Define restrictions.cancel transitions for scheduled/requested/applied/release_requested/released/cancelled. Either add cancel to IR35 start paths or reject it in requested/applied and direct users to release. Align DD-A10, common.md §5, FR-A10, and AT-A10-B/E.
+- Suggested Revision: Add IR35 path ④ cancellation: restrictions.cancel on requested/applied sets release_requested in the same transition with releaseIntent.source=cancel. scheduled becomes cancelled; release_requested returns current state idempotently; released/cancelled returns CONFLICT.
 
 #### G1-004
 
 - Severity: MAJOR
 - Issue ID: G1-004
-- Document: 04-agentic-sdlc/fixture-contract.json、02-design/deterministic-contracts.md（D07）、02-design/review-resolution-contracts.md（IR12/IR69）、01-requirements/client.md、01-requirements/admin.md、acceptance-review-018.csv、acceptance-review-019.csv、acceptance-fixes.csv
-- Location: fixture-contract.json:1816-1879（`acceptancePatches["AT-C06-E.3"]`、series value=120、expected kWh=120.0）／deterministic-contracts.md:101／review-resolution-contracts.md:74, 438／client.md:178（AT-C06-E .3）／要件admin.md:344-345（AT-A13-E/B）／acceptance-review-018.csv:25（AT-REV18-024）／acceptance-review-019.csv:42（AT-REV19-041）／acceptance-fixes.csv:18（AT-FIX-017）
-- Problem: D07は「1A合成値の範囲は…power/kW:[0,100]」「範囲外…はIR12のRawMeasurement正規化でsuspectとして値を集計・制御から除く」と定める。AT-C06-E.3のpatchは1時間窓・1台で「実績120 kWh」を作るため、各分のpower値が120 kWとなり範囲外である。それにもかかわらずquality=valid・qualityReason=nullで置き、期待値kWh=120.0、savingPercentage=-20とする。AT-FIX-017は範囲外値を「suspectで除外」と集計除外まで期待している。patch経由の行に範囲検査を適用するか（IR69「正規DTO schemaで検証して不正なら例外」）、集計時に再判定するかは定義されていない。
-- Why it matters: 負の削減量表示（IR68/IR80）を検証する受入の前提データが、上位規範の不変条件に反する状態でしか作れない。/demoからの通常投入（demo.trigger telemetry）ではこの状態を再現できない。
-- Example Failure: 実装Aは正規DTO検証にD07の範囲を含めてfixture生成時に例外となりAT-C06-E.3が実行不能。実装Bは集計時に範囲外を除外してkWh=null・coverage=0を返しAT-REV19-041が失敗。実装Cは保存済みqualityだけを信じて120.0を返し、AT-FIX-017の「集計から除外」と整合しない。
-- Required Fix: E.3の前提をD07の範囲内で作るか、D07の範囲を変更する。どちらの場合もfixture・AT本文・AT-REV19-041の期待値を同時に更新し、patch行に範囲検査を適用するかを明記する。
-- Suggested Revision: 案1: D07のpower範囲を[0,200] kWへ変更する。案2: E.3を`unitIds=[unit-online-rto, unit-limited]`・各60 kW・基準100 kWh（同じ2台）に変更し、DTO savedKWh=-20、savingPercentage=-20を維持する。あわせてIR69に「patchで作る測定もD07/IR12の正規化規則を満たすこと（違反はfixture欠陥）」を追記する。
+- Document: 04-agentic-sdlc/fixture-contract.json, 02-design/deterministic-contracts.md (D07), 02-design/review-resolution-contracts.md (IR12/IR69), 01-requirements/client.md, 01-requirements/admin.md, acceptance-review-018.csv, acceptance-review-019.csv, acceptance-fixes.csv
+- Location: fixture-contract.json:1816-1879 (`acceptancePatches["AT-C06-E.3"]`, series value=120, expected kWh=120.0) / deterministic-contracts.md:101 / review-resolution-contracts.md:74, 438 / client.md:178 (AT-C06-E .3) / Requirements admin.md:344-345 (AT-A13-E/B) / acceptance-review-018.csv:25 (AT-REV18-024) / acceptance-review-019.csv:42 (AT-REV19-041) / acceptance-fixes.csv:18 (AT-FIX-017)
+- Problem: D07 limits synthetic 1A power/kW to [0,100]; IR12 marks out-of-range raw values suspect and excludes them from summaries/control. AT-C06-E.3 patches one unit over one hour to actual 120kWh by setting every minute to 120kW, outside the range. It still sets quality=valid/qualityReason=null and expects kWh=120.0/savingPercentage=-20. AT-FIX-017 explicitly expects out-of-range values to be suspect and excluded from summaries. Whether patch rows receive range validation under IR69 canonical schema checks, or are rechecked during aggregation, is undefined.
+- Why it matters: The negative-savings display acceptance premise (IR68/IR80) can only be built by violating higher-priority invariants. Normal demo.trigger telemetry input cannot reproduce it.
+- Example Failure: A includes D07 ranges in DTO validation and throws during fixture creation. B excludes out-of-range values during aggregation, returning kWh=null/coverage=0 and failing AT-REV19-041. C trusts saved quality and returns 120.0, conflicting with AT-FIX-017 aggregation exclusion.
+- Required Fix: Build E.3 within D07 ranges or change the range. Update fixtures, AT text, and AT-REV19-041 expectations together. State whether patch rows receive range checks.
+- Suggested Revision: Option 1: Expand D07 power range to [0,200]kW. Option 2: Use unitIds=[unit-online-rto,unit-limited], 60kW each, baseline 100kWh for the same pair, retaining savedKWh=-20/savingPercentage=-20. Add to IR69 that patched measurements must meet D07/IR12 normalization rules; violations are fixture defects.
 
 #### G1-005
 
 - Severity: MAJOR
 - Issue ID: G1-005
-- Document: 01-requirements/admin.md（FR-A12）、04-agentic-sdlc/fixture-contract.json、02-design/review-resolution-contracts.md（IR21/IR43/IR92）、02-design/strict-review-contracts.md（SR25）、02-design/admin.md（DD-A12）
-- Location: 要件admin.md:324（AT-A12-N）, :326（AT-A12-B）／fixture-contract.json:1006-1045（device-tamperのsensorsはtemperature/humidity/powerのみ）, :1158-1162（unit-online-rtoのCO₂=800）／review-resolution-contracts.md:131（IR21「Sensor不在はmissing_data」）, :282（IR43「sensor不存在=NOT_FOUND」）, :679（IR92規則2）／strict-review-contracts.md:159（SR25「通知の成立条件は…指標の有効品質・閾値/継続時間」）／設計admin.md:452（DD-A12「unitIds/metric…対応するセンサーがあること」）
-- Problem: AT-A12-Nは「換気対応のunit-online-rto・非対応のunit-non-rto」を対象にmetric=co2・threshold=1000ppmで保存・評価し、「対応していない設備には通知のみ」を期待する（AT-A12-Bも同じ）。しかしunit-non-rtoの現bindingであるdevice-tamperにはCO₂センサーが無く、IR21によりそのUnitのco2 Factはmissing_data、IR43によりdemo.trigger telemetryもNOT_FOUNDとなるため、SR25の通知成立条件（有効品質）を満たせない。DD-A12は保存時点で「対応するセンサーがあること」を要求しており、保存自体がVALIDATIONになる可能性もある。さらにAT-A12-Nは評価に使うCO₂値・観測時刻・継続時間（durationSeconds）・recoveryThresholdを指定しておらず、seedのunit-online-rtoのCO₂は800ppmで閾値未満である。
-- Why it matters: FR-A12の「換気対応設備は換気要求、非対応設備は通知のみ」という要件の中心的な分岐を、現行seedでは受入として作れない。IR92は「規則で決まらない前提は文書欠陥」としている。
-- Example Failure: テストAgentがIR92の既定どおりunit-non-rtoを使うと、通知はsuppressed/qualityとなり「通知のみ」の期待が失敗する。保存時にDD-A12の検査でVALIDATIONになる実装もある。
-- Required Fix: CO₂センサーを持ち換気能力を持たない設備を受入前提として用意し（acceptancePatchesでdevice-tamperにsensor-tamper-co2を追加するか、別Unitを追加）、評価入力（facts/telemetryの値・時刻・継続秒数）と期待するFireResult/NotificationOutcomeを明記する。DD-A12の「対応するセンサー」がCapability.sensorsか現binding Deviceのsensorsかも明記する。
-- Suggested Revision: `acceptancePatches["AT-A12-N"]`を追加し、device-tamperのsensorsにco2（ppm、stale 120秒）を加え、unit-online-rto・unit-non-rtoにCO₂=1100ppmのmeasured/valid測定を00:59:00〜01:00:00に置く。Givenにfixture.airPolicyNotificationInput・recoveryThreshold=900・durationSeconds=60・enabled=true・recipient=hq-operatorを明記し、Thenを「unit-online-rto: results=requested（ventilate low）・notifications=created、unit-non-rto: results=suppressed/invalid_capability・notifications=created」とする。
+- Document: 01-requirements/admin.md (FR-A12), 04-agentic-sdlc/fixture-contract.json, 02-design/review-resolution-contracts.md (IR21/IR43/IR92), 02-design/strict-review-contracts.md (SR25), 02-design/admin.md (DD-A12)
+- Location: Requirements admin.md:324 (AT-A12-N), :326 (AT-A12-B) / fixture-contract.json:1006-1045 (device-tamper sensors contain only temperature/humidity/power), :1158-1162 (unit-online-rto CO₂=800) / review-resolution-contracts.md:131 (IR21“No Sensor means missing_data”), :282 (IR43“Missing sensor=NOT_FOUND”), :679 (IR92 rule 2) / strict-review-contracts.md:159 (SR25“Notification conditions: valid metric quality and threshold/duration”) / Design admin.md:452 (DD-A12“unitIds/metric: a matching Sensor must exist”)
+- Problem: AT-A12-N saves/evaluates metric=co2/threshold=1000ppm for ventilation-capable unit-online-rto and unsupported unit-non-rto, expecting notifications only for the unsupported unit; AT-A12-B is similar. But unit-non-rto's current device-tamper binding has no CO₂ Sensor. IR21 therefore gives missing_data and IR43 demo.trigger telemetry returns NOT_FOUND, so SR25 valid-quality notification conditions cannot hold. DD-A12 also requires a matching Sensor at save, potentially causing VALIDATION. AT-A12-N omits evaluation CO₂ values, observation times, durationSeconds, and recoveryThreshold; seeded unit-online-rto CO₂ is only 800ppm.
+- Why it matters: The central FR-A12 branch (ventilation request on supported units, notification only otherwise) cannot be built from current seed. IR92 treats premises not fixed by rules as document defects.
+- Example Failure: Using default unit-non-rto under IR92 gives suppressed/quality notifications instead of notification-only success. Another implementation fails DD-A12 save validation.
+- Required Fix: Provide a unit with CO₂ sensing but no ventilation capability, by patching sensor-tamper-co2 into device-tamper or adding a Unit. Specify fact/telemetry values, times, durations, and expected FireResult/NotificationOutcome. Clarify whether DD-A12 matching Sensor means Capability.sensors or current-bound Device.sensors.
+- Suggested Revision: Add acceptancePatches[AT-A12-N], with co2 (ppm, stale 120 seconds) in device-tamper sensors and measured/valid CO₂=1100ppm for unit-online-rto/unit-non-rto from 00:59:00–01:00:00. Given specifies fixture.airPolicyNotificationInput, recoveryThreshold=900, durationSeconds=60, enabled=true, recipient=hq-operator. Then: unit-online-rto results=requested (ventilate low), notifications=created; unit-non-rto results=suppressed/invalid_capability, notifications=created.
 
 #### G1-006
 
 - Severity: MAJOR
 - Issue ID: G1-006
-- Document: 02-design/service-contracts.ts、02-design/deterministic-contracts.md（D12）、02-design/client.md（DD-C07）、02-design/admin.md（DD-A12）、01-requirements/client.md、01-requirements/admin.md、04-agentic-sdlc/fixture-contract.json、02-design/review-resolution-contracts.md（IR69/IR92）
-- Location: service-contracts.ts:316-317（AllergenObservation、AirSeries）、:142（DemoTrigger）／deterministic-contracts.md:173／設計client.md:252／設計admin.md:434-440／要件client.md:189（AT-C07-SRC）／要件admin.md:311（AT-A12-SRC）／fixture-contract.json demoSeed（アレルゲンの節なし）／review-resolution-contracts.md:438, 682, 687
-- Problem: allergenObservationはtelemetry.seriesの付帯情報として出力型とavailability（available/not_measured/unsupported）の表示規則だけが定義されている。Repositoryがこの値を何から作るか（保存資源、Capabilityの属性、Measurement以外のイベント）、not_measuredとunsupportedを分ける条件は定義されていない。demoSeedにアレルゲン観測の節は無く、DemoTriggerにもアレルゲン投入のイベントが無い。IR69は「そこに無い業務記録をRepositoryが補わない」、IR92はpatchのentityをdemoSeedの節に限るため、AT-C07-SRC/AT-A12-SRCが求める「作り込んだ観測データ」のfixtureを規則どおりに作る方法が無い。
-- Why it matters: 企業原文BIZ-18（アレルゲン）の対応として明記された表示が、データ定義の欠落により実装も受入もできない（「UIはあるがデータ定義が無い機能」）。
-- Example Failure: 実装Agentは常にnot_measuredを返す実装しか作れず、AT-C07-SRCの「available」fixtureを用意できない。別の実装Agentは独自の保存資源を追加し、IR69/D12に反する。
-- Required Fix: allergenObservationの取得元（例: demoSeedの新しい節、またはCapability/Deviceの属性とDemoTriggerの新イベント）、availabilityの導出規則、最新1件の選び方、複数Unit時のnullの扱い、acceptancePatchesのキーを定義する。
-- Suggested Revision: demoSeedに`allergenObservations: [{id, unitId, substance, value, unit, sourceLabel, observedAt, evidenceText}]`を追加し、「Capabilityに`allergenSupported:boolean`を持ち、falseならunsupported、trueで観測0件ならnot_measured、観測ありならavailable（observedAt降順先頭）」とする。AT-C07-SRCとAT-A12-SRCに3件のacceptancePatchesキーを付ける。
+- Document: 02-design/service-contracts.ts, 02-design/deterministic-contracts.md (D12), 02-design/client.md (DD-C07), 02-design/admin.md (DD-A12), 01-requirements/client.md, 01-requirements/admin.md, 04-agentic-sdlc/fixture-contract.json, 02-design/review-resolution-contracts.md (IR69/IR92)
+- Location: service-contracts.ts:316-317 (AllergenObservation, AirSeries), :142 (DemoTrigger) / deterministic-contracts.md:173 / Design client.md:252 / Design admin.md:434-440 / Requirements client.md:189 (AT-C07-SRC) / Requirements admin.md:311 (AT-A12-SRC) / fixture-contract.json demoSeed (no allergen section) / review-resolution-contracts.md:438, 682, 687
+- Problem: allergenObservation has only an output type and availability display rules (available/not_measured/unsupported) as telemetry.series metadata. Its Repository source (stored resource, Capability attributes, or non-Measurement event) and the distinction between not_measured and unsupported are undefined. demoSeed has no allergen section and DemoTrigger has no allergen event. IR69 prohibits adding business records absent from seed and IR92 limits patch entities to seed sections, so no compliant fixture path creates the crafted observations required by AT-C07-SRC/AT-A12-SRC.
+- Why it matters: The display explicitly mapped to company BIZ-18 allergens cannot be implemented or accepted because its data definition is missing: UI exists without data.
+- Example Failure: One Agent can only return not_measured and cannot create the available fixture for AT-C07-SRC. Another invents a storage resource, violating IR69/D12.
+- Required Fix: Define the source (for example, a new seed section or Capability/Device attributes plus a new DemoTrigger), availability derivation, latest-record selection, null behavior for multiple Units, and acceptancePatches keys.
+- Suggested Revision: Add demoSeed.allergenObservations rows with id/unitId/substance/value/unit/sourceLabel/observedAt/evidenceText. Add Capability.allergenSupported:boolean: false→unsupported; true with no observations→not_measured; observations→available, selecting first by observedAt descending. Give AT-C07-SRC/AT-A12-SRC three acceptancePatches keys.
 
 #### G1-007
 
 - Severity: MAJOR
 - Issue ID: G1-007
-- Document: 01-requirements/client.md（FR-C07）、02-design/client.md（DD-C07）、02-design/deterministic-contracts.md（D08）
-- Location: 要件client.md:195（基本フロー）, :196（BR-C07）, :202（AT-C07-N②「案内『換気を推奨』」）／設計client.md:272-277／deterministic-contracts.md:119
-- Problem: FR-C07は「換気や清掃の案内を見る」と定め、AT-C07-Nは「room-1: CO₂=1000ppm…→②案内『換気を推奨』」を期待する。しかし、どの指標がどの値（または品質）のときに「換気を推奨」を表示するか、清掃の案内をどの条件（PM2.5等）で出すか、条件を満たさないときに何を表示するかは、FR-C07・DD-C07・D08のどこにも無い（全文検索でも該当規則なし）。定義されているのは換気非対応設備の手動換気案内（D08）だけである。
-- Why it matters: 企業原文BIZ-18「清掃・換気の案内」の表示条件を実装Agentが数値で推測することになり、「数値…を実装時に推測しない」という各文書冒頭の実装基準に反する。AT-C07-N②の合否も判定できない。
-- Example Failure: 実装AはCO₂≥1000ppmで推奨を出し、実装BはA12のPolicy閾値があるときだけ出す。seedのCO₂=800ppmの表示で両者の画面が異なり、どちらもテストで否定できない。
-- Required Fix: 案内の表示規則（指標、比較演算子、閾値、必要な品質、換気能力の有無ごとの文言キー、清掃案内の条件）を定義し、AT-C07-N/E/Bに境界値のsubcaseを追加する。
-- Suggested Revision: DD-C07に「co2 value≥1000 ppmかつquality=validなら`air.guidance.ventilate`、pm25≥35 µg/m³かつvalidなら`air.guidance.clean`、欠測・stale・suspectでは案内を出さず品質表示のみ（デモ閾値、DEC-09）」を追加し、AT-C07-Bに999/1000ppmの境界を加える。
+- Document: 01-requirements/client.md (FR-C07), 02-design/client.md (DD-C07), 02-design/deterministic-contracts.md (D08)
+- Location: Requirements client.md:195 (Basic flow), :196 (BR-C07), :202 (AT-C07-N②“Guidance: Ventilation recommended”) / Design client.md:272-277 / deterministic-contracts.md:119
+- Problem: FR-C07 requires ventilation/cleaning guidance. AT-C07-N expects “Ventilation recommended” for room-1 CO₂=1000ppm. Neither FR-C07, DD-C07, nor D08 defines metric/value/quality conditions for ventilation, conditions such as PM2.5 for cleaning, or display when conditions fail (full-text search found no rules). Only manual ventilation guidance for unsupported equipment is defined in D08.
+- Why it matters: The implementation Agent must guess numerical conditions for company BIZ-18 cleaning/ventilation guidance, violating the documents' rule against guessing values during implementation. AT-C07-N② cannot be judged.
+- Example Failure: A recommends ventilation at CO₂≥1000ppm; B only when A12 has a Policy threshold. Their displays for seeded 800ppm differ, and neither can be rejected by tests.
+- Required Fix: Define metrics, operators, thresholds, required quality, wording keys by ventilation capability, and cleaning conditions. Add boundary subcases to AT-C07-N/E/B.
+- Suggested Revision: Add to DD-C07: co2≥1000ppm and quality=valid→air.guidance.ventilate; pm25≥35µg/m³ and valid→air.guidance.clean; missing/stale/suspect shows only quality, no guidance (demo thresholds, DEC-09). Add 999/1000ppm boundaries to AT-C07-B.
 
 #### G1-008
 
 - Severity: MAJOR
 - Issue ID: G1-008
-- Document: 02-design/technician.md（DD-T02/DD-T09）、02-design/implementation-contracts.md（DDC-02）、02-design/service-contracts.ts、01-requirements/technician.md
-- Location: 設計technician.md:94（components/serviceScope）, :288-293（workText「提出時必須 10〜4000文字」、inspectionItems「提出時必須 対象全部に結果/理由」、nextAction.kind「必須」）／implementation-contracts.md:119／service-contracts.ts:43（UnitDetail.components）／fixture-contract.json units（unit-online-rtoのserviceScope=indoor/outdoor/electrical）／要件technician.md:138（AT-T04-N）, :157（AT-T05-N）, :176（AT-T06-N）, :220（AT-T08-N）, :239（AT-T09-N）
-- Problem: 提出時の検証は「対象全部に結果/理由」を要求するが、「対象」を決めるUnitDetail.componentsをserviceScope等からどう導出するかは定義されていない。unit-online-rtoのserviceScopeは3グループ（計18部品）である。AT-T04-Nはindoor 8部品だけを入力して「②提出成功」を期待し、AT-T05-N（outdoor 5部品）、AT-T06-N（electrical 5部品）も同様である。これらのATにはworkText（提出時必須）とnextAction（必須）の入力も無い。逆にAT-T09-Nは本文・写真・部品・nextActionだけで点検結果を入力せずに提出成功を期待し、AT-T08-Nは「編集」とだけ書く。
-- Why it matters: 技術者の点検・報告（FR-T04〜T06/T08/T09、P0）の受入で、書かれた入力どおりに操作すると提出がVALIDATIONになり、期待結果に到達しない。必須集合の導出が未定義のため、実装Agentも検証範囲を決められない。
-- Example Failure: テストAgentがAT-T04-Nの記載どおりindoor 8部品だけを保存して提出すると、outdoor/electricalのresult=null・workText欠落でVALIDATIONとなる。別の実装はindoorだけで提出を通し、AT-T04-E①（result=null 1部品でVALIDATION）の判定範囲がグループ単位に縮む。
-- Required Fix: UnitDetail.componentsの導出規則（serviceScopeのグループ→ComponentKey一覧）と、jobs.submitの必須検証集合を定義する。AT-T04/T05/T06/T08/T09-Nの前提に、対象外グループを含む全点検結果・workText・nextActionの入力値を明記するか、共通の「提出可能な下書き」fixtureを定義する。
-- Suggested Revision: DD-T02に「components=serviceScopeの各グループのComponentKey全件（indoor 8、outdoor 5、electrical 5）」を追加し、AT-T04-NのWhenを「filter=attention（理由・写真1枚）、他の17部品=normal、workText=50文字、nextAction=noneで保存→提出」とする。T05/T06/T09-Nも同様に全入力を明記する。
+- Document: 02-design/technician.md (DD-T02/DD-T09), 02-design/implementation-contracts.md (DDC-02), 02-design/service-contracts.ts, 01-requirements/technician.md
+- Location: Design technician.md:94 (components/serviceScope), :288-293 (workText“Required on submission: 10–4000 characters”, inspectionItems“Required on submission: result/reason for all targets”, nextAction.kind“Required”) / implementation-contracts.md:119 / service-contracts.ts:43 (UnitDetail.components) / fixture-contract.json units (unit-online-rto serviceScope=indoor/outdoor/electrical) / Requirements technician.md:138 (AT-T04-N), :157 (AT-T05-N), :176 (AT-T06-N), :220 (AT-T08-N), :239 (AT-T09-N)
+- Problem: Submission requires results/reasons for all target components, but derivation of UnitDetail.components from serviceScope is undefined. unit-online-rto covers three groups with 18 components. AT-T04-N enters only eight indoor components and expects submission success; AT-T05-N (five outdoor) and AT-T06-N (five electrical) do the same. These ATs also omit required workText and nextAction. AT-T09-N instead enters text/photos/parts/nextAction without inspections and expects success; AT-T08-N only says edit.
+- Why it matters: Following the written input for P0 technician inspection/report acceptance (FR-T04–T06/T08/T09) gives VALIDATION instead of success. Undefined required-set derivation also leaves implementers unable to choose validation scope.
+- Example Failure: Saving only eight indoor items under AT-T04-N then submitting fails because outdoor/electrical results are null and workText is missing. Another implementation accepts indoor alone, narrowing AT-T04-E①'s null-result validation to one group.
+- Required Fix: Define serviceScope-group→ComponentKey derivation and the required jobs.submit validation set. Specify all inspection groups, workText, and nextAction in AT-T04/T05/T06/T08/T09-N, or define a shared submission-ready draft fixture.
+- Suggested Revision: Add DD-T02 components=all ComponentKeys in each serviceScope group (indoor 8, outdoor 5, electrical 5). Change AT-T04-N to filter=attention with reason/one photo, other 17=normal, workText=50 characters, nextAction=none, save→submit. Specify complete inputs similarly for T05/T06/T09-N.
 
 #### G1-009
 
 - Severity: MAJOR
 - Issue ID: G1-009
-- Document: 01-requirements/admin.md（FR-A05/A11/A12）、02-design/admin.md（DD-A05）、02-design/review-resolution-contracts.md（IR07）、02-design/strict-review-contracts.md（SR21/SR28）
-- Location: 要件admin.md:161（AT-A05-N）, :293（AT-A11-N）, :324（AT-A12-N）／設計admin.md:219-229（DD-A05の必須欄）, :235／review-resolution-contracts.md:48（IR07「新規は…enabled=false、priority=50」）／strict-review-contracts.md:137-139（SR21「無効disabled…はsuppressed」）, :181（SR28「必須値をRepositoryやUIが勝手な数値で補完しない」）, :183（「inAppはsimulated」）
-- Problem: AT-A05-Nの保存入力はunitIds、metric、gte 30°C、duration、severity、recipient、channelだけで、DD-A05/SR28/正規型で必須のname、recoveryThreshold、cooldownMinutes、escalateAfterMinutesが無く、enabledも指定していない。IR07の新規既定はenabled=falseで、SR21により無効なPolicyは評価でsuppressedとなるため、期待結果「②Alertが1件、Notificationのプレビューが1件」に到達しない。AT-A12-N（fixture.airPolicyNotificationInputは指定するがenabled・name・recoveryThreshold・durationSecondsなし）とAT-A11-N（enabled・name・timezoneなし）も同じ欠落を持つ。また「Notificationのプレビュー」はinAppではSR28によりdeliveryState=simulatedの保存Notificationであり、previewとの区別が本文で曖昧である。
-- Why it matters: 必須値をUI/Repositoryが補完してはならない（SR28）ため、テストAgentが値を推測しない限り保存できず、既定値を使うと期待結果に達しない。FR-A05はP0である。
-- Example Failure: テストAgentがAT-A05-Nの記載値だけで保存するとVALIDATION（name等の欠落）。欠落値を補ってもenabledを既定のfalseのまま保存するとAlert 0件で失敗する。
-- Required Fix: AT-A05-N/A11-N/A12-NのWhenに全必須入力とenabled=trueを明記するか、fixture-contract.jsonにPolicy入力の固定オブジェクトを定義して参照させる。「プレビュー」をdeliveryState（preview/simulated）で書き分ける。
-- Suggested Revision: AT-A05-NのWhenを「name=Demo high temperature、unitIds=[unit-online-rto]、metric=temperature、operator=gte、threshold=30、recoveryThreshold=28、durationSeconds=60、severity=warning、recipientMembershipIds=[customer-a]、channels=[inApp]、cooldownMinutes=5、escalateAfterMinutes=60、timezone=Asia/Kuala_Lumpur、enabled=true、priority=50で保存」とし、Thenを「Notification（deliveryState=simulated）1件」とする。
+- Document: 01-requirements/admin.md (FR-A05/A11/A12), 02-design/admin.md (DD-A05), 02-design/review-resolution-contracts.md (IR07), 02-design/strict-review-contracts.md (SR21/SR28)
+- Location: Requirements admin.md:161 (AT-A05-N), :293 (AT-A11-N), :324 (AT-A12-N) / Design admin.md:219-229 (DD-A05 required fields), :235 / review-resolution-contracts.md:48 (IR07“On creation: enabled=false, priority=50”) / strict-review-contracts.md:137-139 (SR21“disabled means suppressed”), :181 (SR28“Repository/UI must not invent numbers for required values”), :183 (“inApp is simulated”)
+- Problem: AT-A05-N save input lists only unitIds/metric/gte 30°C/duration/severity/recipient/channel, omitting required name/recoveryThreshold/cooldownMinutes/escalateAfterMinutes and enabled. IR07 defaults enabled=false and SR21 suppresses disabled Policies, so one Alert and one Notification preview cannot result. AT-A12-N references fixture.airPolicyNotificationInput but omits enabled/name/recoveryThreshold/durationSeconds; AT-A11-N omits enabled/name/timezone. Also, inApp under SR28 saves deliveryState=simulated, while the text ambiguously calls it a Notification preview.
+- Why it matters: SR28 prohibits UI/Repository from inventing required values. The Test Agent cannot save without guessing, and defaults cannot produce expected results. FR-A05 is P0.
+- Example Failure: Saving only written AT-A05-N values returns VALIDATION for missing name and others. Even after filling them, default enabled=false gives zero Alerts.
+- Required Fix: Specify all required inputs and enabled=true in AT-A05-N/A11-N/A12-N, or reference fixed Policy input objects in fixture-contract.json. Distinguish preview versus simulated by deliveryState.
+- Suggested Revision: AT-A05-N saves name=Demo high temperature, unitIds=[unit-online-rto], metric=temperature, operator=gte, threshold=30, recoveryThreshold=28, durationSeconds=60, severity=warning, recipientMembershipIds=[customer-a], channels=[inApp], cooldownMinutes=5, escalateAfterMinutes=60, timezone=Asia/Kuala_Lumpur, enabled=true, priority=50. Then expects one Notification with deliveryState=simulated.
 
 #### G1-010
 
 - Severity: MAJOR
 - Issue ID: G1-010
-- Document: 01-requirements/client.md（FR-C04）、04-agentic-sdlc/acceptance-fixes.csv、04-agentic-sdlc/fixture-contract.json、02-design/review-resolution-contracts.md（IR36/IR92）、02-design/deterministic-contracts.md（D01/D09）、04-agentic-sdlc/verification.md
-- Location: 要件client.md:140（AT-C04-E③）／acceptance-fixes.csv:20（AT-FIX-019）／fixture-contract.json:14-15（customer-aのvalidFrom=2026-09-01、validUntil=2026-10-01。全actor同じ）, :371（note）／review-resolution-contracts.md:246（IR36「Membership.validUntil…はジャンプで通常どおり失効」）, :678（IR92規則1）／deterministic-contracts.md:18-21, 141／verification.md:42（`validFrom <= now < validUntil`）
-- Problem: AT-C04-E③は時計を2026-03-07／2026-10-31に設定して週次ルールを保存しVALIDATIONを期待し、AT-FIX-019も2026-03-07を使う。しかしseedの全actorのMembership有効期間は[2026-09-01, 2026-10-01)で、両日付とも範囲外である。Givenは有効期間の上書きを指定しておらず、IR92規則1では書かれていない値はseedのままとなる。範囲外のMembershipによる保存はD01順位2/4（UNAUTHENTICATEDまたは担当期限外FORBIDDEN）に当たり得るが、DST検証をD01のどの順位で行うか（順位1の構造検証か順位7の関連値か）は定義されていない。なおD09は保存時nowから366日以内の全occurrenceを検証するため、seedの時計（2026-09-14）のままでも2026-11-01（曖昧）と2027-03-14（不存在）が検出され、時計を動かす必要自体が無い。
-- Why it matters: 受入の前提データと期待するエラーコードが、seed・IR92・D01から一意に決まらない。
-- Example Failure: 実装Aは2026-03-07ではcustomer-aのsignInまたは保存をFORBIDDENとしAT-C04-E③が失敗する。実装BはDST検証を先に行いVALIDATIONを返す。どちらもD01の文言に反するとは言えない。
-- Required Fix: Givenに有効期間の上書きを明記するか、時計を有効期間内に置いたまま366日検証で検出するケースに書き換える。DST検証がD01のどの順位に当たるかを明記する。
-- Suggested Revision: AT-C04-E③を「時計はseedのまま（2026-09-14T01:00Z）、timezone=America/New_York、日曜02:30（2027-03-14が不存在）／日曜01:30（2026-11-01が曖昧）の週次ルールを保存→VALIDATION（D01順位1）」へ変更し、AT-FIX-019も同じ前提に揃える。
+- Document: 01-requirements/client.md (FR-C04), 04-agentic-sdlc/acceptance-fixes.csv, 04-agentic-sdlc/fixture-contract.json, 02-design/review-resolution-contracts.md (IR36/IR92), 02-design/deterministic-contracts.md (D01/D09), 04-agentic-sdlc/verification.md
+- Location: Requirements client.md:140 (AT-C04-E③) / acceptance-fixes.csv:20 (AT-FIX-019) / fixture-contract.json:14-15 (customer-a validFrom=2026-09-01, validUntil=2026-10-01; same for all actors), :371 (note) / review-resolution-contracts.md:246 (IR36“Membership.validUntil expires normally on clock jumps”), :678 (IR92 rule 1) / deterministic-contracts.md:18-21, 141 / verification.md:42 (`validFrom <= now < validUntil`)
+- Problem: AT-C04-E③ sets the clock to 2026-03-07/2026-10-31, saves weekly rules, and expects VALIDATION; AT-FIX-019 also uses 2026-03-07. All seeded Memberships are valid only [2026-09-01,2026-10-01), so both dates are outside. Given does not override validity, and IR92 rule 1 retains unspecified seed values. Saving outside validity may give D01 priority-2/4 UNAUTHENTICATED or assignment-expired FORBIDDEN. DST validation priority (structural priority 1 or related-value priority 7) is undefined. D09 checks every occurrence within 366 days of save now, so the seed clock 2026-09-14 already detects ambiguous 2026-11-01 and nonexistent 2027-03-14; no clock change is needed.
+- Why it matters: Seed/IR92/D01 do not uniquely determine acceptance premises and expected error codes.
+- Example Failure: A returns FORBIDDEN on customer-a signIn/save at 2026-03-07, failing the case. B checks DST first and returns VALIDATION. Neither clearly violates D01 wording.
+- Required Fix: Explicitly override Membership validity in Given or retain a valid clock and use 366-day checks. State DST validation's D01 priority.
+- Suggested Revision: Use the seed clock 2026-09-14T01:00Z and timezone=America/New_York. Save weekly Sunday 02:30 (nonexistent 2027-03-14) or Sunday 01:30 (ambiguous 2026-11-01)→VALIDATION at D01 priority 1. Align AT-FIX-019.
 
 #### G1-011
 
 - Severity: MAJOR
 - Issue ID: G1-011
-- Document: 04-agentic-sdlc/acceptance-review-019.csv、02-design/review-resolution-contracts.md（IR69/IR89）、02-design/deterministic-contracts.md（D06）、04-agentic-sdlc/fixture-contract.json
-- Location: acceptance-review-019.csv:16（AT-REV19-015）, :3（AT-REV19-002）, :38（AT-REV19-037）／review-resolution-contracts.md:438, 629, 631／deterministic-contracts.md:93／fixture-contract.json:1501-1504（job-contractor-a.scheduledSlot.endAt=2026-09-20T00:00Z）, :1533-1536（assignment-contractor-aのscheduled/validFrom/validUntil）
-- Problem: AT-REV19-015は「assignment-contractor-aをscheduledEnd=01:20Zへpatch」するだけで、01:20Zに「業者/HQの一覧に『作業窓終了・再割当が必要』」を期待する。IR89はこの表示を「JobSummary/JobDetailでstatus∈{assigned,in_progress}かつscheduledSlot.endAt<=now」で判定するが、IR69/IR92により書かれていないJob.scheduledSlotはseed（endAt=2026-09-20T00:00Z）のままで、01:20Zには条件を満たさない。IR89末尾はjobs.assignでJob.scheduledSlotとAssignmentを同期させる不変条件を定めているが、patchはこれを破る。さらにD06は「AssignmentのvalidFrom/UntilはscheduledStart/Endと同じ」とするのに、patch後はvalidUntil=2026-09-20のまま食い違い、作業窓をどちらで判定するかで技術者側の結果も変わり得る。AT-REV19-002・AT-REV19-037も同じくscheduledStart/Endだけをpatchしており、AT-REV19-037の「02:00Zを過ぎても表示されない」はpatch前から表示されない状態のため、同期の検証として機能しない。
-- Why it matters: ユーザー確定のDEC-50（IR72順位1）に対応する受入が、規則どおりに前提を作ると期待結果を出せない。
-- Example Failure: テストAgentがGivenどおりにpatchすると、01:20Zに技術者画面は破棄・history表示になるが、HQ/業者の一覧にはIR89の表示が出ず、AT-REV19-015が失敗する。
-- Required Fix: AT-REV19-002/015/037のGivenでJob.scheduledSlotとAssignment.validFrom/validUntilも同じ値にpatchする（またはjobs.assignの通常操作で作る）。patchが守るべき関連フィールドの不変条件をIR92に追記する。
-- Suggested Revision: AT-REV19-015のGivenを「assignment-contractor-aのscheduledEnd=validUntil=01:20Z、job-contractor-aのscheduledSlot.endAt=01:20Z・status=in_progress」とし、AT-REV19-037は旧枠が過ぎた02:00Zの時点で再割当前に表示が出ることも確認する手順に改める。
+- Document: 04-agentic-sdlc/acceptance-review-019.csv, 02-design/review-resolution-contracts.md (IR69/IR89), 02-design/deterministic-contracts.md (D06), 04-agentic-sdlc/fixture-contract.json
+- Location: acceptance-review-019.csv:16 (AT-REV19-015), :3 (AT-REV19-002), :38 (AT-REV19-037) / review-resolution-contracts.md:438, 629, 631 / deterministic-contracts.md:93 / fixture-contract.json:1501-1504 (job-contractor-a.scheduledSlot.endAt=2026-09-20T00:00Z), :1533-1536 (assignment-contractor-a scheduled/validFrom/validUntil)
+- Problem: AT-REV19-015 patches only assignment-contractor-a scheduledEnd=01:20Z, then expects a work-window-ended/reassignment-needed message for HQ/contractors at 01:20Z. IR89 derives this from JobSummary/JobDetail status assigned/in_progress and scheduledSlot.endAt<=now. Under IR69/IR92, unmentioned Job.scheduledSlot stays at seed endAt=2026-09-20T00:00Z, so the condition fails. The patch breaks IR89's jobs.assign synchronization invariant. D06 also equates Assignment validFrom/Until to scheduledStart/End, but validUntil remains 2026-09-20, making technician results depend on which field is used. AT-REV19-002/037 likewise patch only scheduledStart/End. AT-REV19-037's absence of the message after 02:00Z does not test synchronization because it was already absent before the patch.
+- Why it matters: The acceptance case for user-confirmed DEC-50 (IR72 priority 1) cannot reach its expected result when premises follow the rules.
+- Example Failure: Patching Given as written discards the technician screen and shows history at 01:20Z, but HQ/contractors see no IR89 message, failing AT-REV19-015.
+- Required Fix: Patch Job.scheduledSlot and Assignment.validFrom/validUntil consistently in AT-REV19-002/015/037, or use normal jobs.assign. Add related-field patch invariants to IR92.
+- Suggested Revision: AT-REV19-015 Given: Assignment scheduledEnd=validUntil=01:20Z; Job scheduledSlot.endAt=01:20Z and status=in_progress. AT-REV19-037 must also confirm the message appears at 02:00Z after the old window ends, before reassignment.
 
 #### G1-012
 
 - Severity: MAJOR
 - Issue ID: G1-012
-- Document: 04-agentic-sdlc/acceptance-review-017.csv、04-agentic-sdlc/acceptance-review-018.csv、04-agentic-sdlc/verification.md、02-design/review-resolution-contracts.md（IR47/IR57/IR74）、02-design/deterministic-contracts.md（D05/D14）、04-agentic-sdlc/fixture-contract.json
-- Location: acceptance-review-017.csv:5（AT-REV17-004）, :6（AT-REV17-005）, :15（AT-REV17-014）／acceptance-review-018.csv:4（AT-REV18-003）, :14（AT-REV18-013④）／verification.md:209-219／review-resolution-contracts.md:329（IR47）, :390（IR57）, :513（IR74 REV18-035）／deterministic-contracts.md:87（D05）, :192（D14）／strict-review-contracts.md:133（SR20）／client.md:246（AT-C09-N）／fixture-contract.json:1006-1007（device-tamper.unitId=unit-non-rto）, :1318-1324（contract-general-a、endAt=2027-01-01）
-- Problem: verification.mdはAT-REV17-001〜015・AT-REV18-001〜048を既存ATと合わせて検証するよう求めるが、次の期待値が現行の上位規範・seedと矛盾する。(a) AT-REV17-014は`/customer/units/unit-other-customer`で「SCR-X-not-foundを表示…認証済みならrole home」とするが、IR57は既知routeのprimary queryがNOT_FOUNDなら「URLを維持したままその場でnot-found状態（親一覧へのリンク）」とし、AT-REV18-013④も「URL維持でnot-found表示と親一覧リンク」を期待する。(b) AT-REV17-004はZの無い「希望枠2026-09-15 10:00〜12:00」から「省略時dueAt=2026-09-15 12:00Z」を期待するが、IR74 REV18-035ではZ無しはAsia/Kuala_Lumpurのローカル時刻で、AT-C09-Nも同じ枠を02:00Z〜04:00Zとしているため、dueAtは04:00Zになる。(c) AT-REV17-005はunit-non-rtoのarchive成功を前提にするが、seedではdevice-tamperがunit-non-rtoに現bindingを持ち、contract-general-a（endAt=2027-01-01）がunit-non-rtoを対象にするため、D05/D14によりarchiveはCONFLICTになる。(d) AT-REV18-003はcommunication_lost→restored→power_lost→tamperの後のcommands.createを「tamperだけではCommandを受付」とするが、restoredは接続軸だけを復旧し（SR20）、power_lostの後に電源の復旧が無いためIR47によりpowerSignal=offが最優先でOFFLINEになる。
-- Why it matters: IR72は「見つけた食い違いは実装で選ばず文書欠陥として報告し、G1を停止する」と定める。旧受入計画は現行manifestに含まれ、テストAgentへの入力である。IR81の旧記述検査はMarkdownとverification.mdが対象で、受入CSVの期待値は検査されない。
-- Example Failure: IR57どおりに実装するとAT-REV17-014が失敗し、AT-REV17-014に合わせるとAT-REV18-013④が失敗する。AT-REV17-005はseedのままではarchiveがCONFLICTとなり以降の手順が実行できない。
-- Required Fix: 上記4件の期待値・前提を現行規範に合わせて修正する（またはverification.mdで置換済みのcaseを明示して実施対象から外す）。受入CSVの期待値も旧記述検査または整合テストの対象に加える。
-- Suggested Revision: (a) AT-REV17-014の後半を「customer-aの/customer/units/unit-other-customerはSCR-C03上でURL維持のnot-found状態と親一覧リンク（IR57）。未定義routeだけSCR-X-not-found」、(b)「省略時dueAt=2026-09-15T04:00Z」、(c) Givenに「device-tamperのbindingを解除し、contract-general-aのendAtを過去へpatch」を追加するか、依存の無い新規Unitを対象にする、(d) 手順を「…→power_lost→restored(power)→tamper→commands.create」とする。
+- Document: 04-agentic-sdlc/acceptance-review-017.csv, 04-agentic-sdlc/acceptance-review-018.csv, 04-agentic-sdlc/verification.md, 02-design/review-resolution-contracts.md (IR47/IR57/IR74), 02-design/deterministic-contracts.md (D05/D14), 04-agentic-sdlc/fixture-contract.json
+- Location: acceptance-review-017.csv:5 (AT-REV17-004), :6 (AT-REV17-005), :15 (AT-REV17-014) / acceptance-review-018.csv:4 (AT-REV18-003), :14 (AT-REV18-013④) / verification.md:209-219 / review-resolution-contracts.md:329 (IR47), :390 (IR57), :513 (IR74 REV18-035) / deterministic-contracts.md:87 (D05), :192 (D14) / strict-review-contracts.md:133 (SR20) / client.md:246 (AT-C09-N) / fixture-contract.json:1006-1007 (device-tamper.unitId=unit-non-rto), :1318-1324 (contract-general-a, endAt=2027-01-01)
+- Problem: verification.md requires AT-REV17-001–015 and AT-REV18-001–048 with existing ATs, but four expectations conflict with current rules/seed. (a) AT-REV17-014 uses SCR-X-not-found then role home for /customer/units/unit-other-customer; IR57 and AT-REV18-013④ require in-place not-found with URL retained and parent-list link for a known route's primary NOT_FOUND. (b) AT-REV17-004 expects dueAt=2026-09-15 12:00Z from a 10:00–12:00 window without Z, but IR74 treats it as Asia/Kuala_Lumpur and AT-C09-N maps it to 02:00–04:00Z, so dueAt is 04:00Z. (c) AT-REV17-005 assumes unit-non-rto archives successfully, but current device-tamper binding and contract-general-a ending 2027-01-01 make D05/D14 return CONFLICT. (d) AT-REV18-003 expects tamper alone to allow Command after communication_lost→restored→power_lost→tamper. SR20 restored recovers only connection; power is not restored after power_lost, so IR47 powerSignal=off gives OFFLINE first.
+- Why it matters: IR72 requires reporting conflicts as document defects and stopping G1, not choosing during implementation. Old acceptance plans remain in the current manifest as Test Agent input. IR81 old-text checks cover Markdown/verification.md but not CSV expectations.
+- Example Failure: Following IR57 fails AT-REV17-014; following that AT fails AT-REV18-013④. AT-REV17-005 archive fails with CONFLICT on unchanged seed, preventing later steps.
+- Required Fix: Align these four premises/expectations with current rules, or explicitly mark replaced cases excluded in verification.md. Include acceptance CSV expectations in old-text or consistency checks.
+- Suggested Revision: (a) customer-a at /customer/units/unit-other-customer stays on SCR-C03 with URL-preserving not-found and parent-list link; only undefined routes use SCR-X-not-found. (b) Omitted dueAt=2026-09-15T04:00Z. (c) Unbind device-tamper and patch contract-general-a endAt into the past, or use a new Unit without dependencies. (d) Use …→power_lost→restored(power)→tamper→commands.create.
 
 ### 3.2 MINOR
 
@@ -216,205 +216,205 @@
 
 - Severity: MINOR
 - Issue ID: G1-013
-- Document: 02-design/service-contracts.ts、02-design/review-resolution-contracts.md（IR03/IR35）、02-design/operation-catalog.csv
-- Location: service-contracts.ts:84（Restriction）, :86（RestrictionReleaseView）／review-resolution-contracts.md:26, 236／operation-catalog.csv restrictions.reconcile/retryの認可列（`release-intent-or-terminal-recovery-only`）
-- Problem: IR35は解除要求時に`releaseIntent={source,at,actorMembershipId}`を保存するとし、IR03とカタログはoverride専用者のreconcile/retry可否をこの解除意思（override由来か）で決める。しかし正規型のRestriction/RestrictionReleaseViewにreleaseIntentは無く、内部専用値であるという宣言（IR31のcontributorUserIdsのような記述）も無い。
-- Why it matters: override専用者のA10画面でreconcile/retryボタンの表示可否を、UIが取得した値から決められない。
-- Example Failure: 入金確認でrelease_requestedになった制限に対し、override専用者の画面にretryボタンが出て、押すとFORBIDDENになる。
-- Required Fix: releaseIntentをRepository内部値と明記するか、RestrictionReleaseViewに`releaseIntentSource`を追加する。
-- Suggested Revision: 正規型に`releaseIntent:{source:'payment'|'exception'|'override'|'manual';at:Instant}|null`を追加し、RestrictionReleaseViewにも含める。
+- Document: 02-design/service-contracts.ts, 02-design/review-resolution-contracts.md (IR03/IR35), 02-design/operation-catalog.csv
+- Location: service-contracts.ts:84 (Restriction), :86 (RestrictionReleaseView) / review-resolution-contracts.md:26, 236 / operation-catalog.csv authorization column for restrictions.reconcile/retry (`release-intent-or-terminal-recovery-only`)
+- Problem: IR35 stores releaseIntent={source,at,actorMembershipId} on release request. IR03/catalog uses whether this intent came from override to allow override-only reconcile/retry. Canonical Restriction/RestrictionReleaseView lacks releaseIntent, with no declaration that it is internal-only like IR31 contributorUserIds.
+- Why it matters: The override-only A10 UI cannot decide reconcile/retry button availability from retrieved values.
+- Example Failure: An override-only user sees retry for a payment-origin release_requested restriction and gets FORBIDDEN on pressing it.
+- Required Fix: Declare releaseIntent Repository-internal or add releaseIntentSource to RestrictionReleaseView.
+- Suggested Revision: Add releaseIntent:{source:'payment'|'exception'|'override'|'manual';at:Instant}|null to canonical types and include it in RestrictionReleaseView.
 
 #### G1-014
 
 - Severity: MINOR
 - Issue ID: G1-014
-- Document: 03-uiux/screen-catalog.csv、02-design/review-resolution-contracts.md（IR51）、02-design/client.md（DD-C08）
-- Location: screen-catalog.csv:8（SCR-C08のoperations=alerts.list;notifications.markRead;notifications.list）／review-resolution-contracts.md:355／設計client.md:298-303／要件client.md:229（AT-C08-B①〜③）
-- Problem: IR51は「FR-C08/AT-C08-Bの『未対応件数』はalertCountを指し、通知の未読件数とは別の値として別に表示する」とするが、SCR-C08の操作にsummaries.getが無く、DD-C08のフィールド表にもalertCountが無い。D07によりKPIはsummaries.getで集計し、一覧ページから計算してはならない。
-- Why it matters: AT-C08-Bの観測画面（C08かC01か）が決まらない。
-- Example Failure: 実装AはC08でalerts.listの結果から件数を数え、D07に反する。実装BはC08に件数を出さず、AT-C08-BをC01で観測する。
-- Required Fix: 表示画面を明記し、C08で表示するならSCR-C08にsummaries.getを追加する。
-- Suggested Revision: SCR-C08のoperations/secondary_queriesにsummaries.get(kind=customer)を追加し、DD-C08に「alertCount（IR51）」の読取欄を追加する。
+- Document: 03-uiux/screen-catalog.csv, 02-design/review-resolution-contracts.md (IR51), 02-design/client.md (DD-C08)
+- Location: screen-catalog.csv:8 (SCR-C08 operations=alerts.list;notifications.markRead;notifications.list) / review-resolution-contracts.md:355 / Design client.md:298-303 / Requirements client.md:229 (AT-C08-B①–③)
+- Problem: IR51 says FR-C08/AT-C08-B unresolved count means alertCount, displayed separately from unread notifications. SCR-C08 has no summaries.get operation and DD-C08 lacks alertCount. D07 requires KPI aggregation through summaries.get, not calculation from list pages.
+- Why it matters: It is unclear whether AT-C08-B observes C08 or C01.
+- Example Failure: A counts alerts.list items on C08, violating D07. B omits the count from C08 and observes C01 instead.
+- Required Fix: Specify the display screen; add summaries.get to SCR-C08 if it displays the count.
+- Suggested Revision: Add summaries.get(kind=customer) to SCR-C08 operations/secondary_queries and an alertCount (IR51) read field to DD-C08.
 
 #### G1-015
 
 - Severity: MINOR
 - Issue ID: G1-015
-- Document: 01-requirements/client.md、02-design/service-contracts.ts
-- Location: 要件client.md:310（AT-C12-E①「offline台はpending」）／service-contracts.ts:83（releaseStateのenum）
-- Problem: 「pending」はRestrictionUnit.releaseState（none/waiting_reconcile/requested/released/not_required/failed）に無い。unit-limitedはremove Command作成後に通信断となるため、30秒経過前はrequested、後はfailedとなり、どの値・表示を「pending」とするか決まらない。
-- Why it matters: 観測値が一意でない。
-- Example Failure: テストAgentがreleaseState=requestedとfailedのどちらを合格とするか判断できない。
-- Required Fix: 観測時刻と期待するreleaseState/pendingReason/表示ラベルを明記する。
-- Suggested Revision: 「①30秒未満ではperUnit.releaseState=requested・表示『解除応答待ち（通信断）』、30秒経過後はfailed・集約release_requestedのまま」とする。
+- Document: 01-requirements/client.md, 02-design/service-contracts.ts
+- Location: Requirements client.md:310 (AT-C12-E①“offline units are pending”) / service-contracts.ts:83 (releaseState enum)
+- Problem: pending is not in RestrictionUnit.releaseState (none/waiting_reconcile/requested/released/not_required/failed). unit-limited loses communication after remove Command creation, so it is requested before 30 seconds and failed afterward. The value/display called pending is undefined.
+- Why it matters: The observed value is ambiguous.
+- Example Failure: The Test Agent cannot decide whether releaseState=requested or failed passes.
+- Required Fix: Specify observation time and expected releaseState/pendingReason/display label.
+- Suggested Revision: Before 30 seconds: perUnit.releaseState=requested, display “Waiting for release response (communication lost).” After 30 seconds: failed, with aggregate release_requested unchanged.
 
 #### G1-016
 
 - Severity: MINOR
 - Issue ID: G1-016
-- Document: 03-uiux/UIUXSpecification.md（UX-05）、03-uiux/component-contracts.csv
-- Location: UIUXSpecification.md:142（StatusBadge: domain/status/labelKey）, :146（CommandPanel: capability/observedState/pendingCommand/permission）, :147（ConfirmActionDialog: target/action/impact/reason/onConfirm）／component-contracts.csv:2（StatusBadge: status,severity,labelKey,quality）, :4（CommandPanel: unit,pending,permission,loading,error）, :5（ConfirmActionDialog: open,target,before,after,reasonRequired,submitting,error）
-- Problem: 同じ共通Componentのprops名・構成がUX-05とComponent契約で異なる。IR72では契約CSV（順位5）が優先するが、UX-05側が置換されていない。
-- Why it matters: 実装Agentが2種類のprops名を見て迷い、IR72の「文書欠陥として報告」に当たる。
-- Example Failure: StatusBadgeに`domain`を渡す実装と`severity`/`quality`を渡す実装が混在する。
-- Required Fix: UX-05のprops記述をcomponent-contracts.csvへの参照に置き換えるか、名称を揃える。
-- Suggested Revision: UX-05の「受け取る情報」列を「component-contracts.csvのprops（IR72順位5）」へ変更する。
+- Document: 03-uiux/UIUXSpecification.md (UX-05), 03-uiux/component-contracts.csv
+- Location: UIUXSpecification.md:142 (StatusBadge: domain/status/labelKey), :146 (CommandPanel: capability/observedState/pendingCommand/permission), :147 (ConfirmActionDialog: target/action/impact/reason/onConfirm) / component-contracts.csv:2 (StatusBadge: status,severity,labelKey,quality), :4 (CommandPanel: unit,pending,permission,loading,error), :5 (ConfirmActionDialog: open,target,before,after,reasonRequired,submitting,error)
+- Problem: Shared Component prop names and shapes differ between UX-05 and Component contracts. IR72 gives contract CSV priority 5, but UX-05 has not been replaced.
+- Why it matters: Agents see two prop sets and face a document defect under IR72.
+- Example Failure: Implementations mix StatusBadge domain with severity/quality props.
+- Required Fix: Replace UX-05 prop descriptions with references to component-contracts.csv or align the names.
+- Suggested Revision: Change UX-05 “Information received” to “props in component-contracts.csv (IR72 priority 5).”
 
 #### G1-017
 
 - Severity: MINOR
 - Issue ID: G1-017
-- Document: 03-uiux/screen-catalog.csv、02-design/contractor.md（DD-P03）、02-design/deterministic-contracts.md（D10）、02-design/strict-review-contracts.md（SR11）
-- Location: screen-catalog.csv:15（SCR-P03のurl_selection=tab,sort）／設計contractor.md:122（jobId必須）／deterministic-contracts.md:145／strict-review-contracts.md:80
-- Problem: DD-P03は割当対象のjobIdを必須入力とするが、SCR-P03のURL許可キーにjobIdが無い。D10は「URLの選択ID・tabはcatalogに固定」、SR11は未知キーを除去するため、P02から対象案件を指定して遷移・Back復元することができない。
-- Why it matters: AT-P03-Nの操作導線（受諾した案件の割当画面を開く）が定義されない。
-- Example Failure: /partner/schedule?jobId=job-internal-aでjobIdが除去され、別の案件を選ぶ手間が発生する。
-- Required Fix: url_selectionにjobIdを追加するか、URLに保持しない理由と選択方法を明記する。
-- Suggested Revision: SCR-P03のurl_selectionを`tab,sort,jobId`とする。
+- Document: 03-uiux/screen-catalog.csv, 02-design/contractor.md (DD-P03), 02-design/deterministic-contracts.md (D10), 02-design/strict-review-contracts.md (SR11)
+- Location: screen-catalog.csv:15 (SCR-P03 url_selection=tab,sort) / Design contractor.md:122 (jobId required) / deterministic-contracts.md:145 / strict-review-contracts.md:80
+- Problem: DD-P03 requires target jobId, but SCR-P03 URL keys omit it. D10 fixes selection IDs/tabs in the catalog and SR11 removes unknown keys, preventing targeted navigation from P02 and Back restoration.
+- Why it matters: AT-P03-N navigation to assignment for an accepted job is undefined.
+- Example Failure: /partner/schedule?jobId=job-internal-a loses jobId, forcing users to select again.
+- Required Fix: Add jobId to url_selection, or explain why it is not retained and how selection works.
+- Suggested Revision: Set SCR-P03 url_selection to tab,sort,jobId.
 
 #### G1-018
 
 - Severity: MINOR
 - Issue ID: G1-018
-- Document: 02-design/deterministic-contracts.md（D06）、02-design/review-resolution-contracts.md（IR49/IR89）、04-agentic-sdlc/acceptance-review-019.csv
-- Location: deterministic-contracts.md:93／review-resolution-contracts.md:345, 631／acceptance-review-019.csv:38（AT-REV19-037）
-- Problem: D06の重複判定（既存start<newEnd AND newStart<existingEnd）は、延長・再割当で置き換える旧Assignmentを除外するかを定めていない。AT-REV19-037は同じ技術者の旧枠[00:00Z,02:00Z)と重なる新枠[01:30Z,04:00Z)の成功を期待する。
-- Why it matters: 除外しない実装では延長がCONFLICTになる。
-- Example Failure: jobs.assignが旧Assignmentとの重複でCONFLICTを返し、AT-REV19-037が失敗する。
-- Required Fix: 重複判定から同じJobの置換対象Assignmentを除外することを明記する。
-- Suggested Revision: D06に「同じjobIdの現在active Assignment（置換対象）は重複判定から除外する」を追加する。
+- Document: 02-design/deterministic-contracts.md (D06), 02-design/review-resolution-contracts.md (IR49/IR89), 04-agentic-sdlc/acceptance-review-019.csv
+- Location: deterministic-contracts.md:93 / review-resolution-contracts.md:345, 631 / acceptance-review-019.csv:38 (AT-REV19-037)
+- Problem: D06 overlap checking (existingStart<newEnd AND newStart<existingEnd) does not say whether to exclude the old Assignment being replaced by extension/reassignment. AT-REV19-037 expects a new [01:30Z,04:00Z) window to succeed despite overlapping the same technician's old [00:00Z,02:00Z) window.
+- Why it matters: Without exclusion, extension returns CONFLICT.
+- Example Failure: jobs.assign conflicts with the old Assignment, failing AT-REV19-037.
+- Required Fix: Explicitly exclude the replaced Assignment for the same Job from overlap checks.
+- Suggested Revision: Add to D06: Exclude the current active Assignment with the same jobId (the replacement target) from overlap checks.
 
 #### G1-019
 
 - Severity: MINOR
 - Issue ID: G1-019
-- Document: 02-design/review-resolution-contracts.md（IR91/IR92/IR31）、01-requirements/admin.md、01-requirements/client.md、04-agentic-sdlc/fixture-contract.json
-- Location: review-resolution-contracts.md:681（IR92規則4「該当フィールドだけを…patch」）, :669（IR91規則10）, :195（IR31）／要件admin.md:276（AT-A10-B①）／要件client.md:311（AT-C12-B）／fixture-contract.json `acceptancePatches["AT-P01-N"]`（job-contractor-aをstatus=submittedだけ変更）
-- Problem: 状態フィールドだけのpatchは、通常操作では到達しない組合せを作る。restriction-limited-aをstate=scheduledにしてもperUnit.applyState=applied、apply Command=acknowledged、unit-limited.observedRestrictionは残り、そこへのcancelの副作用（D03の解除評価、SR26の回復case）が定義されない。AT-P01-Nのjob-contractor-aはsubmittedなのに報告版が無く（reportRefs=[]）、IR31の寄与者集合も無い。
-- Why it matters: 期待値として書かれていない副作用が実装ごとに異なり、同じfixtureを使う他の画面（P05等）で例外が出る。
-- Example Failure: AT-A10-B①のcancel後、unit-limitedが観測上は制限中なのにeffectiveControlPolicy=unrestrictedとなり、別テストで不整合が表面化する。
-- Required Fix: 状態patchで同時に揃える関連フィールドを規則化するか、これらのcaseを通常操作で作る。
-- Suggested Revision: IR92規則4に「Restriction.stateのpatchではperUnit/Command/observedRestrictionを状態に整合する値（scheduled: perUnit=not_sent・Commandなし・observedRestriction=null等）へ同時に置き換える。submitted Jobには提出済み報告版を同時に作る」を追加する。
+- Document: 02-design/review-resolution-contracts.md (IR91/IR92/IR31), 01-requirements/admin.md, 01-requirements/client.md, 04-agentic-sdlc/fixture-contract.json
+- Location: review-resolution-contracts.md:681 (IR92 rule 4“patch only the relevant fields”), :669 (IR91 rule 10), :195 (IR31) / Requirements admin.md:276 (AT-A10-B①) / Requirements client.md:311 (AT-C12-B) / fixture-contract.json `acceptancePatches["AT-P01-N"]` (change only job-contractor-a status=submitted)
+- Problem: Patching only state creates combinations unreachable through normal operations. Setting restriction-limited-a to scheduled leaves perUnit.applyState=applied, an acknowledged apply Command, and unit-limited.observedRestriction. Cancel side effects (D03 release evaluation, SR26 recovery cases) are undefined. AT-P01-N job-contractor-a is submitted without a report version (reportRefs=[]) or IR31 contributor set.
+- Why it matters: Unspecified side effects differ, and other screens sharing the fixture, such as P05, may throw errors.
+- Example Failure: After AT-A10-B① cancellation, unit-limited still observes a restriction but effectiveControlPolicy becomes unrestricted; another test exposes the inconsistency.
+- Required Fix: Define related fields that state patches must align, or build these cases through normal operations.
+- Suggested Revision: Add IR92 rule 4: Restriction.state patches must simultaneously align perUnit/Command/observedRestriction (scheduled: perUnit=not_sent, no Command, observedRestriction=null, etc.). Submitted Jobs must also have a submitted report version.
 
 #### G1-020
 
 - Severity: MINOR
 - Issue ID: G1-020
-- Document: 01-requirements/admin.md（FR-A14）、02-design/service-contracts.ts、02-design/review-resolution-contracts.md（IR88）
-- Location: 要件admin.md:362（BR-A14「係数には、地域・年度・単位・出典が必須」）, :369（AT-A14-E「係数の単位が合っていない」）／service-contracts.ts:112（EmissionFactorに単位欄なし）／review-resolution-contracts.md:617（factorUnitは固定表示）
-- Problem: EmissionFactorは単位を持たずkgCO2ePerKWhに固定されているため、「係数の単位が合っていない」状態を作れず、BR-A14の「単位必須」も検証対象が無い。
-- Why it matters: AT-A14-Eのsubcaseが実行できない。
-- Example Failure: テストAgentが単位不一致のfixtureを作れない。
-- Required Fix: subcaseを削除するか、係数に単位欄を追加する。
-- Suggested Revision: AT-A14-Eから「係数の単位が合っていない」を削除し、BR-A14を「単位はkgCO₂e/kWh固定（IR88）」とする。
+- Document: 01-requirements/admin.md (FR-A14), 02-design/service-contracts.ts, 02-design/review-resolution-contracts.md (IR88)
+- Location: Requirements admin.md:362 (BR-A14“Factor requires region, year, unit, and source”), :369 (AT-A14-E“Factor unit does not match”) / service-contracts.ts:112 (EmissionFactor has no unit field) / review-resolution-contracts.md:617 (factorUnit has fixed display)
+- Problem: EmissionFactor has no unit field and is fixed to kgCO2ePerKWh, so a mismatched-factor-unit state cannot be created and BR-A14 required unit has no validation target.
+- Why it matters: The AT-A14-E subcase cannot run.
+- Example Failure: The Test Agent cannot create a unit-mismatch fixture.
+- Required Fix: Remove the subcase or add a factor unit field.
+- Suggested Revision: Remove mismatched factor unit from AT-A14-E and state in BR-A14 that the unit is fixed to kgCO₂e/kWh (IR88).
 
 #### G1-021
 
 - Severity: MINOR
 - Issue ID: G1-021
-- Document: 01-requirements/contractor.md（FR-P05）、02-design/technician.md（DD-T04/T09）、02-design/service-contracts.ts
-- Location: 要件contractor.md:161（AT-P05-B③）／設計technician.md:148, 289／service-contracts.ts:70（ReviewAvailabilityの理由）
-- Problem: 「未点検あり理由なし」の報告は提出時にVALIDATIONとなるため、submitted状態にならず品質確認の対象にならない。demoSeedに報告の節も無い。ReviewAvailabilityにも「記録不備」の理由値が無い。
-- Why it matters: 到達不能な前提と、存在しない無効化理由を期待している。
-- Example Failure: テストAgentがAT-P05-B③の前提を作れない。
-- Required Fix: subcaseを削除するか、提出後に不備が判明する別の条件へ置き換える。
-- Suggested Revision: AT-P05-B③を「提出直前に理由なしnot_inspectedで提出→VALIDATION（T04-E③と同じ）」としてFR-T側へ移す。
+- Document: 01-requirements/contractor.md (FR-P05), 02-design/technician.md (DD-T04/T09), 02-design/service-contracts.ts
+- Location: Requirements contractor.md:161 (AT-P05-B③) / Design technician.md:148, 289 / service-contracts.ts:70 (ReviewAvailability reasons)
+- Problem: A report with not_inspected and no reason returns VALIDATION on submission, so it cannot become submitted or reach quality review. demoSeed also has no report section. ReviewAvailability has no incomplete-record reason.
+- Why it matters: The premise is unreachable and the expected disabled reason does not exist.
+- Example Failure: The Test Agent cannot build AT-P05-B③ Given.
+- Required Fix: Remove the subcase or replace it with a defect discovered after submission.
+- Suggested Revision: Move AT-P05-B③ to FR-T as submit with reasonless not_inspected→VALIDATION, matching T04-E③.
 
 #### G1-022
 
 - Severity: MINOR
 - Issue ID: G1-022
-- Document: 01-requirements/client.md（FR-C05）、02-design/service-contracts.ts
-- Location: 要件client.md:152（BR-C05「一般的な利用の同意」）, :160（AT-C05-B①「一般同意のみ」）／service-contracts.ts:99（Consent.purposeは`location_automation`のみ）
-- Problem: 「一般同意」に当たるデータ・操作が無い。
-- Why it matters: AT-C05-B①の前提を規則どおり作れない。
-- Example Failure: テストAgentが独自のpurpose値を作る。
-- Required Fix: 一般同意をモデル化するか、表現を「位置同意なし」に改める。
-- Suggested Revision: AT-C05-B①を「位置同意granted=false（一般利用は同意記録なし）」とする。
+- Document: 01-requirements/client.md (FR-C05), 02-design/service-contracts.ts
+- Location: Requirements client.md:152 (BR-C05“Consent for general use”), :160 (AT-C05-B①“General consent only”) / service-contracts.ts:99 (Consent.purpose only allows `location_automation`)
+- Problem: No data or operation represents general consent.
+- Why it matters: AT-C05-B① Given cannot be built according to the rules.
+- Example Failure: The Test Agent invents a purpose value.
+- Required Fix: Model general consent or reword as no location consent.
+- Suggested Revision: Use location consent granted=false; general use has no consent record in AT-C05-B①.
 
 #### G1-023
 
 - Severity: MINOR
 - Issue ID: G1-023
-- Document: 01-requirements/technician.md（FR-T12）、02-design/service-contracts.ts、02-design/strict-review-contracts.md（SR20）
-- Location: 要件technician.md:309（AT-T12-E②「新しい通信断の後に古いheartbeat」）／service-contracts.ts:142（DemoTriggerのdevice kindはcommunication_lost/power_lost/tamper/restored）／strict-review-contracts.md:133
-- Problem: heartbeatを投入するDemoTriggerが無く、「古いheartbeat」を何で再現するか（古いsequenceのrestored等）が書かれていない。
-- Why it matters: 手順を一意に実行できない。
-- Example Failure: テストAgentが存在しないeventTypeを送りVALIDATIONになる。
-- Required Fix: 使用するDemoTriggerと値を明記する。
-- Suggested Revision: 「communication_lost(sequence=5)の後にrestored(axis=connection、sequence=4)→CONFLICTまたは反映なし、offlineのまま」とする。
+- Document: 01-requirements/technician.md (FR-T12), 02-design/service-contracts.ts, 02-design/strict-review-contracts.md (SR20)
+- Location: Requirements technician.md:309 (AT-T12-E②“Old heartbeat after new communication loss”) / service-contracts.ts:142 (DemoTrigger device kind: communication_lost/power_lost/tamper/restored) / strict-review-contracts.md:133
+- Problem: There is no heartbeat DemoTrigger and no specified way to reproduce an old heartbeat, such as restored with an old sequence.
+- Why it matters: The procedure is not deterministic.
+- Example Failure: The Test Agent sends a nonexistent eventType and gets VALIDATION.
+- Required Fix: Specify the DemoTrigger and values.
+- Suggested Revision: Use communication_lost(sequence=5), then restored(axis=connection,sequence=4)→CONFLICT or no effect, remaining offline.
 
 #### G1-024
 
 - Severity: MINOR
 - Issue ID: G1-024
-- Document: 01-requirements/client.md、01-requirements/admin.md、01-requirements/technician.md、02-design/deterministic-contracts.md（D05/D13）、02-design/service-contracts.ts
-- Location: 要件client.md:340（AT-C13-N: purpose未指定）, :246（AT-C09-N: 割当先・枠・時計進行が未指定）／要件admin.md:399（AT-A15-N: customerId/purpose/period/unitIds未指定）／要件technician.md:258（AT-T10-N: 試運転のstartAction未指定、先行Commandのack待ちが未記載）, :283（AT-T11-N: checkの成功イベント・sensorTypes未指定）／deterministic-contracts.md:81, 177／service-contracts.ts:217
-- Problem: 期待値には影響しないが必須の入力・手順がWhenに無い。
-- Why it matters: IR92が禁じる推測補完が必要になる。
-- Example Failure: AT-T10-Nで先行set_modeのack前に試運転を開始するとD05によりCONFLICTになる。
-- Required Fix: 必須入力と手順を明記する。
-- Suggested Revision: 例: AT-T10-Nに「set_modeをacknowledgedにした後、startAction=set_power true・endAction=set_power false」、AT-C13-Nに「purpose=Demo offset、period/unitIdsはIR92規則7」を追記する。
+- Document: 01-requirements/client.md, 01-requirements/admin.md, 01-requirements/technician.md, 02-design/deterministic-contracts.md (D05/D13), 02-design/service-contracts.ts
+- Location: Requirements client.md:340 (AT-C13-N: purpose unspecified), :246 (AT-C09-N: assignee, window, and clock progression unspecified) / Requirements admin.md:399 (AT-A15-N: customerId/purpose/period/unitIds unspecified) / Requirements technician.md:258 (AT-T10-N: test-run startAction unspecified; no step to await preceding Command ack), :283 (AT-T11-N: check success event and sensorTypes unspecified) / deterministic-contracts.md:81, 177 / service-contracts.ts:217
+- Problem: Required inputs/steps that do not affect expected values are absent from When.
+- Why it matters: This requires guessed completion prohibited by IR92.
+- Example Failure: Starting a test run before the preceding set_mode acknowledgment in AT-T10-N returns CONFLICT under D05.
+- Required Fix: State required inputs and steps.
+- Suggested Revision: For example, add to AT-T10-N: after set_mode is acknowledged, startAction=set_power true/endAction=set_power false. Add to AT-C13-N: purpose=Demo offset, period/unitIds follow IR92 rule 7.
 
 #### G1-025
 
 - Severity: MINOR
 - Issue ID: G1-025
-- Document: 01-requirements/common.md（AT-X01〜X07）、04-agentic-sdlc/fixture-contract.json
-- Location: 01-requirements/common.md:88, 97, 104, 113, 120, 127, 134／fixture-contract.json demoSeed.capabilities（2件とも温度対応・同じmode候補）
-- Problem: 共通ATは文章で観点を列挙するだけで、Given/When/Thenの具体値やacceptancePatchesのキーが無い。例えばAT-X06の「温度に対応していない」「モードの候補が異なる」「送風のみに対応」の機種はseedに無く、IR92規則6の一覧にも無い。
-- Why it matters: 共通AT（7束）のfixtureをテストAgentが自作することになる。
-- Example Failure: AT-X06の非対応機種の定義がテストごとに異なる。
-- Required Fix: AT-X01〜X07をN/E/B形式の表にし、必要なpatchをacceptancePatchesへ追加する。
-- Suggested Revision: `acceptancePatches["AT-X06-B"]`にtemperature=null、modes=[cool]、control=false等のcapabilityを追加する。
+- Document: 01-requirements/common.md (AT-X01–X07), 04-agentic-sdlc/fixture-contract.json
+- Location: 01-requirements/common.md:88, 97, 104, 113, 120, 127, 134 / fixture-contract.json demoSeed.capabilities (both support temperature and have the same mode options)
+- Problem: Common ATs only list checks in prose, without concrete Given/When/Then values or acceptancePatches keys. For example, AT-X06 models without temperature support, with different mode options, or with fan-only support do not exist in seed or IR92 rule 6.
+- Why it matters: The Test Agent must invent fixtures for seven common AT bundles.
+- Example Failure: Unsupported models in AT-X06 differ between tests.
+- Required Fix: Turn AT-X01–X07 into N/E/B tables and add necessary acceptancePatches.
+- Suggested Revision: Add capabilities such as temperature=null, modes=[cool], control=false to acceptancePatches[AT-X06-B].
 
 #### G1-026
 
 - Severity: MINOR
 - Issue ID: G1-026
-- Document: 04-agentic-sdlc/verification.md（S08）、02-design/strict-review-contracts.md（SR03/SR13）、04-agentic-sdlc/fixture-contract.json
-- Location: verification.md:104／strict-review-contracts.md:24, 88／fixture-contract.json actors（tech-external-bのscopes=[unit-other-customer]）
-- Problem: S08は業者aの辞退後に「別の業者」（contractor-b）へ再委託し自社技術者を割り当てるが、対象案件・設備が未指定で、IR92の既定（unit-online-rto）ではcontractor-bの技術者tech-external-bのscopeに設備が無い。jobs.assign/members.eligibleで技術者のunit scopeを検査するかも定義されていない。
-- Why it matters: S08の前提が一意に作れない。
-- Example Failure: 割当は成功するが、tech-external-bが設備を読めず作業開始できない。
-- Required Fix: S08の案件・業者・技術者のIDを明記し、割当時のscope検査を定義する。
-- Suggested Revision: S08の前提を「job: customer-bのunit-other-customerの案件、辞退: contractor-a、再委託: contractor-b、技術者: tech-external-b」とする。
+- Document: 04-agentic-sdlc/verification.md (S08), 02-design/strict-review-contracts.md (SR03/SR13), 04-agentic-sdlc/fixture-contract.json
+- Location: verification.md:104 / strict-review-contracts.md:24, 88 / fixture-contract.json actors (tech-external-b scopes=[unit-other-customer])
+- Problem: S08 reoffers to another contractor (contractor-b) after contractor-a declines and assigns its technician, but no job/unit is specified. IR92 default unit-online-rto is outside contractor-b technician tech-external-b's scope. Whether jobs.assign/members.eligible checks technician unit scope is also undefined.
+- Why it matters: S08 Given cannot be built uniquely.
+- Example Failure: Assignment succeeds but tech-external-b cannot read the unit or start work.
+- Required Fix: Specify job/contractor/technician IDs in S08 and define assignment scope checks.
+- Suggested Revision: Use a customer-b job on unit-other-customer; decline by contractor-a; reoffer to contractor-b; technician tech-external-b.
 
 #### G1-027
 
 - Severity: MINOR
 - Issue ID: G1-027
-- Document: 01-requirements/client.md、01-requirements/technician.md、01-requirements/admin.md、04-agentic-sdlc/fixture-contract.json、02-design/service-contracts.ts
-- Location: 要件client.md:214（AT-C08-SRC）／要件technician.md:188（AT-T07-SRC）／要件admin.md:148（AT-A05-SRC）／fixture-contract.json demoSeed.alerts（window_openの1件のみ）／service-contracts.ts:142（inferred/inspectionのAlertを作るDemoTriggerなし）
-- Problem: 「断熱不足の点検記録」「根拠なし」のfixtureにID・値・acceptancePatchesキーが無い。クリック可能なデモでも、insulation_loss/inspection根拠のAlertを作る経路が無い。
-- Why it matters: SRC受入の前提値がテストごとに異なり、デモで原文要件（BIZ-17）を示せない。
-- Example Failure: 2つのテストが異なるevidenceTextで同じcaseを合格とする。
-- Required Fix: acceptancePatchesにSRC 3件を定義し、デモ用の生成経路を定める。
-- Suggested Revision: `acceptancePatches["AT-C08-SRC"]`にalert-insulation-a（causeCode=insulation_loss、evidenceKind=inspection）とalert-unknown-a（causeCode=unknown、evidenceKind=demo_observation）を追加する。
+- Document: 01-requirements/client.md, 01-requirements/technician.md, 01-requirements/admin.md, 04-agentic-sdlc/fixture-contract.json, 02-design/service-contracts.ts
+- Location: Requirements client.md:214 (AT-C08-SRC) / Requirements technician.md:188 (AT-T07-SRC) / Requirements admin.md:148 (AT-A05-SRC) / fixture-contract.json demoSeed.alerts (only one window_open record) / service-contracts.ts:142 (no DemoTrigger creates inferred/inspection Alerts)
+- Problem: Fixtures for insulation-loss inspection records and no evidence have no IDs, values, or acceptancePatches keys. The clickable demo also has no path to create insulation_loss/inspection Alerts.
+- Why it matters: SRC premises vary by test, and the demo cannot show company requirement BIZ-17.
+- Example Failure: Two tests use different evidenceText and pass the same case.
+- Required Fix: Define three SRC acceptancePatches and a demo generation path.
+- Suggested Revision: Add alert-insulation-a with causeCode=insulation_loss/evidenceKind=inspection and alert-unknown-a with causeCode=unknown/evidenceKind=demo_observation to acceptancePatches[AT-C08-SRC].
 
 #### G1-028
 
 - Severity: MINOR
 - Issue ID: G1-028
-- Document: 02-design/common.md §2、03-uiux/screen-catalog.csv、03-uiux/component-contracts.csv、01-requirements/common.md（FR-X01）
-- Location: 02-design/common.md:58／component-contracts.csv:59（AppShellのevent: switchLocale;signOut;openNotifications;toggleVoice;extendSession）／screen-catalog.csv（demoSession.switchMembershipを持つScreenなし）／01-requirements/common.md:21
-- Problem: 役割切替（FR-X01、P0）の専用メニューを担うComponent/Screenの契約にdemoSession.switchMembershipが無い。
-- Why it matters: D13「Pageのread/write操作はscreen-catalogのoperationsを使い」により、呼び出し箇所を推測することになる。
-- Example Failure: 役割切替を/loginへの再遷移で実装する案と、ヘッダーメニューで実装する案が並立する。
-- Required Fix: AppShell/ShellContainerの契約にswitchMembershipを追加する。
-- Suggested Revision: AppShellのeventに`switchMembership(demoMembershipId)`、api_dependencyに「ShellContainerがdemoSession.switchMembershipを実行」を追加する。
+- Document: 02-design/common.md §2, 03-uiux/screen-catalog.csv, 03-uiux/component-contracts.csv, 01-requirements/common.md (FR-X01)
+- Location: 02-design/common.md:58 / component-contracts.csv:59 (AppShell event: switchLocale;signOut;openNotifications;toggleVoice;extendSession) / screen-catalog.csv (no Screen includes demoSession.switchMembership) / 01-requirements/common.md:21
+- Problem: The Component/Screen contract for the dedicated role-switching menu (FR-X01, P0) lacks demoSession.switchMembership.
+- Why it matters: D13 says Page reads/writes use screen-catalog operations, so the call location must be guessed.
+- Example Failure: One implementation switches roles by returning to /login; another uses the header menu.
+- Required Fix: Add switchMembership to AppShell/ShellContainer contracts.
+- Suggested Revision: Add switchMembership(demoMembershipId) to AppShell events and state in api_dependency that ShellContainer runs demoSession.switchMembership.
 
 #### G1-029
 
 - Severity: MINOR
 - Issue ID: G1-029
-- Document: 01-requirements/admin.md（FR-A09）、02-design/review-resolution-contracts.md（IR05）
-- Location: 要件admin.md:250（AT-A09-E③「未通知」）／review-resolution-contracts.md:36
-- Problem: IR05ではscheduleの同一遷移で予告通知を必ず作り、宛先0ならscheduleがVALIDATIONとなるため、「未通知」の制限は存在しない。
-- Why it matters: subcaseの前提に到達できない。
-- Example Failure: テストAgentが未通知の制限を作れない。
-- Required Fix: 意図する条件（予告後24時間未経過等）に書き換える。
-- Suggested Revision: AT-A09-E③を「予告後24時間未満でexecute→D01順位6のCONFLICT」とし、B①との重複を整理する。
+- Document: 01-requirements/admin.md (FR-A09), 02-design/review-resolution-contracts.md (IR05)
+- Location: Requirements admin.md:250 (AT-A09-E③“No notice sent”) / review-resolution-contracts.md:36
+- Problem: IR05 always creates advance notices within the schedule transition, and zero recipients causes VALIDATION. A restriction with no notice therefore cannot exist.
+- Why it matters: The subcase premise is unreachable.
+- Example Failure: The Test Agent cannot create an unnotified restriction.
+- Required Fix: Rewrite to the intended condition, such as less than 24 hours after notice.
+- Suggested Revision: Use execute less than 24 hours after notice→D01 priority-6 CONFLICT in AT-A09-E③, and resolve overlap with B①.
 
 ### 3.3 QUESTION
 
@@ -422,53 +422,53 @@
 
 - Severity: QUESTION
 - Issue ID: G1-030
-- Document: 01-requirements/contractor.md（FR-P06）、02-design/query-catalog.csv、02-design/contractor.md（DD-P06）
-- Location: 要件contractor.md:184（AT-P06-N「技術者2名」）／query-catalog.csv members.capacity/members.list（filters: organizationId,qualification,activeOnly）／設計contractor.md:206-221／fixture-contract.json actors（contractor-aはorg-contractor-aのrole=contractor）
-- Problem: members.list/members.capacityが組織内のrole=contractorのMembership（contractor-a自身）を含むかが書かれていない。AT-P06-Nは技術者2名だけを期待する。
-- Why it matters: 件数の期待値が変わる。
-- Example Failure: 実装がcontractor-aを含めて3名を返す。
-- Required Fix: 返却対象をrole=technicianに限定するかを明記する。
-- Suggested Revision: IR42のcontractor向け投影に「members.list/eligible/capacityはrole=technicianのMembershipだけ」を追記する。
+- Document: 01-requirements/contractor.md (FR-P06), 02-design/query-catalog.csv, 02-design/contractor.md (DD-P06)
+- Location: Requirements contractor.md:184 (AT-P06-N“Two technicians”) / query-catalog.csv members.capacity/members.list (filters: organizationId,qualification,activeOnly) / Design contractor.md:206-221 / fixture-contract.json actors (contractor-a has role=contractor in org-contractor-a)
+- Problem: It is not stated whether members.list/members.capacity includes role=contractor Memberships in the organization, including contractor-a itself. AT-P06-N expects only two technicians.
+- Why it matters: Expected counts differ.
+- Example Failure: The implementation includes contractor-a and returns three members.
+- Required Fix: State whether results are limited to role=technician.
+- Suggested Revision: Add to the IR42 contractor projection: members.list/eligible/capacity returns only role=technician Memberships.
 
 #### G1-031
 
 - Severity: QUESTION
 - Issue ID: G1-031
-- Document: 02-design/review-resolution-contracts.md（IR45/IR85）、01-requirements/technician.md、01-requirements/client.md、04-agentic-sdlc/verification.md
-- Location: review-resolution-contracts.md:308, 595／要件technician.md:119-121（AT-T03-N/E/B）／要件client.md:120, 202-204（AT-C03-N、AT-C07-N/B）／verification.md:40
-- Problem: IR45は「Givenで測定値・観測時刻を固定するcase」ではsimulator=falseを与えるとし、IR85はKPI・件数のATだけを明示する。acceptancePatchesを持たないAT（例: AT-T03-Bの120秒/120秒+1ms、AT-T03-Nのsequence=4投入、AT-C07-BのCO₂/湿度値）がこれに該当するかをcaseごとに示した一覧が無い。
-- Why it matters: 時計を分境界の先へ進めるcaseでは、シミュレーターの複写によりstale判定やsequenceの期待値が変わる。
-- Example Failure: AT-T03-B①②で01:01:00Zの複写が作られ、120秒+1msでもvalidのままになる。
-- Required Fix: simulatorの状態をcaseごとに明記するか、「acceptancePatchesを持たないATも、測定値・時刻・sequenceを観測するものはsimulator=false」と一般規則化する。
-- Suggested Revision: IR92に規則9「測定値・観測時刻・stale・sequenceを観測するATはsimulator=falseで開始し、自動生成を検証するcase（AT-REV18-001、AT-REV19-003/009）だけenabled=true」を追加する。
+- Document: 02-design/review-resolution-contracts.md (IR45/IR85), 01-requirements/technician.md, 01-requirements/client.md, 04-agentic-sdlc/verification.md
+- Location: review-resolution-contracts.md:308, 595 / Requirements technician.md:119-121 (AT-T03-N/E/B) / Requirements client.md:120, 202-204 (AT-C03-N, AT-C07-N/B) / verification.md:40
+- Problem: IR45 requires simulator=false for cases fixing measurements/observation times in Given; IR85 explicitly lists only KPI/count ATs. There is no per-case list saying whether ATs without acceptancePatches qualify, such as AT-T03-B 120 seconds/120 seconds+1ms, AT-T03-N sequence=4 input, or AT-C07-B CO₂/humidity values.
+- Why it matters: When a case advances past a minute boundary, simulator copies change stale/sequence expectations.
+- Example Failure: AT-T03-B①② creates a copy at 01:01:00Z, keeping data valid even at 120 seconds+1ms.
+- Required Fix: Specify simulator state per case or define a general rule: even ATs without acceptancePatches observing measurements/time/sequence start with simulator=false.
+- Suggested Revision: Add IR92 rule 9: ATs observing measurements, observation times, stale, or sequence start with simulator=false. Only auto-generation cases (AT-REV18-001, AT-REV19-003/009) use enabled=true.
 
-## 4. 確認した範囲と確認しなかった範囲
+## 4. Reviewed and Unreviewed Scope
 
-### 4.1 確認した範囲
+### 4.1 Reviewed Scope
 
-- 通読: docs/README.md、04-agentic-sdlc/README.md、00-prepare/PrepareDocument.md、01-requirements/{common,client,contractor,technician,admin}.md、02-design/{common,deterministic-contracts,strict-review-contracts,review-resolution-contracts,implementation-contracts,client,contractor,technician,admin}.md、02-design/service-contracts.ts、03-uiux/UIUXSpecification.md、04-agentic-sdlc/verification.md。
-- fixture-contract.json: actors、energy、reviewResolution、demoSeedの全節、acceptancePatchesの全20キーをスクリプトで展開して確認。主要ATの数値（AT-A01-N、AT-C06-N/E.2〜E.4、AT-REV19-004/011/041、AT-P01-N、AT-P06-Bの曜日、AT-C04-Nの曜日）を再計算。
-- 受入計画CSV: acceptance-review-019.csv（全42件）を精査。acceptance-review-018/017/016、acceptance-fixes、acceptance-independent、acceptance-strict-review、acceptance-rereview、acceptance-resolution、acceptance-convergence、acceptance-loop、acceptance-projection、acceptance-independent-g1の全行を出力し、現行IR・seedとの矛盾を走査。全CSVの列数とexecution_status値をスクリプトで確認。
-- スクリプトによる横断照合: 正規型OperationContracts（137）と操作カタログのinput/result/mode、write操作（76）と版カタログ、Query入力を持つread（35）とQueryカタログ、画面カタログのoperations/primary/secondaryの操作名と包含関係、Component名、IR71の無効化表の操作名、操作カタログの認可列（全行出力）、Queryカタログのfilter/sort/mapping（全行出力）、版カタログ（全行出力）、画面カタログのurl_selection/states/tabs（全行出力）、component-contracts.csv（全行出力）。
-- 決定台帳: review-decisions-016〜019.jsonの各DECのstatus（DEC-44/50がaccepted）。
-- 検証: 両検証器の実行、manifestのSHA-256とbaseline IDの再計算、service-contracts.tsのTypeScript strict検査（scratchpadの複製に対して実行）。
+- Read in full: docs/README.md, 04-agentic-sdlc/README.md, 00-prepare/PrepareDocument.md, 01-requirements/{common,client,contractor,technician,admin}.md, 02-design/{common,deterministic-contracts,strict-review-contracts,review-resolution-contracts,implementation-contracts,client,contractor,technician,admin}.md, 02-design/service-contracts.ts, 03-uiux/UIUXSpecification.md, 04-agentic-sdlc/verification.md.
+- fixture-contract.json: Expanded and checked actors, energy, reviewResolution, all demoSeed sections, and all 20 acceptancePatches keys by script. Recalculated key AT numbers: AT-A01-N, AT-C06-N/E.2–E.4, AT-REV19-004/011/041, AT-P01-N, weekdays in AT-P06-B and AT-C04-N.
+- Acceptance CSVs: Closely reviewed all 42 acceptance-review-019 cases. Printed all rows of acceptance-review-018/017/016, acceptance-fixes, acceptance-independent, acceptance-strict-review, acceptance-rereview, acceptance-resolution, acceptance-convergence, acceptance-loop, acceptance-projection, and acceptance-independent-g1; scanned for current IR/seed conflicts. Checked all CSV column counts and execution_status values by script.
+- Scripted cross-checks: canonical OperationContracts (137) versus operation-catalog input/result/mode; writes (76) versus version catalog; Query-input reads (35) versus Query catalog; screen operations/primary/secondary names and containment; Component names; IR71 invalidation-table operation names; all authorization rows; all Query filter/sort/mapping rows; all version rows; all screen url_selection/states/tabs rows; all component-contracts.csv rows.
+- Decision registers: Each DEC status in review-decisions-016–019.json (DEC-44/50 accepted).
+- Validation: Ran both validators, recalculated manifest hashes/baseline ID, and TypeScript strict checked a scratchpad copy of service-contracts.ts.
 
-### 4.2 確認しなかった範囲・限界
+### 4.2 Unreviewed Scope and Limits
 
-- 00-prepare/sources/*（original-handover.md、company-requirements-original.txt、production-instructions.md、reference-style-evidence.json）、reference-design-analysis.md、internal/design-assumptions.md、decision-record-2026-09-16.mdの本文は通読していない（見出しと引用箇所のみ）。企業原文→BIZ→FRの対応の妥当性は再検証していない。
-- company-requirement-map.csv、requirement-origins.csv、traceability.csvは行単位で照合しておらず、件数は検証器の出力に依拠した。
-- agents/*.md、templates/artifacts.md は読んでいない。
-- validate_documents.py・check_review_regressions.pyのソースコードはレビューしておらず、実行結果だけを確認した。検証器が何を検査していないかは、IR81の記載範囲から推定した。
-- UIトークン値と参考サイトの抽出証跡の照合、コントラスト比の再計算は行っていない。
-- 画面カタログのentry/exit/interaction/data_contract/query_triggerの各列、Component契約のpropsとDTOの型の対応は全Screen・全Componentでは照合していない（抜き取り）。
-- 受入条件の期待値の再計算は上記の抜き取りに限る。182束・旧受入計画の全subcaseを1件ずつ机上実行してはいない。
-- アプリは未実装のため、アプリ試験・E2E・アクセシビリティ試験は実行していない（not_run）。
-- 過去版の記録（runs/DOC-0.17.0以前、05-document-review）は参照していない。修正担当の自己レビュー記録（runs/DOC-0.19.0/review.md、gate-G1.yaml等）は判定後にヘッダーだけ参照し、判定根拠にしていない。
+- Did not read all body text of 00-prepare/sources/* (original-handover.md, company-requirements-original.txt, production-instructions.md, reference-style-evidence.json), reference-design-analysis.md, internal/design-assumptions.md, or decision-record-2026-09-16.md; only headings and cited passages. Did not revalidate company-source→BIZ→FR mappings.
+- Did not compare company-requirement-map.csv, requirement-origins.csv, or traceability.csv row by row; relied on validator counts.
+- Did not read agents/*.md or templates/artifacts.md.
+- Did not review validator source code, only execution results. Inferred unchecked areas from the scope stated in IR81.
+- Did not compare UI token values with reference-site extraction evidence or recalculate contrast ratios.
+- Did not compare every screen's entry/exit/interaction/data_contract/query_trigger fields or every Component's props against DTO types; sampled only.
+- Acceptance-value recalculation was limited to the samples above. Did not manually execute every subcase of all 182 bundles and older plans.
+- Application implementation does not exist, so application/E2E/accessibility tests were not run (not_run).
+- Did not consult old records (runs/DOC-0.17.0 and earlier, 05-document-review). Read only headers of the correction author's DOC-0.19.0 review/gate records after the decision, not as evidence for it.
 
-## 5. G1判定
+## 5. G1 Decision
 
 **FAIL**
 
-理由: G1の合格条件は「BLOCKER・CRITICAL・MAJORが0件、両検証器が成功」である。両検証器は成功した（終了コード0、変異62件すべて検出）が、MAJORが12件ある（G1-001〜G1-012）。これらは、Role別の書込み認可の矛盾（G1-001）、業務イベント通知・アレルゲン観測・空気環境案内のデータ定義または表示規則の欠落（G1-002、G1-006、G1-007）、制限取消の遷移の矛盾（G1-003）、報告提出の必須集合の未定義（G1-008）、受入条件の前提データが上位規範・seedと矛盾するかIR92の規則から一意に作れない問題（G1-004、G1-005、G1-009〜G1-012）であり、実装Agent・テストAgentが追加質問や推測なしに進められない。
+G1 requires zero BLOCKER/CRITICAL/MAJOR findings and both validators passing. Both validators passed (exit 0; all 62 mutations detected), but 12 MAJOR findings remain (G1-001–012): role-based write-authorization conflict (001); missing business-notification/allergen/air-guidance data or display rules (002/006/007); restriction-cancellation transition conflict (003); undefined required report-submission set (008); and acceptance data conflicting with higher-priority rules/seed or not uniquely constructible under IR92 (004/005/009–012). Implementation and test Agents cannot proceed without questions or guesses.
 
-BLOCKER/CRITICALは0件で、baseline・manifest・カタログ間の機械的整合は保たれている。MAJOR 12件を修正して新しいbaselineを作成した後、別主体による再判定を行うこと。MINOR 17件とQUESTION 2件は記録として引き継ぐ。
+There are zero BLOCKER/CRITICAL findings, and mechanical consistency across baseline, manifest, and catalogs is maintained. Correct the 12 MAJOR findings, create a new baseline, and have another reviewer reassess. Carry forward the 17 MINOR findings and two QUESTION items as records.

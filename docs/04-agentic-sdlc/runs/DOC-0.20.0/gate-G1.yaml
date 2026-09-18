@@ -4,8 +4,8 @@ gate_result: fail
 spec_baseline_id: 4f45da02ef91f0cf93075848d6ded3373878521740aa2f4047673eee709e4acc
 reviewed_target: DOC-0.19.0 independent G1 findings (G1-001..031)
 previous_gate: ../DOC-0.19.0/independent-g1/gate-decision.yaml  # FAIL
-specification_editor: 修正担当AI（本会話、Opus 5）
-reviewer_agent: Codex independent review team  # 仕様修正者Claudeとは別主体
+specification_editor: Correction AI (this conversation, Opus 5)
+reviewer_agent: Codex independent review team  # Separate from specification editor Claude
 self_rereview_after_correction: completed
 application_tests: not_run
 implementation_status: not_started
@@ -20,7 +20,7 @@ proposed_reversible_decisions: [DEC-54, DEC-55, DEC-56, DEC-57, DEC-58, DEC-59]
 traceability: {OK: 64, INCOMPLETE: 0, MISSING: 0, CONFLICT: 0}
 static_check: passed  # python3 docs/tools/validate_documents.py --tsc <typescript>/lib/tsc.js
 validator_mutation_check: passed  # 84 mutations
-typescript_semantic_check: passed  # validate_documents.py --tsc の出力
+typescript_semantic_check: passed  # Output from validate_documents.py --tsc
 evidence_paths: [review.md, findings.json, traceability-matrix.csv, static-check.json, validator-negative-checks.json, spec-manifest.json]
 
 independent_post_correction_review: completed

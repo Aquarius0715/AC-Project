@@ -6,158 +6,158 @@ owner: test-agent
 scope: frontend-demo-1A
 ---
 
-# 検証計画・受入シナリオ
+# Verification Plan and Acceptance Scenarios
 
-この文書は、将来実装するアプリに対する試験の計画である。今の時点でアプリは実装しておらず、以下の試験はすべてまだ実行していない。[追跡表](../00-prepare/traceability.csv)にある64個の要件、AT-C/P/T/A/X、AT-NFR(非機能要件)を1つずつ検証したうえで、S01〜S08について役割をまたいだ整合性も追加で確認する。役割をまたいだシナリオだけで、すべての要件を検証したことにはしない。
+This is a test plan for the future application. The app has not been implemented, and none of the tests below have been run. Verify each of the 64 requirements, AT-C/P/T/A/X, and AT-NFR entries in the [traceability matrix](../00-prepare/traceability.csv), then also check cross-role consistency through S01–S08. Cross-role scenarios alone do not prove coverage of all requirements.
 
-この版では、4つの役割にある49個の要件それぞれに、AT-番号-N(正常系)、-E(境界・例外)、-B(業務条件)という3種類の受入条件を定義し、合計147個のケースに分けた。企業原文を補うAT-*-SRCの10件、追加のR01の10件、共通の7件・非機能の8件と合わせると、要件に対するケースのまとまりは合計182件になる（0.7.0由来の束。0.8.0追加のAT-FIXは別途全件必須）(役割別のN/E/Bが147、原文補完のSRCが10、追加のR01が10、共通が7、非機能が8)。UI専用のケースと、役割をまたいだSシナリオは、この件数とは別に検証する。182という数字は管理のために数えたケースのまとまりの数であり、1つ1つの確認項目(assertion)の数ではない。受入行の①②はセル内の観測項目番号であり、subcase IDではない。独立した入力条件をcaseとして分離し、各caseの全assertionを確認する。共通の有効fixture、エラー優先順、時計境界は確定契約全章と厳格レビュー修正契約全章を使用する。実装から期待値を逆算してはならない。境界値のそれぞれの変化パターンは、別々のsubcaseとして扱う。manifest(仕様ファイルの一覧)は、仕様のbaseline(基準)と合わせてG1の段階で確認する。設計担当のエージェントが期待値の不足を修正するまで、該当のケースはready(着手可能)にしない。すべてのsubcaseと該当するSRC/R01を満たすまで、親となるATを合格(passed)にしない。
+This version gives each of the 49 requirements across four roles three acceptance categories: AT-number-N (normal), -E (boundary/exception), and -B (business conditions), for 147 cases. With 10 AT-*-SRC source-detail cases, 10 additional R01 cases, 7 common cases, and 8 nonfunctional cases, there are 182 requirement case bundles (from 0.7.0; every AT-FIX added in 0.8.0 is also required). UI-only cases and cross-role S scenarios are counted separately. The number 182 counts management bundles, not individual assertions. The ①② markers in acceptance rows identify observations within a cell, not subcase IDs. Separate independent input conditions into cases and check every assertion in each case. Use all chapters of the deterministic contracts and strict review correction contracts for valid shared fixtures, error precedence, and clock boundaries. Do not derive expected results from implementation. Treat each boundary-value variation as a separate subcase. Check the manifest together with the specification baseline at G1. Do not mark a case ready until design fixes missing expected results. Do not pass a parent AT until all subcases and applicable SRC/R01 cases pass.
 
-## 1. テスト階層・完了の証跡
+## 1. Test levels and completion evidence
 
-| 階層 | 主に何を検証するか | 証跡として残すもの |
+| Level | Main checks | Evidence |
 |---|---|---|
-| Unit(単体) | ポリシー(判定ルール)のテナント・期間・能力、状態遷移、金額・排出量の計算、スキーマの境界値 | ケース名、結果、対象の関数 |
-| Component(部品) | 入力の検証、disabled(無効化)の理由、要求値と確認値、欠測データ、ダイアログのフォーカス移動 | RTL(React Testing Library)などによる利用者操作テストの結果 |
-| Contract(契約) | フロントエンドのサービスの入出力、組み合わさったエラー、表示範囲、重複操作、バージョン。対象はモックのみ | アダプター名、リクエスト・レスポンスをマスク(伏せ字)した記録 |
-| E2E(画面をまたぐ一連の操作) | 同じタブで4つの役割を切り替えるS01〜S08、ディープリンクと再読み込み | 実装のバージョン、ブラウザ、動画・trace(実行記録)・スクリーンショット |
-| 手動・自動アクセシビリティ | キーボード操作、スクリーンリーダー、コントラスト比、360/768/1280px幅、200%拡大、英語・マレー語 | 検証した環境と実際の操作・結果。自動チェックだけで基準を満たしたと宣言しない |
+| Unit | Tenant, period, and capability policies; state transitions; money/emission calculations; schema boundaries | Case name, result, target function |
+| Component | Input validation, disabled reasons, requested/confirmed values, missing data, dialog focus movement | User interaction test results from RTL or similar tools |
+| Contract | Frontend service input/output, combined errors, visibility, duplicate operations, versions; mocks only | Adapter name and redacted request/response records |
+| E2E | S01–S08 with four roles switched in one tab, deep links, reload | Implementation revision, browser, video/trace/screenshots |
+| Manual/automated accessibility | Keyboard, screen reader, contrast, 360/768/1280px widths, 200% zoom, English/Malay | Environment, actual interactions, and results. Automated checks alone do not establish compliance |
 
-実装するときは、まずpackage scripts(実行コマンドの定義)を用意してから、型チェック・lint・build・テストの実際のコマンドを記録する。まだ存在しないコマンドが成功したかのように書かない。受入のためには、すべてのP0/P1要件を検証していること、P0/P1の欠陥がゼロであること、残っている欠陥や未決事項が明記されていることが必要である。失敗したケースを「対象外」として除外しない。
+During implementation, define package scripts first, then record actual type-check, lint, build, and test commands. Do not claim that nonexistent commands passed. Acceptance requires coverage of every P0/P1 requirement, zero P0/P1 defects, and a clear list of remaining defects and open issues. Do not exclude failed cases as out of scope.
 
-## 2. 固定fixture(テスト用の固定データ)
+## 2. Fixed fixtures
 
-| データ | 用途 |
+| Data | Purpose |
 |---|---|
-| tenant-a / tenant-b | テナント(契約単位の組織)をまたいだ操作を拒否できるかの確認 |
-| customer-a / customer-b | 同じテナント内での顧客同士の境界の確認 |
-| contractor-a / contractor-b | 委託先の分離、他社への割り当てを禁止できるかの確認 |
-| tech-internal-a / tech-external-a / tech-external-b | 社内担当の範囲、外部の会社・案件・期間の確認 |
-| hq-operator / hq-restriction-manager | 通常のHQ(本部)権限と、制限・上書き権限を持つ場合の違い |
-| property-home-a / property-office-a、floor-1 / room-1 | 自宅・オフィス、階層構造、パンくずリストの確認 |
-| unit-online-rto / unit-offline-rto / unit-non-rto / unit-limited / unit-other-customer | 操作、一部だけの反映、一般保守、能力の違い、権限を超えた操作の確認 |
-| device-no-sensor / device-tamper / ventilation-demo | 未計測、取り外し専用イベント、換気機能の確認 |
-| invoice-overdue-a、job-internal-a、job-contractor-a | S02/S03/S08で使う固定ID |
-| clock=2026-09-14T01:00:00Z | reset/reload時の開始時刻（アプリでは実時間で進む、IR36）。単体・部品・受入の自動試験はIR69の時計注入で固定する。期限の境界は±1ミリ秒と、ちょうど一致する時刻の両方を確認する |
+| tenant-a / tenant-b | Check rejection of cross-tenant operations |
+| customer-a / customer-b | Check customer boundaries within one tenant |
+| contractor-a / contractor-b | Check contractor separation and rejection of assignments to another company |
+| tech-internal-a / tech-external-a / tech-external-b | Check internal scope and external company/job/period boundaries |
+| hq-operator / hq-restriction-manager | Compare normal HQ permissions with restriction/override permissions |
+| property-home-a / property-office-a, floor-1 / room-1 | Check home/office properties, hierarchy, breadcrumbs |
+| unit-online-rto / unit-offline-rto / unit-non-rto / unit-limited / unit-other-customer | Check controls, partial application, general maintenance, capability differences, unauthorized operations |
+| device-no-sensor / device-tamper / ventilation-demo | Check missing measurements, dedicated removal events, ventilation |
+| invoice-overdue-a, job-internal-a, job-contractor-a | Fixed IDs for S02/S03/S08 |
+| clock=2026-09-14T01:00:00Z | Start time on reset/reload (advances in real time in the app; IR36). Freeze automated unit/component/acceptance tests through IR69 clock injection. Test exactly at expiry and ±1 millisecond |
 
-権限の有効期間は`validFrom <= now < validUntil`、支払期限は`now > dueAt`のとき遅延、制限の開始は`now >= executeAfter`とする案である。スケジュールや猶予期間の境界も、同じルールで固定する。
+Proposed boundaries: permissions are valid when `validFrom <= now < validUntil`; payments are overdue when `now > dueAt`; restrictions start when `now >= executeAfter`. Fix schedule and grace-period boundaries with the same rules.
 
-測定の仮データ: 基準100kWh、実績80kWh、仮の係数0.5kgCO₂e/kWh、仮の単価0.5MYR/kWh。この場合、実績の排出量は40kgCO₂e、削減量は20kWh(20%)、推定の節約額は10MYR、推定の排出削減量は10kgCO₂eとなる。これは実際の地域係数や保証された値ではない。マイナスの削減量、基準値が0の場合、データの欠測、期待するサンプル数が0の場合も、それぞれ用意する。
+Mock measurements: baseline 100kWh, actual 80kWh, sample factor 0.5kgCO₂e/kWh, sample rate 0.5MYR/kWh. Expected actual emissions are 40kgCO₂e, energy savings 20kWh (20%), estimated cost savings 10MYR, and estimated emission reductions 10kgCO₂e. These are not actual regional factors or guaranteed values. Also prepare negative reductions, a zero baseline, missing data, and zero expected samples.
 
-## 3. S01 部屋から空調を操作するシナリオ
+## 3. S01 Control AC from a room
 
-前提: customer-a、オンラインで対応している設備、制限なし。操作: 自分の組織で、自宅やオフィスの物件・階・部屋を作成・編集し、他の組織の親IDや循環参照は拒否されることを確認する。自宅→階→部屋→設備の順に開き、室温28°C・設定温度26°Cであることを確認したうえで、設定温度24°Cを要求する。requested(要求済み)→sent(送信済み)→acknowledged(応答済み)というイベントを、順番に発生させる。
+Given: customer-a, an online supported unit, no restrictions. Steps: Create/edit home or office properties, floors, and rooms in the customer's organization. Check rejection of parent IDs from other organizations and circular references. Open home → floor → room → unit. Confirm room temperature 28°C and setpoint 26°C, then request 24°C. Emit requested → sent → acknowledged events in order.
 
-期待する結果: 応答が来る前は、確認済みの設定温度26°Cを保ったまま、要求中の24°Cは別枠で表示する。応答が来た後だけ、設定温度が24°Cになる。室温28°Cはこの操作では変わらない。履歴には同じcommandId(操作を識別するID)が記録される。操作が失敗した場合や期限切れの場合は、成功したという通知を出さない。一般保守用の設備でも、同じ操作ができる。
+Expected: Before acknowledgment, keep the confirmed 26°C setpoint and show the pending 24°C request separately. Change the setpoint to 24°C only after acknowledgment. This action does not change the 28°C room temperature. History uses the same commandId. Do not show success on failure or timeout. The same control works for units under general maintenance.
 
-追加で確認すること: ボタンの二重クリック、同じ冪等キー(重複防止用のキー)を使った場合、古い応答が遅れて届いた場合、期限が過ぎてから応答が届いた場合、権限が変更されている最中の操作、役割を切り替えている最中に応答が遅れてくる場合を検証する。別の顧客のデータに、直接URLやRepository(データ取得の仕組み)経由でアクセスしようとした場合は拒否されることを確認する。
+Additional checks: double-clicks, the same idempotency key, late old responses, responses after expiry, actions during permission changes, and delayed responses during role switching. Reject access to another customer's data through direct URLs or Repository calls.
 
-## 4. S02 異常の発生から保守完了までのシナリオ
+## 4. S02 From fault detection to maintenance completion
 
-前提: unit-online-rtoについて、フィルター点検を推奨するアラートが出ている。操作: 顧客が設備から保守を依頼する→HQが社内の技術者を割り当てる→技術者が根拠と、室内機・室外機・電気系統の点検、写真、測定値、部品交換、次回対応の内容を記録する→提出する→HQが内容を確認する。
+Given: A filter-inspection recommendation alert on unit-online-rto. Steps: Customer requests maintenance from the unit → HQ assigns an internal technician → technician records evidence, indoor/outdoor/electrical inspections, photos, measurements, replaced parts, and next actions → submits → HQ reviews.
 
-期待する結果: 同じjobId(案件を識別するID)が、assigned(割当済み)→in_progress(作業中)→submitted(提出済み)→completed(完了)という順に変わっていく。顧客には結果が、HQには完了の情報が届く。アラート自体はopen(未対応)またはacknowledged(確認済み)のままである。再測定を行うか、理由を明記した解消操作を行って初めて、resolved(解消済み)になる。
+Expected: The same jobId moves through assigned → in_progress → submitted → completed. The customer receives the result and HQ receives completion information. The Alert remains open or acknowledged. It becomes resolved only after remeasurement or a resolution action with an explicit reason.
 
-追加で確認すること: 必須項目が抜けている状態での提出は拒否されること、差し戻し→修正版の作成→再提出という流れ、同じ内容の二重提出、保存に失敗したときに入力内容が保持されること、取り消し済みの案件や有効期間が切れた案件では作業を開始できないこと。外部委託の経路についてはS08で検証する。
+Additional checks: reject submission with missing required fields; return → revised draft → resubmission; duplicate submission; preserve input on save failure; prevent starting cancelled or expired jobs. S08 covers outsourcing.
 
-## 5. S03 支払いと運転制限のシナリオ
+## 5. S03 Payments and operating restrictions
 
-前提: 支払期限を過ぎたinvoice(請求)、制限可能な契約、オンラインとオフラインの両方の対象設備、権限を持つHQ担当者。操作: 制限の予告を作成する→顧客が理由・期限・解除条件と通知プレビューを確認する→HQが期限より前に実行を試みる→デモ用の時計を進めて制限の適用を要求する→一部の設備だけが応答する→顧客が模擬決済を行い入金確認に至る(原因となった請求がすべてpaid(支払済み)になった同じ遷移で解除要求が起動することを照合する、IR35)→明示のrestrictions.releaseが冪等に同じ状態を返すことを確認する→設備が応答する。
+Given: An overdue invoice, a contract allowing restrictions, both online and offline target units, and an authorized HQ user. Steps: Create advance restriction notice → customer checks reason, deadline, release conditions, and notification preview → HQ attempts execution before the deadline → advance the demo clock and request application → only some units acknowledge → customer makes a simulated payment and it is confirmed (verify that the transition making all source invoices paid also starts the release request; IR35) → verify explicit restrictions.release returns the same state idempotently → devices acknowledge.
 
-期待する結果: 期限より前の実行は拒否される。制限の適用や解除は、適用は全機器の成功、解除は全機器のreleased/not_required証跡がそろうまでは完了扱いにしない。実際のカード番号の入力や外部への送信は発生しない。決済処理中は未入金の状態のままで、確認が済んで初めてpaidになる。送信済みで適用結果不明のオフライン設備は保留する。未配送が確定した設備はD03の証跡でnot_requiredとし、解除の永久待機にしない。監査ログには、操作した人、理由、時刻、対象、相関ID(関連する操作をつなぐID)が残る。
+Expected: Reject execution before the deadline. Application is complete only when all devices succeed; release is complete only when all devices have released/not_required evidence. No real card input or external transmission occurs. The invoice remains unpaid while payment is processing and becomes paid only on confirmation. Keep offline devices pending if delivery occurred but application is unknown. Use D03 evidence to mark confirmed non-delivery not_required so release does not wait forever. Audit records contain actor, reason, time, target, and correlation ID.
 
-追加で確認すること: 猶予期間、例外扱い、事前の取り消し、要求した後に取り消して解除する場合、手動での解除、権限不足、一般保守契約の場合、入金確認の二重実行、CONFLICT(競合)の発生、解除を要求した後に適用の応答が遅れて届く場合、失敗時の再試行。手動で解除しても、Invoice(請求)をpaidに書き換えてはいけない。
+Additional checks: grace periods, exceptions, cancellation before execution, cancellation/release after a request, manual release, insufficient permission, general maintenance contracts, duplicate payment confirmation, CONFLICT, late application acknowledgment after a release request, and failure retries. Manual release must not change Invoice to paid.
 
-## 6. S04 空気環境・換気のシナリオ
+## 6. S04 Air quality and ventilation
 
-前提: CO₂濃度が上昇している状態。換気設備がある設備とない設備の2種類。操作: 合成したセンサー値を変更し、顧客への案内とHQのしきい値・通知方針を確認する。換気の機能がある設備だけに、模擬的な換気の要求を出す。
+Given: Rising CO₂ concentration; one unit with ventilation equipment and one without. Steps: Change synthetic sensor values and check customer guidance and HQ threshold/notification policies. Send simulated ventilation requests only to units with that capability.
 
-期待する結果: ppm(濃度の単位)としきい値をデモとして表示する。換気設備がない場合は、換気に関する案内だけを表示し、送風を「換気」と呼ばない。データが欠測している場合は「不明」と表示し、0や正常値にしない。CO₂濃度が高いという表示を、医学的な保証として扱わない。
+Expected: Label ppm and thresholds as demo values. For units without ventilation equipment, show guidance only; do not call fan operation ventilation. Show missing data as unknown, not 0 or normal. Do not present a high-CO₂ display as a medical guarantee.
 
-追加で確認すること: 自動運転の条件が欠測している場合、HQの方針との優先順位、制限中に発火を試みても拒否されること、CO₂の量(ppm)と排出量(kgCO₂e)という単位を混同していないこと。
+Additional checks: missing automation condition data, HQ policy precedence, rejection of firing under restrictions, and clear separation of CO₂ concentration (ppm) and emissions (kgCO₂e).
 
-## 7. S05 電力・排出量・MRVのシナリオ
+## 7. S05 Power, emissions, and MRV
 
-前提: 前述の基準100kWh・実績80kWhという仮データ（fixture-contract.jsonの`acceptancePatches["AT-C06-N"]`、窓[2026-09-14T00:00Z, 01:00Z)、係数factor-demo-2026、IR92）。操作: 顧客とHQが、期間・設備・基準をそろえて比較する→MRV(測定・報告・検証)のプレビューを見る→模擬的にオフセットへ申し込み、償却の記録を行う。
+Given: The baseline 100kWh/actual 80kWh mock data above (`acceptancePatches["AT-C06-N"]` in fixture-contract.json; window [2026-09-14T00:00Z, 01:00Z); factor-demo-2026; IR92). Steps: Customer and HQ compare the same period, units, and baseline → view MRV preview → simulate opting into offsets and record retirement.
 
-期待する結果: 算定した値がfixture(固定データ)の期待値と一致し、条件・係数のバージョン・データの品質・推定値かデモ値かが表示される。データが欠測している場合はcoverage(カバー率)が下がり、基準値が0の場合は割合を計算しない。実績が120の場合はマイナスの削減量になる。MRVには「外部で検証済み」という表示をしない。オフセットについても、実際の証明書や実際の取引が発生したとは表示しない。
+Expected: Calculated values match the fixture. Show conditions, factor version, data quality, and estimated/demo labels. Missing data reduces coverage; a zero baseline gives no percentage. Actual usage of 120 gives negative savings. Do not label MRV externally verified or imply that offsets produced a real certificate or transaction.
 
-追加で確認すること: 期間が逆になっている場合、算定の境界が異なる場合、係数が欠けている場合、期待するサンプル数が0の場合に、それぞれ拒否されるか算定不可となること。他の顧客の分析値を合算しないこと。
+Additional checks: reject or mark incalculable reversed periods, mismatched calculation boundaries, missing factors, and zero expected samples. Do not combine another customer's analysis values.
 
-## 8. S06 IoT機器のライフサイクル・異常のシナリオ
+## 8. S06 IoT device lifecycle and faults
 
-前提: 未登録のdevice(機器)、校正可能なsensor(センサー)、対応可能なファームウェアの候補。操作: 技術者が機器を登録する→設備に紐付ける→接続を確認する→校正履歴を記録する→ファームウェアの更新に成功・失敗する→通信断・電源断・取り外し専用イベントが発生する→復旧する。
+Given: An unregistered device, a calibratable sensor, and compatible firmware candidates. Steps: Technician registers device → links it to a unit → checks connection → records calibration history → firmware update succeeds/fails → network loss, power loss, and a dedicated removal event occur → recovery.
 
-期待する結果: 同じシリアル番号の重複登録は拒否される。対象外の設備への紐付けも拒否される。ファームウェア更新が失敗した場合はバージョンが変わらず、更新が進行中は制御できない。通信が切れているというだけの理由で「盗難」とは表示しない。HQと技術者には同じ検知・復旧の時刻が表示される。復旧しただけでは、取り外しイベントの記録は消えない。
+Expected: Reject duplicate serial registration and links to unauthorized units. Failed firmware updates leave the version unchanged; controls are unavailable during updates. Do not label a disconnected device stolen based only on disconnection. HQ and technician see the same detection/recovery times. Recovery alone does not erase the removal event.
 
-追加で確認すること: 校正値の単位が合っていない場合、対応していないファームウェアの場合、有効期間が切れている場合、リセット後に古い非同期の更新内容が復活しないこと。
+Additional checks: wrong calibration units, unsupported firmware, expired access, and prevention of old asynchronous updates reappearing after reset.
 
-## 9. S07 言語・音声・自動運転のシナリオ
+## 9. S07 Language, voice, and automation
 
-前提: 英語・マレー語の辞書データ、音声はシミュレーション(模擬)。操作: 言語を切り替える→主要な画面・通知・AIの応答も切り替わる→音声デモで温度を確認する→設定変更の内容を確認する→マイクが拒否された場合、または未対応の場合はテキストで続ける。
+Given: English/Malay dictionaries and simulated voice. Steps: Switch language → main screens, notifications, and AI responses switch too → check temperature through the voice demo → confirm a settings change → continue through text if microphone access is denied or unsupported.
 
-期待する結果: 対象と設定値を復唱して確認したうえで、通常のCommand(操作)と同じ権限・能力が適用される。マイクが拒否された場合でも、テキストで操作を完了できる。実際のマイクを使っていないことが画面に表示される。新しい通知も既存の通知も、選んだ言語で表示される。
+Expected: Repeat and confirm the target and value, then apply the same permissions and capabilities as a normal Command. Text permits completion even if microphone access is denied. The screen states that no real microphone is used. Both new and existing notifications appear in the selected language.
 
-追加で確認すること: 曜日・時間帯・帰宅前といった条件での冷房ルールの作成・編集・停止と、次に実行される時刻の表示。在室状況・天候・生活パターン・位置情報によるイベントを模擬的に発生させる。位置情報の利用に同意しない、または同意を取り消した場合、位置情報に依存するルールが止まること。タイムゾーンの変更、日付をまたぐ場合、期限の境界となる時刻を検証する。
+Additional checks: create/edit/stop cooling rules based on weekday, time, or pre-arrival conditions; show the next run time. Simulate occupancy, weather, lifestyle pattern, and location events. Location-dependent rules stop if location consent is denied or withdrawn. Test time-zone changes, crossing midnight, and exact expiry boundaries.
 
-## 10. S08 施工業者と外部技術者のシナリオ
+## 10. S08 Contractors and external technicians
 
-前提: hq-operatorがcustomer-bのunit-other-customerに作成した案件、contractor-a・contractor-b、tech-external-b（scopeにunit-other-customer）、有効な委託期間（IR94/IR102）。操作: HQがcontractor-aに依頼(offer)を出す→contractor-aが辞退する→HQがcontractor-bに再委託する→contractor-bが受諾する→tech-external-bを割り当てる→技術者が作業内容を提出する→業者が差し戻す→再提出する→品質を確認して受理する→顧客とHQが完了を確認する。
+Given: A job created by hq-operator for customer-b's unit-other-customer; contractor-a/contractor-b; tech-external-b with unit-other-customer in scope; a valid outsourcing period (IR94/IR102). Steps: HQ offers to contractor-a → contractor-a declines → HQ offers to contractor-b → contractor-b accepts → assigns tech-external-b → technician submits work → contractor returns it → technician resubmits → quality reviewer accepts → customer and HQ confirm completion.
 
-期待する結果: offered(依頼中)/accepted(受諾済み)/assigned(割当済み)/in_progress(作業中)/submitted(提出済み)/rework_requested(差し戻し中)/completed(完了)という状態が、同じjobIdのもとで整合的に変化する。自社のチームの候補だけが表示される。品質を確認する人と、実際に作業する人は別である。連絡内容はプレビュー(送信前の確認)として扱う。業者は請求や制限を操作できない。
+Expected: offered/accepted/assigned/in_progress/submitted/rework_requested/completed states remain consistent under the same jobId. Only the contractor's own team candidates appear. The quality reviewer and worker are different people. Communication is a preview. Contractors cannot control invoices or restrictions.
 
-追加で確認すること: 他社・無資格・委託期間外の候補への割り当てが拒否されること。委託が失効した後は、既に開いている画面からの操作も拒否されること。担当を再割り当てした場合、前の担当者のアクセス権が失効すること。URLを直接入力する、またはRepositoryを直接呼び出すことで、他の案件や顧客の情報が漏れないこと。
+Additional checks: reject candidates from another company, without required qualifications, or outside the outsourcing period. Reject actions from already-open screens after outsourcing expires. Reassignment revokes the previous assignee's access. Direct URLs and Repository calls must not expose other jobs or customers.
 
-## 11. 共通AT・非機能ATの観測ポイント
+## 11. Common and nonfunctional AT observation points
 
-| ケース | 追加で確認すること |
+| Case | Additional checks |
 |---|---|
-| AT-X01 / AT-X02 | パスワード再設定時に一般的な文言を使うこと、サインアウト時に古い表示が消えること、英語・マレー語、音声を拒否した場合の代替手段 |
-| AT-X03 / AT-X06 | 4つの役割すべてで、データの品質・単位・能力の表示が一致すること、RTO(Rent to Own契約)でない設備を正常なものとして扱うこと |
-| AT-X04 | route(画面遷移)・service(サービス)・Queryのそれぞれの境界、同じテナント内での顧客の境界、外部委託の期間・会社の境界 |
-| AT-X05 | 同じタブの中で役割を切り替えてもデータが共有されること、再読み込み・リセット時のseed(初期データ)、外部との通信が発生しないこと |
-| AT-X07 | 既読になったことと業務が完了したことを区別すること、相関ID、通知からのリンク、監査ログが画面上で変更できないこと |
-| AT-NFR01 / AT-NFR02 | 自動アクセシビリティチェックと、手動でのキーボード操作・読み上げの確認、360/768/1024/1279/1280/1440(CSSピクセル)、200%拡大、エラー・空の状態の表示 |
-| AT-NFR03 / AT-NFR05 | 機密情報・実際のカード情報を扱わないこと、有効期限切れ、拒否、通信断・競合・失敗からの回復 |
-| AT-NFR04 | production build(本番用ビルド)、固定したデータ量と測定条件を記録すること。200ミリ秒/2秒という目標との比較 |
-| AT-NFR06 | UIがモックの実体を直接importせず、インターフェース(共通の窓口)を経由すること。モックの入出力と、差し替えできる境界を検証する。APIの試験は対象外 |
-| AT-NFR07 | 実際に存在するscriptsについて、型チェック・lint・build・必要な試験の終了コードと証跡 |
-| AT-NFR08 | 保存時のUTC(協定世界時)、表示するタイムゾーン、英語・マレー語、長い翻訳文、金額・単位の書式 |
+| AT-X01 / AT-X02 | Generic password-reset wording; clear old displays on sign-out; English/Malay; alternatives when voice is denied |
+| AT-X03 / AT-X06 | Consistent quality/unit/capability displays across four roles; valid treatment of non-RTO (Rent to Own) units |
+| AT-X04 | Route/service/Query boundaries, customer boundaries within one tenant, outsourcing period/company boundaries |
+| AT-X05 | Shared data across role switches in one tab, seeds on reload/reset, no external communication |
+| AT-X07 | Read status differs from business completion; correlation IDs; notification links; audit logs cannot be edited through UI |
+| AT-NFR01 / AT-NFR02 | Automated accessibility plus manual keyboard/screen-reader checks; widths 360/768/1024/1279/1280/1440 CSS pixels; 200% zoom; error/empty states |
+| AT-NFR03 / AT-NFR05 | No secrets or real card data; expiry, denial, and recovery from disconnection/conflict/failure |
+| AT-NFR04 | Record production build, fixed data volume, and measurement conditions; compare with 200ms/2s targets |
+| AT-NFR06 | UI uses interfaces instead of directly importing mock implementations. Check mock input/output and replaceable boundaries. API tests are out of scope |
+| AT-NFR07 | Exit codes and evidence for actual type-check/lint/build/required-test scripts |
+| AT-NFR08 | UTC storage, display time zone, English/Malay, long translations, amount/unit formats |
 
-## 12. 文書自体の検証
+## 12. Document verification
 
-今回行う文書の検証では、相対リンクがきちんとつながっていること、企業の英語原文SRC-06→BIZ-01〜26→FR-C/P/T/A/X・NFRという対応関係、施工業者に関する追加提案の区分、追跡表の重複や参照先、4つの役割の境界、状態遷移、まだ確認できていない情報の表記を照合する。アプリ自体の試験結果とは分けて報告する。
+For this documentation work, check relative links; company English source SRC-06 → BIZ-01–26 → FR-C/P/T/A/X and NFR mappings; labels for added contractor proposals; duplicate traceability entries and references; four-role boundaries; state transitions; and labels for unverified information. Report these separately from application test results.
 
-## 13. 参考デザイン準拠の検証
+## 13. Reference design checks
 
-参照した値は[抽出証跡](../00-prepare/sources/reference-style-evidence.json)、採用した値は[UIUX](../03-uiux/UIUXSpecification.md)のUX-04/08にある。以下は、今後実装した後の検収で行う追加のケースであり、現時点でまだ画面の描画試験を行った結果ではない。
+Reference values are in the [extraction evidence](../00-prepare/sources/reference-style-evidence.json); adopted values are in [UIUX](../03-uiux/UIUXSpecification.md) UX-04/08. The following are additional acceptance cases for future implementation, not completed rendering test results.
 
-| ケース | 検査の内容・期待する結果 |
+| Case | Check/expected result |
 |---|---|
-| AT-UX-REF01 | primary(基調色)=#005BEA、page(背景)=#F8FBFF、surface(カード面)は白、foreground(文字色)=#0D2238であることを、tokenとcomputed style(実際に適用された値)で照合する |
-| AT-UX-REF02 | 英数字の本文にPlus Jakarta Sansというフォントが使われ、IDの表示にGeist Monoが使われること。英語・マレー語はどちらもラテン文字なので追加の代替フォントは使わない。h1の見出しにBricolageというフォントを自動で適用しないこと |
-| AT-UX-REF03 | カードの角丸14px、コントロールの角丸10px、ナビの角丸16px、カードの影の値を確認する。Tailwindの初期値に戻っていないこと |
-| AT-UX-REF04 | デスクトップでのサイドバー幅240px、折りたたみ時56px、1279px幅ではドロワー表示、1280px幅では固定ナビになること。内容の幅の上限は1152px |
-| AT-UX-REF05 | ページの余白が16/24pxから32/32pxへ変わること、KPI(重要指標)の表示が2列から4列へ変わること、大画面での補助列320px、狭い画面で長い文章が欠けないこと |
-| AT-UX-REF06 | 参考にした元の小さい文字・低いコントラストを、調整済みのADAPT値へ補正していること。通常文字のコントラスト比4.5:1、入力欄の枠線が見分けられること、操作領域が44px確保されていることを確認する |
-| AT-UX-REF07 | ホバー・押下・フォーカス時の見た目、reduced-motion(動きを減らす設定)への対応、ドロワーのEscキーでの閉じ方・背景スクロール停止・閉じた後のフォーカス復帰を確認する |
-| AT-UX-REF08 | 4つの役割すべてで同じShell(枠組み)・フォント・token・カードを使い、役割ごとの違いを、統一感のない別々の配色で表現していないこと |
+| AT-UX-REF01 | Compare tokens and computed styles: primary=#005BEA, page=#F8FBFF, surface=white, foreground=#0D2238 |
+| AT-UX-REF02 | Latin body text uses Plus Jakarta Sans; IDs use Geist Mono. English/Malay both use Latin script, so no extra fallback font. Do not automatically apply Bricolage to h1 |
+| AT-UX-REF03 | Card radius 14px, control radius 10px, navigation radius 16px, specified card shadow; no reversion to Tailwind defaults |
+| AT-UX-REF04 | Desktop sidebar 240px, collapsed 56px; drawer at 1279px, fixed navigation at 1280px; maximum content width 1152px |
+| AT-UX-REF05 | Page padding changes from 16/24px to 32/32px; KPIs from two to four columns; secondary column 320px on large screens; no clipping of long text on narrow screens |
+| AT-UX-REF06 | Replace small/low-contrast reference text with ADAPT values. Check normal text contrast 4.5:1, visible input borders, and 44px touch areas |
+| AT-UX-REF07 | Hover/press/focus appearance; reduced-motion support; drawer Esc handling, background scroll lock, and focus return after closing |
+| AT-UX-REF08 | All four roles share the same Shell, fonts, tokens, and cards; role differences do not use inconsistent color systems |
 
-色の計算による静的な確認: 白い背景に対して、primary色の文字、または白文字を重ねた場合のコントラスト比は約5.70:1。primary色を90%の濃さで重ねたhover(ホバー)状態は約4.80:1。参考にしたsuccess(成功)の文字色#059669と背景#DCFCE7の組み合わせは約3.43:1しかないため、文字色を#166534に補正すると約6.49:1になる。参考にしたsubtle(控えめな)文字の50%の濃さでは、白背景に対して約3.23:1だが、採用した72%の濃さでは約6.46:1になる。これらは指定した色をsRGBという方式で計算しただけの数値であり、画面全体がアクセシビリティ基準に合格していることを意味するものではない。
+Static color calculations: primary text on white, or white text on primary, has contrast of about 5.70:1. The 90%-opacity primary hover state gives about 4.80:1. The reference success text #059669 on #DCFCE7 gives only about 3.43:1; changing text to #166534 gives about 6.49:1. Reference subtle text at 50% opacity gives about 3.23:1 on white; the adopted 72% gives about 6.46:1. These are sRGB calculations for the specified colors only, not proof that the entire screen meets accessibility standards.
 
-## 14. 詳細化にあたって追加した境界試験
+## 14. Additional boundary tests from detailed design
 
-- 予定: 開始日(from)と終了日(to)、日付をまたぐ場合、対象の曜日が0件の場合、開始日=終了日の場合、夏時間による時刻の不在や曖昧さ、確定した日程の重複、委託期間の境界。
-- 権限: 依頼(offer)をまだ受諾していない場合に見える情報を最小限にすること、受諾後に設備を閲覧できること、権限が失効した後に見える履歴を最小限にすること、同じuserId(利用者ID)でMembership(所属)を切り替えて自己承認することを拒否すること。
-- 保存: Unicodeのcode point単位での文字数、画像の5MiB(容量)の境界、MIMEタイプと実際の内容が一致していること、下書き(draft)と提出(submit)で必須項目が異なること、CONFLICT(競合)が起きたときに未保存の入力内容を保持すること。
-- 非同期処理: Command(操作)の30秒、stale(古くなったとみなす)120秒、見積もりの15分、予告の24時間はいずれもデモ用の値として境界を試験する。制限を解除する意思をきちんと保持し、まだ確定していない適用要求と解除要求を同時に競合させて送信しないこと。
-- 会計・環境: 入金額全額の金額・通貨・参照先が一致していること、基準値と実績値の境界が同じであること、MRVのバージョンが固定されていること、購入が確認される前の償却を拒否すること、二重の償却を拒否すること。
-- 操作カタログ: すべての論理的な操作について、入出力と役割ごとのDD(詳細設計)を照合する。すべての操作がモックまたはローカルの表示設定だけで完結し、外部への接続を行わないこと。
+- Schedules: from/to dates, crossing midnight, no selected weekdays, from=to, nonexistent/ambiguous daylight-saving times, overlapping confirmed schedules, outsourcing period boundaries.
+- Permissions: minimum information before offer acceptance; unit access after acceptance; minimum history after expiry; reject self-approval by switching Membership with the same userId.
+- Saving: Unicode code-point counts, 5MiB image boundary, MIME/content agreement, different required fields for draft/submit, unsaved input retained on CONFLICT.
+- Asynchronous processing: test demo boundaries of 30 seconds for Commands, 120 seconds for stale data, 15 minutes for quotes, and 24 hours for advance notice. Preserve release intent; do not send competing release and unresolved application requests together.
+- Accounting/environment: full payment amount/currency/reference match, matching baseline/actual boundaries, fixed MRV version, reject retirement before confirmed purchase and duplicate retirement.
+- Operation catalog: match input/output and role DD for every logical operation. All operations finish within mocks or local display preferences, with no external connections.
 
-## 企業原文の具体化に対する追加検証
+## Additional checks for details added to the company original
 
-企業原文に対応する受入条件は、役割別要件にあるAT-*-SRCの本文を正式なものとする。通常のN(正常)/E(境界・例外)/B(業務条件)に加えてこれを実施し、成功した場合の例だけでなく、データの欠測・未確認・処理中の状態も検証する。以下は計画であり、まだ実行した結果ではない。
+AT-*-SRC text in role requirements is authoritative for source-related acceptance criteria. Run these alongside normal N/E/B cases, covering missing, unverified, and processing states as well as success. This is a plan, not execution results.
 
-| 要件 | 追加ケース | 詳細設計 | 状態 |
+| Requirement | Additional case | Detailed design | Status |
 |---|---|---|---|
 | FR-C07 | AT-C07-SRC | DD-C07 | not_run |
 | FR-C08 | AT-C08-SRC | DD-C08 | not_run |
@@ -170,58 +170,58 @@ scope: frontend-demo-1A
 | FR-A14 | AT-A14-SRC | DD-A14 | not_run |
 | FR-A15 | AT-A15-SRC | DD-A15 | not_run |
 
-## 再訪・競合・役割横断の追加条件
+## Additional revisit, conflict, and cross-role conditions
 
-追加のAT-C12/P03/P05/P07/T10/T11/A08/A09/A11/A14-R01は、それぞれの役割の要件本文を正式なものとし、追跡表のacceptance_case_idsに登録する。これらはすべてまだ実行していない。以下を検証する: DDC-08で対象となる2件の識別、再割り当て後も状態が保たれること、写真の再表示、試運転の終了までの追跡、支払い(Payment)が0件のときの手動入金、同じ契約に2件の請求がある場合、方針の再訪、報告IDの扱い。S03については、原因となった請求2件を含め、解除した後に電源や温度がもとの状態に戻らないことを確認する。
+The role requirement text is authoritative for AT-C12/P03/P05/P07/T10/T11/A08/A09/A11/A14-R01; register them in acceptance_case_ids in the traceability matrix. None has been run. Check identification of the two DDC-08 targets, state preservation after reassignment, photo redisplay, tracking through commissioning completion, manual payment entry with zero Payment records, two invoices under one contract, policy revisits, and report IDs. For S03, include two source invoices and verify that power/temperature do not return to their previous values after release.
 
-## 0.8.0の固定条件・追加受入条件
+## 0.8.0 Fixed conditions and additional acceptance criteria
 
-[fixture-contract.json](fixture-contract.json)の権限・時計・数値を共通の前提とする。customer-a等の文字列は既存テストで組織とMembershipの別名前空間に用いるが、recipientMembershipIdsへは同名Membership IDだけを渡す。fixture generatorはOrganization IDとMembership IDを型付き参照で区別する。各caseはresetしたfixtureから始め、同じ行の異常値は独立caseとして実行する。
+Use permissions, clock, and numbers from [fixture-contract.json](fixture-contract.json) as shared preconditions. Strings such as customer-a are used in separate Organization and Membership namespaces in existing tests, but pass only the Membership ID to recipientMembershipIds. The fixture generator distinguishes Organization and Membership IDs through typed references. Start every case from a reset fixture; execute different invalid values in one row as independent cases.
 
-[acceptance-fixes.csv](acceptance-fixes.csv)のAT-FIX-001〜036は全件必須。仕様参照の静的検査と将来のアプリ受入試験を分ける。status=not_runは試験成功を意味しない。旧ATと新契約の不一致を検出した場合はG1を停止し、片方を無視してテストを作らない。
+Every AT-FIX-001–036 in [acceptance-fixes.csv](acceptance-fixes.csv) is required. Separate static specification-reference checks from future application acceptance tests. status=not_run does not mean success. If older ATs conflict with new contracts, stop G1; do not ignore either side when creating tests.
 
-HTTP 400/401/403/404/409/429/500は1Aでは実通信しない。DomainError VALIDATION/UNAUTHENTICATED/FORBIDDEN/NOT_FOUND/CONFLICT/RATE_LIMITED/UNAVAILABLEを独立fixtureで検査する。本番HTTP対応表はD11の必須成果物であり、これらを確定済みHTTP契約と解釈しない。network disconnect、IoT offline、機器応答timeout、センサーmissing/suspect/staleは別fixtureにする。
+1A makes no real HTTP 400/401/403/404/409/429/500 calls. Test DomainError VALIDATION/UNAUTHENTICATED/FORBIDDEN/NOT_FOUND/CONFLICT/RATE_LIMITED/UNAVAILABLE with independent fixtures. The production HTTP mapping is a required D11 artifact; these are not settled HTTP contracts. Use separate fixtures for network disconnect, IoT offline, device response timeout, and sensor missing/suspect/stale.
 
-## 独立レビュー後の追加受入条件
+## Additional acceptance criteria after independent review
 
-[acceptance-independent.csv](acceptance-independent.csv)のAT-IND-001〜007は独立AIレビューIND-001〜007への回帰条件。既存182束とAT-FIX36件に追加して全件実施する。今回の文書レビューでは静的な契約整合性だけを確認し、アプリ試験結果はnot_runを維持する。
+AT-IND-001–007 in [acceptance-independent.csv](acceptance-independent.csv) are regression cases for independent AI review IND-001–007. Run all in addition to the existing 182 bundles and 36 AT-FIX cases. This document review checks only static contract consistency; application test results remain not_run.
 
-## 0.9.0 厳格レビュー追跡
+## 0.9.0 Strict review tracking
 
-[追加受入計画](acceptance-strict-review.csv)はSTRICT-DOC-0.8.0専用の21件。全21件はspecified。SR17〜19は2026-09-16ユーザー承認済み。すべてapplication executionはnot_run。旧REV-001等と混同しない。修正した文書の静的検証と業務挙動の試験合格は別である。
+The [additional acceptance plan](acceptance-strict-review.csv) contains 21 cases specifically for STRICT-DOC-0.8.0. All 21 are specified. The user approved SR17–19 on 2026-09-16. All application execution remains not_run. Do not confuse them with older REV-001 entries. Static checks of revised documents are separate from passing business-behavior tests.
 
-## 0.10.0 反復レビュー受入計画
+## 0.10.0 Repeated review acceptance plan
 
-[再レビューと反復修正の16件](acceptance-rereview.csv)を追跡表へ追加。これは設計時点のGiven/When/Thenであり実行結果ではない。今回の文書完了は型・カタログ・認可・状態遷移・受入期待値の一貫性で判定する。アプリ未実装を設計不備として数えない。
+Added [16 re-review and repeated-fix cases](acceptance-rereview.csv) to traceability. These are design-stage Given/When/Then definitions, not execution results. Document completion is judged by consistency of types, catalogs, authorization, state transitions, and expected acceptance results. An unimplemented application is not counted as a design defect.
 
-## 0.11.0 再レビュー修正と反復確認
+## 0.11.0 Re-review fixes and repeated checks
 
-[acceptance-resolution.csv](acceptance-resolution.csv)はINDEPENDENT-DOC-0.10.0の18件（17 specified、容量保証候補1 deferred_candidate）と修正後の自己再レビュー6件。全24件は実装後の試験計画でexecution_status=not_run。現時点の検証はリンク/表/カタログ/追跡/型の静的整合とシナリオ机上照合。容量保証候補は既存機能の未修正不具合と区別し、IR18の制約を引き継ぐ。
+[acceptance-resolution.csv](acceptance-resolution.csv) covers 18 INDEPENDENT-DOC-0.10.0 items (17 specified and one capacity-guarantee candidate marked deferred_candidate) plus six self-review items found after corrections. All 24 are post-implementation test plans with execution_status=not_run. Current checks cover static link/table/catalog/traceability/type consistency and desk checks of scenarios. Keep the capacity-guarantee candidate separate from unfixed defects in existing features and carry forward IR18 limits.
 
-## 0.12.0 追加の反復レビュー
+## 0.12.0 Additional repeated review
 
-[8件の受入計画](acceptance-convergence.csv)で制限の全対象scope、受諾後の再送、限定投影のsort、督促preview、積算slot、点検保存、Fact評価、生測定時刻を追跡する。前版の24件も維持する。文書整合と型は実行検証するが、アプリ受入試験はnot_runのまま。
+The [eight-case acceptance plan](acceptance-convergence.csv) tracks full restriction scope, retries after acceptance, limited-projection sorting, reminder previews, accumulation slots, inspection saving, Fact evaluation, and raw measurement times. Keep the previous 24 cases too. Run document consistency and type checks; application acceptance tests remain not_run.
 
-0.13.0: 案件の公開投影に関する再レビュー5件を修正。[受入計画](acceptance-projection.csv)で一覧の検索/件数、期限後履歴、集計、ページング中の失効を追跡する。アプリ試験は未実施。
+0.13.0: Fixed five re-review findings about public job projections. The [acceptance plan](acceptance-projection.csv) tracks list search/counts, history after expiry, summaries, and access expiry during pagination. Application tests have not been run.
 
-0.15.0: [独立再レビュー回帰条件](acceptance-independent-g1.csv)を全件追加する。AT-P01-Nは絞込前後を分け、完了時刻・重大度・共同編集の自己承認を具体例で検証する。アプリ試験はnot_run。
+0.15.0: Add all [independent re-review regression cases](acceptance-independent-g1.csv). Split AT-P01-N before/after filtering; use concrete examples for completion times, severity, and self-approval of jointly edited reports. Application tests are not_run.
 
-## 0.17.0独立レビュー（FRV）の追加検収
+## 0.17.0 Additional acceptance checks from independent review (FRV)
 
-[追加受入計画](acceptance-review-017.csv)のAT-REV17-001〜015を既存ATと合わせて検証する。解除要求の起動経路、時計ジャンプとセッション、transport障害注入、案件期限、archived、顧客数、プリセット、役割別投影、Sensor生成、表示書式、翻訳fallback、描画例外、not-found、installedAt=nullの期待値を定義した。transport/network注入はIR37のdemo.triggerを使い、受入条件中の「〜をUNAVAILABLEにする」はこの注入を指す。時計を24時間進める受入手順ではIR36によりセッションを再ログインしない。全ケースのアプリ実行はnot_run。
+Check AT-REV17-001–015 in the [additional acceptance plan](acceptance-review-017.csv) together with existing ATs. Expected results cover release-request entry paths, clock jumps/sessions, transport failure injection, job expiry, archived resources, customer counts, presets, role projections, Sensor creation, display formats, translation fallback, rendering exceptions, not-found, and installedAt=null. Use IR37 demo.trigger for transport/network injection; "make … UNAVAILABLE" in acceptance criteria means this injection. Under IR36, do not log in again after a 24-hour clock advance in acceptance steps. All application execution remains not_run.
 
-## 0.16.0再レビューの追加検収
+## 0.16.0 Additional re-review acceptance checks
 
-[追加受入計画](acceptance-review-016.csv)を既存ATと合わせて検証する。DEC-17/18をユーザー回答で確定し、権限4パターンと全10状態・他sort・URL復元の期待値を定義した。全ケースのアプリ実行はnot_run。
+Check the [additional acceptance plan](acceptance-review-016.csv) with existing ATs. User answers settled DEC-17/18, defining expected results for four permission combinations, all ten states, other sorts, and URL restoration. All application execution remains not_run.
 
-## 0.18.0厳格レビュー（REV18）の追加検収
+## 0.18.0 Additional strict review acceptance checks (REV18)
 
-[追加受入計画](acceptance-review-018.csv)のAT-REV18-001〜048を既存ATと合わせて検証する。初期業務データは[fixture-contract.json](fixture-contract.json)のdemoSeedで、各ATのGivenはIR69のpatchesとして差分適用する。Givenで測定値・観測時刻を固定するcaseは最初にsimulator enabled=falseを与える（IR45）。Z/offsetの無い受入日時はAsia/Kuala_Lumpurのローカル時刻と読む（IR74）。全ケースのアプリ実行はnot_run。
+Check AT-REV18-001–048 in the [additional acceptance plan](acceptance-review-018.csv) with existing ATs. Initial business data is demoSeed in [fixture-contract.json](fixture-contract.json); apply each AT's Given as IR69 patches. For cases that fix measurement values/times, first set simulator enabled=false (IR45). Interpret acceptance timestamps without Z/offset as Asia/Kuala_Lumpur local time (IR74). All application execution remains not_run.
 
-## 0.19.0独立レビュー（REV19）の追加検収
+## 0.19.0 Additional independent review acceptance checks (REV19)
 
-[追加受入計画](acceptance-review-019.csv)のAT-REV19-001〜042を既存ATと合わせて検証する。demoSeedの省略形式はIR91の規則で正規DTOへ展開し、受入ごとの固定差分は[fixture-contract.json](fixture-contract.json)の`acceptancePatches`（IR85）を使う。作業窓の開始前・終了時の技術者画面（IR76/IR89）、シミュレーターの複写条件（IR77）、管理ダッシュボードの省エネ予想（IR78）、再取得中の表示（IR83）を含む。AT-REV18-013①の「permission-denied表示（開始時刻の案内）」はIR76のwork-not-started状態で判定し、AT-REV18-019はIR78のenergyForecastで判定する。全ケースのアプリ実行はnot_run。
+Check AT-REV19-001–042 in the [additional acceptance plan](acceptance-review-019.csv) with existing ATs. Expand demoSeed shorthand into canonical DTOs under IR91; use `acceptancePatches` in [fixture-contract.json](fixture-contract.json) for case-specific fixed changes (IR85). Coverage includes technician screens before/after work windows (IR76/IR89), simulator copy conditions (IR77), admin energy-saving forecasts (IR78), and refetch displays (IR83). Assess AT-REV18-013①'s "permission-denied display (start-time guidance)" using IR76 work-not-started, and AT-REV18-019 using IR78 energyForecast. All application execution remains not_run.
 
-## 0.21.0 独立G1指摘の追加検収
+## 0.21.0 Additional acceptance checks for independent G1 findings
 
-[AT-G121-001〜005](acceptance-review-021.csv)を既存受入と合わせて全件確認する。A12の継続時間はIR103の通常tickで59秒/60秒を分ける。通知のtype/severity、アレルゲンのQuery再取得、通知fixtureのscopeVersionAtCreationを含む。文書検証器・変異テストの成功はアプリ受入の実行結果ではない。
+Check every [AT-G121-001–005](acceptance-review-021.csv) with existing acceptance cases. For A12 duration, distinguish 59 seconds from 60 seconds using ordinary IR103 ticks. Include notification type/severity, allergen Query refetch, and notification fixture scopeVersionAtCreation. Passing document validators and mutation tests is not an application acceptance result.

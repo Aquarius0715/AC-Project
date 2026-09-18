@@ -59,145 +59,145 @@
       "finding_id": "REV-001",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-001",
-      "contract": "02-design/review-resolution-contracts.md#ir01-受諾と辞退の最小応答"
+      "contract": "02-design/review-resolution-contracts.md#ir01-minimum-responses-for-acceptance-and-decline"
     },
     {
       "finding_id": "REV-002",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-002",
-      "contract": "02-design/review-resolution-contracts.md#ir02-所有顧客の不変性"
+      "contract": "02-design/review-resolution-contracts.md#ir02-customer-ownership-is-immutable"
     },
     {
       "finding_id": "REV-003",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-003",
-      "contract": "02-design/review-resolution-contracts.md#ir03-強制解除専用権限"
+      "contract": "02-design/review-resolution-contracts.md#ir03-permission-limited-to-forced-release"
     },
     {
       "finding_id": "REV-004",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-004",
-      "contract": "02-design/review-resolution-contracts.md#ir04-督促の共有された模擬記録"
+      "contract": "02-design/review-resolution-contracts.md#ir04-shared-simulated-reminder-records"
     },
     {
       "finding_id": "REV-005",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-005",
-      "contract": "02-design/review-resolution-contracts.md#ir05-予告の時刻と証跡"
+      "contract": "02-design/review-resolution-contracts.md#ir05-advance-notice-time-and-evidence"
     },
     {
       "finding_id": "REV-006",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-006",
-      "contract": "02-design/review-resolution-contracts.md#ir06-決済試行の排他"
+      "contract": "02-design/review-resolution-contracts.md#ir06-only-one-active-payment-attempt"
     },
     {
       "finding_id": "REV-007",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-007",
-      "contract": "02-design/review-resolution-contracts.md#ir07-policy共通フォーム"
+      "contract": "02-design/review-resolution-contracts.md#ir07-shared-policy-form"
     },
     {
       "finding_id": "REV-008",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-008",
-      "contract": "02-design/review-resolution-contracts.md#ir08-電力量の由来"
+      "contract": "02-design/review-resolution-contracts.md#ir08-energy-data-origin"
     },
     {
       "finding_id": "REV-009",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-009",
-      "contract": "02-design/review-resolution-contracts.md#ir09-音声変更の操作文脈"
+      "contract": "02-design/review-resolution-contracts.md#ir09-operation-context-for-voice-changes"
     },
     {
       "finding_id": "REV-010",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-010",
-      "contract": "02-design/review-resolution-contracts.md#ir10-通知の業務分類"
+      "contract": "02-design/review-resolution-contracts.md#ir10-notification-business-categories"
     },
     {
       "finding_id": "REV-011",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-011",
-      "contract": "02-design/review-resolution-contracts.md#ir11-算定境界の識別"
+      "contract": "02-design/review-resolution-contracts.md#ir11-calculation-boundary-identity"
     },
     {
       "finding_id": "REV-012",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-012",
-      "contract": "02-design/review-resolution-contracts.md#ir12-生測定と正規測定"
+      "contract": "02-design/review-resolution-contracts.md#ir12-raw-and-normalized-measurements"
     },
     {
       "finding_id": "REV-013",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-013",
-      "contract": "02-design/review-resolution-contracts.md#ir13-現行受入条件の統一"
+      "contract": "02-design/review-resolution-contracts.md#ir13-align-current-acceptance-conditions"
     },
     {
       "finding_id": "REV-014",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-014",
-      "contract": "02-design/review-resolution-contracts.md#ir14-現行版の識別"
+      "contract": "02-design/review-resolution-contracts.md#ir14-identify-the-current-version"
     },
     {
       "finding_id": "REV-015",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-015",
-      "contract": "02-design/review-resolution-contracts.md#ir15-mrv出力の範囲"
+      "contract": "02-design/review-resolution-contracts.md#ir15-mrv-output-scope"
     },
     {
       "finding_id": "REV-016",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-016",
-      "contract": "02-design/review-resolution-contracts.md#ir16-factの鮮度と再利用"
+      "contract": "02-design/review-resolution-contracts.md#ir16-fact-freshness-and-reuse"
     },
     {
       "finding_id": "REV-017",
       "disposition": "specified",
       "case_id": "AT-RESOLVE-017",
-      "contract": "02-design/review-resolution-contracts.md#ir17-repository世代と閲覧世代"
+      "contract": "02-design/review-resolution-contracts.md#ir17-repository-generation-and-view-generation"
     },
     {
       "finding_id": "REV-018",
       "disposition": "deferred_candidate",
       "case_id": "AT-RESOLVE-018",
-      "contract": "02-design/review-resolution-contracts.md#ir18-長時間メモリ保持の扱い"
+      "contract": "02-design/review-resolution-contracts.md#ir18-long-term-memory-retention"
     },
     {
       "finding_id": "RC-001",
       "disposition": "specified",
       "case_id": "AT-RC-001",
-      "contract": "02-design/review-resolution-contracts.md#ir03-強制解除専用権限"
+      "contract": "02-design/review-resolution-contracts.md#ir03-permission-limited-to-forced-release"
     },
     {
       "finding_id": "RC-002",
       "disposition": "specified",
       "case_id": "AT-RC-002",
-      "contract": "02-design/review-resolution-contracts.md#ir10-通知の業務分類"
+      "contract": "02-design/review-resolution-contracts.md#ir10-notification-business-categories"
     },
     {
       "finding_id": "RC-003",
       "disposition": "specified",
       "case_id": "AT-RC-003",
-      "contract": "02-design/review-resolution-contracts.md#ir06-決済試行の排他"
+      "contract": "02-design/review-resolution-contracts.md#ir06-only-one-active-payment-attempt"
     },
     {
       "finding_id": "RC-004",
       "disposition": "specified",
       "case_id": "AT-RC-004",
-      "contract": "02-design/review-resolution-contracts.md#ir07-policy共通フォーム"
+      "contract": "02-design/review-resolution-contracts.md#ir07-shared-policy-form"
     },
     {
       "finding_id": "RC-005",
       "disposition": "specified",
       "case_id": "AT-RC-005",
-      "contract": "02-design/review-resolution-contracts.md#ir12-生測定と正規測定"
+      "contract": "02-design/review-resolution-contracts.md#ir12-raw-and-normalized-measurements"
     },
     {
       "finding_id": "RC-006",
       "disposition": "specified",
       "case_id": "AT-RC-006",
-      "contract": "02-design/review-resolution-contracts.md#ir17-repository世代と閲覧世代"
+      "contract": "02-design/review-resolution-contracts.md#ir17-repository-generation-and-view-generation"
     }
   ]
 }

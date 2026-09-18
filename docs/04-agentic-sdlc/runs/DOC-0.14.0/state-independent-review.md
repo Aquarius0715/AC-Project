@@ -1,37 +1,37 @@
-# 状態遷移・認可の独立補助レビュー
+# Independent Supporting Review of State Transitions and Authorization
 
-- 対象: DOC-0.14.0 / frontend-demo-1A
-- レビュー対象baseline: `f8e6cdd8387f1e623f69616518f41108e55ae9cd5f7ec4b223be5776238f4096`
-- レビュー日: 2026-09-16
-- レビュー担当: 独立補助AI `/root/state_review`
-- 方法: 仕様をread-onlyで照合。既存の自己合格記録を判定根拠に使用しない。
-- 判定: 下記担当範囲の新規指摘 **0件**。未解決指摘 **0件**。
-- アプリ動作検証: **not_run**。文書上の実装可能性・整合性の判定であり、実装、実機、外部API、決済、本番適合の合格ではない。
+- Scope: DOC-0.14.0 / frontend-demo-1A
+- Reviewed baseline: `f8e6cdd8387f1e623f69616518f41108e55ae9cd5f7ec4b223be5776238f4096`
+- Review date: 2026-09-16
+- Reviewer: Independent supporting AI `/root/state_review`
+- Method: Read-only comparison of specifications. Existing self-review pass records were not used as a basis for the assessment.
+- Assessment: **0 new findings** and **0 unresolved findings** in the assigned scope below.
+- Application runtime validation: **not_run**. This assesses document implementability and consistency; it does not approve implementation, real devices, external APIs, payments, or production suitability.
 
-## 確認範囲
+## Scope Checked
 
-`docs/02-design/` の `deterministic-contracts.md`、`strict-review-contracts.md`、`review-resolution-contracts.md`、`service-contracts.ts`、`implementation-contracts.md`、`operation-catalog.csv`、`write-version-catalog.csv` を中心に、関連するadmin/client/technicianの要件・詳細設計と、`acceptance-fixes.csv`、`acceptance-strict-review.csv`、`acceptance-rereview.csv`、`acceptance-resolution.csv`、`acceptance-convergence.csv` の該当条件を照合した。
+The review focused on `deterministic-contracts.md`, `strict-review-contracts.md`, `review-resolution-contracts.md`, `service-contracts.ts`, `implementation-contracts.md`, `operation-catalog.csv`, and `write-version-catalog.csv` in `docs/02-design/`. It compared relevant admin/client/technician requirements and detailed designs with applicable conditions in `acceptance-fixes.csv`, `acceptance-strict-review.csv`, `acceptance-rereview.csv`, `acceptance-resolution.csv`, and `acceptance-convergence.csv`.
 
-中心は時限制御、Device binding、Restriction、支払確定と制限評価の同期、および設備稼働の集計分類である。案件投影・住所公開・報告要約・成果物全体のG1判定は主レビューの担当とし、本補助レビューの指摘0件を全仕様への単独合格判定に流用しない。ユーザー承認済みの1Aデモ範囲、住所は設置物件から取得する方針、期限後報告は有無・受理状態だけという方針を前提とした。
+The main focus was time-limited control, Device binding, Restriction, synchronization of payment confirmation with restriction evaluation, and equipment operation classifications for summaries. Job projections, address disclosure, report summaries, and the overall G1 decision are assigned to the main review. The zero findings in this supporting review must not be reused as a standalone approval of all specifications. The review assumes the user-approved 1A demo scope, the policy to obtain addresses from the installation property, and the policy to show only report availability and acceptance status after expiry.
 
-## 具体シナリオと判定根拠
+## Specific Scenarios and Assessment Basis
 
-| 確認シナリオ | 文書上の期待結果と根拠 | 判定 |
+| Scenario checked | Expected result in the documents and basis | Assessment |
 | --- | --- | --- |
-| Command応答が期限直前、期限同値、期限後に到着 | D04は `receivedAt < expiresAt` のみ成功とし、同値は失効優先、遅延応答でexpiredをacknowledgedへ戻さない。AT-FIX-028が境界を指定する。 | 整合 |
-| 診断run中に画面離脱、役割切替、担当失効、通信断が発生 | implementation-contractsの診断run契約はRepository時計で継続し、元Membershipを終了時に再認可。終了阻害はend_blocked/end_failedで記録し、応答なしに停止済みとしない。D05の設備排他と診断run用Command予約枠も整合する。 | 整合 |
-| FW/checkの60秒期限後に成功が到着 | D05は境界同値を失敗優先とし、遅い成功でfirmwareVersionを更新しない。再試行は新operationIdと新キー。 | 整合 |
-| Deviceを別Unitへ付替え、旧bindingイベントが後着 | D05/SR24は旧bindingを終了して保持し、新sensorId、観測unknown、lastSeenAt=nullへ更新。旧bindingイベントは履歴のみで現状態・Alert・通知を変更しない。旧bindingの復旧はCONFLICT。IR21は保持factsの破棄を指定する。 | 整合 |
-| Device付替え後に現在顧客が旧顧客の履歴を参照 | SR24は現在Device読取権と発生時Unit/customerへの現在読取権の積集合を要求し、認可後に件数・ページングを算定する。IR02は既存Unitの顧客変更を禁止する。 | 整合 |
-| 制限適用が未配送、送信済み不明、確認済みの各状態で全額入金 | D03は未配送証跡によるnot_required、送信済み不明のreconcile、適用済みのremoveを区別。SR05は論理制限と観測値を分離し、全設備の証跡が揃うまで集約releasedにしない。 | 整合 |
-| 終端Restrictionの旧IDを、新しいsequenceで再観測。後継制限も存在 | SR26は終端を戻さず回復caseで制御をblock。旧IDだけをremoveし、後継の論理policyは維持。複数caseは全解決までblockを維持し、AT-REREV-005/AT-CYCLE-007で確認条件が定義される。 | 整合 |
-| 制限中または未解決回復caseがある契約の編集とscheduleが競合 | SR19/SR26は同一遷移の再検証を要求し、active制限・回復case中の編集を拒否。先行編集が成功した場合は旧expectedContractVersionのscheduleを拒否する。 | 整合 |
-| override専用HQが解除を開始し、結果不明から回復 | IR03は限定投影によるlist/get/overrideと解除意思後のreconcile/retry releaseを定義。正規型・操作認可・版カタログが対応し、請求詳細を取得せず実行経路が成立する。 | 整合 |
-| 同じInvoiceに別キーで決済を同時開始、手動入金も競合 | IR06はinitiated/processingを最大1件に限定。Invoice版を照合し、手動入金も非終端試行があれば拒否。D04とwrite-version-catalogは初回Invoice版と後続Payment版を区別する。 | 整合 |
-| 複数原因請求のうち1件だけ支払、続いて全件支払 | implementation-contractsの手動入金・複数請求契約はPayment/Invoice/監査/通知/制限評価を同一遷移にまとめる。1件だけでは解除せず、全件paidでscheduledはcancelled、requested/appliedはrelease_requested。processingをpaid扱いしない。 | 整合 |
-| 古い観測、欠測、通信不明で稼働KPIと一覧を取得 | SR27はeffectivePowerStateを共通分類として用い、freshな電源観測と最新measured/validのpowerを要求する。SR06で同じ分類のfilterへ遷移する。通信unknownは稼働unknownと分ける。 | 整合 |
-| 古い閲覧世代の非同期応答、権限失効後のページ取得 | D07/SR14/IR17/IR24はgeneration/viewEpoch/scopeと現在権限の再検証、旧callback破棄、公開範囲縮小時のsnapshot無効化を定義する。業務の受理済み処理と閲覧の中止を分離する。 | 整合 |
+| Command response arrives just before, exactly at, or after expiry | D04 allows success only when `receivedAt < expiresAt`. Expiry takes priority at equality, and a late response does not change expired back to acknowledged. AT-FIX-028 defines the boundary. | Consistent |
+| During a diagnostic run, the user leaves the screen, switches roles, loses an assignment, or loses communication | The diagnostic-run contract in implementation-contracts continues on the Repository clock and reauthorizes the original Membership at the end. Blocked termination is recorded as end_blocked/end_failed; the run is not marked stopped without a response. D05 equipment exclusivity and reserved Command slots for diagnostic runs are also consistent. | Consistent |
+| FW/check success arrives after the 60-second deadline | D05 gives failure priority at equality and does not update firmwareVersion on late success. Retrying uses a new operationId and key. | Consistent |
+| A Device is moved to another Unit and an old-binding event arrives late | D05/SR24 ends and retains the old binding, creates a new sensorId, and sets the observation to unknown and lastSeenAt=null. Old-binding events affect history only, not current state, Alerts, or notifications. Recovery of an old binding returns CONFLICT. IR21 specifies discarding retained facts. | Consistent |
+| After Device rebinding, the current customer reads the old customer's history | SR24 requires the intersection of current Device read permission and current read permission for the Unit/customer at the time of the event. Counts and pagination are calculated after authorization. IR02 prohibits changing the customer of an existing Unit. | Consistent |
+| Full payment arrives when restriction application is undelivered, sent with an unknown result, or confirmed | D03 distinguishes not_required based on non-delivery evidence, reconcile for a sent command with an unknown result, and remove for an applied restriction. SR05 separates logical restrictions from observations and does not set the aggregate state to released until evidence is available for all units. | Consistent |
+| An old ID of a terminal Restriction is observed again with a new sequence; a successor restriction also exists | SR26 does not revert the terminal state and blocks control through a recovery case. It removes only the old ID and preserves the successor's logical policy. With multiple cases, blocking continues until all are resolved. AT-REREV-005/AT-CYCLE-007 define the check conditions. | Consistent |
+| Editing a contract with an active restriction or unresolved recovery case races with schedule | SR19/SR26 requires revalidation within the same transition and rejects edits while a restriction or recovery case is active. If an earlier edit succeeds, schedule with the old expectedContractVersion is rejected. | Consistent |
+| Override-only HQ starts release and recovers from an unknown result | IR03 defines list/get/override through a limited projection and reconcile/retry release after release intent. Canonical types, operation permissions, and the version catalog support this path without retrieving invoice details. | Consistent |
+| Payments for the same Invoice start concurrently with different keys; a manual payment also races | IR06 limits initiated/processing attempts to one. It checks the Invoice version and rejects manual payment when a nonterminal attempt exists. D04 and write-version-catalog distinguish the initial Invoice version from subsequent Payment versions. | Consistent |
+| One of several invoices causing a restriction is paid, then all are paid | The manual-payment/multiple-invoice contract in implementation-contracts puts Payment/Invoice/audit/notification/restriction evaluation in one transition. Paying one invoice does not release the restriction. When all are paid, scheduled becomes cancelled and requested/applied becomes release_requested. processing is not treated as paid. | Consistent |
+| Retrieve operation KPIs and lists with old observations, missing data, or unknown communication | SR27 uses effectivePowerState as the common classification and requires a fresh power-state observation and the latest measured/valid power. SR06 links to filters using the same classification. Communication unknown is separate from operation unknown. | Consistent |
+| An asynchronous response belongs to an old view generation, or a page is retrieved after permission expires | D07/SR14/IR17/IR24 defines revalidation of generation/viewEpoch/scope and current permissions, discarding old callbacks, and invalidating snapshots when visibility shrinks. Accepted business processing is separate from cancelling a view. | Consistent |
 
-## 引継ぎと再レビュー条件
+## Handover and Re-review Conditions
 
-上記は固定baselineに対する初回の補助レビュー結果である。rootから共有されたIRV-001〜003（集計受入条件、住所文言、引渡し旧リンク）の修正はこの記録では検証済みとして扱わない。新baselineへの合格や全体G1は、主レビューが修正差分を確認して判断する。時限制御、binding、制限、決済、認可の契約または対応型・操作・版条件に変更が入った場合は本担当範囲を再レビューする。
+These are the results of the initial supporting review against a fixed baseline. The corrections for IRV-001–003 shared by root (summary acceptance criteria, address wording, and old handover links) are not treated as verified in this record. The main reviewer checks the correction diff to decide approval of a new baseline and overall G1. Re-review this assigned scope if time-limited control, binding, restriction, payment, or authorization contracts, or their related types, operations, or version conditions, change.

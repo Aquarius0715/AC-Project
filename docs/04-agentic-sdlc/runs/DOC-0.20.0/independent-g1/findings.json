@@ -17,7 +17,7 @@
     {
       "id": "G120-001",
       "severity": "MAJOR",
-      "title": "空気環境方針の受入で60秒の継続条件が成立していない",
+      "title": "Air-quality policy acceptance does not establish the 60-second continuous condition",
       "locations": [
         "docs/01-requirements/admin.md:324",
         "docs/04-agentic-sdlc/fixture-contract.json:3590",
@@ -32,16 +32,16 @@
         "G1-005",
         "G1-009"
       ],
-      "reproduction": "AT-A12-N / AT-G120-005のpatchを01:00Zで適用し、durationSeconds=60の新しいPolicyを保存。同tickにobservedAt=00:59ZのFactを初めてfireする。",
-      "problem": "通常の60秒tick、継続カウンタ、事前の方針評価を作らないまま通知createdを期待している。D08は条件の連続成立を必要とし、遅着した過去観測から過去Alertを新規発生させない。過去のobservedAtだけでは新規方針の継続成立を証明できない。IR97のセンサー追加は元のmissing_dataを解消するが、この不整合は残る。",
-      "impact": "正しい継続時間判定の実装が受入に失敗するか、受入に合わせた実装が継続時間を迂回する。少なくとも通知createdの期待値を一意に実現できない。",
-      "suggested_revision": "保存後の現在時刻で両設備へ有効なFactを投入し、60秒の評価経過を明記する。59秒と60秒の通知期待値、換気Commandの発生タイミングをD08/SR25と整合させ、fixture・AT-A12-N/B・AT-G120-005を同時更新する。",
+      "reproduction": "Apply the AT-A12-N / AT-G120-005 patch at 01:00Z and save a new Policy with durationSeconds=60. In the same tick, fire a Fact with observedAt=00:59Z for the first time.",
+      "problem": "The test expects a created notification without 60 seconds of normal ticks, a duration counter, or prior policy evaluation. D08 requires a continuously true condition and does not create past Alerts from late past observations. A past observedAt alone cannot prove continuous satisfaction for a new policy. IR97 sensor additions fix the original missing_data but leave this mismatch.",
+      "impact": "A correct duration implementation fails acceptance, or an implementation matching acceptance bypasses duration. At least the expected created notification cannot be achieved unambiguously.",
+      "suggested_revision": "After saving, inject valid current-time Facts for both units and specify 60 seconds of evaluation. Align notification expectations at 59/60 seconds and ventilation Command timing with D08/SR25. Update fixtures, AT-A12-N/B, and AT-G120-005 together.",
       "status": "open"
     },
     {
       "id": "G120-002",
       "severity": "MINOR",
-      "title": "Alert通知のtypeがIR95と正規DTOで矛盾する",
+      "title": "Alert notification type conflicts between IR95 and the canonical DTO",
       "locations": [
         "docs/02-design/review-resolution-contracts.md:753",
         "docs/02-design/review-resolution-contracts.md:769",
@@ -57,16 +57,16 @@
       "prior_findings": [
         "G1-002"
       ],
-      "reproduction": "demo.trigger(load_alert)でpolicyId=null、type=sensorのAlertを作り、IR95による通知を生成する。",
-      "problem": "IR95のtemplateKeyとtypeは同名という規則はtype=alertを要求するが、NotificationTypeにalertはない。IR10は同じ通知をtype=faultに写像する。IR72では実装側に矛盾の選択を委ねられない。",
-      "impact": "通知のDTO検証と故障分類・フィルターが一致しない。修正すべき既存写像は明確なためMINORとする。",
-      "suggested_revision": "alertテンプレートを同名規則の例外とし、IR10の分類とsourceAlertIdの規則を適用する。実際の生成通知のtype=faultを受入に追加する。",
+      "reproduction": "Use demo.trigger(load_alert) to create an Alert with policyId=null and type=sensor, then generate its notification under IR95.",
+      "problem": "IR95 requires templateKey and type to share a name, implying type=alert, but NotificationType has no alert. IR10 maps the same notification to type=fault. IR72 does not allow implementation to choose between conflicting rules.",
+      "impact": "Notification DTO validation disagrees with fault classification/filters. Rated MINOR because the existing mapping to fix is clear.",
+      "suggested_revision": "Exclude the alert template from the same-name rule and apply IR10 classification/sourceAlertId rules. Add acceptance for actual generated type=fault.",
       "status": "open"
     },
     {
       "id": "G120-003",
       "severity": "MINOR",
-      "title": "業務通知のseverityが未定義",
+      "title": "Business notification severity is undefined",
       "locations": [
         "docs/02-design/review-resolution-contracts.md:753",
         "docs/02-design/service-contracts.ts:110"
@@ -79,16 +79,16 @@
       "prior_findings": [
         "G1-002"
       ],
-      "reproduction": "AT-P03-N / AT-G120-002でcontractor-aが割当を行い、4宛先へのschedule_change通知を生成する。",
-      "problem": "IR95は宛先・template・channel等を定めるが、必須のNotification.severityを定めない。参照先D08/D12にも非Alert業務通知の既定値はない。",
-      "impact": "normal/warning/criticalの選択が実装依存となり、表示色・重大度フィルター・既定の並び順が一意にならない。",
-      "suggested_revision": "業務イベント別のseverity、または既定値と例外を定める。Alertについては起点からの継承を明記し、受入で確認する。",
+      "reproduction": "In AT-P03-N / AT-G120-002, contractor-a assigns work and generates schedule_change notifications for four recipients.",
+      "problem": "IR95 defines recipients, template, channel, and other fields, but not required Notification.severity. Referenced D08/D12 also provide no default for non-Alert business notifications.",
+      "impact": "Choosing normal/warning/critical depends on implementation, so colors, severity filters, and default order are not deterministic.",
+      "suggested_revision": "Define severity by business event, or a default with exceptions. State that Alerts inherit source severity and verify it in acceptance.",
       "status": "open"
     },
     {
       "id": "G120-004",
       "severity": "MINOR",
-      "title": "アレルゲン観測更新の変更イベントとQuery無効化が未定義",
+      "title": "Allergen observation updates lack change events and Query invalidation rules",
       "locations": [
         "docs/02-design/review-resolution-contracts.md:804",
         "docs/02-design/review-resolution-contracts.md:446",
@@ -102,16 +102,16 @@
       "prior_findings": [
         "G1-006"
       ],
-      "reproduction": "C07/A12のtelemetry.seriesを取得済みにし、同じUnitにdemo.trigger(allergen)で新しい観測を追加する。",
-      "problem": "IR98が新たな保存先を定義したが、閉じたIR71の変更イベント表とChangeEntityTypeに対応項目がない。measurementへ写す規則もなく、telemetry.seriesの再取得を決められない。",
-      "impact": "保存済みの最新観測と、表示中の取得状態・値が食い違う可能性がある。",
-      "suggested_revision": "専用entityTypeを追加するか既存イベントへの写像を明記し、entityId/versionと対象Queryを定義する。キャッシュ済み画面が更新される受入を追加する。",
+      "reproduction": "Load C07/A12 telemetry.series, then add a new observation to the same Unit using demo.trigger(allergen).",
+      "problem": "IR98 defines a new store, but the closed IR71 change-event table and ChangeEntityType have no matching entry. No mapping to measurement is defined, so telemetry.series refetch behavior is undecided.",
+      "impact": "The stored latest observation may disagree with displayed availability and values.",
+      "suggested_revision": "Add a dedicated entityType or define a mapping to existing events, including entityId/version and target Queries. Add acceptance proving cached screens update.",
       "status": "open"
     },
     {
       "id": "G120-005",
       "severity": "MINOR",
-      "title": "通知fixtureの必須scopeVersionAtCreationを補完する規則がない",
+      "title": "No rule fills required scopeVersionAtCreation in notification fixtures",
       "locations": [
         "docs/04-agentic-sdlc/fixture-contract.json:3095",
         "docs/04-agentic-sdlc/fixture-contract.json:3114",
@@ -126,10 +126,10 @@
       "prior_findings": [
         "G1-027"
       ],
-      "reproduction": "AT-C08-SRCのnotif-alert-insulation-a / notif-alert-unknown-aをIR91の規則だけで正規化してNotificationとして検証する。seed通知にも同じ省略がある。",
-      "problem": "必須numberのscopeVersionAtCreationが行になく、IR91の共通規則やNotification専用規則でも生成されない。null可能な項目や配列の補完対象でもない。",
-      "impact": "IR69/91に従うfixture生成は型検証で失敗する。値を暗黙に補う実装は規範にない推測を必要とする。",
-      "suggested_revision": "各行に作成時scopeVersionを明示するか、fixture生成時のrecipient Membershipから導出する規則を追加する。seedと全通知patchの必須項目検査を追加する。",
+      "reproduction": "Normalize AT-C08-SRC notif-alert-insulation-a / notif-alert-unknown-a using only IR91, then validate as Notification. Seed notifications have the same omission.",
+      "problem": "The required numeric scopeVersionAtCreation is absent and is not generated by common or Notification-specific IR91 rules. It is neither nullable nor an array covered by default filling.",
+      "impact": "Fixture generation following IR69/91 fails type validation. Implicitly filling the value requires an assumption absent from the rules.",
+      "suggested_revision": "Specify creation-time scopeVersion in each row or derive it from recipient Membership during fixture generation. Add required-field checks for seed and all notification patches.",
       "status": "open"
     }
   ]

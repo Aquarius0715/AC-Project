@@ -7,213 +7,213 @@ consumers: [implementation-agent, test-agent, review-agent]
 scope: frontend-demo-1A
 ---
 
-# 共通UIUX仕様書
+# Common UIUX Specification
 
-この文書は、4つの役割すべてに共通する、実装・操作・表示のルールを定める。ワイヤフレーム(画面のラフな下書き)や画面配置図は、この文書の対象外である。各画面の業務処理については[詳細設計](../02-design/common.md)を見てほしい。使用するライブラリは、DEC-02/03で決めた提案標準に従う。配色・書体・形状は、ユーザーが指定したLoyaltyページから取得したHTML/CSSに合わせる。根拠と、値を補正した箇所については[参考デザイン分析](../00-prepare/reference-design-analysis.md)を見てほしい。
+This document defines shared implementation, interaction, and display rules for all four roles. Wireframes (rough screen sketches) and screen layout diagrams are outside its scope. See the [detailed design](../02-design/common.md) for each screen's business logic. Libraries follow the proposed standards in DEC-02/03. Colors, fonts, and shapes follow the HTML/CSS obtained from the Loyalty page specified by the user. See the [reference design analysis](../00-prepare/reference-design-analysis.md) for evidence and adjusted values.
 
-**0.21.0の実装基準**: [確定契約](../02-design/deterministic-contracts.md) 全章およびstrict-review-contracts.md全章、操作カタログの認可列、画面カタログを併読する。数値・権限・非同期・復旧を実装時に推測しない。デモの設計提案であり本番の業務承認ではない。
+**Implementation basis for 0.21.0**: Read all chapters of the [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the operation catalog's authorization column, and the screen catalog together. Do not guess numeric rules, permissions, asynchronous behavior, or recovery behavior during implementation. These are demo design proposals, not production business approvals.
 
-## 企業要望と共通UIUXへの展開
+## Company requests and shared UIUX rules
 
-一次資料は[企業要件の英語原文(SRC-06)](../00-prepare/sources/company-requirements-original.txt)である。企業の原文にある表示・操作の目的から、共通のルールを定義する。見た目については、ドキュメント作成者が指定した参考HTML/CSSに合わせる。ライブラリの選定、デモに使う言語、細かい寸法は、制作方針にもとづく設計上の提案である。
+The primary source is the [company's original English requirements (SRC-06)](../00-prepare/sources/company-requirements-original.txt). Shared rules are based on the display and interaction goals in that source. Appearance follows the reference HTML/CSS specified by the document authors. Library choices, demo languages, and exact dimensions are design proposals based on the production policy.
 
-| 出所 | 求められる体験 | 共通ルール・受入時に確認する観点 |
+| Source | Required experience | Shared rules and acceptance checks |
 |---|---|---|
-| 企業原文 BIZ-01〜03 | 利用開始・終了、多言語対応、音声AI | 認証がデモであることを明示する。翻訳キーですべての役割の表示を切り替える。音声は、入力・解釈・確認・応答の4段階に分け、テキストでも操作を完了できるようにする。初期言語をen(英語)/ms(マレー語)にし、英語を初期選択とするのは提案である |
-| 企業原文 BIZ-04・07・08 | 視覚的なダッシュボード、場所と状態の把握 | 選択中の物件・設備を常に分かるようにし、KPI(重要指標)から対象の一覧へ移動できるようにする。グラフには期間・単位・取得時刻と、表形式での代替表示を付ける |
-| 企業原文 BIZ-09〜11・17 | 赤・橙・緑による通知、部品の状態と原因の把握 | 色だけでなく文言やアイコンも併用する。通信状態と重要度は別々に表示する。窓の開放や断熱不足は、根拠を示した「原因の候補」として表示し、まだ推定にすぎないものを確定した原因のように表示しない |
-| 企業原文 BIZ-13〜16・19 | 遠隔操作、予定設定、位置・料金との連動、換気 | 現在の値と要求する値、設定の保存と模擬的な発火、要求中の状態と応答済みの状態を、それぞれ分けて表示する。対応できる能力と、対応できない理由を確認できるようにする |
-| 企業原文 BIZ-18 | CO₂・粉じん・湿度・アレルゲン | CO₂の濃度(ppm)と排出量(kgCO₂e)は、別の概念として表示する。アレルゲンについては、対象・出典・観測時刻・取得できたかどうかの状態を示し、未計測を0や「安全」に変換しない |
-| 企業原文 BIZ-21・22 | 支払いの案内と冷房の制限 | 対象・理由・期限・解除状況を説明する。クレジット・デビット・支払い手順の3種類に区分する。デモでは選択式にし、実際のカード番号を入力する欄は設けない |
-| 企業原文 BIZ-23〜26 | 省エネの比較、MRV(測定・報告・検証)・Scope 2、任意のオフセット | 基準・期間・係数・境界・データの品質を、同じ場所で確認できるようにする。省エネ量・推定削減量・模擬的な償却・将来の市場構想は、それぞれ別に表示する。オフセットは初期状態では未選択にする |
-| 制作方針 SRC-02 | 4つの役割、参考にした外観、共通ライブラリ、将来のAPI接続 | 同じComponent(部品)・Icon(アイコン)・token(共通の値)・formのルールを適用する。業務データは非同期のRepository(データ取得の仕組み)経由で扱う |
-| 参考モック SRC-05 | 配色・書体・余白・形状 | UX-04以降と、参考デザイン分析にあるREF(参照)値に従う。読みやすさのために補正した箇所はADAPT(調整)として記録する |
+| Company original BIZ-01–03 | Start/end use, multiple languages, voice AI | Clearly label demo authentication. Use translation keys to switch display text for every role. Split voice interaction into input, interpretation, confirmation, and response; allow completion through text too. Offering en (English)/ms (Malay) initially, with English selected by default, is a proposal |
+| Company original BIZ-04/07/08 | Visual dashboards, location and status awareness | Always show the selected property and unit. Link KPIs (key performance indicators) to the matching list. Give charts a period, unit, retrieval time, and an alternative table view |
+| Company original BIZ-09–11/17 | Red/orange/green notifications, component conditions and causes | Use text and icons as well as color. Show connection status separately from severity. Show open windows and poor insulation as possible causes with supporting evidence; do not present estimates as confirmed causes |
+| Company original BIZ-13–16/19 | Remote control, scheduling, location/price links, ventilation | Distinguish current and requested values, saving settings and simulated firing, and pending and acknowledged states. Show supported capabilities and reasons why an action is unsupported |
+| Company original BIZ-18 | CO₂, dust, humidity, allergens | Show CO₂ concentration (ppm) and emissions (kgCO₂e) as separate concepts. For allergens, show the target, source, observation time, and availability. Do not turn missing measurements into 0 or "safe" |
+| Company original BIZ-21/22 | Payment guidance and cooling restrictions | Explain the target, reason, deadline, and release status. Separate credit, debit, and payment instructions. Use selection controls in the demo; do not provide fields for real card numbers |
+| Company original BIZ-23–26 | Energy-saving comparisons, MRV (measurement, reporting, verification), Scope 2, optional offsets | Keep the baseline, period, factors, boundaries, and data quality together. Show energy savings, estimated emission reductions, simulated retirement, and future market concepts separately. Leave offsets unselected by default |
+| Production policy SRC-02 | Four roles, reference appearance, shared libraries, future API connections | Apply shared Component, Icon, token, and form rules. Access business data through asynchronous Repositories |
+| Reference mock SRC-05 | Colors, fonts, spacing, shapes | Follow UX-04 onward and the REF values in the reference design analysis. Record readability adjustments as ADAPT |
 
-画面ごとに原文を補うケース(AT-*-SRC)は、以下の共通ルールと合わせて検証する。モックで見つかった機能を、企業にとって必須の要求に追加する場合は、設計上の提案として、その理由と影響範囲を記録する。
+Validate each screen's cases that add detail to the source (AT-*-SRC) together with the following shared rules. If a feature found in a mock is added as a mandatory company requirement, record its reason and impact as a design proposal.
 
-## UX-01. UIライブラリと取得元
+## UX-01. UI libraries and sources
 
-| 用途 | 標準・取得元 | プロジェクト内での使用ルール |
+| Purpose | Standard/source | Project usage rules |
 |---|---|---|
-| 基本UI | [shadcn/ui公式](https://ui.shadcn.com/docs) | 公式のコンポーネントをshared/uiに取り込んで管理する方式にする。ボタン、Dialog(ダイアログ)、Sheet(シート)、Tabs(タブ)、Select(選択)、Popover(ポップオーバー)などを共通化する。役割ごとに、同じ役割のUIを独自に作らない |
-| アイコン | [Lucide React公式](https://lucide.dev/guide/react) | lucide-reactから名前付きでimportする。標準サイズは16px、主要な操作は20px、強調したいものは24pxとする。線の太さは1.75を標準とする(参考にしたsidebarのSVGに合わせる)。装飾用のアイコンにはaria-hiddenを付け、アイコンだけのボタンには名前(ラベル)を必ず付ける |
-| フォーム | [React Hook Form公式リポジトリ](https://github.com/react-hook-form/react-hook-form) | react-hook-formを標準とする。「reactForms」という言葉の解釈はDEC-03を参照する。入力の状態はフォームの中で管理し、画面のstateにコピーしない |
-| スキーマ検証 | Zod + @hookform/resolvers | 入力用のschemaと、DTO(データ転送)用のschemaを区別する。ユースケースごとの必須項目・形式・条件分岐は、schemaにまとめる |
-| データ取得・更新 | [TanStack Query公式](https://tanstack.com/query/latest/docs/framework/react/overview) | Repositoryへの非同期の要求、キャッシュ、更新(mutation)は、共通のhookにまとめる |
-| 一覧・グラフ | TanStack Table / Recharts | 複雑な並び替え・ページングや、時系列のグラフに使う。単純な一覧には共通のTableを使う。グラフを独自に描き直さない |
-| 日付入力 | shadcn Calendar系 | 日付と、時刻・タイムゾーンは別々に管理する。表示の書式はIntl(国際化API)を使い、UTC(協定世界時)への変換は共通の関数にまとめる |
-| 翻訳 | i18next + react-i18next | en(英語)/ms(マレー語)のキーを同時に更新する。英語を初期表示とする。通知のテンプレートや、音声デモの応答文も、同じ辞書の仕組みを使う |
-| 検証 | Vitest、React Testing Library、Playwright、axe-core | ロジックの検証、利用者操作の検証、E2E(画面をまたぐ検証)、自動でのアクセシビリティ検証を、それぞれ役割分担する |
+| Basic UI | [Official shadcn/ui docs](https://ui.shadcn.com/docs) | Copy and manage official components in shared/ui. Share buttons, Dialog, Sheet, Tabs, Select, Popover, and similar elements. Do not build separate versions of equivalent UI for each role |
+| Icons | [Official Lucide React docs](https://lucide.dev/guide/react) | Use named imports from lucide-react. Default size: 16px; main actions: 20px; emphasis: 24px. Default stroke width: 1.75, matching the reference sidebar SVG. Set aria-hidden on decorative icons and always label icon-only buttons |
+| Forms | [Official React Hook Form repository](https://github.com/react-hook-form/react-hook-form) | Use react-hook-form as the standard. See DEC-03 for the interpretation of "reactForms." Keep input state in the form; do not copy it into screen state |
+| Schema validation | Zod + @hookform/resolvers | Separate input schemas from DTO (data transfer object) schemas. Keep required fields, formats, and conditional rules for each use case in its schema |
+| Data reads/updates | [Official TanStack Query docs](https://tanstack.com/query/latest/docs/framework/react/overview) | Put asynchronous Repository requests, caching, and mutations in shared hooks |
+| Lists/charts | TanStack Table / Recharts | Use for complex sorting/pagination and time-series charts. Use the shared Table for simple lists. Do not build custom replacements for charts |
+| Date input | shadcn Calendar family | Manage dates separately from time and time zone. Use Intl for display formats and shared functions for conversion to UTC |
+| Translation | i18next + react-i18next | Update en (English)/ms (Malay) keys together. English is the default. Notification templates and voice demo responses use the same dictionary system |
+| Testing | Vitest, React Testing Library, Playwright, axe-core | Assign separate roles for logic tests, user interaction tests, E2E tests across screens, and automated accessibility checks |
 
-公式資料を取得して確認した日: 2026-09-14。shadcn、Lucide、TanStack Queryについては公式の文書を確認した。React Hook Formについては、ガイド本文を取得できなかったため、公式リポジトリで確認した。それ以外はこのプロジェクトでの採用候補であり、互換性・ライセンス・メンテナンス状況は、実装を始めるときに改めて確認する。バージョン番号を推測して固定しない。
+Official sources were retrieved and checked on 2026-09-14. Official documentation was checked for shadcn, Lucide, and TanStack Query. The React Hook Form guide could not be retrieved, so its official repository was checked instead. The other libraries are project candidates; check compatibility, licenses, and maintenance again when implementation starts. Do not guess and pin version numbers.
 
-現時点で既存の実装はない。導入するときに、1つの互換性が取れたセットとlockfile(バージョン固定ファイル)を作り、採用したバージョンとライセンスを記録する。同じ目的のUIキットやアイコンセットを、重ねて追加しない。例外を作る場合は、必要な機能、標準ライブラリで足りない理由、負担、影響、置き換えられるかどうかを、決定記録に残す。セマンティックHTML(意味の通ったHTML)だけで十分な部分に、無理にライブラリを使わせない。
+There is no existing implementation. On setup, create one compatible set of dependencies and a lockfile, and record the selected versions and licenses. Do not add overlapping UI kits or icon sets. For exceptions, record the required feature, why the standard library is insufficient, cost, impact, and whether replacement is possible. Do not force library use where semantic HTML is enough.
 
-## UX-02. State・Effect・Contextの責任分担
+## UX-02. Responsibilities of State, Effect, and Context
 
-| 状態の種類 | 保管先 | やってはいけない二重管理 |
+| State type | Storage | Duplicate management to avoid |
 |---|---|---|
-| Repositoryから得られる設備・案件・請求・履歴のデータ | TanStack Query cache(キャッシュ) | 取得結果を、useState/Context/Zustandなどへ再度コピーすること |
-| 検索・並び替え・ページ・期間・選択中の物件 | URLのsearch params(検証つき) | URLと、ローカルのstateを、Effectで双方向に同期させること |
-| 入力値・変更されたかどうか(dirty)・入力検証・送信状態 | React Hook Form | 各入力項目を、それぞれuseStateで再度管理すること、独自のエラー辞書を作ること |
-| ダイアログの開閉のような、短い間だけ使う局所的な状態 | コンポーネント内のuseState、必要ならuseReducer | 画面全体のContextに格納すること |
-| 絞り込んだ結果・合計・ボタンを有効にするかの判定 | 描画時にその場で計算する純粋な関数 | 計算した結果を、Effectで別のstateに保存すること |
-| テーマ・言語(locale)・セッション・Repositoryへの参照 | ライブラリのProvider、または小さなContext | テレメトリー(センサーの測定値、Measurement)など、頻繁に更新される値を、巨大なContextに混ぜること |
-| 共有するデモ用の業務データ | mock Repositoryの内部 | 画面ごとにseed(初期データ)を変えること、Contextを疑似データベースとして使うこと |
+| Unit, job, invoice, and history data from Repositories | TanStack Query cache | Copying fetched results into useState/Context/Zustand |
+| Search, sort, page, period, selected property | Validated URL search params | Two-way synchronization between URL and local state through Effects |
+| Input values, dirty state, validation, submission state | React Hook Form | Managing each input again with useState or creating a separate error dictionary |
+| Short-lived local state, such as whether a dialog is open | Component useState; useReducer if needed | Storing it in a screen-wide Context |
+| Filtered results, totals, button availability | Pure functions computed during rendering | Saving derived results into separate state through Effects |
+| Theme, locale, session, Repository references | Library Providers or small Contexts | Mixing frequently updated values, such as telemetry (sensor measurements, Measurement), into one large Context |
+| Shared demo business data | Inside the mock Repository | Different seeds for each screen or using Context as a database |
 
-Effect(副作用)は、外部のシステムと同期する必要があるときだけに限定する。何かのイベントをきっかけに保存する処理は、イベントハンドラーやmutation(更新処理)の中で行い、依存配列を隠して動作を分かりにくくしない。React公式のドキュメントも、不要なEffectは避けるべきだという考え方を説明している。[React公式: You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect)
+Limit Effects to synchronization with external systems. Save in response to events through event handlers or mutations. Do not hide dependencies in a way that makes behavior unclear. React's official documentation also recommends avoiding unnecessary Effects. [Official React docs: You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect)
 
-Effectを使ってよい例としては、購読と解除、メディアAPI、DOM外部のwidgetとの同期がある。使う理由とcleanup(後始末の処理)は必ずセットにし、Strict Mode(React開発時の二重実行モード)で再実行されても、二重に登録されないようにする。データの取得は、原則としてQueryのhookを使う。`useMemo`/`useCallback`は、測定によって必要性が確認できた場合や、参照の安定性が必要な場合にだけ使う。
+Valid Effect uses include subscriptions and cleanup, media APIs, and synchronization with external DOM widgets. State the reason and provide cleanup together. Prevent duplicate registration when Strict Mode runs the Effect again during development. Normally use Query hooks to fetch data. Use `useMemo`/`useCallback` only when measurements show a need or stable references are required.
 
 ```tsx
-// 方針例: 選択条件はURL、データ取得はQuery、表示用の変換は純粋な導出関数で行う。
+// Example: keep filters in the URL, fetch through Query, and derive display values with pure functions.
 const filters = parseUnitFilters(searchParams);
 const unitsQuery = useUnits(filters);
 const visibleUnits = selectVisibleUnits(unitsQuery.data?.items ?? [], filters);
-// visibleUnitsを別のstateへコピーするEffectは作らない。
+// Do not add an Effect that copies visibleUnits into separate state.
 ```
 
-Contextは、セッション情報のように広く配布する必要があるものに限定する。必要なProviderは使ってよい。「Contextは禁止」「useEffectは0にする」「useStateは0にする」といったルール自体を目的にしない。レビューでは、保管先が1つにまとまっているか、外部との同期が本当に必要かを判断する。
+Limit Context to information that needs broad distribution, such as session data. Use Providers where needed. Do not make rules such as "no Context," "zero useEffect," or "zero useState" goals in themselves. Reviews should check for a single source of state and a real need for external synchronization.
 
-## UX-03. フォームの標準
+## UX-03. Form standards
 
-- `useForm`と`zodResolver`を基本として使う。ネイティブな入力にはregisterを使い、制御されたコンポーネントには、必要な箇所だけControllerを使う。配列形式の入力にはuseFieldArrayを使う。
-- ラベル、必須か任意か、説明文、単位、エラー、disabled(無効)にしている理由は、共通のFieldコンポーネントで統一する。placeholder(入力欄の中の薄い文字)だけをラベル代わりにしない。
-- 初期値はschemaと一致させる。非同期でデータを読み込んだ後のresetは、対象IDが変わったときか、明示的に再読み込みしたときだけに限る。バックグラウンドでの更新によって、まだ保存していない入力(dirty)を上書きしない。
-- 最初の検証はフォーカスが外れたとき(blur)または送信時に行い、エラーが出た後は修正するたびに再検証する方針とする。送信時には最初のエラー項目にフォーカスを移し、上部のエラー要約から該当項目へ移動できるようにする。
-- 送信中は二重送信を防ぎ、送信に失敗した場合は入力値を保持する。モックのVALIDATION結果はfieldErrors(項目ごとのエラー)へ、CONFLICT結果は競合の案内へ変換する。
-- 点検の下書き保存では、まだ入力が完了していない状態も許可する。提出用のschemaでは必須項目をすべて満たす必要がある。すでに完了した状態のフォームを直接書き換えるのではなく、新しい報告として作り直す。
-- 温度・時間・金額は、文字列から数値へ変換するときに境界値を確認する。空文字を0として扱わない。許容範囲は、能力データや共通のschemaから取得する。
-- 保存していない内容があるまま画面を離れようとする場合だけ、破棄してよいか確認する。通常の閲覧のための画面遷移には、不要な確認を追加しない。
+- Use `useForm` and `zodResolver` as the default. Use register for native inputs and Controller only where controlled components need it. Use useFieldArray for array inputs.
+- Use a shared Field component for labels, required/optional markers, help text, units, errors, and disabled reasons. A placeholder is not a substitute for a label.
+- Match initial values to the schema. After asynchronous loading, reset only when the target ID changes or the user explicitly reloads. Background refresh must not overwrite unsaved (dirty) input.
+- Validate first on blur or submission. After an error, validate again whenever the user edits the value. On submission, focus the first invalid field and provide links to fields from the error summary at the top.
+- Prevent duplicate submissions while submitting and preserve input on failure. Map mock VALIDATION results to fieldErrors and CONFLICT results to conflict guidance.
+- Allow incomplete inspection drafts to be saved. Submission schemas require all mandatory fields. Create a new report instead of directly editing a completed form.
+- Check temperature, time, and money boundaries when converting strings to numbers. Do not treat an empty string as 0. Get allowed ranges from capability data or shared schemas.
+- Ask whether to discard changes only when leaving with unsaved input. Do not add unnecessary confirmation to normal viewing navigation.
 
-## UX-04. 参考デザインに準拠したデザイントークン
+## UX-04. Design tokens based on the reference design
 
-値を定義する唯一の場所は`src/shared/styles/tokens.css`である。以下の値を、この版での採用値とする。`REF`は取得元のサイトにある値、`ADAPT`は今回の要件のために明示的に補正した値を表す。根拠は[抽出証跡](../00-prepare/sources/reference-style-evidence.json)を見てほしい。
+The single source for values is `src/shared/styles/tokens.css`. The following values are adopted for this version. `REF` means a value from the source site; `ADAPT` means an explicit adjustment for these requirements. See the [extraction evidence](../00-prepare/sources/reference-style-evidence.json).
 
-| semantic token(意味づけされた値) | 採用する値 | 根拠・用途 |
+| Semantic token | Adopted value | Basis/purpose |
 |---|---|---|
-| --color-primary / --color-primary-fg | #005BEA / #FFFFFF | REF 主要ボタン、選択中のnav(ナビゲーション) |
-| --color-primary-soft | #E6F0FF | REF アイコンの枠、選択候補の背景 |
-| --color-primary-hover | rgb(0 91 234 / .90) | REF hover:bg-primary/90。背景と合成した値であり、勝手に別の固定の濃い青に変えない |
-| --color-background / --color-surface / --color-surface-2 | #F8FBFF / #FFFFFF / #EDF6FF | REF ページ全体・カード・補助領域の背景 |
-| --color-secondary / --color-secondary-fg | #EDF6FF / #0D2238 | REF secondary(第2の色)。ティール系の色を第2ブランドカラーにしない |
-| --color-text / --color-text-muted | #0D2238 / rgb(13 34 56 / .72) | REF 本文・補足説明の文字色 |
-| --color-text-subtle-reference / --color-text-subtle | rgb(13 34 56 / .50) / rgb(13 34 56 / .72) | REFの値は残しつつ、12px程度で意味のあるラベルには、より濃いADAPTの値を使う |
-| --color-hero / --color-hero-fg | #0D2238 / #FFFFFF | REF 主要なサマリー領域。補助的な文字は白72%にADAPT |
-| --color-border / --color-input-border | #D6E4F5 / #71849A | 装飾目的の枠線はREF、入力欄の枠線は視認性を高めるためADAPT |
-| --color-success-accent / --color-success / --color-success-soft | #059669 / #166534 / #DCFCE7 | 装飾・背景はREF、文字色はADAPT |
-| --color-critical-accent / --color-critical / --color-critical-soft | #FF4757 / #B91C1C / #FFE5E9 | 装飾・背景はREF、文字色はADAPT |
-| --color-warning / --color-warning-soft | #9A3412 / #FFEDD5 | REF、オレンジ系の注意を表す色 |
-| --color-unknown / --color-unknown-soft | #475569 / #EDF6FF | ADAPT、不明・欠測を正常な色として見せない |
-| --color-focus | #005BEA | REF 2pxのoutline(輪郭線)と2pxのoffset(余白)。ボタンには補助的に3px/50%のringを使う |
-| --chart-series-1〜4 | #005BEA / #0D2238 / #7C3AED / #9A3412 | ADAPT、1番目と2番目はブランドカラー。色だけでなく線の種類と凡例も併用する |
+| --color-primary / --color-primary-fg | #005BEA / #FFFFFF | REF main buttons, selected navigation |
+| --color-primary-soft | #E6F0FF | REF icon frames, selectable-option backgrounds |
+| --color-primary-hover | rgb(0 91 234 / .90) | REF hover:bg-primary/90. This blends with the background; do not replace it with a different fixed dark blue |
+| --color-background / --color-surface / --color-surface-2 | #F8FBFF / #FFFFFF / #EDF6FF | REF page, card, and secondary-area backgrounds |
+| --color-secondary / --color-secondary-fg | #EDF6FF / #0D2238 | REF secondary color. Do not use teal as a second brand color |
+| --color-text / --color-text-muted | #0D2238 / rgb(13 34 56 / .72) | REF body and supporting text |
+| --color-text-subtle-reference / --color-text-subtle | rgb(13 34 56 / .50) / rgb(13 34 56 / .72) | Keep the REF value, but use the darker ADAPT value for meaningful labels around 12px |
+| --color-hero / --color-hero-fg | #0D2238 / #FFFFFF | REF main summary area. ADAPT supporting text to 72% white |
+| --color-border / --color-input-border | #D6E4F5 / #71849A | REF decorative borders; ADAPT input borders for visibility |
+| --color-success-accent / --color-success / --color-success-soft | #059669 / #166534 / #DCFCE7 | REF decoration/background; ADAPT text |
+| --color-critical-accent / --color-critical / --color-critical-soft | #FF4757 / #B91C1C / #FFE5E9 | REF decoration/background; ADAPT text |
+| --color-warning / --color-warning-soft | #9A3412 / #FFEDD5 | REF orange warning colors |
+| --color-unknown / --color-unknown-soft | #475569 / #EDF6FF | ADAPT; do not use normal-status colors for unknown or missing data |
+| --color-focus | #005BEA | REF 2px outline with 2px offset. Add a 3px/50% ring to buttons |
+| --chart-series-1–4 | #005BEA / #0D2238 / #7C3AED / #9A3412 | ADAPT; series 1 and 2 use brand colors. Use line styles and legends as well as colors |
 
-| 分類 | tokenと値 | 使用のルール |
+| Category | Token/value | Usage rules |
 |---|---|---|
-| 本文用フォント | --font-sans: "Plus Jakarta Sans", system-ui, sans-serif | REF。英語・マレー語はどちらもラテン文字なので、追加の代替フォントは不要。font-display:swapを指定する |
-| ID・コード用フォント | --font-mono: "Geist Mono", ui-monospace, monospace | REF。契約IDや機器のシリアル番号など、限られた用途に使う |
-| 任意で使うdisplay用フォント | --font-display: "Bricolage Grotesque", var(--font-sans) | REFとして定義はあるが、業務画面のh1見出しの標準としては使わない |
-| 文字サイズ | --text-xs:12px / sm:14px / base:16px / lg:18px / xl:20px / 2xl:24px / 3xl:30px / 5xl:48px / 6xl:60px | REFのscale(段階)。本文は14〜16px、重要な説明は12px以上とする。5xl/6xlはhero(目立つ数値)だけに使う |
-| 行の高さ | xs:16px / sm:20px / base:24px / 2xl:32px / 3xl:36px / hero:1 | REF。英語・マレー語とも同じ行の高さを使う |
-| 太さ・字間 | normal400 / medium500 / semibold600 / bold700、KPI(重要指標)の数値は-.01em | REF。短いラベルには.12emの字間と大文字化(uppercase)を英語・マレー語のどちらにも同じように適用する |
-| 余白 | --space-1〜8:4/8/12/16/20/24/28/32px、--space-12:48px | REF 4px刻み。カード内は16/20px、hero部分は24px→28px |
-| 角丸 | --radius-control:10px / --radius-card:14px / --radius-nav:16px / --radius-small:6px | REF。rounded-lg=16、rounded-xl=14という実際の値を保持する |
-| 影 | --shadow-card:0 14px 34px rgba(13,34,56,.055) | REF。1pxの白70%のring(枠)や、border90%との組み合わせも可能 |
-| ボタンの影 | --shadow-action:0 10px 22px rgba(0,91,234,.18) / hover:0 14px 30px rgba(0,91,234,.24) | REF、primaryのボタンだけに使う。すべてのカードをhover時に浮き上がらせない |
-| 動き | --duration-normal:200ms、--ease-out:cubic-bezier(0,0,.2,1) | REF hover時はy=-2px、press(押下)時はy=1px/scale=.985。reduced-motion(動きを減らす設定)のときは移動させない |
-| 内容の幅 | --content-max:1152px | REF max-w-6xl=72rem。参考にしたHTMLにはmargin-inline:autoの指定がないため、自動で追加しない |
-| サイドバー | --sidebar-width:240px / --sidebar-width-icon:56px | REFの画面にあるinlineの値。ライブラリの初期値である256/48pxは使わない |
-| ブレークポイント(画面幅の切り替え) | sm640 / md768 / lg1024 / xl1280px | REF。nav(ナビ)の切り替えはxl、KPIの表示切り替えはmd、補助領域の切り替えはlgとする |
-| 重なりの層 | --z-sidebar:10 / --z-header:30 / --z-modal:50 / --z-toast:60 | 前の2つはREF、後ろの2つはADAPT。要素の重なりとフォーカスをまとめて管理する |
+| Body font | --font-sans: "Plus Jakarta Sans", system-ui, sans-serif | REF. English and Malay both use Latin script, so no extra fallback font is needed. Set font-display:swap |
+| ID/code font | --font-mono: "Geist Mono", ui-monospace, monospace | REF. Limit use to items such as contract IDs and device serial numbers |
+| Optional display font | --font-display: "Bricolage Grotesque", var(--font-sans) | Defined as REF, but not the default h1 font for business screens |
+| Font size | --text-xs:12px / sm:14px / base:16px / lg:18px / xl:20px / 2xl:24px / 3xl:30px / 5xl:48px / 6xl:60px | REF scale. Body text: 14–16px; important explanations: at least 12px. Use 5xl/6xl only for hero numbers |
+| Line height | xs:16px / sm:20px / base:24px / 2xl:32px / 3xl:36px / hero:1 | REF. Use the same line heights for English and Malay |
+| Weight/letter spacing | normal400 / medium500 / semibold600 / bold700; KPI numbers: -.01em | REF. Apply .12em letter spacing and uppercase to short labels in both English and Malay |
+| Spacing | --space-1–8:4/8/12/16/20/24/28/32px; --space-12:48px | REF 4px steps. Inside cards: 16/20px; hero: 24px→28px |
+| Corner radius | --radius-control:10px / --radius-card:14px / --radius-nav:16px / --radius-small:6px | REF. Keep the actual values rounded-lg=16 and rounded-xl=14 |
+| Shadow | --shadow-card:0 14px 34px rgba(13,34,56,.055) | REF. May be combined with a 1px 70%-white ring or a 90%-opacity border |
+| Button shadow | --shadow-action:0 10px 22px rgba(0,91,234,.18) / hover:0 14px 30px rgba(0,91,234,.24) | REF, for primary buttons only. Do not lift every card on hover |
+| Motion | --duration-normal:200ms; --ease-out:cubic-bezier(0,0,.2,1) | REF hover: y=-2px; press: y=1px/scale=.985. Disable movement under reduced-motion |
+| Content width | --content-max:1152px | REF max-w-6xl=72rem. The reference HTML has no margin-inline:auto; do not add it automatically |
+| Sidebar | --sidebar-width:240px / --sidebar-width-icon:56px | REF inline values from the reference screen. Do not use the library defaults of 256/48px |
+| Breakpoints | sm640 / md768 / lg1024 / xl1280px | REF. Navigation switches at xl, KPIs at md, secondary areas at lg |
+| Stacking layers | --z-sidebar:10 / --z-header:30 / --z-modal:50 / --z-toast:60 | First two: REF; last two: ADAPT. Manage stacking and focus together |
 
-shadcnの`--primary`/`--background`/`--card`/`--muted`/`--border`は、上記の値に対応づける。参考ページの.bg-backgroundは白で、.bg-bgは薄い青なので、この2つを1つのtokenにまとめない。生の色の値は、この表と生成元だけに置き、各画面ではsemantic token(意味づけされた値)を参照する。
+Map shadcn's `--primary`/`--background`/`--card`/`--muted`/`--border` to these values. The reference page's .bg-background is white and .bg-bg is pale blue; do not merge them into one token. Keep raw color values only in this table and their source; screens must use semantic tokens.
 
-フォントは、公式配布のライセンスを確認したうえでローカル配信する。参考サイトにあるハッシュ付きのwoff2ファイルへ、恒久的にリンク(hotlink)しない。英語・マレー語はどちらもラテン文字なので、追加のフォント設計は不要。ダークモードとブランドロゴの複製は、今回の標準には含めない。
+Serve fonts locally after checking the official licenses. Do not permanently hotlink the reference site's hashed woff2 files. English and Malay both use Latin script, so no additional font design is needed. Dark mode and copying the brand logo are outside this standard.
 
-## UX-05. コンポーネントの共通契約
+## UX-05. Shared component contracts
 
-| 共通コンポーネント | 受け取る情報（概要。propsの正はcomponent-contracts.csv、IR72の順位5、IR102） | ルール |
+| Shared component | Input summary (component-contracts.csv is authoritative for props; IR72 rank 5, IR102) | Rules |
 |---|---|---|
-| AppShell / RoleNavigation | role(役割)、許可されたルート、表示名、appNameKey | ナビの表示と、サービスの利用可否の両方を確認する。現在いる場所はaria-currentで表現する。音声切替は権限のない役割ではdisabledと理由表示(IR44)。アプリ名は翻訳キーapp.name、demo-only操作の領域にはDEMOラベルを常時表示する(IR60/IR74) |
-| SessionExpiryDialog | session、now、extending、error | Session期限の120秒前にrole=alertdialogで表示し、初期focusは「延長する」。延長・サインアウトの実行はShellContainerが行う(IR55) |
-| ErrorBoundary | fallback、correlationId | 描画時の未捕捉例外を全画面errorとして表示し、白画面にしない(IR44) |
-| KpiCard | label(表示名)、value(件数)/null、denominator(分母)/null、unknownCount(不明件数)/null、asOf(時点)、href(同条件の一覧) | 件数KPIを4役割で共通化する。nullは「算定不可」、0は「0」。取得失敗時に0へ置き換えない(IR90) |
-| MetricCard / TelemetryValue | value(値)/null、unit(単位)、origin(出所)、quality(データの品質)、observedAt(観測時刻)、isDemo(デモかどうか) | 未計測の場合は「— 未計測」と表示する。デモであること・推定であること・更新時刻を隠さない |
-| StatusBadge | domain(分類)、status(状態)、labelKey(表示名のキー) | 設備・通信・案件・請求の状態名は、それぞれ別の辞書で管理する。色だけで区別しない |
-| DataTable | columns(列)、rows(行)、sort(並び替え)、pagination(ページ分割)、rowAction(行の操作) | キーボードでもモバイルでも操作できるようにする。件数が多い表はページングする。行をクリックする操作だけに頼らない |
-| TimeSeriesChart / EnergyChart | series(系列)、unit(単位)、quality(データの品質)、period(期間) | 欠測を線でつなげない。数値の表と凡例を併せて表示する。2軸を使う場合は単位を明示する |
-| VoiceContainer / VoicePanel | Container: context、locale、routeJobId / Panel: intent、候補、案件候補、理由、確認状態 | 取得・送信はVoiceContainer(feature hook)が行い、VoicePanelは表示とeventだけを持つ(IR09/IR90) |
-| CommandPanel | capability(能力)、observedState(観測された状態)、pendingCommand(処理中の操作)、permission(権限) | 要求中の状態を、成功トーストで上書きしない。対応できない理由を表示する |
-| ConfirmActionDialog | target(対象)、action(操作内容)、impact(影響)、reason(理由)、onConfirm(確定時の処理) | 制限・解除・試運転・ファームウェア更新・音声設定の変更など共通して使う。初期フォーカスは安全な選択肢に置く |
-| AsyncBoundary / EmptyState | status(状態)、messageKey(メッセージのキー)、retryAction(再試行の操作) | 持続的なエラーを、一時的なトーストだけで済ませない |
-| Timeline / NotificationPanel / NotificationPreview | actor(操作した人)、time(時刻)、action(操作内容)、result(結果)、correlationId(相関ID) | 「プレビュー・未送信」であることを表示する。既読になったことと、業務が完了したことを区別する |
+| AppShell / RoleNavigation | role, allowed routes, display name, appNameKey | Check both navigation visibility and service access. Mark the current location with aria-current. Disable voice switching for roles without permission and show the reason (IR44). Use translation key app.name for the app name; always show a DEMO label in demo-only operation areas (IR60/IR74) |
+| SessionExpiryDialog | session, now, extending, error | Show as role=alertdialog 120 seconds before Session expiry; initially focus "Extend." ShellContainer performs extension and sign-out (IR55) |
+| ErrorBoundary | fallback, correlationId | Show uncaught rendering exceptions as a full-screen error instead of a blank screen (IR44) |
+| KpiCard | label, value/null, denominator/null, unknownCount/null, asOf, href (list with the same conditions) | Share count KPIs across all four roles. null means "Cannot calculate"; 0 means "0." Do not replace failed retrieval with 0 (IR90) |
+| MetricCard / TelemetryValue | value/null, unit, origin, quality, observedAt, isDemo | Show "— Not measured" for missing measurements. Do not hide demo/estimated labels or update times |
+| StatusBadge | domain, status, labelKey | Use separate dictionaries for unit, connection, job, and invoice status names. Do not rely on color alone |
+| DataTable | columns, rows, sort, pagination, rowAction | Support keyboard and mobile use. Paginate large tables. Do not rely only on clicking rows |
+| TimeSeriesChart / EnergyChart | series, unit, quality, period | Do not join lines across missing measurements. Include a numeric table and legend. Clearly label units when using two axes |
+| VoiceContainer / VoicePanel | Container: context, locale, routeJobId / Panel: intent, candidates, job candidates, reasons, confirmation state | VoiceContainer (feature hook) handles fetching/submission; VoicePanel only displays data and emits events (IR09/IR90) |
+| CommandPanel | capability, observedState, pendingCommand, permission | Do not replace a pending state with a success toast. Show why an action is unsupported |
+| ConfirmActionDialog | target, action, impact, reason, onConfirm | Share across restrictions, release, commissioning, firmware updates, voice setting changes, and similar actions. Initially focus the safe option |
+| AsyncBoundary / EmptyState | status, messageKey, retryAction | Do not show persistent errors only as temporary toasts |
+| Timeline / NotificationPanel / NotificationPreview | actor, time, action, result, correlationId | Label previews as "Preview — not sent." Distinguish read status from business completion |
 
-UI primitives(基本部品)は、業務用のRepositoryを直接呼び出さない。業務用のコンポーネントは、型のついたpropsとcallback(呼び出し関数)を受け取り、データの取得はfeature hook(機能ごとのhook)に任せる。役割による違いは、権限や表示するデータで表現し、同じコンポーネントをコピーして4つ保守するようなことはしない。
+UI primitives must not call business Repositories directly. Business components receive typed props and callbacks; feature hooks fetch data. Express role differences through permissions and displayed data instead of maintaining four copies of the same component.
 
-## UX-06. 操作・言語・アクセシビリティ
+## UX-06. Interaction, language, and accessibility
 
-グラフや状態を示すカードは、概要から根拠・詳細へと段階的に確認できるようにする。期間・組織・単位は、常に分かる位置に表示する。成功・保留・失敗の状態を明確にし、エラーには次にすべき行動を添える。破壊的な操作の直後に「元に戻す」ボタンを出す場合も、実際に取り消せる操作のときだけにする。
+Charts and status cards must let users move from an overview to evidence and details. Keep the period, organization, and units clearly visible. Distinguish success, pending, and failure states, and give the next action with each error. Show an "Undo" button after a destructive action only when that action can actually be undone.
 
-英語・マレー語のキー、複数形の扱い、長い翻訳文をきちんと検証する。ms辞書の文言は実装Agentの下書きとして未確認フラグを付け、企業検収前にBusiness/UI/UXが確認する(IR74)。msに欠けたキーはenへfallbackし、両方欠ければキー文字列を表示する。en/msのキー集合の一致はlintで検査する(IR44)。locale tagはen-MY/ms-MY、金額は「120.00 MYR」の順、温度は小数1桁、丸めは十進の四捨五入とする(IR44)。時刻はIntl.DateTimeFormat、金額はIntl.NumberFormatを使って整形し、予約にはタイムゾーンを表示する。言語を変更しても、測定単位や、保存するUTC(協定世界時)の値を勝手に変えない。音声によるデモは、文字起こし・対象・操作内容を確認したうえで、通常のCommand(操作)として処理する。
+Validate English/Malay keys, plurals, and long translations. Mark ms dictionary text as an unverified implementation-agent draft; Business/UI/UX must review it before company acceptance (IR74). Fall back to en for missing ms keys; if both are missing, show the key string. Lint must check that en/ms key sets match (IR44). Use locale tags en-MY/ms-MY, amounts in the order "120.00 MYR," temperatures with one decimal place, and decimal half-up rounding (IR44). Format times with Intl.DateTimeFormat and money with Intl.NumberFormat; show the time zone for bookings. Changing language must not change measurement units or stored UTC values. For voice demos, confirm the transcript, target, and action, then process it as a normal Command.
 
-WCAG 2.2 AAという基準を設計の目標とする。通常の文字はコントラスト比4.5:1以上、大きな文字は3:1以上とし、操作対象が見分けられるか、フォーカスの位置が見えるかを検証する。これは「基準に適合していると保証するもの」ではなく、実装時に検査するための基準である。[W3C公式クイックリファレンス](https://www.w3.org/WAI/WCAG22/quickref/)
+Use WCAG 2.2 AA as the design target. Normal text must have at least 4.5:1 contrast; large text at least 3:1. Check that controls are recognizable and focus is visible. These are implementation test criteria, not a guarantee of compliance. [Official W3C quick reference](https://www.w3.org/WAI/WCAG22/quickref/)
 
-このプロジェクトでの操作領域の目標は44×44pxである。キーボードだけで主要なシナリオを完了できるようにし、Dialog(ダイアログ)を閉じたときは呼び出し元にフォーカスを戻す。重大なエラーは、適切なlive region(読み上げ対象の領域)で通知し、テレメトリー(センサーの測定値、Measurement)の更新のたびに読み上げさせない。表示中のデータの再取得中はaria-busyと「更新中」表示にとどめ、skeletonへ戻さない(IR83)。ブラウザの200%拡大、360px幅、スクリーンリーダーでの操作も確認する。
+The project's target touch area is 44×44px. Allow the main scenarios to be completed with a keyboard alone. When a Dialog closes, return focus to its trigger. Announce critical errors through suitable live regions; do not announce every telemetry (sensor measurement, Measurement) update. When refetching displayed data, use aria-busy and an "Updating" indicator; do not return to a skeleton (IR83). Also test at 200% browser zoom, 360px width, and with a screen reader.
 
-## UX-07. UIレビューの合格条件
+## UX-07. UI review pass criteria
 
-- ライブラリの取得元・採用したバージョンと、共通コンポーネントの置き場所を報告し、重複するキットを追加していないこと。
-- フォーム、Query、URL、局所的なstateの役割分担ができていて、Effectを使う場合は、それぞれ外部と同期する理由があること。
-- 色・フォント・サイズ・余白がtokenを参照していることを確認し、状態を表す色には文字とアイコンも併用されていること。
-- loading(読込中)/empty(空)/error(エラー)/forbidden(禁止)/offline(オフライン)/stale(古い状態)の各表示と、送信に失敗したときに入力内容が保持されることを確認すること。
-- スマートフォン、キーボード操作、英語・マレー語の切り替え、データの欠測、長い文章、音声の代替手段を含めて検証し、まだ実施していない項目は明記すること。
-- 機器の確認が終わる前に成功と表示すること、実際の取引と誤解させる表現、CO₂の単位の混同、既読にしただけで異常が解消したように見せることがないこと。
+- Report library sources, adopted versions, and shared component locations. Do not add duplicate kits.
+- Give forms, Query, URL, and local state clear responsibilities. Every Effect must have a reason to synchronize with an external system.
+- Check that colors, fonts, sizes, and spacing use tokens, and that status colors are paired with text and icons.
+- Check loading/empty/error/forbidden/offline/stale displays and preservation of input after submission failure.
+- Test smartphones, keyboard use, English/Malay switching, missing data, long text, and voice alternatives. Clearly identify checks not yet run.
+- Do not show success before device confirmation, imply real transactions, confuse CO₂ units, or suggest that marking an item read has resolved a fault.
 
-## UX-08. 参考デザインに準拠した画面パターンと検収
+## UX-08. Screen patterns based on the reference design and acceptance checks
 
-ワイヤフレームは作らず、繰り返し使える構成のルールを定義する。各役割の詳細設計には、使用するpattern(パターン)を明記する。
+Define reusable composition rules without creating wireframes. Each role's detailed design must name the pattern it uses.
 
-| Pattern ID | 構成・寸法のルール | 主な用途 |
+| Pattern ID | Layout/dimension rules | Main use |
 |---|---|---|
-| UI-OVERVIEW | タイトル24px→30px+説明文14px、必要に応じて濃い色のhero(目立つ領域)、KPI(重要指標)は2列→4列、下部にカードを配置。ページの余白はx16/y24→x32/y32(xl幅のとき) | 各役割のdashboard(ダッシュボード) |
-| UI-LIST | 同じ枠組みを使い、見出し+操作、検索・絞り込み、白いカードでの一覧、件数・ページング、詳細への導線を配置 | 設備・案件・請求・デバイスの一覧 |
-| UI-DETAIL | 主要な情報のカードと、関連する履歴を配置。lg以上の画面幅ではminmax(0,1fr)+320pxの構成で、間隔(gap)は20px。小さい画面では縦に並べる | 設備・案件・請求の詳細画面 |
-| UI-FORM | 白いカードの中に14pxのlabel(ラベル)/16pxのinput(入力欄)を配置し、意味のまとまりごとにsection(区画)を分ける。欄と欄の間は16px、主操作ボタンと取消ボタンを配置し、エラーの要約も表示する | 場所、報告、方針、契約の入力画面 |
-| UI-ANALYSIS | 共通のKPI、単位・期間の表示、グラフと数値の表、根拠・データ品質のカードを配置 | 電力、空気環境、MRVの分析画面 |
-| UI-TIMELINE | 白いカードの中に、1行あたりpy12pxで、左に出来事と時刻、右に結果を示すbadge(バッジ)を配置。長いIDは折り返す | 監査ログ・案件の履歴画面 |
+| UI-OVERVIEW | Title 24px→30px + description 14px; optional dark hero area; KPIs in 2→4 columns; cards below. Page padding x16/y24→x32/y32 at xl | Dashboards for each role |
+| UI-LIST | Shared shell with heading/actions, search/filters, list in a white card, count/pagination, and links to details | Unit, job, invoice, and device lists |
+| UI-DETAIL | Main information card and related history. At lg and above, use minmax(0,1fr)+320px with a 20px gap. Stack vertically on small screens | Unit, job, and invoice details |
+| UI-FORM | White card with 14px labels/16px inputs, grouped into meaningful sections. Use 16px field gaps, primary/cancel buttons, and an error summary | Location, report, policy, and contract forms |
+| UI-ANALYSIS | Shared KPIs, units/period, charts and numeric tables, evidence/data-quality cards | Power, air quality, and MRV analysis |
+| UI-TIMELINE | White card; each row has py12px, event/time on the left, result badge on the right. Wrap long IDs | Audit logs and job history |
 
-PC向けのnav(ナビゲーション)は、1280px以上の画面幅では左側に固定表示し、それ未満では上部のheader(ヘッダー)とSheet(引き出しメニュー)で表示する。drawer(引き出し)は、開いている間は背景のスクロールを止め、Escキーで閉じられるようにし、選択した後は閉じて遷移先の見出しにフォーカスを移す。役割が違っても、色やフォントの体系は変えず、メニューの内容と権限・主要な指標の違いで区別する。
+At widths of 1280px and above, fix desktop navigation to the left. Below that, use a top header and Sheet. While the drawer is open, stop background scrolling. Support Esc to close it; after selection, close it and focus the destination heading. Keep the same color and font systems across roles. Distinguish roles through menus, permissions, and key metrics.
 
-業務画面での読みやすさ・操作性のために採用したルールは、ADAPT(調整)として記録する。360px、768px、1024px、1279px、1280px、1440pxの画面幅で、レイアウトの幅・折り返し・ナビの切り替え境界を検証する。入力を伴う業務画面では、44pxの操作領域を優先し、参考にしたページにある28pxの操作領域をそのままコピーしない。
+Record readability and interaction adjustments for business screens as ADAPT. Test layout width, wrapping, and navigation switch boundaries at 360px, 768px, 1024px, 1279px, 1280px, and 1440px. On business screens with input, prioritize 44px touch areas instead of copying the reference page's 28px controls.
 
-検収では、tokenの値、フォントの適用状況、カードの角丸14px、サイドバーの幅240/56px、ブレークポイント、主要なコンポーネントを、DOM(画面の構造)やcomputed style(実際に適用されているスタイル)で確認し、実装したときのスクリーンショットを記録する。参照ページとのピクセル単位の比較は、参照ページ側の描画基準を別途取得できた場合にだけ行う。行っていない場合を、行ったこととして合格にしない。
+During acceptance, check token values, applied fonts, 14px card corners, 240/56px sidebar widths, breakpoints, and key components through the DOM and computed styles. Record implementation screenshots. Compare pixels against the reference page only if a separate rendering baseline for that page is available. Do not mark an unperformed comparison as passed.
 
-## UX-09 画面・Componentの実装契約（0.17.0）
+## UX-09. Screen and Component implementation contracts (0.17.0)
 
-[画面カタログ](screen-catalog.csv)で48 routeのScreen ID、対象role、FR/DD、入口/出口、URL選択、タブ、主要/補助Query、状態、入出力を定義する。[Component契約](component-contracts.csv)で表示責務・Props・State・Event・依存・Loading/Error/Emptyを定義する。単体ページに共通部品を合成し、データの変更はPageのRepository操作で行う。
+The [screen catalog](screen-catalog.csv) defines Screen IDs, roles, FR/DD links, entry/exit paths, URL selections, tabs, primary/secondary Queries, states, and inputs/outputs for 48 routes. The [Component contracts](component-contracts.csv) define display responsibilities, Props, State, Event, dependencies, and Loading/Error/Empty behavior. Compose pages from shared components; change data through each Page's Repository operations.
 
-ボタン押下は入力検証→確認（制御・削除・制限・支払・提出/受理）→write→版付き結果→Query無効化→再表示。確認取消でwrite0。読取・選択・previewには破壊的確認を挿入しない。送信中は同じ操作disabled、別経路からの重複はD04のキーで防ぐ。成功は受付と機器応答を区別し、失敗時は入力・相関ID・再試行導線を保つ。通信offlineとDevice offline、connecting、error、staleは別表示とする。
+Button flow: validate input → confirm (control/delete/restrict/pay/submit/accept) → write → versioned result → invalidate Query → redisplay. Cancelling confirmation causes zero writes. Do not add destructive-action confirmations to reads, selections, or previews. Disable the same action during submission; use D04 keys to prevent duplicates from other paths. Distinguish request acceptance from device acknowledgment. On failure, preserve input, correlation ID, and retry access. Show network offline, Device offline, connecting, error, and stale separately.
 
-共同routeのC04/C05はschedule/event、C11/C12はpayment/restriction/inquiryをURL tabで選択する。部分失敗は補助Queryのパネルだけ、制御の能力/制限取得失敗は操作disabled。未測定と空リストと404を同じ状態にしない。残りの遷移・入力制約は確定契約D01/D09/D10/D13を参照する。
+For shared routes, select schedule/event for C04/C05 and payment/restriction/inquiry for C11/C12 through the URL tab. Limit partial failures to the affected secondary Query panel. Disable controls if capability/restriction retrieval fails. Do not treat missing measurements, empty lists, and 404 as the same state. See deterministic contracts D01/D09/D10/D13 for the remaining navigation and input constraints.
 
-0.9.0修正契約: [厳格レビュー修正契約](../02-design/strict-review-contracts.md)と[操作別版契約](../02-design/write-version-catalog.csv)を併読する。
+0.9.0 correction contracts: Read the [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 
-2026-09-16承認反映: 期間プリセットはSR17を適用。offset再試行ボタンはfailedだけに表示し、購入/償却の失敗段階をラベルへ出す（SR18）。契約編集拒否理由と制限取消/解除への導線はSR19に従う。
+Approvals applied on 2026-09-16: Use SR17 for period presets. Show the offset retry button only for failed, and label the failed purchase/retirement stage (SR18). Follow SR19 for contract edit denial reasons and links to restriction cancellation/release.
 
-現行0.21.0の追加契約: [再レビュー修正契約](../02-design/review-resolution-contracts.md) IR01〜106を併読する。同じ論点の旧記述より優先し、衝突時の順位はIR72に従う。
+Additional contracts for current version 0.21.0: Read IR01–106 in the [review resolution contracts](../02-design/review-resolution-contracts.md). They take priority over older text on the same issue; follow IR72 when rules conflict.
 
-0.14.0: IR25に従い、受諾前住所は設備の設置物件から取得し、期限後の報告表示は報告有無・受理状態だけを凍結する。
+0.14.0: Under IR25, get the address before acceptance from the unit's installation property. After expiry, freeze only whether a report exists and its acceptance status.
 
-P01/T01の一覧・集計条件はIR26で共通化する。C04/C05/A04の停止理由はIR27のdisabledReasonを表示する。機種フォームの理由の必須性はIR28の新規/更新分岐に従う。
+IR26 provides common list/summary conditions for P01/T01. Show IR27 disabledReason for stopped items on C04/C05/A04. Follow IR28's create/update branches for required reasons in the model form.
 
-0.15.0: P01/T01の重大度はIR30の未解消アラート分類。normalを設備全体の健康保証と表示しない。自己承認拒否はIR31のFORBIDDENとして表示する。
+0.15.0: P01/T01 severity follows IR30's unresolved alert categories. Do not present normal as a guarantee that the whole unit is healthy. Display self-approval denial as IR31 FORBIDDEN.
 
-P05/A06の受理・差戻しボタンはWorkReport.reviewAvailabilityに従って無効化し、理由を表示する。直接呼出しはIR31でも拒否する。
+Disable P05/A06 accept/return buttons according to WorkReport.reviewAvailability and show the reason. IR31 also rejects direct calls.
 
-0.16.0: A16の必須監査Query・機器候補選択・URL復元・権限付き関連リンクはIR33。P01/T01の一覧・集計のunitIdsはIR32。
+0.16.0: IR33 covers A16's required audit Query, device candidate selection, URL restoration, and permission-aware related links. IR32 covers unitIds for P01/T01 lists and summaries.
 
-0.18.0: KPIからの一覧遷移とURL許可キーはIR50、FORBIDDEN/NOT_FOUNDの表示はIR57、制限中の操作候補はIR46、機器の接続表示はIR47、セッション延長ダイアログはIR55、負の削減量の表示はIR68。機器状態（connecting/device-*）は設備・機器・測定・制御・制限・集計を読むScreenだけに適用する(IR74)。
+0.18.0: IR50 covers KPI-to-list navigation and allowed URL keys; IR57 FORBIDDEN/NOT_FOUND displays; IR46 operation choices under restrictions; IR47 device connection displays; IR55 the session extension dialog; IR68 negative reductions. Device states (connecting/device-*) apply only to Screens that read units, devices, measurements, controls, restrictions, or summaries (IR74).
 
-0.19.0: 作業窓開始前の技術者画面はwork-not-started（IR76）、成功済みデータの再取得中はデータを保持してaria-busyの「更新中」（IR83）、件数KPIはKpiCard、音声の取得・送信はVoiceContainer、公開画面の状態集合と通知一覧の空表示はIR90、管理ダッシュボードの省エネ予想の表示はIR78、作業窓終了の予告と「作業窓終了・再割当が必要」の表示はIR89。
+0.19.0: Use work-not-started for technician screens before the work window (IR76). Keep successfully loaded data during refetch and show aria-busy with "Updating" (IR83). Use KpiCard for count KPIs and VoiceContainer for voice fetching/submission. IR90 covers public screen state sets and empty notification lists; IR78 covers admin dashboard energy-saving forecasts; IR89 covers work-window end notices and the "Work window ended — reassignment required" display.
 
-案件一覧のソートはIR34。状態（業務順）・重大度・期限の項目と昇順/降順を選択でき、初期値は状態の業務順（昇順）。URL復元・cursor初期化・loading/error・キーボード操作・aria-sortを共通DataTableへ適用する。制限操作の表示はrestriction.manage/overrideの2権限で分ける。
+Job list sorting follows IR34. Allow selection of status (business order), severity, or deadline, and ascending/descending order. Default to status in ascending business order. Apply URL restoration, cursor reset, loading/error states, keyboard use, and aria-sort through the shared DataTable. Separate restriction-operation displays by the two permissions restriction.manage/override.

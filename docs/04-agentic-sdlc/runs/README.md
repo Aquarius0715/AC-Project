@@ -1,3 +1,3 @@
-# 実行記録
+# Run Records
 
-`<task-id>/`というフォルダごとに、ゲート(品質チェックの節目)の記録と仕様manifest(どの仕様ファイルを使ったかの一覧)を置く。文書だけを作る工程もこの対象に含める。実装タスクの記録は、実際に作業が行われたときだけ作成する。
+Each `<task-id>/` folder stores gate records (quality checkpoints) and a specification manifest (a list of the specification files used). This also applies to document-only phases. Create implementation task records only when the work actually takes place.

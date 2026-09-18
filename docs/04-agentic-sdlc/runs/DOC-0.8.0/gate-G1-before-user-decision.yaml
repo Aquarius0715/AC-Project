@@ -1,4 +1,4 @@
-# 0.8.0文書修正と自己再レビュー。独立承認・アプリ試験ではない。
+# 0.8.0 document corrections and self-review. This is not independent approval or application testing.
 gate_id: G1
 task_id: DOC-0.8.0
 gate_result: pending
@@ -13,8 +13,8 @@ evidence_paths:
   - static-check.json
   - validator-negative-checks.json
 notes:
-  - 前回36件へ文書修正・範囲決定・追加受入条件を対応付けた
-  - 1A自己再レビューで未解決BLOCKER/CRITICALは検出していない
-  - 別主体のG1承認を自己レビューで置換しない
-  - 本番APIと実機終了責任はNOT DEFINED、企業判断はOPENとして継続
-  - 詳細レビュー記録は05-document-reviewに保存（既存方針によりコミット対象外）
+  - Mapped document corrections, scope decisions, and additional acceptance criteria to the previous 36 findings
+  - The 1A self-review found no unresolved BLOCKER/CRITICAL findings
+  - Self-review does not replace G1 approval by another reviewer
+  - Production APIs and responsibility for terminating operations on real devices remain NOT DEFINED; company decisions remain OPEN
+  - Detailed review records are stored in 05-document-review (excluded from commits under the existing policy)
