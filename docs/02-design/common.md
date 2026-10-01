@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.21.0
+version: 0.22.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -15,7 +15,7 @@ The business goals in this document come from the BIZ items drawn from the [Orig
 
 The features, screen fields, states, and exceptions in this design follow the original company requirements and their linked requirements. This document defines the processing and acceptance criteria for each FR (functional requirement). Reference mock screens are used only to guide the appearance of the shared UI.
 
-**Implementation baseline for 0.21.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
+**Implementation baseline for 0.22.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
 
 ## 1. Structure and Responsibilities
 
@@ -49,11 +49,11 @@ The proposed stack (PROPOSED) is TypeScript (strict mode), React, Vite, and Reac
 |---|---|
 | /login | Select a fictional account and one of four roles. Show that this is not real authentication |
 | /forgot-password | Check the email format, then show a message that does not reveal whether the email exists. Sending is a preview only |
-| /settings/preferences | Language, display timezone, read-only demo currency MYR, and consent settings |
+| /settings/preferences | Language, display timezone, read-only demo currency MYR, consent settings (client only), monthly report email (client), and Security › two-step verification (demo, FR-X08, IR112) |
 | /notifications | List notifications within the user's scope and manage read status. Keep this separate from business state |
 | /demo | Switch scenarios, trigger failures, control the demo clock, and reset. Demo-only screen |
-| /forbidden | Show access denial. Do not redirect automatically; show a link to the role home (IR57) |
-| `*` (undefined routes) | Show page not found (SCR-X-not-found), using the D01 not-found text. Do not redirect automatically; show a link to the role home (IR57) |
+| /forbidden | Show the shared “Page unavailable” view (same component as `*`). Do not redirect automatically; show a link to the role home (IR57, IR112) |
+| `*` (undefined routes) | Show the shared “Page unavailable” view (SCR-X-not-found), using the D01 not-found text. Do not redirect automatically; show a link to the role home (IR57) |
 
 The shared header contains language selection, notifications, voice/text switching, and sign-out. Demo role switching has its own menu, separate from changing users in normal business use.
 
@@ -122,7 +122,7 @@ interface CommandRepository {
 
 `DemoViewContext` describes the selected fictional user, role, and visible scope. `DemoWriteOptions` carries a key to prevent duplicate demo actions and the version before the change. These do not define production authentication or server permissions. See the [Frontend Input and Output Contract](implementation-contracts.md) for the fields.
 
-The [Operation Catalog](operation-catalog.csv) lists the 137 local service operations needed by the screens, with their inputs, return values, and screens that use them. It does not define URLs, HTTP methods, database tables, or server transactions.
+The [Operation Catalog](operation-catalog.csv) lists the 189 local service operations needed by the screens, with their inputs, return values, and screens that use them. It does not define URLs, HTTP methods, database tables, or server transactions.
 
 Successful mock operations return ServiceResult<T>; failures reject with DomainError. Pending processing is shown through Command.status or similar fields in the success DTO. Do not create a custom pending Promise response type.
 
@@ -234,4 +234,4 @@ API paths, HTTP methods, databases, server authentication and authorization, rea
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.21.0: Read IR01–106 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.22.0: Read IR01–112 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

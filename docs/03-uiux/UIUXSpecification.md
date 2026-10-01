@@ -1,6 +1,6 @@
 ---
 document_id: UX-COMMON
-version: 0.21.0
+version: 0.22.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 This document defines shared implementation, interaction, and display rules for all four roles. Wireframes (rough screen sketches) and screen layout diagrams are outside its scope. See the [detailed design](../02-design/common.md) for each screen's business logic. Libraries follow the proposed standards in DEC-02/03. Colors, fonts, and shapes follow the HTML/CSS obtained from the Loyalty page specified by the user. See the [reference design analysis](../00-prepare/reference-design-analysis.md) for evidence and adjusted values.
 
-**Implementation basis for 0.21.0**: Read all chapters of the [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the operation catalog's authorization column, and the screen catalog together. Do not guess numeric rules, permissions, asynchronous behavior, or recovery behavior during implementation. These are demo design proposals, not production business approvals.
+**Implementation basis for 0.22.0**: Read all chapters of the [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the operation catalog's authorization column, and the screen catalog together. Do not guess numeric rules, permissions, asynchronous behavior, or recovery behavior during implementation. These are demo design proposals, not production business approvals.
 
 ## Company requests and shared UIUX rules
 
@@ -188,9 +188,20 @@ Record readability and interaction adjustments for business screens as ADAPT. Te
 
 During acceptance, check token values, applied fonts, 14px card corners, 240/56px sidebar widths, breakpoints, and key components through the DOM and computed styles. Record implementation screenshots. Compare pixels against the reference page only if a separate rendering baseline for that page is available. Do not mark an unperformed comparison as passed.
 
+## UX-08a. Figma-confirmed layout and component conventions (0.22.0, IR112)
+
+The Figma wireframes (file VOeKPrid46kOf24ktEfe8r; pages Client, Admin, Contractor, Technician, and UI Guideline) confirmed by the user on 2026-10-01 are the visual and behavioral reference for every role screen. Each sidebar item is one row of screens in Figma; each screen has an ID tag (for example 02-4) and a click map naming its destinations.
+
+- **Desktop frame**: design at 1920×1080 with a fixed sidebar and a main area (header + content). Content fills the width; when it does not fit 1080 px, rearrange into columns before allowing vertical scrolling; only long editors may scroll inside the content area while their footer actions stay visible. Mobile references stay at 360×800 (Client unit control and new request).
+- **Overlays**: modals and dialogs are centered on the whole viewport (not the content area) over a scrim; drawers and assistant panels attach to the right edge.
+- **Search-select filters**: Customer, Property, Unit, and Device filters use one SearchSelect component (states closed, open, typing, no match): the first 20 options are shown and typing searches the rest on the server; the label reads “Name: Value”. Form-field selects inside forms stay ordinary selects.
+- **Status badges**: use the shared StatusBadge sets (Severity Critical/Warning/Info/Normal; Maintenance Requested…Cancelled; Payment Unpaid/Overdue/Processing/Paid; Restriction Applied/Release requested/Released; Power Running/Stopped/Unknown; Unit Online/Offline) and the generic tone set (Neutral, Info, Success, Warning, Danger, Accent) for other labels; job steps use the Job/Progress component (internal and outsourced delivery). Never hand-draw chips.
+- **Buttons**: Primary, Secondary, Soft, Danger, Danger outline, Link in sizes 40/36/30 px with Default/Disabled states.
+- **Shell**: role sidebars (Client, Admin, Contractor, Technician) and a header RoleChip as the right-most header item. Admin sidebar: Overview, Customers & units, Access & roles, Devices & models, Alert policies, Maintenance jobs, Contracts, Billing, Restrictions, Automation policies, Energy analysis, MRV, Offsets, Audit, Notifications (no Air quality page). Contractor sidebar adds Payouts. Shared screens per role: Login, Forgot password, Notifications, Preferences (with Security / two-step verification), Demo controls, and one “Page unavailable (403/404)” screen.
+
 ## UX-09. Screen and Component implementation contracts (0.17.0)
 
-The [screen catalog](screen-catalog.csv) defines Screen IDs, roles, FR/DD links, entry/exit paths, URL selections, tabs, primary/secondary Queries, states, and inputs/outputs for 48 routes. The [Component contracts](component-contracts.csv) define display responsibilities, Props, State, Event, dependencies, and Loading/Error/Empty behavior. Compose pages from shared components; change data through each Page's Repository operations.
+The [screen catalog](screen-catalog.csv) defines Screen IDs, roles, FR/DD links, entry/exit paths, URL selections, tabs, primary/secondary Queries, states, and inputs/outputs for 49 routes. The [Component contracts](component-contracts.csv) define display responsibilities, Props, State, Event, dependencies, and Loading/Error/Empty behavior. Compose pages from shared components; change data through each Page's Repository operations.
 
 Button flow: validate input → confirm (control/delete/restrict/pay/submit/accept) → write → versioned result → invalidate Query → redisplay. Cancelling confirmation causes zero writes. Do not add destructive-action confirmations to reads, selections, or previews. Disable the same action during submission; use D04 keys to prevent duplicates from other paths. Distinguish request acceptance from device acknowledgment. On failure, preserve input, correlation ID, and retry access. Show network offline, Device offline, connecting, error, and stale separately.
 
@@ -200,7 +211,7 @@ For shared routes, select schedule/event for C04/C05 and payment/restriction/inq
 
 Approvals applied on 2026-09-16: Use SR17 for period presets. Show the offset retry button only for failed, and label the failed purchase/retirement stage (SR18). Follow SR19 for contract edit denial reasons and links to restriction cancellation/release.
 
-Additional contracts for current version 0.21.0: Read IR01–106 in the [review resolution contracts](../02-design/review-resolution-contracts.md). They take priority over older text on the same issue; follow IR72 when rules conflict.
+Additional contracts for current version 0.22.0: Read IR01–112 in the [review resolution contracts](../02-design/review-resolution-contracts.md). They take priority over older text on the same issue; follow IR72 when rules conflict.
 
 0.14.0: Under IR25, get the address before acceptance from the unit's installation property. After expiry, freeze only whether a report exists and its acceptance status.
 
@@ -216,4 +227,4 @@ Disable P05/A06 accept/return buttons according to WorkReport.reviewAvailability
 
 0.19.0: Use work-not-started for technician screens before the work window (IR76). Keep successfully loaded data during refetch and show aria-busy with "Updating" (IR83). Use KpiCard for count KPIs and VoiceContainer for voice fetching/submission. IR90 covers public screen state sets and empty notification lists; IR78 covers admin dashboard energy-saving forecasts; IR89 covers work-window end notices and the "Work window ended — reassignment required" display.
 
-Job list sorting follows IR34. Allow selection of status (business order), severity, or deadline, and ascending/descending order. Default to status in ascending business order. Apply URL restoration, cursor reset, loading/error states, keyboard use, and aria-sort through the shared DataTable. Separate restriction-operation displays by the two permissions restriction.manage/override.
+Job list sorting follows IR34. Allow selection of status (business order), severity, or deadline, and ascending/descending order. Default to status in ascending business order. Apply URL restoration, cursor reset, loading/error states, keyboard use, and aria-sort through the shared DataTable. Separate restriction-operation displays by the two permissions restriction.write/override.

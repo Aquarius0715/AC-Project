@@ -1,6 +1,6 @@
 ---
 document_id: DD-C
-version: 0.21.0
+version: 0.22.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 This document defines client (customer) screen features, fields, states, and errors (exceptions). It follows the original company requirements and their linked requirements. It defines the processing and acceptance criteria (what tests check) needed for each FR (functional requirement). Reference mock screens are used only to guide the shared UI appearance.
 
-**Implementation baseline for 0.21.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
+**Implementation baseline for 0.22.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
 
 ## Inputs and Responsibilities
 
@@ -26,18 +26,23 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | Design ID / requirement | Route / main component | Read and action contracts | Input, processing, validation | Errors and prohibited actions |
 |---|---|---|---|---|
 | DD-C01 / FR-C01 | `/customer` / `Overview` | `units.list`, `telemetry.summary`, `alerts.list`, `summaries.get` | Filter by property and period. Store filters in the URL and summarize only permitted units | Distinguish missing data from 0. Show update time for old values |
-| DD-C02 / FR-C02 | `/customer/properties` / `PropertyExplorer` | `properties.list`, `properties.save`, `properties.archive`, `spaces.list`, `spaces.save`, `spaces.archive`, `units.list` | Create and edit property types, names, and hierarchies in the user's organization. Reject cyclic parent space IDs and parents from other properties. Only HQ edits unit capabilities and manufacturer register data | Do not delete spaces containing units. Deleted URLs show not-found. Breadcrumbs return to parent levels |
-| DD-C03 / FR-C03 | `/customer/units/:id` / `UnitControl` | `units.get`, `commands.create`, `commands.get` | Build temperature min/max/step, mode, and fan options from capabilities. Mutate after confirmation. Show room temperature separately from settings | Show rejection, expiry, and failure reasons. Recheck state before manual retry |
+| DD-C02 / FR-C02 | `/customer/properties` / `PropertyExplorer` | `properties.list`, `spaces.list`, `units.list`, `locations.rename` | Read-only tree property→floor/area→room→units; rename a location only (1–120 characters, unique among siblings). HQ creates, moves, and deletes the structure | No add/move/delete controls. Deleted URLs show not-found. Breadcrumbs return to parent levels |
+| DD-C03 / FR-C03 | `/customer/units/:id` / `UnitControl` | `units.get`, `commands.create`, `commands.get`, `locations.rename`, `units.setAlertPolicies`, `policies.list` | Build temperature min/max/step, mode, and fan options from capabilities. Mutate after confirmation. Show room temperature separately from settings | Show rejection, expiry, and failure reasons. Recheck state before manual retry |
 | DD-C04 / FR-C04 | `/customer/automations` / `AutomationEditor` | `automations.list`, `automations.save`, `automations.simulate`, `automations.fire`, `automations.nextRuns`, `units.list`, `units.get` | Require at least one weekday, start/end times, timezone, target units, and actions. Explicitly confirm overnight settings | Warn on overlapping conditions and show priorities. Reject triggered automation under restrictions and show the reason |
 | DD-C05 / FR-C05 | `/customer/automations` / `AutomationEditor` | `automations.save`, `automations.simulate`, `automations.fire`, `consents.get`, `consents.update`, `units.list`, `units.get` | Change fields by condition type (discriminated union). Explain the purpose of location consent. The demo does not collect real location; users enter arrival/departure events | If consent is denied or location unavailable, use manual or scheduled control. Clearly label lifestyle-pattern inference as a demo |
 | DD-C06 / FR-C06 | `/customer/energy` / `EnergyExplorer` | `energy.summary`, `baselines.list`, `units.list` | Require start<end and at most 366 days (provisional). Show currency, tariff version, comparison period, and data reliability | Show usable data coverage when data is missing. Do not treat estimated replacements as measurements |
-| DD-C07 / FR-C07 | `/customer/air-quality` / `AirQuality` | `telemetry.series`, `units.get`, `commands.create`, `commands.get`, `units.list` | Select metric and period. Separately check ventilation capability before requesting ventilation | Show “Unsupported” when no sensor exists. Fan circulation is not outdoor-air ventilation |
+| DD-C07 / FR-C07 | `/customer/air-quality` / `AirQuality` | `telemetry.series`, `units.get`, `units.list`, `ventilation.log`, `ventilation.list` | Select metric and period. Log a manual ventilation (method, 1–240 minutes); no device command | Show “Unsupported” when no sensor exists. A log does not imply CO₂ fell |
 | DD-C08 / FR-C08 | `/customer/alerts` / `AlertInbox` | `alerts.list`, `notifications.markRead`, `notifications.list`, `summaries.get` | Filter by severity or unread status. Keep notificationId separate from alertId | Do not show a healthy “No alerts” summary when fetching fails |
 | DD-C09 / FR-C09 | `/customer/maintenance` / `MaintenanceRequest` | `jobs.list`, `jobs.create`, `jobs.get`, `jobs.cancel`, `jobs.addNote`, `reports.get`, `attachments.getContent`, `units.list` | Require unitId, type, symptom description (10–2000 characters), and future requested times (provisional). Requested times are not confirmed bookings | Prevent duplicate requests. Ask users to reselect unavailable times. Customers may cancel only requests with no assignee yet |
 | DD-C10 / FR-C10 | `/customer/payments` / `BillingOverview` | `contracts.list`, `invoices.list` | Filter by contract ID and invoice state. Store amounts in minor currency units (such as yen or cents) | Deny data outside permitted scope. Do not present “No invoices yet” as overdue payment |
 | DD-C11 / FR-C11 | `/customer/payments/:id` / `PaymentDemo` | `invoices.get`, `payments.simulate`, `notifications.preview`, `notifications.recipients` | Enter invoice ID, demo payment method, and confirmation. Provide no real card-number fields | Do not transfer real money. Do not show completion before processing ends. Reuse the same idempotency key on retry |
 | DD-C12 / FR-C12 | `/customer/payments/:id` / `RestrictionNotice` | `restrictions.forInvoice`, `commands.get`, `inquiries.create`, `inquiries.list` | Restrictions are read-only. Provide inquiry and payment paths. Show target units and applied rule version | Hold processing when offline. Provide no customer forced-release feature |
 | DD-C13 / FR-C13 | `/customer/energy/offsets` / `OffsetPreview` | `energy.summary`, `offsets.preview`, `offsets.simulate`, `offsets.list`, `units.list` | Enter requested quantity (>0), period, and demo confirmation. Issue no proof numbers for real trades or certification | Show actual CO2 reductions separately from retired credits. Prevent duplicate requests after failure |
+| DD-C14 / FR-C14 | `/customer/properties?mode=group` / `GroupControl` | `units.list`, `units.get`, `commands.create`, `commands.get` | Owner only; one room/area; review per-unit change and skips; one Command per AC | Offline/restricted ACs skipped or clamped before sending; retry failed ACs one by one |
+| DD-C15 / FR-C15 | `/customer/alerts?tab=policies` / `AlertPolicyList` | `policies.list`, `policies.get`, `policies.save`, `policies.delete`, `policies.setDefaultRule`, `units.setAlertPolicies`, `units.list` | Default policy rules on/off per customer; own policies with one condition; recovery direction and fixed units | Default policy cannot be edited or deleted; delete detaches first |
+| DD-C16 / FR-C16 | `/customer/energy` / `EnergyReportExport` | `energy.exportReport` | Completed month, at least one section, PDF/CSV | Same tariff and estimation labels as the screen |
+| DD-C17 / FR-C17 | `/customer/maintenance?jobId=` / `JobCompletionFeedback` | `jobs.get`, `jobs.rate`, `jobs.reportProblem` | 1–5 ★ required; editable 7 days; problem details 10–2000, up to 5 photos | Not completed → CONFLICT; ratings never shown to other customers |
+| DD-C18 / FR-C18 | `/customer/maintenance?tab=filter-care` / `FilterCare` | `filterCare.list`, `filterCare.markCleaned`, `filterCare.saveSettings` | Run time since cleaning per AC; threshold 50–2000 h or model default; fallback days 7–180 | Offline → unknown, never 0 |
 
 ## Shared Implementation Steps
 
@@ -87,40 +92,35 @@ Scope: FR-C01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `units.
 
 ### DD-C02 Details
 
-**Source mapping**: SRC-06 BIZ-07 → FR-C02 → DD-C02. Source category: original company requirements SRC-06 + design additions. Design additions: hierarchy editing and deletion rules. Field types, required status, defaults, and action order are implementation proposals.
+**Source mapping**: SRC-06 BIZ-07 → FR-C02 → DD-C02. Source category: original company requirements SRC-06 + Figma-confirmed screen specification (Client 02a–02d, 2026-10-01). Design additions: read-only structure with rename.
 
-Scope: FR-C02 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `properties.list, properties.save, properties.archive, spaces.list, spaces.save, spaces.archive, units.list`.
+Scope: FR-C02 / Main display pattern: **UI-LIST**. Service boundary: `properties.list, spaces.list, units.list, locations.rename`.
 
-**Initial view and prerequisites**: The user may edit properties owned by their organization. Only HQ may edit capabilities in the unit register. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
+**Initial view and prerequisites**: Client Membership with access to the customer's properties. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| property.name | string/required | 1–120 characters after trim | Property name |
-| property.kind | enum/required | home/office; initially unselected | Type |
-| space.name | string/required | 1–120 characters | Floor/room name |
-| space.kind | enum/required | area/floor/room/space | Hierarchy type |
-| parentSpaceId | ID/null | null for root; same property; no cycles | Parent |
-| expectedVersion | integer/required on update | Fetched version | Conflict detection |
+| propertyId / spaceId | ID/optional URL keys | Selected tree node | Selection |
+| target | LocationTarget/required on rename | property, space, or unit of the customer | Rename target |
+| name | string/required on rename | 1–120 characters after trim, unique among siblings | New name |
+| expectedVersion | integer/required on rename | Fetched version | Conflict detection |
 
 **Steps**
 
-1. Create a home or office property. Add needed areas, floors, and rooms. Select a space to view its units, then edit names or types.
-2. Apply the following business rules to both reads and actions.
-   - Each space belongs to only one parent.
-   - Select a parent in the same property. A space cannot be its own parent or have a descendant as parent.
-   - Do not archive or delete a space that still contains units or child spaces. First guide the user to move them.
-3. Receive the created ID and version, then update the tree and breadcrumbs. Directly under a property, show units with no assigned space (IR62). For navigation from KPIs, show the unit-list section filtered by powerState/connections (IR50). Direct unit reassignment to the HQ register. Renaming does not change unit IDs.
-4. Queries to update: `properties / spaces / units / customer summary`。
+1. Show the property list (with type and unit counts) and the selected property's floors/areas and rooms. Selecting a room lists every AC in it with power/connection badges; opening one goes to Unit Control. Unassigned units appear under the property with the note “placed by HQ” (IR62).
+2. The structure is read-only (IR109): no add, move, archive, or delete controls. ✎ / Rename opens a centered modal showing the location, its type, and the new name; saving calls `locations.rename`.
+3. After a rename, update tree and breadcrumbs; IDs and parents never change. For navigation from KPIs, show the unit list filtered by powerState/connections (IR50).
+4. Queries to update: `properties / spaces / units / customer summary`.
 
-**Boundary cases and failures**: Reject empty or 121-character names, parent cycles, and parent IDs from other organizations. On CONFLICT, show the current version and keep inputs. Do not overwrite automatically.
+**Boundary cases and failures**: Empty, 121-character, or duplicate sibling names return VALIDATION with the input kept. CONFLICT shows the current name and keeps the input. Direct structural writes from a client session return FORBIDDEN.
 
-**Verification**: Check the traceability entries under AT-C02 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
+**Verification**: Check the traceability entries under AT-C02 (N/E/B) and the relevant S scenarios.
 
 ### DD-C03 Details
 
 **Source mapping**: SRC-06 BIZ-13 → FR-C03 → DD-C03. Source category: original company requirements SRC-06 + design additions. Design additions: modes, fan levels, and acknowledgement states. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-C03 / Main display pattern: **UI-DETAIL**. Service boundary: `units.get, commands.create, commands.get`.
+Scope: FR-C03 / Main display pattern: **UI-DETAIL**. Service boundary: `units.get, commands.create, commands.get, locations.rename, units.setAlertPolicies, policies.list`.
 
 **Initial view and prerequisites**: Active Membership, permission to control the unit (control capability), online unit, and compliance with contract restrictions. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -144,6 +144,8 @@ Scope: FR-C03 / Main display pattern: **UI-DETAIL**. Service boundary: `units.ge
 4. Queries to update: `commands / unit detail / telemetry summary / audit`。
 
 **Boundary cases and failures**: For demo capability 16–30 degrees in 1-degree steps, reject 15, 31, and 24.5 degrees. Offline units, other customers' units, restriction violations, and late acknowledgements are not successes. Follow IR46 for actions under restrictions and IR47 for connection/power-signal rejection.
+
+**Alert policies on this AC (IR108)**: A card lists the default policy (always attached, “n of 6 rules on”, View) and the customer policies attached to the AC (`ACUnit.alertPolicyIds`, details from `policies.list` with `unitId`) with Detach. “+ Attach policy” opens a centered modal listing the customer’s other policies with checkboxes (“Already attached” disabled) and a link to create a new policy in Alerts › Alert policies; saving calls `units.setAlertPolicies` with the full list. ✎ Rename renames the AC (`locations.rename`, kind=unit).
 
 **Verification**: Check the traceability entries under AT-C03 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -249,13 +251,13 @@ Scope: FR-C06 / Main display pattern: **UI-ANALYSIS**. Service boundary: `energy
 
 **Air Quality Display and Processing, Including Allergens (BIZ-18)**
 
-Add allergenObservation to telemetry.series air-quality display data. availability is available/not_measured/unsupported. Show substance, value, unit, observedAt, and sourceLabel only when data is available. For available, always show evidence and time; a number also requires a unit. Treat incomplete information as unknown. Do not derive allergen quantity from PM2.5. Show CO2 in ppm; show electricity-related emissions separately in kgCO2e. For units without ventilation capability, show guidance only.
+Add allergenObservation to telemetry.series air-quality display data. availability is available/not_measured/unsupported. Show substance, value, unit, observedAt, and sourceLabel only when data is available. For available, always show evidence and time; a number also requires a unit. Treat incomplete information as unknown. Do not derive allergen quantity from PM2.5. Show CO2 in ppm; show electricity-related emissions separately in kgCO2e. Ventilation is a manual action recorded with Log ventilation (IR110).
 
 Verification: AT-C07-SRC. Check display switching with not-measured, unsupported, and synthetic-observation fixtures. Do not show “0” or “Safe” for unmeasured data. A number without a unit is unknown.
 
-**Source mapping**: SRC-06 BIZ-18, BIZ-19 → FR-C07 → DD-C07. Source category: original company requirements SRC-06 + design additions. Design additions: checking ventilation capability and displaying missing data. Field types, required status, defaults, and action order are implementation proposals.
+**Source mapping**: SRC-06 BIZ-18, BIZ-19 → FR-C07 → DD-C07. Source category: original company requirements SRC-06 + design additions. Design additions: displaying missing data and the manual ventilation log (Figma 05a–05c, 2026-10-01). Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-C07 / Main display pattern: **UI-ANALYSIS**. Service boundary: `telemetry.series, units.get, commands.create, commands.get, units.list`.
+Scope: FR-C07 / Main display pattern: **UI-ANALYSIS**. Service boundary: `telemetry.series, units.get, units.list, ventilation.log, ventilation.list`.
 
 **Initial view and prerequisites**: Air-quality sensor availability and ventilation capability can be fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -265,20 +267,20 @@ Scope: FR-C07 / Main display pattern: **UI-ANALYSIS**. Service boundary: `teleme
 | metric | enum/required | co2/pm25/temperature/humidity | Display metric |
 | period | enum/required | 1h/24h/7d/custom; default: 24h. 1h/24h use rolling [to-60 minutes,to)/[to-1440 minutes,to) windows; 7d uses SR17 calendar days; to is a UTC minute boundary (IR41) | Time series |
 | value / quality / observedAt | Read-only | Distinguish null from 0 | Measurement evidence |
-| ventilationAction | UnitAction/optional | Only with ventilation capability | Ventilation request |
+| method / durationMinutes | enum/required, integer/required | window_opened/door_opened/ventilation_fan/other; 1–240 minutes | Ventilation log |
 
 **Steps**
 
-1. Select a room or unit. Check CO2, PM2.5, temperature, humidity, and their observation times. Read ventilation/cleaning guidance; only when ventilation capability exists, request it through confirmation.
+1. Select a room or unit. Check CO2, PM2.5, temperature, humidity, and their observation times. Read ventilation/cleaning guidance; after ventilating, open “Log ventilation” (centered modal: room, method, duration, current CO2) and save.
 2. Apply the following business rules to both reads and actions.
    - Show CO2 in ppm, PM2.5 in µg/m³, temperature in degrees, and humidity in %, as separate series.
    - Humidity 0 is a measured zero, not missing data. null means missing.
    - Follow the IR99 table for ventilation/cleaning guidance (co2≥1000ppm, pm25≥35µg/m³, insufficient data). IR98 defines the allergen observation source.
-   - Without ventilation capability, show only manual guidance.
-3. Viewing does not change business state. Ventilation requests create normal Command history, but acknowledgement alone does not imply reduced indoor CO2.
-4. Queries to update: `telemetry / commands (only on ventilation requests) / audit`.
+   - Log ventilation never creates a Command and is not sent to HQ; the room’s ventilation history lists the logs (`ventilation.list`).
+3. Viewing does not change business state. Saving a log creates one VentilationLog with co2AtLog; it does not imply reduced indoor CO2.
+4. Queries to update: `telemetry / ventilation logs`.
 
-**Boundary cases and failures**: PM2.5 values remain displayable when CO2 data is missing. Do not create ventilation Commands for units with only fan capability.
+**Boundary cases and failures**: PM2.5 values remain displayable when CO2 data is missing. Duration outside 1–240 minutes is VALIDATION with input kept.
 
 **Verification**: Check the traceability entries under AT-C07 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -315,6 +317,8 @@ Scope: FR-C08 / Main display pattern: **UI-LIST**. Service boundary: `alerts.lis
 4. Queries to update: `notifications / unread count`。
 
 **Boundary cases and failures**: Do not show zero alerts after a fetch failure. If the referenced unit is unavailable, show only “Unavailable” without details.
+
+**Tabs (Figma 06a–06g)**: Alerts (this design) and Alert policies (DD-C15). The Unit filter is a search-select (first 20 units, type to search the rest). Clients never resolve alerts.
 
 **Verification**: Check the traceability entries under AT-C08 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -479,12 +483,144 @@ Scope: FR-C13 / Main display pattern: **UI-ANALYSIS / UI-FORM**. Service boundar
 
 **Verification**: Check the traceability entries under AT-C13 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
+### DD-C14 Details
+
+**Source mapping**: SRC-06 BIZ-13 → FR-C14 → DD-C14. Source category: Figma-confirmed screen specification (Client 02m/02n, 2026-10-01).
+
+Scope: FR-C14 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `units.list, units.get, commands.create, commands.get`.
+
+**Initial view and prerequisites**: Client owner (`Membership.clientRole=owner`) with control.execute; a room or area is selected in Units & locations. Members see only Single AC.
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| spaceId | ID/required | One room or area | Selection scope |
+| unitIds | ID[]/required | 1..units in the space; URL key `unitIds` | Selected ACs |
+| power / celsius / mode / fanLevel | per FR-C03 | Capability ranges of each AC | Change |
+
+**Steps**
+
+1. Toggle Single AC / Group control. Cards show each AC with power/connection badges; “Select all online” and Clear.
+2. Choose the change; Review & send opens a centered modal listing each AC: change (before → after), Will send, Skipped (offline), or clamped value under a restriction (IR46).
+3. Send calls `commands.create` once per AC that will be sent, each with its own idempotency key and expectedUnitVersion (IR109). Each card follows its Command with `commands.get` (Sending → Confirmed / Failed); Retry resends one AC.
+4. Queries to update: `units / commands`.
+
+**Boundary cases and failures**: Mixed spaces → VALIDATION before sending. A failure of one AC never rolls back others.
+
+**Verification**: Check the traceability entries under AT-C14 (N/E/B).
+
+### DD-C15 Details
+
+**Source mapping**: SRC-06 BIZ-08, BIZ-17, BIZ-18 → FR-C15 → DD-C15. Source category: Figma-confirmed screen specification (Client 06e–06g, 02e, 02l, 2026-10-01).
+
+Scope: FR-C15 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `policies.list, policies.get, policies.save, policies.delete, policies.setDefaultRule, units.setAlertPolicies, units.list`.
+
+**Initial view and prerequisites**: Client of the customer. `policies.list` with kind alert returns the default policy (kind=default_alert) and the customer’s policies.
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| name | string/required | 1–120 characters | Policy name |
+| metric | enum/required | temperature/humidity/co2/pm25/power; unit fixed per metric | What to watch |
+| operator / threshold / durationSeconds | required | Compare; duration 1–86400 s | Condition |
+| recoveryThreshold | number/required | Below threshold for gt/gte, above for lt/lte | Recovery |
+| activeWindow | object/optional | weekdays + local start/end, policy timezone | Only if … |
+| severity | enum/required | normal (shown “Info”)/warning/critical | How loud |
+| channels | Channel[]/required | inApp always; email; whatsapp only if allowed in Preferences | Notify me by |
+| enabled | boolean | Default true | On/off |
+
+**Steps**
+
+1. Alert policies tab: the default policy card (“Limits set by HQ · on/off is yours”) lists six rules with condition, type, severity, and an On toggle; toggling calls `policies.setDefaultRule` for the customer (applies to all its ACs).
+2. “Your policies” lists each policy with its When/Then sentences, attached ACs, Edit and ⋯ (Delete). “+ Create policy” and Edit open the editor (centered panel) with a live summary sentence.
+3. Save calls `policies.save` (kind=alert, customerId=own customer). Attaching happens on each AC (DD-C03) via `units.setAlertPolicies`; the editor shows “Attached to” read-only.
+4. Delete confirms with the attached AC names; `policies.delete` detaches from every unit and deletes (IR108).
+5. Queries to update: `policies / units / alerts`.
+
+**Boundary cases and failures**: Wrong recovery direction, mixed units, or empty channels → VALIDATION with input kept. CONFLICT on an old version shows the current policy. The default policy has no Edit/Delete.
+
+**Verification**: Check the traceability entries under AT-C15 (N/E/B).
+
+### DD-C16 Details
+
+**Source mapping**: SRC-06 BIZ-16, BIZ-23 → FR-C16 → DD-C16. Source category: Figma-confirmed screen specification (Client 04g, 2026-10-01).
+
+Scope: FR-C16 / Main display pattern: **UI-FORM**. Service boundary: `energy.exportReport`.
+
+**Initial view and prerequisites**: “Export” in the Energy & cost header opens a centered modal.
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| month | YYYY-MM/required | Last completed month | Report month |
+| propertyIds | ID[]/required | All accessible properties | Locations |
+| sections | enum[]/required | energy_cost, month_comparison, co2_offsets, alerts_maintenance; at least one | Content |
+| format | enum/required | pdf (default) or csv | File type |
+| monthlyEmail | boolean | Current Preferences.monthlyReportEmail | Monthly copy |
+
+**Steps**
+
+1. Choose options and Download → `energy.exportReport`; show “Report ready” with the demo file. If monthlyEmail changed, call `preferences.update` with monthlyReportEmail.
+2. Figures use the screen’s tariff and estimation labels; amounts in MYR.
+
+**Boundary cases and failures**: VALIDATION for an unfinished month or no sections; nothing is downloaded.
+
+**Verification**: Check the traceability entries under AT-C16 (N/E/B).
+
+### DD-C17 Details
+
+**Source mapping**: SRC-06 BIZ-12 → FR-C17 → DD-C17. Source category: Figma-confirmed screen specification (Client 07g–07i, 2026-10-01).
+
+Scope: FR-C17 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, jobs.rate, jobs.reportProblem`.
+
+**Initial view and prerequisites**: Selected job (`jobId`) has status completed.
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| stars | 1–5/required | No default | Rating |
+| tags | string[]/optional | On time, Clean work, Explained clearly, Polite, Fixed the problem | What went well |
+| comment | string/optional | 0–1000 characters | Comment |
+| reasonCode / details | required (problem) | same_problem/new_damage/not_completed/other; 10–2000 characters | Problem |
+| photos / preferredSlot | optional | Up to 5 JPEG/PNG ≤ 5 MiB; future slot | Evidence and visit |
+
+**Steps**
+
+1. Completed jobs show a banner “Confirm & rate” (also on Overview for 7 days). The modal saves with `jobs.rate`; the job shows “Rated n★” and the rating stays editable until editableUntil (7 days).
+2. ≤ 2★ asks “What went wrong?” and offers Report a problem; `jobs.reportProblem` creates a requested follow-up job (followUpOfJobId) shown as “Under HQ review”. HQ classifies it (DD-A06, `jobs.classifyFollowUp`).
+3. Queries to update: `jobs / summaries`.
+
+**Boundary cases and failures**: Not completed or after the window → CONFLICT; invalid input → VALIDATION with input kept.
+
+**Verification**: Check the traceability entries under AT-C17 (N/E/B).
+
+### DD-C18 Details
+
+**Source mapping**: SRC-06 BIZ-18, BIZ-12 → FR-C18 → DD-C18. Source category: Figma-confirmed screen specification (Client 07j, 2026-10-01).
+
+Scope: FR-C18 / Main display pattern: **UI-LIST**. Service boundary: `filterCare.list, filterCare.markCleaned, filterCare.saveSettings`.
+
+**Initial view and prerequisites**: Maintenance › Filter care tab (`tab=filter-care`).
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| runHoursSinceCleaning | Read-only | null when unknown/offline | Progress |
+| thresholdHours | integer or null | null = model default (250 h); 50–2000 | Remind at |
+| fallbackDays | integer | 7–180, default 30 | When run time unknown |
+| recipients / channels | enum / Channel[] | owners (default) or all users; app + email | Who and how |
+
+**Steps**
+
+1. Table per AC: run time, progress bar (% of threshold), status OK/Due soon (≥ 80 %)/Overdue (≥ 100 %)/unknown, last cleaned (by whom, job link). Areas with many ACs show a summary row with “View n”.
+2. Request cleaning opens the New request modal prefilled with the unit and type=preventive. Mark cleaned calls `filterCare.markCleaned`. Owners edit reminders (`filterCare.saveSettings`).
+3. Crossing the threshold raises an Alert of type maintenance (cleaning_due notification, IR104 mapping unchanged).
+
+**Boundary cases and failures**: Members cannot save settings (FORBIDDEN). Out-of-range values → VALIDATION.
+
+**Verification**: Check the traceability entries under AT-C18 (N/E/B).
+
 Convert condition forms to the Condition type's discriminated union. occupancy is {type,occupied}, location is {type,event}, pattern is {type,localTime}, weather is {type,metric:"temperature",operator,value}, tariff is {type,operator,value,unit:"MYR_per_kWh"}, peak is {type,active}, and solar/battery is {type,operator,value,unit:"kW"}. Do not send an extra params wrapper. Use weather_temperature for weather Fact.metric; do not confuse it with the room-temperature Fact temperature.
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
 2026-09-16 approved updates: C01/C06 period boundaries follow SR17. C13 retry follows SR18 like A15; get the current version and attemptId through offsets.list.
 
-Additional contracts for current version 0.21.0: Read IR01–106 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.22.0: Read IR01–112 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

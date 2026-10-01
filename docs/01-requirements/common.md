@@ -1,6 +1,6 @@
 ---
 document_id: REQ-COMMON
-version: 0.21.0
+version: 0.22.0
 status: draft
 owner: design-agent
 scope: frontend-demo-1A
@@ -12,7 +12,7 @@ Parent document: [PrepareDocument](../00-prepare/PrepareDocument.md). Read this 
 
 This document reorganizes the [original company requirements in English (SRC-06)](../00-prepare/sources/company-requirements-original.txt), the primary source. Trace information through company original → BIZ groups (categories of company requests) → FR (functional requirements) here → detailed design and acceptance criteria. Each feature separates company requests from design team additions. Screen fields, input limits, state changes, and priorities are frontend implementation proposals, not detailed company approvals. Reference mock screens guide visual design. Functional requirements and acceptance criteria make the original goals concrete using production instructions and added design details.
 
-**0.21.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.22.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Common features
 
@@ -25,6 +25,7 @@ This document reorganizes the [original company requirements in English (SRC-06)
 | FR-X05 | P0 | Company original SRC-06 + added design details / BIZ-05 | Clarify shared demo data, reset, and differences from real processing | Role switches in one tab show the same jobs/invoices/units. Reset returns to the same seed. No real card input, external sending, real device control, or real trades |
 | FR-X06 | P0 | Company original SRC-06 + added design details / BIZ-05, BIZ-06, BIZ-12, BIZ-19 | Distinguish supported features and non-RTO treatment | Disable unsupported model actions with reasons. General-maintenance units can be monitored/controlled without contract billing. Do not label fan circulation as ventilation |
 | FR-X07 | P0 | Company original SRC-06 + added design details / BIZ-08, BIZ-20, BIZ-22 | Provide notifications, history, and audit | Link to related alert/job/restriction screens. Reading a notification is separate from resolving an alert. Change records keep actor, time, target, reason, result, and correlation ID linking related records |
+| FR-X08 | P1 | Figma-confirmed screen specification 2026-10-01 (Preferences › Security, every role) / BIZ-01, BIZ-04 | Two-step verification (demo) | Turn on with an authenticator code and 8 recovery codes; turning off asks for a current code. Demo only: any 6 digits are accepted and real sign-in stays a demo role picker. |
 
 ## Non-functional requirements
 
@@ -50,18 +51,22 @@ Assess each AT-NFR using the measurement method above and the [verification plan
 | Action | Client | Contractor | Technician (internal/external) | HQ |
 |---|---|---|---|---|
 | View units/locations | Own use scope | Information needed for accepted jobs | Internal: assigned scope / external: assigned units and period | Managed scope |
-| Create/edit properties/locations | Own organization | No | No | Managed scope |
+| Create/move/delete properties/locations/units | No (rename locations and units only, IR109) | No | No | asset.write within managed scope |
+| Alert policies | Own customer's policies; default-rule on/off for own customer; attach on own units (IR108) | No | No | alert.policy.write; default policy limits HQ only |
+| Client user accounts | Owner invites members | No | No | asset.write (Customers & units › Users) |
 | Normal AC control | Within scope/capabilities | No (do not grant commands.create/voice.resolveIntent to contractors) | Diagnostic permission and valid target/period | control.execute permission |
 | Maintenance requests | Own units | Coordinate accepted jobs | Handle assigned jobs | Create/assign within managed scope |
 | Contractor acceptance/own assignment | No | Accepted jobs, own company, valid qualifications/period | No | Outsource or assign internally |
 | Inspection/work reports | View results | View, quality review, return for rework | Create for assigned jobs | View/quality review |
-| View invoices/payment demo | Own contracts | No | No | Manage with billing.manage |
-| Restrictions/grace/release | View reasons | No | No | restriction.manage; override requires separate permission |
-| IoT registration/calibration/firmware updates | View status | View accepted units' status | device.maintain within assigned scope | device.manage permission |
-| MRV/audit | Own estimates/history | History needed for jobs only | History of assigned actions | mrv.manage/audit.read permissions |
-| Change users/roles | No | View own assignment candidates only | No | identity.manage permission |
+| View invoices/payment demo | Own contracts | No | No | billing.read to view, billing.write to issue, billing.payment to confirm/record payments |
+| Contractor payouts | No | Own approved/paid statements; ask questions | No | billing.read; billing.payment to generate/approve/pay/answer |
+| Certificates | No | Own technicians: view, upload renewals | No | job.write verifies renewals |
+| Restrictions/grace/release | View reasons | No | No | restriction.write; override requires separate permission |
+| IoT registration/calibration/firmware updates | View status | View accepted units' status | device.maintain within assigned scope | device.write permission |
+| MRV/audit | Own estimates/history | History needed for jobs only | History of assigned actions | mrv.read/mrv.write; mrv.review records reviews; mrv.factors changes factors; audit.read |
+| Change users/roles | No | View own assignment candidates only | No | identity.read to view, identity.write to change (HQ/contractor/technician only); identity.write and restriction.override are granted only by another identity administrator |
 
-Use IR46 for allowed AC actions under restrictions, and IR47 for rejection based on connectivity/power signals. Do not disclose details, including existence, of inaccessible data. Show reasons for blocked actions only when viewing the data itself is allowed. Contractors do not automatically gain technician control permissions. If one manager has several roles, switch Membership so the active role is clear.
+HQ permissions are the 38 values of IR107: Read/Write per resource plus independent actions; Write implies Read. Use IR46 for allowed AC actions under restrictions, and IR47 for rejection based on connectivity/power signals. Do not disclose details, including existence, of inaccessible data. Show reasons for blocked actions only when viewing the data itself is allowed. Contractors do not automatically gain technician control permissions. If one manager has several roles, switch Membership so the active role is clear.
 
 ## Canonical terms
 
@@ -110,6 +115,8 @@ Display severity, connectivity, operation, workflow progress, and data quality a
 
 An action requires all of the following: valid session, matching tenant, allowed role/permission, matching target scope, valid period, and current state/capability conditions. The same conditions govern projections. Client, contractor, and external technician boundaries differ. Recheck permissions on every action, not only when showing menus.
 
+Forbidden (403) and not found (404) render the same shared “Page unavailable” view with a link to the role home (or sign-in), without revealing whether the target exists (Figma 2026-10-01, IR112).
+
 AT-X04 verifies rejection for seven cases: another tenant, another customer in the same tenant, another contractor, an unqualified technician, exactly at expiry, an old open screen after permission changes, and the same person switching Membership to approve their own work. This tests frontend demo display/action control. Production authorization design/implementation is out of scope.
 
 ### FR-X05 Demo and shared data
@@ -133,9 +140,15 @@ Tie Capability to a model version. Unverified capabilities are not supported. Ge
 
 Choose recipients from the event and current business scope. Publish only quality-reviewed reports to customers; hide internal rework notes. Audit records keep the actor, role, target, reason, result, version, and correlation ID as they were at the time. AT-X07 checks that reading a notification leaves the alert unresolved, report visibility changes after acceptance, and sign-out does not change historical actors.
 
+### FR-X08 Two-step verification (demo)
+
+- **Company request basis**: SRC-06 BIZ-01, BIZ-04; Figma-confirmed Preferences › Security (Client 10g, Admin 15-7, Contractor 07-7, Technician 04-7, 2026-10-01).
+
+Preferences gains a Security section with the status (Off / On · n recovery codes left) and Turn on / Turn off. The setup dialog shows a setup key (QR in production), a 6-digit code field, and, after verifying, 8 recovery codes once (`twoFactor.get/enable/disable`). In the demo any 6 digits are accepted and no authenticator is called; real sign-in remains out of scope. Turning off asks for a current code. HQ may later require it for Admin accounts (not in 1A).
+
 ### Concrete common acceptance criteria
 
-The table below governs Given/When/Then for AT-X01–X07 (IR101). Unstated setup uses demoSeed per IR92, clock 2026-09-14T01:00:00.000Z, simulator=false (IR97 item 4).
+The table below governs Given/When/Then for AT-X01–X08 (IR101). Unstated setup uses demoSeed per IR92, clock 2026-09-14T01:00:00.000Z, simulator=false (IR97 item 4).
 
 | ID | Given / When | Then |
 |---|---|---|
@@ -160,6 +173,9 @@ The table below governs Given/When/Then for AT-X01–X07 (IR101). Unstated setup
 | AT-X07-N | customer-a marks notif-alert-window-a as read | Save readAt; alert-window-a remains open; summaries.get alertCount remains 1 (IR51) |
 | AT-X07-E | Internal job from AT-C09-N: after tech-internal-a submits, customer-a calls jobs.get → hq-operator returns via jobs.review with reason → tech-internal-a resubmits → hq-operator accepts → customer-a calls jobs.get | Before acceptance, reportRefs empty and no body. After acceptance, show only accepted version, without return reason (IR42) |
 | AT-X07-B | customer-a calls commands.create → signOut → hq-operator calls audit.list | Audit actorId, actorRoleAtTime=client, correlationId, and result=success remain unchanged after sign-out |
+| AT-X08-N | customer-a Preferences › Security › Turn on → enter any 6 digits | twoFactor.enable returns enabled=true and 8 recovery codes shown once; status “On · 8 recovery codes left” |
+| AT-X08-E | ① Enter 5 digits ② Turn off without a code | ① VALIDATION, stays Off ② VALIDATION, stays On |
+| AT-X08-B | ① hq-operator turns it on ② Sign out and sign in on the demo picker | ① Same dialog for every role ② Demo picker still signs in (real sign-in out of scope); status remains On |
 
 See [frontend input/output contracts](../02-design/implementation-contracts.md) for detailed interactions. Assess non-functional requirements with numerical targets and the measured environment; adding a library alone does not meet them.
 
@@ -171,4 +187,4 @@ FR-X01/X02 require D09's 30-minute session and fixed en/ms grammar; FR-X03/X05 u
 
 0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 
-Additional current 0.21.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–106. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.22.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–112. They override older text on the same issues; use IR72 for conflict priority.

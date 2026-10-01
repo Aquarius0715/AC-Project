@@ -1,6 +1,6 @@
 ---
 document_id: DD-REVIEW-RESOLUTION
-version: 0.21.0
+version: 0.22.0
 status: self-reviewed-pending-independent-G1
 scope: frontend-demo-1A
 ---
@@ -21,7 +21,7 @@ For a Unit move within the same customer, check both scopes and changeReason. Re
 
 ## IR03 Permission limited to forced release
 
-Allow HQ users with only restriction.override to call restrictions.list/get within their management scope. Return RestrictionReleaseView (projection=release), containing only id/version/createdAt/updatedAt/unitIds/rulesVersion/policy/state/perUnit/recoveryCases and restriction times needed for the decision. Exclude invoice IDs, contract IDs, reminder text, and the full audit. Users with restriction.manage receive the existing Restriction. Open the A09 list entry to override-only users, with the path list → A10 get → override → get. Require the A09 create/apply sections and supporting contract/invoice/equipment reads only for manage holders. For override-only users, list filters support only status (invoiceId/contractId return FORBIDDEN), and counts/order are limited to the scope of this projection. Fetch audit.list only with audit.read.
+Allow HQ users with only restriction.override to call restrictions.list/get within their management scope. Return RestrictionReleaseView (projection=release), containing only id/version/createdAt/updatedAt/unitIds/rulesVersion/policy/state/perUnit/recoveryCases and restriction times needed for the decision. Exclude invoice IDs, contract IDs, reminder text, and the full audit. Users with restriction.write receive the existing Restriction. Open the A09 list entry to override-only users, with the path list → A10 get → override → get. Require the A09 create/apply sections and supporting contract/invoice/equipment reads only for manage holders. For override-only users, list filters support only status (invoiceId/contractId return FORBIDDEN), and counts/order are limited to the scope of this projection. Fetch audit.list only with audit.read.
 
 Allow override-only users to reconcile and retry(phase=release) only for release_requested with an override release intent, or an unresolved recovery case on a terminal record. Reconcile during normal application, retry(apply), and schedule/execute/defer/exempt/cancel/release require manage. override requires a reason, the latest Restriction.version, and a new key. Read the version for reconcile/retry through get as well. Release Command status can be tracked through get.perUnit/recoveryCases, so no extra commands.get permission is needed. override always returns RestrictionReleaseView. Project reconcile/retry write responses and writes.getResult to RestrictionRead using current permissions, so a saved full response is not exposed after manage permission is lost. Also remove resourceIds outside the projection.
 
@@ -29,7 +29,7 @@ Allow override-only users to reconcile and retry(phase=release) only for release
 
 notifications.preview remains a read and saves no records. HQ A08 fetches an overdue unpaid Invoice, selects a customer recipient through notifications.recipients(target=invoice,templateKey=payment_reminder,channel), shows the preview, then calls invoices.remind after the explicit action "Record simulated reminder". Inputs are invoiceId/recipientMembershipId/channel/reason. expectedVersion is Invoice.version, and idempotencyKey is required. reason must be 1–1000 characters. Do not send externally.
 
-In the same transition, the Repository checks billing.manage, invoice scope, latest version, now>dueAt, status=unpaid, and that the recipient is an active Membership of that customer eligible for the channel. An expired recipient returns VALIDATION; paid/processing/not yet overdue returns CONFLICT. On success, save one Notification and one audit record, and increment Invoice.version by 1. Notification has templateKey/type=payment_reminder; inApp is simulated and email/whatsapp are preview. All channels are saved in notifications.list. Return InvoiceReminderReceipt with only invoiceId/notificationId/invoiceVersion. Do not return the notification body to HQ users other than the recipient. The customer sees the same notification on C08 and the same Invoice on C11. A same-key retry returns the same receipt without creating duplicates. A reminder with a new key requires the latest Invoice version after checking it again. A read-only preview does not increment the Invoice version.
+In the same transition, the Repository checks billing.write, invoice scope, latest version, now>dueAt, status=unpaid, and that the recipient is an active Membership of that customer eligible for the channel. An expired recipient returns VALIDATION; paid/processing/not yet overdue returns CONFLICT. On success, save one Notification and one audit record, and increment Invoice.version by 1. Notification has templateKey/type=payment_reminder; inApp is simulated and email/whatsapp are preview. All channels are saved in notifications.list. Return InvoiceReminderReceipt with only invoiceId/notificationId/invoiceVersion. Do not return the notification body to HQ users other than the recipient. The customer sees the same notification on C08 and the same Invoice on C11. A same-key retry returns the same receipt without creating duplicates. A reminder with a new key requires the latest Invoice version after checking it again. A read-only preview does not increment the Invoice version.
 
 ## IR05 Advance notice time and evidence
 
@@ -47,7 +47,7 @@ A processing event updates Payment and Invoice.paymentStatus to processing and i
 
 All kinds on A05/A11/A12 require name (1–120 characters after trim), unitIds (nonempty, no duplicates), timezone (supported IANA name), enabled (boolean), and priority (integer 0–100). For new records, clearly show an empty name, no selected equipment, timezone=Preferences.timezone, enabled=false, and priority=50 in the UI. Editing uses fetched values; the Repository does not fill in missing values. Keep these defaults consistent with Automation. Kind-specific required fields follow the existing DD/SR28; saving is blocked when they are missing.
 
-A05 obtains target equipment/capabilities through units.list → selected units.get, regardless of whether alerts exist. A12 also uses units.list → units.get. Candidate reads on A05 are within alert.policy.manage scope; on A12, within automation.policy.manage scope. Notification recipients use the eligible set for all selected targets/channels. Do not show the policy save form to read-only staff.
+A05 obtains target equipment/capabilities through units.list → selected units.get, regardless of whether alerts exist. A12 also uses units.list → units.get. Candidate reads on A05 are within alert.policy.write scope; on A12, within automation.policy.write scope. Notification recipients use the eligible set for all selected targets/channels. Do not show the policy save form to read-only staff.
 
 ## IR08 Energy data origin
 
@@ -124,7 +124,7 @@ Apply the SR03 all-target-Units condition to Restriction get/list/forInvoice, wr
 
 ## IR20 Reminder preview preconditions — CV-004
 
-payment_reminder notifications.preview/recipients is limited to HQ with billing.manage. Also check target.kind=invoice, now>dueAt, and Invoice.status=unpaid on reads. An ineligible state returns CONFLICT, missing permission returns FORBIDDEN, and out-of-scope access returns NOT_FOUND. preview checks the same customer-recipient/channel conditions as IR04. If payment starts after preview, remind rechecks and rejects it. The preview Notification is unsaved; do not reuse its temporary ID in markRead or notification lists. On successful remind, the Repository issues an ID for the saved record.
+payment_reminder notifications.preview/recipients is limited to HQ with billing.write. Also check target.kind=invoice, now>dueAt, and Invoice.status=unpaid on reads. An ineligible state returns CONFLICT, missing permission returns FORBIDDEN, and out-of-scope access returns NOT_FOUND. preview checks the same customer-recipient/channel conditions as IR04. If payment starts after preview, remind rechecks and rejects it. The preview Notification is unsaved; do not reuse its temporary ID in markRead or notification lists. On successful remind, the Repository issues an ID for the saved record.
 
 ## IR21 Fact evaluation time and sensors — CV-007
 
@@ -208,7 +208,7 @@ jobs.list also accepts the same unitIds as summaries.get(kind=partner/technician
 
 ## IR33 Audit screen read paths and search boundary
 
-A16 requires audit.list as a Query; do not show a failure as a normal empty result. Device events have a separate supporting panel that obtains authorized candidates from devices.list. Call devices.events({id:deviceId,query}) only after deviceId selection. With no selection, show guidance; with no candidates, show empty; on list failure, show retry within the panel. An invalid or invisible selected ID stops with not-found; do not substitute another device. Keep selected deviceId in the URL and restore it with the same steps on Back/Forward. audit.read candidate/history read permissions follow the existing operation catalog; do not additionally grant device.manage.
+A16 requires audit.list as a Query; do not show a failure as a normal empty result. Device events have a separate supporting panel that obtains authorized candidates from devices.list. Call devices.events({id:deviceId,query}) only after deviceId selection. With no selection, show guidance; with no candidates, show empty; on list failure, show retry within the panel. An invalid or invisible selected ID stops with not-found; do not substitute another device. Keep selected deviceId in the URL and restore it with the same steps on Back/Forward. audit.read candidate/history read permissions follow the existing operation catalog; do not additionally grant device.write.
 
 When navigating from an audit targetRef to an existing detail screen, use /admin/jobs?jobId=:id for kind=job, /admin/restrictions/:id for restriction, and /admin/devices?deviceId=:id for device, each requiring its existing read permission. For command, fetch commands.get separately only with its existing permission, then use its unitId to navigate to /admin/units?unitId=:unitId. A16 audit.read alone does not expand access to other resources. Resolve links through shared Navigation/feature hooks. Without permission or for an unknown kind, show only masked audit details. Deleted/expired resources show not-found at the destination; retain the original audit.
 
@@ -217,7 +217,7 @@ audit.list applies every filter to the authorized set. Both another tenant's cor
 
 ## IR34 User-confirmed permissions and job sorting
 
-DEC-17: Restriction operations have two permission types. defer/exempt/cancel require restriction.manage; override requires restriction.override. Holding both allows both sets of operations, but neither implicitly grants the other. Keep existing manage conditions for schedule/execute/release and others, and IR03 conditions permitting only release tracking after override. Check both menus/buttons and the Repository; do not skip reason, scope, state, or version validation. A direct write without permission returns FORBIDDEN, makes zero business changes, and creates only the D01 denial audit. This fixes the FR-A10 inconsistency between list and detail; it adds no new permission.
+DEC-17: Restriction operations have two permission types. defer/exempt/cancel require restriction.write; override requires restriction.override. Holding both allows both sets of operations, but neither implicitly grants the other. Keep existing manage conditions for schedule/execute/release and others, and IR03 conditions permitting only release tracking after override. Check both menus/buttons and the Repository; do not skip reason, scope, state, or version validation. A direct write without permission returns FORBIDDEN, makes zero business changes, and creates only the D01 denial audit. This fixes the FR-A10 inconsistency between list and detail; it adds no new permission.
 
 DEC-18: Job lists offer sorting by status (business order), severity, and deadline, with ascending/descending directions. The default is status asc, with ties always broken by id/jobId ASCII asc. Fix status comparison order to these 10 states.
 
@@ -237,7 +237,7 @@ Release requests (state=release_requested) may start only through routes ①–�
 
 In the same transition to release_requested, perform the D03 release evaluation once per perUnit. For online equipment with applyState=applied, create a remove_restriction Command and set releaseState=requested. not_sent/not_applied becomes not_required; sent_unknown becomes waiting_reconcile. Offline applied equipment uses releaseState=none/pendingReason=offline, not failed, and waits for explicit retry(phase=release). Create release Commands even when the caller is a client (Command.actorMembershipId is the Repository's internal actor 'system-restriction'; the audit actor is the person performing payment confirmation).
 
-`restrictions.release` is an explicit release-request operation by a restriction.manage holder. Preconditions are state∈{requested,applied,release_requested} and either "all cause invoices are paid" or "exception/grace is active". Unpaid with no grace/exception returns FORBIDDEN (contract restriction violation). From requested/applied, perform the same transition as ② above with source='manual'. If already release_requested, idempotently return the current Restriction without adding Commands, audits (except denial audits), or versions. Only restrictions.retry(phase=release) retries or requests failed equipment again. "release" in AT-A09-N④ is this idempotent response; the transition to release_requested itself occurs during payment confirmation. AT-C11-N④ checks that client payment confirmation alone starts ①.
+`restrictions.release` is an explicit release-request operation by a restriction.write holder. Preconditions are state∈{requested,applied,release_requested} and either "all cause invoices are paid" or "exception/grace is active". Unpaid with no grace/exception returns FORBIDDEN (contract restriction violation). From requested/applied, perform the same transition as ② above with source='manual'. If already release_requested, idempotently return the current Restriction without adding Commands, audits (except denial audits), or versions. Only restrictions.retry(phase=release) retries or requests failed equipment again. "release" in AT-A09-N④ is this idempotent response; the transition to release_requested itself occurs during payment confirmation. AT-C11-N④ checks that client payment confirmation alone starts ①.
 
 ## IR36 Demo clock progression and session lifetime — FRV-002
 
@@ -253,11 +253,11 @@ DemoTrigger network(connected=false) simulates network disconnection. Reject all
 
 ## IR38 Deadline derivation for customer-created jobs — FRV-004
 
-Only job.manage holders (HQ) may specify jobs.create dueAt. A client sending dueAt receives VALIDATION (fieldErrors.dueAt). If omitted, the Repository saves dueAt=requestedEnd (the same rule as D16 generated jobs). When HQ specifies it, check dueAt>=requestedEnd; a lower value returns VALIDATION. 1A has no later dueAt change operation (use a new job). JobSummary.dueAt, overdueOnly, dueAt sorting, and technician/partner overdueCount use only this saved value.
+Only job.write holders (HQ) may specify jobs.create dueAt. A client sending dueAt receives VALIDATION (fieldErrors.dueAt). If omitted, the Repository saves dueAt=requestedEnd (the same rule as D16 generated jobs). When HQ specifies it, check dueAt>=requestedEnd; a lower value returns VALIDATION. 1A has no later dueAt change operation (use a new job). JobSummary.dueAt, overdueOnly, dueAt sorting, and technician/partner overdueCount use only this saved value.
 
 ## IR39 Visibility of archived resources — FRV-005
 
-Exclude Property/Space/ACUnit with archived=true from all lists (properties/spaces/units.list), summaries.get/admin.summary counts/denominators/KPIs, candidate selection (through units.list), notification recipient resolution, and scope checks for new business operations. 1A offers no archived filter; exclusion is unconditional. Individual reads (units.get and space/property selection resolution) return NOT_FOUND to clients/contractors/technicians. Only HQ asset.manage holders receive a read-only DTO with archived:true. Control, assignment, contract, restriction, and Device operations return CONFLICT (reason archived). Unit references from existing Job/Report/Audit/Command history permit history access under D05, and history screens show an archived label. In the same archive transition, invalidate units/properties/spaces/summaries/automatic-operation Queries. Archived IDs in a unitIds filter do not match and count as zero results.
+Exclude Property/Space/ACUnit with archived=true from all lists (properties/spaces/units.list), summaries.get/admin.summary counts/denominators/KPIs, candidate selection (through units.list), notification recipient resolution, and scope checks for new business operations. 1A offers no archived filter; exclusion is unconditional. Individual reads (units.get and space/property selection resolution) return NOT_FOUND to clients/contractors/technicians. Only HQ asset.write holders receive a read-only DTO with archived:true. Control, assignment, contract, restriction, and Device operations return CONFLICT (reason archived). Unit references from existing Job/Report/Audit/Command history permit history access under D05, and history screens show an archived label. In the same archive transition, invalidate units/properties/spaces/summaries/automatic-operation Queries. Archived IDs in a unitIds filter do not match and count as zero results.
 
 ## IR40 Population for customer counts — FRV-006
 
@@ -374,7 +374,7 @@ Show SessionExpiryDialog (role=alertdialog) 120 seconds before Session.expiresAt
 
 Determine jobs.cancel availability only from this table. cancelReason is required as 1–1000 characters after trim. Contractors and technicians do not have jobs.cancel (FORBIDDEN).
 
-| Current Job.status | Client (own job) | HQ job.manage | Result on success |
+| Current Job.status | Client (own job) | HQ job.write | Result on success |
 |---|---|---|---|
 | requested | Allowed | Allowed | cancelled |
 | offered | Not allowed | Allowed | cancelled. Remove undecided Offers from contractor lists; later accept/decline returns CONFLICT |
@@ -415,7 +415,7 @@ Return AdminSummary.energySummary to dashboard.read holders. Targets are nonarch
 
 ## IR64 Contact-window input and visibility — REV18-020
 
-contactWindow is 0–200 code points after trim. If it contains '@', or if removing whitespace, hyphens, parentheses, and '+' leaves at least seven consecutive digits, return VALIDATION (fieldErrors.contactWindow, messageKey=errors.contact_details_forbidden). Return JobDetail.contactWindow only to the client (own job), HQ job.manage, the assigned technician within the viewing window (IR49), and the accepted contractor within the access window. Other projections use null. Do not include it in JobOfferSummary, JobHistorySnapshot, or notification params. Complete detection in free text is not guaranteed (DDC-09). Input guidance and handling of time notation follow IR90 (REV19-017).
+contactWindow is 0–200 code points after trim. If it contains '@', or if removing whitespace, hyphens, parentheses, and '+' leaves at least seven consecutive digits, return VALIDATION (fieldErrors.contactWindow, messageKey=errors.contact_details_forbidden). Return JobDetail.contactWindow only to the client (own job), HQ job.write, the assigned technician within the viewing window (IR49), and the accepted contractor within the access window. Other projections use null. Do not include it in JobOfferSummary, JobHistorySnapshot, or notification params. Complete detection in free text is not guaranteed (DDC-09). Input guidance and handling of time notation follow IR90 (REV19-017).
 
 ## IR65 Voice target matching and syntax — REV18-021
 
@@ -480,6 +480,18 @@ ChangeEvent.entityType accepts only the values in the following table plus curso
 | factor | factors.list, energy.summary |
 | mrv_report | mrv.list, mrv.get, mrv.versions |
 | offset_record | offsets.list |
+| client_user | clientUsers.list |
+| ventilation_log | ventilation.list |
+| unit_import | units.list, properties.list, spaces.list |
+| firmware_campaign | firmwareCampaigns.list, firmwareCampaigns.get, devices.get, devices.operations |
+| contractor | contractors.list |
+| rate_card | rateCards.list, payouts.get |
+| certificate | certificates.list, members.eligible, members.capacity |
+| unavailability | members.capacity, members.eligible |
+| sla_target | sla.scorecard |
+| payout_statement | payouts.list, payouts.get |
+| filter_care | filterCare.list |
+| default_rule_setting | policies.list, policies.get |
 | session | All Queries (update IR17 viewEpoch and discard) |
 
 ## IR72 Specification priority — REV18-029
@@ -519,7 +531,7 @@ Align check_review_regressions.py mutation targets with the current baseline and
 - REV18-040: Derive DemoTrigger(device) evidenceSource from its type: communication_lost → heartbeat, power_lost → power_signal, tamper → tamper_signal; restored uses the same value as the referenced fault. DD-T12 evidenceSource is read-only.
 - REV18-041: Space.kind nesting has no order constraint (validate only same Property and no cycles).
 - REV18-042: units.save and similar operations do not accept tenantId input (it comes from the D14 Session).
-- REV18-043: FR-A04 requires device.manage; FR-A12 requires automation.policy.manage.
+- REV18-043: FR-A04 requires device.write; FR-A12 requires automation.policy.write.
 - REV18-044: NFR-03 "Reconfirm on expiry" means that if Session expiry, a permission change, or a target-version change occurs while the confirmation dialog is open, confirm must not submit. Fetch again and repeat confirmation.
 - REV18-045: 1A is the clickable frontend demo of Phase 1 in the original company text. 1B connects real equipment, firmware, and production APIs in the same Phase 1. Phase 2 is HVAC.
 - REV18-046: List connecting/device-error/device-online/device-offline in the screen catalog only for Screens whose operations include equipment, device, measurement, control, restriction, or summary reads.
@@ -561,7 +573,7 @@ Calculate EnergyForecast as follows. Use decimal rational arithmetic and round d
 7. forecastSavedKWh = predictedBaselineKWh − predictedActualKWh (null if either is null). forecastSavingPercentage = forecastSavedKWh ÷ predictedBaselineKWh × 100 (null if predictedBaselineKWh is 0 or null).
 8. If a baseline was selected, include modeled_baseline and prorated_forecast in qualityWarnings. Also include partial_coverage if validUnitMinutes<expectedUnitMinutes. Sort qualityWarnings in ascending ASCII order with no duplicates.
 
-The A01 energy-saving card displays actual results (kWh, cost, coverage) beside the forecast. For forecast values >0, show “Expected reduction {absolute value}”; for values <0, “Expected increase {absolute value}”; for 0, “No change 0.0”. Always show “Forecast (prorated assumed baseline, demo)” and validUnitMinutes/expectedUnitMinutes. For null, show “No target equipment” if qualityWarnings contains no_units, “Baseline not set” if it contains baseline_unavailable, or “Cannot calculate” otherwise (this overrides IR68's null display). Show a link to /admin/energy only for energy.manage holders. Do not call admin.summary during SR17's first minute of the day (from=to).
+The A01 energy-saving card displays actual results (kWh, cost, coverage) beside the forecast. For forecast values >0, show “Expected reduction {absolute value}”; for values <0, “Expected increase {absolute value}”; for 0, “No change 0.0”. Always show “Forecast (prorated assumed baseline, demo)” and validUnitMinutes/expectedUnitMinutes. For null, show “No target equipment” if qualityWarnings contains no_units, “Baseline not set” if it contains baseline_unavailable, or “Cannot calculate” otherwise (this overrides IR68's null display). Show a link to /admin/energy only for energy.write holders. Do not call admin.summary during SR17's first minute of the day (from=to).
 
 Place `baseline-demo-tenant-a` in demoSeed.baselines (unitIds=all five nonarchived units in tenant-a, method=demo_fixed, boundaryId=ac_input_electricity, period=[2026-08-01T00:00:00.000Z,2026-08-31T00:00:00.000Z), baselineKWh=2592, quality=modeled, createdAt=2026-09-01T00:00:00.000Z, version=1). /admin without filters displays a forecast; changing the equipment set with customerId/propertyId displays “Baseline not set”.
 
@@ -633,7 +645,7 @@ If summary.factorSnapshot is null, show “Calculation incomplete” in factor-r
 
 ## IR90 Minor clarifications — REV19-016–035
 
-- REV19-016: DD-A01's customer count follows IR40. DD-A04 requires device.manage; DD-A12 requires automation.policy.manage (REV18-043 in IR74). D09 `<room>` matches Space.name under IR65. In verification.md S03, payment confirmation triggers a release request (IR35); explicit release checks the idempotent response. /forbidden and undefined routes in common.md §2 display screens linking to role home; they do not redirect automatically (IR57).
+- REV19-016: DD-A01's customer count follows IR40. DD-A04 requires device.write; DD-A12 requires automation.policy.write (REV18-043 in IR74). D09 `<room>` matches Space.name under IR65. In verification.md S03, payment confirmation triggers a release request (IR35); explicit release checks the idempotent response. /forbidden and undefined routes in common.md §2 display screens linking to role home; they do not redirect automatically (IR57).
 - REV19-017: Keep contactWindow validation rules (IR64). Always show “Use HH:mm for times (example: Weekdays 09:00-18:00)” beside the input and include the same example in errors.contact_details_forbidden. “0900-1800” returns VALIDATION as eight consecutive digits; “09:00-18:00” is accepted.
 - REV19-018: At IR67's mutual-exclusion recheck after one second, if the same equipment has a normal Command (UnitAction) in requested/sent, an active DiagnosticRun, or another queued/running DeviceOperation, set the operation to failed, failureCode=CONFLICT, finishedAt=now, without changing connection or version. D05 prevents this conflict in normal operation paths, so this rule protects an invariant; acceptance tests create the conflicting state using IR69 patches. Exclude restriction Commands with delivery=not_sent from this recheck. Restriction apply/remove Commands for equipment with check/firmware queued/running follow D03 as undelivered intent with delivery=not_sent and pendingReason=device_operation_running. Send them through restrictions.retry after the operation ends.
 - REV19-019: invoices.create accepts dueAt only when later than now. Create overdue invoices with demoSeed or demo.advanceClock (IR36).
@@ -727,7 +739,7 @@ Qualifiers in the operation catalog's authorization column have only the meaning
 | admin:<permission> | Holds the permission and is within managed scope |
 | admin:<permission>:scope-candidate-read-only | D12 supporting reads |
 | admin:<permission>:kind=… | Permission for each Policy.kind |
-| admin:job.manage:internal-job / internal-or-escalation | Jobs with contractorOrgId=null / for outsourced jobs, jobs.review reviewMode=hq_escalation (D06) |
+| admin:job.write:internal-job / internal-or-escalation | Jobs with contractorOrgId=null / for outsourced jobs, jobs.review reviewMode=hq_escalation (D06) |
 | admin:restriction.override:release-projection / release-intent-or-terminal-recovery-only | IR03 |
 | IR01:same-key-receipt… | IR01 |
 
@@ -755,26 +767,26 @@ Shared rules: channel=inApp, deliveryState=simulated, one notification per recip
 
 | Event | templateKey | target | Recipients |
 |---|---|---|---|
-| job.requested (jobs.create, plans.generateNext) | job_update | job | Customer client Memberships that can read the job Unit; HQ job.manage holders |
+| job.requested (jobs.create, plans.generateNext) | job_update | job | Customer client Memberships that can read the job Unit; HQ job.write holders |
 | job.offered | job_update | job | partner.accept holders at the offered contractor; customer clients (display "Being arranged") |
-| job.accepted | job_update | job | HQ job.manage holders; customer clients |
-| job.declined | job_update | job | HQ job.manage holders |
-| job.assigned (initial assignment, reassignment, extension) | schedule_change | job | Technician of the new Assignment; customer clients; HQ job.manage holders; for outsourced work, partner.assign holders at the accepted contractor |
-| report.submitted | job_update | job | For outsourced work, partner.review holders at the accepted contractor; for internal work, HQ job.manage holders; customer clients (progress only) |
-| report.returned | report_return | job | Assigned technician; HQ job.manage holders |
-| job.completed | completion | job | Customer clients; HQ job.manage holders; assigned technician; for outsourced work, partner.review holders at the accepted contractor |
-| job.cancelled / on_hold / resumed | job_update | job | Customer clients; assigned technician; for outsourced work, partner.assign holders at the accepted contractor; HQ job.manage holders |
-| restriction.requested / applied / release_requested / released / cancelled | restriction | restriction | Customer clients who can read all target Units under IR19; HQ restriction.manage holders |
-| payment.confirmed (payment confirmation) | payment | invoice | Customer clients who can read the invoice; HQ billing.manage holders |
-| inquiry.received / answered | inquiry | inquiry | For received, HQ billing.manage holders; for answered, clients of the customer who made the inquiry |
+| job.accepted | job_update | job | HQ job.write holders; customer clients |
+| job.declined | job_update | job | HQ job.write holders |
+| job.assigned (initial assignment, reassignment, extension) | schedule_change | job | Technician of the new Assignment; customer clients; HQ job.write holders; for outsourced work, partner.assign holders at the accepted contractor |
+| report.submitted | job_update | job | For outsourced work, partner.review holders at the accepted contractor; for internal work, HQ job.write holders; customer clients (progress only) |
+| report.returned | report_return | job | Assigned technician; HQ job.write holders |
+| job.completed | completion | job | Customer clients; HQ job.write holders; assigned technician; for outsourced work, partner.review holders at the accepted contractor |
+| job.cancelled / on_hold / resumed | job_update | job | Customer clients; assigned technician; for outsourced work, partner.assign holders at the accepted contractor; HQ job.write holders |
+| restriction.requested / applied / release_requested / released / cancelled | restriction | restriction | Customer clients who can read all target Units under IR19; HQ restriction.write holders |
+| payment.confirmed (payment confirmation) | payment | invoice | Customer clients who can read the invoice; HQ billing.write holders |
+| inquiry.received / answered | inquiry | inquiry | For received, HQ billing.write holders; for answered, clients of the customer who made the inquiry |
 | Opening an Alert without a policy (device events, IR98 load_alert, records generated outside the seed) | alert | unit | Customer clients who can read the Unit; HQ alert.resolve holders; assigned technicians within their viewing window |
-| device_operation.failed | device_operation | device | Membership that created the operation; HQ device.manage holders |
+| device_operation.failed | device_operation | device | Membership that created the operation; HQ device.write holders |
 
 Add job_update and device_operation to canonical Notification.templateKey and NotificationType. For the seed's four actors, for example, if contractor-a performs job.assigned, tech-external-a, customer-a, hq-operator, and hq-restriction-manager receive one each (four total); actor contractor-a receives none.
 
 ## IR96 Restriction cancellation — G1-003 and G1-013
 
-Determine the result of restrictions.cancel (restriction.manage, reason required) only from this table (DEC-56).
+Determine the result of restrictions.cancel (restriction.write, reason required) only from this table (DEC-56).
 
 | Current state | Result |
 |---|---|
@@ -850,7 +862,7 @@ Define the following to make shared acceptance unambiguous (DEC-59).
 - Requests after a Membership reaches now>=validUntil or now<validFrom return UNAUTHENTICATED (messageKey=errors.membership_inactive, D01 priority 2). Discard the screen and navigate to /login as for D09 expiry. demoSession.signIn/switchMembership to a Membership outside its valid period returns FORBIDDEN (errors.membership_inactive).
 - restrictions.schedule with a Contract whose restrictionEligible=false returns VALIDATION (fieldErrors.contractId, messageKey=errors.restriction_ineligible, D01 priority 7).
 - If voice.resolveIntent candidates have multiple identical pathLabels, VoicePanel also shows unitId for each and switches to text-input mode for selection (FR-X02 "When they cannot be distinguished"). Do not select automatically.
-- Create AT-X04-E⑤ self-approval through `acceptancePatches["AT-X04-E.5"]` (hq-self-approver, a second Membership for user-tech-internal-a, with role=admin and job.manage).
+- Create AT-X04-E⑤ self-approval through `acceptancePatches["AT-X04-E.5"]` (hq-self-approver, a second Membership for user-tech-internal-a, with role=admin and job.write).
 
 demoSeed.capabilities explicitly identifies the owning tenant (tenantId). tenant-b's unit-tenant-b references cap-split-std-tb for tenant-b. Equipment referencing another tenant's model ID is a fixture defect (IR91 item 1).
 
@@ -879,7 +891,7 @@ demoSeed.capabilities explicitly identifies the owning tenant (tenantId). tenant
 
 D08 duration starts when a saved, enabled Policy first evaluates a fresh/valid Fact meeting the threshold at the current tick. Do not use pre-save history or a late Fact's observedAt as the start time. elapsedSeconds=now−condition-start tick. With durationSeconds=60, elapsed time is 0 at the start, the condition does not qualify at 59 seconds, and it first qualifies at 60 seconds. Discard the start tick on bad quality, stale data, disconnection, or a nonmatching condition (D08). A new save starts the counter at 0. Internal evaluation and fire at the same tick must not count time twice.
 
-After this duration condition is met, evaluate air_quality notifications and notify_and_ventilate candidates independently under SR25. Before it is met, notifications are suppressed/not_due and this Policy creates no control candidate (Units with no other candidates have results=suppressed/no_match). After it is met, ventilation capability, busy state, or restrictions do not suppress notifications. This is a reversible demo detail under DEC-60.
+After this duration condition is met, evaluate the air-quality alert policy’s notifications under SR25 (since IR108 an air-quality policy is an alert policy and has no ventilation candidate). Before it is met, notifications are suppressed/not_due and this Policy creates no control candidate (Units with no other candidates have results=suppressed/no_match). After it is met, ventilation capability, busy state, or restrictions do not suppress notifications. This is a reversible demo detail under DEC-60.
 
 AT-A12-N/B and AT-G120-005 use fixture `acceptancePatches["AT-A12-N"]` in this order.
 
@@ -909,7 +921,7 @@ When generating notifications under IR95, determine the required Notification ty
 | job_update | job_update | normal |
 | device_operation | device_operation | warning |
 
-Policy-based alert/air_quality notifications inherit SR28 input severity from the source Alert; do not overwrite it with this table's business-notification defaults. The quality template is the D08/SR21 quality notification and uses sourcePolicy.severity. restrictions.schedule notices and notifications.preview use the same table with the target's current state. device_operation.failed is an asynchronous system event (IR59), so actor=system-demo. The creating Membership is not excluded as the actor and is included as a recipient if it currently has read access. Deduplicate recipients to one notification per Membership under IR95.
+Policy-based alert notifications (including air-quality alert policies, IR108) inherit SR28 input severity from the source Alert; do not overwrite it with this table's business-notification defaults. The quality template is the D08/SR21 quality notification and uses sourcePolicy.severity. restrictions.schedule notices and notifications.preview use the same table with the target's current state. device_operation.failed is an asynchronous system event (IR59), so actor=system-demo. The creating Membership is not excluded as the actor and is included as a recipient if it currently has read access. Deduplicate recipients to one notification per Membership under IR95.
 
 ## IR105 Allergen observation change notifications — G120-004
 
@@ -922,3 +934,27 @@ Allow allergen_observation in events.subscribe resources and invalidate only tel
 When IR91 normalizes notification rows in demoSeed and acceptancePatches, if scopeVersionAtCreation is omitted, set it from Membership.scopeVersion found through recipientMembershipId after all patches are applied. This is the fixture's creation-time snapshot. Later Membership.scopeVersion changes do not alter existing notification values. Validate an explicit scopeVersionAtCreation as a nonnegative integer and keep it; do not rewrite it to match current scopeVersion.
 
 If the recipient Membership is absent, the source scopeVersion is not a nonnegative integer, or an explicit value is not a nonnegative integer, fail fixture generation. AT-C08-SRC notif-alert-insulation-a / notif-alert-unknown-a fills in customer-a scopeVersion=1. Runtime notification generation saves the current Membership scopeVersion at notification creation under IR95/D08; later authorization uses current scope. validate_documents.py checks explicit values or their source for the seed and every notification patch.
+
+## IR107 Permission model of 38 values — Figma 2026-10-01
+
+User decision 2026-10-01 (Figma Admin 03-1…03-7, confirmed as final). `Permission` has 38 values: Read/Write per resource (asset, identity, device, alert.policy, job, contract, billing, restriction, automation.policy, energy, mrv, offset), `dashboard.read`, `alert.read`, `audit.read`, and independent actions `device.maintain`, `control.execute`, `control.diagnose`, `alert.resolve`, `billing.payment`, `restriction.override`, `mrv.review`, `mrv.factors`, `partner.accept`, `partner.assign`, `partner.review`. This replaces the 22 `.manage`-style values: every former `X.manage` maps to `X.read` for read operations and `X.write` for write operations in the operation catalog; `payments.confirm`, `payments.recordManual`, and payouts writes need `billing.payment`; `mrv.recordReview` needs `mrv.review`; `factors.save` needs `mrv.factors`. Write implies Read: saving a Membership with a Write permission and without its Read adds the Read (the UI locks Read on). Only another HQ identity administrator may grant `identity.write` or `restriction.override`; self-grant is FORBIDDEN. Fixture actors keep their previous capabilities by expanding each former value (billing.manage → billing.read/write/payment, mrv.manage → mrv.read/write/review/factors). Access & roles lists HQ/contractor/technician memberships only; client accounts are managed through `clientUsers.*` (IR111).
+
+## IR108 Customer-owned alert policies attached by units — Figma 2026-10-01
+
+Alert policies (`kind=alert`) belong to one customer (`customerId`, fixed after creation) and have one AlertCondition (metric, operator, threshold, recoveryThreshold, durationSeconds, activeWindow, severity). Units carry policies: `ACUnit.alertPolicyIds` is the only attachment source and is changed only by `units.setAlertPolicies` with the full list; every ID must be an alert policy of the unit's customer (otherwise NOT_FOUND). `Policy.unitIds` of an alert policy is the derived list of units carrying it and is not accepted as input (`AlertPolicyInput` has no unitIds). The HQ default policy (`kind=default_alert`, id policy-default, customerId=null) applies to every unit implicitly, cannot be attached, detached, or deleted (VALIDATION), and holds six DefaultAlertRules; its limits are edited only by HQ alert.policy.write and affect all units. `policies.setDefaultRule` stores one DefaultRuleSetting per (policy, rule, customer); a disabled rule is not evaluated for that customer's units. `policies.delete` first removes the policy from every unit's alertPolicyIds in the same change set, then deletes it. Separate air-quality policies (`kind=air_quality`) are removed: CO₂/PM2.5 limits are alert policies, which create Alerts and notifications only and never Commands; AT-A12-N therefore expects zero Commands. Acceptance inputs for alert policies carry `attachUnitIds` at the case level, applied with `units.setAlertPolicies` right after `policies.save` at the same tick.
+
+## IR109 Client structure is read-only; rename and group control — Figma 2026-10-01
+
+Client sessions cannot call `properties.save`, `properties.archive`, `spaces.save`, `spaces.archive`, or `units.save` (FORBIDDEN). `locations.rename` renames a property, space, or unit of the session's customer: name trimmed 1–120 characters, unique among siblings (same parent, case-insensitive), expectedVersion required; it changes only the name and version. HQ uses `locations.rename` or the existing save operations. Group control (FR-C14) is owner-only (`Membership.clientRole=owner`) and limited to units of one space; the UI sends one `commands.create` per unit with its own idempotency key and expectedUnitVersion; there is no batch operation and no rollback across units. The earlier rule “no room-wide bulk control” is replaced by this rule.
+
+## IR110 Client feedback, ventilation log, filter care, and export — Figma 2026-10-01
+
+`ventilation.log` records a manual ventilation (method, 1–240 minutes, co2AtLog from the latest valid CO₂ reading of the room or null) and never creates a Command or a notification. `jobs.rate` is allowed only when the job is completed and the caller is a client of its customer; the first call sets customerConfirmedAt; updates are allowed until rating.editableUntil (ratedAt of the first call + 7 days); afterwards CONFLICT. Completed jobs without a rating are confirmed automatically 7 days after completedAt (rating stays null). `jobs.reportProblem` creates a new job (status requested, same unit, type reactive, followUpOfJobId, followUpClass=pending); `jobs.classifyFollowUp` sets rework or new_request once. Filter care: runHoursSinceCleaning sums intervals with effectivePowerState=on since lastCleanedAt; unknown connection makes it null and status unknown; due_soon at ≥ 80 % and overdue at ≥ 100 % of thresholdHours; crossing 100 % creates one Alert type=maintenance (cleaning_due) per cycle. `energy.exportReport` is a read that returns a demo ReportFile; `Preferences.monthlyReportEmail` defaults to false.
+
+## IR111 HQ and partner operations added from Figma — 2026-10-01
+
+Client users: email unique per customer (case-insensitive); the last active owner cannot be demoted, disabled, or removed (CONFLICT); `clientUsers.resendInvite` returns a preview only. CSV import: `units.importPreview` writes nothing and expires after 30 minutes; `units.importCommit` with an expired or changed preview is CONFLICT; error rows are skipped; `units.importUndo` within undoUntil archives created entities only when none has telemetry or jobs. Warranty: coverage status = contract when an active contract covers the unit, else under_warranty when now < warrantyEndsAt − 90 days, expiring when within 90 days, otherwise no_coverage. Firmware campaigns: waves ascend and end at 100; a wave starts only when the previous wave reached 95 % success; failures above autoPauseFailurePercent within a wave pause the campaign; devices with an active diagnostic run, firmware operation, or open tamper are skipped with reasonKey. Contractors: suspension blocks `jobs.offer` (CONFLICT) but not existing offers or jobs; rate cards are versioned by effectiveFrom (future only). Certificates: `members.eligible` uses only valid verified certificates; a pending renewal does not extend eligibility; `certificates.verify` approve sets the matching QualificationGrant.validUntil. Unavailability sets available minutes to 0 for the dates and is reported in Capacity.unavailability. SLA metrics follow FR-A22 definitions; targets apply to jobs created at or after effectiveFrom. Payouts: `payouts.generate` creates or replaces draft statements for an ended month from jobs accepted in that month priced by the rate card effective at acceptance; approved/paid statements are untouched; approve → paid only on or after payDate; contractors see approved/paid statements only; `payouts.query` adds a job note; `payouts.resolveQuery` with adjustmentMinor adds an adjustment line to the next draft. Technician: `units.resolveQr` returns NOT_FOUND for units outside the technician's assignments; `jobs.checkIn` follows the `jobs.start` rules (IR76/IR89/IR94) and additionally records arrival; location_qr requires distanceMeters ≤ 200 and qrUnitId = job unit, otherwise only manual with reason; `jobs.pauseWork` only in in_progress; `reports.signOff` binds to reportVersion and is cleared by the next `jobs.saveDraft`.
+
+## IR112 Shared UI conventions and two-step verification — Figma 2026-10-01
+
+Desktop screens are 1920×1080 responsive layouts (sidebar + main; columns before scrolling); modals and dialogs are centered on the whole viewport, not the content area. Customer/Property/Unit/Device filters are search-selects that show the first 20 options and search the rest on the server as the user types (GitHub branch-picker style). Status chips use the shared StatusBadge vocabulary; power uses Running/Stopped/Unknown and connection Online/Offline. Forbidden (`/forbidden`) and not found (`*`) render one shared “Page unavailable” view (403/404 wording does not reveal existence, IR57). Two-step verification (FR-X08) is demo only: `twoFactor.enable` accepts any 6 digits and returns 8 recovery codes once; `twoFactor.disable` requires a 6-digit code; demo sign-in is unchanged. New DTO fields absent from demoSeed default to null or [] (ACUnit.alertPolicyIds=[], warrantyEndsAt=null; MaintenanceJob.followUpOfJobId/followUpClass/timeOnSite/rating/customerConfirmedAt=null, warrantyClaims=[]; WorkReport.refrigerant=[], signOff=null; Membership.clientRole=owner for seed client actors, null otherwise).

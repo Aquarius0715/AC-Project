@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.21.0
+version: 0.22.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -17,7 +17,7 @@ This design follows the company's original requests and the related requirements
 
 This document defines the processing needed for each FR (functional requirement) and acceptance criteria to test. Reference mock screens are used only to guide the shared UI appearance.
 
-**Implementation baseline for 0.21.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
+**Implementation baseline for 0.22.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
 
 ## Inputs and Responsibilities
 
@@ -44,21 +44,28 @@ Show retry only for recoverable errors. For forbidden and not-found, follow IR57
 | Design ID / requirement | Route / main component | Read and action contracts | Input, processing, validation | Errors and prohibited actions |
 |---|---|---|---|---|
 | DD-A01 / FR-A01 | `/admin` / `AdminOverview` | `admin.summary` | Specify organization and period. Show both target and unknown unit counts with operating rates | Never automatically classify unmeasured units as inactive or normal |
-| DD-A02 / FR-A02 | `/admin/units` / `AssetRegistry` | `organizations.list`、`organizations.save`、`customers.list`、`customers.save`、`properties.save`、`spaces.save`、`units.save`、`units.archive`、`units.list`、`units.get`、`properties.list`、`spaces.list`、`capabilities.list`、`units.delete`、`commands.create`、`commands.get`、`diagnosticRuns.list`、`diagnosticRuns.get` | Require a 1–120-character name. Enter parent ID, modelId, split type, and installation date. Derive tenantId from Session, not input (IR74) | Do not delete spaces in use; move related units first. Prefer archiving (taking out of use) to deletion |
-| DD-A03 / FR-A03 | `/admin/settings/access` / `AccessManager` | `members.list`、`members.save`、`organizations.list` | Use identity.manage permission, membershipId, role, scope, and validFrom/Until. Separate HQ permissions by function | Demo policy forbids indefinite external assignments. Prevent users from granting themselves stronger permissions |
-| DD-A04 / FR-A04 | `/admin/devices` / `DeviceRegistry` | `capabilities.list`、`capabilities.save`、`devices.list`、`devices.get`、`devices.register`、`devices.bind`、`devices.check`、`devices.calibrate`、`devices.updateFirmware`、`units.list`、`units.get`、`devices.calibrations`、`devices.operations` | Temperature requires min<=max and step>0. Specify allowed modes/fan levels and explicit ventilation support | Show the impact of capability changes incompatible with current Commands. Do not assume supported features |
-| DD-A05 / FR-A05 | `/admin/alerts` / `AlertPolicyEditor` | `alerts.list`、`policies.save`、`notifications.preview`、`policies.list`、`policies.get`、`alerts.get`、`alerts.acknowledge`、`alerts.resolve`、`notifications.recipients`, units.list, units.get | Use matching units. Require upper/lower thresholds, positive duration, and recipients. Thresholds are fictional demo values | Marking a notification read does not resolve the Alert. External sending is preview only |
-| DD-A06 / FR-A06 | `/admin/jobs` / `MaintenanceCoordinator` | `jobs.list`、`jobs.create`、`jobs.offer`、`jobs.assign`、`jobs.review`、`jobs.saveCost`、`jobs.hold`、`jobs.resumeHold`、`jobs.cancel`、`plans.save`、`plans.generateNext`、`jobs.get`、`reports.get`、`attachments.getContent`、`members.eligible`、`organizations.list`、`jobs.extendAccess`、`plans.list`、`plans.get`、`units.list` | Enter maintenance type, target, and deadline. Choose internal or outsourced work. Enter nonnegative costs with currency. Contractors accept before assigning their staff | Re-offer to another contractor after decline. Judge completion separately from alert resolution. Do not send real contractor payments |
+| DD-A02 / FR-A02 | `/admin/units` / `AssetRegistry` | `organizations.list`、`organizations.save`、`customers.list`、`customers.save`、`properties.save`、`spaces.save`、`units.save`、`units.archive`、`units.list`、`units.get`、`properties.list`、`spaces.list`、`capabilities.list`、`units.delete`、`commands.create`、`commands.get`、`diagnosticRuns.list`、`diagnosticRuns.get`、`properties.archive`、`spaces.archive`、`units.setAlertPolicies`、`policies.list` | Require a 1–120-character name. Enter parent ID, modelId, split type, and installation date. Derive tenantId from Session, not input (IR74) | Do not delete spaces in use; move related units first. Prefer archiving (taking out of use) to deletion |
+| DD-A03 / FR-A03 | `/admin/settings/access` / `AccessManager` | `members.list`、`members.save`、`organizations.list` | Use identity.read/identity.write, membershipId, role (admin/contractor/technician only), scope, validFrom/Until, qualifications, and the 38-value permission matrix (IR107). Write implies Read | Demo policy forbids indefinite external assignments. Prevent users from granting themselves stronger permissions |
+| DD-A04 / FR-A04 | `/admin/devices` / `DeviceRegistry` | `capabilities.list`、`capabilities.save`、`devices.list`、`devices.get`、`devices.register`、`devices.bind`、`devices.check`、`devices.calibrate`、`devices.updateFirmware`、`units.list`、`units.get`、`devices.calibrations`、`devices.operations`、`devices.events`、`audit.list` | Temperature requires min<=max and step>0. Specify allowed modes/fan levels and explicit ventilation support | Show the impact of capability changes incompatible with current Commands. Do not assume supported features |
+| DD-A05 / FR-A05 | `/admin/alerts` / `AlertPolicyEditor` | `alerts.list`、`policies.save`、`notifications.preview`、`policies.list`、`policies.get`、`alerts.get`、`alerts.acknowledge`、`alerts.resolve`、`notifications.recipients`、`units.list`、`units.get`、`telemetry.series`、`policies.setDefaultRule`、`policies.delete`、`units.setAlertPolicies`、`customers.list`、`automations.simulate`、`automations.fire` | Policies belong to one customer (IR108); units attach them on unit edit. HQ default policy on every unit with per-customer rule on/off. Require upper/lower thresholds, positive duration, and recipients. Thresholds are fictional demo values | Marking a notification read does not resolve the Alert. External sending is preview only |
+| DD-A06 / FR-A06 | `/admin/jobs` / `MaintenanceCoordinator` | `jobs.list`、`jobs.create`、`jobs.offer`、`jobs.assign`、`jobs.review`、`jobs.saveCost`、`jobs.hold`、`jobs.resumeHold`、`jobs.cancel`、`plans.save`、`plans.generateNext`、`jobs.get`、`reports.get`、`attachments.getContent`、`members.eligible`、`organizations.list`、`jobs.extendAccess`、`plans.list`、`plans.get`、`units.list`、`jobs.classifyFollowUp` | Enter maintenance type, target, and deadline. Choose internal or outsourced work. Enter nonnegative costs with currency. Contractors accept before assigning their staff | Re-offer to another contractor after decline. Judge completion separately from alert resolution. Do not send real contractor payments |
 | DD-A07 / FR-A07 | `/admin/billing/contracts` / `ContractEditor` | `contracts.list`、`contracts.save`、`customers.list`、`units.list` | Enter contract type, customerId, unitIds, period, and price. Store restriction eligibility per contract | Do not apply RTO remote-stop restrictions to general maintenance contracts. Changes affecting finalized invoices require new versions |
-| DD-A08 / FR-A08 | `/admin/billing` / `BillingManager` | `invoices.list`、`invoices.create`、`payments.confirm`、`notifications.preview`、`inquiries.list`、`inquiries.answer`、`payments.recordManual`、`contracts.list`、`invoices.get`、`notifications.recipients`, invoices.remind | Use billing.manage permission, contract, amount, deadline, and payment reference. Manual confirmation requires a reason | Do not double-count a payment reference. Navigation alone must not confirm payment |
-| DD-A09 / FR-A09 | `/admin/restrictions` / `RestrictionManager` | `restrictions.schedule`、`restrictions.execute`、`restrictions.release`、`commands.get`、`restrictions.list`、`restrictions.get`、`restrictions.retry`、`restrictions.reconcile`、`contracts.list`、`invoices.list`、`units.list`、`units.get` | Enter restriction.manage permission, contract, units, reason, notice deadline, and restriction details. Recheck conditions immediately before execution | Reject paid, grace, exception, or unsupported-unit cases. Allowed unit actions during restrictions follow IR46. Failure/expiry remains unapplied |
+| DD-A08 / FR-A08 | `/admin/billing` / `BillingManager` | `invoices.list`、`invoices.create`、`payments.confirm`、`notifications.preview`、`inquiries.list`、`inquiries.answer`、`payments.recordManual`、`contracts.list`、`invoices.get`、`notifications.recipients`, invoices.remind | Use billing.write permission, contract, amount, deadline, and payment reference. Manual confirmation requires a reason | Do not double-count a payment reference. Navigation alone must not confirm payment |
+| DD-A09 / FR-A09 | `/admin/restrictions` / `RestrictionManager` | `restrictions.schedule`、`restrictions.execute`、`restrictions.release`、`commands.get`、`restrictions.list`、`restrictions.get`、`restrictions.retry`、`restrictions.reconcile`、`contracts.list`、`invoices.list`、`units.list`、`units.get` | Enter restriction.write permission, contract, units, reason, notice deadline, and restriction details. Recheck conditions immediately before execution | Reject paid, grace, exception, or unsupported-unit cases. Allowed unit actions during restrictions follow IR46. Failure/expiry remains unapplied |
 | DD-A10 / FR-A10 | `/admin/restrictions/:id` / `RestrictionException` | `restrictions.defer`、`restrictions.exempt`、`restrictions.cancel`、`restrictions.override`、`audit.list`、`restrictions.get`、`restrictions.retry`、`restrictions.reconcile`, restrictions.list | Use override permission, reason, and expiry. When cancellation overlaps an execution request, check state and switch to release if needed | Manual release does not rewrite payment state. History cannot be deleted |
 | DD-A11 / FR-A11 | `/admin/settings/automation` / `ControlPolicy` | `policies.save`、`automations.simulate`、`automations.fire`、`policies.list`、`policies.get`、`units.list`、`units.get` | Enter units, priority, trigger event, action, and stop conditions. Prioritize contract restrictions and safety capabilities | Suppress automatic execution when data is unavailable. Send no real commands to external power equipment |
-| DD-A12 / FR-A12 | `/admin/settings/air-quality` / `AirPolicy` | `policies.save`、`automations.simulate`、`automations.fire`、`telemetry.series`、`policies.list`、`policies.get`、`units.get`、`commands.get`、`notifications.recipients`、`units.list` | Fix ppm, µg/m³, °C, and % to their matching metrics | Do not guarantee health or safety. Fan-only capability must not issue ventilation Commands |
+| DD-A12 / FR-A12 | `/admin/alerts?tab=policies` (former `/admin/settings/air-quality` removed) / `AlertPolicyEditor` | `policies.save`、`policies.list`、`policies.get`、`automations.simulate`、`automations.fire`、`telemetry.series`、`notifications.recipients`、`units.list` | CO₂ (ppm) and PM2.5 (µg/m³) limits are customer-owned alert policies (IR108); fix ppm, µg/m³, °C, and % to their matching metrics | Do not guarantee health or safety. Air-quality policies notify only and never create Commands |
 | DD-A13 / FR-A13 | `/admin/energy` / `EnergyAnalysis` | `energy.summary`、`baselines.list`、`baselines.save`、`units.list` | Enter baseline period, boundary, model version, and unit set. Validate period overlaps and missing data | Cannot calculate without a baseline. Do not guarantee reductions such as 10–20% or more |
 | DD-A14 / FR-A14 | `/admin/mrv` / `MRVWorkspace` | `mrv.preview`、`mrv.saveDraft`、`mrv.recordReview`、`factors.list`、`factors.save`、`mrv.list`、`mrv.get`、`baselines.list`、`organizations.list`、`units.list`、`mrv.versions` | Require period, units, baseline version, factor version, and boundary. List evidence | Note missing data and estimates. Use “Demo review,” not “Externally verified” |
 | DD-A15 / FR-A15 | `/admin/offsets` / `OffsetRegistry` | `offsets.preview`、`offsets.simulate`、`offsets.list`、`customers.list`、`units.list` | Quantity must be >0. Label scheme/provider “Not selected” and require the demo flag | Do not copy emission amounts into credit balances. No real trading or certificate issuance |
 | DD-A16 / FR-A16 | `/admin/audit` / `AuditExplorer` | `audit.list`、`devices.events` | Use audit.read permission, period, actor, target, and event type. Mask confidential values | Show denied and successful actions separately. No deletion or changes through the screen. Demo records are not guaranteed tamper-proof |
+| DD-A17 / FR-A17 | `/admin/units?customerId=&tab=users` / `ClientUserList` | `clientUsers.list`、`clientUsers.save`、`clientUsers.remove`、`clientUsers.resendInvite` | Email unique per customer; role owner/member; reason for removal | Last active owner cannot be demoted, disabled, or removed |
+| DD-A18 / FR-A18 | `/admin/units` (Import CSV) / `UnitImportWizard` | `units.importPreview`、`units.importCommit`、`units.importUndo`、`customers.list` | UTF-8 CSV ≤ 1000 rows; 9 mapped columns; nothing written before import | Error rows skipped; undo only 24 h and before telemetry/jobs |
+| DD-A19 / FR-A19 | `/admin/units?tab=warranty` / `WarrantyCoverage` | `units.coverage`、`jobs.recordWarrantyClaim`、`contracts.list` | Coverage = warranty or active contract; claim amount > 0 | Claims only for parts replaced under warranty |
+| DD-A20 / FR-A20 | `/admin/devices?tab=firmware` / `FirmwareCampaigns` | `firmwareCampaigns.list`、`firmwareCampaigns.get`、`firmwareCampaigns.schedule`、`firmwareCampaigns.control`、`devices.list` | Signed version; start ≥ 24 h ahead; waves end at 100 %; auto-pause 1–50 % | Busy/offline/tampered devices skipped; failed devices keep the old version |
+| DD-A21 / FR-A21 | `/admin/jobs?tab=contractors` / `ContractorRegister` | `contractors.list`、`contractors.save`、`contractors.setOfferStatus`、`rateCards.list`、`rateCards.save`、`certificates.list`、`certificates.verify` | Rate card from a future date; suspension reason 1–1000 | Suspension blocks new offers only |
+| DD-A22 / FR-A22 | `/admin/jobs?tab=sla` / `SlaScorecard` | `sla.scorecard`、`sla.saveTargets` | Percentages 0–100; response 1–168 h; targets per plan | New targets apply only to new jobs |
+| DD-A23 / FR-A23 | `/admin/billing?tab=payouts` / `ContractorPayouts` | `payouts.list`、`payouts.get`、`payouts.generate`、`payouts.transition`、`payouts.resolveQuery`、`rateCards.list` | billing.payment for every write; mark paid on or after the pay date | Approved/paid statements are never regenerated |
 
 ## Shared Implementation Steps
 
@@ -91,7 +98,11 @@ Scope: FR-A01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `admin.
 | customerCount | Read-only | Count where both Customer.status and Organization.status are active (IR40) | Customer count |
 | from / to | datetime/required | From today/7d/30d/custom presets (SR17); maximum 366 days (IR74) | Period |
 | counts / rates | Read-only | Numerator/denominator/unknownCount/asOf | Operating state |
-| amountsByCurrency | Read-only array | Separate by currency | Unpaid amount |
+| total / powerOn / powerOff / powerUnknown | Read-only | total=powerOn+powerOff+powerUnknown; archived units excluded (SR27, IR39) | Power-state axis |
+| online / offline / unknown | Read-only | unknown = connection unknown/connecting/error; separate axis from powerUnknown (SR27) | Connection axis |
+| alertCount | Read-only | open/acknowledged critical/warning only (IR51) | Unresolved alerts |
+| jobCounts | Read-only Record<JobStatus, number> | All ten statuses in the period, including zeros | Maintenance by status |
+| overdueInvoiceCount / amountsByCurrency | Read-only / array or null | Separate by currency; null with billingVisibility=forbidden (D-KPI) | Unpaid amount |
 | energySummary | Read-only | Actual period results and quality. Reduction fields are null (comparison in A13) | Energy-saving results |
 | energyForecast | Read-only | IR78: forecast prorated from a demo_fixed baseline matching the target unit set. For null show “No target units / No baseline / Cannot calculate” | Expected reduction |
 
@@ -101,6 +112,11 @@ Scope: FR-A01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `admin.
 2. Apply these business rules to reads and actions. Operating rate is the powerOn share of units with known current state. Always show total units and unknown units together. Customer count follows IR40 (Customers where both Customer and Organization are active). Determine overdue billing from unpaid amounts.
 3. This screen is read-only. Keep periods, scope, and definitions consistent between the dashboard and lists opened from it.
 4. Queries to update: `admin summary (on related events)`.
+5. Layout (top to bottom), all from the single `admin.summary` result; no other Query is called, so the screen has no recent-alert list, job list, per-customer table, hourly chart, restriction count, or CSV export. (a) Filter bar: Customer, Property, Period (Today / Last 7 days / Last 30 days / Custom, SR17), the `asOf` time with display timezone and period range, and an explicit Refresh. (b) Eight KpiCards: active customers, target units (ON/OFF/unknown under the value), operation rate (ON / known, with the unknown count), unresolved alerts, energy used (energySummary kWh, cost, coverage), overdue billing (amount per currency and overdueInvoiceCount), maintenance jobs in the period, and connection (online, with offline and unknown/connecting/error). (c) Energy-saving forecast card (step 6). (d) Power-state card and connection card, each with a stacked bar and one row per class. (e) Jobs-by-status card listing all `jobCounts` keys and a billing card listing one row per currency.
+6. Forecast card (IR78): label “Forecast (prorated assumed baseline, demo)”; forecastSavedKWh and forecastSavingPercentage using “Expected reduction / Expected increase / No change 0.0” with absolute values; predictedBaselineKWh with baselineRef, method, and baseline kWh; predictedActualKWh with actualKWhOnValidSlots; coverage as validUnitMinutes / expectedUnitMinutes; and qualityWarnings as returned, one badge each. Null values show “No target equipment” (no_units), “Baseline not set” (baseline_unavailable), or “Cannot calculate”. State that it is a forecast, not a measured saving; actual results stay in the energy-used KPI.
+7. Drill-down links (IR50, SR06): units and operation → `/admin/units?customerId&propertyId&powerState=on|off|unknown`; connection → `connections=online|offline` or `connections=connecting,error,unknown`; alerts → `/admin/alerts`; overdue billing → `/admin/billing?overdueOnly=true`. These current-state links carry the customer/property filters but not the period. Jobs → `/admin/jobs` with `statuses` and the period. Back restores this URL including the period (D13).
+8. Permission-scoped sections: without billing.write, `billingVisibility=forbidden` and `amountsByCurrency=null`; the billing KPI and card show “Not permitted”, never 0, and the billing link is hidden. The forecast is shown to every dashboard.read holder, but the `/admin/energy` link appears only for energy.write holders.
+9. States: initial/loading shows a skeleton only on first load or when the URL conditions change; refetch keeps values with an “Updating” indicator and aria-busy (IR83); a failed refetch keeps values and adds a stale banner with last success time and Retry; an initial failure shows an error message and Retry with no KPI values; zero target units is a successful empty result (counts 0, rates and energy “Cannot calculate”, forecast “No target equipment”); in the first minute of today (from=to) show “No completed measurement interval” and do not call `admin.summary` (SR17). Wireframes: Figma “Admin — Wireframes”, row “Overview — /admin (FR-A01)”.
 
 **Boundary cases and failures**: Do not silently include unknown units in the operating-rate denominator. Do not sum different currencies; display them separately. A rate with zero data is not calculable.
 
@@ -110,7 +126,7 @@ Scope: FR-A01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `admin.
 
 **Source mapping**: SRC-06 BIZ-07 → FR-A02 → DD-A02. Source category: original company requirements SRC-06 + design additions. Design additions: registration, editing, and archiving (taking out of use). Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-A02 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `organizations.list, organizations.save, customers.list, customers.save, properties.save, spaces.save, units.save, units.archive, units.list, units.get, properties.list, spaces.list, capabilities.list, units.delete, commands.create, commands.get, diagnosticRuns.list, diagnosticRuns.get`.
+Scope: FR-A02 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `organizations.list, organizations.save, customers.list, customers.save, properties.save, spaces.save, units.save, units.archive, units.list, units.get, properties.list, spaces.list, capabilities.list, units.delete, commands.create, commands.get, diagnosticRuns.list, diagnosticRuns.get, properties.archive, spaces.archive, units.setAlertPolicies, policies.list`.
 
 **Initial view and prerequisites**: Permission to edit the managed organization register; customer/property/unit relationships can be traced correctly. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -132,6 +148,8 @@ Scope: FR-A02 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 3. Keep immutable IDs, versions, before/after values, and change reasons. Relocation updates the current location and preserves the original in history.
 4. Queries to update: `organizations / customers / properties / spaces / units / audit`。
 
+**Screens (Figma Admin 02-1…02-16, IR111)**: (1) Customer list `/admin/units`: search (name, ID, property), Status/Contract filters, KPI tiles (customers, properties, units, needs attention), rows with status, operation, alerts, contract badges; inactive customers only with Status: All (IR40); “+ New customer” modal (`customers.save`). (2) Customer header (KPIs: units, operation, open alerts, overdue billing, restriction link) with tabs Units & locations, Users (DD-A17), Alert policies (customer-filtered policy list linking to SCR-A05), Warranty & coverage (DD-A19). (3) Location tree with “+ Add property/floor/area/room” modals (`properties.save`/`spaces.save`), ⋯ Rename and Delete on every location (`properties.archive`/`spaces.archive`; disabled with CONFLICT while it still contains locations or units). (4) Selecting a room lists its units; unit rows open unit edit `?unitId=`. (5) Unit edit: name, location select (saving asks a change reason in a modal), model, installed at, IoT binding, service scope, “Alert policies on this unit” card (default policy always attached; customer policies with Edit → SCR-A05 and Detach; “+ Attach policy” modal lists only that customer’s policies → `units.setAlertPolicies`), links to command panel, diagnostic runs, device events, audit; Delete unit (CONFLICT while in use). Archived units open read-only (IR39). URL keys customerId, locationId (property or space), unitId, tab, powerState, connections, search.
+
 **Boundary cases and failures**: Reject another customer's room, hierarchy cycles, nonexistent modelId, or deletion of units in use. Do not register new units for inactive customers.
 
 **Verification**: Check the traceability entries under AT-A02 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
@@ -142,7 +160,7 @@ Scope: FR-A02 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 Scope: FR-A03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `members.list, members.save, organizations.list`.
 
-**Initial view and prerequisites**: identity.manage permission; the target's current role, scope, and valid period are fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
+**Initial view and prerequisites**: identity.write permission; the target's current role, scope, and valid period are fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
@@ -157,11 +175,13 @@ Scope: FR-A03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 **Steps**
 
 1. Select user and organization. Choose one of four roles; for technicians, also select internal/external. Set scope, period, and individual permissions. Confirm and save.
-2. Apply these business rules to reads and actions. Keep role and permissions separate. Admin status does not automatically grant restriction.manage or override. External technicians must not have unit access without an end date. Increasing one's own permissions requires another HQ permission administrator to perform the change.
+2. Apply these business rules to reads and actions. Keep role and permissions separate. Admin status does not automatically grant restriction.write or override. External technicians must not have unit access without an end date. Increasing one's own permissions requires another HQ permission administrator to perform the change.
 3. Update Membership version and scopeVersion. Discard caches from old sessions; evaluate subsequent mutations using new permissions.
 4. Queries to update: `members / session scope / all affected query caches / audit`。
 
 **Boundary cases and failures**: Reject other-tenant scopes, external access without an end date, validFrom at or after validUntil, and adding override to oneself. Reject saves from old screens after permissions expire.
+
+**Permission matrix (IR107, Figma Admin 03-1…03-7)**: Rows per resource with READ / WRITE / ACTIONS columns (see FR-A03 BR-A03); a header shows “Permissions · n of 38”. Turning Write on locks Read on. The role select only pre-checks defaults. The organization filter and “+ Add scope” use search-selects (first 20, type to search). Client memberships are excluded from `members.list` results on this screen (role filter Admin/Contractor/Technician) and from the role options. Revoke access opens a centered modal (valid until = now, reason). Granting `identity.write` or `restriction.override` to one’s own membership is rejected (FORBIDDEN) with Save disabled.
 
 **Verification**: Check the traceability entries under AT-A03 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -169,9 +189,9 @@ Scope: FR-A03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 **Source mapping**: SRC-06 BIZ-06, BIZ-20 → FR-A04 → DD-A04. Source category: original company requirements SRC-06 + design additions. Design additions: model capabilities and IoT register editing. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-A04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `capabilities.list, capabilities.save, devices.list, devices.get, devices.register, devices.bind, devices.check, devices.calibrate, devices.updateFirmware, units.list, units.get, devices.calibrations, devices.operations`.
+Scope: FR-A04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `capabilities.list, capabilities.save, devices.list, devices.get, devices.register, devices.bind, devices.check, devices.calibrate, devices.updateFirmware, units.list, units.get, devices.calibrations, devices.operations, devices.events, audit.list`.
 
-**Initial view and prerequisites**: device.manage permission (IR74). Capability values are managed as a demo register. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
+**Initial view and prerequisites**: device.write permission (IR74). Capability values are managed as a demo register. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
@@ -191,6 +211,9 @@ Scope: FR-A04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 2. Apply these business rules to reads and actions. Use false or unknown for unconfirmed capabilities. Do not infer modes from product category alone. Disable existing automation rules that conflict with new capabilities and show the reason.
 3. Update Capability version and available unit actions. Keep unfinished Command contents in history; do not rewrite them to match new capabilities.
 4. Queries to update: `capabilities / units / devices / automations / audit`。
+5. Tabs: `tab=models` (capability list and editor) and `tab=devices` (device list; `deviceId` opens the detail with binding, sensors, operations, and calibrations).
+6. Version history (capability): shown only to holders of audit.read. On explicit open, call `audit.list` with `targetId=<capabilityId>` and list each saved version as previousVersion→nextVersion, actor, time, reason, and maskedBefore/maskedAfter. No separate capability-version read operation exists; the current version comes from `capabilities.list`.
+7. Device events: for the selected `deviceId`, call `devices.events` (communication_lost / power_lost / tamper / restored / operation_failed with recovery) as a secondary Query after `devices.get` succeeds.
 
 **Boundary cases and failures**: Reject min>max, step<=0, or enabled mode control with no modes. Do not include unsupported firmware versions as candidates.
 
@@ -212,28 +235,36 @@ Verification: AT-A05-SRC. Use fixtures for suspected open window, inspection rec
 
 **Source mapping**: SRC-06 BIZ-08, BIZ-11, BIZ-17 → FR-A05 → DD-A05. Source category: original company requirements SRC-06 + design additions. Design additions: threshold settings and alert handling. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-A05 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `alerts.list, policies.save, notifications.preview, policies.list, policies.get, alerts.get, alerts.acknowledge, alerts.resolve, notifications.recipients, units.list, units.get`.
+Scope: FR-A05 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `alerts.list, policies.save, notifications.preview, policies.list, policies.get, alerts.get, alerts.acknowledge, alerts.resolve, notifications.recipients, units.list, units.get, telemetry.series, policies.setDefaultRule, policies.delete, units.setAlertPolicies, customers.list, automations.simulate, automations.fire`.
 
-**Initial view and prerequisites**: alert.policy.manage and recipient read permissions; metric units and target units are fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
+**Initial view and prerequisites**: alert.policy.write and recipient read permissions; metric units and target units are fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| unitIds / metric | ID array and enum/required | Within supported capabilities | Targets |
+| customerId / metric | ID and enum/required | Owner customer (fixed after creation); metric within supported capabilities | Owner and metric |
 | operator / threshold | enum and number/required | gt/gte/lt/lte comparisons; finite number | Trigger condition |
 | durationSeconds | integer/required | 1–86400 | Duration (seconds) |
 | recoveryThreshold | number/required | Hysteresis matching comparison direction | Recovery threshold |
-| severity | enum/required | warning/critical | Severity |
+| severity | enum/required | normal (“Info”)/warning/critical | Severity |
+| activeWindow | object/optional | weekdays + startLocal/endLocal in the policy timezone | Only if … |
 | recipientMembershipIds / channels | array/required | At least one each; inApp/email/whatsapp | Recipients / channels |
 | escalateAfterMinutes / cooldownMinutes | integer/required | 1–1440 / 1–1440 | Escalation delay / duplicate suppression |
-| name / unitIds | Required | 1–120 trimmed characters / within scope, nonempty, no duplicates | IR07 shared inputs |
+| name | Required | 1–120 trimmed characters | IR07 shared inputs (alert policies carry no unitIds input, IR108) |
 | timezone / enabled / priority | Required | IANA name / boolean / integer 0–100. New UI shows Preferences.timezone / false / 50 | IR07 shared inputs |
 
 **Steps**
 
-1. Set target units, metric, comparison, and duration. Specify recipients, channels, and escalation delay. After saving, combine conditions to check trigger and recovery behavior.
+1. Choose the owner customer, metric, comparison, and duration. Specify recipients, channels, and escalation delay. After saving, combine conditions to check trigger and recovery behavior.
 2. Apply these business rules to reads and actions. Units are fixed by metric. Do not use missing or stale data to judge normal thresholds; treat them as connection/data-quality notices. Suppress repeats with cooldown. Record severity changes as new notification reasons.
 3. Save Policy version. On trigger, create an Alert and Notification preview. Keep notification read status separate from Alert acknowledgement.
 4. Queries to update: `policies / alerts / notifications / admin summary / audit`。
+5. Tabs: `tab=alerts` (default; alert list with status/severity/cause/unit filters and the `alertId` detail) and `tab=policies` (policy list and the `policyId` editor). The detail shows cause and evidence using the BIZ-17 wording above, the target unit, and notification activity; reading a notification never changes the Alert.
+6. Resolve (IR66): policy-free Alerts resolve only manually by an alert.resolve holder with a 1–1000 character reason and at least one evidence ID. Evidence candidates are the Alert's own `evidenceIds` (from `alerts.get`) and remeasurements from `telemetry.series` for the same unit and metric observed after `detectedAt`, fetched only when the Resolve dialog opens.
+7. Policy editor order: basics (name, priority, timezone) → targets and metric → condition and recovery → severity → recipients/channels, cooldown, escalation → `notifications.preview` per recipient → demo test (synthetic reading and clock advance, simulator off) → save.
+8. Scope entry (IR108): the Policies tab filters by `customerId` → `propertyId` → `unitId` (URL keys, search-selects with the first 20 options and server search; `policies.list` filters, customer candidates from `customers.list`, unit candidates from `units.list`). The list is grouped “Default · on every unit” first, then one group per customer (owner). A unitId filter (from unit edit) lists only the policies attached to that unit. A new policy first asks for the owner customer; the owner is fixed after creation. The editor’s “Owner & units” section shows the attached units read-only with a link to each unit edit — units are never assigned from this screen.
+9. Default policy (`kind=default_alert`, policy-default): rule list (6 rules), the selected rule’s condition editor (HQ template; saving affects all units), and “On / off per customer — this rule” with a customer search-select; toggles call `policies.setDefaultRule` with a reason. “Copy as a <customer> policy →” opens an unsaved alert policy prefilled from the rule. The default policy cannot be deleted or detached.
+10. Air-quality limits (FR-A12/DD-A12) are alert policies with metric co2 (ppm) or pm25 (µg/m³). Metric choices: temperature, humidity, CO₂, PM2.5, refrigerant pressure, vibration, power. “Only if …” sets activeWindow (weekdays and local hours in the policy timezone). Delete policy (`policies.delete`) detaches from all units after confirmation.
+11. Alerts tab actions: Acknowledge, Resolve (step 6), Request maintenance (opens New job in SCR-A06 prefilled with unit and alert), Open unit → (SCR-A02 unit edit).
 
 **Boundary cases and failures**: Reject zero recipients, zero duration, and recovery thresholds inconsistent with comparison direction. Check just-before, exact-threshold, and duration boundaries.
 
@@ -243,9 +274,9 @@ Scope: FR-A05 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 **Source mapping**: SRC-06 BIZ-12 → FR-A06 → DD-A06. Source category: original company requirements SRC-06 + design additions. Design additions: request intake, delegation, and quality review. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-A06 / Main display pattern: **UI-LIST / UI-DETAIL / UI-FORM**. Service boundary: `jobs.list, jobs.create, jobs.offer, jobs.assign, jobs.review, jobs.saveCost, jobs.hold, jobs.resumeHold, jobs.cancel, plans.save, plans.generateNext, jobs.get, reports.get, attachments.getContent, members.eligible, organizations.list, jobs.extendAccess, plans.list, plans.get, units.list`.
+Scope: FR-A06 / Main display pattern: **UI-LIST / UI-DETAIL / UI-FORM**. Service boundary: `jobs.list, jobs.create, jobs.offer, jobs.assign, jobs.review, jobs.saveCost, jobs.hold, jobs.resumeHold, jobs.cancel, plans.save, plans.generateNext, jobs.get, reports.get, attachments.getContent, members.eligible, organizations.list, jobs.extendAccess, plans.list, plans.get, units.list, jobs.classifyFollowUp`.
 
-**Initial view and prerequisites**: job.manage permission; target units and internal/contractor options are fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
+**Initial view and prerequisites**: job.write permission; target units and internal/contractor options are fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
@@ -263,8 +294,14 @@ Scope: FR-A06 / Main display pattern: **UI-LIST / UI-DETAIL / UI-FORM**. Service
 2. Apply these business rules to reads and actions. HQ confirms internal assignees and schedules. Contractors accept before assigning their own staff. Recurring plans show the next generation date; allow only one job per plan occurrence.
 3. Link Job, Assignment, Offer, cost lines, and review history to the same jobId. Judge work completion separately from Alert resolution.
 4. Queries to update: `jobs / plans / offers / assignments / costs / notifications / audit`。
+5. Tabs: `tab=jobs` (default) and `tab=plans`. Both share the scope filter `customerId` → `propertyId` → `unitId` (URL keys; `jobs.list` / `plans.list` filters).
+6. Jobs tab: show per-status counts for the scoped result set, filters for type, delivery (internal/contractor via `organizationId`), assignee (`membershipId`) and `overdueOnly`, and sort (IR34). Each row shows job, unit, customer, type, status, and the IR89 overdue badge. The `jobId` detail shows a status stepper (internal delivery skips offered/accepted), requested window, due, scheduled slot, symptom, delivery (assignee or offer with access window and `jobs.extendAccess`), the submitted report with Return for rework / Accept (`jobs.review`, self-approval rejected), and cost lines with estimate/actual totals per currency. Hold and Cancel follow IR56; where cancellation is not allowed, disable it and show the reason.
+7. New job: step 1 `jobs.create` (unit, type, symptom, requested window, due defaulting to requested end, contact window); step 2 either `jobs.assign` with candidates from `members.eligible` for the chosen slot, or `jobs.offer` to a contractor organization. “Save as requested” stops after step 1.
+8. Plans tab: `plans.list` → `plans.get` for `planId`; edit recurrence (monthly, 1–12 months) and next due with `plans.save`; list generated occurrences with their jobs; “Generate job” calls `plans.generateNext` once for the next occurrence (a repeat for the same date returns CONFLICT).
 
 **Boundary cases and failures**: Check re-offering after decline, overlapping confirmed schedules, overdue jobs, and returns after failed quality review. Summarize estimate and actual costs separately by currency, without conversion.
+
+**Follow-up requests (FR-C17)**: A client “Report a problem” creates a requested job with followUpOfJobId and followUpClass=pending, highlighted in the Jobs tab; HQ classifies it within one business day as rework (free, linked to the original job) or a new request (`jobs.classifyFollowUp`, reason required). Tabs: Jobs, Plans, Contractors (DD-A21), SLA by customer (DD-A22).
 
 **Verification**: Check the traceability entries under AT-A06 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -274,7 +311,7 @@ Scope: FR-A06 / Main display pattern: **UI-LIST / UI-DETAIL / UI-FORM**. Service
 
 Scope: FR-A07 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `contracts.list, contracts.save, customers.list, units.list`.
 
-**Initial view and prerequisites**: contract.manage permission; customer and linked units are in the same tenant. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
+**Initial view and prerequisites**: contract.write permission; customer and linked units are in the same tenant. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
@@ -291,6 +328,8 @@ Scope: FR-A07 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 2. Apply these business rules to reads and actions. General maintenance uses restrictionEligible=false. Even RTO is eligible only when explicitly specified. Contract revisions do not retroactively change issued invoices.
 3. Keep contract versions. New invoices reference the new version; past invoices keep the original. Contract expiry does not mean a real device has stopped.
 4. Queries to update: `contracts / customer payments / audit`。
+5. List: scope filter `customerId` → `unitId` and plan-type chips (`kind`), all as URL keys and `contracts.list` filters. Each row shows contract ID, plan type, customer, unit count, price, period, and restriction eligibility with rules version.
+6. Editor (`contractId`) and New contract (no `id`): customer, unit checklist limited to that customer's active units (a unit already on another contract is labelled, not hidden), plan type, period, price and currency, restriction eligibility and rules version (enabled only for `rto`; disabled with the reason for other plans), and a “what saving does” summary (new version, issued invoices keep their version). When `activeRestrictionIds` is non-empty or `hasUnresolvedRecovery` is true, disable save and show the SR19 reason.
 
 **Boundary cases and failures**: Reject other customers' units, reversed periods, negative prices, and restrictions for general maintenance. Do not block monitoring or maintenance for units without contracts.
 
@@ -321,7 +360,7 @@ Verification: AT-A08-SRC. Reproduce processing, success, and failure for each pa
 
 Scope: FR-A08 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `invoices.list, invoices.create, payments.confirm, notifications.preview, inquiries.list, inquiries.answer, payments.recordManual, contracts.list, invoices.get, notifications.recipients, invoices.remind`.
 
-**Initial view and prerequisites**: billing.manage permission; contracts, invoices, and simulated payment targets can be matched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
+**Initial view and prerequisites**: billing.write permission; contracts, invoices, and simulated payment targets can be matched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
@@ -340,6 +379,10 @@ Scope: FR-A08 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 2. Apply these business rules to reads and actions. Phase 1A supports full payment only. Repeated confirmation of the same invoiceId/paymentReference returns the same result. Reminders target unpaid overdue invoices. Also show exceptions and disputes.
 3. Record Payment confirmed, Invoice paid, and audit history. Once all causeInvoiceIds of a related Restriction are paid, move scheduled to cancelled and requested/applied to release_requested. If any remain unpaid, do not release; show pending device responses and remaining count.
 4. Queries to update: `invoices / payments / restrictions / notifications / audit`。
+5. Tabs: `tab=invoices` (default) and `tab=inquiries`. The Invoices tab has the scope filter `customerId` → `propertyId` → `contractId` (URL keys; `invoices.list` filters), status chips, and totals per currency for the scoped result set (outstanding, overdue, processing, paid in period) without conversion.
+6. Invoice detail (`invoiceId`): amount, contract and contract version, period, due, payment method and payment status as read-only values (“Not selected” when null). Enable `payments.confirm` only for an existing processing Payment and `payments.recordManual` only when the invoice has no Payment; otherwise disable with the reason. Reminder: choose recipient (`notifications.recipients`) and channel, show `notifications.preview`, then `invoices.remind` with a reason, only for overdue unpaid invoices. Show related restriction IDs from `InvoiceDetail.restrictionIds` as links to the Restrictions screen; restriction state and units are not read here. Show linked inquiries via `inquiries.list(invoiceId)`.
+7. Record manual payment: confirmed amount must equal the full invoice amount and currency, payment reference 1–128 characters unique within the tenant, reason 1–1000 characters; summarise the effect (invoice paid, method stays null, related restrictions move per step 3, resubmitting the same reference returns the same result).
+8. Create invoice: contract and contract version, period within the contract, amount in the contract currency, future due date (`invoices.create`). Inquiries tab: `inquiries.list` with state filter; the `inquiryId` detail shows the message and linked invoice/restriction IDs and sends a 1–2000 character reply with `inquiries.answer`; a reply never changes invoices or restrictions.
 
 **Boundary cases and failures**: Reject amount/currency mismatches, reusing a reference on another invoice, and rebilling paid invoices. Recheck and stop reminders attempted immediately after payment is confirmed.
 
@@ -351,7 +394,7 @@ Scope: FR-A08 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 Scope: FR-A09 / Main display pattern: **UI-LIST / UI-DETAIL / UI-FORM**. Service boundary: `restrictions.schedule, restrictions.execute, restrictions.release, commands.get, restrictions.list, restrictions.get, restrictions.retry, restrictions.reconcile, contracts.list, invoices.list, units.list, units.get`.
 
-**Initial view and prerequisites**: restriction.manage permission, an eligible RTO contract, unpaid status, and confirmed target-unit capabilities. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
+**Initial view and prerequisites**: restriction.write permission, an eligible RTO contract, unpaid status, and confirmed target-unit capabilities. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
@@ -368,6 +411,9 @@ Scope: FR-A09 / Main display pattern: **UI-LIST / UI-DETAIL / UI-FORM**. Service
 2. Apply these business rules to reads and actions. Reaching a deadline on screen does not automatically stop real equipment. Phase 1A simulates only explicitly confirmed HQ actions. Application requires success evidence for every unit; release requires released/not_required evidence for every unit (D03). Power-off and temperature limits are separate policies.
 3. Create Restriction and per-unit Commands. When all causeInvoiceIds have confirmed payment, move scheduled to cancelled or requested/applied to release_requested. If any remain unpaid, keep the current state.
 4. Queries to update: `restrictions / commands / units / customer billing / notifications / audit`。
+5. List: scope filter `contractId` / `invoiceId` and state (URL keys; `restrictions.list` filters) with per-state counts of the scoped result set. Each row shows ID, state, contract, customer, policy, unit count, and progress (applied/released units, pending offline units).
+6. Detail (`restrictionId`): lifecycle stepper, policy, noticeAt, executeAfter, grace/exception, the customer-visible reason (IR42), cause invoices with paid state (`invoices.list`), and per-unit apply/release/observed state (`units.get`, `commands.get`). Enable Execute only for scheduled restrictions at or after executeAfter with rules-version confirmation; Retry/Reconcile only for units that are pending, failed or waiting for reconciliation (SR26); explicit Request release only when payment, grace/exception or override allows it (IR35), otherwise disabled with the reason. Link to the SCR-A10 exception screen.
+7. Schedule restriction: pick an eligible RTO contract (`contracts.list`); cause invoices are fixed to all its overdue unpaid invoices; units without the needed capability or with an active restriction are shown disabled with the reason; policy (temperature limit with a setpoint inside the unit range, or power off); executeAfter at least 24 hours ahead; customer-visible reason; show how many clients receive the notice and reject when none can view every target (IR05).
 
 **Boundary cases and failures**: If all cause invoices are paid immediately before execution, set cancelled and create no apply requests. Grace, exceptions, missing notice, and unsupported devices also prevent application. If some units are offline, do not set the whole restriction applied; show per-unit pending states. Failed release stays release_requested; late apply acknowledgements must not return it to applied.
 
@@ -379,7 +425,7 @@ Scope: FR-A09 / Main display pattern: **UI-LIST / UI-DETAIL / UI-FORM**. Service
 
 Scope: FR-A10 / Main display pattern: **UI-DETAIL / UI-FORM / UI-TIMELINE**. Service boundary: `restrictions.defer, restrictions.exempt, restrictions.cancel, restrictions.override, audit.list, restrictions.get, restrictions.retry, restrictions.reconcile, restrictions.list`.
 
-**Initial view and prerequisites**: Grace/exception actions require restriction.manage; manual release requires restriction.override. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
+**Initial view and prerequisites**: Grace/exception actions require restriction.write; manual release requires restriction.override. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
@@ -395,6 +441,7 @@ Scope: FR-A10 / Main display pattern: **UI-DETAIL / UI-FORM / UI-TIMELINE**. Ser
 2. Apply these business rules to reads and actions. Cancellation follows IR96: scheduled→cancelled; requested/applied→release_requested with releaseIntent.source=cancel; release_requested is idempotent; released/cancelled returns CONFLICT. Grace/exception expiry does not reapply automatically; conditions must be checked again.
 3. Record before/after grace and exception details, expiry, release reason, and actor. Manual release does not clear unpaid Invoice balances.
 4. Queries to update: `restrictions / commands / audit / notifications`。
+5. Screen: breadcrumb back to SCR-A09, a summary (policy, units, cause invoices, grace/exception, the viewer's restriction permissions), four action cards (grace/defer, exception/exempt, cancel, override release) that each state the resulting transition for the current state before save (IR96/IR35), the form for the chosen action (future `until` for defer/exempt, reason 1–1000), an impact summary (release still needs per-unit evidence; the invoice stays unpaid), and an `audit.list` timeline shown only with audit.read. Override is shown only to restriction.override holders; override-only users see the release projection (IR03).
 
 **Boundary cases and failures**: Reject HQ users without override permission, empty reasons, and past grace dates. Cancellation from requested must not assume application is impossible.
 
@@ -406,7 +453,7 @@ Scope: FR-A10 / Main display pattern: **UI-DETAIL / UI-FORM / UI-TIMELINE**. Ser
 
 Scope: FR-A11 / Main display pattern: **UI-FORM**. Service boundary: `policies.save, automations.simulate, automations.fire, policies.list, policies.get, units.list, units.get`.
 
-**Initial view and prerequisites**: automation.policy.manage permission; target units and control capabilities are fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
+**Initial view and prerequisites**: automation.policy.write permission; target units and control capabilities are fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
@@ -422,6 +469,8 @@ Scope: FR-A11 / Main display pattern: **UI-FORM**. Service boundary: `policies.s
 2. Apply these business rules to reads and actions. Priority is capabilities/active restrictions → HQ policies → customer rules. Within a level, higher priority wins; ties use ascending ID order. Skip execution for unavailable or expired data and show the reason.
 3. Save policy version. `automations.simulate` returns only selected/suppressed rules and reasons; it creates no Command. Trigger through `automations.fire` with DemoWriteOptions for duplicate prevention. It passes through shared Command policy and returns commandIds (DDC-08§6).
 4. Queries to update: `policies / automations / simulation results / audit`。
+5. Screen: scope filter `customerId` → `propertyId` → `unitId` (URL keys; `policies.list` with kind=automation), list grouped by the customer of the target units (policies spanning customers under “Across customers”), and the `policyId` editor loaded from `policies.get` (AT-A11-R01). The editor has basics (name, priority, timezone, enabled), target units, a When sentence for the chosen condition type, a Then sentence for the UnitAction with the capability range of the targets, and an explanation of the tier order.
+6. Simulate: enter synthetic facts per unit (value, unit, observedAt, quality) and call `automations.simulate`; show one row per unit with the selected rule or the suppression reason (`DecisionReason`, e.g. missing_data). Fire (demo) calls `automations.fire` with a one-time key and reports the created command IDs.
 
 **Boundary cases and failures**: Check HQ priority over customer rules, deterministic results for ties, and no automatic execution when solar data is unavailable.
 
@@ -437,36 +486,32 @@ Add allergenObservation to air-quality display data returned by `telemetry.serie
 - not_measured
 - unsupported
 
-Show substance, value, unit, observedAt, and sourceLabel only when data is available. available requires evidence and time; a numeric value also requires a unit. Treat incomplete information as unknown. Do not derive allergen amounts from PM2.5. Show CO₂ in ppm and electricity-related emissions separately in kgCO₂e. Without ventilation capability, show guidance only.
+Show substance, value, unit, observedAt, and sourceLabel only when data is available. available requires evidence and time; a numeric value also requires a unit. Treat incomplete information as unknown. Do not derive allergen amounts from PM2.5. Show CO₂ in ppm and electricity-related emissions separately in kgCO₂e.
 
 Verification: AT-A12-SRC. Switch among not-measured, unsupported, and synthetic-observation fixtures. Unmeasured data must not show 0 or “Safe.” A number without a unit must show unknown.
 
-**Source mapping**: SRC-06 BIZ-18, BIZ-19 → FR-A12 → DD-A12. Source category: original company requirements SRC-06 + design additions. Design additions: ventilation rules and missing-data handling. Field types, required status, defaults, and action order are implementation proposals.
+**Source mapping**: SRC-06 BIZ-18, BIZ-19 → FR-A12 → DD-A12. Source category: original company requirements SRC-06 + Figma-confirmed screen specification (Admin 05-7, 2026-10-01): the separate Air quality policies page is merged into Alert policies (SCR-A05).
 
-Scope: FR-A12 / Main display pattern: **UI-FORM / UI-ANALYSIS**. Service boundary: `policies.save, automations.simulate, automations.fire, telemetry.series, policies.list, policies.get, units.get, commands.get, notifications.recipients, units.list`.
+Scope: FR-A12 / Main display pattern: **UI-FORM / UI-ANALYSIS**. Service boundary: `policies.save, policies.list, policies.get, automations.simulate, automations.fire, telemetry.series, notifications.recipients, units.list`.
 
-**Initial view and prerequisites**: automation.policy.manage permission (IR74); target metric and ventilation capability are defined for the device. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
+**Initial view and prerequisites**: alert.policy.read/write; the Policies tab of SCR-A05 with an air-quality policy selected (e.g. `policyId=policy-co2-a`). Display in this order: validate route/conditions → check session scope → fetch the required Queries.
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| unitIds / metric | Required | Metric exists in both each Unit's Capability.sensors and its currently bound Device.sensors (IR21/IR43) | Targets |
-| threshold / recoveryThreshold | number/required | Unit fixed per metric | Trigger/recovery conditions |
-| durationSeconds | integer/required | 1–86400 | Duration (seconds) |
-| responseMode | enum/required | notify_only/notify_and_ventilate | Response mode |
-| severity / channels | Required | warning/critical; nonempty channels. New: unselected | Notification settings SR28 |
-| cooldownMinutes / escalateAfterMinutes | integer/required | 1–1440; new: not entered | Repeat/unacknowledged notices SR28 |
-| recipientMembershipIds | ID array/required | At least one active recipient | Recipients |
-| name / unitIds | Required | 1–120 trimmed characters / within scope, nonempty, no duplicates | IR07 shared inputs |
-| timezone / enabled / priority | Required | IANA name / boolean / integer 0–100. New UI: Preferences.timezone / false / 50 | IR07 shared inputs |
+| metric | enum/required | co2 (ppm) or pm25 (µg/m³); unit fixed | Air-quality metric |
+| threshold / recoveryThreshold | number/required | Recovery on the correct side of the threshold | Trigger/recovery |
+| durationSeconds | integer/required | 1–86400 | Duration |
+| activeWindow | object/optional | e.g. Mon–Fri 08:00–19:00 | Only if … |
+| severity / channels / cooldownMinutes / escalateAfterMinutes / recipientMembershipIds | as DD-A05 | SR28 | Notification settings |
 
 **Steps**
 
-1. Set metric, thresholds, duration, and recovery conditions. Choose notification only or also ventilation. Check capabilities and run a simulated evaluation.
-2. Apply these business rules to reads and actions. Request automatic ventilation only for ventilation=true targets. Others receive notifications only. Show each target's action before saving.
-3. Save environmental policy version and notification previews. `automations.fire` creates ventilate Commands only for ventilation=true targets (DDC-08§6); track device acknowledgements. Verify indoor-air improvement with later measurements.
-4. Queries to update: `policies / alerts / commands / notifications / audit`。
+1. Same editor as DD-A05 (IR108). The default policy carries the HQ ventilation rules (CO₂ ≥ 1000 ppm, PM2.5 ≥ 35 µg/m³); customer policies add their own limits.
+2. Current readings: for an attached unit, `telemetry.series` shows the latest valid co2/pm25/humidity with units, the allergenObservation availability/source (IR98), and IR99 guidance; unmeasured values are “not measured”, never 0 or safe.
+3. Test with demo data / Simulate (`automations.simulate`, `automations.fire` for the demo) shows the duration rule (no alert before the full duration) and the notifications; no control decision or Command is produced. Notification text advises ventilating and logging it in the client Air quality screen (FR-C07).
+4. Queries to update: `policies / alerts / notifications / audit`.
 
-**Boundary cases and failures**: Do not mix ppm and µg/m³ thresholds. Do not use unmeasured data to judge normality or recovery. Do not substitute fan Commands for unsupported ventilation.
+**Boundary cases and failures**: Do not mix ppm and µg/m³ thresholds. Do not use unmeasured data to judge normality or recovery. The old route `/admin/settings/air-quality` shows Page unavailable.
 
 **Verification**: Check the traceability entries under AT-A12 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -476,7 +521,7 @@ Scope: FR-A12 / Main display pattern: **UI-FORM / UI-ANALYSIS**. Service boundar
 
 Scope: FR-A13 / Main display pattern: **UI-ANALYSIS / UI-FORM**. Service boundary: `energy.summary, baselines.list, baselines.save, units.list`.
 
-**Initial view and prerequisites**: energy.manage permission, period data within managed scope, and the ability to enter baseline-model evidence. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
+**Initial view and prerequisites**: energy.write permission, period data within managed scope, and the ability to enter baseline-model evidence. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
@@ -494,6 +539,8 @@ Scope: FR-A13 / Main display pattern: **UI-ANALYSIS / UI-FORM**. Service boundar
 2. Apply these business rules to reads and actions. Keep baseline with unit set, boundary, period conditions, and model version. Do not label results adjusted when weather or other adjustment models do not exist. Do not clamp negative reductions (increases) to 0.
 3. Saving a baseline creates a new version. Do not later change baseline versions referenced by existing MRV reports.
 4. Queries to update: `baselines / energy / audit`。
+5. Tabs: `tab=analysis` (default) and `tab=baselines`. Analysis: choose customer (URL `customerId`), units from `units.list`, period, and baseline; show `energy.summary` actual, baseline, difference in kWh and %, cost, and emissions with the IR68 wording, the “not adjusted” label, calculation conditions (boundary, baseline snapshot, factor snapshot, tariff version, coverage) and quality warnings. When unit sets or boundaries differ, show the warning and no difference.
+6. Baselines: scope filter `customerId` → `propertyId` → `unitId` and period (URL keys; `baselines.list` filters), the list, and the selected `baselineId`; editing saves a new version with `baselines.save`. baselineKWh is entered only for demo_fixed. Explain that existing MRV reports keep the version they reference.
 
 **Boundary cases and failures**: Check zero baseline, missing actual data, different unit sets, and different boundaries. Example: baseline 100, actual 80 shows “Reduction 20.0 kWh / Reduction 20.0%.” Baseline 100, actual 120 has DTO values -20kWh/-20% and shows “Increase 20.0 kWh” / “Increase 20.0%” (IR68).
 
@@ -519,7 +566,7 @@ Verification: AT-A14-SRC. With the same consumption, changing factor version cha
 
 Scope: FR-A14 / Main display pattern: **UI-ANALYSIS / UI-FORM / UI-DETAIL**. Service boundary: `mrv.preview, mrv.saveDraft, mrv.recordReview, factors.list, factors.save, mrv.list, mrv.get, baselines.list, organizations.list, units.list, mrv.versions`.
 
-**Initial view and prerequisites**: mrv.manage permission; period, units, baseline version, factor version, and boundary are selected. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
+**Initial view and prerequisites**: mrv.write permission; period, units, baseline version, factor version, and boundary are selected. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
@@ -535,6 +582,9 @@ Scope: FR-A14 / Main display pattern: **UI-ANALYSIS / UI-FORM / UI-DETAIL**. Ser
 2. Apply these business rules to reads and actions. Factor region, year, and source are required (unit fixed to kgCO₂e/kWh, IR102). Review history is demo_reviewed, distinct from external certification. Input-version changes create new report versions and preserve old results.
 3. Save factor/baseline snapshot references, calculation results, quality, and reviewHistory in MRVReport. Viewing a preview alone creates no finalized record.
 4. Queries to update: `mrv / review history / audit`。
+5. Tabs: `tab=reports` (default) and `tab=factors`. Reports: filters `organizationId`, `unitId`, period and status (URL keys; `mrv.list` filters). The `reportId` detail shows a version selector (`mrv.versions`, `reportVersion`; old versions read-only), results (electricity kWh, Scope 2 kgCO₂e, energy vs baseline and emissions vs baseline as separate figures using IR68 wording), the stored condition snapshots (organization, sites/units, period, boundary, baseline and factor with region/year/value/source/version), evidence, and demo review history with the review action for the latest version only.
+6. New report: conditions from `organizations.list` → `units.list`, `baselines.list`, `factors.list`, boundary; `mrv.preview` shows a “Not saved” preview with “Demo — unverified”; missing factor/region/boundary or zero coverage shows “Calculation incomplete” without zero-filling; “Save draft” calls `mrv.saveDraft` with the selected evidence.
+7. Factors: `factors.list` and a form (region, year, kgCO₂e/kWh with the fixed unit, source stating demo) saved with `factors.save` as a new version; existing reports keep the factor version they reference.
 
 **Boundary cases and failures**: Check missing factors, coverage 0, and duplicate review of one report version. Unverified values must not appear certified.
 
@@ -559,7 +609,7 @@ Verification: AT-A15-SRC. Without selecting an offset, no request is created. Op
 
 Scope: FR-A15 / Main display pattern: **UI-LIST / UI-FORM / UI-DETAIL**. Service boundary: `offsets.preview, offsets.simulate, offsets.list, customers.list, units.list`.
 
-**Initial view and prerequisites**: offset.manage permission; the screen states that transactions are simulated. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
+**Initial view and prerequisites**: offset.write permission; the screen states that transactions are simulated. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
@@ -610,11 +660,179 @@ Scope: FR-A16 / Main display pattern: **UI-TIMELINE / UI-DETAIL**. Service bound
 
 ## HQ Paths for Shared Operations (FR-X04/X06)
 
-Show CommandPanel at /admin/units?unitId=:id; users with control.execute use commands.create/get. Require a 1–1000-character reason. Acknowledgement/resolution at /admin/alerts?alertId=:id requires alert.resolve; registration, binding, connection checks, calibration, and FW updates at /admin/devices?deviceId=:id require device.manage. Share inputs and states with DD-C03/DD-T11 and deterministic contracts D01/D05. Without permission, allow target viewing only and show why actions are disabled.
+Show CommandPanel at /admin/units?unitId=:id; users with control.execute use commands.create/get. Require a 1–1000-character reason. Acknowledgement/resolution at /admin/alerts?alertId=:id requires alert.resolve; registration, binding, connection checks, calibration, and FW updates at /admin/devices?deviceId=:id require device.write. Share inputs and states with DD-C03/DD-T11 and deterministic contracts D01/D05. Without permission, allow target viewing only and show why actions are disabled.
 
 DD-A08: On invoice selection, fetch invoices.get and select paymentId/version for confirmation from InvoiceDetail.paymentRefs. payments.confirm uses the Payment version; recordManual uses the Invoice version. Do not invent IDs when no Payment exists.
 
 Convert condition forms to the Condition type's discriminated union. occupancy is {type,occupied}, location is {type,event}, pattern is {type,localTime}, weather is {type,metric:"temperature",operator,value}, tariff is {type,operator,value,unit:"MYR_per_kWh"}, peak is {type,active}, and solar/battery is {type,operator,value,unit:"kW"}. Do not send an extra params wrapper. Use weather_temperature for weather Fact.metric; do not confuse it with the room-temperature Fact temperature.
+
+### DD-A17 Details
+
+**Source mapping**: SRC-06 BIZ-04 → FR-A17 → DD-A17. Source category: Figma-confirmed screen specification (Admin 02-15, 2026-10-01).
+
+Scope: FR-A17 / Main display pattern: **UI-LIST**. Service boundary: `clientUsers.list, clientUsers.save, clientUsers.remove, clientUsers.resendInvite`.
+
+**Initial view and prerequisites**: asset.read; customer selected; tab `users`.
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| email | string/required | Valid address, unique per customer | Invitation |
+| clientRole | enum/required | owner/member; default member | Role |
+| status | enum | invited/active/disabled | Account state |
+| reason | string/required for remove | 1–1000 characters | Audit |
+
+**Steps**
+
+1. Table: user (name, email), role, status (“Invite pending · invited <date> by <actor>”), last sign-in, notification channels, ⋯ menu.
+2. “+ Invite user” (centered modal) → `clientUsers.save` without id. Menu: change role / disable (`clientUsers.save` with id), resend invite (`clientUsers.resendInvite`, preview only), reset password (`auth.previewPasswordReset`, generic message), remove (`clientUsers.remove`).
+3. Queries to update: `client users / audit`.
+
+**Boundary cases and failures**: Last active owner → CONFLICT; duplicate email → VALIDATION. No permission editor for client users.
+
+**Verification**: Check the traceability entries under AT-A17 (N/E/B).
+
+### DD-A18 Details
+
+**Source mapping**: SRC-06 BIZ-07 → FR-A18 → DD-A18. Source category: Figma-confirmed screen specification (Admin 02-17/02-18, 2026-10-01).
+
+Scope: FR-A18 / Main display pattern: **UI-FORM**. Service boundary: `units.importPreview, units.importCommit, units.importUndo, customers.list`.
+
+**Initial view and prerequisites**: asset.write; “Import CSV” on the customer list opens a two-step centered modal.
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| customerId | ID/required | Active customer (search-select) | Owner of created rows |
+| file | CSV/required | UTF-8, ≤ 1000 rows | Source |
+| mapping | Record/required | property, unit_name, model_code required; floor, room, serial, installed_on, warranty_end optional | Column mapping |
+
+**Steps**
+
+1. Step 1: customer, file (row/column count shown), template download, column mapping → Validate (`units.importPreview`, writes nothing).
+2. Step 2: counts ready/warning/error and a row table (row, location/unit, model · serial, result message); Download error report; ← Back; “Import n valid rows” (`units.importCommit`).
+3. After import show the result with “Undo (24 h)” (`units.importUndo`, reason).
+4. Queries to update: `properties / spaces / units / audit`.
+
+**Boundary cases and failures**: Expired or changed preview → CONFLICT (validate again). Undo after telemetry or jobs on a created unit → CONFLICT.
+
+**Verification**: Check the traceability entries under AT-A18 (N/E/B).
+
+### DD-A19 Details
+
+**Source mapping**: SRC-06 BIZ-12, BIZ-21 → FR-A19 → DD-A19. Source category: Figma-confirmed screen specification (Admin 02-19, 2026-10-01).
+
+Scope: FR-A19 / Main display pattern: **UI-LIST**. Service boundary: `units.coverage, jobs.recordWarrantyClaim, contracts.list`.
+
+**Initial view and prerequisites**: asset.read or contract.read; tab `warranty`.
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| customerId / coverage / expiringWithinDays | filters | All / All / 90 | Scope |
+| partLabel / amountMinor / currency / reason | required for a claim | amount > 0 | Warranty claim |
+
+**Steps**
+
+1. KPI tiles (under warranty, ends ≤ 90 days, out of warranty with no contract, maintenance contract) and the unit table sorted by coverage end.
+2. Actions: Renewal offer → SCR-A07 New contract prefilled with customer and unit; Open contract → SCR-A07; Export CSV (client-side, demo).
+3. “Warranty on jobs” lists claimable parts; Mark claim filed → `jobs.recordWarrantyClaim`.
+
+**Boundary cases and failures**: Claim outside warranty → VALIDATION.
+
+**Verification**: Check the traceability entries under AT-A19 (N/E/B).
+
+### DD-A20 Details
+
+**Source mapping**: SRC-06 BIZ-06, BIZ-20 → FR-A20 → DD-A20. Source category: Figma-confirmed screen specification (Admin 04-9/04-10, 2026-10-01).
+
+Scope: FR-A20 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary: `firmwareCampaigns.list, firmwareCampaigns.get, firmwareCampaigns.schedule, firmwareCampaigns.control, devices.list`.
+
+**Initial view and prerequisites**: device.read; tab `firmware`; URL `campaignId`.
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| modelId / targetVersion | required | Signed version from Capability.firmwareCandidates | Target |
+| deviceIds | ID[]/required | Devices of the model (excluding open tamper) | Scope |
+| waves | array/required | Ascending percents ending at 100 (default 5 devices → 20 % → 100 %) | Rollout |
+| window | local times/required | e.g. 01:00–05:00 device local time | Install window |
+| autoPauseFailurePercent / startAt | required | 1–50 % / ≥ 24 h ahead | Safety |
+
+**Steps**
+
+1. List of campaigns with state badges; detail with version/checksum, window, auto-pause, created by, wave progress bars, result counts, and a failure/skip table with Retry.
+2. Pause / resume / abort (reason) / retry_device → `firmwareCampaigns.control`; + New campaign (centered modal) → `firmwareCampaigns.schedule`.
+3. Customer notices are created 24 h before start (templateKey device_operation preview).
+
+**Boundary cases and failures**: Devices busy with a test run, firmware job, or tamper are skipped with the reason; failed devices keep the old version.
+
+**Verification**: Check the traceability entries under AT-A20 (N/E/B).
+
+### DD-A21 Details
+
+**Source mapping**: SRC-06 BIZ-12 → FR-A21 → DD-A21. Source category: Figma-confirmed screen specification (Admin 06-9, 2026-10-01).
+
+Scope: FR-A21 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary: `contractors.list, contractors.save, contractors.setOfferStatus, rateCards.list, rateCards.save, certificates.list, certificates.verify`.
+
+**Initial view and prerequisites**: job.read; tab `contractors`; URL `contractorId`.
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| registrationNo / serviceAreas / contactEmail / insuranceValidUntil | required except insurance | At least one service area | Company profile |
+| rate card lines | array/required | workType, amount (MYR), effectiveFrom in the future | Pricing |
+| reason | string/required for suspension | 1–1000 | Audit |
+
+**Steps**
+
+1. KPI tiles (offer acceptance, arrival in window, report accepted first time, customer rating with count, rework rate; 90 days) for the selected contractor.
+2. Contractor list (status, region, technician count); detail cards: registration, service areas, delegation period, contact, insurance; technicians & certificates with “Verify uploads (n)” (`certificates.verify` approve/reject); rate card table with version and Edit rate card (`rateCards.save`); Suspend offers (`contractors.setOfferStatus`).
+3. Queries to update: `contractors / rate cards / certificates / members`.
+
+**Boundary cases and failures**: Offers to a suspended contractor are rejected by `jobs.offer` (CONFLICT).
+
+**Verification**: Check the traceability entries under AT-A21 (N/E/B).
+
+### DD-A22 Details
+
+**Source mapping**: SRC-06 BIZ-12 → FR-A22 → DD-A22. Source category: Figma-confirmed screen specification (Admin 06-10, 2026-10-01).
+
+Scope: FR-A22 / Main display pattern: **UI-ANALYSIS**. Service boundary: `sla.scorecard, sla.saveTargets`.
+
+**Initial view and prerequisites**: job.read; tab `sla`.
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| period / contractorOrgId | filters | Last 90 days / all | Scope |
+| responseHours / arrivalInWindowPercent / firstTimeFixPercent | required on edit | 1–168 / 0–100 / 0–100 per plan type | Targets |
+
+**Steps**
+
+1. KPI tiles with targets; Customers table (jobs, response, arrival, first-time fix, rating, overdue, status); Recent breaches with Open job → (SCR-A06 job detail); Export CSV (client-side).
+2. Edit SLA targets → `sla.saveTargets` (effective for jobs created afterwards).
+
+**Boundary cases and failures**: Metrics without data show “—”, never 0 %.
+
+**Verification**: Check the traceability entries under AT-A22 (N/E/B).
+
+### DD-A23 Details
+
+**Source mapping**: SRC-06 BIZ-12, BIZ-21 → FR-A23 → DD-A23. Source category: Figma-confirmed screen specification (Admin 08-8, 2026-10-01).
+
+Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary: `payouts.list, payouts.get, payouts.generate, payouts.transition, payouts.resolveQuery, rateCards.list`.
+
+**Initial view and prerequisites**: billing.read; tab `payouts`; URL `statementId`.
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| period / contractorOrgId / status | filters | Current month | Scope |
+| reply / adjustmentMinor | required/optional | 1–2000; signed minor units | Answer a question |
+
+**Steps**
+
+1. Statements table (contractor, statement, queries, MYR, status); detail with gross, deductions, net, lines, and questions.
+2. Reply / Add adjustment → `payouts.resolveQuery`; Approve / Mark paid (unlocks on the pay date) → `payouts.transition`; Generate drafts → `payouts.generate`. All need billing.payment.
+3. Queries to update: `payouts / audit`.
+
+**Boundary cases and failures**: Mark paid before the pay date or on a draft → CONFLICT.
+
+**Verification**: Check the traceability entries under AT-A23 (N/E/B).
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
@@ -624,7 +842,7 @@ Convert condition forms to the Condition type's discriminated union. occupancy i
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.21.0: Read IR01–106 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.22.0: Read IR01–112 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

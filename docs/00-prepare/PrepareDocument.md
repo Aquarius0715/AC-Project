@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.21.0
+version: 0.22.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -157,6 +157,7 @@ Small text and controls are adjusted for readability and usability in work scree
 | DEC-07 | Share the same data across role switches; reset on reload | Frontend design proposal |
 | DEC-08 | Simulate voice interactions | Design proposal suited to this frontend scope |
 | DEC-09 | Specific input limits, response timeouts, schedule conflicts, visibility, and other details | Design proposal, not official company operating rules |
+| DEC-62 | The Figma wireframes (file VOeKPrid46kOf24ktEfe8r) are the final screen specification as of 2026-10-01, including screens marked “(proposal)” | User decision in this conversation, 2026-10-01; reflected in IR107–IR112 and FR-C14–C18, FR-P09–P10, FR-T13–T15, FR-A17–A23, FR-X08 |
 
 **DEC-10 (design proposal)**: Preserve work status on reassignment. Release restrictions only after all cause invoices fixed at notice time are paid. Release does not automatically power units on or restore previous set temperatures. Manual payment recording, test-run end confirmation, and viewing saved reports are specified for the 1A demo. This does not mean company approval of commercial rules. See [input/output contract DDC-08](../02-design/implementation-contracts.md#ddc-08-multi-resource-revisit-and-cross-role-contracts).
 
@@ -243,6 +244,8 @@ Reversible proposals adopted in the 0.18.0 strict review (REV18-001–048) are r
 
 Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded as PROPOSED in [DEC-19–24](internal/review-decisions-017.json). Product Owner / Business / Security / UI/UX must review them before company acceptance (IR35–44).
 
-[DEC-17/18](internal/review-decisions-016.json) from the 0.16.0 re-review were confirmed by the user response. Restriction actions use two permissions, restriction.manage/override. Job lists support sorting, with ascending business order as the default. See IR34 for comparison order, UI, and acceptance criteria. The earlier G1 pass does not apply to the revised baseline.
+[DEC-17/18](internal/review-decisions-016.json) from the 0.16.0 re-review were confirmed by the user response. Restriction actions use two permissions, restriction.write/override. Job lists support sorting, with ascending business order as the default. See IR34 for comparison order, UI, and acceptance criteria. The earlier G1 pass does not apply to the revised baseline.
 
 0.21.0: Independent G1 findings G120-001–005 for DOC-0.20.0 are fixed in IR103–106. Reversible demo proposals for duration and notification severity are in [DEC-60–61](internal/review-decisions-021.json). The [acceptance plan](../04-agentic-sdlc/acceptance-review-021.csv) is included in traceability, and independent G1 is reassessed for the new baseline. See the [current gate](../04-agentic-sdlc/runs/DOC-0.21.0/gate-G1.yaml) for the result.
+
+0.22.0: The user confirmed the Figma wireframes as the final specification (DEC-62). Client structure is read-only except rename, alert policies are customer-owned and attached by units, air-quality limits are alert policies, permissions are 38 Read/Write/action values, and 18 Figma features were added as requirements (see README 0.22.0 and IR107–IR112).

@@ -84,9 +84,10 @@ for path in markdown:
             previous = None
 
 trace = rows('00-prepare/traceability.csv')
-expected = {f'FR-{letter}{i:02}' for letter, n in [('C',13),('P',8),('T',12),('A',16),('X',7)] for i in range(1,n+1)} | {f'NFR-{i:02}' for i in range(1,9)}
+# 0.22.0 (2026-10-01): Figma-confirmed screens add FR-C14–C18, FR-P09–P10, FR-T13–T15, FR-A17–A23 and FR-X08 (IR107–IR112).
+expected = {f'FR-{letter}{i:02}' for letter, n in [('C',18),('P',10),('T',15),('A',23),('X',8)] for i in range(1,n+1)} | {f'NFR-{i:02}' for i in range(1,9)}
 if unique(trace, 'requirement_id', 'requirement') != expected:
-    fail('Requirement coverage must be 64 original IDs')
+    fail('Requirement coverage must be 82 IDs')
 acceptance = set()
 for row in trace:
     req = (ROOT / row['requirement_file']).read_text()
@@ -112,8 +113,8 @@ opnames = unique(operations, 'operation', 'operation')
 opmap = {row['operation']: row for row in operations}
 types = (ROOT / '02-design/service-contracts.ts').read_text()
 typed = {name:(input_, result, mode) for name,input_,result,mode in re.findall(r"^  '([^']+)': \{input:(.*);result:(.*);mode:'(read|write)'\};$", types, re.M)}
-if set(typed) != opnames or len(operations) != 137:
-    fail('137 operation/TypeScript contract keys differ')
+if set(typed) != opnames or len(operations) != 189:
+    fail('189 operation/TypeScript contract keys differ')
 for row in operations:
     name = row['operation']
     if typed.get(name) != (row['input_contract'], row['result_contract'], row['mode']):
@@ -176,8 +177,8 @@ for role in ['client','contractor','technician','admin']:
         for op in re.findall(r'[a-zA-Z]+\.[a-zA-Z]+', cells[3]):
             if op not in opmap or did not in opmap[op]['design_ids'].split(';'):
                 fail('DD/catalog mismatch '+did+' '+op)
-if role_tables != 49:
-    fail('Expected 49 role requirement rows')
+if role_tables != 66:
+    fail('Expected 66 role requirement rows')
 # FRV-011: detail-section service boundary sentences must equal the summary table (single source of operations).
 for role in ['client','contractor','technician','admin']:
     text = (ROOT / f'02-design/{role}.md').read_text()
@@ -319,7 +320,7 @@ for row in trace:
     wanted={c['case_id'] for c in rereview_cases if row['requirement_id'] in c['requirement_ids'].split(';')}
     if set(filter(None,row['rereview_case_ids'].split(';'))) != wanted:
         fail('Rereview trace drift '+row['requirement_id'])
-if opmap['offsets.simulate']['authorization'] != 'client:self:event=request-or-retry | admin:offset.manage':
+if opmap['offsets.simulate']['authorization'] != 'client:self:event=request-or-retry | admin:offset.write':
     fail('Offset event authorization drift')
 t12=next(sc for sc in screens if sc['screen_id']=='SCR-T12')
 if not {'devices.get','devices.events','alerts.get','alerts.acknowledge'} <= set(t12['operations'].split(';')):
@@ -339,10 +340,13 @@ for pattern in [r'Device = .*bindingId:ID\|null',r'DeviceEvent = .*alertIds:ID\[
 for name in ['AdminSummary','Summary']:
     if 'powerUnknown:number' not in re.search(r'export type '+name+r' = (.*);',types)[1]:
         fail('Power unknown counter missing '+name)
-air = re.search(r"kind:'air_quality';(.*?)\}\);",types)[1]
-for field in ['severity:', 'channels:Channel[]', 'cooldownMinutes:number', 'escalateAfterMinutes:number']:
+# IR108: air-quality limits are customer-owned alert policies (FR-A12 merged into FR-A05).
+air = (re.search(r"\{kind:'alert';(.*?)\} & AlertCondition\)", types) or [None, ''])[1] + (re.search(r'export type AlertCondition = (.*);', types) or [None, ''])[1]
+for field in ['customerId:ID', 'severity:', 'channels:Channel[]', 'cooldownMinutes:number', 'escalateAfterMinutes:number']:
     if field not in air:
-        fail('AirPolicy notification setting missing '+field)
+        fail('Alert policy notification setting missing '+field)
+if "kind:'air_quality'" in types:
+    fail('Separate air-quality policy kind returned (IR108)')
 notification_decision = re.search(r'export type NotificationDecision = (.*);',types)[1]
 for value in ["'failed'","'cooldown'","'no_recipient'"]:
     if value not in notification_decision:
@@ -445,7 +449,7 @@ for field in ['createdAt','updatedAt']:
     if "'"+field+"'" not in release_projection:
         fail('Release list sort field absent '+field)
 for name in ['notifications.preview','notifications.recipients']:
-    if 'payment_reminder:admin:billing.manage:overdue-unpaid-only' not in opmap[name]['authorization']:
+    if 'payment_reminder:admin:billing.write:overdue-unpaid-only' not in opmap[name]['authorization']:
         fail('Reminder preview authorization absent '+name)
 resolution=(ROOT/'02-design/review-resolution-contracts.md').read_text()
 if 'reports.saveDraft' in resolution or 'jobs.saveDraft InspectionMeasurementInput' not in resolution:
@@ -807,7 +811,7 @@ if 'returnTo' not in screen_by_id['SCR-X-login']['url_selection'].split(','):
 for sid in ['SCR-T02','SCR-T04','SCR-T07','SCR-T10','SCR-T11']:
     if 'work-not-started' not in screen_by_id[sid]['states'].split(';'):
         fail('Work-not-started state absent '+sid)
-for sid, keys in {'SCR-A13':{'unitIds','baselineId'}, 'SCR-A11':{'policyId'}, 'SCR-A12':{'policyId'}}.items():
+for sid, keys in {'SCR-A13':{'unitIds','baselineId'}, 'SCR-A11':{'policyId'}, 'SCR-A05':{'policyId'}}.items():
     if not keys <= set(screen_by_id[sid]['url_selection'].split(',')):
         fail('IR90 URL keys missing '+sid)
 for name in ['KpiCard','VoiceContainer']:
@@ -1020,12 +1024,16 @@ if seed:
         fail('Report draft input must cover 18 components (IR100)')
     for key in ['AT-A05-N','AT-A11-N','AT-A12-N']:
         policy_input = AP.get(key, {}).get('input', {})
-        if policy_input.get('enabled') is not True or not policy_input.get('unitIds') or 'kind' not in policy_input:
+        # IR108: alert policies carry no unitIds; units are attached afterwards (attachUnitIds).
+        targets = policy_input.get('unitIds') if policy_input.get('kind')=='automation' else AP.get(key, {}).get('attachUnitIds')
+        if policy_input.get('enabled') is not True or not targets or 'kind' not in policy_input:
             fail('Policy acceptance input incomplete (IR97) '+key)
+        if policy_input.get('kind')=='alert' and ('unitIds' in policy_input or not policy_input.get('customerId')):
+            fail('Alert policy acceptance input must be customer-owned without unitIds (IR108) '+key)
     if 'sensor-tamper-co2' not in json.dumps(AP.get('AT-A12-N', {})):
         fail('AT-A12-N CO2 sensor patch absent (IR97)')
 common_req = (ROOT/'01-requirements/common.md').read_text()
-if '### Concrete common acceptance criteria' not in common_req or any(f'| AT-X0{i}-{k} |' not in common_req for i in range(1,8) for k in 'NEB'):
+if '### Concrete common acceptance criteria' not in common_req or any(f'| AT-X0{i}-{k} |' not in common_req for i in range(1,9) for k in 'NEB'):
     fail('Common acceptance table absent (IR101)')
 if 'summaries.get' not in screen_by_id['SCR-C08']['operations'].split(';') or 'jobId' not in screen_by_id['SCR-P03']['url_selection'].split(','):
     fail('IR102 screen contract missing (SCR-C08 summaries.get / SCR-P03 jobId)')
@@ -1094,7 +1102,7 @@ try:
     start = _instant(a12['clock'])
     if duration != 60 or _instant(initial['occurredAt']) != start or any(_instant(f['observedAt']) != start for f in initial['facts']):
         raise ValueError('initial observation is not at policy evaluation start')
-    if (set(initial['unitIds']) != set(a12['input']['unitIds'])
+    if (set(initial['unitIds']) != set(a12['attachUnitIds'])
             or {f['unitId'] for f in initial['facts']} != set(initial['unitIds'])
             or final['facts'] != initial['facts'] or final['unitIds'] != initial['unitIds']
             or initial['eventId'] == final['eventId']
@@ -1111,15 +1119,15 @@ try:
             if step['elapsedSeconds'] != elapsed:
                 raise ValueError('boundary assertion is at the wrong elapsed time')
             assertions.append(elapsed)
-        elif operation in ('policies.save','automations.fire'):
+        elif operation in ('policies.save','units.setAlertPolicies','automations.fire'):
             calls.append((operation,step['inputRef'],elapsed))
         else:
             raise ValueError('unsupported duration flow operation')
     if (elapsed != duration or assertions != [0,duration-1,duration]
-            or calls != [('policies.save','input',0),('automations.fire','evaluation',0),('automations.fire','finalEvaluation',duration)]):
+            or calls != [('policies.save','input',0),('units.setAlertPolicies','attachUnitIds',0),('automations.fire','evaluation',0),('automations.fire','finalEvaluation',duration)]):
         raise ValueError('save, evaluate and boundary clock sequence differs')
     expected_boundaries = [dict(elapsedSeconds=e, alertCount=a, notificationCount=n, commandCount=c)
-                           for e,a,n,c in [(0,0,0,0),(duration-1,0,0,0),(duration,2,2,1)]]
+                           for e,a,n,c in [(0,0,0,0),(duration-1,0,0,0),(duration,2,2,0)]]
     if a12['expected']['boundaries'] != expected_boundaries:
         raise ValueError('policy-scoped boundary counts differ')
 except (KeyError, TypeError, ValueError) as error:
@@ -1172,7 +1180,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.21.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.22.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

@@ -1,6 +1,6 @@
 ---
 document_id: REQ-T
-version: 0.21.0
+version: 0.22.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # Technician requirements
 
-**0.21.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.22.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Purpose and assumptions
 
@@ -41,6 +41,9 @@ P0 means the core foundational flow. P1 is also required for completion in phase
 | FR-T10 | P0 | Added design details (supporting a company goal) / BIZ-13 | Remote diagnostics/test runs | Allow settings/test runs only within assignment period, capabilities, and permissions. Distinguish confirmation through response. |
 | FR-T11 | P1 | Added design details (supporting a company goal) / BIZ-20 | IoT device lifecycle | Simulate registration, unit binding, connection checks, calibration, and firmware updates with visible progress, failure, and history. |
 | FR-T12 | P1 | Company original SRC-06 + added design details / BIZ-20 | IoT faults | Separately reproduce/check communication loss, power loss, and removal. Keep recovery times and response history. |
+| FR-T13 | P1 | Figma-confirmed screen specification 2026-10-01 (Technician 01-6/02-32) / BIZ-12, BIZ-20 | QR scan and site check-in | Scan the unit label to open today's job or the unit register; check in at the site (location within 200 m, unit QR, inside the work window) to start the job, or check in manually with a reason. |
+| FR-T14 | P1 | Figma-confirmed screen specification 2026-10-01 (Technician 02-29/02-30) / BIZ-12 | Parts, refrigerant, and time on site | Record parts (catalogue/van stock), refrigerant recovered/charged with leak check, and arrival/start/pause/finish times in the work report. |
+| FR-T15 | P1 | Figma-confirmed screen specification 2026-10-01 (Technician 02-31) / BIZ-12 | Customer sign-off | Capture the customer's signature (or an absence reason with a site photo) on the report version before submitting. |
 
 ## Business boundaries and dependencies
 
@@ -311,9 +314,60 @@ Design: [DD-T11](../02-design/technician.md#dd-t11-details). Assess parent AT-T1
 
 Design: [DD-T12](../02-design/technician.md#dd-t12-details). Assess parent AT-T12 using all N/E/B and applicable SRC/R01 cases in traceability.
 
+### FR-T13 QR scan and site check-in
+
+- **Company request basis**: SRC-06 BIZ-12, BIZ-20; Figma-confirmed Technician 01-6 and 02-32 (2026-10-01).
+- **Entry conditions**: Technician with an active assignment; the QR label encodes the unit.
+- **Main flow**: Overview › Scan QR → matched unit and today's job → Open job / Open unit (read-only register) / Enter ID manually. In the job, Start job on site opens Check in: location (within 200 m), unit QR matched, arrival inside the work window → Check in & start.
+- **Business rule BR-T13**: `units.resolveQr` returns only assigned units; others show the shared “Page unavailable” with no unit data (same as AT-T02-E②). `jobs.checkIn` records arrival time, method, and distance, then moves the job to in_progress (same rules as `jobs.start`, IR76/IR94). If location or QR is unavailable, a manual check-in needs a reason (1–1000) and HQ sees “manual check-in”. Arrival inside the window counts toward SLA (FR-A22).
+- **Resulting business state**: MaintenanceJob.timeOnSite.arrivedAt/startedAt set; status in_progress.
+- **Boundaries/prohibitions**: Before the window opens or after it ends, check-in is rejected like `jobs.start` (FORBIDDEN/CONFLICT per IR76/IR89).
+
+| Acceptance ID | Given / When | Then (observable result) |
+|---|---|---|
+| AT-T13-N | tech-external-a, job-contractor-a 10:00–12:00, now 10:05, 78 m from site. When: scan AC-QR-online-rto → Open job → Check in & start | ① Matched unit-online-rto and job-contractor-a ② timeOnSite.arrivedAt=10:05, checkInMethod=location_qr, status in_progress |
+| AT-T13-E | ① Scan the label of unit-other-customer ② Manual check-in without reason ③ Check in at 09:30 | ① Page unavailable, no unit data ② VALIDATION ③ Rejected; Start disabled before the window (IR76) |
+| AT-T13-B | Location 250 m away | Location check fails; only manual check-in with reason is offered |
+
+Design: [DD-T13](../02-design/technician.md#dd-t13-details). Assess parent AT-T13 using all N/E/B cases in traceability.
+
+### FR-T14 Parts, refrigerant, and time on site
+
+- **Company request basis**: SRC-06 BIZ-12; Figma-confirmed Technician 02-29/02-30 (2026-10-01).
+- **Entry conditions**: Job in progress assigned to the technician, inside the work window.
+- **Main flow**: Workspace › Parts & refrigerant: + Add part (search catalogue, van stock first; qty; source van stock / HQ warehouse / bought locally; lot/serial; replaces checklist item; old part disposal) → + Refrigerant (type, cylinder, recovered/charged kg, leak check result and method) → Time on site card shows arrived, started, pauses, on-site time; Pause work toggles a pause.
+- **Business rule BR-T14**: Parts and refrigerant are part of the draft report (`jobs.saveDraft`) and become read-only on submit. Bought-locally parts need a receipt photo. Net refrigerant = charged − recovered; amounts are kept per unit for leak-check/regulatory logs. Van stock is deducted when the report is accepted. finishedAt is set on submit; times are visible to the contractor and HQ.
+- **Resulting business state**: WorkReport.parts/refrigerant on the draft version; MaintenanceJob.timeOnSite pauses.
+- **Boundaries/prohibitions**: Quantity ≤ 0, negative kg, or bought-locally without receipt → VALIDATION. Pausing outside in_progress → CONFLICT.
+
+| Acceptance ID | Given / When | Then (observable result) |
+|---|---|---|
+| AT-T14-N | job-contractor-a in progress. When: add Air filter ×1 (van stock, replaces Filter), Drain pan tablet ×2; refrigerant R32 recovered 0.40 kg, charged 0.65 kg, leak check pass; save draft | ① Draft has 2 part lines and 1 refrigerant record (net +0.25 kg) ② Autosaved draft version increments |
+| AT-T14-E | ① Quantity 0 ② Bought locally without receipt ③ Pause a submitted job | ① ② VALIDATION ③ CONFLICT |
+| AT-T14-B | Pause 10 min then resume, submit at 11:38 | onSiteMinutes excludes the pause; finishedAt=submit time |
+
+Design: [DD-T14](../02-design/technician.md#dd-t14-details). Assess parent AT-T14 using all N/E/B cases in traceability.
+
+### FR-T15 Customer sign-off
+
+- **Company request basis**: SRC-06 BIZ-12; Figma-confirmed Technician 02-31 (2026-10-01).
+- **Entry conditions**: Draft report of an in-progress job.
+- **Main flow**: Get signature (or prompted on Submit) → summary of job, work, parts, time on site → signer name and signature → Confirm; or “Customer not present” → reason + site photo.
+- **Business rule BR-T15**: `reports.signOff` attaches the sign-off to the current draft report version; editing the draft afterwards invalidates it (badge returns to “Not signed”). Submitting without a sign-off shows a warning; when the customer is absent the reason is required. The sign-off confirms on-site work only; the customer still confirms and rates after HQ accepts the report (FR-C17).
+- **Resulting business state**: WorkReport.signOff set with reportVersion.
+- **Boundaries/prohibitions**: Neither signature nor absence reason with photo → VALIDATION.
+
+| Acceptance ID | Given / When | Then (observable result) |
+|---|---|---|
+| AT-T15-N | Draft v2 of job-contractor-a. When: signer “Tan Mei Ling (customer-a)” signs and confirms | signOff.reportVersion=2, badge “Signed 11:38” |
+| AT-T15-E | Confirm with an empty pad and no absence reason | VALIDATION |
+| AT-T15-B | Edit the draft after signing | New draft version; signOff cleared; Submit warns “Not signed” |
+
+Design: [DD-T15](../02-design/technician.md#dd-t15-details). Assess parent AT-T15 using all N/E/B cases in traceability.
+
 
 0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 
-Additional current 0.21.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–106. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.22.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–112. They override older text on the same issues; use IR72 for conflict priority.
 
 Job lists support ascending/descending sorting by status (business order), severity, and deadline. Default: status in business order (IR34). Sort all results before pagination; language changes do not change order. Also use AT-REV16-005 for acceptance.

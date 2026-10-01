@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTRACTS
-version: 0.21.0
+version: 0.22.0
 status: proposed-frontend-contract
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 This document turns the [Common Detailed Design](common.md) into implementable inputs and outputs. Implement it together with each role's field tables and business rules. Values here define the phase 1A demo (DEC-09). Scope is browser-only screen models, forms, and mock services. This document does not define databases, server processing, API endpoints, or authentication. “Save,” “unique,” and “audit” refer to handling fictional data only in the browser, not guarantees of production persistence or security.
 
-**Implementation baseline for 0.21.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
+**Implementation baseline for 0.22.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
 
 ## DDC-01 Shared Frontend Types and Display Consistency
 
@@ -238,14 +238,14 @@ Shared logical operations are `demoSession.signIn/signOut/switchMembership/exten
 |---|---|
 | control.execute | Customer and HQ, within permitted use/management scope and contract/device capabilities |
 | control.diagnose / device.maintain | Technicians within active assignments; external technicians only during the work period. Resolution requires reason and evidence |
-| dashboard.read / asset.manage | HQ registry reading/writing. asset.manage alone may read managed units. Apply operation-catalog support-read rules |
+| dashboard.read / asset.write | HQ registry reading/writing. asset.write alone may read managed units. Apply operation-catalog support-read rules |
 | alert.resolve | Technicians within active assignments and HQ. Reason and evidence IDs required |
-| job.manage / contract.manage / billing.manage | HQ, within the target tenant |
+| job.write / contract.write / billing.write | HQ, within the target tenant |
 | partner.accept / partner.assign / partner.review | Contractors, only for their company's delegations. Reject self-approval by the same userId |
-| identity.manage / device.manage | HQ, within the same tenant. Users cannot increase their own permissions; another person must make the change |
-| alert.policy.manage / automation.policy.manage / energy.manage | HQ, for policies/analysis of managed targets |
-| restriction.manage / restriction.override | Independent HQ capabilities, not automatically granted to normal HQ |
-| mrv.manage / offset.manage / audit.read | Separate HQ capabilities, distinct from customer analysis/record viewing |
+| identity.write / device.write | HQ, within the same tenant. Users cannot increase their own permissions; another person must make the change |
+| alert.policy.write / automation.policy.write / energy.write | HQ, for policies/analysis of managed targets |
+| restriction.write / restriction.override | Independent HQ capabilities, not automatically granted to normal HQ |
+| mrv.write / offset.write / audit.read | Separate HQ capabilities, distinct from customer analysis/record viewing |
 
 Check both the role allowlist and permission. Reject unknown capability names. Eligibility for a permission is not a default grant. Give each seed actor only explicitly defined capabilities.
 
@@ -279,12 +279,12 @@ These are phase 1A design proposals under DEC-10, not final commercial business 
 
 | Operation | Read/write meaning | Permissions and revisits |
 |---|---|---|
-| policies.list/get | `Policy` includes id, version, kind(alert/automation/air_quality), unitIds, enabled, and relevant DD inputs. `get` returns the current saved version | `alert` requires `alert.policy.manage`; `automation`/`air_quality` require `automation.policy.manage`. Read/write only within scope. Initialize revisited forms through `get` |
+| policies.list/get | `Policy` includes id, version, kind(alert/default_alert/automation), unitIds (derived attachment list for alert, IR108), customerId, enabled, and relevant DD inputs. `get` returns the current saved version | `alert`/`default_alert` require `alert.policy.read` (write: `alert.policy.write`) or a client of the owner customer; `automation` requires `automation.policy.read`/`write`. Read/write only within scope. Initialize revisited forms through `get` |
 | jobs.get | `draftReportRef` and `reportRefs` each pair `reportId` with `reportVersion`. An uncreated draft is null | To create the first draft, technician calls `saveDraft` with `jobId` to generate an ID. Resume existing drafts through `reports.get` |
 | reports.get | Return `WorkReport` matching `jobId`, `reportId`, and `reportVersion`. Include items/measurements/parts/workText/nextAction/attachmentRefs, author, version, submission, and acceptance data | Active assignees see their job's draft/submitted versions; quality reviewers see submitted versions; customers see accepted versions only. Past versions are immutable. After external delegation expires, only JobHistorySnapshot is visible; deny report body fetches |
 | attachments.add | Add JPEG/PNG to an existing draft's `jobId`/`reportId`. Validate MIME, content, size, and count; keep Blob and `Attachment` in the same mock | Requires active technician assignment and editable draft. `Attachment` has id/jobId/reportId/blobId/name/mime/size/status |
 | attachments.getContent | Return the Blob for `attachmentId` linked to the specified `reportVersion`, not a URL | Same visibility rules as `reports.get`. Screen creates temporary URLs using `URL.createObjectURL`, revokes on leave/switch, and refetches/recreates on revisit |
-| inquiries.list | Customers receive `Inquiry` linked to their own `invoiceId`/`restrictionId`; HQ receives those within `billing.manage` scope | Customers see received/answered and reply. Open the same invoice through answer-notification target.id, then select inquiryId. Never return another customer's reply |
+| inquiries.list | Customers receive `Inquiry` linked to their own `invoiceId`/`restrictionId`; HQ receives those within `billing.write` scope | Customers see received/answered and reply. Open the same invoice through answer-notification target.id, then select inquiryId. Never return another customer's reply |
 | devices.addResponseNote | Append `responseNote` (1–1000 characters) to `deviceId`/`eventId` with author, time, and correlation ID | Requires `device.maintain` and active assignment. Notes do not change connection or tamper state. Recovery is a separate `/demo` event |
 
 Keep image bodies in shared Repository `Map<blobId, Blob>`. Sign-out and role switching do not delete shared Blobs. Locally selected unsaved images may be discarded on leave. Remove draft photos through differences in `jobs.saveDraft.attachmentIds`. Keep Blobs referenced by older submitted versions; release unreferenced Blobs. Reset releases all Blobs and temporary URLs. Submission failure must not lose text or saved images.
@@ -335,7 +335,7 @@ Keep timers as subscriptions to the shared mock clock, not screen-owned timers. 
 
 ### 3. Manual Payments and Multiple Invoices
 
-- `payments.confirm(paymentId, ...)` confirms an existing `processing` Payment. `payments.recordManual(invoiceId, ...)` creates a new `confirmed` Payment with `method=null` for an `unpaid` invoice with no Payment or only failed history. Both require `billing.manage`.
+- `payments.confirm(paymentId, ...)` confirms an existing `processing` Payment. `payments.recordManual(invoiceId, ...)` creates a new `confirmed` Payment with `method=null` for an `unpaid` invoice with no Payment or only failed history. Both require `billing.write`.
 - `recordManual` requires the full invoice amount and matching currency. `reason`: 1–1000 characters; `paymentReference`: 1–128. If an `initiated` or `processing` Payment exists, return `CONFLICT` and requery after its result is final. Never create a new payment for a `paid` invoice.
 - Repeated confirmation with the same tenant/invoice/reference and matching amount/currency returns existing success before checking `expectedVersion`. Reusing a reference for another invoice or changing its amount returns `CONFLICT`. A new intent/key does not allow duplicate payment.
 - Update Payment `confirmed`, Invoice `paid`, audit, notifications, and related restriction evaluation together in one mock transition. Successful customer card events use the same finalization function. If simulated payment and manual confirmation compete, only one finalizes.
@@ -345,7 +345,7 @@ On restriction creation, `causeInvoiceIds` lists all overdue unpaid invoices in 
 
 Only when every cause invoice is `paid`, automatically move `scheduled` to `cancelled` and `requested`/`applied` to `release_requested`. One payment alone keeps application state and shows the remaining unpaid cause count. `processing` is not `paid`. Do not automatically add later invoices to existing notices.
 
-Phase 1A allows one active restriction (scheduled/requested/applied/release_requested) per unit. Reject overlapping new `schedule` as `CONFLICT`. After the existing restriction becomes `cancelled` or `released`, a new cause set may have a new notice ID. Proposed permissions: `restriction.override` for manual release; `restriction.manage` for release due to grace/exception after application. Neither changes Invoice. release with unpaid invoices and no grace/exception returns FORBIDDEN; in release_requested it idempotently returns current state (IR35). Keep this distinct from exception-operation permission paths.
+Phase 1A allows one active restriction (scheduled/requested/applied/release_requested) per unit. Reject overlapping new `schedule` as `CONFLICT`. After the existing restriction becomes `cancelled` or `released`, a new cause set may have a new notice ID. Proposed permissions: `restriction.override` for manual release; `restriction.write` for release due to grace/exception after application. Neither changes Invoice. release with unpaid invoices and no grace/exception returns FORBIDDEN; in release_requested it idempotently returns current state (IR35). Keep this distinct from exception-operation permission paths.
 
 ### 4. Restriction Commands and Release Observations
 
@@ -402,4 +402,4 @@ Customer notes allow only `visibility=customer`; contractor notes allow `interna
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.21.0: Read IR01–106 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.22.0: Read IR01–112 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

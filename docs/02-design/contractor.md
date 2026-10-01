@@ -1,6 +1,6 @@
 ---
 document_id: DD-P
-version: 0.21.0
+version: 0.22.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 This document defines contractor screen features, fields, states, and errors (exceptions). It follows the original company requirements and their linked requirements. It defines the processing and acceptance criteria (what tests check) needed for each FR (functional requirement). Reference mock screens are used only to guide the shared UI appearance.
 
-**Implementation baseline for 0.21.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
+**Implementation baseline for 0.22.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
 
 ## Inputs and Responsibilities
 
@@ -25,14 +25,16 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 
 | Design ID / requirement | Route / main component | Read and action contracts | Input, processing, validation | Errors and prohibited actions |
 |---|---|---|---|---|
-| DD-P01 / FR-P01 | `/partner` / `PartnerOverview` | `jobs.list`, `jobs.get`, `summaries.get` | Get contractorOrgId from the session. Show overdue jobs separately from unit urgency | Show an empty state for zero jobs. Clear previous summaries when access expires |
+| DD-P01 / FR-P01 | `/partner` (dashboard), `/partner/jobs` (list) / `PartnerOverview`, `PartnerJobList` | `jobs.list`, `jobs.get`, `summaries.get`, `members.capacity` | Get contractorOrgId from the session. KPI tiles link to the job list with the same filter. Show overdue jobs separately from unit urgency | Show an empty state for zero jobs. Clear previous summaries when access expires |
 | DD-P02 / FR-P02 | `/partner/jobs/:id` / `PartnerJob` | `jobs.get`, `jobs.accept`, `jobs.decline` | Accept only an offer addressed to the user's company within its valid period. Declining requires a reason (1–1000 characters, provisional) | Treat expiry, HQ cancellation, or another person's update as CONFLICT and refetch. Declining does not delete the job |
 | DD-P03 / FR-P03 | `/partner/schedule` / `AssignmentEditor` | `jobs.list`, `members.eligible`, `jobs.assign` | Enter technician ID, work start/end times, and required qualifications. Validate that the work period fits within the delegation period | Reject saving if a confirmed schedule overlaps, and reschedule. Reassignment after work starts requires a reason and revokes previous access |
 | DD-P04 / FR-P04 | `/partner/units/:id` / `PartnerUnit` | `units.get`, `alerts.list`, `telemetry.summary` | Match the unit ID to a valid accepted job. Show only the necessary site address and entry instructions | Reject direct URLs after the delegation period ends. Provide no remote-control buttons |
 | DD-P05 / FR-P05 | `/partner/jobs/:id/review` / `QualityReview` | `jobs.get`, `jobs.review`, `reports.get`, `attachments.getContent` | Review only submitted reports. Select “Accept” or “Return”; a return requires a reason. Keep earlier report revisions | Do not overwrite the technician's original report or allow people to approve their own work |
-| DD-P06 / FR-P06 | `/partner/team` / `TeamCapacity` | `members.list`, `jobs.list`, `members.capacity` | Filter by date or qualification within the user's company. Qualifications are fictional demo attributes | Do not assign candidates with expired memberships. Refer new user registration to HQ |
+| DD-P06 / FR-P06 | `/partner/team` / `TeamCapacity` | `members.list`, `jobs.list`, `members.capacity`, `members.setUnavailability` | Filter by date or qualification within the user's company. Qualifications are fictional demo attributes | Do not assign candidates with expired memberships. Refer new user registration to HQ |
 | DD-P07 / FR-P07 | `/partner/history` / `PartnerHistory` | `jobs.events`, `jobs.addNote`, `notifications.preview`, `notifications.recipients` | Select jobId and a template. Notes are 1–2000 characters (provisional); select only authorized recipients | Do not allow free-entry external recipients or include confidential customer billing data in templates |
 | DD-P08 / FR-P08 | `/partner/*` / `PartnerAccessGuard` | `jobs.get`, `session.get` | Recheck accepted delegation and its period immediately before every action. Use the demo clock for expiry | Once expired, reject the next action and discard cached data even if the screen remains open |
+| DD-P09 / FR-P09 | `/partner/team?tab=certifications` / `CertificateList` | `certificates.list`, `certificates.submit`, `certificates.requestTraining` | Renewal file PDF/JPG/PNG ≤ 10 MB; issuedAt < expiresAt; eligibility uses verified certificates | Pending renewals do not extend eligibility; other companies NOT_FOUND |
+| DD-P10 / FR-P10 | `/partner/payouts` / `PartnerPayouts` | `payouts.list`, `payouts.get`, `payouts.query`, `rateCards.list` | Approved/paid statements only; question message 1–2000 | Corrections only as next-statement adjustments |
 
 ## Shared Implementation Steps
 
@@ -55,7 +57,7 @@ Keep form values in RHF (React Hook Form) and validate them with schemas. Read-o
 
 **Source mapping**: SRC-06 BIZ-04, BIZ-12 → FR-P01 → DD-P01. Source category: development policy SRC-02 + design additions. Design additions defined here: dashboard for delegated jobs. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-P01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.list, jobs.get, summaries.get`.
+Scope: FR-P01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.list, jobs.get, summaries.get, members.capacity`.
 
 **Initial view and prerequisites**: An active contractor Membership is required. HQ offer summaries can be viewed before acceptance. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -74,6 +76,10 @@ Scope: FR-P01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.l
    - Detailed unit values and entry instructions are visible only after acceptance and within the delegation period.
 3. Viewing a screen does not accept an offer. Use the same search conditions for KPIs (counts and other indicators) and list entries.
 4. Queries to update: `jobs / partner summary (on events)`.
+
+**Overview dashboard (`/partner`, Figma 01-1…01-4)**: Period select (this week default; URL from/to). KPI tiles from `summaries.get` — Offers to answer (offerCount), Awaiting assignment (accepted without assignment), In progress/scheduled (activeCount), Reports to review (reviewCount), Overdue (overdueCount, IR89); each tile opens `/partner/jobs` with the equivalent status filter. Weekly progress bar counts by status with the same filter as the list. “Needs your action” lists offers to answer (Respond → offer summary), ended work windows (Reassign → schedule), submitted reports (Review), and accepted jobs without a technician (Assign → schedule with jobId). Today’s timeline shows assigned slots; Team capacity uses `members.capacity` for the period. Recent activity links to job history. States: skeleton on first load, empty (zero counts, not “not loaded”), stale with Retry and disabled actions (IR83), route guard for HQ URLs (FR-P08).
+
+**Job list (`/partner/jobs`, Figma 02-1…02-6)**: Status tabs All/Offered/Active/Review/Completed with counts, Sort (IR34), Period; columns job · unit · customer, technician, slot/deadline, status badge with detail line; paging. Rows open the offer, job detail, or quality review.
 
 **Boundary cases and failures**: Exclude offers addressed to other companies from counts. After delegation ends and unit access closes, keep minimum history of the company's acceptance and decline records visible.
 
@@ -200,7 +206,7 @@ Scope: FR-P05 / Main display pattern: **UI-DETAIL / UI-FORM**. Service boundary:
 
 **Source mapping**: SRC-06 BIZ-12 → FR-P06 → DD-P06. Source category: development policy SRC-02 + design additions. Design additions defined here: viewing company workers, qualifications, and capacity. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-P06 / Main display pattern: **UI-LIST**. Service boundary: `members.list, jobs.list, members.capacity`.
+Scope: FR-P06 / Main display pattern: **UI-LIST**. Service boundary: `members.list, jobs.list, members.capacity, members.setUnavailability`.
 
 **Initial view and prerequisites**: The user has permission to read the company worker list. This does not include creating users. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -221,6 +227,8 @@ Scope: FR-P06 / Main display pattern: **UI-LIST**. Service boundary: `members.li
 4. Queries to update: `members / assignments (read-only)`.
 
 **Boundary cases and failures**: Editing the company ID in the URL must not reveal another company's roster. Technicians with expired memberships cannot be selected for assignment.
+
+**Unavailable days (Figma 04-8)**: “+ Unavailable days” opens a centered modal: technician (or All for team public holidays), from, to (≤ 31 days), type (annual leave/training/public holiday/sick/other), note. Before saving, list confirmed assignments in the range as a warning; saving (`members.setUnavailability`) keeps them and offers “Open schedule →”. Capacity shows the dates as 0 h with the type label (Capacity.unavailability).
 
 **Verification**: Check the traceability entries under AT-P06 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -283,9 +291,59 @@ Scope: FR-P08 / Main display pattern: **Guard shared by all patterns**. Service 
 
 **Verification**: Check the traceability entries under AT-P08 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
+### DD-P09 Details
+
+**Source mapping**: SRC-06 BIZ-12 → FR-P09 → DD-P09. Source category: Figma-confirmed screen specification (Contractor 04-6/04-7, 2026-10-01).
+
+Scope: FR-P09 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `certificates.list, certificates.submit, certificates.requestTraining`.
+
+**Initial view and prerequisites**: Contractor with partner.assign; Team & capacity tab `certifications`.
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| membershipId / status / expiringWithinDays | filters | Own technicians; default 60 days | List scope |
+| issuedAt / expiresAt | date/required | issuedAt < expiresAt | Renewal |
+| number | string/required | 1–64 characters | Certificate number |
+| file | DocumentInput/required | PDF/JPEG/PNG ≤ 10 MB | Evidence |
+
+**Steps**
+
+1. KPIs Valid / Expiring / Expired / Pending HQ verification; banner names the job an expiring certificate blocks (“renew before then or reassign”).
+2. Table: technician, certificate (number, issued), expires, status badge, blocks (job and slot), action (View, Upload renewal, Open assignment →, Request training).
+3. Upload renewal opens a centered modal; `certificates.submit` with renewalOf creates a pending_verification certificate. Request training calls `certificates.requestTraining`.
+4. Queries to update: `certificates / members.eligible / members.capacity`.
+
+**Boundary cases and failures**: VALIDATION keeps the form; other-company IDs are NOT_FOUND.
+
+**Verification**: Check the traceability entries under AT-P09 (N/E/B).
+
+### DD-P10 Details
+
+**Source mapping**: SRC-06 BIZ-12, BIZ-21 → FR-P10 → DD-P10. Source category: Figma-confirmed screen specification (Contractor 06-1/06-2, 2026-10-01).
+
+Scope: FR-P10 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary: `payouts.list, payouts.get, payouts.query, rateCards.list`.
+
+**Initial view and prerequisites**: Contractor Membership; route `/partner/payouts?statementId=` (latest approved statement by default).
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| period / status | filters | YYYY-MM; approved/paid | List scope |
+| lineId / topic | required on question | amount/deduction/missing_job/other | Question target |
+| message | string/required | 1–2000 characters | Question |
+
+**Steps**
+
+1. KPIs (jobs paid, gross, deductions, net payable with pay date) from the selected statement; statements list with status badges.
+2. Lines table: job (link to job history), work, accepted date, status, amount; deductions negative with reason; jobs in review listed as “Not included · next statement”. Rate card version from `rateCards.list`. Download PDF (demo).
+3. Ask HQ opens a centered modal; `payouts.query` adds an open question and a job-history note.
+
+**Boundary cases and failures**: Draft or other-company statements are NOT_FOUND. Network failure keeps the message for retry.
+
+**Verification**: Check the traceability entries under AT-P10 (N/E/B).
+
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.21.0: Read IR01–106 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.22.0: Read IR01–112 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 0.14.0: Under IR25, get the pre-acceptance address from the unit's installation property. After expiry, freeze only report presence and acceptance state for report display.
 

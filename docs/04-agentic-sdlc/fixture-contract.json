@@ -23,7 +23,8 @@
         }
       ],
       "qualifications": [],
-      "displayName": "customer-a"
+      "displayName": "customer-a",
+      "clientRole": "owner"
     },
     {
       "membershipId": "customer-b",
@@ -45,7 +46,8 @@
         }
       ],
       "qualifications": [],
-      "displayName": "customer-b"
+      "displayName": "customer-b",
+      "clientRole": "owner"
     },
     {
       "membershipId": "contractor-a",
@@ -69,7 +71,8 @@
         }
       ],
       "qualifications": [],
-      "displayName": "contractor-a"
+      "displayName": "contractor-a",
+      "clientRole": null
     },
     {
       "membershipId": "contractor-b",
@@ -93,7 +96,8 @@
         }
       ],
       "qualifications": [],
-      "displayName": "contractor-b"
+      "displayName": "contractor-b",
+      "clientRole": null
     },
     {
       "membershipId": "tech-internal-a",
@@ -102,6 +106,7 @@
       "permissions": [
         "control.diagnose",
         "device.maintain",
+        "alert.read",
         "alert.resolve"
       ],
       "tenantId": "tenant-a",
@@ -148,7 +153,8 @@
           "revokedAt": null
         }
       ],
-      "displayName": "tech-internal-a"
+      "displayName": "tech-internal-a",
+      "clientRole": null
     },
     {
       "membershipId": "tech-external-a",
@@ -157,6 +163,7 @@
       "permissions": [
         "control.diagnose",
         "device.maintain",
+        "alert.read",
         "alert.resolve"
       ],
       "tenantId": "tenant-a",
@@ -203,7 +210,8 @@
           "revokedAt": null
         }
       ],
-      "displayName": "tech-external-a"
+      "displayName": "tech-external-a",
+      "clientRole": null
     },
     {
       "membershipId": "tech-external-b",
@@ -212,6 +220,7 @@
       "permissions": [
         "control.diagnose",
         "device.maintain",
+        "alert.read",
         "alert.resolve"
       ],
       "tenantId": "tenant-a",
@@ -246,7 +255,8 @@
           "revokedAt": null
         }
       ],
-      "displayName": "tech-external-b"
+      "displayName": "tech-external-b",
+      "clientRole": null
     },
     {
       "membershipId": "hq-operator",
@@ -254,19 +264,34 @@
       "role": "admin",
       "permissions": [
         "dashboard.read",
-        "asset.manage",
+        "asset.read",
+        "asset.write",
         "control.execute",
-        "device.manage",
+        "device.read",
+        "device.write",
+        "alert.read",
         "alert.resolve",
-        "job.manage",
-        "contract.manage",
-        "billing.manage",
-        "identity.manage",
-        "alert.policy.manage",
-        "automation.policy.manage",
-        "energy.manage",
-        "mrv.manage",
-        "offset.manage",
+        "job.read",
+        "job.write",
+        "contract.read",
+        "contract.write",
+        "billing.read",
+        "billing.write",
+        "billing.payment",
+        "identity.read",
+        "identity.write",
+        "alert.policy.read",
+        "alert.policy.write",
+        "automation.policy.read",
+        "automation.policy.write",
+        "energy.read",
+        "energy.write",
+        "mrv.read",
+        "mrv.write",
+        "mrv.review",
+        "mrv.factors",
+        "offset.read",
+        "offset.write",
         "audit.read"
       ],
       "tenantId": "tenant-a",
@@ -282,7 +307,8 @@
         }
       ],
       "qualifications": [],
-      "displayName": "hq-operator"
+      "displayName": "hq-operator",
+      "clientRole": null
     },
     {
       "membershipId": "hq-restriction-manager",
@@ -290,21 +316,37 @@
       "role": "admin",
       "permissions": [
         "dashboard.read",
-        "asset.manage",
+        "asset.read",
+        "asset.write",
         "control.execute",
-        "device.manage",
+        "device.read",
+        "device.write",
+        "alert.read",
         "alert.resolve",
-        "job.manage",
-        "contract.manage",
-        "billing.manage",
-        "identity.manage",
-        "alert.policy.manage",
-        "automation.policy.manage",
-        "energy.manage",
-        "mrv.manage",
-        "offset.manage",
+        "job.read",
+        "job.write",
+        "contract.read",
+        "contract.write",
+        "billing.read",
+        "billing.write",
+        "billing.payment",
+        "identity.read",
+        "identity.write",
+        "alert.policy.read",
+        "alert.policy.write",
+        "automation.policy.read",
+        "automation.policy.write",
+        "energy.read",
+        "energy.write",
+        "mrv.read",
+        "mrv.write",
+        "mrv.review",
+        "mrv.factors",
+        "offset.read",
+        "offset.write",
         "audit.read",
-        "restriction.manage",
+        "restriction.read",
+        "restriction.write",
         "restriction.override"
       ],
       "tenantId": "tenant-a",
@@ -320,7 +362,8 @@
         }
       ],
       "qualifications": [],
-      "displayName": "hq-restriction-manager"
+      "displayName": "hq-restriction-manager",
+      "clientRole": null
     },
     {
       "membershipId": "hq-override-only",
@@ -342,7 +385,8 @@
         }
       ],
       "qualifications": [],
-      "displayName": "hq-operator"
+      "displayName": "hq-operator",
+      "clientRole": null
     }
   ],
   "defaultLocale": "en",
@@ -2289,6 +2333,7 @@
             "permissions": [
               "control.diagnose",
               "device.maintain",
+              "alert.read",
               "alert.resolve"
             ],
             "tenantId": "tenant-a",
@@ -2353,6 +2398,7 @@
             "permissions": [
               "control.diagnose",
               "device.maintain",
+              "alert.read",
               "alert.resolve"
             ],
             "tenantId": "tenant-a",
@@ -2424,6 +2470,7 @@
             "permissions": [
               "control.diagnose",
               "device.maintain",
+              "alert.read",
               "alert.resolve"
             ],
             "tenantId": "tenant-a",
@@ -3423,9 +3470,6 @@
       "patches": [],
       "input": {
         "name": "Demo high temperature A05",
-        "unitIds": [
-          "unit-online-rto"
-        ],
         "timezone": "Asia/Kuala_Lumpur",
         "enabled": true,
         "priority": 50,
@@ -3443,8 +3487,13 @@
           "inApp"
         ],
         "escalateAfterMinutes": 60,
-        "cooldownMinutes": 5
+        "cooldownMinutes": 5,
+        "customerId": "customer-a",
+        "activeWindow": null
       },
+      "attachUnitIds": [
+        "unit-online-rto"
+      ],
       "trigger": {
         "scenarioId": "AT-A05-N",
         "eventId": "evt-a05-telemetry-1",
@@ -3475,7 +3524,8 @@
             "deliveryState": "simulated"
           }
         ]
-      }
+      },
+      "flowNote": "policies.save(input) then units.setAlertPolicies for each attachUnitIds entry (IR108)"
     },
     "AT-A11-N": {
       "clock": "2026-09-14T01:00:00.000Z",
@@ -3575,21 +3625,15 @@
       ],
       "input": {
         "name": "Demo CO2 A12",
-        "unitIds": [
-          "unit-online-rto",
-          "unit-non-rto"
-        ],
         "timezone": "Asia/Kuala_Lumpur",
         "enabled": true,
         "priority": 50,
-        "kind": "air_quality",
+        "kind": "alert",
         "metric": "co2",
         "operator": "gte",
         "threshold": 1000,
         "recoveryThreshold": 900,
         "durationSeconds": 60,
-        "responseMode": "notify_and_ventilate",
-        "ventilationLevel": "low",
         "recipientMembershipIds": [
           "hq-operator"
         ],
@@ -3598,8 +3642,14 @@
           "inApp"
         ],
         "cooldownMinutes": 5,
-        "escalateAfterMinutes": 60
+        "escalateAfterMinutes": 60,
+        "customerId": "customer-a",
+        "activeWindow": null
       },
+      "attachUnitIds": [
+        "unit-online-rto",
+        "unit-non-rto"
+      ],
       "evaluation": {
         "eventId": "evt-a12-1",
         "occurredAt": "2026-09-14T01:00:00.000Z",
@@ -3630,17 +3680,12 @@
       "expected": {
         "results": {
           "unit-online-rto": {
-            "control": "requested",
-            "action": {
-              "kind": "ventilate",
-              "level": "low"
-            },
-            "commands": 1,
+            "control": "none",
+            "commands": 0,
             "notifications": "created"
           },
           "unit-non-rto": {
-            "control": "suppressed",
-            "reason": "invalid_capability",
+            "control": "none",
             "commands": 0,
             "notifications": "created"
           }
@@ -3662,7 +3707,7 @@
             "elapsedSeconds": 60,
             "alertCount": 2,
             "notificationCount": 2,
-            "commandCount": 1
+            "commandCount": 0
           }
         ]
       },
@@ -3697,6 +3742,10 @@
         {
           "operation": "policies.save",
           "inputRef": "input"
+        },
+        {
+          "operation": "units.setAlertPolicies",
+          "inputRef": "attachUnitIds"
         },
         {
           "operation": "automations.fire",
@@ -4114,7 +4163,8 @@
             "userId": "user-tech-internal-a",
             "role": "admin",
             "permissions": [
-              "job.manage"
+              "job.read",
+              "job.write"
             ],
             "tenantId": "tenant-a",
             "validFrom": "2026-09-01T00:00:00.000Z",

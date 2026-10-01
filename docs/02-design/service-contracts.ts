@@ -1,4 +1,4 @@
-/** 0.21.0 / 1A frontend specification only; no implementation or HTTP contract.
+/** 0.22.0 / 1A frontend specification only; no implementation or HTTP contract.
  * Numeric/string constraints and policy guards: deterministic-contracts.md and strict-review-contracts.md and review-resolution-contracts.md (all sections).
  * Optional fields mean omitted input; output absence is explicit null.
  */
@@ -17,17 +17,18 @@ export type ServiceResult<T> = {data:T;meta:Meta};
 export type Page<T> = {items:T[];nextCursor:string|null;total:number;snapshotVersion:number};
 export type Range = {from:Instant;to:Instant};
 export type Money = {amountMinor:number;currency:Currency};
-export type Permission = 'dashboard.read'|'asset.manage'|'control.execute'|'control.diagnose'|'device.maintain'|'device.manage'|'alert.resolve'|'job.manage'|'contract.manage'|'billing.manage'|'partner.accept'|'partner.assign'|'partner.review'|'identity.manage'|'alert.policy.manage'|'automation.policy.manage'|'energy.manage'|'restriction.manage'|'restriction.override'|'mrv.manage'|'offset.manage'|'audit.read';
+/** IR107: 38 values = Read/Write per resource + independent actions. Write implies Read. */
+export type Permission = 'dashboard.read'|'asset.read'|'asset.write'|'identity.read'|'identity.write'|'device.read'|'device.write'|'device.maintain'|'control.execute'|'control.diagnose'|'alert.read'|'alert.resolve'|'alert.policy.read'|'alert.policy.write'|'job.read'|'job.write'|'contract.read'|'contract.write'|'billing.read'|'billing.write'|'billing.payment'|'restriction.read'|'restriction.write'|'restriction.override'|'automation.policy.read'|'automation.policy.write'|'energy.read'|'energy.write'|'mrv.read'|'mrv.write'|'mrv.review'|'mrv.factors'|'offset.read'|'offset.write'|'audit.read'|'partner.accept'|'partner.assign'|'partner.review';
 export type Session = Context & {userId:ID;role:Role;permissions:Permission[];generation:number;viewEpoch:number;issuedAt:Instant;expiresAt:Instant};
-export type Preferences = {locale:Locale;timezone:string;currency:'MYR'};
+export type Preferences = {locale:Locale;timezone:string;currency:'MYR';monthlyReportEmail:boolean;twoFactorEnabled:boolean};
 export type User = {id:ID;displayName:string};
-export type Membership = Entity & {userId:ID;organizationId:ID;role:Role;employment:'internal'|'external'|null;permissions:Permission[];scopes:ScopeRef[];scopeVersion:number;qualifications:QualificationGrant[];validFrom:Instant;validUntil:Instant|null};
+export type Membership = Entity & {userId:ID;organizationId:ID;role:Role;employment:'internal'|'external'|null;permissions:Permission[];scopes:ScopeRef[];scopeVersion:number;qualifications:QualificationGrant[];validFrom:Instant;validUntil:Instant|null;clientRole:ClientRole|null};
 export type Organization = Entity & {name:string;kind:'customer'|'contractor'|'operator';status:'active'|'inactive'};
 export type Customer = Entity & {name:string;status:'active'|'inactive';organizationId:ID;serviceProfile:'rto'|'general'|'energy'|'environment'};
 export type Property = Entity & {customerOrgId:ID;kind:'home'|'office';name:string;address:string|null;accessInstructions:string|null;archived:boolean};
 export type Space = Entity & {propertyId:ID;parentSpaceId:ID|null;kind:'area'|'floor'|'room'|'space';name:string;archived:boolean};
-export type Metric = 'temperature'|'humidity'|'co2'|'pm25'|'power'|'vibration'|'refrigerant_pressure';
-export type UnitSymbol = '°C'|'%'|'ppm'|'µg/m³'|'kW'|'mm/s'|'kPa';
+export type Metric = 'temperature'|'humidity'|'co2'|'pm25'|'power'|'vibration'|'refrigerant_pressure'|'compressor_cycles'|'airflow_drop'|'heartbeat_gap';
+export type UnitSymbol = '°C'|'%'|'ppm'|'µg/m³'|'kW'|'mm/s'|'kPa'|'cycles/h'|'min';
 export type Quality = 'valid'|'missing'|'stale'|'suspect';
 export type Measurement = Entity & {boundaryId:EnergyBoundaryId|null;qualityReason:MeasurementIssue|null;rawUnit:string|null;unitId:ID;sensorId:ID;metric:Metric;value:number|null;unit:UnitSymbol;observedAt:Instant;receivedAt:Instant;origin:'measured'|'estimated'|'inspection';quality:Quality;isDemo:true;sequence:number;eventId:ID};
 export type Sensor = {boundaryId:EnergyBoundaryId|null;id:ID;deviceId:ID;metric:Metric;unit:UnitSymbol;staleAfterSeconds:number;calibratedAt:Instant|null};
@@ -38,7 +39,7 @@ export type Connection = 'online'|'offline'|'unknown'|'connecting'|'error';
 export type ObservedState = {power:boolean|null;celsius:number|null;mode:Mode|null;fanLevel:Fan|null;observedAt:Instant|null};
 export type RestrictionPolicy = {kind:'temperature_limit';minimumCoolingSetpoint:number}|{kind:'power_off'};
 export type ObservedRestriction = {restrictionId:ID;rulesVersion:ID;policy:RestrictionPolicy;observedAt:Instant}|null;
-export type ACUnit = Entity & {customerOrgId:ID;propertyId:ID;spaceId:ID|null;displayName:string;modelId:ID;type:'split';installedAt:Instant|null;serviceScope:('indoor'|'outdoor'|'electrical')[];archived:boolean;capabilityVersion:number;connection:Connection;observedState:ObservedState;observedRestriction:ObservedRestriction;lastSeenAt:Instant|null};
+export type ACUnit = Entity & {customerOrgId:ID;propertyId:ID;spaceId:ID|null;displayName:string;modelId:ID;type:'split';installedAt:Instant|null;serviceScope:('indoor'|'outdoor'|'electrical')[];warrantyEndsAt:Instant|null;alertPolicyIds:ID[];archived:boolean;capabilityVersion:number;connection:Connection;observedState:ObservedState;observedRestriction:ObservedRestriction;lastSeenAt:Instant|null};
 export type UnitSummary = ACUnit & {effectivePowerState:EffectivePowerState;latestMeasurements:Measurement[];activeAlertCount:number};
 export type UnitDetail = UnitSummary & {capabilities:Capability;effectiveControlPolicy:EffectiveControlPolicy;controlAvailability:ControlAvailability;components:ComponentKey[];pendingCommands:Command[];pendingCommandIds:ID[];location:{pathLabels:string[];address:string|null;accessInstructions:string|null}};
 export type UnitAction = {kind:'set_power';power:boolean}|{kind:'set_temperature';celsius:number}|{kind:'set_mode';mode:Mode}|{kind:'set_fan';fanLevel:Fan}|{kind:'ventilate';level:Fan};
@@ -55,7 +56,7 @@ export type Offer = Entity & {jobId:ID;contractorOrgId:ID;termsVersion:ID;offere
 export type Assignment = Entity & {jobId:ID;technicianMembershipId:ID;validFrom:Instant;validUntil:Instant;scheduledStart:Instant;scheduledEnd:Instant;status:'active'|'revoked';reason:string|null};
 export type ReportRef = {reportId:ID;reportVersion:number};
 export type CostLine = Money & {kind:'estimate'|'actual';description:string;visibility:'internal'|'customer'};
-export type MaintenanceJob = Entity & {planId:ID|null;occurrenceAt:Instant|null;unitId:ID;alertIds:ID[];type:'periodic'|'reactive'|'preventive';status:JobStatus;symptom:string;contactWindow:string|null;requestedSlot:Slot;scheduledSlot:Slot|null;dueAt:Instant;startedAt:Instant|null;completedAt:Instant|null;contractorOrgId:ID|null;assignmentId:ID|null;draftReportRef:ReportRef|null;reportRefs:ReportRef[];costs:CostLine[]};
+export type MaintenanceJob = Entity & {planId:ID|null;occurrenceAt:Instant|null;unitId:ID;alertIds:ID[];type:'periodic'|'reactive'|'preventive';status:JobStatus;symptom:string;contactWindow:string|null;requestedSlot:Slot;scheduledSlot:Slot|null;dueAt:Instant;startedAt:Instant|null;completedAt:Instant|null;contractorOrgId:ID|null;assignmentId:ID|null;draftReportRef:ReportRef|null;reportRefs:ReportRef[];costs:CostLine[];followUpOfJobId:ID|null;followUpClass:'pending'|'rework'|'new_request'|null;timeOnSite:TimeOnSite|null;rating:JobRating|null;customerConfirmedAt:Instant|null;warrantyClaims:WarrantyClaim[]};
 export type JobSummary = Pick<MaintenanceJob,'id'|'version'|'unitId'|'type'|'status'|'dueAt'|'requestedSlot'|'scheduledSlot'|'assignmentId'> & {projection:'summary';severity:Severity;isDemo:true};
 export type JobOfferSummary = {projection:'offer';status:'offered'|'accepted';severity:null;jobId:ID;jobVersion:number;offerId:ID;type:MaintenanceJob['type'];siteAddress:string|null;requiredQualifications:QualificationCode[];requestedSlot:Slot;dueAt:Instant;offerExpiresAt:Instant;termsVersion:ID};
 export type JobDetail = MaintenanceJob & {projection:'detail';assignment:Assignment|null;offer:Offer|null;eventCursor:number};
@@ -63,14 +64,16 @@ export type ReportHistorySummary = {hasReport:false;acceptance:'not_accepted'}|{
 export type JobHistorySnapshot = {projection:'history';asOf:Instant;severity:null;dueAt:null;jobId:ID;type:MaintenanceJob['type'];status:JobStatus;contractorOrgId:ID|null;completedAt:Instant|null;ownDecisionEvents:JobEvent[];redactedReportSummary:ReportHistorySummary};
 export type ComponentKey = 'filter'|'evaporator_coil'|'blower_motor'|'blower_fan'|'drain_pipe'|'drain_pan'|'outlet'|'louver'|'condenser_coil'|'compressor'|'fan'|'blade'|'refrigerant_pipe'|'thermostat'|'sensor'|'capacitor'|'contactor'|'wiring';
 export type InspectionItem = {id:ID;componentGroup:'indoor'|'outdoor'|'electrical';componentKey:ComponentKey;result:'normal'|'attention'|'not_inspected'|'not_applicable'|null;reason:string|null;evidenceIds:ID[];authorId:ID;observedAt:Instant};
-export type Part = {name:string;quantity:number};
+export type Part = {name:string;quantity:number;catalogCode:string|null;source:'van_stock'|'hq_warehouse'|'bought_locally';lotSerial:string|null;replacesComponentKey:ComponentKey|null;oldPartDisposal:'disposed_on_site'|'returned'|null;receiptAttachmentId:ID|null};
+export type RefrigerantRecord = {refrigerant:'R32'|'R410A';cylinderId:string;recoveredKg:number;chargedKg:number;leakCheck:'pass'|'fail'|'not_done';leakCheckMethod:string|null};
+export type SignOff = {signerName:string;signedAt:Instant;signatureAttachmentId:ID|null;absentReason:string|null;sitePhotoAttachmentId:ID|null;reportVersion:number};
 export type NextAction = {kind:'none'}|{kind:'follow_up';date:Instant;note:string};
 /** Internal repository provenance; never returned in public WorkReport DTOs. */
 export type ReportRevisionProvenance = {reportId:ID;reportVersion:number;contributorUserIds:ID[]};
 export type ReviewAvailability = {allowed:true;reason:null}|{allowed:false;reason:'permission_denied'|'self_authored'|'not_current'|'not_submitted'};
-export type WorkReport = Entity & {reviewAvailability:ReviewAvailability;jobId:ID;authorId:ID;items:InspectionItem[];measurements:Measurement[];parts:Part[];workText:string;nextAction:NextAction|null;attachmentRefs:Attachment[];submittedAt:Instant|null;acceptedAt:Instant|null;reviewHistory:Review[]};
+export type WorkReport = Entity & {reviewAvailability:ReviewAvailability;jobId:ID;authorId:ID;items:InspectionItem[];measurements:Measurement[];parts:Part[];refrigerant:RefrigerantRecord[];signOff:SignOff|null;workText:string;nextAction:NextAction|null;attachmentRefs:Attachment[];submittedAt:Instant|null;acceptedAt:Instant|null;reviewHistory:Review[]};
 export type Review = {reviewerUserId:ID;reportVersion:number;decision:'accept'|'return';reason:string|null;occurredAt:Instant};
-export type WorkReportDraft = {jobId:ID;reportId?:ID;items:InspectionItemInput[];measurements:InspectionMeasurementInput[];parts:Part[];workText:string;nextAction:NextAction|null;attachmentIds:ID[]};
+export type WorkReportDraft = {jobId:ID;reportId?:ID;items:InspectionItemInput[];measurements:InspectionMeasurementInput[];parts:Part[];refrigerant:RefrigerantRecord[];workText:string;nextAction:NextAction|null;attachmentIds:ID[]};
 export type Attachment = Entity & {jobId:ID;reportId:ID;blobId:ID;name:string;mime:'image/jpeg'|'image/png';size:number;status:'processing'|'ready'|'failed'};
 export type JobNote = Entity & {jobId:ID;authorId:ID;visibility:'internal'|'customer';message:string};
 export type JobEvent = Entity & {jobId:ID;actorUserId:ID;action:string;occurredAt:Instant;note:JobNote|null;reportRef:ReportRef|null};
@@ -97,7 +100,12 @@ export type Condition = {type:'occupancy';occupied:boolean}|{type:'location';eve
 export type Compare = 'gt'|'gte'|'lt'|'lte';
 export type RuleBase = Entity & {name:string;unitIds:ID[];ownerMembershipId:ID;createdByUserId:ID;timezone:string;enabled:boolean;priority:number;disabledReason:'capability_changed'|'unit_archived'|'consent_revoked'|null};
 export type Automation = RuleBase & ({kind:'schedule';weekdays:number[];startLocal:string;endLocal:string;endsNextDay:boolean;startAction:UnitAction;endAction:UnitAction}|{kind:'event';condition:Condition;action:UnitAction});
-export type Policy = RuleBase & ({kind:'automation';condition:Condition;action:UnitAction}|{kind:'alert';metric:Metric;operator:Compare;threshold:number;recoveryThreshold:number;durationSeconds:number;severity:'warning'|'critical';recipientMembershipIds:ID[];channels:Channel[];escalateAfterMinutes:number;cooldownMinutes:number}|{kind:'air_quality';metric:Metric;operator:'gte';threshold:number;recoveryThreshold:number;durationSeconds:number;responseMode:'notify_only'|'notify_and_ventilate';ventilationLevel:'low';recipientMembershipIds:ID[];severity:'warning'|'critical';channels:Channel[];cooldownMinutes:number;escalateAfterMinutes:number});
+/** IR108: alert policies belong to one customer; units carry them (ACUnit.alertPolicyIds) and alert Policy.unitIds is the derived attachment list. Air-quality limits are alert policies (FR-A12 merged into FR-A05). */
+export type ActiveWindow = {weekdays:number[];startLocal:string;endLocal:string};
+export type AlertCondition = {metric:Metric;operator:Compare;threshold:number;recoveryThreshold:number;durationSeconds:number;activeWindow:ActiveWindow|null;severity:Severity};
+export type DefaultAlertRule = AlertCondition & {ruleKey:ID;name:string;category:'air_quality'|'fault'|'maintenance'|'connection'};
+export type DefaultRuleSetting = Entity & {policyId:ID;ruleKey:ID;customerId:ID;enabled:boolean;changedByMembershipId:ID;reason:string|null};
+export type Policy = RuleBase & ({kind:'automation';condition:Condition;action:UnitAction}|({kind:'alert';customerId:ID;recipientMembershipIds:ID[];channels:Channel[];escalateAfterMinutes:number;cooldownMinutes:number} & AlertCondition)|{kind:'default_alert';customerId:null;rules:DefaultAlertRule[];ruleSettings:DefaultRuleSetting[]});
 export type Consent = Entity & {membershipId:ID;purpose:'location_automation';granted:boolean;grantedAt:Instant|null;revokedAt:Instant|null};
 export type Fact = {unitId:ID;metric:Metric|'weather_temperature'|'tariff'|'solar'|'battery'|'occupied'|'location'|'peak';value:number|boolean|'arrival'|'departure'|null;unit:string;observedAt:Instant;quality:Quality};
 export type EvaluationInput = {eventId:ID;occurredAt:Instant;unitIds:ID[];facts:Fact[];phase:'schedule_start'|'schedule_end'|'condition'};
@@ -124,19 +132,21 @@ export type AdminSummary = {customerCount:number;total:number;online:number;offl
 /** IR78: prorated modeled-baseline forecast for the admin dashboard only; comparisons stay in energy.summary. */
 export type EnergyForecast = {period:Range;unitIds:ID[];basis:'prorated_modeled_baseline';baselineRef:{id:ID;version:number}|null;baselineSnapshot:EnergyBaseline|null;expectedUnitMinutes:number;validUnitMinutes:number;actualKWhOnValidSlots:number|null;predictedBaselineKWh:number|null;predictedActualKWh:number|null;forecastSavedKWh:number|null;forecastSavingPercentage:number|null;qualityWarnings:('actual_unavailable'|'baseline_unavailable'|'modeled_baseline'|'no_units'|'partial_coverage'|'prorated_forecast')[]};
 export type Summary = {kind:'customer'|'partner'|'technician';counts:{total:number;online:number;offline:number;unknown:number;powerOn:number;powerOff:number;powerUnknown:number;alertCount:number;offerCount:number;activeCount:number;reviewCount:number;scheduledCount:number;inProgressCount:number;overdueCount:number;assignedCount:number};asOf:Instant};
-export type Capacity = {membershipId:ID;date:string;availableSlots:Slot[];assignedSlots:Slot[];availableMinutes:number|null;assignedMinutes:number;utilization:number|null};
+export type Capacity = {membershipId:ID;date:string;availableSlots:Slot[];assignedSlots:Slot[];availableMinutes:number|null;assignedMinutes:number;utilization:number|null;unavailability:Unavailability['type']|null};
 export type ResolvedIntent = {kind:'unsupported'}|{kind:'help';messageKey:'voice.help'}|{kind:'candidates';candidates:{unitId:ID;pathLabel:string}[]}|{kind:'temperature';unitId:ID;measurement:Measurement|null}|{kind:'change';unitId:ID;celsius:number;before:ObservedState;expectedVersion:number};
 export type ResetPreview = {messageKey:'auth.reset_generic';deliveryState:'preview'};
 export type ArchivedResource = {id:ID;version:number;archived:true};
 export type DemoGeneration = {generation:number};
 export type DemoEvent = {eventId:ID;generation:number;occurredAt:Instant;type:string};
-export type Query = {cursor?:string;limit?:number;sort?:{field:'id'|'version'|'name'|'status'|'createdAt'|'updatedAt'|'severity'|'dueAt'|'observedAt'|'occurredAt';direction:'asc'|'desc'};filters?:{customerId?:ID;propertyId?:ID;spaceId?:ID;unitId?:ID;unitIds?:ID[];jobId?:ID;contractId?:ID;invoiceId?:ID;restrictionId?:ID;organizationId?:ID;membershipId?:ID;kind?:string;status?:string;statuses?:string[];overdueOnly?:boolean;includeDescendants?:boolean;connections?:Connection[];powerState?:'on'|'off'|'unknown';unassignedOnly?:boolean;severity?:Severity;enabled?:boolean;unreadOnly?:boolean;from?:Instant;to?:Instant;date?:string;qualification?:QualificationCode;activeOnly?:boolean;actorId?:ID;targetId?:ID;correlationId?:ID;result?:AuditView['result']}};
+export type Query = {cursor?:string;limit?:number;sort?:{field:'id'|'version'|'name'|'status'|'createdAt'|'updatedAt'|'severity'|'dueAt'|'observedAt'|'occurredAt';direction:'asc'|'desc'};filters?:{search?:string;period?:string;contractorOrgId?:ID;statementId?:ID;campaignId?:ID;modelId?:ID;expiringWithinDays?:number;coverage?:UnitCoverage['status'];customerId?:ID;propertyId?:ID;spaceId?:ID;unitId?:ID;unitIds?:ID[];jobId?:ID;contractId?:ID;invoiceId?:ID;restrictionId?:ID;organizationId?:ID;membershipId?:ID;kind?:string;status?:string;statuses?:string[];overdueOnly?:boolean;includeDescendants?:boolean;connections?:Connection[];powerState?:'on'|'off'|'unknown';unassignedOnly?:boolean;severity?:Severity;enabled?:boolean;unreadOnly?:boolean;from?:Instant;to?:Instant;date?:string;qualification?:QualificationCode;activeOnly?:boolean;actorId?:ID;targetId?:ID;correlationId?:ID;result?:AuditView['result']}};
 export type Save<T> = Omit<T,keyof Entity|'ownerMembershipId'|'createdByUserId'> & {id?:ID};
 export type BlobInput = {name:string;mime:'image/jpeg'|'image/png';size:number;bytes:Uint8Array};
+export type DocumentInput = {name:string;mime:'application/pdf'|'image/jpeg'|'image/png';size:number;bytes:Uint8Array};
 
 
 export type RuleInput = {id?:ID;name:string;unitIds:ID[];timezone:string;enabled:boolean;priority:number};
-export type PolicyInput = RuleInput & (Omit<Extract<Policy,{kind:'alert'}>,keyof RuleBase>|Omit<Extract<Policy,{kind:'automation'}>,keyof RuleBase>|Omit<Extract<Policy,{kind:'air_quality'}>,keyof RuleBase>);
+export type AlertPolicyInput = Omit<RuleInput,'unitIds'> & Omit<Extract<Policy,{kind:'alert'}>,keyof RuleBase>;
+export type PolicyInput = (RuleInput & Omit<Extract<Policy,{kind:'automation'}>,keyof RuleBase>)|AlertPolicyInput;
 export type ScheduledOccurrence = {automationId:ID;phase:'schedule_start'|'schedule_end';at:Instant;action:UnitAction};
 export type DeletedResource = {id:ID;deleted:true};
 export type WriteResult = {state:'not_received'|'pending'}|{state:'succeeded';operation:string;resourceIds:ID[];result:WriteResultData}|{state:'failed';error:DomainError};
@@ -167,6 +177,38 @@ export type RawMeasurement = {unitId:ID;sensorId:ID;metric:Metric;value:number|n
 export type JobDecisionReceipt = {jobId:ID;jobVersion:number;offerId:ID;decision:'accept'|'decline'};
 export type NotificationType = 'cleaning_due'|'fault'|'quality'|'schedule_change'|'report_return'|'completion'|'payment'|'payment_reminder'|'restriction'|'inquiry'|'job_update'|'device_operation';
 export type InvoiceReminderReceipt = {invoiceId:ID;invoiceVersion:number;notificationId:ID};
+
+/** IR107–IR112: Figma-confirmed screens (2026-10-01). */
+export type ClientRole = 'owner'|'member';
+export type ClientUser = Entity & {customerId:ID;membershipId:ID|null;email:string;displayName:string|null;clientRole:ClientRole;status:'invited'|'active'|'disabled';lastSignInAt:Instant|null;allowedChannels:Channel[];invitedAt:Instant;invitedByMembershipId:ID};
+export type LocationTarget = {kind:'property'|'space'|'unit';id:ID};
+export type VentilationLog = Entity & {spaceId:ID;unitId:ID|null;method:'window_opened'|'door_opened'|'ventilation_fan'|'other';durationMinutes:number;co2AtLog:{value:number;unit:'ppm';observedAt:Instant}|null;loggedByMembershipId:ID;loggedAt:Instant};
+export type ImportRow = {rowNumber:number;propertyName:string;floorName:string|null;roomName:string|null;unitName:string;modelCode:string;serial:string|null;installedOn:string|null;warrantyEnd:string|null;result:'ready'|'warning'|'error';messageKey:string|null};
+export type ImportPreview = {previewId:ID;customerId:ID;fileName:string;rows:ImportRow[];readyCount:number;warningCount:number;errorCount:number;expiresAt:Instant};
+export type UnitImport = Entity & {customerId:ID;previewId:ID;createdPropertyIds:ID[];createdSpaceIds:ID[];createdUnitIds:ID[];skippedRowNumbers:number[];undoUntil:Instant;state:'imported'|'undone'};
+export type WarrantyClaim = {id:ID;partLabel:string;amountMinor:number;currency:Currency;state:'claimable'|'filed';filedAt:Instant|null;reason:string|null};
+export type UnitCoverage = {unitId:ID;customerId:ID;modelId:ID;warrantyEndsAt:Instant|null;contractIds:ID[];status:'under_warranty'|'contract'|'expiring'|'no_coverage';claimableJobIds:ID[]};
+export type FirmwareCampaignResult = {deviceId:ID;waveIndex:number;status:'pending'|'installing'|'succeeded'|'failed'|'skipped';reasonKey:string|null;operationId:ID|null;at:Instant|null};
+export type FirmwareCampaign = Entity & {modelId:ID;fromVersions:string[];targetVersion:string;checksum:string;deviceIds:ID[];waves:{label:string;percent:number}[];window:{startLocal:string;endLocal:string};autoPauseFailurePercent:number;startAt:Instant;state:'scheduled'|'running'|'paused'|'aborted'|'completed';progress:{succeeded:number;installing:number;pending:number;failed:number;skipped:number};results:FirmwareCampaignResult[];reason:string|null};
+export type ContractorKpis = {period:Range;offerAcceptance:number|null;arrivalInWindow:number|null;firstTimeAccepted:number|null;averageRating:number|null;ratingCount:number;reworkRate:number|null};
+export type ContractorProfile = Entity & {organizationId:ID;name:string;status:'active'|'suspended';registrationNo:string;serviceAreas:string[];contactEmail:string;insuranceValidUntil:Instant|null;delegation:Range;rateCardId:ID|null;suspendedReason:string|null;kpis:ContractorKpis};
+export type RateCard = Entity & {contractorOrgId:ID;effectiveFrom:Instant;currency:Currency;lines:{workType:'periodic_inspection'|'repair_base'|'emergency'|'rework_deduction';amountMinor:number;note:string|null}[]};
+export type Certificate = Entity & {membershipId:ID;organizationId:ID;code:QualificationCode|'other';name:string;number:string;issuedAt:Instant;expiresAt:Instant;fileName:string|null;status:'valid'|'expiring'|'expired'|'pending_verification'|'rejected';renewalOf:ID|null;verifiedByMembershipId:ID|null;verifiedAt:Instant|null;trainingRequestedAt:Instant|null};
+export type Unavailability = Entity & {organizationId:ID;membershipId:ID|null;from:string;to:string;type:'annual_leave'|'training'|'public_holiday'|'sick'|'other';note:string|null;conflictingAssignmentIds:ID[]};
+export type SlaMetrics = {responseWithinTarget:number|null;arrivalInWindow:number|null;firstTimeFix:number|null;averageRating:number|null;ratingCount:number;openOverdue:number};
+export type SlaTargets = Entity & {planType:Contract['planType'];responseHours:number;arrivalInWindowPercent:number;firstTimeFixPercent:number;effectiveFrom:Instant};
+export type SlaScorecard = {period:Range;contractorOrgId:ID|null;totals:SlaMetrics;customers:(SlaMetrics & {customerId:ID;jobCount:number;status:'on_track'|'at_risk'|'breached'})[];breaches:{jobId:ID;customerId:ID;kind:'response'|'arrival'|'first_time_fix'|'overdue';detail:string}[]};
+export type PayoutLine = {id:ID;jobId:ID;workType:RateCard['lines'][number]['workType'];acceptedAt:Instant|null;amountMinor:number;kind:'charge'|'deduction'|'adjustment';note:string|null};
+export type PayoutQuestion = {id:ID;lineId:ID;topic:'amount'|'deduction'|'missing_job'|'other';message:string;state:'open'|'answered'|'adjusted';reply:string|null;adjustmentMinor:number|null};
+export type PayoutStatement = Entity & {contractorOrgId:ID;period:string;status:'draft'|'approved'|'paid';currency:Currency;grossMinor:number;deductionsMinor:number;netMinor:number;payDate:Instant;lines:PayoutLine[];queries:PayoutQuestion[];approvedByMembershipId:ID|null;paidAt:Instant|null};
+export type TwoFactorStatus = {enabled:boolean;enabledAt:Instant|null;recoveryCodesLeft:number|null;setupKey:string|null};
+export type JobRating = {stars:1|2|3|4|5;tags:string[];comment:string|null;ratedAt:Instant;editableUntil:Instant};
+export type TimeOnSite = {arrivedAt:Instant|null;checkInMethod:'location_qr'|'manual'|null;checkInReason:string|null;distanceMeters:number|null;startedAt:Instant|null;pauses:{from:Instant;to:Instant|null}[];finishedAt:Instant|null;onSiteMinutes:number|null};
+export type FilterCareStatus = {unitId:ID;runHoursSinceCleaning:number|null;thresholdHours:number;fallbackDays:number;lastCleanedAt:Instant|null;lastCleanedBy:'customer'|'technician'|null;lastCleaningJobId:ID|null;status:'ok'|'due_soon'|'overdue'|'unknown'};
+export type FilterCareSettings = Entity & {customerId:ID;thresholdHours:number|null;fallbackDays:number;recipients:'owners'|'all_users';channels:Channel[]};
+export type ReportFile = {fileName:string;mime:'application/pdf'|'text/csv';size:number;generatedAt:Instant;isDemo:true};
+export type QrResolution = {unitId:ID;jobId:ID|null};
+export type PartCatalogItem = {code:string;name:string;vanStockQuantity:number|null};
 
 export type OperationContracts = {
   'invoices.remind': {input:{invoiceId:ID;recipientMembershipId:ID;channel:Channel;reason:string};result:InvoiceReminderReceipt;mode:'write'};
@@ -275,7 +317,7 @@ export type OperationContracts = {
   'policies.list': {input:Query;result:Page<Policy>;mode:'read'};
   'policies.save': {input:PolicyInput;result:Policy;mode:'write'};
   'preferences.get': {input:Record<string,never>;result:Preferences;mode:'read'};
-  'preferences.update': {input:{locale:Locale;timezone:string};result:Preferences;mode:'write'};
+  'preferences.update': {input:{locale:Locale;timezone:string;monthlyReportEmail?:boolean};result:Preferences;mode:'write'};
   'properties.archive': {input:{id:ID;reason:string};result:ArchivedResource;mode:'write'};
   'properties.list': {input:Query;result:Page<Property>;mode:'read'};
   'properties.save': {input:{id?:ID;customerOrgId:ID;kind:'home'|'office';name:string;address:string|null;accessInstructions:string|null};result:Property;mode:'write'};
@@ -305,6 +347,58 @@ export type OperationContracts = {
   'units.list': {input:Query;result:Page<UnitSummary>;mode:'read'};
   'units.save': {input:{id?:ID;customerOrgId:ID;propertyId:ID;spaceId:ID|null;displayName:string;modelId:ID;type:'split';installedAt:Instant|null;serviceScope:ACUnit['serviceScope'];changeReason?:string};result:ACUnit;mode:'write'};
   'voice.resolveIntent': {input:{text:string;locale:Locale;selectedUnitId?:ID};result:ResolvedIntent;mode:'read'};
+  'locations.rename': {input:{target:LocationTarget;name:string};result:Property|Space|ACUnit;mode:'write'};
+  'units.setAlertPolicies': {input:{unitId:ID;alertPolicyIds:ID[]};result:ACUnit;mode:'write'};
+  'policies.setDefaultRule': {input:{policyId:ID;ruleKey:ID;customerId:ID;enabled:boolean;reason?:string};result:DefaultRuleSetting;mode:'write'};
+  'policies.delete': {input:{policyId:ID};result:DeletedResource;mode:'write'};
+  'ventilation.log': {input:{spaceId:ID;unitId?:ID;method:VentilationLog['method'];durationMinutes:number};result:VentilationLog;mode:'write'};
+  'ventilation.list': {input:Query;result:Page<VentilationLog>;mode:'read'};
+  'clientUsers.list': {input:Query;result:Page<ClientUser>;mode:'read'};
+  'clientUsers.save': {input:{id?:ID;customerId:ID;email:string;clientRole:ClientRole;status?:'active'|'disabled';reason?:string};result:ClientUser;mode:'write'};
+  'clientUsers.remove': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
+  'clientUsers.resendInvite': {input:{id:ID};result:NotificationPreview;mode:'read'};
+  'units.importPreview': {input:{customerId:ID;fileName:string;csvText:string;mapping:Record<string,string>};result:ImportPreview;mode:'read'};
+  'units.importCommit': {input:{previewId:ID;customerId:ID};result:UnitImport;mode:'write'};
+  'units.importUndo': {input:{importId:ID;reason:string};result:UnitImport;mode:'write'};
+  'units.coverage': {input:Query;result:Page<UnitCoverage>;mode:'read'};
+  'jobs.recordWarrantyClaim': {input:{jobId:ID;partLabel:string;amountMinor:number;currency:Currency;reason:string};result:MaintenanceJob;mode:'write'};
+  'firmwareCampaigns.list': {input:Query;result:Page<FirmwareCampaign>;mode:'read'};
+  'firmwareCampaigns.get': {input:{id:ID};result:FirmwareCampaign;mode:'read'};
+  'firmwareCampaigns.schedule': {input:{modelId:ID;targetVersion:string;deviceIds:ID[];waves:FirmwareCampaign['waves'];window:FirmwareCampaign['window'];autoPauseFailurePercent:number;startAt:Instant};result:FirmwareCampaign;mode:'write'};
+  'firmwareCampaigns.control': {input:{campaignId:ID;action:'pause'|'resume'|'abort'|'retry_device';deviceId?:ID;reason?:string};result:FirmwareCampaign;mode:'write'};
+  'contractors.list': {input:Query;result:Page<ContractorProfile>;mode:'read'};
+  'contractors.save': {input:{id?:ID;organizationId:ID;registrationNo:string;serviceAreas:string[];contactEmail:string;insuranceValidUntil:Instant|null};result:ContractorProfile;mode:'write'};
+  'contractors.setOfferStatus': {input:{contractorOrgId:ID;status:'active'|'suspended';reason:string};result:ContractorProfile;mode:'write'};
+  'rateCards.list': {input:Query;result:Page<RateCard>;mode:'read'};
+  'rateCards.save': {input:{contractorOrgId:ID;effectiveFrom:Instant;currency:Currency;lines:RateCard['lines']};result:RateCard;mode:'write'};
+  'certificates.list': {input:Query;result:Page<Certificate>;mode:'read'};
+  'certificates.submit': {input:{membershipId:ID;code:Certificate['code'];name:string;number:string;issuedAt:Instant;expiresAt:Instant;file:DocumentInput;renewalOf?:ID};result:Certificate;mode:'write'};
+  'certificates.verify': {input:{certificateId:ID;decision:'approve'|'reject';reason?:string};result:Certificate;mode:'write'};
+  'certificates.requestTraining': {input:{certificateId:ID;note:string};result:Certificate;mode:'write'};
+  'members.setUnavailability': {input:{membershipId:ID|null;from:string;to:string;type:Unavailability['type'];note?:string};result:Unavailability;mode:'write'};
+  'sla.scorecard': {input:{period:Range;contractorOrgId?:ID};result:SlaScorecard;mode:'read'};
+  'sla.saveTargets': {input:{planType:Contract['planType'];responseHours:number;arrivalInWindowPercent:number;firstTimeFixPercent:number;effectiveFrom:Instant};result:SlaTargets;mode:'write'};
+  'payouts.list': {input:Query;result:Page<PayoutStatement>;mode:'read'};
+  'payouts.get': {input:{id:ID};result:PayoutStatement;mode:'read'};
+  'payouts.generate': {input:{period:string};result:PayoutStatement[];mode:'write'};
+  'payouts.transition': {input:{statementId:ID;action:'approve'|'mark_paid';reason?:string};result:PayoutStatement;mode:'write'};
+  'payouts.query': {input:{statementId:ID;lineId:ID;topic:PayoutQuestion['topic'];message:string};result:PayoutStatement;mode:'write'};
+  'payouts.resolveQuery': {input:{statementId:ID;queryId:ID;reply:string;adjustmentMinor?:number};result:PayoutStatement;mode:'write'};
+  'twoFactor.get': {input:Record<string,never>;result:TwoFactorStatus;mode:'read'};
+  'twoFactor.enable': {input:{code:string};result:TwoFactorStatus & {recoveryCodes:string[]};mode:'write'};
+  'twoFactor.disable': {input:{code:string};result:TwoFactorStatus;mode:'write'};
+  'jobs.rate': {input:{jobId:ID;stars:JobRating['stars'];tags:string[];comment?:string};result:MaintenanceJob;mode:'write'};
+  'jobs.reportProblem': {input:{jobId:ID;reasonCode:'same_problem'|'new_damage'|'not_completed'|'other';details:string;photos:BlobInput[];preferredSlot:Slot|null};result:MaintenanceJob;mode:'write'};
+  'jobs.classifyFollowUp': {input:{jobId:ID;classification:'rework'|'new_request';reason:string};result:MaintenanceJob;mode:'write'};
+  'filterCare.list': {input:Query;result:Page<FilterCareStatus>;mode:'read'};
+  'filterCare.markCleaned': {input:{unitId:ID};result:FilterCareStatus;mode:'write'};
+  'filterCare.saveSettings': {input:{thresholdHours:number|null;fallbackDays:number;recipients:FilterCareSettings['recipients'];channels:Channel[]};result:FilterCareSettings;mode:'write'};
+  'energy.exportReport': {input:{month:string;propertyIds:ID[];sections:('energy_cost'|'month_comparison'|'co2_offsets'|'alerts_maintenance')[];format:'pdf'|'csv'};result:ReportFile;mode:'read'};
+  'units.resolveQr': {input:{code:string};result:QrResolution;mode:'read'};
+  'jobs.checkIn': {input:{jobId:ID;method:'location_qr'|'manual';distanceMeters:number|null;qrUnitId:ID|null;reason?:string};result:MaintenanceJob;mode:'write'};
+  'jobs.pauseWork': {input:{jobId:ID;paused:boolean};result:MaintenanceJob;mode:'write'};
+  'reports.signOff': {input:{jobId:ID;reportId:ID;reportVersion:number;signerName:string;signature:BlobInput|null;absentReason?:string;sitePhoto?:BlobInput};result:WorkReport;mode:'write'};
+  'parts.list': {input:Query;result:Page<PartCatalogItem>;mode:'read'};
   'writes.getResult': {input:{operation:string;idempotencyKey:ID};result:WriteResult;mode:'read'};
 };
 export type OperationName = keyof OperationContracts;
@@ -312,7 +406,7 @@ export type RepositoryCall = <K extends OperationName>(operation:K,context:Conte
 
 /** Subscription is synchronous and is not a Promise Repository operation. */
 /** IR71: fixed entity types; cursor_only carries no resource data. */
-export type ChangeEntityType = 'unit'|'device'|'measurement'|'allergen_observation'|'command'|'diagnostic_run'|'device_operation'|'alert'|'notification'|'job'|'report'|'attachment'|'offer'|'assignment'|'plan'|'contract'|'invoice'|'payment'|'restriction'|'inquiry'|'automation'|'policy'|'consent'|'membership'|'organization'|'customer'|'property'|'space'|'capability'|'baseline'|'factor'|'mrv_report'|'offset_record'|'session'|'cursor_only';
+export type ChangeEntityType = 'unit'|'device'|'measurement'|'allergen_observation'|'command'|'diagnostic_run'|'device_operation'|'alert'|'notification'|'job'|'report'|'attachment'|'offer'|'assignment'|'plan'|'contract'|'invoice'|'payment'|'restriction'|'inquiry'|'automation'|'policy'|'consent'|'membership'|'organization'|'customer'|'property'|'space'|'capability'|'baseline'|'factor'|'mrv_report'|'offset_record'|'client_user'|'ventilation_log'|'unit_import'|'firmware_campaign'|'contractor'|'rate_card'|'certificate'|'unavailability'|'sla_target'|'payout_statement'|'filter_care'|'default_rule_setting'|'session'|'cursor_only';
 export type ChangeEvent = {generation:number;cursor:number;eventId:ID;entityType:ChangeEntityType;entityId:ID|null;version:number|null;occurredAt:Instant;changedFields:string[]};
 export type Subscribe = (context:Context,input:{afterCursor:number;resources:Exclude<ChangeEntityType,'cursor_only'>[];unitIds:ID[]},listener:(event:ChangeEvent)=>void)=>()=>void;
 export type AllergenObservation = {availability:'not_measured'|'unsupported'|'available';substance:string|null;value:number|null;unit:string|null;sourceLabel:string|null;observedAt:Instant|null;evidenceText:string|null};

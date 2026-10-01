@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.21.0
+version: 0.22.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -11,7 +11,7 @@ scope: frontend-demo-1A
 
 This design defines features, screen fields, states, and exceptions based on the original company document and its linked requirements. It defines the processing and acceptance criteria for each FR (functional requirement). Reference mock screens guide the shared UI appearance.
 
-**Implementation baseline for 0.21.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
+**Implementation baseline for 0.22.0**: Read all chapters of the [Deterministic Contracts](deterministic-contracts.md) and strict-review-contracts.md, the authorization columns of the operation catalog, and the screen catalog together. Do not guess values, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not approval for production business use.
 
 ## Inputs and Responsibilities
 
@@ -35,6 +35,9 @@ Treat route parameters as untrusted input and always validate them. Service name
 | DD-T10 / FR-T10 | `/technician/units/:id/control` / `DiagnosticControl` | `commands.create`, `commands.get`, `diagnosticRuns.create`, `diagnosticRuns.get`, `units.get`, `jobs.get`, `diagnosticRuns.list` | Check `control.diagnose` permission, unit capabilities, reason, and test-run duration (1–15 minutes, provisional) | Do not use test runs to bypass contract restrictions. Do not automatically resend after expiry |
 | DD-T11 / FR-T11 | `/technician/devices` / `DeviceMaintenance` | `devices.list`, `devices.register`, `devices.bind`, `devices.check`, `devices.calibrate`, `devices.updateFirmware`, `devices.get`, `units.list`, `units.get`, `jobs.list`, `devices.calibrations`, `devices.operations` | Serial numbers must be unique. Set unitId and sensor types. Enter unit, reference value, and date/time for calibration. Choose supported firmware versions | Do not start updates offline. Do not show the new version as applied after update failure |
 | DD-T12 / FR-T12 | `/technician/devices/:id` / `DeviceEvents` | `devices.get`, `devices.events`, `alerts.get`, `alerts.acknowledge`, `devices.addResponseNote` | Show eventType and detection evidence. Use a dedicated simulated event for removal | Restored communication does not automatically clear removal alerts |
+| DD-T13 / FR-T13 | `/technician` (Scan QR), `/technician/jobs/:id` (Check in) / `QrScan`, `SiteCheckIn` | `units.resolveQr`, `jobs.checkIn`, `jobs.get` | Assigned units only; location ≤ 200 m, QR match, inside the window; manual reason 1–1000 | Unassigned label → Page unavailable; outside window rejected as jobs.start |
+| DD-T14 / FR-T14 | `/technician/jobs/:id` / `PartsAndTime` | `jobs.saveDraft`, `jobs.pauseWork`, `parts.list` | Parts qty > 0, receipt for bought-locally; refrigerant kg ≥ 0 | Read-only after submit |
+| DD-T15 / FR-T15 | `/technician/jobs/:id` / `CustomerSignOff` | `reports.signOff`, `reports.get` | Signature or absence reason with site photo; bound to report version | Editing the draft clears the sign-off |
 
 ## Shared Implementation Steps
 
@@ -386,10 +389,86 @@ Scope: FR-T12 / Main display pattern: **UI-DETAIL** and **UI-TIMELINE**. Service
 
 **Verification**: Check the traceability entries under AT-T12 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
+### DD-T13 Details
+
+**Source mapping**: SRC-06 BIZ-12, BIZ-20 → FR-T13 → DD-T13. Source category: Figma-confirmed screen specification (Technician 01-6, 02-32, 2026-10-01).
+
+Scope: FR-T13 / Main display pattern: **UI-FORM**. Service boundary: `units.resolveQr, jobs.checkIn, jobs.get`.
+
+**Initial view and prerequisites**: “▣ Scan QR” in the Overview header or Check in from Start job. Camera access is simulated in the demo; the label code can be typed.
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| code | string/required | Label code or unit ID | QR scan |
+| method | enum/required | location_qr or manual | Check-in method |
+| distanceMeters | number/null | ≤ 200 for location_qr | Location check |
+| reason | string/optional | Required for manual, 1–1000 | Manual check-in |
+
+**Steps**
+
+1. Scan: `units.resolveQr` → matched card (unit, location, model) and today’s job; Open job → workspace, Open unit → register (read-only).
+2. Check in (centered modal): job, site, window, now; three checks (Location, Unit QR, Arrival) with ✓/✕; Check in & start → `jobs.checkIn`; Scan QR again re-runs the scan.
+3. Queries to update: `jobs / summaries`.
+
+**Boundary cases and failures**: Unassigned or unknown label → shared Page unavailable without unit data. Outside the window → same error and disabled state as `jobs.start`.
+
+**Verification**: Check the traceability entries under AT-T13 (N/E/B).
+
+### DD-T14 Details
+
+**Source mapping**: SRC-06 BIZ-12 → FR-T14 → DD-T14. Source category: Figma-confirmed screen specification (Technician 02-29/02-30, 2026-10-01).
+
+Scope: FR-T14 / Main display pattern: **UI-FORM**. Service boundary: `jobs.saveDraft, jobs.pauseWork, parts.list`.
+
+**Initial view and prerequisites**: In-progress job workspace; the Parts & refrigerant and Time on site cards replace the readings card on this view (readings stay on the Indoor tab).
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| part | catalogCode/name, required | From `parts.list` (van stock first) or free name | Part |
+| quantity | integer/required | ≥ 1 | Quantity |
+| source | enum/required | van_stock / hq_warehouse / bought_locally (receipt required) | Source |
+| lotSerial / replacesComponentKey / oldPartDisposal | optional | Checklist component; disposed_on_site/returned | Traceability |
+| refrigerant | object/optional | R32/R410A, cylinderId, recoveredKg/chargedKg ≥ 0, leakCheck pass/fail/not_done | Regulatory log |
+
+**Steps**
+
+1. + Add part opens a centered modal; “Add to report” appends a Part and autosaves via `jobs.saveDraft`. Remove deletes the line from the draft.
+2. + Refrigerant adds a RefrigerantRecord with the computed net amount.
+3. Time on site shows arrivedAt (check-in), startedAt, pauses, finishedAt (on submit), and on-site minutes; Pause work calls `jobs.pauseWork`.
+4. Queries to update: `reports / jobs`.
+
+**Boundary cases and failures**: VALIDATION keeps the modal; after submit all fields are read-only.
+
+**Verification**: Check the traceability entries under AT-T14 (N/E/B).
+
+### DD-T15 Details
+
+**Source mapping**: SRC-06 BIZ-12 → FR-T15 → DD-T15. Source category: Figma-confirmed screen specification (Technician 02-31, 2026-10-01).
+
+Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.signOff, reports.get`.
+
+**Initial view and prerequisites**: Draft report exists (`reports.get` for the current version).
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| signerName | string/required | 1–120 characters | Signer |
+| signature | BlobInput/conditional | PNG of the pad; required unless absent | Signature |
+| absentReason / sitePhoto | conditional | Reason 1–1000 and a JPEG/PNG photo when the customer is absent | Absence |
+
+**Steps**
+
+1. The centered modal summarises job, work, parts, and on-site time; Clear resets the pad.
+2. Confirm calls `reports.signOff` with reportId and reportVersion; the workspace badge shows “Signed hh:mm”.
+3. Submitting without a sign-off shows a warning dialog; continuing requires an absence reason.
+
+**Boundary cases and failures**: A newer draft version clears the sign-off (CONFLICT if the version changed while signing).
+
+**Verification**: Check the traceability entries under AT-T15 (N/E/B).
+
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
 0.10.0: T12 fetches alerts.get using DeviceEvent.alertIds and acknowledges using Alert.version (SR23). Filter device history by scope at event time (SR24).
 
-Additional contracts for current version 0.21.0: Read IR01–106 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.22.0: Read IR01–112 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

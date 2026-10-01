@@ -1,6 +1,6 @@
 ---
 document_id: TEST-PLAN
-version: 0.21.0
+version: 0.22.0
 status: planned-not-executed
 owner: test-agent
 scope: frontend-demo-1A
@@ -69,9 +69,9 @@ Additional checks: grace periods, exceptions, cancellation before execution, can
 
 ## 6. S04 Air quality and ventilation
 
-Given: Rising CO₂ concentration; one unit with ventilation equipment and one without. Steps: Change synthetic sensor values and check customer guidance and HQ threshold/notification policies. Send simulated ventilation requests only to units with that capability.
+Given: Rising CO₂ concentration; one unit with ventilation equipment and one without. Steps: Change synthetic sensor values and check customer guidance, the client manual ventilation log, and HQ air-quality alert policies (IR108/IR110). No ventilation Command is sent.
 
-Expected: Label ppm and thresholds as demo values. For units without ventilation equipment, show guidance only; do not call fan operation ventilation. Show missing data as unknown, not 0 or normal. Do not present a high-CO₂ display as a medical guarantee.
+Expected: Label ppm and thresholds as demo values. Ventilation is guidance plus a manual log for every unit; do not call fan operation ventilation. Show missing data as unknown, not 0 or normal. Do not present a high-CO₂ display as a medical guarantee.
 
 Additional checks: missing automation condition data, HQ policy precedence, rejection of firing under restrictions, and clear separation of CO₂ concentration (ppm) and emissions (kgCO₂e).
 

@@ -1,6 +1,6 @@
 ---
 document_id: REQ-C
-version: 0.21.0
+version: 0.22.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # Client requirements
 
-**0.21.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.22.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Purpose and assumptions
 
@@ -30,18 +30,23 @@ P0 means the core foundational flow. P1 is also required for completion in phase
 | Requirement ID | Priority | Status/basis | Requirement | Acceptance criteria |
 |---|---|---|---|---|
 | FR-C01 | P0 | Company original SRC-06 + added design details / BIZ-04, BIZ-08 | Monitoring dashboard | Show operation, room temperature, humidity, air quality, power, and alerts using the same unit’s latest values. For missing data, show unknown and its time. |
-| FR-C02 | P0 | Company original SRC-06 + added design details / BIZ-07 | Location hierarchy | Create/edit own home/office categories, floors, rooms, and spaces. Navigate property→floor→room→unit; clearly show units with no space. |
+| FR-C02 | P0 | Company original SRC-06 + added design details / BIZ-07 | Location hierarchy (read-only) | View own properties, floors, rooms, and spaces read-only and navigate property→floor→room→unit; clearly show units with no space. Clients may only rename locations and units; HQ creates, moves, and deletes the structure (FR-A02). |
 | FR-C03 | P0 | Company original SRC-06 + added design details / BIZ-13 | Remote control | Change power, set temperature, supported modes, and fan speed. Show requested→sent→response or failure. Unsupported/offline devices do not succeed. |
 | FR-C04 | P1 | Company original SRC-06 + added design details / BIZ-14 | Schedules/pre-arrival cooling | Create/edit/disable weekday and time slots. View next execution and test results. |
 | FR-C05 | P1 | Company original SRC-06 + added design details / BIZ-14, BIZ-15, BIZ-17 | Automation with consent | Choose demo occupancy/location/routine/weather conditions. Withdrawing location consent stops location rules. |
 | FR-C06 | P1 | Company original SRC-06 + added design details / BIZ-16, BIZ-23 | Power/cost comparison | Show kWh, estimated cost, baseline differences, and conditions by period/unit. Do not calculate savings percentage with a zero baseline. |
-| FR-C07 | P1 | Company original SRC-06 + added design details / BIZ-18, BIZ-19 | Air quality | Show CO₂ ppm, temperature/humidity, dust, units, values, and sources. Without supported ventilation equipment, show guidance only. |
+| FR-C07 | P1 | Company original SRC-06 + added design details / BIZ-18, BIZ-19 | Air quality | Show CO₂ ppm, temperature/humidity, dust, units, values, and sources. Show ventilation guidance and let the user log a manual ventilation; no device command is sent. |
 | FR-C08 | P0 | Company original SRC-06 + added design details / BIZ-08, BIZ-09, BIZ-17 | Fault/inspection notifications | Show urgent/caution/normal clearly with text/icons. Link to unit/request screens. Reading a notification does not clear the alert. |
 | FR-C09 | P0 | Company original SRC-06 + added design details / BIZ-12 | Maintenance requests/bookings/history | Submit unit, symptoms, and requested time; receive request number. View contractor/technician progress and completion reports in the same job. |
 | FR-C10 | P0 | Company original SRC-06 + added design details / BIZ-21 | Contracts/invoices | Show contract/unit links, deadlines, unpaid/processing/paid states. Display non-RTO contracts correctly rather than leaving the screen empty. |
 | FR-C11 | P0 | Company original SRC-06 + added design details / BIZ-22 | Payment guidance/demo | Preview WhatsApp/email guidance and proceed to test payments. No real card numbers. Reproduce success/failure/processing. |
 | FR-C12 | P0 | Company original SRC-06 + added design details / BIZ-21 | Restriction explanation | View start time, reason, scope, and release conditions. After payment, show release pending until device response. |
 | FR-C13 | P1 | Company original SRC-06 + added design details / BIZ-23, BIZ-24, BIZ-25, BIZ-26 | Emissions/offset access | Show estimated CO₂ emissions (kgCO₂e) and calculation conditions. Only interested users proceed to demo offset requests/records. |
+| FR-C14 | P1 | Figma-confirmed screen specification 2026-10-01 (02m/02n) / BIZ-13 | Group control | The customer owner selects several ACs in one room or area and sends one setting change; each AC gets its own command, offline/restricted ACs are skipped and shown before sending. |
+| FR-C15 | P0 | Figma-confirmed screen specification 2026-10-01 (02e/02l/06e–06g) / BIZ-08, BIZ-17, BIZ-18 | Customer alert policies | View the HQ default policy and switch each rule on/off for the account; create, edit, and delete own alert policies; attach/detach them on each AC. |
+| FR-C16 | P1 | Figma-confirmed screen specification 2026-10-01 (04g) / BIZ-16, BIZ-23 | Monthly energy report export | Export a monthly energy/cost report as PDF or CSV and opt in to a monthly email copy. |
+| FR-C17 | P1 | Figma-confirmed screen specification 2026-10-01 (07g–07i) / BIZ-12 | Confirm, rate, and report a problem | After HQ accepts the report, confirm the job and rate it; report a problem that creates a follow-up request. |
+| FR-C18 | P1 | Figma-confirmed screen specification 2026-10-01 (07j) / BIZ-18, BIZ-12 | Filter care | Show filter run time since cleaning per AC with reminders; mark self-cleaning or request cleaning. |
 
 ## Business boundaries and dependencies
 
@@ -85,22 +90,22 @@ Detailed thresholds and operating rules absent from the company original are pha
 
 Design: [DD-C01](../02-design/client.md#dd-c01-details). Assess parent AT-C01 using all N/E/B and applicable SRC/R01 cases in traceability.
 
-### FR-C02 Location hierarchy management
+### FR-C02 Location hierarchy (read-only with rename)
 
 - **Company request basis**: SRC-06 BIZ-07 — Manage homes/offices by area, floor, room, and space.
-- **Added design details**: Hierarchy editing/deletion rules.
+- **Added design details**: Figma-confirmed 2026-10-01 (Client 02a–02d): the structure is read-only for clients; HQ manages it in Customers & units (FR-A02).
 
-- **Entry conditions**: Permission to edit own organization's properties. Only HQ edits capabilities in the unit register.
-- **Main flow**: Create home/office property → add needed areas/floors/rooms → select location to view units → edit names/categories.
-- **Business rule BR-C02**: Each location has one parent within the same property. It cannot move under itself or a descendant. Locations with units or children cannot be archived/deleted; ask users to select a destination first.
-- **Resulting business state**: Return new location ID/version; update tree/breadcrumbs. Direct unit membership changes to HQ's register. Renaming does not change unit IDs.
-- **Boundaries/prohibitions**: Reject empty or ≥121-character names, cycles, and other-organization parent IDs. On concurrent-edit CONFLICT, show current version and preserve input; do not overwrite automatically.
+- **Entry conditions**: Client Membership with access to the customer's properties (owner or member).
+- **Main flow**: Select property → expand floors/areas → select a room to list every AC in it → open an AC (Unit Control) or rename the location (✎ / Rename).
+- **Business rule BR-C02**: Clients cannot create, move, archive, or delete properties, floors, rooms, spaces, or units, and cannot place unassigned units into rooms (HQ does this). The only structural write is `locations.rename` for a property, space, or unit: name 1–120 characters, unique among siblings (IR109).
+- **Resulting business state**: Rename increments the target version; HQ and technicians see the new name; IDs, parents, and unit membership never change.
+- **Boundaries/prohibitions**: Reject empty or ≥121-character names and duplicate sibling names (VALIDATION, input kept). Rename from an old version returns CONFLICT and shows the current name. Other-customer IDs return NOT_FOUND.
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-C02-N | customer-a; retain seed property-home-a/property-office-a. When: Create kind=home, name=Home → floor “1F” → room “Bedroom” (parent=1F) → rename to “Main bedroom” | ① One new Property and two Spaces, each with id/version=1 (three properties including two existing) ② Breadcrumb “Home > 1F > Main bedroom” ③ Renamed version=2, child unit IDs unchanged ④ No unit membership-change button; guidance to HQ register |
-| AT-C02-E | ① Empty/121-character name ② parentSpaceId=self/descendant/space in customer-b property ③ Display version=1, another action makes version=2, then save | ① VALIDATION, fieldErrors.name, zero saves ② Self/descendant VALIDATION; other organization NOT_FOUND; zero saves ③ CONFLICT, show current version=2, retain input, no automatic overwrite |
-| AT-C02-B | ① Create floor “2F” in property-home-a and make it parent of seed floor-1 (1F) ② Archive room-1 containing unit-online-rto ③ Archive floor-1 with children ④ Archive newly created empty space “Storage” | ① Success, version+1 ②③ CONFLICT, “Select a destination first,” unchanged state ④ Success; later direct URL is not-found |
+| AT-C02-N | customer-a; seed property-home-a/property-office-a. When: select Home A → room “Bedroom” → rename “Home A” to “Home A — Tan family” | ① Tree shows two properties; Bedroom lists Bedroom AC and Bedroom AC #2 ② One `locations.rename` call; Property version+1, child unit IDs unchanged ③ No add/move/delete controls; unassigned units show “placed by HQ” guidance ④ Breadcrumb shows the new name |
+| AT-C02-E | ① Empty/121-character name ② Rename room “Bedroom” to sibling name “Living room” ③ Display version=1, another action makes version=2, then save ④ Direct properties.save / spaces.save / spaces.archive with a client session | ① VALIDATION, fieldErrors.name, zero saves ② VALIDATION (duplicate among siblings), input kept ③ CONFLICT, current name shown, input kept ④ FORBIDDEN, zero changes |
+| AT-C02-B | ① Rename a unit to a 120-character name ② Rename an unassigned unit ③ Open a space archived by HQ by direct URL | ① Success ② Success; it stays unassigned ③ not-found |
 
 Design: [DD-C02](../02-design/client.md#dd-c02-details). Assess parent AT-C02 using all N/E/B and applicable SRC/R01 cases in traceability.
 
@@ -113,6 +118,7 @@ Design: [DD-C02](../02-design/client.md#dd-c02-details). Assess parent AT-C02 us
 - **Main flow**: View room temperature/current confirmed settings → edit power/temperature/mode/fan speed → confirm target/change → follow request accepted, sent, and device response.
 - **Business rule BR-C03**: Each confirmed submission is one Action. Change power, temperature, mode, and fan separately. Temperature follows model minimum/maximum/step; modes/fan speeds use fixed choices. Power OFF does not set measured temperature to zero. No second request to the same unit while one is pending.
 - **Resulting business state**: Create one Command. Show requested and current settings separately. Update settings only after acknowledged. Keep failed requests/reasons in history.
+- **Alert policies on this AC (Figma 02e/02l)**: Unit Control shows the policies attached to the AC: the HQ default policy (always attached, cannot be detached) and the customer's own policies with Detach. “+ Attach policy” lists only the customer's policies (`units.setAlertPolicies`, IR108); detaching removes the policy from this AC only. Rename the AC with ✎ (`locations.rename`).
 - **Boundaries/prohibitions**: For a 16–30°C model with 1°C steps, reject 15°C, 31°C, and 24.5°C. Offline, other-customer, restriction-violating, or late-response operations are not success. Use IR46 for allowed restricted actions and IR47 for connection rejection.
 
 | Acceptance ID | Given / When | Then (observable result) |
@@ -189,19 +195,19 @@ Alongside CO₂, dust, and humidity, show whether allergen data is available and
 **Additional acceptance AT-C07-SRC**: Check three fixtures (IR98): not measured (unit-limited, no observation row), unsupported (unit-non-rto), and predefined observation data (unit-online-rto), plus missing-unit `acceptancePatches["AT-C07-SRC.4"]`. Missing data must not show zero or safe. Numeric values without units show unknown.
 
 - **Company request basis**: SRC-06 BIZ-18, BIZ-19 — Monitor CO₂, dust, humidity, allergens; give cleaning/ventilation advice; improve air quality with fresh air when CO₂ rises.
-- **Added design details**: Ventilation capability checks and missing-data display.
+- **Added design details**: Missing-data display and a manual ventilation log (Figma 05a–05c, 2026-10-01).
 
 - **Entry conditions**: Sensor availability and ventilation capabilities can be retrieved.
-- **Main flow**: Select room/metric → check value/unit/quality → view ventilation/cleaning advice → only with ventilation capability, confirm and request ventilation.
-- **Business rule BR-C07**: 1h/24h presets roll back from current UTC minute boundary; 7d uses SR17 calendar days (IR41). Show separate CO₂ (ppm), PM2.5 (µg/m³), temperature (°C), and humidity (%) series. Humidity 0 is a measured zero; only null is missing. Without ventilation capability, show manual guidance only.
-- **Resulting business state**: Viewing makes no changes. Ventilation requests create normal Command history, but response alone does not imply indoor CO₂ fell.
-- **Boundaries/prohibitions**: PM2.5 can display even with missing CO₂. Fan-only units must not create ventilation Commands.
+- **Main flow**: Select room/metric → check value/unit/quality → view ventilation/cleaning advice → after opening a window or running a fan, “Log ventilation” (method, duration).
+- **Business rule BR-C07**: 1h/24h presets roll back from current UTC minute boundary; 7d uses SR17 calendar days (IR41). Show separate CO₂ (ppm), PM2.5 (µg/m³), temperature (°C), and humidity (%) series. Humidity 0 is a measured zero; only null is missing. Ventilation is always a manual action logged by the user (IR110); the screen never sends a device command.
+- **Resulting business state**: Viewing makes no changes. “Log ventilation” creates one VentilationLog (room, method, duration, CO₂ at logging, user, time) and zero Commands; a log does not imply CO₂ fell.
+- **Boundaries/prohibitions**: PM2.5 can display even with missing CO₂. Duration outside 1–240 minutes is VALIDATION. The log is not sent to HQ or to the AC.
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-C07-N | room-1: CO₂=1000ppm, PM2.5=12µg/m³, temperature 28°C, humidity 60%, ventilation-demo supported. When: Display → confirm/send ventilation → acknowledged | ① Four separate series with units ② “Ventilation recommended” (co2≥1000ppm, IR99) ③ One Command kind=ventilate ④ CO₂ remains 1000ppm after response; no assumed reduction |
-| AT-C07-E | Display unit-online-rto CO₂=null, PM2.5=12µg/m³ / request ventilation on unsupported unit-non-rto (cap-split-std) | CO₂ not measured; PM2.5 12µg/m³; “No current advice” (IR99). Unsupported ventilation button disabled; direct commands.create(ventilate) returns VALIDATION (model choices, D01 priority 7), zero Commands. |
-| AT-C07-B | unit-online-rto: ① humidity=0 ② humidity=null ③ View unsupported unit-non-rto ④ CO₂=999ppm, PM2.5=12 ⑤ CO₂=1000ppm ⑥ PM2.5=35µg/m³ ⑦ Both CO₂/PM2.5 null | ① “0%” ② “Not measured” ③ Ventilation disabled, unsupported reason/manual guidance ④ “No current advice” ⑤ “Ventilation recommended” ⑥ “Filter cleaning/inspection recommended” ⑦ “Not enough data for advice” (IR99) |
+| AT-C07-N | room-1: CO₂=1000ppm, PM2.5=12µg/m³, temperature 28°C, humidity 60%. When: Display → Log ventilation (window opened, 15 min) → save | ① Four separate series with units ② “Ventilation recommended” (co2≥1000ppm, IR99) ③ One VentilationLog with co2AtLog=1000 ppm, zero Commands ④ CO₂ remains 1000ppm; no assumed reduction |
+| AT-C07-E | Display unit-online-rto CO₂=null, PM2.5=12µg/m³ / Log ventilation with duration 0 or 241 min | CO₂ not measured; PM2.5 12µg/m³; “No current advice” (IR99). Duration VALIDATION, input kept, zero logs. |
+| AT-C07-B | unit-online-rto: ① humidity=0 ② humidity=null ③ View unit-non-rto without a fresh-air function ④ CO₂=999ppm, PM2.5=12 ⑤ CO₂=1000ppm ⑥ PM2.5=35µg/m³ ⑦ Both CO₂/PM2.5 null | ① “0%” ② “Not measured” ③ Manual ventilation guidance; Log ventilation still available ④ “No current advice” ⑤ “Ventilation recommended” ⑥ “Filter cleaning/inspection recommended” ⑦ “Not enough data for advice” (IR99) |
 
 Design: [DD-C07](../02-design/client.md#dd-c07-details). Assess parent AT-C07 using all N/E/B and applicable SRC/R01 cases in traceability.
 
@@ -343,11 +349,96 @@ Show optional offsets separately from future tokenization/digital-asset and mark
 
 Design: [DD-C13](../02-design/client.md#dd-c13-details). Assess parent AT-C13 using all N/E/B and applicable SRC/R01 cases in traceability.
 
+### FR-C14 Group control (owner)
+
+- **Company request basis**: SRC-06 BIZ-13 — Control ACs remotely; Figma-confirmed 02m/02n (2026-10-01) replaces the earlier “no room-wide bulk control” rule.
+- **Entry conditions**: Client owner (`clientRole=owner`) with control.execute; the selection is limited to one space level (one room or area).
+- **Main flow**: In Units & locations select a room/area → switch to Group control → select ACs (or “Select all online”) → choose power/temperature/mode/fan → Review & send shows each AC's change and skips → Send to N ACs.
+- **Business rule BR-C14**: Each selected AC gets its own `commands.create` with the same FR-C03 validation and confirmation; there is no batch command. Offline ACs and ACs whose restriction would clamp the value are listed as Skipped or with the clamped value before sending. Members see Single AC only.
+- **Resulting business state**: One Command per sent AC; each card shows Sending → Confirmed/Failed independently; failed ACs can be retried one by one.
+- **Boundaries/prohibitions**: Selections across rooms/areas, member sessions, and zero online ACs are rejected before sending. Automations (FR-C04) remain the way to schedule changes.
+
+| Acceptance ID | Given / When | Then (observable result) |
+|---|---|---|
+| AT-C14-N | customer-a owner, Office A › Open office (8 ACs, 1 offline). When: select 4 incl. the offline one → set On, 24 °C, Cool, Fan Auto → review → send | ① Review lists 3 “Will send” and 1 “Skipped (offline)” ② Three Commands, one per AC ③ Each card shows its own Confirmed/Failed |
+| AT-C14-E | ① Member session opens Group control ② Select ACs from two rooms ③ One AC fails | ① Not offered; direct sends per AC follow FR-C03 authorization ② VALIDATION before sending ③ Only that card shows Failed with Retry |
+| AT-C14-B | ① Select all online (7) ② Lobby AC under restriction minimum 24 °C with 22 °C requested | ① Seven Commands ② Review shows “Set to 24 °C (restriction)” |
+
+Design: [DD-C14](../02-design/client.md#dd-c14-details). Assess parent AT-C14 using all N/E/B cases in traceability.
+
+### FR-C15 Customer alert policies
+
+- **Company request basis**: SRC-06 BIZ-08, BIZ-17, BIZ-18 — Fault and air-quality notifications; Figma-confirmed 06e–06g/02e/02l (2026-10-01).
+- **Entry conditions**: Client Membership of the customer; editing requires owner or member of that customer (policies belong to the customer, not the user).
+- **Main flow**: Alerts › Alert policies → view the default policy (HQ limits) and switch rules on/off → create or edit an own policy (what to watch, condition, recovery, “only if” hours, severity, channels) → attach it on each AC's page.
+- **Business rule BR-C15**: Every AC carries the HQ default policy (6 rules: ventilation CO₂, dust/PM2.5, refrigerant leak, compressor short-cycling, clogged filter, AC offline). Clients cannot edit its limits but can switch each rule on/off for all their ACs (`policies.setDefaultRule`). Own policies (`kind=alert`, `customerId` = own customer) carry one condition; units carry policies (`units.setAlertPolicies`), never the reverse. Editing changes the policy on every attached AC. Delete detaches it from all ACs first after confirmation; the default policy cannot be deleted. Recovery must be on the correct side of the threshold; units are fixed per metric (ppm/µg/m³ never mixed). WhatsApp is offered only when allowed in Preferences. Missing/stale readings never trigger.
+- **Resulting business state**: Policy version+1 on save; DefaultRuleSetting per customer and rule; ACUnit.alertPolicyIds updated on attach/detach. Alerts remain view-only for clients (no Resolve).
+- **Boundaries/prohibitions**: Other customers' policies and the HQ template limits are not editable. Attaching another customer's policy returns NOT_FOUND.
+
+| Acceptance ID | Given / When | Then (observable result) |
+|---|---|---|
+| AT-C15-N | customer-a. When: create “Stuffy office” CO₂ ≥ 1200 ppm 15 min, recover < 1000, Mon–Fri 08:00–19:00, Warning, in-app → attach to Workstations AC 1 and 2 → switch default rule “AC offline” off | ① Policy version=1, customerId=customer-a ② Both ACs list it under “Alert policies on this AC” ③ DefaultRuleSetting enabled=false for customer-a; other customers unchanged |
+| AT-C15-E | ① Recovery 1300 ppm for ≥ 1200 ② Delete the default policy ③ Attach customer-b's policy to Bedroom AC | ① VALIDATION, nothing saved ② VALIDATION (default cannot be deleted) ③ NOT_FOUND |
+| AT-C15-B | ① Delete “Bedroom too hot” attached to 2 ACs ② Missing CO₂ readings for 20 min | ① Confirmation names both ACs; policy detached then deleted ② No alert; “not measured” shown |
+
+Design: [DD-C15](../02-design/client.md#dd-c15-details). Assess parent AT-C15 using all N/E/B cases in traceability.
+
+### FR-C16 Monthly energy report export
+
+- **Company request basis**: SRC-06 BIZ-16, BIZ-23 — Energy/cost visibility; Figma-confirmed 04g (2026-10-01).
+- **Entry conditions**: Client with access to the selected properties.
+- **Main flow**: Energy & cost › Export → month, locations, sections (energy & cost by AC, comparison with last month, CO₂ and offsets, alerts & maintenance), format PDF/CSV → Download; optionally tick “Email this report to me on the 1st of every month”.
+- **Business rule BR-C16**: Figures use the same tariff, estimation labels, and MYR amounts as the screen; estimated values stay marked. Only completed months can be exported. The monthly email uses the Preferences email and can be turned off there (`Preferences.monthlyReportEmail`).
+- **Resulting business state**: `energy.exportReport` returns a demo file; nothing else changes.
+- **Boundaries/prohibitions**: No sections or an unfinished month is VALIDATION; locations outside scope are NOT_FOUND.
+
+| Acceptance ID | Given / When | Then (observable result) |
+|---|---|---|
+| AT-C16-N | customer-a, September 2026, all locations, all sections, PDF | ① One ReportFile (application/pdf, isDemo=true) ② Estimated values marked as estimated |
+| AT-C16-E | ① Zero sections ② Current month | ① ② VALIDATION, no file |
+| AT-C16-B | Tick monthly email then save | Preferences.monthlyReportEmail=true; unticking in Preferences turns it off |
+
+Design: [DD-C16](../02-design/client.md#dd-c16-details). Assess parent AT-C16 using all N/E/B cases in traceability.
+
+### FR-C17 Confirm, rate, and report a problem after completion
+
+- **Company request basis**: SRC-06 BIZ-12 — Maintenance requests and history; Figma-confirmed 07g–07i (2026-10-01).
+- **Entry conditions**: Job of the customer in status completed (HQ or contractor accepted the report).
+- **Main flow**: Completed job banner (also on Overview for 7 days) → Confirm & rate (1–5 ★ required, tags, optional comment) → job closed for the client; or Report a problem (reason, details, photos, preferred visit) → follow-up request “Under HQ review”.
+- **Business rule BR-C17**: The rating can be changed for 7 days (`jobs.rate`); unconfirmed jobs are auto-confirmed after 7 days without a rating. Ratings ≤ 2 ★ ask what went wrong and offer Report a problem. Ratings are visible to HQ and the service company only, never to other customers, and feed contractor KPIs/SLA (FR-A21, FR-A22). Report a problem creates a requested follow-up job linked by `followUpOfJobId`; HQ classifies it within one business day as rework (free) or a new request (`jobs.classifyFollowUp`).
+- **Resulting business state**: MaintenanceJob.rating and customerConfirmedAt are set; a follow-up job appears in My requests.
+- **Boundaries/prohibitions**: Jobs not yet completed cannot be rated or reported (CONFLICT). Details outside 10–2000 characters and more than 5 photos are VALIDATION.
+
+| Acceptance ID | Given / When | Then (observable result) |
+|---|---|---|
+| AT-C17-N | customer-a, completed job-c02. When: rate 4 ★ with tags “On time”, “Clean work”, “Fixed the problem” and a comment | ① job-c02 rating.stars=4, customerConfirmedAt set ② Admin contractor KPIs include the rating |
+| AT-C17-E | ① Rate an in-progress job ② Report a problem with 9-character details ③ Change the rating 8 days later | ① CONFLICT ② VALIDATION, input kept ③ CONFLICT (window closed) |
+| AT-C17-B | ① Rate 2 ★ ② Report a problem on job-c02 | ① “What went wrong?” and Report a problem offered ② New requested job with followUpOfJobId=job-c02, followUpClass=pending |
+
+Design: [DD-C17](../02-design/client.md#dd-c17-details). Assess parent AT-C17 using all N/E/B cases in traceability.
+
+### FR-C18 Filter care
+
+- **Company request basis**: SRC-06 BIZ-18, BIZ-12 — Cleaning advice and maintenance; Figma-confirmed 07j (2026-10-01).
+- **Entry conditions**: Client with access to the ACs; Maintenance › Filter care tab.
+- **Main flow**: View run time since the last cleaning per AC (or per area summary) with status OK / Due soon / Overdue → Request cleaning (opens a prefilled maintenance request) or Mark cleaned (self cleaning) → owners edit reminders.
+- **Business rule BR-C18**: Run time counts hours the AC was running (from telemetry). Reminders fire at the model default 250 h (owner may set 50–2000 h) or every N days (7–180, default 30) when run time is unknown, to the location owners (or all users) by app and email. A reminder is an Alert of type maintenance and therefore a cleaning_due notification. A technician cleaning recorded in a job resets the counter like Mark cleaned; Mark cleaned is shown to the technician.
+- **Resulting business state**: FilterCareStatus reset with lastCleanedBy=customer; FilterCareSettings saved per customer.
+- **Boundaries/prohibitions**: Offline ACs show run time as unknown, never 0.
+
+| Acceptance ID | Given / When | Then (observable result) |
+|---|---|---|
+| AT-C18-N | customer-a: Meeting room AC 268 h, Bedroom AC 212 h (threshold 250 h). When: Mark cleaned on Bedroom AC | ① Meeting room AC Overdue, Bedroom AC Due soon ② Bedroom AC resets to 0 h, lastCleanedBy=customer |
+| AT-C18-E | ① Threshold 20 h ② Member edits reminders | ① VALIDATION ② FORBIDDEN |
+| AT-C18-B | ① Offline AC ② Request cleaning on Meeting room AC | ① Status unknown, run time “—” ② New maintenance request form prefilled with the unit |
+
+Design: [DD-C18](../02-design/client.md#dd-c18-details). Assess parent AT-C18 using all N/E/B cases in traceability.
+
 
 0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 
 Approval applied 2026-09-16: FR-C01/C06 today/7d/30d use display-timezone calendar days and completed minutes (SR17). FR-C13 retries failed demo offsets only on the same record and failed stage (SR18).
 
-Additional current 0.21.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–106. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.22.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–112. They override older text on the same issues; use IR72 for conflict priority.
 
 Job lists support ascending/descending sorting by status (business order), severity, and deadline. Default: status in business order (IR34). Sort all results before pagination; language changes do not change order. Also use AT-REV16-005 for acceptance.

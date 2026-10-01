@@ -1,6 +1,6 @@
 ---
 document_id: REQ-P
-version: 0.21.0
+version: 0.22.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # Contractor requirements
 
-**0.21.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.22.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Purpose and assumptions
 
@@ -29,14 +29,16 @@ P0 means the core foundational flow. P1 is also required for completion in phase
 
 | Requirement ID | Priority | Status/basis | Requirement | Acceptance criteria |
 |---|---|---|---|---|
-| FR-P01 | P0 | Production instructions SRC-02 + added design details / BIZ-04, BIZ-12 | Accepted-work dashboard | Show own company's offers, pending acceptance count, deadlines, and progress. Exclude other companies' jobs even from totals. |
+| FR-P01 | P0 | Production instructions SRC-02 + added design details / BIZ-04, BIZ-12 | Accepted-work dashboard and job list | `/partner` shows an overview dashboard (KPI tiles, weekly progress, needs your action, today timeline, team capacity, recent activity); `/partner/jobs` lists own jobs by status tab. Exclude other companies' jobs even from totals. |
 | FR-P02 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | Accept/decline jobs | Accept or decline HQ offers; reflect results in HQ screens and record decline reasons. |
 | FR-P03 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | Schedules and own technician assignments | Assign active own-company technicians to accepted jobs with limited work periods. Reject out-of-period or other-company assignments. |
 | FR-P04 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | View target units and alert evidence | View only locations, models, connectivity, alerts, and history needed for accepted jobs. Hide customer billing. |
 | FR-P05 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | Report quality review/rework | Review submitted technician reports. Return missing required records with a reason, or accept and add to completion history. |
-| FR-P06 | P1 | Production instructions SRC-02 + added design details / BIZ-12 | View own workers and availability | View own technicians' qualifications, assignments, and schedules. Cannot grant permissions or view other companies' data. |
+| FR-P06 | P1 | Production instructions SRC-02 + added design details / BIZ-12 | View own workers and availability | View own technicians' qualifications, assignments, and schedules; record unavailable days (leave, training, public holidays). Cannot grant permissions or view other companies' data. |
 | FR-P07 | P1 | Production instructions SRC-02 + added design details / BIZ-12, BIZ-20 | Job communication/history | View schedule-change, rework, and completion notification previews and job history. No real sending. |
 | FR-P08 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | Delegation/work-period boundaries | Reject other-company jobs, out-of-period units, billing changes, and restriction changes even through direct URLs/service calls. |
+| FR-P09 | P1 | Figma-confirmed screen specification 2026-10-01 (Contractor 04-6/04-7) / BIZ-12 | Certificate expiry and renewals | Track own technicians' certificates, see which assignments an expiring certificate blocks, upload renewals for HQ verification, and request training. |
+| FR-P10 | P1 | Figma-confirmed screen specification 2026-10-01 (Contractor 06-1/06-2) / BIZ-12, BIZ-21 | Payout statements | View HQ-approved payout statements (lines, deductions, net, pay date) and ask HQ about a line. |
 
 ## Business boundaries and dependencies
 
@@ -64,17 +66,17 @@ Detailed thresholds and operating rules absent from the company original are pha
 ### FR-P01 Accepted-work dashboard
 
 - **Company request basis**: SRC-06 BIZ-04, BIZ-12 — Clear dashboards for customers, internal/external technicians, and administrators/HQ; scheduled, reactive, and preventive maintenance, including general non-RTO maintenance.
-- **Added design details**: Dashboard for accepted jobs. The separate contractor role comes from production instruction SRC-02, not an independent role in the company original.
+- **Added design details**: Dashboard for accepted jobs and a separate job list (Figma Contractor 01-1…01-4 and 02-1…02-6, 2026-10-01). The separate contractor role comes from production instruction SRC-02, not an independent role in the company original.
 
 - **Entry conditions**: Active contractor Membership. Before accepting an HQ offer, the job summary is visible.
-- **Main flow**: Count own pending acceptance, scheduled, active, and awaiting-quality-review jobs → select a status to view the list → open the job action screen.
+- **Main flow**: `/partner` (period, default this week): KPI tiles Offers to answer / Awaiting assignment / In progress or scheduled / Reports to review / Overdue → each tile opens `/partner/jobs` with the same filter; weekly progress bar by status; “Needs your action” (Respond, Reassign, Review, Assign); today’s timeline; team capacity (utilization = assigned ÷ available hours, “—” when undefined); recent activity → job history. `/partner/jobs`: status tabs All/Offered/Active/Review/Completed with counts, sort, period → open the job action screen. Sidebar Jobs badge = pending offers.
 - **Business rule BR-P01**: Before acceptance, show only job type, the registered address of the AC's installation property, required qualifications, and candidate schedules. Detailed unit readings and entry instructions require acceptance and a valid work period.
 - **Resulting business state**: Viewing does not accept a job. KPI counts and listed targets use the same filters.
 - **Boundaries/prohibitions**: Exclude other companies' offers from counts. After delegation expires and unit access ends, retain minimal own acceptance/decline history.
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-P01-N | `acceptancePatches["AT-P01-N"]`: contractor-a has one unanswered unexpired offered job, one accepted job within its access period, and one submitted job (tech-external-a starts job-contractor-a → saveDraft with `acceptancePatches["shared:report-draft-all-normal"]` → submit, IR97 item 3); contractor-b has one offered job. No period filter. When: ① Get `/partner` without status filter ② Change to status=offered | ① Three rows, offerCount=1/activeCount=1/reviewCount=1 ② One row, offerCount=1/activeCount=0/reviewCount=0; no b offer ③ Unanswered Offer decision remains null after viewing |
+| AT-P01-N | `acceptancePatches["AT-P01-N"]`: contractor-a has one unanswered unexpired offered job, one accepted job within its access period, and one submitted job (tech-external-a starts job-contractor-a → saveDraft with `acceptancePatches["shared:report-draft-all-normal"]` → submit, IR97 item 3); contractor-b has one offered job. No period filter. When: ① Get `/partner/jobs` without status filter ② Change to status=offered | ① Three rows, offerCount=1/activeCount=1/reviewCount=1 ② One row, offerCount=1/activeCount=0/reviewCount=0; no b offer ③ Unanswered Offer decision remains null after viewing |
 | AT-P01-E | ① Directly enter jobId of an offer to contractor-b ② Open own history after delegation expiry | ① NOT_FOUND ② Only JobHistorySnapshot (own decision/completion date), no live values |
 | AT-P01-B | Open the same offer ① Before acceptance ② After acceptance within the period ③ After delegation expiry | ① JobOfferSummary (registered installation-property address only; no entry instructions/telemetry/billing) ② JobDetail ③ JobHistorySnapshot |
 
@@ -174,9 +176,9 @@ Design: [DD-P05](../02-design/contractor.md#dd-p05-details). Assess parent AT-P0
 - **Added design details**: Own workers, qualifications, and availability views. The separate contractor role comes from production instruction SRC-02, not the company original.
 
 - **Entry conditions**: Permission to read own-company roster; no user creation permission included.
-- **Main flow**: Select date/qualification/active or expired → view own technicians' assignments/free slots → proceed to job assignment.
+- **Main flow**: Select date/qualification/active or expired → view own technicians' assignments/free slots → proceed to job assignment. “+ Unavailable days” records leave, training, or public holidays for one technician or the whole team (`members.setUnavailability`).
 - **Business rule BR-P06**: Utilization = assigned hours / configured available hours for the period. For example, 4 assigned hours out of 8 available = 50%. If available hours are undefined, show no percentage. Do not show personal location tracking or other-company schedules.
-- **Resulting business state**: Viewing does not change membership/qualifications. Ask HQ to coordinate membership changes.
+- **Resulting business state**: Viewing does not change membership/qualifications. Ask HQ to coordinate membership changes. Unavailable days set available hours to 0 for those dates, so utilization and `members.eligible` skip them; conflicting confirmed assignments are listed as a warning and kept (reassign in Schedule).
 - **Boundaries/prohibitions**: Changing company ID in the URL cannot retrieve another company's roster. Expired technicians cannot be selected for assignment.
 
 | Acceptance ID | Given / When | Then (observable result) |
@@ -231,10 +233,44 @@ Design: [DD-P07](../02-design/contractor.md#dd-p07-details). Assess parent AT-P0
 
 Design: [DD-P08](../02-design/contractor.md#dd-p08-details). Assess parent AT-P08 using all N/E/B and applicable SRC/R01 cases in traceability.
 
+### FR-P09 Certificate expiry and renewals
+
+- **Company request basis**: SRC-06 BIZ-12 — Qualified maintenance work; Figma-confirmed Contractor 04-6/04-7 (2026-10-01).
+- **Entry conditions**: Contractor with partner.assign for the own company; Team & capacity › Certifications tab.
+- **Main flow**: Filter by technician/status/“expiring within” → KPIs Valid / Expiring ≤ 60 days / Expired / Pending HQ verification → a row shows the job it blocks → Upload renewal (issued, expires, number, PDF/JPG/PNG ≤ 10 MB) → “Pending HQ verification”; or Open assignment to reassign; or Request training.
+- **Business rule BR-P09**: Eligibility (`members.eligible`) uses verified certificates only; until HQ verifies a renewal (FR-A21), the current expiry applies. An expired certificate makes the technician ineligible for jobs needing it; nothing is revoked before expiry. Reminders go to the contractor admin 60, 30, and 7 days before expiry.
+- **Resulting business state**: A Certificate with status pending_verification and renewalOf; HQ approval updates the Membership qualification validUntil.
+- **Boundaries/prohibitions**: Other companies' technicians are NOT_FOUND; files over 10 MB or issuedAt ≥ expiresAt are VALIDATION.
+
+| Acceptance ID | Given / When | Then (observable result) |
+|---|---|---|
+| AT-P09-N | contractor-a, tech-external-a Electrical basics expires 2026-10-15, job-p07 on 2026-10-20 needs it. When: Upload renewal (2026-09-28 → 2029-09-27) | ① Row shows “Expiring · 14 d” blocking job-p07 ② New Certificate pending_verification, renewalOf set ③ Eligibility still uses 2026-10-15 until HQ approves |
+| AT-P09-E | ① 12 MB file ② Membership of contractor-b | ① VALIDATION ② NOT_FOUND |
+| AT-P09-B | ① HQ approves the renewal ② Certificate passes its expiry without renewal | ① Status valid; qualification validUntil=2029-09-27 ② Status expired; technician not offered for jobs needing it |
+
+Design: [DD-P09](../02-design/contractor.md#dd-p09-details). Assess parent AT-P09 using all N/E/B cases in traceability.
+
+### FR-P10 Payout statements
+
+- **Company request basis**: SRC-06 BIZ-12, BIZ-21 — Contractor work and billing transparency; Figma-confirmed Contractor 06-1/06-2 (2026-10-01).
+- **Entry conditions**: Contractor Membership of the company; Sidebar › Payouts (`/partner/payouts`).
+- **Main flow**: Select period/status → KPIs jobs paid, gross, deductions, net payable (with pay date) → statement list → statement lines (job, work, accepted date, status, MYR) → Ask HQ on a line (topic, message) → Download PDF.
+- **Business rule BR-P10**: Statements are generated on the 1st for jobs whose report was accepted in the previous month, priced by the contractor’s rate card; HQ approves them and pays on the 15th. Only approved and paid statements are visible; jobs still in review move to the next statement and show “Not included”. Rework deductions appear as negative lines. A question adds a note to that job’s history and notifies HQ billing; the statement stays approved and any correction appears as an adjustment on the next statement. Amounts in MYR; the bank account is set by HQ (masked).
+- **Resulting business state**: PayoutStatement.questions gains an open question.
+- **Boundaries/prohibitions**: Draft statements and other companies' statements are NOT_FOUND; empty message or > 2000 characters is VALIDATION.
+
+| Acceptance ID | Given / When | Then (observable result) |
+|---|---|---|
+| AT-P10-N | contractor-a, stmt-2026-09 approved (5 jobs, gross 2,110.00, deduction −120.00 for job-p07, net 1,990.00, pays 2026-10-15). When: Ask HQ about the job-p07 deduction | ① KPIs match the statement ② One open question; job-p07 history shows the note |
+| AT-P10-E | ① Open a draft statement ② Empty message | ① NOT_FOUND ② VALIDATION |
+| AT-P10-B | job-p09 still in quality review | Listed as “Not included · next statement” |
+
+Design: [DD-P10](../02-design/contractor.md#dd-p10-details). Assess parent AT-P10 using all N/E/B cases in traceability.
+
 
 0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 
-Additional current 0.21.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–106. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.22.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–112. They override older text on the same issues; use IR72 for conflict priority.
 
 0.14.0: Under IR25, the pre-acceptance address comes from the unit's installation property. After expiry, freeze only report existence/acceptance status.
 
