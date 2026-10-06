@@ -12,7 +12,7 @@ Parent document: [PrepareDocument](../00-prepare/PrepareDocument.md). Read this 
 
 This document reorganizes the [original company requirements in English (SRC-06)](../00-prepare/sources/company-requirements-original.txt), the primary source. Trace information through company original → BIZ groups (categories of company requests) → FR (functional requirements) here → detailed design and acceptance criteria. Each feature separates company requests from design team additions. Screen fields, input limits, state changes, and priorities are frontend implementation proposals, not detailed company approvals. Reference mock screens guide visual design. Functional requirements and acceptance criteria make the original goals concrete using production instructions and added design details.
 
-**0.22.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.24.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Common features
 
@@ -53,7 +53,7 @@ Assess each AT-NFR using the measurement method above and the [verification plan
 | View units/locations | Own use scope | Information needed for accepted jobs | Internal: assigned scope / external: assigned units and period | Managed scope |
 | Create/move/delete properties/locations/units | No (rename locations and units only, IR109) | No | No | asset.write within managed scope |
 | Alert policies | Own customer's policies; default-rule on/off for own customer; attach on own units (IR108) | No | No | alert.policy.write; default policy limits HQ only |
-| Client user accounts | Owner invites members | No | No | asset.write (Customers & units › Users) |
+| Client user accounts | Owner lists users, invites members, and resends invites (FR-C19) | No | No | asset.write (Customers & units › Users) |
 | Normal AC control | Within scope/capabilities | No (do not grant commands.create/voice.resolveIntent to contractors) | Diagnostic permission and valid target/period | control.execute permission |
 | Maintenance requests | Own units | Coordinate accepted jobs | Handle assigned jobs | Create/assign within managed scope |
 | Contractor acceptance/own assignment | No | Accepted jobs, own company, valid qualifications/period | No | Outsource or assign internally |
@@ -187,4 +187,4 @@ FR-X01/X02 require D09's 30-minute session and fixed en/ms grammar; FR-X03/X05 u
 
 0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 
-Additional current 0.22.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–112. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.24.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–114. They override older text on the same issues; use IR72 for conflict priority.

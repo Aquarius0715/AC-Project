@@ -84,11 +84,12 @@ for path in markdown:
             previous = None
 
 trace = rows('00-prepare/traceability.csv')
+# 0.24.0 (2026-10-06): IR114 adds FR-C19 (customer users, SCR-C19, DD-C19); 83 requirement IDs, 67 role rows.
 # 0.23.0 (2026-10-02): IR113 maintenance scheduling adds 8 job operations (197); no new requirement IDs.
 # 0.22.0 (2026-10-01): Figma-confirmed screens add FR-C14–C18, FR-P09–P10, FR-T13–T15, FR-A17–A23 and FR-X08 (IR107–IR112).
-expected = {f'FR-{letter}{i:02}' for letter, n in [('C',18),('P',10),('T',15),('A',23),('X',8)] for i in range(1,n+1)} | {f'NFR-{i:02}' for i in range(1,9)}
+expected = {f'FR-{letter}{i:02}' for letter, n in [('C',19),('P',10),('T',15),('A',23),('X',8)] for i in range(1,n+1)} | {f'NFR-{i:02}' for i in range(1,9)}
 if unique(trace, 'requirement_id', 'requirement') != expected:
-    fail('Requirement coverage must be 82 IDs')
+    fail('Requirement coverage must be 83 IDs')
 acceptance = set()
 for row in trace:
     req = (ROOT / row['requirement_file']).read_text()
@@ -178,8 +179,8 @@ for role in ['client','contractor','technician','admin']:
         for op in re.findall(r'[a-zA-Z]+\.[a-zA-Z]+', cells[3]):
             if op not in opmap or did not in opmap[op]['design_ids'].split(';'):
                 fail('DD/catalog mismatch '+did+' '+op)
-if role_tables != 66:
-    fail('Expected 66 role requirement rows')
+if role_tables != 67:
+    fail('Expected 67 role requirement rows')
 # FRV-011: detail-section service boundary sentences must equal the summary table (single source of operations).
 for role in ['client','contractor','technician','admin']:
     text = (ROOT / f'02-design/{role}.md').read_text()
@@ -1181,7 +1182,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.23.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.24.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

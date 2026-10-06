@@ -37,6 +37,13 @@ export type Job = {
   partnerProposal: PartnerProposal | null;
   declined: { reason: string; comment: string; at: string } | null;
   history: { at: string; text: string }[];
+  /** Coordination notes from the client (jobs.addNote, visibility=customer, IR114). */
+  notes?: { by: string; text: string; at: string }[];
+  /** “Report a problem” follow-up (FR-C17 / IR114). */
+  followUpOf?: string;
+  followUpClass?: "pending" | "rework" | "new_request";
+  followUpReason?: string;
+  rating?: number;
 };
 export type Note = { id: string; role: "client" | "admin" | "contractor" | "technician"; title: string; detail: string; href: string; at: string; read: boolean };
 
@@ -195,6 +202,39 @@ export const jobActions = {
   requestOther(id: string, preferred: Slot[], comment: string) {
     update(id, (j) => ({ status: "requested", preferred, round: j.round + 1, scheduled: null, technician: null, techAck: null }), `Client asked for another time${comment ? ` — “${comment}”` : ""}`);
     notify("admin", `Client asked to move ${id}`, "3 new preferred times", `/admin/jobs?jobId=${id}`);
+  },
+  /** Client: coordination note on an open job (IR114) — never changes time, assignee or status. */
+  addNote(id: string, text: string) {
+    const j = load().jobs.find((x) => x.id === id);
+    if (!j || j.status === "completed" || j.status === "cancelled") return "CONFLICT — notes are only possible on open jobs";
+    if (!text.trim() || text.length > 2000) return "Write 1–2000 characters";
+    update(id, (x) => ({ notes: [...(x.notes ?? []), { by: "customer-a", text: text.trim(), at: NOW }] }), `Client note: “${text.trim()}”`);
+    notify("admin", `Client note on ${id}`, text.trim().slice(0, 80), `/admin/jobs?jobId=${id}`);
+    if (j.delivery === "contractor") notify("contractor", `Client note on ${id}`, text.trim().slice(0, 80), `/partner/jobs/${id}`);
+    return undefined;
+  },
+  /** Client: “Report a problem” on a completed job → requested follow-up job, pending HQ classification (FR-C17). */
+  reportProblem(fromId: string, reason: string, details: string, visit: string) {
+    const s = load();
+    const src = s.jobs.find((x) => x.id === fromId);
+    if (!src || src.status !== "completed") return { error: "CONFLICT — only completed jobs can be reported" };
+    const n = s.jobs.filter((j) => /^job-c\d+$/.test(j.id)).map((j) => +j.id.slice(5)).reduce((a, b) => Math.max(a, b), 0) + 1;
+    const id = `job-c${String(n).padStart(2, "0")}`;
+    const job = req(id, { unitId: src.unitId, unit: src.unit, loc: src.loc, type: "Reactive", symptom: `${reason} — ${details}`, status: "requested", followUpOf: fromId, followUpClass: "pending",
+      preferred: visit ? [{ date: visit, win: "09:00–12:00" }] : [], history: [{ at: NOW, text: `customer-a reported a problem on ${fromId} — follow-up created, under HQ review` }] });
+    state = { ...s, jobs: [job, ...s.jobs] };
+    save();
+    notify("admin", `Follow-up ${id} of ${fromId}`, "Report a problem — classify as rework or new request within 1 business day", `/admin/jobs?jobId=${id}`);
+    return { id };
+  },
+  /** HQ: classify a follow-up once (jobs.classifyFollowUp, IR114). */
+  classifyFollowUp(id: string, cls: "rework" | "new_request", reason: string) {
+    const j = load().jobs.find((x) => x.id === id);
+    if (!j || j.followUpClass !== "pending") return "CONFLICT — already classified";
+    if (!reason.trim() || reason.length > 1000) return "A reason is required (1–1000 characters)";
+    update(id, () => ({ followUpClass: cls, followUpReason: reason.trim() }), `HQ classified the follow-up as ${cls === "rework" ? "rework (free)" : "a new request"} · ${reason.trim()}`);
+    notify("client", `${id}: ${cls === "rework" ? "Rework (free)" : "New request"}`, `HQ reviewed your problem report on ${j.followUpOf}`, `/customer/maintenance?jobId=${id}`);
+    return undefined;
   },
   /* ---- contractor ---- */
   partnerAccept(id: string) { update(id, () => ({ status: "accepted", partnerProposal: null }), "contractor-a accepted the offer"); notify("admin", `contractor-a accepted ${id}`, "assign a technician next", `/admin/jobs?jobId=${id}`); },
