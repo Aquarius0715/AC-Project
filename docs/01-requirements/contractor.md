@@ -30,7 +30,7 @@ P0 means the core foundational flow. P1 is also required for completion in phase
 | Requirement ID | Priority | Status/basis | Requirement | Acceptance criteria |
 |---|---|---|---|---|
 | FR-P01 | P0 | Production instructions SRC-02 + added design details / BIZ-04, BIZ-12 | Accepted-work dashboard and job list | `/partner` shows an overview dashboard (KPI tiles, weekly progress, needs your action, today timeline, team capacity, recent activity); `/partner/jobs` lists own jobs by status tab. Exclude other companies' jobs even from totals. |
-| FR-P02 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | Accept/decline jobs | Accept or decline HQ offers; reflect results in HQ screens and record decline reasons. |
+| FR-P02 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | Accept/decline jobs | Accept or decline HQ offers with a fixed agreed visit time, or propose another time (approved by the client through HQ); reflect results in HQ screens and record decline reasons. |
 | FR-P03 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | Schedules and own technician assignments | Assign active own-company technicians to accepted jobs with limited work periods. Reject out-of-period or other-company assignments. |
 | FR-P04 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | View target units and alert evidence | View only locations, models, connectivity, alerts, and history needed for accepted jobs. Hide customer billing. |
 | FR-P05 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | Report quality review/rework | Review submitted technician reports. Return missing required records with a reason, or accept and add to completion history. |
@@ -89,15 +89,15 @@ Design: [DD-P01](../02-design/contractor.md#dd-p01-details). Assess parent AT-P0
 
 - **Entry conditions**: An offered job addressed to own company, before offerExpiresAt, not cancelled by HQ. An unanswered expired offer returns the job to requested and removes it from the contractor list (IR48). Acceptance/decline after expiry returns CONFLICT(errors.offer_expired); individual job reads return NOT_FOUND (IR86).
 - **Main flow**: Check minimal job details and delegation terms → accept or decline with a reason → update HQ and contractor displays.
-- **Business rule BR-P02**: Acceptance does not assign a technician or confirm a booking. Decline returns the job to requested and records actor, reason, and offerId. A new offer receives a new offerId.
+- **Business rule BR-P02**: Offers carry a fixed visit time agreed with the client (or the plan occurrence) and the job's origin. If the team cannot come then, the contractor proposes another time; the offer stays reserved and Accept is blocked until HQ and the client resolve it (IR113). Acceptance does not assign a technician. Decline returns the job to requested and records actor, reason, and offerId. A new offer receives a new offerId.
 - **Resulting business state**: Acceptance sets `accepted` and grants needed unit access only during the delegated period. Decline grants no detailed access.
 - **Boundaries/prohibitions**: Reject acceptance/decline exactly at expiry and require refetch. If HQ cancelled just before acceptance (CONFLICT), do not overwrite automatically.
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-P02-N | hq-operator offers job-internal-a to contractor-a (offerExpiresAt=2026-09-15T01:00Z, accessValidFrom=2026-09-14T01:00Z, accessValidUntil=2026-09-22T00:00Z). When: contractor-a accepts | ① Job accepted, Offer decision=accept, decidedBy saved ② HQ list shows accepted ③ Target unit viewable within period |
+| AT-P02-N | With `acceptancePatches["shared:ir113-agreed-slots"]`, hq-operator offers job-internal-a to contractor-a (visitSlot=2026-09-21T02:00Z–04:00Z, offerExpiresAt=2026-09-15T01:00Z, accessValidFrom=2026-09-14T01:00Z, accessValidUntil=2026-09-22T00:00Z). When: contractor-a accepts | ① Job accepted, Offer decision=accept, decidedBy saved ② HQ list shows accepted ③ Target unit viewable within period |
 | AT-P02-E | ① Accept/decline at now=offerExpiresAt ② HQ cancels after display → accept using old version | ① CONFLICT, refetch guidance, unchanged state ② CONFLICT, remains cancelled |
-| AT-P02-B | ① accept ② decline with reason ③ Re-offer after decline | ① accepted ② requested, declineReason/offerId retained, no unit viewing permission ③ New offerId |
+| AT-P02-B | ① accept ② decline with reason ③ Re-offer after decline ④ proposePartnerSlot 2026-10-02 14:00–16:00 with tech-external-a and a reason, then accept ⑤ withdrawPartnerSlot then accept | ① accepted ② requested, declineReason/offerId retained, no unit viewing permission ③ New offerId ④ Partner proposal pending; accept CONFLICT errors.partner_proposal_pending; one notification to hq-operator ⑤ withdrawn; accepted (IR113) |
 
 Design: [DD-P02](../02-design/contractor.md#dd-p02-details). Assess parent AT-P02 using all N/E/B and applicable SRC/R01 cases in traceability.
 
@@ -107,16 +107,16 @@ Design: [DD-P02](../02-design/contractor.md#dd-p02-details). Assess parent AT-P0
 - **Added design details**: Own-staff assignment and qualification checks. The separate contractor role comes from production instruction SRC-02, not the company original.
 
 - **Entry conditions**: Accepted job and permission to manage own assignments.
-- **Main flow**: Check requested slot/delegation period → find active, qualified, available own-company technicians → set work start/end → confirm assignment → share schedule/assignee.
+- **Main flow**: Check the fixed visit slot/delegation period → find active, qualified, available own-company technicians → set work start/end → confirm assignment → share schedule/assignee.
 - **Business rule BR-P03**: Recheck membership, qualifications, and period just before saving, not only during candidate search. Warn on overlapping schedules. Phase 1A rejects saving when a confirmed schedule already occupies the same time.
 - **Resulting business state**: First assignment creates Assignment, confirms scheduledSlot, and sets Job to `assigned`. Reassignment preserves `assigned` or `in_progress`, disables the old assignment, and updates the job's scheduledSlot/assignment ID to the new assignment (IR89). Preserve original report authorship and record the change reason.
 - **Boundaries/prohibitions**: Reject other-company, unqualified, and out-of-delegation-period assignments. Reassignment during work requires a reason. The previous technician loses action access immediately.
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-P03-N | job-internal-a accepted in AT-P02-N; tech-external-a (qualified, contractor-a; seed assignment-contractor-a lasts until 2026-09-20T00:00Z). When: Assign 2026-09-21 10:00–12:00 (Asia/Kuala_Lumpur) | ① Assignment created ② scheduledSlot confirmed ③ Job assigned ④ One templateKey=schedule_change notification to tech-external-a (inApp, simulated); one each to customer-a, hq-operator, hq-restriction-manager; zero to actor contractor-a (IR95) |
+| AT-P03-N | job-internal-a accepted in AT-P02-N (visitSlot 2026-09-21 10:00–12:00); tech-external-a (qualified, contractor-a; seed assignment-contractor-a lasts until 2026-09-20T00:00Z). When: Assign 2026-09-21 10:00–12:00 (Asia/Kuala_Lumpur) | ① Assignment created ② scheduledSlot confirmed ③ Job assigned ④ One templateKey=schedule_change notification to tech-external-a (inApp, simulated); one each to customer-a, hq-operator, hq-restriction-manager; zero to actor contractor-a (IR95) |
 | AT-P03-E | ① contractor-b technician ② Unqualified ③ Outside delegation period ④ Reassign in_progress without reason ⑤ Reassign with reason | ① NOT_FOUND ② FORBIDDEN ③ VALIDATION (slot outside delegation period), zero assignments ④ VALIDATION ⑤ Success, Job remains in_progress |
-| AT-P03-B | ① Non-overlapping schedule ② Overlap with confirmed schedule ③ Candidate qualification revoked just before save | ① Success ② CONFLICT ③ FORBIDDEN |
+| AT-P03-B | ① Non-overlapping schedule ② Overlap with confirmed schedule ③ Candidate qualification revoked just before save ④ Assign a slot different from the offer's visitSlot | ① Success, Assignment acknowledgement=pending ② CONFLICT ③ FORBIDDEN ④ VALIDATION errors.slot_not_agreed (IR113) |
 
 **Additional acceptance AT-P03-R01 (revisit, conflict, cross-role)**
 

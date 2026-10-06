@@ -44,7 +44,7 @@ export default function UnitControl({ params }: { params: Promise<{ id: string }
               </Link>
             ))}
           </div>
-          <p className="mt-3 text-[11px] text-muted">Choose one AC to control. Controls apply only to the selected AC — no room-wide bulk control.</p>
+          <p className="mt-3 text-[11px] text-muted">Choose an AC to control it on its own, or use Group control in Units &amp; locations to send one setting to several ACs in this space.</p>
         </Card>
 
         <div className="flex min-w-0 flex-col gap-4">

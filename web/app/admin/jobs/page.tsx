@@ -1,75 +1,300 @@
 "use client";
 
-import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, Tabs, Textarea, useToast, cx } from "@/components/ui";
+import { use, useState } from "react";
+import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, Timeline, cx, useToast } from "@/components/ui";
+import { JobStatusBadge, OriginBadge, PreferredSlotsInput, Rank, preferredError } from "@/components/JobBits";
+import { Job, JobStatus, Slot, fitFor, fmt, jobActions, longDate, statusLabel, useJobs } from "@/lib/jobs";
 
-type J = { id: string; unit: string; cust: string; kind: string; status: string; line: string; tone: "primary" | "warn" | "ok" | "crit" | "unknown" };
-const seed: J[] = [
-  { id: "job-internal-a", unit: "Bedroom AC", cust: "customer-a", kind: "Reactive", status: "requested", line: "Unassigned · due 09-15 12:00", tone: "primary" },
-  { id: "job-a11", unit: "Rooftop unit", cust: "customer-b", kind: "Reactive", status: "offered", line: "Offer to contractor-a · expires 09-24 09:00", tone: "primary" },
-  { id: "job-contractor-a", unit: "Bedroom AC", cust: "customer-a", kind: "Preventive", status: "in_progress", line: "contractor-a · tech-external-a · window ended 09-20", tone: "crit" },
-  { id: "job-c04", unit: "Bedroom AC", cust: "customer-a", kind: "Reactive", status: "assigned", line: "Internal · tech-internal-a", tone: "warn" },
-  { id: "job-p09", unit: "Lobby AC", cust: "customer-b", kind: "Periodic", status: "submitted", line: "contractor-a · awaiting contractor review", tone: "warn" },
-  { id: "job-a06", unit: "Living room AC", cust: "customer-a", kind: "Periodic", status: "submitted", line: "Internal · tech-internal-a · report v1", tone: "warn" },
-  { id: "job-c02", unit: "Living room AC", cust: "customer-a", kind: "Periodic", status: "completed", line: "Internal · completed 09-08", tone: "ok" },
+const PIPE: JobStatus[] = ["requested", "time_proposed", "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "on_hold"];
+const ORDER: JobStatus[] = ["requested", "time_proposed", "offered", "accepted", "assigned", "in_progress", "on_hold", "submitted", "rework_requested", "completed", "cancelled"];
+const plans = [
+  { id: "plan-living-a", name: "Living room AC — periodic inspection & filter cleaning", rule: "Every 3 months · customer-a · next visit 2026-12-08", unit: "Living room AC", delivery: "Internal · tech-internal-b" },
+  { id: "plan-lobby-b", name: "Lobby AC — quarterly inspection", rule: "Every 3 months · customer-b · next 2026-12-16", unit: "Lobby AC", delivery: "Offer to contractor-a" },
 ];
-const plans = [{ id: "plan-living-a", name: "Living room AC — periodic filter cleaning", rule: "Every month · customer-a · next 2026-10-15" }, { id: "plan-lobby-b", name: "Lobby AC — quarterly inspection", rule: "Every 3 months · customer-b · next 2026-12-01" }];
+type Tab = "jobs" | "plans" | "contractors" | "sla";
 
-export default function AdminJobs() {
+export default function AdminJobs({ searchParams }: { searchParams: Promise<{ jobId?: string; tab?: string }> }) {
+  const sp = use(searchParams);
   const toast = useToast();
-  const [tab, setTab] = useState<"jobs" | "plans">("jobs");
-  const [list, setList] = useState(seed);
-  const [sel, setSel] = useState(seed[5]);
+  const jobs = useJobs();
+  const [tab, setTab] = useState<Tab>((["plans", "contractors", "sla"].includes(sp.tab ?? "") ? sp.tab : "jobs") as Tab);
+  const [selId, setSelId] = useState(sp.jobId ?? "job-c07");
+  const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");
+  const [delivery, setDelivery] = useState<"all" | "internal" | "contractor">("all");
+  const [stage, setStage] = useState<JobStatus | null>(null);
+  const [modal, setModal] = useState<null | { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "new" } | { kind: "reason"; what: "rework" | "hold" | "reassign" }>(null);
   const [plan, setPlan] = useState(plans[0]);
-  const [overdue, setOverdue] = useState(false);
-  const [modal, setModal] = useState<null | "new" | "rework" | "hold">(null);
-  const [step, setStep] = useState(0);
-  const [reason, setReason] = useState("");
-  const [tried, setTried] = useState(false);
-  const [f, setF] = useState({ unit: "Bedroom AC", kind: "Reactive", delivery: "internal", sym: "" });
-  const counts = ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "rework", "completed", "on_hold"];
-  const shown = list.filter((j) => !overdue || j.tone === "crit");
-  const setS = (status: string) => { setList((l) => l.map((x) => (x.id === sel.id ? { ...x, status } : x))); setSel({ ...sel, status }); };
-  const close = () => { setModal(null); setStep(0); setTried(false); setReason(""); };
+  const list = [...jobs].filter((j) => j.status !== "cancelled").sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status))
+    .filter((j) => (origin === "all" || j.origin === origin) && (delivery === "all" || j.delivery === delivery) && (!stage || j.status === stage));
+  const sel = jobs.find((j) => j.id === selId) ?? list[0];
   return (
-    <Page>
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "jobs", label: "Jobs", count: list.length }, { id: "plans", label: "Plans", count: 2 }]} />
-      {tab === "jobs" ? (
+    <Page className="max-w-[1440px]">
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "jobs", label: "Jobs", count: jobs.filter((j) => j.status !== "cancelled").length }, { id: "plans", label: "Plans", count: 2 }, { id: "contractors", label: "Contractors", count: 3 }, { id: "sla", label: "SLA by customer" }]} />
+      {tab === "jobs" && (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2">{counts.map((c) => <span key={c} className="rounded-full bg-surface2 px-2.5 py-1 text-xs"><span className="text-muted">{c}</span> <b>{list.filter((j) => j.status === c).length}</b></span>)}</div><div className="flex items-center gap-3"><Check label="Overdue only" checked={overdue} onChange={setOverdue} /><Btn size="sm" variant="primary" onClick={() => setModal("new")}>+ New job</Btn></div></div>
-          <div className="split-rev">
-            <Card title="Jobs · all customers" sub="status ↑" className="self-start"><div className="flex flex-col gap-2">{shown.map((j) => <ListRow key={j.id} selected={sel.id === j.id} onClick={() => setSel(j)}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{j.id} · {j.unit}</b><Badge tone={j.tone}>{j.status}</Badge></div><div className="text-[11px] text-muted">{j.cust} · {j.kind}</div><div className="text-[11px] text-muted">{j.line}</div></div></ListRow>)}{shown.length === 0 && <p className="text-xs text-muted">No jobs.</p>}</div></Card>
-            <div className="flex min-w-0 flex-col gap-4">
-              <Card title={`${sel.id} · ${sel.unit}`} sub={`${sel.kind} · ${sel.cust} · Home A › 1F · ${sel.status === "offered" ? "plan-living-a" : "plan-living-a (Sep occurrence)"}`} action={<Badge tone={sel.tone}>{sel.status}</Badge>}>
-                <p className="mb-2 text-xs text-muted">Internal delivery skips Offered / Accepted. Submitted jobs cannot be cancelled — put on hold first (IR56).</p>
-                <SummaryList cols={2} items={[["Requested window", "09-15 10:00–12:00 · Asia/Kuala_Lumpur"], ["Due", "09-15 12:00 = requested end"], ["Scheduled", "09-15 10:00–12:00 · tech-internal-a"], ["Symptom", "Periodic filter cleaning · contact 9:00–18:00"]]} />
-                {sel.status === "offered" ? <div className="mt-3"><Banner>Contractor offer · contractor-a · expires 09-24 09:00. Re-offer after decline is possible.</Banner></div> : <div className="mt-3 rounded-xl bg-surface2 p-3 text-xs"><b className="text-[11px] tracking-wide">DELIVERY · INTERNAL</b><br />tech-internal-a · assignment valid 09-15 10:00–12:00<br />Qualifications demo_indoor ✓ · no overlapping confirmed schedule</div>}
-              </Card>
-              {sel.status === "submitted" && <Card title="Work report · version 1" sub="Submitted 09-15 11:48 by tech-internal-a · 6 checks · 3 photos">
-                <SummaryList items={[["Filter cleaned", "Normal"], ["Drain line", "Normal"], ["Refrigerant pressure", "Normal · 412 kPa"], ["Airflow", "Needs attention · reduced on Low"]]} />
-                <p className="mt-2 text-xs text-ok">You did not contribute to this report, so you can review it (self-approval is rejected).</p>
-                <div className="mt-3 flex flex-wrap gap-2"><Btn variant="primary" onClick={() => { setS("completed"); toast("Report accepted — job completed"); }}>Accept report</Btn><Btn onClick={() => setModal("rework")}>Return for rework…</Btn><Btn variant="danger" onClick={() => setModal("hold")}>Put on hold…</Btn></div>
-              </Card>}
-              <Card title="Costs" action={<Btn size="sm" onClick={() => toast("Cost line added")}>+ Add cost line</Btn>}>
-                <div className="scroll-x"><table className="w-full min-w-[480px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted"><tr><th>Kind</th><th>Description</th><th>Visibility</th><th className="text-right">Amount</th></tr></thead><tbody>{[["Estimate", "Filter cleaning labour", "customer", "80.00 MYR"], ["Estimate", "Replacement filter", "customer", "25.00 MYR"], ["Actual", "Filter cleaning labour", "customer", "80.00 MYR"], ["Actual", "Filter (imported)", "internal", "6.20 USD"]].map((r, i) => <tr key={i} className="border-t border-line">{r.map((c, j) => <td key={j} className={cx("py-1.5", j === 3 && "text-right font-semibold")}>{c}</td>)}</tr>)}</tbody></table></div>
-                <p className="mt-2 text-xs">Estimate total <b>105.00 MYR</b> · Actual total <b>80.00 MYR + 6.20 USD</b></p><p className="text-[11px] text-muted">Totals are shown per currency — never converted.</p>
-              </Card>
+          <div className="scroll-x"><div className="grid min-w-[880px] grid-cols-10 overflow-hidden rounded-2xl border border-line bg-surface">
+            {PIPE.map((s) => <button key={s} onClick={() => setStage(stage === s ? null : s)} className={cx("border-r border-line px-3 py-2 text-left last:border-r-0 hover:bg-surface2", stage === s && "bg-primary-soft")}><div className="text-[11px] text-muted">{statusLabel[s]}</div><div className={cx("text-lg font-bold", s === "time_proposed" && jobs.some((j) => j.status === s) && "text-warn")}>{jobs.filter((j) => j.status === s).length}</div></button>)}
+          </div></div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap gap-2">
+              <Select className="w-auto" aria-label="Origin" value={origin} onChange={(e) => setOrigin(e.target.value as typeof origin)}><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>
+              <Select className="w-auto" aria-label="Delivery" value={delivery} onChange={(e) => setDelivery(e.target.value as typeof delivery)}><option value="all">Delivery: All</option><option value="internal">Delivery: Internal</option><option value="contractor">Delivery: Contractor</option></Select>
+              {stage && <Btn size="sm" variant="ghost" onClick={() => setStage(null)}>✕ {statusLabel[stage]}</Btn>}
             </div>
+            <Btn variant="primary" onClick={() => setModal({ kind: "new" })}>+ New job</Btn>
+          </div>
+          <div className="split-rev">
+            <Card title="Jobs · all customers" sub="status ↑" className="self-start">
+              <div className="flex flex-col gap-1.5">{list.map((j) => (
+                <ListRow key={j.id} selected={sel?.id === j.id} onClick={() => setSelId(j.id)}>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{j.id} · {j.unit}</b><JobStatusBadge s={j.status} /></div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted"><OriginBadge origin={j.origin} />{j.customer} · {j.type}</div>
+                    <div className="text-[11px] text-muted">{rowLine(j)}</div>
+                  </div>
+                </ListRow>
+              ))}{list.length === 0 && <p className="text-xs text-muted">No jobs in this filter.</p>}</div>
+            </Card>
+            {sel && <JobDetail j={sel} open={setModal} />}
           </div>
         </>
-      ) : (
+      )}
+      {tab === "plans" && (
         <div className="split-rev">
           <Card title="Maintenance plans" className="self-start"><div className="flex flex-col gap-2">{plans.map((p) => <ListRow key={p.id} selected={plan.id === p.id} onClick={() => setPlan(p)}><div><b className="text-[13px]">{p.id}</b><div className="text-[11px] text-muted">{p.name}</div></div></ListRow>)}</div></Card>
-          <Card title={plan.name} sub={plan.rule} action={<Btn size="sm" variant="primary" onClick={() => toast("CONFLICT — an occurrence already exists for this period", "warn")}>Generate jobs</Btn>}>
-            <SummaryList items={[["Plan", plan.id], ["Rule", plan.rule], ["Lead time", "7 days"], ["Delivery", "Internal"]]} /><p className="mt-2 text-xs text-muted">Generating twice for the same period returns a CONFLICT instead of duplicating jobs.</p>
+          <Card title={plan.name} sub={plan.rule} action={<Btn size="sm" variant="primary" onClick={() => toast("CONFLICT — an occurrence already exists for this period", "warn")}>Generate next visit</Btn>}>
+            <SummaryList items={[["Plan", plan.id], ["Unit", plan.unit], ["Rule", plan.rule], ["Delivery", plan.delivery], ["Client notice", "1 month before each visit · origin “Periodic plan”"]]} />
+            <div className="mt-3"><Banner>Generated visits get a fixed time and go straight to assignment / offer. The client can “Request another time” with 3 options — that sends the visit back to triage like a client request (IR113).</Banner></div>
           </Card>
         </div>
       )}
-      <Modal open={modal === "new"} onClose={close} title={`New job — step ${step + 1} of 2`} footer={step === 0 ? <><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (f.sym.trim().length < 10) return; setTried(false); setStep(1); }}>Next</Btn></> : <><Btn onClick={() => setStep(0)}>← Back</Btn><Btn variant="primary" onClick={() => { setList((l) => [{ id: "job-a12", unit: f.unit, cust: "customer-a", kind: f.kind, status: f.delivery === "internal" ? "assigned" : "offered", line: f.delivery === "internal" ? "Internal · tech-internal-a" : "Offer to contractor-a", tone: "primary" }, ...l]); toast("Job created"); close(); }}>Create job</Btn></>}>
-        <Steps steps={["Details", "Delivery"]} current={step} />
-        {step === 0 ? <><Field label="Unit"><Select value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })}><option>Bedroom AC</option><option>Living room AC</option><option>Rooftop unit</option></Select></Field><Field label="Type"><Choice value={f.kind as "Reactive"} onChange={(v) => setF({ ...f, kind: v })} options={[{ id: "Reactive", label: "Reactive" }, { id: "Preventive" as "Reactive", label: "Preventive" }, { id: "Periodic" as "Reactive", label: "Periodic" }]} /></Field><Field label="Symptom / scope (10+ chars)" error={tried && f.sym.trim().length < 10 ? "Enter at least 10 characters" : undefined}><Textarea value={f.sym} onChange={(e) => setF({ ...f, sym: e.target.value })} /></Field></> : <><Field label="Delivery"><Choice value={f.delivery as "internal"} onChange={(v) => setF({ ...f, delivery: v })} options={[{ id: "internal", label: "Internal technician" }, { id: "contractor" as "internal", label: "Offer to contractor" }]} /></Field><Banner>{f.delivery === "internal" ? "Internal delivery skips Offered / Accepted." : "Offer to contractor-a — they answer within the offer window."}</Banner></>}
-      </Modal>
-      <Modal open={modal === "rework" || modal === "hold"} onClose={close} title={modal === "rework" ? "Return for rework" : "Put on hold (IR56)"} footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!reason.trim()) return; setS(modal === "rework" ? "rework" : "on_hold"); toast(modal === "rework" ? "Returned for rework" : "Job put on hold", "warn"); close(); }}>Confirm</Btn></>}><Field label="Reason (required)" error={tried && !reason.trim() ? "A reason is required" : undefined}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field></Modal>
+      {tab === "contractors" && <Contractors />}
+      {tab === "sla" && <Sla />}
+      {modal?.kind === "book" && sel && <BookModal j={sel} slot={modal.slot} onClose={() => setModal(null)} />}
+      {modal?.kind === "propose" && sel && <ProposeModal j={sel} onClose={() => setModal(null)} />}
+      {modal?.kind === "new" && <NewJobModal onClose={() => setModal(null)} onDone={(id) => { setModal(null); setSelId(id); }} />}
+      {modal?.kind === "reason" && sel && <ReasonModal what={modal.what} j={sel} onClose={() => setModal(null)} />}
     </Page>
+  );
+}
+
+function rowLine(j: Job) {
+  switch (j.status) {
+    case "requested": return j.declined ? `Client declined · round ${j.round} · ${j.preferred.length} new times` : `${j.preferred.length} preferred times · book one or propose`;
+    case "time_proposed": return `Proposed ${fmt(j.proposal?.slot)} · reply by ${j.proposal?.replyBy}`;
+    case "offered": return j.partnerProposal?.status === "pending" ? `${j.contractor} proposes ${fmt(j.partnerProposal.slot)} · needs client OK` : `Offer to ${j.contractor} · ${fmt(j.scheduled)}`;
+    case "accepted": return `${j.contractor} accepted · assign technician`;
+    case "assigned": return `${j.delivery === "contractor" ? j.contractor + " · " : "Internal · "}${j.technician} · ${j.techAck?.status === "accepted" ? "accepted ✓" : j.techAck?.status === "cant_make" ? "can’t make it ⚠" : "awaiting acceptance"}`;
+    default: return `${j.delivery === "contractor" ? j.contractor : "Internal"} · ${j.technician ?? "—"} · ${fmt(j.scheduled)}`;
+  }
+}
+
+function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "reason"; what: "rework" | "hold" | "reassign" }) => void }) {
+  const toast = useToast();
+  const fits = j.preferred.map(fitFor);
+  const anyFit = fits.some((f) => f.fits !== "none");
+  return (
+    <div className="flex min-w-0 flex-col gap-4">
+      <Card title={<span className="flex flex-wrap items-center gap-2">{j.id} · {j.unit} <JobStatusBadge s={j.status} /><OriginBadge origin={j.origin} /></span>} sub={`${j.type} · ${j.customer} · ${j.loc}${j.planId ? ` · ${j.planId} (${j.planVisit})` : ""}`} action={<div className="flex gap-2"><Btn size="sm" onClick={() => open({ kind: "reason", what: "hold" })}>Hold…</Btn><Btn size="sm" variant="danger" onClick={() => { jobActions.cancel(j.id, "cancelled by HQ"); toast("Job cancelled", "warn"); }}>Cancel…</Btn></div>}>
+        <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
+          {[["Symptom", j.symptom], ["Needs", j.type === "Periodic" ? "General maintenance" : "Refrigerant handling · 2 h"], ["Scheduled", j.scheduled ? longDate(j.scheduled) : "not booked"], ["Contact", "9:00–18:00 · call before arriving"]].map(([k, v]) => <div key={k} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted">{k}</div><div className="text-[13px] font-semibold">{v}</div></div>)}
+        </div>
+      </Card>
+
+      {j.status === "requested" && (
+        <>
+          {j.declined && <Banner tone="crit" icon="✕"><b>Client declined the proposed time · {j.declined.at}</b><br />Reason: {j.declined.reason}{j.declined.comment ? ` — “${j.declined.comment}”` : ""}. Held capacity was released.</Banner>}
+          <Card title={`Client’s preferred times${j.round > 1 ? ` (round ${j.round})` : ""} — book one of these`} sub="Availability: qualification + overlap + travel">
+            <DataTable rowKey={(r) => r.i + ""} rows={j.preferred.map((s, i) => ({ s, i, f: fits[i] }))} cols={[
+              { key: "r", label: "Rank", render: (r) => <Rank i={r.i} /> },
+              { key: "t", label: "Time", render: (r) => <b>{longDate(r.s)}</b> },
+              { key: "h", label: "HQ technicians", render: (r) => <span className="text-xs text-muted">{r.f.hq}</span>, hideBelow: "md" },
+              { key: "c", label: "Contractors", render: (r) => <span className="text-xs text-muted">{r.f.partner}</span>, hideBelow: "md" },
+              { key: "f", label: "Fit", render: (r) => r.f.fits === "none" ? <Badge tone="crit">No fit</Badge> : <Badge tone="ok">Fits</Badge> },
+              { key: "a", label: "Action", render: (r) => <Btn size="sm" variant={r.f.fits === "none" ? "secondary" : "primary"} disabled={r.f.fits === "none"} onClick={() => open({ kind: "book", slot: r.s })}>Use this time</Btn> },
+            ]} />
+            <p className="mt-2 text-[11px] text-muted">“Use this time” books with the time locked. HQ cannot book a time outside the client’s preferred times without the client’s approval.</p>
+          </Card>
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#f5c473] bg-[#fff8ec] p-4">
+            <div className="min-w-0 flex-1"><b className="text-warn">{anyFit ? "Prefer another time?" : "None of the times works — propose another time"}</b><p className="text-xs">Earliest fits: Thu 10-01 10:00–12:00 (contractor-a · tech-external-a) · Thu 10-01 14:00–16:00 (tech-internal-a). Nothing is booked until the client accepts.</p></div>
+            <Btn variant={anyFit ? "secondary" : "primary"} onClick={() => open({ kind: "propose" })}>Propose another time…</Btn>
+          </div>
+        </>
+      )}
+
+      {j.status === "time_proposed" && j.proposal && (
+        <Card tone="warn" title={j.proposal.by === "contractor" ? "Partner’s time sent to the client — waiting" : "Proposal sent — waiting for the client"} action={<Badge tone="warn">Reply by {j.proposal.replyBy}</Badge>}>
+          <SummaryList items={[["Proposed time", longDate(j.proposal.slot)], ["Held capacity", `${j.proposal.who} — booked automatically when the client accepts`], ["Message", `“${j.proposal.message}”`], ["Client", "Notified in the Client app · reminder 24 h before the deadline"]]} />
+          <div className="mt-3 flex flex-wrap justify-end gap-2"><Btn variant="danger" onClick={() => { jobActions.withdraw(j.id); toast("Proposal withdrawn", "warn"); }}>Withdraw proposal</Btn><Btn onClick={() => open({ kind: "propose" })}>Edit proposal…</Btn><Btn onClick={() => toast("Reminder sent to the client")}>Remind client</Btn></div>
+          <p className="mt-2 text-[11px] text-muted">Accept → booked with the held partner (no extra HQ step). Decline → back to Requested with the client’s reason and new times. No reply → stays Requested and a “Call the client” task is created.</p>
+        </Card>
+      )}
+
+      {(j.status === "offered" || j.status === "accepted" || j.status === "assigned" || j.status === "in_progress") && (
+        <Card title={j.delivery === "contractor" ? "Delivery · offer to contractor" : "Delivery · internal"}>
+          <SummaryList items={[
+            ["Agreed time", j.scheduled ? `${longDate(j.scheduled)} (${j.origin === "plan" ? "from plan" : "client-approved"})` : "—"],
+            ...(j.delivery === "contractor" ? [["Contractor", `${j.contractor} · ${j.status === "offered" ? "offer open · expires 09-25 12:00" : "accepted"}`] as [string, string]] : []),
+            ["Technician", j.technician ? `${j.technician} · ${j.techAck?.status === "accepted" ? `accepted ✓ ${j.techAck.at ?? ""}` : j.techAck?.status === "cant_make" ? "can’t make this time" : "awaiting acceptance"}` : "not assigned yet"],
+          ]} />
+          {j.techAck?.status === "cant_make" && <div className="mt-3"><Banner tone="warn" action={<span className="flex gap-2">{j.delivery === "internal" && <Btn size="sm" onClick={() => open({ kind: "reason", what: "reassign" })}>Reassign…</Btn>}<Btn size="sm" variant="primary" onClick={() => open({ kind: "propose" })}>Propose another time…</Btn></span>}>{j.technician}: “{j.techAck.reason}”{j.techAck.alt ? ` · could do ${j.techAck.alt}` : ""}. Any new time needs the client’s approval.</Banner></div>}
+        </Card>
+      )}
+
+      {j.status === "offered" && j.partnerProposal?.status === "pending" && (
+        <Card tone="warn" title={`⇄ ${j.contractor} proposes a different time`} action={<Badge tone="warn">Needs client approval</Badge>}>
+          <SummaryList items={[["Agreed with client", <s key="s" className="text-muted">{fmt(j.scheduled)}</s>], ["Proposed by contractor", <b key="b">{longDate(j.partnerProposal.slot)} · {j.partnerProposal.tech}</b>], ["Reason", `“${j.partnerProposal.reason}” — ${j.contractor}, ${j.partnerProposal.sentAt}`]]} />
+          <div className="mt-3 flex flex-wrap justify-end gap-2"><Btn onClick={() => toast("Use “+ New job › Offer” to choose another contractor (demo)")}>Offer to another contractor…</Btn><Btn onClick={() => { jobActions.keepTime(j.id); toast("Agreed time kept"); }}>Keep {fmt(j.scheduled)} · ask again</Btn><Btn variant="primary" onClick={() => { jobActions.forwardPartner(j.id, "09-25 12:00"); toast("Sent to the client for approval"); }}>Send to client for approval</Btn></div>
+          <p className="mt-2 text-[11px] text-muted">An agreed time never changes without the client’s OK. The offer stays reserved for {j.contractor} while the client decides.</p>
+        </Card>
+      )}
+
+      {j.status === "submitted" && (
+        <Card title="Work report · version 1" sub={`Submitted by ${j.technician}`}>
+          <SummaryList items={[["Filter cleaned", "Normal"], ["Drain line", "Normal"], ["Refrigerant pressure", "Normal · 412 kPa"], ["Airflow", "Needs attention · reduced on Low"]]} />
+          {j.delivery === "contractor" ? <p className="mt-2 text-xs text-muted">Outsourced job — the contractor reviews first; HQ reviews only on escalation.</p> : <>
+            <p className="mt-2 text-xs text-ok">You did not contribute to this report, so you can review it (self-approval is rejected).</p>
+            <div className="mt-3 flex flex-wrap gap-2"><Btn variant="primary" onClick={() => toast("Report accepted — job completed")}>Accept report</Btn><Btn onClick={() => open({ kind: "reason", what: "rework" })}>Return for rework…</Btn></div>
+          </>}
+        </Card>
+      )}
+
+      <Card title="History"><Timeline items={j.history.slice(-6).map((h) => ({ time: h.at, title: h.text }))} /></Card>
+      <Card title="Costs" action={<Btn size="sm" onClick={() => toast("Cost line added")}>+ Add cost line</Btn>}>
+        <SummaryList items={[["Estimate", "Labour 80.00 MYR · Parts 25.00 MYR"], ["Actual", "80.00 MYR + 6.20 USD"]]} />
+        <p className="mt-1 text-[11px] text-muted">Totals are shown per currency — never converted.</p>
+      </Card>
+    </div>
+  );
+}
+
+function BookModal({ j, slot, onClose }: { j: Job; slot: Slot; onClose: () => void }) {
+  const toast = useToast();
+  const f = fitFor(slot);
+  const [d, setD] = useState<"internal" | "contractor">(f.fits === "both" || f.fits === "internal" ? "internal" : "contractor");
+  return (
+    <Modal open onClose={onClose} title={`Book ${j.id}`} footer={<><Btn onClick={onClose}>← Back</Btn><Btn variant="primary" onClick={() => { jobActions.book(j.id, slot, d, d === "internal" ? "tech-internal-a" : "contractor-a"); toast(d === "internal" ? "Assigned — technician notified" : "Offer sent to contractor-a"); onClose(); }}>{d === "internal" ? "Assign" : "Send offer"}</Btn></>}>
+      <p className="text-xs text-muted">{j.type} · {j.unit} · {j.customer} · {j.origin === "plan" ? "Periodic plan" : "Client request"}</p>
+      <Field label="Visit time · from the client" hint="Cannot be edited here. Need another time? Close and use “Propose another time…” — the client must accept it."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold">🔒 {longDate(slot)}</div></Field>
+      <Field label="Who does the work" hint={f.fits === "contractor" ? "No qualified HQ technician is free at this time — offer to a contractor." : undefined}><Choice value={d} onChange={setD} options={[...(f.fits === "contractor" ? [] : [{ id: "internal" as const, label: "Assign internally" }]), { id: "contractor" as const, label: "Offer to contractor" }]} /></Field>
+      {d === "internal" ? (
+        <Field label="Technician" hint="Only members with valid qualifications for the whole slot are listed"><Select><option>tech-internal-a · Available</option></Select></Field>
+      ) : (
+        <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
+          <Field label="Contractor organization"><Select><option>contractor-a</option><option>contractor-b</option></Select></Field>
+          <Field label="Offer expires at"><Input defaultValue="2026-09-25 12:00" /></Field>
+          <Field label="Access valid from"><Input defaultValue={`${slot.date} 00:00`} /></Field>
+        </div>
+      )}
+      <Banner>{d === "internal" ? "The technician must accept the assignment (受領)." : "contractor-a can Accept, Decline or Propose another time — a different time always goes back to the client."}</Banner>
+    </Modal>
+  );
+}
+
+function ProposeModal({ j, onClose }: { j: Job; onClose: () => void }) {
+  const toast = useToast();
+  const [date, setDate] = useState("2026-10-01");
+  const [win, setWin] = useState("10:00–12:00");
+  const [who, setWho] = useState("contractor-a · tech-external-a");
+  const [msg, setMsg] = useState("All qualified technicians are booked Sep 28–30. The earliest free slot is Thursday morning. Sorry for the wait.");
+  const [tried, setTried] = useState(false);
+  const pre = j.preferred.some((s) => s.date === date && s.win === win);
+  return (
+    <Modal open onClose={onClose} title="Propose another time to the client" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!msg.trim() || pre) return; jobActions.propose(j.id, { date, win }, who, msg.trim(), "09-24 18:00"); toast("Proposal sent — waiting for the client"); onClose(); }}>Send proposal</Btn></>}>
+      <p className="text-xs text-muted">{j.id} · {j.customer} · {j.unit}</p>
+      <div className="rounded-xl border-2 border-primary bg-primary-soft/50 p-3">
+        <div className="mb-2 flex items-center justify-between"><b className="text-[13px] text-primary">Option A</b><Badge tone="ok">Fits · capacity held</Badge></div>
+        <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
+          <Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
+          <Field label="Window"><Select value={win} onChange={(e) => setWin(e.target.value)}>{["09:00–11:00", "10:00–12:00", "14:00–16:00"].map((w) => <option key={w}>{w}</option>)}</Select></Field>
+        </div>
+        <Field label="Who does it" className="mt-2"><Select value={who} onChange={(e) => setWho(e.target.value)}><option>contractor-a · tech-external-a</option><option>tech-internal-a</option></Select></Field>
+        {pre && <p className="mt-1 text-xs text-crit">✕ This is one of the client’s own times — book it directly instead.</p>}
+      </div>
+      <Field label="Message to the client · required" error={tried && !msg.trim() ? "A message is required" : undefined}><Textarea value={msg} onChange={(e) => setMsg(e.target.value)} /></Field>
+      <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label="Reply by"><Select><option>09-24 18:00 (48 h)</option><option>09-23 18:00 (24 h)</option></Select></Field><Field label="If no reply"><Select><option>Keep “Requested” and call the client</option></Select></Field></div>
+      <Banner>The client sees “Time proposed” with Accept / Decline. Accept → booked automatically with the held partner. Decline → the client sends new times. Held capacity is released on decline or timeout.</Banner>
+    </Modal>
+  );
+}
+
+function NewJobModal({ onClose, onDone }: { onClose: () => void; onDone: (id: string) => void }) {
+  const toast = useToast();
+  const [sym, setSym] = useState("");
+  const [slots, setSlots] = useState<Slot[]>([{ date: "2026-10-05", win: "10:00–12:00" }, { date: "2026-10-06", win: "14:00–16:00" }, { date: "2026-10-07", win: "09:00–11:00" }]);
+  const [tried, setTried] = useState(false);
+  const err = tried ? preferredError(slots) : undefined;
+  return (
+    <Modal open onClose={onClose} title="New maintenance job — on behalf of a customer" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (sym.trim().length < 10 || preferredError(slots)) return; const id = jobActions.create({ unitId: "unit-online-rto", unit: "Bedroom AC", loc: "Home A › 1F › Bedroom", type: "Reactive", symptom: sym.trim(), preferred: slots }); toast(`${id} created as Requested`); onDone(id); }}>Create as requested</Btn></>}>
+      <Field label="Customer · unit"><Select><option>customer-a · Bedroom AC (unit-online-rto)</option></Select></Field>
+      <Field label="Symptom / scope (10+ characters)" error={tried && sym.trim().length < 10 ? "Enter at least 10 characters" : undefined}><Textarea value={sym} onChange={(e) => setSym(e.target.value)} placeholder="Customer called: unit leaks water at night." /></Field>
+      <PreferredSlotsInput value={slots} onChange={setSlots} error={err} label="Customer’s preferred times (asked on the phone)" hint="Same rule as client requests: book one of these, or propose another time for the customer to accept." />
+      <p className="text-[11px] text-muted">Periodic visits are created from Plans, not here.</p>
+    </Modal>
+  );
+}
+
+function ReasonModal({ what, j, onClose }: { what: "rework" | "hold" | "reassign"; j: Job; onClose: () => void }) {
+  const toast = useToast();
+  const [r, setR] = useState("");
+  const [tried, setTried] = useState(false);
+  const title = what === "rework" ? "Return for rework" : what === "hold" ? "Put on hold (IR56)" : `Reassign ${j.id}`;
+  return (
+    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!r.trim()) return; if (what === "reassign") jobActions.book(j.id, j.scheduled!, "internal", "tech-internal-b"); toast(what === "rework" ? "Returned for rework" : what === "hold" ? "Job put on hold" : "Reassigned — tech-internal-b must accept", "warn"); onClose(); }}>Confirm</Btn></>}>
+      {what === "reassign" && <Field label="New technician (same agreed time)"><Select><option>tech-internal-b · Available</option></Select></Field>}
+      <Field label="Reason (required)" error={tried && !r.trim() ? "A reason is required" : undefined}><Textarea value={r} onChange={(e) => setR(e.target.value)} /></Field>
+    </Modal>
+  );
+}
+
+const contractors = [
+  { id: "contractor-a", area: "KL, Selangor · 2 technicians", st: "Active" },
+  { id: "contractor-b", area: "Penang · 3 technicians", st: "Active" },
+  { id: "contractor-c", area: "Johor · offers suspended 09-20", st: "Suspended" },
+];
+function Contractors() {
+  const toast = useToast();
+  const [sel, setSel] = useState(contractors[0]);
+  const [list, setList] = useState(contractors);
+  return (
+    <div className="split-rev">
+      <Card title="Contractors" action={<Btn size="sm" onClick={() => toast("Add contractor (demo)")}>+ Add contractor</Btn>} className="self-start">
+        <div className="flex flex-col gap-2">{list.map((c) => <ListRow key={c.id} selected={sel.id === c.id} onClick={() => setSel(c)}><div className="min-w-0 flex-1"><b className="text-[13px]">{c.id}</b><div className="text-[11px] text-muted">{c.area}</div></div><Badge tone={c.st === "Active" ? "ok" : "crit"}>{c.st}</Badge></ListRow>)}</div>
+        <p className="mt-2 text-[11px] text-muted">Contractor companies are partners, not users — their staff accounts are managed in Access & roles.</p>
+      </Card>
+      <div className="flex min-w-0 flex-col gap-4">
+        <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}>
+          <Kpi label="Offer acceptance" value="92 %" sub="23 / 25 offers · 90 d" /><Kpi label="Arrival in window" value="96 %" sub="target ≥ 95 %" /><Kpi label="First-time accept" value="84 %" tone="warn" sub="below 90 % target" /><Kpi label="Customer rating" value="4.6 ★" sub="12 ratings (Client)" /><Kpi label="Time changes asked" value="2" sub="both approved by clients" />
+        </div>
+        <div className="split">
+          <Card title={sel.id} action={<span className="flex gap-2"><Btn size="sm">Edit</Btn><Btn size="sm" variant="danger" onClick={() => { setList((l) => l.map((c) => (c.id === sel.id ? { ...c, st: c.st === "Active" ? "Suspended" : "Active" } : c))); toast(sel.st === "Active" ? "Offers suspended — existing jobs continue" : "Offers resumed", "warn"); }}>{list.find((c) => c.id === sel.id)?.st === "Active" ? "Suspend offers" : "Resume offers"}</Btn></span>}>
+            <SummaryList items={[["Registration", "SSM 202301012345 (fictional)"], ["Service areas", "Kuala Lumpur, Selangor"], ["Delegation period", "2026-04-01 – 2027-03-31"], ["Insurance", "valid to 2027-01-31"]]} />
+            <p className="mt-3 text-[13px] font-bold">Rate card rc-{sel.id} v3 (from 2026-07-01)</p>
+            <SummaryList items={[["Periodic inspection (per unit)", "380.00 MYR"], ["Repair — base visit", "450.00 MYR + parts"], ["Emergency call-out (< 4 h)", "650.00 MYR"], ["Rework deduction (2nd return)", "− 120.00 MYR"]]} />
+          </Card>
+          <Card title="Technicians & certificates">
+            <SummaryList items={[["tech-external-a", <Badge key="1" tone="warn">1 expiring · 10-15</Badge>], ["tech-external-a2", <Badge key="2" tone="ok">Valid</Badge>], ["tech-external-b", <Badge key="3" tone="muted">Expired</Badge>]]} />
+            <div className="mt-3"><Banner>Certificates uploaded by the contractor need HQ verification before they count.</Banner></div>
+            <div className="mt-3"><Btn size="sm" disabled>Verify uploads (0)</Btn></div>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Sla() {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
+        <Kpi label="Response within SLA" value="94 %" sub="last 90 days" /><Kpi label="Booked on a preferred time" value="71 %" sub="29 % needed a proposal" /><Kpi label="Proposal accepted first time" value="80 %" sub="4 / 5" /><Kpi label="Breaches" value="2" tone="crit" sub="this month" />
+      </div>
+      <Card title="SLA scorecard by customer" action={<Btn size="sm">Edit SLA targets</Btn>}>
+        <DataTable rowKey={(r) => r.c} rows={[{ c: "customer-a", plan: "RTO Standard", resp: "8 h", met: "96 %", pref: "75 %", br: 1 }, { c: "customer-b", plan: "Business Plus", resp: "4 h", met: "91 %", pref: "66 %", br: 1 }]} cols={[
+          { key: "c", label: "Customer", render: (r) => <b>{r.c}</b> }, { key: "p", label: "Contract plan", render: (r) => r.plan }, { key: "r", label: "Response target", render: (r) => r.resp }, { key: "m", label: "Met", render: (r) => r.met }, { key: "pr", label: "On preferred time", render: (r) => r.pref, hideBelow: "sm" }, { key: "b", label: "Breaches", render: (r) => (r.br ? <Badge tone="crit">{r.br}</Badge> : "0") },
+        ]} />
+        <p className="mt-2 text-[11px] text-muted">Targets apply to jobs created after the target’s effective date. Waiting for a client reply on a proposed time does not count against response SLA.</p>
+      </Card>
+    </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Badge, Banner, Card, Check, DataTable, EmptyState, Page, Search, Stat, UtilBar } from "@/components/ui";
+import { Badge, Banner, Btn, Card, Check, DataTable, EmptyState, Field, Input, Modal, Page, Search, Select, Stat, Tabs, Textarea, UtilBar, useToast } from "@/components/ui";
 
 const techs = [
   { id: "tech-external-a", quals: ["Split-unit refrigerant handling", "Electrical basics"], sub: "Refrigerant handling · Electrical basics · active since 2025-04", asg: "09:00–13:00 assigned", free: "13:00–17:00 free", used: 10, tot: 40, week: ["2 / 8 h", "4 / 8 h", "0 / 8 h", "4 / 8 h", "0 / 8 h", "—", "—"], active: true },
@@ -12,11 +12,16 @@ const techs = [
 const quals: [string, string][] = [["Split-unit refrigerant handling", "tech-external-a · valid to 2027-03-31"], ["Electrical basics", "tech-external-a · expires 2026-10-15"], ["General maintenance", "tech-external-a2 · valid to 2027-01-31"], ["Gas leak detection", "not held"]];
 
 export default function Team() {
+  const toast = useToast();
+  const [tab, setTab] = useState<"members" | "certs">("members");
+  const [modal, setModal] = useState<null | "unavail" | "upload">(null);
   const [activeOnly, setActiveOnly] = useState(true);
   const [q, setQ] = useState("");
   const list = techs.filter((t) => (!activeOnly || t.active) && (!q || t.quals.some((x) => x.toLowerCase().includes(q.toLowerCase())) || t.id.includes(q)));
   return (
     <Page>
+      <div className="flex flex-wrap items-center justify-between gap-2"><Tabs value={tab} onChange={setTab} tabs={[{ id: "members", label: "Members" }, { id: "certs", label: "Certifications", count: 1 }]} /><div className="flex gap-2"><Btn size="sm" onClick={() => setModal("unavail")}>+ Unavailable days</Btn></div></div>
+      {tab === "certs" ? <Certs onUpload={() => setModal("upload")} /> : <>
       <div className="flex flex-wrap items-center gap-4"><Check label="Active only" checked={activeOnly} onChange={setActiveOnly} /><div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder="Filter by qualification or technician" value={q} onChange={setQ} /></div></div>
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
@@ -41,6 +46,41 @@ export default function Team() {
           <p className="text-[11px] text-muted">{activeOnly ? "1 expired member hidden (Active only). " : ""}Qualification or membership changes are requested from HQ — contractors cannot grant permissions.</p>
         </div>
       </div>
+      </>}
+      <Modal open={modal === "unavail"} onClose={() => setModal(null)} title="Add unavailable days" footer={<><Btn onClick={() => setModal(null)}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(null); toast("Unavailable days saved — available hours set to 0"); }}>Save</Btn></>}>
+        <Field label="Technician"><Select><option>tech-external-a</option><option>tech-external-a2</option></Select></Field>
+        <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}><Field label="From"><Input type="date" defaultValue="2026-10-01" /></Field><Field label="To"><Input type="date" defaultValue="2026-10-01" /></Field></div>
+        <Field label="Type"><Select><option>Training</option><option>Annual leave</option><option>Public holiday</option><option>Sick</option><option>Other</option></Select></Field>
+        <Banner tone="warn">Conflicts with 1 confirmed assignment (job-c07 · 10-01 10:00–12:00). Reassign it or ask HQ to propose a new time to the client — the client must approve any time change.</Banner>
+      </Modal>
+      <Modal open={modal === "upload"} onClose={() => setModal(null)} title="Upload renewal — Electrical basics" footer={<><Btn onClick={() => setModal(null)}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(null); toast("Renewal uploaded — pending HQ verification"); }}>Upload</Btn></>}>
+        <Field label="Technician"><Input disabled value="tech-external-a" /></Field>
+        <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}><Field label="Certificate no."><Input defaultValue="EB-2026-0442" /></Field><Field label="Valid until"><Input type="date" defaultValue="2028-10-15" /></Field></div>
+        <div className="rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted">📄 Drop a PDF / image (≤ 5 MiB)</div>
+        <p className="text-[11px] text-muted">A pending renewal does not extend eligibility until HQ verifies it.</p>
+      </Modal>
     </Page>
+  );
+}
+
+function Certs({ onUpload }: { onUpload: () => void }) {
+  const rows = [
+    { t: "tech-external-a", c: "Split-unit refrigerant handling", until: "2027-03-31", st: "Valid" },
+    { t: "tech-external-a", c: "Electrical basics", until: "2026-10-15", st: "Expiring · 14 d" },
+    { t: "tech-external-a2", c: "General maintenance", until: "2027-01-31", st: "Valid" },
+    { t: "tech-external-b", c: "Refrigerant handling", until: "2026-08-31", st: "Expired" },
+  ];
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}><Stat label="Valid" value="4" sub="certificates in date" /><Stat label="Expiring ≤ 60 days" value="1" sub="tech-external-a · 14 d" /><Stat label="Expired" value="1" sub="tech-external-b (membership ended)" /><Stat label="Pending HQ verification" value="0" sub="renewals you uploaded" /></div>
+      <Card title="Certificates">
+        <DataTable rowKey={(r) => r.t + r.c} rows={rows} cols={[
+          { key: "t", label: "Technician", render: (r) => <b>{r.t}</b> }, { key: "c", label: "Certificate", render: (r) => r.c }, { key: "u", label: "Valid until", render: (r) => r.until },
+          { key: "s", label: "Status", render: (r) => <Badge tone={r.st === "Valid" ? "ok" : r.st === "Expired" ? "muted" : "warn"}>{r.st}</Badge> },
+          { key: "a", label: "", render: (r) => (r.st.startsWith("Expiring") ? <Btn size="sm" variant="primary" onClick={onUpload}>Upload renewal</Btn> : null) },
+        ]} />
+        <p className="mt-2 text-[11px] text-muted">Only valid, HQ-verified certificates make a technician eligible for offers that require them.</p>
+      </Card>
+    </div>
   );
 }

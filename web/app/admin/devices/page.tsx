@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FirmwareCampaigns } from "@/components/Features";
 import { Badge, Banner, Btn, Card, Check, ConnBadge, Field, Input, ListRow, Modal, Page, Search, Select, SummaryList, Tabs, Textarea, Timeline, useToast, cx } from "@/components/ui";
 
 const models = [
@@ -17,7 +18,7 @@ const devs = [
 
 export default function AdminDevices() {
   const toast = useToast();
-  const [tab, setTab] = useState<"models" | "devices">("models");
+  const [tab, setTab] = useState<"models" | "devices" | "firmware">("models");
   const [m, setM] = useState(models[0]);
   const [d, setD] = useState(devs[0]);
   const [q, setQ] = useState("");
@@ -34,8 +35,8 @@ export default function AdminDevices() {
   const shown = devs.filter((x) => !q || (x.serial + x.id + x.unit).toLowerCase().includes(q.toLowerCase()));
   return (
     <Page>
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "models", label: "Models", count: 2 }, { id: "devices", label: "IoT devices", count: 5 }]} />
-      {tab === "models" ? (
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "models", label: "Models", count: 2 }, { id: "devices", label: "IoT devices", count: 5 }, { id: "firmware", label: "Firmware campaigns", count: 1 }]} />
+      {tab === "firmware" ? <FirmwareCampaigns /> : tab === "models" ? (
         <div className="split-rev">
           <Card title="Models" sub="tenant-a" action={<Btn size="sm" onClick={() => setModal("newModel")}>+ New</Btn>} className="self-start">
             <div className="flex flex-col gap-2">{models.map((x) => <ListRow key={x.id} selected={m.id === x.id} onClick={() => setM(x)}><div className="min-w-0"><b className="text-[13px]">{x.name}</b> {x.tag && <Badge tone="primary">{x.tag}</Badge>}<div className="text-[11px] text-muted">{x.cap}</div><div className="text-[11px] text-muted">{x.used}</div></div></ListRow>)}</div>

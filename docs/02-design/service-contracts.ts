@@ -49,16 +49,24 @@ export type DiagnosticRun = Entity & {jobId:ID;unitId:ID;actorMembershipId:ID;st
 export type Severity = 'critical'|'warning'|'normal';
 export type Alert = Entity & {unitId:ID;policyId:ID|null;type:'sensor'|'quality'|'maintenance'|'tamper'|'reconciliation_required';severity:Severity;status:'open'|'acknowledged'|'resolved';causeCode:'window_open'|'insulation_loss'|'unknown';evidenceKind:'demo_observation'|'inferred'|'inspection';evidenceText:string;observedAt:Instant;evidenceIds:ID[];detectedAt:Instant;acknowledgedAt:Instant|null;resolvedAt:Instant|null;resolutionReason:string|null;previousAlertId:ID|null;deliveryFailures:DeliveryFailure[]};
 export type Slot = {startAt:Instant;endAt:Instant};
+/** IR113: where a job came from. client_request = created by a client (or by HQ on a client's behalf) with preferred times; periodic_plan = generated from a MaintenancePlan. */
+export type JobOrigin = 'client_request'|'periodic_plan';
+export type SlotHold = {kind:'internal';membershipId:ID}|{kind:'contractor';contractorOrgId:ID;technicianMembershipId:ID|null};
+/** IR113: a time outside the client's preferred times; booked only after the client accepts it. */
+export type SlotProposal = {id:ID;source:'hq'|'contractor';slot:Slot;hold:SlotHold;message:string;replyBy:Instant;status:'pending'|'accepted'|'declined'|'withdrawn'|'expired';decidedAt:Instant|null;declineReason:'not_home'|'too_late'|'other'|null;declineComment:string|null};
+export type PartnerSlotProposal = {id:ID;offerId:ID;slot:Slot;technicianMembershipId:ID;reason:string;sentAt:Instant;status:'pending'|'sent_to_client'|'kept'|'approved'|'declined'|'withdrawn'};
+/** IR113: UI status; time_proposed = slotProposal.status pending (job stays requested or offered). */
+export type JobDisplayStatus = JobStatus|'time_proposed';
 export type JobStatus = 'requested'|'offered'|'accepted'|'assigned'|'in_progress'|'submitted'|'completed'|'rework_requested'|'cancelled'|'on_hold';
 /** DEC-18: display ranking only, not a transition sequence. */
 export const JOB_STATUS_ORDER = ['requested','offered','accepted','assigned','in_progress','on_hold','submitted','rework_requested','completed','cancelled'] as const satisfies readonly JobStatus[];
-export type Offer = Entity & {jobId:ID;contractorOrgId:ID;termsVersion:ID;offeredAt:Instant;offerExpiresAt:Instant;accessValidFrom:Instant;accessValidUntil:Instant;decision:'accept'|'decline'|null;decidedBy:ID|null;decidedAt:Instant|null;declineReason:string|null};
-export type Assignment = Entity & {jobId:ID;technicianMembershipId:ID;validFrom:Instant;validUntil:Instant;scheduledStart:Instant;scheduledEnd:Instant;status:'active'|'revoked';reason:string|null};
+export type Offer = Entity & {jobId:ID;contractorOrgId:ID;termsVersion:ID;visitSlot:Slot;offeredAt:Instant;offerExpiresAt:Instant;accessValidFrom:Instant;accessValidUntil:Instant;decision:'accept'|'decline'|null;decidedBy:ID|null;decidedAt:Instant|null;declineReason:string|null};
+export type Assignment = Entity & {jobId:ID;technicianMembershipId:ID;validFrom:Instant;validUntil:Instant;scheduledStart:Instant;scheduledEnd:Instant;status:'active'|'revoked';reason:string|null;acknowledgement:'pending'|'accepted'|'cant_make';acknowledgedAt:Instant|null;cantMakeReason:string|null;alternativeSlot:Slot|null};
 export type ReportRef = {reportId:ID;reportVersion:number};
 export type CostLine = Money & {kind:'estimate'|'actual';description:string;visibility:'internal'|'customer'};
-export type MaintenanceJob = Entity & {planId:ID|null;occurrenceAt:Instant|null;unitId:ID;alertIds:ID[];type:'periodic'|'reactive'|'preventive';status:JobStatus;symptom:string;contactWindow:string|null;requestedSlot:Slot;scheduledSlot:Slot|null;dueAt:Instant;startedAt:Instant|null;completedAt:Instant|null;contractorOrgId:ID|null;assignmentId:ID|null;draftReportRef:ReportRef|null;reportRefs:ReportRef[];costs:CostLine[];followUpOfJobId:ID|null;followUpClass:'pending'|'rework'|'new_request'|null;timeOnSite:TimeOnSite|null;rating:JobRating|null;customerConfirmedAt:Instant|null;warrantyClaims:WarrantyClaim[]};
-export type JobSummary = Pick<MaintenanceJob,'id'|'version'|'unitId'|'type'|'status'|'dueAt'|'requestedSlot'|'scheduledSlot'|'assignmentId'> & {projection:'summary';severity:Severity;isDemo:true};
-export type JobOfferSummary = {projection:'offer';status:'offered'|'accepted';severity:null;jobId:ID;jobVersion:number;offerId:ID;type:MaintenanceJob['type'];siteAddress:string|null;requiredQualifications:QualificationCode[];requestedSlot:Slot;dueAt:Instant;offerExpiresAt:Instant;termsVersion:ID};
+export type MaintenanceJob = Entity & {planId:ID|null;occurrenceAt:Instant|null;unitId:ID;alertIds:ID[];type:'periodic'|'reactive'|'preventive';status:JobStatus;symptom:string;contactWindow:string|null;requestedSlot:Slot;origin:JobOrigin;preferredSlots:Slot[];preferenceRound:number;slotProposal:SlotProposal|null;partnerSlotProposal:PartnerSlotProposal|null;scheduledSlot:Slot|null;dueAt:Instant;startedAt:Instant|null;completedAt:Instant|null;contractorOrgId:ID|null;assignmentId:ID|null;draftReportRef:ReportRef|null;reportRefs:ReportRef[];costs:CostLine[];followUpOfJobId:ID|null;followUpClass:'pending'|'rework'|'new_request'|null;timeOnSite:TimeOnSite|null;rating:JobRating|null;customerConfirmedAt:Instant|null;warrantyClaims:WarrantyClaim[]};
+export type JobSummary = Pick<MaintenanceJob,'id'|'version'|'unitId'|'type'|'status'|'dueAt'|'requestedSlot'|'scheduledSlot'|'assignmentId'|'origin'|'preferredSlots'> & {projection:'summary';severity:Severity;isDemo:true;displayStatus:JobDisplayStatus;assignmentAcknowledgement:Assignment['acknowledgement']|null};
+export type JobOfferSummary = {projection:'offer';status:'offered'|'accepted';severity:null;jobId:ID;jobVersion:number;offerId:ID;type:MaintenanceJob['type'];siteAddress:string|null;requiredQualifications:QualificationCode[];requestedSlot:Slot;dueAt:Instant;offerExpiresAt:Instant;termsVersion:ID;origin:JobOrigin;visitSlot:Slot;partnerSlotProposal:PartnerSlotProposal|null};
 export type JobDetail = MaintenanceJob & {projection:'detail';assignment:Assignment|null;offer:Offer|null;eventCursor:number};
 export type ReportHistorySummary = {hasReport:false;acceptance:'not_accepted'}|{hasReport:true;acceptance:'accepted'|'not_accepted'};
 export type JobHistorySnapshot = {projection:'history';asOf:Instant;severity:null;dueAt:null;jobId:ID;type:MaintenanceJob['type'];status:JobStatus;contractorOrgId:ID|null;completedAt:Instant|null;ownDecisionEvents:JobEvent[];redactedReportSummary:ReportHistorySummary};
@@ -138,7 +146,7 @@ export type ResetPreview = {messageKey:'auth.reset_generic';deliveryState:'previ
 export type ArchivedResource = {id:ID;version:number;archived:true};
 export type DemoGeneration = {generation:number};
 export type DemoEvent = {eventId:ID;generation:number;occurredAt:Instant;type:string};
-export type Query = {cursor?:string;limit?:number;sort?:{field:'id'|'version'|'name'|'status'|'createdAt'|'updatedAt'|'severity'|'dueAt'|'observedAt'|'occurredAt';direction:'asc'|'desc'};filters?:{search?:string;period?:string;contractorOrgId?:ID;statementId?:ID;campaignId?:ID;modelId?:ID;expiringWithinDays?:number;coverage?:UnitCoverage['status'];customerId?:ID;propertyId?:ID;spaceId?:ID;unitId?:ID;unitIds?:ID[];jobId?:ID;contractId?:ID;invoiceId?:ID;restrictionId?:ID;organizationId?:ID;membershipId?:ID;kind?:string;status?:string;statuses?:string[];overdueOnly?:boolean;includeDescendants?:boolean;connections?:Connection[];powerState?:'on'|'off'|'unknown';unassignedOnly?:boolean;severity?:Severity;enabled?:boolean;unreadOnly?:boolean;from?:Instant;to?:Instant;date?:string;qualification?:QualificationCode;activeOnly?:boolean;actorId?:ID;targetId?:ID;correlationId?:ID;result?:AuditView['result']}};
+export type Query = {cursor?:string;limit?:number;sort?:{field:'id'|'version'|'name'|'status'|'createdAt'|'updatedAt'|'severity'|'dueAt'|'observedAt'|'occurredAt';direction:'asc'|'desc'};filters?:{search?:string;period?:string;origin?:JobOrigin;proposalPending?:boolean;contractorOrgId?:ID;statementId?:ID;campaignId?:ID;modelId?:ID;expiringWithinDays?:number;coverage?:UnitCoverage['status'];customerId?:ID;propertyId?:ID;spaceId?:ID;unitId?:ID;unitIds?:ID[];jobId?:ID;contractId?:ID;invoiceId?:ID;restrictionId?:ID;organizationId?:ID;membershipId?:ID;kind?:string;status?:string;statuses?:string[];overdueOnly?:boolean;includeDescendants?:boolean;connections?:Connection[];powerState?:'on'|'off'|'unknown';unassignedOnly?:boolean;severity?:Severity;enabled?:boolean;unreadOnly?:boolean;from?:Instant;to?:Instant;date?:string;qualification?:QualificationCode;activeOnly?:boolean;actorId?:ID;targetId?:ID;correlationId?:ID;result?:AuditView['result']}};
 export type Save<T> = Omit<T,keyof Entity|'ownerMembershipId'|'createdByUserId'> & {id?:ID};
 export type BlobInput = {name:string;mime:'image/jpeg'|'image/png';size:number;bytes:Uint8Array};
 export type DocumentInput = {name:string;mime:'application/pdf'|'image/jpeg'|'image/png';size:number;bytes:Uint8Array};
@@ -273,14 +281,14 @@ export type OperationContracts = {
   'jobs.addNote': {input:{jobId:ID;message:string;visibility:'internal'|'customer'};result:JobNote;mode:'write'};
   'jobs.assign': {input:{jobId:ID;technicianMembershipId:ID;startAt:Instant;endAt:Instant;reason?:string};result:MaintenanceJob;mode:'write'};
   'jobs.cancel': {input:{jobId:ID;cancelReason:string};result:MaintenanceJob;mode:'write'};
-  'jobs.create': {input:{unitId:ID;type:MaintenanceJob['type'];symptom:string;requestedStart:Instant;requestedEnd:Instant;contactWindow?:string;dueAt?:Instant};result:MaintenanceJob;mode:'write'};
+  'jobs.create': {input:{unitId:ID;type:MaintenanceJob['type'];symptom:string;requestedStart:Instant;requestedEnd:Instant;alternativeSlots:Slot[];contactWindow?:string;dueAt?:Instant};result:MaintenanceJob;mode:'write'};
   'jobs.decline': {input:{jobId:ID;offerId:ID;reason:string};result:JobDecisionReceipt;mode:'write'};
   'jobs.events': {input:{jobId:ID;query:Query};result:Page<JobEvent>;mode:'read'};
   'jobs.extendAccess': {input:{jobId:ID;accessValidUntil:Instant;reason:string};result:MaintenanceJob;mode:'write'};
   'jobs.get': {input:{jobId:ID};result:JobDetail|JobOfferSummary|JobHistorySnapshot;mode:'read'};
   'jobs.hold': {input:{jobId:ID;reason:string};result:MaintenanceJob;mode:'write'};
   'jobs.list': {input:Query;result:Page<JobSummary|JobOfferSummary|JobHistorySnapshot>;mode:'read'};
-  'jobs.offer': {input:{jobId:ID;contractorOrgId:ID;offerExpiresAt:Instant;accessValidFrom:Instant;accessValidUntil:Instant;termsVersion:ID};result:MaintenanceJob;mode:'write'};
+  'jobs.offer': {input:{jobId:ID;contractorOrgId:ID;visitSlot:Slot;offerExpiresAt:Instant;accessValidFrom:Instant;accessValidUntil:Instant;termsVersion:ID};result:MaintenanceJob;mode:'write'};
   'jobs.resumeHold': {input:{jobId:ID;reason:string};result:MaintenanceJob;mode:'write'};
   'jobs.resumeRework': {input:{jobId:ID};result:MaintenanceJob;mode:'write'};
   'jobs.review': {input:{jobId:ID;reportVersion:number;decision:'accept'|'return';reason?:string;reviewMode:'normal'|'hq_escalation'};result:MaintenanceJob;mode:'write'};
@@ -288,6 +296,14 @@ export type OperationContracts = {
   'jobs.saveDraft': {input:WorkReportDraft;result:WorkReport;mode:'write'};
   'jobs.start': {input:{jobId:ID;startConfirmed:true};result:MaintenanceJob;mode:'write'};
   'jobs.submit': {input:{jobId:ID;reportVersion:number};result:MaintenanceJob;mode:'write'};
+  'jobs.proposeSlot': {input:{jobId:ID;slot:Slot;hold:SlotHold;message:string;replyBy:Instant};result:MaintenanceJob;mode:'write'};
+  'jobs.withdrawProposal': {input:{jobId:ID;proposalId:ID};result:MaintenanceJob;mode:'write'};
+  'jobs.respondProposal': {input:{jobId:ID;proposalId:ID;decision:'accept'|'decline';declineReason?:SlotProposal['declineReason'];comment?:string;preferredSlots?:Slot[]};result:MaintenanceJob;mode:'write'};
+  'jobs.requestReschedule': {input:{jobId:ID;preferredSlots:Slot[];comment?:string};result:MaintenanceJob;mode:'write'};
+  'jobs.proposePartnerSlot': {input:{jobId:ID;offerId:ID;slot:Slot;technicianMembershipId:ID;reason:string};result:MaintenanceJob;mode:'write'};
+  'jobs.withdrawPartnerSlot': {input:{jobId:ID;proposalId:ID};result:MaintenanceJob;mode:'write'};
+  'jobs.resolvePartnerSlot': {input:{jobId:ID;proposalId:ID;decision:'send_to_client'|'keep';replyBy?:Instant};result:MaintenanceJob;mode:'write'};
+  'jobs.acknowledgeAssignment': {input:{jobId:ID;decision:'accept'|'cant_make';reason?:string;alternativeSlot?:Slot|null};result:Assignment;mode:'write'};
   'members.capacity': {input:{date:string;query:Query};result:Page<Capacity>;mode:'read'};
   'members.eligible': {input:{jobId:ID;startAt:Instant;endAt:Instant;query:Query};result:Page<Membership>;mode:'read'};
   'members.list': {input:Query;result:Page<Membership>;mode:'read'};

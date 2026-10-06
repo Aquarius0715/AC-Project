@@ -30,7 +30,7 @@ Treat route parameters as untrusted input and always validate them. Service name
 | DD-T05 / FR-T05 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Outdoor units use the shared schema with a separate component group | Do not claim detection of tiny leaks without a selected sensor |
 | DD-T06 / FR-T06 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Record each measurement's value, unit, observation time, and inspector. Operating procedures and installation instructions are outside this design | Do not save an unmeasured value as 0 or normal |
 | DD-T07 / FR-T07 | `/technician/units/:id/alerts` / `DiagnosticEvidence` | `alerts.list`, `alerts.get`, `alerts.acknowledge`, `alerts.resolve` | Acknowledgement only marks the alert as acknowledged. Resolution requires remeasurement or a reason recorded by an authorized person | Do not infer theft from connection loss alone. Treat removal detection as a separate event |
-| DD-T08 / FR-T08 | `/technician/jobs/:id` / `JobWorkspace` | `jobs.get`, `jobs.submit`, `reports.get`, `jobs.start`, `jobs.resumeRework`, `units.get` | Check active assignment and start conditions. Submission enters quality-review waiting state | Reject submission after assignment expiry or cancellation. Keep the draft if sending fails |
+| DD-T08 / FR-T08 | `/technician/jobs/:id` / `JobWorkspace` | `jobs.get`, `jobs.submit`, `reports.get`, `jobs.start`, `jobs.resumeRework`, `units.get`, `jobs.acknowledgeAssignment` | Check active assignment and start conditions. Submission enters quality-review waiting state | Reject submission after assignment expiry or cancellation. Keep the draft if sending fails |
 | DD-T09 / FR-T09 | `/technician/jobs/:id` / `ReportEditor` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `attachments.add`, `attachments.getContent`, `units.get` | Report body: 10–4000 characters. Photos: JPEG/PNG, at most 5MiB each, at most 10 (provisional). Part quantities must be greater than 0 | Drafts may be incomplete. Validate the schema on submission. Reselect images after processing failure, while keeping text |
 | DD-T10 / FR-T10 | `/technician/units/:id/control` / `DiagnosticControl` | `commands.create`, `commands.get`, `diagnosticRuns.create`, `diagnosticRuns.get`, `units.get`, `jobs.get`, `diagnosticRuns.list` | Check `control.diagnose` permission, unit capabilities, reason, and test-run duration (1–15 minutes, provisional) | Do not use test runs to bypass contract restrictions. Do not automatically resend after expiry |
 | DD-T11 / FR-T11 | `/technician/devices` / `DeviceMaintenance` | `devices.list`, `devices.register`, `devices.bind`, `devices.check`, `devices.calibrate`, `devices.updateFirmware`, `devices.get`, `units.list`, `units.get`, `jobs.list`, `devices.calibrations`, `devices.operations` | Serial numbers must be unique. Set unitId and sensor types. Enter unit, reference value, and date/time for calibration. Choose supported firmware versions | Do not start updates offline. Do not show the new version as applied after update failure |
@@ -256,7 +256,7 @@ Scope: FR-T07 / Main display pattern: **UI-DETAIL**. Service boundary: `alerts.l
 
 **Source mapping**: SRC-06 BIZ-12 → FR-T08 → DD-T08. Source category: original company requirements SRC-06 + design additions. Design addition: start, submit, and resubmit states. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-T08 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get, jobs.submit, reports.get, jobs.start, jobs.resumeRework, units.get`.
+Scope: FR-T08 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get, jobs.submit, reports.get, jobs.start, jobs.resumeRework, units.get, jobs.acknowledgeAssignment`.
 
 **Initial view and prerequisites**: The user is assigned an `assigned` job within the valid period. Periodic, reactive, and preventive maintenance use the same work-state model. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -269,7 +269,7 @@ Scope: FR-T08 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get
 
 **Steps**
 
-1. Check assignment and schedule. Start work, edit the report, submit, and wait for quality review. If returned, perform rework and resubmit.
+1. A new assignment (acknowledgement pending) shows **New assignment — please accept** with the Origin badge, the agreed visit time and who assigned it: **Accept assignment** (受領) or **Can't make this time…** (reason + optional alternative time, sent to the coordinator) via `jobs.acknowledgeAssignment` (IR113). The Overview shows a banner for each assignment waiting for acceptance. Check assignment and schedule. Start work, edit the report, submit, and wait for quality review. If returned, perform rework and resubmit.
 2. Work can start from `assigned`; rework can resume from `rework_requested`. After `submitted`, the submitted version is read-only. Technicians cannot approve on behalf of customers.
 3. Save start time, submission time, and `reportVersion`. The quality review determines completion.
 4. Queries to update: `jobs / reports / job events / notifications / audit`.

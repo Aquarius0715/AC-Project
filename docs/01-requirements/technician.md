@@ -36,7 +36,7 @@ P0 means the core foundational flow. P1 is also required for completion in phase
 | FR-T05 | P0 | Company original SRC-06 + added design details / BIZ-10 | Outdoor inspection | Record inspections for every condenser, compressor, fan/blade, and refrigerant pipe. |
 | FR-T06 | P0 | Company original SRC-06 + added design details / BIZ-10 | Electrical/control inspection | Record every thermostat, sensor, capacitor, contactor, and wiring item. |
 | FR-T07 | P0 | Company original SRC-06 + added design details / BIZ-08, BIZ-11, BIZ-17 | Alert evidence | Distinguish suspected, measured, and on-site inspection findings with evidence/history. Completing work alone does not resolve alerts. |
-| FR-T08 | P0 | Company original SRC-06 + added design details / BIZ-12 | Scheduled/reactive/preventive maintenance | Start assigned jobs, submit reports, and rework/resubmit after return. Match progress shown to customers/HQ. |
+| FR-T08 | P0 | Company original SRC-06 + added design details / BIZ-12 | Scheduled/reactive/preventive maintenance | Accept new assignments (受領) or report that the agreed time cannot be met; start assigned jobs, submit reports, and rework/resubmit after return. Match progress shown to customers/HQ. |
 | FR-T09 | P0 | Added design details (supporting a company goal) / BIZ-12 | Work reports | Save/submit checklists, photos, readings, replaced parts, work details, and next actions. Clearly identify missing required fields. |
 | FR-T10 | P0 | Added design details (supporting a company goal) / BIZ-13 | Remote diagnostics/test runs | Allow settings/test runs only within assignment period, capabilities, and permissions. Distinguish confirmation through response. |
 | FR-T11 | P1 | Added design details (supporting a company goal) / BIZ-20 | IoT device lifecycle | Simulate registration, unit binding, connection checks, calibration, and firmware updates with visible progress, failure, and history. |
@@ -213,8 +213,8 @@ Design: [DD-T07](../02-design/technician.md#dd-t07-details). Assess parent AT-T0
 - **Added design details**: Start, submit, and resubmit state management.
 
 - **Entry conditions**: Own assigned job within the valid period. Scheduled/reactive/preventive maintenance share one work-state model.
-- **Main flow**: Check assignment/schedule → start → edit report → submit → await quality review → rework/resubmit if returned.
-- **Business rule BR-T08**: Start only from assigned; resume rework from rework_requested. Submitted versions are read-only. Technicians cannot approve on behalf of customers.
+- **Main flow**: Accept the new assignment or report “can't make this time” with a reason → check assignment/schedule → start → edit report → submit → await quality review → rework/resubmit if returned.
+- **Business rule BR-T08**: New assignments start with acknowledgement=pending; the technician accepts or reports cant_make (reason, optional alternative time) to the coordinator (HQ or the receiving contractor), who reassigns or asks HQ to propose a new time to the client (IR113). Start only from assigned; resume rework from rework_requested. Submitted versions are read-only. Technicians cannot approve on behalf of customers.
 - **Resulting business state**: Save start/submission times and reportVersion. The quality reviewer decides completion.
 - **Boundaries/prohibitions**: Reject start/submit when unassigned, cancelled, on_hold, or outside the valid period. Submission failure retains in_progress and draft content.
 
@@ -222,7 +222,7 @@ Design: [DD-T07](../02-design/technician.md#dd-t07-details). Assess parent AT-T0
 |---|---|---|
 | AT-T08-N | tech-external-a, assigned job-contractor-a within work window. When: start → saveDraft with `acceptancePatches["shared:report-draft-all-normal"]` → submit → contractor-a returns (outsourced quality review, IR93) → resumeRework → submit | ① in_progress, startedAt ② submitted, reportVersion=1 ③ rework_requested ④ Back to in_progress, submit new v2 |
 | AT-T08-E | ① Start unassigned requested job-internal-a / start after HQ cancels job-contractor-a / start job-contractor-a after starting and HQ jobs.hold sets on_hold ② Submit outside assignment period ③ UNAVAILABLE on submit in_progress | ① NOT_FOUND / FORBIDDEN (errors.assignment_ended) / CONFLICT (IR93) ② FORBIDDEN ③ Retain in_progress/draft |
-| AT-T08-B | ① Start assigned ② Edit submitted ③ resumeRework from rework_requested | ① in_progress ② Read-only, cannot save ③ in_progress |
+| AT-T08-B | ① Start assigned ② Edit submitted ③ resumeRework from rework_requested ④ tech-external-a acknowledges a new assignment (accept) ⑤ acknowledges cant_make without a reason / with a reason | ① in_progress ② Read-only, cannot save ③ in_progress ④ acknowledgement=accepted, acknowledgedAt set, one notification each to contractor-a and customer-a ⑤ VALIDATION / acknowledgement=cant_make and one notification to contractor-a; job stays assigned (IR113) |
 
 Design: [DD-T08](../02-design/technician.md#dd-t08-details). Assess parent AT-T08 using all N/E/B and applicable SRC/R01 cases in traceability.
 

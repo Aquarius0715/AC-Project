@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ROLES, ROLE_KEY, Role, roleFromPath } from "@/lib/nav";
-import { Badge, ToastProvider, cx } from "./ui";
+import { Badge, Banner, Btn, Modal, SummaryList, ToastProvider, cx } from "./ui";
+import { useJobStore } from "@/lib/jobs";
 import { AssistantPanel } from "./Assistant";
 
 export function useStoredRole(): Role {
@@ -35,6 +36,8 @@ export function AppShell({ role: forced, children }: { role?: Role; children: Re
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [assistant, setAssistant] = useState(false);
+  const [qr, setQr] = useState(false);
+  const unread = useJobStore().notes.filter((n) => n.role === role && !n.read).length;
   useEffect(() => setOpen(false), [pathname]);
 
   const items = cfg.nav;
@@ -69,7 +72,7 @@ export function AppShell({ role: forced, children }: { role?: Role; children: Re
           <nav className="flex flex-col gap-0.5">{items.map((i) => <NavLink key={i.href} {...i} active={i.href === activeHref} />)}</nav>
           <div className="my-2 border-t border-line" />
           <nav className="flex flex-col gap-0.5">
-            {SHARED.map((s) => <NavLink key={s.href} {...s} active={pathname === s.href} badge={s.href === "/notifications" ? "3" : undefined} />)}
+            {SHARED.map((s) => <NavLink key={s.href} {...s} active={pathname === s.href} badge={s.href === "/notifications" ? String(3 + unread) : undefined} />)}
             <Link href="/demo" className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-warn hover:bg-warn-soft/50", pathname === "/demo" && "bg-warn-soft/60")}>
               <span aria-hidden className="w-4 text-center">✦</span>
               <span className="flex-1">Demo controls</span>
@@ -88,6 +91,7 @@ export function AppShell({ role: forced, children }: { role?: Role; children: Re
               <h1 className="truncate text-[15px] font-bold">{title}</h1>
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {role === "technician" && <button onClick={() => setQr(true)} className="inline-flex items-center gap-1.5 rounded-control border border-line px-3 py-1.5 text-xs font-bold hover:bg-surface2">▣ <span className="max-sm:hidden">Scan QR</span></button>}
               {role === "client" && (
                 <button onClick={() => setAssistant(true)} className="inline-flex items-center gap-1.5 rounded-full border border-primary bg-primary-soft/50 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary-soft">🎙 <span className="max-sm:hidden">Assistant</span></button>
               )}
@@ -97,6 +101,11 @@ export function AppShell({ role: forced, children }: { role?: Role; children: Re
           <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>
+      <Modal open={qr} onClose={() => setQr(false)} title="Scan unit QR" footer={<><Btn onClick={() => setQr(false)}>Close</Btn><Link href="/technician/jobs/job-contractor-a" onClick={() => setQr(false)} className="inline-flex items-center rounded-control border border-primary bg-primary px-3.5 py-2 text-[13px] font-semibold text-white">Open job →</Link></>}>
+        <div className="grid h-40 place-items-center rounded-xl bg-ink/90 text-xs text-white">[ camera preview ]</div>
+        <SummaryList items={[["Result", <Badge key="m" tone="ok">✓ Matched</Badge>], ["Label", "AC-QR-online-rto · scanned 10:04"], ["Unit", "Bedroom AC · unit-online-rto · customer-a · Home A › 1F › Bedroom"], ["Your job today", "job-contractor-a"]]} />
+        <Banner>Units outside your assignments show “Not in your assignments” (NOT_FOUND).</Banner>
+      </Modal>
       {role === "client" && <AssistantPanel open={assistant} onClose={() => setAssistant(false)} context={title} />}
     </ToastProvider>
   );

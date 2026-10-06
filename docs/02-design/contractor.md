@@ -26,7 +26,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | Design ID / requirement | Route / main component | Read and action contracts | Input, processing, validation | Errors and prohibited actions |
 |---|---|---|---|---|
 | DD-P01 / FR-P01 | `/partner` (dashboard), `/partner/jobs` (list) / `PartnerOverview`, `PartnerJobList` | `jobs.list`, `jobs.get`, `summaries.get`, `members.capacity` | Get contractorOrgId from the session. KPI tiles link to the job list with the same filter. Show overdue jobs separately from unit urgency | Show an empty state for zero jobs. Clear previous summaries when access expires |
-| DD-P02 / FR-P02 | `/partner/jobs/:id` / `PartnerJob` | `jobs.get`, `jobs.accept`, `jobs.decline` | Accept only an offer addressed to the user's company within its valid period. Declining requires a reason (1–1000 characters, provisional) | Treat expiry, HQ cancellation, or another person's update as CONFLICT and refetch. Declining does not delete the job |
+| DD-P02 / FR-P02 | `/partner/jobs/:id` / `PartnerJob` | `jobs.get`, `jobs.accept`, `jobs.decline`, `jobs.proposePartnerSlot`, `jobs.withdrawPartnerSlot` | Accept only an offer addressed to the user's company within its valid period. Declining requires a reason (1–1000 characters, provisional) | Treat expiry, HQ cancellation, or another person's update as CONFLICT and refetch. Declining does not delete the job |
 | DD-P03 / FR-P03 | `/partner/schedule` / `AssignmentEditor` | `jobs.list`, `members.eligible`, `jobs.assign` | Enter technician ID, work start/end times, and required qualifications. Validate that the work period fits within the delegation period | Reject saving if a confirmed schedule overlaps, and reschedule. Reassignment after work starts requires a reason and revokes previous access |
 | DD-P04 / FR-P04 | `/partner/units/:id` / `PartnerUnit` | `units.get`, `alerts.list`, `telemetry.summary` | Match the unit ID to a valid accepted job. Show only the necessary site address and entry instructions | Reject direct URLs after the delegation period ends. Provide no remote-control buttons |
 | DD-P05 / FR-P05 | `/partner/jobs/:id/review` / `QualityReview` | `jobs.get`, `jobs.review`, `reports.get`, `attachments.getContent` | Review only submitted reports. Select “Accept” or “Return”; a return requires a reason. Keep earlier report revisions | Do not overwrite the technician's original report or allow people to approve their own work |
@@ -89,7 +89,7 @@ Scope: FR-P01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.l
 
 **Source mapping**: SRC-06 BIZ-12 → FR-P02 → DD-P02. Source category: development policy SRC-02 + design additions. Design additions defined here: acceptance and decline steps. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-P02 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get, jobs.accept, jobs.decline`.
+Scope: FR-P02 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get, jobs.accept, jobs.decline, jobs.proposePartnerSlot, jobs.withdrawPartnerSlot`.
 
 **Initial view and prerequisites**: The offer is addressed to the user's company, is before offerExpiresAt, and has not been cancelled by HQ. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -100,12 +100,15 @@ Scope: FR-P02 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get
 | reason | string/required for decline | 1–1000 characters | Decline reason |
 | expectedVersion | integer/required | Displayed job version | Conflict detection |
 | termsVersion | Read-only/required on submission | Delegation terms version | Basis for confirmation |
+| visitSlot / origin | Read-only | Fixed agreed visit time and Origin badge (IR113); no candidate date ranges | What is offered |
+| partner proposal | slot + own qualified technician + reason 1–1000 | Open own offer only; one pending at a time (IR113) | Propose another time |
 
 **Steps**
 
 1. Check minimum job information and delegation terms. Choose acceptance or decline with a reason. Update state displays for both HQ and the contractor.
 2. Apply the following business rules to both reads and actions.
-   - Acceptance is separate from assigning a technician or creating a confirmed booking.
+   - The offer carries a fixed visit time agreed with the client (or the plan occurrence). Accept only if the team can come then; otherwise **Propose another time…** — HQ forwards it to the client; the offer stays reserved, Accept is disabled until it is resolved, and the proposal can be withdrawn (IR113).
+   - Acceptance is separate from assigning a technician.
    - On decline, return to requested and record who declined, the reason, and offerId.
    - Issue a new offerId when offering the job again.
 3. Acceptance sets accepted and opens necessary unit read access only within the delegation period. Declining grants no detailed read access.
@@ -119,7 +122,7 @@ Scope: FR-P02 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get
 
 **Source mapping**: SRC-06 BIZ-12 → FR-P03 → DD-P03. Source category: development policy SRC-02 + design additions. Design additions defined here: assigning company staff and checking qualifications. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-P03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `jobs.list, members.eligible, jobs.assign`.
+Scope: FR-P03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `jobs.list, members.eligible, jobs.assign`. The work slot is the offer's fixed visit time (IR113) and is shown locked; the list shows each assignment's technician acknowledgement (awaiting / accepted / can't make it with reason → reassign).
 
 **Initial view and prerequisites**: The job is accepted, and the user has permission to manage assignments for their company. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 

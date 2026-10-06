@@ -1,6 +1,6 @@
 ---
 document_id: TEST-PLAN
-version: 0.22.0
+version: 0.23.0
 status: planned-not-executed
 owner: test-agent
 scope: frontend-demo-1A

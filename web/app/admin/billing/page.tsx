@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { ContractorPayouts } from "@/components/Features";
 import { Badge, Banner, Btn, Card, Field, Input, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, useToast, cx } from "@/components/ui";
 
 type Inv = { id: string; amt: string; meta: string; method: string; st: "Unpaid" | "Overdue" | "Processing" | "Paid"; ccy: string };
@@ -13,7 +14,7 @@ const seed: Inv[] = [
   { id: "invoice-sep-a", amt: "50.00 MYR", meta: "customer-a · contract-general-a v1 · Sep 2026", method: "Method not selected", st: "Unpaid", ccy: "MYR" },
 ];
 const inquiries = [{ id: "inquiry-a-01", cust: "customer-a", kind: "payment", at: "09-21", text: "“I paid by bank transfer on 20 Sep — why is cooling still limited?”" }, { id: "inquiry-b-02", cust: "customer-b", kind: "billing", at: "09-19", text: "“Please resend the August invoice.”" }];
-type Tab = "invoices" | "inquiries";
+type Tab = "invoices" | "inquiries" | "payouts";
 const tone = (s: Inv["st"]) => (s === "Paid" ? "ok" : s === "Overdue" ? "crit" : s === "Processing" ? "primary" : "warn");
 
 export default function Billing() {
@@ -41,8 +42,8 @@ export default function Billing() {
   };
   return (
     <Page>
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "invoices", label: "Invoices", count: list.length }, { id: "inquiries", label: "Inquiries", count: inquiries.length }]} />
-      {tab === "invoices" ? (
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "invoices", label: "Invoices", count: list.length }, { id: "inquiries", label: "Inquiries", count: inquiries.length }, { id: "payouts" as Tab, label: "Contractor payouts", count: 1 }]} />
+      {tab === "payouts" ? <ContractorPayouts /> : tab === "invoices" ? (
         <>
           <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}>{[["Outstanding", `${sum(["Unpaid", "Overdue", "Processing"])} MYR`, "unpaid · processing"], ["Overdue", `${sum(["Overdue"])} MYR`, "reminders allowed"], ["Processing", `${sum(["Processing"])} MYR`, "awaiting HQ confirmation"], ["Paid in period", `${sum(["Paid"])} MYR`, "Jul"]].map(([a, b, c]) => <div key={a} className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted">{a}</div><div className="text-xl font-bold">{b}</div><div className="text-[11px] text-muted">{c}</div></div>)}</div>
           <p className="text-[11px] text-muted">Totals per currency — never converted</p>

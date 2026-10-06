@@ -2,14 +2,21 @@
 
 import Link from "next/link";
 import { Badge, Banner, Card, Kpi, Page, TextLink, UtilBar, cx } from "@/components/ui";
+import { fmt, useJobs } from "@/lib/jobs";
 
 const hours = [8, 10, 12, 14, 16, 18];
 export default function PartnerOverview() {
+  const live = useJobs().filter((j) => j.contractor === "contractor-a" && j.id !== "job-p09");
+  const actions: [string, string, string][] = [
+    ...live.filter((j) => j.status === "offered" && j.partnerProposal?.status !== "pending").map((j): [string, string, string] => [`${j.id} · ${j.unit} · ${j.customer}`, `New offer · visit ${fmt(j.scheduled)} (fixed) — accept, decline or propose another time`, `/partner/jobs/${j.id}`]),
+    ...live.filter((j) => j.status === "accepted").map((j): [string, string, string] => [`${j.id} · ${j.unit}`, `Accepted · assign a technician for ${fmt(j.scheduled)}`, `/partner/schedule?jobId=${j.id}`]),
+    ...live.filter((j) => j.techAck?.status === "cant_make").map((j): [string, string, string] => [`${j.id} · ${j.unit}`, `${j.technician} can’t make ${fmt(j.scheduled)} — reassign`, `/partner/schedule?jobId=${j.id}`]),
+  ];
   return (
     <Page>
       <div className="flex flex-wrap justify-between gap-2 text-xs text-muted"><span>Updated 09:30 · contractor-a only</span></div>
       <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
-        <Kpi label="Offers to answer" value={1} sub="Expires in 15 h" href="/partner/jobs?status=offered" link="Open offers →" />
+        <Kpi label="Offers to answer" value={1 + live.filter((j) => j.status === "offered").length} sub="Expires in 15 h" href="/partner/jobs?status=offered" link="Open offers →" />
         <Kpi label="Awaiting assignment" value={2} sub="Accepted · no technician yet" href="/partner/schedule" link="Assign →" tone="warn" />
         <Kpi label="In progress / scheduled" value={1} sub="job-contractor-a" href="/partner/jobs" link="View jobs →" />
         <Kpi label="Reports to review" value={1} sub="job-p05 by tech-external-a" href="/partner/jobs/job-p05/review" link="Review →" />
@@ -22,8 +29,8 @@ export default function PartnerOverview() {
       </Card>
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Needs your action (5)">
-            <ul className="divide-y divide-line">{[["job-p09 · Lobby AC · customer-b", "Answer by 2026-09-22 01:00 (15 h left)", "/partner/jobs/job-p09"], ["job-p07 · Server room AC", "Work window ended 09-20 17:00", "/partner/schedule?jobId=job-p07"], ["job-p05 · Server room AC", "Report by tech-external-a · awaiting review", "/partner/jobs/job-p05/review"], ["job-p02 · Rooftop unit", "No technician · delegation ends 09-22 00:00", "/partner/schedule?jobId=job-p02"], ["job-p12 · Lobby AC", "No technician · delegation ends 09-24 18:00", "/partner/schedule?jobId=job-p12"]].map(([t, d, h]) => <li key={t}><Link href={h} className="flex items-center justify-between gap-2 py-2.5 hover:bg-surface2/50"><span><b className="text-[13px]">{t}</b><span className="block text-xs text-muted">{d}</span></span><span className="text-muted">›</span></Link></li>)}</ul>
+          <Card title={`Needs your action (${actions.length + 5})`}>
+            <ul className="divide-y divide-line">{[...actions, ["job-p09 · Lobby AC · customer-b", "Answer by 2026-09-22 01:00 (15 h left)", "/partner/jobs/job-p09"], ["job-p07 · Server room AC", "Work window ended 09-20 17:00", "/partner/schedule?jobId=job-p07"], ["job-p05 · Server room AC", "Report by tech-external-a · awaiting review", "/partner/jobs/job-p05/review"], ["job-p02 · Rooftop unit", "No technician · delegation ends 09-22 00:00", "/partner/schedule?jobId=job-p02"], ["job-p12 · Lobby AC", "No technician · delegation ends 09-24 18:00", "/partner/schedule?jobId=job-p12"]].map(([t, d, h]) => <li key={t}><Link href={h} className="flex items-center justify-between gap-2 py-2.5 hover:bg-surface2/50"><span><b className="text-[13px]">{t}</b><span className="block text-xs text-muted">{d}</span></span><span className="text-muted">›</span></Link></li>)}</ul>
           </Card>
           <Card title="Today · Mon 2026-09-21" action={<TextLink href="/partner/schedule">Schedule →</TextLink>}>
             <div className="scroll-x"><div className="min-w-[520px]">

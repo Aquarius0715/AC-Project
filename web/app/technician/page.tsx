@@ -1,22 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Badge, Banner, Card, EmptyState, Kpi, Page, SeverityBadge, Tabs, TextLink, UtilBar } from "@/components/ui";
-import { tjobs } from "@/lib/tech";
-import { JobList } from "@/components/TechJobList";
+import { use, useState } from "react";
+import { Badge, Banner, Card, EmptyState, Kpi, LinkBtn, Page, SeverityBadge, Tabs, TextLink, UtilBar } from "@/components/ui";
+import { fmt, useJobs } from "@/lib/jobs";
+import { JobList, useTechJobs } from "@/components/TechJobList";
 
-export default function TechOverview() {
-  const [tab, setTab] = useState<"today" | "all">("today");
-  const jobs = tab === "today" ? tjobs.filter((j) => j.today) : tjobs;
+export default function TechOverview({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const sp = use(searchParams);
+  const [tab, setTab] = useState<"today" | "all">(sp.tab === "all" ? "all" : "today");
+  const all = useTechJobs();
+  const jobs = tab === "today" ? all.filter((j) => j.today) : all;
+  const pending = useJobs().filter((j) => j.technician === "tech-external-a" && j.techAck?.status === "pending");
   return (
     <Page>
       <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}>
         <Kpi label="Assigned units" value={2} sub="in your assignments" /><Kpi label="Not started" value={1} sub="job-t07" /><Kpi label="Overdue" value={0} tone="ok" sub="No overdue jobs" />
       </div>
+      {pending.map((j) => <Banner key={j.id} tone="warn" icon="✉" action={<LinkBtn size="sm" variant="primary" href={`/technician/jobs/${j.id}`}>Review & accept</LinkBtn>}><b>New assignment to accept — {j.id} · {j.unit} · {fmt(j.scheduled)}</b> · assigned by {j.contractor ?? "HQ"}. The visit time was agreed with the client.</Banner>)}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
-          <Tabs value={tab} onChange={setTab} tabs={[{ id: "today", label: "Today", count: 2 }, { id: "all", label: "All assigned", count: 4 }]} />
+          <Tabs value={tab} onChange={setTab} tabs={[{ id: "today", label: "Today", count: 2 }, { id: "all", label: "All assigned", count: all.length }]} />
           <Card title={tab === "today" ? "Today — sorted by severity, deadline, progress" : "All assigned jobs"}>
             <JobList jobs={jobs} />
             {tab === "today" && <p className="mt-3 text-xs text-muted">job-t07 shows read-only until its work window opens at 14:00 — actions are disabled until then (IR76).</p>}

@@ -31,7 +31,7 @@ CASES = [
     ('absent_report_accepted', [(TYPE, "{hasReport:false;acceptance:'not_accepted'}", "{hasReport:false;acceptance:'accepted'}")], 'Absent report cannot be accepted'),
     ('address_missing_null', [(TYPE, 'siteAddress:string|null', 'siteAddress:string')], 'Offer must use nullable installation address'),
     ('disabled_reason_missing', [(TYPE, "disabledReason:'capability_changed'|'unit_archived'|'consent_revoked'|null", 'disabledReason:string|null')], 'Rule disable reason absent'),
-    ('stale_operation_count', [('02-design/common.md','189 local service operations','188 local service operations')], 'Common operation count drift'),
+    ('stale_operation_count', [('02-design/common.md','197 local service operations','196 local service operations')], 'Common operation count drift'),
 
     ('unsafe_job_receipt', [(TYPE, 'export type JobDecisionReceipt = {jobId:ID;',
                             'export type JobDecisionReceipt = {unitId:ID;jobId:ID;')],

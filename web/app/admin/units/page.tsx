@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ImportCsvModal, WarrantyTab } from "@/components/Features";
 import { Badge, Banner, Btn, Card, Check, DataTable, Field, Input, Kpi, ListRow, Modal, Page, PowerBadge, ConnBadge, Search, Select, SummaryList, Tabs, Toggle, useToast, cx } from "@/components/ui";
 
 type Cust = { id: string; name: string; status: "active" | "inactive"; props: number; units: number; op: string; alerts: number | string; contract: string };
@@ -19,6 +20,8 @@ const unitRows = [
 export default function AdminUnits() {
   const toast = useToast();
   const [q, setQ] = useState("");
+  const [top, setTop] = useState<"customers" | "warranty">("customers");
+  const [imp, setImp] = useState(false);
   const [status, setStatus] = useState<"active" | "all">("active");
   const [cust, setCust] = useState<Cust | null>(null);
   const [tab, setTab] = useState<"units" | "users" | "policies">("units");
@@ -35,12 +38,16 @@ export default function AdminUnits() {
   if (!cust) {
     return (
       <Page>
+        <div className="flex flex-wrap items-center justify-between gap-2"><Tabs value={top} onChange={setTop} tabs={[{ id: "customers", label: "Customers & units", count: 3 }, { id: "warranty", label: "Warranty & coverage", count: 5 }]} /><Btn size="sm" onClick={() => setImp(true)}>↑ Import CSV</Btn></div>
+        <ImportCsvModal open={imp} onClose={() => setImp(false)} />
+        {top === "warranty" ? <WarrantyTab /> : <>
         <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}><Kpi label="Customers" value={2} sub="+1 inactive (not counted)" /><Kpi label="Properties" value={2} sub="Home A · Home B" /><Kpi label="Units" value={5} sub="Running 2 · Stopped 2 · unknown 1" /><Kpi label="Needs attention" value={1} tone="warn" sub="overdue billing / open alert" /></div>
         <Card title="Customers" sub="Select a customer to manage its properties, spaces, and units" action={<Btn size="sm" variant="primary" onClick={() => setModal("customer")}>+ New customer</Btn>}>
           <div className="mb-3 flex flex-wrap items-center gap-3"><div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder="Search customer name, ID, or property…" value={q} onChange={setQ} /></div><Select aria-label="Status" className="w-auto" value={status} onChange={(e) => setStatus(e.target.value as "all")}><option value="active">Status: Active</option><option value="all">Status: All</option></Select></div>
           <DataTable rows={rows} rowKey={(r) => r.id} onRowClick={(c) => { setCust(c); setTab("units"); }} cols={[{ key: "c", label: "Customer", render: (c) => <><b>{c.id}</b><div className="text-xs text-muted">{c.name}</div></> }, { key: "s", label: "Status", render: (c) => <Badge tone={c.status === "active" ? "ok" : "unknown"}>{c.status}</Badge> }, { key: "p", label: "Properties", render: (c) => c.props, hideBelow: "sm" }, { key: "u", label: "Units", render: (c) => c.units }, { key: "o", label: "Operation", render: (c) => c.op, hideBelow: "md" }, { key: "a", label: "Alerts", render: (c) => c.alerts, hideBelow: "md" }, { key: "k", label: "Contract", render: (c) => c.contract, hideBelow: "md" }, { key: "x", label: "", render: () => "›" }]} />
           <p className="mt-2 text-[11px] text-muted">{rows.length} of 3 · sorted by name · Inactive customers appear only with Status: All (IR40). Archived properties/spaces/units never appear in lists, summaries, or KPI denominators (IR39).</p>
         </Card>
+        </>}
         <Modal open={modal === "customer"} onClose={close} title="New customer" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) return; toast(`Customer “${name}” created`); close(); }}>Create</Btn></>}><Field label="Customer name" error={nameErr}><Input value={name} onChange={(e) => setName(e.target.value)} /></Field></Modal>
       </Page>
     );

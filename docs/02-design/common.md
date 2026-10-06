@@ -94,7 +94,7 @@ The schema distinguishes null (no value) from “not registered.” Treat unknow
 | Telemetry | unitId、sensorId、metric、value:number\|null、unit、observedAt、receivedAt、origin(measured/estimated/inspection)、quality(valid/missing/stale/suspect)、isDemo |
 | Command | unitId, actorId, action:UnitAction or internal RestrictionAction, diagnosticRunId?, status, requestedAt, sentAt?, acknowledgedAt?, expiresAt, failureCode?, idempotencyKey(key to prevent duplicates), expectedVersion, correlationId |
 | Alert | unitId, type, severity(critical/warning/normal), status, evidenceIds[], detectedAt, acknowledgedAt?, resolvedAt?, resolutionReason?. normal is also used in health summaries. Do not change an open alert to normal without a valid basis |
-| MaintenanceJob | unitId、alertIds[]、type(periodic/reactive/preventive)、status、contractorOrgId?、assignmentId?、requestedSlot、scheduledSlot?、dueAt、reportVersion?、draftReportRef?、costs[] |
+| MaintenanceJob | unitId、alertIds[]、type(periodic/reactive/preventive)、origin(client_request/periodic_plan)、status、contractorOrgId?、assignmentId?、requestedSlot、preferredSlots[]、slotProposal?、partnerSlotProposal?、scheduledSlot?、dueAt、reportVersion?、draftReportRef?、costs[] |
 | WorkReport / InspectionItem / Attachment | jobId, authorId, version, items[], measurements[], replacementParts[], workText, nextAction, submittedAt? / componentGroup, componentKey, result, reason?, evidenceIds[] / jobId, reportId, blobId, name, mime, size, status(previewUrl is created only in the screen) |
 | Contract / Invoice / Payment | customerOrgId、unitIds[]、planType、period、rulesVersion / contractId、amountMinor、currency、dueAt、status / invoiceId、amountMinor、method?、status、externalRef?、confirmedAt? |
 | Restriction | contractId、causeInvoiceIds[]、unitIds[]、rulesVersion、noticeAt、executeAfter、reason、policy、state、applyCommandIds[]、releaseCommandIds[]、exception?、graceUntil? |
@@ -122,7 +122,7 @@ interface CommandRepository {
 
 `DemoViewContext` describes the selected fictional user, role, and visible scope. `DemoWriteOptions` carries a key to prevent duplicate demo actions and the version before the change. These do not define production authentication or server permissions. See the [Frontend Input and Output Contract](implementation-contracts.md) for the fields.
 
-The [Operation Catalog](operation-catalog.csv) lists the 189 local service operations needed by the screens, with their inputs, return values, and screens that use them. It does not define URLs, HTTP methods, database tables, or server transactions.
+The [Operation Catalog](operation-catalog.csv) lists the 197 local service operations needed by the screens, with their inputs, return values, and screens that use them. It does not define URLs, HTTP methods, database tables, or server transactions.
 
 Successful mock operations return ServiceResult<T>; failures reject with DomainError. Pending processing is shown through Command.status or similar fields in the success DTO. Do not create a custom pending Promise response type.
 
@@ -148,11 +148,15 @@ Record responses received after the deadline as late events in history. Do not s
 
 | Current state | Authorized person or event | Next state |
 |---|---|---|
-| requested | HQ assigns an internal staff member | assigned |
-| requested | HQ offers the job to an external contractor | offered |
+| requested | HQ assigns an internal staff member at one of the client's preferred times (IR113) | assigned |
+| requested | HQ offers the job to an external contractor with a fixed agreed visit slot (IR113) | offered |
+| requested | None of the preferred times fits: HQ proposes another time (`jobs.proposeSlot`) | requested (UI “Time proposed” until the client answers, IR113) |
+| requested (proposal pending) | The client accepts / declines with new preferred times / does not answer by replyBy | assigned or offered automatically with the held partner / requested (next round) / requested (expired, HQ calls the client) |
+| offered | The contractor proposes another time (`jobs.proposePartnerSlot`); HQ sends it to the client or keeps the agreed slot | offered (visitSlot updated only after the client accepts, IR113) |
 | offered | The selected contractor accepts or declines within the valid period | accepted / requested (keep the decline in history) |
 | offered | offerExpiresAt is reached without a response (IR48) | requested (keep the Offer as expired) |
-| accepted | The contractor assigns an active technician from its own company | assigned |
+| accepted | The contractor assigns an active technician from its own company at the offer's visit slot | assigned |
+| assigned | The assigned technician accepts the assignment (受領) or reports it cannot make the time (`jobs.acknowledgeAssignment`) | assigned (acknowledgement accepted / cant_make; coordinator reassigns or HQ proposes a new time, IR113) |
 | assigned | The assigned technician starts work within the valid period | in_progress |
 | assigned / in_progress | HQ (internal work) or the receiving contractor (outsourced work) changes the assignee with a reason | Keep the state. Invalidate the old assignment and create a new one. Keep the original author on work-in-progress records |
 | in_progress | The assignee submits the required report | submitted |

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { BarChart, Btn, Card, Check, DataTable, Kpi, LinkBtn, Page, Tabs, Toggle, Badge } from "@/components/ui";
+import { ExportReportModal } from "@/components/Features";
 import { units, week } from "@/lib/client";
 
 const days = ["Mon 14", "Tue 15", "Wed 16", "Thu 17", "Fri 18", "Sat 19", "Sun 20"];
@@ -17,6 +18,7 @@ export default function Energy() {
   const [range, setRange] = useState<"today" | "7d" | "30d" | "custom">("7d");
   const [sel, setSel] = useState<string[]>(["Bedroom AC"]);
   const [view, setView] = useState<"chart" | "table">("chart");
+  const [exp, setExp] = useState(false);
   const toggle = (u: string) => setSel((s) => (s.includes(u) ? (s.length > 1 ? s.filter((x) => x !== u) : s) : s.length >= 4 ? s : [...s, u]));
   const actual = days.map((_, i) => +sel.reduce((a, u) => a + perUnit[u].actual[i], 0).toFixed(1));
   const base = days.map((_, i) => sel.reduce((a, u) => a + perUnit[u].base[i], 0));
@@ -27,6 +29,7 @@ export default function Energy() {
     <Page>
       <Card>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <Btn size="sm" className="order-last ml-auto" onClick={() => setExp(true)}>↓ Export</Btn>
           <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted">Period</span><Tabs value={range} onChange={setRange} tabs={[{ id: "today", label: "Today" }, { id: "7d", label: "7d" }, { id: "30d", label: "30d" }, { id: "custom", label: "Custom" }]} /></div>
           <span className="text-xs text-muted">Sep 14 00:00 – Sep 21 00:00 (7 days) · Asia/Kuala_Lumpur</span>
         </div>
@@ -55,6 +58,7 @@ export default function Energy() {
         </div>
         <p className="mt-3 text-[11px] text-muted">Estimates only. Savings are not a tradable balance and are not converted into carbon credits.</p>
       </Card>
+    <ExportReportModal open={exp} onClose={() => setExp(false)} />
     </Page>
   );
 }

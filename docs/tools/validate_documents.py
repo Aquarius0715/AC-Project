@@ -84,6 +84,7 @@ for path in markdown:
             previous = None
 
 trace = rows('00-prepare/traceability.csv')
+# 0.23.0 (2026-10-02): IR113 maintenance scheduling adds 8 job operations (197); no new requirement IDs.
 # 0.22.0 (2026-10-01): Figma-confirmed screens add FR-C14–C18, FR-P09–P10, FR-T13–T15, FR-A17–A23 and FR-X08 (IR107–IR112).
 expected = {f'FR-{letter}{i:02}' for letter, n in [('C',18),('P',10),('T',15),('A',23),('X',8)] for i in range(1,n+1)} | {f'NFR-{i:02}' for i in range(1,9)}
 if unique(trace, 'requirement_id', 'requirement') != expected:
@@ -113,8 +114,8 @@ opnames = unique(operations, 'operation', 'operation')
 opmap = {row['operation']: row for row in operations}
 types = (ROOT / '02-design/service-contracts.ts').read_text()
 typed = {name:(input_, result, mode) for name,input_,result,mode in re.findall(r"^  '([^']+)': \{input:(.*);result:(.*);mode:'(read|write)'\};$", types, re.M)}
-if set(typed) != opnames or len(operations) != 189:
-    fail('189 operation/TypeScript contract keys differ')
+if set(typed) != opnames or len(operations) != 197:
+    fail('197 operation/TypeScript contract keys differ')
 for row in operations:
     name = row['operation']
     if typed.get(name) != (row['input_contract'], row['result_contract'], row['mode']):
@@ -1180,7 +1181,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.22.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.23.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')
