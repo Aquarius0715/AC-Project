@@ -21,10 +21,10 @@ All five AT-G121 cases are included in verification.md and corresponding traceab
 
 - Location: `docs/04-agentic-sdlc/acceptance-review-021.csv:3` (AT-G121-002, Then).
 - Related contracts: `docs/02-design/query-catalog.csv:2` and `:20`; `docs/02-design/client.md:309`; `docs/01-requirements/client.md:229` (AT-C08-B).
-- Evidence: AT-G121-002 requires 「故障フィルターで表示」. Neither notifications.list nor alerts.list permits a type/fault filter. C08 defines severity and unread filtering; the existing type acceptance requires distinct icons and labels.
+- Evidence: AT-G121-002 requires "display with a fault filter". Neither notifications.list nor alerts.list permits a type/fault filter. C08 defines severity and unread filtering; the existing type acceptance requires distinct icons and labels.
 - Reproduction: create the specified load_alert and attempt to fulfill the new Then by sending notifications.list filters.type=fault. D12 rejects the unknown filter as VALIDATION; implementing a local filter would invent an unspecified feature and potentially filter only the current page.
 - Impact: the final presentation assertion cannot be performed as written, although the underlying type=fault DTO correction is valid. This is a limited acceptance wording issue, not a need to expand the UI.
-- Suggested correction: replace 「故障フィルターで表示」 with 「故障アイコン・ラベルで表示」, matching IR10 and AT-C08-B. Alternatively, explicitly specify a new filter across all affected catalogs if that is intended.
+- Suggested correction: replace "display with a fault filter" with "display with a fault icon and label", matching IR10 and AT-C08-B. Alternatively, explicitly specify a new filter across all affected catalogs if that is intended.
 - Status: open at the pinned baseline.
 
 ## Limits

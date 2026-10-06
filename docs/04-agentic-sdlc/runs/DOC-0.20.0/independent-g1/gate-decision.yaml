@@ -16,5 +16,5 @@ application_tests: not_run
 implementation_status: not_started
 production_connection_readiness: NOT_READY
 deployment_approval: false
-reason: AT-A12の継続時間前提が通知createdを満たさず、MAJOR 0件の合格条件を満たさない。通知・fixture・更新イベントにも残件あり。
+reason: AT-A12 duration setup does not support a created notification, so the zero-MAJOR pass condition is unmet. Notification, fixture, and update-event issues also remain.
 evidence_paths: [review.md, findings.json, static-check.json, validator-negative-checks.json, baseline-integrity-check.json]

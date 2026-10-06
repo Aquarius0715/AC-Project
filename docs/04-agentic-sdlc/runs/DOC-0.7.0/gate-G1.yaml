@@ -1,18 +1,18 @@
-# 文書工程0.7.0のG1記録。実装・試験は未着手。
+# G1 record for document phase 0.7.0. Implementation and testing have not started.
 gate_id: G1
 task_id: DOC-0.7.0
-gate_result: pending  # 0.6.0レビュー（レビュー資料はコミット対象外）の指摘を修正した版。別主体による再レビューまでpending
+gate_result: pending  # Version with corrections from the 0.6.0 review (review materials are excluded from commits). Pending until another reviewer reviews it again.
 spec_baseline_id: 0fce18188c32e468b94ed4a0eee506d00c9a5c98ba372d15351c266803ce2edb
 spec_manifest: spec-manifest.json
 revision_or_diff_hash: null
 evidence_paths: []
-affected_requirement_ids: [FR-C01..FR-C13, FR-P01..FR-P08, FR-T01..FR-T12, FR-A01..FR-A16]  # 受入条件の書き換え
+affected_requirement_ids: [FR-C01..FR-C13, FR-P01..FR-P08, FR-T01..FR-T12, FR-A01..FR-A16]  # Acceptance criteria rewritten
 invalidated_task_ids: []
-invalidated_acceptance_ids: []  # 全ATはnot_runのため失効対象なし
+invalidated_acceptance_ids: []  # No acceptance tests to invalidate because all ATs are not_run
 supersedes_evidence: []
 notes:
-  - 受入条件AT-N/E/Bを具体値へ分解（147行）
-  - automations.fire / jobs.resumeHold / jobs.resumeRework を追加（119操作）
-  - 出所ラベル判定規則を追加しFR-T02/FR-A07を再判定
-  - 優先順位の再定義とOPEN-10（施工業者の独立役割）
-  - 未対応: 要件本文と設計本文の重複整理（P3）
+  - Expanded AT-N/E/B acceptance criteria into specific values (147 rows)
+  - Added automations.fire / jobs.resumeHold / jobs.resumeRework (119 operations)
+  - Added source-label classification rules and reassessed FR-T02/FR-A07
+  - Redefined priorities and added OPEN-10 (a separate contractor role)
+  - Not addressed: removing duplication between requirement and design text (P3)

@@ -1,11 +1,11 @@
-# DOC-0.16.0 現行G1判定
+# DOC-0.16.0 Current G1 Decision
 
-**独立G1: passed。未解決0件。1A設計の実装引渡しはREADY。**
+**Independent G1: passed. Zero unresolved findings. The 1A design is READY for implementation handover.**
 
-[独立レビュー報告（指定13項目）](independent-g1-review.md)・[判定JSON](independent-g1-result.json)・[gate記録](gate-G1.yaml)を参照。
+See the [independent review report (13 specified items)](independent-g1-review.md), [decision JSON](independent-g1-result.json), and [gate record](gate-G1.yaml).
 
-判定baseline: `fe251845299c3b5d0a9d493683be3e70076111af3b290b8b01a8fa2f7450e0b2`。修正者は/root、独立レビュアーは/root/independent_g1_016。追加指摘G1R-001も修正・独立再確認済み。
+Decision baseline: `fe251845299c3b5d0a9d493683be3e70076111af3b290b8b01a8fa2f7450e0b2`. Correction author: /root. Independent reviewer: /root/independent_g1_016. The additional finding G1R-001 was also corrected and independently rechecked.
 
-[回答後の自己レビュー](self-review-after-decisions.md)と[回答前レビュー](before-decisions/review.md)は当時の記録として保持する。これらのpending/未実施表記は現在の工程状態を示さない。
+The [self-review after the answers](self-review-after-decisions.md) and [review before the answers](before-decisions/review.md) are retained as records from those times. Their pending/not-performed statements do not show the current phase status.
 
-アプリ実装・動作/性能/a11y試験は未実施。本番接続はNOT READY、デプロイ承認ではない。
+Application implementation and runtime/performance/a11y tests have not been performed. Production connections are NOT READY; this is not deployment approval.

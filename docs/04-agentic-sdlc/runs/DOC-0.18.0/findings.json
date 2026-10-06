@@ -6,7 +6,7 @@
   "initial_verdict": "NOT READY",
   "post_correction_self_rereview": "not_performed (session interrupted before run records and self re-review)",
   "independent_g1": "not_evaluated",
-  "note": "指摘データは中断したセッションの記録から回収した。修正内容の検証と引継ぎは独立レビューREV19（DOC-0.19.0）で実施した（IR75）。",
+  "note": "Finding data was recovered from the interrupted session records. Correction validation and handover were performed in independent review REV19 (DOC-0.19.0) (IR75).",
   "findings": [
     {
       "id": "REV18-001",

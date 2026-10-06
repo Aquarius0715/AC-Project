@@ -6,7 +6,7 @@
       "id": "DEC-17",
       "issue_id": "REV-001",
       "status": "accepted",
-      "question": "FR-A10の権限粒度: restriction.manage/overrideの2権限か、4操作を個別権限にするか",
+      "question": "FR-A10 permission detail: use two permissions, restriction.manage/override, or separate permissions for four actions?",
       "owner": "Product Owner / Security",
       "selected": {
         "permissions": [
@@ -14,18 +14,18 @@
           "restriction.override"
         ]
       },
-      "source": "ユーザー回答:「２種類にしましょうか」「ソート機能をつけてください。デフォルトは業務順でお願いします」",
+      "source": "User response: \"Let us use two types.\" \"Please add sorting. Use business order by default.\"",
       "decision_status": "accepted",
-      "decided_by": "本会話のユーザー",
+      "decided_by": "The user in this conversation",
       "decided_at": "2026-09-16",
       "decided_at_precision": "day",
-      "answer": "２種類にしましょうか"
+      "answer": "Let us use two types."
     },
     {
       "id": "DEC-18",
       "issue_id": "REV-005",
       "status": "accepted",
-      "question": "Job.status sortの比較順: 明示した業務順か状態コードASCII順か",
+      "question": "Job.status sort order: explicit business order or ASCII order of status codes?",
       "owner": "Product Owner / UI/UX",
       "selected": {
         "sortable_fields": [
@@ -54,12 +54,12 @@
           "cancelled"
         ]
       },
-      "source": "ユーザー回答:「２種類にしましょうか」「ソート機能をつけてください。デフォルトは業務順でお願いします」",
+      "source": "User response: \"Let us use two types.\" \"Please add sorting. Use business order by default.\"",
       "decision_status": "accepted",
-      "decided_by": "本会話のユーザー",
+      "decided_by": "The user in this conversation",
       "decided_at": "2026-09-16",
       "decided_at_precision": "day",
-      "answer": "これは、ソート機能をつけてください。デフォルトは業務順でお願いします"
+      "answer": "Please add sorting for this. Use business order by default."
     }
   ]
 }

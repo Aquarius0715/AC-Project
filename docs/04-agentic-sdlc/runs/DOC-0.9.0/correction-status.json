@@ -7,147 +7,147 @@
   "findings": [
     {
       "finding_id": "REV-001",
-      "title": "受諾前のDTOから楽観ロックの版を取得できない",
+      "title": "The pre-acceptance DTO does not provide the optimistic-lock version",
       "status": "specified_self_checked",
       "contract_section": "SR01",
       "acceptance_case": "AT-STRICT-001"
     },
     {
       "finding_id": "REV-002",
-      "title": "新規作成型操作が存在しない資源の版を要求する",
+      "title": "Create operations require the version of a resource that does not yet exist",
       "status": "specified_self_checked",
       "contract_section": "SR02",
       "acceptance_case": "AT-STRICT-002"
     },
     {
       "finding_id": "REV-003",
-      "title": "scopeIdsの意味と空集合の認可が仕様未定義",
+      "title": "The meaning of scopeIds and authorization for an empty set are undefined",
       "status": "specified_self_checked",
       "contract_section": "SR03",
       "acceptance_case": "AT-STRICT-003"
     },
     {
       "finding_id": "REV-004",
-      "title": "画面が必要とする候補・関連データ取得が操作一覧から欠落",
+      "title": "The operation catalog lacks retrieval of candidate and related data needed by screens",
       "status": "specified_self_checked",
       "contract_section": "SR04",
       "acceptance_case": "AT-STRICT-004"
     },
     {
       "finding_id": "REV-005",
-      "title": "制御UIが論理的に有効な制限を取得できない",
+      "title": "The control UI cannot retrieve logically active restrictions",
       "status": "specified_self_checked",
       "contract_section": "SR05",
       "acceptance_case": "AT-STRICT-005"
     },
     {
       "finding_id": "REV-006",
-      "title": "延滞・階層・KPI絞り込みをQuery契約で表現できない",
+      "title": "The Query contract cannot express overdue, hierarchy, and KPI filters",
       "status": "specified_self_checked",
       "contract_section": "SR06",
       "acceptance_case": "AT-STRICT-006"
     },
     {
       "finding_id": "REV-007",
-      "title": "手入力の測定値がサーバー相当メタデータ一式を要求する",
+      "title": "Manually entered measurements require a full set of server-side metadata",
       "status": "specified_self_checked",
       "contract_section": "SR07",
       "acceptance_case": "AT-STRICT-007"
     },
     {
       "finding_id": "REV-008",
-      "title": "校正履歴・終了済み操作・試運転を再訪時に取得できない",
+      "title": "Calibration history, completed operations, and test runs cannot be retrieved when returning to a screen",
       "status": "specified_self_checked",
       "contract_section": "SR08",
       "acceptance_case": "AT-STRICT-008"
     },
     {
       "finding_id": "REV-009",
-      "title": "MRVが必要な係数snapshotと旧版表示を復元できない",
+      "title": "MRV cannot restore required factor snapshots and older-version views",
       "status": "specified_self_checked",
       "contract_section": "SR09",
       "acceptance_case": "AT-STRICT-009"
     },
     {
       "finding_id": "REV-010",
-      "title": "受入条件が確定契約と反対の結果を要求する",
+      "title": "Acceptance criteria require results that contradict the agreed contract",
       "status": "specified_self_checked",
       "contract_section": "SR10",
       "acceptance_case": "AT-STRICT-010"
     },
     {
       "finding_id": "REV-011",
-      "title": "選択IDのURL仕様が画面ごとに欠ける",
+      "title": "URL specifications for selected IDs are missing for individual screens",
       "status": "specified_self_checked",
       "contract_section": "SR11",
       "acceptance_case": "AT-STRICT-011"
     },
     {
       "finding_id": "REV-012",
-      "title": "宛先ゼロの通知失敗を返すモデルがない",
+      "title": "No model can return a notification failure caused by zero recipients",
       "status": "specified_self_checked",
       "contract_section": "SR12",
       "acceptance_case": "AT-STRICT-012"
     },
     {
       "finding_id": "REV-013",
-      "title": "資格の必要条件・失効をデータとイベントで表せない",
+      "title": "Qualification requirements and expiry cannot be represented in data and events",
       "status": "specified_self_checked",
       "contract_section": "SR13",
       "acceptance_case": "AT-STRICT-013"
     },
     {
       "finding_id": "REV-014",
-      "title": "更新中の複数ページ取得が安定したsnapshotを完了できない",
+      "title": "Multi-page retrieval during updates cannot complete a stable snapshot",
       "status": "specified_self_checked",
       "contract_section": "SR14",
       "acceptance_case": "AT-STRICT-014"
     },
     {
       "finding_id": "REV-015",
-      "title": "オフセット画面の許可role条件が矛盾",
+      "title": "Allowed-role conditions for the offset screen conflict",
       "status": "specified_self_checked",
       "contract_section": "SR15",
       "acceptance_case": "AT-STRICT-015"
     },
     {
       "finding_id": "REV-016",
-      "title": "必読契約の参照範囲がD11で止まっている",
+      "title": "References to required contracts stop at D11",
       "status": "specified_self_checked",
       "contract_section": "SR16",
       "acceptance_case": "AT-STRICT-016"
     },
     {
       "finding_id": "REV-017",
-      "title": "today/7d/30dのUTC期間への変換が未定義",
+      "title": "Conversion of today/7d/30d into UTC periods is undefined",
       "status": "specified_self_checked",
       "contract_section": "SR17",
       "acceptance_case": "AT-STRICT-017"
     },
     {
       "finding_id": "REV-018",
-      "title": "オフセットのfailed後の回復と遅延イベントが未定義",
+      "title": "Offset recovery after failed status and delayed events are undefined",
       "status": "specified_self_checked",
       "contract_section": "SR18",
       "acceptance_case": "AT-STRICT-018"
     },
     {
       "finding_id": "REV-019",
-      "title": "契約改版が進行中制限へ与える影響が未定義",
+      "title": "The effect of contract revisions on ongoing restrictions is undefined",
       "status": "specified_self_checked",
       "contract_section": "SR19",
       "acceptance_case": "AT-STRICT-019"
     },
     {
       "finding_id": "REV-020",
-      "title": "復旧イベントが通信・電源・tamperのどれを回復するか不明",
+      "title": "It is unclear whether a recovery event restores communication, power, or tamper status",
       "status": "specified_self_checked",
       "contract_section": "SR20",
       "acceptance_case": "AT-STRICT-020"
     },
     {
       "finding_id": "REV-021",
-      "title": "通知だけのAirPolicyの評価結果を表現できない",
+      "title": "The evaluation result of a notification-only AirPolicy cannot be represented",
       "status": "specified_self_checked",
       "contract_section": "SR21",
       "acceptance_case": "AT-STRICT-021"

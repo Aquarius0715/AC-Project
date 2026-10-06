@@ -60,7 +60,7 @@
     {
       "case": "notice_recipient_scope_missing",
       "detected": true,
-      "expected_diagnostic": "Convergence behavioral guard missing 全対象Unitを閲覧できる宛先"
+      "expected_diagnostic": "Convergence behavioral guard missing recipients who can view all target Units"
     },
     {
       "case": "job_history_list_missing",

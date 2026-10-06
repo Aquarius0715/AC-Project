@@ -1,0 +1,15 @@
+{
+  "scope": "translation-document-structure",
+  "completed_on": "2026-09-18",
+  "counts": {
+    "json_parsed": 108,
+    "csv_structure_checked": 41,
+    "markdown_structure_checked": 66,
+    "documentation_files_scanned": 242
+  },
+  "japanese_remaining": 0,
+  "issues": [],
+  "acceptance_rows_independently_sampled": 38,
+  "fixture_translated_strings_reviewed": 21,
+  "application_tests": "not_run"
+}

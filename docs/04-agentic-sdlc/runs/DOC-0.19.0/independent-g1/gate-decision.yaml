@@ -2,7 +2,7 @@ gate_id: G1
 task_id: DOC-0.19.0
 spec_baseline_id: 048ffcef25f8463bca33346f5bb1dd8dbb1fdad03b61132d1cfc5d17ebeb1ac2
 gate_result: fail
-reviewer: 独立G1レビュー担当AI（別エージェント）
+reviewer: Independent G1 review AI (another agent)
 reviewed_commit: 0505446
 reviewed_branch: docs/0.19.0-independent-review
 review_date: 2026-09-17
@@ -28,11 +28,11 @@ validators:
     detected: 62
     result: passed
 independent_checks:
-  manifest_sha256_recomputed: passed  # 61ファイル全件一致、baseline ID一致
-  typescript_strict_on_scratch_copy: passed  # tsc 5.8.3 --strict --noEmit（仕様ファイルは未変更）
+  manifest_sha256_recomputed: passed  # All 61 files and baseline ID match
+  typescript_strict_on_scratch_copy: passed  # tsc 5.8.3 --strict --noEmit (specification files unchanged)
 application_tests: not_run
 self_review_used_as_evidence: false
-production_connection_readiness: NOT_READY  # D11。1A判定の阻害項目には数えない
+production_connection_readiness: NOT_READY  # D11. Not counted as a blocker for the 1A decision
 deployment_approval: false
-reason: 両検証器は成功したが、MAJORが12件あるためG1合格条件（BLOCKER/CRITICAL/MAJOR 0件）を満たさない
+reason: Both validators passed, but 12 MAJOR findings remain, so G1 does not meet its pass condition of zero BLOCKER/CRITICAL/MAJOR findings
 evidence_paths: [review.md, findings.json]

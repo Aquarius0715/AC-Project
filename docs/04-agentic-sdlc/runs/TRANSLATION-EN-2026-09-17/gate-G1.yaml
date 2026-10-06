@@ -1,0 +1,17 @@
+gate_id: G1
+task_id: TRANSLATION-EN-2026-09-17
+gate_result: pending
+spec_baseline_id: 2bd7a7b86c339d70a4312977b170b23fa0d0fa18635f48305ae455c56930e8d0
+source_specification_version: 0.21.0
+source_review_run: DOC-0.21.0
+review_scope: English translation of documentation
+independent_post_correction_review: pending
+static_check: passed
+typescript_semantic_check: passed
+validator_mutation_check: passed
+mutation_cases: 102
+application_tests: not_run
+implementation_status: not_started
+deployment_approval: false
+reason: Translation and automated checks are complete. Historical G1 approval is not reused as independent approval of translated contents.
+evidence_paths: [progress.md, spec-manifest.json, translation-checks.json, static-check.json, validator-negative-checks.json]

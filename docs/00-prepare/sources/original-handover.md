@@ -1,362 +1,362 @@
-# AC Project — Codex実装引き継ぎ資料
+# AC Project — Codex implementation handover
 
-## 1. 次のCodexへの依頼
+## 1. Request for the next Codex
 
-参考サイト https://aconland-mudah-milik.vercel.app/ の構成を参考に、空調のIoT監視・遠隔制御・保守管理サービスのクリック可能なUI／UXを実装してください。
+Build a clickable UI/UX for an AC IoT monitoring, remote control, and maintenance service, using the structure of https://aconland-mudah-milik.vercel.app/ as a reference.
 
-最初の対象は分離型エアコン（Split Unit AC）です。利用者を「クライアント」「技術者（社内・外部業者）」「管理者・HQ」の3分類に分け、それぞれ視覚的に分かりやすいダッシュボードを用意してください。画面遷移に加えて、空調操作、異常対応、保守依頼、支払いと運転制限などの一連の流れをデモで確認できる状態にしてください。
+Start with split AC units. Group users into three types: client, technician (internal/external contractor), and administrator/HQ. Provide a clear visual dashboard for each. The demo should support full flows for AC control, alert handling, maintenance requests, payments, and operating restrictions, as well as screen navigation.
 
-まず既存リポジトリ・AGENTS.md・起動手順・既存実装を確認し、既存の技術構成とデザインシステムがあれば優先してください。この資料だけでは参考サイトのソースコードや既存リポジトリへのアクセスは提供されていません。未確認の実装を存在すると仮定しないでください。
+First check the existing repository, AGENTS.md, startup instructions, and implementation. Prefer the existing technology stack and design system if present. This document does not provide access to the reference site's source code or an existing repository. Do not assume unverified implementations exist.
 
-以下の「確定要件」はユーザーからの依頼に基づきます。「実装案・仮置き」は着手しやすくするための提案であり、既に承認された詳細仕様ではありません。通常の可逆的なUI判断は合理的な仮定で進め、その仮定を成果物に記録してください。
+The “confirmed requirements” below are based on user requests. “Implementation proposals/provisional choices” help work begin; they are not already approved detailed specifications. Make reasonable assumptions for ordinary reversible UI decisions and record them in the deliverables.
 
-## 2. プロジェクトの目的と現在地
+## 2. Project goals and current status
 
-### 目的
+### Goals
 
-- 空調の状態を継続監視し、異常の発生時・発生前に通知して保守対応を支援する。
-- 遠隔操作と自動運転で、快適性・空気環境・エネルギー効率を管理する。
-- レント・トゥ・オウン（RTO）では、契約・支払いと空調の運転制限を連動できるようにする。
-- RTO以外の一般保守、定期・事後・予防保全でも利用できるようにする。
-- 電力由来のCO₂排出量・削減効果を可視化し、将来はDigital MRVとカーボンオフセットへ拡張する。
+- Continuously monitor AC status and notify before or when faults occur to support maintenance.
+- Manage comfort, air quality, and energy efficiency through remote control and automation.
+- Link RTO (rent-to-own) contracts/payments to AC operating restrictions.
+- Support general non-RTO maintenance, including scheduled, reactive, and preventive work.
+- Visualize power-related CO₂ emissions and savings; later extend to Digital MRV and carbon offsets.
 
-### 現在の成果と未実施事項
+### Completed and pending work
 
-- ユーザーの原文要件を3役割に整理済み。
-- 参考サイトの公開ページと公開デモ画面を調査し、要件との差分を整理済み。
-- 本会話ではアプリの実装、リポジトリの変更、デプロイ、実機接続は行っていない。
-- 参考サイト調査は取得できたページ内容と公開配信コードの一部に基づく。全画面のクリック検証、見た目の詳細検証、本番バックエンド検証は未実施。
+- Original user requirements are organized into three roles.
+- Public pages and demo screens of the reference site were researched and compared with requirements.
+- No app implementation, repository changes, deployment, or real device connection occurred in this conversation.
+- Reference research is based on retrieved page content and some publicly served code. Full click testing, detailed visual review, and production backend verification have not been done.
 
-### 開発フェーズ
+### Development phases
 
-| フェーズ | 対象・成果物 |
+| Phase | Scope/deliverables |
 |---|---|
-| 1A：今回の着手対象 | 分離型エアコンを対象とする、3役割のクリック可能なUI／UX。デモデータと状態遷移を含む |
-| 1B：後続実装 | DB・API・認証・決済・通知・IoT機器・ファームウェア・実機制御を含むシステム |
-| 2：将来拡張 | HVAC・中央空調等。換気設備や複数メーカー・形式への対応拡大 |
+| 1A: current starting scope | Clickable three-role UI/UX for split AC units, including demo data and state transitions |
+| 1B: later implementation | System including database, APIs, authentication, payments, notifications, IoT devices, firmware, and real control |
+| 2: future expansion | HVAC, central AC, ventilation equipment, and more brands/types |
 
-1A／1Bという区分は、この引き継ぎで実装段階を明確にするための表記。ユーザーの元の指定は「phase 1：分離型、まずクリック可能なUI／UX、その後フルソリューション」「phase 2：HVAC」。
+The 1A/1B labels clarify implementation stages in this handover. The original user instruction was “phase 1: split units, first clickable UI/UX, then full solution” and “phase 2: HVAC.”
 
-## 3. 参考サイトの確認結果と差分
+## 3. Reference site findings and differences
 
-### 参照先
+### References
 
-- トップ：https://aconland-mudah-milik.vercel.app/
-- クライアント：https://aconland-mudah-milik.vercel.app/customer
-- 管理者：https://aconland-mudah-milik.vercel.app/admin
-- 施工業者：https://aconland-mudah-milik.vercel.app/partner
-- 技術者：https://aconland-mudah-milik.vercel.app/technician
-- RTO説明：https://aconland-mudah-milik.vercel.app/how-rto-works
-- 施工業者向け説明：https://aconland-mudah-milik.vercel.app/contractor
-- Exchange：https://aconland-mudah-milik.vercel.app/exchange
-- 投資：https://aconland-mudah-milik.vercel.app/investment
-- AIロードマップ：https://aconland-mudah-milik.vercel.app/future/ai
-- API・SDKロードマップ：https://aconland-mudah-milik.vercel.app/future/api-sdk
+- Home: https://aconland-mudah-milik.vercel.app/
+- Client: https://aconland-mudah-milik.vercel.app/customer
+- Administrator: https://aconland-mudah-milik.vercel.app/admin
+- Contractor: https://aconland-mudah-milik.vercel.app/partner
+- Technician: https://aconland-mudah-milik.vercel.app/technician
+- RTO explanation: https://aconland-mudah-milik.vercel.app/how-rto-works
+- Contractor explanation: https://aconland-mudah-milik.vercel.app/contractor
+- Exchange: https://aconland-mudah-milik.vercel.app/exchange
+- Investment: https://aconland-mudah-milik.vercel.app/investment
+- AI roadmap: https://aconland-mudah-milik.vercel.app/future/ai
+- API/SDK roadmap: https://aconland-mudah-milik.vercel.app/future/api-sdk
 
-確認日：2026年9月14日。公開ページは変更される可能性があるため、実装時の状態を再確認すること。
+Checked: September 14, 2026. Public pages can change; recheck them during implementation.
 
-### 中心となる設計の違い
+### Main design difference
 
-参考サイトは「商品選択→RTO申請→審査→契約→施工→支払い・保守」が中心。今回の要件では「物件→階・部屋→設置済み空調→監視・操作・保守」を中心に据え、契約を設備に紐づける。
+The reference centers on product selection → RTO application → review → contract → installation → payments/maintenance. This project centers on property → floor/room → installed AC → monitoring/control/maintenance, with contracts linked to units.
 
-| 項目 | 参考サイトで確認できた内容 | 今回の実装方針 |
+| Item | Found in reference site | Current implementation approach |
 |---|---|---|
-| 顧客ダッシュボード | 契約、申請、次回支払い、保証・保守更新、ポイント | 室温、空気環境、稼働、電力、異常を主情報にする |
-| 業者・技術者画面 | 案件受付、日程、担当者、作業写真・報告、顧客承認、報酬、研修 | 設備監視・異常根拠・予防保全・IoT保守を追加 |
-| HQ画面 | 審査、施工、支払い、在庫、業者、SLA、苦情、監査 | 全設備監視、制御、運転制限、エネルギー・MRVを追加 |
-| 赤・オレンジ・緑 | 主にSLA等の業務状態 | 設備・空気環境の状態にも使用。業務状態とは別に管理 |
-| GPS・ジオフェンス | 技術者の現場・稼働管理 | 利用者の外出・帰宅による冷房制御は別機能として追加 |
-| Exchange | ポイント、明細、紹介、評価、契約記録 | カーボンクレジット機能と同一視しない |
-| AI・API・SDK | 将来機能として掲載 | 今回必要な音声操作やIoT接続を別途設計 |
-| IoT監視・遠隔制御・MRV | 確認したページでは見つからない | 新規機能として設計。ただし未実装と断定しない |
+| Customer dashboard | Contracts, applications, next payment, warranty/maintenance renewals, points | Make room temperature, air quality, operation, power, and alerts the main information |
+| Contractor/technician screens | Job intake, schedules, assignees, photos/reports, customer approval, pay, training | Add unit monitoring, alert evidence, preventive maintenance, and IoT maintenance |
+| HQ screens | Reviews, installation, payments, stock, contractors, SLA, complaints, audit | Add monitoring of all units, control, restrictions, energy, and MRV |
+| Red/orange/green | Mainly workflow states such as SLA | Also use for unit/air-quality states, managed separately from workflow states |
+| GPS/geofencing | Technician site/work tracking | Add user away/home cooling control as a separate feature |
+| Exchange | Points, statements, referrals, ratings, contract records | Do not equate it with carbon credits |
+| AI/API/SDK | Listed as future features | Separately design needed voice control and IoT connections |
+| IoT monitoring/remote control/MRV | Not found on checked pages | Design as new features, without claiming the reference has no implementation |
 
-施工業者向け説明には、自動割り当て・GPS・報酬処理はバックエンド自動処理ではなくクリック可能な画面として表現されている旨が記載されていた。投資ページもUI／UXプロトタイプであることが明示されていた。画面があることを本番処理の完成と扱わないこと。
+The contractor explanation stated that auto-assignment, GPS, and pay processing were clickable screens, not automated backend processing. The investment page also clearly said it was a UI/UX prototype. A screen does not prove production processing is complete.
 
-### 参考サイトにあるが、今回の必須要件ではないもの
+### Reference features that are not required in this phase
 
-投資家向け資金調達、紹介エージェント、紹介手数料、ポイント、キャンペーンは初期実装の必須対象にしない。商品カタログ・在庫・RTO新規申請審査・業者報酬・研修管理は、既存実装があれば維持し、今回の監視機能を実装するために一から作り直す必要はない。既存機能を無断削除しない。
+Investor funding, referral agents/commissions, points, and campaigns are not required initially. Keep product catalogs, stock, new RTO application reviews, contractor pay, and training if already implemented; they do not need rebuilding from scratch to add monitoring. Do not remove existing features without permission.
 
-## 4. 確定要件：クライアント
+## 4. Confirmed requirements: client
 
-目的：空調を快適に利用し、状態・電気代・空気環境・保守・支払いを確認する。
+Goal: use AC comfortably and check status, electricity costs, air quality, maintenance, and payments.
 
-| ID | 要件 |
+| ID | Requirement |
 |---|---|
-| C01 | グラフィカルなダッシュボードに稼働状況、室温、湿度、空気環境、消費電力、アラートを表示 |
-| C02 | 自宅／オフィスを分類し、エリア・階・部屋・スペース単位で空調を管理 |
-| C03 | 遠隔で電源・設定温度・対応する運転モード・風量を操作 |
-| C04 | 曜日・時間帯の運転スケジュール、帰宅前の冷房開始 |
-| C05 | 在室・位置情報・生活パターン・天候に応じた自動運転。位置情報は同意に基づく |
-| C06 | 電力・電気代の推移、通常運転の基準値との比較、推定削減量を表示 |
-| C07 | CO₂濃度、温湿度、粉じん等を表示し、換気・清掃を案内 |
-| C08 | 異常、清掃・交換時期、換気を赤・オレンジ・緑と通知で表示 |
-| C09 | 保守・修理の依頼、予約、進捗、結果、履歴を確認 |
-| C10 | RTO等の契約、請求、支払期限、入金状況を確認 |
-| C11 | WhatsApp／メールで支払い案内を受け、カード決済や支払い手順へ進む |
-| C12 | 未払い時の運転制限について予定・理由・内容・解除条件を確認 |
-| C13 | 推定CO₂排出・削減量を確認し、希望者がオフセットに進める |
+| C01 | Graphical dashboard with operation, room temperature, humidity, air quality, power use, and alerts |
+| C02 | Classify home/office and manage AC by area, floor, room, and space |
+| C03 | Remotely control power, set temperature, supported modes, and fan speed |
+| C04 | Weekday/time-slot schedules and cooling before arrival |
+| C05 | Automation based on occupancy, location, routines, and weather; location requires consent |
+| C06 | Show power/cost trends, comparisons with normal-operation baselines, and estimated savings |
+| C07 | Show CO₂, temperature/humidity, dust, and ventilation/cleaning guidance |
+| C08 | Show faults, cleaning/replacement due dates, and ventilation with red/orange/green and notifications |
+| C09 | Request maintenance/repairs and view bookings, progress, results, and history |
+| C10 | View RTO/other contracts, invoices, due dates, and payment receipt states |
+| C11 | Receive payment guidance by WhatsApp/email and proceed to card payments or instructions |
+| C12 | View nonpayment restriction schedules, reasons, details, and release conditions |
+| C13 | View estimated CO₂ emissions/savings and optionally proceed to offsets |
 
-## 5. 確定要件：技術者（社内・外部業者）
+## 5. Confirmed requirements: technicians (internal/external contractors)
 
-目的：担当設備の状態を把握し、定期・事後・予防保全を実施する。
+Goal: understand assigned units and perform scheduled, reactive, and preventive maintenance.
 
-| ID | 要件 |
+| ID | Requirement |
 |---|---|
-| T01 | 担当設備、異常重要度、未対応案件、予定、進捗のダッシュボード |
-| T02 | 設置場所、メーカー、型番、機器構成、設置日、保守範囲の確認 |
-| T03 | センサー値、電力、運転状態、通信状態のリアルタイム監視 |
-| T04 | 室内機：フィルター、蒸発器コイル、送風モーター・ファン、ドレン配管・パン、吹出口・ルーバーの診断支援・点検記録 |
-| T05 | 室外機：凝縮器コイル、コンプレッサー、ファン・羽根、冷媒配管の診断支援・点検記録 |
-| T06 | 電気・制御：サーモスタット、センサー、コンデンサー、接触器、配線の診断支援・点検記録 |
-| T07 | 異常・故障の疑いと、その根拠データ・履歴の確認 |
-| T08 | 定期・事後・予防保全の受付、対応、完了報告 |
-| T09 | チェックリスト、写真、測定値、交換部品、作業内容、次回対応の記録 |
-| T10 | 権限内の遠隔診断・設定変更・試運転 |
-| T11 | IoT機器の登録、設備との紐付け、接続確認、校正、ファームウェア更新 |
-| T12 | 取り外し・改ざん、電源断、通信断の通知と確認 |
+| T01 | Dashboard of assigned units, alert severity, unresolved jobs, schedules, and progress |
+| T02 | View installation location, brand, model, device configuration, installation date, and maintenance scope |
+| T03 | Real-time monitoring of sensor readings, power, operation, and connectivity |
+| T04 | Indoor unit: diagnostic support and inspection records for filters, evaporator coils, blower motors/fans, drain pipes/pans, outlets/louvers |
+| T05 | Outdoor unit: diagnostic support and inspection records for condenser coils, compressors, fans/blades, refrigerant pipes |
+| T06 | Electrical/control: diagnostic support and inspection records for thermostats, sensors, capacitors, contactors, wiring |
+| T07 | View suspected faults and their supporting data/history |
+| T08 | Intake, handling, and completion reports for scheduled/reactive/preventive maintenance |
+| T09 | Record checklists, photos, readings, replacement parts, work details, and next actions |
+| T10 | Remote diagnostics, setting changes, and test runs within permissions |
+| T11 | IoT registration, unit linking, connection checks, calibration, and firmware updates |
+| T12 | Notifications/checks for removal/tampering, power loss, and communication loss |
 
-社内技術者は担当範囲を横断して閲覧できる。外部業者は割り当てられた顧客・設備・作業期間にアクセスを限定する。技術者が顧客請求の変更や未払いによる制限を自由に行える構成にしない。
+Internal technicians can view across their assigned scope. External contractors are limited to assigned customers, units, and work periods. Technicians must not freely change customer invoices or apply nonpayment restrictions.
 
-## 6. 確定要件：管理者・HQ
+## 6. Confirmed requirements: administrator/HQ
 
-目的：顧客、設備、保守、契約、収益、エネルギー、環境実績を一元管理する。
+Goal: centrally manage customers, units, maintenance, contracts, revenue, energy, and environmental results.
 
-| ID | 要件 |
+| ID | Requirement |
 |---|---|
-| A01 | 顧客・設備数、稼働率、異常、保守、未払い、電力、推定削減量を可視化 |
-| A02 | 顧客、組織、物件、拠点、エリア、階、部屋、設備を管理 |
-| A03 | 3分類のユーザーと社内・外部の閲覧・操作権限を管理 |
-| A04 | メーカー、型番、対応機能、IoT、センサー、ファームウェアを管理 |
-| A05 | アラート条件、通知先、通知手段、エスカレーションを設定 |
-| A06 | 保守計画、担当割当、期限、作業品質、費用を管理 |
-| A07 | RTO、一般保守、省エネ、環境関連サービスの契約プランを管理 |
-| A08 | 請求、決済連携、入金確認、督促を管理 |
-| A09 | 契約・適用ルールに基づく事前通知、設定温度制限・停止、入金後解除 |
-| A10 | 制限権限、猶予、例外、手動解除、監査履歴を管理 |
-| A11 | 在室、時間帯料金、ピーク調整、太陽光・蓄電池連携の制御方針 |
-| A12 | 空気環境のしきい値、通知、対応換気設備への制御 |
-| A13 | 導入前後・基準モデルとの比較による省エネ効果分析 |
-| A14 | Digital MRV：測定、算定方法、排出係数、品質、検証履歴、報告書 |
-| A15 | 外部サービスと連携したクレジット購入・償却・証明情報管理。取引は制度に応じて検討 |
-| A16 | 機器改ざん、通信異常、不正アクセス、遠隔操作の監視・監査 |
+| A01 | Visualize customer/unit counts, operation rate, faults, maintenance, unpaid bills, power, and estimated savings |
+| A02 | Manage customers, organizations, properties, sites, areas, floors, rooms, and units |
+| A03 | Manage three user groups and internal/external view/action permissions |
+| A04 | Manage brands, models, capabilities, IoT, sensors, and firmware |
+| A05 | Configure alert conditions, recipients, channels, and escalation |
+| A06 | Manage maintenance plans, assignments, deadlines, work quality, and costs |
+| A07 | Manage contract plans for RTO, general maintenance, energy savings, and environmental services |
+| A08 | Manage invoices, payment integration, receipt confirmation, and reminders |
+| A09 | Advance notices, temperature limits/stops, and release after payment under contract/application rules |
+| A10 | Manage restriction permissions, grace periods, exceptions, manual release, and audit history |
+| A11 | Control policies for occupancy, time-of-use tariffs, peak adjustment, and solar/battery integration |
+| A12 | Air-quality thresholds, notifications, and control of supported ventilation equipment |
+| A13 | Analyze savings against before/after installation data and baseline models |
+| A14 | Digital MRV: measurements, calculation methods, emission factors, quality, verification history, reports |
+| A15 | Manage credit purchases, retirement, and proof through external services; consider trading according to the scheme |
+| A16 | Monitor/audit tampering, communication faults, unauthorized access, and remote control |
 
-## 7. 共通要件と実装上の境界
+## 7. Common requirements and implementation boundaries
 
-### 共通要件
+### Common requirements
 
-- サインイン、サインアウト、パスワード再設定。
-- 表示言語の選択。通知・AI応答も選択言語に対応。
-- 音声AIによる状態確認・操作・問い合わせ。操作権限を適用。
-- 赤＝緊急対応、オレンジ＝注意・対応推奨、緑＝正常。文字・アイコンも併用。
-- グラフ、設備配置、状態カードを使った視覚的なUI。
-- 小型・低価格・現地市場向けIoT機器。空調内設置、保守性、通信、取り外し検知を検討。
-- 複数メーカー・形式への対応を目標とし、型番ごとの対応機能を管理。
+- Sign in, sign out, and reset passwords.
+- Choose a display language; notifications and AI responses also use it.
+- Voice AI for status checks, actions, and questions, subject to permissions.
+- Red = urgent action; orange = caution/action recommended; green = normal. Also use text/icons.
+- Visual UI with charts, unit layouts, and status cards.
+- Small, low-cost IoT devices for the local market. Consider in-unit installation, maintenance, communication, and removal detection.
+- Aim to support multiple brands/types and manage capabilities by model.
 
-### 表示・制御で守るべき区別
+### Required display/control distinctions
 
-- 直接測定値、推定・診断結果、現地点検結果を区別する。未計測を正常扱いしない。
-- 通信断、未登録、欠測は「不明／オフライン」として表示し、緑にしない。
-- 室内CO₂濃度（ppm）と電力由来のCO₂排出量（kgCO₂e）を別の指標・画面として扱う。
-- 電力由来排出量の概念式は使用電力量×排出係数。実用時には対象地域・年度・算定境界を確認する。
-- 削減電力量は条件を揃えた基準値と実績の差として扱う。デモの算定は仮値であることを明記する。
-- 10〜20％以上という省エネ率は元要望の期待値であり、保証値ではない。
-- 微小冷媒漏れ、アレルゲン、全構成部品の故障を、未選定センサーで検知できると約束しない。
-- 換気制御は対応設備がある場合のみ。室内機の送風操作を外気導入と同一視しない。
-- 排出削減の算定結果が、そのまま取引可能なクレジットになるとは扱わない。
-- 遠隔操作は「要求」「送信」「機器応答」「失敗」を区別。本番ではUI値変更だけで成功扱いしない。
-- 電源断・通信断だけで盗難や取り外しと断定しない。デモでも事象を区別する。
-- IoT実機の部品選定・電気施工・メーカー保証への影響は、このUI資料では決定しない。
+- Separate direct readings, estimates/diagnoses, and on-site inspection results. Do not treat unmeasured data as normal.
+- Show communication loss, unregistered devices, and missing data as unknown/offline, not green.
+- Treat indoor CO₂ concentration (ppm) and power-related CO₂ emissions (kgCO₂e) as different metrics/screens.
+- The basic power-related emissions formula is energy used × emission factor. Confirm region, year, and calculation boundary for real use.
+- Energy savings are the difference between baseline and actual use under matched conditions. Clearly label demo calculations as provisional.
+- The original 10–20% or more savings rate is an expectation, not a guarantee.
+- Do not promise that unselected sensors can detect tiny refrigerant leaks, allergens, or every component failure.
+- Ventilation control requires supported equipment. Indoor fan circulation is not fresh air intake.
+- Calculated emission savings do not automatically become tradable credits.
+- Separate remote-control requested, sent, device response, and failed states. In production, changing a UI value alone is not success.
+- Power/communication loss alone does not prove theft or removal. Keep events separate even in demos.
+- This UI document does not decide real IoT parts, electrical work, or manufacturer warranty effects.
 
-## 8. 画面構成案
+## 8. Proposed screen structure
 
-以下は実装案。既存ルートがあれば統合し、機械的に置き換えない。
+The following is a proposal. Integrate with existing routes where present; do not replace them mechanically.
 
-| 役割 | ルート案 | 主な画面 |
+| Role | Proposed route | Main screens |
 |---|---|---|
-| 共通 | /login、/forgot-password | 認証、デモ役割選択、パスワード再設定 |
-| クライアント | /customer | 状態カード、空調一覧、警告、電力推移 |
-| クライアント | /customer/properties | 自宅・オフィス、階・部屋・スペース |
-| クライアント | /customer/units/:id | 設備詳細、運転状態、操作、履歴 |
-| クライアント | /customer/air-quality | CO₂、温湿度、粉じん、換気案内 |
-| クライアント | /customer/energy | 電力・電気代・基準比較・排出量 |
-| クライアント | /customer/automations | スケジュール、在室、位置、料金連動 |
-| クライアント | /customer/maintenance | 保守依頼、予約、履歴 |
-| クライアント | /customer/payments | 契約・請求、支払い、制限の案内 |
-| 技術者 | /technician | 担当設備・案件、優先順位 |
-| 技術者 | /technician/units/:id | センサー、異常根拠、部品別状態 |
-| 技術者 | /technician/jobs/:id | 作業、チェックリスト、報告 |
-| 技術者 | /technician/devices | IoT登録、接続、校正、更新 |
-| 管理者 | /admin | 全体稼働、異常、保守、支払い、エネルギー |
-| 管理者 | /admin/units | 顧客・場所・設備横断一覧 |
-| 管理者 | /admin/alerts | 異常受付、担当割当、エスカレーション |
-| 管理者 | /admin/jobs | 定期・事後・予防保全の管理 |
-| 管理者 | /admin/billing | 契約、請求、入金、督促 |
-| 管理者 | /admin/restrictions | 制限の予告・実行・解除・履歴 |
-| 管理者 | /admin/energy、/admin/mrv | 分析、算定条件、報告・検証 |
-| 管理者 | /admin/offsets | オフセットの見積・申込・償却記録のデモ |
-| 管理者 | /admin/devices | デバイス、接続、対応機能、更新 |
-| 管理者 | /admin/settings、/admin/audit | 権限、通知、制御条件、監査 |
+| Common | /login, /forgot-password | Authentication, demo role selection, password reset |
+| Client | /customer | Status cards, AC list, warnings, power trends |
+| Client | /customer/properties | Home/office, floors, rooms, spaces |
+| Client | /customer/units/:id | Unit details, operation state, controls, history |
+| Client | /customer/air-quality | CO₂, temperature/humidity, dust, ventilation guidance |
+| Client | /customer/energy | Power, cost, baseline comparison, emissions |
+| Client | /customer/automations | Schedules, occupancy, location, tariff integration |
+| Client | /customer/maintenance | Maintenance requests, bookings, history |
+| Client | /customer/payments | Contracts/invoices, payments, restriction guidance |
+| Technician | /technician | Assigned units/jobs and priorities |
+| Technician | /technician/units/:id | Sensors, alert evidence, component status |
+| Technician | /technician/jobs/:id | Work, checklists, reports |
+| Technician | /technician/devices | IoT registration, connection, calibration, updates |
+| Administrator | /admin | Overall operation, faults, maintenance, payments, energy |
+| Administrator | /admin/units | Cross-customer/location/unit list |
+| Administrator | /admin/alerts | Alert intake, assignment, escalation |
+| Administrator | /admin/jobs | Scheduled/reactive/preventive maintenance management |
+| Administrator | /admin/billing | Contracts, invoices, receipts, reminders |
+| Administrator | /admin/restrictions | Restriction notices, execution, release, history |
+| Administrator | /admin/energy, /admin/mrv | Analysis, calculation conditions, reporting/verification |
+| Administrator | /admin/offsets | Demo offset quotes, requests, and retirement records |
+| Administrator | /admin/devices | Devices, connectivity, capabilities, updates |
+| Administrator | /admin/settings, /admin/audit | Permissions, notifications, control conditions, audit |
 
-参考サイトのサイドバー、概要カード、一覧、詳細画面の構成を活用する。正確な色・フォント・余白・グラフ様式はこの資料では未確定。実際の参考画面と既存コードを確認して合わせる。言語・通知・音声操作は共通ヘッダー等からアクセス可能にする。
+Use the reference site's sidebar, summary cards, lists, and detail layouts. Exact colors, fonts, spacing, and chart styles are not fixed here. Check real reference screens and existing code to match them. Make language, notifications, and voice controls accessible from a shared header or similar area.
 
-## 9. 1Aで操作可能にするデモシナリオ
+## 9. Interactive demo scenarios for 1A
 
-### S01：部屋から空調を操作
+### S01: Control AC from a room
 
-1. 自宅／オフィス→階→部屋→空調を選択。
-2. 現在温度と設定温度を別表示。
-3. 設定温度・電源を変更。
-4. デモの要求中→成功／失敗を表示し、操作履歴を更新。
-5. オフライン設備では成功表示せず、再試行や状態確認に進める。
+1. Select home/office → floor → room → AC.
+2. Show current and set temperatures separately.
+3. Change set temperature/power.
+4. Show demo requested → success/failure and update action history.
+5. For offline units, do not show success; offer retry or status checking.
 
-### S02：異常から保守完了
+### S02: From fault to maintenance completion
 
-1. 空調にフィルター点検推奨などのデモ異常を発生。
-2. クライアントとHQに同じ異常を表示。
-3. HQが担当技術者に割り当て。
-4. 技術者が根拠データを確認し、チェックリストと作業報告を記録。
-5. 完了後にクライアントの保守履歴とHQの進捗を更新。
-6. 作業完了と異常解消を区別。再測定等のデモ操作で異常を解消する。
+1. Trigger a demo alert such as a filter inspection recommendation.
+2. Show the same alert to client and HQ.
+3. HQ assigns a technician.
+4. The technician checks evidence and records a checklist/work report.
+5. After completion, update client maintenance history and HQ progress.
+6. Separate work completion from alert resolution. Resolve the alert through a demo remeasurement or similar action.
 
-### S03：支払いと運転制限
+### S03: Payments and operating restrictions
 
-1. 支払い遅延の契約に予告を作成。
-2. クライアントに理由、期限、制限内容、支払い導線を表示。
-3. HQが制限開始を確認。猶予・例外・取消を表現。
-4. 顧客がデモ決済を行い、入金確認後に解除要求へ進む。
-5. 制限・解除操作と機器反映を区別し、オフライン時は保留表示。
-6. 全操作を監査履歴に記録。
+1. Create advance notice for an overdue contract.
+2. Show the client the reason, deadline, restriction details, and payment link.
+3. HQ confirms restriction start; show grace periods, exceptions, and cancellation.
+4. The customer makes a demo payment; after receipt confirmation, proceed to release requested.
+5. Separate restriction/release actions from device application; show pending when offline.
+6. Record all actions in audit history.
 
-デモ決済は本物のカード情報を要求しない。WhatsApp・メールは送信プレビュー／シミュレーションとし、外部への実送信は行わない。
+Demo payments do not ask for real card data. WhatsApp/email use send previews/simulation without real external sending.
 
-### S04：空気環境と換気
+### S04: Air quality and ventilation
 
-1. デモCO₂濃度上昇により換気推奨を表示。
-2. 換気設備なしの場合は利用者への案内にする。
-3. 対応換気設備ありの構成では、換気要求のデモを表示。
-4. しきい値はデモ設定として管理し、健康安全を保証する表示をしない。
+1. Show ventilation advice after a demo CO₂ rise.
+2. If no ventilation equipment exists, give user guidance.
+3. With supported equipment, show a demo ventilation request.
+4. Manage thresholds as demo settings; do not display health/safety guarantees.
 
-### S05：電力・排出量
+### S05: Power and emissions
 
-1. 期間・設備で絞り込み、実績と基準値を比較。
-2. 推定節約額・排出量・削減量と算定条件を表示。
-3. 欠測がある場合はデータ品質を表示。
-4. MRVのレポートプレビュー、オフセットのデモ記録へ進む。
+1. Filter by period/unit and compare actual use with baseline.
+2. Show estimated cost savings, emissions, reductions, and calculation conditions.
+3. Show data quality when readings are missing.
+4. Proceed to MRV report previews and demo offset records.
 
-### S06：IoT異常
+### S06: IoT faults
 
-通信断と取り外し検知を別々に再現し、HQ・技術者に通知。復旧時刻と対応履歴を記録する。
+Reproduce communication loss and removal detection separately; notify HQ/technicians. Record recovery times and response history.
 
-### S07：言語・音声
+### S07: Language and voice
 
-選択言語で主要画面と通知を切り替え、音声による「部屋の温度確認」「設定温度変更」の導線を示す。音声未対応・マイク拒否時はテキスト入力へ戻れるようにする。本物の音声認識を使うか、明示したシミュレーションにするかを実装結果に記載する。
+Switch key screens and notifications to the chosen language. Show voice flows for room-temperature queries and set-temperature changes. Allow text fallback when voice is unsupported or microphone access is denied. State in the implementation result whether real speech recognition or a clearly labeled simulation is used.
 
-## 10. データと権限の実装案
+## 10. Proposed data and permission implementation
 
-### 主なデータモデル
+### Main data models
 
-| エンティティ | 主要情報・関係 |
+| Entity | Main information/relationships |
 |---|---|
-| User／Membership | 組織、役割、社内・外部区分、担当範囲 |
-| Property／Space | 顧客、自宅・オフィス、エリア・階・部屋の階層 |
-| ACUnit | 場所、メーカー、型番、形式、設置日、対応機能 |
-| Device／Sensor | 空調ID、シリアル、センサー種別、最終通信、FW、校正 |
-| Telemetry | 機器、指標、時刻、値、単位、データ品質 |
-| Command | 設備、操作者、要求、状態、機器応答、失敗理由 |
-| Alert | 設備、種類、重要度、根拠、検知・確認・解消時刻 |
-| MaintenanceJob | 設備、種類、担当、期限、状態、報告、写真 |
-| Contract／Invoice／Payment | 顧客・設備、プラン、請求期限、入金状態 |
-| Restriction | 契約、予告、制限内容、例外、実行・解除状態 |
-| Automation | 条件、対象設備、動作、有効状態 |
-| Notification／AuditEvent | 宛先、チャネル、配信状態／操作主体と変更内容 |
-| EnergyBaseline／EmissionFactor | 基準モデル、地域、期間、係数、版 |
-| MRVReport／OffsetRecord | 算定期間、根拠、検証、クレジット・償却証明 |
+| User/Membership | Organization, role, internal/external type, assigned scope |
+| Property/Space | Customer, home/office, area/floor/room hierarchy |
+| ACUnit | Location, brand, model, type, installation date, capabilities |
+| Device/Sensor | AC ID, serial, sensor type, last contact, firmware, calibration |
+| Telemetry | Device, metric, time, value, unit, data quality |
+| Command | Unit, actor, request, state, device response, failure reason |
+| Alert | Unit, type, severity, evidence, detection/acknowledgment/resolution times |
+| MaintenanceJob | Unit, type, assignee, deadline, state, report, photos |
+| Contract/Invoice/Payment | Customer/unit, plan, payment deadline, receipt state |
+| Restriction | Contract, notice, restriction details, exceptions, execution/release state |
+| Automation | Conditions, target units, actions, enabled state |
+| Notification/AuditEvent | Recipient, channel, delivery state / actor and changes |
+| EnergyBaseline/EmissionFactor | Baseline model, region, period, factor, version |
+| MRVReport/OffsetRecord | Calculation period, evidence, verification, credit/retirement proof |
 
-### 権限方針
+### Permission policy
 
-- クライアント：本人／所属組織が利用する設備・契約のみ。
-- 社内技術者：担当範囲の設備・案件。請求・制限権限は付与しない。
-- 外部技術者：割り当て案件・設備・期間に限定。
-- HQ：管理対象組織内の全体管理。高影響操作は独立した権限で管理。
-- 1Aのデモ役割切替は本番認証・認可の代替ではない。1BではAPI側で検証する。
+- Client: only units/contracts used by themselves or their organization.
+- Internal technician: units/jobs in assigned scope; no billing/restriction permissions.
+- External technician: assigned jobs, units, and periods only.
+- HQ: overall management within managed organizations; separate permissions for high-impact actions.
+- 1A demo role switching does not replace production authentication/authorization. Validate on the API side in 1B.
 
-### 状態管理の例
+### State management examples
 
-- コマンド：requested → sent → acknowledged、またはfailed／expired。
-- アラート：open → acknowledged → resolved。
-- 保守：requested → assigned → in_progress → completed（取消・再対応も考慮）。
-- 制限：scheduled → requested → applied → release_requested → released（失敗・取消も表現）。
+- Command: requested → sent → acknowledged, or failed/expired.
+- Alert: open → acknowledged → resolved.
+- Maintenance: requested → assigned → in_progress → completed (also consider cancellation/rework).
+- Restriction: scheduled → requested → applied → release_requested → released (also show failures/cancellation).
 
-これらの状態名は実装案。既存モデルがあれば整合させる。
+These state names are proposals. Align with existing models if present.
 
-## 11. 技術方針・仮置き
+## 11. Technical policy and provisional choices
 
-- 技術スタックは未指定。既存リポジトリがあればそれを優先する。
-- 新規で技術選択が必要な場合の案：TypeScript＋React／Next.js、既存に合うUI・グラフライブラリ。これは確定仕様ではない。
-- 1Aは共有デモストアで、役割を切り替えても同じ設備・請求・案件の状態が見えるようにする。
-- デモデータをリセットできるようにする。再読込時の保持方式は実装側で選び、READMEに記載。
-- UIとデータ取得・操作サービスを分離し、後続でAPIアダプターに差し替えられるようにする。
-- IoTプロトコル、クラウド、DB、決済会社、通知プロバイダー、炭素プラットフォームは未選定。勝手に本番契約・接続しない。
-- 全言語対応を完成したと主張しない。言語キー方式で拡張可能にし、初期デモ言語は英語を基本とする案。追加言語は日本語・マレー語を候補として記録する。初期言語セットは未確定。
-- 参考サイトのRM表示を採用する場合も、対象国・通貨の決定とは扱わず、設定可能なデモ値にする。
-- デモ顧客・住所・センサー値は架空とし、参考サイトの個人情報らしきデータをそのままコピーしない。
+- No technology stack is specified. Prefer an existing repository's stack.
+- If a new choice is needed: TypeScript + React/Next.js and compatible UI/chart libraries are proposed, not confirmed specifications.
+- 1A uses a shared demo store so role switches show the same unit/invoice/job states.
+- Allow demo data reset. Implementation chooses reload persistence and documents it in README.
+- Separate UI from data access/action services for later API adapter replacement.
+- IoT protocols, cloud, database, payment provider, notification provider, and carbon platform are unselected. Do not make production contracts or connections without authorization.
+- Do not claim complete support for every language. Use extensible translation keys. English is proposed as the main initial demo language; record Japanese/Malay as candidates. The initial language set is unconfirmed.
+- Even if using the reference site's RM display, treat it as a configurable demo value, not a target country/currency decision.
+- Use fictional customers, addresses, and readings; do not directly copy apparent personal data from the reference site.
 
-## 12. 実装順序案
+## 12. Proposed implementation order
 
-1. リポジトリ、実行方法、既存機能、参考サイトを確認し、再利用できる部分を整理。
-2. アプリの共通レイアウト、3役割の導線、言語キー、共有デモストアを実装。
-3. 物件・部屋・設備一覧、設備詳細、操作パネルを実装。
-4. アラート→担当割当→作業→完了の役割横断フローを実装。
-5. 契約・支払い→予告→制限→解除のデモを実装。
-6. 空気環境・省エネ・自動運転・IoT管理画面を実装。
-7. 音声導線、MRV・オフセットのデモ、通知・監査を接続。
-8. 主要シナリオ、権限別表示、スマートフォン表示、エラー・空状態を確認。
-9. README、起動方法、操作例、モック範囲、後続課題を整理して引き渡す。
+1. Check repository, execution steps, existing features, and reference site; identify reusable parts.
+2. Implement shared layout, three-role navigation, translation keys, and shared demo store.
+3. Implement property/room/unit lists, unit details, and control panel.
+4. Implement alert → assignment → work → completion across roles.
+5. Implement contract/payment → notice → restriction → release demo.
+6. Implement air-quality, energy-saving, automation, and IoT management screens.
+7. Connect voice flows, MRV/offset demos, notifications, and audits.
+8. Check main scenarios, role visibility, mobile layouts, errors, and empty states.
+9. Prepare README, startup steps, examples, mock scope, and later tasks for handover.
 
-画面数が多い場合も、見た目だけのリンク切れメニューで完成扱いにしない。詳細未実装の将来機能は、その範囲を明示する。
+Even with many screens, menus with broken links are not completion. Clearly state the scope of future features whose details are unimplemented.
 
-## 13. 1Aの完了条件
+## 13. 1A completion criteria
 
-- [ ] 3役割にアクセスでき、異なる情報と操作が表示される。
-- [ ] 技術者の社内・外部区分と担当範囲がデモに反映されている。
-- [ ] 物件・階・部屋・設備を辿って詳細を開ける。
-- [ ] 設定温度と室温、操作要求と実際の反映を区別している。
-- [ ] S01〜S07の導線が動作する。シミュレーション部分は明示されている。
-- [ ] 顧客・技術者・HQの間で同じ設備・案件・請求の状態が整合する。
-- [ ] 赤・オレンジ・緑に文字・アイコンを併用し、欠測・通信断を正常扱いしない。
-- [ ] RTO契約がない一般保守の設備も表示・操作できる。
-- [ ] 電力・空気環境・排出量の指標、単位、実測・推定・デモが区別されている。
-- [ ] 未対応機種の操作は無効化・理由表示できる。
-- [ ] 音声未対応・マイク拒否時にテキスト入力で操作できる。
-- [ ] 一般的なスマートフォン幅で主要操作に支障がない。
-- [ ] 本物の決済・通知送信・空調停止・クレジット購入を行わない。
-- [ ] 主要フローの確認結果と、既存プロジェクトで必要なビルド等の結果を報告する。
-- [ ] READMEに起動方法、デモ切替、リセット、実装済み・未実装・モック範囲を記載する。
+- [ ] All three roles are accessible with different information/actions.
+- [ ] Internal/external technician types and assigned scope appear in the demo.
+- [ ] Users can follow property → floor → room → unit to details.
+- [ ] Set/room temperatures and requested/applied actions are distinct.
+- [ ] S01–S07 flows work; simulations are clearly labeled.
+- [ ] Unit/job/invoice states agree across customer, technician, and HQ views.
+- [ ] Red/orange/green also use text/icons; missing data/communication loss are not normal.
+- [ ] General-maintenance units without RTO contracts can be viewed/controlled.
+- [ ] Power, air quality, and emissions have distinct metrics, units, and measured/estimated/demo labels.
+- [ ] Unsupported model actions are disabled with reasons.
+- [ ] Text input works when voice is unsupported or microphone access is denied.
+- [ ] Main actions work at common smartphone widths.
+- [ ] No real payments, notification sending, AC stops, or credit purchases occur.
+- [ ] Report main-flow checks and required existing-project build/check results.
+- [ ] README covers startup, demo switching, reset, implemented/unimplemented features, and mock scope.
 
-## 14. 本番実装前に決める事項
+## 14. Decisions before production implementation
 
-UI段階では仮値で進められるが、実機接続や商用運用の前には確定が必要。
+The UI phase can use provisional values, but these must be settled before real device connections or commercial operation.
 
-| 項目 | 未決定内容 |
+| Topic | Open decisions |
 |---|---|
-| 対象市場 | 国、通貨、言語、電力料金、適用する契約・通知ルール |
-| 空調の対象 | 初期メーカー・型番、接続方式、可能な監視・制御 |
-| ハードウェア | センサー、電源、通信、設置方法、コスト、取り外し検知方式 |
-| 異常診断 | 指標、測定周期、しきい値、検証データ、誤検知への対応 |
-| 運転制限 | 制限方法、猶予、例外、通知条件、復旧・通信断時の動作 |
-| 決済・通知 | 決済会社、Webhook、メール・WhatsApp・プッシュの実接続 |
-| 自動運転 | 在室判定、位置情報、天候、料金、太陽光・蓄電池の取得元 |
-| MRV・オフセット | 基準モデル、排出係数、検証方法、制度、外部プラットフォーム |
-| 運用 | テナント境界、保管期間、監査、復旧、ファームウェア更新方式 |
-| 提供方法 | 既存サイト拡張か新規か、ホスティング・公開範囲 |
+| Target market | Country, currency, language, electricity rates, applicable contract/notification rules |
+| AC scope | Initial brands/models, connection methods, available monitoring/control |
+| Hardware | Sensors, power, communication, installation, cost, removal detection |
+| Fault diagnosis | Metrics, sampling intervals, thresholds, validation data, false-positive handling |
+| Restrictions | Methods, grace periods, exceptions, notice conditions, recovery/communication-loss behavior |
+| Payments/notifications | Payment provider, Webhooks, real email/WhatsApp/push connections |
+| Automation | Sources for occupancy, location, weather, rates, solar/battery data |
+| MRV/offsets | Baseline models, emission factors, verification, schemes, external platforms |
+| Operations | Tenant boundaries, retention, audit, recovery, firmware update methods |
+| Delivery | Extend an existing site or build new; hosting/public access scope |
 
-## 15. Codexからの最終報告に含めるもの
+## 15. What Codex's final report should include
 
-- 実装した画面・ユーザーフロー。
-- 起動・確認方法と、提供可能な場合のプレビュー。
-- 確認したシナリオと結果。
-- デモ／未実装／実接続済みの区分。
-- 採用した仮定、次に必要な意思決定。
-- 1Bへ引き継ぐAPI・データ・IoTの接続箇所。
+- Implemented screens and user flows.
+- Startup/check instructions and a preview if available.
+- Scenarios checked and results.
+- Demo/unimplemented/real-connected distinctions.
+- Adopted assumptions and next decisions.
+- API/data/IoT connection points to hand over to 1B.
 
-この資料の範囲を超えて、本番の外部連携、請求、機器制御、公開設定の変更が承認済みであるとは解釈しない。
+Do not interpret this document as approval for production integrations, billing, device control, or public-access changes beyond its scope.

@@ -1,5 +1,5 @@
 {
-  "reviewer": "独立G1レビュー担当AI（別エージェント）",
+  "reviewer": "Independent G1 review AI (another agent)",
   "spec_baseline_id": "048ffcef25f8463bca33346f5bb1dd8dbb1fdad03b61132d1cfc5d17ebeb1ac2",
   "gate_result": "fail",
   "findings": [
@@ -8,217 +8,217 @@
       "severity": "MAJOR",
       "document": "02-design/operation-catalog.csv; 02-design/strict-review-contracts.md; 02-design/review-resolution-contracts.md; 02-design/implementation-contracts.md; 01-requirements/technician.md; 04-agentic-sdlc/acceptance-review-019.csv",
       "location": "operation-catalog.csv:3,20,35,37,45; strict-review-contracts.md:24 (SR03); review-resolution-contracts.md:343,345,430 (IR49/IR67); implementation-contracts.md:240,288; technician.md:201 (AT-T07-N),284 (AT-T11-E),308 (AT-T12-N); acceptance-review-019.csv:22 (AT-REV19-021)",
-      "summary": "社内技術者が案件なしで行う書込み（alerts.acknowledge、devices.addResponseNote/calibrate/updateFirmware）の認可が、カタログのassigned-valid-job・SR03とAT-T07-N/T12-N/T11-E③/AT-REV19-021で矛盾し、カタログ認可列の修飾語も未定義。AT-T11-E③のOFFLINEはIR67のfailureCodeと区別されていない"
+      "summary": "Internal-technician writes without jobs (alerts.acknowledge, devices.addResponseNote/calibrate/updateFirmware) conflict between catalog assigned-valid-job/SR03 and AT-T07-N/T12-N/T11-E③/AT-REV19-021; catalog qualifiers are undefined. AT-T11-E③ OFFLINE is not distinguished from IR67 failureCode."
     },
     {
       "id": "G1-002",
       "severity": "MAJOR",
       "document": "02-design/implementation-contracts.md; 02-design/service-contracts.ts; 02-design/deterministic-contracts.md; 02-design/review-resolution-contracts.md; 01-requirements/contractor.md",
       "location": "implementation-contracts.md:190-205; service-contracts.ts:108,166; review-resolution-contracts.md:64 (IR10); deterministic-contracts.md:121-129,169; contractor.md:115 (AT-P03-N④)",
-      "summary": "業務イベント（依頼・委託・受諾・割当・報告提出/差戻し・完了・入金確認・機器障害等）の通知のtemplateKey/type/channel/deliveryState/宛先Membershipが未定義で、templateKey enumにも対応値が無い"
+      "summary": "Business-event notifications (requests/offers/acceptance/assignment/report submission/return/completion/payment confirmation/device faults, etc.) lack templateKey/type/channel/deliveryState/recipient Membership rules and matching enum values."
     },
     {
       "id": "G1-003",
       "severity": "MAJOR",
       "document": "02-design/review-resolution-contracts.md; 02-design/admin.md; 02-design/common.md; 01-requirements/admin.md; 02-design/service-contracts.ts",
       "location": "review-resolution-contracts.md:236,240 (IR35); 02-design/admin.md:55,395 (DD-A10); 02-design/common.md:181,185; 01-requirements/admin.md:275 (AT-A10-E④),276 (AT-A10-B②)",
-      "summary": "requested/appliedの制限へのrestrictions.cancelの結果が、IR35（解除要求の起動経路は3つだけ）とDD-A10・common.md §5・AT-A10-B②/E④（取消で解除要求へ進む）で矛盾し、遷移表とreleaseIntent.sourceが未定義"
+      "summary": "restrictions.cancel for requested/applied conflicts between IR35 (only three release-start paths) and DD-A10/common.md §5/AT-A10-B②/E④ (cancel starts release). Transition table and releaseIntent.source are undefined."
     },
     {
       "id": "G1-004",
       "severity": "MAJOR",
       "document": "04-agentic-sdlc/fixture-contract.json; 02-design/deterministic-contracts.md; 02-design/review-resolution-contracts.md; 01-requirements/client.md; 01-requirements/admin.md",
       "location": "fixture-contract.json:1816-1879 (AT-C06-E.3); deterministic-contracts.md:101 (D07 power/kW:[0,100]); review-resolution-contracts.md:74 (IR12),438 (IR69); client.md:178; admin.md:344-345; acceptance-review-019.csv:42; acceptance-fixes.csv:18",
-      "summary": "AT-C06-E.3（AT-A13-E/B、AT-REV18-024、AT-REV19-041）のfixtureが範囲外の120 kWをquality=validで置き、D07/IR12の範囲外→suspect・集計除外と矛盾する"
+      "summary": "AT-C06-E.3 fixtures (AT-A13-E/B, AT-REV18-024, AT-REV19-041) set out-of-range 120kW as valid, conflicting with D07/IR12 suspect/exclusion rules."
     },
     {
       "id": "G1-005",
       "severity": "MAJOR",
       "document": "01-requirements/admin.md; 04-agentic-sdlc/fixture-contract.json; 02-design/review-resolution-contracts.md; 02-design/strict-review-contracts.md; 02-design/admin.md",
       "location": "01-requirements/admin.md:324 (AT-A12-N),326 (AT-A12-B); fixture-contract.json:1006-1045,1158-1162; review-resolution-contracts.md:131 (IR21),282 (IR43); strict-review-contracts.md:159 (SR25); 02-design/admin.md:452",
-      "summary": "AT-A12-N/Bの換気非対応設備unit-non-rto（device-tamper）にCO₂センサーが無く、IR21/SR25により『通知のみ』が成立しない。評価に使う値・継続秒数・recoveryThresholdも未指定"
+      "summary": "AT-A12-N/B unit-non-rto/device-tamper has no CO₂ Sensor, so notification-only behavior cannot hold under IR21/SR25. Evaluation values, duration, and recoveryThreshold are also unspecified."
     },
     {
       "id": "G1-006",
       "severity": "MAJOR",
       "document": "02-design/service-contracts.ts; 02-design/deterministic-contracts.md; 02-design/client.md; 02-design/admin.md; 01-requirements/client.md; 01-requirements/admin.md; 04-agentic-sdlc/fixture-contract.json",
       "location": "service-contracts.ts:142,316-317; deterministic-contracts.md:173; 02-design/client.md:252; 02-design/admin.md:434-440; client.md:189 (AT-C07-SRC); admin.md:311 (AT-A12-SRC); review-resolution-contracts.md:438,682,687",
-      "summary": "allergenObservation（BIZ-18）の取得元データ・availabilityの導出規則・demoSeed/patch/DemoTriggerの投入経路が無く、AT-C07-SRC/AT-A12-SRCを作れない"
+      "summary": "allergenObservation (BIZ-18) has no source data, availability derivation, or demoSeed/patch/DemoTrigger input path; AT-C07-SRC/AT-A12-SRC cannot be built."
     },
     {
       "id": "G1-007",
       "severity": "MAJOR",
       "document": "01-requirements/client.md; 02-design/client.md; 02-design/deterministic-contracts.md",
       "location": "client.md:195-196,202 (AT-C07-N②); 02-design/client.md:272-277; deterministic-contracts.md:119",
-      "summary": "顧客の空気環境画面で『換気を推奨』『清掃の案内』を表示する条件（指標・閾値・品質）が未定義で、AT-C07-N②を判定できない"
+      "summary": "Customer air-screen ventilation/cleaning guidance lacks metric/threshold/quality conditions; AT-C07-N② cannot be assessed."
     },
     {
       "id": "G1-008",
       "severity": "MAJOR",
       "document": "02-design/technician.md; 02-design/implementation-contracts.md; 02-design/service-contracts.ts; 01-requirements/technician.md",
       "location": "02-design/technician.md:94,288-293; implementation-contracts.md:119; service-contracts.ts:43; technician.md:138 (AT-T04-N),157 (AT-T05-N),176 (AT-T06-N),220 (AT-T08-N),239 (AT-T09-N)",
-      "summary": "提出時の必須点検項目集合（UnitDetail.componentsの導出）が未定義で、AT-T04/T05/T06/T08/T09-Nの『提出成功』に必要な他グループの点検結果・workText・nextActionが前提に無い"
+      "summary": "Required inspection set on submission (UnitDetail.components derivation) is undefined. AT-T04/T05/T06/T08/T09-N lacks other-group results/workText/nextAction needed for success."
     },
     {
       "id": "G1-009",
       "severity": "MAJOR",
       "document": "01-requirements/admin.md; 02-design/admin.md; 02-design/review-resolution-contracts.md; 02-design/strict-review-contracts.md",
       "location": "01-requirements/admin.md:161 (AT-A05-N),293 (AT-A11-N),324 (AT-A12-N); 02-design/admin.md:219-229,235; review-resolution-contracts.md:48 (IR07); strict-review-contracts.md:137-139,181,183",
-      "summary": "AT-A05-N（A11-N/A12-N）の保存入力に必須項目とenabledが無く、IR07の新規既定enabled=falseとSR28の補完禁止により期待結果（Alert/通知生成）に到達しない。『プレビュー』とinApp=simulatedの区別も曖昧"
+      "summary": "AT-A05-N (also A11-N/A12-N) omits required fields and enabled. IR07 default enabled=false and SR28 no-invented-defaults rule prevent expected Alert/notification generation. Preview versus inApp simulated is also unclear."
     },
     {
       "id": "G1-010",
       "severity": "MAJOR",
       "document": "01-requirements/client.md; 04-agentic-sdlc/acceptance-fixes.csv; 04-agentic-sdlc/fixture-contract.json; 02-design/review-resolution-contracts.md; 02-design/deterministic-contracts.md",
       "location": "client.md:140 (AT-C04-E③); acceptance-fixes.csv:20 (AT-FIX-019); fixture-contract.json:14-15,371; review-resolution-contracts.md:246 (IR36),678 (IR92); deterministic-contracts.md:18-21,141",
-      "summary": "AT-C04-E③/AT-FIX-019が時計を2026-03-07/2026-10-31に置くが、全actorのMembership有効期間[2026-09-01,2026-10-01)の外で、期待値VALIDATIONが一意に決まらない（DST検証のD01順位も未定義）"
+      "summary": "AT-C04-E③/AT-FIX-019 use 2026-03-07/2026-10-31 outside all Membership validity [2026-09-01,2026-10-01), so expected VALIDATION is ambiguous; DST validation priority in D01 is undefined."
     },
     {
       "id": "G1-011",
       "severity": "MAJOR",
       "document": "04-agentic-sdlc/acceptance-review-019.csv; 02-design/review-resolution-contracts.md; 02-design/deterministic-contracts.md; 04-agentic-sdlc/fixture-contract.json",
       "location": "acceptance-review-019.csv:3,16 (AT-REV19-015),38; review-resolution-contracts.md:438,629,631 (IR89); deterministic-contracts.md:93 (D06); fixture-contract.json:1501-1504,1533-1536",
-      "summary": "AT-REV19-015はAssignment.scheduledEndだけをpatchするが、IR89の『作業窓終了・再割当が必要』はJob.scheduledSlot.endAt（seedでは2026-09-20）で判定するため期待結果が出ない。validUntilとの不一致も残る"
+      "summary": "AT-REV19-015 patches only Assignment.scheduledEnd, not Job.scheduledSlot.endAt or validUntil, so IR89 expected display cannot appear. AT-REV19-002/037 have the same synchronization gap."
     },
     {
       "id": "G1-012",
       "severity": "MAJOR",
       "document": "04-agentic-sdlc/acceptance-review-017.csv; 04-agentic-sdlc/acceptance-review-018.csv; 04-agentic-sdlc/verification.md; 02-design/review-resolution-contracts.md; 02-design/deterministic-contracts.md",
       "location": "acceptance-review-017.csv:5 (AT-REV17-004),6 (AT-REV17-005),15 (AT-REV17-014); acceptance-review-018.csv:4 (AT-REV18-003),14; verification.md:209-219; review-resolution-contracts.md:329 (IR47),390 (IR57),513 (IR74); deterministic-contracts.md:87,192",
-      "summary": "実施必須の旧受入計画の期待値が現行規範・seedと矛盾: AT-REV17-014（IR57/AT-REV18-013④）、AT-REV17-004のdueAt 12:00Z（IR74でKL時刻）、AT-REV17-005のunit-non-rto archive（D05とseedのbinding/契約）、AT-REV18-003の電源断後の受付（IR47）"
+      "summary": "Old acceptance expectations/premises required by verification.md (AT-REV17-014/004/005 and AT-REV18-003) conflict with current IR57/IR74/D05/IR47 and seed."
     },
     {
       "id": "G1-013",
       "severity": "MINOR",
       "document": "02-design/service-contracts.ts; 02-design/review-resolution-contracts.md; 02-design/operation-catalog.csv",
       "location": "service-contracts.ts:84,86; review-resolution-contracts.md:26 (IR03),236 (IR35)",
-      "summary": "IR35で保存するreleaseIntentが正規型に無く内部値の宣言も無いため、override専用者のreconcile/retry可否をUIが判定できない"
+      "summary": "releaseIntent required by IR35 and override-only tracking is absent from canonical Restriction/RestrictionReleaseView and not declared internal-only; UI availability cannot be determined."
     },
     {
       "id": "G1-014",
       "severity": "MINOR",
       "document": "03-uiux/screen-catalog.csv; 02-design/review-resolution-contracts.md; 02-design/client.md",
       "location": "screen-catalog.csv:8 (SCR-C08); review-resolution-contracts.md:355 (IR51); 02-design/client.md:298-303; client.md:229",
-      "summary": "IR51はFR-C08で未対応件数（alertCount）を別表示するとするが、SCR-C08にsummaries.getもalertCount欄も無い"
+      "summary": "IR51 requires separate alertCount on C08, but SCR-C08 lacks summaries.get and DD-C08 has no field; AT-C08-B observation screen is unclear."
     },
     {
       "id": "G1-015",
       "severity": "MINOR",
       "document": "01-requirements/client.md; 02-design/service-contracts.ts",
       "location": "client.md:310 (AT-C12-E①); service-contracts.ts:83",
-      "summary": "AT-C12-E①の『offline台はpending』がreleaseStateのenumに無く、観測値が一意でない"
+      "summary": "AT-C12-E① pending is not a releaseState value; observation time and requested/failed expectations are unspecified."
     },
     {
       "id": "G1-016",
       "severity": "MINOR",
       "document": "03-uiux/UIUXSpecification.md; 03-uiux/component-contracts.csv",
       "location": "UIUXSpecification.md:142,146,147; component-contracts.csv:2,4,5",
-      "summary": "StatusBadge/CommandPanel/ConfirmActionDialogのpropsがUX-05とComponent契約で異なる"
+      "summary": "UX-05 shared Component props differ from component-contracts.csv; old descriptions remain despite IR72 priority."
     },
     {
       "id": "G1-017",
       "severity": "MINOR",
       "document": "03-uiux/screen-catalog.csv; 02-design/contractor.md",
       "location": "screen-catalog.csv:15 (SCR-P03); 02-design/contractor.md:122; deterministic-contracts.md:145; strict-review-contracts.md:80",
-      "summary": "DD-P03はjobIdを必須とするが、SCR-P03のURL許可キーにjobIdが無く、対象案件を指定した遷移・Back復元ができない"
+      "summary": "SCR-P03 url_selection lacks required jobId, preventing targeted navigation and Back restoration."
     },
     {
       "id": "G1-018",
       "severity": "MINOR",
       "document": "02-design/deterministic-contracts.md; 02-design/review-resolution-contracts.md; 04-agentic-sdlc/acceptance-review-019.csv",
       "location": "deterministic-contracts.md:93 (D06); review-resolution-contracts.md:345,631; acceptance-review-019.csv:38",
-      "summary": "延長・再割当で置き換える旧Assignmentを重複判定から除外するかが未定義で、AT-REV19-037の重なる新枠がCONFLICTになり得る"
+      "summary": "D06 overlap checks do not exclude the old Assignment replaced during extension/reassignment; AT-REV19-037 overlaps it."
     },
     {
       "id": "G1-019",
       "severity": "MINOR",
       "document": "02-design/review-resolution-contracts.md; 01-requirements/admin.md; 01-requirements/client.md; 04-agentic-sdlc/fixture-contract.json",
       "location": "review-resolution-contracts.md:195,669,681; admin.md:276 (AT-A10-B); client.md:311 (AT-C12-B); fixture-contract.json acceptancePatches AT-P01-N",
-      "summary": "IR92規則4の状態フィールドだけのpatchが、perUnit/Command/observedRestrictionや報告版と整合しない到達不能な状態を作り、副作用が未定義"
+      "summary": "State-only patches create inconsistent Restriction perUnit/Command/observation combinations and submitted Jobs without report versions/contributors."
     },
     {
       "id": "G1-020",
       "severity": "MINOR",
       "document": "01-requirements/admin.md; 02-design/service-contracts.ts; 02-design/review-resolution-contracts.md",
       "location": "admin.md:362 (BR-A14),369 (AT-A14-E); service-contracts.ts:112; review-resolution-contracts.md:617 (IR88)",
-      "summary": "EmissionFactorに単位欄が無く、BR-A14の単位必須とAT-A14-Eの『係数の単位不一致』を作れない"
+      "summary": "EmissionFactor has no unit field and uses fixed kgCO2ePerKWh, so AT-A14-E unit mismatch and BR-A14 required-unit validation cannot be tested."
     },
     {
       "id": "G1-021",
       "severity": "MINOR",
       "document": "01-requirements/contractor.md; 02-design/technician.md; 02-design/service-contracts.ts",
       "location": "contractor.md:161 (AT-P05-B③); 02-design/technician.md:148,289; service-contracts.ts:70",
-      "summary": "AT-P05-B③の『未点検あり理由なし』の提出済み報告は提出検証で到達不能で、ReviewAvailabilityにも対応理由が無い"
+      "summary": "AT-P05-B③ requires an unreachable submitted report with reasonless not_inspected and a nonexistent ReviewAvailability reason."
     },
     {
       "id": "G1-022",
       "severity": "MINOR",
       "document": "01-requirements/client.md; 02-design/service-contracts.ts",
       "location": "client.md:152 (BR-C05),160 (AT-C05-B①); service-contracts.ts:99",
-      "summary": "『一般同意』に当たるデータ・操作が無く、AT-C05-B①の前提を作れない"
+      "summary": "AT-C05-B① general consent has no data model or operation."
     },
     {
       "id": "G1-023",
       "severity": "MINOR",
       "document": "01-requirements/technician.md; 02-design/service-contracts.ts; 02-design/strict-review-contracts.md",
       "location": "technician.md:309 (AT-T12-E②); service-contracts.ts:142; strict-review-contracts.md:133 (SR20)",
-      "summary": "AT-T12-E②の『古いheartbeat』を投入するDemoTriggerが無く、再現手順が未定義"
+      "summary": "AT-T12-E② old heartbeat has no DemoTrigger or concrete reproduction values."
     },
     {
       "id": "G1-024",
       "severity": "MINOR",
       "document": "01-requirements/client.md; 01-requirements/admin.md; 01-requirements/technician.md; 02-design/deterministic-contracts.md; 02-design/service-contracts.ts",
       "location": "client.md:246 (AT-C09-N),340 (AT-C13-N); admin.md:399 (AT-A15-N); technician.md:258 (AT-T10-N),283 (AT-T11-N); deterministic-contracts.md:81,177; service-contracts.ts:217",
-      "summary": "期待値には影響しないが必須の入力・手順（purpose、startAction、先行Commandのack待ち、割当枠、checkの成功イベント等）がWhenに無い"
+      "summary": "Required inputs/steps are missing in AT-C13-N/C09-N/A15-N/T10-N/T11-N, requiring prohibited guesses."
     },
     {
       "id": "G1-025",
       "severity": "MINOR",
       "document": "01-requirements/common.md; 04-agentic-sdlc/fixture-contract.json",
       "location": "01-requirements/common.md:88,97,104,113,120,127,134; fixture-contract.json demoSeed.capabilities",
-      "summary": "共通AT-X01〜X07が具体的なGiven/Thenとpatchを持たず、AT-X06の非対応機種等のfixtureがseedに無い"
+      "summary": "Common AT-X01–X07 lack concrete Given/When/Then and patch keys; AT-X06 unsupported models are absent from seed/default rules."
     },
     {
       "id": "G1-026",
       "severity": "MINOR",
       "document": "04-agentic-sdlc/verification.md; 02-design/strict-review-contracts.md; 04-agentic-sdlc/fixture-contract.json",
       "location": "verification.md:104 (S08); strict-review-contracts.md:24,88; fixture-contract.json actors tech-external-b",
-      "summary": "S08の再委託先contractor-bの技術者tech-external-bのscopeに既定設備が無く、割当時のscope検査も未定義"
+      "summary": "S08 job/unit IDs are unspecified and default unit-online-rto is outside tech-external-b scope; assignment scope checks are undefined."
     },
     {
       "id": "G1-027",
       "severity": "MINOR",
       "document": "01-requirements/client.md; 01-requirements/technician.md; 01-requirements/admin.md; 04-agentic-sdlc/fixture-contract.json; 02-design/service-contracts.ts",
       "location": "client.md:214 (AT-C08-SRC); technician.md:188 (AT-T07-SRC); admin.md:148 (AT-A05-SRC); service-contracts.ts:142",
-      "summary": "『断熱不足の点検記録』『根拠なし』のSRC fixtureにID・値・patchキーが無く、デモでinsulation_loss/inspection根拠のAlertを作る経路も無い"
+      "summary": "SRC inspection/no-evidence fixtures lack IDs/values/patch keys; the demo has no insulation_loss/inspection Alert generation path."
     },
     {
       "id": "G1-028",
       "severity": "MINOR",
       "document": "02-design/common.md; 03-uiux/component-contracts.csv; 03-uiux/screen-catalog.csv; 01-requirements/common.md",
       "location": "02-design/common.md:58; component-contracts.csv:59 (AppShell); 01-requirements/common.md:21 (FR-X01)",
-      "summary": "役割切替（demoSession.switchMembership）を呼ぶScreen/Componentの契約が無い"
+      "summary": "Role-switching Component/Screen contracts lack demoSession.switchMembership, so its call location is undefined."
     },
     {
       "id": "G1-029",
       "severity": "MINOR",
       "document": "01-requirements/admin.md; 02-design/review-resolution-contracts.md",
       "location": "admin.md:250 (AT-A09-E③); review-resolution-contracts.md:36 (IR05)",
-      "summary": "IR05ではschedule時に予告を必ず作るため、AT-A09-E③の『未通知』の制限は到達不能"
+      "summary": "AT-A09-E③ unnotified restriction is unreachable because IR05 schedule always creates notice or fails."
     },
     {
       "id": "G1-030",
       "severity": "QUESTION",
       "document": "01-requirements/contractor.md; 02-design/query-catalog.csv; 02-design/contractor.md",
       "location": "contractor.md:184 (AT-P06-N); query-catalog.csv members.capacity/members.list; 02-design/contractor.md:206-221",
-      "summary": "members.list/capacityがrole=contractorのMembership（contractor-a自身）を含むか。AT-P06-Nは技術者2名だけを期待する"
+      "summary": "It is undefined whether contractor members.list/capacity includes role=contractor Memberships; AT-P06-N expects technicians only."
     },
     {
       "id": "G1-031",
       "severity": "QUESTION",
       "document": "02-design/review-resolution-contracts.md; 01-requirements/technician.md; 01-requirements/client.md",
       "location": "review-resolution-contracts.md:308 (IR45),595 (IR85); technician.md:119-121; client.md:120,202-204",
-      "summary": "acceptancePatchesを持たない測定値・stale・sequence観測のAT（AT-T03-N/E/B、AT-C07-N/B等）をsimulator=falseで実行するかの一覧・一般規則が無い"
+      "summary": "Simulator state is not explicit for measurement/time/stale/sequence ATs without acceptancePatches; automatic copies can change expectations."
     }
   ]
 }

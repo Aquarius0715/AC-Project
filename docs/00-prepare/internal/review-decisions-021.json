@@ -2,7 +2,7 @@
   "version": "0.21.0",
   "scope": "frontend-demo-1A",
   "review_id": "INDEPENDENT-G1-DOC-0.20.0-CODEX",
-  "note": "G120-001〜005の修正で必要な可逆的なデモ具体化。企業承認を表さない。",
+  "note": "Reversible demo details needed to fix G120-001–005. These do not mean company approval.",
   "decisions": [
     {
       "id": "DEC-60",
@@ -13,7 +13,7 @@
       "proposed_by": "Codex specification correction agent",
       "proposed_at": "2026-09-17",
       "reversible": true,
-      "question": "継続成立の開始とair_quality換気候補の起動時点を一意にする",
+      "question": "Define a single start point for continuous condition duration and trigger time for air_quality ventilation candidates",
       "selected": {
         "duration_origin": "first eligible current-tick evaluation after save",
         "air_quality_candidate": "eligible only once duration condition holds; notification and control independently evaluated"
@@ -29,7 +29,7 @@
       "proposed_by": "Codex specification correction agent",
       "proposed_at": "2026-09-17",
       "reversible": true,
-      "question": "業務通知の重大度を決める",
+      "question": "Define business notification severity",
       "selected": {
         "default": "normal",
         "payment_reminder": "warning",

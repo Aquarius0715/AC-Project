@@ -24,5 +24,5 @@ implementation_status: not_started
 production_connection_readiness: NOT_READY
 deployment_approval: false
 proposed_reversible_decisions: [DEC-60, DEC-61]
-reason: 独立した2担当が最終baselineと変更差分を確認し、全修正対象と追加指摘の解消を判定した。未解決指摘0件。仕様修正担当の自己確認を独立承認として扱っていない。
+reason: Two independent reviewers checked the final baseline and changes and confirmed that all original and additional findings were resolved. Zero unresolved findings. The specification editor's self-check was not treated as independent approval.
 evidence_paths: [review.md, findings.json, contracts-review.md, ui-review.md, ../review-cycle.json, ../static-check.json, ../validator-negative-checks.json, ../baseline-integrity-check.json, ../contract-type-examples-result.json]

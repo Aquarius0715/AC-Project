@@ -1,31 +1,31 @@
-# 制作指示の記録と確認状態
+# Production instruction record and verification status
 
-更新日: 2026-09-15 / 対象: SRC-02の確認範囲と、現在の修正作業に対する指示。
+Updated: 2026-09-15 / Scope: SRC-02 verification coverage and instructions for the current corrections.
 
-この記録は企業要件SRC-06とは別の制作条件を扱う。原指示が確認できるものと、過去文書の要約からのみ把握できるものを区別する。過去のユーザー発言を復元・捏造しない。
+This record covers production conditions separate from company requirements SRC-06. It distinguishes instructions with available original records from those known only through summaries in earlier documents. Do not reconstruct or invent past user statements.
 
-## 過去の制作条件（SRC-02）
+## Earlier production conditions (SRC-02)
 
-| 条件 | 保存されている根拠 | 確認状態・現在の扱い |
+| Condition | Stored evidence | Verification status/current treatment |
 |---|---|---|
-| フロントエンド文書のみ、4役割、文書構成 | PrepareDocumentのSRC-02要約 | 原指示メッセージ・日時・参照IDは未収録。現行の制作基準として維持する |
-| Agentic SDLC、参考Loyaltyの外観に合わせる | PrepareDocument、DEC-06 | 原指示未収録。企業の明示要件・ブランド承認とは扱わない |
-| 共通ライブラリ、「reactForms」 | 内部DEC-03とUIUX仕様 | 原指示未収録。「React Hook Formと解釈」は作成者の技術提案 |
-| ワイヤフレームを作らない | UIUX仕様の対象外記述 | 明示指示の根拠未収録。現行の文書範囲として維持し、企業指定とは呼ばない |
+| Frontend documents only, four roles, document structure | SRC-02 summary in PrepareDocument | Original message, date/time, and reference ID are not archived. Keep as the current production baseline |
+| Agentic SDLC and matching the reference Loyalty appearance | PrepareDocument, DEC-06 | Original instructions not archived; not explicit company requirements or brand approval |
+| Shared libraries, “reactForms” | Internal DEC-03 and UIUX specification | Original instructions not archived; interpreting this as React Hook Form is the author's technical proposal |
+| No wireframes | Exclusion statement in UIUX specification | Evidence of an explicit instruction is not archived. Keep as current document scope, not a company instruction |
 
-上記の根拠文書は指示の二次的要約であり、原指示を検証済みであることを示さない。実際の原記録を取得できた際に引用箇所・日時・参照IDを追記する。既存範囲内の可逆的な文書修正は継続し、未収録だけを理由に都度承認待ちにしない。原文との具体的な衝突が発生した場合は、影響箇所と提案を提示して判断を求める。
+These source documents are secondary summaries, not proof that the original instructions were verified. Add quotations, dates/times, and reference IDs when actual original records become available. Continue reversible document changes within the existing scope; do not pause for approval each time merely because a record is missing. If an actual conflict with the original arises, present the affected areas and a proposal for a decision.
 
-## 現在確認できるユーザー指示
+## Currently verified user instructions
 
-記録日: 2026-09-15。現在の会話で直接受領した次の指示を記録する。発言時刻・メッセージIDは提供されていないため記載しない。
+Recorded: 2026-09-15. The following instruction was received directly in the current conversation. No statement time or message ID was provided, so neither is recorded.
 
-> ありがとうございます。レビュー事項をもとに修正を進めてください。また、レビュー資料はコミットプッシュしないでください
+> Thank you. Please make the corrections based on the review findings. Also, do not commit or push the review materials.
 
-適用: レビュー指摘に基づく仕様文書の修正は許可されている。レビュー資料はコミット・プッシュ対象から除外する。レビュー資料の指摘・修正案は作成者の評価であり、企業の追加要求や正式な業務承認へ昇格させない。
+Application: Specification changes based on review findings are authorized. Exclude review materials from commits and pushes. Findings and proposals in review materials are the author's assessment; do not promote them to additional company requirements or formal business approval.
 
-## 用語の判定
+## Term classification
 
-- **企業明示要件**: SRC-06の該当原文が直接述べている目的・要望。
-- **制作指示**: 確認できる発言原記録、または原記録未収録と明示した過去要約。
-- **設計解釈**: 例として、音声応答から音声による温度照会・機器変更へ展開する判断。
-- **設計提案**: interface、状態遷移、デモの値・制約・追加操作。PROPOSEDは業務承認済みを意味しない。
+- **Explicit company requirement**: A goal or request directly stated in the relevant SRC-06 original text.
+- **Production instruction**: A verifiable original statement or an earlier summary clearly marked as missing its original record.
+- **Design interpretation**: For example, extending voice responses into voice temperature queries and device changes.
+- **Design proposal**: Interfaces, state transitions, demo values, limits, and extra actions. PROPOSED does not mean business approval.

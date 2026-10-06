@@ -1,12 +1,12 @@
 {
   "review_id": "G1-FIX-DOC-0.19.0-2026-09-17",
-  "target": "DOC-0.19.0（commit 0505446）に対する独立G1の指摘",
+  "target": "Independent G1 findings for DOC-0.19.0 (commit 0505446)",
   "source_review": "runs/DOC-0.19.0/independent-g1/review.md",
   "corrected_baseline": "DOC-0.20.0",
-  "reviewer": "独立G1レビュー担当AI（別エージェント）",
-  "specification_editor": "修正担当AI（本会話、Opus 5）",
+  "reviewer": "Independent G1 review AI (separate agent)",
+  "specification_editor": "Correction AI (this conversation, Opus 5)",
   "initial_verdict": "FAIL",
-  "post_correction_self_rereview": "completed（自己再レビュー。G1判定ではない）",
+  "post_correction_self_rereview": "completed (self-review, not a G1 decision)",
   "independent_g1": "pending",
   "proposed_decisions": [
     "DEC-54",

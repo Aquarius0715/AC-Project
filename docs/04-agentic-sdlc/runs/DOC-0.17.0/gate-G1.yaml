@@ -2,10 +2,10 @@ gate_id: G1
 task_id: DOC-0.17.0
 gate_result: pending
 spec_baseline_id: 654be5e4973d1defe98cc875c8d585e292d58796b7205517b5a82e1b41b4d8df
-reviewer_agent: independent-review-fable-5.1 (本会話)
-specification_editor: independent-review-fable-5.1 (本会話、同一エージェント)
-orchestrator: independent-review-fable-5.1 (本会話)
-independent_post_correction_review: not_performed  # 修正後の再確認は同一エージェントの自己再レビュー。別主体による判定が必要
+reviewer_agent: independent-review-fable-5.1 (this conversation)
+specification_editor: independent-review-fable-5.1 (this conversation, same agent)
+orchestrator: independent-review-fable-5.1 (this conversation)
+independent_post_correction_review: not_performed  # The post-correction check is self-review by the same agent. A decision by another reviewer is required
 self_rereview_after_correction: completed
 application_tests: not_run
 implementation_status: not_started

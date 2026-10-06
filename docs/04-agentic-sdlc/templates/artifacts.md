@@ -1,31 +1,31 @@
-# Agentic SDLC 成果物テンプレート
+# Agentic SDLC Artifact Templates
 
-以下はコピーして使うためのテンプレートである。空欄になっている承認結果や実行結果を、事実に基づかずに埋めて完成させたことにしない。状態を表す値は、対象ごとに決まった以下のschema(型の定義)を使う。
+These templates are for copying and reuse. Do not fill blank approval or execution results without facts and claim completion. Use the following schema for each type of status.
 
-## 状態schema
+## Status schema
 
-| 対象 | フィールドと許容される値 | 完了・状態遷移のルール |
+| Target | Field and allowed values | Completion/transition rules |
 |---|---|---|
-| タスク | task_status: planned(計画中)/ready(着手可能)/in_progress(作業中)/in_review(レビュー中)/done(完了)/blocked(保留) | plannedからreadyに進むのは、依存関係・受入subcase・仕様baselineを確認した後。doneにするには、必要なゲートがpassed(合格)になっていて、証跡があること |
-| 試験 | test_result: not_run(未実行)/passed(合格)/failed(不合格)/blocked(保留) | 実行していなければnot_run。期待値が不明、または環境が足りない場合はblocked。実際の結果とすべてのsubcaseから判定する |
-| ゲート | gate_result: pending(判定待ち)/passed(合格)/failed(不合格)/blocked(保留)/stale(古くなった) | 未判定はpending。関連する仕様が変わった場合、過去にpassedだったものもstaleとして扱い、再判定の対象にする |
-| 証跡の有効性 | evidence_status: current(現行)/stale(古くなった) | 過去に行った試験の実際の結果は書き換えず、それが今の仕様にも当てはまるかどうかを別に管理する |
-| 指摘 | finding_status: open(未対応)/in_progress(対応中)/resolved(解決済み) | 修正されたことと、再検証されたことを確認してからresolvedにする |
-| 決定 | decision_status: open(未対応)/proposed(提案中)/accepted(承認済み)/rejected(却下)/superseded(別の決定に置き換え) | acceptedにするには、実際にdecided_by(決定した人)/at(日時)/answer(回答)が必要。提案の実装を許可することと、業務としての承認を混同しない |
+| Task | task_status: planned/ready/in_progress/in_review/done/blocked | Move from planned to ready only after checking dependencies, acceptance subcases, and specification baseline. done requires passing all required gates and supporting evidence |
+| Test | test_result: not_run/passed/failed/blocked | Use not_run if not executed. Use blocked if the expected result is unknown or the environment is unavailable. Decide from actual results and all subcases |
+| Gate | gate_result: pending/passed/failed/blocked/stale | Use pending before a decision. If relevant specifications change, mark earlier passes stale and reassess them |
+| Evidence validity | evidence_status: current/stale | Keep past actual test results unchanged; track separately whether they apply to the current specification |
+| Finding | finding_status: open/in_progress/resolved | Mark resolved only after confirming the fix and retest |
+| Decision | decision_status: open/proposed/accepted/rejected/superseded | accepted requires actual decided_by/at/answer values. Permission to implement a proposal is separate from business approval |
 
-文書のfront matter(先頭のメタデータ)にあるdraft/proposedなどは、文書自体の状態を表すものであり、この実行用のschemaとは別のものである。異なる種類の状態を、1つのstatus列にまとめて集計しない。
+The draft/proposed values in document front matter describe the document itself, separately from this execution schema. Do not combine different status types into one status column.
 
-## タスク入力(オーケストレーションエージェント→担当エージェント)
+## Task input (orchestration agent → assigned agent)
 
 ```yaml
 task_id: AC-000
 document_version: 0.10.0
 spec_baseline_id: null
-spec_files: [] # pathとsha256。要件・設計・AT・共通契約・出所を含む
+spec_files: [] # path and sha256; include requirements, design, ATs, common contracts, and sources
 acceptance_manifest_hash: null
 task_status: planned
 agent_role: implementation
-objective: "対象要件に対する具体的な成果"
+objective: "Concrete outcome for the assigned requirements"
 requirement_ids: [FR-C03, FR-X04]
 design_ids: [DD-C03, DD-COMMON]
 acceptance_ids: [AT-C03, AT-X04, S01]
@@ -41,7 +41,7 @@ deliverables: []
 completion_criteria: []
 ```
 
-## 引き継ぎ(すべてのエージェント共通)
+## Handoff (all agents)
 
 ```yaml
 task_id: AC-000
@@ -65,7 +65,7 @@ next_agent: test
 next_action: ""
 ```
 
-## テストケース・実行記録
+## Test cases and execution records
 
 ```yaml
 case_id: AT-C03
@@ -89,7 +89,7 @@ evidence_paths: []
 defect_id: null
 ```
 
-## レビュー指摘
+## Review findings
 
 ```yaml
 finding_id: RV-000
@@ -106,15 +106,15 @@ finding_status: open
 retest_evidence: null
 ```
 
-指摘の優先度: P0=権限を超えた操作・実際の処理の誤発火・重大なデータ破壊、P1=必須の操作の流れや状態に関わる欠陥・重要なアクセシビリティの欠陥、P2=代わりの方法がある軽い不具合、P3=改善の提案。この優先度は、要件そのものの実装優先度とは別のものである。P0/P1が未解決のままでは合格にしない。
+Finding priority: P0 = unauthorized operations, accidental real processing, or major data corruption; P1 = defects in required flows/states or major accessibility defects; P2 = minor defects with a workaround; P3 = improvement proposals. These priorities are separate from requirement implementation priorities. Do not pass with unresolved P0/P1 findings.
 
-## 人への判断依頼・決定記録
+## Human decision request and decision record
 
 ```yaml
 decision_id: OPEN-00
 task_id: AC-000
-question: "判断が必要な一点"
-source_of_required_decision: "依頼の矛盾、未確定の契約条件など具体的な根拠"
+question: "One point requiring a decision"
+source_of_required_decision: "Concrete basis, such as conflicting requests or unsettled contract terms"
 affected_ids: []
 facts: []
 prepared_artifacts: []
@@ -129,7 +129,7 @@ decided_at: null
 decision_status: open
 ```
 
-## 仕様baseline・変更の影響とゲート記録
+## Specification baseline, change impact, and gate records
 
 ```yaml
 gate_id: G1
@@ -144,12 +144,12 @@ invalidated_acceptance_ids: []
 supersedes_evidence: []
 ```
 
-spec_baseline_idとは、spec_files(pathとsha256をpathの順番で並べて固定したmanifest、つまりファイル一覧)から計算したハッシュ値である。document_version(文書のバージョン番号)が同じというだけで、同じ仕様だと判断してはいけない。まだコミットしていない差分を含めて実際のファイルをハッシュ化し、そのmanifest自体も成果物として保存する。指示の元になった記録が収録されていない場合は、その事実をassumptions(仮定)として残す。存在しない元記録について、架空のハッシュを作らない。
+spec_baseline_id is the hash calculated from spec_files (a fixed manifest of path/sha256 pairs sorted by path). The same document_version does not prove that specifications are identical. Hash the actual files, including uncommitted changes, and save the manifest as an artifact. If the original instruction record is missing, record that fact in assumptions. Do not invent hashes for nonexistent records.
 
-仕様を変更したときは、オーケストレーションエージェントが、変更されたFR/DD/AT/DECから追跡表・操作カタログ・タスクの依存関係を逆にたどり、影響を受けるタスク・試験・ゲートを洗い出す。共通のスキーマ・状態遷移・権限に関する変更は、それを参照しているすべてのタスクが対象になる。過去の実行結果はそのまま保持したうえで、証跡をstale(古い)、影響するゲートをstale、完了していたタスクをready(依存関係が未解決ならblocked)に戻し、現在のbaselineに対応する試験をnot_run(未実行)に戻す。無関係なタスクまで再実行する必要はない。
+When specifications change, orchestration traces backward from changed FR/DD/AT/DEC entries through the traceability matrix, operation catalog, and task dependencies to identify affected tasks, tests, and gates. Shared schema, state transition, or permission changes affect every task that references them. Preserve past execution results, but mark evidence and affected gates stale. Return completed tasks to ready (or blocked if dependencies are unresolved), and reset tests for the current baseline to not_run. Unrelated tasks do not need to be rerun.
 
-例: 実装の差分がなくても、FR-A09の解除条件を変更した場合は、AT-A09とS03、および関連する請求・制限のタスクについて、G1/G3/G4を再判定する。以前の結果は古いspec_baseline_idのまま残しておき、同じ実装revision(版)であっても、新しい試験では新しい期待値とbaselineを記録する。作業を再開するときは、owned_files(担当ファイル)・現在の差分・spec_baseline_idを再確認し、途中で担当者が変わった場合はその旨を引き継ぎに残す。
+Example: Even with no implementation diff, changing FR-A09 release conditions requires reassessing G1/G3/G4 for AT-A09, S03, and related billing/restriction tasks. Keep earlier results under their old spec_baseline_id. New tests record the new expected results and baseline even at the same implementation revision. When resuming work, recheck owned_files, current diff, and spec_baseline_id. Record any change of owner in the handoff.
 
-## 完了報告
+## Completion report
 
-対象の内容と変更した理由、実装した画面や操作、実施した検証と実施していない検証、デモ用・未実装・実際に接続済みのものの区別、仮定や未決事項、次に必要な意思決定、将来API接続をする際に差し替える予定の箇所を記載する。文書だけを作るタスクの場合、ビルドが成功したことやデモが完成したことを主張しない。
+Describe the scope and reasons for changes, implemented screens and operations, checks run and not run, which parts are demo-only/unimplemented/actually connected, assumptions and open issues, next required decisions, and the planned replacement points for future API connections. For document-only tasks, do not claim a successful build or a completed demo.

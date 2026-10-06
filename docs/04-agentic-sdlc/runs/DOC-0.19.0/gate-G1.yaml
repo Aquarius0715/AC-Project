@@ -1,13 +1,13 @@
 gate_id: G1
 task_id: DOC-0.19.0
-gate_result: fail  # 別エージェントの独立G1判定（independent-g1/gate-decision.yaml）。DOC-0.20.0で修正
+gate_result: fail  # Independent G1 decision by another agent (independent-g1/gate-decision.yaml). Corrected in DOC-0.20.0
 spec_baseline_id: 048ffcef25f8463bca33346f5bb1dd8dbb1fdad03b61132d1cfc5d17ebeb1ac2
 reviewed_target: DOC-0.18.0 working tree (uncommitted, no baseline)
-reviewer_agent: independent-review-opus-5 (本会話。DOC-0.18.0の修正担当セッションとは別)
-specification_editor: independent-review-opus-5 (本会話、同一エージェント)
-orchestrator: independent-review-opus-5 (本会話)
-independent_post_correction_review: completed  # 判定FAIL（MAJOR 12・MINOR 17・QUESTION 2）。independent-g1/ に記録
-self_rereview_after_correction: completed  # 1回目でREV19-037、3回目（受入前提の全件点検）でREV19-038〜042を検出し修正、最終回で未解決0件
+reviewer_agent: independent-review-opus-5 (this conversation; separate from the DOC-0.18.0 correction session)
+specification_editor: independent-review-opus-5 (this conversation, same agent)
+orchestrator: independent-review-opus-5 (this conversation)
+independent_post_correction_review: completed  # Decision FAIL (12 MAJOR, 17 MINOR, 2 QUESTION). Recorded in independent-g1/
+self_rereview_after_correction: completed  # Found and corrected REV19-037 in round 1 and REV19-038–042 in round 3 (full acceptance-premise check); zero unresolved findings in the final round
 application_tests: not_run
 implementation_status: not_started
 production_connection_readiness: NOT_READY

@@ -2,17 +2,17 @@
   "version": "0.19.0",
   "scope": "frontend-demo-1A",
   "review_id": "INDEPENDENT-DOC-0.18.0-REV19-2026-09-17",
-  "note": "本レビューで修正担当が採用した可逆的な設計提案。README規約のPROPOSEDに相当し、1Aデモ実装は進行可能。企業承認・商用確定ではない。owner欄は企業検収前に確認する担当候補。",
+  "note": "Reversible design proposals adopted by the correction agent in this review. They correspond to PROPOSED under the README rules, and 1A demo implementation may proceed. They do not mean company approval or final commercial decisions. The owner field lists candidate reviewers before company acceptance.",
   "decisions": [
     {
       "id": "DEC-42",
       "issue_id": "REV19-002",
       "status": "proposed",
       "decision_status": "proposed",
-      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_by": "Independent review and correction AI (this conversation, Opus 5)",
       "proposed_at": "2026-09-17",
       "reversible": true,
-      "question": "作業窓の開始前は技術者画面でunits.get等を呼ばず、状態work-not-startedで案件を読取表示するか",
+      "question": "Before the work window starts, show jobs read-only as work-not-started and do not call units.get or similar operations from technician screens?",
       "selected": {
         "before_scheduled_start": "jobs.get only; units.get disabled",
         "unit_page_forbidden": "work-not-started with start time"
@@ -25,10 +25,10 @@
       "issue_id": "REV19-003",
       "status": "proposed",
       "decision_status": "proposed",
-      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_by": "Independent review and correction AI (this conversation, Opus 5)",
       "proposed_at": "2026-09-17",
       "reversible": true,
-      "question": "生存シミュレーターはmeasured/valid/非nullの最新値だけを複写し、デモ投入のsequenceは省略時に自動採番するか",
+      "question": "Copy only the latest measured/valid/non-null readings in the heartbeat simulator, and assign sequence automatically when omitted in demo input?",
       "selected": {
         "copy_condition": "origin=measured, quality=valid, value!=null",
         "sequence": "optional, latest+1"
@@ -41,36 +41,36 @@
       "issue_id": "REV19-004",
       "status": "accepted",
       "decision_status": "accepted",
-      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_by": "Independent review and correction AI (this conversation, Opus 5)",
       "proposed_at": "2026-09-17",
       "reversible": true,
-      "question": "管理ダッシュボードの『削減量の予想』を、対象設備集合と一致する仮定基準の按分と有効slot平均からの外挿で算出し、seedに既定の仮定基準を置くか",
+      "question": "Calculate admin dashboard estimated savings from a prorated assumed baseline for the exact unit set minus an estimate from average valid slots, with a default assumed baseline in seed?",
       "selected": {
         "forecast": "prorated demo_fixed baseline minus extrapolated valid-slot average",
         "seed_baseline": "baseline-demo-tenant-a 2592 kWh / 30 days / 5 units",
         "labels": {
-          "no_units": "対象設備なし",
-          "baseline_unavailable": "基準未設定",
-          "other_null": "算定不可"
+          "no_units": "No target units",
+          "baseline_unavailable": "Baseline not set",
+          "other_null": "Cannot calculate"
         }
       },
       "owner": "Product Owner / Business",
       "contract": "IR78",
-      "decided_by": "本会話のユーザー",
+      "decided_by": "The user in this conversation",
       "decided_at": "2026-09-17",
       "decided_at_precision": "day",
-      "answer": "Aで大丈夫です",
-      "source": "ユーザー回答:「1に関して、Aで大丈夫です」"
+      "answer": "Option A is fine.",
+      "source": "User response: \"For 1, option A is fine.\""
     },
     {
       "id": "DEC-45",
       "issue_id": "REV19-008",
       "status": "proposed",
       "decision_status": "proposed",
-      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_by": "Independent review and correction AI (this conversation, Opus 5)",
       "proposed_at": "2026-09-17",
       "reversible": true,
-      "question": "未認証時のログイン後の復帰先をURLクエリreturnToで受け渡し、不正値は無視するか",
+      "question": "Pass the post-login destination through the returnTo URL query for unauthenticated users and ignore invalid values?",
       "selected": {
         "transport": "/login?returnTo=encodeURIComponent(path+search)",
         "invalid": "removed and ignored"
@@ -83,10 +83,10 @@
       "issue_id": "REV19-009",
       "status": "proposed",
       "decision_status": "proposed",
-      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_by": "Independent review and correction AI (this conversation, Opus 5)",
       "proposed_at": "2026-09-17",
       "reversible": true,
-      "question": "再取得中は表示データを保持してaria-busyの更新中表示とし、同じ1秒tickの購読イベントによる無効化をkeyごとに1回へまとめるか",
+      "question": "Keep displayed data during refetch with an aria-busy updating state, and combine subscription invalidations for the same key in the same one-second tick?",
       "selected": {
         "refetch_display": "keep data, aria-busy, no skeleton",
         "coalesce": "per query key per 1s tick"
@@ -99,10 +99,10 @@
       "issue_id": "REV19-010",
       "status": "proposed",
       "decision_status": "proposed",
-      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_by": "Independent review and correction AI (this conversation, Opus 5)",
       "proposed_at": "2026-09-17",
       "reversible": true,
-      "question": "位置情報同意の初期記録をseedと顧客Membership作成時に作るか",
+      "question": "Create initial location consent records in seed and when creating a customer Membership?",
       "selected": {
         "seed": "granted=false version=1 per client membership",
         "members_save": "creates initial consent"
@@ -115,10 +115,10 @@
       "issue_id": "REV19-012",
       "status": "proposed",
       "decision_status": "proposed",
-      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_by": "Independent review and correction AI (this conversation, Opus 5)",
       "proposed_at": "2026-09-17",
       "reversible": true,
-      "question": "期限切れの未応答Offerへの受諾・辞退をCONFLICT(errors.offer_expired)、案件の個別取得をNOT_FOUNDとするか",
+      "question": "Return CONFLICT(errors.offer_expired) for acceptance/decline of expired unanswered Offers and NOT_FOUND for individual job reads?",
       "selected": {
         "accept_decline_after_expiry": "CONFLICT errors.offer_expired",
         "jobs_get_after_expiry": "NOT_FOUND"
@@ -131,10 +131,10 @@
       "issue_id": "REV19-013",
       "status": "proposed",
       "decision_status": "proposed",
-      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_by": "Independent review and correction AI (this conversation, Opus 5)",
       "proposed_at": "2026-09-17",
       "reversible": true,
-      "question": "理由系入力（reason/resolutionReason/reviewComment等）の上限を1000文字に統一するか",
+      "question": "Use a shared 1000-character maximum for reason fields such as reason/resolutionReason/reviewComment?",
       "selected": {
         "reason_fields_max": 1000
       },
@@ -146,10 +146,10 @@
       "issue_id": "REV19-015",
       "status": "accepted",
       "decision_status": "accepted",
-      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_by": "Independent review and correction AI (this conversation, Opus 5)",
       "proposed_at": "2026-09-17",
       "reversible": true,
-      "question": "作業窓の終了15分前に予告し、終了時は未保存入力を破棄して通知し、HQ/業者には再割当が必要な表示を出すか",
+      "question": "Warn 15 minutes before the work window ends, discard unsaved inputs with a notice at the end, and show HQ/contractors that reassignment is needed?",
       "selected": {
         "warning_before_minutes": 15,
         "on_end": "discard unsaved input with notice",
@@ -157,21 +157,21 @@
       },
       "owner": "Product Owner / UI/UX",
       "contract": "IR89",
-      "decided_by": "本会話のユーザー",
+      "decided_by": "The user in this conversation",
       "decided_at": "2026-09-17",
       "decided_at_precision": "day",
-      "answer": "現在の案で大丈夫です",
-      "source": "ユーザー回答:「２に関して、現在の案で大丈夫です」"
+      "answer": "The current proposal is fine.",
+      "source": "User response: \"For 2, the current proposal is fine.\""
     },
     {
       "id": "DEC-51",
       "issue_id": "REV19-018",
       "status": "proposed",
       "decision_status": "proposed",
-      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_by": "Independent review and correction AI (this conversation, Opus 5)",
       "proposed_at": "2026-09-17",
       "reversible": true,
-      "question": "機器操作（check/firmware）中の設備への制限Commandを未配送意図として保留するか",
+      "question": "Keep restriction Commands pending as undelivered intents while a device check/firmware operation is running?",
       "selected": {
         "restriction_command_during_device_operation": "delivery=not_sent, pendingReason=device_operation_running"
       },
@@ -183,10 +183,10 @@
       "issue_id": "REV19-022",
       "status": "proposed",
       "decision_status": "proposed",
-      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_by": "Independent review and correction AI (this conversation, Opus 5)",
       "proposed_at": "2026-09-17",
       "reversible": true,
-      "question": "非同期の受付監査をpendingで記録し、確定時に同じcorrelationIdで結果を追記するか",
+      "question": "Record acceptance of asynchronous operations as pending in the audit and append the final result with the same correlationId?",
       "selected": {
         "pending_audit": "accepted async operations",
         "finalize": "append success/failed"
@@ -199,10 +199,10 @@
       "issue_id": "REV19-017",
       "status": "proposed",
       "decision_status": "proposed",
-      "proposed_by": "独立レビュー兼修正担当AI（本会話、Opus 5）",
+      "proposed_by": "Independent review and correction AI (this conversation, Opus 5)",
       "proposed_at": "2026-09-17",
       "reversible": true,
-      "question": "連絡可能時間の判定規則を維持し、HH:mm形式の入力案内を表示するか",
+      "question": "Keep contact-hour validation rules and show an HH:mm input hint?",
       "selected": {
         "rule": "unchanged (IR64)",
         "hint": "Weekdays 09:00-18:00"
