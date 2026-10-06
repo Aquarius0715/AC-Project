@@ -304,7 +304,7 @@ Scope: FR-A06 / Main display pattern: **UI-LIST / UI-DETAIL / UI-FORM**. Service
 
 **Boundary cases and failures**: Check re-offering after decline, overlapping confirmed schedules, overdue jobs, and returns after failed quality review. Summarize estimate and actual costs separately by currency, without conversion.
 
-**Follow-up requests (FR-C17)**: A client “Report a problem” creates a requested job with followUpOfJobId and followUpClass=pending, highlighted in the Jobs tab; HQ classifies it within one business day as rework (free, linked to the original job) or a new request (`jobs.classifyFollowUp`, reason required). Tabs: Jobs, Plans, Contractors (DD-A21), SLA by customer (DD-A22).
+**Follow-up requests (FR-C17)**: A client “Report a problem” creates a requested job with followUpOfJobId and followUpClass=pending, highlighted in the Jobs tab; HQ classifies it within one business day as rework (free, linked to the original job) or a new request (`jobs.classifyFollowUp`, reason required). The list row shows “↩ Follow-up of <jobId>” with the classify-by time; the detail (06-17) shows the client's report, the original job and its rating; Classify… opens a centered dialog (06-18) with Rework (free) / New request and a reason (1–1000). Classification is set once (second call CONFLICT, IR114); the job stays requested and is booked under IR113 (06-11). Tabs: Jobs, Plans, Contractors (DD-A21), SLA by customer (DD-A22).
 
 **Verification**: Check the traceability entries under AT-A06 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -694,6 +694,8 @@ Scope: FR-A17 / Main display pattern: **UI-LIST**. Service boundary: `clientUser
 
 **Verification**: Check the traceability entries under AT-A17 (N/E/B).
 
+**Customer app (IR114)**: Client owners list users, invite members, and resend invites from `/customer/users` (DD-C19); role changes, disabling, password resets, and removal remain on this tab.
+
 ### DD-A18 Details
 
 **Source mapping**: SRC-06 BIZ-07 → FR-A18 → DD-A18. Source category: Figma-confirmed screen specification (Admin 02-17/02-18, 2026-10-01).
@@ -845,7 +847,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.22.0: Read IR01–112 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.24.0: Read IR01–114 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

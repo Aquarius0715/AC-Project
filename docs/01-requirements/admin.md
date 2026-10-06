@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # Administrator and HQ requirements
 
-**0.22.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.24.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Purpose and assumptions
 
@@ -186,13 +186,14 @@ Design: [DD-A05](../02-design/admin.md#dd-a05-details). Assess parent AT-A05 usi
 - **Main flow**: Register maintenance type/unit/deadline (or triage a client request with 3 preferred times) → book one preferred time by assigning internally or offering to a contractor, or propose another time and wait for the client → handle contractor time-change proposals and technician acknowledgements → track schedule/progress → record quality review/actual costs.
 - **Business rule BR-A06**: HQ sets internal assignee/schedule only at an agreed slot: one of the client's preferred times, an accepted proposal, or the plan occurrence (IR113). A proposal holds the chosen partner's capacity until the client answers; a contractor's time change is sent to the client or rejected, never applied directly. Contractors assign their own staff after accepting an Offer. Recurring plans show next occurrence; create only one job per plan/occurrence. IR48 governs unanswered Offer expiry; IR56 governs cancellable states.
 - **Resulting business state**: Link Job, Assignment, Offer, cost lines, and quality history by jobId. Work completion alone does not resolve Alert.
+- **Follow-up classification (Figma 06-17/06-18, IR114)**: A client “Report a problem” (FR-C17) creates a requested job with followUpClass=pending, shown in the Jobs list with “↩ Follow-up of <jobId>” and a classify-by time (1 business day). Classify… opens a dialog: Rework (free, linked to the original job) or New request (billable) and a required reason (1–1000). Classification is set once; the job then stays requested and is booked under IR113.
 - **Boundaries/prohibitions**: Check re-offer after decline, confirmed schedule overlaps, overdue work, and quality returns. Aggregate estimated/actual costs separately by currency without conversion.
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
 | AT-A06-N | job.write. When: Create reactive unit-non-rto job with requested 2026-09-21 10:00–12:00 Asia/Kuala_Lumpur and 2 alternativeSlots → offer contractor-a (visitSlot=2026-09-21 10:00–12:00, offerExpiresAt=2026-09-15T01:00Z, accessValidFrom=2026-09-14T01:00Z, accessValidUntil=2026-09-22T00:00Z) → accept → assign tech-external-a 2026-09-21 10:00–12:00 Asia/Kuala_Lumpur → advance to 2026-09-21T02:00Z → technician start→submit → contractor-a approves → HQ records actual costs | ① Same jobId: requested→offered→accepted→assigned→in_progress→submitted→completed ② costLines saved ③ Alert resolution assessed separately |
 | AT-A06-E | Re-offer after decline / overlap confirmed schedules / overdue / return report / estimated MYR and actual USD | New offerId, requested→offered after decline. Cannot save confirmed overlap. Overdue shows warning without automatic state change. Return becomes rework_requested. Costs grouped by currency. |
-| AT-A06-B | ① HQ internal assignment ② Contractor assigns after acceptance ③ Generate same plan/date twice ④ jobs.proposeSlot with a slot equal to a preferred time ⑤ contractor-a proposes another time on its open offer; HQ resolves send_to_client; customer-a accepts ⑥ Proposal not answered by replyBy | ① assigned ② accepted then assigned ③ Second CONFLICT, still one job ④ VALIDATION errors.slot_is_preferred ⑤ Offer visitSlot updated, job stays offered, jobs.accept allowed again ⑥ Proposal expired, job requested, one notification to hq-operator (IR113) |
+| AT-A06-B | ① HQ internal assignment ② Contractor assigns after acceptance ③ Generate same plan/date twice ④ jobs.proposeSlot with a slot equal to a preferred time ⑤ contractor-a proposes another time on its open offer; HQ resolves send_to_client; customer-a accepts ⑥ Proposal not answered by replyBy ⑦ Classify follow-up job (followUpOfJobId=job-c02, pending) as rework with a reason, then call again; also with an empty reason | ① assigned ② accepted then assigned ③ Second CONFLICT, still one job ④ VALIDATION errors.slot_is_preferred ⑤ Offer visitSlot updated, job stays offered, jobs.accept allowed again ⑥ Proposal expired, job requested, one notification to hq-operator (IR113) ⑦ followUpClass=rework and reason stored, job stays requested; second call CONFLICT; empty reason VALIDATION (IR114) |
 
 Design: [DD-A06](../02-design/admin.md#dd-a06-details). Assess parent AT-A06 using all N/E/B and applicable SRC/R01 cases in traceability.
 
@@ -437,7 +438,7 @@ Design: [DD-A16](../02-design/admin.md#dd-a16-details). Assess parent AT-A16 usi
 ### FR-A17 Client user accounts
 
 - **Company request basis**: SRC-06 BIZ-04; Figma-confirmed Admin 02-15 (2026-10-01).
-- **Entry conditions**: asset.read to view, asset.write to change; Customers & units › customer › Users tab. A client owner can also invite members from the customer app.
+- **Entry conditions**: asset.read to view, asset.write to change; Customers & units › customer › Users tab. A client owner can also invite members and resend invites from the customer app (FR-C19, `/customer/users`); every other change stays here.
 - **Main flow**: List client users of the customer (user, role Owner/Member, status, last sign-in, notification channels) → + Invite user (email, role) → row menu: change role, resend invite, reset password, disable, remove.
 - **Business rule BR-A17**: Client users only ever see that customer's properties and units and have no permission editor; Owner can additionally use group control, edit filter-care reminders, and invite members. Email is unique per customer. The last active owner cannot be demoted, disabled, or removed (CONFLICT). Reset password uses the generic reset preview (`auth.previewPasswordReset`). HQ/contractor/technician accounts stay in Access & roles (FR-A03).
 - **Resulting business state**: ClientUser created as invited (pending until first sign-in), then active; role/status changes increment version; remove deletes the account but keeps audit history.
@@ -557,7 +558,7 @@ Design: [DD-A23](../02-design/admin.md#dd-a23-details). Assess parent AT-A23 usi
 
 Approval applied 2026-09-16: FR-A07/A09 reject contract edits during active restrictions and allow them after cancellation/release completes (SR19). FR-A15 retries only the failed stage of the same failed record with a new attempt; retirement failure retains the purchased reference (SR18).
 
-Additional current 0.22.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–112. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.24.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–114. They override older text on the same issues; use IR72 for conflict priority.
 
 0.15.0: FR-A06 quality review uses IR29 completion times and IR31 self-approval prohibition for all contributors.
 

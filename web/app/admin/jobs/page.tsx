@@ -22,7 +22,7 @@ export default function AdminJobs({ searchParams }: { searchParams: Promise<{ jo
   const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");
   const [delivery, setDelivery] = useState<"all" | "internal" | "contractor">("all");
   const [stage, setStage] = useState<JobStatus | null>(null);
-  const [modal, setModal] = useState<null | { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "new" } | { kind: "reason"; what: "rework" | "hold" | "reassign" }>(null);
+  const [modal, setModal] = useState<null | { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "new" } | { kind: "reason"; what: "rework" | "hold" | "reassign" } | { kind: "classify" }>(null);
   const [plan, setPlan] = useState(plans[0]);
   const list = [...jobs].filter((j) => j.status !== "cancelled").sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status))
     .filter((j) => (origin === "all" || j.origin === origin) && (delivery === "all" || j.delivery === delivery) && (!stage || j.status === stage));
@@ -50,7 +50,7 @@ export default function AdminJobs({ searchParams }: { searchParams: Promise<{ jo
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{j.id} · {j.unit}</b><JobStatusBadge s={j.status} /></div>
                     <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted"><OriginBadge origin={j.origin} />{j.customer} · {j.type}</div>
-                    <div className="text-[11px] text-muted">{rowLine(j)}</div>
+                    <div className={cx("text-[11px]", j.followUpClass === "pending" ? "font-semibold text-warn" : "text-muted")}>{rowLine(j)}</div>
                   </div>
                 </ListRow>
               ))}{list.length === 0 && <p className="text-xs text-muted">No jobs in this filter.</p>}</div>
@@ -74,11 +74,13 @@ export default function AdminJobs({ searchParams }: { searchParams: Promise<{ jo
       {modal?.kind === "propose" && sel && <ProposeModal j={sel} onClose={() => setModal(null)} />}
       {modal?.kind === "new" && <NewJobModal onClose={() => setModal(null)} onDone={(id) => { setModal(null); setSelId(id); }} />}
       {modal?.kind === "reason" && sel && <ReasonModal what={modal.what} j={sel} onClose={() => setModal(null)} />}
+      {modal?.kind === "classify" && sel && <ClassifyModal j={sel} onClose={() => setModal(null)} />}
     </Page>
   );
 }
 
 function rowLine(j: Job) {
+  if (j.followUpClass === "pending") return `↩ Follow-up of ${j.followUpOf} · classify by 09-23 11:05`;
   switch (j.status) {
     case "requested": return j.declined ? `Client declined · round ${j.round} · ${j.preferred.length} new times` : `${j.preferred.length} preferred times · book one or propose`;
     case "time_proposed": return `Proposed ${fmt(j.proposal?.slot)} · reply by ${j.proposal?.replyBy}`;
@@ -89,7 +91,7 @@ function rowLine(j: Job) {
   }
 }
 
-function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "reason"; what: "rework" | "hold" | "reassign" }) => void }) {
+function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot } | { kind: "propose" } | { kind: "reason"; what: "rework" | "hold" | "reassign" } | { kind: "classify" }) => void }) {
   const toast = useToast();
   const fits = j.preferred.map(fitFor);
   const anyFit = fits.some((f) => f.fits !== "none");
@@ -101,7 +103,26 @@ function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot }
         </div>
       </Card>
 
-      {j.status === "requested" && (
+      {j.followUpOf && (
+        <Card tone="warn" title={j.followUpClass === "pending" ? "↩ Follow-up request — classify within 1 business day" : `↩ Follow-up of ${j.followUpOf}`} action={j.followUpClass === "pending" ? <Badge tone="warn">Pending classification</Badge> : <Badge tone={j.followUpClass === "rework" ? "ok" : "primary"}>{j.followUpClass === "rework" ? "Rework (free)" : "New request"}</Badge>}>
+          <SummaryList items={[
+            ["Created by", `customer-a · “Report a problem” on ${j.followUpOf} (Client app)`],
+            ["Client’s report", j.symptom],
+            ["Original job", `${j.followUpOf} · completed · report accepted`],
+            ["Preferred visit", j.preferred[0] ? longDate(j.preferred[0]) : "—"],
+            ...(j.followUpReason ? [["Reason", j.followUpReason] as [string, string]] : []),
+          ]} />
+          {j.followUpClass === "pending" && <>
+            <div className="grid-fluid mt-3" style={{ ["--min" as string]: "220px" }}>
+              <div className="rounded-xl border border-line bg-surface p-3"><b className="text-[13px]">Rework (free)</b><p className="text-xs text-muted">Linked to {j.followUpOf}. No charge for the client; counts against the first-time-fix KPI of the original technician / contractor.</p></div>
+              <div className="rounded-xl border border-line bg-surface p-3"><b className="text-[13px]">New request</b><p className="text-xs text-muted">A separate, billable job; {j.followUpOf} stays closed.</p></div>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-2"><span className="text-[11px] text-muted">Set once with a reason (jobs.classifyFollowUp). Until then the client sees “Under HQ review”.</span><Btn variant="primary" onClick={() => open({ kind: "classify" })}>Classify…</Btn></div>
+          </>}
+        </Card>
+      )}
+
+      {j.status === "requested" && j.followUpClass !== "pending" && (
         <>
           {j.declined && <Banner tone="crit" icon="✕"><b>Client declined the proposed time · {j.declined.at}</b><br />Reason: {j.declined.reason}{j.declined.comment ? ` — “${j.declined.comment}”` : ""}. Held capacity was released.</Banner>}
           <Card title={`Client’s preferred times${j.round > 1 ? ` (round ${j.round})` : ""} — book one of these`} sub="Availability: qualification + overlap + travel">
@@ -230,6 +251,22 @@ function NewJobModal({ onClose, onDone }: { onClose: () => void; onDone: (id: st
       <Field label="Symptom / scope (10+ characters)" error={tried && sym.trim().length < 10 ? "Enter at least 10 characters" : undefined}><Textarea value={sym} onChange={(e) => setSym(e.target.value)} placeholder="Customer called: unit leaks water at night." /></Field>
       <PreferredSlotsInput value={slots} onChange={setSlots} error={err} label="Customer’s preferred times (asked on the phone)" hint="Same rule as client requests: book one of these, or propose another time for the customer to accept." />
       <p className="text-[11px] text-muted">Periodic visits are created from Plans, not here.</p>
+    </Modal>
+  );
+}
+
+function ClassifyModal({ j, onClose }: { j: Job; onClose: () => void }) {
+  const toast = useToast();
+  const [cls, setCls] = useState<"rework" | "new_request">("rework");
+  const [r, setR] = useState("");
+  const [tried, setTried] = useState(false);
+  const bad = !r.trim() || r.length > 1000;
+  return (
+    <Modal open onClose={onClose} title="Classify follow-up request" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (bad) return; const e = jobActions.classifyFollowUp(j.id, cls, r); if (e) { toast(e, "warn"); return; } toast(cls === "rework" ? "Classified as rework (free) — book the client’s preferred visit" : "Classified as a new request — book it like any client request"); onClose(); }}>Classify</Btn></>}>
+      <p className="text-xs text-muted">{j.id} · {j.customer} · {j.unit} — follow-up of {j.followUpOf}</p>
+      <Field label="Classification · required"><Choice value={cls} onChange={setCls} options={[{ id: "rework", label: "Rework (free)" }, { id: "new_request", label: "New request" }]} /></Field>
+      <Field label="Reason · required (1–1000 characters)" error={tried && bad ? "A reason is required (1–1000 characters)" : undefined}><Textarea value={r} onChange={(e) => setR(e.target.value)} placeholder={`Drain pan still overflowing — same leak as ${j.followUpOf}.`} /></Field>
+      <Banner>Set once — cannot be changed later. The job stays “Requested” and is booked like any client request (IR113); the client sees “Rework (free)” or “New request” instead of “Under HQ review”.</Banner>
     </Modal>
   );
 }

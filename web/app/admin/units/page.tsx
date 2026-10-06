@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ImportCsvModal, WarrantyTab } from "@/components/Features";
+import { ClientRole, ClientUser, clientUserActions, emailError, useClientUsers } from "@/lib/clientUsers";
 import { Badge, Banner, Btn, Card, Check, DataTable, Field, Input, Kpi, ListRow, Modal, Page, PowerBadge, ConnBadge, Search, Select, SummaryList, Tabs, Toggle, useToast, cx } from "@/components/ui";
 
 type Cust = { id: string; name: string; status: "active" | "inactive"; props: number; units: number; op: string; alerts: number | string; contract: string };
@@ -75,7 +76,7 @@ export default function AdminUnits() {
           </div>
         </div>
       )}
-      {tab === "users" && <Card title="Customer › Users" sub="client accounts"><DataTable rows={[{ id: "customer-a", role: "Client · unit owner", st: "active" }, { id: "tan.family", role: "Client · member", st: "active" }]} rowKey={(r) => r.id} cols={[{ key: "i", label: "User", render: (r) => <b>{r.id}</b> }, { key: "r", label: "Role", render: (r) => r.role }, { key: "s", label: "Status", render: (r) => <Badge tone="ok">{r.st}</Badge> }]} /></Card>}
+      {tab === "users" && <ClientUsersTab />}
       {tab === "policies" && <Card title="Customer › Alert policies" sub="customer-a policies only">{[["Bedroom too hot", "2 units"], ["Stuffy office", "2 units"], ["Night humidity", "0 units · Off"]].map(([a, b]) => <div key={a} className="flex justify-between border-t border-line py-2 text-[13px] first:border-0"><b>{a}</b><span className="text-muted">{b}</span></div>)}</Card>}
 
       <Modal open={modal === "location" || modal === "rename"} onClose={close} title={modal === "rename" ? "Rename location" : "Add location"} footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) return; toast("Location saved"); close(); }}>Save</Btn></>}><Field label="Name" error={nameErr}><Input value={name} onChange={(e) => setName(e.target.value)} /></Field></Modal>
@@ -85,5 +86,41 @@ export default function AdminUnits() {
       <Modal open={modal === "move"} onClose={close} title="Change location — reason required" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!reason.trim()) return; toast("Location changed"); close(); }}>Save</Btn></>}><Field label="New location"><Select><option>Home A › 1F › Kitchen</option><option>Home A › 2F › Study</option></Select></Field><Field label="Reason" error={tried && !reason.trim() ? "A reason is required" : undefined}><Input value={reason} onChange={(e) => setReason(e.target.value)} /></Field></Modal>
       <Modal open={modal === "attach"} onClose={close} title="Attach alert policy" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { toast("Policy attached"); close(); }}>Attach</Btn></>}><Field label="customer-a policies only"><Select><option>Bedroom too hot</option><option>Stuffy office</option><option>Night humidity</option></Select></Field></Modal>
     </Page>
+  );
+}
+
+/** FR-A17 — HQ manages every client user; owners can also invite members from the customer app (FR-C19). */
+function ClientUsersTab() {
+  const toast = useToast();
+  const users = useClientUsers();
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<ClientRole>("member");
+  const [tried, setTried] = useState(false);
+  const err = tried ? emailError(email, users) : undefined;
+  const close = () => { setOpen(false); setTried(false); setEmail(""); setRole("member"); };
+  const run = (e: string | undefined, ok: string) => toast(e ?? ok, e ? "warn" : undefined);
+  const act = (u: ClientUser, a: string) => {
+    if (a === "resend") run(clientUserActions.resend(u.id), `Invitation preview re-created for ${u.email}`);
+    if (a === "role") run(clientUserActions.setRole(u.id, u.role === "owner" ? "member" : "owner"), `Role changed to ${u.role === "owner" ? "Member" : "Owner"}`);
+    if (a === "reset") toast("Password reset preview created (generic message)");
+    if (a === "disable") run(clientUserActions.setStatus(u.id, u.status === "disabled" ? "active" : "disabled"), u.status === "disabled" ? "Sign-in enabled" : "Sign-in disabled");
+    if (a === "remove") run(clientUserActions.remove(u.id), `${u.email} removed from customer-a`);
+  };
+  return (
+    <Card title="Client users of customer-a" sub="People who sign in to the customer app. They only ever see customer-a’s properties and units." action={<Btn size="sm" variant="primary" onClick={() => setOpen(true)}>+ Invite user</Btn>}>
+      <DataTable rows={users} rowKey={(u) => u.id} cols={[
+        { key: "u", label: "User", render: (u) => <><b>{u.name ?? u.email}</b><div className="text-xs text-muted">{u.name ? u.email : `invited ${u.invitedAt ?? ""} by ${u.invitedBy ?? "—"}`}</div></> },
+        { key: "r", label: "Role", render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{u.role === "owner" ? "Owner" : "Member"}</Badge> },
+        { key: "s", label: "Status", render: (u) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{u.status === "active" ? "Active" : u.status === "invited" ? "Invite pending" : "Disabled"}</Badge> },
+        { key: "l", label: "Last sign-in", render: (u) => u.lastSignIn ?? "—", hideBelow: "md" },
+        { key: "a", label: "", render: (u) => <Select aria-label="Actions" className="w-auto" value="" onChange={(e) => act(u, e.target.value)}><option value="">⋯</option><option value="role">Change role (Owner / Member)</option>{u.status === "invited" && <option value="resend">Resend invite</option>}<option value="reset">Reset password</option><option value="disable">{u.status === "disabled" ? "Enable sign-in" : "Disable sign-in"}</option><option value="remove">Remove from customer</option></Select> },
+      ]} />
+      <p className="mt-2 text-[11px] text-muted">Client users have no permission editor — the owner can also invite members from the customer app (Users). HQ, contractor and technician accounts are managed in Access &amp; roles.</p>
+      <Modal open={open} onClose={close} title="Invite client user" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); const e = clientUserActions.invite(email, role, "hq-operator"); if (e) return; toast(`Invitation preview created for ${email.trim()}`); close(); }}>Send invite</Btn></>}>
+        <Field label="Email" error={err}><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+        <Field label="Role"><Select value={role} onChange={(e) => setRole(e.target.value as ClientRole)}><option value="member">Member</option><option value="owner">Owner</option></Select></Field>
+      </Modal>
+    </Card>
   );
 }

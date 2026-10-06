@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # Client requirements
 
-**0.22.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.24.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Purpose and assumptions
 
@@ -47,6 +47,7 @@ P0 means the core foundational flow. P1 is also required for completion in phase
 | FR-C16 | P1 | Figma-confirmed screen specification 2026-10-01 (04g) / BIZ-16, BIZ-23 | Monthly energy report export | Export a monthly energy/cost report as PDF or CSV and opt in to a monthly email copy. |
 | FR-C17 | P1 | Figma-confirmed screen specification 2026-10-01 (07g–07i) / BIZ-12 | Confirm, rate, and report a problem | After HQ accepts the report, confirm the job and rate it; report a problem that creates a follow-up request. |
 | FR-C18 | P1 | Figma-confirmed screen specification 2026-10-01 (07j) / BIZ-18, BIZ-12 | Filter care | Show filter run time since cleaning per AC with reminders; mark self-cleaning or request cleaning. |
+| FR-C19 | P1 | Figma-confirmed screen specification 2026-10-06 (11a–11c) / BIZ-04 | Customer users (owner) | The customer owner lists the customer's client users, invites members and resends pending invites. Role changes, disabling, password resets, and removal stay with HQ (FR-A17). Members do not see the page. |
 
 ## Business boundaries and dependencies
 
@@ -246,6 +247,7 @@ Design: [DD-C08](../02-design/client.md#dd-c08-details). Assess parent AT-C08 us
 - **Business rule BR-C09**: Preferred times are not confirmed bookings. HQ books one of them; any other time (proposed by HQ or by a service partner through HQ) is booked only after the client accepts it; declining keeps the request open (IR113). Periodic plan visits are booked by HQ; the client may request another time with 3 preferred times up to 48 h before the visit. Customers cannot set dueAt; deadline is requested slot end (IR38). Customers can cancel only requested jobs. After assigned, they may send coordination notes but cannot directly change schedule/assignee.
 - **Resulting business state**: HQ/contractor/technician use the same jobId. Cancellation before assignment records cancelled and reason. Publish submitted reports to customers after quality review.
 - **Boundaries/prohibitions**: Reject symptoms ≤9 or ≥2001 characters, past or same-day preferred times, fewer than 3 or duplicate preferred times, or missing unit. Preserve symptoms on communication failure. Duplicate requests do not create duplicate jobs.
+- **Coordination notes (Figma 07b → 07o → 07p, IR114)**: On any own job that is not completed or cancelled, “+ Add note” opens a dialog (`jobs.addNote`, visibility=customer, 1–2000 characters). A note never changes the visit time, assignee, or status; HQ (and the contractor of a delegated job) is notified, and the assigned technician sees it in the job history.
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
@@ -406,7 +408,7 @@ Design: [DD-C16](../02-design/client.md#dd-c16-details). Assess parent AT-C16 us
 - **Entry conditions**: Job of the customer in status completed (HQ or contractor accepted the report).
 - **Main flow**: Completed job banner (also on Overview for 7 days) → Confirm & rate (1–5 ★ required, tags, optional comment) → job closed for the client; or Report a problem (reason, details, photos, preferred visit) → follow-up request “Under HQ review”.
 - **Business rule BR-C17**: The rating can be changed for 7 days (`jobs.rate`); unconfirmed jobs are auto-confirmed after 7 days without a rating. Ratings ≤ 2 ★ ask what went wrong and offer Report a problem. Ratings are visible to HQ and the service company only, never to other customers, and feed contractor KPIs/SLA (FR-A21, FR-A22). Report a problem creates a requested follow-up job linked by `followUpOfJobId`; HQ classifies it within one business day as rework (free) or a new request (`jobs.classifyFollowUp`).
-- **Resulting business state**: MaintenanceJob.rating and customerConfirmedAt are set; a follow-up job appears in My requests.
+- **Resulting business state**: MaintenanceJob.rating and customerConfirmedAt are set; a follow-up job appears in My requests as “Under HQ review” until HQ classifies it in Admin 06-17/06-18 (FR-A06, IR114); afterwards it shows “Rework (free)” or “New request”.
 - **Boundaries/prohibitions**: Jobs not yet completed cannot be rated or reported (CONFLICT). Details outside 10–2000 characters and more than 5 photos are VALIDATION.
 
 | Acceptance ID | Given / When | Then (observable result) |
@@ -434,11 +436,28 @@ Design: [DD-C17](../02-design/client.md#dd-c17-details). Assess parent AT-C17 us
 
 Design: [DD-C18](../02-design/client.md#dd-c18-details). Assess parent AT-C18 using all N/E/B cases in traceability.
 
+### FR-C19 Customer users (owner)
+
+- **Company request basis**: SRC-06 BIZ-04 — Visual dashboards for customers with role-appropriate access; Figma-confirmed 11a–11c (2026-10-06, DEC-65) add the customer-app screen promised by FR-A17 (“a client owner can also invite members from the customer app”).
+- **Entry conditions**: Client Membership with clientRole=owner of the customer; sidebar Users (`/customer/users`). Members see no Users item; opening the URL directly shows the shared Page unavailable view (FORBIDDEN, IR112).
+- **Main flow**: Users → list of the customer's client users (name, e-mail, role, status, last sign-in) → + Invite member (e-mail; role fixed to Member) → Send invite → the row appears as “Invite pending” with an invitation preview → Resend invite on a pending row (preview).
+- **Business rule BR-C19**: Owners use `clientUsers.list`, `clientUsers.save` without id and with clientRole=member only, and `clientUsers.resendInvite` for invited users (IR114). E-mail is unique per customer and compared case-insensitively (IR111). Owners cannot invite owners, change roles, disable sign-in, reset passwords, or remove users; HQ does that in Customers & units › Users (FR-A17). Invitations and resends are previews only (FR-X05).
+- **Resulting business state**: One ClientUser with status=invited, clientRole=member, and invitedByMembershipId = the owner's Membership; HQ sees the same row in Customers & units › Users.
+- **Boundaries/prohibitions**: Duplicate e-mail → VALIDATION with the input kept. clientRole=owner, a save with id, or `clientUsers.remove` from a client session → FORBIDDEN. Other customers' users are never listed.
+
+| Acceptance ID | Given / When | Then (observable result) |
+|---|---|---|
+| AT-C19-N | customer-a owner Tan Wei (tan.wei@example.com) and member Mei Tan. When: open Users → invite lim.ka@example.com → Resend invite on the new row | ① List shows Tan Wei (Owner, Active) and Mei Tan (Member, Active) ② One ClientUser lim.ka@example.com status=invited, clientRole=member, invitedBy = Tan Wei's Membership ③ Resend returns a NotificationPreview only; zero real sends |
+| AT-C19-E | ① Invite Mei.Tan@example.com ② Member Mei Tan opens /customer/users ③ Owner calls clientUsers.save with clientRole=owner ④ Owner calls clientUsers.remove for Mei Tan | ① VALIDATION (duplicate, case-insensitive), input kept ② Page unavailable (FORBIDDEN); the sidebar has no Users item ③ FORBIDDEN, zero changes ④ FORBIDDEN, zero changes |
+| AT-C19-B | ① Invite with an empty or malformed e-mail ② Resend invite for an active user | ① VALIDATION, zero saves ② VALIDATION (only invited users can be re-invited), zero previews |
+
+Design: [DD-C19](../02-design/client.md#dd-c19-details). Assess parent AT-C19 using all N/E/B cases in traceability.
+
 
 0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 
 Approval applied 2026-09-16: FR-C01/C06 today/7d/30d use display-timezone calendar days and completed minutes (SR17). FR-C13 retries failed demo offsets only on the same record and failed stage (SR18).
 
-Additional current 0.22.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–112. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.24.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–114. They override older text on the same issues; use IR72 for conflict priority.
 
 Job lists support ascending/descending sorting by status (business order), severity, and deadline. Default: status in business order (IR34). Sort all results before pagination; language changes do not change order. Also use AT-REV16-005 for acceptance.

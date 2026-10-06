@@ -7,6 +7,7 @@ import { ROLES, ROLE_KEY, Role, roleFromPath } from "@/lib/nav";
 import { Badge, Banner, Btn, Modal, SummaryList, ToastProvider, cx } from "./ui";
 import { useJobStore } from "@/lib/jobs";
 import { AssistantPanel } from "./Assistant";
+import { CURRENT_CLIENT } from "@/lib/clientUsers";
 
 export function useStoredRole(): Role {
   const pathname = usePathname();
@@ -49,7 +50,7 @@ export function AppShell({ role: forced, children }: { role?: Role; children: Re
   const best = Math.max(0, ...items.map((i) => score(i.href, i.match)));
   const activeHref = best ? items.find((i) => score(i.href, i.match) === best)?.href : undefined;
   const sharedActive = SHARED.find((s) => pathname === s.href);
-  const title = sharedActive?.label ?? (pathname === "/demo" ? "Demo controls" : items.find((i) => i.href === activeHref)?.label ?? "AC Project");
+  const title = sharedActive?.label ?? (pathname === "/customer/users" ? "Users" : pathname === "/demo" ? "Demo controls" : items.find((i) => i.href === activeHref)?.label ?? "AC Project");
 
   const NavLink = ({ href, label, icon, badge, active }: { href: string; label: string; icon: string; badge?: string; active: boolean }) => (
     <Link href={href} aria-current={active ? "page" : undefined} className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold", active ? "bg-primary-soft text-primary" : "text-ink hover:bg-surface2")}>
@@ -72,6 +73,7 @@ export function AppShell({ role: forced, children }: { role?: Role; children: Re
           <nav className="flex flex-col gap-0.5">{items.map((i) => <NavLink key={i.href} {...i} active={i.href === activeHref} />)}</nav>
           <div className="my-2 border-t border-line" />
           <nav className="flex flex-col gap-0.5">
+            {role === "client" && CURRENT_CLIENT.role === "owner" && <NavLink href="/customer/users" label="Users" icon="☺" active={pathname === "/customer/users"} />}
             {SHARED.map((s) => <NavLink key={s.href} {...s} active={pathname === s.href} badge={s.href === "/notifications" ? String(3 + unread) : undefined} />)}
             <Link href="/demo" className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-warn hover:bg-warn-soft/50", pathname === "/demo" && "bg-warn-soft/60")}>
               <span aria-hidden className="w-4 text-center">✦</span>

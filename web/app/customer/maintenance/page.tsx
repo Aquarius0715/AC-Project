@@ -28,7 +28,7 @@ export default function Maintenance({ searchParams }: { searchParams: Promise<{ 
   const [tab, setTab] = useState<StatusTab>("all");
   const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");
   const [selId, setSelId] = useState<string | null>(sp.jobId ?? null);
-  const [modal, setModal] = useState<null | "new" | "decline" | "other" | "rate" | "problem" | "cancel">(null);
+  const [modal, setModal] = useState<null | "new" | "decline" | "other" | "rate" | "problem" | "cancel" | "note">(null);
   const jobs = [...all].sort((a, b) => ORDER.indexOf(a.status) - ORDER.indexOf(b.status));
   const shown = jobs.filter((j) => (tab === "all" || tabOf(j.status) === tab) && (origin === "all" || j.origin === origin));
   const count = (t: StatusTab) => jobs.filter((j) => t === "all" || tabOf(j.status) === t).length;
@@ -54,7 +54,7 @@ export default function Maintenance({ searchParams }: { searchParams: Promise<{ 
                 return (
                   <ListRow key={j.id} selected={sel?.id === j.id} onClick={() => setSelId(j.id)}>
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-muted">{j.id}</span><b>{j.unit}</b><OriginBadge origin={j.origin} /></div>
+                      <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-muted">{j.id}</span><b>{j.unit}</b><OriginBadge origin={j.origin} />{j.followUpOf && <FollowUpBadge j={j} />}</div>
                       <div className="text-xs text-muted">{j.loc} · {j.origin === "plan" ? "Periodic inspection" : j.type}</div>
                       <div className={cx("text-xs", l.warn && "font-semibold text-warn")}>{l.icon} {l.text}</div>
                     </div>
@@ -73,14 +73,15 @@ export default function Maintenance({ searchParams }: { searchParams: Promise<{ 
       {sel && <DeclineModal open={modal === "decline"} j={sel} onClose={() => setModal(null)} onDone={() => { setModal(null); toast("Declined — HQ will look again", "warn"); }} />}
       {sel && <OtherTimeModal open={modal === "other"} j={sel} onClose={() => setModal(null)} onDone={() => { setModal(null); toast("Asked HQ for another time"); }} />}
       {sel && <RateModal open={modal === "rate"} onClose={() => setModal(null)} onDone={() => { rated.add(sel.id); setModal(null); toast("Thanks — job confirmed and rated"); }} />}
-      {sel && <ProblemModal open={modal === "problem"} j={sel} onClose={() => setModal(null)} onDone={() => { rated.add(sel.id); setModal(null); toast("Problem reported — HQ decides rework or a new request", "warn"); }} />}
+      {sel && <ProblemModal open={modal === "problem"} j={sel} onClose={() => setModal(null)} onDone={(id) => { rated.add(sel.id); setModal(null); setSelId(id); toast(`Problem reported — follow-up ${id} is under HQ review`, "warn"); }} />}
+      {sel && <NoteModal open={modal === "note"} j={sel} onClose={() => setModal(null)} onDone={() => { setModal(null); toast("Note sent — HQ, the service partner and the technician can read it"); }} />}
       {sel && <CancelModal open={modal === "cancel"} j={sel} onClose={() => setModal(null)} onDone={() => { setModal(null); toast("Request cancelled", "warn"); }} />}
     </Page>
   );
 }
 const rated = new Set<string>();
 
-function Detail({ j, onClose, open }: { j: Job; onClose: () => void; open: (m: "decline" | "other" | "rate" | "problem" | "cancel") => void }) {
+function Detail({ j, onClose, open }: { j: Job; onClose: () => void; open: (m: "decline" | "other" | "rate" | "problem" | "cancel" | "note") => void }) {
   const toast = useToast();
   const p = j.proposal;
   return (
@@ -88,6 +89,7 @@ function Detail({ j, onClose, open }: { j: Job; onClose: () => void; open: (m: "
       <SummaryList items={[
         ["Unit", `${j.unit} · ${j.loc}`],
         ["Origin · type", j.origin === "plan" ? `Periodic plan · ${j.planId} · visit ${j.planVisit}` : `Client request · ${j.type}`],
+        ...(j.followUpOf ? [["Follow-up of", <span key="f" className="flex flex-wrap items-center gap-2">{j.followUpOf}<FollowUpBadge j={j} /></span>] as [string, React.ReactNode]] : []),
         ...(j.origin === "request" ? [["Request", `“${j.symptom}”`] as [string, string]] : []),
         ...(j.scheduled && j.status !== "time_proposed" ? [[j.origin === "plan" ? "Scheduled" : "Confirmed time", `${longDate(j.scheduled)}${j.origin === "plan" ? " · set by HQ from your plan" : ""}`] as [string, string]] : []),
         ...(j.technician && j.techAck?.status === "accepted" ? [["Technician", `${j.technician}${j.delivery === "contractor" ? ` (${j.contractor})` : " · HQ"}`] as [string, string]] : []),
@@ -126,13 +128,19 @@ function Detail({ j, onClose, open }: { j: Job; onClose: () => void; open: (m: "
           {!rated.has(j.id) && <div className="mt-3 flex justify-end gap-2"><Btn onClick={() => open("problem")}>Report a problem</Btn><Btn variant="primary" onClick={() => open("rate")}>Confirm & rate</Btn></div>}
         </>
       )}
+      {j.status !== "completed" && j.status !== "cancelled" && (
+        <>
+          <p className="mt-4 text-[13px] font-bold">Notes to coordinator</p>
+          {(j.notes ?? []).length === 0 ? <p className="text-xs text-muted">No notes yet.</p> : <ul className="mt-1 flex flex-col gap-1 text-[13px]">{(j.notes ?? []).map((n, i) => <li key={i}><span className="text-muted">You · {n.at} — </span>“{n.text}”</li>)}</ul>}
+        </>
+      )}
       <p className="mt-4 text-[13px] font-bold">History</p>
       <Timeline items={j.history.slice(-5).map((h) => ({ time: h.at, title: h.text }))} />
       <div className="mt-3 flex flex-wrap justify-between gap-2">
         {(j.status === "requested" || j.status === "time_proposed") && j.origin === "request" ? <Btn size="sm" variant="danger" onClick={() => open("cancel")}>Cancel request</Btn> : <span />}
-        <Btn size="sm" onClick={() => toast("Note sent to HQ")}>+ Add note</Btn>
+        {j.status !== "completed" && j.status !== "cancelled" && <Btn size="sm" onClick={() => open("note")}>+ Add note</Btn>}
       </div>
-      <p className="mt-2 text-[11px] text-muted">Cancel is possible until a time is booked. Any time outside your preferred times is booked only after you accept it.</p>
+      <p className="mt-2 text-[11px] text-muted">Cancel is possible until a time is booked. Any time outside your preferred times is booked only after you accept it. Notes can’t change the time or technician.</p>
     </Card>
   );
 }
@@ -212,16 +220,40 @@ function RateModal({ open, onClose, onDone }: { open: boolean; onClose: () => vo
   );
 }
 
-function ProblemModal({ open, j, onClose, onDone }: { open: boolean; j: Job; onClose: () => void; onDone: () => void }) {
+const PROBLEM: Record<"same" | "new" | "incomplete" | "other", string> = { same: "Same problem again", new: "New damage", incomplete: "Work not completed", other: "Other" };
+function ProblemModal({ open, j, onClose, onDone }: { open: boolean; j: Job; onClose: () => void; onDone: (id: string) => void }) {
   const [reason, setReason] = useState<"same" | "new" | "incomplete" | "other">("same");
   const [d, setD] = useState("");
+  const [visit, setVisit] = useState("2026-09-25");
   const [tried, setTried] = useState(false);
+  const [err, setErr] = useState<string | undefined>();
   return (
-    <Modal open={open} onClose={onClose} title={`Report a problem — ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (d.trim().length < 10) return; onDone(); }}>Send report</Btn></>}>
+    <Modal open={open} onClose={onClose} title={`Report a problem — ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (d.trim().length < 10 || d.length > 2000) return; const r = jobActions.reportProblem(j.id, PROBLEM[reason], d.trim(), visit); if ("error" in r) { setErr(r.error); return; } setD(""); setTried(false); onDone(r.id!); }}>Send report</Btn></>}>
       <Field label="What happened?"><Choice value={reason} onChange={setReason} options={[{ id: "same", label: "Same problem again" }, { id: "new", label: "New damage" }, { id: "incomplete", label: "Work not completed" }, { id: "other", label: "Other" }]} /></Field>
-      <Field label="Details (10–2000 characters)" error={tried && d.trim().length < 10 ? "Describe the problem (10+ characters)" : undefined}><Textarea value={d} onChange={(e) => setD(e.target.value)} /></Field>
-      <Field label="Preferred visit (optional)"><Input type="date" defaultValue="2026-09-25" /></Field>
-      <Banner>Creates a follow-up request linked to {j.id}. HQ decides rework (free) or a new request.</Banner>
+      <Field label="Details (10–2000 characters)" error={tried && (d.trim().length < 10 || d.length > 2000) ? "Describe the problem (10–2000 characters)" : undefined}><Textarea value={d} onChange={(e) => setD(e.target.value)} /></Field>
+      <Field label="Preferred visit (optional)"><Input type="date" value={visit} onChange={(e) => setVisit(e.target.value)} /></Field>
+      {err && <Banner tone="crit">{err}</Banner>}
+      <Banner>Creates a follow-up request linked to {j.id} (“Under HQ review”). HQ decides within 1 business day: rework (free) or a new request.</Banner>
+    </Modal>
+  );
+}
+
+function FollowUpBadge({ j }: { j: Job }) {
+  return j.followUpClass === "rework" ? <Badge tone="ok">Rework (free)</Badge> : j.followUpClass === "new_request" ? <Badge tone="primary">New request</Badge> : <Badge tone="warn">Under HQ review</Badge>;
+}
+
+function NoteModal({ open, j, onClose, onDone }: { open: boolean; j: Job; onClose: () => void; onDone: () => void }) {
+  const [t, setT] = useState("");
+  const [tried, setTried] = useState(false);
+  const [err, setErr] = useState<string | undefined>();
+  const bad = !t.trim() || t.length > 2000;
+  return (
+    <Modal open={open} onClose={onClose} title={`Add a note for ${j.id}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (bad) return; const e = jobActions.addNote(j.id, t); if (e) { setErr(e); return; } setT(""); setTried(false); onDone(); }}>Send note</Btn></>}>
+      <Field label="Note to the HQ coordinator (1–2000 characters)" error={tried && bad ? "Write 1–2000 characters" : undefined} hint={`${t.length} / 2000 · Visible to: HQ coordinator${j.delivery === "contractor" ? ` · ${j.contractor}` : ""}${j.technician ? ` · assigned technician (${j.technician})` : ""}`}>
+        <Textarea value={t} onChange={(e) => setT(e.target.value)} placeholder="Please call 30 minutes before arriving — the gate code changed to 4821." />
+      </Field>
+      {err && <Banner tone="crit">{err}</Banner>}
+      <Banner>A note can’t change the visit time or the technician. To move the visit, write it here — HQ sends you a new time to accept. Notes are kept in the job history.</Banner>
     </Modal>
   );
 }

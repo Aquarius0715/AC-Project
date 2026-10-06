@@ -197,7 +197,7 @@ The Figma wireframes (file VOeKPrid46kOf24ktEfe8r; pages Client, Admin, Contract
 - **Search-select filters**: Customer, Property, Unit, and Device filters use one SearchSelect component (states closed, open, typing, no match): the first 20 options are shown and typing searches the rest on the server; the label reads “Name: Value”. Form-field selects inside forms stay ordinary selects.
 - **Status badges**: use the shared StatusBadge sets (Severity Critical/Warning/Info/Normal; Maintenance Requested…Cancelled plus Time proposed (amber ⇄, a requested/offered job with a pending SlotProposal, IR113); Origin Client request (teal ✉) / Periodic plan (purple ↻) shown next to the job ID on every role's job lists and details; Payment Unpaid/Overdue/Processing/Paid; Restriction Applied/Release requested/Released; Power Running/Stopped/Unknown; Unit Online/Offline) and the generic tone set (Neutral, Info, Success, Warning, Danger, Accent) for other labels; job steps use the Job/Progress component (internal and outsourced delivery). Never hand-draw chips.
 - **Buttons**: Primary, Secondary, Soft, Danger, Danger outline, Link in sizes 40/36/30 px with Default/Disabled states.
-- **Shell**: role sidebars (Client, Admin, Contractor, Technician) and a header RoleChip as the right-most header item. Admin sidebar: Overview, Customers & units, Access & roles, Devices & models, Alert policies, Maintenance jobs, Contracts, Billing, Restrictions, Automation policies, Energy analysis, MRV, Offsets, Audit, Notifications (no Air quality page). Contractor sidebar adds Payouts. Shared screens per role: Login, Forgot password, Notifications, Preferences (with Security / two-step verification), Demo controls, and one “Page unavailable (403/404)” screen.
+- **Shell**: role sidebars (Client, Admin, Contractor, Technician) and a header RoleChip as the right-most header item. Admin sidebar: Overview, Customers & units, Access & roles, Devices & models, Alert policies, Maintenance jobs, Contracts, Billing, Restrictions, Automation policies, Energy analysis, MRV, Offsets, Audit, Notifications (no Air quality page). Contractor sidebar adds Payouts. Client sidebar adds Users below the divider for owners only (FR-C19, IR114). Shared screens per role: Login, Forgot password, Notifications, Preferences (with Security / two-step verification), Demo controls, and one “Page unavailable (403/404)” screen.
 
 ## UX-09. Screen and Component implementation contracts (0.17.0)
 
@@ -211,7 +211,7 @@ For shared routes, select schedule/event for C04/C05 and payment/restriction/inq
 
 Approvals applied on 2026-09-16: Use SR17 for period presets. Show the offset retry button only for failed, and label the failed purchase/retirement stage (SR18). Follow SR19 for contract edit denial reasons and links to restriction cancellation/release.
 
-Additional contracts for current version 0.22.0: Read IR01–112 in the [review resolution contracts](../02-design/review-resolution-contracts.md). They take priority over older text on the same issue; follow IR72 when rules conflict.
+Additional contracts for current version 0.24.0: Read IR01–114 in the [review resolution contracts](../02-design/review-resolution-contracts.md). They take priority over older text on the same issue; follow IR72 when rules conflict.
 
 0.14.0: Under IR25, get the address before acceptance from the unit's installation property. After expiry, freeze only whether a report exists and its acceptance status.
 

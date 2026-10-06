@@ -43,6 +43,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | DD-C16 / FR-C16 | `/customer/energy` / `EnergyReportExport` | `energy.exportReport` | Completed month, at least one section, PDF/CSV | Same tariff and estimation labels as the screen |
 | DD-C17 / FR-C17 | `/customer/maintenance?jobId=` / `JobCompletionFeedback` | `jobs.get`, `jobs.rate`, `jobs.reportProblem` | 1–5 ★ required; editable 7 days; problem details 10–2000, up to 5 photos | Not completed → CONFLICT; ratings never shown to other customers |
 | DD-C18 / FR-C18 | `/customer/maintenance?tab=filter-care` / `FilterCare` | `filterCare.list`, `filterCare.markCleaned`, `filterCare.saveSettings` | Run time since cleaning per AC; threshold 50–2000 h or model default; fallback days 7–180 | Offline → unknown, never 0 |
+| DD-C19 / FR-C19 | `/customer/users` / `ClientUsers` | `clientUsers.list`, `clientUsers.save`, `clientUsers.resendInvite` | Owner only; invite e-mail unique per customer (case-insensitive); role fixed to member | Owners cannot change roles, disable, reset passwords, or remove users (HQ, DD-A17) |
 
 ## Shared Implementation Steps
 
@@ -359,6 +360,8 @@ Scope: FR-C09 / Main display pattern: **UI-LIST / UI-FORM / UI-DETAIL**. Service
 
 **Verification**: Check the traceability entries under AT-C09 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
+**Coordination notes (IR114)**: The job detail lists “Notes to coordinator” and “+ Add note” for jobs that are not completed or cancelled. The dialog (07o) takes 1–2000 characters and calls `jobs.addNote` with visibility=customer; on success the note appears in the list (07p) and HQ (plus the contractor of a delegated job) receives one job_update notification. Notes never change the slot, assignee, or status.
+
 ### DD-C10 Details
 
 **Source mapping**: SRC-06 BIZ-21 → FR-C10 → DD-C10. Source category: original company requirements SRC-06 + design additions. Design additions: contract lists and invoice states. Field types, required status, defaults, and action order are implementation proposals.
@@ -620,12 +623,37 @@ Scope: FR-C18 / Main display pattern: **UI-LIST**. Service boundary: `filterCare
 
 **Verification**: Check the traceability entries under AT-C18 (N/E/B).
 
+### DD-C19 Details
+
+**Source mapping**: SRC-06 BIZ-04 → FR-C19 → DD-C19. Source category: Figma-confirmed screen specification (Client 11a–11c, 2026-10-06, DEC-65).
+
+Scope: FR-C19 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `clientUsers.list, clientUsers.save, clientUsers.resendInvite`.
+
+**Initial view and prerequisites**: clientRole=owner; sidebar Users (`/customer/users`), shown only for owners (Shell sidebar variant Active=users).
+
+| Field | Type / required | Default / constraints | Purpose |
+|---|---|---|---|
+| email | string/required | Valid address, unique per customer (case-insensitive) | Invitation |
+| clientRole | enum (fixed) | member; owners cannot choose owner | Role |
+| status | Read-only | invited / active / disabled | Account state |
+| lastSignInAt | Read-only | null = never signed in | Activity |
+
+**Steps**
+
+1. `clientUsers.list` (customerId = own customer) shows name, e-mail, role, status, and last sign-in; invited rows show “Invite pending” and Resend invite.
+2. + Invite member opens a centered dialog (e-mail; role Member locked with “Ask HQ to make someone an owner”) → `clientUsers.save` without id → the list refetches and an invitation preview is shown.
+3. Resend invite calls `clientUsers.resendInvite` (preview only).
+
+**Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept, 11c). Member sessions have no sidebar item; the direct URL shows Page unavailable (FORBIDDEN). Role change, disable, password reset, and removal are not offered (HQ, DD-A17).
+
+**Verification**: Check the traceability entries under AT-C19 (N/E/B).
+
 Convert condition forms to the Condition type's discriminated union. occupancy is {type,occupied}, location is {type,event}, pattern is {type,localTime}, weather is {type,metric:"temperature",operator,value}, tariff is {type,operator,value,unit:"MYR_per_kWh"}, peak is {type,active}, and solar/battery is {type,operator,value,unit:"kW"}. Do not send an extra params wrapper. Use weather_temperature for weather Fact.metric; do not confuse it with the room-temperature Fact temperature.
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
 2026-09-16 approved updates: C01/C06 period boundaries follow SR17. C13 retry follows SR18 like A15; get the current version and attemptId through offsets.list.
 
-Additional contracts for current version 0.22.0: Read IR01–112 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.24.0: Read IR01–114 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.
