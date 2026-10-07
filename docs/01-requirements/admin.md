@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # Administrator and HQ requirements
 
-**0.25.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.29.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Purpose and assumptions
 
@@ -558,7 +558,7 @@ Design: [DD-A23](../02-design/admin.md#dd-a23-details). Assess parent AT-A23 usi
 
 Approval applied 2026-09-16: FR-A07/A09 reject contract edits during active restrictions and allow them after cancellation/release completes (SR19). FR-A15 retries only the failed stage of the same failed record with a new attempt; retirement failure retains the purchased reference (SR18).
 
-Additional current 0.25.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–115. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.29.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–119. They override older text on the same issues; use IR72 for conflict priority.
 
 0.15.0: FR-A06 quality review uses IR29 completion times and IR31 self-approval prohibition for all contributors.
 

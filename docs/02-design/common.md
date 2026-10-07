@@ -39,9 +39,9 @@ tests/                unit, component, contract, e2e
 
 Data dependencies run in this order: `page → feature hook → Repository interface → injected adapter`. The domain layer (business rules) depends on neither React, HTTP, nor mocks. Pages must not use fetch, mock seeds (initial data), or localStorage directly. Only the composition-root selects the adapter.
 
-Screen navigation follows the same approach. Pages and feature hooks must not call React Router APIs (`useNavigate`, `useParams`, `useLocation`, etc.) directly. Instead, they use a small Navigation interface under `shared` (for example, `navigateTo(routeKey, params)` and `getParam(name)`). Only the composition-root knows its React Router implementation. As with the Repository pattern, this separates the interface from its implementation, so a future router change affects only the Navigation interface implementation.
+Screen navigation follows the same approach. Pages and feature hooks must not call router APIs (`useRouter`, `useParams`, `usePathname`, `useSearchParams`, etc.) directly. Instead, they use a small Navigation interface under `shared` (for example, `navigateTo(routeKey, params)` and `getParam(name)`). Only the composition-root knows its router implementation (Next.js App Router, DEC-67). As with the Repository pattern, this separates the interface from its implementation, so a future router change affects only the Navigation interface implementation.
 
-The proposed stack (PROPOSED) is TypeScript (strict mode), React, Vite, and React Router. The app will be an SPA (single-page application) because server-side HTML rendering (SSR) is not required. Direct URL access (deep links) will require an SPA fallback setting on the future hosting service. At implementation start, check library version compatibility and fix versions in a lockfile. App startup commands do not exist yet, so this document does not claim that the app has been tested.
+The stack is TypeScript (strict mode), React, and **Next.js (App Router)** (DEC-67, IR116; this replaces the earlier Vite + React Router SPA proposal). In Phase 1A all screens are client components that call the mock adapter, so the demo can be served as a static or Node-hosted build. In production the same Next.js app is also the BFF (backend for frontend): it keeps the server-side session and relays operations to the Core API ([backend architecture](backend-architecture.md)); the browser never calls the Core API directly. The `src/` tree above maps to Next.js as `app/` (routes and route groups), with features/domain/infrastructure/shared as plain modules. At implementation start, check library version compatibility and fix versions in a lockfile.
 
 ## 2. Shared Routes and Screen States
 
@@ -234,8 +234,8 @@ Make clocks, ID generation, and success/failure results replaceable. Avoid tests
 - UI loading/error/empty/pending/confirmed states, and rules for discarding views on role changes.
 - Frontend verification using simulated responses.
 
-API paths, HTTP methods, databases, server authentication and authorization, real payments, real notifications, and real device control are outside this document's design scope. Their open status does not prevent completion of these frontend documents.
+API paths, HTTP methods, databases, server authentication and authorization, real payments, real notifications, and real device control are outside this document's design scope. Their open status does not prevent completion of these frontend documents. The production target is designed separately at a logical, cloud-agnostic level in the [backend architecture](backend-architecture.md) and [network architecture](network-architecture.md) (IR116); those documents do not change Phase 1A.
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.25.0: Read IR01–115 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.29.0: Read IR01–119 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

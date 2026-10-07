@@ -1,2 +1,5 @@
 docs/05-document-review/
 .DS_Store
+
+# Docker local environment (container-design.md)
+.env.local

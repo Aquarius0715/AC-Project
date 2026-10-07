@@ -996,3 +996,41 @@ User decision 2026-10-07 (DEC-66): the consistency check between the Figma Use C
 7. **Illustrative IDs.** Figma examples that are not in the fixture keep their role-page meaning and are not seed data: job-c07 (Client Bedroom AC #2 request used for the IR113 scheduling walkthrough), job-c09 (follow-up of job-c02, IR114), mrv-a14-a / mrv-aug-a, policy-peak-a, restriction-x06, stmt-2026-09 and similar. Acceptance cases use only fixture-contract IDs.
 8. **Cross-cutting requirements.** FR-X03 (status and quality labels) and FR-X06 (capabilities and contract types) have no use case of their own; every use case that shows telemetry or capability-gated actions applies them, and the use-case catalogue notes this.
 
+## IR116 Frontend stack, production backend, and network design — 2026-10-07
+
+User decision 2026-10-07 (DEC-67): the frontend stack is Next.js (App Router), as already implemented in `web/`, and the production backend and network are designed at a logical, cloud-agnostic level. Phase 1A scope, screens, operations, and acceptance criteria do not change.
+
+1. **Frontend stack.** TypeScript strict + React + Next.js App Router replaces the Vite + React Router SPA proposal ([common design §1](common.md#1-structure-and-responsibilities)). The layered rules stay: pages call feature hooks, hooks call the Repository interface, only the composition root selects the adapter and the router (Navigation interface). In production the Next.js app is also the BFF; the browser never calls the Core API directly.
+2. **Backend.** A modular monolith Core API implements the 197 operations exactly as catalogued (`POST /v1/ops/<operation>`, ServiceResult / DomainError with fixed HTTP status mapping, Idempotency-Key, expected versions), with separately deployed IoT, scheduler, notification, import / export, webhook, and outbox workers ([backend architecture](backend-architecture.md)).
+3. **Network.** Only the edge is public (`app`, `hooks`, `mqtt`, `files`); application and data zones are private; devices connect outbound only over MQTT with mutual TLS; egress uses an allowlist ([network architecture](network-architecture.md)).
+4. **Status.** Both documents are PROPOSED; hosting, region, AC device interface, payment and messaging providers, retention, and fleet size remain OPEN (OPEN-BE-01…06, OPEN-NW-01…04). They are not Phase 1A acceptance inputs.
+
+## IR117 AWS, Stripe, HQ network restriction, retention, and capacity — 2026-10-07
+
+User decision 2026-10-07 (DEC-68) for the production target in the [backend architecture](backend-architecture.md) and [network architecture](network-architecture.md). Phase 1A is unchanged.
+
+1. **Hosting.** AWS; primary region ap-southeast-5 (Malaysia), DR and services not yet available there in ap-southeast-1 (Singapore). Component mapping: backend architecture §3a, network architecture §2a.
+2. **Payments.** Stripe Checkout (MYR; cards and FPX as enabled). `payments.simulate` becomes a Checkout Session; PaymentConfirmed is set only after a verified webhook and a PaymentIntent retrieval; restriction release keeps IR35. Contractor payouts stay outside Stripe until OPEN-BE-07 is decided.
+3. **HQ network restriction.** The HQ admin app is served only on `admin.<domain>`, allowed by WAF only from the company network (office and company VPN egress addresses). Admin-role sessions are issued only there, and the Core API rejects admin-role operations without that session mark (FORBIDDEN → shared Page unavailable). Other roles are not restricted.
+4. **Retention and capacity.** Set by the design (backend architecture §7 and §13): billing records 7 years, audit 7 years in S3 Object Lock, raw telemetry 35 days hot / 13 months in S3, hourly aggregates 7 years; launch 3,000 units, design capacity 20,000 units. Confirm retention with legal counsel before go-live.
+5. **Customer office firewall requirements.** Outbound TCP 8883 (or 443 WSS) to `mqtt.<domain>` by name, no TLS inspection, DNS and NTP, no inbound (network architecture §5a).
+6. **Still OPEN.** AC manufacturer interface (OPEN-BE-02), WhatsApp provider (OPEN-BE-04), payout rail (OPEN-BE-07), cellular SIM provider (OPEN-NW-02).
+
+## IR118 Backend implementation in Go + Echo and database design — 2026-10-07
+
+User decision 2026-10-07 (DEC-69): the backend is implemented in Go with the Echo framework. The implementation design is the [backend Go design](backend-go-design.md); the database is the [database design](database-design.md) with the executable [db/schema.sql](db/schema.sql). Phase 1A is unchanged.
+
+1. **API.** One Echo route `POST /v1/ops/:operation` dispatches the 197 catalogued operations; the registry is generated from the operation catalog and every operation has exactly one handler. Inputs are decoded strictly; DomainError uses the nine `ErrorCode` values with a fixed HTTP mapping (VALIDATION 422, UNAUTHENTICATED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT 409, OFFLINE 409, TIMEOUT 504, RATE_LIMITED 429, UNAVAILABLE 503).
+2. **Transactions.** Each operation runs in one PostgreSQL transaction that sets `app.tenant_id` for row-level security, writes audit and outbox rows before commit, and uses optimistic versions; scoped zero-row writes are NOT_FOUND (D01), version mismatches CONFLICT.
+3. **Database.** Aurora PostgreSQL 16, one schema per module, no cross-schema foreign keys, tenant-scoped foreign keys, business rules encoded as constraints where they need no clock or other module (database design §5), partitioned telemetry and audit with the IR117 retention.
+4. **Verification.** db/schema.sql was applied to PostgreSQL 16 and the core Go pipeline was compiled and tested against it on 2026-10-07 (backend Go design §1). These are design checks, not Phase 1A acceptance.
+
+## IR119 Everything runs in Docker — 2026-10-07
+
+User decision 2026-10-07 (DEC-70): all application components run as Docker images in every environment; production data and messaging stay AWS managed services. Design: [container design](container-design.md); files: repository-root `compose.yaml`, `web/Dockerfile`, `docker/`.
+
+1. **Images.** `ac-web` (Next.js standalone; demo mock mode and production BFF) and `ac-backend` (Go binaries api, webhook, worker, migrate; dev target adds iotbridge and devicesim). Distroless, non-root, read-only root filesystem, linux/arm64 (+ amd64 for developers), secrets only at run time.
+2. **Local and CI.** Docker Compose profiles `demo`, `infra`, `schema`, `backend`, `full`, `obs`, `stripe`; containers stand in for Aurora (PostgreSQL 16), ElastiCache (Valkey), SQS/SNS/Kinesis/S3/SES/Secrets Manager (LocalStack), IoT Core (Mosquitto + iot-bridge), Cognito (Keycloak), Stripe (stripe-mock / Stripe CLI), weather (WireMock).
+3. **Staging and production.** The same image digests run on ECS Fargate (container design §5); Compose is never used there.
+4. **Toolchain.** Go 1.25 or later (current pgx v5 requires it); Node 22 LTS for the web image. The Phase 1A demo can be started with `docker compose --profile demo up`; Phase 1A scope is unchanged.
+

@@ -1,0 +1,56 @@
+{
+  "realm": "ac",
+  "enabled": true,
+  "displayName": "AC Project (local Cognito stand-in)",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "clients": [
+    {
+      "clientId": "ac-web",
+      "name": "Client / Partner / Technician apps (app.<domain>)",
+      "publicClient": false,
+      "secret": "local-ac-web-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"],
+      "attributes": { "pkce.code.challenge.method": "S256" }
+    },
+    {
+      "clientId": "ac-admin-web",
+      "name": "HQ admin app (admin.<domain>, company network only)",
+      "publicClient": false,
+      "secret": "local-ac-admin-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"],
+      "attributes": { "pkce.code.challenge.method": "S256" }
+    }
+  ],
+  "users": [
+    {
+      "username": "hq-operator",
+      "email": "hq-operator@ac.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "HQ",
+      "lastName": "Operator",
+      "credentials": [{ "type": "password", "value": "local-pass", "temporary": false }],
+      "requiredActions": ["CONFIGURE_TOTP"]
+    },
+    {
+      "username": "tan.wei",
+      "email": "tan.wei@ac.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Tan",
+      "lastName": "Wei",
+      "credentials": [{ "type": "password", "value": "local-pass", "temporary": false }]
+    }
+  ]
+}
