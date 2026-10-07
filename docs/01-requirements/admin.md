@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # Administrator and HQ requirements
 
-**0.24.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.25.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Purpose and assumptions
 
@@ -165,7 +165,7 @@ Notify about increased load possibly caused by open windows or poor insulation, 
 
 - **Entry conditions**: alert.read for the Alerts tab (alert.resolve to resolve); alert.policy.read to view and alert.policy.write to change policies; recipient-view permission; metric units known.
 - **Main flow**: Alerts tab: filter (customer/property/unit search-selects, status, severity) → alert detail → Acknowledge / Resolve (reason + evidence) / Request maintenance (new job prefilled) / Open unit. Policies tab (grouped Default → per customer): choose the owner customer → basics (name, priority, timezone) → metric/comparison/threshold/duration/recovery → optional active hours → severity → recipients/channels, cooldown, escalation → notification preview → test with demo data → save. Units attach the policy on their unit edit page (FR-A02).
-- **Business rule BR-A05**: A policy belongs to one customer (owner fixed after creation) and has one condition; its attached units are read-only here (IR108). The HQ default policy (6 rules: ventilation CO₂ ≥ 1000 ppm, PM2.5 ≥ 35 µg/m³, refrigerant low pressure, compressor short-cycling, clogged filter, AC offline) runs on every unit and cannot be detached or deleted; its limits are HQ-only, each rule can be switched on/off per customer (`policies.setDefaultRule`) by the client or by HQ for that customer, and “Copy as a customer policy” creates an unsaved editable copy. Saving the default policy affects all units. Metric units are fixed. Do not use missing/stale data as normal threshold readings; route to connection/quality notices. Cooldown suppresses repeated notices; severity change is a new notification reason.
+- **Business rule BR-A05**: A policy belongs to one customer (owner fixed after creation) and has one condition; its attached units are read-only here (IR108). The HQ default policy (6 rules: ventilation CO₂ ≥ 1000 ppm, PM2.5 ≥ 35 µg/m³, refrigerant low pressure, compressor short-cycling, clogged filter, AC offline) runs on every unit and cannot be detached or deleted; its limits are HQ-only, each rule can be switched on/off per customer (`policies.setDefaultRule`) by the client owner (clientRole=owner; members are read-only, IR115) or by HQ (alert.policy.write) for that customer, and “Copy as a customer policy” creates an unsaved editable copy. Saving the default policy affects all units. Metric units are fixed. Do not use missing/stale data as normal threshold readings; route to connection/quality notices. Cooldown suppresses repeated notices; severity change is a new notification reason.
 - **Resulting business state**: Save Policy version. Matching conditions create Alert and Notification preview. Notification read status differs from Alert acknowledgment.
 - **Boundaries/prohibitions**: Reject no recipients, zero duration, and recovery thresholds inconsistent with comparison direction. Check just-below/equal thresholds and duration boundaries.
 
@@ -558,7 +558,7 @@ Design: [DD-A23](../02-design/admin.md#dd-a23-details). Assess parent AT-A23 usi
 
 Approval applied 2026-09-16: FR-A07/A09 reject contract edits during active restrictions and allow them after cancellation/release completes (SR19). FR-A15 retries only the failed stage of the same failed record with a new attempt; retirement failure retains the purchased reference (SR18).
 
-Additional current 0.24.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–114. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.25.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–115. They override older text on the same issues; use IR72 for conflict priority.
 
 0.15.0: FR-A06 quality review uses IR29 completion times and IR31 self-approval prohibition for all contributors.
 

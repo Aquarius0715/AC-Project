@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # Client requirements
 
-**0.24.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.25.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Purpose and assumptions
 
@@ -43,7 +43,7 @@ P0 means the core foundational flow. P1 is also required for completion in phase
 | FR-C12 | P0 | Company original SRC-06 + added design details / BIZ-21 | Restriction explanation | View start time, reason, scope, and release conditions. After payment, show release pending until device response. |
 | FR-C13 | P1 | Company original SRC-06 + added design details / BIZ-23, BIZ-24, BIZ-25, BIZ-26 | Emissions/offset access | Show estimated CO₂ emissions (kgCO₂e) and calculation conditions. Only interested users proceed to demo offset requests/records. |
 | FR-C14 | P1 | Figma-confirmed screen specification 2026-10-01 (02m/02n) / BIZ-13 | Group control | The customer owner selects several ACs in one room or area and sends one setting change; each AC gets its own command, offline/restricted ACs are skipped and shown before sending. |
-| FR-C15 | P0 | Figma-confirmed screen specification 2026-10-01 (02e/02l/06e–06g) / BIZ-08, BIZ-17, BIZ-18 | Customer alert policies | View the HQ default policy and switch each rule on/off for the account; create, edit, and delete own alert policies; attach/detach them on each AC. |
+| FR-C15 | P0 | Figma-confirmed screen specification 2026-10-01 (02e/02l/06e–06g) / BIZ-08, BIZ-17, BIZ-18 | Customer alert policies | View the HQ default policy (the owner switches each rule on/off for the account, IR115); create, edit, and delete own alert policies; attach/detach them on each AC. |
 | FR-C16 | P1 | Figma-confirmed screen specification 2026-10-01 (04g) / BIZ-16, BIZ-23 | Monthly energy report export | Export a monthly energy/cost report as PDF or CSV and opt in to a monthly email copy. |
 | FR-C17 | P1 | Figma-confirmed screen specification 2026-10-01 (07g–07i) / BIZ-12 | Confirm, rate, and report a problem | After HQ accepts the report, confirm the job and rate it; report a problem that creates a follow-up request. |
 | FR-C18 | P1 | Figma-confirmed screen specification 2026-10-01 (07j) / BIZ-18, BIZ-12 | Filter care | Show filter run time since cleaning per AC with reminders; mark self-cleaning or request cleaning. |
@@ -371,16 +371,16 @@ Design: [DD-C14](../02-design/client.md#dd-c14-details). Assess parent AT-C14 us
 ### FR-C15 Customer alert policies
 
 - **Company request basis**: SRC-06 BIZ-08, BIZ-17, BIZ-18 — Fault and air-quality notifications; Figma-confirmed 06e–06g/02e/02l (2026-10-01).
-- **Entry conditions**: Client Membership of the customer; editing requires owner or member of that customer (policies belong to the customer, not the user).
-- **Main flow**: Alerts › Alert policies → view the default policy (HQ limits) and switch rules on/off → create or edit an own policy (what to watch, condition, recovery, “only if” hours, severity, channels) → attach it on each AC's page.
-- **Business rule BR-C15**: Every AC carries the HQ default policy (6 rules: ventilation CO₂, dust/PM2.5, refrigerant leak, compressor short-cycling, clogged filter, AC offline). Clients cannot edit its limits but can switch each rule on/off for all their ACs (`policies.setDefaultRule`). Own policies (`kind=alert`, `customerId` = own customer) carry one condition; units carry policies (`units.setAlertPolicies`), never the reverse. Editing changes the policy on every attached AC. Delete detaches it from all ACs first after confirmation; the default policy cannot be deleted. Recovery must be on the correct side of the threshold; units are fixed per metric (ppm/µg/m³ never mixed). WhatsApp is offered only when allowed in Preferences. Missing/stale readings never trigger.
+- **Entry conditions**: Client Membership of the customer; editing own policies requires owner or member of that customer (policies belong to the customer, not the user). Switching default-policy rules requires clientRole=owner (IR115); members see the toggles read-only.
+- **Main flow**: Alerts › Alert policies → view the default policy (HQ limits) and, as owner, switch rules on/off → create or edit an own policy (what to watch, condition, recovery, “only if” hours, severity, channels) → attach it on each AC's page.
+- **Business rule BR-C15**: Every AC carries the HQ default policy (6 rules: ventilation CO₂, dust/PM2.5, refrigerant leak, compressor short-cycling, clogged filter, AC offline). Clients cannot edit its limits; the customer owner can switch each rule on/off for all their ACs (`policies.setDefaultRule`, owner only — a member call is FORBIDDEN and nothing changes, IR115). Own policies (`kind=alert`, `customerId` = own customer) carry one condition; units carry policies (`units.setAlertPolicies`), never the reverse. Editing changes the policy on every attached AC. Delete detaches it from all ACs first after confirmation; the default policy cannot be deleted. Recovery must be on the correct side of the threshold; units are fixed per metric (ppm/µg/m³ never mixed). WhatsApp is offered only when allowed in Preferences. Missing/stale readings never trigger.
 - **Resulting business state**: Policy version+1 on save; DefaultRuleSetting per customer and rule; ACUnit.alertPolicyIds updated on attach/detach. Alerts remain view-only for clients (no Resolve).
 - **Boundaries/prohibitions**: Other customers' policies and the HQ template limits are not editable. Attaching another customer's policy returns NOT_FOUND.
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-C15-N | customer-a. When: create “Stuffy office” CO₂ ≥ 1200 ppm 15 min, recover < 1000, Mon–Fri 08:00–19:00, Warning, in-app → attach to Workstations AC 1 and 2 → switch default rule “AC offline” off | ① Policy version=1, customerId=customer-a ② Both ACs list it under “Alert policies on this AC” ③ DefaultRuleSetting enabled=false for customer-a; other customers unchanged |
-| AT-C15-E | ① Recovery 1300 ppm for ≥ 1200 ② Delete the default policy ③ Attach customer-b's policy to Bedroom AC | ① VALIDATION, nothing saved ② VALIDATION (default cannot be deleted) ③ NOT_FOUND |
+| AT-C15-N | customer-a owner. When: create “Stuffy office” CO₂ ≥ 1200 ppm 15 min, recover < 1000, Mon–Fri 08:00–19:00, Warning, in-app → attach to Workstations AC 1 and 2 → switch default rule “AC offline” off | ① Policy version=1, customerId=customer-a ② Both ACs list it under “Alert policies on this AC” ③ DefaultRuleSetting enabled=false for customer-a; other customers unchanged |
+| AT-C15-E | ① Recovery 1300 ppm for ≥ 1200 ② Delete the default policy ③ Attach customer-b's policy to Bedroom AC ④ Member session switches default rule “AC offline” | ① VALIDATION, nothing saved ② VALIDATION (default cannot be deleted) ③ NOT_FOUND ④ Toggles are read-only with “Only the account owner can change this”; a direct `policies.setDefaultRule` call is FORBIDDEN and DefaultRuleSetting is unchanged |
 | AT-C15-B | ① Delete “Bedroom too hot” attached to 2 ACs ② Missing CO₂ readings for 20 min | ① Confirmation names both ACs; policy detached then deleted ② No alert; “not measured” shown |
 
 Design: [DD-C15](../02-design/client.md#dd-c15-details). Assess parent AT-C15 using all N/E/B cases in traceability.
@@ -458,6 +458,6 @@ Design: [DD-C19](../02-design/client.md#dd-c19-details). Assess parent AT-C19 us
 
 Approval applied 2026-09-16: FR-C01/C06 today/7d/30d use display-timezone calendar days and completed minutes (SR17). FR-C13 retries failed demo offsets only on the same record and failed stage (SR18).
 
-Additional current 0.24.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–114. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.25.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–115. They override older text on the same issues; use IR72 for conflict priority.
 
 Job lists support ascending/descending sorting by status (business order), severity, and deadline. Default: status in business order (IR34). Sort all results before pagination; language changes do not change order. Also use AT-REV16-005 for acceptance.

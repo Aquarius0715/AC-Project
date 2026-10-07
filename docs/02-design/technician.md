@@ -77,6 +77,7 @@ Scope: FR-T01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.l
 2. Apply these business conditions to reads and actions. “Not addressed” means jobs assigned to the user that have not started, not all requested jobs. Internal users viewing multiple jobs must still stay within their tenant and assigned scope.
 3. This screen is read-only. For zero scheduled jobs, show an empty state and a way to view past history.
 4. Queries to update: `jobs / assignments / alerts`.
+5. Tabs (IR115, Figma Technician 01-1/01-2): `tab=today` (default; jobs scheduled today) and `tab=all` (all assigned jobs, opened from Sidebar › Assigned jobs).
 
 **Boundary cases and failures**: Hide live unit information when an external technician's assignment expires. Before work starts, show assigned jobs as read-only within the viewing window; actions before the work window return FORBIDDEN (IR49). Directly entering another technician's job ID must not allow work to start.
 
@@ -158,6 +159,7 @@ Scope: FR-T04 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, 
 2. The target group is `indoor`. Components are `filter / evaporator_coil / blower_motor / blower_fan / drain_pipe / drain_pan / outlet / louver`. The initial result is `null` (not entered). To submit without inspection, explicitly choose `not_inspected` and enter a reason. If the unit has no such component, choose `not_applicable` and record a reason.
 3. Link inspection results to the report version, author, and observation time. Keep sensor estimates as separate evidence. Do not overwrite original sensor data with on-site inspection results.
 4. Queries to update: `report draft / inspection items`.
+5. Tabs (IR115, Figma Technician 02-2/02-3/02-29): the URL `tab` selects the checklist group — `tab=indoor` (default), `tab=outdoor`, `tab=electrical` (DD-T05/DD-T06 use the same layout). The side view switch Readings / Parts & refrigerant / Time on site (DD-T14) is local state, not a URL key; photos attach to components and readings, and the work report (submit, customer sign-off DD-T15) is the footer panel, not a tab.
 
 **Boundary cases and failures**: Reject missing entries, measurements without units, not-inspected results without reasons, and photos from other jobs. Never default to normal and treat uninspected work as complete.
 
@@ -469,6 +471,6 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 
 0.10.0: T12 fetches alerts.get using DeviceEvent.alertIds and acknowledges using Alert.version (SR23). Filter device history by scope at event time (SR24).
 
-Additional contracts for current version 0.24.0: Read IR01–114 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.25.0: Read IR01–115 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

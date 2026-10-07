@@ -537,7 +537,7 @@ Scope: FR-C15 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 **Steps**
 
-1. Alert policies tab: the default policy card (“Limits set by HQ · on/off is yours”) lists six rules with condition, type, severity, and an On toggle; toggling calls `policies.setDefaultRule` for the customer (applies to all its ACs).
+1. Alert policies tab: the default policy card (“Limits set by HQ · on/off is set by the account owner”) lists six rules with condition, type, severity, and an On toggle; toggling calls `policies.setDefaultRule` for the customer (applies to all its ACs). Only clientRole=owner can toggle (IR115); members see disabled toggles with “Only the account owner can change this”.
 2. “Your policies” lists each policy with its When/Then sentences, attached ACs, Edit and ⋯ (Delete). “+ Create policy” and Edit open the editor (centered panel) with a live summary sentence.
 3. Save calls `policies.save` (kind=alert, customerId=own customer). Attaching happens on each AC (DD-C03) via `units.setAlertPolicies`; the editor shows “Attached to” read-only.
 4. Delete confirms with the attached AC names; `policies.delete` detaches from every unit and deletes (IR108).
@@ -654,6 +654,6 @@ Convert condition forms to the Condition type's discriminated union. occupancy i
 
 2026-09-16 approved updates: C01/C06 period boundaries follow SR17. C13 retry follows SR18 like A15; get the current version and attemptId through offsets.list.
 
-Additional contracts for current version 0.24.0: Read IR01–114 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.25.0: Read IR01–115 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

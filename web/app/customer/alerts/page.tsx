@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CURRENT_CLIENT } from "@/lib/clientUsers";
 import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, ErrorState, Field, Input, Modal, OnOffBadge, Page, Select, SeverityBadge, SummaryList, Tabs, Toggle, cx, useToast } from "@/components/ui";
 
 type Alert = { id: string; title: string; sev: "warning" | "info"; kind: string; icon: string; where: string; ev: string; group: "attn" | "info"; read: boolean };
@@ -34,6 +35,8 @@ export default function Alerts() {
   const info = list.filter((a) => a.group === "info" && show(a));
   const openAlert = (a: Alert) => { setOpen(a); setList((l) => l.map((x) => (x.id === a.id ? { ...x, read: true } : x))); };
   const recOk = +f.rec < +f.val;
+  // policies.setDefaultRule is owner-only in the customer app (FR-C15, IR115); members see the rules read-only.
+  const isOwner = CURRENT_CLIENT.role === "owner";
 
   const Item = ({ a }: { a: Alert }) => (
     <button onClick={() => openAlert(a)} className="flex w-full items-start gap-3 border-t border-line px-1 py-3 text-left first:border-0 hover:bg-surface2/50">
@@ -59,9 +62,10 @@ export default function Alerts() {
       ) : (
         <>
           <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-[15px] font-bold">Alert policies</h2><p className="max-w-xl text-xs text-muted">A policy is a set of limits. It only runs on the ACs you attach it to (open an AC › Alert policies). Every AC also has the default policy.</p></div><Btn variant="primary" onClick={() => { setEdit("new"); setF({ name: "", metric: "co2", op: "≥", val: "1200", dur: "15", rec: "1000", sev: "warning" }); }}>+ Create policy</Btn></div>
-          <Card title="Default policy" sub="Limits set by HQ · on / off is yours">
-            <p className="mb-3 text-xs text-muted">Covers ventilation and the usual causes of breakdowns. It is attached to every AC and cannot be detached or edited, but you can switch each rule on or off for your account (all your ACs). Ask HQ if a limit should change.</p>
-            <div className="scroll-x"><table className="w-full text-left text-[13px]"><thead className="text-[11px] uppercase text-muted"><tr><th className="py-1.5 pr-3">Rule</th><th className="pr-3">Condition</th><th className="pr-3">Severity</th><th>On</th></tr></thead><tbody>{defaultRules.map((r, i) => <tr key={r[0]} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{r[0]}</td><td className="pr-3">{r[1]}</td><td className="pr-3"><SeverityBadge s={r[2].toLowerCase() as "warning"} /></td><td><Toggle on={rules[i]} onChange={(v) => setRules((s) => s.map((x, j) => (j === i ? v : x)))} label={r[0]} /></td></tr>)}</tbody></table></div>
+          <Card title="Default policy" sub="Limits set by HQ · on / off is set by the account owner">
+            <p className="mb-3 text-xs text-muted">Covers ventilation and the usual causes of breakdowns. It is attached to every AC and cannot be detached or edited, but the account owner can switch each rule on or off for your account (all your ACs). Ask HQ if a limit should change.</p>
+            {!isOwner && <p className="mb-3 text-xs text-warn">Only the account owner can change this.</p>}
+            <div className="scroll-x"><table className="w-full text-left text-[13px]"><thead className="text-[11px] uppercase text-muted"><tr><th className="py-1.5 pr-3">Rule</th><th className="pr-3">Condition</th><th className="pr-3">Severity</th><th>On</th></tr></thead><tbody>{defaultRules.map((r, i) => <tr key={r[0]} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{r[0]}</td><td className="pr-3">{r[1]}</td><td className="pr-3"><SeverityBadge s={r[2].toLowerCase() as "warning"} /></td><td><Toggle on={rules[i]} disabled={!isOwner} onChange={(v) => setRules((s) => s.map((x, j) => (j === i ? v : x)))} label={r[0]} /></td></tr>)}</tbody></table></div>
             {!rules[5] && <p className="mt-2 text-xs text-warn">Turned off: “AC offline” — no alerts for heartbeat loss on any of your ACs. HQ still sees device status.</p>}
           </Card>
           <div className="text-[13px] font-bold">Your policies <span className="text-xs font-normal text-muted">{policies.length} · added on top of the default policy · a policy belongs to your account and can be attached to many ACs</span></div>

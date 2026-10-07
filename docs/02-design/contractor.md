@@ -229,7 +229,7 @@ Scope: FR-P06 / Main display pattern: **UI-LIST**. Service boundary: `members.li
 3. This screen is read-only and does not update memberships or qualifications. Ask HQ to arrange membership changes.
 4. Queries to update: `members / assignments (read-only)`.
 
-**Boundary cases and failures**: Editing the company ID in the URL must not reveal another company's roster. Technicians with expired memberships cannot be selected for assignment.
+**Boundary cases and failures**: Editing the company ID in the URL (`orgId`, default = own company; IR115, Figma Contractor 04-5) must not reveal another company's roster: any other `orgId` returns NOT_FOUND (AT-P06-E①). Technicians with expired memberships cannot be selected for assignment.
 
 **Unavailable days (Figma 04-8)**: “+ Unavailable days” opens a centered modal: technician (or All for team public holidays), from, to (≤ 31 days), type (annual leave/training/public holiday/sick/other), note. Before saving, list confirmed assignments in the range as a warning; saving (`members.setUnavailability`) keeps them and offers “Open schedule →”. Capacity shows the dates as 0 h with the type label (Capacity.unavailability).
 
@@ -346,7 +346,7 @@ Scope: FR-P10 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.24.0: Read IR01–114 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.25.0: Read IR01–115 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 0.14.0: Under IR25, get the pre-acceptance address from the unit's installation property. After expiry, freeze only report presence and acceptance state for report display.
 

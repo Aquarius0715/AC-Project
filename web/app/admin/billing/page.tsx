@@ -63,7 +63,7 @@ export default function Billing() {
                 <Field label="Reason · e.g. “2nd reminder after due date”"><Input value={rReason} onChange={(e) => setRReason(e.target.value)} /></Field>
                 <div className="mt-3 flex justify-end"><Btn variant="primary" disabled={!rReason.trim()} onClick={() => { setReminded(sel.id); toast("Reminder queued (simulated)"); }}>Send reminder</Btn></div>
               </Card>}
-              <Card title="Related restriction" action={<Link className="text-xs font-semibold text-primary" href="/admin/restrictions">Open restriction →</Link>}><p className="text-[13px]"><b>restriction-limited-a</b></p><p className="text-xs text-muted">This invoice is a cause of this restriction. Once all of its cause invoices are paid, it moves to release_requested. State and units are shown on the Restrictions screen (restriction.manage).</p></Card>
+              <Card title="Related restriction" action={<Link className="text-xs font-semibold text-primary" href="/admin/restrictions">Open restriction →</Link>}><p className="text-[13px]"><b>restriction-limited-a</b></p><p className="text-xs text-muted">This invoice is a cause of this restriction. Once all of its cause invoices are paid, it moves to release_requested. State and units are shown on the Restrictions screen (restriction.read).</p></Card>
               <Card title="Customer inquiries" action={<button className="text-xs font-semibold text-primary" onClick={() => setTab("inquiries")}>Open in Inquiries →</button>}><p className="text-[13px]">{inquiries[0].text}</p><p className="text-[11px] text-muted">inquiry-a-01 · payment · received 09-21 · customer-a</p></Card>
             </div>
           </div>

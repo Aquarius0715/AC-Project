@@ -192,4 +192,4 @@ Comparison requires matching unit set/boundary/minute count, actual coverage=1, 
 
 Creating/changing a recovery case increments owning Restriction.version and target Unit.version. Contract.activeRestrictionIds/hasUnresolvedRecovery are derived projections and do not change contract version. Emit contracts ChangeEvent with version=null and derived field names in changedFields to invalidate. Do not discard version=null subscription events through version comparison; recheck current scope and refetch. case.commandIds matches Commands; never reuse acknowledgements for other cases/generations.
 
-Additional contracts for current version 0.24.0: Read IR01–114 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.25.0: Read IR01–115 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
