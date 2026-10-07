@@ -1,6 +1,6 @@
 ---
 document_id: TEST-PLAN
-version: 0.27.0
+version: 0.29.0
 status: planned-not-executed
 owner: test-agent
 scope: frontend-demo-1A
@@ -10,7 +10,7 @@ scope: frontend-demo-1A
 
 This is a test plan for the future application. The app has not been implemented, and none of the tests below have been run. Verify each of the 64 requirements, AT-C/P/T/A/X, and AT-NFR entries in the [traceability matrix](../00-prepare/traceability.csv), then also check cross-role consistency through S01–S08. Cross-role scenarios alone do not prove coverage of all requirements.
 
-This version gives each of the 67 requirements across four roles three acceptance categories: AT-number-N (normal), -E (boundary/exception), and -B (business conditions), for 201 cases. Together with the AT-*-SRC source-detail cases, the R01 cases, the common cases, and the nonfunctional cases there are 237 requirement case bundles in 0.27.0 (the validator reports them as acceptance_bundles; every AT-FIX added in 0.8.0 is also required). UI-only cases and cross-role S scenarios are counted separately. The number 237 counts management bundles, not individual assertions. The ①② markers in acceptance rows identify observations within a cell, not subcase IDs. Separate independent input conditions into cases and check every assertion in each case. Use all chapters of the deterministic contracts and strict review correction contracts for valid shared fixtures, error precedence, and clock boundaries. Do not derive expected results from implementation. Treat each boundary-value variation as a separate subcase. Check the manifest together with the specification baseline at G1. Do not mark a case ready until design fixes missing expected results. Do not pass a parent AT until all subcases and applicable SRC/R01 cases pass.
+This version gives each of the 67 requirements across four roles three acceptance categories: AT-number-N (normal), -E (boundary/exception), and -B (business conditions), for 201 cases. Together with the AT-*-SRC source-detail cases, the R01 cases, the common cases, and the nonfunctional cases there are 237 requirement case bundles in 0.29.0 (the validator reports them as acceptance_bundles; every AT-FIX added in 0.8.0 is also required). UI-only cases and cross-role S scenarios are counted separately. The number 237 counts management bundles, not individual assertions. The ①② markers in acceptance rows identify observations within a cell, not subcase IDs. Separate independent input conditions into cases and check every assertion in each case. Use all chapters of the deterministic contracts and strict review correction contracts for valid shared fixtures, error precedence, and clock boundaries. Do not derive expected results from implementation. Treat each boundary-value variation as a separate subcase. Check the manifest together with the specification baseline at G1. Do not mark a case ready until design fixes missing expected results. Do not pass a parent AT until all subcases and applicable SRC/R01 cases pass.
 
 ## 1. Test levels and completion evidence
 

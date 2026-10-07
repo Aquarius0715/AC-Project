@@ -1016,3 +1016,21 @@ User decision 2026-10-07 (DEC-68) for the production target in the [backend arch
 5. **Customer office firewall requirements.** Outbound TCP 8883 (or 443 WSS) to `mqtt.<domain>` by name, no TLS inspection, DNS and NTP, no inbound (network architecture §5a).
 6. **Still OPEN.** AC manufacturer interface (OPEN-BE-02), WhatsApp provider (OPEN-BE-04), payout rail (OPEN-BE-07), cellular SIM provider (OPEN-NW-02).
 
+## IR118 Backend implementation in Go + Echo and database design — 2026-10-07
+
+User decision 2026-10-07 (DEC-69): the backend is implemented in Go with the Echo framework. The implementation design is the [backend Go design](backend-go-design.md); the database is the [database design](database-design.md) with the executable [db/schema.sql](db/schema.sql). Phase 1A is unchanged.
+
+1. **API.** One Echo route `POST /v1/ops/:operation` dispatches the 197 catalogued operations; the registry is generated from the operation catalog and every operation has exactly one handler. Inputs are decoded strictly; DomainError uses the nine `ErrorCode` values with a fixed HTTP mapping (VALIDATION 422, UNAUTHENTICATED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT 409, OFFLINE 409, TIMEOUT 504, RATE_LIMITED 429, UNAVAILABLE 503).
+2. **Transactions.** Each operation runs in one PostgreSQL transaction that sets `app.tenant_id` for row-level security, writes audit and outbox rows before commit, and uses optimistic versions; scoped zero-row writes are NOT_FOUND (D01), version mismatches CONFLICT.
+3. **Database.** Aurora PostgreSQL 16, one schema per module, no cross-schema foreign keys, tenant-scoped foreign keys, business rules encoded as constraints where they need no clock or other module (database design §5), partitioned telemetry and audit with the IR117 retention.
+4. **Verification.** db/schema.sql was applied to PostgreSQL 16 and the core Go pipeline was compiled and tested against it on 2026-10-07 (backend Go design §1). These are design checks, not Phase 1A acceptance.
+
+## IR119 Everything runs in Docker — 2026-10-07
+
+User decision 2026-10-07 (DEC-70): all application components run as Docker images in every environment; production data and messaging stay AWS managed services. Design: [container design](container-design.md); files: repository-root `compose.yaml`, `web/Dockerfile`, `docker/`.
+
+1. **Images.** `ac-web` (Next.js standalone; demo mock mode and production BFF) and `ac-backend` (Go binaries api, webhook, worker, migrate; dev target adds iotbridge and devicesim). Distroless, non-root, read-only root filesystem, linux/arm64 (+ amd64 for developers), secrets only at run time.
+2. **Local and CI.** Docker Compose profiles `demo`, `infra`, `schema`, `backend`, `full`, `obs`, `stripe`; containers stand in for Aurora (PostgreSQL 16), ElastiCache (Valkey), SQS/SNS/Kinesis/S3/SES/Secrets Manager (LocalStack), IoT Core (Mosquitto + iot-bridge), Cognito (Keycloak), Stripe (stripe-mock / Stripe CLI), weather (WireMock).
+3. **Staging and production.** The same image digests run on ECS Fargate (container design §5); Compose is never used there.
+4. **Toolchain.** Go 1.25 or later (current pgx v5 requires it); Node 22 LTS for the web image. The Phase 1A demo can be started with `docker compose --profile demo up`; Phase 1A scope is unchanged.
+

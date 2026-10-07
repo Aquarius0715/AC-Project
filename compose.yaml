@@ -1,0 +1,223 @@
+# AC Project — everything runs in Docker (IR119, DEC-70, docs/02-design/container-design.md)
+#
+# Profiles
+#   demo     Phase 1A clickable demo (web with the in-browser mock)           docker compose --profile demo up
+#   infra    Local stand-ins for the AWS managed services                      docker compose --profile infra up
+#   schema   Apply docs/02-design/db/schema.sql once (until backend/ exists)   docker compose --profile infra --profile schema up
+#   backend  Go API, webhook, workers, IoT bridge, device simulator (needs ./backend)
+#   full     web in API mode + backend + infra                                 docker compose --profile full up
+#   obs      OpenTelemetry collector + Jaeger
+#
+# Production runs the same application images on ECS Fargate; databases, queues and IoT are AWS managed
+# services there (backend-architecture §3a). Nothing in this file is used in production.
+
+name: ac-project
+
+x-backend: &backend
+  image: ac-backend:dev
+  build:
+    context: ./backend
+    target: runtime
+  env_file:
+    - path: .env.local
+      required: false
+  environment: &backend-env
+    APP_ENV: local
+    DATABASE_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
+    DATABASE_READER_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
+    AWS_REGION: ap-southeast-5
+    AWS_ENDPOINT_URL: http://localstack:4566
+    AWS_ACCESS_KEY_ID: test
+    AWS_SECRET_ACCESS_KEY: test
+    OIDC_ISSUER: http://keycloak:8080/realms/ac
+    OIDC_ADMIN_CLIENT_ID: ac-admin-web
+    OIDC_APP_CLIENT_ID: ac-web
+    MQTT_URL: tcp://mosquitto:1883
+    STRIPE_API_BASE: http://stripe-mock:12111
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: [no-new-privileges:true]
+  networks: [app, data]
+  restart: unless-stopped
+  profiles: [backend, full]
+  depends_on:
+    migrate: { condition: service_completed_successfully }
+    localstack: { condition: service_healthy }
+
+services:
+  # ------------------------------------------------------------------ web (Next.js)
+  web:
+    image: ac-web:dev
+    build: { context: ./web }
+    ports: ["3000:3000"]
+    environment:
+      DATA_SOURCE: mock            # Phase 1A: in-browser mock adapter
+    read_only: true
+    tmpfs: [/tmp, /app/.next/cache]
+    security_opt: [no-new-privileges:true]
+    networks: [edge]
+    profiles: [demo]
+
+  web-api:
+    image: ac-web:dev
+    build: { context: ./web }
+    ports: ["3000:3000"]
+    environment:
+      DATA_SOURCE: api             # production-like: BFF relays /bff/ops/* to the Core API
+      CORE_API_URL: http://api:8080
+      OIDC_ISSUER: http://localhost:8081/realms/ac
+      OIDC_INTERNAL_ISSUER: http://keycloak:8080/realms/ac
+      OIDC_APP_CLIENT_ID: ac-web
+      OIDC_ADMIN_CLIENT_ID: ac-admin-web
+      SESSION_STORE_URL: redis://valkey:6379
+    read_only: true
+    tmpfs: [/tmp, /app/.next/cache]
+    security_opt: [no-new-privileges:true]
+    networks: [edge, app]
+    profiles: [full]
+    depends_on: [api, keycloak, valkey]
+
+  # ------------------------------------------------------------------ backend (Go + Echo)
+  migrate:
+    <<: *backend
+    command: ["/app/migrate", "up"]
+    restart: "no"
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgres://postgres:local@postgres:5432/ac?sslmode=disable
+
+  api:
+    <<: *backend
+    command: ["/app/api"]
+    ports: ["8080:8080"]
+    healthcheck: { test: ["CMD", "/app/api", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
+
+  webhook:
+    <<: *backend
+    command: ["/app/webhook"]
+    ports: ["8082:8080"]
+    networks: [edge, app, data]
+
+  worker-outbox:       { <<: *backend, command: ["/app/worker", "--role=outbox"] }
+  worker-scheduler:    { <<: *backend, command: ["/app/worker", "--role=scheduler"] }
+  worker-iot:          { <<: *backend, command: ["/app/worker", "--role=iot"] }
+  worker-telemetry:    { <<: *backend, command: ["/app/worker", "--role=telemetry"] }
+  worker-rollup:       { <<: *backend, command: ["/app/worker", "--role=rollup"] }
+  worker-automation:   { <<: *backend, command: ["/app/worker", "--role=automation"] }
+  worker-notification: { <<: *backend, command: ["/app/worker", "--role=notification"] }
+  worker-importexport: { <<: *backend, command: ["/app/worker", "--role=importexport"] }
+
+  iot-bridge:          # local stand-in for AWS IoT rules: MQTT topics -> Kinesis / SQS
+    <<: *backend
+    image: ac-backend:dev-tools
+    build: { context: ./backend, target: dev }
+    command: ["/app/iotbridge"]
+
+  device-sim:          # simulated IoT modules (telemetry each minute, heartbeats, command acks)
+    <<: *backend
+    image: ac-backend:dev-tools
+    build: { context: ./backend, target: dev }
+    command: ["/app/devicesim", "--devices=20"]
+    networks: [data]
+
+  # ------------------------------------------------------------------ local stand-ins for AWS services
+  postgres:            # Aurora PostgreSQL 16
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ac
+      POSTGRES_PASSWORD: local
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres -d ac"], interval: 5s, timeout: 3s, retries: 20 }
+    networks: [data]
+    profiles: [infra, schema, backend, full]
+
+  db-schema:           # until backend/ exists: apply the design schema once and create a local login
+    image: postgres:16
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment: { PGPASSWORD: local }
+    volumes: [./docs/02-design/db/schema.sql:/schema.sql:ro]
+    entrypoint: ["sh", "-c"]
+    command:
+      - >
+        psql -h postgres -U postgres -d ac -tAc "select 1 from pg_namespace where nspname='platform'" | grep -q 1
+        || (psql -h postgres -U postgres -d ac -v ON_ERROR_STOP=1 -q -f /schema.sql
+        && psql -h postgres -U postgres -d ac -c "CREATE ROLE ac_app_login LOGIN PASSWORD 'local' IN ROLE ac_app")
+    networks: [data]
+    profiles: [schema]
+
+  valkey:              # ElastiCache (sessions, idempotency fast path, rate limits)
+    image: valkey/valkey:8
+    networks: [app, data]
+    profiles: [infra, backend, full]
+
+  localstack:          # SQS, SNS, S3, Kinesis, Firehose, Secrets Manager, KMS, SES, EventBridge Scheduler
+    image: localstack/localstack:4
+    environment:
+      SERVICES: sqs,sns,s3,kinesis,firehose,secretsmanager,kms,ses,scheduler,events
+      AWS_DEFAULT_REGION: ap-southeast-5
+    ports: ["4566:4566"]
+    volumes: [./docker/localstack/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh:ro]
+    healthcheck: { test: ["CMD-SHELL", "curl -fs localhost:4566/_localstack/init/ready | grep -q '\"completed\": true'"], interval: 5s, timeout: 3s, retries: 30 }
+    networks: [data]
+    profiles: [infra, backend, full]
+
+  mosquitto:           # AWS IoT Core stand-in (MQTT 3.1.1/5); mutual TLS is verified in staging against IoT Core
+    image: eclipse-mosquitto:2
+    ports: ["1883:1883"]
+    volumes: [./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro]
+    networks: [data]
+    profiles: [infra, backend, full]
+
+  keycloak:            # Amazon Cognito stand-in (OIDC, TOTP); realm "ac" with clients ac-web and ac-admin-web
+    image: quay.io/keycloak/keycloak:26.0
+    command: ["start-dev", "--import-realm", "--http-port=8080"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+    ports: ["8081:8080"]
+    volumes: [./docker/keycloak/realm-ac.json:/opt/keycloak/data/import/realm-ac.json:ro]
+    networks: [edge, app]
+    profiles: [infra, backend, full]
+
+  stripe-mock:         # offline Stripe API for tests; use the Stripe CLI (profile stripe) for real test-mode webhooks
+    image: stripe/stripe-mock:latest
+    networks: [app]
+    profiles: [infra, backend, full]
+
+  stripe-cli:
+    image: stripe/stripe-cli:latest
+    command: ["listen", "--forward-to", "webhook:8080/stripe", "--api-key", "${STRIPE_TEST_SECRET_KEY:-}"]
+    networks: [edge]
+    profiles: [stripe]
+
+  weather-mock:        # weather source stand-in (WireMock)
+    image: wiremock/wiremock:3.9.1
+    volumes: [./docker/wiremock:/home/wiremock:ro]
+    networks: [app]
+    profiles: [infra, backend, full]
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    volumes: [./docker/otel/collector.yaml:/etc/otelcol-contrib/config.yaml:ro]
+    networks: [app]
+    profiles: [obs]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    ports: ["16686:16686"]
+    networks: [app]
+    profiles: [obs]
+
+networks:
+  edge: {}             # Z1/Z2 stand-in: browser-facing
+  app: {}              # Z3 stand-in: application services
+  data:                # Z4 stand-in: data services, no published ports in production
+    internal: false
+
+volumes:
+  pgdata: {}

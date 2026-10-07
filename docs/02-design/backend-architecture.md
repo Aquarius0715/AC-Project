@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND
-version: 0.27.0
+version: 0.29.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -18,7 +18,7 @@ This document designs the production backend that will replace the Phase 1A mock
 - Network zones, ports, and traffic rules are in the [network architecture](network-architecture.md).
 - Diagrams: Figma file VOeKPrid46kOf24ktEfe8r, page “System Architecture”, boards 03 (backend) and 04 (network).
 
-Decisions applied (DEC-67):
+Decisions applied (DEC-67, DEC-68, DEC-69):
 
 1. The frontend stack is **Next.js (App Router)**, as implemented in `web/`. In production it also acts as the **BFF** (backend for frontend): it serves the four role apps, holds the user session, and relays operations to the Core API. The browser never calls the Core API directly.
 2. The backend is a **modular monolith** (one Core API deployable with strict module boundaries) plus **separately deployed workers** for IoT, scheduling, notifications, and exports, so that device traffic and background work scale and fail independently of user requests.
@@ -26,6 +26,7 @@ Decisions applied (DEC-67):
 4. Payments use **Stripe** (hosted Stripe Checkout, MYR, cards and FPX online banking as enabled on the account; DEC-68).
 5. The HQ admin app is reachable **only from the company network** (office egress addresses and the company VPN); see §6 and the [network architecture §3](network-architecture.md#3-public-endpoints).
 6. The AC manufacturer interface and the cellular SIM provider remain `OPEN`; retention periods (§7), capacity (§13), and customer office firewall requirements (network architecture §5a) are set by this document.
+7. The backend is written in **Go** with the **Echo** framework (DEC-69); see the [backend Go design](backend-go-design.md), the [database design](database-design.md), and [db/schema.sql](db/schema.sql).
 
 ## 2. System context
 
@@ -53,7 +54,7 @@ Decisions applied (DEC-67):
 | IoT gateway service | Device registry and credentials, MQTT bridge, command dispatch and acknowledgement matching, heartbeat and connection state, firmware operations | Containers next to the MQTT broker | Connected devices, messages | Database, broker |
 | Telemetry processor | Validates and stores measurements (quality valid / missing / stale / suspect), evaluates alert policies, feeds automation conditions | Stream consumers | Messages per second | Time-series store |
 | Automation engine | Evaluates schedules and event conditions; arbitrates capability → restriction → HQ policy → customer rule (DEC-09); creates Commands through the same Command policy | Workers | Rules due | Database |
-| Scheduler | Time-based business transitions (§10) with exactly-once execution per due item | Single active leader + standby | Due items | Database |
+| Scheduler | Time-based business transitions (§10) with exactly-once execution per due item | Several instances claiming items with database leases | Due items | Database |
 | Notification worker | Renders en / ms templates, applies preferences and consents, delivers in-app, e-mail, WhatsApp; records delivery state | Queue consumers | Notifications | Database |
 | Import / export worker | CSV unit import (FR-A18), monthly energy report (FR-C16), MRV and audit exports, attachment scanning | Queue consumers | Jobs | Object storage |
 | Webhook receiver | Receives payment and provider callbacks, verifies signatures, converts them to internal events | Small stateless service | Requests | Outbox |
@@ -120,7 +121,7 @@ Cross-module rules that the modules must keep:
 |---|---|
 | Transport | HTTPS with JSON bodies on the internal network. One endpoint per operation: `POST /v1/ops/<operation>` (for example `/v1/ops/jobs.assign`). Operation names, inputs, and results are exactly those in the operation catalog and service contracts, so the frontend adapter maps one call to one operation. |
 | Caller context | The BFF sends a short-lived signed service token plus the user context (userId, membershipId, tenantId, scopeVersion, sessionId). The Core API re-reads the Membership and never trusts permissions sent by the caller. |
-| Results | Success returns `ServiceResult<T>`; failure returns a DomainError body with code and fields. HTTP status mapping: VALIDATION 422, UNAUTHENTICATED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT 409, UNAVAILABLE 503 (retryable). Out-of-scope reads return NOT_FOUND, never partial data (D01). |
+| Results | Success returns `ServiceResult<T>`; failure returns a DomainError body with code and fields. HTTP status mapping: VALIDATION 422, UNAUTHENTICATED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT 409, OFFLINE 409, TIMEOUT 504, RATE_LIMITED 429, UNAVAILABLE 503 (retryable) — all nine `ErrorCode` values ([backend Go design §6](backend-go-design.md#6-errors)). Out-of-scope reads return NOT_FOUND, never partial data (D01). |
 | Writes and duplicates | Every write carries an `Idempotency-Key` (the frontend's duplicate-prevention key) kept for 24 hours; a repeat returns the original receipt (`writes.getResult`). |
 | Versions | Writes listed in the write version catalog send the expected version; a mismatch returns CONFLICT with the current version and changes nothing. |
 | Lists | Cursor pagination (`cursor`, `limit`), stable sort with ID tiebreak, filters as in the operation inputs. |
@@ -253,12 +254,12 @@ The scheduler claims due items with a database lease so that each item runs once
 
 | Environment | Data | Integrations |
 |---|---|---|
-| Local / demo | Fixture seed (fixture-contract.json) | Mock adapter only (Phase 1A behaviour) |
+| Local / demo | Fixture seed (fixture-contract.json) | Docker Compose: `demo` profile = Phase 1A mock; `full` profile = all services with local stand-ins for AWS ([container design](container-design.md)) |
 | Development | Synthetic data | Provider sandboxes, device simulator |
 | Staging | Production-like synthetic data | Provider sandboxes, a small fleet of test devices |
 | Production | Real data | Live providers and devices |
 
-- Infrastructure as code for every environment; immutable container images promoted from staging to production.
+- Everything runs in Docker (IR119): the same images run in Compose locally and in CI and on ECS Fargate in staging and production; infrastructure as code for every environment; immutable image digests promoted from dev to staging to production.
 - CI runs type checks, lint, unit, contract, and end-to-end tests (NFR-07), database migration checks, and security scans; production deploys use rolling or blue-green releases with automatic rollback on health checks.
 - Database migrations are backward compatible for one release (expand, migrate, contract).
 
@@ -282,4 +283,4 @@ The scheduler claims due items with a database lease so that each item runs once
 | OPEN-BE-06 | Decided 2026-10-07: capacity in §13 | — |
 | OPEN-BE-07 | Contractor payout rail (bank transfer file or Stripe Connect) | Payouts (FR-A23) |
 
-Additional contracts for current version 0.27.0: Read IR01–117 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.29.0: Read IR01–119 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

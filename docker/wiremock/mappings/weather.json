@@ -1,0 +1,8 @@
+{
+  "request": { "method": "GET", "urlPathPattern": "/v1/current" },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": { "area": "kuala-lumpur", "temperatureC": 33.5, "humidityPercent": 72, "observedAt": "2026-10-07T06:00:00Z", "isDemo": true }
+  }
+}

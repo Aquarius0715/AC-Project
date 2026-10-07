@@ -1,6 +1,6 @@
 ---
 document_id: DD-NETWORK
-version: 0.27.0
+version: 0.29.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, review-agent, operations]
@@ -151,4 +151,4 @@ Give these to customer IT before installation (office sites; homes normally need
 | OPEN-NW-03 | Decided 2026-10-07: HQ admin app only from the company network (§3, DEC-68); the company must supply its office egress addresses and VPN egress addresses | — |
 | OPEN-NW-04 | Decided 2026-10-07: customer office firewall requirements in §5a | — |
 
-Additional contracts for current version 0.27.0: Read IR01–117 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.29.0: Read IR01–119 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

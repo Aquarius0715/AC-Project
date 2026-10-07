@@ -84,6 +84,8 @@ for path in markdown:
             previous = None
 
 trace = rows('00-prepare/traceability.csv')
+# 0.29.0 (2026-10-07): IR119 everything runs in Docker (container-design.md, compose.yaml); counts unchanged.
+# 0.28.0 (2026-10-07): IR118 Go + Echo backend design, database design and db/schema.sql (production target only); counts unchanged.
 # 0.27.0 (2026-10-07): IR117 AWS / Stripe / HQ network restriction / retention / capacity (production target only); counts unchanged.
 # 0.26.0 (2026-10-07): IR116 Next.js stack + backend-architecture.md / network-architecture.md (production target, not 1A inputs); counts unchanged.
 # 0.25.0 (2026-10-07): IR115 consistency fixes (tabs, permissions, owner-only default rules); counts unchanged.
@@ -1185,7 +1187,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.27.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.29.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')
