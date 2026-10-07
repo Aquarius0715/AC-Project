@@ -211,7 +211,7 @@ For shared routes, select schedule/event for C04/C05 and payment/restriction/inq
 
 Approvals applied on 2026-09-16: Use SR17 for period presets. Show the offset retry button only for failed, and label the failed purchase/retirement stage (SR18). Follow SR19 for contract edit denial reasons and links to restriction cancellation/release.
 
-Additional contracts for current version 0.25.0: Read IR01–115 in the [review resolution contracts](../02-design/review-resolution-contracts.md). They take priority over older text on the same issue; follow IR72 when rules conflict.
+Additional contracts for current version 0.27.0: Read IR01–117 in the [review resolution contracts](../02-design/review-resolution-contracts.md). They take priority over older text on the same issue; follow IR72 when rules conflict.
 
 0.14.0: Under IR25, get the address before acceptance from the unit's installation property. After expiry, freeze only whether a report exists and its acceptance status.
 
