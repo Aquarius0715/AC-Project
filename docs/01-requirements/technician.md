@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # Technician requirements
 
-**0.24.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.25.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Purpose and assumptions
 
@@ -368,6 +368,6 @@ Design: [DD-T15](../02-design/technician.md#dd-t15-details). Assess parent AT-T1
 
 0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 
-Additional current 0.24.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–114. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.25.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–115. They override older text on the same issues; use IR72 for conflict priority.
 
 Job lists support ascending/descending sorting by status (business order), severity, and deadline. Default: status in business order (IR34). Sort all results before pagination; language changes do not change order. Also use AT-REV16-005 for acceptance.

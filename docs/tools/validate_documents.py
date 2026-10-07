@@ -84,6 +84,7 @@ for path in markdown:
             previous = None
 
 trace = rows('00-prepare/traceability.csv')
+# 0.25.0 (2026-10-07): IR115 consistency fixes (tabs, permissions, owner-only default rules); counts unchanged.
 # 0.24.0 (2026-10-06): IR114 adds FR-C19 (customer users, SCR-C19, DD-C19); 83 requirement IDs, 67 role rows.
 # 0.23.0 (2026-10-02): IR113 maintenance scheduling adds 8 job operations (197); no new requirement IDs.
 # 0.22.0 (2026-10-01): Figma-confirmed screens add FR-C14–C18, FR-P09–P10, FR-T13–T15, FR-A17–A23 and FR-X08 (IR107–IR112).
@@ -1182,7 +1183,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.24.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.25.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

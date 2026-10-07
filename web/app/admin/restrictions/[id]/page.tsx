@@ -39,7 +39,7 @@ export default function Exception({ params }: { params: Promise<{ id: string }> 
           <Card title="What happens"><ul className="list-disc pl-5 text-[13px]"><li>State: applied → release_requested; a remove command is sent to unit-limited</li><li>Released only after the unit confirms (per-unit evidence)</li><li>invoice-overdue-a stays unpaid — billing is not settled</li><li>Before/after, expiry, reason and your name are recorded in the audit log</li></ul></Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Summary"><SummaryList items={[["Policy", "Temperature limit ≥ 24 °C"], ["Units", "unit-limited · applied"], ["Cause", "invoice-overdue-a · unpaid"], ["Grace / exception", done ? `Until ${until}` : "None"], ["Your permissions", hasOverride ? "restriction.manage · restriction.override" : "restriction.manage only"]]} /></Card>
+          <Card title="Summary"><SummaryList items={[["Policy", "Temperature limit ≥ 24 °C"], ["Units", "unit-limited · applied"], ["Cause", "invoice-overdue-a · unpaid"], ["Grace / exception", done ? `Until ${until}` : "None"], ["Your permissions", hasOverride ? "restriction.write · restriction.override" : "restriction.write only"]]} /></Card>
           <Card title="Audit" sub="audit.read"><Timeline items={[{ time: "09-13 08:00:20", title: "Applied", detail: "unit-limited confirmed setpoint ≥ 24 °C · by system", tone: "warn" }, { time: "09-13 08:00", title: "Executed", detail: "requested · 1 command · rules demo-v1 confirmed · by hq-restriction-manager" }, { time: "09-12 08:00", title: "Scheduled", detail: "notice sent to customer-a · executeAfter 09-13 08:00 · by hq-restriction-manager" }]} /></Card>
         </div>
       </div>
