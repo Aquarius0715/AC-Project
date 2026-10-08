@@ -729,5 +729,41 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			return fmt.Errorf("assignment %s: %w", str(a, "id"), err)
 		}
 	}
+	return seedJobEvents(ex, f, jobTenant)
+}
+
+// seedJobEvents derives the job history (jobs.events) that the fixture rows imply: created, offered, the offer
+// decision and the assignment. IDs are deterministic so re-seeding is idempotent; actors are only set where the
+// fixture names them (decidedBy).
+func seedJobEvents(ex func(string, ...any) error, f *Fixture, jobTenant map[string]string) error {
+	ev := func(job, action string, actor, at any) error {
+		return ex(`INSERT INTO maintenance.job_events (id, tenant_id, job_id, actor_user_id, action, occurred_at) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`,
+			ID("event:"+job+":"+action), ID(jobTenant[job]), ID(job), actor, action, at)
+	}
+	for _, j := range f.DemoSeed.Jobs {
+		if err := ev(str(j, "id"), "job.created", nil, f.SeedCreatedAt); err != nil {
+			return err
+		}
+	}
+	for _, o := range f.DemoSeed.Offers {
+		job := str(o, "jobId")
+		if err := ev(job, "job.offered", nil, str(o, "offeredAt")); err != nil {
+			return err
+		}
+		if d := opt(o, "decision"); d != nil && opt(o, "decidedAt") != nil {
+			action := "offer.accepted"
+			if *d == "decline" {
+				action = "offer.declined"
+			}
+			if err := ev(job, action, optID(o, "decidedBy"), *opt(o, "decidedAt")); err != nil {
+				return err
+			}
+		}
+	}
+	for _, a := range f.DemoSeed.Assignments {
+		if err := ev(str(a, "jobId"), "job.assigned", nil, str(a, "createdAt")); err != nil {
+			return err
+		}
+	}
 	return nil
 }
