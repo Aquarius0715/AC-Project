@@ -1,12 +1,12 @@
 {
-  "version": "0.89.0",
-  "spec_baseline_id": "87bdd1d78b506a65a9a5a7993ff7fdcdbb504433ba7ceb35c90a02334894d054",
+  "version": "0.90.0",
+  "spec_baseline_id": "1472293036b918088bc791426694c5816fe68210247d65583c5edae6433b4923",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "01a662d7c904461c6a655221abf36ebc2ec9f3d2d6d13e6b081f77eaf9e08ac4"
+      "sha256": "99c248289dc4cdadc616bf399b907c75a63b1692961274edd1d608fe7a39626c"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -94,7 +94,7 @@
     },
     {
       "path": "02-design/admin.md",
-      "sha256": "5e142cc923142d229ff4d49fe89639209119728992bdff5f006281cc332e245c"
+      "sha256": "7b5ddc8061feb18eb2a3eb0cb8c2f18ac661d6078517d8d33c2ac51c9fcfb43f"
     },
     {
       "path": "02-design/backend-architecture.md",
@@ -122,7 +122,7 @@
     },
     {
       "path": "02-design/database-design.md",
-      "sha256": "cfd693914fb739a994002df4e544851f5f2309bf0d50fefa90515113e72633c6"
+      "sha256": "179e64ebf44916850eb18bfa5c587d98ae2fd61d032c1944e4649beae008cf8e"
     },
     {
       "path": "02-design/deterministic-contracts.md",
@@ -150,11 +150,11 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "cb9ed7ad617ceaee525c04331edc09c2816ebba46d03f7906fc5b3861207149b"
+      "sha256": "63c2150ae24195a5c9d4003c0b117f4d4004185b7a1190a3921f49f64f656d87"
     },
     {
       "path": "02-design/service-contracts.ts",
-      "sha256": "8df63fdd476aaf1603d4b0af23dc21a90f75f40a9e431c375674c93a21564859"
+      "sha256": "6b387cb948eebc303d24ca8e95aad44b42da52a6006f478be83ce1417cc2a57f"
     },
     {
       "path": "02-design/strict-review-contracts.md",
@@ -178,7 +178,7 @@
     },
     {
       "path": "03-uiux/screen-catalog.csv",
-      "sha256": "a296dbb2103d2159668dda45596aea0c041b73b17d31831ba7565031c4c04765"
+      "sha256": "be3820884dbb5ad35ca142f938bf5b97dacf2d880b29c862bde4f6f41ce718c8"
     },
     {
       "path": "04-agentic-sdlc/README.md",
@@ -278,7 +278,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "03c4e7c01e6997e9629901776e9e8ccc9cbfdc4a50a753a0037ac35b276d0dd2"
+      "sha256": "d4f59249ab58f7cf64eb23794c1a31c51afc6fc4265f836f8e1fa6b003b64d03"
     },
     {
       "path": "tools/check_review_regressions.py",
@@ -290,7 +290,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "13c6eb84a2887bdf24f8e374466d656f1b86eb11d660db3200c165fc63f5cb49"
+      "sha256": "c5000578dba714e335fc60181c473009d0fd11f1fd2b5de0c492dc8f7a4e3b47"
     }
   ]
 }

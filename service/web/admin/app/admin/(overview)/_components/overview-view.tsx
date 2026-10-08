@@ -23,7 +23,7 @@ export function AdminOverviewView({ kpis = mockKpis }: { kpis?: Kpis }) {
         <Kpi label="Operation rate" value={empty ? "—" : k.rate} sub={`Running ${k.on} / known ${k.on + k.off} · unknown ${k.unknown} not in denominator`} href="/admin/units?powerState=on" link="Open →" />
         <Kpi label="Unresolved alerts" value={empty ? 0 : k.alerts} tone="warn" sub="open/acknowledged · critical and warning (IR51)" href="/admin/alerts" link="Open →" />
         <Kpi label="Energy used (actual)" value={empty ? "—" : k.kwh} sub={k.kwhSub} href="/admin/energy" link="Open →" />
-        <Kpi label="Overdue billing" value={k.billing} tone="crit" sub={k.billingSub} href="/admin/billing" link="Open →" />
+        <Kpi label="Overdue billing" value={k.billing} tone="crit" sub={k.billingSub} href="/admin/billing?overdueOnly=true" link="Open →" />
         <Kpi label="Maintenance jobs (period)" value={k.jobs} sub="all statuses in the period" href="/admin/jobs" link="Open →" />
         <Kpi label="Connection" value={`${k.online} online`} sub={`offline ${k.offline} · unknown/connecting/error ${k.connUnknown}`} href="/admin/units?connections=online" link="Open →" />
       </div>
@@ -45,7 +45,7 @@ export function AdminOverviewView({ kpis = mockKpis }: { kpis?: Kpis }) {
         <Card title="Maintenance jobs by status — this period" action={<TextLink href="/admin/jobs">Open jobs →</TextLink>}>
           <div className="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-x-4">{jobs.map(([s, n]) => <div key={s} className="flex justify-between border-t border-line py-1.5 text-[13px]"><span className="text-muted">{s}</span><b>{n}</b></div>)}</div>
         </Card>
-        <Card title="Billing — unpaid by currency" action={<TextLink href="/admin/billing">Open overdue →</TextLink>}>
+        <Card title="Billing — unpaid by currency" action={<TextLink href="/admin/billing?overdueOnly=true">Open overdue →</TextLink>}>
           <div className="flex justify-between border-t border-line py-2 text-[13px]"><span>Overdue invoices</span><b>1</b></div><div className="flex justify-between border-t border-line py-2 text-[13px]"><span>MYR (unpaid)</span><b>120.00 MYR</b></div>
           <p className="text-[11px] text-muted">amountsByCurrency is listed per currency — never converted.</p>
         </Card>

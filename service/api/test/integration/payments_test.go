@@ -134,6 +134,17 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	if code, m2 := manual("5000", 1); code != 200 || data(m2)["id"] != data(m)["id"] {
 		t.Errorf("repeat manual returns the same payment: %d", code)
 	}
+	// HQ sees the confirmation reason (DD-A08); the client does not
+	reason := func(who *actor) any {
+		_, d := post(s, who, "invoices.get", `{"id":"`+inv+`"}`)
+		return data(d)["paymentRefs"].([]any)[0].(map[string]any)["confirmationReason"]
+	}
+	if r := reason(&hq); r != "bank transfer seen" {
+		t.Errorf("hq confirmation reason %v", r)
+	}
+	if r := reason(&customerB); r != nil {
+		t.Errorf("client sees the confirmation reason %v", r)
+	}
 	var state string
 	var pending *string
 	ownerScan(t, `SELECT r.state, ru.pending_reason FROM restrictions.restrictions r JOIN restrictions.restriction_units ru ON ru.restriction_id = r.id WHERE r.id = $1`, []any{rid}, &state, &pending)

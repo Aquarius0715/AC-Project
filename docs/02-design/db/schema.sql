@@ -1732,8 +1732,10 @@ CREATE TABLE notify.ref_devices (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, s
 CREATE TABLE notify.ref_properties (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, customer_org_id uuid);  -- identity: membership scopes (IR194)
 
 -- Reference copies for billing (IR194), kept by the billing-api consumer: customer organizations of restrictions and
--- inquiries.
+-- inquiries, and the property of each contract unit (invoices.list propertyId, IR199).
 CREATE TABLE billing.ref_customers (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, organization_id uuid);
+CREATE TABLE billing.ref_units (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, property_id uuid);
+CREATE INDEX ref_units_property ON billing.ref_units (property_id);
 
 -- Reference copies for maintenance (IR192), kept by the maintenance-api consumer: technician planning, partner
 -- memberships and the history snapshots of the worker.

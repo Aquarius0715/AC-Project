@@ -131,6 +131,24 @@ func TestContractsAndInvoices(t *testing.T) {
 	if code, _ := post(s, &hq, "invoices.list", `{"filters":{"status":"late"}}`); code != 422 {
 		t.Error("bad invoice status")
 	}
+	// scope filters: the property of the contract version's units, [from, to) on the period start
+	for name, tc := range map[string]struct {
+		f string
+		n int
+	}{
+		"property":           {`"propertyId":"` + seed.ID("property-home-b").String() + `"`, 1},
+		"other property":     {`"propertyId":"` + seed.ID("property-home-a").String() + `"`, 0},
+		"period start in":    {`"from":"` + ts(-24*15) + `","to":"` + ts(-24*13) + `"`, 1},
+		"period start at to": {`"to":"` + ts(-24*14) + `"`, 0},
+		"period start after": {`"from":"` + ts(-24*13) + `"`, 0},
+	} {
+		if _, m := post(s, &hq, "invoices.list", `{"filters":{"contractId":"`+k+`",`+tc.f+`}}`); len(items(m)) != tc.n {
+			t.Errorf("invoice filter %s: %v", name, m)
+		}
+	}
+	if code, _ := post(s, &hq, "invoices.list", `{"filters":{"from":"`+ts(1)+`","to":"`+ts(1)+`"}}`); code != 422 {
+		t.Error("empty invoice range")
+	}
 	// reminders: only overdue unpaid, active client recipient
 	remind := func(recipient, channel string, v int) (int, map[string]any) {
 		return write(s, &hq, "invoices.remind", `{"invoiceId":"`+invoice+`","recipientMembershipId":"`+recipient+`","channel":"`+channel+`","reason":"overdue"}`, v)

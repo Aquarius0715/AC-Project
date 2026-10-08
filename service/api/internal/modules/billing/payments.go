@@ -19,12 +19,20 @@ type Releases interface {
 	OnInvoicePaid(ctx context.Context, c *ops.Call, invoice uuid.UUID) ([]uuid.UUID, error)
 }
 
-const paymentCols = `id, tenant_id, version, created_at, updated_at, amount_minor, currency, invoice_id, method, status, payment_reference, confirmed_at, event_ids`
+const paymentCols = `id, tenant_id, version, created_at, updated_at, amount_minor, currency, invoice_id, method, status, payment_reference, confirmed_at, confirmation_reason, event_ids`
 
 func scanPayment(r pgx.Row) (Payment, error) {
 	var p Payment
-	err := r.Scan(&p.ID, &p.TenantID, &p.Version, &p.CreatedAt, &p.UpdatedAt, &p.AmountMinor, &p.Currency, &p.InvoiceID, &p.Method, &p.Status, &p.PaymentReference, &p.ConfirmedAt, &p.EventIDs)
+	err := r.Scan(&p.ID, &p.TenantID, &p.Version, &p.CreatedAt, &p.UpdatedAt, &p.AmountMinor, &p.Currency, &p.InvoiceID, &p.Method, &p.Status, &p.PaymentReference, &p.ConfirmedAt, &p.ConfirmationReason, &p.EventIDs)
 	return p, err
+}
+
+// forCaller hides HQ's confirmation reason from non-HQ callers (DD-A08 shows it to HQ; IR199).
+func forCaller(c *ops.Call, p Payment) Payment {
+	if c.Principal.Role != "admin" {
+		p.ConfirmationReason = nil
+	}
+	return p
 }
 
 func (m Billing) loadPayment(ctx context.Context, c *ops.Call, id uuid.UUID) (Payment, Invoice, error) {
@@ -77,7 +85,7 @@ func (m Billing) paymentResult(ctx context.Context, c *ops.Call, id uuid.UUID, a
 	}
 	c.Emit(ops.Event{AggregateType: "payment", AggregateID: id, Type: "PaymentChanged", Payload: map[string]any{"status": p.Status, "invoiceId": p.InvoiceID}})
 	c.Audit(ops.AuditEntry{Action: action, TargetKind: "payment", TargetID: id.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &p.Version, Reason: reason})
-	return p, nil
+	return forCaller(c, p), nil
 }
 
 // ---- payments.simulate ----
@@ -154,7 +162,7 @@ func (m Billing) simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (
 		return nil, err
 	}
 	if slices.Contains(p.EventIDs, *in.EventID) {
-		return p, nil // same event again
+		return forCaller(c, p), nil // same event again
 	}
 	if p.Version != *c.ExpectedVersion {
 		return nil, apperr.E(apperr.Conflict, "error.versionConflict")

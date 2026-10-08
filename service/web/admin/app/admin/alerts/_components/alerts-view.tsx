@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Textarea, Timeline, LineChart, useToast, cx } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
+import { actionMessage } from "@ac/web/lib/actionMessage";
 import { metricLabel, opSymbol, recoveryError, type AdminAlert, type AdminPolicy, type Channel, type Severity } from "@ac/web/lib/adminAlerts";
 import { acknowledgeAlert, resolveAlert, savePolicy, type ActionResult } from "../actions";
 
@@ -37,8 +38,7 @@ const seedPolicies: AdminPolicy[] = [
   demoPolicy("policy-co2-a", "Stuffy office", "CO₂ ≥ 1200 ppm · 15 min · weekdays", "co2", 1200, 1000, 900, true, "2 units"),
   demoPolicy("policy-humidity-a", "Night humidity", "Humidity ≥ 70 % · 30 min · 22–06", "humidity", 70, 65, 1800, false, "0 units"),
 ];
-const message = (r: Extract<ActionResult, { ok: false }>) =>
-  r.code === "CONFLICT" ? "Someone changed this in the meantime — the screen now shows the latest version" : Object.values(r.fieldErrors)[0] ?? `${r.code}: ${r.messageKey}`;
+const message = (r: Extract<ActionResult, { ok: false }>) => actionMessage(r);
 
 type Live = { tab: "alerts" | "policies"; alerts: AdminAlert[]; policies: AdminPolicy[] };
 

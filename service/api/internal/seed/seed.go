@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/pradita/ac-project/service/api/internal/modules/billing"
 	"github.com/pradita/ac-project/service/api/internal/modules/monitoring"
 	"os"
 	"time"
@@ -607,9 +608,13 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			}
 		}
 		from, to := rng(inv, "period", "from", "to")
+		start, err := time.Parse(time.RFC3339, str(inv["period"].(map[string]any), "from"))
+		if err != nil {
+			return fmt.Errorf("invoice %s period: %w", str(inv, "id"), err)
+		}
 		if err := ex(`INSERT INTO billing.invoices (id, tenant_id, number, contract_id, contract_version, customer_id, amount_minor, currency, period, due_at, status, paid_at, version)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,tstzrange($9::timestamptz,$10::timestamptz),$11,$12,$13,$14) ON CONFLICT DO NOTHING`,
-			ID(str(inv, "id")), ID(t), fmt.Sprintf("INV-%s-%04d", str(inv, "dueAt")[:4]+str(inv, "dueAt")[5:7], i+1), ID(str(inv, "contractId")), int(num(inv, "contractVersion")),
+			ID(str(inv, "id")), ID(t), billing.InvoiceNumber(start, i+1), ID(str(inv, "contractId")), int(num(inv, "contractVersion")),
 			ID(customer), int64(num(inv, "amountMinor")), str(inv, "currency"), from, to, str(inv, "dueAt"), str(inv, "status"), opt(inv, "paidAt"), int(num(inv, "version"))); err != nil {
 			return fmt.Errorf("invoice %s: %w", str(inv, "id"), err)
 		}

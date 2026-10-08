@@ -298,19 +298,21 @@ func (m Billing) saveContract(ctx context.Context, c *ops.Call, in *ContractInpu
 
 // Payment is Payment of service-contracts.ts.
 type Payment struct {
-	ID               uuid.UUID   `json:"id"`
-	TenantID         uuid.UUID   `json:"tenantId"`
-	Version          int         `json:"version"`
-	CreatedAt        time.Time   `json:"createdAt"`
-	UpdatedAt        time.Time   `json:"updatedAt"`
-	AmountMinor      int64       `json:"amountMinor"`
-	Currency         string      `json:"currency"`
-	InvoiceID        uuid.UUID   `json:"invoiceId"`
-	Method           *string     `json:"method"`
-	Status           string      `json:"status"`
-	PaymentReference *string     `json:"paymentReference"`
-	ConfirmedAt      *time.Time  `json:"confirmedAt"`
-	EventIDs         []uuid.UUID `json:"eventIds"`
+	ID               uuid.UUID  `json:"id"`
+	TenantID         uuid.UUID  `json:"tenantId"`
+	Version          int        `json:"version"`
+	CreatedAt        time.Time  `json:"createdAt"`
+	UpdatedAt        time.Time  `json:"updatedAt"`
+	AmountMinor      int64      `json:"amountMinor"`
+	Currency         string     `json:"currency"`
+	InvoiceID        uuid.UUID  `json:"invoiceId"`
+	Method           *string    `json:"method"`
+	Status           string     `json:"status"`
+	PaymentReference *string    `json:"paymentReference"`
+	ConfirmedAt      *time.Time `json:"confirmedAt"`
+	// ConfirmationReason is the reason HQ gave when confirming or recording the payment; HQ callers only.
+	ConfirmationReason *string     `json:"confirmationReason"`
+	EventIDs           []uuid.UUID `json:"eventIds"`
 }
 
 // Invoice is Invoice / InvoiceDetail of service-contracts.ts.
@@ -391,11 +393,15 @@ func (m Billing) createInvoice(ctx context.Context, c *ops.Call, in *InvoiceInpu
 	if in.Period.From.Before(k.StartAt) || in.Period.To.After(k.EndAt) {
 		return Invoice{}, apperr.Fields(map[string]string{"period": "errors.outside_contract"})
 	}
+	// the tenant sequence: serialize concurrent creates of one tenant so two invoices never draw the same number
 	var seq int
+	if err := c.Tx.QueryRow(ctx, `SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext('billing.invoice_number:' || current_setting('app.tenant_id')))) l`).Scan(&seq); err != nil {
+		return Invoice{}, err
+	}
 	if err := c.Tx.QueryRow(ctx, `SELECT count(*) + 1 FROM billing.invoices`).Scan(&seq); err != nil {
 		return Invoice{}, err
 	}
-	number := fmt.Sprintf("INV-%s-%04d", in.Period.From.UTC().Format("200601"), seq)
+	number := InvoiceNumber(in.Period.From, seq)
 	var id uuid.UUID
 	err = c.Tx.QueryRow(ctx, `INSERT INTO billing.invoices (tenant_id, number, contract_id, contract_version, customer_id, amount_minor, currency, period, due_at, status, created_at, updated_at)
 		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5, $6, tstzrange($7, $8), $9, 'unpaid', $10, $10) RETURNING id`,
@@ -453,7 +459,7 @@ func (m Billing) getInvoice(ctx context.Context, c *ops.Call, in *IDInput) (Invo
 	if err != nil {
 		return x, err
 	}
-	rows, err := c.Tx.Query(ctx, `SELECT id, tenant_id, version, created_at, updated_at, amount_minor, currency, invoice_id, method, status, payment_reference, confirmed_at
+	rows, err := c.Tx.Query(ctx, `SELECT id, tenant_id, version, created_at, updated_at, amount_minor, currency, invoice_id, method, status, payment_reference, confirmed_at, confirmation_reason
 		FROM billing.payments WHERE invoice_id = $1 ORDER BY created_at DESC, id`, x.ID)
 	if err != nil {
 		return x, err
@@ -461,12 +467,12 @@ func (m Billing) getInvoice(ctx context.Context, c *ops.Call, in *IDInput) (Invo
 	x.PaymentRefs = []Payment{}
 	for rows.Next() {
 		var p Payment
-		if err := rows.Scan(&p.ID, &p.TenantID, &p.Version, &p.CreatedAt, &p.UpdatedAt, &p.AmountMinor, &p.Currency, &p.InvoiceID, &p.Method, &p.Status, &p.PaymentReference, &p.ConfirmedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.TenantID, &p.Version, &p.CreatedAt, &p.UpdatedAt, &p.AmountMinor, &p.Currency, &p.InvoiceID, &p.Method, &p.Status, &p.PaymentReference, &p.ConfirmedAt, &p.ConfirmationReason); err != nil {
 			rows.Close()
 			return x, err
 		}
 		p.EventIDs = []uuid.UUID{}
-		x.PaymentRefs = append(x.PaymentRefs, p)
+		x.PaymentRefs = append(x.PaymentRefs, forCaller(c, p))
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
@@ -478,11 +484,20 @@ func (m Billing) getInvoice(ctx context.Context, c *ops.Call, in *IDInput) (Invo
 
 var invoiceStatuses = []string{"unpaid", "processing", "paid"}
 
+// InvoiceNumber is INV-<YYYYMM of the period start in Kuala Lumpur>-<4-digit tenant sequence> (IR199): a period that
+// starts at local midnight on the 1st belongs to that month, not to the previous UTC month.
+func InvoiceNumber(periodFrom time.Time, seq int) string {
+	return fmt.Sprintf("INV-%s-%04d", periodFrom.In(kualaLumpur).Format("200601"), seq)
+}
+
 func (m Billing) listInvoices(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Invoice], error) {
 	var f struct {
 		CustomerID  *uuid.UUID `json:"customerId,omitempty"`
+		PropertyID  *uuid.UUID `json:"propertyId,omitempty"`
 		ContractID  *uuid.UUID `json:"contractId,omitempty"`
 		Status      *string    `json:"status,omitempty"`
+		From        *time.Time `json:"from,omitempty"`
+		To          *time.Time `json:"to,omitempty"`
 		OverdueOnly *bool      `json:"overdueOnly,omitempty"`
 	}
 	if len(in.Filters) > 0 {
@@ -490,6 +505,9 @@ func (m Billing) listInvoices(ctx context.Context, c *ops.Call, in *paging.Query
 		dec.DisallowUnknownFields()
 		if dec.Decode(&f) != nil || (f.Status != nil && !slices.Contains(invoiceStatuses, *f.Status)) {
 			return paging.Page[Invoice]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
+		}
+		if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
+			return paging.Page[Invoice]{}, apperr.Fields(map[string]string{"filters.to": "error.range"})
 		}
 	}
 	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "i.id", "dueAt": "i.due_at", "createdAt": "i.created_at"}, "i.due_at DESC, i.id ASC")
@@ -513,11 +531,21 @@ func (m Billing) listInvoices(ctx context.Context, c *ops.Call, in *paging.Query
 	if f.CustomerID != nil {
 		conds = append(conds, "i.customer_id = "+add(*f.CustomerID))
 	}
+	if f.PropertyID != nil { // an invoice belongs to the properties of its contract version's units
+		conds = append(conds, `EXISTS (SELECT 1 FROM billing.contract_units cu JOIN billing.ref_units u ON u.id = cu.unit_id
+			WHERE cu.contract_id = i.contract_id AND cu.contract_version = i.contract_version AND u.property_id = `+add(*f.PropertyID)+")")
+	}
 	if f.ContractID != nil {
 		conds = append(conds, "i.contract_id = "+add(*f.ContractID))
 	}
 	if f.Status != nil {
 		conds = append(conds, "i.status = "+add(*f.Status))
+	}
+	if f.From != nil { // [from, to) on the period start
+		conds = append(conds, "lower(i.period) >= "+add(*f.From))
+	}
+	if f.To != nil {
+		conds = append(conds, "lower(i.period) < "+add(*f.To))
 	}
 	if f.OverdueOnly != nil && *f.OverdueOnly {
 		conds = append(conds, "i.status <> 'paid' AND i.due_at < "+add(c.Now))

@@ -35,8 +35,8 @@ const titles: Record<string, string> = {
 };
 
 const routes: Record<Role, Partial<Record<TargetKind, (id: string) => string>>> = {
-  client: { unit: (id) => `/customer/units/${id}`, job: () => "/customer/maintenance", invoice: (id) => `/customer/payments/${id}`, restriction: () => "/customer/payments", inquiry: () => "/customer/maintenance", client_user: () => "/customer/users" },
-  admin: { unit: () => "/admin/units", job: () => "/admin/jobs", invoice: () => "/admin/billing", restriction: (id) => `/admin/restrictions/${id}`, device: () => "/admin/devices", client_user: () => "/admin/settings/access" },
+  client: { unit: (id) => `/customer/units/${id}`, job: (id) => `/customer/maintenance?jobId=${id}`, invoice: (id) => `/customer/payments/${id}`, restriction: () => "/customer/payments", inquiry: () => "/customer/maintenance", client_user: () => "/customer/users" },
+  admin: { unit: (id) => `/admin/units?unitId=${id}`, job: (id) => `/admin/jobs?jobId=${id}`, invoice: (id) => `/admin/billing?invoiceId=${id}`, inquiry: (id) => `/admin/billing?inquiryId=${id}`, restriction: (id) => `/admin/restrictions/${id}`, device: (id) => `/admin/devices?deviceId=${id}`, client_user: () => "/admin/settings/access" },
   contractor: { unit: (id) => `/partner/units/${id}`, job: (id) => `/partner/jobs/${id}` },
   technician: { unit: (id) => `/technician/units/${id}`, job: (id) => `/technician/jobs/${id}`, device: (id) => `/technician/devices/${id}` },
 };
