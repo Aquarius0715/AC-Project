@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pradita/ac-project/service/core/seed"
 	"github.com/pradita/ac-project/service/core/scheduler"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 // completedJob creates a customer-a job completed one hour before the fixture clock.

@@ -1500,3 +1500,15 @@ Go tests used the development database `ac`. A local worker running on the share
 
 `Membership.displayName` (string) is the member user's `identity.users.display_name`, returned by members.list / members.eligible / members.capacity projections and every Membership result. Contractors need it to list their technicians on the team screen (FR-P team, IR42 projection otherwise unchanged: no permissions or scopes for contractors). Web: `/partner/team` reads members.list, a week of members.capacity and saves members.setUnavailability in API mode.
 
+## IR173 Echo v5 and the official Echo guide — 2026-10-08
+
+User request: build the backend following the official Echo documentation (and the web side following the official Next.js documentation, IR174+). The current Echo documentation is for v5 (v5.4.0), so the Core API moved from `echo/v4` 4.16 to `echo/v5` 5.4.0 (DEC-71):
+
+- Handlers and middleware take `*echo.Context` and return errors; `ops.HTTPErrorHandler(c, err)` is the single place that writes error bodies (Echo guide › Error Handling). `apperr.DomainError` implements `echo.HTTPStatusCoder`; Echo's own errors are recognised through that interface.
+- Middleware from `echo/v5/middleware`: Recover, RequestID (UUIDv7), RequestLogger (slog JSON, `HandleError` so the logged status is the final one), ContextTimeout.
+- Routes: `/healthz`, `/readyz`, group `/v1` with the authentication middleware, `POST /v1/ops/:operation`.
+- `cmd/api`: `slog` JSON logger as `e.Logger`, `echo.StartConfig{GracefulTimeout: 25s}.Start(ctx, e)` (Cookbook › Graceful Shutdown).
+- Tests keep `httptest` + `e.ServeHTTP` (Guide › Testing); `TestHTTPErrorHandler` covers DomainError, plain error (no leak), 413, 503, unknown route, wrong method, HEAD and an already committed response. All test files are gofmt-formatted.
+
+Verified: go test (all modules) green; images ac-api 35.6 MB, ac-worker 25.8 MB, ac-migrate 25.7 MB build; the running API answers unknown routes and methods with the DomainError body and correlation ID and logs one JSON line per request.
+

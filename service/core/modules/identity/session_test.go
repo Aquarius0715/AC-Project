@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	"github.com/pradita/ac-project/service/core/ops"
 	"github.com/pradita/ac-project/service/core/platform/authz"
@@ -30,6 +30,7 @@ func TestSessionGet(t *testing.T) {
 	r.Clock = func() time.Time { return now }
 	Register(r)
 	e := echo.New()
+	e.HTTPErrorHandler = ops.HTTPErrorHandler
 	e.POST("/v1/ops/:operation", r.Dispatch)
 	p := &ops.Principal{Principal: authz.Principal{Role: "client", ClientRole: "owner",
 		Permissions: map[string]bool{"control.execute": true, "alert.read": true, "unused": false}},

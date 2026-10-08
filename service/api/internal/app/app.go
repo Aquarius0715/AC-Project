@@ -3,12 +3,11 @@ package app
 
 import (
 	"context"
-	"net/http"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
 
 	"github.com/pradita/ac-project/service/core/modules/assets"
 	"github.com/pradita/ac-project/service/core/modules/audit"
@@ -37,8 +36,9 @@ type Config struct {
 	DatabaseReaderURL string
 	Addr              string
 	Clock             func() time.Time
-	DemoOps           bool      // demo environment only: demo.advanceClock / demo.trigger (IR154)
-	DemoStart         time.Time // demo scenario clock at start (fixture.clock, IR36); zero keeps the base clock
+	DemoOps           bool         // demo environment only: demo.advanceClock / demo.trigger (IR154)
+	DemoStart         time.Time    // demo scenario clock at start (fixture.clock, IR36); zero keeps the base clock
+	Logger            *slog.Logger // Echo's application logger (Echo v5 uses log/slog); nil keeps Echo's default
 }
 
 // Server is the assembled Core API.
@@ -131,21 +131,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	devices.RegisterDevices(reg, dm)
 	devices.RegisterCampaigns(reg, dm)
 
-	e := echo.New()
-	e.HideBanner, e.HidePort = true, true
-	e.Use(middleware.Recover())
-	e.Use(middleware.RequestIDWithConfig(middleware.RequestIDConfig{
-		Generator: func() string { return uuid.Must(uuid.NewV7()).String() },
-	}))
-	e.GET("/healthz", func(c echo.Context) error { return c.NoContent(http.StatusOK) })
-	e.GET("/readyz", func(c echo.Context) error {
-		if err := m.Writer.Ping(c.Request().Context()); err != nil {
-			return c.NoContent(http.StatusServiceUnavailable)
-		}
-		return c.NoContent(http.StatusOK)
-	})
-	a := &auth.Authenticator{Verifier: v, DB: m, Now: reg.Clock}
-	e.POST("/v1/ops/:operation", reg.Dispatch, a.Middleware())
+	e := newEcho(reg, m, &auth.Authenticator{Verifier: v, DB: m, Now: reg.Clock}, cfg.Logger)
 	return &Server{Echo: e, Registry: reg, DB: m}, nil
 }
 

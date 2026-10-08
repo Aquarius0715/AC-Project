@@ -9,8 +9,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/core/modules/control"
-	"github.com/pradita/ac-project/service/core/seed"
 	"github.com/pradita/ac-project/service/core/scheduler"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 func TestCommands(t *testing.T) {

@@ -7,13 +7,12 @@ package auth
 import (
 	"context"
 	"errors"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	"github.com/pradita/ac-project/service/core/ops"
 	"github.com/pradita/ac-project/service/core/platform/apperr"
@@ -42,16 +41,17 @@ type Authenticator struct {
 	Now      func() time.Time
 }
 
-func unauth(c echo.Context, key string) error {
+// unauth returns the 401 DomainError; Echo's HTTPErrorHandler writes it.
+func unauth(c *echo.Context, key string) error {
 	de := apperr.E(apperr.Unauthenticated, key)
 	de.CorrelationID = c.Response().Header().Get(echo.HeaderXRequestID)
-	return c.JSON(http.StatusUnauthorized, de)
+	return de
 }
 
 // Middleware returns the Echo middleware.
 func (a *Authenticator) Middleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			h := c.Request().Header.Get(echo.HeaderAuthorization)
 			if h == "" {
 				return next(c)

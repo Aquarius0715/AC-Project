@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.63.0
+version: 0.64.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -166,6 +166,7 @@ Small text and controls are adjusted for readability and usability in work scree
 | DEC-68 | Production target: AWS hosting, Stripe for payments, HQ admin app only from the company network; retention, capacity and customer office firewall requirements are set by the design team; AC interface and SIM provider stay open | User request in this conversation, 2026-10-07 (“クラウド事業者はひとまずAWS…決済サービスなどはStripe…HQ画面へのアクセスは社内ネットワークに限定します…”); reflected in IR117, backend-architecture.md §1/§3a/§6/§7/§11/§13/§16 and network-architecture.md §2a/§3/§4/§5a/§10 |
 | DEC-69 | The backend is implemented in Go with the Echo framework; the database is Aurora PostgreSQL with one schema per module | User request in this conversation, 2026-10-07 (“バックエンドの言語はGoとします。GoEchoを使用してください”); reflected in IR118, backend-go-design.md, database-design.md, db/schema.sql and Figma System Architecture board 06 |
 | DEC-70 | Everything runs in Docker: all application components are Docker images in every environment (Compose locally and in CI, ECS Fargate in staging and production); production databases, queues and IoT stay AWS managed services | User request in this conversation, 2026-10-07 (“全てDockerで動かす前提です”; answer: apps all in Docker, production DB etc. AWS managed); reflected in IR119, container-design.md, compose.yaml, web/Dockerfile, docker/ and Figma System Architecture board 07 |
+| DEC-71 | Backend and web follow the frameworks' official documentation and current major versions: Core API on Echo v5 structured as in the Echo guide (central HTTPErrorHandler, echo/v5 middleware, route groups, StartConfig graceful shutdown, slog); web on the current Next.js App Router conventions (IR174+) | User request in this conversation, 2026-10-08 (“バックエンドの構成ですが、GoEchoのドキュメントに沿って作成してください。Web側も同様に公式ドキュメントに沿って作成してください”); reflected in IR173, backend-go-design.md §1/§4 |
 
 **DEC-10 (design proposal)**: Preserve work status on reassignment. Release restrictions only after all cause invoices fixed at notice time are paid. Release does not automatically power units on or restore previous set temperatures. Manual payment recording, test-run end confirmation, and viewing saved reports are specified for the 1A demo. This does not mean company approval of commercial rules. See [input/output contract DDC-08](../02-design/implementation-contracts.md#ddc-08-multi-resource-revisit-and-cross-role-contracts).
 
@@ -266,6 +267,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.64.0: Echo v5 per the official guide (IR173, DEC-71). Phase 1A unchanged.
 0.63.0: Membership.displayName (IR172). Phase 1A unchanged.
 0.62.0: Test database isolation (IR171). Phase 1A unchanged.
 0.61.0: One unit scope for every module (IR170). Phase 1A unchanged.

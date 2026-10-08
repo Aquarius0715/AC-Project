@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/labstack/echo/v5"
+
 	"github.com/pradita/ac-project/service/api/internal/app"
 	"github.com/pradita/ac-project/service/core/platform/auth"
 	"github.com/pradita/ac-project/service/core/platform/democlock"
@@ -26,7 +28,10 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)) // JSON logs (backend Go design: log/slog)
+	slog.SetDefault(logger)
 	cfg := app.Config{
+		Logger:            logger,
 		DatabaseURL:       os.Getenv("DATABASE_URL"),
 		DatabaseReaderURL: os.Getenv("DATABASE_READER_URL"),
 		Addr:              envOr("ADDR", ":8080"),
@@ -50,16 +55,12 @@ func main() {
 		slog.Error("startup", "err", err)
 		os.Exit(1)
 	}
-	go func() {
-		if err := s.Echo.Start(cfg.Addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("serve", "err", err)
-			stop()
-		}
-	}()
-	<-ctx.Done()
-	shut, cancel := context.WithTimeout(context.Background(), 25*time.Second)
-	defer cancel()
-	_ = s.Echo.Shutdown(shut)
+	// graceful shutdown as in the Echo cookbook: StartConfig.Start returns once ctx is cancelled (SIGINT/SIGTERM)
+	// and in-flight requests have finished or GracefulTimeout has passed (ECS stopTimeout is 30 s)
+	sc := echo.StartConfig{Address: cfg.Addr, HideBanner: true, HidePort: true, GracefulTimeout: 25 * time.Second}
+	if err := sc.Start(ctx, s.Echo); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		slog.Error("serve", "err", err)
+	}
 	s.DB.Close()
 }
 

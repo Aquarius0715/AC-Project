@@ -53,6 +53,9 @@ func (e *DomainError) Error() string { return string(e.Code) + ": " + e.MessageK
 // HTTPStatus returns the fixed status for the error code.
 func (e *DomainError) HTTPStatus() int { return status[e.Code] }
 
+// StatusCode implements echo.HTTPStatusCoder, so Echo's central error handler and the request logger see the status.
+func (e *DomainError) StatusCode() int { return e.HTTPStatus() }
+
 // E creates a DomainError with an empty fieldErrors map.
 func E(c Code, messageKey string) *DomainError {
 	return &DomainError{Code: c, MessageKey: messageKey, FieldErrors: map[string]string{}}

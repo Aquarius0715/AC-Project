@@ -16,7 +16,7 @@ This document turns the [backend architecture](backend-architecture.md) into an 
 | Decision | Choice |
 |---|---|
 | Language | Go 1.25 or later (one module per service in the `service/go.work` workspace: `service/core` shared domain and platform packages, `service/api` Core API, `service/worker` background roles, `service/migrate` schema migrations; current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
-| HTTP framework | Echo v4 (`github.com/labstack/echo/v4`, checked with v4.16.0) for the Core API and the webhook receiver |
+| HTTP framework | Echo v5 (`github.com/labstack/echo/v5`, checked with v5.4.0) for the Core API and the webhook receiver, structured as in the official Echo guide (IR173): handlers `func(c *echo.Context) error` return errors to one central `HTTPErrorHandler`; middleware from `echo/v5/middleware`; route group `/v1`; graceful shutdown with `echo.StartConfig`; `log/slog` as `e.Logger`; tests with `net/http/httptest` against `e.ServeHTTP` |
 | Database driver | pgx v5 (`github.com/jackc/pgx/v5`, `pgxpool`); no ORM |
 | Query code | sqlc generates typed Go from SQL in `db/queries/<schema>/*.sql`; hand-written SQL only for dynamic list filters |
 | Migrations | `service/migrate` (IR167): embedded `migrations/NNNNNN_name.up.sql` files applied in order under an advisory lock, one transaction each (`-- migrate:no-transaction` for `CONCURRENTLY`), bookkeeping in the golang-migrate compatible `schema_migrations` table; `000001_init` is [db/schema.sql](db/schema.sql) |
@@ -99,15 +99,17 @@ The authorization column (for example `client:self-customer:owner | admin:alert.
 
 ## 4. Request pipeline (Core API)
 
+Echo setup (`service/api/internal/app/http.go`, Echo guide: Quickstart, Routing, Error Handling, Cookbook › Graceful Shutdown, Testing): one `echo.New()`, the middleware below in order, `/healthz` and `/readyz`, the group `v1 := e.Group("/v1", auth)` with `v1.POST("/ops/:operation", Dispatch)`, and `e.HTTPErrorHandler = ops.HTTPErrorHandler`. Handlers and middleware never write error bodies themselves; they return a `*apperr.DomainError` (which implements `echo.HTTPStatusCoder`) and the central handler writes it with the correlation ID, maps Echo's own errors (unknown route or method → NOT_FOUND `error.unknownOperation`, 413 → VALIDATION `error.bodyTooLarge`, 503/504 → TIMEOUT) and turns any other error into UNAVAILABLE without internal detail, skipping responses already committed. `cmd/api` starts with `echo.StartConfig{GracefulTimeout: 25s}.Start(ctx, e)` on a SIGINT/SIGTERM context.
+
 Echo middleware order:
 
 | Order | Middleware | Behaviour |
 |---|---|---|
 | 1 | Recover | Panic → UNAVAILABLE (503), stack logged, no detail returned |
-| 2 | Correlation ID | Uses the BFF's `X-Correlation-Id` or creates a UUIDv7; echoed in `X-Request-Id`, logs, traces, events, audit |
+| 2 | Correlation ID | `middleware.RequestIDWithConfig` with a UUIDv7 generator (keeps an incoming `X-Request-Id`); echoed in `X-Request-Id`, logs, traces, events, audit |
 | 3 | OpenTelemetry (`otelecho`) | Span per request, attributes `ac.operation`, `ac.tenant` |
-| 4 | Access log | `slog` line with operation, status, latency, membership; bodies are never logged |
-| 5 | Body limit / timeout | 1 MiB JSON (files go to S3); context deadline 5 s for reads, 10 s for writes |
+| 4 | Access log | `middleware.RequestLoggerWithConfig` writing one `slog` JSON line (method, URI, status after the error handler, request ID, latency); bodies are never logged |
+| 5 | Body limit / timeout | 1 MiB JSON checked by the dispatcher (files go to S3); `middleware.ContextTimeout` 30 s on the request context used by the database (per-operation 5 s / 10 s deadlines remain the production target) |
 | 6 | Authentication | Verifies the Cognito access token (issuer, audience = app client, expiry, `token_use=access`), loads the selected Membership (`X-Tenant-Id` + `X-Membership-Id` from the BFF session context; the membership must belong to the token subject, be inside its validity window and the user must be active, otherwise UNAUTHENTICATED) with permissions, scopes, client role and validity; requests without a token stay anonymous and reach only `public:` operations; caches it for 30 s keyed by membershipId + scopeVersion |
 | 7 | HQ network | Admin-role principals must carry a token from the admin app client (served only on `admin.<domain>`, IR117); otherwise FORBIDDEN |
 | 8 | Dispatcher | `POST /v1/ops/:operation` (below) |

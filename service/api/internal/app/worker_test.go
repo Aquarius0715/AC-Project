@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pradita/ac-project/service/core/seed"
 	"github.com/pradita/ac-project/service/core/scheduler"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 func TestWorkerTickExpiresOffers(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	"github.com/pradita/ac-project/service/core/platform/apperr"
 	"github.com/pradita/ac-project/service/core/platform/authz"
@@ -109,6 +109,7 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 		return out{OK: true}, nil
 	})
 	e := echo.New()
+	e.HTTPErrorHandler = HTTPErrorHandler
 	e.POST("/v1/ops/:operation", r.Dispatch)
 	return r, e, rec, idem, ro
 }

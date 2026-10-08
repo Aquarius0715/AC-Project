@@ -15,7 +15,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	"github.com/pradita/ac-project/service/core/platform/apperr"
 	"github.com/pradita/ac-project/service/core/platform/authz"
@@ -174,10 +174,12 @@ func PrincipalFrom(ctx context.Context) *Principal {
 	return p
 }
 
-func fail(c echo.Context, err error, corr string) error {
+// fail returns err as a DomainError carrying the correlation ID; Echo's HTTPErrorHandler writes it (Echo guide,
+// Error Handling: handlers return errors to one central handler).
+func fail(_ *echo.Context, err error, corr string) error {
 	de := apperr.From(err)
 	de.CorrelationID = corr
-	return c.JSON(de.HTTPStatus(), de)
+	return de
 }
 
 // branchMatches evaluates a write-version-catalog branch against the decoded input.
@@ -231,7 +233,7 @@ func expectedVersion(s Spec, body []byte, header string) (*int, error) {
 }
 
 // Dispatch is the Echo handler for POST /v1/ops/:operation.
-func (r *Registry) Dispatch(c echo.Context) error {
+func (r *Registry) Dispatch(c *echo.Context) error {
 	ctx := c.Request().Context()
 	corr := c.Response().Header().Get(echo.HeaderXRequestID)
 	if corr == "" {

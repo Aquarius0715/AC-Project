@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/pradita/ac-project/service/core/seed"
 	"github.com/pradita/ac-project/service/core/scheduler"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 func TestSlotProposals(t *testing.T) {

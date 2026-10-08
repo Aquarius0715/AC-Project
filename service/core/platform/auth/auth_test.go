@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
 
 	"github.com/pradita/ac-project/service/core/ops"
 	"github.com/pradita/ac-project/service/core/platform/db"
@@ -53,8 +53,9 @@ func setup(t *testing.T) *Authenticator {
 
 func call(a *Authenticator, hdr map[string]string) (*httptest.ResponseRecorder, *ops.Principal) {
 	e := echo.New()
+	e.HTTPErrorHandler = ops.HTTPErrorHandler
 	var got *ops.Principal
-	e.GET("/", func(c echo.Context) error { got = ops.PrincipalFrom(c.Request().Context()); return c.NoContent(204) }, a.Middleware())
+	e.GET("/", func(c *echo.Context) error { got = ops.PrincipalFrom(c.Request().Context()); return c.NoContent(204) }, a.Middleware())
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	for k, v := range hdr {
 		req.Header.Set(k, v)
