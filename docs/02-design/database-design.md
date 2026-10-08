@@ -155,7 +155,7 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 
 ## 9. Migrations
 
-- golang-migrate with sequential files in `service/api/db/migrations`; [db/schema.sql](db/schema.sql) becomes `000001_init.up.sql`. Applied migrations are never edited.
+- `service/migrate` (IR167) applies sequential files embedded from `service/migrate/migrations` (golang-migrate naming and `schema_migrations` table, so the golang-migrate CLI can inspect or `force` the same database); [db/schema.sql](db/schema.sql) is `000001_init.up.sql`, and a test fails when the two differ until the first release freezes it. Applied migrations are never edited. `migrate up` refuses a database that has the schemas but no recorded version (`migrate force 1` records a psql-built schema) and stops on a dirty version left by a failed non-transactional migration.
 - Expand → migrate → contract: add nullable columns or new tables first, deploy code that writes both, backfill in batches, then drop the old shape in a later release. CHECK changes for new enum values ship before the code that uses them.
 - Large index builds use `CREATE INDEX CONCURRENTLY` in their own migration (no transaction).
 - Each migration runs in CI against PostgreSQL 16 with the store tests; production runs it as a one-off ECS task before the service deploy (backend Go design §10).

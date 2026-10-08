@@ -15,11 +15,11 @@ This document turns the [backend architecture](backend-architecture.md) into an 
 
 | Decision | Choice |
 |---|---|
-| Language | Go 1.25 or later (one module per service in the `service/go.work` workspace: `service/core` shared domain and platform packages, `service/api` Core API, `service/worker` background roles; current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
+| Language | Go 1.25 or later (one module per service in the `service/go.work` workspace: `service/core` shared domain and platform packages, `service/api` Core API, `service/worker` background roles, `service/migrate` schema migrations; current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
 | HTTP framework | Echo v4 (`github.com/labstack/echo/v4`, checked with v4.16.0) for the Core API and the webhook receiver |
 | Database driver | pgx v5 (`github.com/jackc/pgx/v5`, `pgxpool`); no ORM |
 | Query code | sqlc generates typed Go from SQL in `db/queries/<schema>/*.sql`; hand-written SQL only for dynamic list filters |
-| Migrations | golang-migrate (`db/migrations/NNNNNN_name.up.sql` / `.down.sql`); `0001_init` is [db/schema.sql](db/schema.sql) |
+| Migrations | `service/migrate` (IR167): embedded `migrations/NNNNNN_name.up.sql` files applied in order under an advisory lock, one transaction each (`-- migrate:no-transaction` for `CONCURRENTLY`), bookkeeping in the golang-migrate compatible `schema_migrations` table; `000001_init` is [db/schema.sql](db/schema.sql) |
 | IDs | UUIDv7 from `github.com/google/uuid` (`uuid.NewV7`), time-ordered for index locality |
 | Validation | Generated input structs + a `Validate() *DomainError` method per input (rules from the DD documents); `go-playground/validator` only for simple tags |
 | Logging / tracing | `log/slog` JSON with a masking handler; OpenTelemetry SDK + `otelecho`, exported through the AWS Distro for OpenTelemetry collector |
@@ -41,7 +41,7 @@ backend/
     api/            Core API (Echo) — POST /v1/ops/:operation, /healthz, /readyz
     webhook/        Webhook receiver (Echo) — /stripe, /ses, /whatsapp
     worker/         one binary, --role=outbox|scheduler|notification|telemetry|iot|automation|importexport|rollup
-    migrate/        applies db/migrations (run as a one-off ECS task before deploy)
+    migrate/        now service/migrate (IR167): applies the embedded migrations (one-off ECS task before deploy)
     gen/            code generators (operations, contracts) — run in CI, output committed
   internal/
     app/            composition root: config → pools → AWS clients → modules → Echo / worker loops

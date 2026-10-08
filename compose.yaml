@@ -1,11 +1,11 @@
 # AC Project — everything runs in Docker (IR119, DEC-70, docs/02-design/container-design.md)
 # Services live under service/ (service/api: Go Core API, service/worker: background roles, service/core: shared Go module,
-# service/web: Next.js web + BFF)
+# service/migrate: schema migrations, service/web: Next.js web + BFF)
 #
 # Profiles
 #   demo     Phase 1A clickable demo (web with the in-browser mock)           docker compose --profile demo up
 #   infra    Local stand-ins for the AWS managed services                      docker compose --profile infra up
-#   schema   Apply docs/02-design/db/schema.sql once (until service/api migrations exist)   docker compose --profile infra --profile schema up
+#   schema   service/migrate once (schema, local login, demo fixture)          docker compose --profile infra --profile schema up
 #   backend  Go API, webhook, workers, IoT bridge, device simulator (service/api)
 #   full     web in API mode + backend + infra                                 docker compose --profile full up
 #   obs      OpenTelemetry collector + Jaeger
@@ -104,15 +104,25 @@ services:
     depends_on: [api, keycloak, valkey]
 
   # ------------------------------------------------------------------ backend (Go + Echo)
-  migrate:
-    <<: *backend
+  migrate:             # one-off: embedded migrations (service/migrate), local login role, demo fixture once
+    image: ac-migrate:dev
+    build:
+      context: ./service
+      dockerfile: migrate/Dockerfile
+      target: runtime
     command: ["/app/migrate", "up"]
     restart: "no"
     depends_on:
       postgres: { condition: service_healthy }
     environment:
-      <<: *backend-env
       DATABASE_URL: postgres://postgres:local@postgres:5432/ac?sslmode=disable
+      APP_LOGIN_PASSWORD: local                         # local only: ac_app_login IN ROLE ac_app
+      SEED_FIXTURE: /fixture/fixture-contract.json     # local only: skipped when identity.users has rows
+    volumes: [./docs/04-agentic-sdlc/fixture-contract.json:/fixture/fixture-contract.json:ro]
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    networks: [data]
+    profiles: [schema, backend, full]
 
   api:
     <<: *backend
@@ -159,21 +169,6 @@ services:
     healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres -d ac"], interval: 5s, timeout: 3s, retries: 20 }
     networks: [data]
     profiles: [infra, schema, backend, full]
-
-  db-schema:           # until backend/ exists: apply the design schema once and create a local login
-    image: postgres:16
-    depends_on:
-      postgres: { condition: service_healthy }
-    environment: { PGPASSWORD: local }
-    volumes: [./docs/02-design/db/schema.sql:/schema.sql:ro]
-    entrypoint: ["sh", "-c"]
-    command:
-      - >
-        psql -h postgres -U postgres -d ac -tAc "select 1 from pg_namespace where nspname='platform'" | grep -q 1
-        || (psql -h postgres -U postgres -d ac -v ON_ERROR_STOP=1 -q -f /schema.sql
-        && psql -h postgres -U postgres -d ac -c "CREATE ROLE ac_app_login LOGIN PASSWORD 'local' IN ROLE ac_app")
-    networks: [data]
-    profiles: [schema]
 
   valkey:              # ElastiCache (sessions, idempotency fast path, rate limits)
     image: valkey/valkey:8

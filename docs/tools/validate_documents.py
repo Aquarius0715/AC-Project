@@ -84,6 +84,7 @@ for path in markdown:
             previous = None
 
 trace = rows('00-prepare/traceability.csv')
+# 0.58.0 (2026-10-08): IR167 migration service; counts unchanged.
 # 0.57.0 (2026-10-08): IR166 service layout; counts unchanged.
 # 0.56.0 (2026-10-08): IR165 UnitDetail; counts unchanged.
 # 0.55.0 (2026-10-08): IR164 recovery cases; counts unchanged.
@@ -1215,7 +1216,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.57.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.58.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

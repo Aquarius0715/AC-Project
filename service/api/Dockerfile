@@ -9,6 +9,7 @@ COPY go.work ./
 COPY core/go.mod core/go.sum core/
 COPY api/go.mod api/go.sum api/
 COPY worker/go.mod worker/go.sum worker/
+COPY migrate/go.mod migrate/go.sum migrate/
 RUN --mount=type=cache,target=/go/pkg/mod cd api && go mod download
 COPY core core
 COPY api api
