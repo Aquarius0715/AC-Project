@@ -134,6 +134,16 @@ func TestMembersList(t *testing.T) {
 			t.Fatal("clients excluded by default")
 		}
 	}
+	// IR172: every membership carries its user's display name (contractors list their technicians by name)
+	_, m = post(s, &contrA, "members.list", `{"limit":100}`)
+	if len(items(m)) == 0 {
+		t.Fatal("contractor sees its technicians")
+	}
+	for _, it := range items(m) {
+		if name, _ := it["displayName"].(string); name == "" {
+			t.Fatalf("displayName missing: %v", it["id"])
+		}
+	}
 	if _, m := post(s, &hq, "members.list", `{"filters":{"role":"client"},"limit":100}`); len(items(m)) < 2 {
 		t.Error("role=client")
 	}

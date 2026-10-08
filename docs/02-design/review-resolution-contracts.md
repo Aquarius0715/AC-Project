@@ -1496,3 +1496,7 @@ Tests: the IR169 scope test also covers alerts.list (hidden before the work wind
 
 Go tests used the development database `ac`. A local worker running on the shared demo clock (IR168) processed test rows mid-test and broke `TestRestrictionLifecycle`, and tests left rows that changed what the local BFF showed. Tests now connect to `ac_test` (`service/api/tools/resetdb.sh` takes `DB=ac_test`; `make testdb` rebuilds it, `make test` creates it when missing and runs with `-count=1` so a cached skip cannot hide a missing database). The seed also derives the job history implied by the fixture (job.created, job.offered, offer decision with decidedBy, job.assigned; deterministic IDs).
 
+## IR172 Membership display name — 2026-10-08
+
+`Membership.displayName` (string) is the member user's `identity.users.display_name`, returned by members.list / members.eligible / members.capacity projections and every Membership result. Contractors need it to list their technicians on the team screen (FR-P team, IR42 projection otherwise unchanged: no permissions or scopes for contractors). Web: `/partner/team` reads members.list, a week of members.capacity and saves members.setUnavailability in API mode.
+

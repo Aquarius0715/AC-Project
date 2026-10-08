@@ -41,6 +41,7 @@ type Member struct {
 	CreatedAt      time.Time  `json:"createdAt"`
 	UpdatedAt      time.Time  `json:"updatedAt"`
 	UserID         uuid.UUID  `json:"userId"`
+	DisplayName    string     `json:"displayName"` // the user's display name (IR172)
 	OrganizationID uuid.UUID  `json:"organizationId"`
 	Role           string     `json:"role"`
 	Employment     *string    `json:"employment"`
@@ -54,12 +55,12 @@ type Member struct {
 }
 
 const memberCols = `m.id, m.tenant_id, m.version, m.created_at, m.updated_at, m.user_id, m.organization_id, m.role, m.employment, m.scope_version, m.valid_from,
-	m.valid_until, m.client_role`
+	m.valid_until, m.client_role, COALESCE((SELECT u.display_name FROM identity.users u WHERE u.id = m.user_id), '')`
 
 func scanMember(r pgx.Row) (Member, error) {
 	var x Member
 	err := r.Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.UserID, &x.OrganizationID, &x.Role, &x.Employment, &x.ScopeVersion,
-		&x.ValidFrom, &x.ValidUntil, &x.ClientRole)
+		&x.ValidFrom, &x.ValidUntil, &x.ClientRole, &x.DisplayName)
 	return x, err
 }
 
@@ -201,6 +202,7 @@ var RolePermissions = map[string][]string{
 type MemberInput struct {
 	ID             *uuid.UUID `json:"id,omitempty"`
 	UserID         uuid.UUID  `json:"userId"`
+	DisplayName    string     `json:"displayName"` // the user's display name (IR172)
 	OrganizationID uuid.UUID  `json:"organizationId"`
 	Role           string     `json:"role"`
 	Employment     *string    `json:"employment"`
