@@ -59,8 +59,8 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 		}
 		switch u.apply {
 		case "not_sent": // undelivered apply is finalized as cancelled: zero-delivery evidence
-			if _, err := c.Tx.Exec(ctx, `UPDATE control.commands SET status = 'cancelled', version = version + 1, updated_at = $3
-				WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested' AND delivery = 'not_sent'`, id, u.unit, c.Now); err != nil {
+			unit := u.unit
+			if err := events.Publish(ctx, c.Tx, c.Principal.TenantID, "restriction", id, events.RestrictionCommandsCancelled, events.CommandsCancelled{RestrictionID: id, UnitID: &unit}); err != nil {
 				return err
 			}
 			err = set(`apply_state = 'not_applied', release_state = 'not_required', pending_reason = NULL`)
@@ -79,7 +79,7 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 			if delivered {
 				err = set(`release_state = 'requested', release_command_ids = release_command_ids || $3::uuid, pending_reason = NULL`, cmd)
 			} else { // offline applied units wait for retry(phase=release); the undelivered intent is cancelled
-				if _, err := c.Tx.Exec(ctx, `UPDATE control.commands SET status = 'cancelled', version = version + 1, updated_at = $2 WHERE id = $1`, cmd, c.Now); err != nil {
+				if err := events.Publish(ctx, c.Tx, c.Principal.TenantID, "restriction", id, events.RestrictionCommandsCancelled, events.CommandsCancelled{RestrictionID: id, CommandIDs: []uuid.UUID{cmd}}); err != nil {
 					return err
 				}
 				err = set(`pending_reason = $3`, reason)

@@ -99,7 +99,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		}
 		reg.Clock = dc.Now
 	}
-	registerDemo(reg, &demoOps{enabled: cfg.DemoOps, m: m, clock: dc})
+	registerDemo(reg, &demoOps{inline: len(cfg.Domains) == 0, enabled: cfg.DemoOps, m: m, clock: dc})
 	identity.Register(reg)
 	identity.RegisterMembers(reg)
 	am := &assets.Module{Mon: monitorReads{alerts: monitoring.Alerts{}, telemetry: monitoring.Telemetry{Sensors: devices.Models{}}}, Models: devices.Models{}, Policies: monitoring.Policies{},

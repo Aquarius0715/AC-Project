@@ -4,7 +4,9 @@ import (
 	"slices"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/assets"
+	"github.com/pradita/ac-project/service/api/internal/modules/control"
 	"github.com/pradita/ac-project/service/api/internal/modules/monitoring"
+	"github.com/pradita/ac-project/service/api/internal/modules/restrictions"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
@@ -20,8 +22,8 @@ func consumers(m *db.TxManager, domains []string) []*events.Consumer {
 			out = append(out, &events.Consumer{Name: name, DB: m, Handlers: handlers})
 		}
 	}
-	add(ops.DomainEquipment, "equipment", merge(assets.EventHandlers(), monitoring.EventHandlers())) // IR184
-	add(ops.DomainBilling, "billing", map[string]events.Handler{})
+	add(ops.DomainEquipment, "equipment", merge(assets.EventHandlers(), monitoring.EventHandlers(), control.EventHandlers())) // IR184, IR185
+	add(ops.DomainBilling, "billing", restrictions.EventHandlers())                                                           // IR185
 	return out
 }
 

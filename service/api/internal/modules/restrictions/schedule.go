@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"math"
 	"slices"
 	"strings"
@@ -373,11 +374,11 @@ func (m Restrictions) send(ctx context.Context, c *ops.Call, restriction, unit u
 	if reason != nil {
 		status, delivery, sentAt = "requested", "not_sent", nil
 	}
-	var id uuid.UUID
-	err = c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action, restriction_id, status, delivery,
-		requested_at, sent_at, expires_at, correlation_id, created_at, updated_at)
-		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'restriction', $4, $5, $6, $7, $8, $9, $10, $11, $8, $8) RETURNING id`,
-		unit, device, SystemActor, action, restriction, status, delivery, c.Now, sentAt, c.Now.Add(IntentTTL), c.CorrelationID).Scan(&id)
+	// the command row is equipment's (IR185): billing assigns the ID and publishes the decided command
+	id := uuid.Must(uuid.NewV7())
+	err = events.Publish(ctx, c.Tx, c.Principal.TenantID, "command", id, events.RestrictionCommandRequested, events.RestrictionCommand{
+		CommandID: id, UnitID: unit, DeviceID: device, ActorID: SystemActor, Action: action, RestrictionID: restriction, Status: status,
+		Delivery: delivery, RequestedAt: c.Now, SentAt: sentAt, ExpiresAt: c.Now.Add(IntentTTL), CorrelationID: c.CorrelationID})
 	if err == nil {
 		c.Emit(ops.Event{AggregateType: "command", AggregateID: id, Type: "CommandRequested", Payload: map[string]any{"unitId": unit, "deviceId": device, "action": json.RawMessage(action), "delivery": delivery}})
 	}

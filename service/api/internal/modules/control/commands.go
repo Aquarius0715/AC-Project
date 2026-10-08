@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -11,7 +12,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pradita/ac-project/service/api/internal/modules/restrictions"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
@@ -315,7 +315,7 @@ func ExpireCommands(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) 
 	if err != nil {
 		return 0, err
 	}
-	return len(ids), restrictions.CommandsEnded(ctx, tx, ids, now)
+	return len(ids), publishRestrictionCommands(ctx, tx, events.CommandsEnded, ids, now) // billing reacts (IR185)
 }
 
 // Acknowledge applies a device acknowledgement (IoT bridge / device simulator): before expiresAt the command becomes
@@ -327,7 +327,7 @@ func Acknowledge(ctx context.Context, tx pgx.Tx, command uuid.UUID, receivedAt t
 		return false, err
 	}
 	if tag.RowsAffected() == 1 {
-		if err := restrictions.CommandAcknowledged(ctx, tx, command, receivedAt); err != nil {
+		if err := publishRestrictionCommands(ctx, tx, events.CommandAcknowledged, []uuid.UUID{command}, receivedAt); err != nil { // billing reacts (IR185)
 			return true, err
 		}
 		if err := applyObserved(ctx, tx, command, receivedAt); err != nil {

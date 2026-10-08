@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"math"
 	"sync"
 	"time"
@@ -48,6 +49,7 @@ func (d *demoClock) Advance(_ context.Context, by time.Duration) error {
 // demoOps serves demo.* in the demo environment only (backend architecture §15, IR154); production returns
 // UNAVAILABLE errors.demo_only. demoSession.* is always served by the BFF sign-in, never by the Core API.
 type demoOps struct {
+	inline  bool // serves every domain (tests, single process)
 	enabled bool
 	m       *db.TxManager
 	clock   scenarioClock
@@ -83,7 +85,12 @@ func (d *demoOps) advance(ctx context.Context, c *ops.Call, in *AdvanceInput) (G
 	if err := d.clock.Advance(ctx, in.To.Sub(c.Now)); err != nil {
 		return Generation{}, apperr.From(err)
 	}
-	if _, err := scheduler.Tick(ctx, d.m, in.To); err != nil { // process deadlines reached by the jump
+	// process deadlines reached by the jump: in-process when one process serves every domain; split services leave
+	// it to the scheduler worker, which runs on the same shared clock (IR168, IR185)
+	if !d.inline {
+		return Generation{Generation: 1}, nil
+	}
+	if _, err := scheduler.Tick(ctx, d.m, in.To); err != nil {
 		return Generation{}, err
 	}
 	return Generation{Generation: 1}, nil
@@ -234,7 +241,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 			if err != nil || tag.RowsAffected() == 0 {
 				return err
 			}
-			return restrictions.CommandsEnded(ctx, tx, []uuid.UUID{*in.CommandID}, in.OccurredAt)
+			return control.EndRestrictionCommands(ctx, tx, []uuid.UUID{*in.CommandID}, in.OccurredAt)
 		})
 	}
 	if in.EventType == "restriction_observation" { // SR26: a device reports which restriction it enforces
@@ -246,8 +253,9 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 			if _, err := tx.Exec(ctx, `UPDATE assets.units SET observed_restriction = $2, last_seen_at = $3 WHERE id = $1`, *in.UnitID, obsRaw, c.Now); err != nil {
 				return err
 			}
-			_, err := restrictions.Observe(ctx, tx, c.Now, *in.UnitID, in.Observed, in.EventID)
-			return err
+			raw, _ := json.Marshal(in.Observed) // "null" when the device enforces none
+			return events.Publish(ctx, tx, c.Principal.TenantID, "unit", *in.UnitID, events.UnitRestrictionObserved,
+				events.Observation{UnitID: *in.UnitID, Observed: raw, EventID: in.EventID, At: c.Now}) // billing updates recovery cases (IR185)
 		})
 	}
 	r := in.Measurement // telemetry: D07 / IR12 normalization, IR77 sequence latest+1, IR11 boundary from the sensor

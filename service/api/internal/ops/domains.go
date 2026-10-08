@@ -24,7 +24,7 @@ var moduleDomain = map[string]string{
 	"Identity & access":   DomainIdentity,
 	"Notifications":       DomainIdentity,
 	"Audit":               DomainIdentity,
-	"Demo":                DomainIdentity,
+	"Demo":                DomainEquipment, // demo.trigger simulates device events (IR185)
 	"Assets":              DomainEquipment,
 	"Devices":             DomainEquipment,
 	"Control":             DomainEquipment,

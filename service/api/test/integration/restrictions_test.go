@@ -86,6 +86,7 @@ func expireAt(t *testing.T, now time.Time) {
 	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error { _, err := control.ExpireCommands(ctx, tx, now); return err }); err != nil {
 		t.Fatal(err)
 	}
+	drainEvents(t) // the worker tick is not an operation: apply CommandsEnded as billing's consumer would (IR185)
 }
 
 func TestRestrictionLifecycle(t *testing.T) {

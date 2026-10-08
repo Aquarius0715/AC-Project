@@ -1568,8 +1568,8 @@ User decision: split the API into microservices by business domain. Phase A turn
 
 | Service | Catalog modules | Operations |
 |---|---|---|
-| `identity-api` | Identity & access, Notifications, Audit, Demo | 30 |
-| `equipment-api` | Assets, Devices, Control, Monitoring & alerts, Read models | 63 |
+| `identity-api` | Identity & access, Notifications, Audit (Demo moved to equipment-api by IR185) | 27 |
+| `equipment-api` | Assets, Devices, Control, Monitoring & alerts, Read models, Demo (IR185) | 66 |
 | `maintenance-api` | Maintenance | 59 |
 | `billing-api` | Billing, Restrictions | 30 |
 | `energy-api` | Energy & carbon | 15 |
@@ -1636,4 +1636,22 @@ The restrictions module (billing-api) stops writing `assets.units` and `monitori
 `events.Publish(ctx, tx, tenant, …)` writes the outbox row in the producer's transaction with an explicit tenant (device acknowledgements and worker ticks run without a tenant context); the equipment consumer runs every 250 ms in equipment-api, inline in the all-domain test server (repeated until no event is pending, since events can chain), and test helpers that call the device path directly drain the events afterwards. The device observation itself (`assets.units.observed_restriction` from `demo.trigger restriction_observation`) is now written by the trigger, before `restrictions.Observe` updates recovery cases. Remaining for part 2: device commands created and cancelled by restrictions (`control.commands`) and the reverse calls from control into restrictions on acknowledgement and expiry.
 
 Verified: all Go tests green (restriction lifecycle, recovery, cancel / payment, exception release, override reconcile); in compose the deployed equipment-api consumer applied an injected `RecoveryCasesChanged` event within 2 s, recorded once in `platform.processed_events`.
+
+## IR185 No cross-domain writes left (phase B step 2b, part 2) — 2026-10-09
+
+Device commands of restrictions and the callbacks between control and restrictions now travel as events, and the demo operations belong to equipment-api. A scan of every INSERT / UPDATE / DELETE in the business modules and demo operations against the IR180 ownership map finds no statement on another domain's schema.
+
+| Event | From → to | Effect |
+|---|---|---|
+| `RestrictionCommandRequested {commandId, unitId, deviceId, action, restrictionId, status, delivery, requestedAt, sentAt, expiresAt, correlationId}` | billing → equipment | equipment stores the command billing decided; billing assigns the UUIDv7 command ID, so restriction records reference it at once and the API still returns the command IDs and delivery state immediately |
+| `RestrictionCommandsCancelled {commandIds}` or `{restrictionId, unitId}` | billing → equipment | cancel the given commands, or every undelivered intent of the restriction on the unit; applied after the request event in outbox order |
+| `CommandAcknowledged {commandIds, at}` | equipment → billing | `restrictions.CommandAcknowledged` (apply / release / recovery progress); control no longer imports the restrictions module |
+| `CommandsEnded {commandIds, at}` | equipment → billing | failed or expired restriction commands (`ExpireCommands`, device rejection) |
+| `UnitRestrictionObserved {unitId, observed, eventId, at}` | equipment → billing | `restrictions.Observe` updates recovery cases (SR26) after equipment recorded the device observation |
+
+- The Demo catalog module moves from identity-api to equipment-api (`demo.trigger` simulates device events). `demo.advanceClock` moves the shared scenario clock (IR168); it runs the cross-domain scheduler tick only when one process serves every domain; the split services leave the reached deadlines to the scheduler worker on the same clock.
+- Equipment consumes restriction events and billing consumes command events (consumer names `equipment` and `billing`); in the all-domain process the chains are applied inline.
+- Remaining phase B work (IR181 steps 3–4): cross-domain reads (for example restrictions read device connection and in-flight commands to decide delivery, the unit scope reads maintenance assignments) and the database split.
+
+Verified: all Go tests green, none skipped (restriction lifecycle, cancel / payment, exception release / retry, override / reconcile, recovery cases, demo operations, commands, diagnostics, worker); the write scan reports 0 cross-domain writes; in compose the six services start healthy and `demo.advanceClock` is routed to equipment-api. The dev database was rebuilt afterwards because the smoke test had moved the shared demo clock to 2030.
 
