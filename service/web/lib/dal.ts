@@ -31,6 +31,16 @@ export type CoreOptions = { write?: boolean; expectedVersion?: number; idempoten
 
 /** Calls one Core API operation as the signed-in membership and returns `data` (DomainError → CoreError). */
 export async function coreOp<T>(operation: string, input: unknown, opts: CoreOptions = {}): Promise<T> {
+  return (await coreCall<T>(operation, input, opts)).data;
+}
+
+/** The Core API business clock (Meta.snapshotAt; the demo scenario clock in the demo environment, IR36). */
+export const coreNow = cache(async (): Promise<Date> => {
+  const { meta } = await coreCall<unknown>("session.get", {}, {});
+  return meta?.snapshotAt ? new Date(meta.snapshotAt) : new Date();
+});
+
+async function coreCall<T>(operation: string, input: unknown, opts: CoreOptions): Promise<{ data: T; meta?: { snapshotAt?: string } }> {
   const s = await verifySession();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -45,7 +55,7 @@ export async function coreOp<T>(operation: string, input: unknown, opts: CoreOpt
   });
   const body = await res.json().catch(() => null);
   if (!res.ok) throw new CoreError(res.status, body ?? { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });
-  return (body as { data: T }).data;
+  return body as { data: T; meta?: { snapshotAt?: string } };
 }
 
 export const apiMode = () => process.env.DATA_SOURCE === "api";
