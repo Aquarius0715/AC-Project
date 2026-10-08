@@ -1860,3 +1860,19 @@ The Figma page “System Architecture” (file VOeKPrid46kOf24ktEfe8r) still sho
 - **Board 07** (containers): four web images from `service/web/Dockerfile`, `ac-gateway` and `ac-<domain>-api` from `service/api/build/service.Dockerfile`, `ac-worker` / `ac-migrate`; compose `gateway + 5 services`, `worker-scheduler × 2`, web apps on 3000–3003, the `planned` profile.
 - **Board 08** (new): request path (web apps → gateway → services), one card per service (operations, catalog modules, schemas and role, copies, consumed events, answered queries, schedulers), the three cross-domain contracts (events, change capture, internal queries), workers, enforcement and the open database split.
 - Compose: `iot-bridge` and `device-sim` move to the `planned` profile with `webhook` (their commands are not built yet, so `--profile backend` no longer starts failing containers); the profiles table of container-design.md lists the current services.
+
+## IR198 Frontend board as built; data source of every page — 2026-10-09
+
+Board 02 of the Figma page “System Architecture” still showed the single `web/` app on Next.js 15 with page-level stores. It now shows the frontend as built (IR175–IR179): the four apps and `@ac/web`, the request and data flow in API mode (`proxy.ts` optimistic check and token refresh → Server Component reading through `lib/dal.ts` → client view → Server Actions → gateway), the data source of every page, and the differences from the design (board 01, common.md §1 / §8). Boards 03–08 moved down to keep the spacing.
+
+Data source of the 72 pages in API mode (measured from the imports of every `page.tsx`):
+
+| App | Server (DAL + Server Actions) | Browser through `/bff/ops` | Fixture rows only | No data |
+|---|---|---|---|---|
+| customer | overview, alerts, units/[id], notifications | maintenance, preferences, demo, login | air-quality, automations, energy, energy/offsets, payments, payments/[id], properties, users (8) | /, forgot-password, forbidden |
+| partner | team, units/[id], notifications | overview, jobs, jobs/[id], schedule, history, preferences, demo, login | jobs/[id]/review, payouts (2) | same three |
+| technician | units/[id], units/[id]/alerts, notifications | overview, jobs/[id], preferences, demo, login | jobs, devices, devices/[id], units/[id]/control (4) | same three |
+| admin | overview, notifications | jobs, preferences, demo, login | alerts, audit, billing, billing/contracts, devices, energy, mrv, offsets, restrictions, restrictions/[id], settings/access, settings/automation, units (13) | same three |
+
+- 27 data screens still render fixture rows in API mode; the Core API implements all 197 catalogued operations (registry check), so the gap is the web wiring. Order of work: admin (13), customer (8), technician (4), partner (2), each to the IR176 pattern.
+- Design deviations recorded for a decision: the data-access layering of common.md (page → feature hook → Repository → adapter) is replaced by the Next.js DAL / Server Components pattern the user asked for (to be written into common.md §1 / §8); the Navigation interface, shadcn/ui, React Hook Form + Zod, i18next and the Vitest / Playwright / axe test stack are not implemented yet.

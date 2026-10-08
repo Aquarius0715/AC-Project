@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.88.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
+Version: 0.89.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.89.0 (2026-10-09): Frontend architecture board as built and the data source of every page; 27 screens to wire (IR198). Phase 1A unchanged.
 0.88.0 (2026-10-09): System Architecture boards 03/06/07 updated and board 08 added for the domain services; compose planned profile (IR197). Phase 1A unchanged.
 0.87.0 (2026-10-09): The audit log belongs to identity: AuditRecorded events, audit.history query (IR196). Phase 1A unchanged.
 0.86.0 (2026-10-09): Scheduler per business domain; system internal queries for workers (IR195). Phase 1A unchanged.
