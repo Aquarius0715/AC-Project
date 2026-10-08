@@ -142,6 +142,7 @@ type CustomerSave struct {
 // Validate implements ops.Validator.
 func (in *CustomerSave) Validate() map[string]string {
 	fe := map[string]string{}
+	in.Name = strings.TrimSpace(in.Name)
 	if !strLen(in.Name, 1, 120) {
 		fe["name"] = "error.length"
 	}

@@ -1,6 +1,9 @@
 package ops
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestChanges(t *testing.T) {
 	s := func(v string) *string { return &v }
@@ -17,6 +20,19 @@ func TestChanges(t *testing.T) {
 	}
 	if b, a := Changes(nil, nil); len(b) != 0 || len(a) != 0 {
 		t.Error("no change")
+	}
+	b, a = Changes(map[string]any{"when": time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)}, map[string]any{"when": time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC)})
+	if *b["when"] != "2026-09-01T00:00:00Z" || *a["when"] != "2026-09-02T00:00:00Z" {
+		t.Errorf("times are shown without quotes: %v → %v", *b["when"], *a["when"])
+	}
+	kl := time.FixedZone("MYT", 8*3600)
+	at := time.Date(2026, 9, 1, 8, 0, 0, 0, kl)
+	if b, _ := Changes(map[string]any{"when": time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)}, map[string]any{"when": &at}); len(b) != 0 {
+		t.Errorf("the same instant in another zone is no change: %v", b)
+	}
+	var none *time.Time
+	if b, a := Changes(map[string]any{"when": none}, map[string]any{"when": &at}); b["when"] != nil || *a["when"] != "2026-09-01T00:00:00Z" {
+		t.Errorf("nil time → set: %v → %v", b, a)
 	}
 }
 

@@ -107,6 +107,7 @@ type OrganizationSave struct {
 // Validate implements ops.Validator (DD-A02: name 1–120).
 func (in *OrganizationSave) Validate() map[string]string {
 	fe := map[string]string{}
+	in.Name = strings.TrimSpace(in.Name)
 	if n := utf8.RuneCountInString(in.Name); n < 1 || n > 120 {
 		fe["name"] = "error.length"
 	}
@@ -119,12 +120,30 @@ func (in *OrganizationSave) Validate() map[string]string {
 	return fe
 }
 
+// uniqueName rejects a second organization of the same kind with the same trimmed, case-insensitive name in the
+// tenant (a second customer with the same billing name is CONFLICT, IR208). It runs after the write in the same
+// transaction, so NOT_FOUND and version conflicts come first and a duplicate rolls the write back.
+func uniqueName(ctx context.Context, c *ops.Call, id uuid.UUID) error {
+	var taken bool
+	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.organizations o, identity.organizations t WHERE t.id = $1
+		AND o.kind = t.kind AND o.id <> t.id AND lower(btrim(o.name)) = lower(btrim(t.name)))`, id).Scan(&taken); err != nil {
+		return err
+	}
+	if taken {
+		return apperr.E(apperr.Conflict, "error.duplicateName")
+	}
+	return nil
+}
+
 func organizationsSave(ctx context.Context, c *ops.Call, in *OrganizationSave) (Organization, error) {
 	if in.ID == nil {
 		id := uuid.Must(uuid.NewV7())
 		o, err := scanOrg(c.Tx.QueryRow(ctx, `INSERT INTO identity.organizations (id, tenant_id, name, kind, status)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4) RETURNING `+orgCols, id, in.Name, in.Kind, in.Status))
 		if err != nil {
+			return Organization{}, err
+		}
+		if err := uniqueName(ctx, c, id); err != nil {
 			return Organization{}, err
 		}
 		c.Audit(ops.AuditEntry{Action: "organizations.save", TargetKind: "organization", TargetID: id.String(), NextVersion: &o.Version})
@@ -145,6 +164,9 @@ func organizationsSave(ctx context.Context, c *ops.Call, in *OrganizationSave) (
 		return Organization{}, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 	if err != nil {
+		return Organization{}, err
+	}
+	if err := uniqueName(ctx, c, o.ID); err != nil {
 		return Organization{}, err
 	}
 	c.Audit(ops.AuditEntry{Action: "organizations.save", TargetKind: "organization", TargetID: o.ID.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &o.Version})

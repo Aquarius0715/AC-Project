@@ -224,11 +224,14 @@ export function Field({ label, hint, error, children, className }: { label: stri
     </label>
   );
 }
-export const Input = ({ className, ...p }: React.InputHTMLAttributes<HTMLInputElement>) => <input {...p} className={cx(inputCls, className)} />;
+/** The control classes; a width in className (w-auto, w-40, …) replaces w-full — two width utilities would be decided
+ * by the stylesheet order, not by the order in className. */
+const control = (className?: string) => (className && /(^|\s)w-/.test(className) ? inputCls.replace("w-full ", "") : inputCls);
+export const Input = ({ className, ...p }: React.InputHTMLAttributes<HTMLInputElement>) => <input {...p} className={cx(control(className), className)} />;
 export const Select = ({ className, children, ...p }: React.SelectHTMLAttributes<HTMLSelectElement>) => (
-  <select {...p} className={cx(inputCls, "pr-8", className)}>{children}</select>
+  <select {...p} className={cx(control(className), "pr-8", className)}>{children}</select>
 );
-export const Textarea = ({ className, ...p }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...p} className={cx(inputCls, "min-h-[84px] resize-y", className)} />;
+export const Textarea = ({ className, ...p }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...p} className={cx(control(className), "min-h-[84px] resize-y", className)} />;
 export function Check({ label, checked, onChange, disabled }: { label: React.ReactNode; checked?: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {
   return (
     <label className="inline-flex items-center gap-2 text-[13px]">

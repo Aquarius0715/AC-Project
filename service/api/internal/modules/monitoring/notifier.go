@@ -64,7 +64,8 @@ func cmp(op string, a, b float64) bool {
 	return a <= b
 }
 
-// inWindow reports whether at falls into the active window in tz (nil window: always).
+// inWindow reports whether at falls into the active window in tz (nil window: always). An end before the start runs
+// past midnight and the weekdays are start days: 22:00–06:00 on Monday covers Monday 22:00 to Tuesday 06:00.
 func inWindow(w *ActiveWindow, at time.Time, tz string) bool {
 	if w == nil {
 		return true
@@ -79,7 +80,17 @@ func inWindow(w *ActiveWindow, at time.Time, tz string) bool {
 		wd = 7
 	}
 	hm := l.Format("15:04")
-	return slices.Contains(w.Weekdays, wd) && hm >= w.StartLocal && hm < w.EndLocal
+	if w.StartLocal < w.EndLocal {
+		return slices.Contains(w.Weekdays, wd) && hm >= w.StartLocal && hm < w.EndLocal
+	}
+	if hm >= w.StartLocal {
+		return slices.Contains(w.Weekdays, wd)
+	}
+	prev := wd - 1 // the morning part belongs to the window that started the day before
+	if prev == 0 {
+		prev = 7
+	}
+	return hm < w.EndLocal && slices.Contains(w.Weekdays, prev)
 }
 
 // policiesOf returns the notification candidates of a unit: attached alert policies plus the tenant default policy

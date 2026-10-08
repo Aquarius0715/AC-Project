@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -50,11 +51,16 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	model := seed.ID("ventilation-demo").String()
 
 	// property create / validation / update / conflict
-	code, m := write(s, &hq, "properties.save", `{"customerOrgId":"`+org+`","kind":"office","name":"Test HQ `+uuid.NewString()[:6]+`","address":null,"accessInstructions":null}`, 0)
+	propName := "Test HQ " + uuid.NewString()[:6]
+	code, m := write(s, &hq, "properties.save", `{"customerOrgId":"`+org+`","kind":"office","name":"`+propName+`","address":null,"accessInstructions":null}`, 0)
 	if code != 200 || ver(m) != 1 {
 		t.Fatalf("property create: %d %v", code, m)
 	}
 	prop := data(m)["id"].(string)
+	// names are unique among non-archived siblings, trimmed and case-insensitive (IR208); the duplicate is rolled back
+	if code, m := write(s, &hq, "properties.save", `{"customerOrgId":"`+org+`","kind":"home","name":" `+strings.ToLower(propName)+`","address":null,"accessInstructions":null}`, 0); code != 409 || m["messageKey"] != "error.duplicateSiblingName" {
+		t.Errorf("duplicate property name: %d %v", code, m)
+	}
 	for _, bad := range []string{
 		`{"customerOrgId":"` + org + `","kind":"castle","name":"x","address":null,"accessInstructions":null}`,
 		`{"customerOrgId":"` + org + `","kind":"home","name":"","address":null,"accessInstructions":null}`,
@@ -68,8 +74,9 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	if code, _ := write(s, &hq, "properties.save", `{"customerOrgId":"`+uuid.NewString()+`","kind":"home","name":"x","address":null,"accessInstructions":null}`, 0); code != 404 {
 		t.Errorf("unknown customer: %d", code)
 	}
-	upd := `{"id":"` + prop + `","customerOrgId":"` + org + `","kind":"office","name":"Renamed","address":"1 Test Rd (fictional)","accessInstructions":null}`
-	if code, m := write(s, &hq, "properties.save", upd, 1); code != 200 || ver(m) != 2 || data(m)["name"] != "Renamed" {
+	renamed := "Renamed " + uuid.NewString()[:6]
+	upd := `{"id":"` + prop + `","customerOrgId":"` + org + `","kind":"office","name":"` + renamed + `","address":"1 Test Rd (fictional)","accessInstructions":null}`
+	if code, m := write(s, &hq, "properties.save", upd, 1); code != 200 || ver(m) != 2 || data(m)["name"] != renamed {
 		t.Fatalf("property update: %d %v", code, m)
 	}
 	if code, m := write(s, &hq, "properties.save", upd, 1); code != 409 || m["code"] != "CONFLICT" {
@@ -105,6 +112,21 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	if code, m := write(s, &hq, "spaces.save", `{"id":"`+room+`","propertyId":"`+prop+`","parentSpaceId":"`+floor+`","kind":"room","name":"Server room A"}`, 1); code != 200 || ver(m) != 2 {
 		t.Fatalf("space update: %d", code)
 	}
+	for name, b := range map[string]string{
+		"floor at the root": `{"propertyId":"` + prop + `","parentSpaceId":null,"kind":"floor","name":"1f"}`,
+		"room on the floor": `{"propertyId":"` + prop + `","parentSpaceId":"` + floor + `","kind":"room","name":" server room a "}`,
+	} {
+		if code, m := write(s, &hq, "spaces.save", b, 0); code != 409 || m["messageKey"] != "error.duplicateSiblingName" {
+			t.Errorf("duplicate space (%s): %d %v", name, code, m)
+		}
+	}
+	code, m = write(s, &hq, "spaces.save", `{"propertyId":"`+prop+`","parentSpaceId":"`+floor+`","kind":"room","name":"1F"}`, 0)
+	if code != 200 {
+		t.Fatalf("the same name under another parent is allowed: %d", code)
+	}
+	if code, _ := write(s, &hq, "spaces.archive", `{"id":"`+data(m)["id"].(string)+`","reason":"test cleanup"}`, 1); code != 200 {
+		t.Errorf("room 1F archive: %d", code)
+	}
 
 	// units: create, wrong customer, unknown model, future install, relocation reason
 	unitBody := func(id, space string, extra string) string {
@@ -123,6 +145,9 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		t.Fatalf("unit create: %d %v", code, m)
 	}
 	unit := data(m)["id"].(string)
+	if code, m := write(s, &hq, "units.save", strings.Replace(unitBody("", room, ""), "Server AC", "server ac", 1), 0); code != 409 || m["messageKey"] != "error.duplicateSiblingName" {
+		t.Errorf("duplicate unit name in the room: %d %v", code, m)
+	}
 	badUnits := map[string]string{
 		"other customer":  strings.Replace(unitBody("", "", ""), org, seed.ID("org-customer-a").String(), 1),
 		"unknown model":   strings.Replace(unitBody("", "", ""), model, uuid.NewString(), 1),
@@ -142,6 +167,31 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	}
 	if code, m := write(s, &hq, "units.save", unitBody(unit, floor, `,"changeReason":"moved to floor"`), 1); code != 200 || ver(m) != 2 {
 		t.Fatalf("relocate: %d %v", code, m)
+	}
+	// renaming another unit on the floor to the moved unit's name is a duplicate too (update path)
+	code, m = write(s, &hq, "units.save", strings.Replace(unitBody("", floor, ""), "Server AC", "Server AC 2", 1), 0)
+	if code != 200 {
+		t.Fatalf("second unit: %d %v", code, m)
+	}
+	second := data(m)["id"].(string)
+	if code, m := write(s, &hq, "units.save", unitBody(second, floor, ""), 1); code != 409 || m["messageKey"] != "error.duplicateSiblingName" {
+		t.Errorf("rename to a sibling's name: %d %v", code, m)
+	}
+	if code, _ := write(s, &hq, "units.archive", `{"id":"`+second+`","reason":"test cleanup"}`, 1); code != 200 {
+		t.Errorf("second unit archive: %d", code)
+	}
+	// the history keeps the original location: only the changed field, with its old and new value (DD-A02 step 3)
+	day := `"from":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `","to":"` + clock.Add(time.Hour).Format(time.RFC3339) + `"`
+	_, am := post(s, &hq, "audit.list", `{"filters":{`+day+`,"targetKind":"unit","targetId":"`+unit+`"},"limit":10}`)
+	var moved map[string]any
+	for _, a := range items(am) {
+		if a["nextVersion"] == float64(2) {
+			moved = a
+		}
+	}
+	if moved == nil || moved["reason"] != "moved to floor" || moved["maskedBefore"].(map[string]any)["spaceId"] != room ||
+		moved["maskedAfter"].(map[string]any)["spaceId"] != floor || len(moved["maskedAfter"].(map[string]any)) != 1 {
+		t.Fatalf("relocation audit: %v", am)
 	}
 	if code, _ := write(s, &hq, "units.save", unitBody(uuid.NewString(), "", ""), 1); code != 404 {
 		t.Errorf("unknown unit: %d", code)

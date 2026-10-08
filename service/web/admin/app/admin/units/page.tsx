@@ -1,136 +1,144 @@
-"use client";
+// /admin/units (FR-A02, SCR-A02): in API mode a Server Component reads the customer register (customers.list for both
+// statuses, organizations.list, properties.list, units.list) with the contract standing where the session may read it
+// (contracts.list, overdue invoices.list, restrictions.list). For customerId it adds the customer's spaces, models
+// (capabilities.list), alert policies (policies.list for the customer) and open alerts; for unitId units.get with the
+// D05 archive blockers (contracts, jobs, device bindings, restrictions, pending commands). URL keys: customerId, tab,
+// locationId (property, space or "unassigned:<propertyId>"), propertyId, unitId, powerState, connections, search.
+// Writes are Server Actions (actions.ts). The Phase 1A demo keeps the fixtures.
+import { connection } from "next/server";
+import { apiMode, coreAll, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
+import { klStamp } from "@ac/web/lib/energy";
+import { metricLabel } from "@ac/web/lib/adminAlerts";
+import type { ApiCapability } from "@ac/web/lib/devices";
+import {
+  connections, customerRows, defaultRules, filterUnits, locationTree, modelLabel, placeOptions, policyLines, powerStates, registerKpis, selection, standing, unitRows, unitsAt,
+  conditionText, type ApiContractLite, type ApiCustomerPolicy, type ApiCustomerRow, type ApiInvoiceLite, type ApiOrgRow, type ApiPropertyRow, type ApiRestrictionLite,
+  type ApiSpaceRow, type ApiUnitDetail, type ApiUnitRow, type Connection,
+} from "@ac/web/lib/assets";
+import { UnitsDemo } from "./_components/units-demo";
+import { UnitsView, type CustomerLive, type UnitLive, type UnitsLive } from "./_components/units-view";
 
-import { useState } from "react";
-import { setSearchParam, useSearchParam } from "@ac/web/lib/urlState";
-import { ImportCsvModal, WarrantyTab } from "@ac/web/components/Features";
-import { ClientRole, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
-import { Badge, Banner, Btn, Card, DataTable, Field, Input, Kpi, ListRow, Modal, Page, PowerBadge, ConnBadge, Search, Select, SummaryList, Tabs, useToast } from "@ac/web/components/ui";
+type Member = { id: string; displayName: string };
+type Job = { id: string; type: string; status: string };
+type Device = { id: string; serial: string; unitId: string | null; connection: Connection };
+type Alert = { severity: "critical" | "warning" | "normal" };
+type Audit = { occurredAt: string; actorId: string; reason: string | null };
+const done = ["completed", "cancelled"];
+const day = 86_400_000; // audit periods: the last 365 days up to tomorrow (at most 366 days, IR143)
 
-type Cust = { id: string; name: string; status: "active" | "inactive"; props: number; units: number; op: string; alerts: number | string; contract: string };
-const customers: Cust[] = [
-  { id: "customer-a", name: "Tan household", status: "active", props: 1, units: 3, op: "50.0%", alerts: 1, contract: "contract-rto-a" },
-  { id: "customer-b", name: "Lim Trading Sdn Bhd", status: "active", props: 1, units: 2, op: "50.0%", alerts: 0, contract: "contract-rto-b" },
-  { id: "customer-z", name: "inactive since 2025-12-31", status: "inactive", props: 0, units: 0, op: "—", alerts: "—", contract: "—" },
-];
-const locations = [{ id: "home-a", name: "Home A", kids: ["1F", "2F"] }, { id: "bedroom", name: "Bedroom", kids: [] }];
-const unitRows = [
-  { id: "unit-online-rto", name: "Bedroom AC", loc: "Home A › 1F › Bedroom", model: "ventilation-demo v3", power: "running" as const, conn: "online" as const },
-  { id: "unit-bedroom-2", name: "Bedroom AC #2", loc: "Home A › 1F › Bedroom", model: "cap-split-std v1", power: "stopped" as const, conn: "online" as const },
-  { id: "unit-non-rto", name: "Living room AC", loc: "Home A › 1F › Living room", model: "cap-split-std v1", power: "running" as const, conn: "online" as const },
-];
-
-export default function AdminUnits() {
-  const toast = useToast();
-  const [q, setQ] = useState("");
-  // URL state is the source of truth (SCR-A02: customerId + tab=overview|users|policies|warranty, Figma 02-15 / 02-16 / 02-19)
-  const urlTab = useSearchParam("tab");
-  const urlCustomer = useSearchParam("customerId");
-  const cust = customers.find((x) => x.id === urlCustomer) ?? null;
-  const top: "customers" | "warranty" = !cust && urlTab === "warranty" ? "warranty" : "customers";
-  const tab: "units" | "users" | "policies" = urlTab === "users" || urlTab === "policies" ? urlTab : "units";
-  const setTop = (t: "customers" | "warranty") => setSearchParam("tab", t === "warranty" ? "warranty" : "overview");
-  const setTab = (t: "units" | "users" | "policies") => setSearchParam("tab", t === "units" ? "overview" : t);
-  const setCust = (c: Cust | null) => {
-    setSearchParam("customerId", c ? c.id : null);
-    setSearchParam("tab", "overview");
+export default async function AdminUnitsPage({ searchParams }: PageProps<"/admin/units">) {
+  await connection();
+  if (!apiMode()) return <UnitsDemo />;
+  const sp = await searchParams;
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const [now, perms] = await Promise.all([coreNow(), corePermissions()]);
+  const has = (...p: string[]) => p.some((x) => perms.has(x));
+  if (!has("asset.read")) return <UnitsView live={null} />;
+  const canContracts = has("contract.read", "billing.read", "restriction.read");
+  const canInvoices = has("billing.read", "restriction.read");
+  const [active, inactive, orgs, properties, units, contracts, overdue, restrictions, members] = await Promise.all([
+    coreAll<ApiCustomerRow>("customers.list", { filters: { status: "active" } }),
+    coreAll<ApiCustomerRow>("customers.list", { filters: { status: "inactive" } }),
+    coreAll<ApiOrgRow>("organizations.list", { filters: { kind: "customer" } }),
+    coreAll<ApiPropertyRow>("properties.list"),
+    coreAll<ApiUnitRow>("units.list"),
+    canContracts ? coreAll<ApiContractLite>("contracts.list") : Promise.resolve(null),
+    canInvoices ? coreAll<ApiInvoiceLite>("invoices.list", { filters: { overdueOnly: true } }) : Promise.resolve(null),
+    has("restriction.read") ? coreAll<ApiRestrictionLite>("restrictions.list") : Promise.resolve(null),
+    has("identity.read") ? coreAll<Member>("members.list") : Promise.resolve([] as Member[]),
+  ]);
+  const standingOf = (c: ApiCustomerRow) => (contracts && overdue ? standing(c.id, contracts, overdue, restrictions, now) : null);
+  const rows = customerRows([...active, ...inactive], orgs, properties, units, standingOf);
+  const live: UnitsLive = {
+    now: now.toISOString(), todayKL: klStamp(now.toISOString()).slice(0, 10), canWrite: has("asset.write"), standingKnown: !!(contracts && overdue),
+    rows, kpis: registerKpis(rows, units), search: one("search") ?? "", missing: !!one("customerId") && !rows.some((r) => r.id === one("customerId")),
   };
-  const [imp, setImp] = useState(false);
-  const [status, setStatus] = useState<"active" | "all">("active");
-  const [loc, setLoc] = useState("home-a");
-  const [unit, setUnit] = useState<(typeof unitRows)[number] | null>(null);
-  const [modal, setModal] = useState<null | "customer" | "location" | "rename" | "delete" | "unit" | "move" | "attach" | "deleteUnit">(null);
-  const [name, setName] = useState("");
-  const [reason, setReason] = useState("");
-  const [tried, setTried] = useState(false);
-  const rows = customers.filter((c) => (status === "all" || c.status === "active") && (!q || (c.id + c.name).toLowerCase().includes(q.toLowerCase())));
-  const close = () => { setModal(null); setTried(false); setName(""); setReason(""); };
-  const nameErr = tried && !name.trim() ? "Name is required (1–120 characters)" : undefined;
+  const cust = rows.find((r) => r.id === one("customerId"));
+  if (!cust) return <UnitsView live={live} />;
 
-  if (!cust) {
-    return (
-      <Page>
-        <div className="flex flex-wrap items-center justify-between gap-2"><Tabs value={top} onChange={setTop} tabs={[{ id: "customers", label: "Customers & units", count: 3 }, { id: "warranty", label: "Warranty & coverage", count: 5 }]} /><Btn size="sm" onClick={() => setImp(true)}>↑ Import CSV</Btn></div>
-        <ImportCsvModal open={imp} onClose={() => setImp(false)} />
-        {top === "warranty" ? <WarrantyTab /> : <>
-        <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}><Kpi label="Customers" value={2} sub="+1 inactive (not counted)" /><Kpi label="Properties" value={2} sub="Home A · Home B" /><Kpi label="Units" value={5} sub="Running 2 · Stopped 2 · unknown 1" /><Kpi label="Needs attention" value={1} tone="warn" sub="overdue billing / open alert" /></div>
-        <Card title="Customers" sub="Select a customer to manage its properties, spaces, and units" action={<Btn size="sm" variant="primary" onClick={() => setModal("customer")}>+ New customer</Btn>}>
-          <div className="mb-3 flex flex-wrap items-center gap-3"><div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder="Search customer name, ID, or property…" value={q} onChange={setQ} /></div><Select aria-label="Status" className="w-auto" value={status} onChange={(e) => setStatus(e.target.value as "all")}><option value="active">Status: Active</option><option value="all">Status: All</option></Select></div>
-          <DataTable rows={rows} rowKey={(r) => r.id} onRowClick={(c) => setCust(c)} cols={[{ key: "c", label: "Customer", render: (c) => <><b>{c.id}</b><div className="text-xs text-muted">{c.name}</div></> }, { key: "s", label: "Status", render: (c) => <Badge tone={c.status === "active" ? "ok" : "unknown"}>{c.status}</Badge> }, { key: "p", label: "Properties", render: (c) => c.props, hideBelow: "sm" }, { key: "u", label: "Units", render: (c) => c.units }, { key: "o", label: "Operation", render: (c) => c.op, hideBelow: "md" }, { key: "a", label: "Alerts", render: (c) => c.alerts, hideBelow: "md" }, { key: "k", label: "Contract", render: (c) => c.contract, hideBelow: "md" }, { key: "x", label: "", render: () => "›" }]} />
-          <p className="mt-2 text-[11px] text-muted">{rows.length} of 3 · sorted by name · Inactive customers appear only with Status: All (IR40). Archived properties/spaces/units never appear in lists, summaries, or KPI denominators (IR39).</p>
-        </Card>
-        </>}
-        <Modal open={modal === "customer"} onClose={close} title="New customer" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) return; toast(`Customer “${name}” created`); close(); }}>Create</Btn></>}><Field label="Customer name" error={nameErr}><Input value={name} onChange={(e) => setName(e.target.value)} /></Field></Modal>
-      </Page>
-    );
+  const orgUnits = units.filter((u) => u.customerOrgId === cust.orgId);
+  const props = properties.filter((p) => p.customerOrgId === cust.orgId);
+  const canPolicies = has("alert.policy.read");
+  const unitId = one("unitId");
+  const [spaces, caps, policies, openAlerts, detail] = await Promise.all([
+    Promise.all(props.map((p) => coreAll<ApiSpaceRow>("spaces.list", { filters: { propertyId: p.id } }))).then((x) => x.flat()),
+    has("dashboard.read", "device.read") ? coreAll<ApiCapability>("capabilities.list") : Promise.resolve([] as ApiCapability[]),
+    canPolicies ? coreAll<ApiCustomerPolicy>("policies.list", { filters: { customerId: cust.id } }) : Promise.resolve(null),
+    has("alert.read", "alert.policy.read")
+      ? Promise.all((["open", "acknowledged"] as const).map((status) => coreAll<Alert>("alerts.list", { filters: { customerId: cust.id, status } }))).then((x) => x.flat())
+      : Promise.resolve(null),
+    unitId ? coreOp<ApiUnitDetail>("units.get", { id: unitId }).catch((e) => (e instanceof CoreError && e.status === 404 ? null : Promise.reject(e))) : Promise.resolve(null),
+  ]);
+  const d = detail && detail.customerOrgId === cust.orgId ? detail : null;
+  const models = new Map(caps.map((k) => [k.id, k.model]));
+  const memberName = new Map(members.map((m) => [m.id, m.displayName]));
+  const tree = locationTree(props, spaces, orgUnits, cust.orgId);
+  // an opened unit selects its own location unless the URL names one (Figma 02-4: the tree shows where the unit is)
+  const sel = selection(tree, one("locationId") ?? (d && !d.archived ? d.spaceId ?? `unassigned:${d.propertyId}` : one("propertyId")), spaces);
+  const powerState = powerStates.find((p) => p === one("powerState"));
+  const conns = (one("connections") ?? "").split(",").filter((c): c is Connection => (connections as string[]).includes(c));
+  const at = sel ? unitsAt(sel, orgUnits) : [];
+  const sev = (s: Alert["severity"]) => openAlerts?.filter((a) => a.severity === s).length ?? 0;
+  const lastEdit = sel && sel.kind !== "unassigned" && has("audit.read")
+    ? await coreOp<{ items: Audit[] }>("audit.list", {
+      limit: 1, filters: { targetKind: sel.kind, targetId: sel.kind === "property" ? sel.property.id : sel.space.id, from: new Date(now.getTime() - 365 * day).toISOString(), to: new Date(now.getTime() + day).toISOString() },
+    }).then((p) => p.items[0] ?? null)
+    : null;
+  const customer: CustomerLive = {
+    row: cust, tab: one("tab") === "policies" ? "policies" : "overview", tree, selection: sel, places: placeOptions(tree, spaces),
+    models: caps.map((k) => ({ id: k.id, label: `${k.manufacturer} ${k.model}` })).sort((a, b) => a.label.localeCompare(b.label)),
+    perProperty: tree.map((p) => `${p.name} ${p.units}`).join(" · ") || "no properties yet",
+    alertsSub: openAlerts ? ([["critical", sev("critical")], ["warning", sev("warning")], ["info", sev("normal")]] as const).filter(([, n]) => n > 0).map(([l, n]) => `${n} ${l}`).join(" · ") || "none open" : null,
+    filter: { powerState, connections: conns, search: one("search") ?? "" }, total: at.length, units: unitRows(filterUnits(at, { powerState, connections: conns, search: "" }), spaces, models),
+    lastEdit: lastEdit ? `${klStamp(lastEdit.occurredAt).slice(0, 10)} · ${memberName.get(lastEdit.actorId) ?? "HQ"}` : null,
+    policies: policies ? policyLines(policies, orgUnits.map((u) => u.id), (m) => memberName.get(m) ?? cust.name) : null,
+    rules: (() => { const d = policies?.find((p) => p.kind === "default_alert"); return d ? { policyId: d.id, items: defaultRules(d) } : null; })(),
+    canRules: has("alert.policy.write"), canAttach: has("asset.write", "alert.policy.write") && canPolicies,
+  };
+
+  if (unitId) {
+    if (!d) customer.unitMissing = true;
+    else customer.unit = await unitLive(d, { now, has, contracts, restrictions, policies, models, memberName, customerName: cust.name });
   }
-  return (
-    <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px]"><button className="font-semibold text-primary" onClick={() => { setCust(null); setUnit(null); }}>← Customers & units</button><span className="text-muted">› {cust.id} · {cust.name}</span></div>
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "units", label: "Units & locations" }, { id: "users", label: "Users" }, { id: "policies", label: "Alert policies" }]} />
-      {tab === "units" && (
-        <div className="split-rev">
-          <Card title="Locations" action={<Btn size="sm" onClick={() => setModal("location")}>+ Add</Btn>} className="self-start">
-            <div className="flex flex-col gap-1.5">{locations.map((l) => <ListRow key={l.id} selected={loc === l.id} onClick={() => { setLoc(l.id); setUnit(null); }}><b className="flex-1 text-[13px]">⌂ {l.name}</b><button aria-label="Rename" className="text-muted" onClick={(e) => { e.stopPropagation(); setName(l.name); setModal("rename"); }}>✎</button></ListRow>)}</div>
-            <Btn size="sm" variant="danger" className="mt-3" onClick={() => setModal("delete")}>Delete location…</Btn>
-          </Card>
-          <div className="flex min-w-0 flex-col gap-4">
-            <Card title={`${loc === "home-a" ? "Home A" : "Bedroom"} — units`} action={<Btn size="sm" variant="primary" onClick={() => setModal("unit")}>+ New unit</Btn>}>
-              <DataTable rows={loc === "bedroom" ? unitRows.slice(0, 2) : unitRows} rowKey={(r) => r.id} selectedKey={unit?.id} onRowClick={setUnit} cols={[{ key: "n", label: "Unit", render: (r) => <><b>{r.name}</b><div className="text-xs text-muted">{r.id}</div></> }, { key: "l", label: "Location", render: (r) => r.loc, hideBelow: "sm" }, { key: "m", label: "Model", render: (r) => r.model, hideBelow: "md" }, { key: "p", label: "Power", render: (r) => <PowerBadge s={r.power} /> }, { key: "c", label: "Conn.", render: (r) => <ConnBadge s={r.conn} />, hideBelow: "sm" }]} />
-            </Card>
-            {unit && (
-              <Card title={`Unit edit — ${unit.name}`} sub={unit.id} action={<Btn size="sm" variant="ghost" onClick={() => setUnit(null)}>✕</Btn>}>
-                <SummaryList cols={2} items={[["Name", unit.name], ["Location", unit.loc], ["Model", unit.model], ["Status", "Active"]]} />
-                <div className="mt-3 flex flex-wrap gap-2"><Btn size="sm" onClick={() => setModal("move")}>Change location…</Btn><Btn size="sm" onClick={() => setModal("attach")}>+ Attach policy</Btn><Btn size="sm" variant="danger" onClick={() => setModal("deleteUnit")}>Delete unit…</Btn></div>
-              </Card>
-            )}
-          </div>
-        </div>
-      )}
-      {tab === "users" && <ClientUsersTab />}
-      {tab === "policies" && <Card title="Customer › Alert policies" sub="customer-a policies only">{[["Bedroom too hot", "2 units"], ["Stuffy office", "2 units"], ["Night humidity", "0 units · Off"]].map(([a, b]) => <div key={a} className="flex justify-between border-t border-line py-2 text-[13px] first:border-0"><b>{a}</b><span className="text-muted">{b}</span></div>)}</Card>}
-
-      <Modal open={modal === "location" || modal === "rename"} onClose={close} title={modal === "rename" ? "Rename location" : "Add location"} footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) return; toast("Location saved"); close(); }}>Save</Btn></>}><Field label="Name" error={nameErr}><Input value={name} onChange={(e) => setName(e.target.value)} /></Field></Modal>
-      <Modal open={modal === "delete"} onClose={close} title="Delete location" footer={<Btn onClick={close}>Close</Btn>}><Banner tone="crit">CONFLICT — this location still has units. Move or delete them first.</Banner></Modal>
-      <Modal open={modal === "deleteUnit"} onClose={close} title="Delete unit" footer={<Btn onClick={close}>Close</Btn>}><Banner tone="crit">CONFLICT — unit is in use (contract scope / open jobs). It cannot be deleted.</Banner></Modal>
-      <Modal open={modal === "unit"} onClose={close} title="New unit in Bedroom" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!name.trim()) return; toast("Unit created"); close(); }}>Create</Btn></>}><Field label="Unit name" error={nameErr}><Input value={name} onChange={(e) => setName(e.target.value)} /></Field><Field label="Model"><Select><option>ventilation-demo v3</option><option>cap-split-std v1</option></Select></Field></Modal>
-      <Modal open={modal === "move"} onClose={close} title="Change location" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!reason.trim()) return; toast("Location changed"); close(); }}>Save</Btn></>}><Field label="New location"><Select><option>Home A › 1F › Kitchen</option><option>Home A › 2F › Study</option></Select></Field><Field label="Reason" error={tried && !reason.trim() ? "A reason is required" : undefined}><Input value={reason} onChange={(e) => setReason(e.target.value)} /></Field></Modal>
-      <Modal open={modal === "attach"} onClose={close} title="Attach policies to Bedroom AC" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { toast("Policy attached"); close(); }}>Attach</Btn></>}><Field label="customer-a policies only"><Select><option>Bedroom too hot</option><option>Stuffy office</option><option>Night humidity</option></Select></Field></Modal>
-    </Page>
-  );
+  live.customer = customer;
+  return <UnitsView live={live} />;
 }
 
-/** FR-A17 — HQ manages every client user; owners can also invite members from the customer app (FR-C19). */
-function ClientUsersTab() {
-  const toast = useToast();
-  const users = useClientUsers();
-  const [open, setOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const [role, setRole] = useState<ClientRole>("member");
-  const [tried, setTried] = useState(false);
-  const err = tried ? emailError(email, users) : undefined;
-  const close = () => { setOpen(false); setTried(false); setEmail(""); setRole("member"); };
-  const run = (e: string | undefined, ok: string) => toast(e ?? ok, e ? "warn" : undefined);
-  const act = (u: ClientUser, a: string) => {
-    if (a === "resend") run(clientUserActions.resend(u.id), `Invitation preview re-created for ${u.email}`);
-    if (a === "role") run(clientUserActions.setRole(u.id, u.role === "owner" ? "member" : "owner"), `Role changed to ${u.role === "owner" ? "Member" : "Owner"}`);
-    if (a === "reset") toast("Password reset preview created (generic message)");
-    if (a === "disable") run(clientUserActions.setStatus(u.id, u.status === "disabled" ? "active" : "disabled"), u.status === "disabled" ? "Sign-in enabled" : "Sign-in disabled");
-    if (a === "remove") run(clientUserActions.remove(u.id), `${u.email} removed from customer-a`);
+type Ctx = {
+  now: Date; has: (...p: string[]) => boolean; contracts: ApiContractLite[] | null; restrictions: ApiRestrictionLite[] | null; policies: ApiCustomerPolicy[] | null;
+  models: Map<string, string>; memberName: Map<string, string>; customerName: string;
+};
+/** The unit edit card: the bound device, the attached policies (default first) and what blocks taking the unit out of use (D05). */
+async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
+  const [jobs, devices, archived] = await Promise.all([
+    x.has("job.read") && !d.archived ? coreAll<Job>("jobs.list", { filters: { unitId: d.id } }) : Promise.resolve(null),
+    x.has("device.read") ? coreAll<Device>("devices.list", { filters: { unitId: d.id } }) : Promise.resolve(null),
+    d.archived && x.has("audit.read")
+      ? coreOp<{ items: Audit[] }>("audit.list", { limit: 1, filters: { targetKind: "unit", targetId: d.id, action: "units.archive", from: new Date(x.now.getTime() - 365 * day).toISOString(), to: new Date(x.now.getTime() + day).toISOString() } }).then((p) => p.items[0] ?? null)
+      : Promise.resolve(null),
+  ]);
+  const device = devices?.find((v) => v.unitId === d.id) ?? null;
+  const t = x.now.getTime();
+  const blockers = d.archived ? [] : [
+    ...(x.contracts ?? []).filter((k) => k.unitIds.includes(d.id) && t < Date.parse(k.endAt)).map((k) => ({ label: `Unexpired contract (${k.planType.toUpperCase()}, until ${klStamp(k.endAt).slice(0, 10)})`, href: `/admin/billing/contracts?contractId=${k.id}` })),
+    ...(jobs ?? []).filter((j) => !done.includes(j.status)).map((j) => ({ label: `Active job (${j.type}, ${j.status.replace("_", " ")})`, href: `/admin/jobs?jobId=${j.id}` })),
+    ...(device ? [{ label: `Active device binding (${device.serial})`, href: `/admin/devices?tab=devices&deviceId=${device.id}` }] : []),
+    ...(x.restrictions ?? []).filter((r) => r.unitIds.includes(d.id) && ["requested", "applied", "release_requested"].includes(r.state)).map((r) => ({ label: `Active restriction (${r.state.replace("_", " ")})`, href: `/admin/restrictions?restrictionId=${r.id}` })),
+    ...(d.pendingCommandIds.length ? [{ label: `${d.pendingCommandIds.length} pending command${d.pendingCommandIds.length === 1 ? "" : "s"}`, href: null }] : []),
+  ];
+  const byId = new Map((x.policies ?? []).map((p) => [p.id, p]));
+  const def = x.policies?.find((p) => p.kind === "default_alert");
+  const attached = [
+    ...(def ? [{ id: def.id, kind: "default_alert" as const, name: def.name, type: "Default", condition: `${def.rules?.length ?? 0} rules · ventilation and fault causes`, madeBy: "Always attached", on: `${defaultRules(def).filter((r) => r.enabled).length} of ${def.rules?.length ?? 0} rules on` }] : []),
+    ...d.alertPolicyIds.map((id) => {
+      const p = byId.get(id);
+      return { id, kind: "alert" as const, name: p?.name ?? id.slice(0, 8), type: metricLabel[p?.metric ?? ""] ?? p?.metric ?? "", condition: p ? conditionText(p) : "policy outside this view", madeBy: p ? `Made by ${x.memberName.get(p.ownerMembershipId) ?? x.customerName}` : "", on: p && !p.enabled ? "Off" : "" };
+    }),
+  ];
+  return {
+    u: d, path: d.location.pathLabels.join(" › "), model: `${modelLabel(d, x.models)} · split`, device: device ? { id: device.id, serial: device.serial, connection: device.connection } : null,
+    deviceKnown: devices !== null, attached, blockers: x.has("job.read", "device.read") || x.contracts ? blockers : null,
+    archivedNote: d.archived ? (archived ? `Taken out of use ${klStamp(archived.occurredAt).slice(0, 10)}${archived.reason ? ` · reason: ${archived.reason}` : ""} · ${x.memberName.get(archived.actorId) ?? "HQ"}` : "Taken out of use") : null,
+    seen: d.lastSeenAt ? klStamp(d.lastSeenAt).slice(11) : null,
   };
-  return (
-    <Card title="Client users of customer-a" sub="People who sign in to the customer app. They only ever see customer-a’s properties and units." action={<Btn size="sm" variant="primary" onClick={() => setOpen(true)}>+ Invite user</Btn>}>
-      <DataTable rows={users} rowKey={(u) => u.id} cols={[
-        { key: "u", label: "User", render: (u) => <><b>{u.name ?? u.email}</b><div className="text-xs text-muted">{u.name ? u.email : `invited ${u.invitedAt ?? ""} by ${u.invitedBy ?? "—"}`}</div></> },
-        { key: "r", label: "Role", render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{u.role === "owner" ? "Owner" : "Member"}</Badge> },
-        { key: "s", label: "Status", render: (u) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{u.status === "active" ? "Active" : u.status === "invited" ? "Invite pending" : "Disabled"}</Badge> },
-        { key: "l", label: "Last sign-in", render: (u) => u.lastSignIn ?? "—", hideBelow: "md" },
-        { key: "a", label: "", render: (u) => <Select aria-label="Actions" className="w-auto" value="" onChange={(e) => act(u, e.target.value)}><option value="">⋯</option><option value="role">Change role (Owner / Member)</option>{u.status === "invited" && <option value="resend">Resend invite</option>}<option value="reset">Reset password</option><option value="disable">{u.status === "disabled" ? "Enable sign-in" : "Disable sign-in"}</option><option value="remove">Remove from customer</option></Select> },
-      ]} />
-      <p className="mt-2 text-[11px] text-muted">Client users have no permission editor — the owner can also invite members from the customer app (Users). HQ, contractor and technician accounts are managed in Access &amp; roles.</p>
-      <Modal open={open} onClose={close} title="Invite client user" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); const e = clientUserActions.invite(email, role, "hq-operator"); if (e) return; toast(`Invitation preview created for ${email.trim()}`); close(); }}>Send invite</Btn></>}>
-        <Field label="Email" error={err}><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
-        <Field label="Role"><Select value={role} onChange={(e) => setRole(e.target.value as ClientRole)}><option value="member">Member</option><option value="owner">Owner</option></Select></Field>
-      </Modal>
-    </Card>
-  );
 }

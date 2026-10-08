@@ -34,6 +34,18 @@ export async function coreOp<T>(operation: string, input: unknown, opts: CoreOpt
   return (await coreCall<T>(operation, input, opts)).data;
 }
 
+/** Every item of a list operation: follows nextCursor with the same filters and sort (SR14), up to `max` items. */
+export async function coreAll<T>(operation: string, query: { filters?: Record<string, unknown>; sort?: { field: string; direction: "asc" | "desc" } } = {}, max = 1000): Promise<T[]> {
+  const out: T[] = [];
+  let cursor: string | null = null;
+  do {
+    const page: { items: T[]; nextCursor: string | null } = await coreOp(operation, { ...query, limit: 100, ...(cursor ? { cursor } : {}) });
+    out.push(...page.items);
+    cursor = page.nextCursor;
+  } while (cursor && out.length < max);
+  return out;
+}
+
 /** session.get once per render pass: the principal and the response meta. */
 const coreSession = cache(() => coreCall<{ permissions?: string[]; userId?: string; membershipId?: string; tenantId?: string }>("session.get", {}, {}));
 

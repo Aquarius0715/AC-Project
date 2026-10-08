@@ -112,7 +112,7 @@ var DefaultRules = []DefaultAlertRule{
 	rule("refrigerant_low_pressure", "Refrigerant low pressure", "fault", "refrigerant_pressure", "lte", 350, 380, 120, "critical"),
 	rule("compressor_short_cycling", "Compressor short-cycling", "fault", "compressor_cycles", "gte", 4, 3, 10800, "warning"),
 	rule("clogged_filter", "Clogged filter", "maintenance", "airflow_drop", "gte", 30, 20, 3600, "normal"),
-	rule("ac_offline", "AC offline", "connection", "heartbeat_gap", "gte", 900, 60, 1, "warning"),
+	rule("ac_offline", "AC offline", "connection", "heartbeat_gap", "gte", 15, 1, 1, "warning"), // heartbeat_gap is in minutes (UnitSymbol min): 15 minutes without a heartbeat
 }
 
 var (

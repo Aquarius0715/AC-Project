@@ -3,6 +3,7 @@ package ops
 import (
 	"encoding/json"
 	"strings"
+	"time"
 )
 
 // Changes returns the fields whose value differs between before and after, as display strings (strings as they are,
@@ -35,11 +36,22 @@ func show(v any) *string {
 	if s, ok := v.(*string); ok {
 		return s
 	}
+	// times compare as instants: a +08:00 input and the UTC value read back are the same time
+	if t, ok := v.(*time.Time); ok && t != nil {
+		v = *t
+	}
+	if t, ok := v.(time.Time); ok {
+		v = t.UTC()
+	}
 	raw, err := json.Marshal(v)
 	if err != nil || string(raw) == "null" {
 		return nil
 	}
 	s := string(raw)
+	var str string // values that marshal to a JSON string (IDs, times) are shown without the quotes
+	if json.Unmarshal(raw, &str) == nil {
+		s = str
+	}
 	return &s
 }
 

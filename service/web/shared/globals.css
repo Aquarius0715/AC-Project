@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Each app builds from its own directory and Tailwind skips node_modules, where @ac/web is linked: scan the shared
+   components, screens and libs too, or classes used only there (the app shell grid, for one) are never generated. */
+@source ".";
 
 @theme {
   --color-primary: #005bea;
@@ -34,13 +37,12 @@ button:disabled { cursor: not-allowed; opacity: .5; }
 .grid-fluid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--min, 220px)), 1fr)); }
 .grid-fluid-fill { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--min, 220px)), 1fr)); }
 /* Main + side layout: side collapses under main when the container is narrow. */
-.split { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+/* The single-column base rules come before the container query: with equal specificity the later rule wins. */
+.split, .split-rev, .split-even { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
 @container (min-width: 880px) {
   .split { grid-template-columns: minmax(0, 1fr) clamp(280px, 32%, 380px); }
   .split-rev { grid-template-columns: clamp(260px, 32%, 340px) minmax(0, 1fr); }
   .split-even { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-.split-rev { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
-.split-even { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
 .page { container-type: inline-size; }
 .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }

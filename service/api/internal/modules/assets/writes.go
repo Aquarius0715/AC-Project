@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/devices"
 	"github.com/pradita/ac-project/service/api/internal/ops"
@@ -29,7 +31,7 @@ func conflict(key string) error { return apperr.E(apperr.Conflict, key) }
 // versionedUpdate turns "no row updated" into NOT_FOUND (target missing / out of scope) or CONFLICT (version moved).
 func versionedUpdate(ctx context.Context, c *ops.Call, table string, id uuid.UUID, err error) error {
 	if !errors.Is(err, pgx.ErrNoRows) {
-		return err
+		return dupSibling(err)
 	}
 	var exists bool
 	_ = c.Tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM "+table+" WHERE id = $1)", id).Scan(&exists)
@@ -77,6 +79,7 @@ type PropertySave struct {
 // Validate implements ops.Validator (DD-A02 field table).
 func (in *PropertySave) Validate() map[string]string {
 	fe := map[string]string{}
+	in.Name = strings.TrimSpace(in.Name) // 1–120 characters after trim, as in locations.rename
 	if in.CustomerOrgID == uuid.Nil {
 		fe["customerOrgId"] = "error.required"
 	}
@@ -110,6 +113,38 @@ func (m *Module) customerActive(ctx context.Context, c *ops.Call, org uuid.UUID)
 	return nil
 }
 
+// dupSibling maps the properties_name / spaces_name unique indexes (lower(name) per parent) to the sibling-name
+// CONFLICT of siblingName (IR208).
+func dupSibling(err error) error {
+	var pg *pgconn.PgError
+	if errors.As(err, &pg) && pg.Code == "23505" && (pg.ConstraintName == "properties_name" || pg.ConstraintName == "spaces_name") {
+		return conflict("error.duplicateSiblingName")
+	}
+	return err
+}
+
+// siblingName applies the locations.rename sibling rule to the HQ saves (DD-A02, IR208): another non-archived
+// property of the customer, space under the same parent or unit in the same space with the same trimmed,
+// case-insensitive name is CONFLICT. It runs after the write in the same transaction, so NOT_FOUND and version
+// conflicts come first and a duplicate rolls the write back.
+func siblingName(ctx context.Context, c *ops.Call, kind string, id uuid.UUID) error {
+	q := `SELECT 1 FROM assets.properties o, assets.properties t WHERE t.id = $1 AND o.customer_org_id = t.customer_org_id AND o.id <> t.id AND NOT o.archived AND lower(btrim(o.name)) = lower(btrim(t.name))`
+	switch kind {
+	case "space":
+		q = `SELECT 1 FROM assets.spaces o, assets.spaces t WHERE t.id = $1 AND o.property_id = t.property_id AND o.parent_space_id IS NOT DISTINCT FROM t.parent_space_id AND o.id <> t.id AND NOT o.archived AND lower(btrim(o.name)) = lower(btrim(t.name))`
+	case "unit":
+		q = `SELECT 1 FROM assets.units o, assets.units t WHERE t.id = $1 AND o.property_id = t.property_id AND o.space_id IS NOT DISTINCT FROM t.space_id AND o.id <> t.id AND NOT o.archived AND lower(btrim(o.display_name)) = lower(btrim(t.display_name))`
+	}
+	var taken bool
+	if err := c.Tx.QueryRow(ctx, "SELECT EXISTS ("+q+")", id).Scan(&taken); err != nil {
+		return err
+	}
+	if taken {
+		return conflict("error.duplicateSiblingName")
+	}
+	return nil
+}
+
 func (m *Module) propertiesSave(ctx context.Context, c *ops.Call, in *PropertySave) (Property, error) {
 	if in.ID == nil {
 		if err := m.customerActive(ctx, c, in.CustomerOrgID); err != nil {
@@ -120,6 +155,9 @@ func (m *Module) propertiesSave(ctx context.Context, c *ops.Call, in *PropertySa
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6) RETURNING `+propertyCols,
 			id, in.CustomerOrgID, in.Kind, in.Name, in.Address, in.AccessInstructions))
 		if err != nil {
+			return Property{}, dupSibling(err)
+		}
+		if err := siblingName(ctx, c, "property", id); err != nil {
 			return Property{}, err
 		}
 		c.Emit(ops.Event{AggregateType: "property", AggregateID: id, Type: "LocationChanged"})
@@ -132,6 +170,9 @@ func (m *Module) propertiesSave(ctx context.Context, c *ops.Call, in *PropertySa
 		*in.ID, *c.ExpectedVersion, in.Kind, in.Name, in.Address, in.AccessInstructions, in.CustomerOrgID))
 	if err != nil {
 		return Property{}, versionedUpdate(ctx, c, "assets.properties", *in.ID, err)
+	}
+	if err := siblingName(ctx, c, "property", p.ID); err != nil {
+		return Property{}, err
 	}
 	c.Emit(ops.Event{AggregateType: "property", AggregateID: p.ID, Type: "LocationChanged"})
 	c.Audit(ops.AuditEntry{Action: "properties.save", TargetKind: "property", TargetID: p.ID.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &p.Version})
@@ -176,6 +217,7 @@ var spaceKinds = map[string]bool{"area": true, "floor": true, "room": true, "spa
 // Validate implements ops.Validator.
 func (in *SpaceSave) Validate() map[string]string {
 	fe := map[string]string{}
+	in.Name = strings.TrimSpace(in.Name)
 	if in.PropertyID == uuid.Nil {
 		fe["propertyId"] = "error.required"
 	}
@@ -241,6 +283,9 @@ func (m *Module) spacesSave(ctx context.Context, c *ops.Call, in *SpaceSave) (Sp
 		s, err := scanSpace(c.Tx.QueryRow(ctx, `INSERT INTO assets.spaces (id, tenant_id, property_id, parent_space_id, kind, name)
 			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5) RETURNING `+spaceCols, id, in.PropertyID, in.ParentSpaceID, in.Kind, in.Name))
 		if err != nil {
+			return Space{}, dupSibling(err)
+		}
+		if err := siblingName(ctx, c, "space", id); err != nil {
 			return Space{}, err
 		}
 		c.Emit(ops.Event{AggregateType: "space", AggregateID: id, Type: "LocationChanged"})
@@ -252,6 +297,9 @@ func (m *Module) spacesSave(ctx context.Context, c *ops.Call, in *SpaceSave) (Sp
 		*in.ID, *c.ExpectedVersion, in.ParentSpaceID, in.Kind, in.Name, in.PropertyID))
 	if err != nil {
 		return Space{}, versionedUpdate(ctx, c, "assets.spaces", *in.ID, err)
+	}
+	if err := siblingName(ctx, c, "space", s.ID); err != nil {
+		return Space{}, err
 	}
 	c.Emit(ops.Event{AggregateType: "space", AggregateID: s.ID, Type: "LocationChanged"})
 	c.Audit(ops.AuditEntry{Action: "spaces.save", TargetKind: "space", TargetID: s.ID.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &s.Version})
@@ -279,6 +327,7 @@ var scopes = map[string]bool{"indoor": true, "outdoor": true, "electrical": true
 // Validate implements ops.Validator.
 func (in *UnitSave) Validate() map[string]string {
 	fe := map[string]string{}
+	in.DisplayName = strings.TrimSpace(in.DisplayName)
 	if in.CustomerOrgID == uuid.Nil {
 		fe["customerOrgId"] = "error.required"
 	}
@@ -351,6 +400,9 @@ func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (Unit
 			id, in.CustomerOrgID, in.PropertyID, in.SpaceID, in.DisplayName, in.ModelID, in.Type, in.InstalledAt, in.ServiceScope, capVer); err != nil {
 			return Unit{}, err
 		}
+		if err := siblingName(ctx, c, "unit", id); err != nil {
+			return Unit{}, err
+		}
 		c.Emit(ops.Event{AggregateType: "unit", AggregateID: id, Type: "UnitChanged"})
 		one := 1
 		c.Audit(ops.AuditEntry{Action: "units.save", TargetKind: "unit", TargetID: id.String(), NextVersion: &one})
@@ -359,7 +411,12 @@ func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (Unit
 	// relocation (property or space change) requires a reason (DD-A02 changeReason)
 	var curProp uuid.UUID
 	var curSpace *uuid.UUID
-	err = c.Tx.QueryRow(ctx, `SELECT property_id, space_id FROM assets.units WHERE id = $1 AND customer_org_id = $2 AND NOT archived`, *in.ID, in.CustomerOrgID).Scan(&curProp, &curSpace)
+	var curName string
+	var curModel uuid.UUID
+	var curInstalled *time.Time
+	var curScope []string
+	err = c.Tx.QueryRow(ctx, `SELECT property_id, space_id, display_name, model_id, installed_at, service_scope FROM assets.units WHERE id = $1 AND customer_org_id = $2 AND NOT archived`,
+		*in.ID, in.CustomerOrgID).Scan(&curProp, &curSpace, &curName, &curModel, &curInstalled, &curScope)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Unit{}, notFound()
 	}
@@ -382,8 +439,15 @@ func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (Unit
 	if err != nil {
 		return Unit{}, versionedUpdate(ctx, c, "assets.units", *in.ID, err)
 	}
+	if err := siblingName(ctx, c, "unit", *in.ID); err != nil {
+		return Unit{}, err
+	}
 	c.Emit(ops.Event{AggregateType: "unit", AggregateID: *in.ID, Type: "UnitChanged"})
-	c.Audit(ops.AuditEntry{Action: "units.save", TargetKind: "unit", TargetID: in.ID.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &v, Reason: reason})
+	// before/after keep the original location and values in the history (DD-A02 step 3)
+	before, after := ops.Changes(
+		map[string]any{"propertyId": curProp, "spaceId": curSpace, "displayName": curName, "modelId": curModel, "installedAt": curInstalled, "serviceScope": curScope},
+		map[string]any{"propertyId": in.PropertyID, "spaceId": in.SpaceID, "displayName": in.DisplayName, "modelId": in.ModelID, "installedAt": in.InstalledAt, "serviceScope": in.ServiceScope})
+	c.Audit(ops.AuditEntry{Action: "units.save", TargetKind: "unit", TargetID: in.ID.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &v, Reason: reason, Before: before, After: after})
 	return m.load(ctx, c, *in.ID)
 }
 

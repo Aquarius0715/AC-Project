@@ -164,12 +164,20 @@ func TestOrganizations(t *testing.T) {
 	if code, _ := post(s, &customerA, "organizations.list", `{}`); code != 403 {
 		t.Error("client cannot list organizations")
 	}
-	code, m = write(s, &hq, "organizations.save", `{"name":"Chong Family Office","kind":"customer","status":"active"}`, 0)
+	suffix := uuid.NewString()[:6]
+	code, m = write(s, &hq, "organizations.save", `{"name":"Chong Family Office `+suffix+`","kind":"customer","status":"active"}`, 0)
 	if code != 200 || ver(m) != 1 {
 		t.Fatalf("create: %d %v", code, m)
 	}
 	id := data(m)["id"].(string)
-	if code, m := write(s, &hq, "organizations.save", `{"id":"`+id+`","name":"Chong Office","kind":"customer","status":"inactive"}`, 1); code != 200 || data(m)["status"] != "inactive" {
+	// a second customer with the same billing name (trimmed, case-insensitive) is CONFLICT; other kinds may share it (IR208)
+	if code, m := write(s, &hq, "organizations.save", `{"name":" chong family office `+suffix+`","kind":"customer","status":"active"}`, 0); code != 409 || m["messageKey"] != "error.duplicateName" {
+		t.Errorf("duplicate billing name: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "organizations.save", `{"id":"`+id+`","name":"Demo Customer A","kind":"customer","status":"active"}`, 1); code != 409 || m["messageKey"] != "error.duplicateName" {
+		t.Errorf("rename to another customer's name: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "organizations.save", `{"id":"`+id+`","name":"Chong Office `+suffix+`","kind":"customer","status":"inactive"}`, 1); code != 200 || data(m)["status"] != "inactive" {
 		t.Fatalf("update: %d", code)
 	}
 	if code, _ := write(s, &hq, "organizations.save", `{"id":"`+id+`","name":"x","kind":"contractor","status":"active"}`, 2); code != 422 {
