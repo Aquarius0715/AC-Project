@@ -1745,7 +1745,7 @@ Verified: all Go tests green, none skipped; `TestReplicas` compares all notify a
 | `energy.actuals` | energy-api | `{unitIds, from, to}` → `{summary, forecast}` (default factor, no baseline) |
 | `identity.activeOrganizations` | identity-api | `{ids}` → active organization IDs |
 
-- `ops.RegisterQuery(r, domain, name, h)` binds a query; `ops.Ask[O](ctx, registry, call, name, in)` runs it in the caller's transaction when the process serves the owner's domain, otherwise through `ops.HTTPQueries`.
+- `ops.RegisterQuery(r, domain, name, h)` binds a query; `ops.Ask` (generic over the output type; arguments ctx, registry, call, name, input) runs it in the caller's transaction when the process serves the owner's domain, otherwise through `ops.HTTPQueries`.
 - Wire: `POST /internal/v1/queries/<name>` on each service (not routed by the gateway), behind the normal authentication middleware with the caller's `Authorization`, `X-Tenant-Id`, `X-Membership-Id`, plus `X-Internal-Token: INTERNAL_API_TOKEN`, `X-Request-Id` (correlation) and `X-Business-Now` (the caller's business time, IR157). The owner runs the query in a read transaction with the caller's principal and applies its own scope rules; errors come back as DomainError. Missing token → 401; a query of another domain → 404.
 - Configuration: `<DOMAIN>_API_URL` per service (compose: identity, maintenance, billing, energy); without it a remote query is UNAVAILABLE.
 - In the split services the composed read is not one snapshot across domains (each owner reads its own committed state); dashboards accept this.
