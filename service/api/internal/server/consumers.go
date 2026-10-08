@@ -5,6 +5,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/modules/assets"
 	"github.com/pradita/ac-project/service/api/internal/modules/control"
+	"github.com/pradita/ac-project/service/api/internal/modules/energy"
 	"github.com/pradita/ac-project/service/api/internal/modules/monitoring"
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/modules/restrictions"
@@ -26,6 +27,7 @@ func consumers(m *db.TxManager, domains []string) []*events.Consumer {
 	add(ops.DomainEquipment, "equipment", merge(assets.EventHandlers(), monitoring.EventHandlers(), control.EventHandlers())) // IR184, IR185
 	add(ops.DomainBilling, "billing", restrictions.EventHandlers())                                                           // IR185
 	add(ops.DomainIdentity, "identity", events.Handlers(notify.Replicas...))                                                  // IR188
+	add(ops.DomainEnergy, "energy", events.Handlers(energy.Replicas...))                                                      // IR189
 	return out
 }
 

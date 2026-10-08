@@ -86,7 +86,7 @@ type Preview struct {
 // baseline is not comparable.
 func preview(ctx context.Context, c *ops.Call, in *Conditions) (Preview, error) {
 	var kind string
-	err := c.Tx.QueryRow(ctx, `SELECT kind FROM identity.organizations WHERE id = $1`, in.OrganizationID).Scan(&kind)
+	err := c.Tx.QueryRow(ctx, `SELECT kind FROM energy.ref_organizations WHERE id = $1`, in.OrganizationID).Scan(&kind)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && kind != "customer") {
 		return Preview{}, apperr.Fields(map[string]string{"organizationId": "error.invalid"})
 	}
@@ -94,7 +94,7 @@ func preview(ctx context.Context, c *ops.Call, in *Conditions) (Preview, error) 
 		return Preview{}, err
 	}
 	var inOrg int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM assets.units WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.UnitIDs, in.OrganizationID).Scan(&inOrg); err != nil {
+	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.UnitIDs, in.OrganizationID).Scan(&inOrg); err != nil {
 		return Preview{}, err
 	}
 	if inOrg != len(in.UnitIDs) {
@@ -375,7 +375,7 @@ func saveDraft(ctx context.Context, c *ops.Call, in *SaveInput) (Report, error) 
 		id, version = *in.ID, latest+1
 	}
 	var found int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM maintenance.attachments WHERE id = ANY($1)`, in.EvidenceIDs).Scan(&found); err != nil {
+	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_attachments WHERE id = ANY($1)`, in.EvidenceIDs).Scan(&found); err != nil {
 		return Report{}, err
 	}
 	if found != len(in.EvidenceIDs) {

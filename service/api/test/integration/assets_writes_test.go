@@ -179,7 +179,7 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		if err := tx.QueryRow(t.Context(), `SELECT count(*) FROM audit.audit_log WHERE target_id = $1`, prop).Scan(&audits); err != nil {
 			return err
 		}
-		return tx.QueryRow(t.Context(), `SELECT count(*) FROM platform.outbox WHERE aggregate_id = $1`, prop).Scan(&events)
+		return tx.QueryRow(t.Context(), `SELECT count(*) FROM platform.outbox WHERE aggregate_id = $1 AND event_type NOT LIKE 'RowChanged:%'`, prop).Scan(&events)
 	}); err != nil {
 		t.Fatal(err)
 	}

@@ -1709,3 +1709,26 @@ Notifications (identity-api) resolved targets and recipients (IR142, IR58) by jo
 - The IR186 projections stay as they are (they derive windows); new cross-domain reads use the generic copies.
 
 Verified: all Go tests green, none skipped; `TestNotifyReplicas` compares every copy with its source (EXCEPT both ways) after updates, inserts and deletes; the notification and inbox tests pass on the copies.
+
+## IR189 Energy reference copies and the principal timezone (phase B step 3, part 4) — 2026-10-09
+
+Energy (energy-api) read assets, identity, maintenance and monitoring tables. It now reads its own copies (IR188 mechanism, consumer `energy`).
+
+| Copy (energy, RLS) | Source columns | Used by |
+|---|---|---|
+| `ref_units` | assets.units id, tenant_id, customer_org_id, property_id, archived | summary, baselines, quotes, MRV, report scope checks |
+| `ref_customers` | assets.customers id, tenant_id, organization_id | offset customer and records |
+| `ref_properties` | assets.properties id, tenant_id, customer_org_id, archived | monthly report |
+| `ref_organizations` | identity.organizations id, tenant_id, kind | MRV preview (customer organizations only) |
+| `ref_attachments` | maintenance.attachments id, tenant_id | MRV evidence check |
+| `ref_alerts` | monitoring.alerts id, tenant_id, unit_id, detected_at | monthly report counts |
+| `ref_jobs` | maintenance.jobs id, tenant_id, unit_id, status, updated_at | monthly report counts |
+| `ref_power_samples` | monitoring.measurements (minute-slot `power` rows only, trigger `WHEN`) sensor_id, observed_at, sequence, tenant_id, unit_id, value, unit, origin, quality, boundary_id, event_id | D07 integration (`Integrate`) |
+
+- One capture trigger per source table: its column list is the union of what the consumers copy (units add `archived`, jobs add `status`, `updated_at`); each replica copies its subset.
+- `platform.capture_row` names the partition root as the source, so rows of `monitoring.measurements_*` partitions publish `RowChanged:monitoring.measurements`.
+- The report timezone comes with the principal: identity resolves `preferences.timezone` with the membership (`Principal.Timezone`, wire field `timezone`; default Asia/Kuala_Lumpur). In the split services a preference change applies after the principal cache (30 s).
+- Production note: in the demo the power samples travel through the outbox; at telemetry volume the same rows come from the ingestion stream (Kinesis) into energy's store.
+- Still shared: energy writes and reads `audit.audit_log` for offset event history (audit is shared infrastructure until the database split, IR181 step 4).
+
+Verified: all Go tests green, none skipped; `TestReplicas` compares all notify and energy copies with their sources, including power samples; the energy summary, baseline, offsets, MRV and report tests pass on the copies.

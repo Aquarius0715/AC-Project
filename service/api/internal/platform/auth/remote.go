@@ -28,6 +28,7 @@ type PrincipalDTO struct {
 	Role         string                 `json:"role"`
 	ClientRole   string                 `json:"clientRole"`
 	Employment   string                 `json:"employment"`
+	Timezone     string                 `json:"timezone"`
 	Permissions  []string               `json:"permissions"`
 	Scopes       map[string][]uuid.UUID `json:"scopes"`
 	ScopeVersion int                    `json:"scopeVersion"`
@@ -36,7 +37,7 @@ type PrincipalDTO struct {
 // ToDTO converts a principal for the wire.
 func ToDTO(p *ops.Principal) PrincipalDTO {
 	d := PrincipalDTO{UserID: p.UserID, TenantID: p.TenantID, MembershipID: p.MembershipID, OrgID: p.OrgID, Role: p.Role,
-		ClientRole: p.ClientRole, Employment: p.Employment, Scopes: p.Scopes, ScopeVersion: p.ScopeVersion, Permissions: []string{}}
+		ClientRole: p.ClientRole, Employment: p.Employment, Timezone: p.Timezone, Scopes: p.Scopes, ScopeVersion: p.ScopeVersion, Permissions: []string{}}
 	for perm, ok := range p.Permissions {
 		if ok {
 			d.Permissions = append(d.Permissions, perm)
@@ -49,7 +50,7 @@ func ToDTO(p *ops.Principal) PrincipalDTO {
 func FromDTO(d PrincipalDTO) *ops.Principal {
 	p := &ops.Principal{Principal: authz.Principal{Role: d.Role, ClientRole: d.ClientRole, Permissions: map[string]bool{}},
 		TenantID: d.TenantID, MembershipID: d.MembershipID, UserID: d.UserID, OrgID: d.OrgID, ScopeVersion: d.ScopeVersion,
-		Scopes: d.Scopes, Employment: d.Employment}
+		Scopes: d.Scopes, Employment: d.Employment, Timezone: d.Timezone}
 	for _, perm := range d.Permissions {
 		p.Permissions[perm] = true
 	}

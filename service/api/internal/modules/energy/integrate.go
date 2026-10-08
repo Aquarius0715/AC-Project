@@ -37,15 +37,15 @@ func CheckRange(from, to time.Time) error {
 
 // Integrate applies D07 / IR08 / IR11: per unit and minute, the sample exactly at the slot start (highest sequence,
 // then lowest ID) counts only when measured, valid, in kW and on the ac_input_electricity boundary; its value / 60
-// is the slot energy. Later samples within a slot are never substituted.
+// is the slot energy. Later samples within a slot are never substituted. The samples are energy's copy of the
+// minute-slot power measurements (IR189).
 func Integrate(ctx context.Context, c *ops.Call, units []uuid.UUID, from, to time.Time) (Integration, error) {
 	out := Integration{ExpectedSlots: len(units) * int(to.Sub(from)/time.Minute)}
 	if len(units) == 0 {
 		return out, nil
 	}
 	rows, err := c.Tx.Query(ctx, `SELECT DISTINCT ON (unit_id, observed_at) value, unit, origin, quality, boundary_id
-		FROM monitoring.measurements WHERE unit_id = ANY($1) AND metric = 'power' AND observed_at >= $2 AND observed_at < $3
-		  AND observed_at = date_trunc('minute', observed_at)
+		FROM energy.ref_power_samples WHERE unit_id = ANY($1) AND observed_at >= $2 AND observed_at < $3
 		ORDER BY unit_id, observed_at, sequence DESC, event_id::text ASC`, units, from, to)
 	if err != nil {
 		return out, err

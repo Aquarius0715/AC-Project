@@ -80,8 +80,8 @@ func f1(p *float64) string {
 // in the caller's timezone; other customers' properties are NOT_FOUND. Only the file metadata is returned.
 func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile, error) {
 	tz := "Asia/Kuala_Lumpur"
-	if err := c.Tx.QueryRow(ctx, `SELECT timezone FROM identity.preferences WHERE user_id = $1`, c.Principal.UserID).Scan(&tz); err != nil && err != pgx.ErrNoRows {
-		return ReportFile{}, err
+	if c.Principal.Timezone != "" { // from identity with the principal (IR189)
+		tz = c.Principal.Timezone
 	}
 	loc, err := time.LoadLocation(tz)
 	if err != nil {
@@ -93,13 +93,13 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 		return ReportFile{}, apperr.Fields(map[string]string{"month": "errors.month_not_ended"})
 	}
 	var own int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM assets.properties WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.PropertyIDs, c.Principal.OrgID).Scan(&own); err != nil {
+	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_properties WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.PropertyIDs, c.Principal.OrgID).Scan(&own); err != nil {
 		return ReportFile{}, err
 	}
 	if own != len(in.PropertyIDs) {
 		return ReportFile{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
-	rows, err := c.Tx.Query(ctx, `SELECT id FROM assets.units WHERE property_id = ANY($1) AND NOT archived ORDER BY id`, in.PropertyIDs)
+	rows, err := c.Tx.Query(ctx, `SELECT id FROM energy.ref_units WHERE property_id = ANY($1) AND NOT archived ORDER BY id`, in.PropertyIDs)
 	if err != nil {
 		return ReportFile{}, err
 	}
@@ -133,15 +133,15 @@ func exportReport(ctx context.Context, c *ops.Call, in *ExportInput) (ReportFile
 			fmt.Fprintf(&b, "month_comparison,previous_kWh,%s\nmonth_comparison,current_kWh,%s\n", f1(prev.Totals.KWh), f1(month.Totals.KWh))
 		case "co2_offsets":
 			var retired float64
-			if err := c.Tx.QueryRow(ctx, `SELECT COALESCE(sum(r.amount_kg), 0)::float8 FROM energy.offset_records r JOIN assets.customers cu ON cu.id = r.customer_id
+			if err := c.Tx.QueryRow(ctx, `SELECT COALESCE(sum(r.amount_kg), 0)::float8 FROM energy.offset_records r JOIN energy.ref_customers cu ON cu.id = r.customer_id
 				WHERE cu.organization_id = $1 AND r.state = 'demo_retired' AND r.updated_at >= $2 AND r.updated_at < $3`, c.Principal.OrgID, start, end).Scan(&retired); err != nil {
 				return ReportFile{}, err
 			}
 			fmt.Fprintf(&b, "co2_offsets,emissions_kg,%s\nco2_offsets,demo_retired_kg,%.1f\n", f1(month.Totals.EmissionsKg), retired)
 		case "alerts_maintenance":
 			var alerts, jobs int
-			if err := c.Tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM monitoring.alerts WHERE unit_id = ANY($1) AND detected_at >= $2 AND detected_at < $3),
-				(SELECT count(*) FROM maintenance.jobs WHERE unit_id = ANY($1) AND status = 'completed' AND updated_at >= $2 AND updated_at < $3)`, units, start, end).Scan(&alerts, &jobs); err != nil {
+			if err := c.Tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM energy.ref_alerts WHERE unit_id = ANY($1) AND detected_at >= $2 AND detected_at < $3),
+				(SELECT count(*) FROM energy.ref_jobs WHERE unit_id = ANY($1) AND status = 'completed' AND updated_at >= $2 AND updated_at < $3)`, units, start, end).Scan(&alerts, &jobs); err != nil {
 				return ReportFile{}, err
 			}
 			fmt.Fprintf(&b, "alerts_maintenance,alerts,%d\nalerts_maintenance,completed_jobs,%d\n", alerts, jobs)

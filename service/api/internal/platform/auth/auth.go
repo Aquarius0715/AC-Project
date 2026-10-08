@@ -113,14 +113,14 @@ func (a *Authenticator) Load(ctx context.Context, subject string, tenant, member
 		now = a.Now()
 	}
 	err := a.DB.Run(ctx, true, p, func(tx pgx.Tx) error {
-		var clientRole, employment *string
+		var clientRole, employment, timezone *string
 		var validUntil *time.Time
 		var validFrom time.Time
 		var status string
-		if err := tx.QueryRow(ctx, `SELECT m.user_id, m.organization_id, m.role, m.client_role, m.employment, m.scope_version, m.valid_from, m.valid_until, u.status
-			FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id
+		if err := tx.QueryRow(ctx, `SELECT m.user_id, m.organization_id, m.role, m.client_role, m.employment, m.scope_version, m.valid_from, m.valid_until, u.status, pf.timezone
+			FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id LEFT JOIN identity.preferences pf ON pf.user_id = u.id
 			WHERE m.id = $1 AND (u.cognito_sub = $2 OR u.id::text = $2)`, membership, subject).
-			Scan(&p.UserID, &p.OrgID, &p.Role, &clientRole, &employment, &p.ScopeVersion, &validFrom, &validUntil, &status); err != nil {
+			Scan(&p.UserID, &p.OrgID, &p.Role, &clientRole, &employment, &p.ScopeVersion, &validFrom, &validUntil, &status, &timezone); err != nil {
 			return err
 		}
 		if status != "active" || now.Before(validFrom) || (validUntil != nil && !now.Before(*validUntil)) {
@@ -131,6 +131,9 @@ func (a *Authenticator) Load(ctx context.Context, subject string, tenant, member
 		}
 		if employment != nil {
 			p.Employment = *employment
+		}
+		if timezone != nil {
+			p.Timezone = *timezone
 		}
 		rows, err := tx.Query(ctx, `SELECT permission FROM identity.membership_permissions WHERE membership_id = $1`, membership)
 		if err != nil {

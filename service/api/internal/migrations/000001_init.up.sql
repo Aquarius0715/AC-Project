@@ -68,14 +68,18 @@ DECLARE
   src jsonb;
   row jsonb := '{}';
   col text;
+  source text;
 BEGIN
+  -- partitions report the partitioned table (root) as the source
+  SELECT n.nspname || '.' || c.relname INTO source FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.oid = COALESCE(pg_partition_root(TG_RELID), TG_RELID);
   IF TG_OP = 'DELETE' THEN src := to_jsonb(OLD); ELSE src := to_jsonb(NEW); END IF;
   FOREACH col IN ARRAY TG_ARGV LOOP
     row := row || jsonb_build_object(col, src -> col);
   END LOOP;
   INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id)
-    VALUES ((src ->> 'tenant_id')::uuid, TG_TABLE_NAME, COALESCE((src ->> 'id')::uuid, (src ->> 'restriction_id')::uuid, gen_random_uuid()),
-            'RowChanged:' || TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, jsonb_build_object('op', TG_OP, 'row', row), 'change-capture');
+    VALUES ((src ->> 'tenant_id')::uuid, split_part(source, '.', 2), COALESCE((src ->> 'id')::uuid, (src ->> 'restriction_id')::uuid, gen_random_uuid()),
+            'RowChanged:' || source, jsonb_build_object('op', TG_OP, 'row', row), 'change-capture');
   RETURN NULL;
 END $$;
 
@@ -1703,12 +1707,41 @@ CREATE TABLE notify.ref_restrictions (id uuid PRIMARY KEY, tenant_id uuid NOT NU
 CREATE TABLE notify.ref_restriction_units (restriction_id uuid NOT NULL, unit_id uuid NOT NULL, tenant_id uuid NOT NULL, PRIMARY KEY (restriction_id, unit_id));
 CREATE TABLE notify.ref_devices (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, serial text, unit_id uuid);
 
-CREATE TRIGGER units_capture AFTER INSERT OR DELETE OR UPDATE OF customer_org_id, property_id, display_name ON assets.units
-  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'customer_org_id', 'property_id', 'display_name');
+-- Reference copies for energy (IR189), kept by the energy-api consumer.
+CREATE TABLE energy.ref_units (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, customer_org_id uuid, property_id uuid, archived boolean);
+CREATE TABLE energy.ref_customers (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, organization_id uuid);
+CREATE TABLE energy.ref_properties (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, customer_org_id uuid, archived boolean);
+CREATE TABLE energy.ref_organizations (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, kind text);
+CREATE TABLE energy.ref_attachments (id uuid PRIMARY KEY, tenant_id uuid NOT NULL);
+CREATE TABLE energy.ref_alerts (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, unit_id uuid, detected_at timestamptz);
+CREATE INDEX ref_alerts_unit ON energy.ref_alerts (unit_id, detected_at);
+CREATE TABLE energy.ref_jobs (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, unit_id uuid, status text, updated_at timestamptz);
+CREATE INDEX ref_jobs_unit ON energy.ref_jobs (unit_id, updated_at);
+CREATE TABLE energy.ref_power_samples (           -- minute-slot power measurements (D07, IR08, IR11)
+  sensor_id uuid NOT NULL, observed_at timestamptz NOT NULL, sequence bigint NOT NULL,
+  tenant_id uuid NOT NULL, unit_id uuid, value double precision, unit text, origin text, quality text, boundary_id text, event_id uuid,
+  PRIMARY KEY (sensor_id, observed_at, sequence)
+);
+CREATE INDEX ref_power_samples_unit ON energy.ref_power_samples (unit_id, observed_at);
+
+CREATE TRIGGER units_capture AFTER INSERT OR DELETE OR UPDATE OF customer_org_id, property_id, display_name, archived ON assets.units
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'customer_org_id', 'property_id', 'display_name', 'archived');
 CREATE TRIGGER customers_capture AFTER INSERT OR DELETE OR UPDATE OF organization_id ON assets.customers
   FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'organization_id');
-CREATE TRIGGER jobs_capture AFTER INSERT OR DELETE OR UPDATE OF unit_id, customer_org_id ON maintenance.jobs
-  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'unit_id', 'customer_org_id');
+CREATE TRIGGER jobs_capture AFTER INSERT OR DELETE OR UPDATE OF unit_id, customer_org_id, status, updated_at ON maintenance.jobs
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'unit_id', 'customer_org_id', 'status', 'updated_at');
+CREATE TRIGGER properties_capture AFTER INSERT OR DELETE OR UPDATE OF customer_org_id, archived ON assets.properties
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'customer_org_id', 'archived');
+CREATE TRIGGER organizations_capture AFTER INSERT OR DELETE OR UPDATE OF kind ON identity.organizations
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'kind');
+CREATE TRIGGER attachments_capture AFTER INSERT OR DELETE ON maintenance.attachments
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id');
+CREATE TRIGGER alerts_capture AFTER INSERT OR DELETE OR UPDATE OF unit_id, detected_at ON monitoring.alerts
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'unit_id', 'detected_at');
+-- minute-slot power samples only (D07): the rows energy integrates; measurements are insert-only
+CREATE TRIGGER measurements_capture AFTER INSERT ON monitoring.measurements
+  FOR EACH ROW WHEN (NEW.metric = 'power' AND NEW.observed_at = date_trunc('minute', NEW.observed_at))
+  EXECUTE FUNCTION platform.capture_row('sensor_id', 'observed_at', 'sequence', 'tenant_id', 'unit_id', 'value', 'unit', 'origin', 'quality', 'boundary_id', 'event_id');
 CREATE TRIGGER offers_capture AFTER INSERT OR DELETE OR UPDATE OF job_id, contractor_org_id ON maintenance.offers
   FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'job_id', 'contractor_org_id');
 CREATE TRIGGER assignments_capture AFTER INSERT OR DELETE OR UPDATE OF job_id, technician_membership_id, status ON maintenance.assignments

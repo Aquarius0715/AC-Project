@@ -210,7 +210,7 @@ func (in *SummaryInput) Validate() map[string]string {
 func summary(ctx context.Context, c *ops.Call, in *SummaryInput) (Summary, error) {
 	if c.Principal.Role == "client" {
 		var mine int
-		if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM assets.units WHERE id = ANY($1) AND customer_org_id = $2`, in.UnitIDs, c.Principal.OrgID).Scan(&mine); err != nil {
+		if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2`, in.UnitIDs, c.Principal.OrgID).Scan(&mine); err != nil {
 			return Summary{}, err
 		}
 		if mine != len(in.UnitIDs) {
@@ -218,7 +218,7 @@ func summary(ctx context.Context, c *ops.Call, in *SummaryInput) (Summary, error
 		}
 	}
 	var known int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM assets.units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).Scan(&known); err != nil {
+	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).Scan(&known); err != nil {
 		return Summary{}, err
 	}
 	if known != len(in.UnitIDs) {

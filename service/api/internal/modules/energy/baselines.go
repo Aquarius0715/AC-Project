@@ -60,7 +60,7 @@ func clientUnits(c *ops.Call, args *[]any) string {
 		return "TRUE"
 	}
 	*args = append(*args, c.Principal.OrgID)
-	return fmt.Sprintf("NOT EXISTS (SELECT 1 FROM unnest(b.unit_ids) uid LEFT JOIN assets.units u ON u.id = uid WHERE u.customer_org_id IS DISTINCT FROM $%d)", len(*args))
+	return fmt.Sprintf("NOT EXISTS (SELECT 1 FROM unnest(b.unit_ids) uid LEFT JOIN energy.ref_units u ON u.id = uid WHERE u.customer_org_id IS DISTINCT FROM $%d)", len(*args))
 }
 
 // LoadBaseline returns a readable baseline version (current when version is nil).
@@ -221,7 +221,7 @@ const modeledQuality = `{"kind":"modeled","coverage":null,"expectedSlots":null,"
 // source snapshot. Saved versions never recalculate.
 func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline, error) {
 	var known int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM assets.units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).Scan(&known); err != nil {
+	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).Scan(&known); err != nil {
 		return Baseline{}, err
 	}
 	if known != len(in.UnitIDs) {

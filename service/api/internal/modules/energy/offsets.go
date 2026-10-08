@@ -102,14 +102,14 @@ func customerOf(ctx context.Context, c *ops.Call, given *uuid.UUID) (uuid.UUID, 
 	var err error
 	switch {
 	case c.Principal.Role == "client":
-		err = c.Tx.QueryRow(ctx, `SELECT id, organization_id FROM assets.customers WHERE organization_id = $1`, c.Principal.OrgID).Scan(&id, &org)
+		err = c.Tx.QueryRow(ctx, `SELECT id, organization_id FROM energy.ref_customers WHERE organization_id = $1`, c.Principal.OrgID).Scan(&id, &org)
 		if err == nil && given != nil && *given != id {
 			return id, org, apperr.E(apperr.NotFound, "error.notFound")
 		}
 	case given == nil:
 		return id, org, apperr.Fields(map[string]string{"customerId": "error.required"})
 	default:
-		err = c.Tx.QueryRow(ctx, `SELECT id, organization_id FROM assets.customers WHERE id = $1`, *given).Scan(&id, &org)
+		err = c.Tx.QueryRow(ctx, `SELECT id, organization_id FROM energy.ref_customers WHERE id = $1`, *given).Scan(&id, &org)
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return id, org, apperr.E(apperr.NotFound, "error.notFound")
@@ -124,7 +124,7 @@ func previewQuote(ctx context.Context, c *ops.Call, in *QuoteInput) (Quote, erro
 		return Quote{}, err
 	}
 	var inOrg int
-	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM assets.units WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.UnitIDs, org).Scan(&inOrg); err != nil {
+	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND customer_org_id = $2 AND NOT archived`, in.UnitIDs, org).Scan(&inOrg); err != nil {
 		return Quote{}, err
 	}
 	if inOrg != len(in.UnitIDs) {
@@ -197,7 +197,7 @@ type Event struct {
 const recordCols = `r.id, r.tenant_id, r.version, r.created_at, r.updated_at, r.quote_id, r.customer_id, r.amount_kg::float8, r.state, r.previous_state, r.purchase_ref,
 	r.retirement_ref, r.certificate_ref, cu.organization_id`
 
-const recordFrom = `energy.offset_records r JOIN assets.customers cu ON cu.id = r.customer_id`
+const recordFrom = `energy.offset_records r JOIN energy.ref_customers cu ON cu.id = r.customer_id`
 
 func scanRecord(row pgx.Row) (Record, error) {
 	var x Record
@@ -285,7 +285,7 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	conds := []string{"TRUE"}
 	if c.Principal.Role == "client" { // IR90 / REV19-030: every quote unit must be the client's
 		conds = append(conds, "cu.organization_id = "+add(c.Principal.OrgID),
-			"NOT EXISTS (SELECT 1 FROM energy.offset_quotes q, unnest(q.unit_ids) uid LEFT JOIN assets.units u ON u.id = uid WHERE q.id = r.quote_id AND u.customer_org_id IS DISTINCT FROM cu.organization_id)")
+			"NOT EXISTS (SELECT 1 FROM energy.offset_quotes q, unnest(q.unit_ids) uid LEFT JOIN energy.ref_units u ON u.id = uid WHERE q.id = r.quote_id AND u.customer_org_id IS DISTINCT FROM cu.organization_id)")
 	}
 	if f.CustomerID != nil {
 		conds = append(conds, "r.customer_id = "+add(*f.CustomerID))

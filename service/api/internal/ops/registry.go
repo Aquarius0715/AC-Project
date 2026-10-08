@@ -31,6 +31,7 @@ type Principal struct {
 	ScopeVersion int
 	Scopes       map[string][]uuid.UUID // membership_scopes by kind (tenant, organization, property, unit)
 	Employment   string                 // internal | external (technicians)
+	Timezone     string                 // the user's preferences timezone ("" when unset), IR189
 }
 
 // Event is an outbox row recorded by a handler (backend architecture §8).

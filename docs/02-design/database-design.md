@@ -28,7 +28,7 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 | maintenance | Maintenance | plans, jobs, job_alerts, slot_proposals, offers, partner_slot_proposals, assignments, work_reports (versioned), report_reviews, attachments, job_notes, job_events, job_history_snapshots, contractors, rate_cards, certificates, unavailability, sla_targets, filter_care_settings, filter_cleanings, parts_catalog |
 | billing | Billing | contracts (versioned), contract_units, invoices, payments, stripe_events, inquiries, payout_statements, payout_lines, payout_queries |
 | restrictions | Restrictions | restrictions, restriction_invoices, restriction_units |
-| energy | Energy & carbon | baselines (versioned), emission_factors (versioned), mrv_reports (versioned), mrv_reviews, offset_quotes, offset_records, offset_attempts |
+| energy | Energy & carbon | baselines (versioned), emission_factors (versioned), mrv_reports (versioned), mrv_reviews, offset_quotes, offset_records, offset_attempts, ref_* reference copies including minute-slot power samples (IR189) |
 | notify | Notifications | notifications, deliveries, templates, ref_* reference copies of other domains' rows kept from RowChanged events (IR188) |
 | audit | Audit | audit_log (append-only, partitioned) |
 
