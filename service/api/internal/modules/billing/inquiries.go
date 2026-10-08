@@ -161,7 +161,7 @@ func (m Billing) loadInquiry(ctx context.Context, c *ops.Call, id uuid.UUID, loc
 
 func (m Billing) listInquiries(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Inquiry], error) {
 	var f struct {
-		State         *string    `json:"state,omitempty"`
+		Status        *string    `json:"status,omitempty"` // => state
 		SubjectType   *string    `json:"subjectType,omitempty"`
 		InvoiceID     *uuid.UUID `json:"invoiceId,omitempty"`
 		RestrictionID *uuid.UUID `json:"restrictionId,omitempty"`
@@ -170,7 +170,7 @@ func (m Billing) listInquiries(ctx context.Context, c *ops.Call, in *paging.Quer
 	if len(in.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
 		dec.DisallowUnknownFields()
-		if dec.Decode(&f) != nil || (f.State != nil && !slices.Contains([]string{"received", "answered"}, *f.State)) ||
+		if dec.Decode(&f) != nil || (f.Status != nil && !slices.Contains([]string{"received", "answered"}, *f.Status)) ||
 			(f.SubjectType != nil && !slices.Contains([]string{"payment", "restriction"}, *f.SubjectType)) {
 			return paging.Page[Inquiry]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
@@ -186,7 +186,7 @@ func (m Billing) listInquiries(ctx context.Context, c *ops.Call, in *paging.Quer
 	var args []any
 	add := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
 	conds := []string{clientScope(c, "cu.organization_id", &args)}
-	for col, v := range map[string]any{"q.state": f.State, "q.subject_type": f.SubjectType, "q.invoice_id": f.InvoiceID, "q.restriction_id": f.RestrictionID, "q.customer_id": f.CustomerID} {
+	for col, v := range map[string]any{"q.state": f.Status, "q.subject_type": f.SubjectType, "q.invoice_id": f.InvoiceID, "q.restriction_id": f.RestrictionID, "q.customer_id": f.CustomerID} {
 		switch x := v.(type) {
 		case *string:
 			if x != nil {

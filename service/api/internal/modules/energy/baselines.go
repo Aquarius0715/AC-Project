@@ -83,9 +83,14 @@ func LoadBaseline(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) 
 
 func listBaselines(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Baseline], error) {
 	var f struct {
-		UnitID     *uuid.UUID `json:"unitId,omitempty"`
-		Method     *string    `json:"method,omitempty"`
-		BoundaryID *string    `json:"boundaryId,omitempty"`
+		UnitID     *uuid.UUID   `json:"unitId,omitempty"`
+		UnitIDs    *[]uuid.UUID `json:"unitIds,omitempty"` // the unit sets intersect
+		From       *time.Time   `json:"from,omitempty"`    // [from, to) on period.from
+		To         *time.Time   `json:"to,omitempty"`
+		CustomerID *uuid.UUID   `json:"customerId,omitempty"` // any unit belongs to the customer
+		PropertyID *uuid.UUID   `json:"propertyId,omitempty"` // any unit is in the property
+		Method     *string      `json:"method,omitempty"`
+		BoundaryID *string      `json:"boundaryId,omitempty"`
 	}
 	if len(in.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
@@ -93,8 +98,11 @@ func listBaselines(ctx context.Context, c *ops.Call, in *paging.Query) (paging.P
 		if dec.Decode(&f) != nil || (f.Method != nil && !slices.Contains(methods, *f.Method)) || (f.BoundaryID != nil && !slices.Contains(boundaries, *f.BoundaryID)) {
 			return paging.Page[Baseline]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
+		if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
+			return paging.Page[Baseline]{}, apperr.Fields(map[string]string{"filters.to": "error.range"})
+		}
 	}
-	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "b.id", "createdAt": "b.created_at", "periodFrom": "lower(b.period)"}, "b.created_at DESC, b.id DESC")
+	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "b.id", "createdAt": "b.created_at", "updatedAt": "b.created_at", "periodFrom": "lower(b.period)"}, "b.created_at DESC, b.id DESC")
 	if err != nil {
 		return paging.Page[Baseline]{}, err
 	}
@@ -107,6 +115,21 @@ func listBaselines(ctx context.Context, c *ops.Call, in *paging.Query) (paging.P
 	conds := []string{"b.is_current", clientUnits(c, &args)}
 	if f.UnitID != nil {
 		conds = append(conds, add(*f.UnitID)+" = ANY(b.unit_ids)")
+	}
+	if f.UnitIDs != nil {
+		conds = append(conds, "b.unit_ids && "+add(*f.UnitIDs)+"::uuid[]")
+	}
+	if f.From != nil {
+		conds = append(conds, "lower(b.period) >= "+add(*f.From))
+	}
+	if f.To != nil {
+		conds = append(conds, "lower(b.period) < "+add(*f.To))
+	}
+	if f.CustomerID != nil {
+		conds = append(conds, "EXISTS (SELECT 1 FROM energy.ref_units u JOIN energy.ref_customers cu ON cu.organization_id = u.customer_org_id WHERE u.id = ANY(b.unit_ids) AND cu.id = "+add(*f.CustomerID)+")")
+	}
+	if f.PropertyID != nil {
+		conds = append(conds, "EXISTS (SELECT 1 FROM energy.ref_units u WHERE u.id = ANY(b.unit_ids) AND u.property_id = "+add(*f.PropertyID)+")")
 	}
 	if f.Method != nil {
 		conds = append(conds, "b.method = "+add(*f.Method))

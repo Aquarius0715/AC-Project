@@ -66,7 +66,7 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 	if !f.From.Before(*f.To) || f.To.Sub(*f.From) > 366*24*time.Hour {
 		return paging.Page[View]{}, apperr.Fields(map[string]string{"filters.to": "errors.period_range"})
 	}
-	order, err := paging.OrderBy(in.Sort, map[string]string{"occurredAt": "a.occurred_at"}, "a.occurred_at DESC, a.id DESC")
+	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "a.id", "occurredAt": "a.occurred_at", "createdAt": "a.occurred_at", "updatedAt": "a.occurred_at"}, "a.occurred_at DESC, a.id DESC") // entries are immutable: created = updated = occurred
 	if err != nil {
 		return paging.Page[View]{}, err
 	}

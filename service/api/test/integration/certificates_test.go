@@ -102,7 +102,7 @@ func TestCertificatesAndParts(t *testing.T) {
 	// parts catalog
 	code1 := "TST-" + uuid.NewString()[:6]
 	owner(t, `INSERT INTO maintenance.parts_catalog (code, tenant_id, name) VALUES ($1, $2, 'Test filter mesh')`, code1, seed.ID("tenant-a"))
-	_, m = post(s, &hq, "parts.list", `{"filters":{"q":"filter MESH"},"limit":100}`)
+	_, m = post(s, &hq, "parts.list", `{"filters":{"search":"filter MESH"},"limit":100}`)
 	found := false
 	for _, it := range items(m) {
 		found = found || (it["code"] == code1 && it["vanStockQuantity"] == nil)

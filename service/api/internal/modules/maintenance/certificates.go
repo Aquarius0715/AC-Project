@@ -103,6 +103,8 @@ func (m Certificates) reload(ctx context.Context, c *ops.Call, id uuid.UUID) (Ce
 
 var certCodes = map[string]bool{"demo_indoor": true, "demo_outdoor": true, "demo_electrical": true, "other": true}
 
+var certStatuses = map[string]bool{"valid": true, "expiring": true, "expired": true, "pending_verification": true, "rejected": true}
+
 // SubmitCertInput is certificates.submit input.
 type SubmitCertInput struct {
 	MembershipID uuid.UUID  `json:"membershipId"`
@@ -274,14 +276,17 @@ func (m Certificates) requestTraining(ctx context.Context, c *ops.Call, in *Trai
 
 func (m Certificates) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Certificate], error) {
 	var f struct {
-		MembershipID *uuid.UUID `json:"membershipId,omitempty"`
-		Code         *string    `json:"code,omitempty"`
-		Status       *string    `json:"status,omitempty"`
+		OrganizationID     *uuid.UUID `json:"organizationId,omitempty"`
+		MembershipID       *uuid.UUID `json:"membershipId,omitempty"`
+		Code               *string    `json:"code,omitempty"`
+		Status             *string    `json:"status,omitempty"`
+		ExpiringWithinDays *int       `json:"expiringWithinDays,omitempty"` // now <= expiresAt < now + N days
 	}
 	if len(in.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
 		dec.DisallowUnknownFields()
-		if dec.Decode(&f) != nil || (f.Code != nil && !certCodes[*f.Code]) {
+		if dec.Decode(&f) != nil || (f.Code != nil && !certCodes[*f.Code]) || (f.Status != nil && !certStatuses[*f.Status]) ||
+			(f.ExpiringWithinDays != nil && (*f.ExpiringWithinDays < 1 || *f.ExpiringWithinDays > 3650)) {
 			return paging.Page[Certificate]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
 	}
@@ -291,11 +296,18 @@ func (m Certificates) list(ctx context.Context, c *ops.Call, in *paging.Query) (
 	if c.Principal.Role == "contractor" {
 		conds = append(conds, "organization_id = "+add(c.Principal.OrgID))
 	}
+	if f.OrganizationID != nil {
+		conds = append(conds, "organization_id = "+add(*f.OrganizationID))
+	}
 	if f.MembershipID != nil {
 		conds = append(conds, "membership_id = "+add(*f.MembershipID))
 	}
 	if f.Code != nil {
 		conds = append(conds, "code = "+add(*f.Code))
+	}
+	if f.ExpiringWithinDays != nil {
+		now := add(c.Now)
+		conds = append(conds, "expires_at >= "+now+"::timestamptz AND expires_at < "+now+"::timestamptz + make_interval(days => "+add(*f.ExpiringWithinDays)+"::int)")
 	}
 	rows, err := c.Tx.Query(ctx, "SELECT "+certCols+" FROM maintenance.certificates WHERE "+strings.Join(conds, " AND ")+" ORDER BY expires_at, id", args...)
 	if err != nil {
@@ -316,6 +328,13 @@ func (m Certificates) list(ctx context.Context, c *ops.Call, in *paging.Query) (
 	if err := rows.Err(); err != nil {
 		return paging.Page[Certificate]{}, err
 	}
+	if err := paging.SortSlice(all, in.Sort, map[string]func(a, b Certificate) int{
+		"id":        func(a, b Certificate) int { return strings.Compare(a.ID.String(), b.ID.String()) },
+		"expiresAt": func(a, b Certificate) int { return a.ExpiresAt.Compare(b.ExpiresAt) },
+		"status":    func(a, b Certificate) int { return strings.Compare(a.Status, b.Status) },
+	}); err != nil {
+		return paging.Page[Certificate]{}, err
+	}
 	return pageOf(all, *in, f, c.Principal.ScopeVersion)
 }
 
@@ -330,7 +349,8 @@ type PartItem struct {
 
 func (m Certificates) parts(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[PartItem], error) {
 	var f struct {
-		Q *string `json:"q,omitempty"`
+		Search       *string    `json:"search,omitempty"`       // code or name contains, case-insensitive
+		MembershipID *uuid.UUID `json:"membershipId,omitempty"` // that technician's van stock first (van stock is not tracked yet)
 	}
 	if len(in.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
@@ -340,10 +360,10 @@ func (m Certificates) parts(ctx context.Context, c *ops.Call, in *paging.Query) 
 		}
 	}
 	q, args := `SELECT code, name FROM maintenance.parts_catalog WHERE active`, []any{}
-	if f.Q != nil {
-		q, args = q+` AND (code ILIKE $1 OR name ILIKE $1)`, append(args, "%"+strings.TrimSpace(*f.Q)+"%")
+	if f.Search != nil {
+		q, args = q+` AND (code ILIKE $1 OR name ILIKE $1)`, append(args, "%"+strings.TrimSpace(*f.Search)+"%")
 	}
-	rows, err := c.Tx.Query(ctx, q+" ORDER BY code", args...)
+	rows, err := c.Tx.Query(ctx, q+" ORDER BY lower(name), code", args...) // name asc, id asc (query catalog)
 	if err != nil {
 		return paging.Page[PartItem]{}, err
 	}
@@ -358,6 +378,12 @@ func (m Certificates) parts(ctx context.Context, c *ops.Call, in *paging.Query) 
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
+		return paging.Page[PartItem]{}, err
+	}
+	if err := paging.SortSlice(all, in.Sort, map[string]func(a, b PartItem) int{
+		"id":   func(a, b PartItem) int { return strings.Compare(a.Code, b.Code) },
+		"name": func(a, b PartItem) int { return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) },
+	}); err != nil {
 		return paging.Page[PartItem]{}, err
 	}
 	return pageOf(all, *in, f, c.Principal.ScopeVersion)

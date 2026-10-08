@@ -115,7 +115,7 @@ func (m Automations) list(ctx context.Context, c *ops.Call, in *paging.Query) (p
 			return paging.Page[Automation]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
 	}
-	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "a.id", "name": "a.name", "priority": "a.priority", "createdAt": "a.created_at"}, "a.created_at DESC, a.id DESC")
+	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "a.id", "name": "a.name", "priority": "a.priority", "createdAt": "a.created_at", "updatedAt": "a.updated_at"}, "a.created_at DESC, a.id DESC")
 	if err != nil {
 		return paging.Page[Automation]{}, err
 	}

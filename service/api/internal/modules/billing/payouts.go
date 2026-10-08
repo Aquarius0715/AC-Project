@@ -527,6 +527,10 @@ func (m Payouts) list(ctx context.Context, c *ops.Call, in *paging.Query) (pagin
 			return paging.Page[Statement]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
 	}
+	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "id", "createdAt": "created_at", "status": "status", "period": "period"}, "period DESC, contractor_org_id, id")
+	if err != nil {
+		return paging.Page[Statement]{}, err
+	}
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Statement]{}, err
@@ -551,7 +555,7 @@ func (m Payouts) list(ctx context.Context, c *ops.Call, in *paging.Query) (pagin
 	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM billing.payout_statements WHERE "+where, args...).Scan(&total); err != nil {
 		return paging.Page[Statement]{}, err
 	}
-	rows, err := c.Tx.Query(ctx, fmt.Sprintf("SELECT %s FROM billing.payout_statements WHERE %s ORDER BY period DESC, contractor_org_id, id LIMIT %d OFFSET %d", statementCols, where, w.Limit, w.Offset), args...)
+	rows, err := c.Tx.Query(ctx, fmt.Sprintf("SELECT %s FROM billing.payout_statements WHERE %s ORDER BY %s LIMIT %d OFFSET %d", statementCols, where, order, w.Limit, w.Offset), args...)
 	if err != nil {
 		return paging.Page[Statement]{}, err
 	}

@@ -177,13 +177,13 @@ func TestRestrictionLifecycle(t *testing.T) {
 	if code, _ := post(s, &overrider, "restrictions.list", `{"filters":{"contractId":"`+k+`"}}`); code != 403 {
 		t.Error("override-only contract filter")
 	}
-	if _, m := post(s, &overrider, "restrictions.list", `{"filters":{"state":"requested"},"limit":100}`); len(items(m)) == 0 || items(m)[0]["projection"] != "release" {
+	if _, m := post(s, &overrider, "restrictions.list", `{"filters":{"status":"requested"},"limit":100}`); len(items(m)) == 0 || items(m)[0]["projection"] != "release" {
 		t.Error("override-only list")
 	}
 	if _, m := post(s, &restrMgr, "restrictions.list", `{"filters":{"contractId":"`+k+`","invoiceId":"`+inv+`"}}`); len(items(m)) != 1 || len(items(m)[0]["events"].([]any)) < 2 {
 		t.Fatalf("manager list: %v", m)
 	}
-	if code, _ := post(s, &restrMgr, "restrictions.list", `{"filters":{"state":"paused"}}`); code != 422 {
+	if code, _ := post(s, &restrMgr, "restrictions.list", `{"filters":{"status":"paused"}}`); code != 422 {
 		t.Error("bad state filter")
 	}
 	if code, _ := post(s, &customerB, "restrictions.get", `{"id":"`+id+`"}`); code != 403 {
@@ -505,12 +505,19 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 	if code != 200 || data(m)["exception"].(map[string]any)["reason"] != "hospital" || unitState(m, u)["releaseState"] != "waiting_reconcile" {
 		t.Fatalf("exempt: %d %v", code, m)
 	}
-	if _, m := post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{"filters":{"state":"release_requested"}}}`); len(items(m)) != 1 ||
+	if _, m := post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{"filters":{"status":"release_requested"}}}`); len(items(m)) != 1 ||
 		items(m)[0]["exception"].(map[string]any)["reason"] != nil || items(m)[0]["releaseIntent"].(map[string]any)["actorMembershipId"] != "masked" {
 		t.Fatalf("client mask: %v", m)
 	}
-	if code, _ := post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{"filters":{"contractId":"`+k+`"}}}`); code != 422 {
-		t.Error("forInvoice contract filter")
+	// query catalog: contractId => contractId; invoiceId => also cites that invoice
+	if _, m := post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{"filters":{"contractId":"`+k+`"}}}`); len(items(m)) != 1 {
+		t.Errorf("forInvoice contract filter: %v", m)
+	}
+	if _, m := post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{"filters":{"contractId":"`+uuid.NewString()+`"}}}`); len(items(m)) != 0 {
+		t.Errorf("forInvoice other contract: %v", m)
+	}
+	if _, m := post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{"filters":{"invoiceId":"`+uuid.NewString()+`"}}}`); len(items(m)) != 0 {
+		t.Errorf("forInvoice second invoice: %v", m)
 	}
 	owner(t, `UPDATE assets.units SET last_seen_at = $2, observed_restriction = NULL WHERE id = $1`, u, clock)
 	code, m = write(s, &restrMgr, "restrictions.reconcile", `{"restrictionId":"`+id+`","unitIds":["`+u+`"]}`, ver(get()))

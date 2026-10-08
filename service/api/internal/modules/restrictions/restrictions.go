@@ -298,15 +298,19 @@ var states = []string{"scheduled", "requested", "applied", "release_requested", 
 type listFilter struct {
 	ContractID *uuid.UUID `json:"contractId,omitempty"`
 	InvoiceID  *uuid.UUID `json:"invoiceId,omitempty"`
-	State      *string    `json:"state,omitempty"`
+	Status     *string    `json:"status,omitempty"` // => state
 }
 
 func (m Restrictions) query(ctx context.Context, c *ops.Call, in paging.Query, f listFilter, extra []string, args []any) ([]Restriction, *string, int, int, error) {
-	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "r.id", "createdAt": "r.created_at", "executeAfter": "r.execute_after", "noticeAt": "r.notice_at"}, "r.created_at DESC, r.id DESC")
+	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "r.id", "createdAt": "r.created_at", "updatedAt": "r.updated_at", "executeAfter": "r.execute_after", "noticeAt": "r.notice_at"}, "r.created_at DESC, r.id DESC")
 	if err != nil {
 		return nil, nil, 0, 0, err
 	}
-	w, err := paging.Resolve(in, f, c.Principal.ScopeVersion, 1)
+	// the cursor binds the filter and the extra conditions' values (SR14)
+	w, err := paging.Resolve(in, struct {
+		F listFilter `json:"f"`
+		X []any      `json:"x"`
+	}{f, args}, c.Principal.ScopeVersion, 1)
 	if err != nil {
 		return nil, nil, 0, 0, err
 	}
@@ -318,8 +322,8 @@ func (m Restrictions) query(ctx context.Context, c *ops.Call, in paging.Query, f
 	if f.InvoiceID != nil {
 		conds = append(conds, "EXISTS (SELECT 1 FROM restrictions.restriction_invoices ri WHERE ri.restriction_id = r.id AND ri.invoice_id = "+add(*f.InvoiceID)+")")
 	}
-	if f.State != nil {
-		conds = append(conds, "r.state = "+add(*f.State))
+	if f.Status != nil {
+		conds = append(conds, "r.state = "+add(*f.Status))
 	}
 	where := strings.Join(conds, " AND ")
 	var total int
@@ -357,7 +361,7 @@ func decodeFilter(raw json.RawMessage, f *listFilter) error {
 	}
 	dec := json.NewDecoder(strings.NewReader(string(raw)))
 	dec.DisallowUnknownFields()
-	if dec.Decode(f) != nil || (f.State != nil && !slices.Contains(states, *f.State)) {
+	if dec.Decode(f) != nil || (f.Status != nil && !slices.Contains(states, *f.Status)) {
 		return apperr.Fields(map[string]string{"filters": "error.invalid"})
 	}
 	return nil
@@ -409,11 +413,15 @@ func (m Restrictions) forInvoice(ctx context.Context, c *ops.Call, in *ForInvoic
 	if err := decodeFilter(in.Query.Filters, &f); err != nil {
 		return paging.Page[Restriction]{}, err
 	}
-	if f.InvoiceID != nil || f.ContractID != nil {
-		return paging.Page[Restriction]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
+	// query catalog: invoiceId => causeInvoiceIds contains AND input.invoiceId; contractId => contractId
+	var extra []string
+	var args []any
+	if f.InvoiceID != nil && *f.InvoiceID != in.InvoiceID {
+		args = append(args, *f.InvoiceID)
+		extra = append(extra, "EXISTS (SELECT 1 FROM restrictions.restriction_invoices ri WHERE ri.restriction_id = r.id AND ri.invoice_id = $1)")
 	}
 	f.InvoiceID = &in.InvoiceID
-	xs, next, total, snap, err := m.query(ctx, c, in.Query, f, nil, nil)
+	xs, next, total, snap, err := m.query(ctx, c, in.Query, f, extra, args)
 	if err != nil {
 		return paging.Page[Restriction]{}, err
 	}

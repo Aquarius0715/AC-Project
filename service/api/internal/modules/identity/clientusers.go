@@ -68,6 +68,7 @@ func clientUsersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
 		Status     *string    `json:"status,omitempty"`
 		ClientRole *string    `json:"clientRole,omitempty"`
+		Search     *string    `json:"search,omitempty"` // email or display name contains, case-insensitive
 	}
 	if len(in.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
@@ -77,7 +78,7 @@ func clientUsersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging
 			return paging.Page[ClientUser]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
 	}
-	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "x.id", "email": "x.email", "invitedAt": "x.invited_at"}, "x.email ASC, x.id ASC")
+	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "x.id", "name": "lower(COALESCE(x.display_name, x.email::text))", "email": "x.email", "invitedAt": "x.invited_at", "createdAt": "x.created_at", "updatedAt": "x.updated_at"}, "lower(COALESCE(x.display_name, x.email::text)) ASC, x.id ASC")
 	if err != nil {
 		return paging.Page[ClientUser]{}, err
 	}
@@ -99,6 +100,10 @@ func clientUsersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging
 	}
 	if f.ClientRole != nil {
 		conds = append(conds, "x.client_role = "+add(*f.ClientRole))
+	}
+	if f.Search != nil && strings.TrimSpace(*f.Search) != "" {
+		p := add("%" + strings.TrimSpace(*f.Search) + "%")
+		conds = append(conds, "(x.email ILIKE "+p+" OR x.display_name ILIKE "+p+")")
 	}
 	where := strings.Join(conds, " AND ")
 	var total int

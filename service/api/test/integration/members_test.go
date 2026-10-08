@@ -147,7 +147,7 @@ func TestMembersList(t *testing.T) {
 	if _, m := post(s, &hq, "members.list", `{"filters":{"role":"client"},"limit":100}`); len(items(m)) < 2 {
 		t.Error("role=client")
 	}
-	if _, m := post(s, &hq, "members.list", `{"filters":{"active":false,"organizationId":"`+uuid.NewString()+`"}}`); len(items(m)) != 0 {
+	if _, m := post(s, &hq, "members.list", `{"filters":{"activeOnly":false,"organizationId":"`+uuid.NewString()+`"}}`); len(items(m)) != 0 {
 		t.Error("filters")
 	}
 	_, m = post(s, &contrA, "members.list", `{"limit":100}`)

@@ -278,7 +278,7 @@ func listReports(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 			return paging.Page[Report]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
 	}
-	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "r.id", "updatedAt": "r.created_at", "periodFrom": "lower(r.period)"}, "r.created_at DESC, r.id DESC")
+	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "r.id", "createdAt": "r.created_at", "updatedAt": "r.created_at", "periodFrom": "lower(r.period)"}, "r.created_at DESC, r.id DESC")
 	if err != nil {
 		return paging.Page[Report]{}, err
 	}
@@ -318,13 +318,17 @@ func (in *VersionsInput) Validate() map[string]string {
 }
 
 func versions(ctx context.Context, c *ops.Call, in *VersionsInput) (paging.Page[Report], error) {
+	if in.Query.HasFilters() { // no filters (query catalog)
+		return paging.Page[Report]{}, apperr.Fields(map[string]string{"query.filters": "error.invalid"})
+	}
+	order, err := paging.OrderBy(in.Query.Sort, map[string]string{"version": "r.version"}, "r.version ASC")
+	if err != nil {
+		return paging.Page[Report]{}, err
+	}
 	if _, err := latestVersion(ctx, c, in.ID); err != nil {
 		return paging.Page[Report]{}, err
 	}
-	if len(in.Query.Filters) > 0 && string(in.Query.Filters) != "{}" || in.Query.Sort != nil {
-		return paging.Page[Report]{}, apperr.Fields(map[string]string{"query": "error.invalid"})
-	}
-	return pageReports(ctx, c, in.Query, in.ID, "r.id = $1", []any{in.ID}, "r.version ASC")
+	return pageReports(ctx, c, in.Query, in.ID, "r.id = $1", []any{in.ID}, order)
 }
 
 // SaveInput is mrv.saveDraft input.

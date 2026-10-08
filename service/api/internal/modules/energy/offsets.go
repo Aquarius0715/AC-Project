@@ -259,10 +259,15 @@ func loadRecord(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Reco
 func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Record], error) {
 	var f struct {
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
-		State      *string    `json:"state,omitempty"`
+		Status     *string    `json:"status,omitempty"` // => state
+		From       *time.Time `json:"from,omitempty"`   // [from, to) on createdAt
+		To         *time.Time `json:"to,omitempty"`
 	}
-	if err := decodeStrict(in.Filters, &f); err != nil || (f.State != nil && !strings.Contains(" demo_requested demo_purchased demo_retired failed ", " "+*f.State+" ")) {
+	if err := decodeStrict(in.Filters, &f); err != nil || (f.Status != nil && !strings.Contains(" demo_requested demo_purchased demo_retired failed ", " "+*f.Status+" ")) {
 		return paging.Page[Record]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
+	}
+	if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
+		return paging.Page[Record]{}, apperr.Fields(map[string]string{"filters.to": "error.range"})
 	}
 	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "r.id", "createdAt": "r.created_at", "updatedAt": "r.updated_at"}, "r.created_at DESC, r.id DESC")
 	if err != nil {
@@ -282,8 +287,14 @@ func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	if f.CustomerID != nil {
 		conds = append(conds, "r.customer_id = "+add(*f.CustomerID))
 	}
-	if f.State != nil {
-		conds = append(conds, "r.state = "+add(*f.State))
+	if f.Status != nil {
+		conds = append(conds, "r.state = "+add(*f.Status))
+	}
+	if f.From != nil {
+		conds = append(conds, "r.created_at >= "+add(*f.From))
+	}
+	if f.To != nil {
+		conds = append(conds, "r.created_at < "+add(*f.To))
 	}
 	where := strings.Join(conds, " AND ")
 	var total int

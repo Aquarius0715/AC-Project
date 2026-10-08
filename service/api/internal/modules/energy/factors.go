@@ -67,7 +67,7 @@ func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 			return paging.Page[Factor]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
 	}
-	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "f.id", "year": "f.year", "region": "f.region"}, "f.year DESC, f.region ASC, f.id ASC")
+	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "f.id", "year": "f.year", "region": "f.region", "createdAt": "f.created_at", "updatedAt": "f.created_at"}, "f.year DESC, f.region ASC, f.id ASC")
 	if err != nil {
 		return paging.Page[Factor]{}, err
 	}

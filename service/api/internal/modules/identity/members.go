@@ -153,16 +153,17 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	var f struct {
 		Role           *string    `json:"role,omitempty"`
 		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
-		Active         *bool      `json:"active,omitempty"`
+		Qualification  *string    `json:"qualification,omitempty"` // a grant of that code valid now (SR13)
+		ActiveOnly     *bool      `json:"activeOnly,omitempty"`    // true: validFrom <= now < validUntil; false: no validity filter
 	}
 	if len(in.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
 		dec.DisallowUnknownFields()
-		if dec.Decode(&f) != nil || (f.Role != nil && !slices.Contains(roles, *f.Role)) {
+		if dec.Decode(&f) != nil || (f.Role != nil && !slices.Contains(roles, *f.Role)) || (f.Qualification != nil && !slices.Contains(qualificationCodes, *f.Qualification)) {
 			return paging.Page[Member]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
 	}
-	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "m.id", "validFrom": "m.valid_from", "updatedAt": "m.updated_at"}, "m.id ASC")
+	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "m.id", "validFrom": "m.valid_from", "createdAt": "m.created_at", "updatedAt": "m.updated_at"}, "m.id ASC")
 	if err != nil {
 		return paging.Page[Member]{}, err
 	}
@@ -184,13 +185,14 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 	if f.OrganizationID != nil {
 		conds = append(conds, "m.organization_id = "+add(*f.OrganizationID))
 	}
-	if f.Active != nil {
+	if f.ActiveOnly != nil && *f.ActiveOnly {
 		now := add(c.Now)
-		q := "(m.valid_from <= " + now + " AND (m.valid_until IS NULL OR m.valid_until > " + now + "))"
-		if !*f.Active {
-			q = "NOT " + q
-		}
-		conds = append(conds, q)
+		conds = append(conds, "(m.valid_from <= "+now+" AND (m.valid_until IS NULL OR m.valid_until > "+now+"))")
+	}
+	if f.Qualification != nil {
+		code, now := add(*f.Qualification), add(c.Now)
+		conds = append(conds, "EXISTS (SELECT 1 FROM identity.qualification_grants g WHERE g.membership_id = m.id AND g.code = "+code+
+			" AND g.valid_from <= "+now+" AND g.valid_until > "+now+" AND (g.revoked_at IS NULL OR g.revoked_at > "+now+"))")
 	}
 	where := strings.Join(conds, " AND ")
 	var total int
@@ -223,6 +225,9 @@ func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pag
 // ---- members.save ----
 
 var roles = []string{"client", "contractor", "technician", "admin"}
+
+// qualificationCodes are the demo QualificationCode values (SR13).
+var qualificationCodes = []string{"demo_indoor", "demo_outdoor", "demo_electrical"}
 
 // RolePermissions are the permissions each role may hold (IR132 item 1).
 var RolePermissions = map[string][]string{

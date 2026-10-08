@@ -163,9 +163,11 @@ var (
 
 func (Inbox) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Notification], error) {
 	var f struct {
-		Severity   *string `json:"severity,omitempty"`
-		UnreadOnly *bool   `json:"unreadOnly,omitempty"`
-		Type       *string `json:"type,omitempty"`
+		Severity   *string    `json:"severity,omitempty"`
+		UnreadOnly *bool      `json:"unreadOnly,omitempty"`
+		Type       *string    `json:"type,omitempty"`
+		From       *time.Time `json:"from,omitempty"` // [from, to) on occurredAt
+		To         *time.Time `json:"to,omitempty"`
 	}
 	if len(in.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
@@ -173,8 +175,12 @@ func (Inbox) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pa
 		if dec.Decode(&f) != nil || (f.Severity != nil && !slices.Contains(severities, *f.Severity)) || (f.Type != nil && !slices.Contains(types, *f.Type)) {
 			return paging.Page[Notification]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
+		if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
+			return paging.Page[Notification]{}, apperr.Fields(map[string]string{"filters.to": "error.range"})
+		}
 	}
 	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "n.id", "occurredAt": "n.occurred_at",
+		"createdAt": "n.created_at", "updatedAt": "COALESCE(n.read_at, n.created_at)", // reading is the only update
 		"severity": "CASE n.severity WHEN 'critical' THEN 3 WHEN 'warning' THEN 2 ELSE 1 END"}, "n.occurred_at DESC, n.id DESC")
 	if err != nil {
 		return paging.Page[Notification]{}, err
@@ -194,6 +200,12 @@ func (Inbox) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pa
 	}
 	if f.Type != nil {
 		conds = append(conds, "n.type = "+add(*f.Type))
+	}
+	if f.From != nil {
+		conds = append(conds, "n.occurred_at >= "+add(*f.From))
+	}
+	if f.To != nil {
+		conds = append(conds, "n.occurred_at < "+add(*f.To))
 	}
 	where := strings.Join(conds, " AND ")
 	var total int

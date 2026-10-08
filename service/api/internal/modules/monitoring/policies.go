@@ -374,6 +374,10 @@ func (m Policies) list(ctx context.Context, c *ops.Call, in *paging.Query) (pagi
 			dir = -1
 		}
 		switch in.Sort.Field {
+		case "id":
+			less = func(a, b Policy) int { return dir * strings.Compare(a.ID.String(), b.ID.String()) }
+		case "createdAt":
+			less = func(a, b Policy) int { return dir * a.CreatedAt.Compare(b.CreatedAt) }
 		case "name":
 			less = func(a, b Policy) int { return dir * strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)) }
 		case "priority":

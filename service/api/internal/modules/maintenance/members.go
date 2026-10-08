@@ -2,6 +2,7 @@ package maintenance
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
 	"sort"
@@ -51,6 +52,58 @@ func (m Workforce) technicians(ctx context.Context, c *ops.Call, internalOnly bo
 	}
 	rows.Close()
 	return out, rows.Err()
+}
+
+// techFilter is the members.eligible / members.capacity filter set of the query catalog: organizationId,
+// qualification (a grant of that code valid now, SR13) and activeOnly (candidates are always memberships valid now, so
+// it narrows nothing further).
+type techFilter struct {
+	OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
+	Qualification  *string    `json:"qualification,omitempty"`
+	ActiveOnly     *bool      `json:"activeOnly,omitempty"`
+}
+
+func decodeTechFilter(q paging.Query) (techFilter, error) {
+	var f techFilter
+	if len(q.Filters) == 0 {
+		return f, nil
+	}
+	dec := json.NewDecoder(strings.NewReader(string(q.Filters)))
+	dec.DisallowUnknownFields()
+	if dec.Decode(&f) != nil || (f.Qualification != nil && (!certCodes[*f.Qualification] || *f.Qualification == "other")) {
+		return f, apperr.Fields(map[string]string{"filters": "error.invalid"})
+	}
+	return f, nil
+}
+
+// keep returns the technicians that match the filter; qualifications are loaded from identity only when needed.
+func (f techFilter) keep(ctx context.Context, c *ops.Call, techs []identity.Member) ([]identity.Member, error) {
+	if f.Qualification != nil {
+		if err := identity.LoadMembers(ctx, c, techs); err != nil {
+			return nil, err
+		}
+	}
+	out := []identity.Member{}
+	for _, t := range techs {
+		if f.OrganizationID != nil && t.OrganizationID != *f.OrganizationID {
+			continue
+		}
+		if f.Qualification != nil && !holds(t, *f.Qualification, c.Now) {
+			continue
+		}
+		out = append(out, t)
+	}
+	return out, nil
+}
+
+// holds reports whether the member has a grant of code valid at now: [validFrom, validUntil) and not revoked.
+func holds(m identity.Member, code string, now time.Time) bool {
+	for _, g := range m.Qualifications {
+		if g.Code == code && !g.ValidFrom.After(now) && now.Before(g.ValidUntil) && (g.RevokedAt == nil || now.Before(*g.RevokedAt)) {
+			return true
+		}
+	}
+	return false
 }
 
 func pageOf[T any](all []T, q paging.Query, hashOf any, scopeVersion int) (paging.Page[T], error) {
@@ -112,7 +165,14 @@ func (m Workforce) eligible(ctx context.Context, c *ops.Call, in *EligibleInput)
 	if err != nil {
 		return paging.Page[identity.Member]{}, err
 	}
+	f, err := decodeTechFilter(in.Query)
+	if err != nil {
+		return paging.Page[identity.Member]{}, err
+	}
 	techs, err := m.technicians(ctx, c, true)
+	if err == nil {
+		techs, err = f.keep(ctx, c, techs)
+	}
 	if err != nil {
 		return paging.Page[identity.Member]{}, err
 	}
@@ -139,6 +199,13 @@ func (m Workforce) eligible(ctx context.Context, c *ops.Call, in *EligibleInput)
 		}
 	}
 	if err := identity.LoadMembers(ctx, c, out); err != nil {
+		return paging.Page[identity.Member]{}, err
+	}
+	if err := paging.SortSlice(out, in.Query.Sort, map[string]func(a, b identity.Member) int{
+		"id":        func(a, b identity.Member) int { return strings.Compare(a.ID.String(), b.ID.String()) },
+		"createdAt": func(a, b identity.Member) int { return a.CreatedAt.Compare(b.CreatedAt) },
+		"updatedAt": func(a, b identity.Member) int { return a.UpdatedAt.Compare(b.UpdatedAt) },
+	}); err != nil {
 		return paging.Page[identity.Member]{}, err
 	}
 	return pageOf(out, in.Query, in, c.Principal.ScopeVersion)
@@ -176,7 +243,14 @@ func (m Workforce) capacity(ctx context.Context, c *ops.Call, in *CapacityInput)
 	day, _ := time.ParseInLocation("2006-01-02", in.Date, kualaLumpur)
 	work := Slot{day.Add(9 * time.Hour).UTC(), day.Add(17 * time.Hour).UTC()}
 	weekend := day.Weekday() == time.Saturday || day.Weekday() == time.Sunday
+	f, err := decodeTechFilter(in.Query)
+	if err != nil {
+		return paging.Page[Capacity]{}, err
+	}
 	techs, err := m.technicians(ctx, c, false)
+	if err == nil {
+		techs, err = f.keep(ctx, c, techs)
+	}
 	if err != nil {
 		return paging.Page[Capacity]{}, err
 	}
@@ -226,6 +300,11 @@ func (m Workforce) capacity(ctx context.Context, c *ops.Call, in *CapacityInput)
 		out = append(out, cp)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].MembershipID.String() < out[j].MembershipID.String() })
+	if err := paging.SortSlice(out, in.Query.Sort, map[string]func(a, b Capacity) int{
+		"id": func(a, b Capacity) int { return strings.Compare(a.MembershipID.String(), b.MembershipID.String()) },
+	}); err != nil {
+		return paging.Page[Capacity]{}, err
+	}
 	return pageOf(out, in.Query, in.Date, c.Principal.ScopeVersion)
 }
 

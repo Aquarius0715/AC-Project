@@ -107,7 +107,7 @@ func TestOffsets(t *testing.T) {
 		t.Error("retry a retired record")
 	}
 	// lists
-	if _, m := post(s, &customerB, "offsets.list", `{"filters":{"state":"demo_retired"},"limit":100}`); len(items(m)) == 0 {
+	if _, m := post(s, &customerB, "offsets.list", `{"filters":{"status":"demo_retired"},"limit":100}`); len(items(m)) == 0 {
 		t.Error("client list")
 	}
 	if _, m := post(s, &customerA, "offsets.list", `{"limit":100}`); func() bool {
@@ -123,7 +123,7 @@ func TestOffsets(t *testing.T) {
 	if _, m := post(s, &hq, "offsets.list", `{"filters":{"customerId":"`+seed.ID("cust-b").String()+`"},"limit":100}`); len(items(m)) == 0 {
 		t.Error("HQ list")
 	}
-	if code, _ := post(s, &hq, "offsets.list", `{"filters":{"state":"sold"}}`); code != 422 {
+	if code, _ := post(s, &hq, "offsets.list", `{"filters":{"status":"sold"}}`); code != 422 {
 		t.Error("bad state filter")
 	}
 	// expired quotes cannot be requested; HQ quotes need the customer's units

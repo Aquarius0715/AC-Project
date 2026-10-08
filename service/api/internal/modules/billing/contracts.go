@@ -119,16 +119,16 @@ func (m Billing) listContracts(ctx context.Context, c *ops.Call, in *paging.Quer
 	var f struct {
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
 		UnitID     *uuid.UUID `json:"unitId,omitempty"`
-		PlanType   *string    `json:"planType,omitempty"`
+		Kind       *string    `json:"kind,omitempty"` // => planType
 	}
 	if len(in.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
 		dec.DisallowUnknownFields()
-		if dec.Decode(&f) != nil || (f.PlanType != nil && !slices.Contains(planTypes, *f.PlanType)) {
+		if dec.Decode(&f) != nil || (f.Kind != nil && !slices.Contains(planTypes, *f.Kind)) {
 			return paging.Page[Contract]{}, apperr.Fields(map[string]string{"filters": "error.invalid"})
 		}
 	}
-	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "k.id", "createdAt": "k.created_at", "startAt": "lower(k.term)"}, "k.id ASC")
+	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "k.id", "createdAt": "k.created_at", "updatedAt": "k.created_at", "startAt": "lower(k.term)"}, "k.id ASC")
 	if err != nil {
 		return paging.Page[Contract]{}, err
 	}
@@ -145,8 +145,8 @@ func (m Billing) listContracts(ctx context.Context, c *ops.Call, in *paging.Quer
 	if f.UnitID != nil {
 		conds = append(conds, "EXISTS (SELECT 1 FROM billing.contract_units cu WHERE cu.contract_id = k.id AND cu.contract_version = k.version AND cu.unit_id = "+add(*f.UnitID)+")")
 	}
-	if f.PlanType != nil {
-		conds = append(conds, "k.plan_type = "+add(*f.PlanType))
+	if f.Kind != nil {
+		conds = append(conds, "k.plan_type = "+add(*f.Kind))
 	}
 	where := strings.Join(conds, " AND ")
 	var total int
@@ -510,7 +510,7 @@ func (m Billing) listInvoices(ctx context.Context, c *ops.Call, in *paging.Query
 			return paging.Page[Invoice]{}, apperr.Fields(map[string]string{"filters.to": "error.range"})
 		}
 	}
-	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "i.id", "dueAt": "i.due_at", "createdAt": "i.created_at"}, "i.due_at DESC, i.id ASC")
+	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "i.id", "dueAt": "i.due_at", "createdAt": "i.created_at", "updatedAt": "i.updated_at"}, "i.due_at DESC, i.id ASC")
 	if err != nil {
 		return paging.Page[Invoice]{}, err
 	}

@@ -211,6 +211,13 @@ func (in *RunListInput) Validate() map[string]string {
 }
 
 func (m Diagnostics) list(ctx context.Context, c *ops.Call, in *RunListInput) (paging.Page[Run], error) {
+	if err := paging.NoFilters(in.Query, "query.filters"); err != nil {
+		return paging.Page[Run]{}, err
+	}
+	order, err := paging.OrderBy(in.Query.Sort, map[string]string{"id": "r.id", "createdAt": "r.created_at"}, "r.created_at DESC, r.id")
+	if err != nil {
+		return paging.Page[Run]{}, err
+	}
 	w, err := paging.Resolve(in.Query, in, c.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Run]{}, err
@@ -229,7 +236,7 @@ func (m Diagnostics) list(ctx context.Context, c *ops.Call, in *RunListInput) (p
 	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.diagnostic_runs r WHERE "+where, args...).Scan(&total); err != nil {
 		return paging.Page[Run]{}, err
 	}
-	rows, err := c.Tx.Query(ctx, fmt.Sprintf("SELECT %s FROM control.diagnostic_runs r WHERE %s ORDER BY r.created_at DESC, r.id LIMIT %d OFFSET %d", runCols, where, w.Limit, w.Offset), args...)
+	rows, err := c.Tx.Query(ctx, fmt.Sprintf("SELECT %s FROM control.diagnostic_runs r WHERE %s ORDER BY %s LIMIT %d OFFSET %d", runCols, where, order, w.Limit, w.Offset), args...)
 	if err != nil {
 		return paging.Page[Run]{}, err
 	}

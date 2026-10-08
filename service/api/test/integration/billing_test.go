@@ -66,7 +66,7 @@ func TestContractsAndInvoices(t *testing.T) {
 	if _, m := post(s, &customerA, "contracts.list", `{"filters":{"unitId":"`+u+`"}}`); len(items(m)) != 0 {
 		t.Error("other customer's contract")
 	}
-	if code, _ := post(s, &hq, "contracts.list", `{"filters":{"planType":"vip"}}`); code != 422 {
+	if code, _ := post(s, &hq, "contracts.list", `{"filters":{"kind":"vip"}}`); code != 422 {
 		t.Error("bad plan filter")
 	}
 	// a restriction on the contract blocks revisions

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"slices"
 	"strings"
 
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
@@ -29,6 +30,20 @@ type Query struct {
 	Limit   *int            `json:"limit,omitempty"`
 	Sort    *Sort           `json:"sort,omitempty"`
 	Filters json.RawMessage `json:"filters,omitempty"`
+}
+
+// HasFilters reports whether the query carries any filter (an empty object and null carry none).
+func (q Query) HasFilters() bool {
+	raw := strings.TrimSpace(string(q.Filters))
+	return raw != "" && raw != "null" && raw != "{}"
+}
+
+// NoFilters is VALIDATION on field when an operation without catalogued filters receives some (SR06: unknown keys).
+func NoFilters(q Query, field string) error {
+	if q.HasFilters() {
+		return apperr.Fields(map[string]string{field: "error.invalid"})
+	}
+	return nil
 }
 
 // Page is Page<T>.
@@ -120,4 +135,32 @@ func OrderBy(s *Sort, allowed map[string]string, def string) (string, error) {
 		tie = idCol // qualified tie-breaker, unambiguous in joins
 	}
 	return col + " " + dir + ", " + tie + " ASC", nil
+}
+
+// SortSlice orders in-memory items by the requested sort: keys compares two items per allowed field (like
+// strings.Compare); ties fall back to the "id" comparator when there is one. A nil sort keeps the current order; a
+// field outside keys is VALIDATION.
+func SortSlice[T any](items []T, s *Sort, keys map[string]func(a, b T) int) error {
+	if s == nil {
+		return nil
+	}
+	cmp, ok := keys[s.Field]
+	if !ok {
+		return apperr.Fields(map[string]string{"sort.field": "error.invalid"})
+	}
+	if s.Direction != "asc" && s.Direction != "desc" {
+		return apperr.Fields(map[string]string{"sort.direction": "error.invalid"})
+	}
+	id := keys["id"]
+	slices.SortStableFunc(items, func(a, b T) int {
+		c := cmp(a, b)
+		if s.Direction == "desc" {
+			c = -c
+		}
+		if c == 0 && id != nil && s.Field != "id" {
+			c = id(a, b)
+		}
+		return c
+	})
+	return nil
 }

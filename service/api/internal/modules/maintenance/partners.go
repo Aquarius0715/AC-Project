@@ -207,6 +207,7 @@ func (m Partners) loadProfile(ctx context.Context, c *ops.Call, where string, ar
 func (m Partners) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Profile], error) {
 	var f struct {
 		Status *string `json:"status,omitempty"`
+		Search *string `json:"search,omitempty"` // name, registration number or a service area contains
 	}
 	if len(in.Filters) > 0 {
 		dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
@@ -224,11 +225,17 @@ func (m Partners) list(ctx context.Context, c *ops.Call, in *paging.Query) (pagi
 		return paging.Page[Profile]{}, err
 	}
 	args := []any{c.Now}
-	where := "TRUE"
+	conds := []string{"TRUE"}
 	if f.Status != nil {
 		args = append(args, *f.Status)
-		where = "p.status = $2"
+		conds = append(conds, fmt.Sprintf("p.status = $%d", len(args)))
 	}
+	if f.Search != nil && strings.TrimSpace(*f.Search) != "" {
+		args = append(args, "%"+strings.TrimSpace(*f.Search)+"%")
+		n := len(args)
+		conds = append(conds, fmt.Sprintf("(p.name ILIKE $%d OR p.registration_no ILIKE $%d OR EXISTS (SELECT 1 FROM unnest(p.service_areas) a WHERE a ILIKE $%d))", n, n, n))
+	}
+	where := strings.Join(conds, " AND ")
 	var total int
 	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.contractors p WHERE "+where+" AND $1::timestamptz IS NOT NULL", args...).Scan(&total); err != nil {
 		return paging.Page[Profile]{}, err
@@ -522,6 +529,10 @@ func (m Partners) listRateCards(ctx context.Context, c *ops.Call, in *paging.Que
 	if c.Principal.Role == "contractor" {
 		f.ContractorOrgID = &c.Principal.OrgID
 	}
+	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "id", "createdAt": "created_at", "effectiveFrom": "effective_from"}, "effective_from DESC, id")
+	if err != nil {
+		return paging.Page[RateCard]{}, err
+	}
 	w, err := paging.Resolve(*in, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[RateCard]{}, err
@@ -534,7 +545,7 @@ func (m Partners) listRateCards(ctx context.Context, c *ops.Call, in *paging.Que
 	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM maintenance.rate_cards WHERE "+where, args...).Scan(&total); err != nil {
 		return paging.Page[RateCard]{}, err
 	}
-	rows, err := c.Tx.Query(ctx, fmt.Sprintf("SELECT %s FROM maintenance.rate_cards WHERE %s ORDER BY effective_from DESC, id LIMIT %d OFFSET %d", rateCols, where, w.Limit, w.Offset), args...)
+	rows, err := c.Tx.Query(ctx, fmt.Sprintf("SELECT %s FROM maintenance.rate_cards WHERE %s ORDER BY %s LIMIT %d OFFSET %d", rateCols, where, order, w.Limit, w.Offset), args...)
 	if err != nil {
 		return paging.Page[RateCard]{}, err
 	}

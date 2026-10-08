@@ -2,6 +2,7 @@ package devices
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -41,10 +42,7 @@ func (in *HistoryInput) Validate() map[string]string {
 	if in.device() == uuid.Nil {
 		return map[string]string{"deviceId": "error.required"}
 	}
-	if len(in.Query.Filters) > 0 && string(in.Query.Filters) != "{}" && string(in.Query.Filters) != "null" {
-		return map[string]string{"query.filters": "error.invalid"}
-	}
-	return nil
+	return nil // the filters are checked per operation (decodeHistory)
 }
 
 // historyAccess checks the current-device part of SR24 (device visible to the caller) and, for technicians, an
@@ -75,8 +73,39 @@ func (m *Module) historyAccess(ctx context.Context, c *ops.Call, device uuid.UUI
 	return "$2::uuid IS NULL", []any{nil}, nil // every history row (HQ); keeps the $2 slot
 }
 
+// historyFilter is the devices.events period of the query catalog ([from, to) on occurredAt); devices.operations and
+// devices.calibrations take no filters, so any filter key there is VALIDATION (SR06).
+type historyFilter struct {
+	From *time.Time `json:"from,omitempty"`
+	To   *time.Time `json:"to,omitempty"`
+}
+
+func decodeHistory(q paging.Query, period bool) (historyFilter, error) {
+	var f historyFilter
+	if !q.HasFilters() {
+		return f, nil
+	}
+	dec := json.NewDecoder(strings.NewReader(string(q.Filters)))
+	dec.DisallowUnknownFields()
+	if !period || dec.Decode(&f) != nil {
+		return f, apperr.Fields(map[string]string{"query.filters": "error.invalid"})
+	}
+	if f.From != nil && f.To != nil && !f.From.Before(*f.To) {
+		return f, apperr.Fields(map[string]string{"query.filters.to": "error.range"})
+	}
+	return f, nil
+}
+
 func historyPage[T any](ctx context.Context, c *ops.Call, q paging.Query, sel, from, where string, args []any, order string, scan func(pgx.Row) (T, error)) (paging.Page[T], error) {
-	w, err := paging.Resolve(q, nil, c.Principal.ScopeVersion, 1)
+	f, err := decodeHistory(q, false)
+	if err != nil {
+		return paging.Page[T]{}, err
+	}
+	return historyPageOf(ctx, c, q, f, sel, from, where, args, order, scan)
+}
+
+func historyPageOf[T any](ctx context.Context, c *ops.Call, q paging.Query, f historyFilter, sel, from, where string, args []any, order string, scan func(pgx.Row) (T, error)) (paging.Page[T], error) {
+	w, err := paging.Resolve(q, f, c.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[T]{}, err
 	}
@@ -209,7 +238,20 @@ func (m *Module) events(ctx context.Context, c *ops.Call, in *HistoryInput) (pag
 	if err != nil {
 		return paging.Page[DeviceEvent]{}, err
 	}
-	p, err := historyPage(ctx, c, in.Query, evCols, evFrom, "e.device_id = $1 AND "+scope, append([]any{in.device()}, sargs...), order, m.scanEvent(ctx, c))
+	f, err := decodeHistory(in.Query, true)
+	if err != nil {
+		return paging.Page[DeviceEvent]{}, err
+	}
+	where, args := "e.device_id = $1 AND "+scope, append([]any{in.device()}, sargs...)
+	if f.From != nil {
+		args = append(args, *f.From)
+		where += fmt.Sprintf(" AND e.occurred_at >= $%d", len(args))
+	}
+	if f.To != nil {
+		args = append(args, *f.To)
+		where += fmt.Sprintf(" AND e.occurred_at < $%d", len(args))
+	}
+	p, err := historyPageOf(ctx, c, in.Query, f, evCols, evFrom, where, args, order, m.scanEvent(ctx, c))
 	if err != nil {
 		return p, err
 	}

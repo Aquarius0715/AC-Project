@@ -54,10 +54,10 @@ func TestInquiries(t *testing.T) {
 	if _, m := post(s, &customerA, "inquiries.list", `{"filters":{"restrictionId":"`+rid+`"}}`); len(items(m)) != 0 {
 		t.Error("other customer's inquiries")
 	}
-	if _, m := post(s, &hq, "inquiries.list", `{"filters":{"state":"received","subjectType":"restriction","invoiceId":"`+inv+`"},"limit":100}`); len(items(m)) != 1 {
+	if _, m := post(s, &hq, "inquiries.list", `{"filters":{"status":"received","subjectType":"restriction","invoiceId":"`+inv+`"},"limit":100}`); len(items(m)) != 1 {
 		t.Errorf("HQ list: %v", m)
 	}
-	if code, _ := post(s, &hq, "inquiries.list", `{"filters":{"state":"open"}}`); code != 422 {
+	if code, _ := post(s, &hq, "inquiries.list", `{"filters":{"status":"open"}}`); code != 422 {
 		t.Error("bad state filter")
 	}
 	if code, _ := post(s, &techB, "inquiries.list", `{}`); code != 403 {
