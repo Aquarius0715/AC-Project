@@ -1481,3 +1481,14 @@ Found in the technician screen wiring: `units.list` / `units.get` and every read
 
 Tests: `TestUnitScopeExternalTechnicianAndContractor` covers no Assignment, Assignment without an accepted Offer, viewing window before the work window (403), inside the work window (200), revoked Assignment, other contractor, and an ended access window; the scope tests that previously used an external technician's Membership.scopes now use the internal technician. Test acknowledgements restore the unit's observedState afterwards, because IR168 copies acknowledged settings with a later observedAt. `democlock` keeps the last known offset when the row disappears (database rebuilt while running). Web: `/technician/units/[id]` reads units.get, open alerts (alerts.list unitId), job history (jobs.list unitId) and telemetry.series (latest 100 temperature measurements, bucketed) in API mode.
 
+## IR170 One unit scope for every module — 2026-10-08
+
+The open point of IR169 item 3 is closed. `service/core/platform/unitscope` is the single D01 unit read scope; assets (units), monitoring (alerts, telemetry, ventilation through the scoped unit set) and devices (list, get, history) use it instead of their own copies, which had the IR169 defect as well (external technicians saw every unit in Membership.scopes; contractors matched their own organization against the customer organization).
+
+- List mode (units.list and pickers): the IR169 rule with the IR49 viewing window for external technicians.
+- Equipment mode (alerts.list, devices.list, telemetry list scopes): external technicians only inside the work window `[scheduledStart, scheduledEnd)`.
+- Single equipment reads (units.get, alerts.get, devices.get, telemetry.series / latest by unit) resolve in List mode and then apply `unitscope.Gate`: an external technician whose work window has not started gets FORBIDDEN `errors.assignment_not_started` (IR49(b)).
+- Devices keep the D05 rule that a technician or contractor sees their own unbound registrations; clients keep the binding-organization rule.
+
+Tests: the IR169 scope test also covers alerts.list (hidden before the work window, listed inside it), alerts.get and telemetry.series (403 before, 200 inside) and the contractor reading the alert of its accepted job. Go coverage 84.0 % of 12 343 statements.
+

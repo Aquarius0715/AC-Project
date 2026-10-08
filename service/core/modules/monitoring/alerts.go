@@ -15,6 +15,7 @@ import (
 	"github.com/pradita/ac-project/service/core/ops"
 	"github.com/pradita/ac-project/service/core/platform/apperr"
 	"github.com/pradita/ac-project/service/core/platform/paging"
+	"github.com/pradita/ac-project/service/core/platform/unitscope"
 )
 
 // Alert is Alert of service-contracts.ts.
@@ -71,27 +72,11 @@ type Alerts struct {
 	Access TechAccess
 }
 
-// alertScope applies D01 to alert rows: admins the tenant, clients their organization, technicians and contractors
-// their membership scopes (unit / organization).
-func alertScope(p *ops.Principal, args *[]any) string {
-	add := func(v any) string { *args = append(*args, v); return fmt.Sprintf("$%d", len(*args)) }
-	switch p.Role {
-	case "admin":
-		return "TRUE"
-	case "client":
-		return "a.customer_org_id = " + add(p.OrgID)
-	}
-	var parts []string
-	if ids := p.Scopes["unit"]; len(ids) > 0 {
-		parts = append(parts, "a.unit_id = ANY("+add(ids)+")")
-	}
-	if ids := p.Scopes["organization"]; len(ids) > 0 {
-		parts = append(parts, "a.customer_org_id = ANY("+add(ids)+")")
-	}
-	if len(parts) == 0 {
-		return "FALSE"
-	}
-	return "(" + strings.Join(parts, " OR ") + ")"
+// alertScope applies D01 to alert rows through the unit of the alert (unitscope, IR169). Lists use Equipment mode
+// (external technicians only inside the work window); single reads use List mode followed by unitscope.Gate so a
+// not-yet-started Assignment answers FORBIDDEN errors.assignment_not_started (IR49(b)).
+func alertScope(c *ops.Call, args *[]any, mode unitscope.Mode) string {
+	return unitscope.SQL(c, args, "a.unit_id", mode)
 }
 
 var severities = map[string]bool{"critical": true, "warning": true, "normal": true}
@@ -144,7 +129,7 @@ func (m Alerts) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging
 	}
 	var args []any
 	add := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
-	conds := []string{alertScope(c.Principal, &args)}
+	conds := []string{alertScope(c, &args, unitscope.Equipment)}
 	if f.UnitID != nil {
 		conds = append(conds, "a.unit_id = "+add(*f.UnitID))
 	}
@@ -216,11 +201,14 @@ func (in *GetInput) Validate() map[string]string {
 
 func (m Alerts) get(ctx context.Context, c *ops.Call, in *GetInput) (Alert, error) {
 	args := []any{in.ID}
-	a, err := scanAlert(c.Tx.QueryRow(ctx, "SELECT "+alertCols+" FROM monitoring.alerts a WHERE a.id = $1 AND "+alertScope(c.Principal, &args), args...))
+	a, err := scanAlert(c.Tx.QueryRow(ctx, "SELECT "+alertCols+" FROM monitoring.alerts a WHERE a.id = $1 AND "+alertScope(c, &args, unitscope.List), args...))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return a, apperr.E(apperr.NotFound, "error.notFound")
 	}
-	return a, err
+	if err != nil {
+		return a, err
+	}
+	return a, unitscope.Gate(ctx, c, []uuid.UUID{a.UnitID})
 }
 
 // lockAlert loads an alert in the caller's scope for update, applies the version and the technician rule (IR94 for
@@ -230,7 +218,7 @@ func (m Alerts) lockAlert(ctx context.Context, c *ops.Call, id uuid.UUID) (strin
 	var status string
 	var unit uuid.UUID
 	var v int
-	err := c.Tx.QueryRow(ctx, "SELECT a.status, a.unit_id, a.version FROM monitoring.alerts a WHERE a.id = $1 AND "+alertScope(c.Principal, &args)+" FOR UPDATE", args...).
+	err := c.Tx.QueryRow(ctx, "SELECT a.status, a.unit_id, a.version FROM monitoring.alerts a WHERE a.id = $1 AND "+alertScope(c, &args, unitscope.List)+" FOR UPDATE", args...).
 		Scan(&status, &unit, &v)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", unit, apperr.E(apperr.NotFound, "error.notFound")

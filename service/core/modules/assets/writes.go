@@ -13,6 +13,7 @@ import (
 	"github.com/pradita/ac-project/service/core/modules/devices"
 	"github.com/pradita/ac-project/service/core/ops"
 	"github.com/pradita/ac-project/service/core/platform/apperr"
+	"github.com/pradita/ac-project/service/core/platform/unitscope"
 )
 
 // Models is what Assets needs from the Devices module.
@@ -693,10 +694,11 @@ func (m *Module) SpacesOfUnits(ctx context.Context, c *ops.Call, units []uuid.UU
 	return out, rows.Err()
 }
 
-// ScopedUnits returns every unit the caller may read (used for technician list scopes).
+// ScopedUnits returns every unit whose equipment data the caller may read (Equipment mode: external technicians
+// only inside their work window, IR49(b)); used for telemetry list scopes.
 func (m *Module) ScopedUnits(ctx context.Context, c *ops.Call) ([]uuid.UUID, error) {
 	var args []any
-	return m.unitIDs(ctx, c, scopeSQL(c, &args), args)
+	return m.unitIDs(ctx, c, unitscope.SQL(c, &args, "u.id", unitscope.Equipment), args)
 }
 
 // SpacesOfOrg returns every space in the properties of a customer organization.

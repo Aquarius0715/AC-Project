@@ -15,6 +15,7 @@ import (
 	"github.com/pradita/ac-project/service/core/ops"
 	"github.com/pradita/ac-project/service/core/platform/apperr"
 	"github.com/pradita/ac-project/service/core/platform/paging"
+	"github.com/pradita/ac-project/service/core/platform/unitscope"
 )
 
 // TelemetryUnits is what the telemetry and ventilation operations need from Assets.
@@ -89,7 +90,7 @@ func (m Telemetry) readableUnits(ctx context.Context, c *ops.Call, units []uuid.
 	if len(vis) != len(units) {
 		return apperr.E(apperr.NotFound, "error.notFound")
 	}
-	return nil
+	return unitscope.Gate(ctx, c, units) // IR49(b): external technicians wait for the work window
 }
 
 // ---- telemetry.series ----

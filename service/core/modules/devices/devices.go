@@ -16,6 +16,7 @@ import (
 	"github.com/pradita/ac-project/service/core/ops"
 	"github.com/pradita/ac-project/service/core/platform/apperr"
 	"github.com/pradita/ac-project/service/core/platform/paging"
+	"github.com/pradita/ac-project/service/core/platform/unitscope"
 )
 
 // UnitInfo is what Devices needs from Assets about a unit.
@@ -84,24 +85,19 @@ type Module struct {
 }
 
 // deviceScope limits devices to the caller (D01): admins the tenant; clients devices bound to their organization;
-// contractors and technicians devices on units in their membership scopes.
-func deviceScope(p *ops.Principal, args *[]any) string {
+// everyone else their own unbound registrations (D05) and devices on units in the unitscope (IR169; lists in
+// Equipment mode, single reads in List mode followed by unitscope.Gate, IR49(b)).
+func deviceScope(c *ops.Call, args *[]any, mode unitscope.Mode) string {
+	p := c.Principal
 	add := func(v any) string { *args = append(*args, v); return fmt.Sprintf("$%d", len(*args)) }
-	bound := `EXISTS (SELECT 1 FROM devices.device_bindings b WHERE b.device_id = d.id AND b.unbound_at IS NULL AND %s)`
 	switch p.Role {
 	case "admin":
 		return "TRUE"
 	case "client":
-		return fmt.Sprintf(bound, "b.customer_org_id = "+add(p.OrgID))
+		return "EXISTS (SELECT 1 FROM devices.device_bindings b WHERE b.device_id = d.id AND b.unbound_at IS NULL AND b.customer_org_id = " + add(p.OrgID) + ")"
 	}
-	parts := []string{"(d.unit_id IS NULL AND d.created_by_membership_id = " + add(p.MembershipID) + ")"} // own unbound registrations (D05)
-	if ids := p.Scopes["unit"]; len(ids) > 0 {
-		parts = append(parts, "d.unit_id = ANY("+add(ids)+")")
-	}
-	if ids := p.Scopes["organization"]; len(ids) > 0 {
-		parts = append(parts, fmt.Sprintf(bound, "b.customer_org_id = ANY("+add(ids)+")"))
-	}
-	return "(" + strings.Join(parts, " OR ") + ")"
+	own := "(d.unit_id IS NULL AND d.created_by_membership_id = " + add(p.MembershipID) + ")"
+	return "(" + own + " OR (d.unit_id IS NOT NULL AND " + unitscope.SQL(c, args, "d.unit_id", mode) + "))"
 }
 
 func (m *Module) load(ctx context.Context, c *ops.Call, where string, args []any, order string, limit, offset int) ([]Device, int, error) {
@@ -167,7 +163,7 @@ func (m *Module) list(ctx context.Context, c *ops.Call, in *paging.Query) (pagin
 		return paging.Page[Device]{}, err
 	}
 	var args []any
-	conds := []string{deviceScope(c.Principal, &args)}
+	conds := []string{deviceScope(c, &args, unitscope.Equipment)}
 	if f.UnitID != nil {
 		args = append(args, *f.UnitID)
 		conds = append(conds, fmt.Sprintf("d.unit_id = $%d", len(args)))
@@ -206,7 +202,11 @@ func (in *IDInput) Validate() map[string]string {
 
 func (m *Module) get(ctx context.Context, c *ops.Call, in *IDInput) (DeviceDetail, error) {
 	args := []any{in.ID}
-	return m.detail(ctx, c, "d.id = $1 AND "+deviceScope(c.Principal, &args), args)
+	d, err := m.detail(ctx, c, "d.id = $1 AND "+deviceScope(c, &args, unitscope.List), args)
+	if err != nil || d.UnitID == nil {
+		return d, err
+	}
+	return d, unitscope.Gate(ctx, c, []uuid.UUID{*d.UnitID})
 }
 
 // detail loads one device with calibration references and its active operation.

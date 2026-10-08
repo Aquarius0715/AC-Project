@@ -14,6 +14,7 @@ import (
 	"github.com/pradita/ac-project/service/core/ops"
 	"github.com/pradita/ac-project/service/core/platform/apperr"
 	"github.com/pradita/ac-project/service/core/platform/paging"
+	"github.com/pradita/ac-project/service/core/platform/unitscope"
 )
 
 // TechUnitAccess is the IR94 check for technician operations without jobId.
@@ -52,7 +53,7 @@ func (in *HistoryInput) Validate() map[string]string {
 func (m *Module) historyAccess(ctx context.Context, c *ops.Call, device uuid.UUID) (string, []any, error) {
 	args := []any{device}
 	var unit *uuid.UUID
-	err := c.Tx.QueryRow(ctx, "SELECT d.unit_id FROM devices.devices d WHERE d.id = $1 AND "+deviceScope(c.Principal, &args), args...).Scan(&unit)
+	err := c.Tx.QueryRow(ctx, "SELECT d.unit_id FROM devices.devices d WHERE d.id = $1 AND "+deviceScope(c, &args, unitscope.List), args...).Scan(&unit)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", nil, apperr.E(apperr.NotFound, "error.notFound")
 	}

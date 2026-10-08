@@ -41,6 +41,31 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	if code, m := post(s, &techB, "units.get", `{"id":"`+unit+`"}`); code != 403 || m["messageKey"] != "errors.assignment_not_started" {
 		t.Fatalf("before the work window: %d %v", code, m)
 	}
+	// equipment reads (IR49(b)): lists omit the unit, single reads answer FORBIDDEN until the work window starts
+	owner(t, `UPDATE monitoring.alerts SET status = 'resolved', resolved_at = $2 WHERE unit_id = $1 AND rule_key = 'warning' AND status <> 'resolved'`, unit, clock)
+	alert := newAlert(t, unit, seed.ID("org-customer-b").String(), "warning", clock.Add(-time.Minute))
+	alertListed := func() bool {
+		_, m := post(s, &techB, "alerts.list", `{"limit":100,"filters":{"unitId":"`+unit+`"}}`)
+		for _, it := range items(m) {
+			if it["id"] == alert {
+				return true
+			}
+		}
+		return false
+	}
+	if alertListed() {
+		t.Fatal("alerts.list before the work window")
+	}
+	if code, m := post(s, &techB, "alerts.get", `{"id":"`+alert+`"}`); code != 403 || m["messageKey"] != "errors.assignment_not_started" {
+		t.Fatalf("alerts.get before the work window: %d %v", code, m)
+	}
+	series := `{"from":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `","to":"` + clock.Format(time.RFC3339) + `","unitIds":["` + unit + `"],"metric":"temperature","query":{}}`
+	if code, m := post(s, &techB, "telemetry.series", series); code != 403 || m["messageKey"] != "errors.assignment_not_started" {
+		t.Fatalf("telemetry before the work window: %d %v", code, m)
+	}
+	if code, _ := post(s, &contrA, "alerts.get", `{"id":"`+alert+`"}`); code != 200 {
+		t.Fatalf("contractor reads the alert of its accepted job: %d", code)
+	}
 	if code, _ := post(s, &contrA, "units.get", `{"id":"`+unit+`"}`); code != 200 {
 		t.Fatalf("contractor units.get: %d", code)
 	}
@@ -50,6 +75,12 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	owner(t, `UPDATE maintenance.assignments SET scheduled = tstzrange($2, $3) WHERE job_id = $1`, job, clock.Add(-time.Minute), clock.Add(time.Hour))
 	if code, m := post(s, &techB, "units.get", `{"id":"`+unit+`"}`); code != 200 {
 		t.Fatalf("inside the work window: %d %v", code, m)
+	}
+	if !alertListed() {
+		t.Fatal("alerts.list inside the work window")
+	}
+	if code, _ := post(s, &techB, "telemetry.series", series); code != 200 {
+		t.Fatalf("telemetry inside the work window: %d", code)
 	}
 	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE job_id = $1`, job)
 	if listed(&techB) {
