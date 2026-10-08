@@ -4,7 +4,7 @@ import Link from "next/link";
 import { use, useState } from "react";
 import { Banner, Card, ConnBadge, LineChart, Page, SeverityBadge, SummaryList, Tabs } from "@/components/ui";
 import { useNow, useOp } from "@/lib/useOp";
-import { bucket, componentGroups, klTime, latest, windowMs, type ApiUnitDetail } from "@/lib/unitApi";
+import { bucket, componentGroups, klTime, latest, windowMs, type ApiUnitDetail } from "@/lib/units";
 
 type ApiAlert = { id: string; severity: "critical" | "warning" | "normal"; status: string; causeCode: string; type: string; evidenceText: string; detectedAt: string; acknowledgedAt: string | null };
 type ApiJob = { projection: string; id?: string; type?: string; status?: string; scheduledSlot?: { startAt: string; endAt: string } | null; requestedSlot?: { startAt: string; endAt: string } | null };

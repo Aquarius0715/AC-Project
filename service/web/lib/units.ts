@@ -1,8 +1,6 @@
-// Unit detail and remote control against the Core API (DATA_SOURCE=api): units.get projected for the control screen,
+// Unit detail types and pure view helpers (units.get, commands, telemetry) shared by Server and Client Components.
 // commands.create per changed setting, commands.get polling until the device answers or the command expires (D04),
 // and units.setAlertPolicies with the unit version (FR-C03, FR-C15).
-import { callOp } from "@/lib/ops";
-import { invalidate } from "@/lib/useOp";
 
 type Mode = "cool" | "dry" | "fan";
 type Fan = "low" | "mid" | "high";
@@ -60,28 +58,6 @@ export function historyRow(c: ApiCommand) {
 export function latest(d: ApiUnitDetail, metric: string): { text: string; at: string } | null {
   const m = d.latestMeasurements.find((x) => x.metric === metric && x.value !== null);
   return m ? { text: `${m.value} ${m.unit}`, at: kl(m.observedAt) } : null;
-}
-
-const terminal = new Set<ApiCommand["status"]>(["acknowledged", "failed", "expired", "cancelled"]);
-
-/** Sends one command with the current unit version and waits for its end state (polls every 2 s, at most 40 s). */
-export async function sendCommand(unitId: string, action: UnitAction, onUpdate: (c: ApiCommand) => void): Promise<ApiCommand> {
-  const unit = await callOp<ApiUnitDetail>("units.get", { id: unitId });
-  let c = await callOp<ApiCommand>("commands.create", { unitId, action, expectedUnitVersion: unit.version }, { write: true });
-  onUpdate(c);
-  for (let i = 0; i < 20 && !terminal.has(c.status); i++) {
-    await new Promise((r) => setTimeout(r, 2000));
-    c = await callOp<ApiCommand>("commands.get", { id: c.id });
-    onUpdate(c);
-  }
-  invalidate();
-  return c;
-}
-
-export async function setAlertPolicies(unitId: string, alertPolicyIds: string[]) {
-  const unit = await callOp<ApiUnitDetail>("units.get", { id: unitId });
-  await callOp("units.setAlertPolicies", { unitId, alertPolicyIds }, { write: true, expectedVersion: unit.version });
-  invalidate();
 }
 
 // Technician unit register / monitoring (FR-T02, FR-T04): component groups of the 18 ComponentKeys and the
