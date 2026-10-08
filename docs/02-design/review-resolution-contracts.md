@@ -1536,3 +1536,10 @@ Following the Next.js authentication and data guides, the web reads and writes t
 
 Verified with the running stack: rows rendered on the server for customer-a, the Server Action marked a notification read, a repeat with the stale version returned the conflict message, and anonymous page or action requests got 307 to sign-in. `tsc`, `eslint .` and `next build` pass. The other screens follow the same pattern in later rounds.
 
+## IR177 Server-rendered screens and local HQ sign-in — 2026-10-08
+
+1. More screens follow the IR176 pattern (Server Component reads through `lib/dal.ts`, client view in `_components/`, Server Actions for writes, `loading.tsx` / `error.tsx`): customer overview (`app/customer/(overview)`, route group scopes its loading/error to the page), customer alerts, customer unit detail (unknown, invalid or other-customer IDs render not-found; `createCommand` and `setUnitAlertPolicies` are Server Actions; command status polling stays on the BFF Route Handler because Server Functions are for mutations) and the admin dashboard (`admin.summary` for today up to the Core API business clock, `dal.coreNow` = Meta.snapshotAt of `session.get`).
+2. Local HQ sign-in: HQ users must use TOTP (IR117). The local demo realm `docker/keycloak/realm-ac.json` now pre-provisions one TOTP credential per HQ user (HmacSHA1, 6 digits, 30 s, the local test secret in the file) instead of forcing `CONFIGURE_TOTP`, so local and CI end-to-end runs can complete the second factor; Keycloak still asks for the code. The secret exists only in the local realm file and must never be used outside the local stack.
+
+Verified: hq-operator signs in with password + TOTP, the admin dashboard renders the Core API KPIs on the server (2 customers, 5 units, 120.00 MYR billed); customer screens render server-side in API mode and keep their fixture data in the Phase 1A demo.
+

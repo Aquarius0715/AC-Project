@@ -334,11 +334,15 @@
           "type": "password",
           "value": "local-pass",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "local demo authenticator",
+          "secretData": "{\"value\": \"local-hq-totp-0001\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
         }
       ],
-      "requiredActions": [
-        "CONFIGURE_TOTP"
-      ],
+      "requiredActions": [],
       "id": "90a3c28d-a990-5566-9cb3-fd2b341c788b",
       "attributes": {
         "tenant_id": [
@@ -364,11 +368,15 @@
           "type": "password",
           "value": "local-pass",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "local demo authenticator",
+          "secretData": "{\"value\": \"local-hq-totp-0001\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
         }
       ],
-      "requiredActions": [
-        "CONFIGURE_TOTP"
-      ],
+      "requiredActions": [],
       "id": "27d2d5ff-ec58-59eb-83f1-3159bea53f03",
       "attributes": {
         "tenant_id": [
@@ -394,11 +402,15 @@
           "type": "password",
           "value": "local-pass",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "local demo authenticator",
+          "secretData": "{\"value\": \"local-hq-totp-0001\"}",
+          "credentialData": "{\"subType\": \"totp\", \"digits\": 6, \"counter\": 0, \"period\": 30, \"algorithm\": \"HmacSHA1\"}"
         }
       ],
-      "requiredActions": [
-        "CONFIGURE_TOTP"
-      ],
+      "requiredActions": [],
       "id": "ecd33bf4-0275-5491-80e7-4c89ef03af83",
       "attributes": {
         "tenant_id": [
