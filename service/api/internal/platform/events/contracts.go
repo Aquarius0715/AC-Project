@@ -29,6 +29,7 @@ const (
 	NotificationRequested = "NotificationRequested" // store one notification (ID assigned by the producer)
 	QualificationGranted  = "QualificationGranted"  // maintenance → identity: a verified certificate covers a grant (IR192)
 	JobNoteRequested      = "JobNoteRequested"      // billing → maintenance: an internal job note (payout questions, IR193)
+	AuditRecorded         = "AuditRecorded"         // any domain → identity: one audit log entry (IR196)
 
 	// maintenance → equipment, written by row triggers on maintenance.offers / maintenance.assignments (IR186)
 	OfferAccessChanged      = "OfferAccessChanged"      // a contractor's access window to a unit (accepted Offers)
@@ -148,4 +149,21 @@ type JobNote struct {
 	AuthorUserID uuid.UUID `json:"authorUserId"`
 	Message      string    `json:"message"`
 	At           time.Time `json:"at"`
+}
+
+// Audit is the payload of AuditRecorded: one audit_log row (the ID is assigned by the writer).
+type Audit struct {
+	ID              uuid.UUID  `json:"id"`
+	ActorID         string     `json:"actorId"`
+	ActorRole       string     `json:"actorRole"`
+	MembershipID    *uuid.UUID `json:"membershipId"`
+	Action          string     `json:"action"`
+	TargetKind      string     `json:"targetKind"`
+	TargetID        string     `json:"targetId"`
+	PreviousVersion *int       `json:"previousVersion"`
+	NextVersion     *int       `json:"nextVersion"`
+	OccurredAt      time.Time  `json:"occurredAt"`
+	CorrelationID   string     `json:"correlationId"`
+	Result          string     `json:"result"`
+	Reason          string     `json:"reason,omitempty"`
 }

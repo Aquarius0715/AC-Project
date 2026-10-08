@@ -112,6 +112,20 @@ func TestRecorderAndRLS(t *testing.T) {
 	if n != 2 {
 		t.Fatalf("outbox rows %d", n)
 	}
+	// the audit entry is published for identity's consumer in the same transaction (IR196)
+	_ = m.Writer.QueryRow(ctx, `SELECT count(*) FROM platform.outbox WHERE event_type = 'AuditRecorded' AND tenant_id = $1 AND payload->>'targetId' = $2
+		AND payload->>'action' = 'units.save' AND payload->>'reason' = 'r' AND (payload->>'nextVersion')::int = 2`, p.TenantID, agg.String()).Scan(&n)
+	if n != 1 {
+		t.Fatalf("AuditRecorded events %d", n)
+	}
+	// row-level security on the audit log
+	if err := m.Run(ctx, false, p, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, action, target_kind, target_id, occurred_at, correlation_id, result)
+			VALUES (current_setting('app.tenant_id')::uuid, 'test', 'admin', 'units.save', 'unit', $1, now(), 'corr', 'success')`, agg.String())
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
 	count := func(pp *ops.Principal) int {
 		var k int
 		if err := m.Run(ctx, true, pp, func(tx pgx.Tx) error {

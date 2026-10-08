@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
 // TxManager runs one transaction per operation on the writer or reader pool.
@@ -164,12 +166,16 @@ func (Recorder) Record(ctx context.Context, tx pgx.Tx, c *ops.Call, op string) e
 	if p == nil {
 		return nil
 	}
-	for _, a := range c.Audits {
-		if _, err := tx.Exec(ctx, `INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, membership_id, action, target_kind, target_id,
-			previous_version, next_version, occurred_at, correlation_id, result, reason)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'success',NULLIF($12,''))`,
-			p.TenantID, p.UserID.String(), p.Role, p.MembershipID, a.Action, a.TargetKind, a.TargetID,
-			a.PreviousVersion, a.NextVersion, c.Now, c.CorrelationID, a.Reason); err != nil {
+	for _, a := range c.Audits { // the audit log is identity's: published in this transaction, stored by its consumer (IR196)
+		id := uuid.Must(uuid.NewV7())
+		var membership *uuid.UUID
+		if p.MembershipID != uuid.Nil {
+			m := p.MembershipID
+			membership = &m
+		}
+		if err := events.Publish(ctx, tx, p.TenantID, "audit", id, events.AuditRecorded, events.Audit{ID: id, ActorID: p.UserID.String(), ActorRole: p.Role,
+			MembershipID: membership, Action: a.Action, TargetKind: a.TargetKind, TargetID: a.TargetID, PreviousVersion: a.PreviousVersion, NextVersion: a.NextVersion,
+			OccurredAt: c.Now, CorrelationID: c.CorrelationID, Result: "success", Reason: a.Reason}); err != nil {
 			return err
 		}
 	}

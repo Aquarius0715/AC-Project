@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/audit"
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
@@ -188,24 +189,15 @@ func decorate(ctx context.Context, c *ops.Call, x *Restriction) error {
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	rows, err = c.Tx.Query(ctx, `SELECT id, tenant_id, actor_id, actor_role_at_time, action, previous_version, next_version, occurred_at, correlation_id, result,
-		masked_before, masked_after, reason FROM audit.audit_log WHERE target_kind = 'restriction' AND target_id = $1 ORDER BY occurred_at, correlation_id, id`, x.ID.String())
+	hist, err := audit.History(ctx, c, "restriction", x.ID.String()) // identity's audit log (IR196)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 	x.Events = []Event{}
-	for rows.Next() {
-		var e Event
-		if err := rows.Scan(&e.ID, &e.TenantID, &e.ActorID, &e.ActorRoleAtTime, &e.Action, &e.PreviousVersion, &e.NextVersion, &e.OccurredAt, &e.CorrelationID, &e.Result,
-			&e.MaskedBefore, &e.MaskedAfter, &e.Reason); err != nil {
-			return err
-		}
-		e.Version, e.CreatedAt, e.UpdatedAt = 1, e.OccurredAt, e.OccurredAt
-		e.TargetRef = map[string]string{"kind": "restriction", "id": x.ID.String()}
-		x.Events = append(x.Events, e)
+	for _, v := range hist {
+		x.Events = append(x.Events, Event(v))
 	}
-	return rows.Err()
+	return nil
 }
 
 // stateEvents maps audited actions to the state-change events clients may see (IR42).

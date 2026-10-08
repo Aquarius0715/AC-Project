@@ -152,6 +152,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	energy.RegisterQueries(reg)
 	identity.RegisterQueries(reg)
 	restrictions.RegisterQueries(reg)
+	audit.RegisterQueries(reg)
 	summaries.Register(reg, sums)
 	summaries.RegisterAdmin(reg, sums)
 	notify.Register(reg)

@@ -1839,3 +1839,14 @@ The scheduler worker ran every domain's clock-driven transitions in one transact
 - Cluster mode of the suite runs both domain schedulers with their roles and registries wherever a test ticks the worker (`schedTick`) and after `demo.advanceClock`.
 
 Verified: `make test` and `make test-cluster` green (96 integration tests), none skipped; in the cluster run the equipment scheduler asks billing `restrictions.unitPolicy` over the system route; `TestSystemQueries` checks the token and tenant guards; in compose both schedulers run on their logins and a client's command expires after `demo.advanceClock` (`worker tick: … ExpiredCommands:1`).
+
+## IR196 The audit log belongs to identity (phase B step 3, part 11) — 2026-10-09
+
+Every service inserted its audit rows into `audit.audit_log` in its own write transaction, and billing (restrictions) and energy (offset records) read the history of their records from it.
+
+- **Write**: the recorder publishes one `AuditRecorded {id, actorId, actorRole, membershipId, action, targetKind, targetId, previousVersion, nextVersion, occurredAt, correlationId, result, reason}` per audit entry in the writer's transaction (the writer assigns the UUIDv7 entry ID); the `identity` consumer inserts the row (`ON CONFLICT (id, occurred_at) DO NOTHING`). The business effect stays exactly-once and its audit entry at-least-once, as before for events. A handler never saw its own entry (the recorder runs after the handler), so responses are unchanged.
+- **Read**: `audit.history {targetKind, targetId}` (owner identity; `audit.History`) returns a target's entries in log order; restriction details (`events`) and offset records (`eventHistory`) use it. `audit.list` (FR-A16) is identity's own read.
+- **Roles**: only `ac_svc_identity` keeps `INSERT`/`SELECT` on audit; the other domain roles have no audit access, so the cluster suite fails on any direct audit write or read elsewhere.
+- With this, a domain service touches only its own schemas and `platform` (outbox, idempotency keys, processed events, tenants, demo clock); the database split (IR181 step 4) can follow.
+
+Verified: `make test` and `make test-cluster` green, none skipped; the recorder unit test checks the published entry and row-level security on the log; in compose a client's `inquiries.create` on billing-api appears in the HQ audit view from identity-api with no audit events pending, and the services log no errors.

@@ -8,25 +8,44 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/pradita/ac-project/service/api/internal/platform/db"
+	"github.com/pradita/ac-project/service/api/internal/ops"
 )
 
-func testDB(t *testing.T) *db.TxManager {
+// testRunner is the minimal ops.Runner of these tests (the db package depends on events): one transaction with the
+// tenant context set.
+type testRunner struct{ pool *pgxpool.Pool }
+
+func (r testRunner) Run(ctx context.Context, _ bool, p *ops.Principal, fn func(pgx.Tx) error) error {
+	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		if p != nil {
+			if _, err := tx.Exec(ctx, "SELECT set_config('app.tenant_id', $1, true)", p.TenantID.String()); err != nil {
+				return err
+			}
+		}
+		return fn(tx)
+	})
+}
+
+func testDB(t *testing.T) testRunner {
 	t.Helper()
 	url := os.Getenv("AC_TEST_DATABASE_URL")
 	if url == "" {
 		url = "postgres://ac_app_login:local@localhost:5432/ac_test?sslmode=disable"
 	}
-	m, err := db.Open(context.Background(), url, "")
+	pool, err := pgxpool.New(context.Background(), url)
+	if err == nil {
+		err = pool.Ping(context.Background())
+	}
 	if err != nil {
 		t.Skip("database not available:", err)
 	}
-	t.Cleanup(m.Close)
-	return m
+	t.Cleanup(pool.Close)
+	return testRunner{pool}
 }
 
-func emit(t *testing.T, m *db.TxManager, tenant uuid.UUID, typ, payload string) uuid.UUID {
+func emit(t *testing.T, m testRunner, tenant uuid.UUID, typ, payload string) uuid.UUID {
 	t.Helper()
 	var id uuid.UUID
 	err := m.Run(context.Background(), false, nil, func(tx pgx.Tx) error {

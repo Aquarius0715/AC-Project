@@ -4,6 +4,7 @@ import (
 	"slices"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/assets"
+	"github.com/pradita/ac-project/service/api/internal/modules/audit"
 	"github.com/pradita/ac-project/service/api/internal/modules/billing"
 	"github.com/pradita/ac-project/service/api/internal/modules/control"
 	"github.com/pradita/ac-project/service/api/internal/modules/energy"
@@ -27,11 +28,11 @@ func consumers(m *db.TxManager, domains []string) []*events.Consumer {
 			out = append(out, &events.Consumer{Name: name, DB: m, Handlers: handlers})
 		}
 	}
-	add(ops.DomainEquipment, "equipment", merge(assets.EventHandlers(), monitoring.EventHandlers(), control.EventHandlers()))         // IR184, IR185
-	add(ops.DomainBilling, "billing", merge(restrictions.EventHandlers(), events.Handlers(billing.Replicas...)))                      // IR185
-	add(ops.DomainIdentity, "identity", merge(events.Handlers(notify.Replicas...), notify.EventHandlers(), identity.GrantHandlers())) // IR188
-	add(ops.DomainMaintenance, "maintenance", merge(events.Handlers(maintenance.Replicas...), maintenance.NoteHandlers()))            // IR192
-	add(ops.DomainEnergy, "energy", events.Handlers(energy.Replicas...))                                                              // IR189
+	add(ops.DomainEquipment, "equipment", merge(assets.EventHandlers(), monitoring.EventHandlers(), control.EventHandlers()))                                // IR184, IR185
+	add(ops.DomainBilling, "billing", merge(restrictions.EventHandlers(), events.Handlers(billing.Replicas...)))                                             // IR185
+	add(ops.DomainIdentity, "identity", merge(events.Handlers(notify.Replicas...), notify.EventHandlers(), identity.GrantHandlers(), audit.EventHandlers())) // IR188
+	add(ops.DomainMaintenance, "maintenance", merge(events.Handlers(maintenance.Replicas...), maintenance.NoteHandlers()))                                   // IR192
+	add(ops.DomainEnergy, "energy", events.Handlers(energy.Replicas...))                                                                                     // IR189
 	return out
 }
 

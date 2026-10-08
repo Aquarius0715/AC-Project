@@ -1836,9 +1836,10 @@ GRANT USAGE ON SCHEMA platform, identity, assets, devices, control, monitoring, 
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA platform, identity, assets, devices, control, monitoring, maintenance, billing, restrictions, energy, notify TO ac_app, ac_worker;
 GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA audit TO ac_app, ac_worker;
 GRANT SELECT ON ALL TABLES IN SCHEMA platform, identity, assets, devices, control, monitoring, maintenance, billing, restrictions, energy, notify, audit TO ac_readonly;
--- Least privilege per business-domain service (IR194): each service role reaches only its own schemas, the shared
--- infrastructure (platform) and the append-only audit log. ac_app stays for the scheduler worker and tools until the
--- workers are split per domain. Reference copies live in the consumer's own schema (ref_*).
+-- Least privilege per business-domain service (IR194): each service role reaches only its own schemas and the shared
+-- infrastructure (platform); the append-only audit log belongs to identity (IR196: other services publish
+-- AuditRecorded). ac_app stays for tools and the all-domain development scheduler. Reference copies live in the
+-- consumer's own schema (ref_*).
 DO $$
 DECLARE
   d record;
@@ -1853,10 +1854,11 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = d.role) THEN
       EXECUTE format('CREATE ROLE %I NOLOGIN', d.role);
     END IF;
-    EXECUTE format('GRANT USAGE ON SCHEMA platform, audit, %s TO %I', array_to_string(d.schemas, ', '), d.role);
+    EXECUTE format('GRANT USAGE ON SCHEMA platform, %s TO %I', array_to_string(d.schemas, ', '), d.role);
     EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA platform, %s TO %I', array_to_string(d.schemas, ', '), d.role);
-    EXECUTE format('GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA audit TO %I', d.role);
   END LOOP;
+  GRANT USAGE ON SCHEMA audit TO ac_svc_identity;
+  GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA audit TO ac_svc_identity;
 END $$;
 -- Later migrations: ALTER DEFAULT PRIVILEGES in each schema grants the same rights on new tables.
 
