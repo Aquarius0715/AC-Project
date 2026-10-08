@@ -40,7 +40,7 @@ func TestDemoOperations(t *testing.T) {
 	trig(s, tele("25", "K", sensor))
 	rows := [][2]any{}
 	func() {
-		conn, err := pgx.Connect(context.Background(), "postgres://postgres:local@localhost:5432/ac?sslmode=disable")
+		conn, err := pgx.Connect(context.Background(), "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable")
 		if err != nil {
 			t.Skip(err)
 		}

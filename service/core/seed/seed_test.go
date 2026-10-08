@@ -15,7 +15,7 @@ func ownerConn(t *testing.T) *pgx.Conn {
 	t.Helper()
 	url := os.Getenv("AC_TEST_OWNER_DATABASE_URL")
 	if url == "" {
-		url = "postgres://postgres:local@localhost:5432/ac?sslmode=disable"
+		url = "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable"
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()

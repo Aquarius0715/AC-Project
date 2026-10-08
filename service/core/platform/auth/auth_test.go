@@ -21,7 +21,7 @@ var clock = time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
 func setup(t *testing.T) *Authenticator {
 	t.Helper()
 	ctx := context.Background()
-	owner := "postgres://postgres:local@localhost:5432/ac?sslmode=disable"
+	owner := "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable"
 	conn, err := pgx.Connect(ctx, owner)
 	if err != nil {
 		t.Skip("database not available:", err)
@@ -36,7 +36,7 @@ func setup(t *testing.T) *Authenticator {
 	conn.Close(ctx)
 	url := os.Getenv("AC_TEST_DATABASE_URL")
 	if url == "" {
-		url = "postgres://ac_app_login:local@localhost:5432/ac?sslmode=disable"
+		url = "postgres://ac_app_login:local@localhost:5432/ac_test?sslmode=disable"
 	}
 	m, err := db.Open(ctx, url, url)
 	if err != nil {

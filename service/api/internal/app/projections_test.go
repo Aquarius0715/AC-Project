@@ -14,7 +14,7 @@ import (
 func freeze(t *testing.T, now time.Time) {
 	t.Helper()
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, "postgres://postgres:local@localhost:5432/ac?sslmode=disable")
+	conn, err := pgx.Connect(ctx, "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable")
 	if err != nil {
 		t.Skip(err)
 	}

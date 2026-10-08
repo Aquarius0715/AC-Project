@@ -36,7 +36,7 @@ func server(t *testing.T) *Server { t.Helper(); return serverWith(t, false) }
 func serverWith(t *testing.T, demo bool) *Server {
 	t.Helper()
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, "postgres://postgres:local@localhost:5432/ac?sslmode=disable")
+	conn, err := pgx.Connect(ctx, "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable")
 	if err != nil {
 		t.Skip("database not available:", err)
 	}
@@ -48,7 +48,7 @@ func serverWith(t *testing.T, demo bool) *Server {
 		t.Fatal(err)
 	}
 	conn.Close(ctx)
-	url := "postgres://ac_app_login:local@localhost:5432/ac?sslmode=disable"
+	url := "postgres://ac_app_login:local@localhost:5432/ac_test?sslmode=disable"
 	v := auth.StaticVerifier{}
 	for _, a := range f.Actors {
 		v["tok-"+map[string]string{"hq-operator": "hq", "customer-a": "a", "customer-b": "b", "tech-external-b": "tb", "tech-internal-a": "ti", "tech-external-a": "ta", "contractor-a": "ca", "contractor-b": "cb", "hq-restriction-manager": "rm", "hq-override-only": "oo"}[a.MembershipID]] = seed.ID(a.UserID).String()

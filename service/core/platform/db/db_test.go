@@ -19,7 +19,7 @@ func testDB(t *testing.T) *TxManager {
 	t.Helper()
 	url := os.Getenv("AC_TEST_DATABASE_URL")
 	if url == "" {
-		url = "postgres://ac_app_login:local@localhost:5432/ac?sslmode=disable"
+		url = "postgres://ac_app_login:local@localhost:5432/ac_test?sslmode=disable"
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -155,7 +155,7 @@ func TestOpenErrors(t *testing.T) {
 	m := testDB(t)
 	url := os.Getenv("AC_TEST_DATABASE_URL")
 	if url == "" {
-		url = "postgres://ac_app_login:local@localhost:5432/ac?sslmode=disable"
+		url = "postgres://ac_app_login:local@localhost:5432/ac_test?sslmode=disable"
 	}
 	if _, err := Open(context.Background(), url, "::bad"); err == nil {
 		t.Fatal("bad reader url")

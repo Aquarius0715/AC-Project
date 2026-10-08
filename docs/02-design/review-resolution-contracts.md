@@ -1492,3 +1492,7 @@ The open point of IR169 item 3 is closed. `service/core/platform/unitscope` is t
 
 Tests: the IR169 scope test also covers alerts.list (hidden before the work window, listed inside it), alerts.get and telemetry.series (403 before, 200 inside) and the contractor reading the alert of its accepted job. Go coverage 84.0 % of 12 343 statements.
 
+## IR171 Test database isolation — 2026-10-08
+
+Go tests used the development database `ac`. A local worker running on the shared demo clock (IR168) processed test rows mid-test and broke `TestRestrictionLifecycle`, and tests left rows that changed what the local BFF showed. Tests now connect to `ac_test` (`service/api/tools/resetdb.sh` takes `DB=ac_test`; `make testdb` rebuilds it, `make test` creates it when missing and runs with `-count=1` so a cached skip cannot hide a missing database). The seed also derives the job history implied by the fixture (job.created, job.offered, offer decision with decidedBy, job.assigned; deterministic IDs).
+
