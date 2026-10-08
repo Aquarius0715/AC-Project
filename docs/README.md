@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.94.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
+Version: 0.95.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.95.0 (2026-10-09): Admin offset demo registry reads and simulates through the server (IR204). Phase 1A unchanged.
 0.94.0 (2026-10-09): Admin MRV demo workspace reads through the server; SCR-A14 period URL keys; MRV evidence selection recorded as open (IR203). Phase 1A unchanged.
 0.93.0 (2026-10-09): Admin energy analysis reads through the server with the IR68/IR44 formatter; SCR-A13 period URL keys (IR202). Phase 1A unchanged.
 0.92.0 (2026-10-09): Admin contracts and devices read through the server; audit entries keep masked before/after values; capability updates need a change reason (IR201). Phase 1A unchanged.
