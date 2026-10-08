@@ -46,27 +46,29 @@ export function useBffSession(): BffSession | null {
   return s;
 }
 
-/** Reads an operation in api mode; returns the mock value in mock mode (and while the data source is unknown). */
+/** Reads an operation in api mode; returns the mock value in mock mode (and while the data source is unknown).
+ * The fetch result is stored with the request it answers; `loading` is derived (no setState in the effect body). */
 export function useOp<T, R>(operation: string, input: unknown, mock: R, map: (data: T) => R, enabled = true): { data: R; loading: boolean; error: OpError | null; source: "mock" | "api" | null } {
   const session = useBffSession();
   const rev = useRevision();
-  const [state, setState] = useState<{ data: R; loading: boolean; error: OpError | null }>({ data: mock, loading: false, error: null });
   const key = JSON.stringify(input);
+  const request = `${operation}|${key}|${rev}`;
+  const [state, setState] = useState<{ request: string | null; data: R; error: OpError | null }>({ request: null, data: mock, error: null });
+  const active = session?.dataSource === "api" && enabled;
   useEffect(() => {
-    if (session?.dataSource !== "api" || !enabled) return;
+    if (!active) return;
     let live = true;
-    setState((s) => ({ ...s, loading: true, error: null }));
     callOp<T>(operation, JSON.parse(key))
-      .then((d) => live && setState({ data: map(d), loading: false, error: null }))
-      .catch((e: unknown) => live && setState((s) => ({ ...s, loading: false, error: e instanceof OpError ? e : null })));
+      .then((d) => live && setState({ request, data: map(d), error: null }))
+      .catch((e: unknown) => live && setState((s) => ({ request, data: s.data, error: e instanceof OpError ? e : null })));
     return () => {
       live = false;
     };
-    // map is a pure projection supplied inline by the caller
+    // map is a pure projection supplied inline by the caller; request covers operation, input and revision
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.dataSource, operation, key, rev, enabled]);
+  }, [active, request]);
   if (session?.dataSource !== "api") return { data: mock, loading: false, error: null, source: session?.dataSource ?? null }; // live mock value
-  return { ...state, source: "api" };
+  return { data: state.data, loading: active && state.request !== request, error: state.request === request ? state.error : null, source: "api" };
 }
 
 /** The business clock for date ranges: the Core API clock in api mode (demo scenario clock), else the browser clock. */

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Banner, Btn, Card, Field, Input, Modal, Page, PowerBadge, SummaryList, Badge, cx, useToast } from "@/components/ui";
+import { Btn, Card, Field, Input, Modal, Page, PowerBadge, SummaryList, Badge, cx, useToast } from "@/components/ui";
 import { GroupControl, GUnit } from "@/components/Features";
 
 type Node = { id: string; name: string; type: string; units?: number; children?: Node[]; unassigned?: boolean };

@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, ListRow, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Textarea, Timeline, Toggle, LineChart, useToast, cx } from "@/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, ListRow, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Textarea, Timeline, LineChart, useToast, cx } from "@/components/ui";
 
 const alerts = [
   { id: "alert-c08-critical", title: "High temperature observed", time: "08:55", sev: "critical" as const, meta: "customer-a · Bedroom AC · no policy", st: "Open" },

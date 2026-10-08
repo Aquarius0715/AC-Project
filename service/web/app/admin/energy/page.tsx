@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Field, Input, ListRow, Page, Select, SummaryList, Tabs, useToast } from "@/components/ui";
+import { Btn, Card, Check, Field, Input, ListRow, Page, Select, SummaryList, Tabs, useToast } from "@/components/ui";
 import { useUrlTab } from "@/lib/useUrlTab";
 
 const baselines = [
@@ -17,7 +17,6 @@ export default function Energy() {
   const [bid, setBid] = useState(baselines[0].id);
   const [actual, setActual] = useState(80);
   const [sel, setSel] = useState(baselines[0]);
-  const [name, setName] = useState("");
   const [kwh, setKwh] = useState("100");
   const b = baselines.find((x) => x.id === bid)!;
   const mismatch = b.units.slice().sort().join() !== units.slice().sort().join();

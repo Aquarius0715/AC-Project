@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { use, useState } from "react";
-import { Badge, Banner, Card, EmptyState, Kpi, LinkBtn, Page, SeverityBadge, Tabs, TextLink, UtilBar } from "@/components/ui";
+import { Banner, Card, Kpi, LinkBtn, Page, SeverityBadge, Tabs, TextLink, UtilBar } from "@/components/ui";
 import { fmt, useJobs } from "@/lib/jobs";
 import { JobList, useTechJobs } from "@/components/TechJobList";
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { use, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilBar, cx, useToast } from "@/components/ui";
-import { OriginBadge, WINDOWS } from "@/components/JobBits";
+import { OriginBadge } from "@/components/JobBits";
 import { Job, fmt, jobActions, longDate, useJobs } from "@/lib/jobs";
 
 type R = "normal" | "attention" | "not_inspected" | "not_applicable" | null;

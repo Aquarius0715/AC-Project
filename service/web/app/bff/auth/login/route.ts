@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
-import { OIDC_COOKIE, oidcConfig, sign } from "@/lib/session";
+import { OIDC_COOKIE, oidcConfig, safeReturnTo, sign } from "@/lib/session";
 
 // GET /bff/auth/login?login_hint=<demo user>&returnTo=<path>: starts the OIDC authorization-code flow with PKCE.
 export async function GET(req: NextRequest) {
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     ...(req.nextUrl.searchParams.get("login_hint") ? { login_hint: req.nextUrl.searchParams.get("login_hint")! } : {}),
   }).toString();
   const res = NextResponse.redirect(url);
-  res.cookies.set(OIDC_COOKIE, sign({ state, verifier, returnTo: returnTo?.startsWith("/") ? returnTo : null }), {
+  res.cookies.set(OIDC_COOKIE, sign({ state, verifier, returnTo: safeReturnTo(returnTo) }), {
     httpOnly: true, sameSite: "lax", secure: cfg.appUrl.startsWith("https"), path: "/bff/auth", maxAge: 600,
   });
   return res;

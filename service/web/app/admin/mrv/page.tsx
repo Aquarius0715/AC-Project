@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, DataTable, Field, Input, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, useToast, cx } from "@/components/ui";
+import { Banner, Btn, Card, DataTable, Field, Input, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, useToast, cx } from "@/components/ui";
 import { useUrlTab } from "@/lib/useUrlTab";
 
 const reports = [

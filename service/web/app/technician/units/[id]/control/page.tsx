@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { use, useState } from "react";
-import { Badge, Banner, Btn, Card, Field, Input, Modal, Page, Select, SummaryList, Textarea, useToast } from "@/components/ui";
+import { Banner, Btn, Card, Field, Input, Modal, Page, Select, SummaryList, Textarea, useToast } from "@/components/ui";
 
 export default function DiagControl({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);

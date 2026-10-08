@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { use, useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, DemoBadge, Modal, Page, SummaryList, Timeline, useToast } from "@/components/ui";
+import { Badge, Banner, Btn, Card, DemoBadge, Modal, Page, SummaryList, Timeline, useToast } from "@/components/ui";
 
 type Phase = "choose" | "processing" | "confirmed" | "failed";
 

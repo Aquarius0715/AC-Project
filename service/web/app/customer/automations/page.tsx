@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, Modal, OnOffBadge, Page, PageHead, Select, SummaryList, Toggle, cx, useToast } from "@/components/ui";
+import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Input, Modal, OnOffBadge, Page, PageHead, Select, SummaryList, Toggle, cx, useToast } from "@/components/ui";
 
 type Auto = { id: string; name: string; kind: string; icon: string; when: string; then: string; unit: string; note?: string; on: boolean };
 const seed: Auto[] = [

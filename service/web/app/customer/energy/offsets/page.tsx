@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, DemoBadge, Field, Input, Page, Steps, SummaryList, useToast } from "@/components/ui";
+import { Banner, Btn, Card, Check, DemoBadge, Field, Input, Page, Steps, SummaryList, useToast } from "@/components/ui";
 
 export default function Offsets() {
   const toast = useToast();

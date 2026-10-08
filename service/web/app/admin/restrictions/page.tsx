@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, DataTable, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, Textarea, useToast } from "@/components/ui";
+import { Badge, Btn, Card, DataTable, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, useToast } from "@/components/ui";
 
 type R = { id: string; meta: string; policy: string; st: "Scheduled" | "Requested" | "Applied" | "Release requested" | "Released"; prog: string; tone: "primary" | "warn" | "ok" | "unknown" };
 const seed: R[] = [
@@ -22,7 +22,8 @@ export default function Restrictions() {
   const [tried, setTried] = useState(false);
   const setSt = (st: R["st"]) => { setList((l) => l.map((x) => (x.id === sel.id ? { ...x, st } : x))); setSel({ ...sel, st }); };
   const cur = flow.indexOf(sel.st);
-  const execErr = tried && (!f.exec ? "Execute-after is required" : (new Date(f.exec).getTime() - Date.now()) < 24 * 3600e3 ? "Execute-after must be at least 24 h after the notice" : undefined);
+  const [openedAt] = useState(() => Date.now()); // reference time for the 24 h rule (render stays pure)
+  const execErr = tried && (!f.exec ? "Execute-after is required" : (new Date(f.exec).getTime() - openedAt) < 24 * 3600e3 ? "Execute-after must be at least 24 h after the notice" : undefined);
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2">{flow.map((s) => <span key={s} className="rounded-full bg-surface2 px-2.5 py-1 text-xs"><span className="text-muted">{s}</span> <b>{list.filter((x) => x.st === s).length}</b></span>)}</div><Btn size="sm" variant="primary" onClick={() => setModal(true)}>+ Schedule restriction</Btn></div>

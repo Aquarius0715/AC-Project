@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, DataTable, EmptyState, Field, Input, ListRow, Page, Select, SummaryList, Tabs, Timeline } from "@/components/ui";
+import { Badge, Btn, Card, Choice, DataTable, EmptyState, Field, Input, ListRow, Page, SummaryList, Tabs, Timeline } from "@/components/ui";
 import { useUrlTab } from "@/lib/useUrlTab";
 
 type L = { id: string; op: string; target: string; actor: string; at: string; corr: string; res: "Success" | "Denied" | "Failed" | "Pending" };

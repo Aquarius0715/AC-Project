@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, ErrorState, Kpi, Page, Tabs, TextLink, UtilBar } from "@/components/ui";
+import { Banner, Btn, Card, ErrorState, Kpi, Page, TextLink } from "@/components/ui";
 import { useNow, useOp } from "@/lib/useOp";
 
 /** AdminSummary of service-contracts.ts (fields shown on the KPI row). */

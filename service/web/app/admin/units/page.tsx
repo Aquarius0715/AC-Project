@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { setSearchParam, useSearchParam } from "@/lib/urlState";
 import { ImportCsvModal, WarrantyTab } from "@/components/Features";
 import { ClientRole, ClientUser, clientUserActions, emailError, useClientUsers } from "@/lib/clientUsers";
-import { Badge, Banner, Btn, Card, Check, DataTable, Field, Input, Kpi, ListRow, Modal, Page, PowerBadge, ConnBadge, Search, Select, SummaryList, Tabs, Toggle, useToast, cx } from "@/components/ui";
+import { Badge, Banner, Btn, Card, DataTable, Field, Input, Kpi, ListRow, Modal, Page, PowerBadge, ConnBadge, Search, Select, SummaryList, Tabs, useToast } from "@/components/ui";
 
 type Cust = { id: string; name: string; status: "active" | "inactive"; props: number; units: number; op: string; alerts: number | string; contract: string };
 const customers: Cust[] = [
@@ -21,30 +22,26 @@ const unitRows = [
 export default function AdminUnits() {
   const toast = useToast();
   const [q, setQ] = useState("");
-  const [top, setTop] = useState<"customers" | "warranty">("customers");
+  // URL state is the source of truth (SCR-A02: customerId + tab=overview|users|policies|warranty, Figma 02-15 / 02-16 / 02-19)
+  const urlTab = useSearchParam("tab");
+  const urlCustomer = useSearchParam("customerId");
+  const cust = customers.find((x) => x.id === urlCustomer) ?? null;
+  const top: "customers" | "warranty" = !cust && urlTab === "warranty" ? "warranty" : "customers";
+  const tab: "units" | "users" | "policies" = urlTab === "users" || urlTab === "policies" ? urlTab : "units";
+  const setTop = (t: "customers" | "warranty") => setSearchParam("tab", t === "warranty" ? "warranty" : "overview");
+  const setTab = (t: "units" | "users" | "policies") => setSearchParam("tab", t === "units" ? "overview" : t);
+  const setCust = (c: Cust | null) => {
+    setSearchParam("customerId", c ? c.id : null);
+    setSearchParam("tab", "overview");
+  };
   const [imp, setImp] = useState(false);
   const [status, setStatus] = useState<"active" | "all">("active");
-  const [cust, setCust] = useState<Cust | null>(null);
-  const [tab, setTab] = useState<"units" | "users" | "policies">("units");
   const [loc, setLoc] = useState("home-a");
   const [unit, setUnit] = useState<(typeof unitRows)[number] | null>(null);
   const [modal, setModal] = useState<null | "customer" | "location" | "rename" | "delete" | "unit" | "move" | "attach" | "deleteUnit">(null);
   const [name, setName] = useState("");
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
-  // URL state (SCR-A02: customerId + tab=overview|users|policies|warranty, Figma 02-15 / 02-16 / 02-19)
-  useEffect(() => {
-    const sp = new URLSearchParams(window.location.search);
-    const t = sp.get("tab"); const c = customers.find((x) => x.id === sp.get("customerId"));
-    if (t === "warranty") setTop("warranty");
-    if (c) { setCust(c); if (t === "users" || t === "policies") setTab(t); }
-  }, []);
-  useEffect(() => {
-    const u = new URL(window.location.href);
-    if (cust) { u.searchParams.set("customerId", cust.id); u.searchParams.set("tab", tab === "units" ? "overview" : tab); }
-    else { u.searchParams.delete("customerId"); u.searchParams.set("tab", top === "warranty" ? "warranty" : "overview"); }
-    window.history.replaceState(null, "", u);
-  }, [cust, tab, top]);
   const rows = customers.filter((c) => (status === "all" || c.status === "active") && (!q || (c.id + c.name).toLowerCase().includes(q.toLowerCase())));
   const close = () => { setModal(null); setTried(false); setName(""); setReason(""); };
   const nameErr = tried && !name.trim() ? "Name is required (1–120 characters)" : undefined;
@@ -58,7 +55,7 @@ export default function AdminUnits() {
         <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}><Kpi label="Customers" value={2} sub="+1 inactive (not counted)" /><Kpi label="Properties" value={2} sub="Home A · Home B" /><Kpi label="Units" value={5} sub="Running 2 · Stopped 2 · unknown 1" /><Kpi label="Needs attention" value={1} tone="warn" sub="overdue billing / open alert" /></div>
         <Card title="Customers" sub="Select a customer to manage its properties, spaces, and units" action={<Btn size="sm" variant="primary" onClick={() => setModal("customer")}>+ New customer</Btn>}>
           <div className="mb-3 flex flex-wrap items-center gap-3"><div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder="Search customer name, ID, or property…" value={q} onChange={setQ} /></div><Select aria-label="Status" className="w-auto" value={status} onChange={(e) => setStatus(e.target.value as "all")}><option value="active">Status: Active</option><option value="all">Status: All</option></Select></div>
-          <DataTable rows={rows} rowKey={(r) => r.id} onRowClick={(c) => { setCust(c); setTab("units"); }} cols={[{ key: "c", label: "Customer", render: (c) => <><b>{c.id}</b><div className="text-xs text-muted">{c.name}</div></> }, { key: "s", label: "Status", render: (c) => <Badge tone={c.status === "active" ? "ok" : "unknown"}>{c.status}</Badge> }, { key: "p", label: "Properties", render: (c) => c.props, hideBelow: "sm" }, { key: "u", label: "Units", render: (c) => c.units }, { key: "o", label: "Operation", render: (c) => c.op, hideBelow: "md" }, { key: "a", label: "Alerts", render: (c) => c.alerts, hideBelow: "md" }, { key: "k", label: "Contract", render: (c) => c.contract, hideBelow: "md" }, { key: "x", label: "", render: () => "›" }]} />
+          <DataTable rows={rows} rowKey={(r) => r.id} onRowClick={(c) => setCust(c)} cols={[{ key: "c", label: "Customer", render: (c) => <><b>{c.id}</b><div className="text-xs text-muted">{c.name}</div></> }, { key: "s", label: "Status", render: (c) => <Badge tone={c.status === "active" ? "ok" : "unknown"}>{c.status}</Badge> }, { key: "p", label: "Properties", render: (c) => c.props, hideBelow: "sm" }, { key: "u", label: "Units", render: (c) => c.units }, { key: "o", label: "Operation", render: (c) => c.op, hideBelow: "md" }, { key: "a", label: "Alerts", render: (c) => c.alerts, hideBelow: "md" }, { key: "k", label: "Contract", render: (c) => c.contract, hideBelow: "md" }, { key: "x", label: "", render: () => "›" }]} />
           <p className="mt-2 text-[11px] text-muted">{rows.length} of 3 · sorted by name · Inactive customers appear only with Status: All (IR40). Archived properties/spaces/units never appear in lists, summaries, or KPI denominators (IR39).</p>
         </Card>
         </>}

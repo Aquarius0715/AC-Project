@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, ListRow, Page, Select, Toggle, useToast, cx } from "@/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, ListRow, Page, Select, useToast, cx } from "@/components/ui";
 
 const pols = [
   { id: "p-shave", name: "Peak shaving", sub: "When peak active → fan low", pri: 70, group: "ACROSS CUSTOMERS", on: true },

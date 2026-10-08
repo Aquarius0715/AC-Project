@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
-import { Badge, Banner, Btn, Card, Check, ConnBadge, Modal, Page, PowerBadge, Stat, SummaryList, LinkBtn, Toggle, cx, useToast, Choice } from "@/components/ui";
+import { use, useState } from "react";
+import { Badge, Banner, Btn, Card, Check, ConnBadge, Modal, Page, PowerBadge, Stat, SummaryList, Toggle, cx, useToast, Choice } from "@/components/ui";
 import { units, unitRowFromApi, type ApiUnit } from "@/lib/client";
 import { useOp } from "@/lib/useOp";
 import { OpError } from "@/lib/ops";
@@ -30,15 +30,16 @@ export default function UnitControl({ params }: { params: Promise<{ id: string }
   const [mode, setMode] = useState<"cool" | "dry" | "fan">("cool");
   const [fan, setFan] = useState<"low" | "mid" | "high">("mid");
   const [confirm, setConfirm] = useState(false);
-  // api mode: start the controls from the device-reported setting once the unit has loaded
-  useEffect(() => {
-    if (!d) return;
+  // api mode: start the controls from the device-reported setting when another unit or a newer report arrives
+  // (adjust state during render, React "You might not need an effect")
+  const reported = d ? `${d.id}|${d.observedState.observedAt}` : null;
+  const [seenReport, setSeenReport] = useState<string | null>(null);
+  if (d && reported !== seenReport) {
+    setSeenReport(reported);
     if (d.observedState.celsius !== null) setTemp(d.observedState.celsius);
     if (d.observedState.mode) setMode(d.observedState.mode);
     if (d.observedState.fanLevel) setFan(d.observedState.fanLevel);
-    // reset only when another unit or a newer reported state arrives
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [d?.id, d?.observedState.observedAt]);
+  }
   // Alert policies on this AC (FR-C15, Figma 02e / 02l): customer policies attached per unit; the default policy is implicit.
   const mockPolicies = [
     { id: "policy-temp-a", name: "Bedroom too hot", rule: "Room temperature ≥ 30 °C for 60 s → Warning" },

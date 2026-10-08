@@ -1,10 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import { BarChart, Btn, Card, Check, DataTable, Kpi, LinkBtn, Page, Tabs, Toggle, Badge } from "@/components/ui";
+import { BarChart, Btn, Card, Check, DataTable, Kpi, LinkBtn, Page, Tabs, Badge } from "@/components/ui";
 import { ExportReportModal } from "@/components/Features";
-import { units, week } from "@/lib/client";
+import { week } from "@/lib/client";
 
 const days = ["Mon 14", "Tue 15", "Wed 16", "Thu 17", "Fri 18", "Sat 19", "Sun 20"];
 const perUnit: Record<string, { actual: number[]; base: number[] }> = {

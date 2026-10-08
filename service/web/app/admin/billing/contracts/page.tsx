@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, ListRow, Modal, Page, Select, Tabs, useToast } from "@/components/ui";
+import { Badge, Banner, Btn, Card, Check, Field, Input, ListRow, Modal, Page, Select, Tabs, useToast } from "@/components/ui";
 
 const seed = [
   { id: "contract-general-a", cust: "customer-a", units: "1 unit · unit-non-rto", price: 50, start: "2026-01-01", end: "2027-01-01", plan: "General" as const, v: 1, blocked: false },

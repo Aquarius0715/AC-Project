@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Banner, Card, Kpi, Page, TextLink, UtilBar, cx } from "@/components/ui";
+import { Banner, Card, Kpi, Page, TextLink, UtilBar } from "@/components/ui";
 import { fmt, useJobs } from "@/lib/jobs";
 
 const hours = [8, 10, 12, 14, 16, 18];
@@ -24,7 +24,7 @@ export default function PartnerOverview() {
       </div>
       <Card title="Job progress — this week" action={<TextLink href="/partner/jobs">All jobs →</TextLink>}>
         <div className="grid-fluid" style={{ ["--min" as string]: "130px" }}>
-          {[["Offered", 1, "primary"], ["Accepted · unassigned", 2, "warn"], ["Assigned / in progress", 1, "primary"], ["Overdue", 1, "crit"], ["Submitted · in review", 1, "primary"], ["Completed", 4, "ok"]].map(([l, n, t]) => <div key={l as string} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted">{l}</div><div className="text-xl font-bold">{n}</div></div>)}
+          {[["Offered", 1, "primary"], ["Accepted · unassigned", 2, "warn"], ["Assigned / in progress", 1, "primary"], ["Overdue", 1, "crit"], ["Submitted · in review", 1, "primary"], ["Completed", 4, "ok"]].map(([l, n]) => <div key={l as string} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted">{l}</div><div className="text-xl font-bold">{n}</div></div>)}
         </div>
       </Card>
       <div className="split">

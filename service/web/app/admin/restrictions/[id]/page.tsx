@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { use, useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, Page, Select, SummaryList, Textarea, Timeline, useToast } from "@/components/ui";
+import { Banner, Btn, Card, Check, Field, Input, Page, SummaryList, Textarea, Timeline, useToast } from "@/components/ui";
 
 type A = "defer" | "exempt" | "cancel" | "override";
 const acts: [A, string, string, string][] = [
@@ -22,7 +22,8 @@ export default function Exception({ params }: { params: Promise<{ id: string }> 
   const [done, setDone] = useState(false);
   const [tried, setTried] = useState(false);
   const needsDate = act === "defer" || act === "exempt";
-  const dateErr = tried && needsDate && (!until || new Date(until).getTime() < Date.now() - 86400e3) ? "Date must be in the future" : undefined;
+  const [openedAt] = useState(() => Date.now()); // reference time for the date check (render stays pure)
+  const dateErr = tried && needsDate && (!until || new Date(until).getTime() < openedAt - 86400e3) ? "Date must be in the future" : undefined;
   const run = () => { setTried(true); if (!reason.trim() || dateErr) return; if (act === "override" && !hasOverride) return toast("FORBIDDEN — restriction.override required", "crit"); setDone(true); toast("Action recorded"); };
   return (
     <Page>

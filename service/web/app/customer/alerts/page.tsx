@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CURRENT_CLIENT } from "@/lib/clientUsers";
-import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, ErrorState, Field, Input, Modal, OnOffBadge, Page, Select, SeverityBadge, SummaryList, Tabs, Toggle, cx, useToast } from "@/components/ui";
+import { Badge, Btn, Card, Check, Choice, ErrorState, Field, Input, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Toggle, cx, useToast } from "@/components/ui";
 import { useUrlTab } from "@/lib/useUrlTab";
 import { useOp } from "@/lib/useOp";
 
@@ -50,8 +50,13 @@ export default function Alerts() {
   const toast = useToast();
   const [tab, setTab] = useUrlTab<"alerts" | "policies">({ alerts: "overview", policies: "policies" }, "alerts");
   const remote = useOp<{ items: ApiAlert[] }, Alert[]>("alerts.list", { limit: 100 }, seed, (p) => p.items.map(alertRow));
+  // local list (read flags) restarts from each new remote result: adjust state during render, not in an effect
   const [list, setList] = useState(seed);
-  useEffect(() => setList(remote.data), [remote.data]);
+  const [listSource, setListSource] = useState(remote.data);
+  if (listSource !== remote.data) {
+    setListSource(remote.data);
+    setList(remote.data);
+  }
   const [unread, setUnread] = useState(false);
   const [open, setOpen] = useState<Alert | null>(null);
   const [failed, setFailed] = useState(false);

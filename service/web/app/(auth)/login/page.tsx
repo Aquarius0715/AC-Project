@@ -3,15 +3,19 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ROLES, ROLE_KEY, Role } from "@/lib/nav";
-import { Badge, Btn, Card, cx } from "@/components/ui";
+import { Badge, Card, cx } from "@/components/ui";
 import { useBffSession } from "@/lib/useOp";
+import { useSearchParam } from "@/lib/urlState";
 
 export default function Login() {
   const [role, setRole] = useState<Role>("client");
   const cfg = ROLES[role];
   const bff = useBffSession();
   // DATA_SOURCE=api: sign in through the BFF (OIDC with the demo identity); the demo keeps the local role switch
-  const href = bff?.dataSource === "api" ? `/bff/auth/login?login_hint=${encodeURIComponent(cfg.loginUser)}&returnTo=${encodeURIComponent(cfg.base)}` : cfg.base;
+  // a returnTo set by proxy.ts is kept when it belongs to the chosen role's area (the BFF validates it again)
+  const asked = useSearchParam("returnTo");
+  const returnTo = asked && (asked === cfg.base || asked.startsWith(cfg.base + "/")) ? asked : cfg.base;
+  const href = bff?.dataSource === "api" ? `/bff/auth/login?login_hint=${encodeURIComponent(cfg.loginUser)}&returnTo=${encodeURIComponent(returnTo)}` : cfg.base;
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-10">
       <div className="w-full max-w-[920px]">

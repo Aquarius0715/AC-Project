@@ -34,7 +34,7 @@ export default function Schedule({ searchParams }: { searchParams: Promise<{ job
   const inProg = sel.id === "job-contractor-a" || sel.id === "job-p07";
   const save = () => {
     if (lj) { jobActions.partnerAssign(lj.id, tech); setMsg({ tone: "ok", t: `Assigned ${tech} to ${lj.id} for ${fmt(lj.scheduled)}. The technician must accept.` }); toast("Technician assigned — waiting for acceptance"); return; }
-    const ws = new Date("2026-09-14T01:00"), we = new Date(sel.id === "job-p02" ? "2026-09-22T00:00" : "2026-09-24T18:00");
+    const we = new Date(sel.id === "job-p02" ? "2026-09-22T00:00" : "2026-09-24T18:00");
     if (inProg && !reason.trim()) return setMsg({ tone: "crit", t: "Reason required when reassigning a job already in progress (VALIDATION)." });
     if (new Date(start) >= new Date(end)) return setMsg({ tone: "crit", t: "Start must be before end." });
     if (new Date(end) > we) return setMsg({ tone: "crit", t: "Slot is outside the delegation period (VALIDATION)." });

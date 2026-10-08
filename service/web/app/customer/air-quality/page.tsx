@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, DataTable, Field, Input, LineChart, Modal, Page, Select, Tabs, Textarea, useToast } from "@/components/ui";
+import { Badge, Banner, Btn, Card, DataTable, Field, LineChart, Modal, Page, Select, Tabs, Textarea, useToast } from "@/components/ui";
 
 const series = {
   co2: { label: "CO2", unit: "ppm", pts: [620, 600, 580, 560, 640, 760, 880, 760, 700, 820, 940, 1000], min: 400, max: 1200, th: 1000 },

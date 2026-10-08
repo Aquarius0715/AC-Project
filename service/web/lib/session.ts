@@ -1,5 +1,6 @@
 // BFF session (backend architecture §5): the OIDC tokens and the selected tenant / membership live in an httpOnly,
 // HMAC-signed cookie that only the server reads. Browsers never see the access token.
+import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
@@ -92,6 +93,12 @@ export async function readSession(): Promise<Session | null> {
   }
   jar.set(SESSION_COOKIE, sign(next), cookieOptions());
   return next;
+}
+
+/** A same-origin path to return to after sign-in; rejects absolute, protocol-relative ("//host") and backslash forms. */
+export function safeReturnTo(v: string | null | undefined): string | null {
+  if (!v || !v.startsWith("/") || v.startsWith("//") || v.includes("\\") || /[\u0000-\u001f]/.test(v)) return null;
+  return v;
 }
 
 export const roleHome: Record<Session["role"], string> = { client: "/customer", contractor: "/partner", technician: "/technician", admin: "/admin" };

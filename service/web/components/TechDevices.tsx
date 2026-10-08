@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, ConnBadge, Field, Input, ListRow, Modal, Page, Search, SummaryList, Tabs, Textarea, Timeline, cx, useToast } from "@/components/ui";
+import { Badge, Banner, Btn, Card, ConnBadge, Field, Input, ListRow, Modal, Page, Search, Tabs, Textarea, Timeline, useToast } from "@/components/ui";
 
 const devices = [
   { id: "ac-001", serial: "AC-001", dev: "device-ac-001", unit: "unit-t11-new · ventilation-demo v3", fw: "fw v1 → v2", conn: "online" as const, tamper: false },

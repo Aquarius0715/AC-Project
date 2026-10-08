@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { use, useState } from "react";
-import { Badge, Banner, Card, ConnBadge, LineChart, Page, SeverityBadge, SummaryList, Tabs } from "@/components/ui";
+import { Banner, Card, ConnBadge, LineChart, Page, SeverityBadge, SummaryList, Tabs } from "@/components/ui";
 import { useNow, useOp } from "@/lib/useOp";
 import { bucket, componentGroups, klTime, latest, windowMs, type ApiUnitDetail } from "@/lib/unitApi";
 

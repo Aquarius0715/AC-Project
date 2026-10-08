@@ -8,21 +8,16 @@ import { Badge, Banner, Btn, Modal, SummaryList, ToastProvider, cx } from "./ui"
 import { useJobStore } from "@/lib/jobs";
 import { AssistantPanel } from "./Assistant";
 import { CURRENT_CLIENT } from "@/lib/clientUsers";
+import { setStoredValue, useStoredValue } from "@/lib/urlState";
 
 export function useStoredRole(): Role {
   const pathname = usePathname();
   const fromPath = roleFromPath(pathname);
-  const [stored, setStored] = useState<Role>("client");
+  const saved = useStoredValue(ROLE_KEY) as Role | null; // last role, external store (no effect)
   useEffect(() => {
-    try {
-      const s = localStorage.getItem(ROLE_KEY) as Role | null;
-      if (s && ROLES[s]) setStored(s);
-    } catch {}
-  }, []);
-  useEffect(() => {
-    if (fromPath) try { localStorage.setItem(ROLE_KEY, fromPath); } catch {}
+    if (fromPath) setStoredValue(ROLE_KEY, fromPath); // sync the external system only
   }, [fromPath]);
-  return fromPath ?? stored;
+  return fromPath ?? (saved && ROLES[saved] ? saved : "client");
 }
 
 const SHARED = [
@@ -30,16 +25,31 @@ const SHARED = [
   { href: "/settings/preferences", label: "Preferences", icon: "✲" },
 ];
 
+function NavLink({ href, label, icon, badge, active }: { href: string; label: string; icon: string; badge?: string; active: boolean }) {
+  return (
+    <Link href={href} aria-current={active ? "page" : undefined} className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold", active ? "bg-primary-soft text-primary" : "text-ink hover:bg-surface2")}>
+      <span aria-hidden className="w-4 text-center text-muted">{icon}</span>
+      <span className="min-w-0 flex-1 leading-tight">{label}</span>
+      {badge && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-crit px-1 text-[10px] font-bold text-white">{badge}</span>}
+    </Link>
+  );
+}
+
 export function AppShell({ role: forced, children }: { role?: Role; children: React.ReactNode }) {
   const detected = useStoredRole();
   const role = forced ?? detected;
   const cfg = ROLES[role];
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  // close the mobile menu when the route changes: adjust state during render (React: "You might not need an effect")
+  const [menuPath, setMenuPath] = useState(pathname);
+  if (menuPath !== pathname) {
+    setMenuPath(pathname);
+    setOpen(false);
+  }
   const [assistant, setAssistant] = useState(false);
   const [qr, setQr] = useState(false);
   const unread = useJobStore().notes.filter((n) => n.role === role && !n.read).length;
-  useEffect(() => setOpen(false), [pathname]);
 
   const items = cfg.nav;
   // longest-prefix match so /customer/units/x highlights "Units & locations"
@@ -52,13 +62,6 @@ export function AppShell({ role: forced, children }: { role?: Role; children: Re
   const sharedActive = SHARED.find((s) => pathname === s.href);
   const title = sharedActive?.label ?? (pathname === "/customer/users" ? "Users" : pathname === "/demo" ? "Demo controls" : items.find((i) => i.href === activeHref)?.label ?? "AC Project");
 
-  const NavLink = ({ href, label, icon, badge, active }: { href: string; label: string; icon: string; badge?: string; active: boolean }) => (
-    <Link href={href} aria-current={active ? "page" : undefined} className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold", active ? "bg-primary-soft text-primary" : "text-ink hover:bg-surface2")}>
-      <span aria-hidden className="w-4 text-center text-muted">{icon}</span>
-      <span className="min-w-0 flex-1 leading-tight">{label}</span>
-      {badge && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-crit px-1 text-[10px] font-bold text-white">{badge}</span>}
-    </Link>
-  );
 
   return (
     <ToastProvider>
