@@ -18,6 +18,10 @@ func EventHandlers() map[string]events.Handler {
 			if err := e.Decode(&p); err != nil {
 				return err
 			}
+			if _, err := tx.Exec(ctx, `UPDATE restrictions.restriction_commands SET status = 'acknowledged', updated_at = $2 WHERE command_id = ANY($1) AND status = 'requested'`,
+				p.CommandIDs, p.At); err != nil {
+				return err
+			}
 			for _, id := range p.CommandIDs {
 				if err := CommandAcknowledged(ctx, tx, id, p.At); err != nil {
 					return err
@@ -44,6 +48,16 @@ func EventHandlers() map[string]events.Handler {
 			var p events.Commands
 			if err := e.Decode(&p); err != nil {
 				return err
+			}
+			for _, id := range p.CommandIDs { // billing's record takes equipment's final status (IR194)
+				status := p.Statuses[id]
+				if status != "failed" && status != "cancelled" {
+					status = "expired"
+				}
+				if _, err := tx.Exec(ctx, `UPDATE restrictions.restriction_commands SET status = $2, updated_at = $3 WHERE command_id = $1 AND status = 'requested'`,
+					id, status, p.At); err != nil {
+					return err
+				}
 			}
 			return CommandsEnded(ctx, tx, p.CommandIDs, p.At)
 		},

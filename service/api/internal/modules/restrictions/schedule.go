@@ -380,6 +380,12 @@ func (m Restrictions) send(ctx context.Context, c *ops.Call, restriction, unit u
 	err = events.Publish(ctx, c.Tx, c.Principal.TenantID, "command", id, events.RestrictionCommandRequested, events.RestrictionCommand{
 		CommandID: id, UnitID: unit, DeviceID: device, ActorID: SystemActor, Action: action, RestrictionID: restriction, Status: status,
 		Delivery: delivery, RequestedAt: c.Now, SentAt: sentAt, ExpiresAt: c.Now.Add(IntentTTL), CorrelationID: c.CorrelationID})
+	if err == nil { // billing's own record of the command (IR194)
+		var a struct{ Kind string }
+		_ = json.Unmarshal(action, &a)
+		_, err = c.Tx.Exec(ctx, `INSERT INTO restrictions.restriction_commands (tenant_id, command_id, restriction_id, unit_id, kind, delivered, status, requested_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, 'requested', $7, $7)`, c.Principal.TenantID, id, restriction, unit, a.Kind, reason == nil, c.Now)
+	}
 	if err == nil {
 		c.Emit(ops.Event{AggregateType: "command", AggregateID: id, Type: "CommandRequested", Payload: map[string]any{"unitId": unit, "deviceId": device, "action": json.RawMessage(action), "delivery": delivery}})
 	}

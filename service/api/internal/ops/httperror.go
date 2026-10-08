@@ -38,7 +38,11 @@ func HTTPErrorHandler(c *echo.Context, err error) {
 		de.CorrelationID = c.Response().Header().Get(echo.HeaderXRequestID)
 	}
 	if de.HTTPStatus() >= http.StatusInternalServerError {
-		c.Logger().Error("request failed", "error", err, "request_id", de.CorrelationID)
+		cause := err
+		if de.Cause() != nil {
+			cause = de.Cause()
+		}
+		c.Logger().Error("request failed", "error", cause, "request_id", de.CorrelationID)
 	}
 	if c.Request().Method == http.MethodHead {
 		_ = c.NoContent(de.HTTPStatus())

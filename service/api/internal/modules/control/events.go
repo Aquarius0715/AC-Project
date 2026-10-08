@@ -46,15 +46,17 @@ func publishRestrictionCommands(ctx context.Context, tx pgx.Tx, eventType string
 	if len(ids) == 0 {
 		return nil
 	}
-	rows, err := tx.Query(ctx, `SELECT tenant_id, id FROM control.commands WHERE id = ANY($1) AND source = 'restriction' ORDER BY tenant_id, id`, ids)
+	rows, err := tx.Query(ctx, `SELECT tenant_id, id, status FROM control.commands WHERE id = ANY($1) AND source = 'restriction' ORDER BY tenant_id, id`, ids)
 	if err != nil {
 		return err
 	}
 	byTenant := map[uuid.UUID][]uuid.UUID{}
+	statuses := map[uuid.UUID]string{}
 	var order []uuid.UUID
 	for rows.Next() {
 		var t, id uuid.UUID
-		if err := rows.Scan(&t, &id); err != nil {
+		var status string
+		if err := rows.Scan(&t, &id, &status); err != nil {
 			rows.Close()
 			return err
 		}
@@ -62,13 +64,18 @@ func publishRestrictionCommands(ctx context.Context, tx pgx.Tx, eventType string
 			order = append(order, t)
 		}
 		byTenant[t] = append(byTenant[t], id)
+		statuses[id] = status
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
 		return err
 	}
 	for _, t := range order {
-		if err := events.Publish(ctx, tx, t, "command", byTenant[t][0], eventType, events.Commands{CommandIDs: byTenant[t], At: at}); err != nil {
+		st := map[uuid.UUID]string{}
+		for _, id := range byTenant[t] {
+			st[id] = statuses[id]
+		}
+		if err := events.Publish(ctx, tx, t, "command", byTenant[t][0], eventType, events.Commands{CommandIDs: byTenant[t], At: at, Statuses: st}); err != nil {
 			return err
 		}
 	}

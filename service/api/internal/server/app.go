@@ -47,6 +47,8 @@ type Config struct {
 	IdentityURL       string            // identity-api base URL for principals (IR181); empty = read identity tables
 	InternalToken     string            // shared token of internal service-to-service endpoints
 	ServiceURLs       map[string]string // base URL per domain for internal queries of unserved domains (IR190)
+	PrincipalTTL      time.Duration     // principal cache of RemoteSource: 0 = 30 s, negative = no cache (IR181)
+	DemoClock         ScenarioClock     // shared scenario clock of several services in one binary (tests); overrides DemoStart
 }
 
 // Server is the assembled Core API.
@@ -90,9 +92,11 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	if cfg.Clock != nil {
 		reg.Clock = cfg.Clock
 	}
-	var dc scenarioClock = &demoClock{base: reg.Clock}
+	var dc ScenarioClock = &demoClock{base: reg.Clock}
 	if cfg.DemoOps {
-		if !cfg.DemoStart.IsZero() { // starts at fixture.clock, runs in real time, shared with the workers (IR36, IR168)
+		if cfg.DemoClock != nil {
+			dc = cfg.DemoClock
+		} else if !cfg.DemoStart.IsZero() { // starts at fixture.clock, runs in real time, shared with the workers (IR36, IR168)
 			shared, err := democlock.Open(ctx, m.Writer, reg.Clock, cfg.DemoStart)
 			if err != nil {
 				m.Close()
@@ -137,7 +141,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	identity.RegisterClientUsers(reg)
 	identity.RegisterTwoFactor(reg)
 	writes.Register(reg)
-	maintenance.RegisterQr(reg)
+	assets.RegisterQr(reg, maintenance.QrAccess{}) // an Assets operation; maintenance answers the assignment (IR194)
 	energy.Register(reg)
 	voice.Register(reg, voice.Voice{Units: am})
 	energy.RegisterMRV(reg)
@@ -173,7 +177,11 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	authn := &auth.Authenticator{Verifier: v, DB: m, Now: reg.Clock}
 	servesIdentity := len(cfg.Domains) == 0 || slices.Contains(cfg.Domains, ops.DomainIdentity)
 	if cfg.IdentityURL != "" && !servesIdentity { // IR181 step 1: principals come from identity-api
-		authn.Source = &auth.RemoteSource{BaseURL: cfg.IdentityURL, Token: cfg.InternalToken, TTL: 30 * time.Second}
+		ttl := cfg.PrincipalTTL
+		if ttl == 0 {
+			ttl = 30 * time.Second
+		}
+		authn.Source = &auth.RemoteSource{BaseURL: cfg.IdentityURL, Token: cfg.InternalToken, TTL: ttl}
 	}
 	e := newEcho(reg, m, authn, cfg.Logger, cfg.InternalToken, servesIdentity)
 	srv := &Server{Echo: e, Registry: reg, DB: m, Consumers: consumers(m, cfg.Domains)}

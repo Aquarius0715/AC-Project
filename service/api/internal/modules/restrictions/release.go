@@ -63,6 +63,10 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 			if err := events.Publish(ctx, c.Tx, c.Principal.TenantID, "restriction", id, events.RestrictionCommandsCancelled, events.CommandsCancelled{RestrictionID: id, UnitID: &unit}); err != nil {
 				return err
 			}
+			if _, err := c.Tx.Exec(ctx, `UPDATE restrictions.restriction_commands SET status = 'cancelled', updated_at = $3
+				WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested' AND NOT delivered`, id, unit, c.Now); err != nil { // same rule as equipment
+				return err
+			}
 			err = set(`apply_state = 'not_applied', release_state = 'not_required', pending_reason = NULL`)
 		case "not_applied":
 			err = set(`release_state = 'not_required', pending_reason = NULL`)
@@ -80,6 +84,9 @@ func (m Restrictions) evaluateRelease(ctx context.Context, c *ops.Call, id uuid.
 				err = set(`release_state = 'requested', release_command_ids = release_command_ids || $3::uuid, pending_reason = NULL`, cmd)
 			} else { // offline applied units wait for retry(phase=release); the undelivered intent is cancelled
 				if err := events.Publish(ctx, c.Tx, c.Principal.TenantID, "restriction", id, events.RestrictionCommandsCancelled, events.CommandsCancelled{RestrictionID: id, CommandIDs: []uuid.UUID{cmd}}); err != nil {
+					return err
+				}
+				if _, err := c.Tx.Exec(ctx, `UPDATE restrictions.restriction_commands SET status = 'cancelled', updated_at = $2 WHERE command_id = $1 AND status = 'requested'`, cmd, c.Now); err != nil {
 					return err
 				}
 				err = set(`pending_reason = $3`, reason)
@@ -106,7 +113,7 @@ func finishRelease(ctx context.Context, tx pgx.Tx, id uuid.UUID, now time.Time) 
 func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at time.Time) error {
 	var restriction, unit uuid.UUID
 	var kind string
-	err := tx.QueryRow(ctx, `SELECT restriction_id, unit_id, action->>'kind' FROM control.commands WHERE id = $1 AND source = 'restriction'`, command).Scan(&restriction, &unit, &kind)
+	err := tx.QueryRow(ctx, `SELECT restriction_id, unit_id, kind FROM restrictions.restriction_commands WHERE command_id = $1`, command).Scan(&restriction, &unit, &kind)
 	if err == pgx.ErrNoRows {
 		return nil
 	}
@@ -163,16 +170,16 @@ func CommandsEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now tim
 		return err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE restrictions.restrictions r SET version = version + 1, updated_at = $2
-		WHERE r.id IN (SELECT restriction_id FROM control.commands WHERE id = ANY($1) AND source = 'restriction')`, commands, now); err != nil {
+		WHERE r.id IN (SELECT restriction_id FROM restrictions.restriction_commands WHERE command_id = ANY($1))`, commands, now); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `UPDATE restrictions.restriction_units ru SET release_state = 'failed'
-		FROM control.commands k WHERE k.id = ANY($1) AND k.source = 'restriction' AND k.action->>'kind' = 'remove_restriction'
+		FROM restrictions.restriction_commands k WHERE k.command_id = ANY($1) AND k.kind = 'remove_restriction'
 		  AND ru.restriction_id = k.restriction_id AND ru.unit_id = k.unit_id AND ru.release_state = 'requested'`, commands); err != nil {
 		return err
 	}
 	_, err := tx.Exec(ctx, `UPDATE restrictions.restriction_units ru SET apply_state = 'not_applied'
-		FROM control.commands k WHERE k.id = ANY($1) AND k.source = 'restriction' AND k.action->>'kind' = 'apply_restriction' AND k.status = 'failed'
+		FROM restrictions.restriction_commands k WHERE k.command_id = ANY($1) AND k.kind = 'apply_restriction' AND k.status = 'failed'
 		  AND ru.restriction_id = k.restriction_id AND ru.unit_id = k.unit_id AND ru.apply_state = 'sent_unknown'`, commands)
 	return err
 }

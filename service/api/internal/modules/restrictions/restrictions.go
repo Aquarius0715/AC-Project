@@ -34,9 +34,11 @@ type UnitCaps struct {
 	TempMin, TempMax, Step float64
 }
 
-// Units resolves restriction targets.
+// Units resolves restriction targets and the device observations equipment keeps on units.
 type Units interface {
 	RestrictionTarget(ctx context.Context, c *ops.Call, unit uuid.UUID) (UnitCaps, bool, error)
+	// Observation returns the unit's observedRestriction (raw JSON, nil when none) and lastSeenAt (IR194).
+	Observation(ctx context.Context, c *ops.Call, unit uuid.UUID) ([]byte, *time.Time, error)
 }
 
 // Devices reports the device bound to a unit (Devices).
@@ -140,7 +142,7 @@ type ReleaseView struct {
 
 const cols = `r.id, r.tenant_id, r.version, r.created_at, r.updated_at, r.recovery_cases, r.notice_notification_ids, r.contract_id, r.contract_version,
 	r.rules_version, r.notice_at, r.execute_after, r.reason, r.policy, r.state, r.exception_until, r.exception_reason, r.grace_until, r.release_intent,
-	r.customer_id, (SELECT organization_id FROM assets.customers cu WHERE cu.id = r.customer_id),
+	r.customer_id, (SELECT organization_id FROM billing.ref_customers cu WHERE cu.id = r.customer_id),
 	COALESCE((SELECT array_agg(invoice_id ORDER BY invoice_id) FROM restrictions.restriction_invoices ri WHERE ri.restriction_id = r.id), '{}')`
 
 func scan(row pgx.Row) (Restriction, error) {

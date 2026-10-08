@@ -18,6 +18,11 @@ test-unit:
 test-integration: testdb-exists
 	$(GO) test -count=1 ./test/...
 
+# the integration suite against the split services: one server per domain on its own database role behind the
+# gateway (IR194); any cross-domain table access fails
+test-cluster: testdb-exists
+	AC_TEST_CLUSTER=1 $(GO) test -count=1 ./test/...
+
 # everything; ac_test is created when missing (AC_TEST_DATABASE_URL / AC_TEST_OWNER_DATABASE_URL override it)
 test: testdb-exists
 	$(GO) vet ./...
@@ -46,4 +51,4 @@ cover: testdb-exists
 		$(GO) test -count=1 -coverpkg=./internal/... -coverprofile=.cover/$$(echo $$p | tr / _).out $$p >.cover/last.log 2>&1 || { cat .cover/last.log; exit 1; }; done
 	python3 scripts/covermerge.py coverage.out .cover/*.out
 
-.PHONY: gen seed test test-unit test-integration cover migrations resetdb testdb testdb-exists test-fresh
+.PHONY: gen seed test test-unit test-integration test-cluster cover migrations resetdb testdb testdb-exists test-fresh

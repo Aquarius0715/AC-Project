@@ -1507,6 +1507,19 @@ CREATE TABLE restrictions.restriction_units (     -- per-unit apply / release st
   PRIMARY KEY (restriction_id, unit_id),
   FOREIGN KEY (tenant_id, restriction_id) REFERENCES restrictions.restrictions(tenant_id, id)
 );
+
+CREATE TABLE restrictions.restriction_commands (  -- the device commands billing requested (IR194): billing's own record
+  tenant_id      uuid NOT NULL,
+  command_id     uuid PRIMARY KEY,                  -- assigned by billing; equipment stores the command (IR185)
+  restriction_id uuid NOT NULL,
+  unit_id        uuid NOT NULL,
+  kind           text NOT NULL CHECK (kind IN ('apply_restriction','remove_restriction')),
+  delivered      boolean NOT NULL,                 -- delivery = sent at request time; undelivered intents can be cancelled
+  status         text NOT NULL CHECK (status IN ('requested','acknowledged','failed','expired','cancelled')),  -- requested = open
+  requested_at   timestamptz NOT NULL,
+  updated_at     timestamptz NOT NULL
+);
+CREATE INDEX restriction_commands_open ON restrictions.restriction_commands (restriction_id, unit_id) WHERE status = 'requested';
 CREATE INDEX restriction_units_unit ON restrictions.restriction_units (tenant_id, unit_id);
 
 -- ---------------------------------------------------------------------------------------------
@@ -1701,8 +1714,8 @@ CREATE TRIGGER audit_log_append_only BEFORE UPDATE OR DELETE ON audit.audit_log
   FOR EACH ROW EXECUTE FUNCTION audit.forbid_change();
 
 -- ---------------------------------------------------------------------------------------------
--- Reference copies for notifications (IR188): notify resolves notification targets and recipients from these
--- instead of the owners' tables. Kept by the identity-api consumer from RowChanged events; same keys as the source.
+-- Reference copies for the identity domain (IR188, IR194): notify resolves notification targets and recipients from
+-- these, identity checks membership scopes and client users with them, instead of the owners' tables. Kept by the identity-api consumer from RowChanged events; same keys as the source.
 -- ---------------------------------------------------------------------------------------------
 CREATE TABLE notify.ref_units (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, customer_org_id uuid, property_id uuid, display_name text);
 CREATE TABLE notify.ref_customers (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, organization_id uuid);
@@ -1716,6 +1729,11 @@ CREATE TABLE notify.ref_inquiries (id uuid PRIMARY KEY, tenant_id uuid NOT NULL,
 CREATE TABLE notify.ref_restrictions (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, customer_id uuid);
 CREATE TABLE notify.ref_restriction_units (restriction_id uuid NOT NULL, unit_id uuid NOT NULL, tenant_id uuid NOT NULL, PRIMARY KEY (restriction_id, unit_id));
 CREATE TABLE notify.ref_devices (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, serial text, unit_id uuid);
+CREATE TABLE notify.ref_properties (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, customer_org_id uuid);  -- identity: membership scopes (IR194)
+
+-- Reference copies for billing (IR194), kept by the billing-api consumer: customer organizations of restrictions and
+-- inquiries.
+CREATE TABLE billing.ref_customers (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, organization_id uuid);
 
 -- Reference copies for maintenance (IR192), kept by the maintenance-api consumer: technician planning, partner
 -- memberships and the history snapshots of the worker.
@@ -1725,8 +1743,6 @@ CREATE TABLE maintenance.ref_memberships (
 );
 CREATE INDEX ref_memberships_org ON maintenance.ref_memberships (organization_id, role);
 CREATE INDEX ref_memberships_user ON maintenance.ref_memberships (user_id);
-CREATE TABLE maintenance.ref_devices (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, serial text, unit_id uuid);  -- QR serial lookup (IR145)
-CREATE INDEX ref_devices_serial ON maintenance.ref_devices (upper(btrim(serial)));
 
 -- Reference copies for energy (IR189), kept by the energy-api consumer.
 CREATE TABLE energy.ref_units (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, customer_org_id uuid, property_id uuid, archived boolean);
@@ -1820,6 +1836,28 @@ GRANT USAGE ON SCHEMA platform, identity, assets, devices, control, monitoring, 
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA platform, identity, assets, devices, control, monitoring, maintenance, billing, restrictions, energy, notify TO ac_app, ac_worker;
 GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA audit TO ac_app, ac_worker;
 GRANT SELECT ON ALL TABLES IN SCHEMA platform, identity, assets, devices, control, monitoring, maintenance, billing, restrictions, energy, notify, audit TO ac_readonly;
+-- Least privilege per business-domain service (IR194): each service role reaches only its own schemas, the shared
+-- infrastructure (platform) and the append-only audit log. ac_app stays for the scheduler worker and tools until the
+-- workers are split per domain. Reference copies live in the consumer's own schema (ref_*).
+DO $$
+DECLARE
+  d record;
+BEGIN
+  FOR d IN SELECT * FROM (VALUES
+      ('ac_svc_identity',    ARRAY['identity','notify']),
+      ('ac_svc_equipment',   ARRAY['assets','devices','control','monitoring']),
+      ('ac_svc_maintenance', ARRAY['maintenance']),
+      ('ac_svc_billing',     ARRAY['billing','restrictions']),
+      ('ac_svc_energy',      ARRAY['energy'])) AS v(role, schemas)
+  LOOP
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = d.role) THEN
+      EXECUTE format('CREATE ROLE %I NOLOGIN', d.role);
+    END IF;
+    EXECUTE format('GRANT USAGE ON SCHEMA platform, audit, %s TO %I', array_to_string(d.schemas, ', '), d.role);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA platform, %s TO %I', array_to_string(d.schemas, ', '), d.role);
+    EXECUTE format('GRANT SELECT, INSERT ON ALL TABLES IN SCHEMA audit TO %I', d.role);
+  END LOOP;
+END $$;
 -- Later migrations: ALTER DEFAULT PRIVILEGES in each schema grants the same rights on new tables.
 
 -- Reference data: the 38 permissions (IR107)

@@ -34,9 +34,10 @@ type Devices interface {
 	OperationBusy(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error)
 }
 
-// Restrictions reports a unit's active restriction policy (Restrictions).
+// Restrictions reports a unit's active restriction policy and unresolved recovery cases (Restrictions, billing).
 type Restrictions interface {
 	UnitPolicy(ctx context.Context, c *ops.Call, unit uuid.UUID) ([]byte, error)
+	UnitRecovering(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error)
 }
 
 // TechAccess is the IR94 technician write check (Maintenance).
@@ -237,9 +238,8 @@ func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Com
 
 // ready applies the D04 mutual exclusion and IR47 delivery checks and returns the bound device.
 func (m Commands) ready(ctx context.Context, c *ops.Call, unit uuid.UUID) (uuid.UUID, error) {
-	var blocked bool // SR26: an unresolved terminal-restriction recovery case blocks ordinary control
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restrictions r, jsonb_array_elements(r.recovery_cases) k
-		WHERE k->>'unitId' = $1::text AND k->>'state' <> 'resolved')`, unit).Scan(&blocked); err != nil {
+	blocked, err := m.Restrictions.UnitRecovering(ctx, c, unit) // SR26: an unresolved terminal-restriction recovery case blocks ordinary control
+	if err != nil {
 		return uuid.Nil, err
 	}
 	if blocked {

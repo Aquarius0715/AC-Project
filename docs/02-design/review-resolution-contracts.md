@@ -1797,3 +1797,29 @@ The composition root (`internal/server/app.go`) wired modules of one domain dire
 - Still direct: the scheduler worker runs every domain's clock transitions in one transaction (its calls run locally), and `audit.audit_log` is written by every service.
 
 Verified: all Go tests green, none skipped; in compose the six services are healthy, the client and partner apps list invoices and jobs (billing and maintenance ask equipment), filter care shows run hours through equipment, and the services log no errors.
+
+## IR194 Least-privilege database role per service; the suite runs on the split services (phase B step 3, part 9) — 2026-10-09
+
+Each business-domain service now connects with a role that reaches only its own schemas, so any remaining cross-domain table access fails instead of silently working on the shared cluster.
+
+- **Roles** (`schema.sql`): `ac_svc_identity` (identity, notify), `ac_svc_equipment` (assets, devices, control, monitoring), `ac_svc_maintenance` (maintenance), `ac_svc_billing` (billing, restrictions), `ac_svc_energy` (energy); all with DML on `platform` and `SELECT`/`INSERT` on `audit` (still shared). `ac_app` stays for the scheduler worker and tools. `cmd/migrate` creates the local logins `ac_<domain>_login`; compose gives every service its own login.
+- **Errors**: SQLSTATE 42501 "permission denied …" is a defect and maps to UNAVAILABLE (row-level security violations stay NOT_FOUND); DomainErrors keep the converted cause, which the error handler logs for 5xx.
+- **Cluster mode of the integration suite** (`make test-cluster`, `AC_TEST_CLUSTER=1`): an all-domain test server becomes a facade — the gateway in front of five single-domain services on their own roles, principals from identity-api (`Config.PrincipalTTL` negative: no cache, since the suite edits memberships directly), internal queries over HTTP, one shared scenario clock (`Config.DemoClock`, like `platform.demo_clock` in compose) and the worker's tick after `demo.advanceClock`; pending events are applied before and after every request. All 94 integration tests pass in both modes.
+
+The first cluster run found these accesses, now removed:
+
+| Operation (service) | Was reading | Now |
+|---|---|---|
+| `units.get` unit detail (equipment) | `restrictions.restriction_units`, `restrictions.restrictions` | billing queries `restrictions.unitRestriction`, `restrictions.unitRecovering` |
+| commands, diagnostics (equipment) | `restrictions.restrictions` recovery cases | `restrictions.unitRecovering` (`control.Restrictions` interface) |
+| `automations.save / simulate / evaluate` (equipment) | `identity.consents`, `identity.memberships` / permissions | `identity.consent`, `identity.members` (`identity.ConsentGranted`, `identity.Members`) |
+| `restrictions.*` (billing) | `assets.customers`, `assets.units` (observation), `control.commands` | `billing.ref_customers` copy; `assets.unitObservation` query; billing's own `restrictions.restriction_commands` |
+| `inquiries.*` (billing) | `assets.customers` | `billing.ref_customers` |
+| `members.save`, `clientUsers.*` (identity) | `assets.customers / properties / units` | `notify.ref_customers / ref_properties / ref_units` |
+| `members.eligible / capacity` (maintenance) | `identity.*` through `identity.LoadMembers` | `identity.loadMembers` query (also fills the missing display name, IR172) |
+| `units.resolveQr` (equipment; Assets in the catalog) | `maintenance.assignments / jobs` (implemented in maintenance) | implemented in assets; `maintenance.qrAssignment` query; `maintenance.ref_devices` dropped |
+| `demo.trigger` restriction observation (equipment) | `restrictions.restriction_units` (tenant probe) | `assets.units` |
+
+- `restrictions.restriction_commands (command_id, restriction_id, unit_id, kind, delivered, status)`: billing records every command it requests (`requested` = open), mirrors its cancellations with equipment's rule (undelivered intents of the restriction on the unit, or explicit IDs), and applies `CommandAcknowledged` / `CommandsEnded` (which now carries `statuses` per command: failed / expired / cancelled). Open-command checks, acknowledgement lookups and end handling read it instead of `control.commands`; the fixture seeds it with its restriction commands.
+
+Verified: `make test` and `make test-cluster` green (94/94 integration tests in cluster mode), none skipped; in compose every service runs on its own login, the four web apps' main reads work through the gateway (client, partner, technician, admin), `units.resolveQr` answers the assigned technician and is NOT_FOUND for another, and the services log no errors.

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/billing"
 	"github.com/pradita/ac-project/service/api/internal/modules/energy"
 	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
@@ -21,7 +22,7 @@ func TestReplicas(t *testing.T) {
 	same := func() {
 		t.Helper()
 		drainEvents(t)
-		for _, r := range append(append(append([]events.Replica{}, notify.Replicas...), energy.Replicas...), maintenance.Replicas...) {
+		for _, r := range append(append(append(append([]events.Replica{}, notify.Replicas...), energy.Replicas...), maintenance.Replicas...), billing.Replicas...) {
 			cols := strings.Join(append(append([]string{}, r.Keys...), r.Cols...), ", ")
 			source := r.Source
 			if source == "monitoring.measurements" { // only minute-slot power samples are captured

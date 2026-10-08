@@ -2,20 +2,19 @@ package server
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/assets"
 	"github.com/pradita/ac-project/service/api/internal/modules/control"
 	"github.com/pradita/ac-project/service/api/internal/modules/devices"
 	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
+	"github.com/pradita/ac-project/service/api/internal/modules/restrictions"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 )
 
-// unitDetails assembles the UnitDetail parts owned by Devices, Control, Restrictions and Maintenance (IR165).
+// unitDetails assembles the UnitDetail parts owned by Devices, Control, Restrictions and Maintenance (IR165); the
+// restriction parts come from billing's queries.
 type unitDetails struct{}
 
 func (unitDetails) Detail(ctx context.Context, c *ops.Call, u assets.Unit) (assets.DetailExtras, error) {
@@ -26,22 +25,19 @@ func (unitDetails) Detail(ctx context.Context, c *ops.Call, u assets.Unit) (asse
 		d.Capabilities = cp
 	}
 	// effectiveControlPolicy: the newest restriction that currently restricts the unit (IR46)
-	var phase string
-	var policy []byte
-	err := c.Tx.QueryRow(ctx, `SELECT r.state, r.policy FROM restrictions.restriction_units ru JOIN restrictions.restrictions r ON r.id = ru.restriction_id
-		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested') ORDER BY r.created_at DESC LIMIT 1`, u.ID).Scan(&phase, &policy)
+	// (restrictions belong to billing: asked through its queries, IR194)
+	r, err := restrictions.Busy{}.UnitRestriction(ctx, c, u.ID)
 	switch {
-	case errors.Is(err, pgx.ErrNoRows):
-		d.EffectiveControlPolicy = map[string]any{"state": "unrestricted"}
 	case err != nil:
 		return d, err
+	case !r.Found:
+		d.EffectiveControlPolicy = map[string]any{"state": "unrestricted"}
 	default:
-		d.EffectiveControlPolicy = map[string]any{"state": "restricted", "phase": phase, "policy": json.RawMessage(policy), "reasonKey": "control.restriction_active"}
+		d.EffectiveControlPolicy = map[string]any{"state": "restricted", "phase": r.Phase, "policy": r.Policy, "reasonKey": "control.restriction_active"}
 	}
 	// controlAvailability: blocked while any terminal-restriction recovery case of the unit is unresolved (SR26)
-	var blocked bool
-	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restrictions r, jsonb_array_elements(r.recovery_cases) k
-		WHERE k->>'unitId' = $1::text AND k->>'state' <> 'resolved')`, u.ID).Scan(&blocked); err != nil {
+	blocked, err := restrictions.Busy{}.UnitRecovering(ctx, c, u.ID)
+	if err != nil {
 		return d, err
 	}
 	d.ControlAvailability = map[string]any{"state": "available"}

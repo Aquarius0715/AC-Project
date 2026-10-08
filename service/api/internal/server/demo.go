@@ -19,12 +19,16 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/scheduler"
 )
 
-// scenarioClock is the demo scenario clock: democlock.Clock (shared through platform.demo_clock, IR168) when the
+// ScenarioClock is the demo scenario clock: democlock.Clock (shared through platform.demo_clock, IR168) when the
 // scenario has a start, else the process-local demoClock (tests with a fixed base clock).
-type scenarioClock interface {
+type ScenarioClock interface {
 	Now() time.Time
 	Advance(ctx context.Context, d time.Duration) error
 }
+
+// NewScenarioClock is a process-local scenario clock over base; services of one binary can share it
+// (Config.DemoClock).
+func NewScenarioClock(base func() time.Time) ScenarioClock { return &demoClock{base: base} }
 
 // demoClock is the base clock plus a forward offset set by demo.advanceClock (IR36), local to this process.
 type demoClock struct {
@@ -52,7 +56,7 @@ type demoOps struct {
 	inline  bool // serves every domain (tests, single process)
 	enabled bool
 	m       *db.TxManager
-	clock   scenarioClock
+	clock   ScenarioClock
 }
 
 func demoOnly() error { return apperr.E(apperr.Unavailable, "errors.demo_only") }
@@ -245,7 +249,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 		})
 	}
 	if in.EventType == "restriction_observation" { // SR26: a device reports which restriction it enforces
-		return out, d.inTenant(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_units WHERE unit_id = $1)`, *in.UnitID, func(tx pgx.Tx, _ uuid.UUID) error {
+		return out, d.inTenant(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`, *in.UnitID, func(tx pgx.Tx, _ uuid.UUID) error {
 			var obsRaw any // the device observation itself (equipment data); restrictions reacts to it
 			if in.Observed != nil {
 				obsRaw, _ = json.Marshal(in.Observed)

@@ -52,7 +52,8 @@ func TestFrom(t *testing.T) {
 	}{
 		{&pgconn.PgError{Code: "23514"}, Validation},
 		{&pgconn.PgError{Code: "22P02"}, Validation},
-		{&pgconn.PgError{Code: "42501"}, NotFound},
+		{&pgconn.PgError{Code: "42501", Message: "new row violates row-level security policy"}, NotFound},
+		{&pgconn.PgError{Code: "42501", Message: "permission denied for table units"}, Unavailable},
 		{&pgconn.PgError{Code: "23503"}, NotFound},
 		{&pgconn.PgError{Code: "23505"}, Conflict},
 		{&pgconn.PgError{Code: "23P01"}, Conflict},

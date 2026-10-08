@@ -148,7 +148,7 @@ func (m Billing) createInquiry(ctx context.Context, c *ops.Call, in *InquiryInpu
 }
 
 func (m Billing) loadInquiry(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Inquiry, error) {
-	q := "SELECT " + inquiryCols + " FROM billing.inquiries q JOIN assets.customers cu ON cu.id = q.customer_id WHERE q.id = $1"
+	q := "SELECT " + inquiryCols + " FROM billing.inquiries q JOIN billing.ref_customers cu ON cu.id = q.customer_id WHERE q.id = $1"
 	if lock {
 		q += " FOR UPDATE OF q"
 	}
@@ -199,7 +199,7 @@ func (m Billing) listInquiries(ctx context.Context, c *ops.Call, in *paging.Quer
 		}
 	}
 	where := strings.Join(conds, " AND ")
-	from := "billing.inquiries q JOIN assets.customers cu ON cu.id = q.customer_id"
+	from := "billing.inquiries q JOIN billing.ref_customers cu ON cu.id = q.customer_id"
 	var total int
 	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM "+from+" WHERE "+where, args...).Scan(&total); err != nil {
 		return paging.Page[Inquiry]{}, err

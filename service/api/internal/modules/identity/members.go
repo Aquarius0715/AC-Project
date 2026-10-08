@@ -64,8 +64,41 @@ func scanMember(r pgx.Row) (Member, error) {
 	return x, err
 }
 
-// LoadMembers fills permissions, scopes and qualifications (IR42: contractors get no permissions or scopes).
+// QueryLoadMembers completes members for other domains (IR194: maintenance's technician lists).
+const QueryLoadMembers = "identity.loadMembers"
+
+// LoadMembersInput is QueryLoadMembers input.
+type LoadMembersInput struct {
+	Members []Member `json:"members"`
+}
+
+// LoadMembers fills permissions, scopes and qualifications (IR42: contractors get no permissions or scopes) and a
+// missing display name (IR172); callers in other domains ask identity-api.
 func LoadMembers(ctx context.Context, c *ops.Call, ms []Member) error {
+	if len(ms) == 0 {
+		return nil
+	}
+	out, err := ops.Delegate(ctx, c, QueryLoadMembers, LoadMembersInput{Members: ms}, loadMembers)
+	if err != nil {
+		return err
+	}
+	copy(ms, out)
+	return nil
+}
+
+func loadMembers(ctx context.Context, c *ops.Call, in *LoadMembersInput) ([]Member, error) {
+	ms := in.Members
+	for i := range ms {
+		if ms[i].DisplayName == "" {
+			if err := c.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT display_name FROM identity.users WHERE id = $1), '')`, ms[i].UserID).Scan(&ms[i].DisplayName); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return ms, fillMembers(ctx, c, ms)
+}
+
+func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 	for i := range ms {
 		x := &ms[i]
 		x.Permissions, x.Scopes, x.Qualifications = []string{}, []ScopeRef{}, []Grant{}
@@ -307,9 +340,9 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				ok = ok && sc.ID == in.OrganizationID
 			}
 		case "property":
-			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.properties WHERE id = $1)`, sc.ID).Scan(&ok)
+			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notify.ref_properties WHERE id = $1)`, sc.ID).Scan(&ok)
 		case "unit":
-			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`, sc.ID).Scan(&ok)
+			err = c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM notify.ref_units WHERE id = $1)`, sc.ID).Scan(&ok)
 		}
 		if err != nil {
 			return Member{}, err
@@ -355,7 +388,7 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 			// IR144: the customer's user list includes the new active member (no-op when the email is already listed)
 			if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.client_users (tenant_id, customer_id, membership_id, email, display_name, client_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
 				SELECT current_setting('app.tenant_id')::uuid, cu.id, $1, u.email, u.display_name, 'member', 'active', $3, $4, $3, $3
-				FROM assets.customers cu, identity.users u WHERE cu.organization_id = $2 AND u.id = $5 ON CONFLICT DO NOTHING`, id, in.OrganizationID, c.Now, c.Principal.MembershipID, in.UserID); err != nil {
+				FROM notify.ref_customers cu, identity.users u WHERE cu.organization_id = $2 AND u.id = $5 ON CONFLICT DO NOTHING`, id, in.OrganizationID, c.Now, c.Principal.MembershipID, in.UserID); err != nil {
 				return Member{}, err
 			}
 		}

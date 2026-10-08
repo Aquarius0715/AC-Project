@@ -661,6 +661,18 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			fixtureIDs(a, "restrictionId"), optID(a, "restrictionId"), str(c, "status"), str(c, "delivery"), str(c, "requestedAt"), opt(c, "sentAt"), opt(c, "acknowledgedAt"), str(c, "expiresAt")); err != nil {
 			return fmt.Errorf("command %s: %w", str(c, "id"), err)
 		}
+		if a["restrictionId"] != nil { // billing's own record of the restriction command (IR194)
+			status := str(c, "status")
+			if status == "sent" {
+				status = "requested"
+			}
+			kind, _ := a["kind"].(string)
+			if err := ex(`INSERT INTO restrictions.restriction_commands (tenant_id, command_id, restriction_id, unit_id, kind, delivered, status, requested_at, updated_at)
+				VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8) ON CONFLICT DO NOTHING`, ID(unitTenant[str(c, "unitId")]), ID(str(c, "id")), optID(a, "restrictionId"), ID(str(c, "unitId")),
+				kind, str(c, "delivery") == "sent", status, str(c, "requestedAt")); err != nil {
+				return fmt.Errorf("restriction command %s: %w", str(c, "id"), err)
+			}
+		}
 	}
 	for _, a := range f.DemoSeed.Alerts {
 		u := str(a, "unitId")

@@ -1,12 +1,12 @@
 {
-  "version": "0.84.0",
-  "spec_baseline_id": "c3ad03052c61aae4b7950b43b2f76b769f53848d244c88184ea1b8363ce9d9a0",
+  "version": "0.85.0",
+  "spec_baseline_id": "51d1ac0ee791d1436f817d38f19ccb1eb19957f177b285327a735470cad32cbd",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "1067678b054800aec10c5206b1b2317f99cebfd80c45928bc6fc3ca995ca398c"
+      "sha256": "f99924f92b4846b60ac5cc2d47b8fe4a93f49bfbea601aea2bbb9b1b6e7ccccd"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -114,7 +114,7 @@
     },
     {
       "path": "02-design/container-design.md",
-      "sha256": "0d328b5d84f27a479b24004bec7bcc1eb6a33effc87639cd0c866c2c13ea18f3"
+      "sha256": "8d735bcee07e1dd8cb12a2b9a33b2be0f52a655575068729618810f6156efc60"
     },
     {
       "path": "02-design/contractor.md",
@@ -122,7 +122,7 @@
     },
     {
       "path": "02-design/database-design.md",
-      "sha256": "87c59f8d23b29804ed5eefe051cfed689cac4e26b66cf7a231cbb2826f10869a"
+      "sha256": "1c4cf4bb166680b1b99af0620d75b7791c40737bc9f796e07df69059969b927b"
     },
     {
       "path": "02-design/deterministic-contracts.md",
@@ -150,7 +150,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "a9139dd5fda46ebed49e6588344bdf32ec4667514ada98c69054b58669ad6afb"
+      "sha256": "a04ec632aa0decf90b95c16fa5c54e2e891346214b6e00dca6cf6cf44c94a6e5"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -278,7 +278,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "e37a098c8ebe46ca8ffc72784e62515fb99460026632d9c30dafc03a9e6bc84e"
+      "sha256": "7e528e160c4c3b9627a55a67da75bebffdf7db9e37a27412f86af638aa7a2203"
     },
     {
       "path": "tools/check_review_regressions.py",
@@ -290,7 +290,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "2620e983ece9552474eaba84e52e6e0e9fb84055efac103157fd7b159013c4b8"
+      "sha256": "8227f022ae8dc272cdc6037e4b7550f0d09c7d3e61551d5a963efc8080ccf080"
     }
   ]
 }

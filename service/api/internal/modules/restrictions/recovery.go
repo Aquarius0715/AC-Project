@@ -147,9 +147,8 @@ func (m Restrictions) reconcileTerminal(ctx context.Context, c *ops.Call, x Rest
 		if !bound || conn != "online" || power == "off" {
 			return nil, apperr.E(apperr.Offline, "errors.device_offline")
 		}
-		var raw []byte
-		var at *time.Time
-		if err := c.Tx.QueryRow(ctx, `SELECT observed_restriction, last_seen_at FROM assets.units WHERE id = $1`, u).Scan(&raw, &at); err != nil {
+		raw, at, err := m.Units.Observation(ctx, c, u) // equipment's observation (IR194)
+		if err != nil {
 			return nil, err
 		}
 		if at == nil || c.Now.Sub(*at) > IntentTTL {
@@ -206,7 +205,7 @@ func resolveRecoveryAlerts(ctx context.Context, tx pgx.Tx, units []uuid.UUID, _ 
 		return err
 	}
 	var tenant uuid.UUID
-	if err := tx.QueryRow(ctx, `SELECT tenant_id FROM assets.units WHERE id = $1`, done[0]).Scan(&tenant); err != nil {
+	if err := tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).Scan(&tenant); err != nil {
 		return err
 	}
 	return events.Publish(ctx, tx, tenant, "unit", done[0], events.ReconciliationResolved, events.Units{UnitIDs: done})
@@ -240,7 +239,7 @@ func recoveryAcknowledged(ctx context.Context, tx pgx.Tx, restriction, unit, com
 
 // recoveryEnded returns failed or expired recovery removes to pending (SR26).
 func recoveryEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now time.Time) error {
-	rows, err := tx.Query(ctx, `SELECT DISTINCT restriction_id FROM control.commands WHERE id = ANY($1) AND source = 'restriction' AND restriction_id IS NOT NULL`, commands)
+	rows, err := tx.Query(ctx, `SELECT DISTINCT restriction_id FROM restrictions.restriction_commands WHERE command_id = ANY($1)`, commands)
 	if err != nil {
 		return err
 	}

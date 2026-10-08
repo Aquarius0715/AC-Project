@@ -84,4 +84,5 @@ var Replicas = []events.Replica{
 	{Source: "restrictions.restrictions", Table: "notify.ref_restrictions", Keys: []string{"id"}, Cols: []string{"tenant_id", "customer_id"}},
 	{Source: "restrictions.restriction_units", Table: "notify.ref_restriction_units", Keys: []string{"restriction_id", "unit_id"}, Cols: []string{"tenant_id"}},
 	{Source: "devices.devices", Table: "notify.ref_devices", Keys: []string{"id"}, Cols: []string{"tenant_id", "serial", "unit_id"}},
+	{Source: "assets.properties", Table: "notify.ref_properties", Keys: []string{"id"}, Cols: []string{"tenant_id", "customer_org_id"}}, // identity scopes (IR194)
 }

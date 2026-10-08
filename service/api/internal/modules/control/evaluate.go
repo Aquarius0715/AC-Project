@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
@@ -234,10 +235,12 @@ func ownerValid(ctx context.Context, c *ops.Call, owner uuid.UUID, hq bool, org 
 	if hq {
 		perm = "automation.policy.write"
 	}
-	var ok bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.memberships m JOIN identity.membership_permissions p ON p.membership_id = m.id AND p.permission = $2
-		WHERE m.id = $1 AND m.valid_from <= $3 AND (m.valid_until IS NULL OR m.valid_until > $3) AND ($4 OR m.organization_id = $5))`, owner, perm, c.Now, hq, org).Scan(&ok)
-	return ok, err
+	f := identity.MembersInput{IDs: []uuid.UUID{owner}, Permission: perm} // identity's memberships (IR194)
+	if !hq {
+		f.OrganizationID = &org
+	}
+	ids, err := identity.Members(ctx, c, f)
+	return len(ids) == 1, err
 }
 
 func (m Automations) candidates(ctx context.Context, c *ops.Call, unit uuid.UUID, in *EvaluationInput) ([]candidate, error) {
@@ -343,8 +346,8 @@ func (m Automations) decide(ctx context.Context, c *ops.Call, unit uuid.UUID, in
 			}
 		}
 		if reason == "" && cond.Type == "location" {
-			var granted bool
-			if err := c.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT granted FROM identity.consents WHERE membership_id = $1 AND purpose = 'location_automation'), false)`, x.owner).Scan(&granted); err != nil {
+			granted, err := identity.ConsentGranted(ctx, c, x.owner, "location_automation")
+			if err != nil {
 				return Decision{}, nil, err
 			}
 			if !granted {

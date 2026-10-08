@@ -3,6 +3,7 @@ package restrictions
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/google/uuid"
@@ -15,11 +16,20 @@ import (
 // its device (D05, SR24).
 type Busy struct{}
 
-// Internal queries behind Busy for equipment (IR193).
+// Internal queries behind Busy for equipment (IR193, IR194).
 const (
-	QueryUnitBusy   = "restrictions.unitBusy"
-	QueryUnitPolicy = "restrictions.unitPolicy"
+	QueryUnitBusy        = "restrictions.unitBusy"
+	QueryUnitPolicy      = "restrictions.unitPolicy"
+	QueryUnitRestriction = "restrictions.unitRestriction"
+	QueryUnitRecovering  = "restrictions.unitRecovering"
 )
+
+// UnitRestriction is the restriction that currently restricts a unit (IR46): its phase (state) and policy.
+type UnitRestriction struct {
+	Phase  string          `json:"phase"`
+	Policy json.RawMessage `json:"policy"`
+	Found  bool            `json:"found"`
+}
 
 // UnitInput names a unit.
 type UnitInput struct {
@@ -30,6 +40,37 @@ type UnitInput struct {
 func RegisterQueries(r *ops.Registry) {
 	ops.RegisterQuery(r, ops.DomainBilling, QueryUnitBusy, unitBusy)
 	ops.RegisterQuery(r, ops.DomainBilling, QueryUnitPolicy, unitPolicy)
+	ops.RegisterQuery(r, ops.DomainBilling, QueryUnitRestriction, unitRestriction)
+	ops.RegisterQuery(r, ops.DomainBilling, QueryUnitRecovering, unitRecovering)
+}
+
+// UnitRestriction returns the newest restriction that currently restricts the unit (unit detail, IR46).
+func (Busy) UnitRestriction(ctx context.Context, c *ops.Call, unit uuid.UUID) (UnitRestriction, error) {
+	return ops.Delegate(ctx, c, QueryUnitRestriction, UnitInput{UnitID: unit}, unitRestriction)
+}
+
+func unitRestriction(ctx context.Context, c *ops.Call, in *UnitInput) (UnitRestriction, error) {
+	var r UnitRestriction
+	err := c.Tx.QueryRow(ctx, `SELECT r.state, r.policy FROM restrictions.restriction_units ru JOIN restrictions.restrictions r ON r.id = ru.restriction_id
+		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested') ORDER BY r.created_at DESC LIMIT 1`, in.UnitID).Scan(&r.Phase, &r.Policy)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return UnitRestriction{}, nil
+	}
+	r.Found = err == nil
+	return r, err
+}
+
+// UnitRecovering reports an unresolved terminal-restriction recovery case of the unit, which blocks ordinary control
+// (SR26).
+func (Busy) UnitRecovering(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
+	return ops.Delegate(ctx, c, QueryUnitRecovering, UnitInput{UnitID: unit}, unitRecovering)
+}
+
+func unitRecovering(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
+	var blocked bool
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restrictions r, jsonb_array_elements(r.recovery_cases) k
+		WHERE k->>'unitId' = $1::text AND k->>'state' <> 'resolved')`, in.UnitID).Scan(&blocked)
+	return blocked, err
 }
 
 // UnitBusy implements devices.Exclusion (asks billing, IR193).

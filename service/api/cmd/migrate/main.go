@@ -4,8 +4,9 @@
 //	migrate version     print the applied version
 //	migrate force N     record version N as clean without running SQL
 //
-// Local and CI only: APP_LOGIN_PASSWORD creates or updates the ac_app_login role, and SEED_FIXTURE
-// loads the demo fixture once (skipped when identity.users already has rows).
+// Local and CI only: APP_LOGIN_PASSWORD creates or updates the ac_app_login role and the domain service logins
+// ac_<domain>_login (IR194), and SEED_FIXTURE loads the demo fixture once (skipped when identity.users already has
+// rows).
 package main
 
 import (
@@ -86,6 +87,12 @@ func local(ctx context.Context, conn *pgx.Conn) error {
 			return err
 		}
 		log.Printf("migrate: login role ac_app_login ready")
+		for _, d := range []string{"identity", "equipment", "maintenance", "billing", "energy"} { // one login per domain service (IR194)
+			if err := migrate.EnsureLogin(ctx, conn, "ac_"+d+"_login", pw, "ac_svc_"+d); err != nil {
+				return err
+			}
+		}
+		log.Printf("migrate: domain service logins ready")
 	}
 	path := os.Getenv("SEED_FIXTURE")
 	if path == "" {

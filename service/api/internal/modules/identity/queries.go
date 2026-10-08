@@ -29,6 +29,8 @@ func RegisterQueries(r *ops.Registry) {
 	})
 	ops.RegisterQuery(r, ops.DomainIdentity, QueryMembers, members)
 	ops.RegisterQuery(r, ops.DomainIdentity, QueryNotificationsStored, notificationsStored)
+	ops.RegisterQuery(r, ops.DomainIdentity, QueryConsent, consent)
+	ops.RegisterQuery(r, ops.DomainIdentity, QueryLoadMembers, loadMembers)
 	registerDirectory(r)
 }
 
@@ -42,6 +44,31 @@ type MembersInput struct {
 	Role           string      `json:"role,omitempty"`
 	OrganizationID *uuid.UUID  `json:"organizationId,omitempty"`
 	Permission     string      `json:"permission,omitempty"`
+}
+
+// QueryConsent reports whether a membership granted a consent purpose (IR194: SR02 location automations).
+const QueryConsent = "identity.consent"
+
+// ConsentInput is QueryConsent input.
+type ConsentInput struct {
+	MembershipID uuid.UUID `json:"membershipId"`
+	Purpose      string    `json:"purpose"`
+}
+
+// Members asks identity for the active memberships matching f (any domain; local for the worker).
+func Members(ctx context.Context, c *ops.Call, f MembersInput) ([]uuid.UUID, error) {
+	return ops.Delegate(ctx, c, QueryMembers, f, members)
+}
+
+// ConsentGranted asks identity whether the membership granted the purpose (false when never recorded).
+func ConsentGranted(ctx context.Context, c *ops.Call, membership uuid.UUID, purpose string) (bool, error) {
+	return ops.Delegate(ctx, c, QueryConsent, ConsentInput{MembershipID: membership, Purpose: purpose}, consent)
+}
+
+func consent(ctx context.Context, c *ops.Call, in *ConsentInput) (bool, error) {
+	var granted bool
+	err := c.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT granted FROM identity.consents WHERE membership_id = $1 AND purpose = $2), false)`, in.MembershipID, in.Purpose).Scan(&granted)
+	return granted, err
 }
 
 // QueryNotificationsStored counts stored notifications among ids for the target at occurredAt (IR191: the

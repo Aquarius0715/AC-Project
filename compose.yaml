@@ -225,34 +225,54 @@ services:
     profiles: [backend, full]
     depends_on: [identity-api, equipment-api, maintenance-api, billing-api, energy-api]
 
-  identity-api:        # identity, notifications, audit, demo (internal; reached through the gateway)
+  identity-api:        # identity, notifications, audit (internal; reached through the gateway)
     <<: *backend
     image: ac-identity-api:dev
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: identity-api } }
+    environment:         # least-privilege login of the domain (IR194)
+      <<: *backend-env
+      DATABASE_URL: postgres://ac_identity_login:local@postgres:5432/ac?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_identity_login:local@postgres:5432/ac?sslmode=disable
     healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
 
   equipment-api:        # units, devices, control, monitoring, read models (internal; reached through the gateway)
     <<: *backend
     image: ac-equipment-api:dev
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: equipment-api } }
+    environment:         # least-privilege login of the domain (IR194)
+      <<: *backend-env
+      DATABASE_URL: postgres://ac_equipment_login:local@postgres:5432/ac?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_equipment_login:local@postgres:5432/ac?sslmode=disable
     healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
 
   maintenance-api:        # jobs, offers, assignments, partners (internal; reached through the gateway)
     <<: *backend
     image: ac-maintenance-api:dev
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: maintenance-api } }
+    environment:         # least-privilege login of the domain (IR194)
+      <<: *backend-env
+      DATABASE_URL: postgres://ac_maintenance_login:local@postgres:5432/ac?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_maintenance_login:local@postgres:5432/ac?sslmode=disable
     healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
 
   billing-api:        # billing, payments, restrictions (internal; reached through the gateway)
     <<: *backend
     image: ac-billing-api:dev
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: billing-api } }
+    environment:         # least-privilege login of the domain (IR194)
+      <<: *backend-env
+      DATABASE_URL: postgres://ac_billing_login:local@postgres:5432/ac?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_billing_login:local@postgres:5432/ac?sslmode=disable
     healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
 
   energy-api:        # energy, MRV, offsets (internal; reached through the gateway)
     <<: *backend
     image: ac-energy-api:dev
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: energy-api } }
+    environment:         # least-privilege login of the domain (IR194)
+      <<: *backend-env
+      DATABASE_URL: postgres://ac_energy_login:local@postgres:5432/ac?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_energy_login:local@postgres:5432/ac?sslmode=disable
     healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
 
   webhook:             # planned service (Stripe / SES / WhatsApp receiver); no command yet

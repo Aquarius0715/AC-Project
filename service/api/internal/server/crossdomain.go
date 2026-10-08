@@ -118,6 +118,7 @@ const (
 	qCustomerOfOrg     = "assets.customerOfOrg"
 	qCustomerState     = "assets.customerState"
 	qRestrictionTarget = "assets.restrictionTarget"
+	qUnitObservation   = "assets.unitObservation"
 	qUnitSeverities    = "monitoring.unitSeverities"
 	qRunHours          = "monitoring.runHours"
 	qBoundDevice       = "devices.boundDevice"
@@ -234,6 +235,22 @@ func (v equipmentView) restrictionTarget(ctx context.Context, c *ops.Call, in *u
 	return targetOut{caps, found}, err
 }
 
+type observationOut struct {
+	Observed   []byte     `json:"observed"`
+	LastSeenAt *time.Time `json:"lastSeenAt"`
+}
+
+func (v equipmentView) Observation(ctx context.Context, c *ops.Call, unit uuid.UUID) ([]byte, *time.Time, error) {
+	r, err := ops.Delegate(ctx, c, qUnitObservation, unitIn{unit}, v.observation)
+	return r.Observed, r.LastSeenAt, err
+}
+
+func (v equipmentView) observation(ctx context.Context, c *ops.Call, in *unitIn) (observationOut, error) {
+	var r observationOut
+	err := c.Tx.QueryRow(ctx, `SELECT observed_restriction, last_seen_at FROM assets.units WHERE id = $1`, in.UnitID).Scan(&r.Observed, &r.LastSeenAt)
+	return r, err
+}
+
 func (v equipmentView) UnitSeverities(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID]string, error) {
 	return ops.Delegate(ctx, c, qUnitSeverities, unitsIn{units}, v.unitSeverities)
 }
@@ -338,6 +355,7 @@ func registerCrossDomain(r *ops.Registry, eq equipmentView, mv maintenanceView) 
 	ops.RegisterQuery(r, e, qCustomerOfOrg, eq.customerOfOrg)
 	ops.RegisterQuery(r, e, qCustomerState, eq.customerState)
 	ops.RegisterQuery(r, e, qRestrictionTarget, eq.restrictionTarget)
+	ops.RegisterQuery(r, e, qUnitObservation, eq.observation)
 	ops.RegisterQuery(r, e, qUnitSeverities, eq.unitSeverities)
 	ops.RegisterQuery(r, e, qRunHours, eq.runHours)
 	ops.RegisterQuery(r, e, qBoundDevice, eq.boundDevice)

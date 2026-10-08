@@ -254,7 +254,7 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 			return nil, apperr.Fields(map[string]string{"unitIds": "errors.reconcile_not_needed"})
 		}
 		var open bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE restriction_id = $1 AND unit_id = $2 AND status IN ('requested','sent'))`, x.ID, u.UnitID).Scan(&open); err != nil {
+		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested')`, x.ID, u.UnitID).Scan(&open); err != nil {
 			return nil, err
 		}
 		if open {
@@ -267,9 +267,8 @@ func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileI
 		if !bound || conn != "online" || power == "off" {
 			return nil, apperr.E(apperr.Offline, "errors.device_offline")
 		}
-		var raw []byte
-		var at *time.Time
-		if err := c.Tx.QueryRow(ctx, `SELECT observed_restriction, last_seen_at FROM assets.units WHERE id = $1`, u.UnitID).Scan(&raw, &at); err != nil {
+		raw, at, err := m.Units.Observation(ctx, c, u.UnitID) // equipment's observation (IR194)
+		if err != nil {
 			return nil, err
 		}
 		if at == nil || c.Now.Sub(*at) > IntentTTL {
@@ -396,7 +395,7 @@ func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (a
 	changed := false
 	for _, u := range targets {
 		var open bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE restriction_id = $1 AND unit_id = $2 AND status IN ('requested','sent'))`, x.ID, u.UnitID).Scan(&open); err != nil {
+		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_commands WHERE restriction_id = $1 AND unit_id = $2 AND status = 'requested')`, x.ID, u.UnitID).Scan(&open); err != nil {
 			return nil, err
 		}
 		if in.Phase == "apply" {

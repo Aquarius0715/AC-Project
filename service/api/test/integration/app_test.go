@@ -39,14 +39,17 @@ func serverWith(t *testing.T, demo bool) *apiserver.Server {
 	return serverCfg(t, func(c *apiserver.Config) { c.DemoOps = demo })
 }
 
-// serverCfg builds a server on the test database; opt adjusts the configuration (domains, identity source).
-func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
+func clockFunc() time.Time { return clock }
+
+// seedFixture applies the demo fixture (idempotent) and returns it.
+func seedFixture(t *testing.T) *seed.Fixture {
 	t.Helper()
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable")
 	if err != nil {
 		t.Skip("database not available:", err)
 	}
+	defer conn.Close(ctx)
 	f, err := seed.Load("../../../../docs/04-agentic-sdlc/fixture-contract.json")
 	if err != nil {
 		t.Fatal(err)
@@ -54,15 +57,33 @@ func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
 	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error { return seed.Apply(ctx, tx, f) }); err != nil {
 		t.Fatal(err)
 	}
-	conn.Close(ctx)
-	url := "postgres://ac_app_login:local@localhost:5432/ac_test?sslmode=disable"
+	return f
+}
+
+// testVerifier maps the static test tokens to the fixture users.
+func testVerifier(t *testing.T) auth.StaticVerifier {
+	t.Helper()
+	f := seedFixture(t)
 	v := auth.StaticVerifier{}
 	for _, a := range f.Actors {
 		v["tok-"+map[string]string{"hq-operator": "hq", "customer-a": "a", "customer-b": "b", "tech-external-b": "tb", "tech-internal-a": "ti", "tech-external-a": "ta", "contractor-a": "ca", "contractor-b": "cb", "hq-restriction-manager": "rm", "hq-override-only": "oo"}[a.MembershipID]] = seed.ID(a.UserID).String()
 	}
-	cfg := apiserver.Config{DatabaseURL: url, Clock: func() time.Time { return clock }}
+	return v
+}
+
+// serverCfg builds a server on the test database; opt adjusts the configuration (domains, identity source). In
+// cluster mode an all-domain server is the split-service facade (cluster_test.go).
+func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
+	t.Helper()
+	v := testVerifier(t)
+	cfg := apiserver.Config{DatabaseURL: "postgres://ac_app_login:local@localhost:5432/ac_test?sslmode=disable", Clock: clockFunc}
 	opt(&cfg)
-	s, err := apiserver.New(ctx, cfg, v)
+	if clusterMode && len(cfg.Domains) == 0 {
+		f := clusterFacade(t, cfg, v)
+		lastServer = f
+		return f
+	}
+	s, err := apiserver.New(context.Background(), cfg, v)
 	if err != nil {
 		t.Fatal(err)
 	}

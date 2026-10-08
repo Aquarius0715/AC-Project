@@ -43,7 +43,7 @@ const clientUserCols = `x.id, x.tenant_id, x.version, x.created_at, x.updated_at
 	(SELECT u.last_sign_in_at FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id WHERE m.id = x.membership_id), x.allowed_channels, x.invited_at,
 	x.invited_by_membership_id, cu.organization_id`
 
-const clientUserFrom = `identity.client_users x JOIN assets.customers cu ON cu.id = x.customer_id`
+const clientUserFrom = `identity.client_users x JOIN notify.ref_customers cu ON cu.id = x.customer_id`
 
 func scanClientUser(r pgx.Row) (ClientUser, error) {
 	var x ClientUser
@@ -183,7 +183,7 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 		return ClientUser{}, err
 	}
 	var org uuid.UUID
-	err := c.Tx.QueryRow(ctx, `SELECT organization_id FROM assets.customers WHERE id = $1`, in.CustomerID).Scan(&org)
+	err := c.Tx.QueryRow(ctx, `SELECT organization_id FROM notify.ref_customers WHERE id = $1`, in.CustomerID).Scan(&org)
 	if errors.Is(err, pgx.ErrNoRows) || (err == nil && c.Principal.Role == "client" && org != c.Principal.OrgID) {
 		return ClientUser{}, apperr.E(apperr.NotFound, "error.notFound")
 	}

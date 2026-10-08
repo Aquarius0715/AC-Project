@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -46,9 +47,16 @@ type DomainError struct {
 	FieldErrors       map[string]string `json:"fieldErrors"`
 	CorrelationID     string            `json:"correlationId"`
 	RetryAfterSeconds *int              `json:"retryAfterSeconds"`
+
+	cause error // the converted error (database, deadline, unknown); logged for 5xx, never sent
 }
 
 func (e *DomainError) Error() string { return string(e.Code) + ": " + e.MessageKey }
+
+// Cause returns the error this DomainError was converted from (nil for errors created by E / Fields).
+func (e *DomainError) Cause() error { return e.cause }
+
+func caused(de *DomainError, err error) *DomainError { de.cause = err; return de }
 
 // HTTPStatus returns the fixed status for the error code.
 func (e *DomainError) HTTPStatus() int { return status[e.Code] }
@@ -79,25 +87,30 @@ func From(err error) *DomainError {
 		return de
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		return E(Timeout, "error.timeout")
+		return caused(E(Timeout, "error.timeout"), err)
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
-		return E(NotFound, "error.notFound")
+		return caused(E(NotFound, "error.notFound"), err)
 	}
 	var pg *pgconn.PgError
 	if errors.As(err, &pg) {
 		switch pg.Code {
 		case "23514", "22P02", "22001", "22003", "22007", "22008":
-			return E(Validation, "error.validation")
-		case "42501", "23503":
-			return E(NotFound, "error.notFound")
+			return caused(E(Validation, "error.validation"), err)
+		case "42501":
+			if strings.HasPrefix(pg.Message, "permission denied") { // a missing table privilege is a defect (IR194), not RLS
+				return caused(E(Unavailable, "error.unavailable"), err)
+			}
+			return caused(E(NotFound, "error.notFound"), err) // row-level security: never reveal other tenants
+		case "23503":
+			return caused(E(NotFound, "error.notFound"), err)
 		case "23505", "23P01":
-			return E(Conflict, "error.conflict")
+			return caused(E(Conflict, "error.conflict"), err)
 		case "40001", "40P01":
-			return E(Unavailable, "error.unavailable").RetryAfter(1)
+			return caused(E(Unavailable, "error.unavailable").RetryAfter(1), err)
 		case "57014":
-			return E(Timeout, "error.timeout")
+			return caused(E(Timeout, "error.timeout"), err)
 		}
 	}
-	return E(Unavailable, "error.unavailable")
+	return caused(E(Unavailable, "error.unavailable"), err)
 }

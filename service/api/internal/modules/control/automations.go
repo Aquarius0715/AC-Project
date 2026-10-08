@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
@@ -381,9 +382,8 @@ func (m Automations) save(ctx context.Context, c *ops.Call, in *AutomationInput)
 		}
 	}
 	if in.Kind == "event" && in.condition.Type == "location" { // location conditions need the owner's consent (SR02)
-		var granted bool
-		err := c.Tx.QueryRow(ctx, `SELECT granted FROM identity.consents WHERE membership_id = $1 AND purpose = 'location_automation'`, c.Principal.MembershipID).Scan(&granted)
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		granted, err := identity.ConsentGranted(ctx, c, c.Principal.MembershipID, "location_automation") // identity's record (IR194)
+		if err != nil {
 			return Automation{}, err
 		}
 		if !granted {

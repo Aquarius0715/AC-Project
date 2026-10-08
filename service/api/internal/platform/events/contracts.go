@@ -110,6 +110,8 @@ type Observation struct {
 type Commands struct {
 	CommandIDs []uuid.UUID `json:"commandIds"`
 	At         time.Time   `json:"at"`
+	// Statuses are the commands' final statuses for CommandsEnded (failed / expired / cancelled, IR194).
+	Statuses map[uuid.UUID]string `json:"statuses,omitempty"`
 }
 
 // Target is a notification target.
