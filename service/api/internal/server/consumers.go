@@ -3,6 +3,8 @@ package server
 import (
 	"slices"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/assets"
+	"github.com/pradita/ac-project/service/api/internal/modules/monitoring"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
@@ -18,8 +20,20 @@ func consumers(m *db.TxManager, domains []string) []*events.Consumer {
 			out = append(out, &events.Consumer{Name: name, DB: m, Handlers: handlers})
 		}
 	}
-	// IR183 step 2b adds the restriction ↔ equipment handlers here.
-	add(ops.DomainEquipment, "equipment", map[string]events.Handler{})
+	add(ops.DomainEquipment, "equipment", merge(assets.EventHandlers(), monitoring.EventHandlers())) // IR184
 	add(ops.DomainBilling, "billing", map[string]events.Handler{})
+	return out
+}
+
+func merge(ms ...map[string]events.Handler) map[string]events.Handler {
+	out := map[string]events.Handler{}
+	for _, m := range ms {
+		for k, h := range m {
+			if _, dup := out[k]; dup {
+				panic("events: two handlers for " + k + " in one consumer")
+			}
+			out[k] = h
+		}
+	}
 	return out
 }

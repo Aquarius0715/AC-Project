@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"sync"
 	"time"
@@ -238,6 +239,13 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 	}
 	if in.EventType == "restriction_observation" { // SR26: a device reports which restriction it enforces
 		return out, d.inTenant(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_units WHERE unit_id = $1)`, *in.UnitID, func(tx pgx.Tx, _ uuid.UUID) error {
+			var obsRaw any // the device observation itself (equipment data); restrictions reacts to it
+			if in.Observed != nil {
+				obsRaw, _ = json.Marshal(in.Observed)
+			}
+			if _, err := tx.Exec(ctx, `UPDATE assets.units SET observed_restriction = $2, last_seen_at = $3 WHERE id = $1`, *in.UnitID, obsRaw, c.Now); err != nil {
+				return err
+			}
 			_, err := restrictions.Observe(ctx, tx, c.Now, *in.UnitID, in.Observed, in.EventID)
 			return err
 		})

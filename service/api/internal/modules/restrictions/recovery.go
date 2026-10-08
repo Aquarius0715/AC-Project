@@ -3,6 +3,7 @@ package restrictions
 import (
 	"context"
 	"encoding/json"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"time"
 
 	"github.com/google/uuid"
@@ -53,24 +54,31 @@ func loadCases(ctx context.Context, tx pgx.Tx, id uuid.UUID, lock bool) ([]Recov
 func saveCases(ctx context.Context, tx pgx.Tx, id uuid.UUID, cases []RecoveryCase, now time.Time) error {
 	raw, _ := json.Marshal(cases)
 	_, err := tx.Exec(ctx, `UPDATE restrictions.restrictions SET recovery_cases = $2, version = version + 1, updated_at = $3 WHERE id = $1`, id, raw, now)
-	if err == nil { // SR29: a recovery-case change also increments the target unit's version
-		_, err = tx.Exec(ctx, `UPDATE assets.units SET version = version + 1, updated_at = $2 WHERE id IN (SELECT unit_id FROM restrictions.restriction_units WHERE restriction_id = $1)`, id, now)
+	if err != nil {
+		return err
 	}
-	return err
+	// SR29: a recovery-case change also increments the target units' versions — owned by equipment (IR184)
+	units, err := restrictionUnits(ctx, tx, id)
+	if err != nil || len(units) == 0 {
+		return err
+	}
+	return publish(ctx, tx, id, "restriction", id, events.RecoveryCasesChanged, events.Units{RestrictionID: id, UnitIDs: units})
+}
+
+func restrictionUnits(ctx context.Context, tx pgx.Tx, id uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := tx.Query(ctx, `SELECT unit_id FROM restrictions.restriction_units WHERE restriction_id = $1 ORDER BY unit_id`, id)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 }
 
 // Observe applies a device observation of a unit (demo.trigger restriction_observation, SR26). The unit's
 // observedRestriction is updated. When the observed restriction is released or cancelled, the terminal state is kept
 // and a pending recovery case is opened (or the open case for the same unit / restriction / rules version is updated)
 // together with one open reconciliation_required Alert. It returns whether a recovery case changed.
+// The unit's own observedRestriction is recorded by the device side before this is called (IR184).
 func Observe(ctx context.Context, tx pgx.Tx, now time.Time, unit uuid.UUID, observed *Observation, eventID uuid.UUID) (bool, error) {
-	var obsRaw any
-	if observed != nil {
-		obsRaw, _ = json.Marshal(observed)
-	}
-	if _, err := tx.Exec(ctx, `UPDATE assets.units SET observed_restriction = $2, last_seen_at = $3 WHERE id = $1`, unit, obsRaw, now); err != nil {
-		return false, err
-	}
 	if observed == nil {
 		return false, nil
 	}
@@ -103,10 +111,8 @@ func Observe(ctx context.Context, tx pgx.Tx, now time.Time, unit uuid.UUID, obse
 	if err := saveCases(ctx, tx, observed.RestrictionID, cases, now); err != nil {
 		return false, err
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO monitoring.alerts (tenant_id, unit_id, customer_org_id, type, severity, status, cause_code, evidence_kind, evidence_text, observed_at, detected_at, created_at, updated_at)
-		SELECT u.tenant_id, u.id, u.customer_org_id, 'reconciliation_required', 'warning', 'open', 'unknown', 'demo_observation',
-			'Device still reports an ended restriction; reconcile it from HQ', $2, $2, $2, $2 FROM assets.units u
-		WHERE u.id = $1 AND NOT EXISTS (SELECT 1 FROM monitoring.alerts a WHERE a.unit_id = u.id AND a.type = 'reconciliation_required' AND a.status <> 'resolved')`, unit, now)
+	// the reconciliation_required alert is owned by equipment (IR184)
+	err = publish(ctx, tx, observed.RestrictionID, "restriction", observed.RestrictionID, events.ReconciliationRequired, events.Units{RestrictionID: observed.RestrictionID, UnitIDs: []uuid.UUID{unit}})
 	return true, err
 }
 
@@ -187,12 +193,23 @@ func (m Restrictions) reconcileTerminal(ctx context.Context, c *ops.Call, x Rest
 }
 
 // resolveRecoveryAlerts resolves the reconciliation_required Alert of units without unresolved cases.
-func resolveRecoveryAlerts(ctx context.Context, tx pgx.Tx, units []uuid.UUID, now time.Time) error {
-	_, err := tx.Exec(ctx, `UPDATE monitoring.alerts a SET status = 'resolved', resolved_at = $2, resolution_reason = 'recovery resolved', version = version + 1, updated_at = $2
-		WHERE a.unit_id = ANY($1) AND a.type = 'reconciliation_required' AND a.status <> 'resolved'
-		  AND NOT EXISTS (SELECT 1 FROM restrictions.restrictions r, jsonb_array_elements(r.recovery_cases) k
-			WHERE k->>'unitId' = a.unit_id::text AND k->>'state' <> 'resolved')`, units, now)
-	return err
+// The alerts belong to equipment: restrictions publishes the units that no longer have an unresolved case (IR184).
+func resolveRecoveryAlerts(ctx context.Context, tx pgx.Tx, units []uuid.UUID, _ time.Time) error {
+	rows, err := tx.Query(ctx, `SELECT u FROM unnest($1::uuid[]) AS u
+		WHERE NOT EXISTS (SELECT 1 FROM restrictions.restrictions r, jsonb_array_elements(r.recovery_cases) k
+			WHERE k->>'unitId' = u::text AND k->>'state' <> 'resolved') ORDER BY u`, units)
+	if err != nil {
+		return err
+	}
+	done, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil || len(done) == 0 {
+		return err
+	}
+	var tenant uuid.UUID
+	if err := tx.QueryRow(ctx, `SELECT tenant_id FROM assets.units WHERE id = $1`, done[0]).Scan(&tenant); err != nil {
+		return err
+	}
+	return events.Publish(ctx, tx, tenant, "unit", done[0], events.ReconciliationResolved, events.Units{UnitIDs: done})
 }
 
 // recoveryAcknowledged resolves the removing case of a terminal restriction when its remove Command is acknowledged.
@@ -212,7 +229,7 @@ func recoveryAcknowledged(ctx context.Context, tx pgx.Tx, restriction, unit, com
 	if !hit {
 		return true, nil // terminal restriction: never change its per-unit state
 	}
-	if _, err := tx.Exec(ctx, `UPDATE assets.units SET observed_restriction = NULL WHERE id = $1 AND observed_restriction->>'restrictionId' = $2::text`, unit, restriction); err != nil {
+	if err := publish(ctx, tx, restriction, "unit", unit, events.UnitRestrictionCleared, events.UnitRestriction{UnitID: unit, RestrictionID: restriction}); err != nil {
 		return true, err
 	}
 	if err := saveCases(ctx, tx, restriction, cases, at); err != nil {
@@ -256,4 +273,14 @@ func recoveryEnded(ctx context.Context, tx pgx.Tx, commands []uuid.UUID, now tim
 		}
 	}
 	return nil
+}
+
+// publish writes an event in the tenant of restriction (the transaction may run without a tenant context: worker
+// ticks, device acknowledgements).
+func publish(ctx context.Context, tx pgx.Tx, restriction uuid.UUID, aggregateType string, aggregateID uuid.UUID, eventType string, payload any) error {
+	var tenant uuid.UUID
+	if err := tx.QueryRow(ctx, `SELECT tenant_id FROM restrictions.restrictions WHERE id = $1`, restriction).Scan(&tenant); err != nil {
+		return err
+	}
+	return events.Publish(ctx, tx, tenant, aggregateType, aggregateID, eventType, payload)
 }

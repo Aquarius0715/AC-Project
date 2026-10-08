@@ -26,6 +26,7 @@ func ackCommand(t *testing.T, id string, at time.Time) bool {
 	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error { ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id), at); return err }); err != nil {
 		t.Fatal(err)
 	}
+	drainEvents(t) // the device path is not an operation: apply the resulting events as the consumers would (IR184)
 	return ok
 }
 

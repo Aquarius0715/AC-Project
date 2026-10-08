@@ -67,7 +67,23 @@ func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
 		t.Fatal(err)
 	}
 	t.Cleanup(s.DB.Close)
+	if len(cfg.Domains) == 0 {
+		lastServer = s
+	}
 	return s
+}
+
+// lastServer is the most recent all-domain test server; drainEvents applies its pending events (IR183/IR184).
+var lastServer *apiserver.Server
+
+func drainEvents(t *testing.T) {
+	t.Helper()
+	if lastServer == nil {
+		return
+	}
+	if err := lastServer.DrainEvents(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func post(s *apiserver.Server, a *actor, op, body string) (int, map[string]any) {

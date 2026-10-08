@@ -1621,3 +1621,19 @@ User decision: cross-service writes are replaced by events (backend architecture
 
 Tests: `TestConsumerOrderDedupAndRetry` (order, tenant context, a failing event retried without reordering, independent consumers, replay ignored). All Go tests green; the dev and test databases were rebuilt for the new column (pre-release: `000001_init` is still `schema.sql`).
 
+## IR184 Restrictions no longer write equipment tables (phase B step 2b, part 1) — 2026-10-08
+
+The restrictions module (billing-api) stops writing `assets.units` and `monitoring.alerts`; it publishes events and equipment-api applies them (contracts in `service/api/internal/platform/events/contracts.go`):
+
+| Event (billing → equipment) | Published when | Applied by equipment |
+|---|---|---|
+| `UnitRestrictionApplied {unitId, restrictionId, observed}` | an apply command is acknowledged | `assets.units.observed_restriction` = observed |
+| `UnitRestrictionCleared {unitId, restrictionId}` | a release / recovery remove is acknowledged | observed restriction cleared when it still names the restriction |
+| `RecoveryCasesChanged {restrictionId, unitIds}` | recovery cases change (SR29) | unit versions + 1 |
+| `ReconciliationRequired {restrictionId, unitIds}` | a device still reports an ended restriction (SR26) | one open `reconciliation_required` alert per unit |
+| `ReconciliationResolved {unitIds}` | units have no unresolved recovery case left | their reconciliation alerts resolved |
+
+`events.Publish(ctx, tx, tenant, …)` writes the outbox row in the producer's transaction with an explicit tenant (device acknowledgements and worker ticks run without a tenant context); the equipment consumer runs every 250 ms in equipment-api, inline in the all-domain test server (repeated until no event is pending, since events can chain), and test helpers that call the device path directly drain the events afterwards. The device observation itself (`assets.units.observed_restriction` from `demo.trigger restriction_observation`) is now written by the trigger, before `restrictions.Observe` updates recovery cases. Remaining for part 2: device commands created and cancelled by restrictions (`control.commands`) and the reverse calls from control into restrictions on acknowledgement and expiry.
+
+Verified: all Go tests green (restriction lifecycle, recovery, cancel / payment, exception release, override reconcile); in compose the deployed equipment-api consumer applied an injected `RecoveryCasesChanged` event within 2 s, recorded once in `platform.processed_events`.
+

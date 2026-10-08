@@ -3,6 +3,7 @@ package restrictions
 import (
 	"context"
 	"encoding/json"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"time"
 
 	"github.com/google/uuid"
@@ -123,8 +124,12 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 			FROM restrictions.restrictions r WHERE r.id = ru.restriction_id AND ru.restriction_id = $1 AND ru.unit_id = $2`, restriction, unit, at); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE assets.units u SET observed_restriction = ru.observed_restriction FROM restrictions.restriction_units ru
-			WHERE ru.restriction_id = $1 AND ru.unit_id = $2 AND u.id = ru.unit_id`, restriction, unit); err != nil {
+		var observed []byte
+		if err := tx.QueryRow(ctx, `SELECT observed_restriction FROM restrictions.restriction_units WHERE restriction_id = $1 AND unit_id = $2`, restriction, unit).Scan(&observed); err != nil {
+			return err
+		}
+		// the unit's observedRestriction is owned by equipment (IR184)
+		if err := publish(ctx, tx, restriction, "unit", unit, events.UnitRestrictionApplied, events.UnitRestriction{UnitID: unit, RestrictionID: restriction, Observed: observed}); err != nil {
 			return err
 		}
 		_, err = tx.Exec(ctx, `UPDATE restrictions.restrictions r SET version = version + 1, updated_at = $2,
@@ -137,7 +142,7 @@ func CommandAcknowledged(ctx context.Context, tx pgx.Tx, command uuid.UUID, at t
 		WHERE restriction_id = $1 AND unit_id = $2`, restriction, unit, at); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `UPDATE assets.units SET observed_restriction = NULL WHERE id = $1 AND observed_restriction->>'restrictionId' = $2::text`, unit, restriction); err != nil {
+	if err := publish(ctx, tx, restriction, "unit", unit, events.UnitRestrictionCleared, events.UnitRestriction{UnitID: unit, RestrictionID: restriction}); err != nil {
 		return err
 	}
 	_, err = tx.Exec(ctx, `UPDATE restrictions.restrictions r SET version = version + 1, updated_at = $2,

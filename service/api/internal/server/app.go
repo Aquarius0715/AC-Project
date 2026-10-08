@@ -56,9 +56,17 @@ type Server struct {
 
 // DrainEvents applies every pending event of this server's consumers (inline mode and tests).
 func (s *Server) DrainEvents(ctx context.Context) error {
-	for _, c := range s.Consumers {
-		if _, err := c.Drain(ctx); err != nil {
-			return err
+	for pass := 0; pass < 10; pass++ { // events can trigger further events: repeat until nothing is pending
+		applied := 0
+		for _, c := range s.Consumers {
+			n, err := c.Drain(ctx)
+			if err != nil {
+				return err
+			}
+			applied += n
+		}
+		if applied == 0 {
+			return nil
 		}
 	}
 	return nil
