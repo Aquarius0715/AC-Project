@@ -635,13 +635,13 @@ func (m *Module) CustomerState(ctx context.Context, c *ops.Call, customer uuid.U
 // VisibleUnits returns the given units that the caller may read (D01 scope; archived units included for history).
 func (m *Module) VisibleUnits(ctx context.Context, c *ops.Call, units []uuid.UUID) ([]uuid.UUID, error) {
 	args := []any{units}
-	return m.unitIDs(ctx, c, "u.id = ANY($1) AND "+scopeSQL(c.Principal, &args), args)
+	return m.unitIDs(ctx, c, "u.id = ANY($1) AND "+scopeSQL(c, &args), args)
 }
 
 // UnitsInSpace returns the caller-readable units placed directly in a space.
 func (m *Module) UnitsInSpace(ctx context.Context, c *ops.Call, space uuid.UUID) ([]uuid.UUID, error) {
 	args := []any{space}
-	return m.unitIDs(ctx, c, "u.space_id = $1 AND "+scopeSQL(c.Principal, &args), args)
+	return m.unitIDs(ctx, c, "u.space_id = $1 AND "+scopeSQL(c, &args), args)
 }
 
 func (m *Module) unitIDs(ctx context.Context, c *ops.Call, where string, args []any) ([]uuid.UUID, error) {
@@ -696,7 +696,7 @@ func (m *Module) SpacesOfUnits(ctx context.Context, c *ops.Call, units []uuid.UU
 // ScopedUnits returns every unit the caller may read (used for technician list scopes).
 func (m *Module) ScopedUnits(ctx context.Context, c *ops.Call) ([]uuid.UUID, error) {
 	var args []any
-	return m.unitIDs(ctx, c, scopeSQL(c.Principal, &args), args)
+	return m.unitIDs(ctx, c, scopeSQL(c, &args), args)
 }
 
 // SpacesOfOrg returns every space in the properties of a customer organization.
@@ -779,7 +779,7 @@ func (m *Module) CustomerProfiles(ctx context.Context, c *ops.Call, orgs []uuid.
 // BriefUnits lists the caller-readable, not archived units matching the optional customer / property / space / unit filters.
 func (m *Module) BriefUnits(ctx context.Context, c *ops.Call, customer, property, space, unit *uuid.UUID) ([]ops.UnitBrief, error) {
 	args := []any{}
-	where := "NOT u.archived AND " + scopeSQL(c.Principal, &args)
+	where := "NOT u.archived AND " + scopeSQL(c, &args)
 	add := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
 	if customer != nil {
 		where += " AND u.customer_org_id = (SELECT organization_id FROM assets.customers WHERE id = " + add(*customer) + ")"

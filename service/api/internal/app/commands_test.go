@@ -73,6 +73,7 @@ func TestCommands(t *testing.T) {
 	}
 	defer conn.Close(ctx)
 	var ok bool
+	keepObserved(t, id)
 	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id), clock.Add(5*time.Second))
 		return err
@@ -94,6 +95,7 @@ func TestCommands(t *testing.T) {
 	if _, m := post(s, &hq, "commands.get", `{"id":"`+id2+`"}`); data(m)["status"] != "expired" || data(m)["failureCode"] != "TIMEOUT" {
 		t.Fatalf("expired: %v", m)
 	}
+	keepObserved(t, id2)
 	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error {
 		ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id2), clock.Add(40*time.Second))
 		return err

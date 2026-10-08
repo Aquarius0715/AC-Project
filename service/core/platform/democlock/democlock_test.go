@@ -111,6 +111,24 @@ func TestNowKeepsOffsetWhenDatabaseFails(t *testing.T) {
 	}
 }
 
+func TestMissingRowKeepsOffset(t *testing.T) {
+	ctx := context.Background()
+	p := scratch(t)
+	wall := time.Date(2026, 10, 8, 12, 0, 0, 0, time.UTC)
+	start := time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)
+	c, err := Open(ctx, p, func() time.Time { return wall }, start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.Exec(ctx, `DELETE FROM platform.demo_clock`); err != nil {
+		t.Fatal(err)
+	}
+	wall = wall.Add(5 * time.Second)
+	if got := c.Now(); !got.Equal(start.Add(5 * time.Second)) {
+		t.Fatalf("Now = %v", got)
+	}
+}
+
 func TestStartFromEnv(t *testing.T) {
 	if s, err := StartFromEnv(func(string) string { return "" }); err != nil || s.Format(time.RFC3339) != DefaultStart {
 		t.Fatalf("default = %v, %v", s, err)

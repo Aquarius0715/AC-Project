@@ -145,15 +145,22 @@ type UnitFilters struct {
 
 var connections = map[string]bool{"online": true, "offline": true, "unknown": true, "connecting": true, "error": true}
 
-// scopeSQL restricts rows to the caller's scope (D01). Admins see the tenant; clients their organization;
-// contractors and technicians their membership scopes (organization, property, unit).
-func scopeSQL(p *ops.Principal, args *[]any) string {
+// scopeSQL restricts rows to the caller's scope (D01, IR152 table). Admins see the tenant; clients their
+// organization; internal technicians their membership scopes (organization, property, unit); external technicians
+// the units of their own active Assignments inside the IR49 viewing window and the accepted Offer's access window,
+// intersected with their scopes; contractors the units of jobs with an accepted Offer inside its access window (IR23).
+func scopeSQL(c *ops.Call, args *[]any) string {
+	p := c.Principal
 	add := func(v any) string { *args = append(*args, v); return fmt.Sprintf("$%d", len(*args)) }
 	switch p.Role {
 	case "admin":
 		return "TRUE"
 	case "client":
 		return "u.customer_org_id = " + add(p.OrgID)
+	case "contractor":
+		now := add(c.Now)
+		return "EXISTS (SELECT 1 FROM maintenance.jobs j JOIN maintenance.offers o ON o.job_id = j.id WHERE j.unit_id = u.id AND o.contractor_org_id = " +
+			add(p.OrgID) + " AND o.decision = 'accept' AND o.access_valid_from <= " + now + " AND " + now + " < o.access_valid_until)"
 	default:
 		var parts []string
 		if ids := p.Scopes["organization"]; len(ids) > 0 {
@@ -168,8 +175,35 @@ func scopeSQL(p *ops.Principal, args *[]any) string {
 		if len(parts) == 0 {
 			return "FALSE"
 		}
-		return "(" + strings.Join(parts, " OR ") + ")"
+		scope := "(" + strings.Join(parts, " OR ") + ")"
+		if p.Role != "technician" || p.Employment == "internal" {
+			return scope
+		}
+		now := add(c.Now)
+		return scope + " AND EXISTS (SELECT 1 FROM maintenance.jobs j JOIN maintenance.assignments a ON a.job_id = j.id" +
+			" JOIN maintenance.offers o ON o.job_id = j.id AND o.decision = 'accept' AND o.access_valid_from <= " + now + " AND " + now + " < o.access_valid_until" +
+			" WHERE j.unit_id = u.id AND a.status = 'active' AND a.technician_membership_id = " + add(p.MembershipID) +
+			" AND a.created_at <= " + now + " AND " + now + " < upper(a.scheduled))"
 	}
+}
+
+// workStarted applies IR49(b): an external technician sees the unit in lists from the Assignment's creation, but
+// equipment reads (units.get) wait for the work window: before scheduledStart → FORBIDDEN errors.assignment_not_started.
+func workStarted(ctx context.Context, c *ops.Call, unit uuid.UUID) error {
+	p := c.Principal
+	if p.Role != "technician" || p.Employment == "internal" {
+		return nil
+	}
+	var started bool
+	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.jobs j JOIN maintenance.assignments a ON a.job_id = j.id
+		WHERE j.unit_id = $1 AND a.status = 'active' AND a.technician_membership_id = $2 AND lower(a.scheduled) <= $3 AND $3 < upper(a.scheduled))`,
+		unit, p.MembershipID, c.Now).Scan(&started); err != nil {
+		return err
+	}
+	if !started {
+		return apperr.E(apperr.Forbidden, "errors.assignment_not_started")
+	}
+	return nil
 }
 
 const unitCols = `u.id, u.tenant_id, u.version, u.created_at, u.updated_at, u.customer_org_id, u.property_id, u.space_id, u.display_name,
@@ -286,7 +320,7 @@ func (m *Module) unitsList(ctx context.Context, c *ops.Call, in *paging.Query) (
 	}
 	var args []any
 	add := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
-	conds := []string{"NOT u.archived", scopeSQL(c.Principal, &args)}
+	conds := []string{"NOT u.archived", scopeSQL(c, &args)}
 	if f.CustomerID != nil {
 		conds = append(conds, "u.customer_org_id = (SELECT organization_id FROM assets.customers WHERE id = "+add(*f.CustomerID)+")")
 	}
@@ -362,13 +396,16 @@ func (in *UnitGetInput) Validate() map[string]string {
 func (m *Module) unitsGet(ctx context.Context, c *ops.Call, in *UnitGetInput) (UnitDetail, error) {
 	var args []any
 	args = append(args, in.ID)
-	where := "u.id = $1 AND " + scopeSQL(c.Principal, &args)
+	where := "u.id = $1 AND " + scopeSQL(c, &args)
 	units, _, err := m.query(ctx, c, where, args, "u.id", 1, 0)
 	if err != nil {
 		return UnitDetail{}, err
 	}
 	if len(units) == 0 {
 		return UnitDetail{}, apperr.E(apperr.NotFound, "error.notFound")
+	}
+	if err := workStarted(ctx, c, in.ID); err != nil {
+		return UnitDetail{}, err
 	}
 	d := UnitDetail{Unit: units[0]}
 	if m.Details != nil {

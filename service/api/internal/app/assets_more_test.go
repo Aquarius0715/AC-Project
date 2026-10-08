@@ -24,6 +24,16 @@ func owner(t *testing.T, sql string, args ...any) {
 	}
 }
 
+// keepObserved restores the observedState of the command's unit when the test ends: an acknowledgement copies the
+// setting with a later observedAt (IR168), which would make fixture units read as stale in later tests (SR27).
+func keepObserved(t *testing.T, commandID string) {
+	t.Helper()
+	var unit string
+	var state []byte
+	ownerScan(t, `SELECT u.id::text, u.observed_state FROM assets.units u JOIN control.commands c ON c.unit_id = u.id WHERE c.id = $1`, []any{commandID}, &unit, &state)
+	t.Cleanup(func() { owner(t, `UPDATE assets.units SET observed_state = $2 WHERE id = $1`, unit, state) })
+}
+
 // ownerScan runs a single-row query as the database owner and scans it into dest.
 func ownerScan(t *testing.T, sql string, args []any, dest ...any) {
 	t.Helper()

@@ -26,7 +26,7 @@ func (m *Module) CountUnits(ctx context.Context, c *ops.Call, scoped bool, ids *
 	add := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
 	conds := []string{"NOT u.archived"}
 	if scoped {
-		conds = append(conds, scopeSQL(c.Principal, &args))
+		conds = append(conds, scopeSQL(c, &args))
 	}
 	if ids != nil {
 		conds = append(conds, "u.id = ANY("+add(*ids)+")")

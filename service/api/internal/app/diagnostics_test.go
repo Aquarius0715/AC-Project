@@ -21,6 +21,7 @@ func ackCommand(t *testing.T, id string, at time.Time) bool {
 		t.Skip(err)
 	}
 	defer conn.Close(ctx)
+	keepObserved(t, id)
 	var ok bool
 	if err := pgx.BeginFunc(ctx, conn, func(tx pgx.Tx) error { ok, err = control.Acknowledge(ctx, tx, uuid.MustParse(id), at); return err }); err != nil {
 		t.Fatal(err)

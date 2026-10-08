@@ -24,7 +24,11 @@ export type ApiUnitDetail = {
   effectiveControlPolicy: { state: "unrestricted" } | { state: "restricted"; phase: string; policy: { kind: "temperature_limit"; minimumCoolingSetpoint: number } | { kind: "power_off" } };
   controlAvailability: { state: "available" } | { state: "blocked"; reasonKey: string };
   pendingCommands: ApiCommand[];
-  location: { pathLabels: string[] };
+  location: { pathLabels: string[]; address: string | null; accessInstructions: string | null };
+  installedAt: string | null;
+  capabilityVersion: number;
+  serviceScope: ("indoor" | "outdoor" | "electrical")[];
+  components: string[];
 };
 
 export type ApiCommand = { id: string; action: UnitAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; failureCode: string | null };
@@ -78,4 +82,32 @@ export async function setAlertPolicies(unitId: string, alertPolicyIds: string[])
   const unit = await callOp<ApiUnitDetail>("units.get", { id: unitId });
   await callOp("units.setAlertPolicies", { unitId, alertPolicyIds }, { write: true, expectedVersion: unit.version });
   invalidate();
+}
+
+// Technician unit register / monitoring (FR-T02, FR-T04): component groups of the 18 ComponentKeys and the
+// rolling series window for telemetry.series.
+const groupOf: Record<string, "Indoor" | "Outdoor" | "Electrical"> = {
+  filter: "Indoor", evaporator_coil: "Indoor", blower_motor: "Indoor", blower_fan: "Indoor", drain_pipe: "Indoor", drain_pan: "Indoor", outlet: "Indoor", louver: "Indoor",
+  condenser_coil: "Outdoor", compressor: "Outdoor", fan: "Outdoor", blade: "Outdoor", refrigerant_pipe: "Outdoor",
+  thermostat: "Electrical", sensor: "Electrical", capacitor: "Electrical", contactor: "Electrical", wiring: "Electrical",
+};
+
+export function componentGroups(keys: string[]): Record<"Indoor" | "Outdoor" | "Electrical", string[]> {
+  const out = { Indoor: [] as string[], Outdoor: [] as string[], Electrical: [] as string[] };
+  for (const k of keys) out[groupOf[k] ?? "Electrical"].push(k.replace(/_/g, " "));
+  return out;
+}
+
+export const windowMs = { "1h": 3600e3, "24h": 86400e3, "7d": 7 * 86400e3 } as const;
+
+/** Buckets measurements into n equal slots (latest value per slot; null where no valid measurement). */
+export function bucket(items: { value: number | null; observedAt: string; quality?: string }[], from: Date, to: Date, n = 12): (number | null)[] {
+  const out: (number | null)[] = Array(n).fill(null);
+  const span = to.getTime() - from.getTime();
+  for (const m of [...items].sort((a, b) => a.observedAt.localeCompare(b.observedAt))) {
+    if (m.value === null || (m.quality && m.quality !== "valid")) continue;
+    const i = Math.min(n - 1, Math.floor(((new Date(m.observedAt).getTime() - from.getTime()) / span) * n));
+    if (i >= 0) out[i] = m.value;
+  }
+  return out;
 }

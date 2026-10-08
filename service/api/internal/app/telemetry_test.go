@@ -59,8 +59,9 @@ func TestTelemetry(t *testing.T) {
 	}{
 		"other customer's unit":   {&customerA, `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
 		"other customer's space":  {&customerA, `{` + rng + `,"spaceId":"` + seed.ID("room-b-1").String() + `","metric":"co2","query":{}}`, 404},
-		"technician in scope":     {&techB, `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 200},
-		"technician out of scope": {&techB, `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2","query":{}}`, 404},
+		"technician in scope":     {&techInt, `{` + rng + `,"unitIds":["` + online + `"],"metric":"co2","query":{}}`, 200},
+		"technician out of scope": {&techInt, `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
+		"external, no assignment": {&techB, `{` + rng + `,"unitIds":["` + other + `"],"metric":"co2","query":{}}`, 404},
 		"both targets":            {&hq, `{` + rng + `,"unitIds":["` + online + `"],"spaceId":"` + seed.ID("room-1").String() + `","metric":"co2","query":{}}`, 422},
 		"no target":               {&hq, `{` + rng + `,"metric":"co2","query":{}}`, 422},
 		"empty unitIds":           {&hq, `{` + rng + `,"unitIds":[],"metric":"co2","query":{}}`, 422},
@@ -150,10 +151,13 @@ func TestVentilation(t *testing.T) {
 	if ids(m)["roomB"] {
 		t.Fatal("customer-a sees customer-b's log")
 	}
-	_, m = post(s, &techB, "ventilation.list", `{"limit":100}`)
+	_, m = post(s, &techInt, "ventilation.list", `{"limit":100}`)
 	got := ids(m)
-	if !got["roomB"] || got[first] {
+	if got["roomB"] || !got[first] {
 		t.Fatalf("technician scope: %v", got)
+	}
+	if _, m = post(s, &techB, "ventilation.list", `{"limit":100}`); len(items(m)) != 0 {
+		t.Fatalf("external technician without an Assignment: %v", ids(m))
 	}
 	_, m = post(s, &hq, "ventilation.list", `{"filters":{"unitId":"`+seed.ID("unit-non-rto").String()+`","from":"`+clock.Add(-time.Minute).Format(time.RFC3339)+`","to":"`+clock.Add(time.Minute).Format(time.RFC3339)+`"},"limit":100}`)
 	for _, it := range items(m) {

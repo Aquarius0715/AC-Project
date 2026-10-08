@@ -72,6 +72,7 @@ func TestDemoOperations(t *testing.T) {
 		t.Fatalf("command: %d %v", code, m)
 	}
 	cmd := data(m)["id"].(string)
+	keepObserved(t, cmd)
 	if code, _ := trig(s, `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Add(time.Second).Format(time.RFC3339)+`","eventType":"command_ack","commandId":"`+cmd+`","sequence":1}`); code != 200 {
 		t.Fatal("ack trigger")
 	}

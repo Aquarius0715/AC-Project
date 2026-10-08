@@ -121,8 +121,10 @@ func TestUnitsListScopes(t *testing.T) {
 	mine := items(m)
 	_, m = post(s, &customerB, "units.list", `{"limit":100}`)
 	other := items(m)
-	_, m = post(s, &techB, "units.list", `{"limit":100}`)
+	_, m = post(s, &techInt, "units.list", `{"limit":100}`)
 	tech := items(m)
+	_, m = post(s, &techB, "units.list", `{"limit":100}`)
+	external := items(m)
 	total := func(a *actor) int {
 		_, m := post(s, a, "units.list", `{"limit":1}`)
 		return int(m["data"].(map[string]any)["total"].(float64))
@@ -143,8 +145,21 @@ func TestUnitsListScopes(t *testing.T) {
 			t.Fatalf("%v: power %v want %s", u["displayName"], u["effectivePowerState"], w)
 		}
 	}
-	if len(tech) != 1 || tech[0]["id"] != seed.ID("unit-other-customer").String() {
-		t.Fatalf("technician sees only scoped units, got %d", len(tech))
+	// internal technicians: Membership.scopes; external technicians: only units of their own Assignments (IR49(b))
+	seen := map[string]bool{}
+	for _, u := range tech {
+		seen[u["id"].(string)] = true
+	}
+	if seen[seed.ID("unit-other-customer").String()] {
+		t.Fatal("internal technician sees a unit outside its scopes")
+	}
+	for _, k := range []string{"unit-online-rto", "unit-offline-rto", "unit-non-rto", "unit-limited"} {
+		if !seen[seed.ID(k).String()] {
+			t.Fatalf("internal technician misses scoped unit %s", k)
+		}
+	}
+	if len(external) != 0 {
+		t.Fatalf("external technician without an Assignment sees %d units", len(external))
 	}
 	// paging
 	code, m := post(s, &hq, "units.list", `{"limit":2}`)

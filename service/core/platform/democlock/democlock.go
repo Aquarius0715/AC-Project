@@ -46,9 +46,13 @@ func Open(ctx context.Context, pool *pgxpool.Pool, base func() time.Time, start 
 func (c *Clock) load(ctx context.Context) error {
 	var ms int64
 	err := c.pool.QueryRow(ctx, `SELECT offset_ms FROM platform.demo_clock WHERE id`).Scan(&ms)
-	if errors.Is(err, pgx.ErrNoRows) {
-		ms = 0
-	} else if err != nil {
+	if errors.Is(err, pgx.ErrNoRows) { // the row was removed (database rebuilt): keep the known offset
+		c.mu.Lock()
+		c.loadedAt = c.base()
+		c.mu.Unlock()
+		return nil
+	}
+	if err != nil {
 		return err
 	}
 	c.mu.Lock()

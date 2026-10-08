@@ -3,6 +3,13 @@
 import Link from "next/link";
 import { use, useState } from "react";
 import { Badge, Banner, Card, ConnBadge, LineChart, Page, SeverityBadge, SummaryList, Tabs } from "@/components/ui";
+import { useNow, useOp } from "@/lib/useOp";
+import { bucket, componentGroups, klTime, latest, windowMs, type ApiUnitDetail } from "@/lib/unitApi";
+
+type ApiAlert = { id: string; severity: "critical" | "warning" | "normal"; status: string; causeCode: string; type: string; evidenceText: string; detectedAt: string; acknowledgedAt: string | null };
+type ApiJob = { projection: string; id?: string; type?: string; status?: string; scheduledSlot?: { startAt: string; endAt: string } | null; requestedSlot?: { startAt: string; endAt: string } | null };
+type ApiMeasurement = { value: number | null; unit: string; observedAt: string; quality: string };
+const jobType: Record<string, string> = { reactive: "Reactive", preventive: "Preventive", installation: "Installation", inspection: "Inspection" };
 
 const comps = { Indoor: ["Filter: attention (2026-06-12)"], Outdoor: ["All normal (2026-06-12)"], Electrical: ["Capacitor not inspected — reason given"] };
 const counts = { Indoor: 8, Outdoor: 5, Electrical: 5 };
@@ -12,6 +19,52 @@ export default function TechUnit({ params }: { params: Promise<{ id: string }> }
   const [tab, setTab] = useState<"register" | "monitoring">("register");
   const [win, setWin] = useState<"1h" | "24h" | "7d">("24h");
   const [lost, setLost] = useState(false);
+  // DATA_SOURCE=api: units.get (technician:assigned), open alerts and job history for this unit, telemetry.series
+  const unit = useOp<ApiUnitDetail, ApiUnitDetail | null>("units.get", { id }, null, (d) => d);
+  const d = unit.source === "api" ? unit.data : null;
+  const alerts = useOp<{ items: ApiAlert[] }, ApiAlert[]>("alerts.list", { limit: 20, filters: { unitId: id } }, [], (p) => p.items.filter((a) => a.status !== "resolved"));
+  const jobs = useOp<{ items: ApiJob[] }, ApiJob[]>("jobs.list", { limit: 20, filters: { unitId: id } }, [], (p) => p.items.filter((j) => j.projection === "summary"));
+  const now = useNow();
+  const to = now ?? new Date();
+  const from = new Date(to.getTime() - windowMs[win]);
+  const series = useOp<{ items: ApiMeasurement[] }, ApiMeasurement[]>("telemetry.series", { from: from.toISOString().slice(0, 16) + ":00Z", to: to.toISOString().slice(0, 16) + ":00Z", unitIds: [id], metric: "temperature", query: { limit: 100, sort: { field: "observedAt", direction: "desc" } } }, [], (p) => p.items);
+  if (unit.source === "api") {
+    if (unit.error?.error.messageKey === "errors.assignment_not_started") return <Page className="max-w-xl"><Card title="Not started yet" sub="You can see this AC from the start time of your assignment. Open the job to check the scheduled window." /></Page>;
+    if (unit.error?.error.code === "NOT_FOUND" || unit.error?.error.code === "FORBIDDEN") return <Page className="max-w-xl"><Card title="This page isn’t available" sub={`Not in your assignments (${unit.error.error.code}).`} /></Page>;
+    if (!d) return <Page><Card title={unit.loading ? "Loading…" : "Unit could not be loaded"} /></Page>;
+    const groups = componentGroups(d.components);
+    const temp = latest(d, "temperature");
+    const pow = latest(d, "power");
+    const hum = latest(d, "humidity");
+    const offline = d.connection !== "online";
+    const points = bucket(series.data, from, to);
+    const sched = (j: ApiJob) => j.scheduledSlot ?? j.requestedSlot;
+    return (
+      <Page>
+        <div className="flex flex-wrap items-center justify-between gap-2"><div><h1 className="text-lg font-bold">{d.displayName}</h1><div className="mt-1 flex gap-2"><ConnBadge s={offline ? "offline" : "online"} /></div></div><Tabs value={tab} onChange={setTab} tabs={[{ id: "register", label: "Register" }, { id: "monitoring", label: "Monitoring" }]} /></div>
+        {offline && <Banner tone="warn">Communication lost — updates stopped. Showing last known values (last seen {klTime(d.lastSeenAt, true)}).</Banner>}
+        {tab === "register" ? (
+          <div className="split">
+            <div className="flex min-w-0 flex-col gap-4">
+              <Card title="Unit register"><SummaryList cols={2} items={[["Location", d.location.pathLabels.join(" › ")], ["Manufacturer / model", `${d.capabilities.manufacturer} / ${d.capabilities.model}`], ["Installed", d.installedAt ? klTime(d.installedAt, true).split(",")[0] : "Not registered"], ["Capability version", String(d.capabilityVersion)], ["Maintenance scope", d.serviceScope.map((x) => x[0].toUpperCase() + x.slice(1)).join(" · ")], ["Access", d.location.accessInstructions ?? "—"]]} /><p className="mt-2 text-xs text-muted">{d.components.length} components across 3 groups ({groups.Indoor.length} indoor, {groups.Outdoor.length} outdoor, {groups.Electrical.length} electrical) — inspect them in the Job Workspace.</p></Card>
+              <Card title={`Components (${d.components.length})`}><div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>{(Object.keys(groups) as (keyof typeof groups)[]).map((g) => <div key={g} className="rounded-xl bg-surface2 p-3"><b className="text-[13px]">{g} · {groups[g].length} components</b><div className="text-xs text-muted">{groups[g].join(", ") || "—"}</div></div>)}</div></Card>
+              <Card title="Maintenance history">{jobs.data.length === 0 ? <p className="text-[13px] text-muted">No jobs you can see on this unit.</p> : jobs.data.map((j) => <Link key={j.id} href={`/technician/jobs/${j.id}`} className="block border-t border-line py-2 text-[13px] first:border-0 hover:bg-surface2/50"><b>{jobType[j.type ?? ""] ?? j.type} · {j.status}</b><div className="text-xs text-muted">{sched(j) ? klTime(sched(j)!.startAt, true) : "not scheduled"}</div></Link>)}</Card>
+            </div>
+            <div className="flex min-w-0 flex-col gap-4">
+              <Card title={`Open alerts (${alerts.data.length})`} action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${id}/alerts`}>Evidence →</Link>}>{alerts.data.length === 0 ? <p className="text-[13px] text-muted">No open alerts.</p> : alerts.data.map((a) => <div key={a.id} className="border-t border-line py-2 first:border-0"><b className="text-[13px]">{a.causeCode !== "unknown" ? a.causeCode.replace(/_/g, " ") : a.type}</b> <SeverityBadge s={a.severity} /><p className="text-xs text-muted">{a.evidenceText} · {klTime(a.detectedAt, true)}</p><p className="mt-1 text-xs text-muted">{a.acknowledgedAt ? "Acknowledged" : "Acknowledged by nobody yet"}. Completing the job does not resolve it.</p></div>)}</Card>
+              <Card title="Live"><SummaryList items={[["Temperature", temp ? `${temp.text} · ${temp.at}` : "—"], ["Power", pow ? `${pow.text} · ${pow.at}` : "—"], ["Humidity", hum ? `${hum.text} · ${hum.at}` : "—"], ["Connection", `${d.connection} · last seen ${klTime(d.lastSeenAt)}`]]} /></Card>
+              <Card title="Diagnostics"><Link href={`/technician/units/${id}/control`} className="text-xs font-semibold text-primary">Open diagnostic control →</Link></Card>
+            </div>
+          </div>
+        ) : (
+          <Card title={`Temperature · last ${win} (rolling)`} action={<Tabs value={win} onChange={setWin} tabs={[{ id: "1h", label: "1h" }, { id: "24h", label: "24h" }, { id: "7d", label: "7d" }]} />}>
+            {points.every((p) => p === null) ? <p className="text-[13px] text-muted">{series.loading ? "Loading…" : "No valid measurements in this window."}</p> : <LineChart points={points} height={170} labels={[`${win} ago`, "", "", "", "now"]} />}
+            <p className="mt-1 text-[11px] text-muted">latest {series.data.length} measurements · gaps stay unconnected; suspect or missing readings are not plotted.</p>
+          </Card>
+        )}
+      </Page>
+    );
+  }
   if (id === "unit-other-customer") return <Page className="max-w-xl"><Card title="This page isn’t available" sub="Not in your assignments (NOT_FOUND)." /></Page>;
   const missing = id === "unit-non-rto";
   const temp = [26, 26, 25, 25, null, null, 26, 27, 28, 29, 30, 30.4];
