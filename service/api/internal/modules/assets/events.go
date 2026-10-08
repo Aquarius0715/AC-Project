@@ -58,15 +58,15 @@ func EventHandlers() map[string]events.Handler {
 			if err := e.Decode(&p); err != nil {
 				return err
 			}
-			if !p.Active || p.UnitID == nil {
+			if p.Deleted || p.UnitID == nil {
 				_, err := tx.Exec(ctx, `DELETE FROM assets.unit_assignment_access WHERE tenant_id = $1 AND assignment_id = $2`, e.TenantID, p.AssignmentID)
 				return err
 			}
-			_, err := tx.Exec(ctx, `INSERT INTO assets.unit_assignment_access (tenant_id, assignment_id, job_id, unit_id, technician_membership_id, created_at, scheduled)
-				VALUES ($1, $2, $3, $4, $5, $6, tstzrange($7, $8))
+			_, err := tx.Exec(ctx, `INSERT INTO assets.unit_assignment_access (tenant_id, assignment_id, job_id, unit_id, technician_membership_id, created_at, scheduled, active)
+				VALUES ($1, $2, $3, $4, $5, $6, tstzrange($7, $8), $9)
 				ON CONFLICT (tenant_id, assignment_id) DO UPDATE SET job_id = EXCLUDED.job_id, unit_id = EXCLUDED.unit_id,
-				  technician_membership_id = EXCLUDED.technician_membership_id, created_at = EXCLUDED.created_at, scheduled = EXCLUDED.scheduled`,
-				e.TenantID, p.AssignmentID, p.JobID, *p.UnitID, p.TechnicianMembershipID, p.CreatedAt, p.ScheduledFrom, p.ScheduledUntil)
+				  technician_membership_id = EXCLUDED.technician_membership_id, created_at = EXCLUDED.created_at, scheduled = EXCLUDED.scheduled, active = EXCLUDED.active`,
+				e.TenantID, p.AssignmentID, p.JobID, *p.UnitID, p.TechnicianMembershipID, p.CreatedAt, p.ScheduledFrom, p.ScheduledUntil, p.Active)
 			return err
 		},
 	}

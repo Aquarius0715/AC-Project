@@ -134,6 +134,14 @@ func TestDiagnosticRuns(t *testing.T) {
 	if _, m := post(s, &techInt, "diagnosticRuns.list", `{"unitId":"`+unit+`","jobId":"`+job+`","query":{}}`); len(items(m)) != 3 {
 		t.Errorf("list: %d", len(items(m)))
 	}
+	// a revoked Assignment keeps the runs of the job visible (IR139, IR187)
+	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE job_id = $1`, job)
+	if _, m := post(s, &techInt, "diagnosticRuns.list", `{"unitId":"`+unit+`","jobId":"`+job+`","query":{}}`); len(items(m)) != 3 {
+		t.Errorf("list after revoke: %d", len(items(m)))
+	}
+	if code, _ := post(s, &techInt, "diagnosticRuns.get", `{"diagnosticRunId":"`+r1+`"}`); code != 200 {
+		t.Errorf("get after revoke: %d", code)
+	}
 	if _, m := post(s, &techB, "diagnosticRuns.list", `{"unitId":"`+unit+`","query":{}}`); len(items(m)) != 0 {
 		t.Error("other technician lists runs")
 	}

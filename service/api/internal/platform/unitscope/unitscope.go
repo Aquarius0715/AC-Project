@@ -80,7 +80,7 @@ func assignmentSQL(c *ops.Call, add func(any) string, unitExpr string, mode Mode
 	}
 	return "EXISTS (SELECT 1 FROM assets.unit_assignment_access sa" +
 		" JOIN assets.unit_offer_access so ON so.job_id = sa.job_id AND so.access_valid_from <= " + now + " AND " + now + " < so.access_valid_until" +
-		" WHERE sa.unit_id = " + unitExpr + " AND sa.technician_membership_id = " + add(c.Principal.MembershipID) +
+		" WHERE sa.unit_id = " + unitExpr + " AND sa.active AND sa.technician_membership_id = " + add(c.Principal.MembershipID) +
 		" AND " + from + " <= " + now + " AND " + now + " < upper(sa.scheduled))"
 }
 

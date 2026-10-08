@@ -154,13 +154,14 @@ func (m Diagnostics) create(ctx context.Context, c *ops.Call, in *RunInput) (Run
 	return x, nil
 }
 
-// visible applies the IR139 read scope to a run.
+// visible applies the IR139 read scope to a run: technicians see runs of jobs they hold or held an Assignment of,
+// read from equipment's projection of maintenance assignments (IR187).
 func visible(ctx context.Context, c *ops.Call, run Run) (bool, error) {
 	if c.Principal.Role != "technician" {
 		return true, nil
 	}
 	var ok bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.assignments WHERE job_id = $1 AND technician_membership_id = $2)`, run.JobID, c.Principal.MembershipID).Scan(&ok)
+	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND technician_membership_id = $2)`, run.JobID, c.Principal.MembershipID).Scan(&ok)
 	return ok, err
 }
 
@@ -222,7 +223,7 @@ func (m Diagnostics) list(ctx context.Context, c *ops.Call, in *RunListInput) (p
 	}
 	if c.Principal.Role == "technician" {
 		args = append(args, c.Principal.MembershipID)
-		where += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM maintenance.assignments a WHERE a.job_id = r.job_id AND a.technician_membership_id = $%d)", len(args))
+		where += fmt.Sprintf(" AND EXISTS (SELECT 1 FROM assets.unit_assignment_access a WHERE a.job_id = r.job_id AND a.technician_membership_id = $%d)", len(args))
 	}
 	var total int
 	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.diagnostic_runs r WHERE "+where, args...).Scan(&total); err != nil {

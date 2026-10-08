@@ -1676,3 +1676,10 @@ The D01 unit scope (IR152, IR169, IR170) no longer joins `maintenance.jobs / off
 - The scope still reads `assets.units` and the projections from the other services that use it (maintenance, billing, energy); these move behind equipment with the database split (IR181 step 4).
 
 Verified: all Go tests green, none skipped, including `TestUnitAccessProjection` (insert, accept, decline, revoke, delete) and the existing scope tests; in compose the projections match the seeded accepted Offers and active Assignments with no pending access events, and the contractor and external technician apps list their units through the gateway.
+
+## IR187 Diagnostic-run scope from the assignment projection (phase B step 3, part 2) — 2026-10-09
+
+`diagnosticRuns.get / list` (IR139) let a technician read the runs of jobs they hold or held an Assignment of. Control (equipment) read `maintenance.assignments` for this; it now reads `assets.unit_assignment_access`.
+
+- The projection keeps revoked Assignments: `AssignmentAccessChanged` gains `deleted` (row deleted) and the row gains `active` (`status = 'active'`). Only `deleted` removes the row; the unit scope (IR186) filters `active`.
+- Verified: all Go tests green, none skipped; `TestDiagnosticRuns` checks that runs stay visible after the Assignment is revoked, `TestUnitAccessProjection` that a revoked Assignment stays inactive in the projection.

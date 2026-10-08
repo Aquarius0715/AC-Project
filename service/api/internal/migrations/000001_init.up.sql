@@ -391,7 +391,7 @@ CREATE TABLE assets.unit_offer_access (           -- accepted Offers: contractor
 );
 CREATE INDEX unit_offer_access_unit ON assets.unit_offer_access (tenant_id, unit_id);
 
-CREATE TABLE assets.unit_assignment_access (      -- active Assignments: technician viewing and work windows per unit
+CREATE TABLE assets.unit_assignment_access (      -- Assignments: technician viewing and work windows per unit (revoked kept, IR187)
   tenant_id                uuid NOT NULL,
   assignment_id            uuid NOT NULL,
   job_id                   uuid NOT NULL,
@@ -399,6 +399,7 @@ CREATE TABLE assets.unit_assignment_access (      -- active Assignments: technic
   technician_membership_id uuid NOT NULL,
   created_at               timestamptz NOT NULL,
   scheduled                tstzrange NOT NULL,
+  active                   boolean NOT NULL,      -- status = 'active'; revoked rows keep diagnostic-run visibility (IR139)
   PRIMARY KEY (tenant_id, assignment_id)
 );
 CREATE INDEX unit_assignment_access_unit ON assets.unit_assignment_access (tenant_id, unit_id, technician_membership_id);
@@ -1045,7 +1046,7 @@ BEGIN
       VALUES (r.tenant_id, 'offer', r.id, 'OfferAccessChanged', payload, 'change-capture');
   ELSE
     payload := jsonb_build_object('assignmentId', r.id, 'jobId', r.job_id, 'unitId', unit, 'technicianMembershipId', r.technician_membership_id,
-      'active', TG_OP <> 'DELETE' AND r.status = 'active', 'createdAt', r.created_at,
+      'deleted', TG_OP = 'DELETE', 'active', TG_OP <> 'DELETE' AND r.status = 'active', 'createdAt', r.created_at,
       'scheduledFrom', lower(r.scheduled), 'scheduledUntil', upper(r.scheduled));
     INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id)
       VALUES (r.tenant_id, 'assignment', r.id, 'AssignmentAccessChanged', payload, 'change-capture');

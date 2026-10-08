@@ -41,12 +41,14 @@ type OfferAccess struct {
 	AccessValidUntil time.Time  `json:"accessValidUntil"`
 }
 
-// AssignmentAccess is the payload of AssignmentAccessChanged; Active false removes it.
+// AssignmentAccess is the payload of AssignmentAccessChanged; Deleted removes it, revoked ones stay with Active false
+// (IR187).
 type AssignmentAccess struct {
 	AssignmentID           uuid.UUID  `json:"assignmentId"`
 	JobID                  uuid.UUID  `json:"jobId"`
 	UnitID                 *uuid.UUID `json:"unitId"`
 	TechnicianMembershipID uuid.UUID  `json:"technicianMembershipId"`
+	Deleted                bool       `json:"deleted"`
 	Active                 bool       `json:"active"`
 	CreatedAt              time.Time  `json:"createdAt"`
 	ScheduledFrom          *time.Time `json:"scheduledFrom"`

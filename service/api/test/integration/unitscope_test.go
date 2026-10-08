@@ -115,8 +115,13 @@ func TestUnitAccessProjection(t *testing.T) {
 	}
 	owner(t, `UPDATE maintenance.offers SET decision = 'decline' WHERE job_id = $1`, job)
 	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE job_id = $1`, job)
-	if count("unit_offer_access") != 0 || count("unit_assignment_access") != 0 {
-		t.Fatal("declined offer and revoked assignment leave the projection")
+	var active bool
+	if count("unit_offer_access") != 0 || count("unit_assignment_access") != 1 {
+		t.Fatal("declined offer leaves the projection, revoked assignment stays (IR187)")
+	}
+	ownerScan(t, `SELECT active FROM assets.unit_assignment_access WHERE job_id = $1`, []any{job}, &active)
+	if active {
+		t.Fatal("revoked assignment is inactive")
 	}
 	owner(t, `UPDATE maintenance.assignments SET status = 'active' WHERE job_id = $1`, job)
 	owner(t, `DELETE FROM maintenance.assignments WHERE job_id = $1`, job)
