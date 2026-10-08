@@ -3,5 +3,5 @@
 import { RouteError } from "@/components/RouteStates";
 
 export default function SegmentError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
-  return <RouteError what="Notifications" error={error} retry={retry} />;
+  return <RouteError what="Overview" error={error} retry={retry} />;
 }

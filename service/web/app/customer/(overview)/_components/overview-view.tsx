@@ -3,15 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Badge, Btn, Card, ConnBadge, Kpi, LineChart, BarChart, Page, PowerBadge, SeverityBadge, Tabs, TextLink, OnOffBadge, Banner } from "@/components/ui";
-import { units as mockUnits, week, unitRowFromApi, mockCounts, type ApiUnit, type CustomerCounts } from "@/lib/client";
-import { useOp } from "@/lib/useOp";
+import { units as mockUnits, week, mockCounts, type CustomerCounts, type UnitRow } from "@/lib/client";
 
-export default function Overview() {
+/** Customer overview. In API mode the Server Component passes the units and counts; the demo uses fixture rows. */
+export function OverviewView({ units = mockUnits, counts = mockCounts }: { units?: UnitRow[]; counts?: CustomerCounts }) {
   const [range, setRange] = useState<"today" | "7d" | "30d">("today");
   const [stale, setStale] = useState(false);
-  // DATA_SOURCE=api: units.list + summaries.get(kind=customer); the demo keeps the fixture rows
-  const { data: units, error } = useOp<{ items: ApiUnit[] }, typeof mockUnits>("units.list", { limit: 100 }, mockUnits, (p) => p.items.map(unitRowFromApi));
-  const { data: counts } = useOp<{ counts: CustomerCounts }, CustomerCounts>("summaries.get", { kind: "customer", filters: {} }, mockCounts, (s) => s.counts);
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3">
@@ -27,7 +24,6 @@ export default function Overview() {
         </div>
       </div>
 
-      {error && <Banner tone="warn">Could not load units ({error.error.code}). Showing the last loaded values.</Banner>}
       {stale && <Banner tone="warn" action={<Btn size="sm" onClick={() => setStale(false)}>↻ Retry</Btn>}>Offline — showing values last loaded at 09:12. Remote actions are disabled until the connection returns.</Banner>}
 
       <div className="grid-fluid" style={{ ["--min" as string]: "210px" }}>
