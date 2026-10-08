@@ -27,7 +27,9 @@ export function sign(value: object): string {
 
 export function verify<T>(token: string | undefined): T | null {
   if (!token) return null;
-  const [body, mac] = token.split(".");
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [body, mac] = parts;
   if (!body || !mac) return null;
   const want = createHmac("sha256", secret()).update(body).digest();
   const got = Buffer.from(mac, "base64url");
@@ -39,10 +41,57 @@ export function verify<T>(token: string | undefined): T | null {
   }
 }
 
+// The cookie outlives the access token; readSession refreshes the token shortly before it expires (refresh_token
+// grant) and rewrites the cookie, so a session lasts as long as the identity provider's SSO session.
+const SESSION_MAX_AGE = 30 * 60;
+const REFRESH_LEEWAY_SECONDS = 30;
+
+export function cookieOptions() {
+  return { httpOnly: true, sameSite: "lax" as const, secure: oidcConfig().appUrl.startsWith("https"), path: "/", maxAge: SESSION_MAX_AGE };
+}
+
+/** Builds a session from a token response; null when the token lacks the tenant / membership / role claims. */
+export function sessionFromTokens(t: { access_token: string; refresh_token?: string; expires_in: number }, previousRefresh: string | null = null): Session | null {
+  const claims = jwtClaims(t.access_token);
+  const role = claims.role as Session["role"] | undefined;
+  if (!claims.tenant_id || !claims.membership_id || !role || !(role in roleHome)) return null;
+  return {
+    accessToken: t.access_token, refreshToken: t.refresh_token ?? previousRefresh, tenantId: String(claims.tenant_id), membershipId: String(claims.membership_id),
+    role, expiresAt: Math.floor(Date.now() / 1000) + t.expires_in,
+  };
+}
+
+async function refresh(s: Session): Promise<Session | null> {
+  if (!s.refreshToken) return null;
+  const cfg = oidcConfig();
+  try {
+    const r = await fetch(`${cfg.internalIssuer}/protocol/openid-connect/token`, {
+      method: "POST", cache: "no-store",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: s.refreshToken, client_id: cfg.clientId, client_secret: cfg.clientSecret }),
+    });
+    if (!r.ok) return null;
+    const next = sessionFromTokens(await r.json(), s.refreshToken);
+    // a refreshed token must keep the selected tenant and membership
+    return next && next.tenantId === s.tenantId && next.membershipId === s.membershipId ? next : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The signed-in session (route handlers only: refreshing rewrites or clears the cookie). */
 export async function readSession(): Promise<Session | null> {
-  const s = verify<Session>((await cookies()).get(SESSION_COOKIE)?.value);
-  if (!s || s.expiresAt * 1000 <= Date.now()) return null;
-  return s;
+  const jar = await cookies();
+  const s = verify<Session>(jar.get(SESSION_COOKIE)?.value);
+  if (!s) return null;
+  if (s.expiresAt - REFRESH_LEEWAY_SECONDS > Date.now() / 1000) return s;
+  const next = await refresh(s);
+  if (!next) {
+    jar.delete(SESSION_COOKIE);
+    return null;
+  }
+  jar.set(SESSION_COOKIE, sign(next), cookieOptions());
+  return next;
 }
 
 export const roleHome: Record<Session["role"], string> = { client: "/customer", contractor: "/partner", technician: "/technician", admin: "/admin" };

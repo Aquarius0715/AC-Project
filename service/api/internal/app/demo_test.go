@@ -78,6 +78,14 @@ func TestDemoOperations(t *testing.T) {
 	if _, m := post(s, &customerB, "commands.get", `{"id":"`+cmd+`"}`); data(m)["status"] != "acknowledged" {
 		t.Errorf("acknowledged: %v", m)
 	}
+	// the acknowledged setting becomes the observed state without a unit version change
+	_, g2 := post(s, &customerB, "units.get", `{"id":"`+u+`"}`)
+	if obs := data(g2)["observedState"].(map[string]any); obs["power"] != true || obs["observedAt"] != clock.Add(time.Second).Format(time.RFC3339Nano) {
+		t.Errorf("observedState after ack: %v", obs)
+	}
+	if ver(g2) != ver(g) {
+		t.Errorf("unit version changed by ack: %d → %d", ver(g), ver(g2))
+	}
 	// the clock only moves forward; deadlines are processed by the jump
 	if code, _ := write(s, &customerB, "demo.advanceClock", `{"to":"`+clock.Add(-time.Hour).Format(time.RFC3339)+`"}`, 0); code != 422 {
 		t.Error("backwards jump")

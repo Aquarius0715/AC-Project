@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { jwtClaims, OIDC_COOKIE, oidcConfig, roleHome, SESSION_COOKIE, sign, verify, type Session } from "@/lib/session";
+import { cookieOptions, OIDC_COOKIE, oidcConfig, roleHome, SESSION_COOKIE, sessionFromTokens, sign, verify } from "@/lib/session";
 
 type Pending = { state: string; verifier: string; returnTo: string | null };
 
@@ -21,17 +21,10 @@ export async function GET(req: NextRequest) {
   });
   if (!token.ok) return NextResponse.redirect(new URL("/login?error=token", cfg.appUrl));
   const t = (await token.json()) as { access_token: string; refresh_token?: string; expires_in: number };
-  const claims = jwtClaims(t.access_token);
-  const role = claims.role as Session["role"] | undefined;
-  if (!claims.tenant_id || !claims.membership_id || !role || !(role in roleHome)) {
-    return NextResponse.redirect(new URL("/login?error=membership", cfg.appUrl));
-  }
-  const session: Session = {
-    accessToken: t.access_token, refreshToken: t.refresh_token ?? null, tenantId: String(claims.tenant_id), membershipId: String(claims.membership_id),
-    role, expiresAt: Math.floor(Date.now() / 1000) + t.expires_in,
-  };
-  const res = NextResponse.redirect(new URL(pending.returnTo ?? roleHome[role], cfg.appUrl));
-  res.cookies.set(SESSION_COOKIE, sign(session), { httpOnly: true, sameSite: "lax", secure: cfg.appUrl.startsWith("https"), path: "/", maxAge: 30 * 60 });
+  const session = sessionFromTokens(t);
+  if (!session) return NextResponse.redirect(new URL("/login?error=membership", cfg.appUrl));
+  const res = NextResponse.redirect(new URL(pending.returnTo ?? roleHome[session.role], cfg.appUrl));
+  res.cookies.set(SESSION_COOKIE, sign(session), cookieOptions());
   res.cookies.delete({ name: OIDC_COOKIE, path: "/bff/auth" });
   return res;
 }

@@ -11,7 +11,7 @@ scope: production-target-implementation
 
 ## 1. Purpose and scope
 
-This document designs the production relational database for the Go backend ([backend Go design](backend-go-design.md), [backend architecture](backend-architecture.md)). The executable schema is [db/schema.sql](db/schema.sql) (93 tables including default partitions, 38 permission rows). It was applied to PostgreSQL 16 on 2026-10-07 and checked for tenant isolation (RLS), the append-only audit trigger, and the no-overlap assignment constraint. Status `PROPOSED` (IR118, DEC-69).
+This document designs the production relational database for the Go backend ([backend Go design](backend-go-design.md), [backend architecture](backend-architecture.md)). The executable schema is [db/schema.sql](db/schema.sql) (99 tables including default partitions as of 2026-10-08, 38 permission rows). It was applied to PostgreSQL 16 on 2026-10-07 and checked for tenant isolation (RLS), the append-only audit trigger, and the no-overlap assignment constraint. Status `PROPOSED` (IR118, DEC-69).
 
 The source of truth for fields and states is [service-contracts.ts](service-contracts.ts); this document says how each type is stored. Phase 1A still uses the in-browser mock and does not use this schema.
 
@@ -19,7 +19,7 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 
 | Schema | Owning module | Main tables |
 |---|---|---|
-| platform | shared infrastructure | tenants, outbox, idempotency_keys, scheduled_items, processed_events, stream_checkpoints |
+| platform | shared infrastructure | tenants, outbox, idempotency_keys, scheduled_items, processed_events, stream_checkpoints, demo_clock (demo environment only, IR168) |
 | identity | Identity & access | users, organizations, memberships, membership_permissions, membership_scopes, qualification_grants, permissions (38), preferences, two_factor, consents, client_users |
 | assets | Assets | customers, properties, spaces, units, unit_alert_policies, unit_imports, unit_import_previews (30-minute CSV validation results written outside the read transaction of `units.importPreview`, purged after expiry) |
 | devices | Devices | capabilities (versioned), devices, sensors, device_bindings, device_operations, device_events, device_event_notes, calibration_records, firmware_campaigns, firmware_campaign_devices |

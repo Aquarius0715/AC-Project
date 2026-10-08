@@ -23,6 +23,7 @@ x-worker: &worker             # service/worker (independent service, IR166)
     target: runtime
   environment:
     DATABASE_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
+    DEMO_OPS: "1"                                       # scenario clock shared with the API (platform.demo_clock, IR168)
   read_only: true
   security_opt: [no-new-privileges:true]
   networks: [app, data]

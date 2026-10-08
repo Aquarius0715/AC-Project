@@ -17,17 +17,31 @@ import (
 	"github.com/pradita/ac-project/service/core/scheduler"
 )
 
-// demoClock is the demo scenario clock: the base clock plus a forward offset set by demo.advanceClock (IR36).
+// scenarioClock is the demo scenario clock: democlock.Clock (shared through platform.demo_clock, IR168) when the
+// scenario has a start, else the process-local demoClock (tests with a fixed base clock).
+type scenarioClock interface {
+	Now() time.Time
+	Advance(ctx context.Context, d time.Duration) error
+}
+
+// demoClock is the base clock plus a forward offset set by demo.advanceClock (IR36), local to this process.
 type demoClock struct {
 	mu     sync.Mutex
 	base   func() time.Time
 	offset time.Duration
 }
 
-func (d *demoClock) now() time.Time {
+func (d *demoClock) Now() time.Time {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	return d.base().Add(d.offset)
+}
+
+func (d *demoClock) Advance(_ context.Context, by time.Duration) error {
+	d.mu.Lock()
+	d.offset += by
+	d.mu.Unlock()
+	return nil
 }
 
 // demoOps serves demo.* in the demo environment only (backend architecture §15, IR154); production returns
@@ -35,7 +49,7 @@ func (d *demoClock) now() time.Time {
 type demoOps struct {
 	enabled bool
 	m       *db.TxManager
-	clock   *demoClock
+	clock   scenarioClock
 }
 
 func demoOnly() error { return apperr.E(apperr.Unavailable, "errors.demo_only") }
@@ -65,9 +79,9 @@ func (d *demoOps) advance(ctx context.Context, c *ops.Call, in *AdvanceInput) (G
 	if in.To.Before(c.Now) { // only forward jumps in the API demo (IR36)
 		return Generation{}, apperr.Fields(map[string]string{"to": "errors.clock_backwards"})
 	}
-	d.clock.mu.Lock()
-	d.clock.offset += in.To.Sub(c.Now)
-	d.clock.mu.Unlock()
+	if err := d.clock.Advance(ctx, in.To.Sub(c.Now)); err != nil {
+		return Generation{}, apperr.From(err)
+	}
 	if _, err := scheduler.Tick(ctx, d.m, in.To); err != nil { // process deadlines reached by the jump
 		return Generation{}, err
 	}

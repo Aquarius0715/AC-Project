@@ -330,10 +330,29 @@ func Acknowledge(ctx context.Context, tx pgx.Tx, command uuid.UUID, receivedAt t
 		if err := restrictions.CommandAcknowledged(ctx, tx, command, receivedAt); err != nil {
 			return true, err
 		}
+		if err := applyObserved(ctx, tx, command, receivedAt); err != nil {
+			return true, err
+		}
 		return true, runAcknowledged(ctx, tx, command, receivedAt)
 	}
 	_, err = tx.Exec(ctx, `UPDATE control.commands SET late_ack_at = $2 WHERE id = $1 AND late_ack_at IS NULL`, command, receivedAt)
 	return false, err
+}
+
+// applyObserved copies an acknowledged unit setting into ACUnit.observedState (power / celsius / mode / fanLevel
+// change only through a Command ack or telemetry, IR45/IR50). observedState is an observation field, so the unit
+// version is unchanged and a fetched expectedUnitVersion stays valid.
+func applyObserved(ctx context.Context, tx pgx.Tx, command uuid.UUID, at time.Time) error {
+	_, err := tx.Exec(ctx, `UPDATE assets.units u SET observed_state = u.observed_state || CASE c.action->>'kind'
+			WHEN 'set_power' THEN jsonb_build_object('power', c.action->'power')
+			WHEN 'set_temperature' THEN jsonb_build_object('celsius', c.action->'celsius')
+			WHEN 'set_mode' THEN jsonb_build_object('mode', c.action->'mode')
+			WHEN 'set_fan' THEN jsonb_build_object('fanLevel', c.action->'fanLevel')
+		END || jsonb_build_object('observedAt', $2::text)
+		FROM control.commands c
+		WHERE c.id = $1 AND u.id = c.unit_id AND c.action->>'kind' IN ('set_power', 'set_temperature', 'set_mode', 'set_fan')`,
+		command, at.UTC().Format(time.RFC3339Nano))
+	return err
 }
 
 // Register binds commands.create / commands.get.

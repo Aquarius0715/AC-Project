@@ -13,6 +13,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/app"
 	"github.com/pradita/ac-project/service/core/platform/auth"
+	"github.com/pradita/ac-project/service/core/platform/democlock"
 )
 
 func main() {
@@ -31,8 +32,8 @@ func main() {
 		Addr:              envOr("ADDR", ":8080"),
 		DemoOps:           os.Getenv("DEMO_OPS") == "1",
 	}
-	if cfg.DemoOps { // fixture.clock unless DEMO_CLOCK_START overrides it (IR36)
-		start, err := time.Parse(time.RFC3339, envOr("DEMO_CLOCK_START", "2026-09-14T01:00:00Z"))
+	if cfg.DemoOps { // fixture.clock unless DEMO_CLOCK_START overrides it (IR36); shared with the workers (IR168)
+		start, err := democlock.StartFromEnv(os.Getenv)
 		if err != nil {
 			slog.Error("DEMO_CLOCK_START", "err", err)
 			os.Exit(1)

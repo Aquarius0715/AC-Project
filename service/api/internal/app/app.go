@@ -28,6 +28,7 @@ import (
 	"github.com/pradita/ac-project/service/core/platform/auth"
 	"github.com/pradita/ac-project/service/core/platform/blob"
 	"github.com/pradita/ac-project/service/core/platform/db"
+	"github.com/pradita/ac-project/service/core/platform/democlock"
 )
 
 // Config is the runtime configuration (container design §4 environment variables).
@@ -58,12 +59,17 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	if cfg.Clock != nil {
 		reg.Clock = cfg.Clock
 	}
-	dc := &demoClock{base: reg.Clock}
+	var dc scenarioClock = &demoClock{base: reg.Clock}
 	if cfg.DemoOps {
-		if !cfg.DemoStart.IsZero() { // the scenario clock starts at fixture.clock and then runs in real time (IR36)
-			dc.offset = cfg.DemoStart.Sub(dc.base())
+		if !cfg.DemoStart.IsZero() { // starts at fixture.clock, runs in real time, shared with the workers (IR36, IR168)
+			shared, err := democlock.Open(ctx, m.Writer, reg.Clock, cfg.DemoStart)
+			if err != nil {
+				m.Close()
+				return nil, err
+			}
+			dc = shared
 		}
-		reg.Clock = dc.now
+		reg.Clock = dc.Now
 	}
 	registerDemo(reg, &demoOps{enabled: cfg.DemoOps, m: m, clock: dc})
 	identity.Register(reg)

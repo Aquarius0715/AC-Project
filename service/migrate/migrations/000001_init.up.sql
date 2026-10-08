@@ -107,6 +107,12 @@ CREATE TABLE platform.stream_checkpoints (     -- Kinesis shard checkpoints for 
   PRIMARY KEY (stream_name, shard_id)
 );
 
+CREATE TABLE platform.demo_clock (             -- demo environment only (DEMO_OPS): scenario clock shared by API and workers (IR168)
+  id         boolean PRIMARY KEY DEFAULT true CHECK (id),   -- single row
+  offset_ms  bigint NOT NULL,                  -- scenario time minus wall-clock time
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- ---------------------------------------------------------------------------------------------
 -- identity
 -- ---------------------------------------------------------------------------------------------

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/pradita/ac-project/service/core/platform/db"
+	"github.com/pradita/ac-project/service/core/platform/democlock"
 	"github.com/pradita/ac-project/service/core/scheduler"
 )
 
@@ -34,5 +35,17 @@ func main() {
 		<-ctx.Done()
 		return
 	}
-	scheduler.Run(ctx, m, time.Second, func() time.Time { return time.Now().UTC() }, log.Printf)
+	clock := func() time.Time { return time.Now().UTC() }
+	if os.Getenv("DEMO_OPS") == "1" { // demo environment: the scenario clock shared with the API (IR168)
+		start, err := democlock.StartFromEnv(os.Getenv)
+		if err != nil {
+			log.Fatal(err)
+		}
+		dc, err := democlock.Open(ctx, m.Writer, clock, start)
+		if err != nil {
+			log.Fatal(err)
+		}
+		clock = dc.Now
+	}
+	scheduler.Run(ctx, m, time.Second, clock, log.Printf)
 }
