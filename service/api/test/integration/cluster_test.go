@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/labstack/echo/v5"
 
@@ -172,8 +173,8 @@ func clusterFacade(t *testing.T, base apiserver.Config, v auth.Verifier) *apiser
 		}
 		rec := &statusRecorder{ResponseWriter: w}
 		gw.ServeHTTP(rec, r)
-		if r.URL.Path == "/v1/ops/demo.advanceClock" && rec.status == http.StatusOK && base.DemoClock != nil { // the worker's tick on the new time
-			if _, err := scheduler.Tick(context.WithoutCancel(r.Context()), all.DB, base.DemoClock.Now()); err != nil {
+		if r.URL.Path == "/v1/ops/demo.advanceClock" && rec.status == http.StatusOK && base.DemoClock != nil { // the workers' tick on the new time
+			if _, err := cl.tick(context.WithoutCancel(r.Context()), base.DemoClock.Now()); err != nil {
 				panic("tick after the jump: " + err.Error())
 			}
 		}
@@ -183,5 +184,37 @@ func clusterFacade(t *testing.T, base apiserver.Config, v auth.Verifier) *apiser
 	})))
 	f.Echo = e
 	facades[base.DemoOps] = f
+	clusters[f] = cl
 	return f
+}
+
+// clusters maps a facade to its services (schedTick).
+var clusters = map[*apiserver.Server]splitCluster{}
+
+// tick runs each domain's scheduler with that domain's role and registry (IR195), then applies the events.
+func (cl splitCluster) tick(ctx context.Context, now time.Time) (scheduler.Result, error) {
+	var total scheduler.Result
+	for _, d := range scheduler.Domains {
+		r, err := scheduler.TickDomains(ctx, cl.srv[d].DB, now, []string{d}, cl.srv[d].Registry)
+		if err != nil {
+			return total, err
+		}
+		total.ExpiredOffers += r.ExpiredOffers
+		total.ExpiredCommands += r.ExpiredCommands
+		total.Runs += r.Runs
+		total.Confirmed += r.Confirmed
+		total.ExpiredProposals += r.ExpiredProposals
+		total.FrozenHistories += r.FrozenHistories
+	}
+	f := &apiserver.Server{Consumers: cl.consumers()}
+	return total, f.DrainEvents(ctx)
+}
+
+// schedTick is the worker tick of the suite: the domain schedulers of the cluster in cluster mode, otherwise the
+// all-domain tick on the server's database.
+func schedTick(ctx context.Context, s *apiserver.Server, now time.Time) (scheduler.Result, error) {
+	if cl, ok := clusters[s]; ok {
+		return cl.tick(ctx, now)
+	}
+	return scheduler.Tick(ctx, s.DB, now)
 }

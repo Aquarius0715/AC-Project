@@ -123,3 +123,37 @@ func TestDirectoryAcrossServices(t *testing.T) {
 		t.Fatalf("grant valid until %v, want %v", got, until)
 	}
 }
+
+// IR195: workers ask other domains without a user through the system route: internal token and tenant only.
+func TestSystemQueries(t *testing.T) {
+	cl := newCluster(t)
+	unit := seed.ID("unit-online-rto").String()
+	ask := func(token, tenant string) int {
+		req, _ := http.NewRequest(http.MethodPost, cl.urls[ops.DomainBilling]+"/internal/v1/system/queries/restrictions.unitPolicy", strings.NewReader(`{"unitId":"`+unit+`"}`))
+		if token != "" {
+			req.Header.Set(ops.InternalTokenHeader, token)
+		}
+		if tenant != "" {
+			req.Header.Set("X-Tenant-Id", tenant)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+	tenant := seed.ID("tenant-a").String()
+	if code := ask("", tenant); code != 401 {
+		t.Fatalf("without the internal token: %d", code)
+	}
+	if code := ask("test-internal", ""); code != 401 {
+		t.Fatalf("without a tenant: %d", code)
+	}
+	if code := ask("wrong", tenant); code != 401 {
+		t.Fatalf("wrong token: %d", code)
+	}
+	if code := ask("test-internal", tenant); code != 200 {
+		t.Fatalf("system query: %d", code)
+	}
+}

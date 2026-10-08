@@ -1823,3 +1823,19 @@ The first cluster run found these accesses, now removed:
 - `restrictions.restriction_commands (command_id, restriction_id, unit_id, kind, delivered, status)`: billing records every command it requests (`requested` = open), mirrors its cancellations with equipment's rule (undelivered intents of the restriction on the unit, or explicit IDs), and applies `CommandAcknowledged` / `CommandsEnded` (which now carries `statuses` per command: failed / expired / cancelled). Open-command checks, acknowledgement lookups and end handling read it instead of `control.commands`; the fixture seeds it with its restriction commands.
 
 Verified: `make test` and `make test-cluster` green (94/94 integration tests in cluster mode), none skipped; in compose every service runs on its own login, the four web apps' main reads work through the gateway (client, partner, technician, admin), `units.resolveQr` answers the assigned technician and is NOT_FOUND for another, and the services log no errors.
+
+## IR195 Scheduler per business domain; system internal queries (phase B step 3, part 10) — 2026-10-09
+
+The scheduler worker ran every domain's clock-driven transitions in one transaction on the all-domain role. It now runs per domain.
+
+| Scheduler | Transitions | Database login |
+|---|---|---|
+| `worker --role=scheduler --domain=equipment` | command expiry (IR138), diagnostic run advance (start / end actions; restriction policy asked from billing) | `ac_equipment_login` |
+| `worker --role=scheduler --domain=maintenance` | offer expiry (IR48), slot proposal expiry, unrated job confirmation, history snapshots (IR124) | `ac_maintenance_login` |
+
+- A domain scheduler is built from the same wiring as its service (`server.ConfigFromEnv`, `server.New` without HTTP): the domain's role, the registry with the internal queries of other domains, and the shared scenario clock (IR168). `scheduler.TickDomains(ctx, db, now, domains, registry)`; `scheduler.Tick` (all domains, local) stays for tests and single-process development (`worker --role=scheduler` without `--domain`).
+- **System internal queries**: calls without a user (workers) go to `POST /internal/v1/system/queries/<name>` with `X-Internal-Token` and `X-Tenant-Id` only; the query runs with a tenant-only principal. `ops.HTTPQueries` picks this route when the call has no bearer token. Missing or wrong token, or no tenant → 401.
+- Compose: `worker-scheduler-equipment` and `worker-scheduler-maintenance` replace `worker-scheduler`, each with its domain login and the services' environment (internal token, `<DOMAIN>_API_URL`).
+- Cluster mode of the suite runs both domain schedulers with their roles and registries wherever a test ticks the worker (`schedTick`) and after `demo.advanceClock`.
+
+Verified: `make test` and `make test-cluster` green (96 integration tests), none skipped; in the cluster run the equipment scheduler asks billing `restrictions.unitPolicy` over the system route; `TestSystemQueries` checks the token and tenant guards; in compose both schedulers run on their logins and a client's command expires after `demo.advanceClock` (`worker tick: … ExpiredCommands:1`).

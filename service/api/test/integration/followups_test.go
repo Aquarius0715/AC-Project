@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pradita/ac-project/service/api/internal/scheduler"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -183,7 +182,7 @@ func TestWorkerConfirmsUnratedJobs(t *testing.T) {
 	s := server(t)
 	job := completedJob(t, s)
 	owner(t, `UPDATE maintenance.jobs SET completed_at = $2 WHERE id = $1`, job, clock.Add(-7*24*time.Hour))
-	if _, err := scheduler.Tick(context.Background(), s.DB, clock); err != nil {
+	if _, err := schedTick(context.Background(), s, clock); err != nil {
 		t.Fatal(err)
 	}
 	if _, m := post(s, &customerA, "jobs.get", `{"jobId":"`+job+`"}`); data(m)["customerConfirmedAt"] == nil || data(m)["rating"] != nil {

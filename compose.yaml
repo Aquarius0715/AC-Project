@@ -284,7 +284,20 @@ services:
     profiles: [planned]
 
   worker-outbox:       { <<: *worker, command: ["/app/worker", "--role=outbox"] }
-  worker-scheduler:    { <<: *worker, command: ["/app/worker", "--role=scheduler"] }
+  worker-scheduler-equipment:     # command expiry, diagnostic runs (IR195): equipment's role; billing asked over HTTP
+    <<: *worker
+    command: ["/app/worker", "--role=scheduler", "--domain=equipment"]
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgres://ac_equipment_login:local@postgres:5432/ac?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_equipment_login:local@postgres:5432/ac?sslmode=disable
+  worker-scheduler-maintenance:   # offer / proposal expiry, rating confirmation, history snapshots (IR195)
+    <<: *worker
+    command: ["/app/worker", "--role=scheduler", "--domain=maintenance"]
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgres://ac_maintenance_login:local@postgres:5432/ac?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_maintenance_login:local@postgres:5432/ac?sslmode=disable
   worker-iot:          { <<: *worker, command: ["/app/worker", "--role=iot"] }
   worker-telemetry:    { <<: *worker, command: ["/app/worker", "--role=telemetry"] }
   worker-rollup:       { <<: *worker, command: ["/app/worker", "--role=rollup"] }

@@ -9,7 +9,6 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/control"
-	"github.com/pradita/ac-project/service/api/internal/scheduler"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -89,7 +88,7 @@ func TestCommands(t *testing.T) {
 		t.Fatalf("second command: %d %v", code, m)
 	}
 	id2 := data(m)["id"].(string)
-	if _, err := scheduler.Tick(ctx, s.DB, clock.Add(31*time.Second)); err != nil {
+	if _, err := schedTick(ctx, s, clock.Add(31*time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	if _, m := post(s, &hq, "commands.get", `{"id":"`+id2+`"}`); data(m)["status"] != "expired" || data(m)["failureCode"] != "TIMEOUT" {

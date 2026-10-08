@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v5"
 
@@ -29,6 +30,10 @@ type query struct {
 
 // QueryPath is the internal route of the queries; callers add X-Internal-Token and the user's Authorization.
 const QueryPath = "/internal/v1/queries/:query"
+
+// SystemQueryPath is the internal route for calls without a user (scheduler workers, IR195): X-Internal-Token and
+// X-Tenant-Id only; the query runs with a tenant-only principal.
+const SystemQueryPath = "/internal/v1/system/queries/:query"
 
 // InternalTokenHeader carries INTERNAL_API_TOKEN on service-to-service calls (Authorization keeps the user's token).
 const InternalTokenHeader = "X-Internal-Token"
@@ -119,17 +124,23 @@ type HTTPQueries struct {
 // Query implements QueryTransport.
 func (h *HTTPQueries) Query(ctx context.Context, c *Call, domain, name string, in json.RawMessage) (json.RawMessage, error) {
 	base := h.Targets[domain]
-	if base == nil || c.Bearer == "" || c.Principal == nil {
+	if base == nil || c.Principal == nil {
 		return nil, apperr.E(apperr.Unavailable, "error.unavailable")
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSuffix(base.String(), "/")+"/internal/v1/queries/"+url.PathEscape(name), bytes.NewReader(in))
+	path := "/internal/v1/queries/" // the caller's user and membership
+	if c.Bearer == "" {
+		path = "/internal/v1/system/queries/" // no user: a worker of the tenant (IR195)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimSuffix(base.String(), "/")+path+url.PathEscape(name), bytes.NewReader(in))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-	req.Header.Set(echo.HeaderAuthorization, "Bearer "+c.Bearer)
-	req.Header.Set("X-Tenant-Id", c.Principal.TenantID.String()) // the same membership context as the caller
-	req.Header.Set("X-Membership-Id", c.Principal.MembershipID.String())
+	req.Header.Set("X-Tenant-Id", c.Principal.TenantID.String()) // the same tenant (and membership) context as the caller
+	if c.Bearer != "" {
+		req.Header.Set(echo.HeaderAuthorization, "Bearer "+c.Bearer)
+		req.Header.Set("X-Membership-Id", c.Principal.MembershipID.String())
+	}
 	req.Header.Set(InternalTokenHeader, h.Token)
 	req.Header.Set(echo.HeaderXRequestID, c.CorrelationID)
 	req.Header.Set(BusinessNowHeader, c.Now.UTC().Format(time.RFC3339Nano))
@@ -166,42 +177,57 @@ func (h *HTTPQueries) Query(ctx context.Context, c *Call, domain, name string, i
 // runs a query of a served domain in a read transaction with the caller's principal and business time.
 func (r *Registry) ServeQuery(token string) echo.HandlerFunc {
 	return func(c *echo.Context) error {
-		if token == "" || subtle.ConstantTimeCompare([]byte(c.Request().Header.Get(InternalTokenHeader)), []byte(token)) != 1 {
+		bearer, _ := strings.CutPrefix(c.Request().Header.Get(echo.HeaderAuthorization), "Bearer ")
+		return r.serveQuery(c, token, PrincipalFrom(c.Request().Context()), bearer)
+	}
+}
+
+// ServeSystemQuery is the handler of SystemQueryPath (no user authentication): the internal token admits the call
+// and the query runs with a principal of the X-Tenant-Id tenant only (IR195).
+func (r *Registry) ServeSystemQuery(token string) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		tenant, err := uuid.Parse(c.Request().Header.Get("X-Tenant-Id"))
+		if err != nil {
 			return apperr.E(apperr.Unauthenticated, "error.unauthenticated")
 		}
-		name := c.Param("query")
-		q, ok := r.queries[name]
-		if !ok || !(r.domains == nil || r.domains[q.domain]) {
-			return apperr.E(apperr.NotFound, "error.unknownOperation")
-		}
-		ctx := c.Request().Context()
-		raw, err := io.ReadAll(io.LimitReader(c.Request().Body, 1<<20))
-		if err != nil {
-			return apperr.E(apperr.Validation, "error.bodyTooLarge")
-		}
-		p := PrincipalFrom(ctx)
-		now := r.Clock()
-		if t, err := time.Parse(time.RFC3339Nano, c.Request().Header.Get(BusinessNowHeader)); err == nil {
-			now = t
-		}
-		bearer, _ := strings.CutPrefix(c.Request().Header.Get(echo.HeaderAuthorization), "Bearer ")
-		call := &Call{Principal: p, Now: now, CorrelationID: c.Response().Header().Get(echo.HeaderXRequestID), Bearer: bearer, Queries: r}
-		if r.BeforeDispatch != nil {
-			r.BeforeDispatch(ctx)
-		}
-		var out any
-		err = r.DB.Run(ctx, true, p, func(tx pgx.Tx) error {
-			call.Tx = tx
-			if _, err := tx.Exec(ctx, `SELECT set_config('app.now', $1, true)`, now.UTC().Format(time.RFC3339Nano)); err != nil {
-				return err
-			}
-			var herr error
-			out, herr = q.handle(ctx, call, raw)
-			return herr
-		})
-		if err != nil {
+		return r.serveQuery(c, token, &Principal{TenantID: tenant}, "")
+	}
+}
+
+func (r *Registry) serveQuery(c *echo.Context, token string, p *Principal, bearer string) error {
+	if token == "" || subtle.ConstantTimeCompare([]byte(c.Request().Header.Get(InternalTokenHeader)), []byte(token)) != 1 {
+		return apperr.E(apperr.Unauthenticated, "error.unauthenticated")
+	}
+	name := c.Param("query")
+	q, ok := r.queries[name]
+	if !ok || !(r.domains == nil || r.domains[q.domain]) {
+		return apperr.E(apperr.NotFound, "error.unknownOperation")
+	}
+	ctx := c.Request().Context()
+	raw, err := io.ReadAll(io.LimitReader(c.Request().Body, 1<<20))
+	if err != nil {
+		return apperr.E(apperr.Validation, "error.bodyTooLarge")
+	}
+	now := r.Clock()
+	if t, err := time.Parse(time.RFC3339Nano, c.Request().Header.Get(BusinessNowHeader)); err == nil {
+		now = t
+	}
+	call := &Call{Principal: p, Now: now, CorrelationID: c.Response().Header().Get(echo.HeaderXRequestID), Bearer: bearer, Queries: r}
+	if r.BeforeDispatch != nil {
+		r.BeforeDispatch(ctx)
+	}
+	var out any
+	err = r.DB.Run(ctx, true, p, func(tx pgx.Tx) error {
+		call.Tx = tx
+		if _, err := tx.Exec(ctx, `SELECT set_config('app.now', $1, true)`, now.UTC().Format(time.RFC3339Nano)); err != nil {
 			return err
 		}
-		return c.JSON(http.StatusOK, map[string]any{"data": out})
+		var herr error
+		out, herr = q.handle(ctx, call, raw)
+		return herr
+	})
+	if err != nil {
+		return err
 	}
+	return c.JSON(http.StatusOK, map[string]any{"data": out})
 }

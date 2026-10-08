@@ -33,29 +33,10 @@ func Main(service string, domains ...string) {
 	defer stop()
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", service) // JSON logs (backend Go design: log/slog)
 	slog.SetDefault(logger)
-	cfg := Config{
-		Logger:            logger,
-		DatabaseURL:       os.Getenv("DATABASE_URL"),
-		DatabaseReaderURL: os.Getenv("DATABASE_READER_URL"),
-		Addr:              envOr("ADDR", ":8080"),
-		DemoOps:           os.Getenv("DEMO_OPS") == "1",
-		Domains:           domains,
-		IdentityURL:       os.Getenv("IDENTITY_INTERNAL_URL"),
-		InternalToken:     os.Getenv("INTERNAL_API_TOKEN"),
-		ServiceURLs:       map[string]string{},
-	}
-	for _, d := range ops.Domains { // <DOMAIN>_API_URL of the other services (IR190), optional
-		if v := os.Getenv(strings.ToUpper(d) + "_API_URL"); v != "" {
-			cfg.ServiceURLs[d] = v
-		}
-	}
-	if cfg.DemoOps { // fixture.clock unless DEMO_CLOCK_START overrides it (IR36); shared with the workers (IR168)
-		start, err := democlock.StartFromEnv(os.Getenv)
-		if err != nil {
-			slog.Error("DEMO_CLOCK_START", "err", err)
-			os.Exit(1)
-		}
-		cfg.DemoStart = start
+	cfg, err := ConfigFromEnv(logger, domains)
+	if err != nil {
+		slog.Error("config", "err", err)
+		os.Exit(1)
 	}
 	v, err := auth.NewVerifierFromEnv(ctx)
 	if err != nil {
@@ -78,6 +59,34 @@ func Main(service string, domains ...string) {
 		slog.Error("serve", "err", err)
 	}
 	s.DB.Close()
+}
+
+// ConfigFromEnv reads the configuration of a domain service (or its worker, IR195) from the environment.
+func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
+	cfg := Config{
+		Logger:            logger,
+		DatabaseURL:       os.Getenv("DATABASE_URL"),
+		DatabaseReaderURL: os.Getenv("DATABASE_READER_URL"),
+		Addr:              envOr("ADDR", ":8080"),
+		DemoOps:           os.Getenv("DEMO_OPS") == "1",
+		Domains:           domains,
+		IdentityURL:       os.Getenv("IDENTITY_INTERNAL_URL"),
+		InternalToken:     os.Getenv("INTERNAL_API_TOKEN"),
+		ServiceURLs:       map[string]string{},
+	}
+	for _, d := range ops.Domains { // <DOMAIN>_API_URL of the other services (IR190), optional
+		if v := os.Getenv(strings.ToUpper(d) + "_API_URL"); v != "" {
+			cfg.ServiceURLs[d] = v
+		}
+	}
+	if cfg.DemoOps { // fixture.clock unless DEMO_CLOCK_START overrides it (IR36); shared with the workers (IR168)
+		start, err := democlock.StartFromEnv(os.Getenv)
+		if err != nil {
+			return cfg, fmt.Errorf("DEMO_CLOCK_START: %w", err)
+		}
+		cfg.DemoStart = start
+	}
+	return cfg, nil
 }
 
 func envOr(k, def string) string {
