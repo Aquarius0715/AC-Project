@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.22.0
+version: 0.30.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -60,7 +60,7 @@ Show retry only for recoverable errors. For forbidden and not-found, follow IR57
 | DD-A15 / FR-A15 | `/admin/offsets` / `OffsetRegistry` | `offsets.preview`、`offsets.simulate`、`offsets.list`、`customers.list`、`units.list` | Quantity must be >0. Label scheme/provider “Not selected” and require the demo flag | Do not copy emission amounts into credit balances. No real trading or certificate issuance |
 | DD-A16 / FR-A16 | `/admin/audit` / `AuditExplorer` | `audit.list`、`devices.events` | Use audit.read permission, period, actor, target, and event type. Mask confidential values | Show denied and successful actions separately. No deletion or changes through the screen. Demo records are not guaranteed tamper-proof |
 | DD-A17 / FR-A17 | `/admin/units?customerId=&tab=users` / `ClientUserList` | `clientUsers.list`、`clientUsers.save`、`clientUsers.remove`、`clientUsers.resendInvite` | Email unique per customer; role owner/member; reason for removal | Last active owner cannot be demoted, disabled, or removed |
-| DD-A18 / FR-A18 | `/admin/units` (Import CSV) / `UnitImportWizard` | `units.importPreview`、`units.importCommit`、`units.importUndo`、`customers.list` | UTF-8 CSV ≤ 1000 rows; 9 mapped columns; nothing written before import | Error rows skipped; undo only 24 h and before telemetry/jobs |
+| DD-A18 / FR-A18 | `/admin/units` (Import CSV) / `UnitImportWizard` | `units.importPreview`、`units.importCommit`、`units.importUndo`、`customers.list` | UTF-8 CSV ≤ 1000 rows; 8 mapped columns; nothing written before import | Error rows skipped; undo only 24 h and before telemetry/jobs |
 | DD-A19 / FR-A19 | `/admin/units?tab=warranty` / `WarrantyCoverage` | `units.coverage`、`jobs.recordWarrantyClaim`、`contracts.list` | Coverage = warranty or active contract; claim amount > 0 | Claims only for parts replaced under warranty |
 | DD-A20 / FR-A20 | `/admin/devices?tab=firmware` / `FirmwareCampaigns` | `firmwareCampaigns.list`、`firmwareCampaigns.get`、`firmwareCampaigns.schedule`、`firmwareCampaigns.control`、`devices.list` | Signed version; start ≥ 24 h ahead; waves end at 100 %; auto-pause 1–50 % | Busy/offline/tampered devices skipped; failed devices keep the old version |
 | DD-A21 / FR-A21 | `/admin/jobs?tab=contractors` / `ContractorRegister` | `contractors.list`、`contractors.save`、`contractors.setOfferStatus`、`rateCards.list`、`rateCards.save`、`certificates.list`、`certificates.verify` | Rate card from a future date; suspension reason 1–1000 | Suspension blocks new offers only |
@@ -150,7 +150,7 @@ Scope: FR-A02 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 **Screens (Figma Admin 02-1…02-16, IR111)**: (1) Customer list `/admin/units`: search (name, ID, property), Status/Contract filters, KPI tiles (customers, properties, units, needs attention), rows with status, operation, alerts, contract badges; inactive customers only with Status: All (IR40); “+ New customer” modal (`customers.save`). (2) Customer header (KPIs: units, operation, open alerts, overdue billing, restriction link) with tabs Units & locations, Users (DD-A17), Alert policies (customer-filtered policy list linking to SCR-A05), Warranty & coverage (DD-A19). (3) Location tree with “+ Add property/floor/area/room” modals (`properties.save`/`spaces.save`), ⋯ Rename and Delete on every location (`properties.archive`/`spaces.archive`; disabled with CONFLICT while it still contains locations or units). (4) Selecting a room lists its units; unit rows open unit edit `?unitId=`. (5) Unit edit: name, location select (saving asks a change reason in a modal), model, installed at, IoT binding, service scope, “Alert policies on this unit” card (default policy always attached; customer policies with Edit → SCR-A05 and Detach; “+ Attach policy” modal lists only that customer’s policies → `units.setAlertPolicies`), links to command panel, diagnostic runs, device events, audit; Delete unit (CONFLICT while in use). Archived units open read-only (IR39). URL keys customerId, locationId (property or space), unitId, tab, powerState, connections, search.
 
-**Boundary cases and failures**: Reject another customer's room, hierarchy cycles, nonexistent modelId, or deletion of units in use. Do not register new units for inactive customers.
+**Boundary cases and failures**: Reject another customer's room, hierarchy cycles, nonexistent modelId, or deletion of units in use. Do not register new units for inactive customers. Archiving (`properties.archive`, `spaces.archive`, `units.archive`) takes a reason of 1–1000 characters; archiving a property or space that still holds non-archived units or child spaces is CONFLICT, and archived properties and spaces cannot receive new spaces or units (NOT_FOUND).
 
 **Verification**: Check the traceability entries under AT-A02 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -215,7 +215,7 @@ Scope: FR-A04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 6. Version history (capability): shown only to holders of audit.read. On explicit open, call `audit.list` with `targetId=<capabilityId>` and list each saved version as previousVersion→nextVersion, actor, time, reason, and maskedBefore/maskedAfter. No separate capability-version read operation exists; the current version comes from `capabilities.list`.
 7. Device events: for the selected `deviceId`, call `devices.events` (communication_lost / power_lost / tamper / restored / operation_failed with recovery) as a secondary Query after `devices.get` succeeds.
 
-**Boundary cases and failures**: Reject min>max, step<=0, or enabled mode control with no modes. Do not include unsupported firmware versions as candidates.
+**Boundary cases and failures**: Reject min>max, step<=0, or enabled mode control with no modes. Do not include unsupported firmware versions as candidates. Capability rules: manufacturer + model unique (case-insensitive, CONFLICT); temperature min < max and 0 < step ≤ max − min; modes, fan levels and ventilation levels are unique values of their enums; modeControl, fanControl or a temperature range require control = true, and modeControl / fanControl need at least one mode / fan level; ventilation levels only when ventilation = true; one sensor per metric, with the metric's fixed unit (temperature °C, humidity %, co2 ppm, pm25 µg/m³, power kW, vibration mm/s, refrigerant_pressure kPa, compressor_cycles cycles/h, airflow_drop %, heartbeat_gap min), staleAfterSeconds 10–86400, and boundaryId only on power. Saving an existing model writes the next version, marks the previous one not current, and moves every unit of the model to the new capability version.
 
 **Verification**: Check the traceability entries under AT-A04 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -247,7 +247,7 @@ Scope: FR-A05 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 | recoveryThreshold | number/required | Hysteresis matching comparison direction | Recovery threshold |
 | severity | enum/required | normal (“Info”)/warning/critical | Severity |
 | activeWindow | object/optional | weekdays + startLocal/endLocal in the policy timezone | Only if … |
-| recipientMembershipIds / channels | array/required | At least one each; inApp/email/whatsapp | Recipients / channels |
+| recipientMembershipIds / channels | array/required | 1–20 recipients who can read the customer's alerts; 1–3 channels including inApp (IR120) | Recipients / channels |
 | escalateAfterMinutes / cooldownMinutes | integer/required | 1–1440 / 1–1440 | Escalation delay / duplicate suppression |
 | name | Required | 1–120 trimmed characters | IR07 shared inputs (alert policies carry no unitIds input, IR108) |
 | timezone / enabled / priority | Required | IANA name / boolean / integer 0–100. New UI shows Preferences.timezone / false / 50 | IR07 shared inputs |
@@ -262,7 +262,7 @@ Scope: FR-A05 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 6. Resolve (IR66): policy-free Alerts resolve only manually by an alert.resolve holder with a 1–1000 character reason and at least one evidence ID. Evidence candidates are the Alert's own `evidenceIds` (from `alerts.get`) and remeasurements from `telemetry.series` for the same unit and metric observed after `detectedAt`, fetched only when the Resolve dialog opens.
 7. Policy editor order: basics (name, priority, timezone) → targets and metric → condition and recovery → severity → recipients/channels, cooldown, escalation → `notifications.preview` per recipient → demo test (synthetic reading and clock advance, simulator off) → save.
 8. Scope entry (IR108): the Policies tab filters by `customerId` → `propertyId` → `unitId` (URL keys, search-selects with the first 20 options and server search; `policies.list` filters, customer candidates from `customers.list`, unit candidates from `units.list`). The list is grouped “Default · on every unit” first, then one group per customer (owner). A unitId filter (from unit edit) lists only the policies attached to that unit. A new policy first asks for the owner customer; the owner is fixed after creation. The editor’s “Owner & units” section shows the attached units read-only with a link to each unit edit — units are never assigned from this screen.
-9. Default policy (`kind=default_alert`, policy-default): rule list (6 rules), the selected rule’s condition editor (HQ template; saving affects all units), and “On / off per customer — this rule” with a customer search-select; toggles call `policies.setDefaultRule` with a reason. “Copy as a <customer> policy →” opens an unsaved alert policy prefilled from the rule. The default policy cannot be deleted or detached.
+9. Default policy (`kind=default_alert`, policy-default): rule list (6 rules, IR120), the selected rule’s condition editor (HQ template; saving affects all units), and “On / off per customer — this rule” with a customer search-select; toggles call `policies.setDefaultRule` with a reason. “Copy as a <customer> policy →” opens an unsaved alert policy prefilled from the rule. The default policy cannot be deleted or detached.
 10. Air-quality limits (FR-A12/DD-A12) are alert policies with metric co2 (ppm) or pm25 (µg/m³). Metric choices: temperature, humidity, CO₂, PM2.5, refrigerant pressure, vibration, power. “Only if …” sets activeWindow (weekdays and local hours in the policy timezone). Delete policy (`policies.delete`) detaches from all units after confirmation.
 11. Alerts tab actions: Acknowledge, Resolve (step 6), Request maintenance (opens New job in SCR-A06 prefilled with unit and alert), Open unit → (SCR-A02 unit edit).
 
@@ -719,7 +719,7 @@ Scope: FR-A18 / Main display pattern: **UI-FORM**. Service boundary: `units.impo
 3. After import show the result with “Undo (24 h)” (`units.importUndo`, reason).
 4. Queries to update: `properties / spaces / units / audit`.
 
-**Boundary cases and failures**: Expired or changed preview → CONFLICT (validate again). Undo after telemetry or jobs on a created unit → CONFLICT.
+**Boundary cases and failures**: Expired or changed preview → CONFLICT (validate again). Undo after telemetry or jobs on a created unit → CONFLICT. Row results: `error` for a missing property or unit name, an unknown model code, an invalid date or a future installed_on, a serial already bound to another unit, or a unit name already used in the same location; `warning` when the row creates a floor or room that does not exist yet; otherwise `ready`. The preview is kept for 30 minutes (`expiresAt`) in a preview store and writes no business data; commit requires the same customer and an unexpired preview, imports ready and warning rows in one transaction, and records one audit entry. Undo archives every created unit, space and property of the import.
 
 **Verification**: Check the traceability entries under AT-A18 (N/E/B).
 
@@ -768,7 +768,7 @@ Scope: FR-A20 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 2. Pause / resume / abort (reason) / retry_device → `firmwareCampaigns.control`; + New campaign (centered modal) → `firmwareCampaigns.schedule`.
 3. Customer notices are created 24 h before start (templateKey device_operation preview).
 
-**Boundary cases and failures**: Devices busy with a test run, firmware job, or tamper are skipped with the reason; failed devices keep the old version.
+**Boundary cases and failures**: Devices busy with a test run, firmware job, or tamper are skipped with the reason; failed devices keep the old version. Control transitions: pause from scheduled or running; resume from paused back to running (or to scheduled while now < startAt); abort (reason 1–1000) from scheduled, running or paused; aborted and completed are terminal; retry_device only for a failed or skipped device while the campaign is running or paused; any other combination is CONFLICT. Schedule rejects unknown devices, devices of another model, devices with open tamper and devices already on the target version (VALIDATION); devices are assigned to waves by cumulative percent in input order; the checksum is the signed artifact digest (`sha256:…`).
 
 **Verification**: Check the traceability entries under AT-A20 (N/E/B).
 
@@ -849,7 +849,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.29.0: Read IR01–119 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.30.0: Read IR01–139 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

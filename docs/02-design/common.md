@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.22.0
+version: 0.30.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -234,8 +234,8 @@ Make clocks, ID generation, and success/failure results replaceable. Avoid tests
 - UI loading/error/empty/pending/confirmed states, and rules for discarding views on role changes.
 - Frontend verification using simulated responses.
 
-API paths, HTTP methods, databases, server authentication and authorization, real payments, real notifications, and real device control are outside this document's design scope. Their open status does not prevent completion of these frontend documents. The production target is designed separately at a logical, cloud-agnostic level in the [backend architecture](backend-architecture.md) and [network architecture](network-architecture.md) (IR116); those documents do not change Phase 1A.
+API paths, HTTP methods, databases, server authentication and authorization, real payments, real notifications, and real device control are outside this document's design scope. Their open status does not prevent completion of these frontend documents. The production target is designed separately (PROPOSED, AWS per DEC-68 / IR117) in the [backend architecture](backend-architecture.md) and [network architecture](network-architecture.md) (IR116); those documents do not change Phase 1A.
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.29.0: Read IR01–119 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.30.0: Read IR01–139 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.22.0
+version: 0.66.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -166,6 +166,7 @@ Small text and controls are adjusted for readability and usability in work scree
 | DEC-68 | Production target: AWS hosting, Stripe for payments, HQ admin app only from the company network; retention, capacity and customer office firewall requirements are set by the design team; AC interface and SIM provider stay open | User request in this conversation, 2026-10-07 (“クラウド事業者はひとまずAWS…決済サービスなどはStripe…HQ画面へのアクセスは社内ネットワークに限定します…”); reflected in IR117, backend-architecture.md §1/§3a/§6/§7/§11/§13/§16 and network-architecture.md §2a/§3/§4/§5a/§10 |
 | DEC-69 | The backend is implemented in Go with the Echo framework; the database is Aurora PostgreSQL with one schema per module | User request in this conversation, 2026-10-07 (“バックエンドの言語はGoとします。GoEchoを使用してください”); reflected in IR118, backend-go-design.md, database-design.md, db/schema.sql and Figma System Architecture board 06 |
 | DEC-70 | Everything runs in Docker: all application components are Docker images in every environment (Compose locally and in CI, ECS Fargate in staging and production); production databases, queues and IoT stay AWS managed services | User request in this conversation, 2026-10-07 (“全てDockerで動かす前提です”; answer: apps all in Docker, production DB etc. AWS managed); reflected in IR119, container-design.md, compose.yaml, web/Dockerfile, docker/ and Figma System Architecture board 07 |
+| DEC-71 | Backend and web follow the frameworks' official documentation and current major versions: Core API on Echo v5 structured as in the Echo guide (central HTTPErrorHandler, echo/v5 middleware, route groups, StartConfig graceful shutdown, slog); web on the current Next.js App Router conventions (IR174+) | User request in this conversation, 2026-10-08 (“バックエンドの構成ですが、GoEchoのドキュメントに沿って作成してください。Web側も同様に公式ドキュメントに沿って作成してください”); reflected in IR173, backend-go-design.md §1/§4 |
 
 **DEC-10 (design proposal)**: Preserve work status on reassignment. Release restrictions only after all cause invoices fixed at notice time are paid. Release does not automatically power units on or restore previous set temperatures. Manual payment recording, test-run end confirmation, and viewing saved reports are specified for the 1A demo. This does not mean company approval of commercial rules. See [input/output contract DDC-08](../02-design/implementation-contracts.md#ddc-08-multi-resource-revisit-and-cross-role-contracts).
 
@@ -260,9 +261,73 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 
 0.23.0: Maintenance scheduling across the four roles (DEC-63, IR113) and confirmation of the former Figma proposal screens (DEC-64). No requirement IDs were added; FR-C09, FR-A06, FR-P02, FR-P03 and FR-T08 and their acceptance criteria were extended.
 
-0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
-0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
-0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
-0.26.0: Frontend stack fixed to Next.js (App Router) and production backend / network designed at a logical, cloud-agnostic level (DEC-67, IR116). Phase 1A scope unchanged.
-0.25.0: Consistency check of use cases, user flows, screens and documents (DEC-66, IR115). Dashboard visibility uses billing.read/energy.read, default-policy rule switching is owner-only for clients, follow-up classification traces to FR-A06, and tab/URL contracts follow Figma. No new requirement IDs.
 0.24.0: Use case diagrams (Figma page “Use Cases”, 126 use cases) found three spec gaps; they now have screens and rules (DEC-65, IR114). New requirement FR-C19 Customer users (owner) with SCR-C19 `/customer/users`; coordination notes (Client 07o/07p) and follow-up classification (Admin 06-17/06-18) use existing operations.
+0.25.0: Consistency check of use cases, user flows, screens and documents (DEC-66, IR115). Dashboard visibility uses billing.read/energy.read, default-policy rule switching is owner-only for clients, follow-up classification traces to FR-A06, and tab/URL contracts follow Figma. No new requirement IDs.
+0.26.0: Frontend stack fixed to Next.js (App Router) and production backend / network designed at a logical, cloud-agnostic level (DEC-67, IR116). Phase 1A scope unchanged.
+0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
+0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
+0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.66.0: Next.js 16 step 1 (IR175). Phase 1A unchanged.
+0.65.0: Go server layout cmd/ + internal/ (IR174). Phase 1A unchanged.
+0.64.0: Echo v5 per the official guide (IR173, DEC-71). Phase 1A unchanged.
+0.63.0: Membership.displayName (IR172). Phase 1A unchanged.
+0.62.0: Test database isolation (IR171). Phase 1A unchanged.
+0.61.0: One unit scope for every module (IR170). Phase 1A unchanged.
+0.60.0: Unit read scope for external technicians and contractors (IR169). Phase 1A unchanged.
+0.59.0: Shared demo clock, ack → observedState, BFF refresh (IR168). Phase 1A unchanged.
+0.58.0: Migration service `service/migrate` (IR167). Phase 1A unchanged.
+0.57.0: Service directory layout under `service/` (IR166). Phase 1A unchanged.
+
+0.56.0: UnitDetail parts and control blocking during recovery (IR165). Phase 1A unchanged.
+
+0.55.0: Terminal-restriction recovery cases (IR164). Phase 1A unchanged.
+
+0.54.0: Result-type conformance sweep (IR163). Phase 1A unchanged.
+
+0.53.0: BFF action check; jobs.addNote result (IR162). Phase 1A unchanged.
+
+0.52.0: Demo business records seeded for the Core API (IR161). Phase 1A unchanged.
+
+0.51.0: Result meta and the server clock for screens (IR160). Phase 1A unchanged.
+
+0.50.0: Demo clock start and full-stack BFF check (IR159). Phase 1A unchanged.
+
+0.49.0: Web BFF and the first API-backed screen (IR158). Phase 1A unchanged.
+
+0.48.0: One business clock in the database (IR157). Phase 1A unchanged.
+
+0.47.0: Business-event notifications for the backend (IR156). Phase 1A unchanged.
+
+0.46.0: Alert-policy notification evaluation for the backend (IR155). Phase 1A unchanged.
+
+0.45.0: Demo operations and demo sessions in the Core API (IR154). Phase 1A unchanged.
+
+0.44.0: Voice intents and the energy export for the backend (IR153). Phase 1A unchanged.
+
+0.43.0: Automation evaluation for the backend (IR152). Phase 1A unchanged.
+
+0.42.0: Customer automation rules for the backend (IR151). Phase 1A unchanged.
+
+0.41.0: Offset quotes and simulated records for the backend (IR150). Phase 1A unchanged.
+
+0.40.0: MRV reports for the backend (IR149). Phase 1A unchanged.
+
+0.39.0: Energy summary and admin dashboard for the backend (IR148). Phase 1A unchanged.
+
+0.38.0: Emission factors, energy integration and baselines for the backend (IR147). Phase 1A unchanged.
+
+0.37.0: Role summaries for the backend (IR146). Phase 1A unchanged.
+
+0.36.0: QR resolution, write results and password-reset preview for the backend (IR145). Phase 1A unchanged.
+
+0.35.0: Client users and two-step verification for the backend (IR144). Phase 1A unchanged.
+
+0.34.0: Inquiries and audit search for the backend (IR143). Phase 1A unchanged.
+
+0.33.0: Notification inbox, recipients and preview, preferences and consents for the backend (IR142). Phase 1A unchanged.
+
+0.32.0: Restriction grace/exception, explicit and forced release, reconcile and retry for the backend (IR141). Phase 1A unchanged.
+
+0.31.0: Restriction schedule, execution, command results, release evaluation, cancellation and reads for the backend (IR140). Phase 1A unchanged.
+
+0.30.0: Alert-policy details for the backend — default rules, HQ limit edits, field and list rules (IR120); telemetry and ventilation reads (IR121); job intake, notes, hold and list filters (IR122); offers, decisions and assignments (IR123); contractor/technician projections (IR124); technician on-site operations (IR125); work reports (IR126); follow-up, cost, access and warranty operations (IR127); time proposals and reschedules (IR128); attachments and sign-off (IR129); maintenance plans (IR130); contractor register, rate cards and SLA (IR131); memberships, eligibility, capacity and unavailability (IR132); certificates and parts catalog (IR133); filter care (IR134); contracts, invoices and reminders (IR135); payments (IR136); contractor payouts (IR137); unit commands (IR138); diagnostic test runs (IR139). Phase 1A unchanged.

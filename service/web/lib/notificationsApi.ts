@@ -1,0 +1,59 @@
+// Notifications against the Core API (DATA_SOURCE=api): notifications.list rows projected into the inbox row shape,
+// and notifications.markRead with the row version (FR-X07; reading is separate from resolving the linked alert).
+import type { Role } from "@/lib/nav";
+import { callOp } from "@/lib/ops";
+import { invalidate } from "@/lib/useOp";
+
+type TargetKind = "unit" | "job" | "invoice" | "restriction" | "device" | "inquiry" | "client_user";
+
+/** Notification of service-contracts.ts (fields shown in the inbox). */
+export type ApiNotification = {
+  id: string;
+  version: number;
+  sourceAlertId: string | null;
+  target: { kind: TargetKind; id: string };
+  templateKey: string;
+  params: { targetName: string; at: string; status: string; reason: string | null; message: string | null };
+  channel: string;
+  occurredAt: string;
+  readAt: string | null;
+};
+
+export type InboxRow = { id: string; version: number; t: string; d: string; w: string; read: boolean; href: string };
+
+const titles: Record<string, string> = {
+  alert: "Alert on",
+  quality: "Air quality alert on",
+  schedule_change: "Schedule changed —",
+  report_return: "Work report returned —",
+  completion: "Work completed —",
+  payment: "Payment update —",
+  payment_reminder: "Payment reminder —",
+  restriction: "Service restriction —",
+  inquiry: "Inquiry update —",
+  job_update: "Job update —",
+  device_operation: "Device operation —",
+  invite: "Invitation —",
+};
+
+const routes: Record<Role, Partial<Record<TargetKind, (id: string) => string>>> = {
+  client: { unit: (id) => `/customer/units/${id}`, job: () => "/customer/maintenance", invoice: (id) => `/customer/payments/${id}`, restriction: () => "/customer/payments", inquiry: () => "/customer/maintenance", client_user: () => "/customer/users" },
+  admin: { unit: () => "/admin/units", job: () => "/admin/jobs", invoice: () => "/admin/billing", restriction: (id) => `/admin/restrictions/${id}`, device: () => "/admin/devices", client_user: () => "/admin/settings/access" },
+  contractor: { unit: (id) => `/partner/units/${id}`, job: (id) => `/partner/jobs/${id}` },
+  technician: { unit: (id) => `/technician/units/${id}`, job: (id) => `/technician/jobs/${id}`, device: (id) => `/technician/devices/${id}` },
+};
+
+const alertsPage: Record<Role, string> = { client: "/customer/alerts", admin: "/admin/alerts", contractor: "", technician: "" };
+
+export function inboxRow(n: ApiNotification, role: Role): InboxRow {
+  const title = titles[n.templateKey] ?? "Notification —";
+  const detail = [n.params.message ?? n.params.reason, n.params.status, n.channel === "in_app" ? null : n.channel].filter(Boolean).join(" · ");
+  const at = new Date(n.occurredAt).toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kuala_Lumpur" });
+  const href = n.sourceAlertId && alertsPage[role] ? alertsPage[role] : (routes[role][n.target.kind]?.(n.target.id) ?? "");
+  return { id: n.id, version: n.version, t: `${title} ${n.params.targetName}`, d: detail, w: at, read: n.readAt !== null, href };
+}
+
+export async function markRead(id: string, version: number) {
+  await callOp("notifications.markRead", { id }, { write: true, expectedVersion: version });
+  invalidate();
+}

@@ -1,10 +1,12 @@
 # AC Project — everything runs in Docker (IR119, DEC-70, docs/02-design/container-design.md)
+# Services live under service/: one Go module (service/cmd/{api,worker,migrate} + service/internal, built with
+# service/build/*.Dockerfile, IR174) and service/web (Next.js web + BFF)
 #
 # Profiles
 #   demo     Phase 1A clickable demo (web with the in-browser mock)           docker compose --profile demo up
 #   infra    Local stand-ins for the AWS managed services                      docker compose --profile infra up
-#   schema   Apply docs/02-design/db/schema.sql once (until backend/ exists)   docker compose --profile infra --profile schema up
-#   backend  Go API, webhook, workers, IoT bridge, device simulator (needs ./backend)
+#   schema   migrate once (schema, local login, demo fixture)                 docker compose --profile infra --profile schema up
+#   backend  Go API, webhook, workers, IoT bridge, device simulator (service/cmd)
 #   full     web in API mode + backend + infra                                 docker compose --profile full up
 #   obs      OpenTelemetry collector + Jaeger
 #
@@ -13,27 +15,48 @@
 
 name: ac-project
 
-x-backend: &backend
-  image: ac-backend:dev
+x-worker: &worker             # cmd/worker (independent service, IR166/IR174)
+  image: ac-worker:dev
   build:
-    context: ./backend
+    context: ./service
+    dockerfile: build/worker.Dockerfile
+    target: runtime
+  environment:
+    DATABASE_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
+    DEMO_OPS: "1"                                       # scenario clock shared with the API (platform.demo_clock, IR168)
+  read_only: true
+  security_opt: [no-new-privileges:true]
+  networks: [app, data]
+  restart: unless-stopped
+  profiles: [backend, full]
+  depends_on:
+    migrate: { condition: service_completed_successfully }
+
+x-backend: &backend
+  image: ac-api:dev
+  build:
+    context: ./service            # one Go module: cmd/<service> + internal/
+    dockerfile: build/api.Dockerfile
     target: runtime
   env_file:
     - path: .env.local
       required: false
   environment: &backend-env
     APP_ENV: local
+    DEMO_OPS: "1"                                       # demo.advanceClock / demo.trigger (IR154); never set in production
     DATABASE_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
     DATABASE_READER_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
     AWS_REGION: ap-southeast-5
     AWS_ENDPOINT_URL: http://localstack:4566
     AWS_ACCESS_KEY_ID: test
     AWS_SECRET_ACCESS_KEY: test
-    OIDC_ISSUER: http://keycloak:8080/realms/ac
+    OIDC_ISSUER: http://localhost:8081/realms/ac          # must equal the iss claim seen by browsers
+    OIDC_JWKS_URL: http://keycloak:8080/realms/ac/protocol/openid-connect/certs
     OIDC_ADMIN_CLIENT_ID: ac-admin-web
     OIDC_APP_CLIENT_ID: ac-web
     MQTT_URL: tcp://mosquitto:1883
     STRIPE_API_BASE: http://stripe-mock:12111
+    WEATHER_API_BASE: http://weather-mock:8080          # WireMock GET /v1/current
     OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
   read_only: true
   tmpfs: [/tmp]
@@ -49,10 +72,10 @@ services:
   # ------------------------------------------------------------------ web (Next.js)
   web:
     image: ac-web:dev
-    build: { context: ./web }
+    build: { context: ./service/web }
     ports: ["3000:3000"]
     environment:
-      DATA_SOURCE: mock            # Phase 1A: in-browser mock adapter
+      DATA_SOURCE: mock            # Phase 1A: screens keep their fixture data (BFF relay answers UNAVAILABLE)
     read_only: true
     tmpfs: [/tmp, /app/.next/cache]
     security_opt: [no-new-privileges:true]
@@ -61,11 +84,14 @@ services:
 
   web-api:
     image: ac-web:dev
-    build: { context: ./web }
+    build: { context: ./service/web }
     ports: ["3000:3000"]
     environment:
-      DATA_SOURCE: api             # production-like: BFF relays /bff/ops/* to the Core API
+      DATA_SOURCE: api             # production-like: BFF relays /bff/ops/* to the Core API (service/web/app/bff, IR158)
       CORE_API_URL: http://api:8080
+      APP_URL: http://localhost:3000
+      SESSION_SECRET: local-dev-session-secret-change-me
+      OIDC_APP_CLIENT_SECRET: local-ac-web-secret
       OIDC_ISSUER: http://localhost:8081/realms/ac
       OIDC_INTERNAL_ISSUER: http://keycloak:8080/realms/ac
       OIDC_APP_CLIENT_ID: ac-web
@@ -79,15 +105,25 @@ services:
     depends_on: [api, keycloak, valkey]
 
   # ------------------------------------------------------------------ backend (Go + Echo)
-  migrate:
-    <<: *backend
+  migrate:             # one-off: embedded migrations (cmd/migrate), local login role, demo fixture once
+    image: ac-migrate:dev
+    build:
+      context: ./service
+      dockerfile: build/migrate.Dockerfile
+      target: runtime
     command: ["/app/migrate", "up"]
     restart: "no"
     depends_on:
       postgres: { condition: service_healthy }
     environment:
-      <<: *backend-env
       DATABASE_URL: postgres://postgres:local@postgres:5432/ac?sslmode=disable
+      APP_LOGIN_PASSWORD: local                         # local only: ac_app_login IN ROLE ac_app
+      SEED_FIXTURE: /fixture/fixture-contract.json     # local only: skipped when identity.users has rows
+    volumes: [./docs/04-agentic-sdlc/fixture-contract.json:/fixture/fixture-contract.json:ro]
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    networks: [data]
+    profiles: [schema, backend, full]
 
   api:
     <<: *backend
@@ -101,25 +137,25 @@ services:
     ports: ["8082:8080"]
     networks: [edge, app, data]
 
-  worker-outbox:       { <<: *backend, command: ["/app/worker", "--role=outbox"] }
-  worker-scheduler:    { <<: *backend, command: ["/app/worker", "--role=scheduler"] }
-  worker-iot:          { <<: *backend, command: ["/app/worker", "--role=iot"] }
-  worker-telemetry:    { <<: *backend, command: ["/app/worker", "--role=telemetry"] }
-  worker-rollup:       { <<: *backend, command: ["/app/worker", "--role=rollup"] }
-  worker-automation:   { <<: *backend, command: ["/app/worker", "--role=automation"] }
-  worker-notification: { <<: *backend, command: ["/app/worker", "--role=notification"] }
-  worker-importexport: { <<: *backend, command: ["/app/worker", "--role=importexport"] }
+  worker-outbox:       { <<: *worker, command: ["/app/worker", "--role=outbox"] }
+  worker-scheduler:    { <<: *worker, command: ["/app/worker", "--role=scheduler"] }
+  worker-iot:          { <<: *worker, command: ["/app/worker", "--role=iot"] }
+  worker-telemetry:    { <<: *worker, command: ["/app/worker", "--role=telemetry"] }
+  worker-rollup:       { <<: *worker, command: ["/app/worker", "--role=rollup"] }
+  worker-automation:   { <<: *worker, command: ["/app/worker", "--role=automation"] }
+  worker-notification: { <<: *worker, command: ["/app/worker", "--role=notification"] }
+  worker-importexport: { <<: *worker, command: ["/app/worker", "--role=importexport"] }
 
   iot-bridge:          # local stand-in for AWS IoT rules: MQTT topics -> Kinesis / SQS
     <<: *backend
-    image: ac-backend:dev-tools
-    build: { context: ./backend, target: dev }
+    image: ac-api:dev-tools
+    build: { context: ./service, dockerfile: build/api.Dockerfile, target: dev }
     command: ["/app/iotbridge"]
 
   device-sim:          # simulated IoT modules (telemetry each minute, heartbeats, command acks)
     <<: *backend
-    image: ac-backend:dev-tools
-    build: { context: ./backend, target: dev }
+    image: ac-api:dev-tools
+    build: { context: ./service, dockerfile: build/api.Dockerfile, target: dev }
     command: ["/app/devicesim", "--devices=20"]
     networks: [data]
 
@@ -134,21 +170,6 @@ services:
     healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres -d ac"], interval: 5s, timeout: 3s, retries: 20 }
     networks: [data]
     profiles: [infra, schema, backend, full]
-
-  db-schema:           # until backend/ exists: apply the design schema once and create a local login
-    image: postgres:16
-    depends_on:
-      postgres: { condition: service_healthy }
-    environment: { PGPASSWORD: local }
-    volumes: [./docs/02-design/db/schema.sql:/schema.sql:ro]
-    entrypoint: ["sh", "-c"]
-    command:
-      - >
-        psql -h postgres -U postgres -d ac -tAc "select 1 from pg_namespace where nspname='platform'" | grep -q 1
-        || (psql -h postgres -U postgres -d ac -v ON_ERROR_STOP=1 -q -f /schema.sql
-        && psql -h postgres -U postgres -d ac -c "CREATE ROLE ac_app_login LOGIN PASSWORD 'local' IN ROLE ac_app")
-    networks: [data]
-    profiles: [schema]
 
   valkey:              # ElastiCache (sessions, idempotency fast path, rate limits)
     image: valkey/valkey:8
@@ -179,6 +200,8 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://localhost:8081       # fixed issuer for tokens, whoever calls
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"  # containers may still reach it as keycloak:8080
     ports: ["8081:8080"]
     volumes: [./docker/keycloak/realm-ac.json:/opt/keycloak/data/import/realm-ac.json:ro]
     networks: [edge, app]

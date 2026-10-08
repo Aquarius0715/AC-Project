@@ -1,6 +1,6 @@
 ---
 document_id: DD-NETWORK
-version: 0.29.0
+version: 0.30.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, review-agent, operations]
@@ -29,7 +29,7 @@ Principles:
 | Z1 Edge | DNS, CDN, WAF, DDoS protection, public load balancer, MQTT broker endpoint, webhook endpoint | Z0 on published ports only | Public |
 | Z2 Web | Web/BFF (Next.js) containers | Z1 load balancer | Egress via Z5 only |
 | Z3 Application | Core API, IoT gateway service, telemetry processor, automation engine, scheduler, notification and import / export workers, webhook receiver, outbox relay | Z2 (Core API only), Z1 (webhook receiver, MQTT bridge), Z6 | Egress via Z5 only |
-| Z4 Data | Relational database, time-series store, cache, message broker, object storage private endpoint, secret store endpoint | Z3 (and Z2 for the session cache) | None |
+| Z4 Data | Relational database (including partitioned telemetry tables), cache, message broker, object storage private endpoint, secret store endpoint | Z3 (and Z2 for the session cache) | None |
 | Z5 Egress | NAT and egress proxy with FQDN allowlist | Z2, Z3 | Outbound to allowlisted providers |
 | Z6 Management | CI/CD runners, operations access gateway (single sign-on, multi-factor), monitoring collectors | Operators through the access gateway | Controlled |
 | Z7 Field sites | AC indoor units, IoT modules or site gateways, site uplink (Wi-Fi / LAN or cellular) | — (outbound only) | Outbound to Z1 MQTT endpoint and NTP |
@@ -70,7 +70,7 @@ The Core API, databases, broker, and management interfaces have no public names.
 | F04 | Web/BFF (Z2) | Core API (Z3) | HTTPS (internal), mutual TLS | Service token + user context | `/v1/ops/<operation>`; no other Z2 → Z3 path |
 | F05 | Web/BFF (Z2) | Cache (Z4) | TLS 6379-class port | Service identity | Sessions only |
 | F06 | Core API and workers (Z3) | Relational database (Z4) | TLS 5432-class port | Per-service database roles | Row-level security by tenant |
-| F07 | Z3 services | Message broker, time-series store, cache (Z4) | TLS | Service identity | Private endpoints only |
+| F07 | Z3 services | Message broker, Kinesis, cache (Z4 endpoints) | TLS | Service identity | Private endpoints only |
 | F08 | Z3 services | Object storage (Z4 private endpoint) | HTTPS 443 | Service identity | Issues pre-signed URLs for F12 |
 | F09 | IoT module (Z7) | MQTT endpoint (Z1) | MQTT over TLS 8883 (fallback WSS 443) | Device X.509 certificate | Outbound only; keep-alive ≤ 60 seconds; topic access limited to its own deviceId |
 | F10 | MQTT endpoint (Z1) | IoT gateway service (Z3) | Internal bridge / subscription | Service identity | Commands down, telemetry and acknowledgements up |
@@ -151,4 +151,4 @@ Give these to customer IT before installation (office sites; homes normally need
 | OPEN-NW-03 | Decided 2026-10-07: HQ admin app only from the company network (§3, DEC-68); the company must supply its office egress addresses and VPN egress addresses | — |
 | OPEN-NW-04 | Decided 2026-10-07: customer office firewall requirements in §5a | — |
 
-Additional contracts for current version 0.29.0: Read IR01–119 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.30.0: Read IR01–139 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

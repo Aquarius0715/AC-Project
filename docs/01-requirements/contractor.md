@@ -1,6 +1,6 @@
 ---
 document_id: REQ-P
-version: 0.22.0
+version: 0.30.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # Contractor requirements
 
-**0.29.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.30.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Purpose and assumptions
 
@@ -270,7 +270,7 @@ Design: [DD-P10](../02-design/contractor.md#dd-p10-details). Assess parent AT-P1
 
 0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 
-Additional current 0.29.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–119. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.30.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–139. They override older text on the same issues; use IR72 for conflict priority.
 
 0.14.0: Under IR25, the pre-acceptance address comes from the unit's installation property. After expiry, freeze only report existence/acceptance status.
 

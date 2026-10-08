@@ -16,9 +16,59 @@
       "secret": "local-ac-web-secret",
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["http://localhost:3000/*"],
-      "webOrigins": ["http://localhost:3000"],
-      "attributes": { "pkce.code.challenge.method": "S256" }
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "tenant_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "tenant_id",
+            "claim.name": "tenant_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "membership_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "membership_id",
+            "claim.name": "membership_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "role",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "role",
+            "claim.name": "role",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "ac-admin-web",
@@ -27,30 +77,353 @@
       "secret": "local-ac-admin-secret",
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
-      "redirectUris": ["http://localhost:3000/*"],
-      "webOrigins": ["http://localhost:3000"],
-      "attributes": { "pkce.code.challenge.method": "S256" }
+      "redirectUris": [
+        "http://localhost:3000/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "tenant_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "tenant_id",
+            "claim.name": "tenant_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "membership_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "membership_id",
+            "claim.name": "membership_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "role",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "role",
+            "claim.name": "role",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
   "users": [
+    {
+      "username": "customer-a",
+      "email": "customer-a@ac.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Customer",
+      "lastName": "a",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-pass",
+          "temporary": false
+        }
+      ],
+      "id": "f33ed7d5-38da-59b6-8e0b-230f10d56945",
+      "attributes": {
+        "tenant_id": [
+          "820cc6b6-9ea8-5d18-8b10-5c8c1d126814"
+        ],
+        "membership_id": [
+          "074c7404-aad8-57a8-8461-399304cede9d"
+        ],
+        "role": [
+          "client"
+        ]
+      }
+    },
+    {
+      "username": "customer-b",
+      "email": "customer-b@ac.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Customer",
+      "lastName": "b",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-pass",
+          "temporary": false
+        }
+      ],
+      "id": "58e1f208-1792-5c49-9ae7-6751e0588a8c",
+      "attributes": {
+        "tenant_id": [
+          "820cc6b6-9ea8-5d18-8b10-5c8c1d126814"
+        ],
+        "membership_id": [
+          "a2c51581-54af-5906-ae6b-c8348e1f45d4"
+        ],
+        "role": [
+          "client"
+        ]
+      }
+    },
+    {
+      "username": "contractor-a",
+      "email": "contractor-a@ac.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Contractor",
+      "lastName": "a",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-pass",
+          "temporary": false
+        }
+      ],
+      "id": "d62a011a-7884-582d-b276-cca2d24a7dec",
+      "attributes": {
+        "tenant_id": [
+          "820cc6b6-9ea8-5d18-8b10-5c8c1d126814"
+        ],
+        "membership_id": [
+          "fd5a921c-5b22-5175-9a04-aa07ba27c5c7"
+        ],
+        "role": [
+          "contractor"
+        ]
+      }
+    },
+    {
+      "username": "contractor-b",
+      "email": "contractor-b@ac.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Contractor",
+      "lastName": "b",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-pass",
+          "temporary": false
+        }
+      ],
+      "id": "c438720a-7cee-554c-9a2d-79b43e03bae8",
+      "attributes": {
+        "tenant_id": [
+          "820cc6b6-9ea8-5d18-8b10-5c8c1d126814"
+        ],
+        "membership_id": [
+          "6d36ddc9-6996-5ac2-9be6-df4675dc85fa"
+        ],
+        "role": [
+          "contractor"
+        ]
+      }
+    },
+    {
+      "username": "tech-internal-a",
+      "email": "tech-internal-a@ac.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Tech",
+      "lastName": "internal-a",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-pass",
+          "temporary": false
+        }
+      ],
+      "id": "241b7f77-d897-5e7d-941f-85b6d4eded17",
+      "attributes": {
+        "tenant_id": [
+          "820cc6b6-9ea8-5d18-8b10-5c8c1d126814"
+        ],
+        "membership_id": [
+          "8fc0cf56-a19f-5e80-ac65-37084abdcc89"
+        ],
+        "role": [
+          "technician"
+        ]
+      }
+    },
+    {
+      "username": "tech-external-a",
+      "email": "tech-external-a@ac.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Tech",
+      "lastName": "external-a",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-pass",
+          "temporary": false
+        }
+      ],
+      "id": "2883e3cf-0c3b-5a98-86cc-d6a317bbe2ab",
+      "attributes": {
+        "tenant_id": [
+          "820cc6b6-9ea8-5d18-8b10-5c8c1d126814"
+        ],
+        "membership_id": [
+          "5e46bceb-48df-5f90-b73c-3f8f3ccccb1a"
+        ],
+        "role": [
+          "technician"
+        ]
+      }
+    },
+    {
+      "username": "tech-external-b",
+      "email": "tech-external-b@ac.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "Tech",
+      "lastName": "external-b",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-pass",
+          "temporary": false
+        }
+      ],
+      "id": "054404d7-c08a-5a40-9b3c-11661f07d360",
+      "attributes": {
+        "tenant_id": [
+          "820cc6b6-9ea8-5d18-8b10-5c8c1d126814"
+        ],
+        "membership_id": [
+          "49c9cb23-6167-53ba-af3b-2005c0722688"
+        ],
+        "role": [
+          "technician"
+        ]
+      }
+    },
     {
       "username": "hq-operator",
       "email": "hq-operator@ac.local",
       "emailVerified": true,
       "enabled": true,
       "firstName": "HQ",
-      "lastName": "Operator",
-      "credentials": [{ "type": "password", "value": "local-pass", "temporary": false }],
-      "requiredActions": ["CONFIGURE_TOTP"]
+      "lastName": "operator",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-pass",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ],
+      "id": "90a3c28d-a990-5566-9cb3-fd2b341c788b",
+      "attributes": {
+        "tenant_id": [
+          "820cc6b6-9ea8-5d18-8b10-5c8c1d126814"
+        ],
+        "membership_id": [
+          "2c0bcc51-6709-5c6d-b039-8a67b60ab535"
+        ],
+        "role": [
+          "admin"
+        ]
+      }
     },
     {
-      "username": "tan.wei",
-      "email": "tan.wei@ac.local",
+      "username": "hq-restriction-manager",
+      "email": "hq-restriction-manager@ac.local",
       "emailVerified": true,
       "enabled": true,
-      "firstName": "Tan",
-      "lastName": "Wei",
-      "credentials": [{ "type": "password", "value": "local-pass", "temporary": false }]
+      "firstName": "HQ",
+      "lastName": "restriction-manager",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-pass",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ],
+      "id": "27d2d5ff-ec58-59eb-83f1-3159bea53f03",
+      "attributes": {
+        "tenant_id": [
+          "820cc6b6-9ea8-5d18-8b10-5c8c1d126814"
+        ],
+        "membership_id": [
+          "be756830-35bb-58ca-843b-f8234a525b2d"
+        ],
+        "role": [
+          "admin"
+        ]
+      }
+    },
+    {
+      "username": "hq-override-only",
+      "email": "hq-override-only@ac.local",
+      "emailVerified": true,
+      "enabled": true,
+      "firstName": "HQ",
+      "lastName": "override-only",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-pass",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ],
+      "id": "ecd33bf4-0275-5491-80e7-4c89ef03af83",
+      "attributes": {
+        "tenant_id": [
+          "820cc6b6-9ea8-5d18-8b10-5c8c1d126814"
+        ],
+        "membership_id": [
+          "bf5ec9ea-91b3-5b93-a474-00dabb4c9b98"
+        ],
+        "role": [
+          "admin"
+        ]
+      }
     }
-  ]
+  ],
+  "components": {
+    "org.keycloak.userprofile.UserProfileProvider": [
+      {
+        "providerId": "declarative-user-profile",
+        "subComponents": {},
+        "config": {
+          "kc.user.profile.config": [
+            "{\"unmanagedAttributePolicy\": \"ADMIN_VIEW\", \"attributes\": [{\"name\": \"username\", \"displayName\": \"${username}\", \"validations\": {\"length\": {\"min\": 3, \"max\": 255}, \"username-prohibited-characters\": {}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"email\", \"displayName\": \"${email}\", \"validations\": {\"email\": {}, \"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"firstName\", \"displayName\": \"${firstName}\", \"validations\": {\"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}, {\"name\": \"lastName\", \"displayName\": \"${lastName}\", \"validations\": {\"length\": {\"max\": 255}}, \"permissions\": {\"view\": [\"admin\", \"user\"], \"edit\": [\"admin\"]}, \"multivalued\": false}], \"groups\": [{\"name\": \"user-metadata\", \"displayHeader\": \"User metadata\", \"displayDescription\": \"Attributes, which refer to user metadata\"}]}"
+          ]
+        }
+      }
+    ]
+  }
 }

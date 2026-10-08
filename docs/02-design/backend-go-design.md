@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND-GO
-version: 0.29.0
+version: 0.30.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -15,11 +15,11 @@ This document turns the [backend architecture](backend-architecture.md) into an 
 
 | Decision | Choice |
 |---|---|
-| Language | Go 1.25 or later (one module, `backend/`; current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
-| HTTP framework | Echo v4 (`github.com/labstack/echo/v4`, checked with v4.16.0) for the Core API and the webhook receiver |
+| Language | Go 1.25 or later (one module `github.com/pradita/ac-project/service` in the official Go server layout (IR174): commands in `service/cmd/{api,worker,migrate,seed,gen}`, every package in `service/internal/`, DB integration tests in `service/test/integration`, Dockerfiles in `service/build/`; current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
+| HTTP framework | Echo v5 (`github.com/labstack/echo/v5`, checked with v5.4.0) for the Core API and the webhook receiver, structured as in the official Echo guide (IR173): handlers `func(c *echo.Context) error` return errors to one central `HTTPErrorHandler`; middleware from `echo/v5/middleware`; route group `/v1`; graceful shutdown with `echo.StartConfig`; `log/slog` as `e.Logger`; tests with `net/http/httptest` against `e.ServeHTTP` |
 | Database driver | pgx v5 (`github.com/jackc/pgx/v5`, `pgxpool`); no ORM |
 | Query code | sqlc generates typed Go from SQL in `db/queries/<schema>/*.sql`; hand-written SQL only for dynamic list filters |
-| Migrations | golang-migrate (`db/migrations/NNNNNN_name.up.sql` / `.down.sql`); `0001_init` is [db/schema.sql](db/schema.sql) |
+| Migrations | `cmd/migrate` + `internal/migrate` + `internal/migrations` (IR167, IR174): embedded `migrations/NNNNNN_name.up.sql` files applied in order under an advisory lock, one transaction each (`-- migrate:no-transaction` for `CONCURRENTLY`), bookkeeping in the golang-migrate compatible `schema_migrations` table; `000001_init` is [db/schema.sql](db/schema.sql) |
 | IDs | UUIDv7 from `github.com/google/uuid` (`uuid.NewV7`), time-ordered for index locality |
 | Validation | Generated input structs + a `Validate() *DomainError` method per input (rules from the DD documents); `go-playground/validator` only for simple tags |
 | Logging / tracing | `log/slog` JSON with a masking handler; OpenTelemetry SDK + `otelecho`, exported through the AWS Distro for OpenTelemetry collector |
@@ -35,16 +35,21 @@ The core request pipeline in §4 and the example handler in §5 were compiled an
 ## 2. Repository layout
 
 ```text
-backend/
+service/            (IR174; the Next.js app is the sibling service/web)
   go.mod
+  Makefile          gen, seed, test, test-unit, test-integration, cover, resetdb, testdb
+  build/            api.Dockerfile, worker.Dockerfile, migrate.Dockerfile (context service/)
+  scripts/          resetdb.sh, covermerge.py
   cmd/
     api/            Core API (Echo) — POST /v1/ops/:operation, /healthz, /readyz
     webhook/        Webhook receiver (Echo) — /stripe, /ses, /whatsapp
     worker/         one binary, --role=outbox|scheduler|notification|telemetry|iot|automation|importexport|rollup
-    migrate/        applies db/migrations (run as a one-off ECS task before deploy)
+    migrate/        applies internal/migrations (one-off ECS task before deploy, IR167)
+    seed/           loads the demo fixture
     gen/            code generators (operations, contracts) — run in CI, output committed
   internal/
-    app/            composition root: config → pools → AWS clients → modules → Echo / worker loops
+    server/         composition root and Echo layer (app.go wiring, http.go newEcho + middleware, demo.*, unit detail join)
+    migrate/ migrations/ seed/ scheduler/   migration runner + embedded SQL, fixture loader, clock-driven transitions
     platform/
       config/       typed configuration
       apperr/       DomainError, codes, PostgreSQL error mapping
@@ -99,16 +104,18 @@ The authorization column (for example `client:self-customer:owner | admin:alert.
 
 ## 4. Request pipeline (Core API)
 
+Echo setup (`service/internal/server/http.go`, Echo guide: Quickstart, Routing, Error Handling, Cookbook › Graceful Shutdown, Testing): one `echo.New()`, the middleware below in order, `/healthz` and `/readyz`, the group `v1 := e.Group("/v1", auth)` with `v1.POST("/ops/:operation", Dispatch)`, and `e.HTTPErrorHandler = ops.HTTPErrorHandler`. Handlers and middleware never write error bodies themselves; they return a `*apperr.DomainError` (which implements `echo.HTTPStatusCoder`) and the central handler writes it with the correlation ID, maps Echo's own errors (unknown route or method → NOT_FOUND `error.unknownOperation`, 413 → VALIDATION `error.bodyTooLarge`, 503/504 → TIMEOUT) and turns any other error into UNAVAILABLE without internal detail, skipping responses already committed. `cmd/api` starts with `echo.StartConfig{GracefulTimeout: 25s}.Start(ctx, e)` on a SIGINT/SIGTERM context.
+
 Echo middleware order:
 
 | Order | Middleware | Behaviour |
 |---|---|---|
 | 1 | Recover | Panic → UNAVAILABLE (503), stack logged, no detail returned |
-| 2 | Correlation ID | Uses the BFF's `X-Correlation-Id` or creates a UUIDv7; echoed in `X-Request-Id`, logs, traces, events, audit |
+| 2 | Correlation ID | `middleware.RequestIDWithConfig` with a UUIDv7 generator (keeps an incoming `X-Request-Id`); echoed in `X-Request-Id`, logs, traces, events, audit |
 | 3 | OpenTelemetry (`otelecho`) | Span per request, attributes `ac.operation`, `ac.tenant` |
-| 4 | Access log | `slog` line with operation, status, latency, membership; bodies are never logged |
-| 5 | Body limit / timeout | 1 MiB JSON (files go to S3); context deadline 5 s for reads, 10 s for writes |
-| 6 | Authentication | Verifies the Cognito access token (issuer, audience = app client, expiry, `token_use=access`), loads the selected Membership (`X-Membership-Id`) with permissions, scopes, client role and validity; caches it for 30 s keyed by membershipId + scopeVersion |
+| 4 | Access log | `middleware.RequestLoggerWithConfig` writing one `slog` JSON line (method, URI, status after the error handler, request ID, latency); bodies are never logged |
+| 5 | Body limit / timeout | 1 MiB JSON checked by the dispatcher (files go to S3); `middleware.ContextTimeout` 30 s on the request context used by the database (per-operation 5 s / 10 s deadlines remain the production target) |
+| 6 | Authentication | Verifies the Cognito access token (issuer, audience = app client, expiry, `token_use=access`), loads the selected Membership (`X-Tenant-Id` + `X-Membership-Id` from the BFF session context; the membership must belong to the token subject, be inside its validity window and the user must be active, otherwise UNAUTHENTICATED) with permissions, scopes, client role and validity; requests without a token stay anonymous and reach only `public:` operations; caches it for 30 s keyed by membershipId + scopeVersion |
 | 7 | HQ network | Admin-role principals must carry a token from the admin app client (served only on `admin.<domain>`, IR117); otherwise FORBIDDEN |
 | 8 | Dispatcher | `POST /v1/ops/:operation` (below) |
 
@@ -225,7 +232,7 @@ Rules every handler follows:
 1. **Visibility first.** A target that does not exist or is outside the caller's scope is NOT_FOUND, never FORBIDDEN (D01). Zero affected rows on a scoped insert or update means NOT_FOUND unless a version mismatch is confirmed, which is CONFLICT.
 2. **Versions.** Updates use `WHERE id = $1 AND version = $2` and `version = version + 1`; aggregates with child rows lock the parent with `SELECT … FOR UPDATE` first.
 3. **State machines.** Status transitions call `domain.<Aggregate>.Transition(from, event)`; illegal transitions are CONFLICT with a message key from the DD tables (for example Command, MaintenanceJob, Restriction in [common design §5](common.md#5-state-transitions-and-consistency)).
-4. **Time.** `c.Now` (UTC, from `platform/clock`) is the only clock; tests inject a fixed clock.
+4. **Time.** `c.Now` (UTC, from `platform/clock`) is the only clock; tests inject a fixed clock. Pools scan `timestamptz` in UTC so every Instant is serialized with `Z`, independent of the host time zone.
 5. **Side effects.** No HTTP calls to AWS or Stripe inside a transaction, except creating a Stripe Checkout Session, which is made idempotent with the operation's key and stored before commit. Everything else is an outbox event handled by a worker.
 6. **Audit and events.** Every successful write records exactly one audit entry per changed aggregate and the events listed in backend architecture §8.
 
@@ -258,7 +265,7 @@ All workers share `internal/platform/events` (SNS FIFO publish, SQS long-poll co
 | rollup | timer | Every 5 minutes upserts `measurements_15m` and, hourly, `measurements_1h` for closed buckets (`INSERT … ON CONFLICT DO UPDATE`) | Re-runnable for late data within 35 days |
 | automation | EventBridge Scheduler ticks, TelemetryReceived, weather polls | Evaluates schedules and conditions, writes `control.automation_runs` (fired / skipped with reason), creates Commands through the Control module's command service | Same Command policy as the UI path |
 | notification | SQS `notification-requested` | Applies preferences, consents and the recipient's scope version, renders en / ms templates, sends via SES or the WhatsApp provider, records `notify.deliveries` | Provider errors are retried with backoff; permanent failures surface on the alert (`delivery_failures`) |
-| importexport | SQS jobs | CSV unit import preview / commit / undo (FR-A18), monthly energy report PDF (FR-C16), MRV and audit exports, attachment scan results | Reads and writes S3 through VPC endpoints |
+| importexport | SQS `importexport-jobs` | CSV unit import preview / commit / undo (FR-A18), monthly energy report PDF (FR-C16), MRV and audit exports, attachment scan results | Reads and writes S3 through VPC endpoints |
 
 The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verifies `Stripe-Signature` with a 5-minute tolerance, stores the event in `billing.stripe_events` (primary key = Stripe event ID, so replays are no-ops), retrieves the PaymentIntent, and then runs the billing confirmation in one transaction that emits PaymentConfirmed. It answers 2xx only after the event is stored.
 
@@ -284,7 +291,7 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 
 ## 10. Build, run, and deploy
 
-- `make gen` (sqlc, operation and contract generators), `make lint`, `make test`, `make up` (`docker compose --profile full up`), `make down`.
+- `make gen` (sqlc, operation and contract generators), `make lint`, `make test`, `make cover` (merged coverage of all packages), `make resetdb` / `make test-fresh` (rebuild the local database from schema.sql and reseed before testing), `make up` (`docker compose --profile full up`), `make down`.
 - Dockerfile: multi-stage `golang:1.25` builder → `gcr.io/distroless/static-debian12:nonroot` runtime, read-only root filesystem, `healthcheck` subcommand, graceful SIGTERM drain ([container design §3](container-design.md#3-dockerfile-standards)).
 - One image, several ECS services: `api`, `webhook`, and one service per worker role (independent autoscaling: API on CPU and request count, workers on SQS backlog and Kinesis iterator age).
 - Deploy order: migrations (expand) → workers → API → BFF; contract steps of migrations ship one release later (database design §9).
@@ -297,4 +304,4 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | OPEN-GO-01 | Final choice of the TypeScript → Go contract generator (output reviewed for union types such as `UnitAction` and `Policy`) |
 | OPEN-GO-02 | WhatsApp provider SDK (depends on OPEN-BE-04) |
 
-Additional contracts for current version 0.29.0: Read IR01–119 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.30.0: Read IR01–139 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

@@ -1,6 +1,6 @@
 ---
 document_id: REQ-C
-version: 0.22.0
+version: 0.30.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # Client requirements
 
-**0.29.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.30.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Purpose and assumptions
 
@@ -373,7 +373,7 @@ Design: [DD-C14](../02-design/client.md#dd-c14-details). Assess parent AT-C14 us
 - **Company request basis**: SRC-06 BIZ-08, BIZ-17, BIZ-18 — Fault and air-quality notifications; Figma-confirmed 06e–06g/02e/02l (2026-10-01).
 - **Entry conditions**: Client Membership of the customer; editing own policies requires owner or member of that customer (policies belong to the customer, not the user). Switching default-policy rules requires clientRole=owner (IR115); members see the toggles read-only.
 - **Main flow**: Alerts › Alert policies → view the default policy (HQ limits) and, as owner, switch rules on/off → create or edit an own policy (what to watch, condition, recovery, “only if” hours, severity, channels) → attach it on each AC's page.
-- **Business rule BR-C15**: Every AC carries the HQ default policy (6 rules: ventilation CO₂, dust/PM2.5, refrigerant leak, compressor short-cycling, clogged filter, AC offline). Clients cannot edit its limits; the customer owner can switch each rule on/off for all their ACs (`policies.setDefaultRule`, owner only — a member call is FORBIDDEN and nothing changes, IR115). Own policies (`kind=alert`, `customerId` = own customer) carry one condition; units carry policies (`units.setAlertPolicies`), never the reverse. Editing changes the policy on every attached AC. Delete detaches it from all ACs first after confirmation; the default policy cannot be deleted. Recovery must be on the correct side of the threshold; units are fixed per metric (ppm/µg/m³ never mixed). WhatsApp is offered only when allowed in Preferences. Missing/stale readings never trigger.
+- **Business rule BR-C15**: Every AC carries the HQ default policy (6 rules: ventilation CO₂, dust/PM2.5, refrigerant low pressure, compressor short-cycling, clogged filter, AC offline). Clients cannot edit its limits; the customer owner can switch each rule on/off for all their ACs (`policies.setDefaultRule`, owner only — a member call is FORBIDDEN and nothing changes, IR115). Own policies (`kind=alert`, `customerId` = own customer) carry one condition; units carry policies (`units.setAlertPolicies`), never the reverse. Editing changes the policy on every attached AC. Delete detaches it from all ACs first after confirmation; the default policy cannot be deleted. Recovery must be on the correct side of the threshold; units are fixed per metric (ppm/µg/m³ never mixed). WhatsApp is offered only when allowed in Preferences. Missing/stale readings never trigger.
 - **Resulting business state**: Policy version+1 on save; DefaultRuleSetting per customer and rule; ACUnit.alertPolicyIds updated on attach/detach. Alerts remain view-only for clients (no Resolve).
 - **Boundaries/prohibitions**: Other customers' policies and the HQ template limits are not editable. Attaching another customer's policy returns NOT_FOUND.
 
@@ -458,6 +458,6 @@ Design: [DD-C19](../02-design/client.md#dd-c19-details). Assess parent AT-C19 us
 
 Approval applied 2026-09-16: FR-C01/C06 today/7d/30d use display-timezone calendar days and completed minutes (SR17). FR-C13 retries failed demo offsets only on the same record and failed stage (SR18).
 
-Additional current 0.29.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–119. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.30.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–139. They override older text on the same issues; use IR72 for conflict priority.
 
 Job lists support ascending/descending sorting by status (business order), severity, and deadline. Default: status in business order (IR34). Sort all results before pagination; language changes do not change order. Also use AT-REV16-005 for acceptance.
