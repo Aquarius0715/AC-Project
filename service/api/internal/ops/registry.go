@@ -117,6 +117,10 @@ type Registry struct {
 	Clock func() time.Time
 
 	domains map[string]bool // ServeDomains; nil = all
+
+	// AfterCommit runs after a write committed and before the response (IR183 inline mode: a single process serving
+	// every domain applies the resulting events synchronously, so callers see their effects as before).
+	AfterCommit func(ctx context.Context)
 }
 
 // NewRegistry creates an empty registry backed by the generated catalog.
@@ -340,6 +344,9 @@ func (r *Registry) Dispatch(c *echo.Context) error {
 		if err := r.Idem.Complete(ctx, p, name, key, resp); err != nil {
 			return fail(c, err, corr)
 		}
+	}
+	if write && r.AfterCommit != nil {
+		r.AfterCommit(ctx)
 	}
 	return c.JSONBlob(http.StatusOK, resp)
 }

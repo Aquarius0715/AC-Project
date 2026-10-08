@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -60,6 +61,10 @@ func Main(service string, domains ...string) {
 	}
 	// graceful shutdown as in the Echo cookbook: StartConfig.Start returns once ctx is cancelled (SIGINT/SIGTERM)
 	// and in-flight requests have finished or GracefulTimeout has passed (ECS stopTimeout is 30 s)
+	for _, c := range s.Consumers { // event subscribers of this service (IR183)
+		c.Logf = func(f string, a ...any) { logger.Warn(fmt.Sprintf(f, a...)) }
+		go c.Run(ctx, 250*time.Millisecond)
+	}
 	sc := echo.StartConfig{Address: cfg.Addr, HideBanner: true, HidePort: true, GracefulTimeout: 25 * time.Second}
 	if err := sc.Start(ctx, s.Echo); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("serve", "err", err)

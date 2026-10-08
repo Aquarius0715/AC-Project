@@ -54,9 +54,11 @@ CREATE TABLE platform.outbox (
   occurred_at    timestamptz NOT NULL DEFAULT platform.app_now(),
   published_at   timestamptz,
   attempts       int NOT NULL DEFAULT 0,
-  last_error     text
+  last_error     text,
+  seq            bigint GENERATED ALWAYS AS IDENTITY UNIQUE  -- commit-independent order for consumers (IR183)
 );
 CREATE INDEX outbox_unpublished ON platform.outbox (occurred_at) WHERE published_at IS NULL;
+CREATE INDEX outbox_type_seq ON platform.outbox (event_type, seq);  -- consumers poll their event types in order
 
 CREATE TABLE platform.idempotency_keys (
   tenant_id      uuid NOT NULL REFERENCES platform.tenants(id),

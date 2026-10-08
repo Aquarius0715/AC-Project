@@ -3,6 +3,7 @@ package server
 
 import (
 	"context"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"log/slog"
 	"slices"
 	"time"
@@ -47,9 +48,20 @@ type Config struct {
 
 // Server is the assembled Core API.
 type Server struct {
-	Echo     *echo.Echo
-	Registry *ops.Registry
-	DB       *db.TxManager
+	Echo      *echo.Echo
+	Registry  *ops.Registry
+	DB        *db.TxManager
+	Consumers []*events.Consumer // event subscribers of the served domains (IR183)
+}
+
+// DrainEvents applies every pending event of this server's consumers (inline mode and tests).
+func (s *Server) DrainEvents(ctx context.Context) error {
+	for _, c := range s.Consumers {
+		if _, err := c.Drain(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // New wires the registry, database and modules. The verifier is injected so tests can use static tokens.
@@ -145,7 +157,15 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		authn.Source = &auth.RemoteSource{BaseURL: cfg.IdentityURL, Token: cfg.InternalToken, TTL: 30 * time.Second}
 	}
 	e := newEcho(reg, m, authn, cfg.Logger, cfg.InternalToken, servesIdentity)
-	return &Server{Echo: e, Registry: reg, DB: m}, nil
+	srv := &Server{Echo: e, Registry: reg, DB: m, Consumers: consumers(m, cfg.Domains)}
+	if len(cfg.Domains) == 0 { // one process serves every domain: apply events inline after each write
+		reg.AfterCommit = func(ctx context.Context) {
+			if err := srv.DrainEvents(context.WithoutCancel(ctx)); err != nil && cfg.Logger != nil {
+				cfg.Logger.Error("inline events", "error", err)
+			}
+		}
+	}
+	return srv, nil
 }
 
 // monitorReads combines the Monitoring read interfaces Assets uses.
