@@ -47,13 +47,13 @@ export function useBffSession(): BffSession | null {
 }
 
 /** Reads an operation in api mode; returns the mock value in mock mode (and while the data source is unknown). */
-export function useOp<T, R>(operation: string, input: unknown, mock: R, map: (data: T) => R): { data: R; loading: boolean; error: OpError | null; source: "mock" | "api" | null } {
+export function useOp<T, R>(operation: string, input: unknown, mock: R, map: (data: T) => R, enabled = true): { data: R; loading: boolean; error: OpError | null; source: "mock" | "api" | null } {
   const session = useBffSession();
   const rev = useRevision();
   const [state, setState] = useState<{ data: R; loading: boolean; error: OpError | null }>({ data: mock, loading: false, error: null });
   const key = JSON.stringify(input);
   useEffect(() => {
-    if (session?.dataSource !== "api") return;
+    if (session?.dataSource !== "api" || !enabled) return;
     let live = true;
     setState((s) => ({ ...s, loading: true, error: null }));
     callOp<T>(operation, JSON.parse(key))
@@ -64,7 +64,7 @@ export function useOp<T, R>(operation: string, input: unknown, mock: R, map: (da
     };
     // map is a pure projection supplied inline by the caller
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.dataSource, operation, key, rev]);
+  }, [session?.dataSource, operation, key, rev, enabled]);
   if (session?.dataSource !== "api") return { data: mock, loading: false, error: null, source: session?.dataSource ?? null }; // live mock value
   return { ...state, source: "api" };
 }
