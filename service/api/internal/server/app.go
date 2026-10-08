@@ -39,6 +39,7 @@ type Config struct {
 	DemoOps           bool         // demo environment only: demo.advanceClock / demo.trigger (IR154)
 	DemoStart         time.Time    // demo scenario clock at start (fixture.clock, IR36); zero keeps the base clock
 	Logger            *slog.Logger // Echo's application logger (Echo v5 uses log/slog); nil keeps Echo's default
+	Domains           []string     // business domains this service serves (IR180); empty = all (tests)
 }
 
 // Server is the assembled Core API.
@@ -54,7 +55,11 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := ops.CheckDomains(); err != nil {
+		return nil, err
+	}
 	reg := ops.NewRegistry()
+	reg.ServeDomains(cfg.Domains...)
 	reg.DB, reg.Rec, reg.Idem = m, notifyingRecorder{inner: db.Recorder{}}, db.Idempotency{M: m}
 	if cfg.Clock != nil {
 		reg.Clock = cfg.Clock

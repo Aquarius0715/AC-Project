@@ -41,7 +41,9 @@ service/api/        (IR174, moved under service/api by IR179; the Next.js apps a
   build/            api.Dockerfile, worker.Dockerfile, migrate.Dockerfile (context service/)
   scripts/          resetdb.sh, covermerge.py
   cmd/
-    api/            Core API (Echo) — POST /v1/ops/:operation, /healthz, /readyz
+    gateway/        Core API entry: routes POST /v1/ops/:operation to the owning domain service (IR180)
+    identity-api/ equipment-api/ maintenance-api/ billing-api/ energy-api/
+                    business-domain Core API services (Echo) — POST /v1/ops/:operation for their domain, /healthz, /readyz
     webhook/        Webhook receiver (Echo) — /stripe, /ses, /whatsapp
     worker/         one binary, --role=outbox|scheduler|notification|telemetry|iot|automation|importexport|rollup
     migrate/        applies internal/migrations (one-off ECS task before deploy, IR167)

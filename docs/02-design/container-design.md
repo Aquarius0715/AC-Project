@@ -26,7 +26,7 @@ Checked on 2026-10-07: the `web` image built from `service/web/Dockerfile` serve
 | Image | Source | Contains | Runs as (local / production) |
 |---|---|---|---|
 | `ac-customer-web` / `ac-partner-web` / `ac-technician-web` / `ac-admin-web` | `service/web/Dockerfile` with `--build-arg APP=<name>` (context `service/web/`, npm workspace with the shared package `service/web/shared`) | One Next.js standalone server per entry point (IR178); `DATA_SOURCE=mock` keeps the Phase 1A fixtures, `DATA_SOURCE=api` renders through the server-only DAL and Server Actions | Compose `<name>-web` (demo, ports 3000–3003) and `<name>-web-api` (full) / one ECS service per app behind the ALB (customer, partner, technician host names; admin host on the HQ network, IR117) |
-| `ac-api` | `service/api/build/api.Dockerfile` (context `service/api/`, `./cmd/api`) | Static Go binary `/app/api` (Core API); `/app/webhook`, `/app/iotbridge`, `/app/devicesim` are planned as their own `service/<name>` | Compose `api` / ECS service `api` |
+| `ac-gateway` / `ac-identity-api` / `ac-equipment-api` / `ac-maintenance-api` / `ac-billing-api` / `ac-energy-api` | `service/api/build/service.Dockerfile --build-arg SERVICE=<name>` (context `service/api/`, `./cmd/<name>`) | Static Go binary `/app/server` (IR180): the gateway routes `/v1/ops/<operation>` to the business-domain service that owns it; each domain service serves only its operations (≈ 36 MB, gateway ≈ 22 MB); `/app/server healthcheck` | Compose `gateway` (port 8080) and five internal domain services / one ECS service each (the ALB can route `/v1/ops/<prefix>.*` directly) |
 | `ac-migrate` | `service/api/build/migrate.Dockerfile` (context `service/api/`, `./cmd/migrate`) | Static Go binary `/app/migrate up` with the embedded migrations (IR167); locally `APP_LOGIN_PASSWORD` creates `ac_app_login` and `SEED_FIXTURE` loads the demo fixture once | Compose `migrate` (one-off; `api` and the workers wait for it) / ECS one-off task before the deploy |
 | `ac-worker` | `service/api/build/worker.Dockerfile` (context `service/api/`, `./cmd/worker`) | Static Go binary `/app/worker --role=<role>` (scheduler implemented; other roles idle until built) | Compose `worker-*` / ECS services per role |
 
@@ -123,7 +123,7 @@ Configuration is twelve-factor: every service reads environment variables only. 
 | `WEATHER_API_BASE` | backend (automation worker) | `http://weather-mock:8080` (WireMock, `docker/wiremock/mappings/weather.json`) | weather provider base URL (PROPOSED, provider not yet chosen); key from Secrets Manager |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | backend, web | `http://otel-collector:4318` | ADOT sidecar `http://localhost:4318` |
 | `DATA_SOURCE` | web | `mock` (demo) / `api` (full) | `api` |
-| `CORE_API_URL` | web (BFF) | `http://api:8080` | internal Core API name (service discovery) |
+| `CORE_API_URL` | web (BFF / DAL) | `http://gateway:8080` | Core API entry (gateway, IR180) |
 | `SESSION_STORE_URL` | web (BFF) | `redis://valkey:6379` | ElastiCache endpoint (TLS) |
 
 Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`, LocalStack `SERVICES` / `AWS_DEFAULT_REGION`) exist only in compose. Local values come from compose and an optional git-ignored `.env.local` (`.env.local.example`).

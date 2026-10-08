@@ -115,6 +115,8 @@ type Registry struct {
 	Rec   Recorder
 	Idem  Idempotency
 	Clock func() time.Time
+
+	domains map[string]bool // ServeDomains; nil = all
 }
 
 // NewRegistry creates an empty registry backed by the generated catalog.
@@ -241,7 +243,7 @@ func (r *Registry) Dispatch(c *echo.Context) error {
 	}
 	name := c.Param("operation")
 	op, ok := r.ops[name]
-	if !ok {
+	if !ok || !r.serves(name) { // unknown, or owned by another domain service (IR180)
 		return fail(c, apperr.E(apperr.NotFound, "error.unknownOperation"), corr)
 	}
 	body, err := io.ReadAll(io.LimitReader(c.Request().Body, 1<<20+1))

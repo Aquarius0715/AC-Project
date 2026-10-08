@@ -1,5 +1,4 @@
-// Command api runs the Core API (POST /v1/ops/:operation, /healthz, /readyz).
-package main
+package server
 
 import (
 	"context"
@@ -15,10 +14,11 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/platform/democlock"
-	"github.com/pradita/ac-project/service/api/internal/server"
 )
 
-func main() {
+// Main runs one domain service (IR180): it serves only the operations of domains, with /healthz and /readyz and the
+// container healthcheck subcommand (container design §3).
+func Main(service string, domains ...string) {
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" { // container healthcheck subcommand (container design §3)
 		r, err := http.Get("http://127.0.0.1:8080/healthz")
 		if err != nil || r.StatusCode != http.StatusOK {
@@ -28,14 +28,15 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)) // JSON logs (backend Go design: log/slog)
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", service) // JSON logs (backend Go design: log/slog)
 	slog.SetDefault(logger)
-	cfg := server.Config{
+	cfg := Config{
 		Logger:            logger,
 		DatabaseURL:       os.Getenv("DATABASE_URL"),
 		DatabaseReaderURL: os.Getenv("DATABASE_READER_URL"),
 		Addr:              envOr("ADDR", ":8080"),
 		DemoOps:           os.Getenv("DEMO_OPS") == "1",
+		Domains:           domains,
 	}
 	if cfg.DemoOps { // fixture.clock unless DEMO_CLOCK_START overrides it (IR36); shared with the workers (IR168)
 		start, err := democlock.StartFromEnv(os.Getenv)
@@ -50,7 +51,7 @@ func main() {
 		slog.Error("auth", "err", err)
 		os.Exit(1)
 	}
-	s, err := server.New(ctx, cfg, v)
+	s, err := New(ctx, cfg, v)
 	if err != nil {
 		slog.Error("startup", "err", err)
 		os.Exit(1)

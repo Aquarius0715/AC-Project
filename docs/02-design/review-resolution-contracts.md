@@ -1562,3 +1562,23 @@ Verified: the four apps typecheck, lint and build; the demo profile serves each 
 
 User request: the web must not live inside the API ("APIの中にWebがあるのはおかしい") and the API is to be split into microservices by business domain (IR180+). Step 1 separates the trees: all Go code (module `github.com/pradita/ac-project/service/api`: `cmd/`, `internal/`, `test/integration/`, `build/*.Dockerfile`, `scripts/`, `Makefile`) moved to `service/api/`, and the npm workspace moved to `service/web/` with the apps `service/web/{customer,partner,technician,admin}` and the shared package `service/web/shared` (`@ac/web`); the web image is `service/web/Dockerfile --build-arg APP=<role>`. Compose build contexts are `./service/api` and `./service/web`. Verified: go vet, all Go tests (0 skipped), `make gen` unchanged, four web apps typecheck/lint/build, all images build, compose demo apps answer on 3000–3003 and `migrate` → `api` starts healthy.
 
+## IR180 Core API as business-domain microservices (phase A) — 2026-10-08
+
+User decision: split the API into microservices by business domain. Phase A turns the single Core API process into five domain services and a gateway; every service is its own command (`service/api/cmd/<name>`), image (`build/service.Dockerfile --build-arg SERVICE=<name>`) and compose / ECS service. The ownership map is code (`internal/ops/domains.go`) and covers all 197 operations (test `TestEveryOperationHasOneDomain`):
+
+| Service | Catalog modules | Operations |
+|---|---|---|
+| `identity-api` | Identity & access, Notifications, Audit, Demo | 30 |
+| `equipment-api` | Assets, Devices, Control, Monitoring & alerts, Read models | 63 |
+| `maintenance-api` | Maintenance | 59 |
+| `billing-api` | Billing, Restrictions | 30 |
+| `energy-api` | Energy & carbon | 15 |
+
+- A service dispatches only its domain's operations (`Registry.ServeDomains`); any other operation answers NOT_FOUND `error.unknownOperation`, so a misrouted request never runs (integration test `TestDomainServiceServesOnlyItsOperations`).
+- `gateway` is the single entry for the web apps (`CORE_API_URL`): it forwards `POST /v1/ops/:operation` unchanged (headers incl. Authorization, tenant, membership, Idempotency-Key, X-Expected-Version, body, status) to `<DOMAIN>_API_URL`, keeps the request ID, answers NOT_FOUND for unknown operations and UNAVAILABLE when the service is down. It does not authenticate; each service verifies the token (IR173 pipeline). In production the ALB can route `/v1/ops/<prefix>.*` to the services directly.
+- Workers, migrate and the shared demo clock (IR168) are unchanged; demo operations belong to `identity-api`.
+
+Phase A keeps one PostgreSQL cluster. Each domain writes only its own schemas (identity, notify, audit / assets, devices, control, monitoring / maintenance / billing, restrictions / energy), but modules still read other domains' schemas in SQL — for example the unit scope (IR170) joins maintenance assignments and offers, billing and restrictions read assets and identity, energy reads assets, maintenance and monitoring, and the read models aggregate assets, billing, maintenance and energy. Phase B replaces these reads with service calls or events and then separates the databases; until then the services must be released together with schema-compatible migrations.
+
+Verified: go vet, all Go tests (0 skipped) plus gateway tests (routing per domain, header and body forwarding, unknown operation, upstream down, env parsing); six images build; in compose the five services and the gateway start healthy; the four web apps in API mode, through the gateway, render the customer overview, alerts and notifications, the partner team, the technician unit and the admin dashboard.
+

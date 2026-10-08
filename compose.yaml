@@ -7,7 +7,7 @@
 #   demo     Phase 1A clickable demo (4 web apps with the in-browser mock)     docker compose --profile demo up
 #   infra    Local stand-ins for the AWS managed services                      docker compose --profile infra up
 #   schema   migrate once (schema, local login, demo fixture)                 docker compose --profile infra --profile schema up
-#   backend  Go API, webhook, workers, IoT bridge, device simulator (service/cmd)
+#   backend  Core API gateway + 5 domain services, workers, IoT bridge, device simulator (service/api/cmd)
 #   full     4 web apps in API mode + backend + infra                         docker compose --profile full up
 #   obs      OpenTelemetry collector + Jaeger
 #
@@ -33,12 +33,7 @@ x-worker: &worker             # cmd/worker (independent service, IR166/IR174)
   depends_on:
     migrate: { condition: service_completed_successfully }
 
-x-backend: &backend
-  image: ac-api:dev
-  build:
-    context: ./service/api        # Go: cmd/<service> + internal/
-    dockerfile: build/api.Dockerfile
-    target: runtime
+x-backend: &backend          # Core API business-domain services (service/api/cmd/<service>, build/service.Dockerfile, IR180)
   env_file:
     - path: .env.local
       required: false
@@ -83,7 +78,7 @@ x-web: &web                   # one Next.js app per entry point (service/web/<na
 x-web-api-env: &web-api-env
   <<: *web-env
   DATA_SOURCE: api
-  CORE_API_URL: http://api:8080
+  CORE_API_URL: http://gateway:8080
   SESSION_SECRET: local-dev-session-secret-change-me
   OIDC_ISSUER: http://localhost:8081/realms/ac
   OIDC_INTERNAL_ISSUER: http://keycloak:8080/realms/ac
@@ -112,7 +107,7 @@ services:
       OIDC_APP_CLIENT_SECRET: local-ac-web-secret
     networks: [edge, app]
     profiles: [full]
-    depends_on: [api, keycloak, valkey]
+    depends_on: [gateway, keycloak, valkey]
 
   partner-web:           # demo (mock data) — contractor entry point
     <<: *web
@@ -135,7 +130,7 @@ services:
       OIDC_APP_CLIENT_SECRET: local-ac-web-secret
     networks: [edge, app]
     profiles: [full]
-    depends_on: [api, keycloak, valkey]
+    depends_on: [gateway, keycloak, valkey]
 
   technician-web:           # demo (mock data) — technician entry point
     <<: *web
@@ -158,7 +153,7 @@ services:
       OIDC_APP_CLIENT_SECRET: local-ac-web-secret
     networks: [edge, app]
     profiles: [full]
-    depends_on: [api, keycloak, valkey]
+    depends_on: [gateway, keycloak, valkey]
 
   admin-web:           # demo (mock data) — admin entry point
     <<: *web
@@ -181,7 +176,7 @@ services:
       OIDC_APP_CLIENT_SECRET: local-ac-admin-secret
     networks: [edge, app]
     profiles: [full]
-    depends_on: [api, keycloak, valkey]
+    depends_on: [gateway, keycloak, valkey]
 
   # ------------------------------------------------------------------ backend (Go + Echo)
   migrate:             # one-off: embedded migrations (cmd/migrate), local login role, demo fixture once
@@ -204,17 +199,61 @@ services:
     networks: [data]
     profiles: [schema, backend, full]
 
-  api:
-    <<: *backend
-    command: ["/app/api"]
+  gateway:             # Core API entry for the web apps: routes /v1/ops/<operation> to the owning service (IR180)
+    image: ac-gateway:dev
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: gateway } }
+    environment:
+      IDENTITY_API_URL: http://identity-api:8080
+      EQUIPMENT_API_URL: http://equipment-api:8080
+      MAINTENANCE_API_URL: http://maintenance-api:8080
+      BILLING_API_URL: http://billing-api:8080
+      ENERGY_API_URL: http://energy-api:8080
     ports: ["8080:8080"]
-    healthcheck: { test: ["CMD", "/app/api", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
+    healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    networks: [edge, app]
+    restart: unless-stopped
+    profiles: [backend, full]
+    depends_on: [identity-api, equipment-api, maintenance-api, billing-api, energy-api]
 
-  webhook:
+  identity-api:        # identity, notifications, audit, demo (internal; reached through the gateway)
     <<: *backend
-    command: ["/app/webhook"]
+    image: ac-identity-api:dev
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: identity-api } }
+    healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
+
+  equipment-api:        # units, devices, control, monitoring, read models (internal; reached through the gateway)
+    <<: *backend
+    image: ac-equipment-api:dev
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: equipment-api } }
+    healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
+
+  maintenance-api:        # jobs, offers, assignments, partners (internal; reached through the gateway)
+    <<: *backend
+    image: ac-maintenance-api:dev
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: maintenance-api } }
+    healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
+
+  billing-api:        # billing, payments, restrictions (internal; reached through the gateway)
+    <<: *backend
+    image: ac-billing-api:dev
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: billing-api } }
+    healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
+
+  energy-api:        # energy, MRV, offsets (internal; reached through the gateway)
+    <<: *backend
+    image: ac-energy-api:dev
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: energy-api } }
+    healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
+
+  webhook:             # planned service (Stripe / SES / WhatsApp receiver); no command yet
+    <<: *backend
+    image: ac-webhook:dev
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: webhook } }
     ports: ["8082:8080"]
     networks: [edge, app, data]
+    profiles: [planned]
 
   worker-outbox:       { <<: *worker, command: ["/app/worker", "--role=outbox"] }
   worker-scheduler:    { <<: *worker, command: ["/app/worker", "--role=scheduler"] }
@@ -228,13 +267,13 @@ services:
   iot-bridge:          # local stand-in for AWS IoT rules: MQTT topics -> Kinesis / SQS
     <<: *backend
     image: ac-api:dev-tools
-    build: { context: ./service/api, dockerfile: build/api.Dockerfile, target: dev }
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: dev, args: { SERVICE: gateway } }
     command: ["/app/iotbridge"]
 
   device-sim:          # simulated IoT modules (telemetry each minute, heartbeats, command acks)
     <<: *backend
     image: ac-api:dev-tools
-    build: { context: ./service/api, dockerfile: build/api.Dockerfile, target: dev }
+    build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: dev, args: { SERVICE: gateway } }
     command: ["/app/devicesim", "--devices=20"]
     networks: [data]
 
