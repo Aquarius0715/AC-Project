@@ -1,3 +1,5 @@
-api/coverage.out
-*/.cover
+coverage.out
+.cover
 web
+test
+scripts

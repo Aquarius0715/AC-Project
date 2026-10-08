@@ -26,9 +26,9 @@ Checked on 2026-10-07: the `web` image built from `service/web/Dockerfile` serve
 | Image | Source | Contains | Runs as (local / production) |
 |---|---|---|---|
 | `ac-web` | `service/web/Dockerfile` | Next.js standalone server (`output: "standalone"`); `DATA_SOURCE` (`mock` or `api`) selects the Repository adapter once the API adapter exists — today `service/web/` always uses the in-browser mock and ignores the variable | Compose `web` (demo, mock) and `web-api` (BFF) / ECS service `web` behind the ALB (app and admin host names) |
-| `ac-api` | `service/api/Dockerfile` (context `service/`) | Static Go binary `/app/api` (Core API); `/app/webhook`, `/app/iotbridge`, `/app/devicesim` are planned as their own `service/<name>` | Compose `api` / ECS service `api` |
-| `ac-migrate` | `service/migrate/Dockerfile` (context `service/`) | Static Go binary `/app/migrate up` with the embedded migrations (IR167); locally `APP_LOGIN_PASSWORD` creates `ac_app_login` and `SEED_FIXTURE` loads the demo fixture once | Compose `migrate` (one-off; `api` and the workers wait for it) / ECS one-off task before the deploy |
-| `ac-worker` | `service/worker/Dockerfile` (context `service/`) | Static Go binary `/app/worker --role=<role>` (scheduler implemented; other roles idle until built) | Compose `worker-*` / ECS services per role |
+| `ac-api` | `service/build/api.Dockerfile` (context `service/`, `./cmd/api`) | Static Go binary `/app/api` (Core API); `/app/webhook`, `/app/iotbridge`, `/app/devicesim` are planned as their own `service/<name>` | Compose `api` / ECS service `api` |
+| `ac-migrate` | `service/build/migrate.Dockerfile` (context `service/`, `./cmd/migrate`) | Static Go binary `/app/migrate up` with the embedded migrations (IR167); locally `APP_LOGIN_PASSWORD` creates `ac_app_login` and `SEED_FIXTURE` loads the demo fixture once | Compose `migrate` (one-off; `api` and the workers wait for it) / ECS one-off task before the deploy |
+| `ac-worker` | `service/build/worker.Dockerfile` (context `service/`, `./cmd/worker`) | Static Go binary `/app/worker --role=<role>` (scheduler implemented; other roles idle until built) | Compose `worker-*` / ECS services per role |
 
 One backend image with several entry commands keeps every service on the same build and version; each ECS service overrides the command (`/app/worker --role=telemetry`, …). The `iotbridge` and `devicesim` binaries are built only into the `dev` target and never pushed to the production repository.
 
@@ -83,7 +83,7 @@ COPY --from=build-dev /out/ /app/
 |---|---|---|
 | `demo` | `web` (mock mode, port 3000) | Phase 1A clickable demo |
 | `infra` | PostgreSQL 16, Valkey, LocalStack, Mosquitto, Keycloak, stripe-mock, weather mock | Stand-ins for AWS services |
-| `schema` | one-off `migrate` (service/migrate): schema, local `ac_app_login`, demo fixture | Database only, without the Go services |
+| `schema` | one-off `migrate` (cmd/migrate): schema, local `ac_app_login`, demo fixture | Database only, without the Go services |
 | `backend` | `migrate`, `api` (8080), `webhook` (8082), eight `worker-*` services, `iot-bridge`, `device-sim` | Go backend against the stand-ins |
 | `full` | `web-api` (BFF mode) + backend + infra | Production-like end-to-end runs and acceptance tests |
 | `obs` | OpenTelemetry collector, Jaeger (16686) | Traces |

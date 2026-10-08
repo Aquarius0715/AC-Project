@@ -15,11 +15,11 @@ This document turns the [backend architecture](backend-architecture.md) into an 
 
 | Decision | Choice |
 |---|---|
-| Language | Go 1.25 or later (one module per service in the `service/go.work` workspace: `service/core` shared domain and platform packages, `service/api` Core API, `service/worker` background roles, `service/migrate` schema migrations; current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
+| Language | Go 1.25 or later (one module `github.com/pradita/ac-project/service` in the official Go server layout (IR174): commands in `service/cmd/{api,worker,migrate,seed,gen}`, every package in `service/internal/`, DB integration tests in `service/test/integration`, Dockerfiles in `service/build/`; current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
 | HTTP framework | Echo v5 (`github.com/labstack/echo/v5`, checked with v5.4.0) for the Core API and the webhook receiver, structured as in the official Echo guide (IR173): handlers `func(c *echo.Context) error` return errors to one central `HTTPErrorHandler`; middleware from `echo/v5/middleware`; route group `/v1`; graceful shutdown with `echo.StartConfig`; `log/slog` as `e.Logger`; tests with `net/http/httptest` against `e.ServeHTTP` |
 | Database driver | pgx v5 (`github.com/jackc/pgx/v5`, `pgxpool`); no ORM |
 | Query code | sqlc generates typed Go from SQL in `db/queries/<schema>/*.sql`; hand-written SQL only for dynamic list filters |
-| Migrations | `service/migrate` (IR167): embedded `migrations/NNNNNN_name.up.sql` files applied in order under an advisory lock, one transaction each (`-- migrate:no-transaction` for `CONCURRENTLY`), bookkeeping in the golang-migrate compatible `schema_migrations` table; `000001_init` is [db/schema.sql](db/schema.sql) |
+| Migrations | `cmd/migrate` + `internal/migrate` + `internal/migrations` (IR167, IR174): embedded `migrations/NNNNNN_name.up.sql` files applied in order under an advisory lock, one transaction each (`-- migrate:no-transaction` for `CONCURRENTLY`), bookkeeping in the golang-migrate compatible `schema_migrations` table; `000001_init` is [db/schema.sql](db/schema.sql) |
 | IDs | UUIDv7 from `github.com/google/uuid` (`uuid.NewV7`), time-ordered for index locality |
 | Validation | Generated input structs + a `Validate() *DomainError` method per input (rules from the DD documents); `go-playground/validator` only for simple tags |
 | Logging / tracing | `log/slog` JSON with a masking handler; OpenTelemetry SDK + `otelecho`, exported through the AWS Distro for OpenTelemetry collector |
@@ -35,16 +35,21 @@ The core request pipeline in §4 and the example handler in §5 were compiled an
 ## 2. Repository layout
 
 ```text
-backend/
+service/            (IR174; the Next.js app is the sibling service/web)
   go.mod
+  Makefile          gen, seed, test, test-unit, test-integration, cover, resetdb, testdb
+  build/            api.Dockerfile, worker.Dockerfile, migrate.Dockerfile (context service/)
+  scripts/          resetdb.sh, covermerge.py
   cmd/
     api/            Core API (Echo) — POST /v1/ops/:operation, /healthz, /readyz
     webhook/        Webhook receiver (Echo) — /stripe, /ses, /whatsapp
     worker/         one binary, --role=outbox|scheduler|notification|telemetry|iot|automation|importexport|rollup
-    migrate/        now service/migrate (IR167): applies the embedded migrations (one-off ECS task before deploy)
+    migrate/        applies internal/migrations (one-off ECS task before deploy, IR167)
+    seed/           loads the demo fixture
     gen/            code generators (operations, contracts) — run in CI, output committed
   internal/
-    app/            composition root: config → pools → AWS clients → modules → Echo / worker loops
+    server/         composition root and Echo layer (app.go wiring, http.go newEcho + middleware, demo.*, unit detail join)
+    migrate/ migrations/ seed/ scheduler/   migration runner + embedded SQL, fixture loader, clock-driven transitions
     platform/
       config/       typed configuration
       apperr/       DomainError, codes, PostgreSQL error mapping
@@ -99,7 +104,7 @@ The authorization column (for example `client:self-customer:owner | admin:alert.
 
 ## 4. Request pipeline (Core API)
 
-Echo setup (`service/api/internal/app/http.go`, Echo guide: Quickstart, Routing, Error Handling, Cookbook › Graceful Shutdown, Testing): one `echo.New()`, the middleware below in order, `/healthz` and `/readyz`, the group `v1 := e.Group("/v1", auth)` with `v1.POST("/ops/:operation", Dispatch)`, and `e.HTTPErrorHandler = ops.HTTPErrorHandler`. Handlers and middleware never write error bodies themselves; they return a `*apperr.DomainError` (which implements `echo.HTTPStatusCoder`) and the central handler writes it with the correlation ID, maps Echo's own errors (unknown route or method → NOT_FOUND `error.unknownOperation`, 413 → VALIDATION `error.bodyTooLarge`, 503/504 → TIMEOUT) and turns any other error into UNAVAILABLE without internal detail, skipping responses already committed. `cmd/api` starts with `echo.StartConfig{GracefulTimeout: 25s}.Start(ctx, e)` on a SIGINT/SIGTERM context.
+Echo setup (`service/internal/server/http.go`, Echo guide: Quickstart, Routing, Error Handling, Cookbook › Graceful Shutdown, Testing): one `echo.New()`, the middleware below in order, `/healthz` and `/readyz`, the group `v1 := e.Group("/v1", auth)` with `v1.POST("/ops/:operation", Dispatch)`, and `e.HTTPErrorHandler = ops.HTTPErrorHandler`. Handlers and middleware never write error bodies themselves; they return a `*apperr.DomainError` (which implements `echo.HTTPStatusCoder`) and the central handler writes it with the correlation ID, maps Echo's own errors (unknown route or method → NOT_FOUND `error.unknownOperation`, 413 → VALIDATION `error.bodyTooLarge`, 503/504 → TIMEOUT) and turns any other error into UNAVAILABLE without internal detail, skipping responses already committed. `cmd/api` starts with `echo.StartConfig{GracefulTimeout: 25s}.Start(ctx, e)` on a SIGINT/SIGTERM context.
 
 Echo middleware order:
 

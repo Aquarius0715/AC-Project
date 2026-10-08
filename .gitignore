@@ -5,5 +5,5 @@ docs/05-document-review/
 .env.local
 
 # Go build / coverage artifacts (service/*)
-service/*/coverage.out
-service/*/.cover/
+service/coverage.out
+service/.cover/

@@ -1,12 +1,12 @@
 # AC Project — everything runs in Docker (IR119, DEC-70, docs/02-design/container-design.md)
-# Services live under service/ (service/api: Go Core API, service/worker: background roles, service/core: shared Go module,
-# service/migrate: schema migrations, service/web: Next.js web + BFF)
+# Services live under service/: one Go module (service/cmd/{api,worker,migrate} + service/internal, built with
+# service/build/*.Dockerfile, IR174) and service/web (Next.js web + BFF)
 #
 # Profiles
 #   demo     Phase 1A clickable demo (web with the in-browser mock)           docker compose --profile demo up
 #   infra    Local stand-ins for the AWS managed services                      docker compose --profile infra up
-#   schema   service/migrate once (schema, local login, demo fixture)          docker compose --profile infra --profile schema up
-#   backend  Go API, webhook, workers, IoT bridge, device simulator (service/api)
+#   schema   migrate once (schema, local login, demo fixture)                 docker compose --profile infra --profile schema up
+#   backend  Go API, webhook, workers, IoT bridge, device simulator (service/cmd)
 #   full     web in API mode + backend + infra                                 docker compose --profile full up
 #   obs      OpenTelemetry collector + Jaeger
 #
@@ -15,11 +15,11 @@
 
 name: ac-project
 
-x-worker: &worker             # service/worker (independent service, IR166)
+x-worker: &worker             # cmd/worker (independent service, IR166/IR174)
   image: ac-worker:dev
   build:
     context: ./service
-    dockerfile: worker/Dockerfile
+    dockerfile: build/worker.Dockerfile
     target: runtime
   environment:
     DATABASE_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
@@ -35,8 +35,8 @@ x-worker: &worker             # service/worker (independent service, IR166)
 x-backend: &backend
   image: ac-api:dev
   build:
-    context: ./service            # go.work workspace: service/core is shared by api and worker
-    dockerfile: api/Dockerfile
+    context: ./service            # one Go module: cmd/<service> + internal/
+    dockerfile: build/api.Dockerfile
     target: runtime
   env_file:
     - path: .env.local
@@ -105,11 +105,11 @@ services:
     depends_on: [api, keycloak, valkey]
 
   # ------------------------------------------------------------------ backend (Go + Echo)
-  migrate:             # one-off: embedded migrations (service/migrate), local login role, demo fixture once
+  migrate:             # one-off: embedded migrations (cmd/migrate), local login role, demo fixture once
     image: ac-migrate:dev
     build:
       context: ./service
-      dockerfile: migrate/Dockerfile
+      dockerfile: build/migrate.Dockerfile
       target: runtime
     command: ["/app/migrate", "up"]
     restart: "no"
@@ -149,13 +149,13 @@ services:
   iot-bridge:          # local stand-in for AWS IoT rules: MQTT topics -> Kinesis / SQS
     <<: *backend
     image: ac-api:dev-tools
-    build: { context: ./service, dockerfile: api/Dockerfile, target: dev }
+    build: { context: ./service, dockerfile: build/api.Dockerfile, target: dev }
     command: ["/app/iotbridge"]
 
   device-sim:          # simulated IoT modules (telemetry each minute, heartbeats, command acks)
     <<: *backend
     image: ac-api:dev-tools
-    build: { context: ./service, dockerfile: api/Dockerfile, target: dev }
+    build: { context: ./service, dockerfile: build/api.Dockerfile, target: dev }
     command: ["/app/devicesim", "--devices=20"]
     networks: [data]
 
