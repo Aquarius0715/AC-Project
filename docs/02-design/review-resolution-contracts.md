@@ -1543,3 +1543,18 @@ Verified with the running stack: rows rendered on the server for customer-a, the
 
 Verified: hq-operator signs in with password + TOTP, the admin dashboard renders the Core API KPIs on the server (2 customers, 5 units, 120.00 MYR billed); customer screens render server-side in API mode and keep their fixture data in the Phase 1A demo.
 
+## IR178 One web app per entry point — 2026-10-08
+
+User request: the four roles have different entry points, so each is its own web service (like `admin-web`). The single Next.js app `service/web` is split into four Next.js apps in one npm workspace (`service/package.json`):
+
+| App | Routes | Local port | OIDC client |
+|---|---|---|---|
+| `service/customer-web` | `/customer/*` | 3000 | `ac-web` |
+| `service/partner-web` | `/partner/*` | 3001 | `ac-web` |
+| `service/technician-web` | `/technician/*` | 3002 | `ac-web` |
+| `service/admin-web` | `/admin/*` | 3003 | `ac-admin-web` (HQ network rule, IR117) |
+
+Shared code is the workspace package `@ac/web` (`service/web-shared`: components, lib with the DAL and session, shared screens — sign-in, notifications, preferences, demo panel, forbidden, not-found — the BFF Route Handlers and the proxy logic), consumed with `transpilePackages` as the Next.js monorepo guidance describes; each app re-exports the shared screens and Route Handlers in thin route files and keeps its own role routes, root layout, `proxy.ts` (fixed `matcher`, calls `authProxy(req, role)`) and `next.config.ts` (`output: "standalone"`, `outputFileTracingRoot` / `turbopack.root` at the workspace root, `env.AC_APP_ROLE`). Paths stay as before inside each app (`/customer/...` on the customer app), so links within a role are unchanged; links between apps are plain `<a>` links to `CUSTOMER_WEB_URL` / `PARTNER_WEB_URL` / `TECHNICIAN_WEB_URL` / `ADMIN_WEB_URL` (hard navigations). Each app has its own session cookie `ac_session_<role>` (local apps share the host `localhost`), its sign-in shows only its role, and the OIDC callback refuses an identity of another role (`/login?error=role`). Images: `build/web.Dockerfile --build-arg APP=<name>-web` (≈ 310 MB each); compose `<name>-web` (demo) and `<name>-web-api` (full). The Keycloak clients list the four local ports.
+
+Verified: the four apps typecheck, lint and build; the demo profile serves each role on its port (the customer app answers 404 for `/admin`); in API mode customer-a, contractor-a, tech-external-a and hq-operator (with TOTP) sign in to their own apps and their pages render on the server; contractor-a signing in to the customer app is refused.
+

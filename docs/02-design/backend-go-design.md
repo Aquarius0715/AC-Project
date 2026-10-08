@@ -35,7 +35,7 @@ The core request pipeline in §4 and the example handler in §5 were compiled an
 ## 2. Repository layout
 
 ```text
-service/            (IR174; the Next.js app is the sibling service/web)
+service/            (IR174; the Next.js apps are the siblings service/*-web and service/web-shared, IR178)
   go.mod
   Makefile          gen, seed, test, test-unit, test-integration, cover, resetdb, testdb
   build/            api.Dockerfile, worker.Dockerfile, migrate.Dockerfile (context service/)

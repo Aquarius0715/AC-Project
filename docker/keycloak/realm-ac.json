@@ -17,10 +17,14 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:3000/*"
+        "http://localhost:3000/*",
+        "http://localhost:3001/*",
+        "http://localhost:3002/*"
       ],
       "webOrigins": [
-        "http://localhost:3000"
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://localhost:3002"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256"
@@ -78,10 +82,10 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "redirectUris": [
-        "http://localhost:3000/*"
+        "http://localhost:3003/*"
       ],
       "webOrigins": [
-        "http://localhost:3000"
+        "http://localhost:3003"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256"

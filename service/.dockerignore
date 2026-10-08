@@ -1,5 +1,7 @@
 coverage.out
 .cover
-web
 test
 scripts
+**/node_modules
+**/.next
+**/tsconfig.tsbuildinfo

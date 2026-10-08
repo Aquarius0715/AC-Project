@@ -1,13 +1,14 @@
 # AC Project — everything runs in Docker (IR119, DEC-70, docs/02-design/container-design.md)
 # Services live under service/: one Go module (service/cmd/{api,worker,migrate} + service/internal, built with
-# service/build/*.Dockerfile, IR174) and service/web (Next.js web + BFF)
+# service/build/*.Dockerfile, IR174) and four Next.js apps, one per entry point (service/{customer,partner,technician,admin}-web
+# on ports 3000–3003, shared code in service/web-shared, IR178)
 #
 # Profiles
-#   demo     Phase 1A clickable demo (web with the in-browser mock)           docker compose --profile demo up
+#   demo     Phase 1A clickable demo (4 web apps with the in-browser mock)     docker compose --profile demo up
 #   infra    Local stand-ins for the AWS managed services                      docker compose --profile infra up
 #   schema   migrate once (schema, local login, demo fixture)                 docker compose --profile infra --profile schema up
 #   backend  Go API, webhook, workers, IoT bridge, device simulator (service/cmd)
-#   full     web in API mode + backend + infra                                 docker compose --profile full up
+#   full     4 web apps in API mode + backend + infra                         docker compose --profile full up
 #   obs      OpenTelemetry collector + Jaeger
 #
 # Production runs the same application images on ECS Fargate; databases, queues and IoT are AWS managed
@@ -68,38 +69,116 @@ x-backend: &backend
     migrate: { condition: service_completed_successfully }
     localstack: { condition: service_healthy }
 
+x-web: &web                   # one Next.js app per entry point (service/<name>-web, build/web.Dockerfile, IR178)
+  environment: &web-env
+    DATA_SOURCE: mock            # Phase 1A demo: screens keep their fixture data
+    CUSTOMER_WEB_URL: http://localhost:3000
+    PARTNER_WEB_URL: http://localhost:3001
+    TECHNICIAN_WEB_URL: http://localhost:3002
+    ADMIN_WEB_URL: http://localhost:3003
+  read_only: true
+  security_opt: [no-new-privileges:true]
+  networks: [edge]
+
+x-web-api-env: &web-api-env
+  <<: *web-env
+  DATA_SOURCE: api
+  CORE_API_URL: http://api:8080
+  SESSION_SECRET: local-dev-session-secret-change-me
+  OIDC_ISSUER: http://localhost:8081/realms/ac
+  OIDC_INTERNAL_ISSUER: http://keycloak:8080/realms/ac
+  SESSION_STORE_URL: redis://valkey:6379
+
 services:
-  # ------------------------------------------------------------------ web (Next.js)
-  web:
-    image: ac-web:dev
-    build: { context: ./service/web }
+  # ------------------------------------------------------------------ web apps (Next.js, one per entry point)
+  customer-web:           # demo (mock data) — client entry point
+    <<: *web
+    image: ac-customer-web:dev
+    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: customer-web } }
     ports: ["3000:3000"]
-    environment:
-      DATA_SOURCE: mock            # Phase 1A: screens keep their fixture data (BFF relay answers UNAVAILABLE)
-    read_only: true
-    tmpfs: [/tmp, /app/.next/cache]
-    security_opt: [no-new-privileges:true]
-    networks: [edge]
+    tmpfs: [/tmp, /app/customer-web/.next/cache]
     profiles: [demo]
 
-  web-api:
-    image: ac-web:dev
-    build: { context: ./service/web }
+  customer-web-api:       # production-like: Server Components / Server Actions call the Core API through the DAL
+    <<: *web
+    image: ac-customer-web:dev
+    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: customer-web } }
     ports: ["3000:3000"]
+    tmpfs: [/tmp, /app/customer-web/.next/cache]
     environment:
-      DATA_SOURCE: api             # production-like: BFF relays /bff/ops/* to the Core API (service/web/app/bff, IR158)
-      CORE_API_URL: http://api:8080
+      <<: *web-api-env
       APP_URL: http://localhost:3000
-      SESSION_SECRET: local-dev-session-secret-change-me
-      OIDC_APP_CLIENT_SECRET: local-ac-web-secret
-      OIDC_ISSUER: http://localhost:8081/realms/ac
-      OIDC_INTERNAL_ISSUER: http://keycloak:8080/realms/ac
       OIDC_APP_CLIENT_ID: ac-web
-      OIDC_ADMIN_CLIENT_ID: ac-admin-web
-      SESSION_STORE_URL: redis://valkey:6379
-    read_only: true
-    tmpfs: [/tmp, /app/.next/cache]
-    security_opt: [no-new-privileges:true]
+      OIDC_APP_CLIENT_SECRET: local-ac-web-secret
+    networks: [edge, app]
+    profiles: [full]
+    depends_on: [api, keycloak, valkey]
+
+  partner-web:           # demo (mock data) — contractor entry point
+    <<: *web
+    image: ac-partner-web:dev
+    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: partner-web } }
+    ports: ["3001:3000"]
+    tmpfs: [/tmp, /app/partner-web/.next/cache]
+    profiles: [demo]
+
+  partner-web-api:       # production-like: Server Components / Server Actions call the Core API through the DAL
+    <<: *web
+    image: ac-partner-web:dev
+    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: partner-web } }
+    ports: ["3001:3000"]
+    tmpfs: [/tmp, /app/partner-web/.next/cache]
+    environment:
+      <<: *web-api-env
+      APP_URL: http://localhost:3001
+      OIDC_APP_CLIENT_ID: ac-web
+      OIDC_APP_CLIENT_SECRET: local-ac-web-secret
+    networks: [edge, app]
+    profiles: [full]
+    depends_on: [api, keycloak, valkey]
+
+  technician-web:           # demo (mock data) — technician entry point
+    <<: *web
+    image: ac-technician-web:dev
+    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: technician-web } }
+    ports: ["3002:3000"]
+    tmpfs: [/tmp, /app/technician-web/.next/cache]
+    profiles: [demo]
+
+  technician-web-api:       # production-like: Server Components / Server Actions call the Core API through the DAL
+    <<: *web
+    image: ac-technician-web:dev
+    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: technician-web } }
+    ports: ["3002:3000"]
+    tmpfs: [/tmp, /app/technician-web/.next/cache]
+    environment:
+      <<: *web-api-env
+      APP_URL: http://localhost:3002
+      OIDC_APP_CLIENT_ID: ac-web
+      OIDC_APP_CLIENT_SECRET: local-ac-web-secret
+    networks: [edge, app]
+    profiles: [full]
+    depends_on: [api, keycloak, valkey]
+
+  admin-web:           # demo (mock data) — admin entry point
+    <<: *web
+    image: ac-admin-web:dev
+    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: admin-web } }
+    ports: ["3003:3000"]
+    tmpfs: [/tmp, /app/admin-web/.next/cache]
+    profiles: [demo]
+
+  admin-web-api:       # production-like: Server Components / Server Actions call the Core API through the DAL
+    <<: *web
+    image: ac-admin-web:dev
+    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: admin-web } }
+    ports: ["3003:3000"]
+    tmpfs: [/tmp, /app/admin-web/.next/cache]
+    environment:
+      <<: *web-api-env
+      APP_URL: http://localhost:3003
+      OIDC_APP_CLIENT_ID: ac-admin-web
+      OIDC_APP_CLIENT_SECRET: local-ac-admin-secret
     networks: [edge, app]
     profiles: [full]
     depends_on: [api, keycloak, valkey]

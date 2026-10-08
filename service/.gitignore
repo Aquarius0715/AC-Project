@@ -1,0 +1,9 @@
+# Node / Next.js (npm workspace: web-shared, *-web)
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+.env*.local
+# Go build / coverage artifacts
+coverage.out
+.cover/
