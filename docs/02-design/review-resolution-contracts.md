@@ -1578,7 +1578,31 @@ User decision: split the API into microservices by business domain. Phase A turn
 - `gateway` is the single entry for the web apps (`CORE_API_URL`): it forwards `POST /v1/ops/:operation` unchanged (headers incl. Authorization, tenant, membership, Idempotency-Key, X-Expected-Version, body, status) to `<DOMAIN>_API_URL`, keeps the request ID, answers NOT_FOUND for unknown operations and UNAVAILABLE when the service is down. It does not authenticate; each service verifies the token (IR173 pipeline). In production the ALB can route `/v1/ops/<prefix>.*` to the services directly.
 - Workers, migrate and the shared demo clock (IR168) are unchanged; demo operations belong to `identity-api`.
 
-Phase A keeps one PostgreSQL cluster. Each domain writes only its own schemas (identity, notify, audit / assets, devices, control, monitoring / maintenance / billing, restrictions / energy), but modules still read other domains' schemas in SQL — for example the unit scope (IR170) joins maintenance assignments and offers, billing and restrictions read assets and identity, energy reads assets, maintenance and monitoring, and the read models aggregate assets, billing, maintenance and energy. Phase B replaces these reads with service calls or events and then separates the databases; until then the services must be released together with schema-compatible migrations.
+Phase A keeps one PostgreSQL cluster. Each domain owns its schemas (identity, notify, audit / assets, devices, control, monitoring / maintenance / billing, restrictions / energy); modules still read — and in a few places write — other domains' schemas in SQL (corrected inventory in IR181) — for example the unit scope (IR170) joins maintenance assignments and offers, billing and restrictions read assets and identity, energy reads assets, maintenance and monitoring, and the read models aggregate assets, billing, maintenance and energy. Phase B replaces these reads with service calls or events and then separates the databases; until then the services must be released together with schema-compatible migrations.
 
 Verified: go vet, all Go tests (0 skipped) plus gateway tests (routing per domain, header and body forwarding, unknown operation, upstream down, env parsing); six images build; in compose the five services and the gateway start healthy; the four web apps in API mode, through the gateway, render the customer overview, alerts and notifications, the partner team, the technician unit and the admin dashboard.
+
+## IR181 Phase B inventory and order — 2026-10-08
+
+A scan of every SQL statement in `service/api/internal` (tests excluded) against the IR180 ownership map corrects IR180: besides cross-domain reads there are cross-domain **writes**, and every service reads identity tables to authenticate.
+
+| From (service) | Writes to another domain | Reads from other domains |
+|---|---|---|
+| every service (`platform/auth`) | — | identity.memberships, users, membership_permissions, membership_scopes (principal per request) |
+| billing-api (restrictions) | control.commands, assets.units (observed restriction), monitoring.alerts (reconciliation alerts) | assets.customers/units, control.commands, monitoring.alerts, identity memberships/permissions, notify.notifications, audit.audit_log |
+| identity-api (demo operations in `internal/server`) | control.commands (acks), monitoring.measurements (telemetry trigger) | equipment, billing, maintenance tables used by demo triggers |
+| identity-api (notifications, consents) | — | billing contracts/invoices/inquiries, restrictions, assets, devices, maintenance jobs/assignments/offers (recipient and target-scope checks) |
+| equipment-api (unit scope, unit detail, read models) | — | maintenance assignments/jobs/offers, billing contract_units/invoices, restrictions, identity memberships/organizations/consents, notify |
+| maintenance-api | — | devices.devices, identity.memberships |
+| billing-api (billing) | — | assets, identity, notify (see first billing row) |
+| energy-api | — | assets customers/properties/units, monitoring alerts/measurements, maintenance jobs/attachments, identity organizations/preferences, audit |
+
+`migrate` (seed) writes every schema by design (fixture loader of the demo environment) and is not a business service.
+
+Phase B order (each step keeps all tests green and is released on its own):
+
+1. **Principal from identity-api.** Services stop reading identity tables in the auth middleware: identity-api exposes the membership principal (permissions, scopes, client role, employment, validity) on an internal endpoint; services cache it for 30 s keyed by membership and scope version (backend Go design §4).
+2. **No cross-domain writes.** Restrictions send device commands and raise reconciliation alerts through equipment-api operations (or domain events) instead of inserting into control and monitoring tables; demo triggers move to the owning services.
+3. **Reads replaced by events and local projections** (event-carried state transfer through the outbox, backend architecture §8): unit access windows (maintenance → equipment), unit / customer labels (equipment → billing, energy, identity), invoice and contract state (billing → equipment, identity), membership directory (identity → maintenance, equipment).
+4. **Database per service:** once a service reads only its own schemas, its schemas move to its own database (or Aurora cluster) with its own migrations.
 
