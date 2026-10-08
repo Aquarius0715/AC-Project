@@ -97,7 +97,7 @@ Local stand-ins for the AWS managed services:
 | ElastiCache (Valkey) | `valkey/valkey:8` | Sessions, idempotency fast path |
 | SQS / SNS FIFO, Kinesis, Firehose, S3, SES, Secrets Manager, KMS, EventBridge Scheduler | `localstack/localstack:4` | Resources created by `docker/localstack/init-aws.sh`; services use `AWS_ENDPOINT_URL` |
 | AWS IoT Core (MQTT, rules) | `eclipse-mosquitto:2` + `iot-bridge` | Same topic layout; the bridge forwards topics to Kinesis / SQS like the IoT rules. Mutual TLS and IoT policies are verified in staging against IoT Core |
-| Amazon Cognito | `keycloak:26` realm `ac` (`docker/keycloak/realm-ac.json`) | Two OIDC clients `ac-web` and `ac-admin-web` (HQ network rule), TOTP (required for HQ users); one local user per fixture actor (username = `membershipId` in `docs/04-agentic-sdlc/fixture-contract.json`, password `local-pass`); the Go verifier is configured by issuer and JWKS URL only |
+| Amazon Cognito | `keycloak:26` realm `ac` (`docker/keycloak/realm-ac.json`) | Two OIDC clients `ac-web` and `ac-admin-web` (HQ network rule), TOTP (required for HQ users; the local realm pre-provisions a test TOTP credential per HQ user for end-to-end runs, IR177); one local user per fixture actor (username = `membershipId` in `docs/04-agentic-sdlc/fixture-contract.json`, password `local-pass`); the Go verifier is configured by issuer and JWKS URL only |
 | Stripe API / webhooks | `stripe/stripe-mock` (offline) and Stripe CLI (test mode) | Live mode never outside production |
 | Weather source | `wiremock` (`docker/wiremock`) | Fixed demo responses |
 | CloudWatch / X-Ray | OpenTelemetry collector + Jaeger | Same OTLP exporter configuration |

@@ -1,6 +1,6 @@
 {
   "version": "0.68.0",
-  "spec_baseline_id": "314eca7e5351edb0220f1f95f96e93b458604559758ac9ed3473ed0937c4cadb",
+  "spec_baseline_id": "4886b09af948065c4278c73d7d298f0d47b126ac269c990d8acfc2bf0f1a103f",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -114,7 +114,7 @@
     },
     {
       "path": "02-design/container-design.md",
-      "sha256": "ba35db27afc808e2a9424829da02d8a031b4ca209e08d82314d7458c5dbed021"
+      "sha256": "71cc752c8e3d9a9dbe0a4d6146179bf6bc2c7230b9d3744fb4eceb65d041e954"
     },
     {
       "path": "02-design/contractor.md",
