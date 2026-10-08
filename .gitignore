@@ -3,3 +3,7 @@ docs/05-document-review/
 
 # Docker local environment (container-design.md)
 .env.local
+
+# Go build / coverage artifacts (service/*)
+service/*/coverage.out
+service/*/.cover/

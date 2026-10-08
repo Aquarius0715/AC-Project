@@ -1,6 +1,6 @@
 ---
 document_id: DD-C
-version: 0.22.0
+version: 0.30.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -534,6 +534,7 @@ Scope: FR-C15 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 | severity | enum/required | normal (shown “Info”)/warning/critical | How loud |
 | channels | Channel[]/required | inApp always; email; whatsapp only if allowed in Preferences | Notify me by |
 | enabled | boolean | Default true | On/off |
+| recipients / escalation / cooldown / timezone / priority | not shown | Sent as session membership / 60 / 5 / Preferences.timezone / 50; kept on edit (IR120) | Notification settings |
 
 **Steps**
 
@@ -654,6 +655,6 @@ Convert condition forms to the Condition type's discriminated union. occupancy i
 
 2026-09-16 approved updates: C01/C06 period boundaries follow SR17. C13 retry follows SR18 like A15; get the current version and attemptId through offsets.list.
 
-Additional contracts for current version 0.29.0: Read IR01–119 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.30.0: Read IR01–139 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

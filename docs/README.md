@@ -1,8 +1,8 @@
 # AC Project Frontend Development Documents
 
-Version: 0.29.0 / Created: 2026-09-14 / Updated: 2026-10-07 / Status: Draft for review / Language: English
+Version: 0.57.0 / Created: 2026-09-14 / Updated: 2026-10-08 / Status: Draft for review / Language: English
 
-These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED, logical, cloud-agnostic targets in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
+These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
 Document authors and final decision makers for the 1A specification: **Masaki Kitano and Yuma Wakai**. See [DEC-12](00-prepare/internal/decision-record-2026-09-16.md) for decisions on the mock demo scope and business rules. People and external reviewers perform the final check before deployment.
 
@@ -15,12 +15,12 @@ Document authors and final decision makers for the 1A specification: **Masaki Ki
 | 3 | Requirements by role: [Client](01-requirements/client.md) / [Contractor](01-requirements/contractor.md) / [Technician](01-requirements/technician.md) / [Administrator](01-requirements/admin.md) | Requirement IDs, priorities, and acceptance criteria |
 | 4 | [Common detailed design](02-design/common.md) | Display data, replaceable interfaces, state transitions, and mock design |
 | 5 | Detailed design by role: [Client](02-design/client.md) / [Contractor](02-design/contractor.md) / [Technician](02-design/technician.md) / [Administrator](02-design/admin.md) | Screens, input, processing, permissions, and error cases |
-| 6 | [Common UIUX specification](03-uiux/UIUXSpecification.md) | Libraries, state management, tokens, and accessibility |
+| 6 | [Common UIUX specification](03-uiux/UIUXSpecification.md) / [Screen catalog](03-uiux/screen-catalog.csv) / [Component contracts](03-uiux/component-contracts.csv) | Libraries, state management, tokens, accessibility, routes, tabs and URL state per screen |
 | 7 | [Agentic SDLC](04-agentic-sdlc/README.md) | Agent responsibilities, gates, and handoff contracts |
 | 8 | [Reference design analysis](00-prepare/reference-design-analysis.md) / [Frontend input/output contracts](02-design/implementation-contracts.md) / [Operation catalog](02-design/operation-catalog.csv) | Visual values from the source and detailed input/output definitions |
 | 9 | [Verification plan](04-agentic-sdlc/verification.md) / [Traceability matrix](00-prepare/traceability.csv) | Check the links from requirements to design and tests |
-| 10 | [Backend architecture](02-design/backend-architecture.md) / [Network architecture](02-design/network-architecture.md) | Production target (PROPOSED, logical, cloud-agnostic): BFF, Core API modules, data, IoT, integrations, zones and traffic flows; not Phase 1A acceptance inputs (IR116) |
-| 11 | [Backend Go design](02-design/backend-go-design.md) / [Database design](02-design/database-design.md) / [db/schema.sql](02-design/db/schema.sql) | Production target implementation (PROPOSED): Go + Echo service layout, request pipeline, workers, tests; PostgreSQL schemas, constraints, RLS, partitions, migrations (IR118) |
+| 10 | [Backend architecture](02-design/backend-architecture.md) / [Network architecture](02-design/network-architecture.md) | Production target (PROPOSED; AWS, Stripe and HQ company-network access per DEC-68 / IR117): BFF, Core API modules, data, IoT, integrations, zones and traffic flows; not Phase 1A acceptance inputs (IR116) |
+| 11 | [Backend Go design](02-design/backend-go-design.md) / [Database design](02-design/database-design.md) / [db/schema.sql](02-design/db/schema.sql) / [Operation persistence map](02-design/operation-persistence-map.csv) | Production target implementation (PROPOSED): Go + Echo service layout, request pipeline, workers, tests; PostgreSQL schemas, constraints, RLS, partitions, migrations (IR118) |
 | 12 | [Container design](02-design/container-design.md) / `compose.yaml` | Everything runs in Docker: images, Dockerfile standards, Compose profiles with local stand-ins for AWS services, ECS Fargate runtime (IR119) |
 
 The four main document types are PrepareDocument, requirements, detailed design, and the UIUX specification. Requirements and design are split into four roles. Shared information is in separate files to avoid duplication. Agentic SDLC documents support execution; they are not a fifth product specification.
@@ -87,14 +87,70 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.23.0 (2026-10-02): Maintenance scheduling across the four roles (IR113, DEC-63/64). Clients give 3 preferred times; HQ books one of them or proposes another time that the client accepts or declines (with new times); partner offers carry a fixed agreed visit time and contractors can propose another time through HQ; technicians accept new assignments (受領) or report they cannot make the time; every job shows its origin (Client request / Periodic plan). The Figma “(proposal)” screens were confirmed and integrated as normal spec (FR-C14–C18, FR-P09–P10, FR-T13–T15, FR-A17–A23, FR-X08 unchanged). 197 operations, 49 screens, 82 requirements. The clickable demo in `web/` implements the same flow with a shared mock store (`web/lib/jobs.ts`).
 
-0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
-
-0.28.0 (2026-10-07): Backend implementation design in Go + Echo ([backend Go design](02-design/backend-go-design.md)) and database design ([database design](02-design/database-design.md), executable [db/schema.sql](02-design/db/schema.sql), 12 schemas, RLS, partitioned telemetry and audit) — DEC-69, IR118. The schema was applied to PostgreSQL 16 and the core request pipeline was compiled and tested against it. Phase 1A scope and counts unchanged.
-
-0.27.0 (2026-10-07): Production target decisions (DEC-68, IR117): AWS (ap-southeast-5 primary, ap-southeast-1 DR) with a component-to-service mapping, Stripe Checkout for payments, the HQ admin app only on `admin.<domain>` from the company network, retention periods, launch / design capacity (3,000 / 20,000 units), and customer office firewall requirements. AC interface, WhatsApp provider, payout rail and SIM provider remain open. Phase 1A scope and counts unchanged.
-
-0.26.0 (2026-10-07): Fixed the frontend stack to Next.js (App Router), which becomes the BFF in production, and added the production [backend architecture](02-design/backend-architecture.md) (modular monolith Core API for the 197 operations, IoT / scheduler / notification / export workers, data stores, events, integrations, NFR targets) and [network architecture](02-design/network-architecture.md) (zones, public endpoints, traffic flows, field connectivity, edge protection, certificates, DR) — DEC-67, IR116. Phase 1A scope and counts unchanged.
+0.24.0 (2026-10-06): Closed the three gaps found by the use case diagrams (DEC-65, IR114). Client owners list users, invite members, and resend invites at `/customer/users` (new FR-C19 / DD-C19 / SCR-C19); clients add coordination notes to open jobs (`jobs.addNote`, Client 07o/07p); HQ classifies “Report a problem” follow-ups as rework or a new request (`jobs.classifyFollowUp`, Admin 06-17/06-18). 83 requirements, 50 screens, 197 operations.
 
 0.25.0 (2026-10-07): Consistency check across the Figma Use Cases, User Flows and wireframes and these documents (DEC-66, IR115). Admin dashboard billing figures and the Energy analysis link need billing.read / energy.read (no *.manage names remain); default-policy rule switching in the customer app is owner-only (FR-C15); follow-up classification traces to FR-A06; tab contracts for SCR-T01/T04/A04/A06/A08/A15/A16/C08/C09/A02/P06 and the `orgId` key follow Figma. 83 requirements, 50 screens, 197 operations (unchanged).
 
-0.24.0 (2026-10-06): Closed the three gaps found by the use case diagrams (DEC-65, IR114). Client owners list users, invite members, and resend invites at `/customer/users` (new FR-C19 / DD-C19 / SCR-C19); clients add coordination notes to open jobs (`jobs.addNote`, Client 07o/07p); HQ classifies “Report a problem” follow-ups as rework or a new request (`jobs.classifyFollowUp`, Admin 06-17/06-18). 83 requirements, 50 screens, 197 operations.
+0.26.0 (2026-10-07): Fixed the frontend stack to Next.js (App Router), which becomes the BFF in production, and added the production [backend architecture](02-design/backend-architecture.md) (modular monolith Core API for the 197 operations, IoT / scheduler / notification / export workers, data stores, events, integrations, NFR targets) and [network architecture](02-design/network-architecture.md) (zones, public endpoints, traffic flows, field connectivity, edge protection, certificates, DR) — DEC-67, IR116. Phase 1A scope and counts unchanged.
+
+0.27.0 (2026-10-07): Production target decisions (DEC-68, IR117): AWS (ap-southeast-5 primary, ap-southeast-1 DR) with a component-to-service mapping, Stripe Checkout for payments, the HQ admin app only on `admin.<domain>` from the company network, retention periods, launch / design capacity (3,000 / 20,000 units), and customer office firewall requirements. AC interface, WhatsApp provider, payout rail and SIM provider remain open. Phase 1A scope and counts unchanged.
+
+0.28.0 (2026-10-07): Backend implementation design in Go + Echo ([backend Go design](02-design/backend-go-design.md)) and database design ([database design](02-design/database-design.md), executable [db/schema.sql](02-design/db/schema.sql), 12 schemas, RLS, partitioned telemetry and audit) — DEC-69, IR118. The schema was applied to PostgreSQL 16 and the core request pipeline was compiled and tested against it. Phase 1A scope and counts unchanged.
+
+0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
+
+0.57.0 (2026-10-08): Services move under `service/` (service/api, service/web) for the microservice layout (IR166). Phase 1A unchanged.
+
+0.56.0 (2026-10-08): UnitDetail parts (capabilities, effective control policy, control availability, components, pending commands, location) and control blocking during recovery (IR165). Phase 1A unchanged.
+
+0.55.0 (2026-10-08): Terminal-restriction recovery cases (SR26) in the backend (IR164). Phase 1A unchanged.
+
+0.54.0 (2026-10-08): Result-type conformance sweep; jobs.acknowledgeAssignment returns Assignment (IR163). Phase 1A unchanged.
+
+0.53.0 (2026-10-08): BFF action check with the seeded scenario; jobs.addNote returns JobNote (IR162). Phase 1A unchanged.
+
+0.52.0 (2026-10-08): Demo business records seeded for the Core API (IR161). Phase 1A unchanged.
+
+0.51.0 (2026-10-08): Result meta snapshotAt/eventCursor and the server clock for screens (IR160); job screens read jobs.list in api mode. Phase 1A unchanged.
+
+0.50.0 (2026-10-08): Demo clock starts at fixture.clock; full-stack BFF sign-in and relay verified (IR159). Phase 1A unchanged.
+
+0.49.0 (2026-10-08): Web BFF (OIDC sign-in, operation relay, session endpoint) and the first API-backed screen (IR158); Keycloak demo users carry seed IDs and tenant/membership/role claims. Phase 1A unchanged.
+
+0.48.0 (2026-10-08): One business clock in the database: `platform.app_now()` and transaction-level `app.now` (IR157). Phase 1A unchanged.
+
+0.47.0 (2026-10-08): Business-event notifications (jobs, restrictions, payments) fixed for the backend (IR156). Phase 1A unchanged.
+
+0.46.0 (2026-10-08): Alert-policy notification evaluation in automation simulate/fire fixed for the backend (IR155). Phase 1A unchanged.
+
+0.45.0 (2026-10-08): Demo operations (DEMO_OPS switch, clock, triggers) and demo sessions via the BFF fixed for the Core API (IR154); all 197 operations now have backend handlers. Phase 1A unchanged.
+
+0.44.0 (2026-10-08): Voice intents and the monthly energy export fixed for the backend (IR153). Phase 1A unchanged.
+
+0.43.0 (2026-10-08): Automation evaluation (simulate/fire, arbitration, tick replay) fixed for the backend (IR152); `control.evaluation_events` added. Phase 1A unchanged.
+
+0.42.0 (2026-10-08): Customer automation rules (save, list, next runs) fixed for the backend (IR151); automation name length aligned to 1–120. Phase 1A unchanged.
+
+0.41.0 (2026-10-08): Offset quotes, simulated records and retries fixed for the backend (IR150). Phase 1A unchanged.
+
+0.40.0 (2026-10-08): MRV reports fixed for the backend (IR149); energy.summary uses the default emission factor and factor_missing (SR09). Phase 1A unchanged.
+
+0.39.0 (2026-10-08): Energy summary comparison and the admin dashboard (actuals, IR78 forecast, billing visibility) fixed for the backend (IR148); partner KPI definitions aligned with D07. Phase 1A unchanged.
+
+0.38.0 (2026-10-08): Emission factors, energy integration and baselines fixed for the backend (IR147). Phase 1A unchanged.
+
+0.37.0 (2026-10-08): Role summaries fixed for the backend (IR146); UnitSummary.activeAlertCount follows the IR51 population. Phase 1A unchanged.
+
+0.36.0 (2026-10-08): QR resolution, write results and password-reset preview fixed for the backend (IR145). Phase 1A unchanged.
+
+0.35.0 (2026-10-08): Client users and two-step verification fixed for the backend (IR144): `identity.two_factor` table, Target kind `client_user` and template `invite`. Phase 1A unchanged.
+
+0.34.0 (2026-10-08): Inquiries and audit search fixed for the backend (IR143). Phase 1A unchanged.
+
+0.33.0 (2026-10-08): Notification inbox, recipients and preview, preferences and consents fixed for the backend (IR142). Phase 1A unchanged.
+
+0.32.0 (2026-10-08): Restriction grace/exception, explicit and forced release, reconcile and retry fixed for the backend (IR141). Phase 1A unchanged.
+
+0.31.0 (2026-10-08): Restriction schedule, execution, command results, release evaluation, cancellation and reads fixed for the backend (IR140). Phase 1A unchanged.
+
+0.30.0 (2026-10-08): Alert-policy details fixed while implementing the backend (IR120): the six default rules with ruleKeys and limits, `DefaultPolicyInput` for HQ limit edits, field rules and client editor values, list filters and order, delete/default-rule-switch versions, and IR108 attachment errors; the client rule label becomes “Refrigerant low pressure”; automation-policy field rules. Telemetry and ventilation reads (IR121): Measurement IDs, series/summary targets and ranges, ventilation log/list scope, `monitoring.allergen_observations`. Job intake, notes, hold and list filters (IR122); offers, decisions and assignments (IR123); contractor/technician projections and frozen job history (IR124); technician on-site operations (IR125); work reports (IR126); follow-up, cost, access and warranty operations (IR127); time proposals and reschedules (IR128); attachments and sign-off (IR129); maintenance plans (IR130); contractor register, rate cards and SLA (IR131); memberships, eligibility, capacity and unavailability (IR132); certificates and parts catalog (IR133); filter care (IR134); contracts, invoices and reminders (IR135); payments (IR136); contractor payouts (IR137); unit commands (IR138); diagnostic test runs (IR139). Phase 1A unchanged.

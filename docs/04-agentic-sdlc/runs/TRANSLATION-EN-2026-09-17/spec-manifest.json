@@ -1,12 +1,12 @@
 {
-  "version": "0.29.0",
-  "spec_baseline_id": "31276f054b03f328869642e2c262d88bc1a32b5d4022c439526be66e69cb0f19",
+  "version": "0.57.0",
+  "spec_baseline_id": "594bf4799e9f3b82557b2a32834f7a5ffe38d11359040d3fc2b510eabf328471",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "f1453b400b2b4a270e1691b8cd5b8a299a9097912ad33b4951be8c141509aa55"
+      "sha256": "53ea5e49d2730411f56434409fcbf45196e4c67010aebe0fde35c74439ae2f86"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -74,71 +74,75 @@
     },
     {
       "path": "01-requirements/admin.md",
-      "sha256": "266ff37b4b93bbbf8e59243b315f2568626182a1d0a8061f2db48f472de5dc84"
+      "sha256": "1e9467f37be96deccfb2baef6873d340ec2ea83a98cfaed9dcc96e14a7d269da"
     },
     {
       "path": "01-requirements/client.md",
-      "sha256": "9c289468e8656aac69d6943bdf7978775c10de45f3ef781660d066683aaaac82"
+      "sha256": "8e431ca8079acb64e2e32c91b5b02ed07b899d842aed8895598cd17ffa7d72d5"
     },
     {
       "path": "01-requirements/common.md",
-      "sha256": "7858093c95c3e1f809bc2db4a4156ca8e3b32745ea2b06e4c3329c4ae4ec4740"
+      "sha256": "6df06fd04ffb7e93ea75490c630d2154680fe3ae15e1739bce09706a3082dd0c"
     },
     {
       "path": "01-requirements/contractor.md",
-      "sha256": "5841299c335fdabdfb7f71c852e381601297755cefa772206a45b44e5ba4b1a1"
+      "sha256": "62ed4dd87c1c4e5ab7cefbfde6c10643aa0e217236136cfce2ba9727c8533a72"
     },
     {
       "path": "01-requirements/technician.md",
-      "sha256": "61537d23b4f52badb3ee70ffbfd92ac1eda8b5ebf5f50e431ca2aa608253b137"
+      "sha256": "28f615d474f011fec523143467b1b24a67eff37fc1afab5516a8b2d5aa8ebb77"
     },
     {
       "path": "02-design/admin.md",
-      "sha256": "8dea72db3436ab130c9ce1913e71b783f13f408dc7c5cd194786818414411c96"
+      "sha256": "5e142cc923142d229ff4d49fe89639209119728992bdff5f006281cc332e245c"
     },
     {
       "path": "02-design/backend-architecture.md",
-      "sha256": "ed9b8ae44dd282da546070fc16b4fe0c4a34eef7548cd0cc4ea04824da68cc7a"
+      "sha256": "e017d5c96544a4246c3d862755d324898ea4973a0421fb4a8684acb7da6170a7"
     },
     {
       "path": "02-design/backend-go-design.md",
-      "sha256": "32623e0febc4c74b66f4785aebb7d564c229872758fe61b8aebe132a1b405e60"
+      "sha256": "3cb0ffcd52fc86362ed18457d65e71780c8d993fb45f82b1ca304cd0fcc4c29b"
     },
     {
       "path": "02-design/client.md",
-      "sha256": "03dccb8ad637cf5892f5b20e3ed7c808b81a2f50ed90b3f8e86e9615b00e7018"
+      "sha256": "482be3172d21b61910181ba78d46205d65276420fd06c53f5d8ae17a457e1cec"
     },
     {
       "path": "02-design/common.md",
-      "sha256": "0e5ed3f9e8a2385ae0f2e873448b9278b8aa584c3d4d6303d63ab6c80a7ff8dc"
+      "sha256": "f752442469e30e717d9152a120869e041f79c1a9506f40877c7e0de7c377169d"
     },
     {
       "path": "02-design/container-design.md",
-      "sha256": "8d704203422c0f5e867f2a081b1c7fac915fc95bf6fd84a86aab778961c4f8e3"
+      "sha256": "99ba9454767b6e006a46d9aa32aed38a1c644786d33d14fa17f380f2813730fb"
     },
     {
       "path": "02-design/contractor.md",
-      "sha256": "0449d0b4cd289e1d1edde20e179499f8d476668325114c8c9ff33170881b375e"
+      "sha256": "8f33719e94fbc79d58c7514cb2e052214614b917185f06e9f88645f10356df3d"
     },
     {
       "path": "02-design/database-design.md",
-      "sha256": "111296cb7d566108b807740efefd3b755da1aedf007dc262927d23a68b662a0c"
+      "sha256": "58f66ce853835f0315fe2455fe010926dc5c9a3c8c886b10c2c4516711a41034"
     },
     {
       "path": "02-design/deterministic-contracts.md",
-      "sha256": "d00662c7cb240b6ea3ee9839038ac8f453b23459045e246832aad93f100d2927"
+      "sha256": "9387c9c57d7c862f4b09986c06f1cc89189ef437395baff775fc03c7802e7999"
     },
     {
       "path": "02-design/implementation-contracts.md",
-      "sha256": "5e1769c598b48d9b704c9dbdaeb8daaf3b23e24bcb5f692e4525ab636e3e8dd0"
+      "sha256": "d91ad88c431f2ed46b05b7c535e9a6c066e09332651e7bde5a635c46366495d1"
     },
     {
       "path": "02-design/network-architecture.md",
-      "sha256": "c60b0c8812069e625df5d51f8d74dd550a25ea1a264a4e2c03a11a5ae729c646"
+      "sha256": "16633d5cb3ca6996f0f4e1493390f8adc4943d7c6e36018100061c87ab446cef"
     },
     {
       "path": "02-design/operation-catalog.csv",
-      "sha256": "416df2df1ab26cf33697a26a270f91ebdb178c20e940c439bf88fffb155b7781"
+      "sha256": "56734df3b68f742dbf9e8bcca02e417822c6f9ac036aa97e7d0ab48e81acd667"
+    },
+    {
+      "path": "02-design/operation-persistence-map.csv",
+      "sha256": "03fd891d8864d6f2c46bf35e9a2622f3eb3ce31c12f335a4d8bbe96cc76b0f2d"
     },
     {
       "path": "02-design/query-catalog.csv",
@@ -146,19 +150,19 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "a2651047cc5196215aa67e854d0587c5509df9d1e31936c3e05a9e25c9bef075"
+      "sha256": "48e38884479aa436e4ad4aa64a5d3ae5081c8490758046d7e880815c058aeb8c"
     },
     {
       "path": "02-design/service-contracts.ts",
-      "sha256": "e4f4fa3f9d9d90b6b7a19b64415528c799ff4e8007e9906b15ae06260452aea6"
+      "sha256": "1d0b77cb534219b51185a618386324a73d52d7d5ddda84f19554114288e6204a"
     },
     {
       "path": "02-design/strict-review-contracts.md",
-      "sha256": "3a496eb508e16a1494c519cde560a48179dea1394115ddd76467f4846da8cdf9"
+      "sha256": "3f582fd07e99492774f6cedb6ccbc9b393f6066ed42254bac3d70d6011c35928"
     },
     {
       "path": "02-design/technician.md",
-      "sha256": "63dfa34b5c98719172afcdb995510caedd4516559c6eab62455cffe25354d414"
+      "sha256": "76a5bdc0d4b05acd8c53a51fce513c7190af00a16d9e395bac93883a6b705d71"
     },
     {
       "path": "02-design/write-version-catalog.csv",
@@ -166,19 +170,19 @@
     },
     {
       "path": "03-uiux/UIUXSpecification.md",
-      "sha256": "f55d552d98953b25f699bdcc29444ed4b726844cf3c0a46a05e356d82ced6d08"
+      "sha256": "e9fdafd2007b20b8be0c1197b29eb8719566ae1302e7f26008fd4996e188a9bb"
     },
     {
       "path": "03-uiux/component-contracts.csv",
-      "sha256": "3d3ccef6b22923608c1ef3cbbf3e0ee3d3429de8ec48bcfec1701cad2652c2a5"
+      "sha256": "16bb7b9b129b1d23fadfb16568ee6b2f87a4170e46df657072963edf556138da"
     },
     {
       "path": "03-uiux/screen-catalog.csv",
-      "sha256": "0272b37e837b8229b623d7ce583454ec26a3efc28efae3fdcfc58160df4de051"
+      "sha256": "a296dbb2103d2159668dda45596aea0c041b73b17d31831ba7565031c4c04765"
     },
     {
       "path": "04-agentic-sdlc/README.md",
-      "sha256": "ec3182cf8d759b23a14f3921bd844d729d76f787cf619b032c278727c735579e"
+      "sha256": "9656af50cde181f9bdcf2ec77582c95bda83d7c66a57438dccd39ce27fb68bdc"
     },
     {
       "path": "04-agentic-sdlc/acceptance-convergence.csv",
@@ -206,7 +210,7 @@
     },
     {
       "path": "04-agentic-sdlc/acceptance-rereview.csv",
-      "sha256": "a75a50cc56beb2ebea849376e4c29921514194b7b71606fa4237f2fcd0aa1e66"
+      "sha256": "ff0f07194456db4ca41916aff9045d5fedc17ea9672d6f1c2e4d3fb66f70eb48"
     },
     {
       "path": "04-agentic-sdlc/acceptance-resolution.csv",
@@ -270,19 +274,23 @@
     },
     {
       "path": "04-agentic-sdlc/verification.md",
-      "sha256": "c520c10c7adac6e4b2ed5fa79ae9edadcfb6f6c234bc6a728b9124126b29ae23"
+      "sha256": "7fc6e5ac2a0437ed5c42eb8d8b04339241d57a2da59fae984baf080c1366a8e3"
     },
     {
       "path": "README.md",
-      "sha256": "b8c126a74cf54b35d84a352ef3fe7d1af1a664973ddc32c2b2946920dc62b3e6"
+      "sha256": "697013a9e20fecc9e624ca51c0f6125226a8599b94e3632691eadfe285b7706e"
     },
     {
       "path": "tools/check_review_regressions.py",
       "sha256": "581cdfeac09cc1cad1c78a7e142cf5ab7f05e7aa128a30f413b92403cddceec8"
     },
     {
+      "path": "tools/gen_operation_persistence_map.py",
+      "sha256": "7ddfe1619aa960b1187747624321743dc299ad733d2efa89cb0ebfc9b2a5adcf"
+    },
+    {
       "path": "tools/validate_documents.py",
-      "sha256": "712dc903f6bd4a2ac9549fc8044f6bc3fb75983f6d9f35c98a180621773f8b8c"
+      "sha256": "ce20c47e7c6e2220f743c281d6208a0f66b74906f1fc311b7d94aef222dfb0ed"
     }
   ]
 }

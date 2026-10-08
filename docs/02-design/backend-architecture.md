@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND
-version: 0.29.0
+version: 0.30.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -20,7 +20,7 @@ This document designs the production backend that will replace the Phase 1A mock
 
 Decisions applied (DEC-67, DEC-68, DEC-69):
 
-1. The frontend stack is **Next.js (App Router)**, as implemented in `web/`. In production it also acts as the **BFF** (backend for frontend): it serves the four role apps, holds the user session, and relays operations to the Core API. The browser never calls the Core API directly.
+1. The frontend stack is **Next.js (App Router)**, as implemented in `service/web/`. In production it also acts as the **BFF** (backend for frontend): it serves the four role apps, holds the user session, and relays operations to the Core API. The browser never calls the Core API directly.
 2. The backend is a **modular monolith** (one Core API deployable with strict module boundaries) plus **separately deployed workers** for IoT, scheduling, notifications, and exports, so that device traffic and background work scale and fail independently of user requests.
 3. Hosting is **AWS** (DEC-68). Primary region Asia Pacific (Malaysia) `ap-southeast-5`; disaster recovery and any service not yet offered in ap-southeast-5 run in Asia Pacific (Singapore) `ap-southeast-1`. Check service availability per region at setup; keep personal data in ap-southeast-5 whenever the service exists there (privacy, §12).
 4. Payments use **Stripe** (hosted Stripe Checkout, MYR, cards and FPX online banking as enabled on the account; DEC-68).
@@ -52,7 +52,7 @@ Decisions applied (DEC-67, DEC-68, DEC-69):
 | Web / BFF (Next.js) | Serves the four role apps and shared routes; OIDC login flow; server-side session; relays `/bff/ops/<operation>` to the Core API with the user context; pushes change notifications to browsers (SSE) | Stateless containers behind the load balancer | Requests | Session in cache |
 | Core API (modular monolith) | Executes the 197 operations: validation, authorization, state transitions, versions, audit, outbox events | Stateless containers in the app zone | Requests, CPU | Database |
 | IoT gateway service | Device registry and credentials, MQTT bridge, command dispatch and acknowledgement matching, heartbeat and connection state, firmware operations | Containers next to the MQTT broker | Connected devices, messages | Database, broker |
-| Telemetry processor | Validates and stores measurements (quality valid / missing / stale / suspect), evaluates alert policies, feeds automation conditions | Stream consumers | Messages per second | Time-series store |
+| Telemetry processor | Validates and stores measurements (quality valid / missing / stale / suspect), evaluates alert policies, feeds automation conditions; a separate rollup role writes the 15-minute and hourly aggregates | Stream consumers | Messages per second | Time-series store |
 | Automation engine | Evaluates schedules and event conditions; arbitrates capability → restriction → HQ policy → customer rule (DEC-09); creates Commands through the same Command policy | Workers | Rules due | Database |
 | Scheduler | Time-based business transitions (§10) with exactly-once execution per due item | Several instances claiming items with database leases | Due items | Database |
 | Notification worker | Renders en / ms templates, applies preferences and consents, delivers in-app, e-mail, WhatsApp; records delivery state | Queue consumers | Notifications | Database |
@@ -60,7 +60,7 @@ Decisions applied (DEC-67, DEC-68, DEC-69):
 | Webhook receiver | Receives payment and provider callbacks, verifies signatures, converts them to internal events | Small stateless service | Requests | Outbox |
 | Outbox relay | Publishes committed domain events from the database outbox to the message broker | Workers | Event rate | Database, broker |
 | Relational database | System of record for all business entities, versions, outbox, audit | Managed, primary + standby, read replica | Storage, IOPS | Persistent |
-| Time-series store | Measurements, heartbeats, aggregates for energy and MRV | Managed | Data volume | Persistent |
+| Telemetry store | Measurements, heartbeats, aggregates for energy and MRV (Aurora partitioned tables, hot 35 days; raw history as S3 Parquet, §3a) | Managed | Data volume | Persistent |
 | Object storage | Photos, attachments, signatures, CSV files, generated reports | Managed, private | Data volume | Persistent |
 | Cache | Sessions, idempotency keys, rate-limit counters, short-lived read caches | Managed, replicated | Memory | Ephemeral |
 | Message broker | Domain events and work queues (at-least-once) | Managed | Throughput | Persistent queues |
@@ -72,6 +72,7 @@ Decisions applied (DEC-67, DEC-68, DEC-69):
 |---|---|---|
 | DNS | Amazon Route 53 | Health-checked failover records for app, admin, hooks, files, mqtt |
 | CDN, WAF, DDoS | Amazon CloudFront, AWS WAF, AWS Shield Standard | WAF IP set restricts `admin.<domain>` to the company network |
+| Public TLS certificates | AWS Certificate Manager (us-east-1 for CloudFront, ap-southeast-5 for the ALB) | Automatic renewal; device certificates are issued by AWS IoT Core / a private CA instead (network architecture §7) |
 | Load balancer | Application Load Balancer (two AZs) | Reachable only from CloudFront (managed prefix list + secret header) |
 | Web / BFF, Core API, workers | Amazon ECS on AWS Fargate | One service per component, autoscaling on CPU and queue depth; images in Amazon ECR |
 | Identity provider | Amazon Cognito user pools | OIDC, TOTP MFA, password reset; one pool per environment |
@@ -96,18 +97,21 @@ Each module owns its tables and is reached by other modules only through its pub
 
 | Module | Operation groups | Owns (main entities) | Main events published |
 |---|---|---|---|
-| Identity & access | session, demoSession (replaced by real sign-in), members, twoFactor, preferences, consents, clientUsers, auth | User, Membership, Permission grants, QualificationGrant, Preferences, Consent, ClientUser invite | MembershipChanged, ConsentChanged |
-| Assets | organizations, customers, properties, spaces, locations, units, summaries | Organization, Customer, Property, Space, ACUnit, import batches | UnitChanged, LocationChanged |
+| Identity & access | session, demoSession (replaced by real sign-in), members (list, save), organizations, twoFactor, preferences, consents, clientUsers, auth | User, Membership, Permission grants, QualificationGrant, Preferences, Consent, ClientUser invite | MembershipChanged, ConsentChanged |
+| Assets | customers, properties, spaces, locations, units | Organization, Customer, Property, Space, ACUnit, import batches | UnitChanged, LocationChanged |
 | Devices | capabilities, devices, firmwareCampaigns | Capability, Device, Sensor, Calibration, Firmware operation and campaign | DeviceConnectionChanged, DeviceEventRaised, FirmwareOperationChanged |
 | Control | commands, diagnosticRuns, automations, voice | Command, DiagnosticRun, Automation, Trigger log | CommandRequested, CommandSettled |
 | Monitoring & alerts | telemetry, alerts, policies, ventilation, energy (read side of measurements) | Alert, AlertPolicy, DefaultRuleSetting, Ventilation log | AlertOpened, AlertResolved |
-| Maintenance | jobs, plans, reports, attachments, parts, members (capacity, eligible), certificates, contractors, rateCards, sla, filterCare | MaintenanceJob, Offer, Assignment, SlotProposal, Plan, WorkReport, Attachment, Certificate, Contractor, RateCard | JobStatusChanged, OfferIssued, ReportSubmitted |
+| Maintenance | jobs, plans, reports, attachments, parts, members (capacity, eligible, setUnavailability), certificates, contractors, rateCards, sla, filterCare | MaintenanceJob, Offer, Assignment, SlotProposal, Plan, WorkReport, Attachment, Certificate, Contractor, RateCard | JobStatusChanged, OfferIssued, ReportSubmitted |
 | Billing | contracts, invoices, payments, inquiries, payouts | Contract, Invoice, PaymentAttempt, Receipt, Inquiry, PayoutStatement | InvoiceIssued, PaymentConfirmed, PayoutChanged |
 | Restrictions | restrictions | Restriction, exception, release intent | RestrictionScheduled, RestrictionApplied, RestrictionReleaseRequested |
 | Energy & carbon | energy, baselines, mrv, factors, offsets | Baseline, MRV report version, Emission factor, Offset record | MrvReportChanged |
 | Notifications | notifications | Notification, delivery attempt, template | NotificationRequested |
 | Audit | audit, writes | Audit record (append-only), write receipt | AuditRecorded |
+| Read models | admin.summary, summaries | No tables; composed from the other modules' query interfaces | — |
 | Demo (non-production) | demo, admin.summary test hooks | Demo clock, triggers | Not deployed to production |
+
+The [operation persistence map](operation-persistence-map.csv) lists, for each of the 197 operations, the owning module, the tables it reads and writes in its own schema, the other modules it calls through their interfaces, and the write side effects (audit row, idempotency record, outbox event); it is generated by `docs/tools/gen_operation_persistence_map.py` from the operation catalog and `db/schema.sql`.
 
 Cross-module rules that the modules must keep:
 
@@ -123,7 +127,7 @@ Cross-module rules that the modules must keep:
 | Caller context | The BFF sends a short-lived signed service token plus the user context (userId, membershipId, tenantId, scopeVersion, sessionId). The Core API re-reads the Membership and never trusts permissions sent by the caller. |
 | Results | Success returns `ServiceResult<T>`; failure returns a DomainError body with code and fields. HTTP status mapping: VALIDATION 422, UNAUTHENTICATED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT 409, OFFLINE 409, TIMEOUT 504, RATE_LIMITED 429, UNAVAILABLE 503 (retryable) — all nine `ErrorCode` values ([backend Go design §6](backend-go-design.md#6-errors)). Out-of-scope reads return NOT_FOUND, never partial data (D01). |
 | Writes and duplicates | Every write carries an `Idempotency-Key` (the frontend's duplicate-prevention key) kept for 24 hours; a repeat returns the original receipt (`writes.getResult`). |
-| Versions | Writes listed in the write version catalog send the expected version; a mismatch returns CONFLICT with the current version and changes nothing. |
+| Versions | `WriteOptions.expectedVersion` travels in the `X-Expected-Version` header (non-negative integer; 0 names a row that does not exist yet, IR120); `WriteOptions.idempotencyKey` in `Idempotency-Key`. The Core API applies the write version catalog branch that matches the input (`all`, `<field> present`, `<field> omitted`, `event=a\|b`): a `required` branch without the header, an `omit` branch with it, or a non-integer value is VALIDATION before the handler runs; a mismatch with the stored version returns CONFLICT and changes nothing. |
 | Lists | Cursor pagination (`cursor`, `limit`), stable sort with ID tiebreak, filters as in the operation inputs. |
 | Correlation | Every request carries a correlation ID that is written to logs, traces, events, and audit records (`AuditView.correlationId`). |
 | Change notification | The BFF keeps one Server-Sent Events stream per signed-in tab. Core events are filtered by tenant and scope and sent as resource keys; the browser invalidates the matching queries (replaces the mock event bus, IR71). |
@@ -211,13 +215,13 @@ Modelling rules:
 | Auto-confirm completed jobs | 7 days after completion without rating | FR-C17 (BR-C17) |
 | Follow-up classification reminder | createdAt + 1 business day | IR114 |
 | Invoice reminders | Due and overdue dates | FR-A08 |
-| Certificate expiry warnings | Expiry − 30 days (PROPOSED) | FR-P09, FR-A21 |
+| Certificate expiry warnings | Status `expiring` from expiry − 60 days, `expired` at expiry | FR-P09, FR-A21 |
 | Filter cleaning reminders | Customer settings | FR-C18 |
 | Automation schedules | Schedule start / end | FR-C04 |
 | Monthly energy report | Month end, when enabled in preferences | FR-C16 |
 | Firmware campaign waves | Campaign schedule | FR-A20 |
 
-The scheduler claims due items with a database lease so that each item runs once even with a standby instance; handlers are idempotent and audited with actorRoleAtTime=system.
+The scheduler claims due items with a database lease (`FOR UPDATE SKIP LOCKED`) so that each item runs once even with several instances; handlers are idempotent and audited with actorRoleAtTime=system.
 
 ## 11. External integrations
 
@@ -283,4 +287,4 @@ The scheduler claims due items with a database lease so that each item runs once
 | OPEN-BE-06 | Decided 2026-10-07: capacity in §13 | — |
 | OPEN-BE-07 | Contractor payout rail (bank transfer file or Stripe Connect) | Payouts (FR-A23) |
 
-Additional contracts for current version 0.29.0: Read IR01–119 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.30.0: Read IR01–139 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

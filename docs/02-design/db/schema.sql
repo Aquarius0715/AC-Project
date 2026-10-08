@@ -27,6 +27,12 @@ CREATE SCHEMA IF NOT EXISTS energy;
 CREATE SCHEMA IF NOT EXISTS notify;
 CREATE SCHEMA IF NOT EXISTS audit;
 
+-- Business time of the current transaction: the API sets app.now to the request clock (demo scenario clock in the demo
+-- environment, IR157); without it the database time is used.
+CREATE FUNCTION platform.app_now() RETURNS timestamptz LANGUAGE sql STABLE AS $$
+  SELECT COALESCE(NULLIF(current_setting('app.now', true), '')::timestamptz, now())
+$$;
+
 -- ---------------------------------------------------------------------------------------------
 -- platform: tenants, outbox, idempotency, scheduler leases (shared infrastructure, not a module)
 -- ---------------------------------------------------------------------------------------------
@@ -34,7 +40,7 @@ CREATE TABLE platform.tenants (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name        text NOT NULL,
   status      text NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive')),
-  created_at  timestamptz NOT NULL DEFAULT now()
+  created_at  timestamptz NOT NULL DEFAULT platform.app_now()
 );
 
 CREATE TABLE platform.outbox (
@@ -45,7 +51,7 @@ CREATE TABLE platform.outbox (
   event_type     text NOT NULL,
   payload        jsonb NOT NULL,
   correlation_id text NOT NULL,
-  occurred_at    timestamptz NOT NULL DEFAULT now(),
+  occurred_at    timestamptz NOT NULL DEFAULT platform.app_now(),
   published_at   timestamptz,
   attempts       int NOT NULL DEFAULT 0,
   last_error     text
@@ -61,8 +67,8 @@ CREATE TABLE platform.idempotency_keys (
   status         text NOT NULL CHECK (status IN ('in_progress','completed')),
   http_status    int,
   response       jsonb,
-  created_at     timestamptz NOT NULL DEFAULT now(),
-  expires_at     timestamptz NOT NULL DEFAULT now() + interval '24 hours',
+  created_at     timestamptz NOT NULL DEFAULT platform.app_now(),
+  expires_at     timestamptz NOT NULL DEFAULT platform.app_now() + interval '24 hours',
   PRIMARY KEY (tenant_id, membership_id, key)
 );
 CREATE INDEX idempotency_expiry ON platform.idempotency_keys (expires_at);
@@ -87,7 +93,7 @@ CREATE INDEX scheduled_due ON platform.scheduled_items (due_at) WHERE done_at IS
 CREATE TABLE platform.processed_events (       -- consumer-side de-duplication (at-least-once delivery)
   consumer     text NOT NULL,
   event_id     uuid NOT NULL,
-  processed_at timestamptz NOT NULL DEFAULT now(),
+  processed_at timestamptz NOT NULL DEFAULT platform.app_now(),
   PRIMARY KEY (consumer, event_id)
 );
 
@@ -97,7 +103,7 @@ CREATE TABLE platform.stream_checkpoints (     -- Kinesis shard checkpoints for 
   sequence_number text NOT NULL,
   lease_owner     text,
   lease_until     timestamptz,
-  updated_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT platform.app_now(),
   PRIMARY KEY (stream_name, shard_id)
 );
 
@@ -118,8 +124,8 @@ CREATE TABLE identity.users (
   phone         text,
   status        text NOT NULL DEFAULT 'active' CHECK (status IN ('invited','active','disabled','anonymised')),
   last_sign_in_at timestamptz,
-  created_at    timestamptz NOT NULL DEFAULT now(),
-  updated_at    timestamptz NOT NULL DEFAULT now(),
+  created_at    timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at    timestamptz NOT NULL DEFAULT platform.app_now(),
   version       int NOT NULL DEFAULT 1
 );
 
@@ -130,8 +136,8 @@ CREATE TABLE identity.organizations (
   kind        text NOT NULL CHECK (kind IN ('customer','contractor','operator')),
   status      text NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive')),
   version     int NOT NULL DEFAULT 1,
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  updated_at  timestamptz NOT NULL DEFAULT now(),
+  created_at  timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at  timestamptz NOT NULL DEFAULT platform.app_now(),
   UNIQUE (tenant_id, id)
 );
 
@@ -147,8 +153,8 @@ CREATE TABLE identity.memberships (
   valid_from      timestamptz NOT NULL,
   valid_until     timestamptz,
   version         int NOT NULL DEFAULT 1,
-  created_at      timestamptz NOT NULL DEFAULT now(),
-  updated_at      timestamptz NOT NULL DEFAULT now(),
+  created_at      timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at      timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, organization_id) REFERENCES identity.organizations(tenant_id, id),
   CHECK (valid_until IS NULL OR valid_until > valid_from),
   CHECK ((role = 'client') = (client_role IS NOT NULL)),
@@ -198,7 +204,15 @@ CREATE TABLE identity.preferences (
   monthly_report_email  boolean NOT NULL DEFAULT false,
   channels              text[] NOT NULL DEFAULT '{inApp}',
   version               int NOT NULL DEFAULT 1,
-  updated_at            timestamptz NOT NULL DEFAULT now()
+  updated_at            timestamptz NOT NULL DEFAULT platform.app_now()
+);
+
+CREATE TABLE identity.two_factor (             -- FR-X08 demo two-step verification (IR112, IR144)
+  user_id              uuid PRIMARY KEY REFERENCES identity.users(id),
+  enabled_at           timestamptz NOT NULL,
+  recovery_code_hashes text[] NOT NULL CHECK (cardinality(recovery_code_hashes) <= 8),
+  version              int NOT NULL DEFAULT 1,
+  updated_at           timestamptz NOT NULL DEFAULT platform.app_now()
 );
 
 CREATE TABLE identity.consents (
@@ -210,8 +224,8 @@ CREATE TABLE identity.consents (
   granted_at    timestamptz,
   revoked_at    timestamptz,
   version       int NOT NULL DEFAULT 1,
-  created_at    timestamptz NOT NULL DEFAULT now(),
-  updated_at    timestamptz NOT NULL DEFAULT now(),
+  created_at    timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at    timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, membership_id) REFERENCES identity.memberships(tenant_id, id),
   UNIQUE (membership_id, purpose)
 );
@@ -230,8 +244,8 @@ CREATE TABLE identity.client_users (           -- customer-side user list and in
   invited_by_membership_id uuid NOT NULL,
   last_invite_sent_at      timestamptz,
   version                  int NOT NULL DEFAULT 1,
-  created_at               timestamptz NOT NULL DEFAULT now(),
-  updated_at               timestamptz NOT NULL DEFAULT now(),
+  created_at               timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at               timestamptz NOT NULL DEFAULT platform.app_now(),
   UNIQUE (tenant_id, customer_id, email)
 );
 
@@ -246,8 +260,8 @@ CREATE TABLE assets.customers (
   status          text NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive')),
   service_profile text NOT NULL CHECK (service_profile IN ('rto','general','energy','environment')),
   version         int NOT NULL DEFAULT 1,
-  created_at      timestamptz NOT NULL DEFAULT now(),
-  updated_at      timestamptz NOT NULL DEFAULT now(),
+  created_at      timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at      timestamptz NOT NULL DEFAULT platform.app_now(),
   UNIQUE (tenant_id, id)
 );
 
@@ -256,13 +270,13 @@ CREATE TABLE assets.properties (
   tenant_id           uuid NOT NULL,
   customer_org_id     uuid NOT NULL,
   kind                text NOT NULL CHECK (kind IN ('home','office')),
-  name                text NOT NULL CHECK (length(name) BETWEEN 1 AND 80),
+  name                text NOT NULL CHECK (length(name) BETWEEN 1 AND 120),
   address             text,
   access_instructions text,
   archived            boolean NOT NULL DEFAULT false,
   version             int NOT NULL DEFAULT 1,
-  created_at          timestamptz NOT NULL DEFAULT now(),
-  updated_at          timestamptz NOT NULL DEFAULT now(),
+  created_at          timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at          timestamptz NOT NULL DEFAULT platform.app_now(),
   UNIQUE (tenant_id, id)
 );
 CREATE INDEX properties_customer ON assets.properties (tenant_id, customer_org_id) WHERE NOT archived;
@@ -274,11 +288,11 @@ CREATE TABLE assets.spaces (
   property_id     uuid NOT NULL,
   parent_space_id uuid,
   kind            text NOT NULL CHECK (kind IN ('area','floor','room','space')),
-  name            text NOT NULL CHECK (length(name) BETWEEN 1 AND 80),
+  name            text NOT NULL CHECK (length(name) BETWEEN 1 AND 120),
   archived        boolean NOT NULL DEFAULT false,
   version         int NOT NULL DEFAULT 1,
-  created_at      timestamptz NOT NULL DEFAULT now(),
-  updated_at      timestamptz NOT NULL DEFAULT now(),
+  created_at      timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at      timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, property_id) REFERENCES assets.properties(tenant_id, id),
   UNIQUE (tenant_id, id)
 );
@@ -292,7 +306,7 @@ CREATE TABLE assets.units (                      -- ACUnit
   customer_org_id     uuid NOT NULL,
   property_id         uuid NOT NULL,
   space_id            uuid,
-  display_name        text NOT NULL CHECK (length(display_name) BETWEEN 1 AND 80),
+  display_name        text NOT NULL CHECK (length(display_name) BETWEEN 1 AND 120),
   model_id            uuid NOT NULL,             -- devices.capabilities.id (other module: no FK)
   type                text NOT NULL DEFAULT 'split' CHECK (type = 'split'),
   installed_at        timestamptz,
@@ -306,8 +320,8 @@ CREATE TABLE assets.units (                      -- ACUnit
   observed_restriction jsonb,
   last_seen_at        timestamptz,
   version             int NOT NULL DEFAULT 1,
-  created_at          timestamptz NOT NULL DEFAULT now(),
-  updated_at          timestamptz NOT NULL DEFAULT now(),
+  created_at          timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at          timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, property_id) REFERENCES assets.properties(tenant_id, id),
   FOREIGN KEY (tenant_id, space_id) REFERENCES assets.spaces(tenant_id, id),
   UNIQUE (tenant_id, id)
@@ -320,11 +334,23 @@ CREATE TABLE assets.unit_alert_policies (        -- units carry policies (IR108)
   tenant_id  uuid NOT NULL,
   unit_id    uuid NOT NULL,
   policy_id  uuid NOT NULL,                      -- monitoring.alert_policies.id
-  attached_at timestamptz NOT NULL DEFAULT now(),
+  attached_at timestamptz NOT NULL DEFAULT platform.app_now(),
   PRIMARY KEY (unit_id, policy_id),
   FOREIGN KEY (tenant_id, unit_id) REFERENCES assets.units(tenant_id, id)
 );
 CREATE INDEX unit_alert_policies_policy ON assets.unit_alert_policies (tenant_id, policy_id);
+
+CREATE TABLE assets.unit_import_previews (       -- FR-A18 preview store: 30-minute validation result, no business data
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id    uuid NOT NULL,
+  customer_id  uuid NOT NULL,
+  membership_id uuid NOT NULL,
+  file_name    text NOT NULL CHECK (length(file_name) BETWEEN 1 AND 200),
+  rows         jsonb NOT NULL,                    -- ImportRow[] with resolved ids
+  expires_at   timestamptz NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT platform.app_now()
+);
+CREATE INDEX unit_import_previews_expiry ON assets.unit_import_previews (expires_at);
 
 CREATE TABLE assets.unit_imports (               -- FR-A18
   id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -339,8 +365,8 @@ CREATE TABLE assets.unit_imports (               -- FR-A18
   undo_until           timestamptz NOT NULL,
   state                text NOT NULL CHECK (state IN ('imported','undone')),
   version              int NOT NULL DEFAULT 1,
-  created_at           timestamptz NOT NULL DEFAULT now(),
-  updated_at           timestamptz NOT NULL DEFAULT now()
+  created_at           timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at           timestamptz NOT NULL DEFAULT platform.app_now()
 );
 
 -- ---------------------------------------------------------------------------------------------
@@ -363,7 +389,7 @@ CREATE TABLE devices.capabilities (              -- model register (FR-A04); one
   sensors             jsonb NOT NULL DEFAULT '[]',
   firmware_candidates text[] NOT NULL DEFAULT '{}',
   is_current          boolean NOT NULL DEFAULT true,
-  created_at          timestamptz NOT NULL DEFAULT now(),
+  created_at          timestamptz NOT NULL DEFAULT platform.app_now(),
   PRIMARY KEY (id, version)
 );
 CREATE UNIQUE INDEX capabilities_current ON devices.capabilities (id) WHERE is_current;
@@ -385,8 +411,8 @@ CREATE TABLE devices.devices (
   power_signal              text NOT NULL DEFAULT 'unknown' CHECK (power_signal IN ('unknown','on','off')),
   tamper                    text NOT NULL DEFAULT 'clear' CHECK (tamper IN ('clear','detected')),
   version                   int NOT NULL DEFAULT 1,
-  created_at                timestamptz NOT NULL DEFAULT now(),
-  updated_at                timestamptz NOT NULL DEFAULT now(),
+  created_at                timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at                timestamptz NOT NULL DEFAULT platform.app_now(),
   UNIQUE (tenant_id, id)
 );
 CREATE UNIQUE INDEX devices_serial ON devices.devices (tenant_id, upper(btrim(serial)));   -- duplicate serial CONFLICT (AT-T11-E)
@@ -437,8 +463,8 @@ CREATE TABLE devices.device_operations (
   expires_at     timestamptz NOT NULL,
   actor_membership_id uuid,
   version        int NOT NULL DEFAULT 1,
-  created_at     timestamptz NOT NULL DEFAULT now(),
-  updated_at     timestamptz NOT NULL DEFAULT now(),
+  created_at     timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at     timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, device_id) REFERENCES devices.devices(tenant_id, id)
 );
 CREATE UNIQUE INDEX device_operations_one_firmware ON devices.device_operations (device_id) WHERE kind = 'firmware' AND status IN ('queued','running');
@@ -457,7 +483,7 @@ CREATE TABLE devices.device_events (
   occurred_at      timestamptz NOT NULL,
   restored_at      timestamptz,
   version          int NOT NULL DEFAULT 1,
-  created_at       timestamptz NOT NULL DEFAULT now(),
+  created_at       timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, device_id) REFERENCES devices.devices(tenant_id, id),
   UNIQUE (device_id, sequence)
 );
@@ -468,8 +494,8 @@ CREATE TABLE devices.device_event_notes (        -- devices.addResponseNote (FR-
   tenant_id    uuid NOT NULL,
   event_id     uuid NOT NULL REFERENCES devices.device_events(id),
   actor_id     uuid NOT NULL,
-  message      text NOT NULL CHECK (length(message) BETWEEN 1 AND 2000),
-  created_at   timestamptz NOT NULL DEFAULT now()
+  message      text NOT NULL CHECK (length(message) BETWEEN 1 AND 1000),   -- DD-T12 responseNote 1–1000
+  created_at   timestamptz NOT NULL DEFAULT platform.app_now()
 );
 
 CREATE TABLE devices.calibration_records (
@@ -484,7 +510,7 @@ CREATE TABLE devices.calibration_records (
   calibrated_at   timestamptz NOT NULL,
   actor_id        uuid NOT NULL,
   job_id          uuid,
-  created_at      timestamptz NOT NULL DEFAULT now()
+  created_at      timestamptz NOT NULL DEFAULT platform.app_now()
 );
 CREATE INDEX calibration_records_device ON devices.calibration_records (tenant_id, device_id, calibrated_at DESC);
 
@@ -498,13 +524,13 @@ CREATE TABLE devices.firmware_campaigns (        -- FR-A20
   waves                      jsonb NOT NULL,     -- [{label, percent}]
   window_start_local         time NOT NULL,
   window_end_local           time NOT NULL,
-  auto_pause_failure_percent int NOT NULL CHECK (auto_pause_failure_percent BETWEEN 1 AND 100),
+  auto_pause_failure_percent int NOT NULL CHECK (auto_pause_failure_percent BETWEEN 1 AND 50),   -- IR111 / DD-A20
   start_at                   timestamptz NOT NULL,
   state                      text NOT NULL CHECK (state IN ('scheduled','running','paused','aborted','completed')),
   reason                     text,
   version                    int NOT NULL DEFAULT 1,
-  created_at                 timestamptz NOT NULL DEFAULT now(),
-  updated_at                 timestamptz NOT NULL DEFAULT now()
+  created_at                 timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at                 timestamptz NOT NULL DEFAULT platform.app_now()
 );
 
 CREATE TABLE devices.firmware_campaign_devices (
@@ -544,8 +570,8 @@ CREATE TABLE control.commands (
   observed_state      jsonb,
   correlation_id      text NOT NULL,
   version             int NOT NULL DEFAULT 1,
-  created_at          timestamptz NOT NULL DEFAULT now(),
-  updated_at          timestamptz NOT NULL DEFAULT now(),
+  created_at          timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at          timestamptz NOT NULL DEFAULT platform.app_now(),
   CHECK (expires_at > requested_at)
 );
 CREATE INDEX commands_unit ON control.commands (tenant_id, unit_id, requested_at DESC);
@@ -561,7 +587,7 @@ CREATE TABLE control.diagnostic_runs (           -- FR-T10
   start_action        jsonb NOT NULL,
   end_action          jsonb NOT NULL,
   duration_minutes    int NOT NULL CHECK (duration_minutes BETWEEN 1 AND 15),
-  reason              text NOT NULL CHECK (length(reason) BETWEEN 1 AND 500),
+  reason              text NOT NULL CHECK (length(reason) BETWEEN 1 AND 1000),   -- DD-T10
   state               text NOT NULL CHECK (state IN ('awaiting_start','running','end_requested','completed','start_failed','end_failed','end_blocked')),
   start_command_id    uuid NOT NULL REFERENCES control.commands(id),
   end_command_id      uuid REFERENCES control.commands(id),
@@ -569,8 +595,8 @@ CREATE TABLE control.diagnostic_runs (           -- FR-T10
   end_at              timestamptz,
   failure_code        text,
   version             int NOT NULL DEFAULT 1,
-  created_at          timestamptz NOT NULL DEFAULT now(),
-  updated_at          timestamptz NOT NULL DEFAULT now()
+  created_at          timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at          timestamptz NOT NULL DEFAULT platform.app_now()
 );
 CREATE INDEX diagnostic_runs_job ON control.diagnostic_runs (tenant_id, job_id);
 
@@ -579,7 +605,7 @@ CREATE TABLE control.automations (               -- customer rules (FR-C04/C05):
   tenant_id             uuid NOT NULL,
   customer_org_id       uuid NOT NULL,
   kind                  text NOT NULL CHECK (kind IN ('schedule','event')),
-  name                  text NOT NULL CHECK (length(name) BETWEEN 1 AND 80),
+  name                  text NOT NULL CHECK (length(name) BETWEEN 1 AND 120),
   owner_membership_id   uuid NOT NULL,
   created_by_user_id    uuid NOT NULL,
   timezone              text NOT NULL,
@@ -588,8 +614,8 @@ CREATE TABLE control.automations (               -- customer rules (FR-C04/C05):
   disabled_reason       text CHECK (disabled_reason IN ('capability_changed','unit_archived','consent_revoked')),
   definition            jsonb NOT NULL,          -- schedule: weekdays/startLocal/endLocal/endsNextDay/actions; event: condition/action
   version               int NOT NULL DEFAULT 1,
-  created_at            timestamptz NOT NULL DEFAULT now(),
-  updated_at            timestamptz NOT NULL DEFAULT now(),
+  created_at            timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at            timestamptz NOT NULL DEFAULT platform.app_now(),
   UNIQUE (tenant_id, id)
 );
 
@@ -615,8 +641,8 @@ CREATE TABLE control.automation_policies (       -- HQ automation policies (FR-A
   condition           jsonb NOT NULL,
   action              jsonb NOT NULL,
   version             int NOT NULL DEFAULT 1,
-  created_at          timestamptz NOT NULL DEFAULT now(),
-  updated_at          timestamptz NOT NULL DEFAULT now(),
+  created_at          timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at          timestamptz NOT NULL DEFAULT platform.app_now(),
   UNIQUE (tenant_id, id)
 );
 
@@ -642,6 +668,18 @@ CREATE TABLE control.automation_runs (           -- trigger log: fired / skipped
   UNIQUE (rule_id, unit_id, trigger_ref)
 );
 
+CREATE TABLE control.evaluation_events (         -- automations.fire results per tenant/eventId/phase (D02 replay, IR152)
+  tenant_id   uuid NOT NULL,
+  event_id    uuid NOT NULL,
+  phase       text NOT NULL CHECK (phase IN ('schedule_start','schedule_end','condition')),
+  occurred_at timestamptz NOT NULL,
+  input_hash  text NOT NULL,
+  result      jsonb NOT NULL,
+  created_at  timestamptz NOT NULL DEFAULT platform.app_now(),
+  PRIMARY KEY (tenant_id, event_id, phase)
+);
+CREATE INDEX evaluation_events_tick ON control.evaluation_events (tenant_id, occurred_at);
+
 -- ---------------------------------------------------------------------------------------------
 -- monitoring
 -- ---------------------------------------------------------------------------------------------
@@ -663,8 +701,8 @@ CREATE TABLE monitoring.alert_policies (         -- Policy kind alert | default_
   escalate_after_minutes   int,
   cooldown_minutes         int,
   version                  int NOT NULL DEFAULT 1,
-  created_at               timestamptz NOT NULL DEFAULT now(),
-  updated_at               timestamptz NOT NULL DEFAULT now(),
+  created_at               timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at               timestamptz NOT NULL DEFAULT platform.app_now(),
   CHECK ((kind = 'alert' AND customer_id IS NOT NULL AND condition IS NOT NULL)
       OR (kind = 'default_alert' AND customer_id IS NULL AND rules IS NOT NULL)),
   UNIQUE (tenant_id, id)
@@ -682,8 +720,8 @@ CREATE TABLE monitoring.default_rule_settings (  -- per customer on/off (owner-o
   changed_by_membership_id uuid NOT NULL,
   reason                   text,
   version                  int NOT NULL DEFAULT 1,
-  created_at               timestamptz NOT NULL DEFAULT now(),
-  updated_at               timestamptz NOT NULL DEFAULT now(),
+  created_at               timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at               timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, policy_id) REFERENCES monitoring.alert_policies(tenant_id, id),
   UNIQUE (policy_id, rule_key, customer_id)
 );
@@ -696,7 +734,7 @@ CREATE TABLE monitoring.alerts (
   policy_id           uuid,
   rule_key            text,
   type                text NOT NULL CHECK (type IN ('sensor','quality','maintenance','tamper','reconciliation_required')),
-  severity            text NOT NULL CHECK (severity IN ('critical','warning','info')),
+  severity            text NOT NULL CHECK (severity IN ('critical','warning','normal')),
   status              text NOT NULL CHECK (status IN ('open','acknowledged','resolved')),
   cause_code          text NOT NULL CHECK (cause_code IN ('window_open','insulation_loss','unknown')),
   evidence_kind       text NOT NULL CHECK (evidence_kind IN ('demo_observation','inferred','inspection')),
@@ -707,11 +745,14 @@ CREATE TABLE monitoring.alerts (
   acknowledged_at     timestamptz,
   resolved_at         timestamptz,
   resolution_reason   text,
+  resolution_evidence_ids uuid[] NOT NULL DEFAULT '{}',   -- DD-T07 remeasurement / confirmation records
+  acknowledged_by     uuid,
+  resolved_by         uuid,
   previous_alert_id   uuid REFERENCES monitoring.alerts(id),
   delivery_failures   jsonb NOT NULL DEFAULT '[]',
   version             int NOT NULL DEFAULT 1,
-  created_at          timestamptz NOT NULL DEFAULT now(),
-  updated_at          timestamptz NOT NULL DEFAULT now()
+  created_at          timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at          timestamptz NOT NULL DEFAULT platform.app_now()
 );
 CREATE INDEX alerts_open ON monitoring.alerts (tenant_id, customer_org_id, severity, detected_at DESC) WHERE status <> 'resolved';
 CREATE INDEX alerts_unit ON monitoring.alerts (tenant_id, unit_id, detected_at DESC);
@@ -723,15 +764,32 @@ CREATE TABLE monitoring.ventilation_logs (       -- manual record (FR-C07, IR110
   space_id               uuid NOT NULL,
   unit_id                uuid,
   method                 text NOT NULL CHECK (method IN ('window_opened','door_opened','ventilation_fan','other')),
-  duration_minutes       int NOT NULL CHECK (duration_minutes BETWEEN 1 AND 720),
+  duration_minutes       int NOT NULL CHECK (duration_minutes BETWEEN 1 AND 240),  -- IR110
   co2_at_log             jsonb,
   logged_by_membership_id uuid NOT NULL,
   logged_at              timestamptz NOT NULL,
   version                int NOT NULL DEFAULT 1,
-  created_at             timestamptz NOT NULL DEFAULT now(),
-  updated_at             timestamptz NOT NULL DEFAULT now()
+  created_at             timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at             timestamptz NOT NULL DEFAULT platform.app_now()
 );
 CREATE INDEX ventilation_logs_space ON monitoring.ventilation_logs (tenant_id, space_id, logged_at DESC);
+
+CREATE TABLE monitoring.allergen_observations (  -- DEC-57 / IR98 source rows for AirSeries.allergenObservation
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id      uuid NOT NULL,
+  unit_id        uuid NOT NULL,
+  availability   text NOT NULL CHECK (availability IN ('not_measured','unsupported','available')),
+  substance      text,
+  value          double precision,
+  unit           text,
+  source_label   text,
+  observed_at    timestamptz,
+  evidence_text  text,
+  created_at     timestamptz NOT NULL DEFAULT platform.app_now(),
+  CHECK (availability <> 'available' OR (substance IS NOT NULL AND source_label IS NOT NULL AND observed_at IS NOT NULL AND evidence_text IS NOT NULL)),
+  CHECK (availability <> 'unsupported' OR (substance IS NULL AND value IS NULL AND unit IS NULL AND source_label IS NULL AND observed_at IS NULL AND evidence_text IS NULL))
+);
+CREATE INDEX allergen_observations_unit ON monitoring.allergen_observations (tenant_id, unit_id, observed_at DESC NULLS LAST, created_at DESC);
 
 -- Telemetry hot store: 35 days, daily partitions managed by pg_partman (database-design §6)
 CREATE TABLE monitoring.measurements (
@@ -794,13 +852,13 @@ CREATE TABLE maintenance.plans (                 -- periodic plans (FR-A06)
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id         uuid NOT NULL,
   unit_id           uuid NOT NULL,
-  interval_months   int NOT NULL CHECK (interval_months BETWEEN 1 AND 24),
-  anchor_day        int NOT NULL CHECK (anchor_day BETWEEN 1 AND 28),
+  interval_months   int NOT NULL CHECK (interval_months BETWEEN 1 AND 12),   -- D16
+  anchor_day        int NOT NULL CHECK (anchor_day BETWEEN 1 AND 31),        -- UTC day of nextDueAt (D16)
   timezone          text NOT NULL DEFAULT 'UTC',
   next_due_at       timestamptz NOT NULL,
   version           int NOT NULL DEFAULT 1,
-  created_at        timestamptz NOT NULL DEFAULT now(),
-  updated_at        timestamptz NOT NULL DEFAULT now(),
+  created_at        timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at        timestamptz NOT NULL DEFAULT platform.app_now(),
   UNIQUE (tenant_id, id)
 );
 
@@ -813,7 +871,7 @@ CREATE TABLE maintenance.jobs (
   occurrence_at          timestamptz,
   type                   text NOT NULL CHECK (type IN ('periodic','reactive','preventive')),
   status                 text NOT NULL CHECK (status IN ('requested','offered','accepted','assigned','in_progress','submitted','completed','rework_requested','cancelled','on_hold')),
-  origin                 text NOT NULL CHECK (origin IN ('client_request','plan','hq','alert')),
+  origin                 text NOT NULL CHECK (origin IN ('client_request','periodic_plan')),
   symptom                text NOT NULL DEFAULT '',
   contact_window         text,
   requested_slot         tstzrange NOT NULL,
@@ -836,8 +894,8 @@ CREATE TABLE maintenance.jobs (
   warranty_claims        jsonb NOT NULL DEFAULT '[]',
   hold_reason            text,
   version                int NOT NULL DEFAULT 1,
-  created_at             timestamptz NOT NULL DEFAULT now(),
-  updated_at             timestamptz NOT NULL DEFAULT now(),
+  created_at             timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at             timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, plan_id) REFERENCES maintenance.plans(tenant_id, id),
   UNIQUE (tenant_id, id),
   UNIQUE (plan_id, occurrence_at)
@@ -869,7 +927,7 @@ CREATE TABLE maintenance.slot_proposals (        -- HQ / contractor proposals to
   decided_at       timestamptz,
   decline_reason   text CHECK (decline_reason IN ('not_home','too_late','other')),
   decline_comment  text,
-  created_at       timestamptz NOT NULL DEFAULT now(),
+  created_at       timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, job_id) REFERENCES maintenance.jobs(tenant_id, id)
 );
 CREATE UNIQUE INDEX slot_proposals_one_pending ON maintenance.slot_proposals (job_id) WHERE status = 'pending';
@@ -889,12 +947,13 @@ CREATE TABLE maintenance.offers (
   decided_by         uuid,
   decided_at         timestamptz,
   decline_reason     text,
+  expired_at         timestamptz,                  -- set by the worker when IR48 returns the job; decision stays null
   version            int NOT NULL DEFAULT 1,
-  created_at         timestamptz NOT NULL DEFAULT now(),
-  updated_at         timestamptz NOT NULL DEFAULT now(),
+  created_at         timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at         timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, job_id) REFERENCES maintenance.jobs(tenant_id, id)
 );
-CREATE UNIQUE INDEX offers_one_open ON maintenance.offers (job_id) WHERE decision IS NULL;
+CREATE UNIQUE INDEX offers_one_open ON maintenance.offers (job_id) WHERE decision IS NULL AND expired_at IS NULL;
 CREATE INDEX offers_contractor ON maintenance.offers (tenant_id, contractor_org_id, offered_at DESC);
 
 CREATE TABLE maintenance.partner_slot_proposals (
@@ -923,8 +982,8 @@ CREATE TABLE maintenance.assignments (
   cant_make_reason          text,
   alternative_slot          tstzrange,
   version                   int NOT NULL DEFAULT 1,
-  created_at                timestamptz NOT NULL DEFAULT now(),
-  updated_at                timestamptz NOT NULL DEFAULT now(),
+  created_at                timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at                timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, job_id) REFERENCES maintenance.jobs(tenant_id, id)
 );
 CREATE UNIQUE INDEX assignments_one_active ON maintenance.assignments (job_id) WHERE status = 'active';
@@ -950,8 +1009,8 @@ CREATE TABLE maintenance.work_reports (          -- one row per report version; 
   review_availability text NOT NULL DEFAULT 'pending',
   submitted_at        timestamptz,
   accepted_at         timestamptz,
-  created_at          timestamptz NOT NULL DEFAULT now(),
-  updated_at          timestamptz NOT NULL DEFAULT now(),
+  created_at          timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at          timestamptz NOT NULL DEFAULT platform.app_now(),
   PRIMARY KEY (id, version),
   FOREIGN KEY (tenant_id, job_id) REFERENCES maintenance.jobs(tenant_id, id)
 );
@@ -983,8 +1042,8 @@ CREATE TABLE maintenance.attachments (
   status      text NOT NULL CHECK (status IN ('processing','ready','failed')),
   scan_result text,
   uploaded_by uuid NOT NULL,
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  updated_at  timestamptz NOT NULL DEFAULT now(),
+  created_at  timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at  timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, job_id) REFERENCES maintenance.jobs(tenant_id, id)
 );
 
@@ -995,7 +1054,7 @@ CREATE TABLE maintenance.job_notes (
   author_id   uuid NOT NULL,
   visibility  text NOT NULL CHECK (visibility IN ('internal','customer')),
   message     text NOT NULL CHECK (length(message) BETWEEN 1 AND 2000),
-  created_at  timestamptz NOT NULL DEFAULT now(),
+  created_at  timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, job_id) REFERENCES maintenance.jobs(tenant_id, id)
 );
 
@@ -1013,6 +1072,26 @@ CREATE TABLE maintenance.job_events (            -- job history (jobs.events)
 );
 CREATE INDEX job_events_job ON maintenance.job_events (tenant_id, job_id, occurred_at);
 
+CREATE TABLE maintenance.job_history_snapshots (   -- IR23/IR24 JobHistorySnapshot frozen once when access ends (IR124)
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id          uuid NOT NULL,
+  job_id             uuid NOT NULL,
+  owner_kind         text NOT NULL CHECK (owner_kind IN ('organization','membership')),
+  owner_id           uuid NOT NULL,                 -- contractor organization or technician membership
+  owner_user_id      uuid,                          -- technician user bound to the history (IR23 PV-005)
+  as_of              timestamptz NOT NULL,
+  type               text NOT NULL,
+  status             text NOT NULL,
+  contractor_org_id  uuid,
+  completed_at       timestamptz,
+  has_report         boolean NOT NULL,
+  acceptance         text NOT NULL CHECK (acceptance IN ('accepted','not_accepted')),
+  decision_event_ids uuid[] NOT NULL DEFAULT '{}',
+  FOREIGN KEY (tenant_id, job_id) REFERENCES maintenance.jobs(tenant_id, id),
+  UNIQUE (job_id, owner_kind, owner_id)
+);
+CREATE INDEX job_history_owner ON maintenance.job_history_snapshots (tenant_id, owner_kind, owner_id);
+
 CREATE TABLE maintenance.contractors (           -- ContractorProfile (FR-A21)
   id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id              uuid NOT NULL,
@@ -1026,8 +1105,8 @@ CREATE TABLE maintenance.contractors (           -- ContractorProfile (FR-A21)
   delegation             tstzrange NOT NULL,
   suspended_reason       text,
   version                int NOT NULL DEFAULT 1,
-  created_at             timestamptz NOT NULL DEFAULT now(),
-  updated_at             timestamptz NOT NULL DEFAULT now()
+  created_at             timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at             timestamptz NOT NULL DEFAULT platform.app_now()
 );
 
 CREATE TABLE maintenance.rate_cards (
@@ -1038,7 +1117,7 @@ CREATE TABLE maintenance.rate_cards (
   currency           char(3) NOT NULL CHECK (currency IN ('MYR','USD')),
   lines              jsonb NOT NULL,             -- [{workType, amountMinor, note}]
   version            int NOT NULL DEFAULT 1,
-  created_at         timestamptz NOT NULL DEFAULT now(),
+  created_at         timestamptz NOT NULL DEFAULT platform.app_now(),
   UNIQUE (contractor_org_id, effective_from)
 );
 
@@ -1053,14 +1132,17 @@ CREATE TABLE maintenance.certificates (          -- FR-P09
   issued_at                 timestamptz NOT NULL,
   expires_at                timestamptz NOT NULL,
   object_key                text,
+  file_name                 text,                       -- uploaded document name (Certificate.fileName)
   status                    text NOT NULL CHECK (status IN ('valid','expiring','expired','pending_verification','rejected')),
+  rejection_reason          text,
   renewal_of                uuid REFERENCES maintenance.certificates(id),
   verified_by_membership_id uuid,
   verified_at               timestamptz,
   training_requested_at     timestamptz,
+  training_request_note     text,                       -- certificates.requestTraining note
   version                   int NOT NULL DEFAULT 1,
-  created_at                timestamptz NOT NULL DEFAULT now(),
-  updated_at                timestamptz NOT NULL DEFAULT now()
+  created_at                timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at                timestamptz NOT NULL DEFAULT platform.app_now()
 );
 CREATE INDEX certificates_expiry ON maintenance.certificates (tenant_id, organization_id, expires_at);
 
@@ -1073,7 +1155,7 @@ CREATE TABLE maintenance.unavailability (        -- FR-P06
   type                       text NOT NULL CHECK (type IN ('annual_leave','training','public_holiday','sick','other')),
   note                       text,
   conflicting_assignment_ids uuid[] NOT NULL DEFAULT '{}',
-  created_at                 timestamptz NOT NULL DEFAULT now()
+  created_at                 timestamptz NOT NULL DEFAULT platform.app_now()
 );
 
 CREATE TABLE maintenance.sla_targets (           -- FR-A22
@@ -1092,12 +1174,12 @@ CREATE TABLE maintenance.filter_care_settings (  -- FR-C18
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id       uuid NOT NULL,
   customer_id     uuid NOT NULL UNIQUE,
-  threshold_hours int,
-  fallback_days   int NOT NULL DEFAULT 90,
-  recipients      text NOT NULL CHECK (recipients IN ('owners','all_users')),
+  threshold_hours int CHECK (threshold_hours BETWEEN 50 AND 2000),   -- null = model default 250 h (DD-C18)
+  fallback_days   int NOT NULL DEFAULT 30 CHECK (fallback_days BETWEEN 7 AND 180),
+  recipients      text NOT NULL DEFAULT 'owners' CHECK (recipients IN ('owners','all_users')),
   channels        text[] NOT NULL DEFAULT '{inApp}',
   version         int NOT NULL DEFAULT 1,
-  updated_at      timestamptz NOT NULL DEFAULT now()
+  updated_at      timestamptz NOT NULL DEFAULT platform.app_now()
 );
 
 CREATE TABLE maintenance.filter_cleanings (
@@ -1133,7 +1215,7 @@ CREATE TABLE billing.contracts (
   rules_version        text,
   is_current           boolean NOT NULL DEFAULT true,
   created_by           uuid NOT NULL,
-  created_at           timestamptz NOT NULL DEFAULT now(),
+  created_at           timestamptz NOT NULL DEFAULT platform.app_now(),
   PRIMARY KEY (id, version)
 );
 CREATE UNIQUE INDEX contracts_current ON billing.contracts (id) WHERE is_current;
@@ -1163,8 +1245,8 @@ CREATE TABLE billing.invoices (
   paid_at           timestamptz,
   last_reminded_at  timestamptz,
   version           int NOT NULL DEFAULT 1,
-  created_at        timestamptz NOT NULL DEFAULT now(),
-  updated_at        timestamptz NOT NULL DEFAULT now(),
+  created_at        timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at        timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (contract_id, contract_version) REFERENCES billing.contracts(id, version),
   UNIQUE (tenant_id, number),
   UNIQUE (contract_id, period)
@@ -1178,8 +1260,8 @@ CREATE TABLE billing.payments (                  -- Stripe Checkout or manual (F
   invoice_id                 uuid NOT NULL REFERENCES billing.invoices(id),
   amount_minor               bigint NOT NULL CHECK (amount_minor > 0),
   currency                   char(3) NOT NULL,
-  method                     text NOT NULL CHECK (method IN ('card','fpx','bank_transfer','cash','cheque','other')),
-  channel                    text NOT NULL CHECK (channel IN ('stripe_checkout','manual')),
+  method                     text CHECK (method IN ('demo_credit_card','demo_debit_card')),   -- PaymentMethod; null for manual (DD-A08)
+  channel                    text NOT NULL CHECK (channel IN ('demo','stripe_checkout','manual')),
   status                     text NOT NULL CHECK (status IN ('initiated','processing','confirmed','failed','expired')),
   stripe_checkout_session_id text UNIQUE,
   stripe_payment_intent_id   text UNIQUE,
@@ -1187,18 +1269,21 @@ CREATE TABLE billing.payments (                  -- Stripe Checkout or manual (F
   recorded_by_membership_id  uuid,
   confirmed_at               timestamptz,
   failure_code               text,
+  confirmation_reason        text,                 -- payments.confirm / recordManual reason (DD-A08)
+  event_ids                  uuid[] NOT NULL DEFAULT '{}',   -- payments.simulate eventIds (idempotent)
   version                    int NOT NULL DEFAULT 1,
-  created_at                 timestamptz NOT NULL DEFAULT now(),
-  updated_at                 timestamptz NOT NULL DEFAULT now()
+  created_at                 timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at                 timestamptz NOT NULL DEFAULT platform.app_now()
 );
 CREATE INDEX payments_invoice ON billing.payments (tenant_id, invoice_id, created_at DESC);
+CREATE UNIQUE INDEX payments_reference ON billing.payments (tenant_id, payment_reference) WHERE payment_reference IS NOT NULL;   -- unique within tenant (DD-A08)
 
 CREATE TABLE billing.stripe_events (             -- webhook de-duplication and evidence
   id            text PRIMARY KEY,                -- Stripe event id (evt_...)
   type          text NOT NULL,
   livemode      boolean NOT NULL,
   payment_id    uuid REFERENCES billing.payments(id),
-  received_at   timestamptz NOT NULL DEFAULT now(),
+  received_at   timestamptz NOT NULL DEFAULT platform.app_now(),
   processed_at  timestamptz,
   payload       jsonb NOT NULL
 );
@@ -1217,8 +1302,8 @@ CREATE TABLE billing.inquiries (                 -- FR-C12 / FR-A08
   answered_at     timestamptz,
   created_by      uuid NOT NULL,
   version         int NOT NULL DEFAULT 1,
-  created_at      timestamptz NOT NULL DEFAULT now(),
-  updated_at      timestamptz NOT NULL DEFAULT now()
+  created_at      timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at      timestamptz NOT NULL DEFAULT platform.app_now()
 );
 
 CREATE TABLE billing.payout_statements (         -- FR-A23 / FR-P10
@@ -1235,8 +1320,8 @@ CREATE TABLE billing.payout_statements (         -- FR-A23 / FR-P10
   approved_by_membership_id uuid,
   paid_at                   timestamptz,
   version                   int NOT NULL DEFAULT 1,
-  created_at                timestamptz NOT NULL DEFAULT now(),
-  updated_at                timestamptz NOT NULL DEFAULT now(),
+  created_at                timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at                timestamptz NOT NULL DEFAULT platform.app_now(),
   UNIQUE (contractor_org_id, period),
   CHECK (net_minor = gross_minor - deductions_minor)
 );
@@ -1259,11 +1344,14 @@ CREATE TABLE billing.payout_queries (
   line_id       uuid REFERENCES billing.payout_lines(id),
   tenant_id     uuid NOT NULL,
   asked_by      uuid NOT NULL,
-  message       text NOT NULL CHECK (length(message) BETWEEN 1 AND 1000),
-  state         text NOT NULL CHECK (state IN ('open','resolved')),
-  resolution    text,
+  topic         text NOT NULL CHECK (topic IN ('amount','deduction','missing_job','other')),
+  message       text NOT NULL CHECK (length(message) BETWEEN 1 AND 2000),   -- IR111
+  state         text NOT NULL CHECK (state IN ('open','answered','adjusted')),
+  resolution    text,                                -- PayoutQuestion.reply
+  adjustment_minor bigint,                           -- signed; applied to the next statement (IR137)
+  applied_statement_id uuid,                         -- statement that carries the adjustment line
   resolved_by   uuid,
-  created_at    timestamptz NOT NULL DEFAULT now(),
+  created_at    timestamptz NOT NULL DEFAULT platform.app_now(),
   resolved_at   timestamptz
 );
 
@@ -1289,8 +1377,8 @@ CREATE TABLE restrictions.restrictions (
   recovery_cases          jsonb NOT NULL DEFAULT '[]',
   notice_notification_ids uuid[] NOT NULL DEFAULT '{}',
   version                 int NOT NULL DEFAULT 1,
-  created_at              timestamptz NOT NULL DEFAULT now(),
-  updated_at              timestamptz NOT NULL DEFAULT now(),
+  created_at              timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at              timestamptz NOT NULL DEFAULT platform.app_now(),
   CHECK (execute_after >= notice_at + interval '24 hours'),     -- IR05
   UNIQUE (tenant_id, id)
 );
@@ -1340,7 +1428,7 @@ CREATE TABLE energy.baselines (
   source        text NOT NULL,
   is_current    boolean NOT NULL DEFAULT true,
   created_by    uuid NOT NULL,
-  created_at    timestamptz NOT NULL DEFAULT now(),
+  created_at    timestamptz NOT NULL DEFAULT platform.app_now(),
   PRIMARY KEY (id, version)
 );
 CREATE UNIQUE INDEX baselines_current ON energy.baselines (id) WHERE is_current;
@@ -1355,7 +1443,7 @@ CREATE TABLE energy.emission_factors (
   source           text NOT NULL,
   is_current       boolean NOT NULL DEFAULT true,
   created_by       uuid NOT NULL,
-  created_at       timestamptz NOT NULL DEFAULT now(),
+  created_at       timestamptz NOT NULL DEFAULT platform.app_now(),
   PRIMARY KEY (id, version)
 );
 CREATE UNIQUE INDEX emission_factors_current ON energy.emission_factors (tenant_id, region, year) WHERE is_current;
@@ -1371,7 +1459,7 @@ CREATE TABLE energy.mrv_reports (                -- one row per report version (
   results        jsonb NOT NULL,
   evidence_ids   uuid[] NOT NULL DEFAULT '{}',
   created_by     uuid NOT NULL,
-  created_at     timestamptz NOT NULL DEFAULT now(),
+  created_at     timestamptz NOT NULL DEFAULT platform.app_now(),
   PRIMARY KEY (id, version)
 );
 
@@ -1398,7 +1486,8 @@ CREATE TABLE energy.offset_quotes (
   currency               char(3),
   expires_at             timestamptz NOT NULL,
   provider               text NOT NULL DEFAULT 'unselected',
-  created_at             timestamptz NOT NULL DEFAULT now()
+  version                int NOT NULL DEFAULT 1,       -- offsets.simulate(request) carries quoteVersion
+  created_at             timestamptz NOT NULL DEFAULT platform.app_now()
 );
 
 CREATE TABLE energy.offset_records (
@@ -1413,8 +1502,8 @@ CREATE TABLE energy.offset_records (
   retirement_ref       text,
   certificate_ref      text,
   version              int NOT NULL DEFAULT 1,
-  created_at           timestamptz NOT NULL DEFAULT now(),
-  updated_at           timestamptz NOT NULL DEFAULT now()
+  created_at           timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at           timestamptz NOT NULL DEFAULT platform.app_now()
 );
 
 CREATE TABLE energy.offset_attempts (
@@ -1424,7 +1513,9 @@ CREATE TABLE energy.offset_attempts (
   stage        text NOT NULL CHECK (stage IN ('purchase','retirement')),
   status       text NOT NULL CHECK (status IN ('pending','succeeded','failed')),
   started_at   timestamptz NOT NULL,
-  completed_at timestamptz
+  completed_at timestamptz,
+  completed_event_id uuid UNIQUE,            -- SR18 eventId of the success/failure event (idempotent replay)
+  completed_event    text CHECK (completed_event IN ('purchase_confirm','retire','fail'))
 );
 
 -- ---------------------------------------------------------------------------------------------
@@ -1436,14 +1527,16 @@ CREATE TABLE notify.notifications (
   recipient_membership_id    uuid NOT NULL,
   scope_version_at_creation  int NOT NULL,
   type                       text NOT NULL,
+  channel                    text NOT NULL DEFAULT 'inApp' CHECK (channel IN ('inApp','email','whatsapp')),   -- inApp simulated, email/whatsapp preview (IR04)
   template_key               text NOT NULL CHECK (template_key IN ('alert','quality','schedule_change','report_return','completion','payment','payment_reminder','restriction','inquiry','job_update','device_operation','invite')),
   target                     jsonb NOT NULL,     -- {kind,id}
   params                     jsonb NOT NULL,
   source_alert_id            uuid,
-  severity                   text NOT NULL CHECK (severity IN ('critical','warning','info')),
+  severity                   text NOT NULL CHECK (severity IN ('critical','warning','normal')),
   occurred_at                timestamptz NOT NULL,
   read_at                    timestamptz,
-  created_at                 timestamptz NOT NULL DEFAULT now()
+  version                    int NOT NULL DEFAULT 1,   -- notifications.markRead requires the expected version
+  created_at                 timestamptz NOT NULL DEFAULT platform.app_now()
 );
 CREATE INDEX notifications_inbox ON notify.notifications (tenant_id, recipient_membership_id, occurred_at DESC);
 CREATE INDEX notifications_unread ON notify.notifications (recipient_membership_id) WHERE read_at IS NULL;
@@ -1457,7 +1550,7 @@ CREATE TABLE notify.deliveries (
   provider_message_id text,
   failure_reason   text,
   attempts         int NOT NULL DEFAULT 0,
-  updated_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT platform.app_now(),
   UNIQUE (notification_id, channel)
 );
 

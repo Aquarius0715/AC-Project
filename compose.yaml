@@ -1,10 +1,11 @@
 # AC Project — everything runs in Docker (IR119, DEC-70, docs/02-design/container-design.md)
+# Services live under service/ (service/api: Go Core API + workers, service/web: Next.js web + BFF)
 #
 # Profiles
 #   demo     Phase 1A clickable demo (web with the in-browser mock)           docker compose --profile demo up
 #   infra    Local stand-ins for the AWS managed services                      docker compose --profile infra up
-#   schema   Apply docs/02-design/db/schema.sql once (until backend/ exists)   docker compose --profile infra --profile schema up
-#   backend  Go API, webhook, workers, IoT bridge, device simulator (needs ./backend)
+#   schema   Apply docs/02-design/db/schema.sql once (until service/api migrations exist)   docker compose --profile infra --profile schema up
+#   backend  Go API, webhook, workers, IoT bridge, device simulator (service/api)
 #   full     web in API mode + backend + infra                                 docker compose --profile full up
 #   obs      OpenTelemetry collector + Jaeger
 #
@@ -16,24 +17,27 @@ name: ac-project
 x-backend: &backend
   image: ac-backend:dev
   build:
-    context: ./backend
+    context: ./service/api
     target: runtime
   env_file:
     - path: .env.local
       required: false
   environment: &backend-env
     APP_ENV: local
+    DEMO_OPS: "1"                                       # demo.advanceClock / demo.trigger (IR154); never set in production
     DATABASE_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
     DATABASE_READER_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
     AWS_REGION: ap-southeast-5
     AWS_ENDPOINT_URL: http://localstack:4566
     AWS_ACCESS_KEY_ID: test
     AWS_SECRET_ACCESS_KEY: test
-    OIDC_ISSUER: http://keycloak:8080/realms/ac
+    OIDC_ISSUER: http://localhost:8081/realms/ac          # must equal the iss claim seen by browsers
+    OIDC_JWKS_URL: http://keycloak:8080/realms/ac/protocol/openid-connect/certs
     OIDC_ADMIN_CLIENT_ID: ac-admin-web
     OIDC_APP_CLIENT_ID: ac-web
     MQTT_URL: tcp://mosquitto:1883
     STRIPE_API_BASE: http://stripe-mock:12111
+    WEATHER_API_BASE: http://weather-mock:8080          # WireMock GET /v1/current
     OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
   read_only: true
   tmpfs: [/tmp]
@@ -49,10 +53,10 @@ services:
   # ------------------------------------------------------------------ web (Next.js)
   web:
     image: ac-web:dev
-    build: { context: ./web }
+    build: { context: ./service/web }
     ports: ["3000:3000"]
     environment:
-      DATA_SOURCE: mock            # Phase 1A: in-browser mock adapter
+      DATA_SOURCE: mock            # Phase 1A: screens keep their fixture data (BFF relay answers UNAVAILABLE)
     read_only: true
     tmpfs: [/tmp, /app/.next/cache]
     security_opt: [no-new-privileges:true]
@@ -61,11 +65,14 @@ services:
 
   web-api:
     image: ac-web:dev
-    build: { context: ./web }
+    build: { context: ./service/web }
     ports: ["3000:3000"]
     environment:
-      DATA_SOURCE: api             # production-like: BFF relays /bff/ops/* to the Core API
+      DATA_SOURCE: api             # production-like: BFF relays /bff/ops/* to the Core API (service/web/app/bff, IR158)
       CORE_API_URL: http://api:8080
+      APP_URL: http://localhost:3000
+      SESSION_SECRET: local-dev-session-secret-change-me
+      OIDC_APP_CLIENT_SECRET: local-ac-web-secret
       OIDC_ISSUER: http://localhost:8081/realms/ac
       OIDC_INTERNAL_ISSUER: http://keycloak:8080/realms/ac
       OIDC_APP_CLIENT_ID: ac-web
@@ -113,13 +120,13 @@ services:
   iot-bridge:          # local stand-in for AWS IoT rules: MQTT topics -> Kinesis / SQS
     <<: *backend
     image: ac-backend:dev-tools
-    build: { context: ./backend, target: dev }
+    build: { context: ./service/api, target: dev }
     command: ["/app/iotbridge"]
 
   device-sim:          # simulated IoT modules (telemetry each minute, heartbeats, command acks)
     <<: *backend
     image: ac-backend:dev-tools
-    build: { context: ./backend, target: dev }
+    build: { context: ./service/api, target: dev }
     command: ["/app/devicesim", "--devices=20"]
     networks: [data]
 
@@ -179,6 +186,8 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://localhost:8081       # fixed issuer for tokens, whoever calls
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"  # containers may still reach it as keycloak:8080
     ports: ["8081:8080"]
     volumes: [./docker/keycloak/realm-ac.json:/opt/keycloak/data/import/realm-ac.json:ro]
     networks: [edge, app]

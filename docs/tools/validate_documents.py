@@ -84,6 +84,34 @@ for path in markdown:
             previous = None
 
 trace = rows('00-prepare/traceability.csv')
+# 0.57.0 (2026-10-08): IR166 service layout; counts unchanged.
+# 0.56.0 (2026-10-08): IR165 UnitDetail; counts unchanged.
+# 0.55.0 (2026-10-08): IR164 recovery cases; counts unchanged.
+# 0.54.0 (2026-10-08): IR163 conformance sweep; counts unchanged.
+# 0.53.0 (2026-10-08): IR162 BFF action check; counts unchanged.
+# 0.52.0 (2026-10-08): IR161 seed business records; counts unchanged.
+# 0.51.0 (2026-10-08): IR160 result meta; counts unchanged.
+# 0.50.0 (2026-10-08): IR159 full-stack check; counts unchanged.
+# 0.49.0 (2026-10-08): IR158 web BFF; counts unchanged.
+# 0.48.0 (2026-10-08): IR157 business clock; counts unchanged.
+# 0.47.0 (2026-10-08): IR156 business-event notifications; counts unchanged.
+# 0.46.0 (2026-10-08): IR155 notification evaluation; counts unchanged.
+# 0.45.0 (2026-10-08): IR154 demo operations; counts unchanged.
+# 0.44.0 (2026-10-08): IR153 voice/export; counts unchanged.
+# 0.43.0 (2026-10-08): IR152 automation evaluation; counts unchanged.
+# 0.42.0 (2026-10-08): IR151 automation rules; counts unchanged.
+# 0.41.0 (2026-10-08): IR150 offsets; counts unchanged.
+# 0.40.0 (2026-10-08): IR149 MRV; counts unchanged.
+# 0.39.0 (2026-10-08): IR148 energy/admin summaries; counts unchanged.
+# 0.38.0 (2026-10-08): IR147 factors/baselines; counts unchanged.
+# 0.37.0 (2026-10-08): IR146 role summaries; counts unchanged.
+# 0.36.0 (2026-10-08): IR145 QR/write results/reset preview; counts unchanged.
+# 0.35.0 (2026-10-08): IR144 client users/two-factor; template invite allowed in the 0.20 DTO invariant.
+# 0.34.0 (2026-10-08): IR143 inquiries/audit details; counts unchanged.
+# 0.33.0 (2026-10-08): IR142 notification/preference details; counts unchanged.
+# 0.32.0 (2026-10-08): IR141 restriction write details; counts unchanged.
+# 0.31.0 (2026-10-08): IR140 restriction backend details; counts unchanged.
+# 0.30.0 (2026-10-08): IR120 alert-policy details (default rules, DefaultPolicyInput); counts unchanged.
 # 0.29.0 (2026-10-07): IR119 everything runs in Docker (container-design.md, compose.yaml); counts unchanged.
 # 0.28.0 (2026-10-07): IR118 Go + Echo backend design, database design and db/schema.sql (production target only); counts unchanged.
 # 0.27.0 (2026-10-07): IR117 AWS / Stripe / HQ network restriction / retention / capacity (production target only); counts unchanged.
@@ -1013,7 +1041,7 @@ for decision in decisions_020:
 for required in ['| Operation without jobId in its input type; the user has never had an Assignment for the target Unit | For internal technicians within unit scope: FORBIDDEN (errors.assignment_required, D01 priority 4)', 'If Device.connection≠online when devices.updateFirmware is requested, return D01 priority-8 OFFLINE (do not create a DeviceOperation)', 'Omit technicians who fail this condition from candidates; direct selection returns FORBIDDEN (errors.technician_out_of_scope)', 'members.eligible and members.capacity return only role=technician Memberships', '| job.assigned (initial assignment, reassignment, extension) | schedule_change | job |', 'Do not send to the Membership (actor) that performed the triggering operation', "| requested / applied | release_requested. Set releaseIntent.source='cancel'", '| released / cancelled | CONFLICT (D01 priority 6) |', 'Values with origin=measured and quality=valid must be in range; otherwise throw a fixture-defect exception', 'Acceptance tests start with simulator=false by default', '| co2 ≥ 1000 ppm, Capability.ventilation=true, and ventilationLevels includes low |', '| pm25 ≥ 35 µg/m³ | air.guidance.clean', '8 indoor, 5 outdoor, and 5 electrical', '1. The items componentKey set matches Unit.components at submission time', 'If authorized, return CONFLICT (messageKey=errors.scope_changed, D01 priority 6, zero side effects)', 'UNAUTHENTICATED (messageKey=errors.membership_inactive, D01 priority 2)', 'VALIDATION (fieldErrors.contractId, messageKey=errors.restriction_ineligible, D01 priority 7)', 'At 30 seconds or later it is failed (aggregate remains release_requested)', 'exclude the active Assignment being replaced for the same jobId']:
     if required not in resolution:
         fail('0.20 behavioral guard missing '+required)
-for pattern in [r"releaseIntent:ReleaseIntent\|null\}", r"export type ReleaseIntent = \{source:'payment'\|'exception'\|'override'\|'manual'\|'cancel';", r"'inquiry'\|'job_update'\|'device_operation';params:", r"\{eventType:'allergen';observation:\{unitId:ID\} & AllergenObservation\}", r"\{eventType:'load_alert';unitId:ID;"]:
+for pattern in [r"releaseIntent:ReleaseIntent\|null\}", r"export type ReleaseIntent = \{source:'payment'\|'exception'\|'override'\|'manual'\|'cancel';", r"'inquiry'\|'job_update'\|'device_operation'(\|'invite')?;params:", r"\{eventType:'allergen';observation:\{unitId:ID\} & AllergenObservation\}", r"\{eventType:'load_alert';unitId:ID;"]:
     if not re.search(pattern, types):
         fail('0.20 DTO invariant missing '+pattern)
 if seed:
@@ -1187,7 +1215,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.29.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.57.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

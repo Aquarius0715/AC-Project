@@ -1,6 +1,6 @@
 ---
 document_id: REQ-COMMON
-version: 0.22.0
+version: 0.30.0
 status: draft
 owner: design-agent
 scope: frontend-demo-1A
@@ -12,7 +12,7 @@ Parent document: [PrepareDocument](../00-prepare/PrepareDocument.md). Read this 
 
 This document reorganizes the [original company requirements in English (SRC-06)](../00-prepare/sources/company-requirements-original.txt), the primary source. Trace information through company original → BIZ groups (categories of company requests) → FR (functional requirements) here → detailed design and acceptance criteria. Each feature separates company requests from design team additions. Screen fields, input limits, state changes, and priorities are frontend implementation proposals, not detailed company approvals. Reference mock screens guide visual design. Functional requirements and acceptance criteria make the original goals concrete using production instructions and added design details.
 
-**0.29.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.30.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Common features
 
@@ -97,7 +97,7 @@ The password reset demo checks only email format and returns the same completion
 - **Company request basis**: SRC-06 BIZ-03 — Voice AI responses.
 - **Added design details**: Extend responses to temperature queries, device actions, and questions; voice demo/text fallback; confirmation before changes. Voice device changes are not explicitly stated in the company original.
 
-Supported intents are temperature query, set-temperature change, and help (read operation instructions; do not create an FR-C12 Inquiry). Hide the panel for roles without voice/text action permission, such as contractors (IR44). When room names match multiple candidates, show extra context such as container/floor to narrow the target. If still indistinguishable, switch to text input for target selection. Never guess and execute. For unknown intents, show “Action unavailable” and return to text input. Before sending a voice change as a Command, show target, previous value, and new value. No business writes occur before confirmation.
+Supported intents are temperature query, set-temperature change, and help (read operation instructions; do not create an FR-C12 Inquiry). The assistant is offered only in the Client app header (Figma Client 09a–09g, IR115); the HQ, Contractor, and Technician apps do not show it (IR44). When room names match multiple candidates, show extra context such as container/floor to narrow the target. If still indistinguishable, switch to text input for target selection. Never guess and execute. For unknown intents, show “Action unavailable” and return to text input. Before sending a voice change as a Command, show target, previous value, and new value. No business writes occur before confirmation.
 
 AT-X02 checks duplicate room names (including identical container/floor context requiring text input), unauthorized rooms, unsupported temperatures, microphone refusal, and cancelled confirmation. Withdrawing location or microphone consent discards the pending request; it does not undo earlier device responses. No real voice service is connected.
 
@@ -187,4 +187,4 @@ FR-X01/X02 require D09's 30-minute session and fixed en/ms grammar; FR-X03/X05 u
 
 0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 
-Additional current 0.29.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–119. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.30.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–139. They override older text on the same issues; use IR72 for conflict priority.

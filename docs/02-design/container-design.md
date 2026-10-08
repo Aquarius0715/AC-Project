@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTAINER
-version: 0.29.0
+version: 0.30.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -19,14 +19,14 @@ Every application component runs as a Docker image in every environment (IR119, 
 
 The Phase 1A demo is also a container: the `web` image in mock mode (`docker compose --profile demo up`).
 
-Checked on 2026-10-07: the `web` image built from `web/Dockerfile` serves `/`, `/login`, `/customer`, `/admin`, `/partner`, `/technician`, `/customer/alerts`, and `/demo` with HTTP 200 from a read-only root filesystem; `docker compose --profile demo --profile infra --profile schema up` started web, PostgreSQL 16 (93 tables from [db/schema.sql](db/schema.sql), local `ac_app_login` role), LocalStack (10 SQS queues, the telemetry stream, buckets, SES identity, secret), Keycloak (realm `ac`, OIDC discovery), Mosquitto (publish on `t/<tenant>/d/<device>/telemetry`), Valkey, stripe-mock, and the weather mock. A Go Echo image built with the §3 Dockerfile was 15.2 MB, ran read-only, answered its own `healthcheck` subcommand, and exited 0 on SIGTERM.
+Checked on 2026-10-07: the `web` image built from `service/web/Dockerfile` serves `/`, `/login`, `/customer`, `/admin`, `/partner`, `/technician`, `/customer/alerts`, and `/demo` with HTTP 200 from a read-only root filesystem; `docker compose --profile demo --profile infra --profile schema up` started web, PostgreSQL 16 (93 tables from [db/schema.sql](db/schema.sql), local `ac_app_login` role), LocalStack (10 SQS queues, the telemetry stream, buckets, SES identity, secret), Keycloak (realm `ac`, OIDC discovery), Mosquitto (publish on `t/<tenant>/d/<device>/telemetry`), Valkey, stripe-mock, and the weather mock. A Go Echo image built with the §3 Dockerfile was 15.2 MB, ran read-only, answered its own `healthcheck` subcommand, and exited 0 on SIGTERM.
 
 ## 2. Image catalogue
 
 | Image | Source | Contains | Runs as (local / production) |
 |---|---|---|---|
-| `ac-web` | `web/Dockerfile` | Next.js standalone server (`output: "standalone"`) | Compose `web` (demo, mock) and `web-api` (BFF) / ECS service `web` behind the ALB (app and admin host names) |
-| `ac-backend` | `backend/Dockerfile` | Static Go binaries `/app/api`, `/app/webhook`, `/app/worker`, `/app/migrate` (plus `/app/iotbridge`, `/app/devicesim` in the dev variant) | Compose services per binary / ECS services `api`, `webhook`, `worker-<role>`; one-off ECS task `migrate` |
+| `ac-web` | `service/web/Dockerfile` | Next.js standalone server (`output: "standalone"`); `DATA_SOURCE` (`mock` or `api`) selects the Repository adapter once the API adapter exists — today `service/web/` always uses the in-browser mock and ignores the variable | Compose `web` (demo, mock) and `web-api` (BFF) / ECS service `web` behind the ALB (app and admin host names) |
+| `ac-backend` | `service/api/Dockerfile` | Static Go binaries `/app/api`, `/app/webhook`, `/app/worker`, `/app/migrate` (plus `/app/iotbridge`, `/app/devicesim` in the dev variant) | Compose services per binary / ECS services `api`, `webhook`, `worker-<role>`; one-off ECS task `migrate` |
 
 One backend image with several entry commands keeps every service on the same build and version; each ECS service overrides the command (`/app/worker --role=telemetry`, …). The `iotbridge` and `devicesim` binaries are built only into the `dev` target and never pushed to the production repository.
 
@@ -81,7 +81,7 @@ COPY --from=build-dev /out/ /app/
 |---|---|---|
 | `demo` | `web` (mock mode, port 3000) | Phase 1A clickable demo |
 | `infra` | PostgreSQL 16, Valkey, LocalStack, Mosquitto, Keycloak, stripe-mock, weather mock | Stand-ins for AWS services |
-| `schema` | one-off `db-schema` that applies [db/schema.sql](db/schema.sql) and creates `ac_app_login` | Until `backend/` and its `migrate` binary exist |
+| `schema` | one-off `db-schema` that applies [db/schema.sql](db/schema.sql) and creates `ac_app_login` | Until `service/api/` and its `migrate` binary exist |
 | `backend` | `migrate`, `api` (8080), `webhook` (8082), eight `worker-*` services, `iot-bridge`, `device-sim` | Go backend against the stand-ins |
 | `full` | `web-api` (BFF mode) + backend + infra | Production-like end-to-end runs and acceptance tests |
 | `obs` | OpenTelemetry collector, Jaeger (16686) | Traces |
@@ -95,14 +95,36 @@ Local stand-ins for the AWS managed services:
 | ElastiCache (Valkey) | `valkey/valkey:8` | Sessions, idempotency fast path |
 | SQS / SNS FIFO, Kinesis, Firehose, S3, SES, Secrets Manager, KMS, EventBridge Scheduler | `localstack/localstack:4` | Resources created by `docker/localstack/init-aws.sh`; services use `AWS_ENDPOINT_URL` |
 | AWS IoT Core (MQTT, rules) | `eclipse-mosquitto:2` + `iot-bridge` | Same topic layout; the bridge forwards topics to Kinesis / SQS like the IoT rules. Mutual TLS and IoT policies are verified in staging against IoT Core |
-| Amazon Cognito | `keycloak:26` realm `ac` (`docker/keycloak/realm-ac.json`) | Two OIDC clients `ac-web` and `ac-admin-web` (HQ network rule), TOTP; the Go verifier is configured by issuer and JWKS URL only |
+| Amazon Cognito | `keycloak:26` realm `ac` (`docker/keycloak/realm-ac.json`) | Two OIDC clients `ac-web` and `ac-admin-web` (HQ network rule), TOTP (required for HQ users); one local user per fixture actor (username = `membershipId` in `docs/04-agentic-sdlc/fixture-contract.json`, password `local-pass`); the Go verifier is configured by issuer and JWKS URL only |
 | Stripe API / webhooks | `stripe/stripe-mock` (offline) and Stripe CLI (test mode) | Live mode never outside production |
 | Weather source | `wiremock` (`docker/wiremock`) | Fixed demo responses |
 | CloudWatch / X-Ray | OpenTelemetry collector + Jaeger | Same OTLP exporter configuration |
 
 Compose networks mirror the network zones: `edge` (browser-facing web, webhook, Keycloak), `app` (application services), `data` (data stand-ins). Only ports needed for development are published to the host.
 
-Configuration is twelve-factor: every service reads environment variables only. Local values come from compose and an optional git-ignored `.env.local` (`.env.local.example`).
+Configuration is twelve-factor: every service reads environment variables only. The variable names are the same locally (compose) and on ECS (task definitions); only the values differ.
+
+| Variable | Used by | Local value (compose) | Production value |
+|---|---|---|---|
+| `APP_ENV` | backend | `local` | `staging` / `production` |
+| `DATABASE_URL` / `DATABASE_READER_URL` | backend | `postgres` container, login `ac_app_login` | Aurora writer / reader endpoints with IAM auth or a Secrets Manager secret |
+| `AWS_REGION` | backend | `ap-southeast-5` | `ap-southeast-5` |
+| `AWS_ENDPOINT_URL` | backend | `http://localstack:4566` | not set (real AWS endpoints, VPC endpoints) |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | backend | `test` / `test` (LocalStack) | not set (ECS task role) |
+| `OIDC_ISSUER` | backend, web | `http://localhost:8081/realms/ac` (Keycloak `KC_HOSTNAME` fixes the `iss` claim) | Cognito user pool issuer |
+| `OIDC_JWKS_URL` | backend | `http://keycloak:8080/realms/ac/protocol/openid-connect/certs` (container network) | not set (derived from the issuer discovery document) |
+| `OIDC_INTERNAL_ISSUER` | web | `http://keycloak:8080/realms/ac` (container network) | not set (same as `OIDC_ISSUER`) |
+| `OIDC_APP_CLIENT_ID` / `OIDC_ADMIN_CLIENT_ID` | backend, web | `ac-web` / `ac-admin-web` | Cognito app clients for `app.<domain>` / `admin.<domain>` (HQ network rule, IR117) |
+| `MQTT_URL` | backend (iot worker, iot-bridge, device-sim) | `tcp://mosquitto:1883` | not set; the iot worker publishes through the AWS IoT data plane endpoint (`IOT_DATA_ENDPOINT`) |
+| `IOT_DATA_ENDPOINT` | backend (iot worker) | not set | AWS IoT Core data endpoint / custom domain |
+| `STRIPE_API_BASE` | backend | `http://stripe-mock:12111` | not set (api.stripe.com); keys come from Secrets Manager |
+| `WEATHER_API_BASE` | backend (automation worker) | `http://weather-mock:8080` (WireMock, `docker/wiremock/mappings/weather.json`) | weather provider base URL (PROPOSED, provider not yet chosen); key from Secrets Manager |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | backend, web | `http://otel-collector:4318` | ADOT sidecar `http://localhost:4318` |
+| `DATA_SOURCE` | web | `mock` (demo) / `api` (full) | `api` |
+| `CORE_API_URL` | web (BFF) | `http://api:8080` | internal Core API name (service discovery) |
+| `SESSION_STORE_URL` | web (BFF) | `redis://valkey:6379` | ElastiCache endpoint (TLS) |
+
+Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`, LocalStack `SERVICES` / `AWS_DEFAULT_REGION`) exist only in compose. Local values come from compose and an optional git-ignored `.env.local` (`.env.local.example`).
 
 ## 5. Production on ECS Fargate
 
@@ -131,4 +153,4 @@ Configuration is twelve-factor: every service reads environment variables only. 
 |---|---|
 | OPEN-CT-01 | Whether developers on x86 laptops need the `amd64` variant in the shared registry or build locally only |
 
-Additional contracts for current version 0.29.0: Read IR01–119 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.30.0: Read IR01–139 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

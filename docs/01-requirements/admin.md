@@ -1,6 +1,6 @@
 ---
 document_id: REQ-A
-version: 0.22.0
+version: 0.30.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # Administrator and HQ requirements
 
-**0.29.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
+**0.30.0 implementation baseline**: Read all chapters of [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the authorization column in the operation catalog, and the screen catalog. Do not guess numbers, permissions, asynchronous behavior, or recovery during implementation. These are demo design proposals, not production business approval.
 
 ## Purpose and assumptions
 
@@ -456,14 +456,14 @@ Design: [DD-A17](../02-design/admin.md#dd-a17-details). Assess parent AT-A17 usi
 
 - **Company request basis**: SRC-06 BIZ-07; Figma-confirmed Admin 02-17/02-18 (2026-10-01).
 - **Entry conditions**: asset.write; “Import CSV” on the customer list.
-- **Main flow**: Step 1: choose customer, upload CSV (UTF-8, template download), map 9 columns (property, floor, room, unit_name, model_code, serial, installed_on, warranty_end, …) → Validate. Step 2: preview with ready / warning / error rows and reasons → Download error report → Import valid rows.
+- **Main flow**: Step 1: choose customer, upload CSV (UTF-8, template download), map 8 columns (property, floor, room, unit_name, model_code, serial, installed_on, warranty_end) → Validate. Step 2: preview with ready / warning / error rows and reasons → Download error report → Import valid rows.
 - **Business rule BR-A18**: Nothing is written until import. Missing properties/floors/rooms are created (warning). Unknown model codes and serials already bound to another unit are errors and skipped. The import runs as one change set under the chosen customer, is recorded in Audit, and can be undone for 24 h while no created unit has telemetry or jobs.
 - **Resulting business state**: UnitImport with created property/space/unit IDs and skipped rows.
 - **Boundaries/prohibitions**: Over 1000 rows, missing required columns, or an expired preview → VALIDATION/CONFLICT; inactive customer → VALIDATION.
 
 | Acceptance ID | Given / When | Then (observable result) |
 |---|---|---|
-| AT-A18-N | customer-a, units-office-a.csv (24 rows). When: Validate → Import | ① Preview 22 ready, 1 warning (room “Meeting 3” will be created), 2 errors (row 7 unknown model CS-XX99, row 19 serial AC-DEMO-0002 bound to unit-non-rto) ② Import creates 22 units and the missing room; rows 7 and 19 skipped ③ One audit entry |
+| AT-A18-N | customer-a, units-office-a.csv (24 rows). When: Validate → Import | ① Preview 21 ready, 1 warning (room “Meeting 3” will be created), 2 errors (row 7 unknown model CS-XX99, row 19 serial AC-DEMO-0002 bound to unit-non-rto) ② Import creates 22 units (ready and warning rows) and the missing room; rows 7 and 19 skipped ③ One audit entry |
 | AT-A18-E | ① File without unit_name mapping ② Import after the preview expired | ① VALIDATION ② CONFLICT, re-validate |
 | AT-A18-B | ① Undo within 24 h, no telemetry ② Undo after one created unit received telemetry | ① state=undone, created entities archived ② CONFLICT |
 
@@ -558,7 +558,7 @@ Design: [DD-A23](../02-design/admin.md#dd-a23-details). Assess parent AT-A23 usi
 
 Approval applied 2026-09-16: FR-A07/A09 reject contract edits during active restrictions and allow them after cancellation/release completes (SR19). FR-A15 retries only the failed stage of the same failed record with a new attempt; retirement failure retains the purchased reference (SR18).
 
-Additional current 0.29.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–119. They override older text on the same issues; use IR72 for conflict priority.
+Additional current 0.30.0 contracts: Read [re-review correction contracts](../02-design/review-resolution-contracts.md) IR01–139. They override older text on the same issues; use IR72 for conflict priority.
 
 0.15.0: FR-A06 quality review uses IR29 completion times and IR31 self-approval prohibition for all contributors.
 
