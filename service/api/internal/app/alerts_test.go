@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/pradita/ac-project/service/api/internal/seed"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 func newAlert(t *testing.T, unit, org, severity string, at time.Time) string {

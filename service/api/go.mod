@@ -3,8 +3,8 @@ module github.com/pradita/ac-project/service/api
 go 1.25.0
 
 require (
-	github.com/MicahParks/keyfunc/v3 v3.8.2
-	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/MicahParks/keyfunc/v3 v3.8.2 // indirect
+	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/labstack/echo/v4 v4.16.0
@@ -27,3 +27,7 @@ require (
 	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 )
+
+require github.com/pradita/ac-project/service/core v0.0.0
+
+replace github.com/pradita/ac-project/service/core => ../core

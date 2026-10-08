@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pradita/ac-project/service/api/internal/seed"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 // owner runs SQL as the schema owner (test fixtures that belong to modules not implemented yet).

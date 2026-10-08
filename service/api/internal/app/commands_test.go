@@ -8,9 +8,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pradita/ac-project/service/api/internal/modules/control"
-	"github.com/pradita/ac-project/service/api/internal/seed"
-	"github.com/pradita/ac-project/service/api/internal/worker"
+	"github.com/pradita/ac-project/service/core/modules/control"
+	"github.com/pradita/ac-project/service/core/seed"
+	"github.com/pradita/ac-project/service/core/scheduler"
 )
 
 func TestCommands(t *testing.T) {
@@ -88,7 +88,7 @@ func TestCommands(t *testing.T) {
 		t.Fatalf("second command: %d %v", code, m)
 	}
 	id2 := data(m)["id"].(string)
-	if _, err := worker.Tick(ctx, s.DB, clock.Add(31*time.Second)); err != nil {
+	if _, err := scheduler.Tick(ctx, s.DB, clock.Add(31*time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	if _, m := post(s, &hq, "commands.get", `{"id":"`+id2+`"}`); data(m)["status"] != "expired" || data(m)["failureCode"] != "TIMEOUT" {

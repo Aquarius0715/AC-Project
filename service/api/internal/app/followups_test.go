@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pradita/ac-project/service/api/internal/seed"
-	"github.com/pradita/ac-project/service/api/internal/worker"
+	"github.com/pradita/ac-project/service/core/seed"
+	"github.com/pradita/ac-project/service/core/scheduler"
 )
 
 // completedJob creates a customer-a job completed one hour before the fixture clock.
@@ -182,7 +182,7 @@ func TestWorkerConfirmsUnratedJobs(t *testing.T) {
 	s := server(t)
 	job := completedJob(t, s)
 	owner(t, `UPDATE maintenance.jobs SET completed_at = $2 WHERE id = $1`, job, clock.Add(-7*24*time.Hour))
-	if _, err := worker.Tick(context.Background(), s.DB, clock); err != nil {
+	if _, err := scheduler.Tick(context.Background(), s.DB, clock); err != nil {
 		t.Fatal(err)
 	}
 	if _, m := post(s, &customerA, "jobs.get", `{"jobId":"`+job+`"}`); data(m)["customerConfirmedAt"] == nil || data(m)["rating"] != nil {

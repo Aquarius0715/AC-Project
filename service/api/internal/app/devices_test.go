@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/pradita/ac-project/service/api/internal/seed"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 var techInt = actor{"tok-ti", "tech-internal-a"}

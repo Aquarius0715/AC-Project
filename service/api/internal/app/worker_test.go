@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pradita/ac-project/service/api/internal/seed"
-	"github.com/pradita/ac-project/service/api/internal/worker"
+	"github.com/pradita/ac-project/service/core/seed"
+	"github.com/pradita/ac-project/service/core/scheduler"
 )
 
 func TestWorkerTickExpiresOffers(t *testing.T) {
@@ -18,13 +18,13 @@ func TestWorkerTickExpiresOffers(t *testing.T) {
 	write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
 		`,"offerExpiresAt":"`+ts(1)+`","accessValidFrom":"`+ts(1)+`","accessValidUntil":"`+ts(100)+`","termsVersion":"t"}`, 1)
 	// before the deadline nothing changes
-	if _, err := worker.Tick(context.Background(), s.DB, clock); err != nil {
+	if _, err := scheduler.Tick(context.Background(), s.DB, clock); err != nil {
 		t.Fatal(err)
 	}
 	if _, m := post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`); data(m)["status"] != "offered" {
 		t.Fatal("offer still open before its deadline")
 	}
-	r, err := worker.Tick(context.Background(), s.DB, clock.Add(time.Hour))
+	r, err := scheduler.Tick(context.Background(), s.DB, clock.Add(time.Hour))
 	if err != nil || r.ExpiredOffers < 1 {
 		t.Fatalf("tick: %+v %v", r, err)
 	}
@@ -41,7 +41,7 @@ func TestWorkerTickExpiresOffers(t *testing.T) {
 		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(1)+`","accessValidUntil":"`+ts(100)+`","termsVersion":"t"}`, 3); code != 200 {
 		t.Error("re-offer after expiry")
 	}
-	if r, err := worker.Tick(context.Background(), s.DB, clock.Add(time.Hour)); err != nil || r.ExpiredOffers != 0 {
+	if r, err := scheduler.Tick(context.Background(), s.DB, clock.Add(time.Hour)); err != nil || r.ExpiredOffers != 0 {
 		t.Fatalf("idempotent tick: %+v %v", r, err)
 	}
 }
@@ -52,7 +52,7 @@ func TestWorkerRunStopsOnCancel(t *testing.T) {
 	var logs int
 	done := make(chan struct{})
 	go func() {
-		worker.Run(ctx, s.DB, 10*time.Millisecond, func() time.Time { return clock.Add(1000 * time.Hour) }, func(string, ...any) { logs++ })
+		scheduler.Run(ctx, s.DB, 10*time.Millisecond, func() time.Time { return clock.Add(1000 * time.Hour) }, func(string, ...any) { logs++ })
 		close(done)
 	}()
 	time.Sleep(50 * time.Millisecond)

@@ -7,8 +7,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
-	"github.com/pradita/ac-project/service/api/internal/seed"
+	"github.com/pradita/ac-project/service/core/modules/maintenance"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 func freeze(t *testing.T, now time.Time) {

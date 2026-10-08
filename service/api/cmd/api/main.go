@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/pradita/ac-project/service/api/internal/app"
-	"github.com/pradita/ac-project/service/api/internal/platform/auth"
+	"github.com/pradita/ac-project/service/core/platform/auth"
 )
 
 func main() {

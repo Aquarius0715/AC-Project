@@ -9,8 +9,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pradita/ac-project/service/api/internal/modules/control"
-	"github.com/pradita/ac-project/service/api/internal/seed"
+	"github.com/pradita/ac-project/service/core/modules/control"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 // boundUnit creates a customer-b unit with a bound device in the given connection state.

@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/pradita/ac-project/service/api/internal/seed"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 // alertPolicyBody builds an alert PolicyInput with overrides (raw JSON values).

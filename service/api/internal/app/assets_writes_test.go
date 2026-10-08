@@ -11,9 +11,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/core/ops"
 
-	"github.com/pradita/ac-project/service/api/internal/seed"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 // write posts with a fresh idempotency key and an optional expected version.

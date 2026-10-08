@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
-	"github.com/pradita/ac-project/service/api/internal/seed"
+	"github.com/pradita/ac-project/service/core/modules/maintenance"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 // draftBody builds a WorkReportDraft with all 18 components (result as given) and overrides.

@@ -9,12 +9,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pradita/ac-project/service/api/internal/modules/control"
-	"github.com/pradita/ac-project/service/api/internal/modules/restrictions"
-	"github.com/pradita/ac-project/service/api/internal/ops"
-	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
-	"github.com/pradita/ac-project/service/api/internal/platform/db"
-	"github.com/pradita/ac-project/service/api/internal/worker"
+	"github.com/pradita/ac-project/service/core/modules/control"
+	"github.com/pradita/ac-project/service/core/modules/restrictions"
+	"github.com/pradita/ac-project/service/core/ops"
+	"github.com/pradita/ac-project/service/core/platform/apperr"
+	"github.com/pradita/ac-project/service/core/platform/db"
+	"github.com/pradita/ac-project/service/core/scheduler"
 )
 
 // demoClock is the demo scenario clock: the base clock plus a forward offset set by demo.advanceClock (IR36).
@@ -68,7 +68,7 @@ func (d *demoOps) advance(ctx context.Context, c *ops.Call, in *AdvanceInput) (G
 	d.clock.mu.Lock()
 	d.clock.offset += in.To.Sub(c.Now)
 	d.clock.mu.Unlock()
-	if _, err := worker.Tick(ctx, d.m, in.To); err != nil { // process deadlines reached by the jump
+	if _, err := scheduler.Tick(ctx, d.m, in.To); err != nil { // process deadlines reached by the jump
 		return Generation{}, err
 	}
 	return Generation{Generation: 1}, nil

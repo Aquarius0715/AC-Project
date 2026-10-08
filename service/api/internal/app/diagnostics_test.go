@@ -8,9 +8,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pradita/ac-project/service/api/internal/modules/control"
-	"github.com/pradita/ac-project/service/api/internal/seed"
-	"github.com/pradita/ac-project/service/api/internal/worker"
+	"github.com/pradita/ac-project/service/core/modules/control"
+	"github.com/pradita/ac-project/service/core/seed"
+	"github.com/pradita/ac-project/service/core/scheduler"
 )
 
 func ackCommand(t *testing.T, id string, at time.Time) bool {
@@ -83,7 +83,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Fatalf("running: %v", m)
 	}
 	ctx := context.Background()
-	if _, err := worker.Tick(ctx, s.DB, clock.Add(6*time.Minute)); err != nil {
+	if _, err := scheduler.Tick(ctx, s.DB, clock.Add(6*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	_, m = post(s, &hq, "diagnosticRuns.get", `{"diagnosticRunId":"`+r1+`"}`)
@@ -102,7 +102,7 @@ func TestDiagnosticRuns(t *testing.T) {
 		t.Fatalf("second run: %d %v", code, m)
 	}
 	r2 := data(m)["id"].(string)
-	if _, err := worker.Tick(ctx, s.DB, clock.Add(31*time.Second)); err != nil {
+	if _, err := scheduler.Tick(ctx, s.DB, clock.Add(31*time.Second)); err != nil {
 		t.Fatal(err)
 	}
 	if _, m := post(s, &hq, "diagnosticRuns.get", `{"diagnosticRunId":"`+r2+`"}`); data(m)["state"] != "start_failed" || data(m)["failureCode"] != "TIMEOUT" {
@@ -122,7 +122,7 @@ func TestDiagnosticRuns(t *testing.T) {
 	if code, _ := run(&techInt, on, off, 5, uv, jv); code != 403 && code != 409 {
 		t.Errorf("start action prohibited or busy: %d", code)
 	}
-	if _, err := worker.Tick(ctx, s.DB, clock.Add(2*time.Minute)); err != nil {
+	if _, err := scheduler.Tick(ctx, s.DB, clock.Add(2*time.Minute)); err != nil {
 		t.Fatal(err)
 	}
 	if _, m := post(s, &hq, "diagnosticRuns.get", `{"diagnosticRunId":"`+r3+`"}`); data(m)["state"] != "end_blocked" {

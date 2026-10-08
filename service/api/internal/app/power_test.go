@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/pradita/ac-project/service/api/internal/seed"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 // TestEffectivePowerSR27 covers the SR27 boundaries: freshness of observation and measurement, quality, origin,

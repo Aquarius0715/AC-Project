@@ -3,7 +3,7 @@ package app
 import (
 	"testing"
 
-	"github.com/pradita/ac-project/service/api/internal/seed"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 func TestUnitDetail(t *testing.T) {

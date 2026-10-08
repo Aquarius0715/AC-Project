@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pradita/ac-project/service/api/internal/seed"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 func countNotes(t *testing.T, target, recipient, template string) int {

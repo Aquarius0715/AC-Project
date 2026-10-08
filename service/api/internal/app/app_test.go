@@ -11,8 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pradita/ac-project/service/api/internal/platform/auth"
-	"github.com/pradita/ac-project/service/api/internal/seed"
+	"github.com/pradita/ac-project/service/core/platform/auth"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 var clock = time.Date(2026, 9, 14, 1, 0, 0, 0, time.UTC)

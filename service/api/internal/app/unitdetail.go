@@ -8,11 +8,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pradita/ac-project/service/api/internal/modules/assets"
-	"github.com/pradita/ac-project/service/api/internal/modules/control"
-	"github.com/pradita/ac-project/service/api/internal/modules/devices"
-	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
-	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/core/modules/assets"
+	"github.com/pradita/ac-project/service/core/modules/control"
+	"github.com/pradita/ac-project/service/core/modules/devices"
+	"github.com/pradita/ac-project/service/core/modules/maintenance"
+	"github.com/pradita/ac-project/service/core/ops"
 )
 
 // unitDetails assembles the UnitDetail parts owned by Devices, Control, Restrictions and Maintenance (IR165).

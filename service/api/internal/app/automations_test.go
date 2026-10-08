@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/pradita/ac-project/service/api/internal/seed"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 func scheduleRule(u string, extra map[string]string) string {

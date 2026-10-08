@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/pradita/ac-project/service/api/internal/seed"
+	"github.com/pradita/ac-project/service/core/seed"
 )
 
 // newInvoice creates a customer-b contract (rto, restriction eligible) and an unpaid invoice; returns contract and invoice IDs.

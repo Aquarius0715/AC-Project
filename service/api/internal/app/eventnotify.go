@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/pradita/ac-project/service/api/internal/modules/notify"
-	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/core/modules/notify"
+	"github.com/pradita/ac-project/service/core/ops"
 )
 
 // notifyingRecorder creates the IR95 business-event notifications from the committed transitions of a write before

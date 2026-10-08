@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/pradita/ac-project/service/api/internal/seed"
-	"github.com/pradita/ac-project/service/api/internal/worker"
+	"github.com/pradita/ac-project/service/core/seed"
+	"github.com/pradita/ac-project/service/core/scheduler"
 )
 
 func TestSlotProposals(t *testing.T) {
@@ -114,7 +114,7 @@ func TestSlotProposals(t *testing.T) {
 	_, m = write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)
 	j4 := data(m)["id"].(string)
 	propose(j4, slotJSON(100, 2), internalHold, ts(2), 1)
-	if _, err := worker.Tick(context.Background(), s.DB, clock.Add(2*time.Hour)); err != nil {
+	if _, err := scheduler.Tick(context.Background(), s.DB, clock.Add(2*time.Hour)); err != nil {
 		t.Fatal(err)
 	}
 	if _, m := post(s, &hq, "jobs.get", `{"jobId":"`+j4+`"}`); data(m)["slotProposal"].(map[string]any)["status"] != "expired" {

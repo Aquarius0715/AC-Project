@@ -1,5 +1,6 @@
 # AC Project — everything runs in Docker (IR119, DEC-70, docs/02-design/container-design.md)
-# Services live under service/ (service/api: Go Core API + workers, service/web: Next.js web + BFF)
+# Services live under service/ (service/api: Go Core API, service/worker: background roles, service/core: shared Go module,
+# service/web: Next.js web + BFF)
 #
 # Profiles
 #   demo     Phase 1A clickable demo (web with the in-browser mock)           docker compose --profile demo up
@@ -14,10 +15,27 @@
 
 name: ac-project
 
-x-backend: &backend
-  image: ac-backend:dev
+x-worker: &worker             # service/worker (independent service, IR166)
+  image: ac-worker:dev
   build:
-    context: ./service/api
+    context: ./service
+    dockerfile: worker/Dockerfile
+    target: runtime
+  environment:
+    DATABASE_URL: postgres://ac_app_login:local@postgres:5432/ac?sslmode=disable
+  read_only: true
+  security_opt: [no-new-privileges:true]
+  networks: [app, data]
+  restart: unless-stopped
+  profiles: [backend, full]
+  depends_on:
+    migrate: { condition: service_completed_successfully }
+
+x-backend: &backend
+  image: ac-api:dev
+  build:
+    context: ./service            # go.work workspace: service/core is shared by api and worker
+    dockerfile: api/Dockerfile
     target: runtime
   env_file:
     - path: .env.local
@@ -108,25 +126,25 @@ services:
     ports: ["8082:8080"]
     networks: [edge, app, data]
 
-  worker-outbox:       { <<: *backend, command: ["/app/worker", "--role=outbox"] }
-  worker-scheduler:    { <<: *backend, command: ["/app/worker", "--role=scheduler"] }
-  worker-iot:          { <<: *backend, command: ["/app/worker", "--role=iot"] }
-  worker-telemetry:    { <<: *backend, command: ["/app/worker", "--role=telemetry"] }
-  worker-rollup:       { <<: *backend, command: ["/app/worker", "--role=rollup"] }
-  worker-automation:   { <<: *backend, command: ["/app/worker", "--role=automation"] }
-  worker-notification: { <<: *backend, command: ["/app/worker", "--role=notification"] }
-  worker-importexport: { <<: *backend, command: ["/app/worker", "--role=importexport"] }
+  worker-outbox:       { <<: *worker, command: ["/app/worker", "--role=outbox"] }
+  worker-scheduler:    { <<: *worker, command: ["/app/worker", "--role=scheduler"] }
+  worker-iot:          { <<: *worker, command: ["/app/worker", "--role=iot"] }
+  worker-telemetry:    { <<: *worker, command: ["/app/worker", "--role=telemetry"] }
+  worker-rollup:       { <<: *worker, command: ["/app/worker", "--role=rollup"] }
+  worker-automation:   { <<: *worker, command: ["/app/worker", "--role=automation"] }
+  worker-notification: { <<: *worker, command: ["/app/worker", "--role=notification"] }
+  worker-importexport: { <<: *worker, command: ["/app/worker", "--role=importexport"] }
 
   iot-bridge:          # local stand-in for AWS IoT rules: MQTT topics -> Kinesis / SQS
     <<: *backend
-    image: ac-backend:dev-tools
-    build: { context: ./service/api, target: dev }
+    image: ac-api:dev-tools
+    build: { context: ./service, dockerfile: api/Dockerfile, target: dev }
     command: ["/app/iotbridge"]
 
   device-sim:          # simulated IoT modules (telemetry each minute, heartbeats, command acks)
     <<: *backend
-    image: ac-backend:dev-tools
-    build: { context: ./service/api, target: dev }
+    image: ac-api:dev-tools
+    build: { context: ./service, dockerfile: api/Dockerfile, target: dev }
     command: ["/app/devicesim", "--devices=20"]
     networks: [data]
 

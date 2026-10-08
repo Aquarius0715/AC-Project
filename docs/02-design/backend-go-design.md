@@ -15,7 +15,7 @@ This document turns the [backend architecture](backend-architecture.md) into an 
 
 | Decision | Choice |
 |---|---|
-| Language | Go 1.25 or later (one module per service, `service/api/` = module `github.com/pradita/ac-project/service/api`; current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
+| Language | Go 1.25 or later (one module per service in the `service/go.work` workspace: `service/core` shared domain and platform packages, `service/api` Core API, `service/worker` background roles; current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
 | HTTP framework | Echo v4 (`github.com/labstack/echo/v4`, checked with v4.16.0) for the Core API and the webhook receiver |
 | Database driver | pgx v5 (`github.com/jackc/pgx/v5`, `pgxpool`); no ORM |
 | Query code | sqlc generates typed Go from SQL in `db/queries/<schema>/*.sql`; hand-written SQL only for dynamic list filters |
