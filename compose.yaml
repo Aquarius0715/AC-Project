@@ -310,6 +310,7 @@ services:
     image: ac-api:dev-tools
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: dev, args: { SERVICE: gateway } }
     command: ["/app/iotbridge"]
+    profiles: [planned]          # binary not built yet (cmd/iotbridge, cmd/devicesim)
 
   device-sim:          # simulated IoT modules (telemetry each minute, heartbeats, command acks)
     <<: *backend
@@ -317,6 +318,7 @@ services:
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: dev, args: { SERVICE: gateway } }
     command: ["/app/devicesim", "--devices=20"]
     networks: [data]
+    profiles: [planned]          # binary not built yet (cmd/iotbridge, cmd/devicesim)
 
   # ------------------------------------------------------------------ local stand-ins for AWS services
   postgres:            # Aurora PostgreSQL 16

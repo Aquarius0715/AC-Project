@@ -81,11 +81,12 @@ COPY --from=build-dev /out/ /app/
 
 | Profile | Starts | Use |
 |---|---|---|
-| `demo` | `web` (mock mode, port 3000) | Phase 1A clickable demo |
+| `demo` | `customer-web`, `partner-web`, `technician-web`, `admin-web` (mock mode, ports 3000–3003) | Phase 1A clickable demo |
 | `infra` | PostgreSQL 16, Valkey, LocalStack, Mosquitto, Keycloak, stripe-mock, weather mock | Stand-ins for AWS services |
-| `schema` | one-off `migrate` (cmd/migrate): schema, local `ac_app_login`, demo fixture | Database only, without the Go services |
-| `backend` | `migrate`, `api` (8080), `webhook` (8082), eight `worker-*` services, `iot-bridge`, `device-sim` | Go backend against the stand-ins |
-| `full` | `web-api` (BFF mode) + backend + infra | Production-like end-to-end runs and acceptance tests |
+| `schema` | one-off `migrate` (cmd/migrate): schema, local `ac_app_login` and the domain logins `ac_<domain>_login`, demo fixture | Database only, without the Go services |
+| `backend` | `migrate`, `gateway` (8080), `identity-api`, `equipment-api`, `maintenance-api`, `billing-api`, `energy-api`, `worker-scheduler-equipment`, `worker-scheduler-maintenance` and the idle `worker-*` roles | Go backend against the stand-ins (IR180, IR194, IR195) |
+| `full` | `customer-web-api`, `partner-web-api`, `technician-web-api`, `admin-web-api` (BFF mode, ports 3000–3003) + backend + infra | Production-like end-to-end runs and acceptance tests |
+| `planned` | `webhook` (8082), `iot-bridge`, `device-sim` | Services whose commands are not built yet; not started by the other profiles (IR197) |
 | `obs` | OpenTelemetry collector, Jaeger (16686) | Traces |
 | `stripe` | Stripe CLI forwarding test-mode webhooks to `webhook:8080/stripe` | Needs `STRIPE_TEST_SECRET_KEY` in `.env.local` |
 

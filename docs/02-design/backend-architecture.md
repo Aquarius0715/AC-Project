@@ -16,7 +16,7 @@ This document designs the production backend that will replace the Phase 1A mock
 - Phase 1A scope is unchanged: the clickable demo still runs on the shared mock and makes no real payment, notification, IoT, or trading connection (FR-X05).
 - The screens, operations, permissions, and state machines already defined in these documents are the contract the backend implements. The [operation catalog](operation-catalog.csv) (197 operations), [service contracts](service-contracts.ts), [write version catalog](write-version-catalog.csv), and the state transitions in [common design §5](common.md#5-state-transitions-and-consistency) are the source of truth; this document must not redefine them.
 - Network zones, ports, and traffic rules are in the [network architecture](network-architecture.md).
-- Diagrams: Figma file VOeKPrid46kOf24ktEfe8r, page “System Architecture”, boards 03 (backend) and 04 (network).
+- Diagrams: Figma file VOeKPrid46kOf24ktEfe8r, page “System Architecture”, boards 03 (backend), 04 (network), 06 (Go implementation and database), 07 (containers) and 08 (business-domain services and cross-domain contracts as built, IR197).
 
 Decisions applied (DEC-67, DEC-68, DEC-69):
 

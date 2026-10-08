@@ -1850,3 +1850,13 @@ Every service inserted its audit rows into `audit.audit_log` in its own write tr
 - With this, a domain service touches only its own schemas and `platform` (outbox, idempotency keys, processed events, tenants, demo clock); the database split (IR181 step 4) can follow.
 
 Verified: `make test` and `make test-cluster` green, none skipped; the recorder unit test checks the published entry and row-level security on the log; in compose a client's `inquiries.create` on billing-api appears in the HQ audit view from identity-api with no audit events pending, and the services log no errors.
+
+## IR197 System Architecture diagrams follow the domain services — 2026-10-09
+
+The Figma page “System Architecture” (file VOeKPrid46kOf24ktEfe8r) still showed the modular-monolith Core API, a single `web/` app and one all-domain scheduler.
+
+- **Board 03** (production backend): the Core API is the gateway plus five business-domain services; the notes map catalog modules to services and state the domain boundaries (events, reference copies, internal queries; enforced by database roles and the split-service tests); the scheduler worker runs per domain.
+- **Board 06** (Go implementation and database): Echo v5; `service/api` layout (`cmd/<service>`, `internal/server`, `internal/gateway`, `internal/ops` with domains and internal queries, `internal/migrations`, `test/integration`); principals from identity-api; outbox with domain events and `AuditRecorded`; schemas labelled with their owning service, the reference copies and projections, `restriction_commands`, `alert_notifications`, `demo_clock`; one database role per domain; the 42501 mapping of IR194; enforced dependency rules; workers and consumers per domain.
+- **Board 07** (containers): four web images from `service/web/Dockerfile`, `ac-gateway` and `ac-<domain>-api` from `service/api/build/service.Dockerfile`, `ac-worker` / `ac-migrate`; compose `gateway + 5 services`, `worker-scheduler × 2`, web apps on 3000–3003, the `planned` profile.
+- **Board 08** (new): request path (web apps → gateway → services), one card per service (operations, catalog modules, schemas and role, copies, consumed events, answered queries, schedulers), the three cross-domain contracts (events, change capture, internal queries), workers, enforcement and the open database split.
+- Compose: `iot-bridge` and `device-sim` move to the `planned` profile with `webhook` (their commands are not built yet, so `--profile backend` no longer starts failing containers); the profiles table of container-design.md lists the current services.
