@@ -89,6 +89,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.91.0 (2026-10-09): IR200; counts unchanged.
 # 0.92.0 (2026-10-09): IR201; counts unchanged.
 # 0.93.0 (2026-10-09): IR202; counts unchanged.
+# 0.94.0 (2026-10-09): IR203; counts unchanged.
 # 0.88.0 (2026-10-09): IR197; counts unchanged.
 # 0.87.0 (2026-10-09): IR196; counts unchanged.
 # 0.86.0 (2026-10-09): IR195; counts unchanged.
@@ -1251,7 +1252,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.93.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.94.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')
