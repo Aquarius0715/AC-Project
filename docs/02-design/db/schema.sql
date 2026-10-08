@@ -60,6 +60,25 @@ CREATE TABLE platform.outbox (
 CREATE INDEX outbox_unpublished ON platform.outbox (occurred_at) WHERE published_at IS NULL;
 CREATE INDEX outbox_type_seq ON platform.outbox (event_type, seq);  -- consumers poll their event types in order
 
+-- Generic change capture (IR188): AFTER row triggers publish RowChanged:<schema>.<table> {op, row} with the columns
+-- named in the trigger arguments. Consuming services keep reference copies (<schema>.ref_<table>) of exactly those
+-- columns instead of reading the owner's tables; the owner's write paths need no changes.
+CREATE FUNCTION platform.capture_row() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  src jsonb;
+  row jsonb := '{}';
+  col text;
+BEGIN
+  IF TG_OP = 'DELETE' THEN src := to_jsonb(OLD); ELSE src := to_jsonb(NEW); END IF;
+  FOREACH col IN ARRAY TG_ARGV LOOP
+    row := row || jsonb_build_object(col, src -> col);
+  END LOOP;
+  INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id)
+    VALUES ((src ->> 'tenant_id')::uuid, TG_TABLE_NAME, COALESCE((src ->> 'id')::uuid, (src ->> 'restriction_id')::uuid, gen_random_uuid()),
+            'RowChanged:' || TG_TABLE_SCHEMA || '.' || TG_TABLE_NAME, jsonb_build_object('op', TG_OP, 'row', row), 'change-capture');
+  RETURN NULL;
+END $$;
+
 CREATE TABLE platform.idempotency_keys (
   tenant_id      uuid NOT NULL REFERENCES platform.tenants(id),
   membership_id  uuid NOT NULL,
@@ -1666,6 +1685,44 @@ BEGIN
 END $$;
 CREATE TRIGGER audit_log_append_only BEFORE UPDATE OR DELETE ON audit.audit_log
   FOR EACH ROW EXECUTE FUNCTION audit.forbid_change();
+
+-- ---------------------------------------------------------------------------------------------
+-- Reference copies for notifications (IR188): notify resolves notification targets and recipients from these
+-- instead of the owners' tables. Kept by the identity-api consumer from RowChanged events; same keys as the source.
+-- ---------------------------------------------------------------------------------------------
+CREATE TABLE notify.ref_units (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, customer_org_id uuid, property_id uuid, display_name text);
+CREATE TABLE notify.ref_customers (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, organization_id uuid);
+CREATE TABLE notify.ref_jobs (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, unit_id uuid, customer_org_id uuid);
+CREATE TABLE notify.ref_offers (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, job_id uuid, contractor_org_id uuid);
+CREATE INDEX ref_offers_job ON notify.ref_offers (job_id);
+CREATE TABLE notify.ref_assignments (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, job_id uuid, technician_membership_id uuid, status text);
+CREATE INDEX ref_assignments_job ON notify.ref_assignments (job_id);
+CREATE TABLE notify.ref_invoices (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, number text, customer_id uuid, status text, due_at timestamptz);
+CREATE TABLE notify.ref_inquiries (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, customer_id uuid, subject_type text);
+CREATE TABLE notify.ref_restrictions (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, customer_id uuid);
+CREATE TABLE notify.ref_restriction_units (restriction_id uuid NOT NULL, unit_id uuid NOT NULL, tenant_id uuid NOT NULL, PRIMARY KEY (restriction_id, unit_id));
+CREATE TABLE notify.ref_devices (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, serial text, unit_id uuid);
+
+CREATE TRIGGER units_capture AFTER INSERT OR DELETE OR UPDATE OF customer_org_id, property_id, display_name ON assets.units
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'customer_org_id', 'property_id', 'display_name');
+CREATE TRIGGER customers_capture AFTER INSERT OR DELETE OR UPDATE OF organization_id ON assets.customers
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'organization_id');
+CREATE TRIGGER jobs_capture AFTER INSERT OR DELETE OR UPDATE OF unit_id, customer_org_id ON maintenance.jobs
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'unit_id', 'customer_org_id');
+CREATE TRIGGER offers_capture AFTER INSERT OR DELETE OR UPDATE OF job_id, contractor_org_id ON maintenance.offers
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'job_id', 'contractor_org_id');
+CREATE TRIGGER assignments_capture AFTER INSERT OR DELETE OR UPDATE OF job_id, technician_membership_id, status ON maintenance.assignments
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'job_id', 'technician_membership_id', 'status');
+CREATE TRIGGER invoices_capture AFTER INSERT OR DELETE OR UPDATE OF number, customer_id, status, due_at ON billing.invoices
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'number', 'customer_id', 'status', 'due_at');
+CREATE TRIGGER inquiries_capture AFTER INSERT OR DELETE OR UPDATE OF customer_id, subject_type ON billing.inquiries
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'customer_id', 'subject_type');
+CREATE TRIGGER restrictions_capture AFTER INSERT OR DELETE OR UPDATE OF customer_id ON restrictions.restrictions
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'customer_id');
+CREATE TRIGGER restriction_units_capture AFTER INSERT OR DELETE ON restrictions.restriction_units
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('restriction_id', 'unit_id', 'tenant_id');
+CREATE TRIGGER devices_capture AFTER INSERT OR DELETE OR UPDATE OF serial, unit_id ON devices.devices
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'serial', 'unit_id');
 
 -- ---------------------------------------------------------------------------------------------
 -- Row-level security: every business table with tenant_id. platform.* is infrastructure read across

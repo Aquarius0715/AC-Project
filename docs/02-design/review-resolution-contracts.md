@@ -1683,3 +1683,29 @@ Verified: all Go tests green, none skipped, including `TestUnitAccessProjection`
 
 - The projection keeps revoked Assignments: `AssignmentAccessChanged` gains `deleted` (row deleted) and the row gains `active` (`status = 'active'`). Only `deleted` removes the row; the unit scope (IR186) filters `active`.
 - Verified: all Go tests green, none skipped; `TestDiagnosticRuns` checks that runs stay visible after the Assignment is revoked, `TestUnitAccessProjection` that a revoked Assignment stays inactive in the projection.
+
+## IR188 Generic change capture and notify reference copies (phase B step 3, part 3) — 2026-10-09
+
+Notifications (identity-api) resolved targets and recipients (IR142, IR58) by joining assets, maintenance, billing, restrictions and devices. They now read reference copies in their own schema.
+
+- `platform.capture_row(col, …)`: one AFTER row trigger function for every captured table. It publishes `RowChanged:<schema>.<table>` with `{op: INSERT|UPDATE|DELETE, row: {only the named columns}}` into `platform.outbox` in the writer's transaction; UPDATE triggers fire only for the captured columns.
+- Consumer side: `events.Replica{Source, Table, Keys, Cols}` keeps `<schema>.ref_<table>` with the same column names (upsert via `jsonb_populate_record`, delete by key). Consumer `identity` applies `notify.Replicas`.
+
+| Copy (notify, RLS) | Source columns |
+|---|---|
+| `ref_units` | assets.units id, tenant_id, customer_org_id, property_id, display_name |
+| `ref_customers` | assets.customers id, tenant_id, organization_id |
+| `ref_jobs` | maintenance.jobs id, tenant_id, unit_id, customer_org_id |
+| `ref_offers` | maintenance.offers id, tenant_id, job_id, contractor_org_id |
+| `ref_assignments` | maintenance.assignments id, tenant_id, job_id, technician_membership_id, status |
+| `ref_invoices` | billing.invoices id, tenant_id, number, customer_id, status, due_at |
+| `ref_inquiries` | billing.inquiries id, tenant_id, customer_id, subject_type |
+| `ref_restrictions` | restrictions.restrictions id, tenant_id, customer_id |
+| `ref_restriction_units` | restrictions.restriction_units restriction_id, unit_id, tenant_id |
+| `ref_devices` | devices.devices id, tenant_id, serial, unit_id |
+
+- Invoice targets take the customer organization from `ref_customers` via the invoice's customer (previously via the contract version; both name the same organization).
+- The business-event recorder (`eventnotify`) runs inside maintenance-api's write transaction and reads maintenance rows of the same transaction; it is unchanged here (its identity reads are listed in IR181).
+- The IR186 projections stay as they are (they derive windows); new cross-domain reads use the generic copies.
+
+Verified: all Go tests green, none skipped; `TestNotifyReplicas` compares every copy with its source (EXCEPT both ways) after updates, inserts and deletes; the notification and inbox tests pass on the copies.

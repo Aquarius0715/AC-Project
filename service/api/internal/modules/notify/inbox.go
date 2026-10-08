@@ -19,17 +19,17 @@ import (
 )
 
 // targetLateral resolves a notification target ({kind,id} in columns k / i) to its customer organization, display
-// name, unit and property (IR142).
+// name, unit and property (IR142), from notify's reference copies of the owners' rows (IR188).
 const targetLateral = `LATERAL (
-	SELECT u.customer_org_id AS org, u.display_name AS name, u.id AS unit_id, u.property_id FROM assets.units u WHERE %[1]s = 'unit' AND u.id = %[2]s
-	UNION ALL SELECT j.customer_org_id, u.display_name, u.id, u.property_id FROM maintenance.jobs j JOIN assets.units u ON u.id = j.unit_id WHERE %[1]s = 'job' AND j.id = %[2]s
-	UNION ALL SELECT k.customer_org_id, i.number, NULL, NULL FROM billing.invoices i JOIN billing.contracts k ON k.id = i.contract_id AND k.version = i.contract_version
+	SELECT u.customer_org_id AS org, u.display_name AS name, u.id AS unit_id, u.property_id FROM notify.ref_units u WHERE %[1]s = 'unit' AND u.id = %[2]s
+	UNION ALL SELECT j.customer_org_id, u.display_name, u.id, u.property_id FROM notify.ref_jobs j JOIN notify.ref_units u ON u.id = j.unit_id WHERE %[1]s = 'job' AND j.id = %[2]s
+	UNION ALL SELECT cu.organization_id, i.number, NULL, NULL FROM notify.ref_invoices i JOIN notify.ref_customers cu ON cu.id = i.customer_id
 		WHERE %[1]s = 'invoice' AND i.id = %[2]s
-	UNION ALL SELECT cu.organization_id, COALESCE((SELECT u.display_name FROM restrictions.restriction_units ru JOIN assets.units u ON u.id = ru.unit_id
+	UNION ALL SELECT cu.organization_id, COALESCE((SELECT u.display_name FROM notify.ref_restriction_units ru JOIN notify.ref_units u ON u.id = ru.unit_id
 		WHERE ru.restriction_id = r.id ORDER BY u.display_name LIMIT 1), 'Restriction'), NULL, NULL
-		FROM restrictions.restrictions r JOIN assets.customers cu ON cu.id = r.customer_id WHERE %[1]s = 'restriction' AND r.id = %[2]s
-	UNION ALL SELECT u.customer_org_id, d.serial, u.id, u.property_id FROM devices.devices d LEFT JOIN assets.units u ON u.id = d.unit_id WHERE %[1]s = 'device' AND d.id = %[2]s
-	UNION ALL SELECT cu.organization_id, q.subject_type, NULL, NULL FROM billing.inquiries q JOIN assets.customers cu ON cu.id = q.customer_id WHERE %[1]s = 'inquiry' AND q.id = %[2]s
+		FROM notify.ref_restrictions r JOIN notify.ref_customers cu ON cu.id = r.customer_id WHERE %[1]s = 'restriction' AND r.id = %[2]s
+	UNION ALL SELECT u.customer_org_id, d.serial, u.id, u.property_id FROM notify.ref_devices d LEFT JOIN notify.ref_units u ON u.id = d.unit_id WHERE %[1]s = 'device' AND d.id = %[2]s
+	UNION ALL SELECT cu.organization_id, q.subject_type, NULL, NULL FROM notify.ref_inquiries q JOIN notify.ref_customers cu ON cu.id = q.customer_id WHERE %[1]s = 'inquiry' AND q.id = %[2]s
 ) t`
 
 // adminKinds lists the target kinds an HQ membership can read and the permissions that grant each (IR142).
@@ -61,10 +61,10 @@ func readableSQL(p *ops.Principal, kind, id string, args *[]any) string {
 	case "client":
 		return "t.org = " + add(p.OrgID)
 	case "contractor":
-		return kind + " = 'job' AND EXISTS (SELECT 1 FROM maintenance.offers o WHERE o.job_id = " + id + " AND o.contractor_org_id = " + add(p.OrgID) + ")"
+		return kind + " = 'job' AND EXISTS (SELECT 1 FROM notify.ref_offers o WHERE o.job_id = " + id + " AND o.contractor_org_id = " + add(p.OrgID) + ")"
 	default:
 		unitScope := "(t.unit_id = ANY(" + add(p.Scopes["unit"]) + ") OR t.property_id = ANY(" + add(p.Scopes["property"]) + ") OR t.org = ANY(" + add(p.Scopes["organization"]) + "))"
-		return "((" + kind + " = 'job' AND EXISTS (SELECT 1 FROM maintenance.assignments a WHERE a.job_id = " + id + " AND a.technician_membership_id = " + add(p.MembershipID) + ")) OR (" +
+		return "((" + kind + " = 'job' AND EXISTS (SELECT 1 FROM notify.ref_assignments a WHERE a.job_id = " + id + " AND a.technician_membership_id = " + add(p.MembershipID) + ")) OR (" +
 			kind + " IN ('unit','device') AND " + unitScope + "))"
 	}
 }
@@ -310,7 +310,7 @@ func resolve(ctx context.Context, c *ops.Call, in *TargetInput) (target, error) 
 			return t, apperr.Fields(map[string]string{"target": "error.invalid"})
 		}
 		var ok bool
-		if err := c.Tx.QueryRow(ctx, `SELECT status = 'unpaid' AND due_at < $2 FROM billing.invoices WHERE id = $1`, in.Target.ID, c.Now).Scan(&ok); err != nil {
+		if err := c.Tx.QueryRow(ctx, `SELECT status = 'unpaid' AND due_at < $2 FROM notify.ref_invoices WHERE id = $1`, in.Target.ID, c.Now).Scan(&ok); err != nil {
 			return t, err
 		}
 		if !ok {
@@ -337,8 +337,8 @@ const recipientsSQL = `SELECT m.id, m.role, u.display_name,
 	WHERE m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until > $1)
 	  AND ((m.role = 'client' AND m.organization_id = $2)
 	    OR (NOT $5 AND m.role = 'admin' AND EXISTS (SELECT 1 FROM identity.membership_permissions mp WHERE mp.membership_id = m.id AND mp.permission = ANY($6)))
-	    OR (NOT $5 AND $3 = 'job' AND m.role = 'contractor' AND m.organization_id IN (SELECT o.contractor_org_id FROM maintenance.offers o WHERE o.job_id = $4))
-	    OR (NOT $5 AND $3 = 'job' AND m.role = 'technician' AND m.id IN (SELECT a.technician_membership_id FROM maintenance.assignments a WHERE a.job_id = $4 AND a.status = 'active')))`
+	    OR (NOT $5 AND $3 = 'job' AND m.role = 'contractor' AND m.organization_id IN (SELECT o.contractor_org_id FROM notify.ref_offers o WHERE o.job_id = $4))
+	    OR (NOT $5 AND $3 = 'job' AND m.role = 'technician' AND m.id IN (SELECT a.technician_membership_id FROM notify.ref_assignments a WHERE a.job_id = $4 AND a.status = 'active')))`
 
 func recipients(ctx context.Context, c *ops.Call, in *TargetInput, t target, role *string) ([]Recipient, error) {
 	var org uuid.UUID

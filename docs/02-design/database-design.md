@@ -29,7 +29,7 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 | billing | Billing | contracts (versioned), contract_units, invoices, payments, stripe_events, inquiries, payout_statements, payout_lines, payout_queries |
 | restrictions | Restrictions | restrictions, restriction_invoices, restriction_units |
 | energy | Energy & carbon | baselines (versioned), emission_factors (versioned), mrv_reports (versioned), mrv_reviews, offset_quotes, offset_records, offset_attempts |
-| notify | Notifications | notifications, deliveries, templates |
+| notify | Notifications | notifications, deliveries, templates, ref_* reference copies of other domains' rows kept from RowChanged events (IR188) |
 | audit | Audit | audit_log (append-only, partitioned) |
 
 Rules:
@@ -151,7 +151,7 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 - Isolation level READ COMMITTED with optimistic versions on every aggregate; `SELECT … FOR UPDATE` on the aggregate root before changing child rows (job + offers / assignments, restriction + units, invoice + payments).
 - Serialization or deadlock errors (40001, 40P01) are retried up to three times by the `TxManager`, then UNAVAILABLE.
 - PostgreSQL errors map to contract codes: 23505 / 23P01 → CONFLICT, 23514 / 22P02 → VALIDATION, 23503 / 42501 → NOT_FOUND (never reveal other tenants), no rows on a scoped update → NOT_FOUND or CONFLICT after a version check.
-- Every write inserts its audit row(s) and outbox row(s) in the same transaction (exactly-once business effect, at-least-once event delivery). `maintenance.offers` and `maintenance.assignments` additionally publish `OfferAccessChanged` / `AssignmentAccessChanged` snapshots from row triggers (IR186).
+- Every write inserts its audit row(s) and outbox row(s) in the same transaction (exactly-once business effect, at-least-once event delivery). `maintenance.offers` and `maintenance.assignments` additionally publish `OfferAccessChanged` / `AssignmentAccessChanged` snapshots from row triggers (IR186); tables read by other services publish `RowChanged:<schema>.<table>` through `platform.capture_row` (IR188).
 
 ## 9. Migrations
 
