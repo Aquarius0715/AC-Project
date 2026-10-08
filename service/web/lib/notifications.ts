@@ -1,8 +1,6 @@
-// Notifications against the Core API (DATA_SOURCE=api): notifications.list rows projected into the inbox row shape,
-// and notifications.markRead with the row version (FR-X07; reading is separate from resolving the linked alert).
+// Notification rows (DATA_SOURCE=api): notifications.list items projected into the inbox row shape. Pure code,
+// shared by the Server Component that reads the list and the client view that renders it (FR-X07).
 import type { Role } from "@/lib/nav";
-import { callOp } from "@/lib/ops";
-import { invalidate } from "@/lib/useOp";
 
 type TargetKind = "unit" | "job" | "invoice" | "restriction" | "device" | "inquiry" | "client_user";
 
@@ -51,9 +49,4 @@ export function inboxRow(n: ApiNotification, role: Role): InboxRow {
   const at = new Date(n.occurredAt).toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kuala_Lumpur" });
   const href = n.sourceAlertId && alertsPage[role] ? alertsPage[role] : (routes[role][n.target.kind]?.(n.target.id) ?? "");
   return { id: n.id, version: n.version, t: `${title} ${n.params.targetName}`, d: detail, w: at, read: n.readAt !== null, href };
-}
-
-export async function markRead(id: string, version: number) {
-  await callOp("notifications.markRead", { id }, { write: true, expectedVersion: version });
-  invalidate();
 }

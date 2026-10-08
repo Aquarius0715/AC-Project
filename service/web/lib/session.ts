@@ -62,7 +62,8 @@ export function sessionFromTokens(t: { access_token: string; refresh_token?: str
   };
 }
 
-async function refresh(s: Session): Promise<Session | null> {
+/** Exchanges the refresh token for a new access token (same tenant and membership), or null. */
+export async function refresh(s: Session): Promise<Session | null> {
   if (!s.refreshToken) return null;
   const cfg = oidcConfig();
   try {
@@ -80,12 +81,17 @@ async function refresh(s: Session): Promise<Session | null> {
   }
 }
 
+/** True when the access token expires within the refresh leeway. */
+export function needsRefresh(s: Session): boolean {
+  return s.expiresAt - REFRESH_LEEWAY_SECONDS <= Date.now() / 1000;
+}
+
 /** The signed-in session (route handlers only: refreshing rewrites or clears the cookie). */
 export async function readSession(): Promise<Session | null> {
   const jar = await cookies();
   const s = verify<Session>(jar.get(SESSION_COOKIE)?.value);
   if (!s) return null;
-  if (s.expiresAt - REFRESH_LEEWAY_SECONDS > Date.now() / 1000) return s;
+  if (!needsRefresh(s)) return s;
   const next = await refresh(s);
   if (!next) {
     jar.delete(SESSION_COOKIE);

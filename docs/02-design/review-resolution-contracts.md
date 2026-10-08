@@ -1526,3 +1526,13 @@ DEC-71 for the web: `service/web` moved from Next.js 15.5 to 16.4 (React 19.3) f
 
 Next steps (IR176+): Server Components that read through a server-only data access layer instead of the browser calling `/bff/ops`, Server Actions for writes, `loading` / `error` files per segment, and Playwright E2E in `service/web/e2e`.
 
+## IR176 Server-side data access in the web (Next.js DAL pattern, pilot) — 2026-10-08
+
+Following the Next.js authentication and data guides, the web reads and writes through a server-only Data Access Layer instead of the browser calling `/bff/ops`:
+
+- `service/web/lib/dal.ts` (`server-only`): `getSession` / `verifySession` (React `cache`, redirect to `/login`) and `coreOp(operation, input, {write, expectedVersion})`, which calls the Core API with the session's access token, tenant and membership and throws `CoreError` with the DomainError.
+- Token refresh moved into `proxy.ts`: Server Components cannot write cookies, so an access token within 30 s of expiry is refreshed there (the only identity-provider call proxy makes) and the new cookie is forwarded both to the page render and to the browser; a failed refresh clears the cookie. Route Handlers keep refreshing through `readSession`. Proxy now also requires a session for the shared pages `/notifications` and `/settings` (307 to `/login?returnTo=…`).
+- Pilot `/notifications`: `page.tsx` is a Server Component (`await connection()` because `DATA_SOURCE` is a runtime setting; otherwise the page was prerendered at build time) that reads `notifications.list` and passes plain rows to `_components/notifications-view.tsx`; marking read is the Server Action `actions.ts › markRead` (verifies the session through the DAL, sends the row version, `refresh()` re-renders the route, returns a message for version conflicts); `loading.tsx` and `error.tsx` (`retry`) follow the file conventions. The pure row mapping lives in `lib/notifications.ts`. The Phase 1A demo (mock) renders the same view with its in-browser rows.
+
+Verified with the running stack: rows rendered on the server for customer-a, the Server Action marked a notification read, a repeat with the stale version returned the conflict message, and anonymous page or action requests got 307 to sign-in. `tsc`, `eslint .` and `next build` pass. The other screens follow the same pattern in later rounds.
+
