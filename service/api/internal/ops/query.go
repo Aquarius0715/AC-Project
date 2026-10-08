@@ -50,6 +50,17 @@ func RegisterQuery[I any, O any](r *Registry, domain, name string, h func(contex
 	}}
 }
 
+// Delegate is the body of a provider method other domains call (IR192): it asks the owner through the call's
+// registry — in the caller's transaction when this process serves the owner's domain, otherwise over HTTP — and runs
+// local directly for calls without a registry (the scheduler worker). local must also be registered as the query
+// name of the owner's domain.
+func Delegate[I any, O any](ctx context.Context, c *Call, name string, in I, local func(context.Context, *Call, *I) (O, error)) (O, error) {
+	if c.Queries == nil {
+		return local(ctx, c, &in)
+	}
+	return Ask[O](ctx, c.Queries, c, name, in)
+}
+
 // Query runs the internal query name for the call (modules use it; the registry comes with the call).
 func Query[O any](ctx context.Context, c *Call, name string, in any) (O, error) {
 	return Ask[O](ctx, c.Queries, c, name, in)

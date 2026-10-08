@@ -43,7 +43,7 @@ func resolveQr(ctx context.Context, c *ops.Call, in *QrInput) (QrResolution, err
 	var unit uuid.UUID
 	if id, err := uuid.Parse(code); err == nil {
 		unit = id
-	} else if err := c.Tx.QueryRow(ctx, `SELECT unit_id FROM devices.devices WHERE upper(btrim(serial)) = upper($1) AND unit_id IS NOT NULL`, in.Code).Scan(&unit); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	} else if err := c.Tx.QueryRow(ctx, `SELECT unit_id FROM maintenance.ref_devices WHERE upper(btrim(serial)) = upper($1) AND unit_id IS NOT NULL`, in.Code).Scan(&unit); err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return QrResolution{}, err
 	}
 	nf := apperr.E(apperr.NotFound, "error.notFound")

@@ -1765,3 +1765,14 @@ Equipment (alert policies), maintenance (job events, IR95), billing (inquiries, 
 - Delivery is asynchronous between the split services (consumer poll ≤ 250 ms); the all-domain process applies the events before the response.
 
 Verified: all Go tests green, none skipped; `TestNotificationsAcrossServices` runs billing-api alone against identity-api over HTTP: the inquiry notification is not stored by billing and appears after identity's consumer runs. The existing alert, inquiry, reminder, restriction and job-event notification tests pass unchanged.
+
+## IR192 Query-backed identity Directory, qualification grants by event, maintenance copies (phase B step 3, part 7) — 2026-10-09
+
+Other domains called `identity.Directory` in-process, so its SQL ran in their transactions; `SetGrant` even wrote `identity.qualification_grants` from maintenance-api (`certificates.verify`). The provider methods now delegate to identity.
+
+- `ops.Delegate(ctx, call, query, input, local)`: the body of a provider method. With a request registry it asks the owner (same transaction when served locally, `/internal/v1/queries` otherwise); calls without a registry (the scheduler worker) run `local` directly. Consumers and the wiring in `app.go` stay unchanged.
+- Directory queries: `identity.nonReaders {ids, customerOrgId}` (alert policy recipients, IR120), `identity.orgState {orgId}` → `{kind, status, found}`, `identity.orgName {orgId}`, `identity.technician {membershipId}` → `{orgId, employment, active, scopes, found}`, `identity.qualified {membershipId, codes, start, end}` (IR123); `ActiveClientOf` uses `identity.members` (IR191).
+- `SetGrant` publishes `QualificationGranted {membershipId, code, validFrom, validUntil}`; the `identity` consumer updates or inserts the grant. Between the split services the grant applies after the consumer poll; assignment checks that follow use it from then on.
+- Maintenance reference copies (consumer `maintenance`): `ref_memberships` (all membership columns; capture trigger on `identity.memberships`) for technician planning (`members.*`), unavailability conflicts and the worker's history snapshots (`FreezeEnded`); `ref_devices` (id, tenant_id, serial, unit_id) for QR serial lookup (IR145).
+
+Verified: all Go tests green twice on the same database, none skipped; `TestDirectoryAcrossServices` runs maintenance-api alone against identity-api: certificate submission checks the technician over HTTP (another contractor's technician is NOT_FOUND) and the approved certificate's grant appears after identity's consumer runs; `TestReplicas` covers the maintenance copies.

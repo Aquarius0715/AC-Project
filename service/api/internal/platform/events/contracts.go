@@ -27,6 +27,7 @@ const (
 
 	// any domain → identity (IR191)
 	NotificationRequested = "NotificationRequested" // store one notification (ID assigned by the producer)
+	QualificationGranted  = "QualificationGranted"  // maintenance → identity: a verified certificate covers a grant (IR192)
 
 	// maintenance → equipment, written by row triggers on maintenance.offers / maintenance.assignments (IR186)
 	OfferAccessChanged      = "OfferAccessChanged"      // a contractor's access window to a unit (accepted Offers)
@@ -128,4 +129,12 @@ type Notification struct {
 	Severity              string         `json:"severity"`
 	SourceAlertID         *uuid.UUID     `json:"sourceAlertId"`
 	OccurredAt            time.Time      `json:"occurredAt"`
+}
+
+// Grant is the payload of QualificationGranted.
+type Grant struct {
+	MembershipID uuid.UUID `json:"membershipId"`
+	Code         string    `json:"code"`
+	ValidFrom    time.Time `json:"validFrom"`
+	ValidUntil   time.Time `json:"validUntil"`
 }

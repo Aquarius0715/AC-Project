@@ -1717,6 +1717,17 @@ CREATE TABLE notify.ref_restrictions (id uuid PRIMARY KEY, tenant_id uuid NOT NU
 CREATE TABLE notify.ref_restriction_units (restriction_id uuid NOT NULL, unit_id uuid NOT NULL, tenant_id uuid NOT NULL, PRIMARY KEY (restriction_id, unit_id));
 CREATE TABLE notify.ref_devices (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, serial text, unit_id uuid);
 
+-- Reference copies for maintenance (IR192), kept by the maintenance-api consumer: technician planning, partner
+-- memberships and the history snapshots of the worker.
+CREATE TABLE maintenance.ref_memberships (
+  id uuid PRIMARY KEY, tenant_id uuid NOT NULL, version int, created_at timestamptz, updated_at timestamptz, user_id uuid, organization_id uuid,
+  role text, employment text, scope_version int, valid_from timestamptz, valid_until timestamptz, client_role text
+);
+CREATE INDEX ref_memberships_org ON maintenance.ref_memberships (organization_id, role);
+CREATE INDEX ref_memberships_user ON maintenance.ref_memberships (user_id);
+CREATE TABLE maintenance.ref_devices (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, serial text, unit_id uuid);  -- QR serial lookup (IR145)
+CREATE INDEX ref_devices_serial ON maintenance.ref_devices (upper(btrim(serial)));
+
 -- Reference copies for energy (IR189), kept by the energy-api consumer.
 CREATE TABLE energy.ref_units (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, customer_org_id uuid, property_id uuid, archived boolean);
 CREATE TABLE energy.ref_customers (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, organization_id uuid);
@@ -1736,6 +1747,9 @@ CREATE INDEX ref_power_samples_unit ON energy.ref_power_samples (unit_id, observ
 
 CREATE TRIGGER units_capture AFTER INSERT OR DELETE OR UPDATE OF customer_org_id, property_id, display_name, archived ON assets.units
   FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'customer_org_id', 'property_id', 'display_name', 'archived');
+CREATE TRIGGER memberships_capture AFTER INSERT OR DELETE OR UPDATE ON identity.memberships
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'version', 'created_at', 'updated_at', 'user_id', 'organization_id', 'role', 'employment',
+    'scope_version', 'valid_from', 'valid_until', 'client_role');
 CREATE TRIGGER customers_capture AFTER INSERT OR DELETE OR UPDATE OF organization_id ON assets.customers
   FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'organization_id');
 CREATE TRIGGER jobs_capture AFTER INSERT OR DELETE OR UPDATE OF unit_id, customer_org_id, status, updated_at ON maintenance.jobs

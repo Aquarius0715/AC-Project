@@ -8,19 +8,20 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/energy"
+	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
-// IR188, IR189: every notify and energy reference copy holds exactly the captured columns of its source rows, and follows updates and
+// IR188, IR189, IR192: every notify, energy and maintenance reference copy holds exactly the captured columns of its source rows, and follows updates and
 // deletes made by any write path.
 func TestReplicas(t *testing.T) {
 	_ = server(t)
 	same := func() {
 		t.Helper()
 		drainEvents(t)
-		for _, r := range append(append([]events.Replica{}, notify.Replicas...), energy.Replicas...) {
+		for _, r := range append(append(append([]events.Replica{}, notify.Replicas...), energy.Replicas...), maintenance.Replicas...) {
 			cols := strings.Join(append(append([]string{}, r.Keys...), r.Cols...), ", ")
 			source := r.Source
 			if source == "monitoring.measurements" { // only minute-slot power samples are captured

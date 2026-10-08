@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
@@ -151,87 +152,34 @@ func organizationsSave(ctx context.Context, c *ops.Call, in *OrganizationSave) (
 	return o, nil
 }
 
-// Directory answers membership questions for other modules.
+// Directory answers membership questions for other modules. Every method is query-backed (IR192): callers in
+// other domains ask identity-api; identity's own data is read only by the handlers in directory.go.
 type Directory struct{}
 
 // NonReaders returns the IDs that are not active memberships able to read the alerts of a customer organization:
 // HQ memberships with alert.read or client memberships of that organization (IR120 item 3).
 func (Directory) NonReaders(ctx context.Context, c *ops.Call, ids []uuid.UUID, customerOrg uuid.UUID) ([]uuid.UUID, error) {
-	rows, err := c.Tx.Query(ctx, `SELECT m.id FROM identity.memberships m
-		WHERE m.id = ANY($1) AND m.valid_from <= $3 AND (m.valid_until IS NULL OR m.valid_until > $3)
-		  AND ((m.role = 'admin' AND EXISTS (SELECT 1 FROM identity.membership_permissions p WHERE p.membership_id = m.id AND p.permission = 'alert.read'))
-		    OR (m.role = 'client' AND m.organization_id = $2))`, ids, customerOrg, c.Now)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	ok := map[uuid.UUID]bool{}
-	for rows.Next() {
-		var id uuid.UUID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ok[id] = true
-	}
-	var bad []uuid.UUID
-	for _, id := range ids {
-		if !ok[id] {
-			bad = append(bad, id)
-		}
-	}
-	return bad, rows.Err()
+	return ops.Delegate(ctx, c, QueryNonReaders, NonReadersInput{IDs: ids, CustomerOrgID: customerOrg}, nonReaders)
 }
 
 // OrgState returns the kind and status of an organization.
 func (Directory) OrgState(ctx context.Context, c *ops.Call, org uuid.UUID) (kind, status string, found bool, err error) {
-	err = c.Tx.QueryRow(ctx, `SELECT kind, status FROM identity.organizations WHERE id = $1`, org).Scan(&kind, &status)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", "", false, nil
-	}
-	return kind, status, err == nil, err
+	st, err := ops.Delegate(ctx, c, QueryOrgState, OrgInput{OrgID: org}, orgState)
+	return st.Kind, st.Status, st.Found, err
 }
 
 // Technician describes a role=technician membership for assignment checks.
 type Technician struct {
-	OrgID      uuid.UUID
-	Employment string
-	Active     bool
-	Scopes     map[string][]uuid.UUID
+	OrgID      uuid.UUID              `json:"orgId"`
+	Employment string                 `json:"employment"`
+	Active     bool                   `json:"active"`
+	Scopes     map[string][]uuid.UUID `json:"scopes"`
 }
 
 // Technician loads a technician membership (found=false for unknown IDs or other roles).
 func (Directory) Technician(ctx context.Context, c *ops.Call, membership uuid.UUID) (Technician, bool, error) {
-	var t Technician
-	var emp *string
-	var from time.Time
-	var until *time.Time
-	err := c.Tx.QueryRow(ctx, `SELECT organization_id, employment, valid_from, valid_until FROM identity.memberships WHERE id = $1 AND role = 'technician'`, membership).
-		Scan(&t.OrgID, &emp, &from, &until)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return t, false, nil
-	}
-	if err != nil {
-		return t, false, err
-	}
-	if emp != nil {
-		t.Employment = *emp
-	}
-	t.Active = !from.After(c.Now) && (until == nil || until.After(c.Now))
-	t.Scopes = map[string][]uuid.UUID{}
-	rows, err := c.Tx.Query(ctx, `SELECT kind, ref_id FROM identity.membership_scopes WHERE membership_id = $1`, membership)
-	if err != nil {
-		return t, false, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var k string
-		var id uuid.UUID
-		if err := rows.Scan(&k, &id); err != nil {
-			return t, false, err
-		}
-		t.Scopes[k] = append(t.Scopes[k], id)
-	}
-	return t, true, rows.Err()
+	t, err := ops.Delegate(ctx, c, QueryTechnician, MembershipInput{MembershipID: membership}, technician)
+	return t.Technician, t.Found, err
 }
 
 // Qualified reports whether the membership holds unrevoked grants for every code covering [start, end) (IR123 item 3).
@@ -239,29 +187,23 @@ func (Directory) Qualified(ctx context.Context, c *ops.Call, membership uuid.UUI
 	if len(codes) == 0 {
 		return true, nil
 	}
-	var n int
-	err := c.Tx.QueryRow(ctx, `SELECT count(DISTINCT code) FROM identity.qualification_grants WHERE membership_id = $1 AND code = ANY($2)
-		AND valid_from <= $3 AND valid_until >= $4 AND revoked_at IS NULL`, membership, codes, start, end).Scan(&n)
-	return n == len(codes), err
+	return ops.Delegate(ctx, c, QueryQualified, QualifiedInput{MembershipID: membership, Codes: codes, Start: start, End: end}, qualified)
 }
 
 // OrgName returns an organization's name.
 func (Directory) OrgName(ctx context.Context, c *ops.Call, org uuid.UUID) (string, error) {
-	var name string
-	err := c.Tx.QueryRow(ctx, `SELECT name FROM identity.organizations WHERE id = $1`, org).Scan(&name)
-	return name, err
+	return ops.Delegate(ctx, c, QueryOrgName, OrgInput{OrgID: org}, orgName)
 }
 
 // SetGrant makes the membership's grant for code cover [from, until) without revocation (certificates.verify, IR133).
+// The caller's domain publishes QualificationGranted; identity applies it (IR192).
 func (Directory) SetGrant(ctx context.Context, c *ops.Call, membership uuid.UUID, code string, from, until time.Time) error {
-	tag, err := c.Tx.Exec(ctx, `UPDATE identity.qualification_grants SET valid_from = $3, valid_until = $4, revoked_at = NULL WHERE membership_id = $1 AND code = $2`,
-		membership, code, from, until)
-	if err != nil || tag.RowsAffected() > 0 {
+	var tenant uuid.UUID
+	if err := c.Tx.QueryRow(ctx, `SELECT current_setting('app.tenant_id')::uuid`).Scan(&tenant); err != nil {
 		return err
 	}
-	_, err = c.Tx.Exec(ctx, `INSERT INTO identity.qualification_grants (tenant_id, membership_id, code, valid_from, valid_until) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4)`,
-		membership, code, from, until)
-	return err
+	return events.Publish(ctx, c.Tx, tenant, "membership", membership, events.QualificationGranted,
+		events.Grant{MembershipID: membership, Code: code, ValidFrom: from, ValidUntil: until})
 }
 
 // ActiveClientOf reports whether a membership is an active client membership of the organization (identity.members,

@@ -105,3 +105,38 @@ func TestNotificationsAcrossServices(t *testing.T) {
 		t.Fatal("identity-api stores the requested notification")
 	}
 }
+
+// IR192: maintenance-api alone checks technicians through identity.technician over HTTP, and a verified certificate
+// reaches identity's qualification grants through QualificationGranted.
+func TestDirectoryAcrossServices(t *testing.T) {
+	_ = server(t)
+	identitySrv := serverCfg(t, func(c *apiserver.Config) { c.Domains, c.InternalToken = []string{ops.DomainIdentity}, "test-internal" })
+	hs := httptest.NewServer(identitySrv.Echo)
+	t.Cleanup(hs.Close)
+	maint := serverCfg(t, func(c *apiserver.Config) {
+		c.Domains, c.InternalToken, c.ServiceURLs = []string{ops.DomainMaintenance}, "test-internal", map[string]string{ops.DomainIdentity: hs.URL}
+	})
+	tech := seed.ID("tech-external-a").String()
+	until := time.Date(2027, 3, 31, 0, 0, 0, 0, time.UTC)
+	body := `{"membershipId":"` + tech + `","code":"demo_electrical","name":"Electrical","number":"E-split","issuedAt":"` + clock.Add(-24*time.Hour).Format(time.RFC3339) +
+		`","expiresAt":"` + until.Format(time.RFC3339) + `","file":` + blobJSON("e.pdf", "application/pdf", []byte("%PDF-1.4 split"), 14) + `}`
+	code, m := write(maint, &contrA, "certificates.submit", body, 0)
+	if code != 200 {
+		t.Fatalf("submit on maintenance-api: %d %v", code, m)
+	}
+	if code, m := write(maint, &contrB, "certificates.submit", body, 0); code != 404 {
+		t.Fatalf("another contractor's technician (identity.technician over HTTP): %d %v", code, m)
+	}
+	cert := data(m)["id"].(string)
+	if code, m := write(maint, &hq, "certificates.verify", `{"certificateId":"`+cert+`","decision":"approve"}`, 1); code != 200 {
+		t.Fatalf("verify on maintenance-api: %d %v", code, m)
+	}
+	if err := identitySrv.DrainEvents(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	var got time.Time
+	ownerScan(t, `SELECT valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_electrical'`, []any{tech}, &got)
+	if !got.Equal(until) {
+		t.Fatalf("grant valid until %v, want %v", got, until)
+	}
+}

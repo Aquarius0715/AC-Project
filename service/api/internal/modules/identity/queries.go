@@ -29,6 +29,7 @@ func RegisterQueries(r *ops.Registry) {
 	})
 	ops.RegisterQuery(r, ops.DomainIdentity, QueryMembers, members)
 	ops.RegisterQuery(r, ops.DomainIdentity, QueryNotificationsStored, notificationsStored)
+	registerDirectory(r)
 }
 
 // QueryMembers returns the memberships active at the caller's business time that match every given filter, sorted

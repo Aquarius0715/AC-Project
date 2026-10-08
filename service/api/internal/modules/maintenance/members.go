@@ -26,7 +26,7 @@ type Workforce struct {
 // technicians lists the active technician memberships the caller may plan (HQ: all, internal only when internalOnly; contractor: own).
 func (m Workforce) technicians(ctx context.Context, c *ops.Call, internalOnly bool) ([]identity.Member, error) {
 	q := `SELECT m.id, m.tenant_id, m.version, m.created_at, m.updated_at, m.user_id, m.organization_id, m.role, m.employment, m.scope_version, m.valid_from,
-		m.valid_until, m.client_role FROM identity.memberships m WHERE m.role = 'technician' AND m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until > $1)`
+		m.valid_until, m.client_role FROM maintenance.ref_memberships m WHERE m.role = 'technician' AND m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until > $1)`
 	args := []any{c.Now}
 	switch {
 	case c.Principal.Role == "contractor":
@@ -322,7 +322,7 @@ func (m Workforce) setUnavailability(ctx context.Context, c *ops.Call, in *Unava
 	}
 	f, _ := time.ParseInLocation("2006-01-02", in.From, kualaLumpur)
 	t, _ := time.ParseInLocation("2006-01-02", in.To, kualaLumpur)
-	q := `SELECT a.id FROM maintenance.assignments a JOIN identity.memberships mb ON mb.id = a.technician_membership_id
+	q := `SELECT a.id FROM maintenance.assignments a JOIN maintenance.ref_memberships mb ON mb.id = a.technician_membership_id
 		WHERE a.status = 'active' AND a.scheduled && tstzrange($1, $2) AND `
 	args := []any{f.UTC(), t.AddDate(0, 0, 1).UTC()}
 	if in.MembershipID != nil {

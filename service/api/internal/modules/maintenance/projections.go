@@ -314,7 +314,7 @@ func FreezeEnded(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
 			EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state <> 'draft'),
 			CASE WHEN EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state = 'accepted') THEN 'accepted' ELSE 'not_accepted' END,
 			COALESCE((SELECT array_agg(e.id ORDER BY e.occurred_at, e.id) FROM maintenance.job_events e
-				JOIN identity.memberships mb ON mb.user_id = e.actor_user_id AND mb.organization_id = o.contractor_org_id
+				JOIN maintenance.ref_memberships mb ON mb.user_id = e.actor_user_id AND mb.organization_id = o.contractor_org_id
 				WHERE e.job_id = j.id AND e.action IN ('offer.accepted','offer.declined')), '{}')
 		FROM maintenance.offers o JOIN maintenance.jobs j ON j.id = o.job_id
 		WHERE o.decision = 'accept' AND o.access_valid_until <= $1
@@ -330,7 +330,7 @@ func FreezeEnded(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
 			CASE WHEN a.status = 'revoked' THEN a.updated_at ELSE upper(a.scheduled) END, j.type, j.status, j.contractor_org_id, j.completed_at,
 			EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state <> 'draft'),
 			CASE WHEN EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state = 'accepted') THEN 'accepted' ELSE 'not_accepted' END
-		FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id JOIN identity.memberships mb ON mb.id = a.technician_membership_id
+		FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id JOIN maintenance.ref_memberships mb ON mb.id = a.technician_membership_id
 		WHERE (a.status = 'active' AND upper(a.scheduled) <= $1) OR (a.status = 'revoked' AND lower(a.scheduled) <= a.updated_at AND a.updated_at <= $1)
 		ORDER BY a.job_id, a.technician_membership_id, a.updated_at DESC
 		ON CONFLICT (job_id, owner_kind, owner_id) DO NOTHING`, now)
