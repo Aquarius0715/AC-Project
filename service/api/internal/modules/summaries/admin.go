@@ -9,7 +9,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/billing"
 	"github.com/pradita/ac-project/service/api/internal/modules/energy"
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
+	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 )
 
@@ -96,72 +99,64 @@ func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (Admi
 		r := float64(n.PowerOn) / float64(d) * 100
 		out.OperatingRate = &r
 	}
-	// customers: Customer and Organization both active (IR40); filters narrow to the matching customer
+	// customers: Customer and Organization both active (IR40; organization status from identity); filters narrow to the
+	// matching customer
 	cargs := []any{}
 	cadd := func(v any) string { cargs = append(cargs, v); return fmt.Sprintf("$%d", len(cargs)) }
-	cconds := []string{"cu.status = 'active'", "o.status = 'active'"}
+	cconds := []string{"cu.status = 'active'"}
 	if in.CustomerID != nil {
 		cconds = append(cconds, "cu.id = "+cadd(*in.CustomerID))
 	}
 	if in.PropertyID != nil {
 		cconds = append(cconds, "cu.organization_id = (SELECT customer_org_id FROM assets.properties WHERE id = "+cadd(*in.PropertyID)+")")
 	}
-	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.customers cu JOIN identity.organizations o ON o.id = cu.organization_id WHERE "+strings.Join(cconds, " AND "), cargs...).
-		Scan(&out.CustomerCount); err != nil {
-		return out, err
-	}
-	// jobs whose requested slot starts in the period, by status
-	rows, err = c.Tx.Query(ctx, `SELECT status, count(*) FROM maintenance.jobs WHERE unit_id = ANY($1) AND lower(requested_slot) >= $2 AND lower(requested_slot) < $3 GROUP BY status`,
-		units, in.From, in.To)
+	rows, err = c.Tx.Query(ctx, "SELECT DISTINCT cu.organization_id FROM assets.customers cu WHERE "+strings.Join(cconds, " AND "), cargs...)
 	if err != nil {
 		return out, err
 	}
-	for rows.Next() {
-		var s string
-		var k int
-		if err := rows.Scan(&s, &k); err != nil {
-			rows.Close()
+	orgs, err := collectIDs(rows)
+	if err != nil {
+		return out, err
+	}
+	active, err := ops.Ask[[]uuid.UUID](ctx, m.Registry, c, identity.QueryActiveOrganizations, identity.OrganizationsInput{IDs: orgs})
+	if err != nil {
+		return out, err
+	}
+	if len(active) > 0 {
+		if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM assets.customers cu WHERE cu.organization_id = ANY("+cadd(active)+") AND "+strings.Join(cconds, " AND "), cargs...).
+			Scan(&out.CustomerCount); err != nil {
 			return out, err
 		}
-		out.JobCounts[s] = k
 	}
-	rows.Close()
+	// jobs whose requested slot starts in the period, by status (maintenance)
+	counts, err := ops.Ask[map[string]int](ctx, m.Registry, c, maintenance.QueryStatusCounts, maintenance.StatusCountsInput{UnitIDs: units, From: in.From, To: in.To})
+	if err != nil {
+		return out, err
+	}
+	for st, k := range counts {
+		out.JobCounts[st] = k
+	}
 	// billing (billing.read; IR115): unpaid invoices past due on contracts covering the units
 	if c.Principal.Permissions["billing.read"] {
-		out.BillingVisibility, out.AmountsByCurrency = "allowed", []Money{}
-		rows, err := c.Tx.Query(ctx, `SELECT i.currency, count(*), sum(i.amount_minor) FROM billing.invoices i
-			WHERE i.status = 'unpaid' AND i.due_at < $2
-			  AND EXISTS (SELECT 1 FROM billing.contract_units cu WHERE cu.contract_id = i.contract_id AND cu.contract_version = i.contract_version AND cu.unit_id = ANY($1))
-			GROUP BY i.currency ORDER BY i.currency`, units, c.Now)
+		overdue, err := ops.Ask[[]billing.Overdue](ctx, m.Registry, c, billing.QueryOverdue, billing.OverdueInput{UnitIDs: units})
 		if err != nil {
 			return out, err
 		}
+		out.BillingVisibility, out.AmountsByCurrency = "allowed", []Money{}
 		total := 0
-		for rows.Next() {
-			var mny Money
-			var k int
-			if err := rows.Scan(&mny.Currency, &k, &mny.AmountMinor); err != nil {
-				rows.Close()
-				return out, err
-			}
-			total += k
-			out.AmountsByCurrency = append(out.AmountsByCurrency, mny)
+		for _, o := range overdue {
+			total += o.Count
+			out.AmountsByCurrency = append(out.AmountsByCurrency, Money{AmountMinor: o.AmountMinor, Currency: o.Currency})
 		}
-		rows.Close()
 		out.OverdueInvoiceCount = &total
 	}
 	// energy: actuals only (no baseline) and the IR78 forecast
-	f, err := energy.DefaultFactor(ctx, c)
+	en, err := ops.Ask[energy.Actuals](ctx, m.Registry, c, energy.QueryActuals, energy.ActualsInput{UnitIDs: units, From: in.From, To: in.To})
 	if err != nil {
 		return out, err
 	}
-	s, integ, err := energy.Compute(ctx, c, units, in.From, in.To, f, nil)
-	if err != nil {
-		return out, err
-	}
-	out.EnergySummary = &s
-	out.EnergyForecast, err = energy.ForecastFor(ctx, c, units, in.From, in.To, integ)
-	return out, err
+	out.EnergySummary, out.EnergyForecast = &en.Summary, en.Forecast
+	return out, nil
 }
 
 // RegisterAdmin binds admin.summary.

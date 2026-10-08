@@ -57,6 +57,9 @@ func newEcho(reg *ops.Registry, m *db.TxManager, a *auth.Authenticator, logger *
 	if internalToken != "" && servesIdentity {
 		e.GET(auth.PrincipalPath, principalHandler(a, internalToken)) // IR181 step 1; not routed by the gateway
 	}
+	if internalToken != "" { // internal queries of the read models (IR190); not routed by the gateway
+		e.Group("/internal/v1", a.Middleware()).POST("/queries/:query", reg.ServeQuery(internalToken))
+	}
 	v1 := e.Group("/v1", a.Middleware())
 	v1.POST("/ops/:operation", reg.Dispatch)
 	return e

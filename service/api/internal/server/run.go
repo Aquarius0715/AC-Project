@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/pradita/ac-project/service/api/internal/ops"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -40,6 +42,12 @@ func Main(service string, domains ...string) {
 		Domains:           domains,
 		IdentityURL:       os.Getenv("IDENTITY_INTERNAL_URL"),
 		InternalToken:     os.Getenv("INTERNAL_API_TOKEN"),
+		ServiceURLs:       map[string]string{},
+	}
+	for _, d := range ops.Domains { // <DOMAIN>_API_URL of the other services (IR190), optional
+		if v := os.Getenv(strings.ToUpper(d) + "_API_URL"); v != "" {
+			cfg.ServiceURLs[d] = v
+		}
 	}
 	if cfg.DemoOps { // fixture.clock unless DEMO_CLOCK_START overrides it (IR36); shared with the workers (IR168)
 		start, err := democlock.StartFromEnv(os.Getenv)

@@ -20,15 +20,11 @@ type Units interface {
 	CountUnits(ctx context.Context, c *ops.Call, scoped bool, ids *[]uuid.UUID, customer, property, unit *uuid.UUID) (assets.UnitCounts, error)
 }
 
-// Jobs counts jobs (Maintenance).
-type Jobs interface {
-	CountJobs(ctx context.Context, c *ops.Call, raw json.RawMessage) (maintenance.JobCounts, error)
-}
-
-// Summaries is the summaries.get operation.
+// Summaries is the summaries.get and admin.summary read models. Units are equipment's own; jobs, billing,
+// energy and organization status come from their owners' internal queries through Registry (IR190).
 type Summaries struct {
-	Units Units
-	Jobs  Jobs
+	Units    Units
+	Registry *ops.Registry
 }
 
 // Input is summaries.get input.
@@ -105,7 +101,7 @@ func (m Summaries) get(ctx context.Context, c *ops.Call, in *Input) (Summary, er
 			PowerUnknown: n.PowerUnknown, AlertCount: n.AlertCount}
 		return out, nil
 	}
-	j, err := m.Jobs.CountJobs(ctx, c, in.Filters)
+	j, err := ops.Ask[maintenance.JobCounts](ctx, m.Registry, c, maintenance.QueryCountJobs, maintenance.CountJobsInput{Filters: in.Filters})
 	if err != nil {
 		return Summary{}, err
 	}

@@ -173,6 +173,7 @@ Modelling rules:
 ## 8. Domain events and asynchronous processing
 
 - **Outbox pattern**: a module writes its state change and an outbox row in one database transaction; the outbox relay publishes the event. Consumers are idempotent (event ID), delivery is at-least-once, and ordering is guaranteed per aggregate key (for example unitId, jobId, invoiceId).
+- **Data between the domain services** (IR186–IR190): a service never reads another domain's tables. It keeps reference copies fed by change-capture events (`platform.capture_row` → `RowChanged:<schema>.<table>`, `events.Replica`) when it needs the owner's rows, and asks the owner's internal queries (`/internal/v1/queries/<name>`, API composition) when it needs the owner's rules, as the read models do.
 - **Main event flows**
 
 | Event | Producer | Consumers |

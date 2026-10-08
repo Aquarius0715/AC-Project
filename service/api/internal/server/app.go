@@ -3,8 +3,10 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"log/slog"
+	"net/url"
 	"slices"
 	"time"
 
@@ -38,12 +40,13 @@ type Config struct {
 	DatabaseReaderURL string
 	Addr              string
 	Clock             func() time.Time
-	DemoOps           bool         // demo environment only: demo.advanceClock / demo.trigger (IR154)
-	DemoStart         time.Time    // demo scenario clock at start (fixture.clock, IR36); zero keeps the base clock
-	Logger            *slog.Logger // Echo's application logger (Echo v5 uses log/slog); nil keeps Echo's default
-	Domains           []string     // business domains this service serves (IR180); empty = all (tests)
-	IdentityURL       string       // identity-api base URL for principals (IR181); empty = read identity tables
-	InternalToken     string       // shared token of internal service-to-service endpoints
+	DemoOps           bool              // demo environment only: demo.advanceClock / demo.trigger (IR154)
+	DemoStart         time.Time         // demo scenario clock at start (fixture.clock, IR36); zero keeps the base clock
+	Logger            *slog.Logger      // Echo's application logger (Echo v5 uses log/slog); nil keeps Echo's default
+	Domains           []string          // business domains this service serves (IR180); empty = all (tests)
+	IdentityURL       string            // identity-api base URL for principals (IR181); empty = read identity tables
+	InternalToken     string            // shared token of internal service-to-service endpoints
+	ServiceURLs       map[string]string // base URL per domain for internal queries of unserved domains (IR190)
 }
 
 // Server is the assembled Core API.
@@ -138,7 +141,11 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	voice.Register(reg, voice.Voice{Units: am})
 	energy.RegisterMRV(reg)
 	energy.RegisterOffsets(reg)
-	sums := summaries.Summaries{Units: am, Jobs: jobs}
+	sums := summaries.Summaries{Units: am, Registry: reg}
+	maintenance.RegisterQueries(reg, jobs) // internal queries of the read models (IR190)
+	billing.RegisterQueries(reg)
+	energy.RegisterQueries(reg)
+	identity.RegisterQueries(reg)
 	summaries.Register(reg, sums)
 	summaries.RegisterAdmin(reg, sums)
 	notify.Register(reg)
@@ -166,6 +173,17 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	}
 	e := newEcho(reg, m, authn, cfg.Logger, cfg.InternalToken, servesIdentity)
 	srv := &Server{Echo: e, Registry: reg, DB: m, Consumers: consumers(m, cfg.Domains)}
+	if len(cfg.Domains) > 0 && len(cfg.ServiceURLs) > 0 { // read models ask the owning services (IR190)
+		q := &ops.HTTPQueries{Targets: map[string]*url.URL{}, Token: cfg.InternalToken}
+		for d, raw := range cfg.ServiceURLs {
+			u, err := url.Parse(raw)
+			if err != nil || u.Scheme == "" || u.Host == "" {
+				return nil, fmt.Errorf("server: service URL of %s is not absolute", d)
+			}
+			q.Targets[d] = u
+		}
+		reg.Remote = q
+	}
 	if len(cfg.Domains) == 0 { // one process serves every domain: apply events inline after each write
 		reg.AfterCommit = func(ctx context.Context) {
 			if err := srv.DrainEvents(context.WithoutCancel(ctx)); err != nil && cfg.Logger != nil {

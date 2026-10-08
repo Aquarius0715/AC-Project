@@ -58,6 +58,8 @@ type Call struct {
 	Principal     *Principal
 	Now           time.Time
 	CorrelationID string
+	// Bearer is the caller's access token, forwarded on internal queries to other services (IR190).
+	Bearer string
 	// ExpectedVersion is WriteOptions.expectedVersion (X-Expected-Version header), checked against the write
 	// version catalog before the handler runs: present when the branch requires it, nil when it must be omitted.
 	ExpectedVersion *int
@@ -125,6 +127,10 @@ type Registry struct {
 	// BeforeDispatch runs before every operation (inline mode: events from direct writes such as the change-capture
 	// triggers of IR186, the worker or device paths are applied before the operation reads their projections).
 	BeforeDispatch func(ctx context.Context)
+
+	queries map[string]query // internal queries (IR190)
+	// Remote sends queries of domains this process does not serve (nil: such queries are UNAVAILABLE).
+	Remote QueryTransport
 }
 
 // NewRegistry creates an empty registry backed by the generated catalog.
@@ -311,7 +317,8 @@ func (r *Registry) Dispatch(c *echo.Context) error {
 		}
 		return fail(c, err, corr)
 	}
-	call := &Call{Principal: p, Now: r.Clock(), CorrelationID: corr, Candidates: cands, ExpectedVersion: ev}
+	bearer, _ := strings.CutPrefix(c.Request().Header.Get(echo.HeaderAuthorization), "Bearer ")
+	call := &Call{Principal: p, Now: r.Clock(), CorrelationID: corr, Candidates: cands, ExpectedVersion: ev, Bearer: bearer}
 	var out any
 	var cursor int64
 	err = r.DB.Run(ctx, !write, p, func(tx pgx.Tx) error {

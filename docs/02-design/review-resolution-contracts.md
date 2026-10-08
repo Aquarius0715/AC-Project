@@ -1732,3 +1732,23 @@ Energy (energy-api) read assets, identity, maintenance and monitoring tables. It
 - Still shared: energy writes and reads `audit.audit_log` for offset event history (audit is shared infrastructure until the database split, IR181 step 4).
 
 Verified: all Go tests green, none skipped; `TestReplicas` compares all notify and energy copies with their sources, including power samples; the energy summary, baseline, offsets, MRV and report tests pass on the copies.
+
+## IR190 Read models by API composition (phase B step 3, part 5) — 2026-10-09
+
+`summaries.get` and `admin.summary` (equipment-api, catalog module Read models) combine logic owned by other domains: job counts with the IR26 / IR49 projections, overdue invoices, energy actuals and the IR78 forecast, organization status (IR40). Copying those tables would duplicate the owners' rules, so the read models call the owners instead.
+
+| Internal query | Owner | Input → output |
+|---|---|---|
+| `maintenance.countJobs` | maintenance-api | `{filters}` (jobs.list filters) → JobCounts (offer, active, review, scheduled, inProgress, overdue, assigned, units) |
+| `maintenance.statusCounts` | maintenance-api | `{unitIds, from, to}` → `{status: count}` of jobs whose requested slot starts in the period |
+| `billing.overdue` | billing-api | `{unitIds}` → `[{currency, count, amountMinor}]` unpaid past due on contracts covering the units |
+| `energy.actuals` | energy-api | `{unitIds, from, to}` → `{summary, forecast}` (default factor, no baseline) |
+| `identity.activeOrganizations` | identity-api | `{ids}` → active organization IDs |
+
+- `ops.RegisterQuery(r, domain, name, h)` binds a query; `ops.Ask[O](ctx, registry, call, name, in)` runs it in the caller's transaction when the process serves the owner's domain, otherwise through `ops.HTTPQueries`.
+- Wire: `POST /internal/v1/queries/<name>` on each service (not routed by the gateway), behind the normal authentication middleware with the caller's `Authorization`, `X-Tenant-Id`, `X-Membership-Id`, plus `X-Internal-Token: INTERNAL_API_TOKEN`, `X-Request-Id` (correlation) and `X-Business-Now` (the caller's business time, IR157). The owner runs the query in a read transaction with the caller's principal and applies its own scope rules; errors come back as DomainError. Missing token → 401; a query of another domain → 404.
+- Configuration: `<DOMAIN>_API_URL` per service (compose: identity, maintenance, billing, energy); without it a remote query is UNAVAILABLE.
+- In the split services the composed read is not one snapshot across domains (each owner reads its own committed state); dashboards accept this.
+- Remaining in-process cross-domain module calls (for example control → maintenance access, restrictions → equipment device models, voice → assets) are the next candidates for the same mechanism (IR181).
+
+Verified: all Go tests green, none skipped; `TestReadModelsAcrossServices` runs equipment-api alone against identity, maintenance, billing and energy servers over HTTP and gets the same `admin.summary` and `summaries.get` (customer, partner, technician) data as the single process, and checks the token and domain guards; in compose the admin and partner apps load the summaries through the gateway with the split services.
