@@ -255,11 +255,13 @@ func (m Billing) saveContract(ctx context.Context, c *ops.Call, in *ContractInpu
 	}
 	id, version := uuid.New(), 1
 	var prev *int
+	var before map[string]any
 	if in.ID != nil {
 		cur, err := m.loadContract(ctx, c, *in.ID, true)
 		if err != nil {
 			return cur, err
 		}
+		before = cur.fields()
 		if cur.CustomerID != in.CustomerID {
 			return cur, apperr.Fields(map[string]string{"customerId": "error.customerFixed"})
 		}
@@ -290,8 +292,15 @@ func (m Billing) saveContract(ctx context.Context, c *ops.Call, in *ContractInpu
 		return x, err
 	}
 	c.Emit(ops.Event{AggregateType: "contract", AggregateID: id, Type: "ContractSaved", Payload: map[string]any{"version": version}})
-	c.Audit(ops.AuditEntry{Action: "contracts.save", TargetKind: "contract", TargetID: id.String(), PreviousVersion: prev, NextVersion: &x.Version})
+	b, a := ops.Changes(before, x.fields())
+	c.Audit(ops.AuditEntry{Action: "contracts.save", TargetKind: "contract", TargetID: id.String(), PreviousVersion: prev, NextVersion: &x.Version, Before: b, After: a})
 	return x, nil
+}
+
+// fields are the audited contract values (the before/after of contracts.save).
+func (k Contract) fields() map[string]any {
+	return map[string]any{"unitIds": k.UnitIDs, "planType": k.PlanType, "startAt": k.StartAt, "endAt": k.EndAt, "priceMinor": k.PriceMinor, "currency": k.Currency,
+		"restrictionEligible": k.RestrictionEligible, "rulesVersion": k.RulesVersion}
 }
 
 // ---- invoices ----

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -188,10 +189,20 @@ func (in *CapabilitySave) Validate() map[string]string {
 	if !uniqueIn(in.FirmwareCandidates, nil) {
 		fe["firmwareCandidates"] = "error.invalid"
 	}
-	if in.ChangeReason != nil && (utf8.RuneCountInString(*in.ChangeReason) < 1 || utf8.RuneCountInString(*in.ChangeReason) > 1000) {
+	switch { // DD-A04: a change reason is required on update and not taken on create
+	case in.ID != nil && in.ChangeReason == nil:
+		fe["changeReason"] = "error.required"
+	case in.ChangeReason != nil && (utf8.RuneCountInString(strings.TrimSpace(*in.ChangeReason)) < 1 || utf8.RuneCountInString(*in.ChangeReason) > 1000):
 		fe["changeReason"] = "error.length"
 	}
 	return fe
+}
+
+// fields are the audited capability values (the before/after of capabilities.save).
+func (c Capability) fields() map[string]any {
+	return map[string]any{"manufacturer": c.Manufacturer, "model": c.Model, "control": c.Control, "modeControl": c.ModeControl, "fanControl": c.FanControl,
+		"temperature": c.Temperature, "modes": c.Modes, "fanLevels": c.FanLevels, "ventilation": c.Ventilation, "ventilationLevels": c.VentilationLevels,
+		"sensors": c.Sensors, "firmwareCandidates": c.FirmwareCandidates}
 }
 
 // UnitCapabilities is what Devices calls on Assets when a model gets a new capability version.
@@ -225,15 +236,17 @@ func (m Capabilities) save(ctx context.Context, c *ops.Call, in *CapabilitySave)
 	}
 	id, version := uuid.Must(uuid.NewV7()), 1
 	reason := ""
+	var before map[string]any
 	if in.ID != nil {
-		var cur int
-		err := c.Tx.QueryRow(ctx, `SELECT version FROM devices.capabilities WHERE id = $1 AND is_current FOR UPDATE`, *in.ID).Scan(&cur)
+		old, err := scanCap(c.Tx.QueryRow(ctx, `SELECT `+capCols+` FROM devices.capabilities WHERE id = $1 AND is_current FOR UPDATE`, *in.ID))
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Capability{}, apperr.E(apperr.NotFound, "error.notFound")
 		}
 		if err != nil {
 			return Capability{}, err
 		}
+		cur := old.Version
+		before = old.fields()
 		if cur != *c.ExpectedVersion {
 			return Capability{}, apperr.E(apperr.Conflict, "error.versionConflict")
 		}
@@ -264,7 +277,8 @@ func (m Capabilities) save(ctx context.Context, c *ops.Call, in *CapabilitySave)
 		prev = &p
 	}
 	c.Emit(ops.Event{AggregateType: "capability", AggregateID: id, Type: "CapabilityChanged", Payload: map[string]int{"version": version}})
-	c.Audit(ops.AuditEntry{Action: "capabilities.save", TargetKind: "capability", TargetID: id.String(), PreviousVersion: prev, NextVersion: &version, Reason: reason})
+	b, a := ops.Changes(before, x.fields())
+	c.Audit(ops.AuditEntry{Action: "capabilities.save", TargetKind: "capability", TargetID: id.String(), PreviousVersion: prev, NextVersion: &version, Reason: reason, Before: b, After: a})
 	return x, nil
 }
 

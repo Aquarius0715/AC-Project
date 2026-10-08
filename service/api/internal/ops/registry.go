@@ -50,6 +50,8 @@ type AuditEntry struct {
 	PreviousVersion *int
 	NextVersion     *int
 	Reason          string
+	// Before / After hold the changed fields only (see Changes); the recorder masks secrets and contacts.
+	Before, After map[string]*string
 }
 
 // Call carries everything a handler needs for one operation.

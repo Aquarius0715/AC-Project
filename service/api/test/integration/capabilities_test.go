@@ -3,6 +3,7 @@ package integration
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -62,9 +63,25 @@ func TestCapabilities(t *testing.T) {
 	// a unit on this model moves to the new capability version
 	_, um := write(s, &hq, "units.save", `{"customerOrgId":"`+seed.ID("org-customer-b").String()+`","propertyId":"`+seed.ID("property-home-b").String()+`","spaceId":null,"displayName":"Cap AC `+uuid.NewString()[:4]+`","modelId":"`+id+`","type":"split","installedAt":null,"serviceScope":["indoor"]}`, 0)
 	unit, _ := data(um)["id"].(string)
-	code, m = write(s, &hq, "capabilities.save", capBody(id, model, `,"changeReason":"added dry mode"`), 1)
+	if code, m := write(s, &hq, "capabilities.save", capBody(id, model, ""), 1); code != 422 || m["fieldErrors"].(map[string]any)["changeReason"] != "error.required" {
+		t.Errorf("update without a change reason: %d %v", code, m)
+	}
+	code, m = write(s, &hq, "capabilities.save", strings.Replace(capBody(id, model, `,"changeReason":"added fan mode"`), `["cool","dry"]`, `["cool","dry","fan"]`, 1), 1)
 	if code != 200 || ver(m) != 2 {
 		t.Fatalf("update: %d %v", code, m)
+	}
+	// the audit entry carries the changed fields only (DD-A04 version history, DD-A16 before/after)
+	day := `"from":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `","to":"` + clock.Add(time.Hour).Format(time.RFC3339) + `"`
+	_, am := post(s, &hq, "audit.list", `{"filters":{`+day+`,"targetKind":"capability","targetId":"`+id+`"},"limit":10}`)
+	var saved map[string]any
+	for _, a := range items(am) {
+		if a["nextVersion"] == float64(2) {
+			saved = a
+		}
+	}
+	if saved == nil || saved["reason"] != "added fan mode" || saved["maskedBefore"].(map[string]any)["modes"] != `["cool","dry"]` ||
+		saved["maskedAfter"].(map[string]any)["modes"] != `["cool","dry","fan"]` || len(saved["maskedAfter"].(map[string]any)) != 1 {
+		t.Fatalf("capability audit: %v", am)
 	}
 	if unit != "" {
 		_, g := post(s, &hq, "units.get", `{"id":"`+unit+`"}`)
@@ -72,10 +89,10 @@ func TestCapabilities(t *testing.T) {
 			t.Fatalf("unit capability version: %v", data(g)["capabilityVersion"])
 		}
 	}
-	if code, _ := write(s, &hq, "capabilities.save", capBody(id, model, ""), 1); code != 409 {
+	if code, _ := write(s, &hq, "capabilities.save", capBody(id, model, `,"changeReason":"again"`), 1); code != 409 {
 		t.Error("stale version")
 	}
-	if code, _ := write(s, &hq, "capabilities.save", capBody(uuid.NewString(), "new-"+model, ""), 1); code != 404 {
+	if code, _ := write(s, &hq, "capabilities.save", capBody(uuid.NewString(), "new-"+model, `,"changeReason":"x"`), 1); code != 404 {
 		t.Error("unknown model")
 	}
 	if code, _ := write(s, &customerA, "capabilities.save", capBody("", "c-"+model, ""), 0); code != 403 {

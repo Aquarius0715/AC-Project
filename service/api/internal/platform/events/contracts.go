@@ -166,4 +166,7 @@ type Audit struct {
 	CorrelationID   string     `json:"correlationId"`
 	Result          string     `json:"result"`
 	Reason          string     `json:"reason,omitempty"`
+	// MaskedBefore / MaskedAfter are the changed fields, already masked (ops.Masked).
+	MaskedBefore map[string]*string `json:"maskedBefore,omitempty"`
+	MaskedAfter  map[string]*string `json:"maskedAfter,omitempty"`
 }

@@ -27,8 +27,9 @@ export function Badge({ tone = "muted", icon, children, className }: { tone?: To
 
 export const PowerBadge = ({ s }: { s: "running" | "stopped" | "unknown" }) =>
   s === "running" ? <Badge tone="ok" icon="▶">Running</Badge> : s === "stopped" ? <Badge tone="muted" icon="■">Stopped</Badge> : <Badge tone="unknown" icon="?">Unknown</Badge>;
-export const ConnBadge = ({ s }: { s: "online" | "offline" | "connecting" }) =>
-  s === "online" ? <Badge tone="ok" icon="●">Online</Badge> : s === "offline" ? <Badge tone="unknown" icon="⊘">Offline</Badge> : <Badge tone="primary" icon="↻">Connecting</Badge>;
+export const ConnBadge = ({ s }: { s: "online" | "offline" | "connecting" | "unknown" | "error" }) =>
+  s === "online" ? <Badge tone="ok" icon="●">Online</Badge> : s === "offline" ? <Badge tone="unknown" icon="⊘">Offline</Badge> : s === "error" ? <Badge tone="crit" icon="✕">Error</Badge>
+    : s === "unknown" ? <Badge tone="unknown" icon="?">Unknown</Badge> : <Badge tone="primary" icon="↻">Connecting</Badge>;
 export const SeverityBadge = ({ s }: { s: "critical" | "warning" | "normal" }) =>
   s === "critical" ? <Badge tone="crit" icon="✕">Critical</Badge> : s === "warning" ? <Badge tone="warn" icon="⚠">Warning</Badge> : <Badge tone="primary" icon="ⓘ">Info</Badge>;
 export const OnOffBadge = ({ on }: { on: boolean }) => (on ? <Badge tone="ok">On</Badge> : <Badge tone="muted">Off</Badge>);

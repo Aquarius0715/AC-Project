@@ -34,11 +34,17 @@ export async function coreOp<T>(operation: string, input: unknown, opts: CoreOpt
   return (await coreCall<T>(operation, input, opts)).data;
 }
 
+/** session.get once per render pass: the principal and the response meta. */
+const coreSession = cache(() => coreCall<{ permissions?: string[] }>("session.get", {}, {}));
+
 /** The Core API business clock (Meta.snapshotAt; the demo scenario clock in the demo environment, IR36). */
 export const coreNow = cache(async (): Promise<Date> => {
-  const { meta } = await coreCall<unknown>("session.get", {}, {});
+  const { meta } = await coreSession();
   return meta?.snapshotAt ? new Date(meta.snapshotAt) : new Date();
 });
+
+/** The signed-in membership's permissions (session.get), for permission-scoped sections; the API still authorizes. */
+export const corePermissions = cache(async (): Promise<Set<string>> => new Set((await coreSession()).data.permissions ?? []));
 
 async function coreCall<T>(operation: string, input: unknown, opts: CoreOptions): Promise<{ data: T; meta?: { snapshotAt?: string } }> {
   const s = await verifySession();

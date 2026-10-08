@@ -53,6 +53,10 @@ func TestContractsAndInvoices(t *testing.T) {
 	if code, m := write(s, &hq, "contracts.save", body(map[string]string{"id": `"` + k + `"`, "priceMinor": "15000"}), 1); code != 200 || data(m)["version"].(float64) != 2 {
 		t.Fatalf("revise: %d %v", code, m)
 	}
+	day := `"from":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `","to":"` + clock.Add(time.Hour).Format(time.RFC3339) + `"`
+	if _, am := post(s, &hq, "audit.list", `{"filters":{`+day+`,"targetKind":"contract","targetId":"`+k+`"},"limit":10}`); !hasChange(items(am), 2, "priceMinor", "12000", "15000") {
+		t.Errorf("contract audit before/after: %v", am)
+	}
 	if code, _ := write(s, &hq, "contracts.save", body(map[string]string{"id": `"` + k + `"`}), 1); code != 409 {
 		t.Error("stale contract version")
 	}
@@ -178,4 +182,16 @@ func TestContractsAndInvoices(t *testing.T) {
 	if _, m := post(s, &hq, "invoices.list", `{"filters":{"contractId":"`+k+`","overdueOnly":true}}`); len(items(m)) != 1 {
 		t.Error("overdue list")
 	}
+}
+
+// hasChange reports whether an audit entry for nextVersion records field changing from before to after.
+func hasChange(entries []map[string]any, nextVersion int, field, before, after string) bool {
+	for _, a := range entries {
+		b, _ := a["maskedBefore"].(map[string]any)
+		f, _ := a["maskedAfter"].(map[string]any)
+		if a["nextVersion"] == float64(nextVersion) && b[field] == before && f[field] == after {
+			return true
+		}
+	}
+	return false
 }

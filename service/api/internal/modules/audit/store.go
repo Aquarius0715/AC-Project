@@ -61,11 +61,18 @@ func EventHandlers() map[string]events.Handler {
 			if err := e.Decode(&a); err != nil {
 				return err
 			}
+			before, after := a.MaskedBefore, a.MaskedAfter
+			if before == nil {
+				before = map[string]*string{}
+			}
+			if after == nil {
+				after = map[string]*string{}
+			}
 			_, err := tx.Exec(ctx, `INSERT INTO audit.audit_log (id, tenant_id, actor_id, actor_role_at_time, membership_id, action, target_kind, target_id,
-				previous_version, next_version, occurred_at, correlation_id, result, reason)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULLIF($14, '')) ON CONFLICT (id, occurred_at) DO NOTHING`,
+				previous_version, next_version, occurred_at, correlation_id, result, reason, masked_before, masked_after)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NULLIF($14, ''), $15, $16) ON CONFLICT (id, occurred_at) DO NOTHING`,
 				a.ID, e.TenantID, a.ActorID, a.ActorRole, a.MembershipID, a.Action, a.TargetKind, a.TargetID, a.PreviousVersion, a.NextVersion, a.OccurredAt,
-				a.CorrelationID, a.Result, a.Reason)
+				a.CorrelationID, a.Result, a.Reason, before, after)
 			return err
 		},
 	}
