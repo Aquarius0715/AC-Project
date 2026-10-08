@@ -37,6 +37,8 @@ func Main(service string, domains ...string) {
 		Addr:              envOr("ADDR", ":8080"),
 		DemoOps:           os.Getenv("DEMO_OPS") == "1",
 		Domains:           domains,
+		IdentityURL:       os.Getenv("IDENTITY_INTERNAL_URL"),
+		InternalToken:     os.Getenv("INTERNAL_API_TOKEN"),
 	}
 	if cfg.DemoOps { // fixture.clock unless DEMO_CLOCK_START overrides it (IR36); shared with the workers (IR168)
 		start, err := democlock.StartFromEnv(os.Getenv)

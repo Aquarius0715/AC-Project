@@ -54,6 +54,8 @@ x-backend: &backend          # Core API business-domain services (service/api/cm
     STRIPE_API_BASE: http://stripe-mock:12111
     WEATHER_API_BASE: http://weather-mock:8080          # WireMock GET /v1/current
     OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    INTERNAL_API_TOKEN: local-internal-token-change-me   # service-to-service calls (identity principal, IR181)
+    IDENTITY_INTERNAL_URL: http://identity-api:8080      # ignored by identity-api itself
   read_only: true
   tmpfs: [/tmp]
   security_opt: [no-new-privileges:true]

@@ -4,6 +4,7 @@ package server
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,6 +41,8 @@ type Config struct {
 	DemoStart         time.Time    // demo scenario clock at start (fixture.clock, IR36); zero keeps the base clock
 	Logger            *slog.Logger // Echo's application logger (Echo v5 uses log/slog); nil keeps Echo's default
 	Domains           []string     // business domains this service serves (IR180); empty = all (tests)
+	IdentityURL       string       // identity-api base URL for principals (IR181); empty = read identity tables
+	InternalToken     string       // shared token of internal service-to-service endpoints
 }
 
 // Server is the assembled Core API.
@@ -136,7 +139,12 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	devices.RegisterDevices(reg, dm)
 	devices.RegisterCampaigns(reg, dm)
 
-	e := newEcho(reg, m, &auth.Authenticator{Verifier: v, DB: m, Now: reg.Clock}, cfg.Logger)
+	authn := &auth.Authenticator{Verifier: v, DB: m, Now: reg.Clock}
+	servesIdentity := len(cfg.Domains) == 0 || slices.Contains(cfg.Domains, ops.DomainIdentity)
+	if cfg.IdentityURL != "" && !servesIdentity { // IR181 step 1: principals come from identity-api
+		authn.Source = &auth.RemoteSource{BaseURL: cfg.IdentityURL, Token: cfg.InternalToken, TTL: 30 * time.Second}
+	}
+	e := newEcho(reg, m, authn, cfg.Logger, cfg.InternalToken, servesIdentity)
 	return &Server{Echo: e, Registry: reg, DB: m}, nil
 }
 

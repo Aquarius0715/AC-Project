@@ -34,11 +34,21 @@ func (s StaticVerifier) Verify(_ context.Context, token string) (string, error) 
 	return "", errors.New("unknown token")
 }
 
-// Authenticator builds principals.
+// PrincipalSource resolves the selected Membership of a token subject into an ops.Principal (IR181 step 1):
+// identity-api reads its own tables (DB), every other service asks identity-api (RemoteSource).
+type PrincipalSource interface {
+	Principal(ctx context.Context, subject string, tenant, membership uuid.UUID) (*ops.Principal, error)
+}
+
+// ErrUnavailable means the principal could not be resolved because identity-api did not answer.
+var ErrUnavailable = errors.New("auth: principal source unavailable")
+
+// Authenticator builds principals. Source wins when set; otherwise the identity tables are read through DB.
 type Authenticator struct {
 	Verifier Verifier
 	DB       ops.Runner
 	Now      func() time.Time
+	Source   PrincipalSource
 }
 
 // unauth returns the 401 DomainError; Echo's HTTPErrorHandler writes it.
@@ -69,7 +79,10 @@ func (a *Authenticator) Middleware() echo.MiddlewareFunc {
 			if err1 != nil || err2 != nil {
 				return unauth(c, "error.membershipRequired")
 			}
-			p, err := a.Load(c.Request().Context(), sub, tenant, membership)
+			p, err := a.principal(c.Request().Context(), sub, tenant, membership)
+			if errors.Is(err, ErrUnavailable) {
+				return apperr.E(apperr.Unavailable, "error.unavailable")
+			}
 			if err != nil {
 				return unauth(c, "error.membershipInvalid")
 			}
@@ -77,6 +90,18 @@ func (a *Authenticator) Middleware() echo.MiddlewareFunc {
 			return next(c)
 		}
 	}
+}
+
+func (a *Authenticator) principal(ctx context.Context, subject string, tenant, membership uuid.UUID) (*ops.Principal, error) {
+	if a.Source != nil {
+		return a.Source.Principal(ctx, subject, tenant, membership)
+	}
+	return a.Load(ctx, subject, tenant, membership)
+}
+
+// Principal implements PrincipalSource with the identity tables (identity-api).
+func (a *Authenticator) Principal(ctx context.Context, subject string, tenant, membership uuid.UUID) (*ops.Principal, error) {
+	return a.Load(ctx, subject, tenant, membership)
 }
 
 // Load reads the Membership for subject in tenant; it fails when the membership does not belong to the subject,
@@ -99,7 +124,7 @@ func (a *Authenticator) Load(ctx context.Context, subject string, tenant, member
 			return err
 		}
 		if status != "active" || now.Before(validFrom) || (validUntil != nil && !now.Before(*validUntil)) {
-			return errors.New("membership not valid now")
+			return apperr.E(apperr.NotFound, "error.membershipInvalid") // inactive user or outside the validity window
 		}
 		if clientRole != nil {
 			p.ClientRole = *clientRole

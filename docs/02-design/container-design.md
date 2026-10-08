@@ -124,6 +124,7 @@ Configuration is twelve-factor: every service reads environment variables only. 
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | backend, web | `http://otel-collector:4318` | ADOT sidecar `http://localhost:4318` |
 | `DATA_SOURCE` | web | `mock` (demo) / `api` (full) | `api` |
 | `CORE_API_URL` | web (BFF / DAL) | `http://gateway:8080` | Core API entry (gateway, IR180) |
+| `INTERNAL_API_TOKEN` / `IDENTITY_INTERNAL_URL` | Core API services | secret / `http://identity-api:8080` | service-to-service calls; principals from identity-api (IR182) |
 | `SESSION_STORE_URL` | web (BFF) | `redis://valkey:6379` | ElastiCache endpoint (TLS) |
 
 Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`, LocalStack `SERVICES` / `AWS_DEFAULT_REGION`) exist only in compose. Local values come from compose and an optional git-ignored `.env.local` (`.env.local.example`).

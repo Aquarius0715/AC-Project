@@ -36,6 +36,12 @@ func server(t *testing.T) *apiserver.Server { t.Helper(); return serverWith(t, f
 
 func serverWith(t *testing.T, demo bool) *apiserver.Server {
 	t.Helper()
+	return serverCfg(t, func(c *apiserver.Config) { c.DemoOps = demo })
+}
+
+// serverCfg builds a server on the test database; opt adjusts the configuration (domains, identity source).
+func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
+	t.Helper()
 	ctx := context.Background()
 	conn, err := pgx.Connect(ctx, "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable")
 	if err != nil {
@@ -54,7 +60,9 @@ func serverWith(t *testing.T, demo bool) *apiserver.Server {
 	for _, a := range f.Actors {
 		v["tok-"+map[string]string{"hq-operator": "hq", "customer-a": "a", "customer-b": "b", "tech-external-b": "tb", "tech-internal-a": "ti", "tech-external-a": "ta", "contractor-a": "ca", "contractor-b": "cb", "hq-restriction-manager": "rm", "hq-override-only": "oo"}[a.MembershipID]] = seed.ID(a.UserID).String()
 	}
-	s, err := apiserver.New(ctx, apiserver.Config{DatabaseURL: url, Clock: func() time.Time { return clock }, DemoOps: demo}, v)
+	cfg := apiserver.Config{DatabaseURL: url, Clock: func() time.Time { return clock }}
+	opt(&cfg)
+	s, err := apiserver.New(ctx, cfg, v)
 	if err != nil {
 		t.Fatal(err)
 	}

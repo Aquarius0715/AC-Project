@@ -1,8 +1,10 @@
 package server
 
 import (
+	"crypto/subtle"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,7 +23,7 @@ const requestTimeout = 30 * time.Second
 // newEcho assembles the HTTP layer following the Echo guide: one Echo instance, the Recover / RequestID /
 // RequestLogger / ContextTimeout middleware chain, a versioned route group, and a central HTTPErrorHandler that
 // turns every returned error into the DomainError body of service-contracts.ts.
-func newEcho(reg *ops.Registry, m *db.TxManager, a *auth.Authenticator, logger *slog.Logger) *echo.Echo {
+func newEcho(reg *ops.Registry, m *db.TxManager, a *auth.Authenticator, logger *slog.Logger, internalToken string, servesIdentity bool) *echo.Echo {
 	e := echo.New()
 	if logger != nil {
 		e.Logger = logger
@@ -52,7 +54,35 @@ func newEcho(reg *ops.Registry, m *db.TxManager, a *auth.Authenticator, logger *
 		}
 		return c.NoContent(http.StatusOK)
 	})
+	if internalToken != "" && servesIdentity {
+		e.GET(auth.PrincipalPath, principalHandler(a, internalToken)) // IR181 step 1; not routed by the gateway
+	}
 	v1 := e.Group("/v1", a.Middleware())
 	v1.POST("/ops/:operation", reg.Dispatch)
 	return e
+}
+
+// principalHandler is identity-api's internal principal endpoint: it resolves a token subject's membership from the
+// identity tables for the other services (RemoteSource). Callers authenticate with the shared INTERNAL_API_TOKEN.
+func principalHandler(a *auth.Authenticator, token string) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		got, _ := strings.CutPrefix(c.Request().Header.Get(echo.HeaderAuthorization), "Bearer ")
+		if subtle.ConstantTimeCompare([]byte(got), []byte(token)) != 1 {
+			return apperr.E(apperr.Unauthenticated, "error.unauthenticated")
+		}
+		q := c.QueryParams()
+		tenant, err1 := uuid.Parse(q.Get("tenant"))
+		membership, err2 := uuid.Parse(q.Get("membership"))
+		if err1 != nil || err2 != nil || q.Get("subject") == "" {
+			return apperr.Fields(map[string]string{"_": "error.malformedInput"})
+		}
+		p, err := a.Load(c.Request().Context(), q.Get("subject"), tenant, membership)
+		if err != nil {
+			if de := apperr.From(err); de.Code == apperr.NotFound {
+				return apperr.E(apperr.NotFound, "error.membershipInvalid")
+			}
+			return err
+		}
+		return c.JSON(http.StatusOK, auth.ToDTO(p))
+	}
 }
