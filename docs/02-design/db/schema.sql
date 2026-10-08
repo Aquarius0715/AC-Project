@@ -377,6 +377,32 @@ CREATE TABLE assets.unit_imports (               -- FR-A18
   updated_at           timestamptz NOT NULL DEFAULT platform.app_now()
 );
 
+-- Projections of maintenance access owned by equipment (IR186): fed by OfferAccessChanged / AssignmentAccessChanged
+-- events, read by the unit scope (IR169/IR170) instead of maintenance tables.
+CREATE TABLE assets.unit_offer_access (           -- accepted Offers: contractor access windows per unit
+  tenant_id          uuid NOT NULL,
+  offer_id           uuid NOT NULL,
+  job_id             uuid NOT NULL,
+  unit_id            uuid NOT NULL,
+  contractor_org_id  uuid NOT NULL,
+  access_valid_from  timestamptz NOT NULL,
+  access_valid_until timestamptz NOT NULL,
+  PRIMARY KEY (tenant_id, offer_id)
+);
+CREATE INDEX unit_offer_access_unit ON assets.unit_offer_access (tenant_id, unit_id);
+
+CREATE TABLE assets.unit_assignment_access (      -- active Assignments: technician viewing and work windows per unit
+  tenant_id                uuid NOT NULL,
+  assignment_id            uuid NOT NULL,
+  job_id                   uuid NOT NULL,
+  unit_id                  uuid NOT NULL,
+  technician_membership_id uuid NOT NULL,
+  created_at               timestamptz NOT NULL,
+  scheduled                tstzrange NOT NULL,
+  PRIMARY KEY (tenant_id, assignment_id)
+);
+CREATE INDEX unit_assignment_access_unit ON assets.unit_assignment_access (tenant_id, unit_id, technician_membership_id);
+
 -- ---------------------------------------------------------------------------------------------
 -- devices
 -- ---------------------------------------------------------------------------------------------
@@ -994,11 +1020,42 @@ CREATE TABLE maintenance.assignments (
   updated_at                timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, job_id) REFERENCES maintenance.jobs(tenant_id, id)
 );
+
 CREATE UNIQUE INDEX assignments_one_active ON maintenance.assignments (job_id) WHERE status = 'active';
 CREATE INDEX assignments_technician ON maintenance.assignments (tenant_id, technician_membership_id, lower(scheduled)) WHERE status = 'active';
 -- A technician cannot hold two overlapping active assignments (CONFLICT, FR-P03)
 ALTER TABLE maintenance.assignments ADD CONSTRAINT assignments_no_overlap
   EXCLUDE USING gist (technician_membership_id WITH =, scheduled WITH &&) WHERE (status = 'active');
+
+-- Change capture into the outbox (IR186): every insert / update / delete of an Offer or Assignment publishes its access
+-- snapshot for equipment's projection, in the same transaction and in commit-safe outbox order.
+CREATE FUNCTION maintenance.publish_access() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  r record;
+  unit uuid;
+  payload jsonb;
+BEGIN
+  IF TG_OP = 'DELETE' THEN r := OLD; ELSE r := NEW; END IF;
+  SELECT j.unit_id INTO unit FROM maintenance.jobs j WHERE j.id = r.job_id;
+  IF TG_TABLE_NAME = 'offers' THEN
+    payload := jsonb_build_object('offerId', r.id, 'jobId', r.job_id, 'unitId', unit, 'contractorOrgId', r.contractor_org_id,
+      'accepted', TG_OP <> 'DELETE' AND r.decision IS NOT DISTINCT FROM 'accept',
+      'accessValidFrom', r.access_valid_from, 'accessValidUntil', r.access_valid_until);
+    INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id)
+      VALUES (r.tenant_id, 'offer', r.id, 'OfferAccessChanged', payload, 'change-capture');
+  ELSE
+    payload := jsonb_build_object('assignmentId', r.id, 'jobId', r.job_id, 'unitId', unit, 'technicianMembershipId', r.technician_membership_id,
+      'active', TG_OP <> 'DELETE' AND r.status = 'active', 'createdAt', r.created_at,
+      'scheduledFrom', lower(r.scheduled), 'scheduledUntil', upper(r.scheduled));
+    INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id)
+      VALUES (r.tenant_id, 'assignment', r.id, 'AssignmentAccessChanged', payload, 'change-capture');
+  END IF;
+  RETURN NULL;
+END $$;
+CREATE TRIGGER offers_publish_access AFTER INSERT OR DELETE OR UPDATE OF job_id, contractor_org_id, decision, access_valid_from, access_valid_until ON maintenance.offers
+  FOR EACH ROW EXECUTE FUNCTION maintenance.publish_access();
+CREATE TRIGGER assignments_publish_access AFTER INSERT OR DELETE OR UPDATE OF job_id, technician_membership_id, status, scheduled, created_at ON maintenance.assignments
+  FOR EACH ROW EXECUTE FUNCTION maintenance.publish_access();
 
 CREATE TABLE maintenance.work_reports (          -- one row per report version; versions are immutable once submitted
   id                  uuid NOT NULL,

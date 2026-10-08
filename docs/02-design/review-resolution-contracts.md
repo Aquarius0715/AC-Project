@@ -1578,7 +1578,7 @@ User decision: split the API into microservices by business domain. Phase A turn
 - `gateway` is the single entry for the web apps (`CORE_API_URL`): it forwards `POST /v1/ops/:operation` unchanged (headers incl. Authorization, tenant, membership, Idempotency-Key, X-Expected-Version, body, status) to `<DOMAIN>_API_URL`, keeps the request ID, answers NOT_FOUND for unknown operations and UNAVAILABLE when the service is down. It does not authenticate; each service verifies the token (IR173 pipeline). In production the ALB can route `/v1/ops/<prefix>.*` to the services directly.
 - Workers, migrate and the shared demo clock (IR168) are unchanged; demo operations belong to `identity-api`.
 
-Phase A keeps one PostgreSQL cluster. Each domain owns its schemas (identity, notify, audit / assets, devices, control, monitoring / maintenance / billing, restrictions / energy); modules still read — and in a few places write — other domains' schemas in SQL (corrected inventory in IR181) — for example the unit scope (IR170) joins maintenance assignments and offers, billing and restrictions read assets and identity, energy reads assets, maintenance and monitoring, and the read models aggregate assets, billing, maintenance and energy. Phase B replaces these reads with service calls or events and then separates the databases; until then the services must be released together with schema-compatible migrations.
+Phase A keeps one PostgreSQL cluster. Each domain owns its schemas (identity, notify, audit / assets, devices, control, monitoring / maintenance / billing, restrictions / energy); modules still read — and in a few places write — other domains' schemas in SQL (corrected inventory in IR181) — for example billing and restrictions read assets and identity, energy reads assets, maintenance and monitoring, and the read models aggregate assets, billing, maintenance and energy. Phase B replaces these reads with service calls or events and then separates the databases; until then the services must be released together with schema-compatible migrations.
 
 Verified: go vet, all Go tests (0 skipped) plus gateway tests (routing per domain, header and body forwarding, unknown operation, upstream down, env parsing); six images build; in compose the five services and the gateway start healthy; the four web apps in API mode, through the gateway, render the customer overview, alerts and notifications, the partner team, the technician unit and the admin dashboard.
 
@@ -1592,7 +1592,7 @@ A scan of every SQL statement in `service/api/internal` (tests excluded) against
 | billing-api (restrictions) | control.commands, assets.units (observed restriction), monitoring.alerts (reconciliation alerts) | assets.customers/units, control.commands, monitoring.alerts, identity memberships/permissions, notify.notifications, audit.audit_log |
 | identity-api (demo operations in `internal/server`) | control.commands (acks), monitoring.measurements (telemetry trigger) | equipment, billing, maintenance tables used by demo triggers |
 | identity-api (notifications, consents) | — | billing contracts/invoices/inquiries, restrictions, assets, devices, maintenance jobs/assignments/offers (recipient and target-scope checks) |
-| equipment-api (unit scope, unit detail, read models) | — | maintenance assignments/jobs/offers, billing contract_units/invoices, restrictions, identity memberships/organizations/consents, notify |
+| equipment-api (unit scope, unit detail, read models) | — | maintenance jobs (read models; the unit scope reads its own projections since IR186), billing contract_units/invoices, restrictions, identity memberships/organizations/consents, notify |
 | maintenance-api | — | devices.devices, identity.memberships |
 | billing-api (billing) | — | assets, identity, notify (see first billing row) |
 | energy-api | — | assets customers/properties/units, monitoring alerts/measurements, maintenance jobs/attachments, identity organizations/preferences, audit |
@@ -1655,3 +1655,24 @@ Device commands of restrictions and the callbacks between control and restrictio
 
 Verified: all Go tests green, none skipped (restriction lifecycle, cancel / payment, exception release / retry, override / reconcile, recovery cases, demo operations, commands, diagnostics, worker); the write scan reports 0 cross-domain writes; in compose the six services start healthy and `demo.advanceClock` is routed to equipment-api. The dev database was rebuilt afterwards because the smoke test had moved the shared demo clock to 2030.
 
+
+## IR186 Unit scope without maintenance reads (phase B step 3, part 1) — 2026-10-09
+
+The D01 unit scope (IR152, IR169, IR170) no longer joins `maintenance.jobs / offers / assignments`. Equipment keeps its own projection of the maintenance access it needs and the scope reads only that.
+
+| Projection (schema assets, RLS) | Row | Kept while |
+|---|---|---|
+| `assets.unit_offer_access` | `(tenant_id, offer_id)` → job_id, unit_id, contractor_org_id, access_valid_from, access_valid_until | the Offer is accepted |
+| `assets.unit_assignment_access` | `(tenant_id, assignment_id)` → job_id, unit_id, technician_membership_id, created_at, scheduled | the Assignment is active |
+
+| Event | From → to | Effect |
+|---|---|---|
+| `OfferAccessChanged {offerId, jobId, unitId, contractorOrgId, accepted, accessValidFrom, accessValidUntil}` | maintenance → equipment | upsert the row while `accepted`, otherwise delete it |
+| `AssignmentAccessChanged {assignmentId, jobId, unitId, technicianMembershipId, active, createdAt, scheduledFrom, scheduledUntil}` | maintenance → equipment | upsert the row while `active`, otherwise delete it |
+
+- Change capture: row triggers `maintenance.publish_access()` on INSERT, DELETE and UPDATE of the access columns of `maintenance.offers` / `maintenance.assignments` write the full snapshot into `platform.outbox` in the same transaction. Every write path (operations, worker, fixtures, support SQL) is covered without instrumenting each one, and snapshots make replays and late deliveries idempotent (last event in outbox order wins).
+- The predicate is unchanged: contractor = accepted Offer inside its access window; external technician = Membership.scopes ∩ own active Assignment (List: `[createdAt, scheduledEnd)`, Equipment: `[scheduledStart, scheduledEnd)`) ∩ an accepted Offer of the same job inside its access window.
+- The split services see access changes after the consumer poll (≤ 250 ms). In the all-domain process `Registry.BeforeDispatch` drains pending events before each operation (as `AfterCommit` does after writes), so reads after direct SQL changes stay exact.
+- The scope still reads `assets.units` and the projections from the other services that use it (maintenance, billing, energy); these move behind equipment with the database split (IR181 step 4).
+
+Verified: all Go tests green, none skipped, including `TestUnitAccessProjection` (insert, accept, decline, revoke, delete) and the existing scope tests; in compose the projections match the seeded accepted Offers and active Assignments with no pending access events, and the contractor and external technician apps list their units through the gateway.

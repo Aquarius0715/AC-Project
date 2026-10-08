@@ -121,6 +121,9 @@ type Registry struct {
 	// AfterCommit runs after a write committed and before the response (IR183 inline mode: a single process serving
 	// every domain applies the resulting events synchronously, so callers see their effects as before).
 	AfterCommit func(ctx context.Context)
+	// BeforeDispatch runs before every operation (inline mode: events from direct writes such as the change-capture
+	// triggers of IR186, the worker or device paths are applied before the operation reads their projections).
+	BeforeDispatch func(ctx context.Context)
 }
 
 // NewRegistry creates an empty registry backed by the generated catalog.
@@ -249,6 +252,9 @@ func (r *Registry) Dispatch(c *echo.Context) error {
 	op, ok := r.ops[name]
 	if !ok || !r.serves(name) { // unknown, or owned by another domain service (IR180)
 		return fail(c, apperr.E(apperr.NotFound, "error.unknownOperation"), corr)
+	}
+	if r.BeforeDispatch != nil {
+		r.BeforeDispatch(ctx)
 	}
 	body, err := io.ReadAll(io.LimitReader(c.Request().Body, 1<<20+1))
 	if err != nil || len(body) > 1<<20 {

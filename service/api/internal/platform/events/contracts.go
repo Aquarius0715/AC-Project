@@ -24,7 +24,34 @@ const (
 	UnitRestrictionObserved = "UnitRestrictionObserved" // a device reported the restriction it enforces (SR26)
 	CommandAcknowledged     = "CommandAcknowledged"     // a restriction command was acknowledged in time
 	CommandsEnded           = "CommandsEnded"           // restriction commands failed or expired
+
+	// maintenance → equipment, written by row triggers on maintenance.offers / maintenance.assignments (IR186)
+	OfferAccessChanged      = "OfferAccessChanged"      // a contractor's access window to a unit (accepted Offers)
+	AssignmentAccessChanged = "AssignmentAccessChanged" // a technician's viewing and work window on a unit
 )
+
+// OfferAccess is the payload of OfferAccessChanged: the Offer's current snapshot; Accepted false removes it.
+type OfferAccess struct {
+	OfferID          uuid.UUID  `json:"offerId"`
+	JobID            uuid.UUID  `json:"jobId"`
+	UnitID           *uuid.UUID `json:"unitId"`
+	ContractorOrgID  uuid.UUID  `json:"contractorOrgId"`
+	Accepted         bool       `json:"accepted"`
+	AccessValidFrom  time.Time  `json:"accessValidFrom"`
+	AccessValidUntil time.Time  `json:"accessValidUntil"`
+}
+
+// AssignmentAccess is the payload of AssignmentAccessChanged; Active false removes it.
+type AssignmentAccess struct {
+	AssignmentID           uuid.UUID  `json:"assignmentId"`
+	JobID                  uuid.UUID  `json:"jobId"`
+	UnitID                 *uuid.UUID `json:"unitId"`
+	TechnicianMembershipID uuid.UUID  `json:"technicianMembershipId"`
+	Active                 bool       `json:"active"`
+	CreatedAt              time.Time  `json:"createdAt"`
+	ScheduledFrom          *time.Time `json:"scheduledFrom"`
+	ScheduledUntil         *time.Time `json:"scheduledUntil"`
+}
 
 // UnitRestriction is the payload of UnitRestrictionApplied / UnitRestrictionCleared.
 type UnitRestriction struct {

@@ -7,6 +7,9 @@
 //   - external technician: Membership.scopes ∩ the caller's own active Assignment ∩ the accepted Offer's access window;
 //     List mode uses the IR49 viewing window [createdAt, scheduledEnd), Equipment mode (telemetry.*, alerts.*,
 //     devices.*, units.get — IR49(b)) the work window [scheduledStart, scheduledEnd)
+//
+// Offers and Assignments belong to maintenance; the scope reads equipment's own projections of them
+// (assets.unit_offer_access, assets.unit_assignment_access), fed by change-capture events (IR186).
 package unitscope
 
 import (
@@ -43,8 +46,8 @@ func SQL(c *ops.Call, args *[]any, unitExpr string, mode Mode) string {
 		return unit("su.customer_org_id = " + add(p.OrgID))
 	case "contractor":
 		now := add(c.Now)
-		return "EXISTS (SELECT 1 FROM maintenance.jobs sj JOIN maintenance.offers so ON so.job_id = sj.id WHERE sj.unit_id = " + unitExpr +
-			" AND so.contractor_org_id = " + add(p.OrgID) + " AND so.decision = 'accept' AND so.access_valid_from <= " + now + " AND " + now + " < so.access_valid_until)"
+		return "EXISTS (SELECT 1 FROM assets.unit_offer_access so WHERE so.unit_id = " + unitExpr +
+			" AND so.contractor_org_id = " + add(p.OrgID) + " AND so.access_valid_from <= " + now + " AND " + now + " < so.access_valid_until)"
 	case "technician":
 	default:
 		return "FALSE"
@@ -75,9 +78,9 @@ func assignmentSQL(c *ops.Call, add func(any) string, unitExpr string, mode Mode
 	if mode == Equipment {
 		from = "lower(sa.scheduled)"
 	}
-	return "EXISTS (SELECT 1 FROM maintenance.jobs sj JOIN maintenance.assignments sa ON sa.job_id = sj.id" +
-		" JOIN maintenance.offers so ON so.job_id = sj.id AND so.decision = 'accept' AND so.access_valid_from <= " + now + " AND " + now + " < so.access_valid_until" +
-		" WHERE sj.unit_id = " + unitExpr + " AND sa.status = 'active' AND sa.technician_membership_id = " + add(c.Principal.MembershipID) +
+	return "EXISTS (SELECT 1 FROM assets.unit_assignment_access sa" +
+		" JOIN assets.unit_offer_access so ON so.job_id = sa.job_id AND so.access_valid_from <= " + now + " AND " + now + " < so.access_valid_until" +
+		" WHERE sa.unit_id = " + unitExpr + " AND sa.technician_membership_id = " + add(c.Principal.MembershipID) +
 		" AND " + from + " <= " + now + " AND " + now + " < upper(sa.scheduled))"
 }
 

@@ -21,7 +21,7 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 |---|---|---|
 | platform | shared infrastructure | tenants, outbox, idempotency_keys, scheduled_items, processed_events, stream_checkpoints, demo_clock (demo environment only, IR168) |
 | identity | Identity & access | users, organizations, memberships, membership_permissions, membership_scopes, qualification_grants, permissions (38), preferences, two_factor, consents, client_users |
-| assets | Assets | customers, properties, spaces, units, unit_alert_policies, unit_imports, unit_import_previews (30-minute CSV validation results written outside the read transaction of `units.importPreview`, purged after expiry) |
+| assets | Assets | customers, properties, spaces, units, unit_alert_policies, unit_imports, unit_import_previews (30-minute CSV validation results written outside the read transaction of `units.importPreview`, purged after expiry), unit_offer_access and unit_assignment_access (the unit scope's projections of accepted Offers and active Assignments, fed by change-capture events, IR186) |
 | devices | Devices | capabilities (versioned), devices, sensors, device_bindings, device_operations, device_events, device_event_notes, calibration_records, firmware_campaigns, firmware_campaign_devices |
 | control | Control | commands, diagnostic_runs, automations, automation_units, automation_policies, automation_policy_units, automation_runs, evaluation_events |
 | monitoring | Monitoring & alerts | alert_policies, default_rule_settings, alerts, ventilation_logs, allergen_observations, measurements (partitioned), measurements_15m, measurements_1h |
@@ -151,7 +151,7 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 - Isolation level READ COMMITTED with optimistic versions on every aggregate; `SELECT … FOR UPDATE` on the aggregate root before changing child rows (job + offers / assignments, restriction + units, invoice + payments).
 - Serialization or deadlock errors (40001, 40P01) are retried up to three times by the `TxManager`, then UNAVAILABLE.
 - PostgreSQL errors map to contract codes: 23505 / 23P01 → CONFLICT, 23514 / 22P02 → VALIDATION, 23503 / 42501 → NOT_FOUND (never reveal other tenants), no rows on a scoped update → NOT_FOUND or CONFLICT after a version check.
-- Every write inserts its audit row(s) and outbox row(s) in the same transaction (exactly-once business effect, at-least-once event delivery).
+- Every write inserts its audit row(s) and outbox row(s) in the same transaction (exactly-once business effect, at-least-once event delivery). `maintenance.offers` and `maintenance.assignments` additionally publish `OfferAccessChanged` / `AssignmentAccessChanged` snapshots from row triggers (IR186).
 
 ## 9. Migrations
 

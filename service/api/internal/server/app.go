@@ -172,6 +172,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 				cfg.Logger.Error("inline events", "error", err)
 			}
 		}
+		reg.BeforeDispatch = reg.AfterCommit
 	}
 	return srv, nil
 }

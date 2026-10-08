@@ -91,3 +91,36 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 		t.Fatal("ended access window hides the unit from the contractor")
 	}
 }
+
+// IR186: equipment's copy of maintenance access follows every change of the Offer and the Assignment rows (row
+// triggers → outbox → assets consumer), including changes made outside the operations.
+func TestUnitAccessProjection(t *testing.T) {
+	_ = server(t)
+	unit := seed.ID("unit-other-customer")
+	job := assign(t, unit.String(), "tech-external-b", clock.Add(time.Hour), clock.Add(2*time.Hour), "active")
+	owner(t, `INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until)
+		VALUES ($1,$2,$3,'v1',tstzrange($4,$5),$6,$5,$6,$5)`,
+		seed.ID("tenant-a"), job, seed.ID("org-contractor-a"), clock.Add(time.Hour), clock.Add(2*time.Hour), clock.Add(-time.Hour))
+	count := func(table string) (n int) {
+		drainEvents(t)
+		ownerScan(t, `SELECT count(*) FROM assets.`+table+` WHERE job_id = $1 AND unit_id = $2`, []any{job, unit}, &n)
+		return n
+	}
+	if count("unit_assignment_access") != 1 || count("unit_offer_access") != 0 {
+		t.Fatal("active assignment projected, undecided offer not")
+	}
+	owner(t, `UPDATE maintenance.offers SET decision = 'accept' WHERE job_id = $1`, job)
+	if count("unit_offer_access") != 1 {
+		t.Fatal("accepted offer projected")
+	}
+	owner(t, `UPDATE maintenance.offers SET decision = 'decline' WHERE job_id = $1`, job)
+	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE job_id = $1`, job)
+	if count("unit_offer_access") != 0 || count("unit_assignment_access") != 0 {
+		t.Fatal("declined offer and revoked assignment leave the projection")
+	}
+	owner(t, `UPDATE maintenance.assignments SET status = 'active' WHERE job_id = $1`, job)
+	owner(t, `DELETE FROM maintenance.assignments WHERE job_id = $1`, job)
+	if count("unit_assignment_access") != 0 {
+		t.Fatal("deleted assignment leaves the projection")
+	}
+}
