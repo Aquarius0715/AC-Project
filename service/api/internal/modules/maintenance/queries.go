@@ -34,6 +34,8 @@ func RegisterQueries(r *ops.Registry, m Jobs) {
 		return m.CountJobs(ctx, c, in.Filters)
 	})
 	ops.RegisterQuery(r, ops.DomainMaintenance, QueryStatusCounts, statusCounts)
+	registerUsage(r)
+	registerAccess(r)
 }
 
 // statusCounts counts the jobs of the units whose requested slot starts in [from, to), by status (admin.summary).

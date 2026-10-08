@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
 // AcceptedJob is a delivered job whose report was accepted (Billing payouts, IR137).
@@ -67,6 +68,21 @@ func (PayoutSource) RateAt(ctx context.Context, c *ops.Call, contractor uuid.UUI
 		out[l.WorkType] = int64(l.AmountMinor)
 	}
 	return out, currency, true, nil
+}
+
+// NoteHandlers apply JobNoteRequested (consumer maintenance, IR193): the internal note and its note.added event,
+// authored by the requesting user at the request time.
+func NoteHandlers() map[string]events.Handler {
+	return map[string]events.Handler{
+		events.JobNoteRequested: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
+			var n events.JobNote
+			if err := e.Decode(&n); err != nil {
+				return err
+			}
+			c := &ops.Call{Tx: tx, Now: n.At, Principal: &ops.Principal{TenantID: e.TenantID, UserID: n.AuthorUserID}}
+			return PayoutSource{}.AddJobNote(ctx, c, n.JobID, n.Message)
+		},
+	}
 }
 
 // AddJobNote adds an internal note with a note.added event to a job's history (payout questions and replies).

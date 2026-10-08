@@ -29,7 +29,7 @@ func consumers(m *db.TxManager, domains []string) []*events.Consumer {
 	add(ops.DomainEquipment, "equipment", merge(assets.EventHandlers(), monitoring.EventHandlers(), control.EventHandlers()))         // IR184, IR185
 	add(ops.DomainBilling, "billing", restrictions.EventHandlers())                                                                   // IR185
 	add(ops.DomainIdentity, "identity", merge(events.Handlers(notify.Replicas...), notify.EventHandlers(), identity.GrantHandlers())) // IR188
-	add(ops.DomainMaintenance, "maintenance", events.Handlers(maintenance.Replicas...))                                               // IR192
+	add(ops.DomainMaintenance, "maintenance", merge(events.Handlers(maintenance.Replicas...), maintenance.NoteHandlers()))            // IR192
 	add(ops.DomainEnergy, "energy", events.Handlers(energy.Replicas...))                                                              // IR189
 	return out
 }

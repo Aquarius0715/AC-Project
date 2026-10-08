@@ -1776,3 +1776,24 @@ Other domains called `identity.Directory` in-process, so its SQL ran in their tr
 - Maintenance reference copies (consumer `maintenance`): `ref_memberships` (all membership columns; capture trigger on `identity.memberships`) for technician planning (`members.*`), unavailability conflicts and the worker's history snapshots (`FreezeEnded`); `ref_devices` (id, tenant_id, serial, unit_id) for QR serial lookup (IR145).
 
 Verified: all Go tests green twice on the same database, none skipped; `TestDirectoryAcrossServices` runs maintenance-api alone against identity-api: certificate submission checks the technician over HTTP (another contractor's technician is NOT_FOUND) and the approved certificate's grant appears after identity's consumer runs; `TestReplicas` covers the maintenance copies.
+
+## IR193 Cross-domain adapters through owner queries; job notes by event (phase B step 3, part 8) — 2026-10-09
+
+The composition root (`internal/server/app.go`) wired modules of one domain directly into another domain's operations. An audit of every adapter found these cross-domain providers; each now delegates (`ops.Delegate`, IR192) to an internal query of its owner.
+
+| Consumer → provider | Methods → internal queries |
+|---|---|
+| equipment (assets units / customers) → maintenance | `maintenance.unitInUse`, `maintenance.claimableJobs`, `maintenance.unitActive`, `maintenance.orgActive` (`maintenance.Usage`) |
+| equipment (assets) → billing | `billing.unitInUse`, `billing.activeContracts`, `billing.unitActive`, `billing.orgActive` (`billing.Usage`) |
+| equipment (assets, devices, control) → billing (restrictions) | `restrictions.unitBusy`, `restrictions.unitPolicy` (`restrictions.Busy`) |
+| equipment (monitoring, control) → maintenance | `maintenance.technicianJob`, `maintenance.technicianUnit`, `maintenance.jobVersion` (`maintenance.Access`, IR94) |
+| maintenance, billing, restrictions → equipment | `assets.unitState`, `assets.unitsOfProperty`, `assets.orgOfCustomer`, `assets.unitsOfOrg`, `assets.unitService`, `assets.customerProfiles`, `assets.siteAddress`, `assets.warrantyEnd`, `assets.briefUnits`, `assets.customerOfOrg`, `assets.customerState`, `assets.restrictionTarget`, `monitoring.unitSeverities`, `monitoring.runHours`, `devices.boundDevice`, `devices.operationBusy` (adapter `equipmentView`) |
+| billing (payouts) → maintenance | `maintenance.acceptedJobs`, `maintenance.rateAt` (adapter `maintenanceView`) |
+
+- `PayoutSource.AddJobNote` wrote `maintenance.job_notes` / `job_events` from billing-api; billing now publishes `JobNoteRequested {jobId, authorUserId, message, at}` and the `maintenance` consumer adds the note and its `note.added` event with that author and time.
+- Equipment's own modules still call assets, monitoring and devices directly; only other domains go through `equipmentView`.
+- Configuration: every service gets `<DOMAIN>_API_URL` of the others (compose adds `EQUIPMENT_API_URL`).
+- Tests: `newCluster` starts one server per domain wired over HTTP like compose; the split tests (domain dispatch, remote principals, read models, notifications, directory) run on it.
+- Still direct: the scheduler worker runs every domain's clock transitions in one transaction (its calls run locally), and `audit.audit_log` is written by every service.
+
+Verified: all Go tests green, none skipped; in compose the six services are healthy, the client and partner apps list invoices and jobs (billing and maintenance ask equipment), filter care shows run hours through equipment, and the services log no errors.

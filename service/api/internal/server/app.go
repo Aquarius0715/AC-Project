@@ -113,19 +113,20 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		OrgActive: []assets.OrgActivity{billing.Usage{}, maintenance.Usage{}}}
 	am.Details = unitDetails{}
 	assets.Register(reg, am)
+	eq := equipmentView{am: am, alerts: monitoring.Alerts{}, tel: monitoring.Telemetry{Sensors: devices.Models{}}, models: devices.Models{}} // other domains' view (IR193)
 	devices.Register(reg, devices.Capabilities{Units: am})
 	monitoring.RegisterAlerts(reg, monitoring.Alerts{Units: am, Access: maintenance.Access{}})
-	jobs := maintenance.Jobs{Units: am, Severity: monitoring.Alerts{}, HQOrg: func(c *ops.Call) uuid.UUID { return c.Principal.OrgID }, Sites: am}
+	jobs := maintenance.Jobs{Units: eq, Severity: eq, HQOrg: func(c *ops.Call) uuid.UUID { return c.Principal.OrgID }, Sites: eq}
 	maintenance.RegisterJobs(reg, jobs)
 	maintenance.RegisterOnSite(reg, maintenance.OnSite{Jobs: jobs})
 	blobs := blob.NewDirFromEnv()
-	reports := maintenance.Reports{Jobs: jobs, Units: am}
-	maintenance.RegisterFollowUps(reg, maintenance.FollowUps{Jobs: jobs, Blobs: blobs, Warranty: am})
+	reports := maintenance.Reports{Jobs: jobs, Units: eq}
+	maintenance.RegisterFollowUps(reg, maintenance.FollowUps{Jobs: jobs, Blobs: blobs, Warranty: eq})
 	maintenance.RegisterReports(reg, reports)
 	maintenance.RegisterPlans(reg, maintenance.Plans{Jobs: jobs})
-	maintenance.RegisterPartners(reg, maintenance.Partners{Orgs: identity.Directory{}, Customers: am})
+	maintenance.RegisterPartners(reg, maintenance.Partners{Orgs: identity.Directory{}, Customers: eq})
 	maintenance.RegisterFiles(reg, maintenance.Files{Reports: reports, Blobs: blobs})
-	delivery := maintenance.Delivery{Jobs: jobs, Directory: identity.Directory{}, Units: am}
+	delivery := maintenance.Delivery{Jobs: jobs, Directory: identity.Directory{}, Units: eq}
 	maintenance.RegisterDelivery(reg, delivery)
 	maintenance.RegisterProposals(reg, maintenance.Proposals{Delivery: delivery})
 	cmds := control.Commands{Units: controlTargets{am}, Devices: devices.Models{}, Restrictions: restrictions.Busy{}, Access: maintenance.Access{}}
@@ -146,19 +147,22 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	billing.RegisterQueries(reg)
 	energy.RegisterQueries(reg)
 	identity.RegisterQueries(reg)
+	restrictions.RegisterQueries(reg)
 	summaries.Register(reg, sums)
 	summaries.RegisterAdmin(reg, sums)
 	notify.Register(reg)
-	rm := restrictions.Restrictions{Units: restrictionTargets{am}, Devices: devices.Models{}}
+	rm := restrictions.Restrictions{Units: eq, Devices: eq}
 	restrictions.Register(reg, rm)
-	bill := billing.Billing{Customers: am, Restrictions: restrictions.Busy{}, Recipients: identity.Directory{}, Releases: rm}
+	bill := billing.Billing{Customers: eq, Restrictions: restrictions.Busy{}, Recipients: identity.Directory{}, Releases: rm}
 	billing.Register(reg, bill)
 	billing.RegisterPayments(reg, bill)
 	billing.RegisterInquiries(reg, bill)
 	audit.Register(reg)
-	billing.RegisterPayouts(reg, billing.Payouts{Source: maintenance.PayoutSource{Jobs: jobs}})
+	mv := maintenanceView{src: maintenance.PayoutSource{Jobs: jobs}}
+	billing.RegisterPayouts(reg, billing.Payouts{Source: mv})
+	registerCrossDomain(reg, eq, mv)
 	maintenance.RegisterWorkforce(reg, maintenance.Workforce{Delivery: delivery})
-	maintenance.RegisterFilterCare(reg, maintenance.FilterCare{Units: am, Run: monitoring.Telemetry{Sensors: devices.Models{}}})
+	maintenance.RegisterFilterCare(reg, maintenance.FilterCare{Units: eq, Run: eq})
 	maintenance.RegisterCertificates(reg, maintenance.Certificates{Delivery: delivery, Grants: identity.Directory{}, Blobs: blobs})
 	monitoring.RegisterTelemetry(reg, monitoring.Telemetry{Units: am, Sensors: devices.Models{}})
 	monitoring.RegisterPolicies(reg, monitoring.Policies{Units: am, Recipients: identity.Directory{}, Caps: unitCaps{am}})

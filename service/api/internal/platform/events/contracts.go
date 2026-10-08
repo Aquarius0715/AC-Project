@@ -28,6 +28,7 @@ const (
 	// any domain → identity (IR191)
 	NotificationRequested = "NotificationRequested" // store one notification (ID assigned by the producer)
 	QualificationGranted  = "QualificationGranted"  // maintenance → identity: a verified certificate covers a grant (IR192)
+	JobNoteRequested      = "JobNoteRequested"      // billing → maintenance: an internal job note (payout questions, IR193)
 
 	// maintenance → equipment, written by row triggers on maintenance.offers / maintenance.assignments (IR186)
 	OfferAccessChanged      = "OfferAccessChanged"      // a contractor's access window to a unit (accepted Offers)
@@ -137,4 +138,12 @@ type Grant struct {
 	Code         string    `json:"code"`
 	ValidFrom    time.Time `json:"validFrom"`
 	ValidUntil   time.Time `json:"validUntil"`
+}
+
+// JobNote is the payload of JobNoteRequested.
+type JobNote struct {
+	JobID        uuid.UUID `json:"jobId"`
+	AuthorUserID uuid.UUID `json:"authorUserId"`
+	Message      string    `json:"message"`
+	At           time.Time `json:"at"`
 }

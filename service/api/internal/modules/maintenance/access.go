@@ -14,8 +14,64 @@ import (
 )
 
 // Access implements the IR94 technician write table for every module (alerts, devices, commands, diagnostics,
-// jobs, attachments).
+// jobs, attachments). Equipment calls it; every method asks maintenance (IR193).
 type Access struct{}
+
+// Internal queries behind Access (IR193).
+const (
+	QueryTechnicianJob  = "maintenance.technicianJob"
+	QueryTechnicianUnit = "maintenance.technicianUnit"
+	QueryJobVersion     = "maintenance.jobVersion"
+)
+
+// TechnicianJobInput is QueryTechnicianJob input.
+type TechnicianJobInput struct {
+	JobID  uuid.UUID `json:"jobId"`
+	UnitID uuid.UUID `json:"unitId"`
+}
+
+// TechnicianUnitInput is QueryTechnicianUnit input.
+type TechnicianUnitInput struct {
+	UnitID   uuid.UUID `json:"unitId"`
+	InScope  bool      `json:"inScope"`
+	Internal bool      `json:"internal"`
+}
+
+// JobInput names a job.
+type JobInput struct {
+	JobID uuid.UUID `json:"jobId"`
+}
+
+// JobVersionResult is QueryJobVersion output.
+type JobVersionResult struct {
+	Version int       `json:"version"`
+	UnitID  uuid.UUID `json:"unitId"`
+	Found   bool      `json:"found"`
+}
+
+func registerAccess(r *ops.Registry) {
+	ops.RegisterQuery(r, ops.DomainMaintenance, QueryTechnicianJob, technicianJob)
+	ops.RegisterQuery(r, ops.DomainMaintenance, QueryTechnicianUnit, technicianUnit)
+	ops.RegisterQuery(r, ops.DomainMaintenance, QueryJobVersion, jobVersion)
+}
+
+// TechnicianJob checks a technician write that names jobId (see technicianJob).
+func (Access) TechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, unit uuid.UUID) error {
+	_, err := ops.Delegate(ctx, c, QueryTechnicianJob, TechnicianJobInput{JobID: jobID, UnitID: unit}, technicianJob)
+	return err
+}
+
+// TechnicianUnit checks a technician write without jobId (see technicianUnit).
+func (Access) TechnicianUnit(ctx context.Context, c *ops.Call, unit uuid.UUID, inScope bool, internal bool) error {
+	_, err := ops.Delegate(ctx, c, QueryTechnicianUnit, TechnicianUnitInput{UnitID: unit, InScope: inScope, Internal: internal}, technicianUnit)
+	return err
+}
+
+// JobVersion returns a job's version and unit (Control diagnostic runs).
+func (Access) JobVersion(ctx context.Context, c *ops.Call, job uuid.UUID) (int, uuid.UUID, bool, error) {
+	r, err := ops.Delegate(ctx, c, QueryJobVersion, JobInput{JobID: job}, jobVersion)
+	return r.Version, r.UnitID, r.Found, err
+}
 
 func forbidden(key string) error { return apperr.E(apperr.Forbidden, key) }
 func notFound() error            { return apperr.E(apperr.NotFound, "error.notFound") }
@@ -27,10 +83,14 @@ type assignment struct {
 	jobStatus           string
 }
 
-// TechnicianJob checks a technician write that names jobId: the user's active Assignment for the job, Job.unitId =
+// technicianJob checks a technician write that names jobId: the user's active Assignment for the job, Job.unitId =
 // target unit, and now inside the work window. Before the window → FORBIDDEN errors.assignment_not_started; ended or
 // revoked after the start → FORBIDDEN errors.assignment_ended; never assigned / revoked before the start → NOT_FOUND.
-func (Access) TechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, unit uuid.UUID) error {
+func technicianJob(ctx context.Context, c *ops.Call, in *TechnicianJobInput) (struct{}, error) {
+	return struct{}{}, checkTechnicianJob(ctx, c, in.JobID, in.UnitID)
+}
+
+func checkTechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, unit uuid.UUID) error {
 	rows, err := c.Tx.Query(ctx, `SELECT j.unit_id, a.status, a.valid_from, a.valid_until, j.status
 		FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id
 		WHERE a.job_id = $1 AND a.technician_membership_id = $2 ORDER BY a.created_at DESC`, jobID, c.Principal.MembershipID)
@@ -76,10 +136,14 @@ func (Access) TechnicianJob(ctx context.Context, c *ops.Call, jobID uuid.UUID, u
 	return notFound()
 }
 
-// TechnicianUnit checks a technician write without jobId (alerts.acknowledge/resolve, devices.addResponseNote): an
+// technicianUnit checks a technician write without jobId (alerts.acknowledge/resolve, devices.addResponseNote): an
 // active Assignment for the unit whose window contains now. Internal technicians with the unit in scope but no
 // assignment get FORBIDDEN errors.assignment_required; everyone else NOT_FOUND.
-func (Access) TechnicianUnit(ctx context.Context, c *ops.Call, unit uuid.UUID, inScope bool, internal bool) error {
+func technicianUnit(ctx context.Context, c *ops.Call, in *TechnicianUnitInput) (struct{}, error) {
+	return struct{}{}, checkTechnicianUnit(ctx, c, in.UnitID, in.InScope, in.Internal)
+}
+
+func checkTechnicianUnit(ctx context.Context, c *ops.Call, unit uuid.UUID, inScope bool, internal bool) error {
 	var any, inWindow, notStarted bool
 	err := c.Tx.QueryRow(ctx, `SELECT count(*) > 0,
 		COALESCE(bool_or(a.status = 'active' AND a.valid_from <= $3 AND $3 < a.valid_until), false),
@@ -108,13 +172,12 @@ func InScope(p *ops.Principal, unit, property, org uuid.UUID) bool {
 	return slices.Contains(p.Scopes["unit"], unit) || slices.Contains(p.Scopes["property"], property) || slices.Contains(p.Scopes["organization"], org)
 }
 
-// JobVersion returns a job's version and unit (Control diagnostic runs).
-func (Access) JobVersion(ctx context.Context, c *ops.Call, job uuid.UUID) (int, uuid.UUID, bool, error) {
-	var v int
-	var unit uuid.UUID
-	err := c.Tx.QueryRow(ctx, `SELECT version, unit_id FROM maintenance.jobs WHERE id = $1`, job).Scan(&v, &unit)
-	if err != nil && err.Error() == "no rows in result set" {
-		return 0, unit, false, nil
+func jobVersion(ctx context.Context, c *ops.Call, in *JobInput) (JobVersionResult, error) {
+	var r JobVersionResult
+	err := c.Tx.QueryRow(ctx, `SELECT version, unit_id FROM maintenance.jobs WHERE id = $1`, in.JobID).Scan(&r.Version, &r.UnitID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return JobVersionResult{}, nil
 	}
-	return v, unit, err == nil, err
+	r.Found = err == nil
+	return r, err
 }

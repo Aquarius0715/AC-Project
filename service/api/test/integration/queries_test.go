@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -13,20 +14,69 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
+// splitCluster is one server per business domain, each serving only its domain and asking the others over HTTP
+// (internal queries), like the compose services; principals come from the shared test verifier.
+type splitCluster struct {
+	srv  map[string]*apiserver.Server
+	urls map[string]string
+}
+
+func newCluster(t *testing.T) splitCluster {
+	t.Helper()
+	cl := splitCluster{srv: map[string]*apiserver.Server{}, urls: map[string]string{}}
+	for _, d := range ops.Domains {
+		s := serverCfg(t, func(c *apiserver.Config) { c.Domains, c.InternalToken = []string{d}, "test-internal" })
+		hs := httptest.NewServer(s.Echo)
+		t.Cleanup(hs.Close)
+		cl.srv[d], cl.urls[d] = s, hs.URL
+	}
+	for d, s := range cl.srv {
+		s.Registry.Remote = &ops.HTTPQueries{Targets: cl.targets(d), Token: "test-internal"}
+	}
+	return cl
+}
+
+// targets are the other services' URLs as seen from domain d.
+func (cl splitCluster) targets(d string) map[string]*url.URL {
+	out := map[string]*url.URL{}
+	for o, raw := range cl.urls {
+		if o != d {
+			out[o], _ = url.Parse(raw)
+		}
+	}
+	return out
+}
+
+// others are the other services' URLs as configuration (Config.ServiceURLs).
+func (cl splitCluster) others(d string) map[string]string {
+	out := map[string]string{}
+	for o, raw := range cl.urls {
+		if o != d {
+			out[o] = raw
+		}
+	}
+	return out
+}
+
+// drain applies pending events in every service until nothing is left (chains cross services).
+func (cl splitCluster) drain(t *testing.T) {
+	t.Helper()
+	for range 3 {
+		for _, d := range ops.Domains {
+			if err := cl.srv[d].DrainEvents(t.Context()); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
 // IR190: in the split services the read models of equipment-api ask maintenance, billing, energy and identity over
 // the internal query endpoint; the answers equal the single-process composition.
 func TestReadModelsAcrossServices(t *testing.T) {
 	all := server(t)
-	urls := map[string]string{}
-	for _, d := range []string{ops.DomainIdentity, ops.DomainMaintenance, ops.DomainBilling, ops.DomainEnergy} {
-		s := serverCfg(t, func(c *apiserver.Config) { c.Domains, c.InternalToken = []string{d}, "test-internal" })
-		hs := httptest.NewServer(s.Echo)
-		t.Cleanup(hs.Close)
-		urls[d] = hs.URL
-	}
-	equipment := serverCfg(t, func(c *apiserver.Config) {
-		c.Domains, c.InternalToken, c.ServiceURLs = []string{ops.DomainEquipment}, "test-internal", urls
-	})
+	cl := newCluster(t)
+	urls := cl.urls
+	equipment := cl.srv[ops.DomainEquipment]
 	from := clock.Add(-24 * time.Hour).Truncate(time.Minute)
 	cases := []struct {
 		who  *actor
@@ -80,12 +130,8 @@ func TestNotificationsAcrossServices(t *testing.T) {
 	s := server(t)
 	u := boundUnit(t, s, "online")
 	_, inv := overdueContract(t, s, u)
-	identitySrv := serverCfg(t, func(c *apiserver.Config) { c.Domains, c.InternalToken = []string{ops.DomainIdentity}, "test-internal" })
-	hs := httptest.NewServer(identitySrv.Echo)
-	t.Cleanup(hs.Close)
-	billingSrv := serverCfg(t, func(c *apiserver.Config) {
-		c.Domains, c.InternalToken, c.ServiceURLs = []string{ops.DomainBilling}, "test-internal", map[string]string{ops.DomainIdentity: hs.URL}
-	})
+	cl := newCluster(t)
+	identitySrv, billingSrv := cl.srv[ops.DomainIdentity], cl.srv[ops.DomainBilling]
 	code, m := write(billingSrv, &customerB, "inquiries.create", `{"subjectType":"payment","invoiceId":"`+inv+`","message":"split services"}`, 0)
 	if code != 200 {
 		t.Fatalf("create on billing-api: %d %v", code, m)
@@ -110,12 +156,8 @@ func TestNotificationsAcrossServices(t *testing.T) {
 // reaches identity's qualification grants through QualificationGranted.
 func TestDirectoryAcrossServices(t *testing.T) {
 	_ = server(t)
-	identitySrv := serverCfg(t, func(c *apiserver.Config) { c.Domains, c.InternalToken = []string{ops.DomainIdentity}, "test-internal" })
-	hs := httptest.NewServer(identitySrv.Echo)
-	t.Cleanup(hs.Close)
-	maint := serverCfg(t, func(c *apiserver.Config) {
-		c.Domains, c.InternalToken, c.ServiceURLs = []string{ops.DomainMaintenance}, "test-internal", map[string]string{ops.DomainIdentity: hs.URL}
-	})
+	cl := newCluster(t)
+	identitySrv, maint := cl.srv[ops.DomainIdentity], cl.srv[ops.DomainMaintenance]
 	tech := seed.ID("tech-external-a").String()
 	until := time.Date(2027, 3, 31, 0, 0, 0, 0, time.UTC)
 	body := `{"membershipId":"` + tech + `","code":"demo_electrical","name":"Electrical","number":"E-split","issuedAt":"` + clock.Add(-24*time.Hour).Format(time.RFC3339) +

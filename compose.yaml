@@ -56,8 +56,9 @@ x-backend: &backend          # Core API business-domain services (service/api/cm
     OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     INTERNAL_API_TOKEN: local-internal-token-change-me   # service-to-service calls (identity principal, IR181)
     IDENTITY_INTERNAL_URL: http://identity-api:8080      # ignored by identity-api itself
-    # internal queries of the read models (IR190); a service never calls itself
+    # internal queries between the services (IR190, IR193); a service never calls itself
     IDENTITY_API_URL: http://identity-api:8080
+    EQUIPMENT_API_URL: http://equipment-api:8080
     MAINTENANCE_API_URL: http://maintenance-api:8080
     BILLING_API_URL: http://billing-api:8080
     ENERGY_API_URL: http://energy-api:8080

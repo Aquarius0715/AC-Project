@@ -15,11 +15,32 @@ import (
 // its device (D05, SR24).
 type Busy struct{}
 
-// UnitBusy implements devices.Exclusion.
+// Internal queries behind Busy for equipment (IR193).
+const (
+	QueryUnitBusy   = "restrictions.unitBusy"
+	QueryUnitPolicy = "restrictions.unitPolicy"
+)
+
+// UnitInput names a unit.
+type UnitInput struct {
+	UnitID uuid.UUID `json:"unitId"`
+}
+
+// RegisterQueries binds the restriction queries other domains ask.
+func RegisterQueries(r *ops.Registry) {
+	ops.RegisterQuery(r, ops.DomainBilling, QueryUnitBusy, unitBusy)
+	ops.RegisterQuery(r, ops.DomainBilling, QueryUnitPolicy, unitPolicy)
+}
+
+// UnitBusy implements devices.Exclusion (asks billing, IR193).
 func (Busy) UnitBusy(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, error) {
+	return ops.Delegate(ctx, c, QueryUnitBusy, UnitInput{UnitID: unit}, unitBusy)
+}
+
+func unitBusy(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 	var b bool
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM restrictions.restriction_units ru JOIN restrictions.restrictions r ON r.id = ru.restriction_id
-		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested'))`, unit).Scan(&b)
+		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested'))`, in.UnitID).Scan(&b)
 	return b, err
 }
 
@@ -107,11 +128,15 @@ func (m Restrictions) OnInvoicePaid(ctx context.Context, c *ops.Call, invoice uu
 }
 
 // UnitPolicy returns the policy of the restriction that currently restricts a unit (requested / applied /
-// release_requested), as raw RestrictionPolicy JSON; nil when the unit is unrestricted (IR46).
+// release_requested), as raw RestrictionPolicy JSON; nil when the unit is unrestricted (IR46). Asks billing (IR193).
 func (Busy) UnitPolicy(ctx context.Context, c *ops.Call, unit uuid.UUID) ([]byte, error) {
+	return ops.Delegate(ctx, c, QueryUnitPolicy, UnitInput{UnitID: unit}, unitPolicy)
+}
+
+func unitPolicy(ctx context.Context, c *ops.Call, in *UnitInput) ([]byte, error) {
 	var p []byte
 	err := c.Tx.QueryRow(ctx, `SELECT r.policy FROM restrictions.restriction_units ru JOIN restrictions.restrictions r ON r.id = ru.restriction_id
-		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested') ORDER BY r.created_at DESC LIMIT 1`, unit).Scan(&p)
+		WHERE ru.unit_id = $1 AND r.state IN ('requested','applied','release_requested') ORDER BY r.created_at DESC LIMIT 1`, in.UnitID).Scan(&p)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

@@ -26,6 +26,7 @@ type Overdue struct {
 // RegisterQueries binds billing's internal queries.
 func RegisterQueries(r *ops.Registry) {
 	ops.RegisterQuery(r, ops.DomainBilling, QueryOverdue, overdue)
+	registerUsage(r)
 }
 
 // overdue sums unpaid invoices past due on contracts covering the units, by currency.

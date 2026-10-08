@@ -17,7 +17,7 @@ import (
 func TestPrincipalFromIdentityService(t *testing.T) {
 	identity := serverCfg(t, func(c *apiserver.Config) {
 		c.Domains = []string{ops.DomainIdentity}
-		c.InternalToken = "internal-test"
+		c.InternalToken = "test-internal"
 	})
 	idSrv := httptest.NewServer(identity.Echo)
 	defer idSrv.Close()
@@ -35,20 +35,22 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 		return res.StatusCode, m
 	}
 	user := seed.ID("user-customer-a").String()
-	if code, m := get("internal-test", user, seed.ID("customer-a").String()); code != 200 || m["role"] != "client" || m["clientRole"] != "owner" {
+	if code, m := get("test-internal", user, seed.ID("customer-a").String()); code != 200 || m["role"] != "client" || m["clientRole"] != "owner" {
 		t.Fatalf("principal: %d %v", code, m)
 	}
 	if code, _ := get("wrong", user, seed.ID("customer-a").String()); code != 401 {
 		t.Fatalf("wrong internal token: %d", code)
 	}
-	if code, _ := get("internal-test", user, seed.ID("customer-b").String()); code != 404 {
+	if code, _ := get("test-internal", user, seed.ID("customer-b").String()); code != 404 {
 		t.Fatalf("another user's membership: %d", code)
 	}
 
+	cl := newCluster(t) // billing asks equipment for customers (IR193)
 	billing := serverCfg(t, func(c *apiserver.Config) {
 		c.Domains = []string{ops.DomainBilling}
 		c.IdentityURL = idSrv.URL
-		c.InternalToken = "internal-test"
+		c.InternalToken = "test-internal"
+		c.ServiceURLs = cl.others(ops.DomainBilling)
 	})
 	if code, m := post(billing, &customerA, "invoices.list", `{"limit":1}`); code != 200 {
 		t.Fatalf("billing-api with remote principal: %d %v", code, m)
@@ -60,7 +62,8 @@ func TestPrincipalFromIdentityService(t *testing.T) {
 	down := serverCfg(t, func(c *apiserver.Config) {
 		c.Domains = []string{ops.DomainBilling}
 		c.IdentityURL = idSrv.URL
-		c.InternalToken = "internal-test"
+		c.InternalToken = "test-internal"
+		c.ServiceURLs = cl.others(ops.DomainBilling)
 	})
 	if code, m := post(down, &customerA, "invoices.list", `{"limit":1}`); code != 503 || m["code"] != "UNAVAILABLE" {
 		t.Fatalf("identity down: %d %v", code, m)
