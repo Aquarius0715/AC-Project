@@ -73,3 +73,35 @@ func TestReadModelsAcrossServices(t *testing.T) {
 		t.Fatalf("another domain's query: %d", code)
 	}
 }
+
+// IR191: billing-api alone notifies through identity — recipients come from identity.members over HTTP and the
+// notification is stored by identity-api's consumer from NotificationRequested.
+func TestNotificationsAcrossServices(t *testing.T) {
+	s := server(t)
+	u := boundUnit(t, s, "online")
+	_, inv := overdueContract(t, s, u)
+	identitySrv := serverCfg(t, func(c *apiserver.Config) { c.Domains, c.InternalToken = []string{ops.DomainIdentity}, "test-internal" })
+	hs := httptest.NewServer(identitySrv.Echo)
+	t.Cleanup(hs.Close)
+	billingSrv := serverCfg(t, func(c *apiserver.Config) {
+		c.Domains, c.InternalToken, c.ServiceURLs = []string{ops.DomainBilling}, "test-internal", map[string]string{ops.DomainIdentity: hs.URL}
+	})
+	code, m := write(billingSrv, &customerB, "inquiries.create", `{"subjectType":"payment","invoiceId":"`+inv+`","message":"split services"}`, 0)
+	if code != 200 {
+		t.Fatalf("create on billing-api: %d %v", code, m)
+	}
+	id := data(m)["id"].(string)
+	count := func() (n int) {
+		ownerScan(t, `SELECT count(*) FROM notify.notifications WHERE target->>'id' = $1 AND recipient_membership_id = $2`, []any{id, seed.ID("hq-operator")}, &n)
+		return n
+	}
+	if count() != 0 {
+		t.Fatal("billing-api must not store notifications itself")
+	}
+	if err := identitySrv.DrainEvents(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	if count() != 1 {
+		t.Fatal("identity-api stores the requested notification")
+	}
+}

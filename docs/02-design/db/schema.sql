@@ -850,6 +850,16 @@ CREATE TABLE monitoring.allergen_observations (  -- DEC-57 / IR98 source rows fo
 CREATE INDEX allergen_observations_unit ON monitoring.allergen_observations (tenant_id, unit_id, observed_at DESC NULLS LAST, created_at DESC);
 
 -- Telemetry hot store: 35 days, daily partitions managed by pg_partman (database-design §6)
+CREATE TABLE monitoring.alert_notifications (    -- notifications requested for alerts (IR191): the policy cooldown
+  tenant_id       uuid NOT NULL,
+  notification_id uuid PRIMARY KEY,
+  alert_id        uuid NOT NULL,
+  policy_id       uuid,
+  unit_id         uuid NOT NULL,
+  occurred_at     timestamptz NOT NULL
+);
+CREATE INDEX alert_notifications_policy ON monitoring.alert_notifications (policy_id, unit_id, occurred_at DESC);
+
 CREATE TABLE monitoring.measurements (
   tenant_id      uuid NOT NULL,
   unit_id        uuid NOT NULL,

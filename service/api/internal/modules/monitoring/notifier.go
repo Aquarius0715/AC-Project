@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 )
@@ -145,20 +147,24 @@ func policiesOf(ctx context.Context, c *ops.Call, unit, org uuid.UUID) ([]notifP
 // recipientsOf resolves the active recipients and channels: alert policies use their recipients (still active and
 // able to read the unit's customer) and channels; the default policy notifies the customer's active clients in-app.
 func recipientsOf(ctx context.Context, c *ops.Call, p notifPolicy, org uuid.UUID) ([]uuid.UUID, []string, error) {
-	q, args, channels := `SELECT m.id FROM identity.memberships m WHERE m.role = 'client' AND m.organization_id = $1 AND m.valid_from <= $2
-		AND (m.valid_until IS NULL OR m.valid_until > $2) ORDER BY m.id`, []any{org, c.Now}, []string{"inApp"}
-	if !p.isDefault {
-		q = `SELECT m.id FROM identity.memberships m WHERE m.id = ANY($3) AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until > $2)
-			AND ((m.role = 'client' AND m.organization_id = $1) OR (m.role = 'admin' AND EXISTS (SELECT 1 FROM identity.membership_permissions mp
-			WHERE mp.membership_id = m.id AND mp.permission = 'alert.read'))) ORDER BY m.id`
-		args, channels = append(args, p.recipients), p.channels
+	if p.isDefault {
+		ids, err := ops.Query[[]uuid.UUID](ctx, c, identity.QueryMembers, identity.MembersInput{Role: "client", OrganizationID: &org})
+		return ids, []string{"inApp"}, err
 	}
-	rows, err := c.Tx.Query(ctx, q, args...)
+	if len(p.recipients) == 0 {
+		return []uuid.UUID{}, p.channels, nil
+	}
+	clients, err := ops.Query[[]uuid.UUID](ctx, c, identity.QueryMembers, identity.MembersInput{IDs: p.recipients, Role: "client", OrganizationID: &org})
 	if err != nil {
 		return nil, nil, err
 	}
-	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
-	return ids, channels, err
+	admins, err := ops.Query[[]uuid.UUID](ctx, c, identity.QueryMembers, identity.MembersInput{IDs: p.recipients, Role: "admin", Permission: "alert.read"})
+	if err != nil {
+		return nil, nil, err
+	}
+	ids := append(clients, admins...)
+	slices.SortFunc(ids, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
+	return ids, p.channels, nil
 }
 
 // Evaluate returns one outcome per notification policy of the unit, sorted by policyId. A policy matches when one of
@@ -213,19 +219,17 @@ func (n Notifier) Evaluate(ctx context.Context, c *ops.Call, unit uuid.UUID, fac
 			}
 		}
 		if reason == "" { // owner still active (D02)
-			var ok bool
-			if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.memberships WHERE id = $1 AND valid_from <= $2 AND (valid_until IS NULL OR valid_until > $2))`,
-				p.owner, c.Now).Scan(&ok); err != nil {
+			owner, err := ops.Query[[]uuid.UUID](ctx, c, identity.QueryMembers, identity.MembersInput{IDs: []uuid.UUID{p.owner}})
+			if err != nil {
 				return nil, err
 			}
-			if !ok {
+			if len(owner) == 0 {
 				reason = "owner_forbidden"
 			}
 		}
 		if reason == "" && p.cooldown > 0 { // cooldown since the last created notification of this policy and unit
 			var last *time.Time
-			if err := c.Tx.QueryRow(ctx, `SELECT max(n.occurred_at) FROM notify.notifications n JOIN monitoring.alerts a ON a.id = n.source_alert_id
-				WHERE a.policy_id = $1 AND a.unit_id = $2`, p.id, unit).Scan(&last); err != nil {
+			if err := c.Tx.QueryRow(ctx, `SELECT max(occurred_at) FROM monitoring.alert_notifications WHERE policy_id = $1 AND unit_id = $2`, p.id, unit).Scan(&last); err != nil {
 				return nil, err
 			}
 			if last != nil && at.Sub(*last) < time.Duration(p.cooldown)*time.Minute {
@@ -267,6 +271,10 @@ func (n Notifier) Evaluate(ctx context.Context, c *ops.Call, unit uuid.UUID, fac
 						id, err := n.Notify.Create(ctx, c, notify.New{RecipientMembershipID: r, Channel: ch, Type: typ, TemplateKey: "alert", TargetKind: "unit", TargetID: unit,
 							Severity: hit.Severity, SourceAlertID: &alert, Params: map[string]any{"status": "open"}})
 						if err != nil {
+							return nil, err
+						}
+						if _, err := c.Tx.Exec(ctx, `INSERT INTO monitoring.alert_notifications (tenant_id, notification_id, alert_id, policy_id, unit_id, occurred_at)
+							VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, $5)`, id, alert, p.id, unit, c.Now); err != nil {
 							return nil, err
 						}
 						o.NotificationIDs = append(o.NotificationIDs, id)

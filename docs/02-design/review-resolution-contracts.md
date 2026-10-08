@@ -1752,3 +1752,16 @@ Verified: all Go tests green, none skipped; `TestReplicas` compares all notify a
 - Remaining in-process cross-domain module calls (for example control → maintenance access, restrictions → equipment device models, voice → assets) are the next candidates for the same mechanism (IR181).
 
 Verified: all Go tests green, none skipped; `TestReadModelsAcrossServices` runs equipment-api alone against identity, maintenance, billing and energy servers over HTTP and gets the same `admin.summary` and `summaries.get` (customer, partner, technician) data as the single process, and checks the token and domain guards; in compose the admin and partner apps load the summaries through the gateway with the split services.
+
+## IR191 Notifications by events and identity membership queries (phase B step 3, part 6) — 2026-10-09
+
+Equipment (alert policies), maintenance (job events, IR95), billing (inquiries, payment reminders) and restrictions (notices) stored notifications in `notify.notifications` and chose recipients from `identity.memberships` in their own transactions. Both now go through identity-api.
+
+- **Create**: `notify.Store.Create` assigns the notification ID (UUIDv7) and publishes `NotificationRequested {notificationId, recipientMembershipId, channel, type, templateKey, target {kind, id}, params, severity, sourceAlertId, occurredAt}` in the producer's transaction. The `identity` consumer inserts the notification with that ID and the recipient's scope version (`ON CONFLICT (id) DO NOTHING`; a recipient without a membership row is skipped). API results that return notification IDs (alert outcomes, `invoices.remind`, restriction notices) keep returning them at once.
+- **Recipients**: internal query `identity.members {ids?, role?, organizationId?, permission?}` returns the memberships active at the caller's business time (sorted). It replaces the membership SQL of the alert notifier (default policy clients; custom recipients that are clients of the unit's organization or admins with `alert.read`; the policy owner check), restriction notices, inquiry notifications (excluding the caller), `Directory.ActiveClientOf` (payment reminders) and the job-event recorder (clients, HQ with a permission, partner members with a permission, the assigned technician).
+- **Restriction notice evidence** (`restrictions.execute`): internal query `identity.notificationsStored {ids, targetId, occurredAt}` counts the stored notices.
+- **Alert cooldown**: `monitoring.alert_notifications (notification_id, alert_id, policy_id, unit_id, occurred_at)` records the notifications equipment requested; the cooldown reads it instead of `notify.notifications`.
+- The job-event recorder reads restriction organizations from `billing.contracts` (same domain as restrictions) instead of `assets.customers`.
+- Delivery is asynchronous between the split services (consumer poll ≤ 250 ms); the all-domain process applies the events before the response.
+
+Verified: all Go tests green, none skipped; `TestNotificationsAcrossServices` runs billing-api alone against identity-api over HTTP: the inquiry notification is not stored by billing and appears after identity's consumer runs. The existing alert, inquiry, reminder, restriction and job-event notification tests pass unchanged.

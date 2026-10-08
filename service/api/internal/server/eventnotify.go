@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 )
@@ -41,37 +42,38 @@ func (s *recipientSet) add(ids ...uuid.UUID) {
 	}
 }
 
-const activeMember = `m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until > $1)`
-
-func (r notifyingRecorder) query(ctx context.Context, c *ops.Call, sql string, args ...any) ([]uuid.UUID, error) {
-	rows, err := c.Tx.Query(ctx, sql, append([]any{c.Now}, args...)...)
-	if err != nil {
-		return nil, err
-	}
-	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+// members asks identity for the active memberships matching f (IR191).
+func members(ctx context.Context, c *ops.Call, f identity.MembersInput) ([]uuid.UUID, error) {
+	return ops.Query[[]uuid.UUID](ctx, c, identity.QueryMembers, f)
 }
 
 func (r notifyingRecorder) clients(ctx context.Context, c *ops.Call, org uuid.UUID) ([]uuid.UUID, error) {
-	return r.query(ctx, c, `SELECT m.id FROM identity.memberships m WHERE m.role = 'client' AND m.organization_id = $2 AND `+activeMember, org)
+	return members(ctx, c, identity.MembersInput{Role: "client", OrganizationID: &org})
 }
 
 func (r notifyingRecorder) hq(ctx context.Context, c *ops.Call, perm string) ([]uuid.UUID, error) {
-	return r.query(ctx, c, `SELECT m.id FROM identity.memberships m WHERE m.role = 'admin' AND EXISTS (SELECT 1 FROM identity.membership_permissions p
-		WHERE p.membership_id = m.id AND p.permission = $2) AND `+activeMember, perm)
+	return members(ctx, c, identity.MembersInput{Role: "admin", Permission: perm})
 }
 
 func (r notifyingRecorder) partners(ctx context.Context, c *ops.Call, org *uuid.UUID, perm string) ([]uuid.UUID, error) {
 	if org == nil {
 		return nil, nil
 	}
-	return r.query(ctx, c, `SELECT m.id FROM identity.memberships m WHERE m.role = 'contractor' AND m.organization_id = $2 AND EXISTS (SELECT 1 FROM identity.membership_permissions p
-		WHERE p.membership_id = m.id AND p.permission = $3) AND `+activeMember, *org, perm)
+	return members(ctx, c, identity.MembersInput{Role: "contractor", OrganizationID: org, Permission: perm})
 }
 
 func (r notifyingRecorder) technician(ctx context.Context, c *ops.Call, job uuid.UUID) ([]uuid.UUID, error) {
-	// the active assignment, or the one revoked by this very transition (cancel / hold)
-	return r.query(ctx, c, `SELECT m.id FROM maintenance.assignments a JOIN identity.memberships m ON m.id = a.technician_membership_id
-		WHERE a.job_id = $2 AND (a.status = 'active' OR (a.status = 'revoked' AND a.updated_at = $1)) AND `+activeMember, job)
+	// the active assignment, or the one revoked by this very transition (cancel / hold); maintenance's own rows
+	rows, err := c.Tx.Query(ctx, `SELECT a.technician_membership_id FROM maintenance.assignments a
+		WHERE a.job_id = $2 AND (a.status = 'active' OR (a.status = 'revoked' AND a.updated_at = $1))`, c.Now, job)
+	if err != nil {
+		return nil, err
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil || len(ids) == 0 {
+		return nil, err
+	}
+	return members(ctx, c, identity.MembersInput{IDs: ids})
 }
 
 func (r notifyingRecorder) send(ctx context.Context, c *ops.Call, set *recipientSet, template, kind string, target uuid.UUID, severity, status string) error {
@@ -223,7 +225,8 @@ func (r notifyingRecorder) job(ctx context.Context, c *ops.Call, op string, job 
 func (r notifyingRecorder) restriction(ctx context.Context, c *ops.Call, id uuid.UUID) error {
 	var state string
 	var org uuid.UUID
-	if err := c.Tx.QueryRow(ctx, `SELECT r.state, cu.organization_id FROM restrictions.restrictions r JOIN assets.customers cu ON cu.id = r.customer_id WHERE r.id = $1`, id).
+	if err := c.Tx.QueryRow(ctx, `SELECT r.state, k.customer_org_id FROM restrictions.restrictions r
+		JOIN billing.contracts k ON k.id = r.contract_id AND k.version = r.contract_version WHERE r.id = $1`, id).
 		Scan(&state, &org); err != nil {
 		return err
 	}

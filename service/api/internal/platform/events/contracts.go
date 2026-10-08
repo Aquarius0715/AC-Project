@@ -25,6 +25,9 @@ const (
 	CommandAcknowledged     = "CommandAcknowledged"     // a restriction command was acknowledged in time
 	CommandsEnded           = "CommandsEnded"           // restriction commands failed or expired
 
+	// any domain → identity (IR191)
+	NotificationRequested = "NotificationRequested" // store one notification (ID assigned by the producer)
+
 	// maintenance → equipment, written by row triggers on maintenance.offers / maintenance.assignments (IR186)
 	OfferAccessChanged      = "OfferAccessChanged"      // a contractor's access window to a unit (accepted Offers)
 	AssignmentAccessChanged = "AssignmentAccessChanged" // a technician's viewing and work window on a unit
@@ -105,4 +108,24 @@ type Observation struct {
 type Commands struct {
 	CommandIDs []uuid.UUID `json:"commandIds"`
 	At         time.Time   `json:"at"`
+}
+
+// Target is a notification target.
+type Target struct {
+	Kind string    `json:"kind"`
+	ID   uuid.UUID `json:"id"`
+}
+
+// Notification is the payload of NotificationRequested.
+type Notification struct {
+	NotificationID        uuid.UUID      `json:"notificationId"`
+	RecipientMembershipID uuid.UUID      `json:"recipientMembershipId"`
+	Channel               string         `json:"channel"`
+	Type                  string         `json:"type"`
+	TemplateKey           string         `json:"templateKey"`
+	Target                Target         `json:"target"`
+	Params                map[string]any `json:"params"`
+	Severity              string         `json:"severity"`
+	SourceAlertID         *uuid.UUID     `json:"sourceAlertId"`
+	OccurredAt            time.Time      `json:"occurredAt"`
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
@@ -237,13 +238,7 @@ func (m Restrictions) schedule(ctx context.Context, c *ops.Call, in *ScheduleInp
 // noticeRecipients returns the active client memberships of the customer organization (IR05 / IR19: clients read
 // every unit and contract of their organization).
 func noticeRecipients(ctx context.Context, c *ops.Call, org uuid.UUID) ([]uuid.UUID, error) {
-	rows, err := c.Tx.Query(ctx, `SELECT id FROM identity.memberships WHERE role = 'client' AND organization_id = $1 AND valid_from <= $2
-		AND (valid_until IS NULL OR valid_until > $2) ORDER BY id`, org, c.Now)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	return ops.Query[[]uuid.UUID](ctx, c, identity.QueryMembers, identity.MembersInput{Role: "client", OrganizationID: &org}) // IR191
 }
 
 // ExecuteInput is restrictions.execute input.
@@ -300,11 +295,17 @@ func (m Restrictions) execute(ctx context.Context, c *ops.Call, in *ExecuteInput
 	if (x.Exception != nil && c.Now.Before(x.Exception.Until)) || (x.GraceUntil != nil && c.Now.Before(*x.GraceUntil)) {
 		return x, apperr.E(apperr.Conflict, "errors.restriction_exempted")
 	}
-	var evidence int
 	var contractVersion int
-	if err := c.Tx.QueryRow(ctx, `SELECT (SELECT count(*) FROM notify.notifications n WHERE n.id = ANY($2) AND n.target->>'id' = $1::text AND n.occurred_at = $3),
-		COALESCE((SELECT version FROM billing.contracts WHERE id = $4 AND is_current), 0)`, x.ID, x.NoticeNotificationIDs, x.NoticeAt, x.ContractID).Scan(&evidence, &contractVersion); err != nil {
+	if err := c.Tx.QueryRow(ctx, `SELECT COALESCE((SELECT version FROM billing.contracts WHERE id = $1 AND is_current), 0)`, x.ContractID).Scan(&contractVersion); err != nil {
 		return x, err
+	}
+	evidence := 0 // the notices identity stored for the restriction at notice time (IR191)
+	if len(x.NoticeNotificationIDs) > 0 {
+		n, err := ops.Query[int](ctx, c, identity.QueryNotificationsStored, identity.NotificationsStoredInput{IDs: x.NoticeNotificationIDs, TargetID: x.ID, OccurredAt: x.NoticeAt})
+		if err != nil {
+			return x, err
+		}
+		evidence = n
 	}
 	if evidence == 0 || evidence != len(x.NoticeNotificationIDs) || contractVersion != x.ContractVersion {
 		return x, apperr.E(apperr.Conflict, "errors.notice_invalid")

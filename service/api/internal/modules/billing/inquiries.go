@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
@@ -81,17 +82,17 @@ func (in *InquiryInput) Validate() map[string]string {
 	return fe
 }
 
-// notifyMembers stores one inquiry notification for each membership (IR95 inquiry.received / answered).
-func (m Billing) notifyMembers(ctx context.Context, c *ops.Call, sql string, arg any, inquiry uuid.UUID, status string) error {
-	rows, err := c.Tx.Query(ctx, sql, arg, c.Now, c.Principal.MembershipID)
-	if err != nil {
-		return err
-	}
-	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+// notifyMembers stores one inquiry notification for each active membership matching f except the caller (IR95
+// inquiry.received / answered); identity resolves the memberships (IR191).
+func (m Billing) notifyMembers(ctx context.Context, c *ops.Call, f identity.MembersInput, inquiry uuid.UUID, status string) error {
+	ids, err := ops.Query[[]uuid.UUID](ctx, c, identity.QueryMembers, f)
 	if err != nil {
 		return err
 	}
 	for _, id := range ids {
+		if id == c.Principal.MembershipID {
+			continue
+		}
 		if _, err := m.Notify.Create(ctx, c, notify.New{RecipientMembershipID: id, Type: "inquiry", TemplateKey: "inquiry", TargetKind: "inquiry", TargetID: inquiry,
 			Params: map[string]any{"status": status}}); err != nil {
 			return err
@@ -99,8 +100,6 @@ func (m Billing) notifyMembers(ctx context.Context, c *ops.Call, sql string, arg
 	}
 	return nil
 }
-
-const activeSQL = ` AND m.valid_from <= $2 AND (m.valid_until IS NULL OR m.valid_until > $2) AND m.id <> $3`
 
 func (m Billing) createInquiry(ctx context.Context, c *ops.Call, in *InquiryInput) (Inquiry, error) {
 	customer, ok, err := m.Customers.CustomerOfOrg(ctx, c, c.Principal.OrgID)
@@ -139,8 +138,7 @@ func (m Billing) createInquiry(ctx context.Context, c *ops.Call, in *InquiryInpu
 		c.Principal.MembershipID, c.Now); err != nil {
 		return Inquiry{}, err
 	}
-	if err := m.notifyMembers(ctx, c, `SELECT m.id FROM identity.memberships m WHERE m.role = 'admin' AND EXISTS (SELECT 1 FROM identity.membership_permissions p
-		WHERE p.membership_id = m.id AND p.permission = $1)`+activeSQL+` ORDER BY m.id`, "billing.write", id, "received"); err != nil {
+	if err := m.notifyMembers(ctx, c, identity.MembersInput{Role: "admin", Permission: "billing.write"}, id, "received"); err != nil {
 		return Inquiry{}, err
 	}
 	c.Emit(ops.Event{AggregateType: "inquiry", AggregateID: id, Type: "InquiryReceived", Payload: map[string]any{"subjectType": in.SubjectType}})
@@ -256,8 +254,7 @@ func (m Billing) answerInquiry(ctx context.Context, c *ops.Call, in *AnswerInput
 		x.ID, in.Reply, c.Principal.MembershipID, c.Now); err != nil {
 		return x, err
 	}
-	if err := m.notifyMembers(ctx, c, `SELECT m.id FROM identity.memberships m WHERE m.role = 'client' AND m.organization_id = $1`+activeSQL+` ORDER BY m.id`,
-		x.customerOrg, x.ID, "answered"); err != nil {
+	if err := m.notifyMembers(ctx, c, identity.MembersInput{Role: "client", OrganizationID: &x.customerOrg}, x.ID, "answered"); err != nil {
 		return x, err
 	}
 	next := x.Version + 1

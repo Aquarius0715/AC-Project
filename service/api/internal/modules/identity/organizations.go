@@ -264,10 +264,9 @@ func (Directory) SetGrant(ctx context.Context, c *ops.Call, membership uuid.UUID
 	return err
 }
 
-// ActiveClientOf reports whether a membership is an active client membership of the organization.
+// ActiveClientOf reports whether a membership is an active client membership of the organization (identity.members,
+// so callers in other domains ask identity-api, IR191).
 func (Directory) ActiveClientOf(ctx context.Context, c *ops.Call, membership, org uuid.UUID) (bool, error) {
-	var ok bool
-	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.memberships WHERE id = $1 AND role = 'client' AND organization_id = $2 AND valid_from <= $3
-		AND (valid_until IS NULL OR valid_until > $3))`, membership, org, c.Now).Scan(&ok)
-	return ok, err
+	ids, err := ops.Query[[]uuid.UUID](ctx, c, QueryMembers, MembersInput{IDs: []uuid.UUID{membership}, Role: "client", OrganizationID: &org})
+	return len(ids) == 1, err
 }

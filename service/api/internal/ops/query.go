@@ -50,9 +50,17 @@ func RegisterQuery[I any, O any](r *Registry, domain, name string, h func(contex
 	}}
 }
 
+// Query runs the internal query name for the call (modules use it; the registry comes with the call).
+func Query[O any](ctx context.Context, c *Call, name string, in any) (O, error) {
+	return Ask[O](ctx, c.Queries, c, name, in)
+}
+
 // Ask runs the internal query name for the caller and decodes its result.
 func Ask[O any](ctx context.Context, r *Registry, c *Call, name string, in any) (O, error) {
 	var out O
+	if r == nil {
+		return out, fmt.Errorf("ops: query %s outside a request", name)
+	}
 	q, ok := r.queries[name]
 	if !ok {
 		return out, fmt.Errorf("ops: unknown query %s", name)
@@ -166,7 +174,7 @@ func (r *Registry) ServeQuery(token string) echo.HandlerFunc {
 			now = t
 		}
 		bearer, _ := strings.CutPrefix(c.Request().Header.Get(echo.HeaderAuthorization), "Bearer ")
-		call := &Call{Principal: p, Now: now, CorrelationID: c.Response().Header().Get(echo.HeaderXRequestID), Bearer: bearer}
+		call := &Call{Principal: p, Now: now, CorrelationID: c.Response().Header().Get(echo.HeaderXRequestID), Bearer: bearer, Queries: r}
 		if r.BeforeDispatch != nil {
 			r.BeforeDispatch(ctx)
 		}

@@ -60,6 +60,8 @@ type Call struct {
 	CorrelationID string
 	// Bearer is the caller's access token, forwarded on internal queries to other services (IR190).
 	Bearer string
+	// Queries runs internal queries of other domains for this call (see Query; nil outside requests).
+	Queries *Registry
 	// ExpectedVersion is WriteOptions.expectedVersion (X-Expected-Version header), checked against the write
 	// version catalog before the handler runs: present when the branch requires it, nil when it must be omitted.
 	ExpectedVersion *int
@@ -318,7 +320,7 @@ func (r *Registry) Dispatch(c *echo.Context) error {
 		return fail(c, err, corr)
 	}
 	bearer, _ := strings.CutPrefix(c.Request().Header.Get(echo.HeaderAuthorization), "Bearer ")
-	call := &Call{Principal: p, Now: r.Clock(), CorrelationID: corr, Candidates: cands, ExpectedVersion: ev, Bearer: bearer}
+	call := &Call{Principal: p, Now: r.Clock(), CorrelationID: corr, Candidates: cands, ExpectedVersion: ev, Bearer: bearer, Queries: r}
 	var out any
 	var cursor int64
 	err = r.DB.Run(ctx, !write, p, func(tx pgx.Tx) error {
