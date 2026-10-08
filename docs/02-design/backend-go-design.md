@@ -15,7 +15,7 @@ This document turns the [backend architecture](backend-architecture.md) into an 
 
 | Decision | Choice |
 |---|---|
-| Language | Go 1.25 or later (one module `github.com/pradita/ac-project/service` in the official Go server layout (IR174): commands in `service/cmd/{api,worker,migrate,seed,gen}`, every package in `service/internal/`, DB integration tests in `service/test/integration`, Dockerfiles in `service/build/`; current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
+| Language | Go 1.25 or later (one module `github.com/pradita/ac-project/service/api` (`service/api/go.mod`) in the official Go server layout (IR174): commands in `service/api/cmd/{api,worker,migrate,seed,gen}`, every package in `service/api/internal/`, DB integration tests in `service/api/test/integration`, Dockerfiles in `service/api/build/`; current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
 | HTTP framework | Echo v5 (`github.com/labstack/echo/v5`, checked with v5.4.0) for the Core API and the webhook receiver, structured as in the official Echo guide (IR173): handlers `func(c *echo.Context) error` return errors to one central `HTTPErrorHandler`; middleware from `echo/v5/middleware`; route group `/v1`; graceful shutdown with `echo.StartConfig`; `log/slog` as `e.Logger`; tests with `net/http/httptest` against `e.ServeHTTP` |
 | Database driver | pgx v5 (`github.com/jackc/pgx/v5`, `pgxpool`); no ORM |
 | Query code | sqlc generates typed Go from SQL in `db/queries/<schema>/*.sql`; hand-written SQL only for dynamic list filters |
@@ -35,7 +35,7 @@ The core request pipeline in §4 and the example handler in §5 were compiled an
 ## 2. Repository layout
 
 ```text
-service/            (IR174; the Next.js apps are the siblings service/*-web and service/web-shared, IR178)
+service/api/        (IR174, moved under service/api by IR179; the Next.js apps are the siblings service/web/* and service/web/shared, IR178)
   go.mod
   Makefile          gen, seed, test, test-unit, test-integration, cover, resetdb, testdb
   build/            api.Dockerfile, worker.Dockerfile, migrate.Dockerfile (context service/)
@@ -104,7 +104,7 @@ The authorization column (for example `client:self-customer:owner | admin:alert.
 
 ## 4. Request pipeline (Core API)
 
-Echo setup (`service/internal/server/http.go`, Echo guide: Quickstart, Routing, Error Handling, Cookbook › Graceful Shutdown, Testing): one `echo.New()`, the middleware below in order, `/healthz` and `/readyz`, the group `v1 := e.Group("/v1", auth)` with `v1.POST("/ops/:operation", Dispatch)`, and `e.HTTPErrorHandler = ops.HTTPErrorHandler`. Handlers and middleware never write error bodies themselves; they return a `*apperr.DomainError` (which implements `echo.HTTPStatusCoder`) and the central handler writes it with the correlation ID, maps Echo's own errors (unknown route or method → NOT_FOUND `error.unknownOperation`, 413 → VALIDATION `error.bodyTooLarge`, 503/504 → TIMEOUT) and turns any other error into UNAVAILABLE without internal detail, skipping responses already committed. `cmd/api` starts with `echo.StartConfig{GracefulTimeout: 25s}.Start(ctx, e)` on a SIGINT/SIGTERM context.
+Echo setup (`service/api/internal/server/http.go`, Echo guide: Quickstart, Routing, Error Handling, Cookbook › Graceful Shutdown, Testing): one `echo.New()`, the middleware below in order, `/healthz` and `/readyz`, the group `v1 := e.Group("/v1", auth)` with `v1.POST("/ops/:operation", Dispatch)`, and `e.HTTPErrorHandler = ops.HTTPErrorHandler`. Handlers and middleware never write error bodies themselves; they return a `*apperr.DomainError` (which implements `echo.HTTPStatusCoder`) and the central handler writes it with the correlation ID, maps Echo's own errors (unknown route or method → NOT_FOUND `error.unknownOperation`, 413 → VALIDATION `error.bodyTooLarge`, 503/504 → TIMEOUT) and turns any other error into UNAVAILABLE without internal detail, skipping responses already committed. `cmd/api` starts with `echo.StartConfig{GracefulTimeout: 25s}.Start(ctx, e)` on a SIGINT/SIGTERM context.
 
 Echo middleware order:
 

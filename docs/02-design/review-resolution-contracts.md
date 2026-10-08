@@ -1558,3 +1558,7 @@ Shared code is the workspace package `@ac/web` (`service/web-shared`: components
 
 Verified: the four apps typecheck, lint and build; the demo profile serves each role on its port (the customer app answers 404 for `/admin`); in API mode customer-a, contractor-a, tech-external-a and hq-operator (with TOTP) sign in to their own apps and their pages render on the server; contractor-a signing in to the customer app is refused.
 
+## IR179 service/api and service/web — 2026-10-08
+
+User request: the web must not live inside the API ("APIの中にWebがあるのはおかしい") and the API is to be split into microservices by business domain (IR180+). Step 1 separates the trees: all Go code (module `github.com/pradita/ac-project/service/api`: `cmd/`, `internal/`, `test/integration/`, `build/*.Dockerfile`, `scripts/`, `Makefile`) moved to `service/api/`, and the npm workspace moved to `service/web/` with the apps `service/web/{customer,partner,technician,admin}` and the shared package `service/web/shared` (`@ac/web`); the web image is `service/web/Dockerfile --build-arg APP=<role>`. Compose build contexts are `./service/api` and `./service/web`. Verified: go vet, all Go tests (0 skipped), `make gen` unchanged, four web apps typecheck/lint/build, all images build, compose demo apps answer on 3000–3003 and `migrate` → `api` starts healthy.
+

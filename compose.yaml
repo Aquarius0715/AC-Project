@@ -1,7 +1,7 @@
 # AC Project — everything runs in Docker (IR119, DEC-70, docs/02-design/container-design.md)
-# Services live under service/: one Go module (service/cmd/{api,worker,migrate} + service/internal, built with
-# service/build/*.Dockerfile, IR174) and four Next.js apps, one per entry point (service/{customer,partner,technician,admin}-web
-# on ports 3000–3003, shared code in service/web-shared, IR178)
+# Services live under service/: Go in service/api (cmd/{api,worker,migrate} + internal, service/api/build/*.Dockerfile,
+# IR174/IR179) and four Next.js apps, one per entry point, in service/web/{customer,partner,technician,admin} on ports
+# 3000–3003 with shared code in service/web/shared (service/web/Dockerfile, IR178/IR179)
 #
 # Profiles
 #   demo     Phase 1A clickable demo (4 web apps with the in-browser mock)     docker compose --profile demo up
@@ -19,7 +19,7 @@ name: ac-project
 x-worker: &worker             # cmd/worker (independent service, IR166/IR174)
   image: ac-worker:dev
   build:
-    context: ./service
+    context: ./service/api
     dockerfile: build/worker.Dockerfile
     target: runtime
   environment:
@@ -36,7 +36,7 @@ x-worker: &worker             # cmd/worker (independent service, IR166/IR174)
 x-backend: &backend
   image: ac-api:dev
   build:
-    context: ./service            # one Go module: cmd/<service> + internal/
+    context: ./service/api        # Go: cmd/<service> + internal/
     dockerfile: build/api.Dockerfile
     target: runtime
   env_file:
@@ -69,7 +69,7 @@ x-backend: &backend
     migrate: { condition: service_completed_successfully }
     localstack: { condition: service_healthy }
 
-x-web: &web                   # one Next.js app per entry point (service/<name>-web, build/web.Dockerfile, IR178)
+x-web: &web                   # one Next.js app per entry point (service/web/<name>, service/web/Dockerfile, IR178)
   environment: &web-env
     DATA_SOURCE: mock            # Phase 1A demo: screens keep their fixture data
     CUSTOMER_WEB_URL: http://localhost:3000
@@ -94,17 +94,17 @@ services:
   customer-web:           # demo (mock data) — client entry point
     <<: *web
     image: ac-customer-web:dev
-    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: customer-web } }
+    build: { context: ./service/web, args: { APP: customer } }
     ports: ["3000:3000"]
-    tmpfs: [/tmp, /app/customer-web/.next/cache]
+    tmpfs: [/tmp, /app/customer/.next/cache]
     profiles: [demo]
 
   customer-web-api:       # production-like: Server Components / Server Actions call the Core API through the DAL
     <<: *web
     image: ac-customer-web:dev
-    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: customer-web } }
+    build: { context: ./service/web, args: { APP: customer } }
     ports: ["3000:3000"]
-    tmpfs: [/tmp, /app/customer-web/.next/cache]
+    tmpfs: [/tmp, /app/customer/.next/cache]
     environment:
       <<: *web-api-env
       APP_URL: http://localhost:3000
@@ -117,17 +117,17 @@ services:
   partner-web:           # demo (mock data) — contractor entry point
     <<: *web
     image: ac-partner-web:dev
-    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: partner-web } }
+    build: { context: ./service/web, args: { APP: partner } }
     ports: ["3001:3000"]
-    tmpfs: [/tmp, /app/partner-web/.next/cache]
+    tmpfs: [/tmp, /app/partner/.next/cache]
     profiles: [demo]
 
   partner-web-api:       # production-like: Server Components / Server Actions call the Core API through the DAL
     <<: *web
     image: ac-partner-web:dev
-    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: partner-web } }
+    build: { context: ./service/web, args: { APP: partner } }
     ports: ["3001:3000"]
-    tmpfs: [/tmp, /app/partner-web/.next/cache]
+    tmpfs: [/tmp, /app/partner/.next/cache]
     environment:
       <<: *web-api-env
       APP_URL: http://localhost:3001
@@ -140,17 +140,17 @@ services:
   technician-web:           # demo (mock data) — technician entry point
     <<: *web
     image: ac-technician-web:dev
-    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: technician-web } }
+    build: { context: ./service/web, args: { APP: technician } }
     ports: ["3002:3000"]
-    tmpfs: [/tmp, /app/technician-web/.next/cache]
+    tmpfs: [/tmp, /app/technician/.next/cache]
     profiles: [demo]
 
   technician-web-api:       # production-like: Server Components / Server Actions call the Core API through the DAL
     <<: *web
     image: ac-technician-web:dev
-    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: technician-web } }
+    build: { context: ./service/web, args: { APP: technician } }
     ports: ["3002:3000"]
-    tmpfs: [/tmp, /app/technician-web/.next/cache]
+    tmpfs: [/tmp, /app/technician/.next/cache]
     environment:
       <<: *web-api-env
       APP_URL: http://localhost:3002
@@ -163,17 +163,17 @@ services:
   admin-web:           # demo (mock data) — admin entry point
     <<: *web
     image: ac-admin-web:dev
-    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: admin-web } }
+    build: { context: ./service/web, args: { APP: admin } }
     ports: ["3003:3000"]
-    tmpfs: [/tmp, /app/admin-web/.next/cache]
+    tmpfs: [/tmp, /app/admin/.next/cache]
     profiles: [demo]
 
   admin-web-api:       # production-like: Server Components / Server Actions call the Core API through the DAL
     <<: *web
     image: ac-admin-web:dev
-    build: { context: ./service, dockerfile: build/web.Dockerfile, args: { APP: admin-web } }
+    build: { context: ./service/web, args: { APP: admin } }
     ports: ["3003:3000"]
-    tmpfs: [/tmp, /app/admin-web/.next/cache]
+    tmpfs: [/tmp, /app/admin/.next/cache]
     environment:
       <<: *web-api-env
       APP_URL: http://localhost:3003
@@ -187,7 +187,7 @@ services:
   migrate:             # one-off: embedded migrations (cmd/migrate), local login role, demo fixture once
     image: ac-migrate:dev
     build:
-      context: ./service
+      context: ./service/api
       dockerfile: build/migrate.Dockerfile
       target: runtime
     command: ["/app/migrate", "up"]
@@ -228,13 +228,13 @@ services:
   iot-bridge:          # local stand-in for AWS IoT rules: MQTT topics -> Kinesis / SQS
     <<: *backend
     image: ac-api:dev-tools
-    build: { context: ./service, dockerfile: build/api.Dockerfile, target: dev }
+    build: { context: ./service/api, dockerfile: build/api.Dockerfile, target: dev }
     command: ["/app/iotbridge"]
 
   device-sim:          # simulated IoT modules (telemetry each minute, heartbeats, command acks)
     <<: *backend
     image: ac-api:dev-tools
-    build: { context: ./service, dockerfile: build/api.Dockerfile, target: dev }
+    build: { context: ./service/api, dockerfile: build/api.Dockerfile, target: dev }
     command: ["/app/devicesim", "--devices=20"]
     networks: [data]
 

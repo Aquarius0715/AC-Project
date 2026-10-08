@@ -20,7 +20,7 @@ This document designs the production backend that will replace the Phase 1A mock
 
 Decisions applied (DEC-67, DEC-68, DEC-69):
 
-1. The frontend stack is **Next.js (App Router)**, as implemented in the four apps `service/{customer,partner,technician,admin}-web` with the shared package `service/web-shared` (IR178). In production it also acts as the **BFF** (backend for frontend): it serves the four role apps, holds the user session, and relays operations to the Core API. The browser never calls the Core API directly.
+1. The frontend stack is **Next.js (App Router)**, as implemented in the four apps `service/web/{customer,partner,technician,admin}` with the shared package `service/web/shared` (IR178). In production it also acts as the **BFF** (backend for frontend): it serves the four role apps, holds the user session, and relays operations to the Core API. The browser never calls the Core API directly.
 2. The backend is a **modular monolith** (one Core API deployable with strict module boundaries) plus **separately deployed workers** for IoT, scheduling, notifications, and exports, so that device traffic and background work scale and fail independently of user requests.
 3. Hosting is **AWS** (DEC-68). Primary region Asia Pacific (Malaysia) `ap-southeast-5`; disaster recovery and any service not yet offered in ap-southeast-5 run in Asia Pacific (Singapore) `ap-southeast-1`. Check service availability per region at setup; keep personal data in ap-southeast-5 whenever the service exists there (privacy, §12).
 4. Payments use **Stripe** (hosted Stripe Checkout, MYR, cards and FPX online banking as enabled on the account; DEC-68).
