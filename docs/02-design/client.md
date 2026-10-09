@@ -113,7 +113,7 @@ Scope: FR-C02 / Main display pattern: **UI-LIST**. Service boundary: `properties
 3. After a rename, update tree and breadcrumbs; IDs and parents never change. For navigation from KPIs, show the unit list filtered by powerState/connections (IR50).
 4. Queries to update: `properties / spaces / units / customer summary`.
 
-**Boundary cases and failures**: Empty, 121-character, or duplicate sibling names return VALIDATION with the input kept. CONFLICT shows the current name and keeps the input. Direct structural writes from a client session return FORBIDDEN.
+**Boundary cases and failures**: Empty or 121-character names return VALIDATION with the input kept; a duplicate sibling name is CONFLICT `error.duplicateSiblingName` (IR208) and a stale version CONFLICT `error.versionConflict`, both keeping the input. Direct structural writes from a client session return FORBIDDEN.
 
 **Verification**: Check the traceability entries under AT-C02 (N/E/B) and the relevant S scenarios.
 
@@ -509,7 +509,7 @@ Scope: FR-C14 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 1. Toggle Single AC / Group control. Cards show each AC with power/connection badges; “Select all online” and Clear.
 2. Choose the change; Review & send opens a centered modal listing each AC: change (before → after), Will send, Skipped (offline), or clamped value under a restriction (IR46).
-3. Send calls `commands.create` once per AC that will be sent, each with its own idempotency key and expectedUnitVersion (IR109). Each card follows its Command with `commands.get` (Sending → Confirmed / Failed); Retry resends one AC.
+3. Send calls `commands.create` per AC that will be sent and per changed setting (a Command carries one UnitAction, as in single control), each with its own idempotency key and expectedUnitVersion (IR109, IR211); an AC's settings go one after another and stop at its first failure. Each card follows its Command with `commands.get` (Sending → Confirmed / Failed); Retry resends one AC.
 4. Queries to update: `units / commands`.
 
 **Boundary cases and failures**: Mixed spaces → VALIDATION before sending. A failure of one AC never rolls back others.
