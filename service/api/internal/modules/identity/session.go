@@ -19,6 +19,7 @@ type Session struct {
 	ScopeVersion int       `json:"scopeVersion"`
 	UserID       uuid.UUID `json:"userId"`
 	Role         string    `json:"role"`
+	ClientRole   *string   `json:"clientRole"` // owner / member for client sessions, otherwise null (the owner-only Users page, IR210)
 	Permissions  []string  `json:"permissions"`
 	Generation   int       `json:"generation"`
 	ViewEpoch    int       `json:"viewEpoch"`
@@ -42,7 +43,11 @@ func Register(r *ops.Registry) {
 			}
 		}
 		sort.Strings(perms)
+		var clientRole *string
+		if p.Role == "client" && p.ClientRole != "" {
+			clientRole = &p.ClientRole
+		}
 		return Session{TenantID: p.TenantID, MembershipID: p.MembershipID, ScopeVersion: p.ScopeVersion, UserID: p.UserID,
-			Role: p.Role, Permissions: perms, Generation: 1, ViewEpoch: 0, IssuedAt: c.Now, ExpiresAt: c.Now.Add(SessionTTL)}, nil
+			Role: p.Role, ClientRole: clientRole, Permissions: perms, Generation: 1, ViewEpoch: 0, IssuedAt: c.Now, ExpiresAt: c.Now.Add(SessionTTL)}, nil
 	})
 }

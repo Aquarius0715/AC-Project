@@ -315,22 +315,22 @@ export function defaultRules(p: ApiCustomerPolicy): RuleLine[] {
 export type Channel = "inApp" | "email" | "whatsapp";
 /** ClientUser of service-contracts.ts. */
 export type ApiClientUser = {
-  id: string; version: number; customerId: string; email: string; displayName: string | null; clientRole: "owner" | "member"; status: "invited" | "active" | "disabled";
-  lastSignInAt: string | null; allowedChannels: Channel[]; invitedAt: string; invitedByMembershipId: string;
+  id: string; version: number; customerId: string; membershipId: string | null; email: string; displayName: string | null; clientRole: "owner" | "member";
+  status: "invited" | "active" | "disabled"; lastSignInAt: string | null; allowedChannels: Channel[]; invitedAt: string; invitedByMembershipId: string;
 };
 export type ClientUserRow = {
   id: string; version: number; email: string; name: string | null; role: "owner" | "member"; status: ApiClientUser["status"]; sub: string; lastSignIn: string; channels: string;
-  lastOwner: boolean;
+  lastOwner: boolean; you: boolean;
 };
 const channelLabel: Record<Channel, string> = { inApp: "In-app", email: "Email", whatsapp: "WhatsApp" };
 /** Rows by name; the last active owner is marked because it cannot be demoted, disabled or removed (CONFLICT). */
-export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) => string): ClientUserRow[] {
+export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) => string, self?: string): ClientUserRow[] {
   const owners = us.filter((u) => u.clientRole === "owner" && u.status === "active").length;
   return [...us].sort((a, b) => (a.displayName ?? a.email).localeCompare(b.displayName ?? b.email)).map((u) => ({
     id: u.id, version: u.version, email: u.email, name: u.displayName, role: u.clientRole, status: u.status,
     sub: u.displayName ? u.email : `invited ${klDate(u.invitedAt)} by ${who(u.invitedByMembershipId)}`, lastSignIn: u.lastSignInAt ? klStamp(u.lastSignInAt) : "—",
     channels: u.status === "active" && u.allowedChannels.length ? u.allowedChannels.map((c) => channelLabel[c]).join(" · ") : "—",
-    lastOwner: u.clientRole === "owner" && u.status === "active" && owners === 1,
+    lastOwner: u.clientRole === "owner" && u.status === "active" && owners === 1, you: !!self && u.membershipId === self,
   }));
 }
 /** A plain address up to 254 characters, not yet a user of this customer (case-insensitive). */

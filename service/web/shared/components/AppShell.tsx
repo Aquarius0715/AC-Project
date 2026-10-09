@@ -9,6 +9,7 @@ import { useJobStore } from "@ac/web/lib/jobs";
 import { AssistantPanel } from "./Assistant";
 import { CURRENT_CLIENT } from "@ac/web/lib/clientUsers";
 import { setStoredValue, useStoredValue } from "@ac/web/lib/urlState";
+import { useBffSession } from "@ac/web/lib/useOp";
 
 export function useStoredRole(): Role {
   const pathname = usePathname();
@@ -40,6 +41,9 @@ export function AppShell({ role: forced, children }: { role?: Role; children: Re
   const role = forced ?? detected;
   const cfg = ROLES[role];
   const pathname = usePathname();
+  const session = useBffSession();
+  // Users is owner-only (FR-C19): the session's client role in API mode, the demo persona otherwise
+  const owner = session?.dataSource === "api" ? session.clientRole === "owner" : CURRENT_CLIENT.role === "owner";
   const [open, setOpen] = useState(false);
   // close the mobile menu when the route changes: adjust state during render (React: "You might not need an effect")
   const [menuPath, setMenuPath] = useState(pathname);
@@ -76,7 +80,7 @@ export function AppShell({ role: forced, children }: { role?: Role; children: Re
           <nav className="flex flex-col gap-0.5">{items.map((i) => <NavLink key={i.href} {...i} active={i.href === activeHref} />)}</nav>
           <div className="my-2 border-t border-line" />
           <nav className="flex flex-col gap-0.5">
-            {role === "client" && CURRENT_CLIENT.role === "owner" && <NavLink href="/customer/users" label="Users" icon="☺" active={pathname === "/customer/users"} />}
+            {role === "client" && owner && <NavLink href="/customer/users" label="Users" icon="☺" active={pathname === "/customer/users"} />}
             {SHARED.map((s) => <NavLink key={s.href} {...s} active={pathname === s.href} badge={s.href === "/notifications" ? String(3 + unread) : undefined} />)}
             <Link href="/demo" className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-warn hover:bg-warn-soft/50", pathname === "/demo" && "bg-warn-soft/60")}>
               <span aria-hidden className="w-4 text-center">✦</span>

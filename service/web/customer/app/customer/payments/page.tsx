@@ -1,45 +1,50 @@
-"use client";
+// /customer/payments (FR-C10, SCR-C10): in API mode a Server Component reads the customer's own contracts.list, the
+// selected contract's invoices (invoices.list with the URL status filter), the unit names (units.list, properties.list,
+// spaces.list) and, for a contract with an active restriction, the notice (restrictions.forInvoice of one of its
+// invoices). URL keys: contractId, status. Read-only; payments start on the invoice page. The Phase 1A demo keeps the
+// fixtures.
+import { connection } from "next/server";
+import { apiMode, coreAll, coreNow, coreOp } from "@ac/web/lib/dal";
+import type { ApiInvoice } from "@ac/web/lib/billing";
+import type { ApiRestriction } from "@ac/web/lib/restrictions";
+import {
+  clientInvoiceRows, contractCards, restrictionNotice, statusFilters, statusQuery, unitPlaces, type ClientContract, type RestrictionNotice,
+} from "@ac/web/lib/clientBilling";
+import { PaymentsDemo } from "./_components/payments-demo";
+import { PaymentsView } from "./_components/payments-view";
 
-import Link from "next/link";
-import { useState } from "react";
-import { Badge, Banner, Card, LinkBtn, ListRow, Page, SummaryList, TextLink } from "@ac/web/components/ui";
+type Unit = { id: string; displayName: string; propertyId: string; spaceId: string | null };
 
-const contracts = [
-  { id: "contract-rto-a", name: "RTO Plan", sub: "contract-rto-a · Jan–Dec 2026", period: "Jan 1 – Dec 31, 2026", plan: "Rent-to-own (RTO)", units: [["Bedroom AC", "Home A › 1F › Bedroom"], ["Meeting room AC", "Office A › Meeting room"], ["Lobby AC", "Office A · not in a room"]], invoices: [["invoice-overdue-a", "Due Sep 10, 2026", "120.00 MYR", "unpaid"], ["invoice-0198", "Due Aug 10 · paid Aug 8", "80.00 MYR", "paid"], ["invoice-0175", "Due Jul 10 · paid Jul 9", "80.00 MYR", "paid"]] },
-  { id: "contract-gm-a", name: "General maintenance", sub: "contract-gm-a · Mar 2026 – Feb 2027", period: "Mar 1, 2026 – Feb 28, 2027", plan: "General maintenance", units: [["Study AC", "Home A › 2F › Study"]], invoices: [["invoice-sep-a", "Due Sep 30", "50.00 MYR", "unpaid"]] },
-  { id: "contract-es-a", name: "Energy service", sub: "contract-es-a · 2025", period: "2025", plan: "Energy service", units: [["Living room AC", "Home A › 1F"]], invoices: [] },
-];
-
-export default function Payments() {
-  const [sel, setSel] = useState(contracts[0]);
-  return (
-    <Page>
-      <div className="split-rev">
-        <Card title={`CONTRACTS (${contracts.length})`} className="self-start">
-          <div className="flex flex-col gap-2">{contracts.map((c) => <ListRow key={c.id} selected={sel.id === c.id} onClick={() => setSel(c)}><div className="min-w-0"><b>{c.name}</b><div className="truncate text-xs text-muted">{c.sub}</div></div></ListRow>)}</div>
-          <p className="mt-3 text-[11px] text-muted">Contract expiry does not stop monitoring or control.</p>
-        </Card>
-        <div className="flex min-w-0 flex-col gap-4">
-          <Card title={sel.name} sub={`${sel.id} · plan type ${sel.plan.split(" ")[0]}`}>
-            <SummaryList items={[["Period", sel.period], ["Plan", sel.plan]]} />
-            <h3 className="mt-4 mb-2 text-[11px] font-bold uppercase tracking-wide text-muted">Contract scope — equipment this contract relates to</h3>
-            <div className="flex flex-col divide-y divide-line">{sel.units.map(([n, l]) => <div key={n} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[13px]"><span><b>{n}</b><span className="block text-xs text-muted">{l}</span></span><TextLink href="/customer/properties">View unit ›</TextLink></div>)}</div>
-          </Card>
-          <Card title="Invoices for this contract" sub={`${sel.invoices.length} invoices`}>
-            <div className="flex flex-col gap-2">
-              {sel.invoices.map(([id, due, amt, st]) => (
-                <div key={id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
-                  <div><b>{id}</b><div className="text-xs text-muted">{due}</div></div>
-                  <div className="flex items-center gap-3"><b>{amt}</b>{st === "unpaid" ? <><Badge tone="crit">Unpaid</Badge><LinkBtn size="sm" variant="primary" href={`/customer/payments/${id}`}>Pay</LinkBtn></> : <><Badge tone="ok" icon="✓">Paid</Badge><Link href={`/customer/payments/${id}`} className="text-muted">›</Link></>}</div>
-                </div>
-              ))}
-              {sel.invoices.length === 0 && <p className="text-xs text-muted">No invoices.</p>}
-            </div>
-            <p className="mt-2 text-[11px] text-muted">Paid invoices have no payment button. “Processing” is not paid.</p>
-          </Card>
-          {sel.id === "contract-rto-a" && <Banner tone="warn" action={<LinkBtn size="sm" href="/customer/payments/invoice-overdue-a?tab=restriction">Details</LinkBtn>}><b>Cooling restriction active</b><div className="text-xs">1 unit in scope · Lobby AC (Office A) — minimum cooling setpoint 24 °C applied. Related to payment, but separate from it: paying does not restore cooling immediately.</div></Banner>}
-        </div>
-      </div>
-    </Page>
-  );
+export default async function CustomerPaymentsPage({ searchParams }: PageProps<"/customer/payments">) {
+  await connection();
+  if (!apiMode()) return <PaymentsDemo />;
+  const sp = await searchParams;
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const [now, contracts, units, properties, spaces] = await Promise.all([
+    coreNow(), coreAll<ClientContract>("contracts.list"), coreAll<Unit>("units.list"), coreAll<{ id: string; name: string }>("properties.list"),
+    coreAll<{ id: string; name: string; parentSpaceId: string | null }>("spaces.list"),
+  ]);
+  const place = unitPlaces(units, properties, spaces);
+  const cards = contractCards(contracts, (id) => place.get(id), now);
+  const sel = cards.find((c) => c.id === one("contractId")) ?? cards[0] ?? null;
+  const status = statusFilters.find((s) => s === one("status")) ?? "all";
+  const [shown, all] = sel
+    ? await Promise.all([
+      coreAll<ApiInvoice>("invoices.list", { filters: { contractId: sel.id, ...statusQuery(status) } }),
+      coreAll<ApiInvoice>("invoices.list", { filters: { contractId: sel.id } }),
+    ])
+    : [[], []];
+  // the active restriction of the contract, found through one of its invoices (the customer has no restriction list)
+  let notice: (RestrictionNotice & { invoiceId: string }) | null = null;
+  if (sel && sel.restrictionIds.length) {
+    for (const i of [...all].sort((a, b) => (a.status === "paid" ? 1 : 0) - (b.status === "paid" ? 1 : 0)).slice(0, 3)) {
+      const page = await coreOp<{ items: ApiRestriction[] }>("restrictions.forInvoice", { invoiceId: i.id, query: { limit: 10 } });
+      const r = page.items.find((x) => sel.restrictionIds.includes(x.id));
+      if (r) {
+        notice = { ...restrictionNotice(r, (id) => place.get(id)), invoiceId: i.id };
+        break;
+      }
+    }
+  }
+  return <PaymentsView live={{ cards, selected: sel?.id ?? null, status, invoices: clientInvoiceRows(shown, now), total: all.length, notice }} />;
 }

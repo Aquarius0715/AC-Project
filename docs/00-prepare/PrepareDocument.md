@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.100.0
+version: 0.101.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -268,6 +268,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.101.0: Customer contracts, payments and users on the server pattern; session.get returns clientRole (IR210). Phase 1A unchanged.
 0.100.0: Admin customers and units part 2 (IR209): client users, warranty & coverage with claimable jobs, CSV import that creates properties and binds serials, units.save warranty end. Phase 1A unchanged.
 0.99.0: Admin customers and units on the server pattern, part 1 (IR208): sibling and billing-name uniqueness, overnight alert windows, ac_offline in minutes. Phase 1A unchanged.
 0.98.0: Admin automation policies on the server pattern (IR207). Phase 1A unchanged.

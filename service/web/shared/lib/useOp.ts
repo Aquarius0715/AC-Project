@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import { callOp, OpError } from "@ac/web/lib/ops";
 
-export type BffSession = { dataSource: "mock" | "api"; signedIn: boolean; role: string | null; membershipId: string | null; serverNow: string | null };
+export type BffSession = { dataSource: "mock" | "api"; signedIn: boolean; role: string | null; membershipId: string | null; clientRole: string | null; serverNow: string | null };
 
 let cached: Promise<BffSession> | null = null;
 
@@ -30,7 +30,7 @@ function useRevision(): number {
 export function bffSession(): Promise<BffSession> {
   cached ??= fetch("/bff/session", { cache: "no-store" })
     .then((r) => r.json() as Promise<BffSession>)
-    .catch(() => ({ dataSource: "mock", signedIn: false, role: null, membershipId: null, serverNow: null }) as BffSession);
+    .catch(() => ({ dataSource: "mock", signedIn: false, role: null, membershipId: null, clientRole: null, serverNow: null }) as BffSession);
   return cached;
 }
 

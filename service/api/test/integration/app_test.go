@@ -147,8 +147,11 @@ func TestSessionGet(t *testing.T) {
 	s := server(t)
 	code, m := post(s, &hq, "session.get", `{}`)
 	d := m["data"].(map[string]any)
-	if code != 200 || d["role"] != "admin" || d["membershipId"] != seed.ID("hq-operator").String() || len(d["permissions"].([]any)) == 0 {
+	if code != 200 || d["role"] != "admin" || d["membershipId"] != seed.ID("hq-operator").String() || len(d["permissions"].([]any)) == 0 || d["clientRole"] != nil {
 		t.Fatalf("%d %v", code, m)
+	}
+	if _, c := post(s, &customerA, "session.get", `{}`); c["data"].(map[string]any)["clientRole"] != "owner" {
+		t.Errorf("client owner session: %v", c["data"])
 	}
 	meta := m["meta"].(map[string]any) // Meta of service-contracts.ts
 	if meta["snapshotAt"] != clock.Format(time.RFC3339) || meta["correlationId"] == "" || meta["eventCursor"] == nil {
