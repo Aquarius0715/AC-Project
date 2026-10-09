@@ -99,7 +99,7 @@ CASES = [
      '0.19 behavioral guard missing'),
     ('forecast_type_missing', [(TYPE, 'energyForecast:EnergyForecast;', '')],
      '0.19 DTO invariant missing'),
-    ('login_return_to_missing', [('03-uiux/screen-catalog.csv', 'demoSession.signIn,"tab,returnTo",', 'demoSession.signIn,tab,')],
+    ('login_return_to_missing', [('03-uiux/screen-catalog.csv', 'demoSession.signIn,"tab,returnTo,error",', 'demoSession.signIn,"tab,error",')],
      'Login returnTo URL key absent'),
     ('work_not_started_state_missing', [('03-uiux/screen-catalog.csv', ';work-not-started', '')],
      'Work-not-started state absent'),

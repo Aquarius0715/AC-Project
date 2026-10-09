@@ -61,5 +61,5 @@ export async function deviceSignal(deviceId: string, restore: boolean) {
 /** Ends this app's session as if it had expired (D09): the next page asks to sign in again. */
 export async function expireSession() {
   (await cookies()).delete(SESSION_COOKIE);
-  redirect("/login");
+  redirect("/login?error=expired");
 }

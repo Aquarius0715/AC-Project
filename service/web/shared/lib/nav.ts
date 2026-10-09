@@ -15,6 +15,8 @@ export type RoleConfig = {
   nav: NavItem[];
   loginUser: string;
   loginDesc: string;
+  loginTitle: string; // the service name on its sign-in page (Figma Login frames)
+  loginSub: string;
 };
 
 export const ROLES: Record<Role, RoleConfig> = {
@@ -27,6 +29,8 @@ export const ROLES: Record<Role, RoleConfig> = {
     chip: "Client — customer-a",
     loginUser: "customer-a",
     loginDesc: "Views units, controls temperature, requests maintenance",
+    loginTitle: "Client",
+    loginSub: "Sign in to manage your units and account",
     nav: [
       { href: "/customer", label: "Overview", icon: "⌂" },
       { href: "/customer/properties", label: "Units & locations", icon: "▤", match: ["/customer/units"] },
@@ -46,7 +50,9 @@ export const ROLES: Record<Role, RoleConfig> = {
     scope: "CONTRACTOR-A",
     chip: "Contractor — contractor-a",
     loginUser: "contractor-a",
-    loginDesc: "Answers HQ offers, assigns technicians, reviews work reports",
+    loginDesc: "Accepts jobs, assigns own technicians",
+    loginTitle: "Partner",
+    loginSub: "Sign in to manage jobs and your technicians",
     nav: [
       { href: "/partner", label: "Overview", icon: "⌂" },
       { href: "/partner/jobs", label: "Jobs", icon: "▤", badge: "1" },
@@ -63,8 +69,10 @@ export const ROLES: Record<Role, RoleConfig> = {
     sub: "Technician",
     scope: "TECH-EXTERNAL-A",
     chip: "Technician — tech-external-a",
-    loginUser: "tech-external-a",
-    loginDesc: "Runs assigned jobs, records inspections, maintains devices",
+    loginUser: "tech-internal-a",
+    loginDesc: "Internal · inspections & work reports",
+    loginTitle: "Technician",
+    loginSub: "Sign in to view assigned jobs and devices",
     nav: [
       { href: "/technician", label: "Overview", icon: "⌂" },
       { href: "/technician?tab=all", label: "Assigned jobs", icon: "▤", match: ["/technician/jobs"] },
@@ -79,7 +87,9 @@ export const ROLES: Record<Role, RoleConfig> = {
     scope: "HQ TENANT",
     chip: "Admin — hq-operator",
     loginUser: "hq-operator",
-    loginDesc: "Operates customers, devices, alerts, billing and reports",
+    loginDesc: "Manages customers, contracts, restrictions",
+    loginTitle: "Admin",
+    loginSub: "Sign in to manage customers, contracts, and access",
     nav: [
       { href: "/admin", label: "Overview", icon: "⌂" },
       { href: "/admin/units", label: "Customers & units", icon: "▤" },
