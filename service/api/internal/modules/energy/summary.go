@@ -213,7 +213,7 @@ func (in *SummaryInput) Validate() map[string]string {
 //	@Description	Authorization: client:self | admin:energy.read | admin:mrv.read
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-A13, DD-C06, DD-C13
+//	@Description	Design: DD-A13, DD-C06, DD-C13, DD-C01
 //	@Tags			energy
 //	@Accept			json
 //	@Produce		json

@@ -163,7 +163,7 @@ type AirSeries struct {
 // @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:automation.policy.read
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR98 allergenObservation source rows
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-C07, DD-T03, DD-A05, DD-A12 · Query: filters none · sort observedAt (default observedAt asc;sensorId asc;id asc)
+// @Description	Design: DD-C07, DD-T03, DD-A05, DD-A12, DD-C01 · Query: filters none · sort observedAt (default observedAt asc;sensorId asc;id asc)
 // @Tags			telemetry
 // @Accept			json
 // @Produce		json
@@ -305,7 +305,7 @@ type TelemetrySummary struct {
 // @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:automation.policy.read
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-C01, DD-P04, DD-T03
+// @Description	Design: DD-P04, DD-T03
 // @Tags			telemetry
 // @Accept			json
 // @Produce		json

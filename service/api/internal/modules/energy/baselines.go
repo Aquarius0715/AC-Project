@@ -86,7 +86,7 @@ func LoadBaseline(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) 
 // @Description	Authorization: client:self | admin:energy.read | admin:mrv.read; IR90 client only when all unitIds in scope
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A13, DD-C06, DD-A14 · Query: filters unitId,unitIds,from,to,customerId,propertyId,method,boundaryId · sort id,createdAt,updatedAt,periodFrom (default createdAt desc;id desc)
+// @Description	Design: DD-A13, DD-C06, DD-A14, DD-C01 · Query: filters unitId,unitIds,from,to,customerId,propertyId,method,boundaryId · sort id,createdAt,updatedAt,periodFrom (default createdAt desc;id desc)
 // @Tags			baselines
 // @Accept			json
 // @Produce		json

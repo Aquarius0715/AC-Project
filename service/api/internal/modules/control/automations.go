@@ -130,7 +130,7 @@ func (m Automations) load(ctx context.Context, c *ops.Call, id uuid.UUID, lock b
 // @Description	Authorization: client:control.execute:self
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR215 lastRun = the latest run-log outcome (Command or skip with reason)
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-C04 · Query: filters unitId,enabled,kind · sort id,name,priority,createdAt,updatedAt (default createdAt desc;id desc)
+// @Description	Design: DD-C04, DD-C01 · Query: filters unitId,enabled,kind · sort id,name,priority,createdAt,updatedAt (default createdAt desc;id desc)
 // @Tags			automations
 // @Accept			json
 // @Produce		json
@@ -645,7 +645,7 @@ func (in *NextRunsInput) Validate() map[string]string {
 //	@Description	Authorization: client:control.execute:self
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR214 draft preview validated like automations.save (nonexistent or ambiguous local time VALIDATION)
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DD-C04
+//	@Description	Design: DD-C04, DD-C01
 //	@Tags			automations
 //	@Accept			json
 //	@Produce		json

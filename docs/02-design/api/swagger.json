@@ -892,7 +892,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:control.execute:self\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR215 lastRun = the latest run-log outcome (Command or skip with reason)\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C04 · Query: filters unitId,enabled,kind · sort id,name,priority,createdAt,updatedAt (default createdAt desc;id desc)",
+                "description": "Authorization: client:control.execute:self\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR215 lastRun = the latest run-log outcome (Command or skip with reason)\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C04, DD-C01 · Query: filters unitId,enabled,kind · sort id,name,priority,createdAt,updatedAt (default createdAt desc;id desc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -1231,7 +1231,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:control.execute:self\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR214 draft preview validated like automations.save (nonexistent or ambiguous local time VALIDATION)\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C04",
+                "description": "Authorization: client:control.execute:self\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR214 draft preview validated like automations.save (nonexistent or ambiguous local time VALIDATION)\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C04, DD-C01",
                 "consumes": [
                     "application/json"
                 ],
@@ -1665,7 +1665,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | admin:energy.read | admin:mrv.read; IR90 client only when all unitIds in scope\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A13, DD-C06, DD-A14 · Query: filters unitId,unitIds,from,to,customerId,propertyId,method,boundaryId · sort id,createdAt,updatedAt,periodFrom (default createdAt desc;id desc)",
+                "description": "Authorization: client:self | admin:energy.read | admin:mrv.read; IR90 client only when all unitIds in scope\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A13, DD-C06, DD-A14, DD-C01 · Query: filters unitId,unitIds,from,to,customerId,propertyId,method,boundaryId · sort id,createdAt,updatedAt,periodFrom (default createdAt desc;id desc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -3779,7 +3779,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:own-membership\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR84 seed/initial record; absent record NOT_FOUND\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C05",
+                "description": "Authorization: client:own-membership\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR84 seed/initial record; absent record NOT_FOUND\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C05, DD-C01",
                 "consumes": [
                     "application/json"
                 ],
@@ -7601,7 +7601,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | admin:energy.read | admin:mrv.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A13, DD-C06, DD-C13",
+                "description": "Authorization: client:self | admin:energy.read | admin:mrv.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A13, DD-C06, DD-C13, DD-C01",
                 "consumes": [
                     "application/json"
                 ],
@@ -20518,7 +20518,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self-customer | admin:asset.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06, DD-C09 · Query: filters customerId,kind · sort id,createdAt,updatedAt (default id asc)",
+                "description": "Authorization: client:self-customer | admin:asset.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06, DD-C09, DD-C01 · Query: filters customerId,kind · sort id,createdAt,updatedAt (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -22780,7 +22780,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self-customer | admin:asset.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C02, DD-C07, DD-C04, DD-C09 · Query: filters propertyId,kind · sort id,createdAt,updatedAt (default id asc)",
+                "description": "Authorization: client:self-customer | admin:asset.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C02, DD-C07, DD-C04, DD-C09, DD-C01 · Query: filters propertyId,kind · sort id,createdAt,updatedAt (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -23414,7 +23414,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:automation.policy.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR98 allergenObservation source rows\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C07, DD-T03, DD-A05, DD-A12 · Query: filters none · sort observedAt (default observedAt asc;sensorId asc;id asc)",
+                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:automation.policy.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR98 allergenObservation source rows\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C07, DD-T03, DD-A05, DD-A12, DD-C01 · Query: filters none · sort observedAt (default observedAt asc;sensorId asc;id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -23563,7 +23563,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:automation.policy.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-C01, DD-P04, DD-T03",
+                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:automation.policy.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-P04, DD-T03",
                 "consumes": [
                     "application/json"
                 ],

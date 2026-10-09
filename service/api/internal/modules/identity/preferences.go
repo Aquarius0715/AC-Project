@@ -157,7 +157,7 @@ func loadConsent(ctx context.Context, c *ops.Call, purpose string, lock bool) (C
 // @Description	Authorization: client:own-membership
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR84 seed/initial record; absent record NOT_FOUND
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-C05
+// @Description	Design: DD-C05, DD-C01
 // @Tags			consents
 // @Accept			json
 // @Produce		json

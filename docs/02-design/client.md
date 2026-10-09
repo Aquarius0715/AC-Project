@@ -25,7 +25,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 
 | Design ID / requirement | Route / main component | Read and action contracts | Input, processing, validation | Errors and prohibited actions |
 |---|---|---|---|---|
-| DD-C01 / FR-C01 | `/customer` / `Overview` | `units.list`, `telemetry.summary`, `alerts.list`, `summaries.get` | Filter by property and period. Store filters in the URL and summarize only permitted units | Distinguish missing data from 0. Show update time for old values |
+| DD-C01 / FR-C01 | `/customer` / `Overview` | `units.list`, `properties.list`, `spaces.list`, `summaries.get`, `alerts.list`, `automations.list`, `automations.nextRuns`, `consents.get`, `baselines.list`, `energy.summary`, `telemetry.series` | Filter by property and period. Store filters in the URL and summarize only permitted units | Distinguish missing data from 0. Show update time for old values |
 | DD-C02 / FR-C02 | `/customer/properties` / `PropertyExplorer` | `properties.list`, `spaces.list`, `units.list`, `locations.rename` | Read-only tree property→floor/area→room→units; rename a location only (1–120 characters, unique among siblings). HQ creates, moves, and deletes the structure | No add/move/delete controls. Deleted URLs show not-found. Breadcrumbs return to parent levels |
 | DD-C03 / FR-C03 | `/customer/units/:id` / `UnitControl` | `units.get`, `commands.create`, `commands.get`, `locations.rename`, `units.setAlertPolicies`, `policies.list`, `commands.list`, `units.list` | Build temperature min/max/step, mode, and fan options from capabilities. Mutate after confirmation. Show room temperature separately from settings | Show rejection, expiry, and failure reasons. Recheck state before manual retry |
 | DD-C04 / FR-C04 | `/customer/automations` / `AutomationEditor` | `automations.list`, `automations.save`, `automations.simulate`, `automations.fire`, `automations.nextRuns`, `units.list`, `units.get`, `automations.delete`, `properties.list`, `spaces.list`, `preferences.get` | Require at least one weekday, start/end times, timezone, target units, and actions. Explicitly confirm overnight settings | Warn on overlapping conditions and show priorities. Reject triggered automation under restrictions and show the reason |
@@ -66,7 +66,7 @@ Keep form values in RHF (React Hook Form) and validate them with schemas. Read-o
 
 **Source mapping**: SRC-06 BIZ-04, BIZ-08 → FR-C01 → DD-C01. Source category: original company requirements SRC-06 + design additions. Design additions: summary scope and missing-data display. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-C01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `units.list, telemetry.summary, alerts.list, summaries.get`.
+Scope: FR-C01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `units.list, properties.list, spaces.list, summaries.get, alerts.list, automations.list, automations.nextRuns, consents.get, baselines.list, energy.summary, telemetry.series`.
 
 **Initial view and prerequisites**: Available units are registered in the user's organization; the screen also opens with zero units. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -79,7 +79,7 @@ Scope: FR-C01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `units.
 
 **Steps**
 
-1. Select property and period. Check operating state, room temperature, humidity, air quality, power, and alert counts. Open relevant unit lists or details from status cards.
+1. Select property and period. Check operating state, room temperature, humidity, air quality, power, and alert counts. Open relevant unit lists or details from status cards. The cards (IR240): the tiles of `summaries.get` for the selection; the unit table from `units.list` latest readings; energy of the period against the previous one and the last 7 days against the 7 before (`energy.summary`), with estimated emissions and, when a baseline covers the units, the estimated saving; the air-quality card (latest CO2 and PM2.5, 24-hour CO2 from `telemetry.series`); Needs attention (unresolved critical and warning alerts; reminders and information counted apart, IR51); the automations of the units shown with the next run of a schedule.
 2. Apply the following business rules to both reads and actions.
    - Do not average different rooms' temperatures into a representative temperature.
    - Show temperature and humidity for the selected unit or each room's measurement point.
