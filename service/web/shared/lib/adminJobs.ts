@@ -50,7 +50,15 @@ export const SORTS = [{ id: "status", text: "Status ↑", field: "status", direc
 export type HqSort = (typeof SORTS)[number]["id"];
 export const sortOf = (v?: string): HqSort => (SORTS.some((s) => s.id === v) ? (v as HqSort) : "status");
 
-export type Query = { customerId?: string; propertyId?: string; unitId?: string; origin?: string; delivery?: string; assignee?: string; overdue?: string; type?: string; stage?: string };
+export type Query = { customerId?: string; propertyId?: string; unitId?: string; origin?: string; delivery?: string; assignee?: string; overdue?: string; type?: string; stage?: string; from?: string; to?: string };
+/** The requested-time period of the list (URL from / to, ISO instants; the HQ overview's job counts, IR245): both valid
+ * and from < to, else none. */
+export function periodOfQuery(q: Pick<Query, "from" | "to">): { from: string; to: string } | null {
+  const f = q.from ? Date.parse(q.from) : NaN, t = q.to ? Date.parse(q.to) : NaN;
+  return Number.isFinite(f) && Number.isFinite(t) && f < t ? { from: new Date(f).toISOString(), to: new Date(t).toISOString() } : null;
+}
+/** “Requested time 09-08 00:00 – 09-14 12:09” for the period chip. */
+export const periodChip = (p: { from: string; to: string }) => `Requested time ${md(p.from)} ${hm(p.from)} – ${md(p.to)} ${hm(p.to)}`;
 /** The jobs.list filters of the scope and the filter bar; delivery is the HQ organization (internal) or a contractor. */
 export function filtersOf(q: Query, hqOrgId: string | null, withStage = true): Record<string, unknown> {
   const f: Record<string, unknown> = {};
@@ -62,6 +70,8 @@ export function filtersOf(q: Query, hqOrgId: string | null, withStage = true): R
   else if (q.delivery && q.delivery !== "internal") f.organizationId = q.delivery;
   if (q.assignee) f.membershipId = q.assignee;
   if (q.overdue === "1") f.overdueOnly = true;
+  const period = periodOfQuery(q);
+  if (period) Object.assign(f, period); // jobs.list from / to: the requested slot's start (IR245)
   const stage = withStage ? STAGES.find((s) => s.id === q.stage) : undefined;
   if (stage) Object.assign(f, stage.filter);
   return f;

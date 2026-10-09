@@ -20,6 +20,8 @@ describe("HQ overview sections (DD-A01, IR244)", () => {
     const l = overviewLinks({ customerId: "c1", propertyId: null });
     expect([l.units, l.power("off"), l.connection("connecting,error,unknown"), l.jobs("assigned"), l.billing, overviewLinks({ customerId: null, propertyId: null }).units])
       .toEqual(["/admin/units?customerId=c1", "/admin/units?customerId=c1&powerState=off", "/admin/units?customerId=c1&connections=connecting%2Cerror%2Cunknown", "/admin/jobs?customerId=c1&stage=assigned", "/admin/billing?overdueOnly=true", "/admin/units"]);
+    const withPeriod = overviewLinks({ customerId: null, propertyId: null, period: { from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:00:00.000Z" } });
+    expect([withPeriod.jobs("completed"), withPeriod.units]).toEqual(["/admin/jobs?stage=completed&from=2026-09-13T16%3A00%3A00.000Z&to=2026-09-14T01%3A00%3A00.000Z", "/admin/units"]);
   });
 
   it("shows the forecast with its direction, or why there is none (IR78)", () => {
@@ -47,5 +49,15 @@ describe("HQ overview sections (DD-A01, IR244)", () => {
     expect(billingView(summary({ amountsByCurrency: [{ amountMinor: 12000, currency: "MYR" }, { amountMinor: 5000, currency: "USD" }] }))).toEqual({ forbidden: false, overdue: 1, rows: [{ currency: "MYR", text: "120.00 MYR" }, { currency: "USD", text: "50.00 USD" }] });
     expect(billingView(summary({ billingVisibility: "forbidden", amountsByCurrency: null, overdueInvoiceCount: null }))).toEqual({ forbidden: true });
     expect(kpisFrom(s)).toMatchObject({ rate: "50.0%", kwh: "9.0 kWh", billing: "120.00 MYR", jobs: 2 });
+  });
+});
+
+describe("HQ Jobs tab period (IR245)", () => {
+  it("passes a valid requested-time period to jobs.list and names it on the chip", async () => {
+    const { filtersOf, periodChip, periodOfQuery } = await import("@ac/web/lib/adminJobs");
+    const q = { from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:00:00.000Z", customerId: "c1" };
+    expect(filtersOf(q, null)).toEqual({ customerId: "c1", from: q.from, to: q.to });
+    expect([periodOfQuery({ from: q.to, to: q.from }), periodOfQuery({ from: "x", to: q.to }), periodOfQuery({})]).toEqual([null, null, null]);
+    expect(periodChip(periodOfQuery(q)!)).toBe("Requested time 09-14 00:00 – 09-14 09:00");
   });
 });

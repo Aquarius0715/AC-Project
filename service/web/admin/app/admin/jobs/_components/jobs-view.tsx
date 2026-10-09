@@ -8,7 +8,7 @@ import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { klTime } from "@ac/web/lib/devices";
-import { classifyBy, costLineOf, extendDefault, hqRefusal, longSlot, money, newJobErrors, offerDefaults, returnReason, slotText, type CostLine, type PreferredRow } from "@ac/web/lib/adminJobs";
+import { classifyBy, costLineOf, extendDefault, hqRefusal, longSlot, money, newJobErrors, offerDefaults, periodChip, returnReason, slotText, type CostLine, type PreferredRow } from "@ac/web/lib/adminJobs";
 import { fromKlInput as fromLocal, klInput as klLocal } from "@ac/web/lib/adminPlans";
 import type { JobStatus } from "@ac/web/lib/jobs";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -43,9 +43,10 @@ let pendingFresh: Fresh | null = null;
 function JobsTab({ live, patch, fresh, onFresh }: { live: JobsLive; patch: (p: Record<string, string | null>) => void; fresh: Fresh | null; onFresh: () => void }) {
   const q = live.q;
   const sel = live.detail;
+  const inScope = live.stages.reduce((a, s) => a + s.count, 0);
   return (
     <>
-      <ScopeBar scope={live.scope} q={q} text={`${live.stages.reduce((a, s) => a + s.count, 0)} jobs in scope`} clear="jobId" />
+      <ScopeBar scope={live.scope} q={q} text={`${inScope} ${inScope === 1 ? "job" : "jobs"} in scope${live.period ? " · in the period" : ""}`} clear="jobId" />
       <div className="scroll-x"><div className="grid min-w-[980px] grid-cols-10 overflow-hidden rounded-2xl border border-line bg-surface">
         {live.stages.map((s) => <button key={s.id} type="button" aria-pressed={q.stage === s.id} onClick={() => patch({ stage: q.stage === s.id ? null : s.id, jobId: null })} className={cx("border-r border-line px-3 py-2 text-left last:border-r-0 hover:bg-surface2", q.stage === s.id && "bg-primary-soft")}><div className="text-[11px] text-muted">{s.label}</div><div className={cx("text-lg font-bold", s.id === "time_proposed" && s.count > 0 && "text-warn", s.count === 0 && "text-muted")}>{s.count}</div></button>)}
       </div></div>
@@ -56,6 +57,7 @@ function JobsTab({ live, patch, fresh, onFresh }: { live: JobsLive; patch: (p: R
         <Select aria-label="Assignee" className="w-auto" value={q.assignee ?? ""} onChange={(e) => patch({ assignee: e.target.value || null })}><option value="">Assignee: All</option>{live.assignees.map((a) => <option key={a.id} value={a.id}>Assignee: {a.name}</option>)}</Select>
         <Select aria-label="Sort" className="w-auto" value={live.sort} onChange={(e) => patch({ sort: e.target.value === "status" ? null : e.target.value })}>{live.sorts.map((s) => <option key={s.id} value={s.id}>Sort: {s.text}</option>)}</Select>
         <label className="flex items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1.5 text-[13px]"><input type="checkbox" checked={q.overdue === "1"} onChange={(e) => patch({ overdue: e.target.checked ? "1" : null })} /> Overdue only</label>
+        {live.period && <button type="button" onClick={() => patch({ from: null, to: null, jobId: null })} className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary" aria-label="Clear the requested-time period">{periodChip(live.period)} ✕</button>}
       </div>
       <div className="split-rev">
         <Card title="Jobs · all customers" sub={live.sorts.find((s) => s.id === live.sort)!.text.toLowerCase()} className="self-start">

@@ -1,6 +1,7 @@
 // The reads of the HQ Jobs tab (FR-A06, DD-A06, SCR-A06) through the DAL: organizations.list (HQ, customers and
 // contractors), customers.list / properties.list / units.list for the scope and the names, members.list for the
-// people, one jobs.list total per pipeline stage within the scope, jobs.list with the filters and the sort (IR34),
+// people, one jobs.list total per pipeline stage within the scope (and the requested-time period from / to of the HQ
+// overview's links, IR245), jobs.list with the filters and the sort (IR34),
 // and for the selected job jobs.get, jobs.events, units.get, — for a requested job — members.eligible per preferred
 // time (the HQ technicians free and qualified then, IR113), and the latest report (reports.get with up to four ready
 // photos through attachments.getContent). The Plans tab (loadPlans) reads plans.list in the same scope, plans.get for
@@ -9,7 +10,7 @@ import "server-only";
 import { coreAll, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { jobEventTitle, type ApiJobEvent } from "@ac/web/lib/partnerOverview";
 import type { ApiWorkReport } from "@ac/web/lib/partnerReview";
-import { agreedSlots, controls, costTotals, delivery, facts, filtersOf, hqRow, preferredRows, reportCard, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
+import { agreedSlots, controls, costTotals, delivery, facts, filtersOf, hqRow, periodOfQuery, preferredRows, reportCard, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
 import { planRows, type ApiPlan } from "@ac/web/lib/adminPlans";
 import { breachRows, PERIODS, periodOf, slaRows, slaTiles, targetsByPlan, type ApiScorecard } from "@ac/web/lib/adminSla";
 import { contractorRows, kpiTiles, pendingCertificates, profileFacts, rateCardView, technicianRows, type ApiCertificate, type ApiProfile, type ApiRateCard, type ApiTechnician } from "@ac/web/lib/adminContractors";
@@ -67,17 +68,18 @@ async function shared(sp: SP) {
 export async function loadJobs(sp: SP) {
   const { now, members, hq, contractors, names, unitOrg, scope, head } = await shared(sp);
   const nowMs = now.getTime();
-  const q: Query = { customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId), origin: one(sp.origin), delivery: one(sp.delivery), assignee: one(sp.assignee), overdue: one(sp.overdue), type: one(sp.type), stage: stageOf(one(sp.stage)) ?? undefined };
+  const q: Query = { customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId), origin: one(sp.origin), delivery: one(sp.delivery), assignee: one(sp.assignee), overdue: one(sp.overdue), type: one(sp.type), stage: stageOf(one(sp.stage)) ?? undefined, from: one(sp.from), to: one(sp.to) };
+  const period = periodOfQuery(q);
   const sort = sortOf(one(sp.sort));
   const spec = SORTS.find((s) => s.id === sort)!;
   const [counts, list, profiles] = await Promise.all([
-    Promise.all(STAGES.map((s) => coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, ...s.filter }, limit: 1 }).then((r) => r.total))),
+    Promise.all(STAGES.map((s) => coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, ...(period ?? {}), ...s.filter }, limit: 1 }).then((r) => r.total))),
     coreOp<Page<ApiHqRow>>("jobs.list", { filters: filtersOf(q, hq?.id ?? null), sort: { field: spec.field, direction: spec.direction }, limit: 100 }),
     optional(coreAll<{ organizationId: string; status: string }>("contractors.list"), []), // offers suspended per profile (DD-A21)
   ]);
   const rows = list.items.filter((j) => j.status !== "cancelled" && (!q.type || j.type === q.type)).map((j) => hqRow(j, nowMs, names, unitOrg));
   const base = {
-    ...head, q, sort, sorts: SORTS, total: list.total,
+    ...head, q, period, sort, sorts: SORTS, total: list.total,
     stages: STAGES.map((s, i) => ({ id: s.id, label: s.label, count: counts[i] })),
     deliveries: [{ id: "internal", name: "Internal" }, ...contractors.map((c) => ({ id: c.id, name: c.name }))],
     assignees: members.filter((m) => m.role === "technician").map((m) => ({ id: m.id, name: m.displayName })),

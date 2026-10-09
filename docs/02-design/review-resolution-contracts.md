@@ -2331,3 +2331,22 @@ In API mode `/admin` (FR-A01, DD-A01, SCR-A01, Figma Admin 01) read `admin.summa
 2. **Sections, all from the one result.** The eight KPIs link to their lists with the scope but not the period (IR50). The forecast card shows Expected reduction / Expected increase / No change 0.0 with absolute values, the predicted baseline (reference, method, kWh), the predicted actual (kWh on valid slots ÷ valid × expected unit-minutes), the coverage and the quality warnings. Without a forecast it says No target equipment / Baseline not set / Cannot calculate (IR78). The power and connection cards show a stacked bar and one row per class with its list link (SR27). All ten job statuses are listed, zeros included. Billing has one row per currency, never summed, and is hidden without billing.read.
 3. **Jobs link.** `jobCounts` counts the jobs whose requested slot starts in the period. A status row opens the Jobs tab for that stage and scope, but the Jobs tab has no period filter, so it lists every job of the stage. Cancelled has no stage and opens the tab unfiltered.
 4. **Demo.** Phase 1A keeps the fixture KPIs and the state toggles.
+
+## IR245 HQ Jobs tab period from the overview — 2026-10-10
+
+IR244 item 3 left a gap: a job-status row of the HQ overview opened the Jobs tab with the stage and scope but without the period, so the tab listed every job of the stage, not the jobs counted on the overview. This supersedes IR244 item 3.
+
+1. **Period in the URL.** `/admin/jobs` takes `from` / `to` (ISO instants). They apply only when both parse and from < to; otherwise they are ignored. `jobs.list` filters.from / to select jobs whose requested slot starts in [from, to), the rule of `admin.summary` jobCounts (query catalog). The period narrows both the list and every stage total.
+2. **Chip.** “Requested time MM-DD hh:mm – MM-DD hh:mm” (Kuala Lumpur time) under the filter bar; ✕ clears the period and the selection. Filter changes replace the history entry, so Back returns to the overview with its period (D13). The scope line reads “n jobs in scope · in the period”.
+3. **Overview links.** The status rows and the Jobs KPI carry the scope and the period. Current-state KPIs (units, alerts, unpaid) still carry no period (IR50). The tab also lists jobs of archived units, which the overview does not count, because its target units exclude archived ones (DD-A01).
+
+## IR246 Preferences on the Core API — 2026-10-10
+
+In API mode `/settings/preferences` (FR-X01, FR-X08, DDC-07, SCR-X-settings-preferences, Figma Client 10d / 10g) was still the Phase 1A page. Choices only showed a toast, the consent and two-step switches saved nothing, and a client could not turn the monthly report e-mail off there, although BR-C16 says it can.
+
+1. **Reads.** A Server Component reads `preferences.get`, `twoFactor.get` and, for a client, `consents.get` for `location_automation`; NOT_FOUND means not granted yet. The time zone options are the usual six, plus the saved zone if it is another one. Each shows its UTC offset at the demo clock, worked out on the server from the numeric wall-clock parts. Node and the browser name offsets differently (“UTC” and “UTC+0”), which broke hydration.
+2. **Save.** One Save sends `preferences.update` with the language and time zone. A client's save also carries `monthlyReportEmail` (IR142 item 5). When the location consent changed, it also sends `consents.update` with the consent's version as the expected version (0 when none is recorded). Cancel restores the saved values, and a refusal shows in a banner.
+3. **Consent line.** It reads “Granted <date>”, “Withdrawn <date>” or “Not granted yet”. The microphone switch stays on the device: it is a browser permission, not an account setting.
+4. **Two-step verification.** Turn on shows the setup key from `twoFactor.get` and asks for a 6-digit code (`twoFactor.enable`), then shows the recovery codes once. Turn off asks for a code (`twoFactor.disable`). While it is on, the screen shows how many recovery codes are left. Any 6 digits are accepted in this build (IR144 item 6).
+5. **Monthly report e-mail (client).** “Email me the monthly energy report (1st of each month)” is under Reports. It is the same flag as the Energy export dialog's option (BR-C16, AT-C16-B). Figma 10d and 10g gain the row.
+6. **Demo.** Phase 1A keeps the browser-only page.

@@ -52,8 +52,9 @@ export function asOfText(asOf: string, range: { from: string; to: string }): str
   return `As of ${stamp(asOf).slice(11)} MYT · ${span} (${KL})`;
 }
 
-/** The drill-down links (IR50, SR06): current-state lists carry the customer / property but not the period. */
-export function overviewLinks(q: { customerId: string | null; propertyId: string | null }) {
+/** The drill-down links (IR50, SR06): current-state lists carry the customer / property but not the period; the job
+ * links carry the period too (the counts are the jobs whose requested time starts in it, IR245). */
+export function overviewLinks(q: { customerId: string | null; propertyId: string | null; period?: { from: string; to: string } }) {
   const scope = (extra: Record<string, string> = {}) => {
     const p = new URLSearchParams({ ...(q.customerId ? { customerId: q.customerId } : {}), ...(q.propertyId ? { propertyId: q.propertyId } : {}), ...extra });
     return p.size ? `?${p}` : "";
@@ -61,7 +62,7 @@ export function overviewLinks(q: { customerId: string | null; propertyId: string
   return {
     units: `/admin/units${scope()}`, power: (state: "on" | "off" | "unknown") => `/admin/units${scope({ powerState: state })}`,
     connection: (c: string) => `/admin/units${scope({ connections: c })}`, alerts: "/admin/alerts", billing: "/admin/billing?overdueOnly=true",
-    jobs: (stage?: string) => `/admin/jobs${scope(stage ? { stage } : {})}`, energy: "/admin/energy",
+    jobs: (stage?: string) => `/admin/jobs${scope({ ...(stage ? { stage } : {}), ...(q.period ? { from: q.period.from, to: q.period.to } : {}) })}`, energy: "/admin/energy",
   };
 }
 

@@ -10364,13 +10364,13 @@
                     },
                     {
                         "type": "string",
-                        "description": "filter",
+                        "description": "filter → requestedSlot.startAt ≥ from and \u003c to (IR245: the rule of admin.summary jobCounts)",
                         "name": "from",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "filter",
+                        "description": "filter → requestedSlot.startAt ≥ from and \u003c to (IR245: the rule of admin.summary jobCounts)",
                         "name": "to",
                         "in": "query"
                     },

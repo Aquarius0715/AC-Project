@@ -19,7 +19,7 @@ export function AdminOverviewView({ live }: { live: Live }) {
   const router = useRouter();
   const patch = useUrlPatch();
   const s = live.summary;
-  const links = overviewLinks({ customerId: live.customerId, propertyId: live.propertyId });
+  const links = overviewLinks({ customerId: live.customerId, propertyId: live.propertyId, period: live.period.error ? undefined : { from: live.period.from, to: live.period.to } });
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -97,7 +97,7 @@ function Sections({ s, links }: { s: AdminSummary; links: ReturnType<typeof over
               <div key={i} className="rounded-xl border border-line">{col.map((j) => <Link key={j.status} href={j.href} className="flex justify-between border-t border-line px-3 py-1.5 text-[13px] first:border-0 hover:bg-surface2"><span className="text-muted">{j.status}</span><b>{j.count}</b></Link>)}</div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-muted">Jobs whose requested time starts in the period. The status rows open the Jobs tab for that stage and scope — it lists every job of the stage, not only this period’s (IR244).</p>
+          <p className="mt-2 text-[11px] text-muted">Jobs whose requested time starts in the period. The status rows open the Jobs tab with that stage, the scope and the period (IR245).</p>
         </Card>
         <Card title="Billing — unpaid by currency" action={!bill.forbidden && <TextLink href={links.billing}>Open overdue →</TextLink>}>
           {bill.forbidden ? <p className="text-[13px] text-muted">Hidden — billing.read is required.</p> : (

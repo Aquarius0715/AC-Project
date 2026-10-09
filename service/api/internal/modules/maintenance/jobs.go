@@ -661,8 +661,8 @@ var severityRank = map[string]int{"normal": 0, "warning": 1, "critical": 2}
 // @Param			unitIds			query		[]string	false	"filter (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
 // @Param			status			query		string		false	"filter"
 // @Param			severity		query		string		false	"filter"
-// @Param			from			query		string		false	"filter"
-// @Param			to				query		string		false	"filter"
+// @Param			from			query		string		false	"filter → requestedSlot.startAt ≥ from and < to (IR245: the rule of admin.summary jobCounts)"
+// @Param			to				query		string		false	"filter → requestedSlot.startAt ≥ from and < to (IR245: the rule of admin.summary jobCounts)"
 // @Param			organizationId	query		string		false	"filter"
 // @Param			membershipId	query		string		false	"filter"
 // @Param			customerId		query		string		false	"filter"
