@@ -11334,7 +11334,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-P07 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)",
+                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-P07, DD-P01 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -14887,7 +14887,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 contractor sees own-company technicians only\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A03, DD-P06, DD-P05 · Query: filters role,organizationId,qualification,activeOnly · sort id,validFrom,createdAt,updatedAt (default id asc)",
+                "description": "Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 contractor sees own-company technicians only\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A03, DD-P06, DD-P05, DD-P01 · Query: filters role,organizationId,qualification,activeOnly · sort id,validFrom,createdAt,updatedAt (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -23898,7 +23898,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | admin:automation.policy.read:scope-candidate-read-only | admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR62 unassignedOnly; IR213 latestMeasurements: latest reading per metric with read-time quality; [] before an external technician's work window\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C01, DD-C02, DD-C04, DD-C05, DD-C06, DD-C07, DD-C09, DD-C13, DD-T11, DD-A04, DD-A06, DD-A07, DD-A09, DD-A11, DD-A12, DD-A13, DD-A14, DD-A15, DD-A05, DD-C14, DD-C15, DD-C03, DD-T12 · Query: filters customerId,propertyId,status,spaceId,includeDescendants,connections,powerState,unitIds,organizationId,unassignedOnly · sort id,createdAt,updatedAt (default id asc)",
+                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | admin:automation.policy.read:scope-candidate-read-only | admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR62 unassignedOnly; IR213 latestMeasurements: latest reading per metric with read-time quality; [] before an external technician's work window\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C01, DD-C02, DD-C04, DD-C05, DD-C06, DD-C07, DD-C09, DD-C13, DD-T11, DD-A04, DD-A06, DD-A07, DD-A09, DD-A11, DD-A12, DD-A13, DD-A14, DD-A15, DD-A05, DD-C14, DD-C15, DD-C03, DD-T12, DD-P01 · Query: filters customerId,propertyId,status,spaceId,includeDescendants,connections,powerState,unitIds,organizationId,unassignedOnly · sort id,createdAt,updatedAt (default id asc)",
                 "consumes": [
                     "application/json"
                 ],

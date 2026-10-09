@@ -902,7 +902,7 @@ type Event struct {
 // @Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-P07 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)
+// @Description	Design: DD-P07, DD-P01 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)
 // @Tags			jobs
 // @Accept			json
 // @Produce		json

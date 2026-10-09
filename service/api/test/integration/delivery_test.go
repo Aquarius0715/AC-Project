@@ -196,6 +196,12 @@ func TestOfferAcceptAssign(t *testing.T) {
 	if _, m := post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`); data(m)["status"] != "requested" || data(m)["contractorOrgId"] != nil {
 		t.Fatal("decline returns the job to requested")
 	}
+	// the company's own decision stays readable as offer.declined (history snapshots keep accept / decline records)
+	var action string
+	ownerScan(t, `SELECT action FROM maintenance.job_events WHERE job_id = $1 AND action LIKE 'offer.%' ORDER BY occurred_at DESC, id DESC LIMIT 1`, []any{job}, &action)
+	if action != "offer.declined" {
+		t.Fatalf("decline event action %q", action)
+	}
 	write(s, &hq, "jobs.offer", offerBody(nil), 3)
 	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
 	owner(t, `UPDATE maintenance.offers SET offer_expires_at = $2 WHERE id = $1`, offer, clock)

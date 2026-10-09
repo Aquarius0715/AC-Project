@@ -154,7 +154,7 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 // @Description	Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 contractor sees own-company technicians only
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A03, DD-P06, DD-P05 · Query: filters role,organizationId,qualification,activeOnly · sort id,validFrom,createdAt,updatedAt (default id asc)
+// @Description	Design: DD-A03, DD-P06, DD-P05, DD-P01 · Query: filters role,organizationId,qualification,activeOnly · sort id,validFrom,createdAt,updatedAt (default id asc)
 // @Tags			members
 // @Accept			json
 // @Produce		json

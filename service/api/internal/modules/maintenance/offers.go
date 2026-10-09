@@ -301,10 +301,11 @@ func (m Delivery) decide(ctx context.Context, c *ops.Call, in *DecisionInput, de
 		WHERE id = $1 RETURNING version`, in.JobID, next).Scan(&v); err != nil {
 		return Receipt{}, err
 	}
-	if err := m.Jobs.event(ctx, c, in.JobID, "offer."+decision+"ed", nil); err != nil {
+	done := map[string]string{"accept": "accepted", "decline": "declined"}[decision] // the past tense the history reads (offer.declined)
+	if err := m.Jobs.event(ctx, c, in.JobID, "offer."+done, nil); err != nil {
 		return Receipt{}, err
 	}
-	c.Emit(ops.Event{AggregateType: "job", AggregateID: in.JobID, Type: "Offer" + strings.ToUpper(decision[:1]) + decision[1:] + "ed", Payload: map[string]any{"offerId": in.OfferID}})
+	c.Emit(ops.Event{AggregateType: "job", AggregateID: in.JobID, Type: "Offer" + strings.ToUpper(done[:1]) + done[1:], Payload: map[string]any{"offerId": in.OfferID}})
 	c.Audit(ops.AuditEntry{Action: "jobs." + decision, TargetKind: "job", TargetID: in.JobID.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &v, Reason: reason})
 	return Receipt{JobID: in.JobID, JobVersion: v, OfferID: in.OfferID, Decision: decision}, nil
 }

@@ -105,6 +105,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.112.0 (2026-10-09): IR221; SCR-T04 + units.resolveQr; counts unchanged.
 # 0.113.0 (2026-10-09): IR222; operation-catalog rest_routes (219 routes) and their checks; counts unchanged.
 # 0.114.0 (2026-10-09): IR223; web on the REST routes, /v1/ops retired; counts unchanged.
+# 0.115.0 (2026-10-09): IR224; SCR-P01 / DD-P01 reads (members.list, units.list, jobs.get, jobs.events); counts unchanged.
 # 0.102.0 (2026-10-09): IR211; counts unchanged.
 # 0.101.0 (2026-10-09): IR210; counts unchanged.
 # 0.100.0 (2026-10-09): IR209; counts unchanged.
@@ -1318,7 +1319,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.114.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.115.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

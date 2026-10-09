@@ -36,12 +36,16 @@ func TestTechnicianUnitAccessReasons(t *testing.T) {
 	if code, key := events(&techInt); code != 403 || key != "errors.assignment_not_started" {
 		t.Errorf("assignment starting later: %d %s", code, key)
 	}
+	revokeOthers := func(from, to time.Time) { // other tests' assignments must not overlap (assignments_no_overlap)
+		owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND scheduled && tstzrange($2, $3) AND job_id <> $4`,
+			seed.ID("tech-internal-a"), from, to, job)
+	}
+	revokeOthers(clock.Add(-2*time.Hour), clock.Add(-time.Hour))
 	owner(t, `UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1`, job, clock.Add(-2*time.Hour), clock.Add(-time.Hour))
 	if code, key := events(&techInt); code != 403 || key != "errors.assignment_ended" {
 		t.Errorf("assignment window ended: %d %s", code, key)
 	}
-	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND scheduled && tstzrange($2, $3) AND job_id <> $4`,
-		seed.ID("tech-internal-a"), clock.Add(-time.Hour), clock.Add(time.Hour), job) // other tests' assignments must not overlap (assignments_no_overlap)
+	revokeOthers(clock.Add(-time.Hour), clock.Add(time.Hour))
 	owner(t, `UPDATE maintenance.assignments SET valid_from = $2, valid_until = $3, scheduled = tstzrange($2, $3) WHERE job_id = $1`, job, clock.Add(-time.Hour), clock.Add(time.Hour))
 	if code, key := events(&techInt); code != 200 {
 		t.Errorf("inside the window: %d %s", code, key)

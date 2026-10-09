@@ -9,6 +9,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
 	"github.com/pradita/ac-project/service/api/internal/seed"
+	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
 func freeze(t *testing.T, now time.Time) {
@@ -33,6 +34,24 @@ func byJob(m map[string]any, job string) map[string]any {
 	return nil
 }
 
+// listJob pages through the caller's jobs.list and returns the job's row (nil when it is not listed): the shared test
+// database keeps other tests' jobs, so a job can be beyond the first page.
+func listJob(s *apiserver.Server, a *actor, job string) map[string]any {
+	body := `{"limit":100}`
+	for page := 0; page < 50; page++ {
+		_, m := post(s, a, "jobs.list", body)
+		if row := byJob(m, job); row != nil {
+			return row
+		}
+		next, _ := data(m)["nextCursor"].(string)
+		if next == "" {
+			return nil
+		}
+		body = `{"limit":100,"cursor":"` + next + `"}`
+	}
+	return nil
+}
+
 func TestContractorAndTechnicianProjections(t *testing.T) {
 	s := server(t)
 	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND lower(scheduled) > $2`,
@@ -52,8 +71,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
 
 	// offer projection before acceptance
-	_, m = post(s, &contrA, "jobs.list", `{"limit":100}`)
-	o := byJob(m, job)
+	o := listJob(s, &contrA, job)
 	if o == nil || o["projection"] != "offer" || o["status"] != "offered" || o["severity"] != nil || len(o["requiredQualifications"].([]any)) == 0 || o["unitId"] != nil {
 		t.Fatalf("offer projection: %v", o)
 	}
@@ -77,7 +95,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 			t.Errorf("%s: want %v", body, want)
 		}
 	}
-	if _, m := post(s, &contrB, "jobs.list", `{"limit":100}`); byJob(m, job) != nil {
+	if listJob(s, &contrB, job) != nil {
 		t.Error("other contractor sees the offer")
 	}
 	if code, _ := post(s, &contrB, "jobs.get", `{"jobId":"`+job+`"}`); code != 404 {
@@ -96,7 +114,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	if _, m := post(s, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); data(m)["projection"] != "detail" {
 		t.Fatalf("detail in window: %v", m)
 	}
-	if _, m := post(s, &contrA, "jobs.list", `{"limit":100}`); byJob(m, job)["projection"] != "summary" {
+	if listJob(s, &contrA, job)["projection"] != "summary" {
 		t.Fatal("summary in window")
 	}
 	if _, m := post(s, &contrA, "jobs.events", `{"jobId":"`+job+`","query":{}}`); len(items(m)) < 3 {
@@ -134,7 +152,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	write(s, &hq, "jobs.offer", `{"jobId":"`+j2+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
 		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(1)+`","accessValidUntil":"`+ts(100)+`","termsVersion":"t"}`, 1)
 	owner(t, `UPDATE maintenance.offers SET offer_expires_at = $2 WHERE job_id = $1`, j2, clock)
-	if _, m := post(s, &contrA, "jobs.list", `{"limit":100}`); byJob(m, j2) != nil {
+	if listJob(s, &contrA, j2) != nil {
 		t.Error("expired offer listed")
 	}
 
@@ -161,7 +179,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	if code, m := post(s, &techInt, "jobs.get", `{"jobId":"`+k+`"}`); code != 200 || data(m)["projection"] != "history" || len(data(m)["ownDecisionEvents"].([]any)) != 0 {
 		t.Fatalf("technician history: %d %v", code, m)
 	}
-	if _, m := post(s, &techInt, "jobs.list", `{"limit":100}`); byJob(m, k) == nil {
+	if listJob(s, &techInt, k) == nil {
 		t.Error("technician history listed")
 	}
 }

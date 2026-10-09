@@ -5,20 +5,13 @@ import { Btn, Card, Choice, Field, Page, Select, Tabs, Textarea, Timeline, useTo
 import { useOp } from "@ac/web/lib/useOp";
 import { jobsApi } from "@ac/web/lib/jobsApi";
 import { OpError } from "@ac/web/lib/ops";
+import { jobEventTitle } from "@ac/web/lib/partnerOverview";
 
 // DATA_SOURCE=api: the company's jobs (offer / summary / history projections, IR23) and their events (jobs.events)
 type ApiJobRow = { projection: string; id?: string; jobId?: string; type: string; status: string; completedAt?: string | null };
 type ApiEvent = { id: string; action: string; occurredAt: string; note: { visibility: "internal" | "customer"; message: string } | null };
 type Ev = { t: string; title: string; d: string; c: boolean };
-const actionTitle: Record<string, string> = {
-  "job.created": "Job created", "job.offered": "Offer received from HQ", "offer.accepted": "Job accepted", "offer.declined": "Offer declined", "offer_expired": "Offer expired",
-  "offer.access_extended": "Access window extended", "job.assigned": "Technician assigned", "job.checked_in": "Checked in on site", "job.started": "Work started",
-  "job.paused": "Work paused", "job.resumed_work": "Work resumed", "job.submitted": "Report submitted", "partner.review": "Partner review", "job.reviewed": "Report reviewed",
-  "job.rework_started": "Rework started", "job.costs_saved": "Costs saved", "job.held": "Job on hold", "job.resumed": "Job resumed", "job.cancelled": "Job cancelled",
-  "job.reschedule_requested": "Reschedule requested", "proposal.sent": "Time proposed", "proposal.accepted": "Proposal accepted", "proposal.declined": "Proposal declined",
-  "proposal.withdrawn": "Proposal withdrawn", "note.added": "Note added", "job.rated": "Customer rating", "job.problem_reported": "Problem reported",
-  "job.follow_up_classified": "Follow-up classified", "job.warranty_claim_filed": "Warranty claim filed",
-};
+const actionTitle = jobEventTitle; // shared with the overview (partnerOverview.ts)
 const kl = (iso: string) => new Date(iso).toLocaleString("en-MY", { dateStyle: "short", timeStyle: "short", hour12: false, timeZone: "Asia/Kuala_Lumpur" });
 function eventRow(e: ApiEvent): Ev {
   return { t: kl(e.occurredAt), title: actionTitle[e.action] ?? e.action.replace(/[._]/g, " "), d: e.note ? `“${e.note.message}” · ${e.note.visibility}` : e.action, c: e.note?.visibility === "customer" };

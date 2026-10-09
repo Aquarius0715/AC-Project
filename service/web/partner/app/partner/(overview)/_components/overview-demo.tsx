@@ -5,7 +5,8 @@ import { Banner, Card, Kpi, Page, TextLink, UtilBar } from "@ac/web/components/u
 import { fmt, useJobs } from "@ac/web/lib/jobs";
 
 const hours = [8, 10, 12, 14, 16, 18];
-export default function PartnerOverview() {
+/** The Phase 1A demo dashboard (DATA_SOURCE=mock): the fixture jobs of the shared store and fixed rows. */
+export function OverviewDemo() {
   const live = useJobs().filter((j) => j.contractor === "contractor-a" && j.id !== "job-p09");
   const actions: [string, string, string][] = [
     ...live.filter((j) => j.status === "offered" && j.partnerProposal?.status !== "pending").map((j): [string, string, string] => [`${j.id} · ${j.unit} · ${j.customer}`, `New offer · visit ${fmt(j.scheduled)} (fixed) — accept, decline or propose another time`, `/partner/jobs/${j.id}`]),
