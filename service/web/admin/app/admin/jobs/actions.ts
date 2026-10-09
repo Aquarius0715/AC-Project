@@ -2,11 +2,14 @@
 
 // Server Actions of the HQ Jobs tab (FR-A06, DD-A06): book an agreed time internally (jobs.assign) or as an offer to a
 // contractor (jobs.offer with the time locked, IR113), propose another time to the client and withdraw it, answer a
-// contractor's time change (jobs.resolvePartnerSlot), hold / resume / cancel (IR56), reassign an internal job and
-// classify a follow-up (IR114). Each carries the job version as the expected version; CONFLICT refreshes the page.
+// contractor's time change (jobs.resolvePartnerSlot), hold / resume / cancel (IR56), reassign an internal job, classify
+// a follow-up (IR114), review the submitted report (jobs.review), save the cost lines (jobs.saveCost), extend a
+// contractor's access (jobs.extendAccess) and create a job on a customer's behalf (jobs.create). Each write on a job
+// carries its version as the expected version; CONFLICT refreshes the page.
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
+import type { CostLine } from "@ac/web/lib/adminJobs";
 
 type Slot = { startAt: string; endAt: string };
 type Result = { ok: true; value: null } | ({ ok: false } & ActionFailure);
@@ -58,4 +61,36 @@ export async function cancelJob(jobId: string, version: number, cancelReason: st
 /** jobs.classifyFollowUp: rework (free) or a new request, once, with a reason. */
 export async function classifyFollowUp(jobId: string, version: number, classification: "rework" | "new_request", reason: string) {
   return run(() => coreOp("jobs.classifyFollowUp", { jobId, classification, reason: reason.trim() }, write(version)));
+}
+
+/** jobs.review on the latest submitted report: normal for an internal job, hq_escalation with a reason for a
+ * contractor's job (IR31, D06); a reviewer who contributed to the version is refused (no self-review). */
+export async function reviewReport(jobId: string, version: number, reportVersion: number, decision: "accept" | "return", reviewMode: "normal" | "hq_escalation", reason: string) {
+  return run(() => coreOp("jobs.review", { jobId, reportVersion, decision, reviewMode, ...(reason.trim() ? { reason: reason.trim() } : {}) }, write(version)));
+}
+
+/** jobs.saveCost: the whole list of cost lines replaces the stored one (estimate / actual, per currency). */
+export async function saveCosts(jobId: string, version: number, costLines: CostLine[]) {
+  return run(() => coreOp("jobs.saveCost", { jobId, costLines }, write(version)));
+}
+
+/** jobs.extendAccess: a later end of the accepted offer's access window, with a reason (1–1000). */
+export async function extendAccess(jobId: string, version: number, accessValidUntil: string, reason: string) {
+  return run(() => coreOp("jobs.extendAccess", { jobId, accessValidUntil, reason: reason.trim() }, write(version)));
+}
+
+/** jobs.create on a customer's behalf (DD-A06 item 8): the 1st preferred time is the requested window, up to two
+ * more, due at or after the requested end, an optional contact window. Returns the new job's id. */
+export async function createJob(input: { unitId: string; type: string; symptom: string; slots: Slot[]; dueAt: string | null; contactWindow: string }): Promise<{ ok: true; value: { id: string } } | ({ ok: false } & ActionFailure)> {
+  const [first, ...alternatives] = input.slots;
+  try {
+    const job = await coreOp<{ id: string }>("jobs.create", {
+      unitId: input.unitId, type: input.type, symptom: input.symptom.trim(), requestedStart: first.startAt, requestedEnd: first.endAt, alternativeSlots: alternatives,
+      ...(input.dueAt ? { dueAt: input.dueAt } : {}), ...(input.contactWindow.trim() ? { contactWindow: input.contactWindow.trim() } : {}),
+    }, { write: true });
+    return { ok: true, value: { id: job.id } };
+  } catch (e) {
+    if (e instanceof CoreError) return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors };
+    throw e;
+  }
 }

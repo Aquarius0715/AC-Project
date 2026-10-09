@@ -1,12 +1,14 @@
 // The reads of the HQ Jobs tab (FR-A06, DD-A06, SCR-A06) through the DAL: organizations.list (HQ, customers and
 // contractors), customers.list / properties.list / units.list for the scope and the names, members.list for the
 // people, one jobs.list total per pipeline stage within the scope, jobs.list with the filters and the sort (IR34),
-// and for the selected job jobs.get, jobs.events, units.get and — for a requested job — members.eligible per
-// preferred time (the HQ technicians free and qualified then, IR113).
+// and for the selected job jobs.get, jobs.events, units.get, — for a requested job — members.eligible per preferred
+// time (the HQ technicians free and qualified then, IR113), and the latest report (reports.get with up to four ready
+// photos through attachments.getContent).
 import "server-only";
 import { coreAll, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { jobEventTitle, type ApiJobEvent } from "@ac/web/lib/partnerOverview";
-import { controls, delivery, facts, filtersOf, hqRow, preferredRows, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
+import type { ApiWorkReport } from "@ac/web/lib/partnerReview";
+import { controls, costTotals, delivery, facts, filtersOf, hqRow, preferredRows, reportCard, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
 import { klTime } from "@ac/web/lib/devices";
 
 type Page<T> = { items: T[]; total: number };
@@ -56,6 +58,7 @@ export async function loadJobs(sp: Record<string, string | string[] | undefined>
     contractors: contractors.map((c) => ({ id: c.id, name: c.name, status: c.status })),
     internalTechs: members.filter((m) => m.role === "technician" && m.employment === "internal").map((m) => ({ id: m.id, name: m.displayName })),
     rows,
+    units: units.map((u) => ({ id: u.id, name: u.displayName, customer: names.customers.get(u.customerOrgId) ?? "customer" })).sort((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
   };
   const pick = one(sp.jobId) ?? rows[0]?.id;
   if (!pick) return { ...base, detail: null };
@@ -64,15 +67,22 @@ export async function loadJobs(sp: Record<string, string | string[] | undefined>
     throw e;
   });
   if (!job) return { ...base, detail: null, missing: pick };
-  const [events, unit, eligible] = await Promise.all([
+  const ref = job.reportRefs?.[job.reportRefs.length - 1];
+  const [events, unit, eligible, report] = await Promise.all([
     optional(coreOp<Page<ApiJobEvent>>("jobs.events", { jobId: job.id, query: { limit: 100 } }).then((r) => r.items), [] as ApiJobEvent[]),
     optional(coreOp<{ displayName: string; location: { pathLabels: string[] } }>("units.get", { id: job.unitId }), null),
     job.status === "requested" && job.slotProposal?.status !== "pending"
       ? Promise.all(job.preferredSlots.map((s) => Date.parse(s.startAt) <= nowMs ? Promise.resolve([] as { id: string; displayName: string }[])
         : optional(coreOp<Page<{ id: string; displayName: string }>>("members.eligible", { jobId: job.id, startAt: s.startAt, endAt: s.endAt, query: { limit: 20 } }).then((r) => r.items), [] as { id: string; displayName: string }[])))
       : Promise.resolve([] as { id: string; displayName: string }[][]),
+    ref ? optional(coreOp<ApiWorkReport>("reports.get", { jobId: job.id, reportId: ref.reportId, reportVersion: ref.reportVersion }), null) : Promise.resolve(null),
   ]);
   const byUser = new Map(members.map((m) => [m.userId, m.displayName]));
+  const photos = report ? (await Promise.all(report.attachmentRefs.filter((a) => a.status === "ready" && a.size <= 2_000_000).slice(0, 4).map(async (a) => {
+    const b = await optional(coreOp<{ mime: string; bytes: string }>("attachments.getContent", { jobId: job.id, reportId: report.id, reportVersion: report.version, attachmentId: a.id }), null);
+    return b ? { id: a.id, name: a.name, url: `data:${b.mime};base64,${b.bytes}` } : null;
+  }))).filter((p): p is { id: string; name: string; url: string } => !!p) : [];
+  const costs = job.costs ?? [];
   return {
     ...base,
     detail: {
@@ -82,6 +92,9 @@ export async function loadJobs(sp: Record<string, string | string[] | undefined>
       history: [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 12).map((e) => ({ id: e.id, at: klTime(e.occurredAt).slice(5), text: `${jobEventTitle[e.action] ?? e.action.replace(/[._]/g, " ")}${e.actorUserId ? ` · ${byUser.get(e.actorUserId) ?? "client"}` : ""}` })),
       partnerTech: job.partnerSlotProposal ? names.people.get(job.partnerSlotProposal.technicianMembershipId) ?? "technician" : null,
       holdWho: job.slotProposal ? (job.slotProposal.hold.kind === "internal" ? names.people.get(job.slotProposal.hold.membershipId) ?? "HQ technician" : names.orgs.get(job.slotProposal.hold.contractorOrgId) ?? "contractor") : null,
+      report: report ? { ...reportCard(job, report, byUser), photos } : null, draft: !!job.draftReportRef,
+      costs, totals: costTotals(costs),
+      extend: job.offer?.decision === "accept" && !["completed", "cancelled"].includes(job.status) ? { until: job.offer.accessValidUntil } : null,
     },
   };
 }

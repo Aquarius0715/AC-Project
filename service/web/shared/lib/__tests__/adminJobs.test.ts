@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyBy, controls, delivery, facts, filtersOf, hqRefusal, hqRow, longSlot, offerDefaults, preferredRows, slotText, sortOf, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names } from "@ac/web/lib/adminJobs";
+import { classifyBy, controls, costLineOf, costTotals, delivery, extendDefault, money, newJobErrors, reportCard, returnReason, reviewModeOf, facts, filtersOf, hqRefusal, hqRow, longSlot, offerDefaults, preferredRows, slotText, sortOf, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names } from "@ac/web/lib/adminJobs";
 
 const NOW = Date.parse("2026-09-21T01:30:00Z"); // Mon 09:30 KL
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
@@ -17,7 +17,7 @@ const job = (over: Record<string, unknown>) => ({
   projection: "detail", id: "job-1-aaaa", version: 4, unitId: "u1", type: "reactive", status: "requested", symptom: "Water dripping", contactWindow: "9:00–18:00", origin: "client_request", planId: null, occurrenceAt: null,
   requestedSlot: slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), preferredSlots: [slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z")], preferenceRound: 1,
   slotProposal: null, partnerSlotProposal: null, scheduledSlot: null, dueAt: "2026-09-22T04:00:00Z", startedAt: null, completedAt: null, contractorOrgId: null, createdAt: "2026-09-18T01:00:00Z",
-  followUpOfJobId: null, followUpClass: null, assignment: null, offer: null, ...over,
+  followUpOfJobId: null, followUpClass: null, assignment: null, offer: null, reportRefs: [], draftReportRef: null, costs: [], ...over,
 }) as unknown as ApiHqJob;
 
 describe("HQ maintenance jobs", () => {
@@ -66,5 +66,65 @@ describe("HQ maintenance jobs", () => {
     expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { startAt: "errors.slot_not_agreed" } })).toBe("startAt: only one of the client’s preferred times (or an accepted proposal) can be booked");
     expect(hqRefusal({ code: "CONFLICT", messageKey: "errors.proposal_pending", fieldErrors: {} })).toBe("Not saved (CONFLICT): a proposal is already waiting for the client — withdraw it first.");
     expect(hqRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} })).toBe("The job no longer exists in your scope.");
+  });
+
+  it("adds up costs per currency and checks a new line", () => {
+    const lines = [
+      { kind: "estimate", description: "Labour", visibility: "customer", amountMinor: 8000, currency: "MYR" }, { kind: "estimate", description: "Filter", visibility: "customer", amountMinor: 2500, currency: "MYR" },
+      { kind: "actual", description: "Labour", visibility: "customer", amountMinor: 8000, currency: "MYR" }, { kind: "actual", description: "Filter (imported)", visibility: "internal", amountMinor: 620, currency: "USD" },
+    ] as const;
+    expect(costTotals([...lines])).toEqual({ estimate: "105.00 MYR", actual: "80.00 MYR + 6.20 USD" });
+    expect(costTotals([])).toEqual({ estimate: "—", actual: "—" });
+    expect(money(620, "USD")).toBe("6.20 USD");
+    expect(costLineOf({ kind: "actual", description: " Drain pump ", visibility: "customer", amount: "45.5", currency: "MYR" }).line).toEqual({ kind: "actual", description: "Drain pump", visibility: "customer", amountMinor: 4550, currency: "MYR" });
+    expect(costLineOf({ kind: "actual", description: "", visibility: "customer", amount: "1", currency: "MYR" }).error).toMatch(/description/);
+    expect(costLineOf({ kind: "actual", description: "x", visibility: "customer", amount: "-1", currency: "MYR" }).error).toMatch(/non-negative/);
+  });
+
+  it("checks a new job and the review mode", () => {
+    const ok = newJobErrors({ unitId: "u1", symptom: "Water dripping from the indoor unit", slots: [slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z")] }, NOW);
+    expect(ok).toEqual({});
+    const bad = newJobErrors({ unitId: "", symptom: "short", slots: [slot("2026-09-21T06:00:00Z", "2026-09-21T08:00:00Z"), slot("2026-09-22T02:00:00Z", "2026-09-22T08:00:00Z"), slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z"), slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z")] }, NOW);
+    expect(bad).toEqual({ unitId: "Choose the unit.", symptom: "Describe the symptom in 10–2000 characters.", slot0: "Times start on a later day than today.", slot1: "Each time is 1–4 hours long.", slot3: "The times must differ." });
+    expect([reviewModeOf({ contractorOrgId: null }), reviewModeOf({ contractorOrgId: "org-c" })]).toEqual(["normal", "hq_escalation"]);
+    expect(extendDefault("2026-09-23T04:00:00Z")).toBe("2026-09-24T04:00:00.000Z");
+  });
+
+  it("shows the submitted report with the HQ review mode", () => {
+    const report = {
+      id: "r1", version: 1, jobId: "job-1", authorId: "u-tech", reviewAvailability: { allowed: true, reason: null }, measurements: [{ id: "m", metric: "refrigerant_pressure", value: 412, unit: "kPa", quality: "valid", observedAt: "2026-09-15T03:40:00Z" }],
+      items: [
+        { id: "i1", componentGroup: "indoor", componentKey: "filter", result: "normal", reason: null, evidenceIds: [], authorId: "u-tech", observedAt: "2026-09-15T03:40:00Z" },
+        { id: "i2", componentGroup: "indoor", componentKey: "blower_fan", result: "attention", reason: "reduced on Low", evidenceIds: [], authorId: "u-tech", observedAt: "2026-09-15T03:40:00Z" },
+        { id: "i3", componentGroup: "outdoor", componentKey: "fan", result: "not_applicable", reason: "no access", evidenceIds: [], authorId: "u-tech", observedAt: "2026-09-15T03:40:00Z" },
+      ],
+      parts: [], refrigerant: [], signOff: null, workText: "Cleaned the filter", nextAction: { kind: "none" }, attachmentRefs: [{ id: "a", name: "p.jpg", mime: "image/jpeg", size: 1, status: "ready" }],
+      submittedAt: "2026-09-15T03:48:00Z", acceptedAt: null, reviewHistory: [{ reviewerUserId: "u-hq", reportVersion: 1, decision: "return", reason: "Re-check", occurredAt: "2026-09-15T05:00:00Z" }],
+    } as never;
+    const byUser = new Map([["u-tech", "tech-internal-a"], ["u-hq", "hq-operator"]]);
+    const card = reportCard(job({ status: "submitted" }), report, byUser);
+    expect([card.title, card.sub, card.mode, card.decide, card.tone]).toEqual(["Work report · version 1", "Submitted 09-15 11:48 by tech-internal-a · 3 checks · 1 photo", "normal", true, "primary"]);
+    expect(card.rows.map((r) => [r.label, r.result])).toEqual([["Indoor unit — filter condition", "OK"], ["Indoor unit — blower fan", "Attention"], ["Outdoor unit — fan", "Not applicable"]]);
+    expect(card.readings).toEqual([["Refrigerant pressure", "412 kPa · recorded"]]);
+    expect(card.rework).toEqual([{ label: "Indoor unit — blower fan — attention (reduced on Low)", checked: true }, { label: "Refrigerant pressure — re-measure", checked: false }, { label: "Photos — add more evidence", checked: false }]);
+    expect(reportCard(job({ status: "submitted", reportRefs: [{ reportId: "r1", reportVersion: 1 }, { reportId: "r1", reportVersion: 4 }] }), report, byUser).sub).toMatch(/^Resubmitted 09-15 11:48/);
+    expect(card.reviews).toEqual([{ text: "v1 returned 09-15 13:00 by hq-operator — “Re-check”", tone: "warn" }]);
+    expect([card.parts, card.next, card.signOff]).toEqual([[], "No follow-up needed", "Not signed"]);
+    const full = reportCard(job({ status: "submitted" }), { ...(report as object), parts: [{ name: "Drain pump", quantity: 1, source: "hq_stock", replacesComponentKey: "drain_pan" }],
+      nextAction: { kind: "follow_up", date: "2026-09-30T00:00:00Z", note: "Check the pump" }, signOff: { signerName: "Aiko", signedAt: "2026-09-15T03:50:00Z", absentReason: null } } as never, byUser);
+    expect([full.parts, full.next, full.signOff]).toEqual([[["Drain pump × 1", "hq stock · replaces drain pan"]], "Follow-up 2026-09-30 — Check the pump", "Signed by Aiko 09-15 11:50"]);
+    const esc = reportCard(job({ status: "submitted", contractorOrgId: "org-c" }), report, byUser);
+    expect([esc.mode, esc.tone, esc.note]).toEqual(["hq_escalation", "warn", "The contractor reviews its own reports first. HQ may accept or return this one only by escalation, with a reason (IR31)."]);
+    const own = reportCard(job({ status: "submitted" }), { ...(report as object), reviewAvailability: { allowed: false, reason: "self_authored" } } as never, byUser);
+    expect([own.decide, own.note]).toEqual([false, "You submitted this report version, so you cannot accept or return it (self-approval is rejected)."]);
+    expect(reportCard(job({ status: "completed" }), report, byUser).note).toMatch(/^Accepted/);
+    expect(returnReason(["Airflow — attention"], " Re-check the blower. ")).toBe("Rework: Airflow — attention. Re-check the blower.");
+    expect(returnReason([], "Only words")).toBe("Only words");
+  });
+
+  it("names the refusals of the review, cost and create actions", () => {
+    expect(hqRefusal({ code: "FORBIDDEN", messageKey: "errors.self_review", fieldErrors: {} })).toBe("you contributed to this report version, so another reviewer must decide (self-approval is rejected).");
+    expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { symptom: "error.length", alternativeSlots: "error.count" } })).toBe("symptom: 10–2000 characters · alternativeSlots: up to two more times");
+    expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { accessValidUntil: "error.mustExtend" } })).toBe("accessValidUntil: the new end must be later than the current end and in the future");
   });
 });
