@@ -87,6 +87,8 @@ type Monitoring interface {
 	// PowerMeasured returns, per unit, whether the latest valid measured power reading is fresh (SR27) and its value.
 	PowerMeasured(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID]bool, error)
 	ActiveAlertCounts(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID]int, error)
+	// LatestMeasurements returns, per unit, the latest Measurement of each metric with read-time staleness (IR213).
+	LatestMeasurements(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID][]any, error)
 }
 
 // Module holds the dependencies.
@@ -222,10 +224,21 @@ func (m *Module) enrich(ctx context.Context, c *ops.Call, units []Unit) error {
 	if err != nil {
 		return err
 	}
+	readable, err := unitscope.EquipmentReadable(ctx, c, ids) // telemetry is an equipment read (IR49(b)): nothing before the work window
+	if err != nil {
+		return err
+	}
+	latest, err := m.Mon.LatestMeasurements(ctx, c, readable)
+	if err != nil {
+		return err
+	}
 	for i := range units {
 		fresh, ok := power[units[i].ID]
 		units[i].EffectivePowerState = EffectivePower(&units[i], c.Now, fresh, ok)
 		units[i].ActiveAlertCount = counts[units[i].ID]
+		if ms := latest[units[i].ID]; ms != nil {
+			units[i].LatestMeasurements = ms
+		}
 	}
 	return nil
 }

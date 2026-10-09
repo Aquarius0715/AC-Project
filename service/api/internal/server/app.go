@@ -222,6 +222,17 @@ func (m monitorReads) ActiveAlertCounts(ctx context.Context, c *ops.Call, units 
 	return m.alerts.ActiveAlertCounts(ctx, c, units)
 }
 
+func (m monitorReads) LatestMeasurements(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID][]any, error) {
+	latest, err := m.telemetry.LatestMeasurements(ctx, c, units)
+	out := make(map[uuid.UUID][]any, len(latest))
+	for u, ms := range latest {
+		for _, x := range ms {
+			out[u] = append(out[u], x)
+		}
+	}
+	return out, err
+}
+
 // unitCaps joins the unit's model version (Assets) with its Capability (Devices) for UnitAction checks.
 type unitCaps struct{ am *assets.Module }
 

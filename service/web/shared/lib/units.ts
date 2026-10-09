@@ -1,6 +1,7 @@
 // Unit detail types and pure view helpers (units.get, commands, telemetry) shared by Server and Client Components.
 // commands.create per changed setting, commands.get polling until the device answers or the command expires (D04),
 // and units.setAlertPolicies with the unit version (FR-C03, FR-C15).
+import { airNumber } from "@ac/web/lib/air";
 
 type Mode = "cool" | "dry" | "fan";
 type Fan = "low" | "mid" | "high";
@@ -17,8 +18,12 @@ export type ApiUnitDetail = {
   effectivePowerState: "on" | "off" | "unknown";
   observedState: { power: boolean | null; celsius: number | null; mode: Mode | null; fanLevel: Fan | null; observedAt: string | null };
   lastSeenAt: string | null;
-  latestMeasurements: { metric: string; value: number | null; unit: string; observedAt: string }[];
-  capabilities: { manufacturer: string; model: string; control: boolean; modeControl: boolean; fanControl: boolean; temperature: { min: number; max: number; step: number } | null; modes: Mode[]; fanLevels: Fan[] };
+  /** The latest reading of each metric with read-time quality (IR213: a valid reading past its sensor's stale limit is stale). */
+  latestMeasurements: { id: string; unitId: string; sensorId: string; metric: string; value: number | null; unit: string; observedAt: string; origin: "measured" | "estimated" | "inspection"; quality: "valid" | "missing" | "stale" | "suspect"; qualityReason: string | null }[];
+  capabilities: {
+    manufacturer: string; model: string; control: boolean; modeControl: boolean; fanControl: boolean; temperature: { min: number; max: number; step: number } | null; modes: Mode[]; fanLevels: Fan[];
+    ventilation: boolean; ventilationLevels: Fan[]; sensors: { metric: string; unit: string; staleAfterSeconds: number }[];
+  };
   effectiveControlPolicy: { state: "unrestricted" } | { state: "restricted"; phase: string; policy: { kind: "temperature_limit"; minimumCoolingSetpoint: number } | { kind: "power_off" } };
   controlAvailability: { state: "available" } | { state: "blocked"; reasonKey: string };
   pendingCommands: ApiCommand[];
@@ -55,9 +60,11 @@ export function historyRow(c: ApiCommand) {
   return { id: c.id.slice(0, 8), text: `${actionText(c.action)} — ${statusText[c.status]}${c.failureCode && c.status === "failed" ? ` (${c.failureCode})` : ""}`, when: kl(c.requestedAt, true), bad };
 }
 
+/** The latest reading of a metric as text (IR213): a stale or suspect value keeps its quality beside it — shown, never
+ * as a current value (D07); null without a reading or with a null value (no fallback to an older one). */
 export function latest(d: ApiUnitDetail, metric: string): { text: string; at: string } | null {
-  const m = d.latestMeasurements.find((x) => x.metric === metric && x.value !== null);
-  return m ? { text: `${m.value} ${m.unit}`, at: kl(m.observedAt) } : null;
+  const m = d.latestMeasurements.find((x) => x.metric === metric);
+  return m && m.value !== null ? { text: `${airNumber(metric, m.value)} ${m.unit}${m.quality === "valid" ? "" : ` (${m.quality})`}`, at: kl(m.observedAt) } : null;
 }
 
 // Technician unit register / monitoring (FR-T02, FR-T04): component groups of the 18 ComponentKeys and the

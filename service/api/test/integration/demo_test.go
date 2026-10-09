@@ -29,36 +29,66 @@ func TestDemoOperations(t *testing.T) {
 	ownerScan(t, `SELECT id::text FROM devices.devices WHERE unit_id = $1`, []any{u}, &device)
 	sensor := uuid.NewString()
 	owner(t, `INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, boundary_id, stale_after_seconds) VALUES ($1,$2,$3,'temperature','°C',NULL,120)`, sensor, seed.ID("tenant-a"), device)
-	tele := func(value, unitName string, sens string) string {
+	teleAt := func(value, unitName string, sens string, observed time.Time) string {
 		return `{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + clock.Format(time.RFC3339) + `","eventType":"telemetry","measurement":{"unitId":"` + u +
-			`","sensorId":"` + sens + `","metric":"temperature","value":` + value + `,"unit":"` + unitName + `","observedAt":"` + clock.Add(-10*time.Second).Format(time.RFC3339) +
+			`","sensorId":"` + sens + `","metric":"temperature","value":` + value + `,"unit":"` + unitName + `","observedAt":"` + observed.Format(time.RFC3339) +
 			`","receivedAt":"` + clock.Format(time.RFC3339) + `","origin":"measured","quality":"valid","eventId":"` + uuid.NewString() + `"}}`
+	}
+	tele := func(value, unitName string, sens string) string {
+		return teleAt(value, unitName, sens, clock.Add(-10*time.Second))
 	}
 	if code, m := trig(s, tele("25", "°C", sensor)); code != 200 || data(m)["type"] != "telemetry" || data(m)["generation"].(float64) != 1 {
 		t.Fatalf("telemetry: %d %v", code, m)
 	}
+	// IR12 normalization: causes in priority order, a cause keeps a null input suspect, otherwise null is missing
 	trig(s, tele("250", "°C", sensor))
 	trig(s, tele("25", "K", sensor))
-	rows := [][2]any{}
+	trig(s, tele("null", "°C", sensor))
+	trig(s, tele("null", "kelvin-degrees-with-a-very-long-unit-name", sensor))
+	trig(s, teleAt("24", "°C", sensor, clock.Add(time.Minute)))
+	type row struct {
+		quality       string
+		seq           int64
+		value         *float64
+		reason, rawUn *string
+	}
+	var rows []row
 	func() {
 		conn, err := pgx.Connect(context.Background(), "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable")
 		if err != nil {
 			t.Skip(err)
 		}
 		defer conn.Close(context.Background())
-		r, err := conn.Query(context.Background(), `SELECT quality, sequence FROM monitoring.measurements WHERE sensor_id = $1 ORDER BY sequence`, sensor)
+		r, err := conn.Query(context.Background(), `SELECT quality, sequence, value, quality_reason, raw_unit FROM monitoring.measurements WHERE sensor_id = $1 ORDER BY sequence`, sensor)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for r.Next() {
-			var q string
-			var seq int64
-			_ = r.Scan(&q, &seq)
-			rows = append(rows, [2]any{q, seq})
+			var x row
+			_ = r.Scan(&x.quality, &x.seq, &x.value, &x.reason, &x.rawUn)
+			rows = append(rows, x)
 		}
 	}()
-	if len(rows) != 3 || rows[0][0] != "valid" || rows[1][0] != "suspect" || rows[2][0] != "suspect" || rows[2][1].(int64) != 3 {
-		t.Errorf("telemetry rows: %v", rows)
+	str := func(p *string) string {
+		if p == nil {
+			return "-"
+		}
+		return *p
+	}
+	want := []struct {
+		quality, reason, raw string
+		value                bool
+	}{
+		{"valid", "-", "-", true}, {"suspect", "out_of_range", "-", false}, {"suspect", "unit_mismatch", "K", false}, {"missing", "-", "-", false},
+		{"suspect", "unit_mismatch", "kelvin-degrees-with-a-very-long-", false}, {"suspect", "invalid_time", "-", true},
+	}
+	if len(rows) != len(want) || rows[2].seq != 3 {
+		t.Fatalf("telemetry rows: %v", rows)
+	}
+	for i, w := range want {
+		if r := rows[i]; r.quality != w.quality || str(r.reason) != w.reason || str(r.rawUn) != w.raw || (r.value != nil) != w.value {
+			t.Errorf("row %d: %s %s %s %v, want %v", i, r.quality, str(r.reason), str(r.rawUn), r.value, w)
+		}
 	}
 	if code, _ := trig(s, tele("25", "°C", uuid.NewString())); code != 404 {
 		t.Error("unknown sensor")

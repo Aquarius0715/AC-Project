@@ -40,6 +40,7 @@ export type ObservedState = {power:boolean|null;celsius:number|null;mode:Mode|nu
 export type RestrictionPolicy = {kind:'temperature_limit';minimumCoolingSetpoint:number}|{kind:'power_off'};
 export type ObservedRestriction = {restrictionId:ID;rulesVersion:ID;policy:RestrictionPolicy;observedAt:Instant}|null;
 export type ACUnit = Entity & {customerOrgId:ID;propertyId:ID;spaceId:ID|null;displayName:string;modelId:ID;type:'split';installedAt:Instant|null;serviceScope:('indoor'|'outdoor'|'electrical')[];warrantyEndsAt:Instant|null;alertPolicyIds:ID[];archived:boolean;capabilityVersion:number;connection:Connection;observedState:ObservedState;observedRestriction:ObservedRestriction;lastSeenAt:Instant|null};
+/** IR213: latestMeasurements = per metric the latest reading at or before now (observedAt desc, sequence desc, id asc), read-time quality (stale past the sensor's staleAfterSeconds); [] without readings. */
 export type UnitSummary = ACUnit & {effectivePowerState:EffectivePowerState;latestMeasurements:Measurement[];activeAlertCount:number};
 export type UnitDetail = UnitSummary & {capabilities:Capability;effectiveControlPolicy:EffectiveControlPolicy;controlAvailability:ControlAvailability;components:ComponentKey[];pendingCommands:Command[];pendingCommandIds:ID[];location:{pathLabels:string[];address:string|null;accessInstructions:string|null}};
 export type UnitAction = {kind:'set_power';power:boolean}|{kind:'set_temperature';celsius:number}|{kind:'set_mode';mode:Mode}|{kind:'set_fan';fanLevel:Fan}|{kind:'ventilate';level:Fan};

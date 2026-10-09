@@ -120,7 +120,7 @@ Scope: FR-T03 / Main display pattern: **UI-DETAIL** and **UI-ANALYSIS**. Service
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
 | unitId / metric | Required | Within assignment; supported sensor | Target series |
-| period / from / to | enum and ISO datetime/required | 1h/24h/7d/custom; default: 24h. 1h/24h are rolling windows, 7d uses calendar days, custom is at most 366 days (IR41) | Period |
+| period / from / to | enum and ISO datetime/required | 1h/24h/7d/custom; default: 24h. 1h/24h are rolling windows, 7d uses calendar days, custom is at most 35 days (telemetry.series, IR121 item 2, IR213) | Period |
 | observedAt / receivedAt | Read-only | UTC | Freshness |
 | staleAfterSeconds | Read-only | From sensor policy; demo: 120 seconds | Stale check |
 | eventId / version | Read-only | Duplicate and ordering control | Update basis |

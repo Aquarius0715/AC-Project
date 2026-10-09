@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
@@ -82,6 +83,21 @@ func assignmentSQL(c *ops.Call, add func(any) string, unitExpr string, mode Mode
 		" JOIN assets.unit_offer_access so ON so.job_id = sa.job_id AND so.access_valid_from <= " + now + " AND " + now + " < so.access_valid_until" +
 		" WHERE sa.unit_id = " + unitExpr + " AND sa.active AND sa.technician_membership_id = " + add(c.Principal.MembershipID) +
 		" AND " + from + " <= " + now + " AND " + now + " < upper(sa.scheduled))"
+}
+
+// EquipmentReadable returns the units (already visible in List mode) whose equipment data the caller may read now: all of
+// them except an external technician's units whose work window has not started (IR49(b)).
+func EquipmentReadable(ctx context.Context, c *ops.Call, units []uuid.UUID) ([]uuid.UUID, error) {
+	p := c.Principal
+	if p.Role != "technician" || p.Employment == "internal" || len(units) == 0 {
+		return units, nil
+	}
+	args := []any{units}
+	rows, err := c.Tx.Query(ctx, "SELECT t.id FROM unnest($1::uuid[]) AS t(id) WHERE "+SQL(c, &args, "t.id", Equipment), args...)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 }
 
 // Gate applies IR49(b) to equipment reads of units the caller can already see in List mode: an external technician

@@ -386,25 +386,39 @@ export function BarChart({ labels, series, unit, height = 160, colors = ["#c9d8e
   );
 }
 
-export function LineChart({ points, min, max, threshold, height = 120, color = "#005bea", labels }: { points: (number | null)[]; min?: number; max?: number; threshold?: number; height?: number; color?: string; labels?: string[] }) {
-  const W = 600;
+/** A line chart in a viewBox of `width` × `height` units scaled to the container width (a wider viewBox keeps the text
+ * small on wide cards); null points are gaps. */
+export function LineChart({ points, min, max, threshold, height = 120, width = 600, color = "#005bea", labels, ticks, shadeGaps }: { points: (number | null)[]; min?: number; max?: number; threshold?: number; height?: number; width?: number; color?: string; labels?: string[]; ticks?: number[]; shadeGaps?: boolean }) {
+  const W = width;
   const vals = points.filter((p): p is number => p !== null);
   const lo = min ?? Math.min(...vals, threshold ?? Infinity);
   const hi = max ?? Math.max(...vals, threshold ?? -Infinity);
   const y = (v: number) => 8 + (height - 28) * (1 - (v - lo) / (hi - lo || 1));
-  const x = (i: number) => 6 + ((W - 12) * i) / Math.max(1, points.length - 1);
-  // gaps (null) break the line — missing data is never connected
-  const segs: string[] = [];
-  let cur = "";
+  const step = (W - 12) / Math.max(1, points.length - 1);
+  const x = (i: number) => 6 + step * i;
+  // gaps (null) break the line — missing data is never connected; a value between two gaps is drawn as a dot
+  const runs: number[][] = [];
+  const gaps: [number, number][] = [];
+  let cur: number[] = [];
   points.forEach((p, i) => {
-    if (p === null) { if (cur) segs.push(cur); cur = ""; return; }
-    cur += `${cur ? "L" : "M"}${x(i).toFixed(1)},${y(p).toFixed(1)}`;
+    if (p === null) {
+      if (cur.length) runs.push(cur);
+      cur = [];
+      if (gaps.length && gaps[gaps.length - 1][1] === i - 1) gaps[gaps.length - 1][1] = i;
+      else gaps.push([i, i]);
+      return;
+    }
+    cur.push(i);
   });
-  if (cur) segs.push(cur);
+  if (cur.length) runs.push(cur);
+  const clampX = (v: number) => Math.min(W - 6, Math.max(6, v));
   return (
     <svg viewBox={`0 0 ${W} ${height}`} className="w-full" style={{ height: "auto", aspectRatio: `${W}/${height}` }} role="img" aria-label="Line chart">
+      {shadeGaps && vals.length > 0 && gaps.map(([a, b]) => <rect key={a} x={clampX(x(a) - step / 2)} y={4} width={Math.max(1, clampX(x(b) + step / 2) - clampX(x(a) - step / 2))} height={height - 24} fill="#94a3b8" opacity={0.14} />)}
+      {ticks?.map((t) => <g key={t}><line x1={0} x2={W} y1={y(t)} y2={y(t)} stroke="#e2e8f0" /><text x={2} y={y(t) - 2} fontSize="9" fill="#71849a">{t}</text></g>)}
       {threshold !== undefined && <line x1={0} x2={W} y1={y(threshold)} y2={y(threshold)} stroke="#dc2626" strokeDasharray="4 3" />}
-      {segs.map((d, i) => <path key={i} d={d} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />)}
+      {runs.map((r, i) => r.length === 1 ? <circle key={i} cx={x(r[0])} cy={y(points[r[0]]!)} r={3} fill={color} />
+        : <path key={i} d={r.map((j, k) => `${k ? "L" : "M"}${x(j).toFixed(1)},${y(points[j]!).toFixed(1)}`).join("")} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />)}
       {labels?.map((l, i) => <text key={i} x={6 + ((W - 12) * i) / Math.max(1, labels.length - 1)} y={height - 4} fontSize="10" fill="#71849a" textAnchor={i === 0 ? "start" : i === labels.length - 1 ? "end" : "middle"}>{l}</text>)}
     </svg>
   );

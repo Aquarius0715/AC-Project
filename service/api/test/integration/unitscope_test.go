@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -40,6 +42,16 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	}
 	if code, m := post(s, &techB, "units.get", `{"id":"`+unit+`"}`); code != 403 || m["messageKey"] != "errors.assignment_not_started" {
 		t.Fatalf("before the work window: %d %v", code, m)
+	}
+	// the unit list carries no telemetry before the work window (latestMeasurements is an equipment read, IR213)
+	owner(t, `INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+		VALUES ($1,$2,$3,'temperature',$4,1,26.5,'°C','measured','valid',$4,$5)`, seed.ID("tenant-a"), unit, uuid.NewString(), clock.Add(-time.Minute), uuid.NewString())
+	readings := func() int {
+		_, m := post(s, &techB, "units.list", `{"limit":100,"filters":{"unitIds":["`+unit+`"]}}`)
+		return len(items(m)[0]["latestMeasurements"].([]any))
+	}
+	if n := readings(); n != 0 {
+		t.Fatalf("latestMeasurements before the work window: %d", n)
 	}
 	// equipment reads (IR49(b)): lists omit the unit, single reads answer FORBIDDEN until the work window starts
 	owner(t, `UPDATE monitoring.alerts SET status = 'resolved', resolved_at = $2 WHERE unit_id = $1 AND rule_key = 'warning' AND status <> 'resolved'`, unit, clock)
@@ -81,6 +93,9 @@ func TestUnitScopeExternalTechnicianAndContractor(t *testing.T) {
 	}
 	if code, _ := post(s, &techB, "telemetry.series", series); code != 200 {
 		t.Fatalf("telemetry inside the work window: %d", code)
+	}
+	if n := readings(); n == 0 { // the inserted temperature, plus readings other tests left on this unit
+		t.Fatal("latestMeasurements inside the work window")
 	}
 	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE job_id = $1`, job)
 	if listed(&techB) {

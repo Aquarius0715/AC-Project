@@ -178,3 +178,92 @@ func TestVentilation(t *testing.T) {
 	}
 	_ = strings.TrimSpace
 }
+
+// IR213: UnitSummary.latestMeasurements holds the latest reading of each metric at or before now (observedAt desc,
+// sequence desc), whatever its origin and quality, ordered by metric. A valid reading older than its sensor's stale
+// limit, or of an unknown sensor, reads as stale; telemetry.series keeps the stored quality.
+func TestLatestMeasurements(t *testing.T) {
+	s := server(t)
+	tenant := seed.ID("tenant-a")
+	u := newUnit(t, s, "Latest AC")
+	dev := uuid.NewString()
+	owner(t, `INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'v1')`,
+		dev, tenant, "LM-"+dev[:8], u, seed.ID("hq-operator"))
+	sensor := map[string]string{"co2": uuid.NewString(), "humidity": uuid.NewString(), "temperature": uuid.NewString(), "pm25": uuid.NewString()}
+	units := map[string]string{"co2": "ppm", "humidity": "%", "temperature": "°C", "pm25": "µg/m³"}
+	for metric, id := range sensor {
+		owner(t, `INSERT INTO devices.sensors (id, tenant_id, device_id, metric, unit, stale_after_seconds) VALUES ($1,$2,$3,$4,$5,120)`, id, tenant, dev, metric, units[metric])
+	}
+	reading := func(metric, sensorID string, ago time.Duration, seq int, quality string, value any) {
+		owner(t, `INSERT INTO monitoring.measurements (tenant_id, unit_id, sensor_id, metric, observed_at, sequence, value, unit, origin, quality, received_at, event_id)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'measured',$9,$5,$10)`, tenant, u, sensorID, metric, clock.Add(-ago), seq, value, units[metric], quality, uuid.NewString())
+	}
+	reading("co2", sensor["co2"], 10*time.Minute, 1, "valid", 700.0)
+	reading("co2", sensor["co2"], 30*time.Second, 2, "valid", 1000.0)
+	reading("co2", sensor["co2"], -time.Minute, 3, "valid", 1500.0)                  // future reading: ignored
+	reading("humidity", sensor["humidity"], 2*time.Minute, 1, "valid", 55.0)         // exactly at the 120 s limit: still valid
+	reading("humidity", sensor["humidity"], 20*time.Second, 2, "missing", nil)       // newer null: no fallback to the older value
+	reading("temperature", sensor["temperature"], 121*time.Second, 1, "valid", 28.0) // older than 120 s → stale
+	reading("pm25", uuid.NewString(), 10*time.Second, 1, "valid", 12.0)              // unknown sensor → stale
+	latest := func(op, body string) []map[string]any {
+		t.Helper()
+		code, m := post(s, &customerB, op, body)
+		if code != 200 {
+			t.Fatalf("%s: %d %v", op, code, m)
+		}
+		d := data(m)
+		if op == "units.list" {
+			d = items(m)[0]
+		}
+		var out []map[string]any
+		for _, x := range d["latestMeasurements"].([]any) {
+			out = append(out, x.(map[string]any))
+		}
+		return out
+	}
+	got := latest("units.get", `{"id":"`+u+`"}`)
+	var seen []string
+	for _, x := range got {
+		seen = append(seen, x["metric"].(string)+"="+x["quality"].(string))
+	}
+	if strings.Join(seen, ",") != "co2=valid,humidity=missing,pm25=stale,temperature=stale" || got[0]["value"].(float64) != 1000 || got[1]["value"] != nil ||
+		got[3]["value"].(float64) != 28 || got[0]["unitId"] != u {
+		t.Fatalf("latest: %v", got)
+	}
+	if l := latest("units.list", `{"limit":10,"filters":{"unitIds":["`+u+`"]}}`); len(l) != 4 || l[0]["value"].(float64) != 1000 {
+		t.Fatalf("units.list carries the same readings: %v", l)
+	}
+	// history keeps the stored quality
+	_, m := post(s, &customerB, "telemetry.series", `{"from":"`+clock.Add(-time.Hour).Format(time.RFC3339)+`","to":"`+clock.Format(time.RFC3339)+`","unitIds":["`+u+`"],"metric":"temperature","query":{}}`)
+	if len(items(m)) != 1 || items(m)[0]["quality"] != "valid" {
+		t.Fatalf("series quality: %v", m)
+	}
+	// co2AtLog (IR110/IR213) is the unit's latest CO₂ reading when it is valid; a newer null reading gives null, never an
+	// older valid value
+	code, m := write(s, &hq, "spaces.save", `{"propertyId":"`+seed.ID("property-home-b").String()+`","parentSpaceId":null,"kind":"room","name":"Vent `+uuid.NewString()[:6]+`"}`, 0)
+	if code != 200 {
+		t.Fatalf("room: %d %v", code, m)
+	}
+	room := data(m)["id"].(string)
+	owner(t, `UPDATE assets.units SET space_id = $2 WHERE id = $1`, u, room)
+	vent := func() any {
+		t.Helper()
+		code, m := write(s, &customerB, "ventilation.log", `{"spaceId":"`+room+`","unitId":"`+u+`","method":"window_opened","durationMinutes":15}`, 0)
+		if code != 200 {
+			t.Fatalf("log: %d %v", code, m)
+		}
+		return data(m)["co2AtLog"]
+	}
+	if co2, _ := vent().(map[string]any); co2 == nil || co2["value"].(float64) != 1000 || co2["observedAt"] != clock.Add(-30*time.Second).Format(time.RFC3339) {
+		t.Fatalf("co2AtLog: %v", co2)
+	}
+	reading("co2", sensor["co2"], 10*time.Second, 4, "missing", nil)
+	if co2 := vent(); co2 != nil {
+		t.Fatalf("newer null reading: %v", co2)
+	}
+	// a unit without readings has an empty list, never null
+	_, m = post(s, &customerB, "units.get", `{"id":"`+newUnit(t, s, "Empty AC")+`"}`)
+	if l, ok := data(m)["latestMeasurements"].([]any); !ok || len(l) != 0 {
+		t.Fatalf("no readings: %v", data(m)["latestMeasurements"])
+	}
+}

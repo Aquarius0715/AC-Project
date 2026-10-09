@@ -31,7 +31,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | DD-C04 / FR-C04 | `/customer/automations` / `AutomationEditor` | `automations.list`, `automations.save`, `automations.simulate`, `automations.fire`, `automations.nextRuns`, `units.list`, `units.get` | Require at least one weekday, start/end times, timezone, target units, and actions. Explicitly confirm overnight settings | Warn on overlapping conditions and show priorities. Reject triggered automation under restrictions and show the reason |
 | DD-C05 / FR-C05 | `/customer/automations` / `AutomationEditor` | `automations.save`, `automations.simulate`, `automations.fire`, `consents.get`, `consents.update`, `units.list`, `units.get` | Change fields by condition type (discriminated union). Explain the purpose of location consent. The demo does not collect real location; users enter arrival/departure events | If consent is denied or location unavailable, use manual or scheduled control. Clearly label lifestyle-pattern inference as a demo |
 | DD-C06 / FR-C06 | `/customer/energy` / `EnergyExplorer` | `energy.summary`, `baselines.list`, `units.list` | Require start<end and at most 366 days (provisional). Show currency, tariff version, comparison period, and data reliability | Show usable data coverage when data is missing. Do not treat estimated replacements as measurements |
-| DD-C07 / FR-C07 | `/customer/air-quality` / `AirQuality` | `telemetry.series`, `units.get`, `units.list`, `ventilation.log`, `ventilation.list` | Select metric and period. Log a manual ventilation (method, 1–240 minutes); no device command | Show “Unsupported” when no sensor exists. A log does not imply CO₂ fell |
+| DD-C07 / FR-C07 | `/customer/air-quality` / `AirQuality` | `telemetry.series`, `units.get`, `units.list`, `ventilation.log`, `ventilation.list`, `properties.list`, `spaces.list` | Select metric and period. Log a manual ventilation (method, 1–240 minutes); no device command | Show “Unsupported” when no sensor exists. A log does not imply CO₂ fell |
 | DD-C08 / FR-C08 | `/customer/alerts` / `AlertInbox` | `alerts.list`, `notifications.markRead`, `notifications.list`, `summaries.get` | Filter by severity or unread status. Keep notificationId separate from alertId | Do not show a healthy “No alerts” summary when fetching fails |
 | DD-C09 / FR-C09 | `/customer/maintenance` / `MaintenanceRequest` | `jobs.list`, `jobs.create`, `jobs.get`, `jobs.cancel`, `jobs.addNote`, `reports.get`, `attachments.getContent`, `units.list`, `jobs.respondProposal`, `jobs.requestReschedule` | Require unitId, type, symptom description (10–2000 characters), and 3 preferred times (IR113). Preferred times are not confirmed bookings; a time outside them is booked only after the client accepts it | Prevent duplicate requests. Ask users to reselect unavailable times. Customers may cancel only requests with no assignee yet |
 | DD-C10 / FR-C10 | `/customer/payments` / `BillingOverview` | `contracts.list`, `invoices.list` | Filter by contract ID and invoice state. Store amounts in minor currency units (such as yen or cents) | Deny data outside permitted scope. Do not present “No invoices yet” as overdue payment |
@@ -258,7 +258,7 @@ Verification: AT-C07-SRC. Check display switching with not-measured, unsupported
 
 **Source mapping**: SRC-06 BIZ-18, BIZ-19 → FR-C07 → DD-C07. Source category: original company requirements SRC-06 + design additions. Design additions: displaying missing data and the manual ventilation log (Figma 05a–05c, 2026-10-01). Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-C07 / Main display pattern: **UI-ANALYSIS**. Service boundary: `telemetry.series, units.get, units.list, ventilation.log, ventilation.list`.
+Scope: FR-C07 / Main display pattern: **UI-ANALYSIS**. Service boundary: `telemetry.series, units.get, units.list, ventilation.log, ventilation.list, properties.list, spaces.list`.
 
 **Initial view and prerequisites**: Air-quality sensor availability and ventilation capability can be fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -266,8 +266,8 @@ Scope: FR-C07 / Main display pattern: **UI-ANALYSIS**. Service boundary: `teleme
 |---|---|---|---|
 | spaceId / unitId | ID/one required | Valid target. Pass unitIds or spaceId to telemetry.series | Measurement location |
 | metric | enum/required | co2/pm25/temperature/humidity | Display metric |
-| period | enum/required | 1h/24h/7d/custom; default: 24h. 1h/24h use rolling [to-60 minutes,to)/[to-1440 minutes,to) windows; 7d uses SR17 calendar days; to is a UTC minute boundary (IR41) | Time series |
-| value / quality / observedAt | Read-only | Distinguish null from 0 | Measurement evidence |
+| period | enum/required | 1h/24h/7d (Figma 05a, no custom range); default: 24h. 1h/24h use rolling [to-60 minutes,to)/[to-1440 minutes,to) windows; 7d uses SR17 calendar days; to is a UTC minute boundary (IR41, IR213) | Time series |
+| value / quality / observedAt | Read-only | Distinguish null from 0; latest readings carry read-time quality (stale past the sensor limit, IR213) | Measurement evidence |
 | method / durationMinutes | enum/required, integer/required | window_opened/door_opened/ventilation_fan/other; 1–240 minutes | Ventilation log |
 
 **Steps**
@@ -278,6 +278,7 @@ Scope: FR-C07 / Main display pattern: **UI-ANALYSIS**. Service boundary: `teleme
    - Humidity 0 is a measured zero, not missing data. null means missing.
    - Follow the IR99 table for ventilation/cleaning guidance (co2≥1000ppm, pm25≥35µg/m³, insufficient data). IR98 defines the allergen observation source.
    - Log ventilation never creates a Command and is not sent to HQ; the room’s ventilation history lists the logs (`ventilation.list`).
+   - Cards show Live / Unavailable / Unknown / Suspect from the latest readings' read-time quality; the chart draws 5-minute (1h/24h) or hourly (7d) averages of valid readings, never joins gaps, and reads at most the 1000 newest readings — a cut-off series is labelled (D07, IR213). Units outside a room show readings but cannot log ventilation (logs belong to a room).
 3. Viewing does not change business state. Saving a log creates one VentilationLog with co2AtLog; it does not imply reduced indoor CO2.
 4. Queries to update: `telemetry / ventilation logs`.
 

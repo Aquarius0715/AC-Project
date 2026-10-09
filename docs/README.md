@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.103.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
+Version: 0.104.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.104.0 (2026-10-09): Customer air quality through the server — rooms and sensors, latest readings with read-time quality, IR99 guidance, allergen source, 5-minute/hourly series and the manual ventilation log; units.list/get return latestMeasurements, ventilation CO₂ never falls back to an older reading, demo telemetry follows the IR12 cause order (IR213). Phase 1A unchanged.
 0.103.0 (2026-10-09): Customer energy & cost (period, baseline, unit comparison, daily energy, carbon), the monthly report export and demo carbon offsets through the server (IR212). Phase 1A unchanged.
 0.102.0 (2026-10-09): Customer units & locations (read-only tree, rename, room ACs) and owner group control — commands per AC and setting, clamped and skipped per AC (IR211). Phase 1A unchanged.
 0.101.0 (2026-10-09): Customer contracts & payments (demo payments with provider events, restriction notice, inquiries) and the owner-only Users page through the server; session.get returns the client role (IR210). Phase 1A unchanged.

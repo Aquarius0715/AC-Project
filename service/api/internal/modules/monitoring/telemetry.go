@@ -374,14 +374,8 @@ func (m Telemetry) log(ctx context.Context, c *ops.Call, in *VentLogInput) (Vent
 		}
 		src = []uuid.UUID{in}
 	}
-	var co2 *CO2Reading
-	var r CO2Reading
-	err = c.Tx.QueryRow(ctx, `SELECT value, unit, observed_at FROM monitoring.measurements WHERE unit_id = ANY($1) AND metric = 'co2' AND quality = 'valid'
-		AND value IS NOT NULL AND observed_at <= $2 ORDER BY observed_at DESC, sequence DESC LIMIT 1`, src, c.Now).Scan(&r.Value, &r.Unit, &r.ObservedAt)
-	switch {
-	case err == nil:
-		co2 = &r
-	case !errors.Is(err, pgx.ErrNoRows):
+	co2, err := m.currentCO2(ctx, c, src)
+	if err != nil {
 		return VentilationLog{}, err
 	}
 	v, err := scanVent(c.Tx.QueryRow(ctx, `INSERT INTO monitoring.ventilation_logs AS v (tenant_id, space_id, unit_id, method, duration_minutes, co2_at_log,
@@ -393,6 +387,24 @@ func (m Telemetry) log(ctx context.Context, c *ops.Call, in *VentLogInput) (Vent
 	c.Emit(ops.Event{AggregateType: "ventilation_log", AggregateID: v.ID, Type: "VentilationLogged", Payload: map[string]any{"spaceId": v.SpaceID}})
 	c.Audit(ops.AuditEntry{Action: "ventilation.log", TargetKind: "ventilation_log", TargetID: v.ID.String(), NextVersion: &v.Version})
 	return v, nil
+}
+
+// currentCO2 is co2AtLog (IR110, IR213): among the units' latest CO₂ readings (LatestMeasurements, read-time
+// staleness) the most recent one that is valid with a value; null when none is — an older valid reading is never used.
+func (m Telemetry) currentCO2(ctx context.Context, c *ops.Call, units []uuid.UUID) (*CO2Reading, error) {
+	latest, err := m.LatestMeasurements(ctx, c, units)
+	if err != nil {
+		return nil, err
+	}
+	var out *CO2Reading
+	for _, u := range units { // units in a stable order: the first unit wins a tie
+		for _, x := range latest[u] {
+			if x.Metric == "co2" && x.Quality == "valid" && x.Value != nil && (out == nil || x.ObservedAt.After(out.ObservedAt)) {
+				out = &CO2Reading{Value: *x.Value, Unit: x.Unit, ObservedAt: x.ObservedAt}
+			}
+		}
+	}
+	return out, nil
 }
 
 func (m Telemetry) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[VentilationLog], error) {
@@ -531,6 +543,51 @@ func (m Telemetry) PowerMeasured(ctx context.Context, c *ops.Call, units []uuid.
 	for _, r := range rs {
 		limit, known := limits[r.sensor]
 		out[r.unit] = r.ok && known && c.Now.Sub(r.at) <= limit
+	}
+	return out, nil
+}
+
+// metricOrder lists every Metric for the latest-reading lookup (one index probe per unit and metric).
+var metricOrder = []string{"airflow_drop", "co2", "compressor_cycles", "heartbeat_gap", "humidity", "pm25", "power", "refrigerant_pressure", "temperature", "vibration"}
+
+// LatestMeasurements implements assets.Monitoring (UnitSummary.latestMeasurements, IR213): per unit, the latest
+// Measurement of each metric at or before now — observedAt desc, sequence desc, id asc, every origin and quality, null
+// values kept — ordered by metric. A valid reading older than its sensor's stale limit, or whose sensor is unknown, is
+// returned with quality=stale (D07: missing→suspect→stale→valid); history in telemetry.series keeps the stored quality.
+func (m Telemetry) LatestMeasurements(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID][]Measurement, error) {
+	out := map[uuid.UUID][]Measurement{}
+	if len(units) == 0 {
+		return out, nil
+	}
+	rows, err := c.Tx.Query(ctx, `SELECT x.* FROM unnest($1::uuid[]) AS u(id) CROSS JOIN unnest($3::text[]) AS k(metric)
+		CROSS JOIN LATERAL (SELECT `+measurementCols+` FROM monitoring.measurements m WHERE m.unit_id = u.id AND m.metric = k.metric AND m.observed_at <= $2
+		ORDER BY m.observed_at DESC, m.sequence DESC, m.event_id ASC LIMIT 1) x ORDER BY x.unit_id, x.metric`, units, c.Now, metricOrder)
+	if err != nil {
+		return nil, err
+	}
+	var all []Measurement
+	var sensors []uuid.UUID
+	for rows.Next() {
+		x, err := scanMeasurement(rows)
+		if err != nil {
+			rows.Close()
+			return nil, err
+		}
+		all, sensors = append(all, x), append(sensors, x.SensorID)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	limits, err := m.Sensors.StaleAfter(ctx, c, sensors)
+	if err != nil {
+		return nil, err
+	}
+	for _, x := range all {
+		if limit, known := limits[x.SensorID]; x.Quality == "valid" && (!known || c.Now.Sub(x.ObservedAt) > limit) {
+			x.Quality = "stale"
+		}
+		out[x.UnitID] = append(out[x.UnitID], x)
 	}
 	return out, nil
 }

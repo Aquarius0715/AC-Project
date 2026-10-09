@@ -1,51 +1,79 @@
-"use client";
+// /customer/air-quality (FR-C07, SCR-C07): in API mode a Server Component reads the customer's rooms (properties.list,
+// spaces.list, units.list), the selected unit's units.get (latest readings with read-time quality, capability sensors and
+// fresh-air function), telemetry.series of the selected metric and period — newest first, at most 1000 readings in 10
+// pages of 100 (D07), with the IR98 allergen observation — and the room's ventilation.list. Log ventilation is
+// ventilation.log, a manual record that creates no Command and is not sent to HQ (IR110). URL keys: spaceId, unitId,
+// metric, period. The Phase 1A demo keeps the fixtures.
+import { connection } from "next/server";
+import { apiMode, coreAll, coreNow, coreOp, corePrincipal } from "@ac/web/lib/dal";
+import type { ApiPropertyRow, ApiSpaceRow, ApiUnitRow } from "@ac/web/lib/assets";
+import type { ApiUnitDetail } from "@ac/web/lib/units";
+import {
+  airGuidance, airMetrics, airNumber, airPeriods, airRooms, airRows, airSelection, airSlots, airWindow, allergenView, axisLabels, axisRange, axisTicks, co2Now,
+  guidanceText, metricCard, metricInfo, updatedAt, ventRow, ventStrip, windowSub, windowTitle, type ApiAirSeries, type ApiMeasurement, type ApiVentilationLog,
+} from "@ac/web/lib/air";
+import { AirQualityDemo } from "./_components/air-quality-demo";
+import { AirQualityView, type AirLive } from "./_components/air-quality-view";
 
-import { useState } from "react";
-import { Badge, Banner, Btn, Card, DataTable, Field, LineChart, Modal, Page, Select, Tabs, Textarea, useToast } from "@ac/web/components/ui";
+const MAX_READINGS = 1000; // D07: 10 pages of 100; a cut-off series is labelled, never shown as complete
 
-const series = {
-  co2: { label: "CO2", unit: "ppm", pts: [620, 600, 580, 560, 640, 760, 880, 760, 700, 820, 940, 1000], min: 400, max: 1200, th: 1000 },
-  pm25: { label: "PM2.5", unit: "µg/m³", pts: [9, 8, 8, 10, 11, 12, 14, 13, 12, 12, 12, 12], min: 0, max: 40, th: 35 },
-  temp: { label: "Temp", unit: "°C", pts: [26, 26, 25, 25, 26, 27, 28, 28, 27, 28, 28, 28], min: 20, max: 34, th: 30 },
-  hum: { label: "Humidity", unit: "%", pts: [55, 56, 58, 60, 62, 60, 59, 60, 61, 60, 60, 60], min: 30, max: 80, th: 70 },
-} as const;
+/** telemetry.series of one unit, newest first, following nextCursor up to MAX_READINGS. */
+async function readSeries(unitId: string, metric: string, from: string, to: string) {
+  const items: ApiMeasurement[] = [];
+  let cursor: string | null = null;
+  let total = 0;
+  let allergen: ApiAirSeries["allergenObservation"] = null;
+  do {
+    const page: ApiAirSeries = await coreOp("telemetry.series", { from, to, unitIds: [unitId], metric, query: { limit: 100, sort: { field: "observedAt", direction: "desc" }, ...(cursor ? { cursor } : {}) } });
+    items.push(...page.items);
+    ({ total, nextCursor: cursor, allergenObservation: allergen } = page);
+  } while (cursor && items.length < MAX_READINGS);
+  return { items, total, allergen };
+}
 
-export default function AirQuality() {
-  const toast = useToast();
-  const [metric, setMetric] = useState<keyof typeof series>("co2");
-  const [win, setWin] = useState<"1h" | "24h" | "7d">("24h");
-  const [view, setView] = useState<"chart" | "table">("chart");
-  const [log, setLog] = useState(false);
-  const [method, setMethod] = useState("Opened window");
-  const [log2, setLog2] = useState<{ t: string; m: string }[]>([{ t: "Yesterday 18:10", m: "Ran ventilation fan · 20 min" }]);
-  const [missing, setMissing] = useState(false);
-  const s = series[metric];
-  return (
-    <Page>
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-4 py-3 text-xs">
-        <div className="flex items-center gap-2"><span className="text-muted">Viewing</span><select className="rounded-control border border-line px-2.5 py-1.5 font-semibold" aria-label="Unit"><option>Bedroom (Bedroom AC)</option><option>Living room AC</option></select></div>
-        <span className="text-muted">Updated 09:12:30 · <button className="underline" onClick={() => setMissing((m) => !m)}>{missing ? "show normal" : "show missing-data state"}</button></span>
-      </div>
-      <div className="grid-fluid" style={{ ["--min" as string]: "210px" }}>
-        {[
-          { l: "CO2", v: missing ? "—" : "1000", u: "ppm", b: missing ? <Badge tone="unknown">Not measured</Badge> : <Badge tone="warn" icon="⚠">High</Badge>, s: missing ? "No data in last 15 min — never shown as normal" : "Observed 09:12 · 5-min average", n: missing ? "" : "Ventilation recommended (≥ 1000 ppm)" },
-          { l: "PM2.5", v: "12", u: "µg/m³", b: <Badge tone="ok" icon="✓">Within guide</Badge>, s: "Observed 09:12", n: "No current advice" },
-          { l: "Temperature", v: "28.0", u: "°C", b: <Badge tone="muted" icon="●">Measured</Badge>, s: "Observed 09:12:30", n: "Setpoint is on Unit Control" },
-          { l: "Humidity", v: "60", u: "%", b: <Badge tone="muted" icon="●">Measured</Badge>, s: "Observed 09:12:30", n: "No current advice" },
-        ].map((m) => (
-          <div key={m.l} className="rounded-2xl border border-line bg-surface p-4"><div className="flex justify-between text-xs text-muted"><span>{m.l}</span>{m.b}</div><div className="text-[28px] font-bold">{m.v} <span className="text-sm font-medium text-muted">{m.u}</span></div><div className="text-[11px] text-muted">{m.s}</div><div className="mt-1 text-xs font-semibold">{m.n}</div></div>
-        ))}
-      </div>
-      <Card><div className="flex flex-wrap items-center justify-between gap-2 text-[13px]"><span><b>Allergen (dust mite)</b> <Badge tone="warn" icon="⚠">Detected</Badge></span><span className="text-xs text-muted">Source: demo_observation · 09:00 · cleaning recommended</span></div></Card>
-      {!missing && <Banner tone="warn" action={<Btn size="sm" variant="primary" onClick={() => setLog(true)}>Log ventilation</Btn>}><b>Ventilation recommended</b><div className="text-xs text-muted">CO2 1000 ppm in Bedroom (≥ 1000 ppm guide). Open a window or run your ventilation fan, then log it — the record is kept in this room’s ventilation history.</div></Banner>}
-      <Card title={`${s.label} — last ${win === "24h" ? "24 hours" : win === "1h" ? "hour" : "7 days"}`} sub={`${s.unit} · Bedroom · rolling window ending 09:12 · 5-min averages`} action={<div className="flex flex-wrap gap-2"><Tabs value={metric} onChange={setMetric} tabs={(Object.keys(series) as (keyof typeof series)[]).map((k) => ({ id: k, label: series[k].label }))} /><Tabs value={win} onChange={setWin} tabs={[{ id: "1h", label: "1h" }, { id: "24h", label: "24h" }, { id: "7d", label: "7d" }]} /><Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: "Chart" }, { id: "table", label: "Table" }]} /></div>}>
-        {view === "chart" ? <><LineChart points={missing ? s.pts.map((p, i) => (i > 4 && i < 8 ? null : p)) : [...s.pts]} min={s.min} max={s.max} threshold={s.th} height={200} labels={["09:12 yesterday", "15:00", "21:00", "03:00", "09:12 now"]} /><div className="mt-1 flex gap-4 text-[11px] text-muted"><span className="text-primary">— {s.label} ({s.unit})</span><span className="text-crit">- - {s.th} {s.unit} guide</span></div></> : <DataTable rows={s.pts.map((p, i) => ({ t: `${(9 + i * 2) % 24}:12`, p }))} rowKey={(r) => r.t + r.p} cols={[{ key: "t", label: "Time", render: (r) => r.t }, { key: "p", label: `${s.label} (${s.unit})`, render: (r) => r.p }]} />}
-      </Card>
-      <Card title="Ventilation history">{log2.map((l, i) => <div key={i} className="flex flex-wrap justify-between gap-2 border-b border-line py-2 text-[13px] last:border-0"><span>{l.m}</span><span className="text-xs text-muted">{l.t}</span></div>)}</Card>
-      <Modal open={log} onClose={() => setLog(false)} title="Log ventilation" footer={<><Btn onClick={() => setLog(false)}>Cancel</Btn><Btn variant="primary" onClick={() => { setLog2((l) => [{ t: "Today 09:15", m: method }, ...l]); setLog(false); toast("Ventilation logged"); }}>Save record</Btn></>}>
-        <Field label="What did you do?"><Select value={method} onChange={(e) => setMethod(e.target.value)}><option>Opened window</option><option>Ran ventilation fan</option><option>Manual ventilation</option></Select></Field>
-        <Field label="Note (optional)"><Textarea placeholder="e.g. 15 minutes" /></Field>
-      </Modal>
-    </Page>
-  );
+export default async function CustomerAirQualityPage({ searchParams }: PageProps<"/customer/air-quality">) {
+  await connection();
+  if (!apiMode()) return <AirQualityDemo />;
+  const sp = await searchParams;
+  const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
+  const [me, now, properties, spaces, units] = await Promise.all([
+    corePrincipal(), coreNow(), coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"), coreAll<ApiUnitRow>("units.list"),
+  ]);
+  const rooms = airRooms(properties, spaces, units);
+  const sel = airSelection(rooms, one("unitId"), one("spaceId"));
+  if (!sel) return <AirQualityView live={null} />;
+  const metric = airMetrics.find((m) => m === one("metric")) ?? "co2";
+  const period = airPeriods.find((p) => p === one("period")) ?? "24h";
+  const w = airWindow(period, now);
+  const [d, series, logs] = await Promise.all([
+    coreOp<ApiUnitDetail>("units.get", { id: sel.unitId }),
+    readSeries(sel.unitId, metric, w.from, w.to),
+    sel.room.spaceId ? coreOp<{ items: ApiVentilationLog[]; total: number }>("ventilation.list", { filters: { spaceId: sel.room.spaceId }, limit: 10 }) : null,
+  ]);
+  const latest = (m: string) => d.latestMeasurements.find((x) => x.metric === m);
+  const sensors = new Set(d.capabilities.sensors.map((s) => s.metric));
+  const freshAir = d.capabilities.ventilation && d.capabilities.ventilationLevels.includes("low");
+  const guidance = airGuidance(latest("co2"), latest("pm25"), freshAir);
+  const roomName = sel.room.spaceId ? spaces.find((s) => s.id === sel.room.spaceId)?.name ?? "this room" : sel.room.path; // outside rooms: the property
+  const slots = airSlots(series.items, w);
+  const points = slots.map((s) => s.avg);
+  const info = metricInfo[metric];
+  const range = axisRange(points, info.guide);
+  const pm25 = latest("pm25");
+  const names = new Map(units.map((u) => [u.id, u.displayName]));
+  const live: AirLive = {
+    rooms: rooms.map((r) => ({ key: r.key, spaceId: r.spaceId, label: r.label, units: r.units })), roomKey: sel.room.key, unitId: d.id, unitName: d.displayName,
+    path: sel.room.path, spaceId: sel.room.spaceId, connection: d.connection, updated: updatedAt(now), freshAir,
+    cards: (["co2", "pm25", "temperature", "humidity"] as const).map((m) => metricCard(m, latest(m), sensors.has(m))),
+    strip: ventStrip(guidance, latest("co2"), roomName, d.displayName, freshAir),
+    clean: guidance.includes("clean") && pm25?.value != null ? `${guidanceText.clean} — PM2.5 ${airNumber("pm25", pm25.value)} µg/m³ in ${roomName} (≥ 35 µg/m³ guide). Request a filter clean from Maintenance.` : null,
+    allergen: allergenView(series.allergen), metric, period,
+    chart: {
+      title: `${info.label} — ${windowTitle(period)}`, sub: windowSub(w, info.unit, roomName), points, labels: axisLabels(w), guide: info.guide, ...range, ticks: axisTicks(range.min, range.max),
+      hasSensor: sensors.has(metric), readings: series.items.length, total: series.total, valid: slots.some((s) => s.avg !== null), gaps: slots.some((s) => s.avg === null),
+    },
+    rows: airRows(slots, metric, w.slotMs), co2Now: co2Now(latest("co2")),
+    history: logs ? { rows: logs.items.map((v) => ventRow(v, me.membershipId, names)), total: logs.total } : null,
+  };
+  return <AirQualityView live={live} />;
 }

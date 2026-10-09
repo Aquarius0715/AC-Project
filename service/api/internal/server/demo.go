@@ -274,19 +274,27 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 		if metric != r.Metric || bound == nil || *bound != r.UnitID {
 			return apperr.Fields(map[string]string{"measurement": "errors.sensor_mismatch"})
 		}
+		// IR12 causes in priority order unit_mismatch → non_finite → out_of_range → invalid_time; a cause keeps a null
+		// input suspect (D07), the value itself is never stored for the first three; otherwise null is missing
 		quality, value, reason := r.Quality, r.Value, (*string)(nil)
 		spec, known := metricUnits[r.Metric]
-		suspect := func(why string) { quality, reason = "suspect", &why }
+		suspect := func(why string, drop bool) {
+			quality, reason = "suspect", &why
+			if drop {
+				value = nil
+			}
+		}
 		switch {
+		case !known || r.Unit != spec.unit:
+			suspect("unit_mismatch", true)
+		case value != nil && (math.IsNaN(*value) || math.IsInf(*value, 0)):
+			suspect("non_finite", true)
+		case value != nil && (*value < spec.min || *value > spec.max):
+			suspect("out_of_range", true)
+		case r.ObservedAt.After(r.ReceivedAt) || r.ReceivedAt.After(c.Now):
+			suspect("invalid_time", false)
 		case value == nil:
 			quality = "missing"
-		case !known || r.Unit != spec.unit:
-			suspect("unit_mismatch")
-		case math.IsNaN(*value) || math.IsInf(*value, 0) || *value < spec.min || *value > spec.max:
-			suspect("out_of_range")
-			value = nil
-		case r.ObservedAt.After(r.ReceivedAt) || r.ReceivedAt.After(c.Now):
-			suspect("future_time")
 		}
 		seq := int64(0)
 		if r.Sequence != nil {
@@ -305,9 +313,13 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 	})
 }
 
+// rawUnit keeps a received unit that differs from the sensor's (IR12: at most 32 characters as evidence).
 func rawUnit(got, want string) *string {
 	if got == want {
 		return nil
+	}
+	if r := []rune(got); len(r) > 32 {
+		got = string(r[:32])
 	}
 	return &got
 }

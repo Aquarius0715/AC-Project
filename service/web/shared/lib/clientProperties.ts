@@ -14,7 +14,8 @@ export type RoomUnit = {
   id: string; version: number; name: string; set: string; temp: string; watts: string; power: "running" | "stopped" | "unknown";
   conn: ApiUnitDetail["connection"]; seen: string | null; online: boolean;
 };
-const metric = (d: ApiUnitDetail, m: string) => d.latestMeasurements.find((x) => x.metric === m && x.value !== null)?.value ?? null;
+/** The latest reading of a metric when it is current (valid, IR213); a stale, suspect or null reading shows “—”. */
+const metric = (d: ApiUnitDetail, m: string) => { const x = d.latestMeasurements.find((r) => r.metric === m); return x && x.quality === "valid" ? x.value : null; };
 export function roomUnits(ds: ApiUnitDetail[]): RoomUnit[] {
   return [...ds].sort((a, b) => a.displayName.localeCompare(b.displayName)).map((d) => {
     const o = d.observedState;
