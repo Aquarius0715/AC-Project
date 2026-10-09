@@ -6,7 +6,7 @@ export type Alert = { id: string; title: string; sev: "warning" | "normal"; kind
 export type ApiAlert = { id: string; unitId: string; type: string; severity: "critical" | "warning" | "normal"; status: string; causeCode: string; evidenceKind: string; evidenceText: string; detectedAt: string };
 
 const causeTitle: Record<string, string> = { window_open: "Possible open window", insulation_loss: "Poor insulation suspected" };
-const typeTitle: Record<string, string> = { maintenance: "Maintenance reminder", quality: "Air quality alert", tamper: "Device tamper", reconciliation_required: "Restriction check needed", sensor: "Sensor alert" };
+const typeTitle: Record<string, string> = { maintenance: "Filter cleaning reminder", quality: "Air quality alert", tamper: "Device tamper", reconciliation_required: "Restriction check needed", sensor: "Sensor alert" };
 const evidenceLabel: Record<string, string> = { inferred: "Evidence (inferred)", inspection: "Inspection record", demo_observation: "Evidence (demo observation)" };
 
 /** The display title of an alert: its suspected cause, else its type. */

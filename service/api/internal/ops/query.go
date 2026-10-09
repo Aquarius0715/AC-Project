@@ -17,6 +17,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 )
 
 // Internal queries (IR190) are reads one domain exposes to the read models of another (API composition). They are
@@ -183,14 +184,15 @@ func (r *Registry) ServeQuery(token string) echo.HandlerFunc {
 }
 
 // ServeSystemQuery is the handler of SystemQueryPath (no user authentication): the internal token admits the call
-// and the query runs with a principal of the X-Tenant-Id tenant only (IR195).
+// and the query runs with the system principal of the X-Tenant-Id tenant (IR195; the domain schedulers' jobs read the
+// tenant's units, IR239).
 func (r *Registry) ServeSystemQuery(token string) echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		tenant, err := uuid.Parse(c.Request().Header.Get("X-Tenant-Id"))
 		if err != nil {
 			return apperr.E(apperr.Unauthenticated, "error.unauthenticated")
 		}
-		return r.serveQuery(c, token, &Principal{TenantID: tenant}, "")
+		return r.serveQuery(c, token, &Principal{Principal: authz.Principal{Role: "system"}, TenantID: tenant}, "")
 	}
 }
 

@@ -1300,6 +1300,24 @@ CREATE TABLE maintenance.filter_cleanings (
 );
 CREATE INDEX filter_cleanings_unit ON maintenance.filter_cleanings (tenant_id, unit_id, cleaned_at DESC);
 
+CREATE TABLE maintenance.filter_reminders (      -- one cleaning reminder per unit and cleaning cycle (IR134 item 5, IR239)
+  id              uuid PRIMARY KEY,               -- the source Alert's id (equipment opens it from FilterCleaningDue)
+  tenant_id       uuid NOT NULL,
+  unit_id         uuid NOT NULL,
+  customer_org_id uuid NOT NULL,
+  cycle_from      timestamptz,                    -- the cleaning the cycle starts at; null = no cleaning recorded yet
+  raised_at       timestamptz NOT NULL,
+  notifications   int NOT NULL DEFAULT 0,         -- requested: recipients × channels (0 = no_recipient)
+  cleared_at      timestamptz                     -- a later cleaning ended the cycle; the Alert is resolved
+);
+CREATE UNIQUE INDEX filter_reminders_cycle ON maintenance.filter_reminders (unit_id, coalesce(cycle_from, '-infinity'::timestamptz));
+CREATE INDEX filter_reminders_open ON maintenance.filter_reminders (tenant_id, unit_id) WHERE cleared_at IS NULL;
+
+CREATE TABLE maintenance.filter_reminder_watermarks ( -- filter statuses last evaluated for reminders (every 15 minutes, IR239)
+  tenant_id    uuid PRIMARY KEY,
+  evaluated_at timestamptz NOT NULL
+);
+
 CREATE TABLE maintenance.parts_catalog (
   code       text PRIMARY KEY,
   tenant_id  uuid NOT NULL,

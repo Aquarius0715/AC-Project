@@ -37,7 +37,22 @@ const (
 
 	// identity → equipment (IR53, IR214)
 	ConsentRevoked = "ConsentRevoked" // a membership withdrew location consent: disable its location automations
+
+	// maintenance → equipment: the source Alert of a filter cleaning reminder (IR134 item 5, IR239)
+	FilterCleaningDue     = "FilterCleaningDue"     // open the maintenance Alert of the unit's cleaning cycle
+	FilterCleaningCleared = "FilterCleaningCleared" // resolve it: a later cleaning ended the cycle
 )
+
+// FilterReminder is the payload of FilterCleaningDue / FilterCleaningCleared; maintenance assigns the Alert ID so the
+// reminder's notifications can name their source Alert before equipment stores it.
+type FilterReminder struct {
+	AlertID       uuid.UUID `json:"alertId"`
+	UnitID        uuid.UUID `json:"unitId"`
+	CustomerOrgID uuid.UUID `json:"customerOrgId"`
+	Evidence      string    `json:"evidence,omitempty"`
+	NoRecipient   bool      `json:"noRecipient,omitempty"` // no active recipient: the Alert records a no_recipient DeliveryFailure (SR12)
+	At            time.Time `json:"at"`
+}
 
 // ConsentRevocation is the payload of ConsentRevoked.
 type ConsentRevocation struct {

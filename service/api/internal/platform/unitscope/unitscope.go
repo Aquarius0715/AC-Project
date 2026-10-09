@@ -1,6 +1,7 @@
 // Package unitscope is the one D01 unit read scope used by every module (IR152 table, IR49, IR124, IR169):
 //
 //   - admin: the tenant
+//   - system (the domain schedulers' jobs, IR239): the tenant
 //   - client: units of the caller's organization
 //   - contractor: units of jobs with the company's accepted Offer inside its access window
 //   - internal technician: units within Membership.scopes (organization, property, unit)
@@ -41,7 +42,7 @@ func SQL(c *ops.Call, args *[]any, unitExpr string, mode Mode) string {
 		return "EXISTS (SELECT 1 FROM assets.units su WHERE su.id = " + unitExpr + " AND " + cond + ")"
 	}
 	switch p.Role {
-	case "admin":
+	case "admin", "system":
 		return "TRUE"
 	case "client":
 		return unit("su.customer_org_id = " + add(p.OrgID))

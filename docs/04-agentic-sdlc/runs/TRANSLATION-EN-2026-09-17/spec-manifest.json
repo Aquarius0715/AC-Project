@@ -1,12 +1,12 @@
 {
-  "version": "0.129.0",
-  "spec_baseline_id": "28a9cb14a1fd09456571e015d96223f3432df83bfe697da112e82b9ddbc427de",
+  "version": "0.130.0",
+  "spec_baseline_id": "c51362cd5cd6010b400b39f598edddcf6cd839b21eef5963de6b466e4950350e",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "548e721d88c94fbd349adbe793e0433fd4bb20b4813efa61c4fccd6828062da0"
+      "sha256": "6ec14c69b61720617f24172f638230077b4f70fa2de1970622ad2a9ad2d88df9"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -102,7 +102,7 @@
     },
     {
       "path": "02-design/backend-architecture.md",
-      "sha256": "02f38d7749d15494797cdee81a28d40e55f64aeb072808578af6fe9307dcab94"
+      "sha256": "489f480a4ed3a0e02fdf697a3a319614bf93bb1f8dc614c55d3b1e841cae2ff0"
     },
     {
       "path": "02-design/backend-go-design.md",
@@ -110,7 +110,7 @@
     },
     {
       "path": "02-design/client.md",
-      "sha256": "2049e6f3c7edb4322c01a0b79b5283a9f9f7917525c4db80b199972950a3a4d3"
+      "sha256": "123c7eb7c87a55c3882ad163fa9e3b3929fc9ed5be13f6693d62d84a58640fc2"
     },
     {
       "path": "02-design/common.md",
@@ -126,7 +126,7 @@
     },
     {
       "path": "02-design/database-design.md",
-      "sha256": "aab1c659efdd73b6fa49bead30f55e7a6f9e3a2581fc3ba609b23e53806e00c7"
+      "sha256": "a6931b797f30d33a3b744f60940467fe17f369e5061cd6050cc4a55b216da7e7"
     },
     {
       "path": "02-design/deterministic-contracts.md",
@@ -146,7 +146,7 @@
     },
     {
       "path": "02-design/operation-persistence-map.csv",
-      "sha256": "d5b6771cfd4eb241f4c1836a6c5e47138eb5dd8ff61772426e57039d2d945afe"
+      "sha256": "4765f63fa0257ce51cfaa6f7f16e3774b154ff0a33eafe5b0cc470bf2c238535"
     },
     {
       "path": "02-design/query-catalog.csv",
@@ -154,7 +154,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "e5becbcbf82c1b510eeb4fa1681be93b0790a7c22b4442fa315af20f6c728851"
+      "sha256": "feadb44b383dfb2bf187abb2f66687cc5666882f1012fd562976daca0f2ab643"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -282,7 +282,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "d9eb2e8204a2238a100d38111214fe6a4ec4593d18019a44f4154d4c3d68366f"
+      "sha256": "566dc54d4e2f142ba2a4302c4cdcd7661a6f4ac2aeb03e5d1248df9b730b1a98"
     },
     {
       "path": "tools/check_review_regressions.py",
@@ -290,11 +290,11 @@
     },
     {
       "path": "tools/gen_operation_persistence_map.py",
-      "sha256": "7ddfe1619aa960b1187747624321743dc299ad733d2efa89cb0ebfc9b2a5adcf"
+      "sha256": "7a938f86cbe362ac57d5079096baa814810cd1fa84b80880701990cddd364c65"
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "e005a182227b26f9e7d7190e1130209b23b0ef7e0e86d51831304fc0455e9f24"
+      "sha256": "dc760d1478e7c8cf9d1e29f434c7cba262d58fa7c3009c1b4ce97018f3346f7e"
     }
   ]
 }

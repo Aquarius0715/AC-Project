@@ -44,6 +44,7 @@ type MembersInput struct {
 	Role           string      `json:"role,omitempty"`
 	OrganizationID *uuid.UUID  `json:"organizationId,omitempty"`
 	Permission     string      `json:"permission,omitempty"`
+	ClientRole     string      `json:"clientRole,omitempty"` // owner / member (filter cleaning reminders to the owners, IR239)
 }
 
 // QueryConsent reports whether a membership granted a consent purpose (IR194: SR02 location automations).
@@ -85,12 +86,13 @@ type NotificationsStoredInput struct {
 func members(ctx context.Context, c *ops.Call, in *MembersInput) ([]uuid.UUID, error) {
 	q := `SELECT m.id FROM identity.memberships m WHERE m.valid_from <= $1 AND (m.valid_until IS NULL OR m.valid_until > $1)
 		AND ($2::uuid[] IS NULL OR m.id = ANY($2)) AND ($3 = '' OR m.role = $3) AND ($4::uuid IS NULL OR m.organization_id = $4)
-		AND ($5 = '' OR EXISTS (SELECT 1 FROM identity.membership_permissions p WHERE p.membership_id = m.id AND p.permission = $5)) ORDER BY m.id`
+		AND ($5 = '' OR EXISTS (SELECT 1 FROM identity.membership_permissions p WHERE p.membership_id = m.id AND p.permission = $5))
+		AND ($6 = '' OR m.client_role = $6) ORDER BY m.id`
 	var ids []uuid.UUID
 	if in.IDs != nil {
 		ids = in.IDs
 	}
-	rows, err := c.Tx.Query(ctx, q, c.Now, ids, in.Role, in.OrganizationID, in.Permission)
+	rows, err := c.Tx.Query(ctx, q, c.Now, ids, in.Role, in.OrganizationID, in.Permission, in.ClientRole)
 	if err != nil {
 		return nil, err
 	}

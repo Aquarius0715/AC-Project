@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
 	"sort"
 	"strings"
@@ -12,8 +13,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
+	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
@@ -283,6 +287,9 @@ func (m FilterCare) markCleaned(ctx context.Context, c *ops.Call, in *MarkInput)
 	if err != nil {
 		return st, err
 	}
+	if _, err := clearReminders(ctx, c, in.UnitID, st.LastCleanedAt); err != nil { // the cleaning ends the reminder's cycle (IR239)
+		return st, err
+	}
 	c.Emit(ops.Event{AggregateType: "unit", AggregateID: in.UnitID, Type: "FilterCleaned"})
 	c.Audit(ops.AuditEntry{Action: "filterCare.markCleaned", TargetKind: "unit", TargetID: in.UnitID.String()})
 	return st, nil
@@ -403,6 +410,139 @@ func (m FilterCare) getSettings(ctx context.Context, c *ops.Call, _ *SettingsGet
 		return FilterSettings{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
 	return m.settings(ctx, c, cust)
+}
+
+// ---- reminders (scheduler job) ----
+
+// FilterRemindEvery is how often the maintenance scheduler evaluates the filter statuses for reminders (IR239).
+const FilterRemindEvery = 15 * time.Minute
+
+// Remind is the maintenance scheduler job of IR134 item 5 (IR239). Every FilterRemindEvery of business time it
+// evaluates the filter status of the tenant's units: a cleaning recorded since a reminder ends that cleaning cycle and
+// resolves its Alert (FilterCleaningCleared — Mark cleaned does so at once, a technician cleaning here); an overdue
+// unit without a reminder in its cycle gets one — the maintenance Alert (FilterCleaningDue, opened by equipment) and
+// one cleaning_due notification per recipient and channel of the customer's settings.
+func (m FilterCare) Remind(ctx context.Context, c *ops.Call) (int, error) {
+	var at time.Time
+	err := c.Tx.QueryRow(ctx, `SELECT evaluated_at FROM maintenance.filter_reminder_watermarks WHERE tenant_id = $1 FOR UPDATE`, c.Principal.TenantID).Scan(&at)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+	case err != nil:
+		return 0, err
+	case c.Now.Sub(at) < FilterRemindEvery:
+		return 0, nil
+	}
+	if _, err := c.Tx.Exec(ctx, `INSERT INTO maintenance.filter_reminder_watermarks (tenant_id, evaluated_at) VALUES ($1, $2)
+		ON CONFLICT (tenant_id) DO UPDATE SET evaluated_at = EXCLUDED.evaluated_at`, c.Principal.TenantID, c.Now); err != nil {
+		return 0, err
+	}
+	units, err := m.Units.BriefUnits(ctx, c, nil, nil, nil, nil)
+	if err != nil {
+		return 0, err
+	}
+	cache := map[uuid.UUID]FilterSettings{}
+	n := 0
+	for _, u := range units {
+		set, ok := cache[u.OrgID]
+		if !ok {
+			cust, found, err := m.Units.CustomerOfOrg(ctx, c, u.OrgID)
+			if err != nil {
+				return n, err
+			}
+			if !found {
+				continue
+			}
+			if set, err = m.settings(ctx, c, cust); err != nil {
+				return n, err
+			}
+			cache[u.OrgID] = set
+		}
+		st, err := m.status(ctx, c, u, set)
+		if err != nil {
+			return n, err
+		}
+		k, err := clearReminders(ctx, c, u.ID, st.LastCleanedAt)
+		if n += k; err != nil {
+			return n, err
+		}
+		if st.Status == "overdue" {
+			k, err := remind(ctx, c, u, set, st)
+			if n += k; err != nil {
+				return n, err
+			}
+		}
+	}
+	return n, nil
+}
+
+// clearReminders ends the open reminders of the unit whose cycle a later cleaning ended (last = the unit's last
+// cleaning now) and asks equipment to resolve their Alerts.
+func clearReminders(ctx context.Context, c *ops.Call, unit uuid.UUID, last *time.Time) (int, error) {
+	rows, err := c.Tx.Query(ctx, `UPDATE maintenance.filter_reminders SET cleared_at = $3 WHERE unit_id = $1 AND cleared_at IS NULL AND cycle_from IS DISTINCT FROM $2
+		RETURNING id, customer_org_id`, unit, last, c.Now)
+	if err != nil {
+		return 0, err
+	}
+	type ended struct{ id, org uuid.UUID }
+	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (ended, error) {
+		var e ended
+		return e, r.Scan(&e.id, &e.org)
+	})
+	for _, e := range list {
+		c.Emit(ops.Event{AggregateType: "alert", AggregateID: e.id, Type: events.FilterCleaningCleared,
+			Payload: events.FilterReminder{AlertID: e.id, UnitID: unit, CustomerOrgID: e.org, At: c.Now}})
+	}
+	return len(list), err
+}
+
+// remind raises the reminder of the unit's current cleaning cycle once: the Alert and the notifications to the owners
+// (or all client users) of the customer by the settings' channels.
+func remind(ctx context.Context, c *ops.Call, u ops.UnitBrief, set FilterSettings, st FilterStatus) (int, error) {
+	id := uuid.Must(uuid.NewV7())
+	tag, err := c.Tx.Exec(ctx, `INSERT INTO maintenance.filter_reminders (id, tenant_id, unit_id, customer_org_id, cycle_from, raised_at)
+		VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5) ON CONFLICT DO NOTHING`, id, u.ID, u.OrgID, st.LastCleanedAt, c.Now)
+	if err != nil || tag.RowsAffected() == 0 { // this cycle was reminded already
+		return 0, err
+	}
+	f := identity.MembersInput{Role: "client", OrganizationID: &u.OrgID}
+	if set.Recipients == "owners" {
+		f.ClientRole = "owner"
+	}
+	recipients, err := identity.Members(ctx, c, f)
+	if err != nil {
+		return 0, err
+	}
+	evidence := reminderEvidence(st, c.Now)
+	sent := 0
+	for _, r := range recipients {
+		for _, ch := range set.Channels {
+			if _, err := (notify.Store{}).Create(ctx, c, notify.New{RecipientMembershipID: r, Channel: ch, Type: "cleaning_due", TemplateKey: "alert", TargetKind: "unit",
+				TargetID: u.ID, Severity: "normal", SourceAlertID: &id, Params: map[string]any{"status": "open", "message": evidence}}); err != nil {
+				return 0, err
+			}
+			sent++
+		}
+	}
+	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.filter_reminders SET notifications = $2 WHERE id = $1`, id, sent); err != nil {
+		return 0, err
+	}
+	c.Emit(ops.Event{AggregateType: "alert", AggregateID: id, Type: events.FilterCleaningDue,
+		Payload: events.FilterReminder{AlertID: id, UnitID: u.ID, CustomerOrgID: u.OrgID, Evidence: evidence, NoRecipient: sent == 0, At: c.Now}})
+	c.Audit(ops.AuditEntry{Action: "filterCare.remind", TargetKind: "unit", TargetID: u.ID.String(), Reason: "cleaning due"})
+	return 1, nil
+}
+
+// reminderEvidence is the Alert's evidence and the notification's message (Figma Client 06a).
+func reminderEvidence(st FilterStatus, now time.Time) string {
+	switch {
+	case st.RunHoursSinceCleaning != nil && st.LastCleanedAt != nil:
+		return fmt.Sprintf("Cleaning due (%.0f h of run time since the last cleaning). Not a fault.", *st.RunHoursSinceCleaning)
+	case st.RunHoursSinceCleaning != nil:
+		return fmt.Sprintf("Cleaning due (%.0f h of run time, no cleaning recorded). Not a fault.", *st.RunHoursSinceCleaning)
+	case st.LastCleanedAt != nil:
+		return fmt.Sprintf("Cleaning due (%d days since the last cleaning, run time unknown). Not a fault.", int(now.Sub(*st.LastCleanedAt).Hours()/24))
+	}
+	return "Cleaning due. Not a fault."
 }
 
 // RegisterFilterCare binds the filter care operations.

@@ -217,7 +217,7 @@ Modelling rules:
 | Follow-up classification reminder | createdAt + 1 business day | IR114 |
 | Invoice reminders | Due and overdue dates | FR-A08 |
 | Certificate expiry warnings | Status `expiring` from expiry − 60 days, `expired` at expiry | FR-P09, FR-A21 |
-| Filter cleaning reminders | Customer settings | FR-C18 |
+| Filter cleaning reminders | Every 15 minutes of business time: an overdue unit once per cleaning cycle (customer settings) | FR-C18, IR239 |
 | Automation schedules | Schedule start / end | FR-C04 |
 | Monthly energy report | Month end, when enabled in preferences | FR-C16 |
 | Firmware campaign waves | Campaign schedule | FR-A20 |

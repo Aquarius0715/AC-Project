@@ -621,7 +621,7 @@ Scope: FR-C18 / Main display pattern: **UI-LIST**. Service boundary: `filterCare
 
 1. Table per AC: run time, progress bar (% of threshold), status OK/Due soon (≥ 80 %)/Overdue (≥ 100 %)/unknown, last cleaned (by whom, job link). Areas with many ACs (4 or more in one space, IR238) show a summary row with “View n”.
 2. Request cleaning (overdue rows) opens the New request modal prefilled with the unit and type=preventive. Mark cleaned (every row, IR238) calls `filterCare.markCleaned` and restarts the run time at 0 h. Owners edit reminders (`filterCare.saveSettings`).
-3. Crossing the threshold raises an Alert of type maintenance (cleaning_due notification, IR104 mapping unchanged).
+3. Crossing the threshold raises an Alert of type maintenance (cleaning_due notification, IR104 mapping unchanged): the maintenance scheduler checks every 15 minutes and reminds once per cleaning cycle; a later cleaning resolves the Alert (IR239).
 
 **Boundary cases and failures**: Members cannot save settings (FORBIDDEN). Out-of-range values → VALIDATION. The reminders card and the edit dialog read the saved settings (or the defaults) with `filterCare.getSettings` (IR238).
 
