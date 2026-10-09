@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.108.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
+Version: 0.109.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.109.0 (2026-10-09): Contractor quality review (evidence check, accept / return with the report and job versions, photos) and payouts (approved and paid statements, line labels, Not included rows, Ask HQ, PDF) through the server; the demo seed gains the contractor-a rate card (IR218). 
 0.108.0 (2026-10-09): Device operations start and time out on the equipment scheduler and finish with the device's result; demo device faults and recoveries are stored as device events with the tamper alert and the out-of-order rule; technician devices and device events through the server (IR217). 
 0.107.0 (2026-10-09): Command history (new commands.list, Command.source; 199 operations) and technician diagnostic control through the server — diagnostic commands, test runs with their device-confirmed states, authorization and job history; the customer unit page shows the stored history (IR216). Phase 1A unchanged.
 0.106.0 (2026-10-09): Automation “Only if” conditions (weekday / occupancy / weather, all must hold) and the run log of skips with their reason, shown as the last-evaluation note (IR215). Phase 1A unchanged.

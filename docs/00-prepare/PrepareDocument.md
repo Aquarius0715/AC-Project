@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.108.0
+version: 0.109.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -268,6 +268,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.109.0: Contractor quality review and payouts on the server pattern; demoSeed.rateCards (IR218). Phase 1A unchanged.
 0.108.0: Device operation lifecycle on the scheduler, demo device events with the tamper alert, technician devices on the server pattern (IR217). Phase 1A unchanged.
 0.107.0: commands.list and Command.source; technician diagnostic control on the server pattern (IR216). Phase 1A unchanged.
 0.106.0: Automation onlyIf conditions and lastRun with recorded skips (IR215). Phase 1A unchanged.

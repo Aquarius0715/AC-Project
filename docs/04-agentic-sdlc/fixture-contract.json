@@ -1706,6 +1706,39 @@
         "alternativeSlot": null
       }
     ],
+    "rateCards": [
+      {
+        "id": "rc-contractor-a",
+        "tenantId": "tenant-a",
+        "contractorOrgId": "org-contractor-a",
+        "version": 3,
+        "effectiveFrom": "2026-06-01T00:00:00.000Z",
+        "createdAt": "2026-06-01T00:00:00.000Z",
+        "currency": "MYR",
+        "lines": [
+          {
+            "workType": "periodic_inspection",
+            "amountMinor": 38000,
+            "note": "per unit visit"
+          },
+          {
+            "workType": "repair_base",
+            "amountMinor": 45000,
+            "note": "parts billed separately"
+          },
+          {
+            "workType": "emergency",
+            "amountMinor": 52000,
+            "note": "same-day call-out"
+          },
+          {
+            "workType": "rework_deduction",
+            "amountMinor": 12000,
+            "note": "per returned report after the first"
+          }
+        ]
+      }
+    ],
     "consents": [
       {
         "id": "consent-customer-a-location",

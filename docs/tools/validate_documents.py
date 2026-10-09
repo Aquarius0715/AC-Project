@@ -99,6 +99,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.106.0 (2026-10-09): IR215; counts unchanged.
 # 0.107.0 (2026-10-09): IR216; commands.list (199 operations).
 # 0.108.0 (2026-10-09): IR217; job lookup screens SCR-T11/T12 without job sort; counts unchanged.
+# 0.109.0 (2026-10-09): IR218; SCR-P10 job lookup; demoSeed.rateCards; counts unchanged.
 # 0.102.0 (2026-10-09): IR211; counts unchanged.
 # 0.101.0 (2026-10-09): IR210; counts unchanged.
 # 0.100.0 (2026-10-09): IR209; counts unchanged.
@@ -696,7 +697,7 @@ if accepted_sort['status']=='accepted':
         fail('Job query status ranking differs from accepted decision')
     # IR217: the technician device screens read jobs.list only to find the assigned job of each unit (IR94) and show no
     # job list, so they have no job sort; every other screen that reads jobs.list shows the list and sorts it (IR34).
-    job_lookups = {'SCR-T11', 'SCR-T12'}
+    job_lookups = {'SCR-T11', 'SCR-T12', 'SCR-P10'}  # IR218: P10 lists the jobs still in review as rows of the statement table
     for screen in screens:
         if 'jobs.list' not in screen['operations'].split(';'):
             continue
@@ -1274,7 +1275,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.108.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.109.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

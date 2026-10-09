@@ -85,6 +85,7 @@ type Fixture struct {
 		Jobs          []map[string]any `json:"jobs"`
 		Offers        []map[string]any `json:"offers"`
 		Assignments   []map[string]any `json:"assignments"`
+		RateCards     []map[string]any `json:"rateCards"`
 		Consents      []struct {
 			ID           string     `json:"id"`
 			TenantID     string     `json:"tenantId"`
@@ -745,6 +746,14 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			str(a, "scheduledStart"), str(a, "scheduledEnd"), str(a, "status"), opt(a, "reason"), str(a, "acknowledgement"), opt(a, "acknowledgedAt"), opt(a, "cantMakeReason"),
 			str(a, "createdAt")); err != nil {
 			return fmt.Errorf("assignment %s: %w", str(a, "id"), err)
+		}
+	}
+	for _, r := range f.DemoSeed.RateCards { // contractor rate cards (FR-A22 / FR-P10): the payout prices of a contractor
+		lines, _ := json.Marshal(r["lines"])
+		if err := ex(`INSERT INTO maintenance.rate_cards (id, tenant_id, contractor_org_id, effective_from, currency, lines, version, created_at)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`,
+			ID(str(r, "id")), ID(str(r, "tenantId")), ID(str(r, "contractorOrgId")), str(r, "effectiveFrom"), str(r, "currency"), lines, r["version"], str(r, "createdAt")); err != nil {
+			return fmt.Errorf("rate card %s: %w", str(r, "id"), err)
 		}
 	}
 	return seedJobEvents(ex, f, jobTenant)
