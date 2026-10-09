@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -240,4 +241,128 @@ func TestConsentWithdrawalDisablesLocationRules(t *testing.T) {
 		}
 	}
 	set(false)
+}
+
+// IR215: every onlyIf condition must hold when a rule runs. A rule whose own trigger held but that could not run keeps
+// the reason in its run log (lastRun); events that are not for the rule leave no trace.
+func TestAutomationExtraConditions(t *testing.T) {
+	s := server(t)
+	ctx := context.Background()
+	u := boundUnit(t, s, "online")
+	base := `{"name":"Hot afternoon","unitIds":["` + u + `"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":50,"kind":"event",` +
+		`"condition":{"type":"weather","metric":"temperature","operator":"gte","value":33},"action":{"kind":"set_temperature","celsius":24}`
+	weather := `{"type":"weather","metric":"temperature","operator":"gte","value":30}`
+	for name, extra := range map[string]string{
+		"four conditions":    `[{"type":"weekday","weekdays":[1]},{"type":"occupancy","occupied":true},{"type":"weekday","weekdays":[2]},{"type":"occupancy","occupied":false}]`,
+		"same type twice":    `[{"type":"occupancy","occupied":true},{"type":"occupancy","occupied":false}]`,
+		"own condition type": `[` + weather + `]`,
+		"no weekdays":        `[{"type":"weekday","weekdays":[]}]`,
+		"weekday 8":          `[{"type":"weekday","weekdays":[8]}]`,
+		"unknown type":       `[{"type":"tariff","operator":"gt","value":1}]`,
+		"extra field":        `[{"type":"occupancy","occupied":true,"value":3}]`,
+		"bad operator":       `[{"type":"occupancy","occupied":true},{"type":"weekday","weekdays":[1],"operator":"gt"}]`,
+	} {
+		if code, m := write(s, &customerB, "automations.save", base+`,"onlyIf":`+extra+`}`, 0); code != 422 || m["fieldErrors"].(map[string]any)["onlyIf"] == nil {
+			t.Errorf("%s: %d %v", name, code, m)
+		}
+	}
+	if code, _ := write(s, &customerB, "automations.save", scheduleRule(u, map[string]string{"onlyIf": `[{"type":"weekday","weekdays":[1]}]`}), 0); code != 422 {
+		t.Errorf("weekday on a schedule: %d", code)
+	}
+	code, m := write(s, &customerB, "automations.save", base+`,"onlyIf":[{"type":"weekday","weekdays":[1]},{"type":"occupancy","occupied":true}]}`, 0)
+	if code != 200 || len(data(m)["onlyIf"].([]any)) != 2 || data(m)["lastRun"] != nil {
+		t.Fatalf("save: %d %v", code, m)
+	}
+	id := data(m)["id"].(string)
+	fact := func(metric, value, unit string) string {
+		return `{"unitId":"` + u + `","metric":"` + metric + `","value":` + value + `,"unit":"` + unit + `","observedAt":"` + clock.Format(time.RFC3339) + `","quality":"valid"}`
+	}
+	fire := func(facts ...string) map[string]any { // one evaluation per tick (D02): clear the tick and the unit's pending commands first
+		t.Helper()
+		owner(t, `DELETE FROM control.evaluation_events`)
+		owner(t, `UPDATE control.commands SET status = 'expired' WHERE unit_id = $1 AND status IN ('requested','sent')`, u)
+		code, m := write(s, &customerB, "automations.fire", `{"eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(time.RFC3339)+`","unitIds":["`+u+`"],"facts":[`+
+			strings.Join(facts, ",")+`],"phase":"condition"}`, 0)
+		if code != 200 {
+			t.Fatalf("fire: %d %v", code, m)
+		}
+		return data(m)["results"].([]any)[0].(map[string]any)
+	}
+	last := func() map[string]any {
+		t.Helper()
+		_, m := post(s, &customerB, "automations.list", `{"limit":10,"filters":{"unitId":"`+u+`"}}`)
+		for _, it := range items(m) {
+			if it["id"] == id {
+				lr, _ := it["lastRun"].(map[string]any)
+				return lr
+			}
+		}
+		t.Fatal("rule not listed")
+		return nil
+	}
+	runs := func() int {
+		var n int
+		ownerScan(t, `SELECT count(*) FROM control.automation_runs WHERE rule_id = $1`, []any{id}, &n)
+		return n
+	}
+	// Monday, hot and someone home: runs
+	if d := fire(fact("weather_temperature", "34", "°C"), fact("occupied", "true", "boolean")); d["decision"] != "requested" || d["ruleId"] != id {
+		t.Fatalf("all conditions hold: %v", d)
+	}
+	if lr := last(); lr == nil || lr["outcome"] != "command_created" || lr["commandId"] == nil || lr["at"] != clock.Format(time.RFC3339) {
+		t.Fatalf("lastRun after a command: %v", lr)
+	}
+	// hot, but nobody home: the extra condition fails and is logged
+	if d := fire(fact("weather_temperature", "34", "°C"), fact("occupied", "false", "boolean")); d["decision"] != "suppressed" || d["reason"] != "no_match" {
+		t.Fatalf("only if someone is home: %v", d)
+	}
+	if lr := last(); lr["outcome"] != "skipped" || lr["reason"] != "no_match" {
+		t.Fatalf("lastRun no_match: %v", lr)
+	}
+	// hot, occupancy unknown: missing data never matches, the skip says why
+	if d := fire(fact("weather_temperature", "34", "°C")); d["reason"] != "missing_data" {
+		t.Fatalf("missing occupancy: %v", d)
+	}
+	if lr := last(); lr["outcome"] != "skipped" || lr["reason"] != "missing_data" {
+		t.Fatalf("lastRun missing_data: %v", lr)
+	}
+	// its own data arrived incomplete: logged; an event that is not for the rule (no weather): no trace
+	if d := fire(`{"unitId":"` + u + `","metric":"weather_temperature","value":null,"unit":"°C","observedAt":"` + clock.Format(time.RFC3339) + `","quality":"missing"}`); d["reason"] != "missing_data" {
+		t.Fatalf("null weather: %v", d)
+	}
+	n := runs()
+	fire(fact("occupied", "true", "boolean"))
+	if runs() != n {
+		t.Fatal("an occupancy event left a run on the weather rule")
+	}
+	// not a selected weekday
+	code, m = write(s, &customerB, "automations.save", base+`,"id":"`+id+`","onlyIf":[{"type":"weekday","weekdays":[6,7]}]}`, 1)
+	if code != 200 || len(data(m)["onlyIf"].([]any)) != 1 {
+		t.Fatalf("weekend only: %d %v", code, m)
+	}
+	if d := fire(fact("weather_temperature", "34", "°C")); d["decision"] != "suppressed" || d["reason"] != "no_match" {
+		t.Fatalf("Monday is not a weekend: %v", d)
+	}
+	// a schedule that needs someone home skips at its start for want of occupancy data (the scheduler has none)
+	code, m = write(s, &customerB, "automations.save", scheduleRule(u, map[string]string{"weekdays": "[1]", "startLocal": `"09:30"`, "endLocal": `"10:00"`, "enabled": "true",
+		"onlyIf": `[{"type":"occupancy","occupied":true}]`}), 0)
+	if code != 200 {
+		t.Fatalf("schedule with onlyIf: %d %v", code, m)
+	}
+	sid := data(m)["id"].(string)
+	before := len(automationCommands(t, u))
+	setWatermark(t, clock)
+	if _, err := schedTick(ctx, s, clock.Add(31*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	var outcome, reason string
+	ownerScan(t, `SELECT outcome, skip_reason FROM control.automation_runs WHERE rule_id = $1`, []any{sid}, &outcome, &reason)
+	if outcome != "skipped" || reason != "missing_data" || len(automationCommands(t, u)) != before {
+		t.Fatalf("schedule skipped: %s %s", outcome, reason)
+	}
+	for rid, v := range map[string]int{id: 2, sid: 1} { // leave no rule behind
+		if code, _ := write(s, &customerB, "automations.delete", `{"id":"`+rid+`"}`, v); code != 200 {
+			t.Errorf("cleanup: %d", code)
+		}
+	}
 }

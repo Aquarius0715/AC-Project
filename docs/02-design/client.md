@@ -168,6 +168,7 @@ Scope: FR-C04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 | timezone | IANA string/required | Default: display setting; valid zone | Execution timezone |
 | startAction / endAction | UnitAction/required | Supported by capabilities | Start/end actions |
 | enabled | boolean/required | New: false; save may use true if explicitly switched ON in confirmation | Intent to enable |
+| onlyIf | ExtraCondition array/optional | 0–3, distinct types: occupancy / weather (a weekday condition is the schedule's own weekdays) (IR215) | Extra conditions, all must hold (Figma 03b “Only if …”) |
 
 **Steps**
 
@@ -200,6 +201,7 @@ Scope: FR-C05 / Main display pattern: **UI-FORM**. Service boundary: `automation
 | granted | boolean/required for location | Default: false | Consent |
 | action | UnitAction/required | Within unit capabilities | Action |
 | priority | integer/required | 0–100; default: 50 | Priority within a level |
+| onlyIf | ExtraCondition array/optional | 0–3, distinct types: weekday / occupancy / weather, not the type of the condition itself (IR215) | Extra conditions, all must hold (Figma 03e “Only if …”) |
 | simulationEvent | synthetic event/optional | isDemo=true | Behavior check |
 
 **Steps**
@@ -209,7 +211,7 @@ Scope: FR-C05 / Main display pattern: **UI-FORM**. Service boundary: `automation
    - Manage location consent only for location_automation; do not record consent to use the app itself (IR102).
    - Phase 1A uses only synthetic events for location data.
    - Lifestyle-pattern inference is a demo; do not collect real personal behavior histories.
-   - Missing condition data does not count as a match.
+   - Missing condition data does not count as a match. Every “Only if” condition must hold too; when a rule's own trigger held but it could not run, the run log keeps the reason and the list shows the last skip (IR215).
 3. Withdrawing consent disables related condition rules. Do not show already issued Commands as cancelled. Manual actions remain available within permissions.
 4. Queries to update: `consents / automations / simulation results / audit`。
 

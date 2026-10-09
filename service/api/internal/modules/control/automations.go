@@ -57,7 +57,17 @@ type Automation struct {
 	EndAction         json.RawMessage `json:"endAction,omitempty"`
 	Condition         json.RawMessage `json:"condition,omitempty"`
 	Action            json.RawMessage `json:"action,omitempty"`
+	OnlyIf            json.RawMessage `json:"onlyIf"`  // ExtraCondition[] (IR215), [] when none
+	LastRun           *LastRun        `json:"lastRun"` // the latest automation_runs outcome of the rule (IR215)
 	customerOrg       uuid.UUID
+}
+
+// LastRun is AutomationRun of service-contracts.ts: the latest command or recorded skip of the rule.
+type LastRun struct {
+	At        time.Time  `json:"at"`
+	Outcome   string     `json:"outcome"`
+	Reason    *string    `json:"reason"`
+	CommandID *uuid.UUID `json:"commandId"`
 }
 
 // definition is the stored kind-specific part.
@@ -70,23 +80,36 @@ type definition struct {
 	EndAction   json.RawMessage `json:"endAction,omitempty"`
 	Condition   json.RawMessage `json:"condition,omitempty"`
 	Action      json.RawMessage `json:"action,omitempty"`
+	OnlyIf      json.RawMessage `json:"onlyIf,omitempty"`
 }
 
 const automationCols = `a.id, a.tenant_id, a.version, a.created_at, a.updated_at, a.name, a.owner_membership_id, a.created_by_user_id, a.timezone, a.enabled, a.priority,
 	a.disabled_reason, a.kind, a.definition, a.customer_org_id,
-	COALESCE((SELECT array_agg(u.unit_id ORDER BY u.unit_id) FROM control.automation_units u WHERE u.automation_id = a.id), '{}')`
+	COALESCE((SELECT array_agg(u.unit_id ORDER BY u.unit_id) FROM control.automation_units u WHERE u.automation_id = a.id), '{}'),
+	(SELECT json_build_object('at', r.occurred_at, 'outcome', r.outcome, 'reason', r.skip_reason, 'commandId', r.command_id) FROM control.automation_runs r
+		WHERE r.rule_id = a.id ORDER BY r.occurred_at DESC, r.seq DESC LIMIT 1)`
 
 func scanAutomation(r pgx.Row) (Automation, error) {
 	var x Automation
-	var def []byte
+	var def, last []byte
 	if err := r.Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.Name, &x.OwnerMembershipID, &x.CreatedByUserID, &x.Timezone, &x.Enabled, &x.Priority,
-		&x.DisabledReason, &x.Kind, &def, &x.customerOrg, &x.UnitIDs); err != nil {
+		&x.DisabledReason, &x.Kind, &def, &x.customerOrg, &x.UnitIDs, &last); err != nil {
 		return x, err
 	}
 	var d definition
 	_ = json.Unmarshal(def, &d)
-	x.Weekdays, x.StartLocal, x.EndLocal, x.EndsNextDay, x.StartAction, x.EndAction, x.Condition, x.Action =
-		d.Weekdays, d.StartLocal, d.EndLocal, d.EndsNextDay, d.StartAction, d.EndAction, d.Condition, d.Action
+	x.Weekdays, x.StartLocal, x.EndLocal, x.EndsNextDay, x.StartAction, x.EndAction, x.Condition, x.Action, x.OnlyIf =
+		d.Weekdays, d.StartLocal, d.EndLocal, d.EndsNextDay, d.StartAction, d.EndAction, d.Condition, d.Action, d.OnlyIf
+	if len(x.OnlyIf) == 0 {
+		x.OnlyIf = json.RawMessage("[]")
+	}
+	if len(last) > 0 {
+		var lr LastRun
+		if err := json.Unmarshal(last, &lr); err == nil {
+			lr.At = lr.At.UTC()
+			x.LastRun = &lr
+		}
+	}
 	return x, nil
 }
 
@@ -176,8 +199,72 @@ type AutomationInput struct {
 	EndAction   json.RawMessage `json:"endAction,omitempty"`
 	Condition   json.RawMessage `json:"condition,omitempty"`
 	Action      json.RawMessage `json:"action,omitempty"`
+	OnlyIf      json.RawMessage `json:"onlyIf,omitempty"`
 	actions     []UnitAction
 	condition   condition
+	extras      []extraCondition
+}
+
+// extraCondition is one “Only if …” condition (Figma Client 03b, IR215): every one must hold when the rule runs.
+type extraCondition struct {
+	Type     string   `json:"type"`
+	Weekdays []int    `json:"weekdays,omitempty"`
+	Occupied *bool    `json:"occupied,omitempty"`
+	Metric   *string  `json:"metric,omitempty"`
+	Operator *string  `json:"operator,omitempty"`
+	Value    *float64 `json:"value,omitempty"`
+}
+
+// parseExtras checks onlyIf (IR215): at most 3 of weekday / occupancy / weather, each type once, no weekday on a
+// schedule (it has its own weekdays) and not the type of the rule's own condition. Returns the error key or "".
+func parseExtras(raw json.RawMessage, kind, conditionType string) ([]extraCondition, string) {
+	out := []extraCondition{}
+	if len(raw) == 0 || string(raw) == "null" {
+		return out, ""
+	}
+	dec := json.NewDecoder(strings.NewReader(string(raw)))
+	dec.DisallowUnknownFields()
+	if dec.Decode(&out) != nil || len(out) > 3 {
+		return nil, "error.invalid"
+	}
+	seen := map[string]bool{}
+	for _, x := range out {
+		if seen[x.Type] {
+			return nil, "errors.duplicate_condition"
+		}
+		seen[x.Type] = true
+		switch x.Type {
+		case "weekday":
+			if kind == "schedule" {
+				return nil, "errors.weekday_on_schedule"
+			}
+			days := map[int]bool{}
+			for _, d := range x.Weekdays {
+				if d < 1 || d > 7 || days[d] {
+					return nil, "error.invalid"
+				}
+				days[d] = true
+			}
+			if len(x.Weekdays) == 0 || x.Occupied != nil || x.Metric != nil || x.Operator != nil || x.Value != nil {
+				return nil, "error.invalid"
+			}
+		case "occupancy":
+			if x.Occupied == nil || x.Weekdays != nil || x.Metric != nil || x.Operator != nil || x.Value != nil {
+				return nil, "error.invalid"
+			}
+		case "weather":
+			if x.Metric == nil || *x.Metric != "temperature" || x.Operator == nil || !slices.Contains([]string{"gt", "gte", "lt", "lte"}, *x.Operator) ||
+				x.Value == nil || *x.Value < -50 || *x.Value > 100 || x.Weekdays != nil || x.Occupied != nil {
+				return nil, "error.invalid"
+			}
+		default:
+			return nil, "error.invalid"
+		}
+		if x.Type == conditionType {
+			return nil, "errors.duplicate_condition"
+		}
+	}
+	return out, ""
 }
 
 var hhmm = regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
@@ -279,6 +366,11 @@ func (in *AutomationInput) Validate() map[string]string {
 	default:
 		fe["kind"] = "error.invalid"
 	}
+	extras, why := parseExtras(in.OnlyIf, in.Kind, in.condition.Type)
+	if why != "" {
+		fe["onlyIf"] = why
+	}
+	in.extras = extras
 	return fe
 }
 
@@ -398,6 +490,9 @@ func (m Automations) save(ctx context.Context, c *ops.Call, in *AutomationInput)
 	}
 	def := definition{Weekdays: in.Weekdays, StartLocal: in.StartLocal, EndLocal: in.EndLocal, EndsNextDay: in.EndsNextDay, StartAction: in.StartAction, EndAction: in.EndAction,
 		Condition: in.Condition, Action: in.Action}
+	if len(in.extras) > 0 {
+		def.OnlyIf, _ = json.Marshal(in.extras)
+	}
 	if in.Kind == "schedule" {
 		loc, _ := time.LoadLocation(in.Timezone)
 		if _, bad := occurrences(def, loc, c.Now.In(loc), 367); bad {

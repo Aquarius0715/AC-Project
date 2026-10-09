@@ -108,7 +108,11 @@ export type CalibrationRecord = Entity & DeviceHistoryScope & {deviceId:ID;senso
 export type Condition = {type:'occupancy';occupied:boolean}|{type:'location';event:'arrival'|'departure'}|{type:'pattern';localTime:string}|{type:'weather';metric:'temperature';operator:Compare;value:number}|{type:'tariff';operator:Compare;value:number;unit:'MYR_per_kWh'}|{type:'peak';active:boolean}|{type:'solar'|'battery';operator:Compare;value:number;unit:'kW'};
 export type Compare = 'gt'|'gte'|'lt'|'lte';
 export type RuleBase = Entity & {name:string;unitIds:ID[];ownerMembershipId:ID;createdByUserId:ID;timezone:string;enabled:boolean;priority:number;disabledReason:'capability_changed'|'unit_archived'|'consent_revoked'|null};
-export type Automation = RuleBase & ({kind:'schedule';weekdays:number[];startLocal:string;endLocal:string;endsNextDay:boolean;startAction:UnitAction;endAction:UnitAction}|{kind:'event';condition:Condition;action:UnitAction});
+/** IR215: “Only if …” conditions — every one must hold when the rule runs (missing data never matches). */
+export type ExtraCondition = {type:'weekday';weekdays:number[]}|{type:'occupancy';occupied:boolean}|{type:'weather';metric:'temperature';operator:Compare;value:number};
+/** IR215: the latest run-log outcome of a rule — a Command, or a skip with its reason. */
+export type AutomationRun = {at:Instant;outcome:'command_created'|'skipped';reason:DecisionReason|null;commandId:ID|null};
+export type Automation = RuleBase & {onlyIf:ExtraCondition[];lastRun:AutomationRun|null} & ({kind:'schedule';weekdays:number[];startLocal:string;endLocal:string;endsNextDay:boolean;startAction:UnitAction;endAction:UnitAction}|{kind:'event';condition:Condition;action:UnitAction});
 /** IR108: alert policies belong to one customer; units carry them (ACUnit.alertPolicyIds) and alert Policy.unitIds is the derived attachment list. Air-quality limits are alert policies (FR-A12 merged into FR-A05). */
 export type ActiveWindow = {weekdays:number[];startLocal:string;endLocal:string};
 export type AlertCondition = {metric:Metric;operator:Compare;threshold:number;recoveryThreshold:number;durationSeconds:number;activeWindow:ActiveWindow|null;severity:Severity};
@@ -243,7 +247,7 @@ export type OperationContracts = {
   'automations.fire': {input:EvaluationInput;result:FireResult;mode:'write'};
   'automations.list': {input:Query;result:Page<Automation>;mode:'read'};
   'automations.nextRuns': {input:{automationId:ID;count:8}|{draft:ScheduleDraft;count:8};result:ScheduledOccurrence[];mode:'read'};
-  'automations.save': {input:RuleInput & ({kind:'schedule';weekdays:number[];startLocal:string;endLocal:string;endsNextDay:boolean;startAction:UnitAction;endAction:UnitAction}|{kind:'event';condition:Condition;action:UnitAction});result:Automation;mode:'write'};
+  'automations.save': {input:RuleInput & {onlyIf?:ExtraCondition[]} & ({kind:'schedule';weekdays:number[];startLocal:string;endLocal:string;endsNextDay:boolean;startAction:UnitAction;endAction:UnitAction}|{kind:'event';condition:Condition;action:UnitAction});result:Automation;mode:'write'};
   'automations.simulate': {input:EvaluationInput;result:SimulationResult;mode:'read'};
   'baselines.list': {input:Query;result:Page<EnergyBaseline>;mode:'read'};
   'baselines.save': {input:BaselineInput;result:EnergyBaseline;mode:'write'};

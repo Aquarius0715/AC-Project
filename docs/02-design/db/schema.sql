@@ -723,8 +723,10 @@ CREATE TABLE control.automation_runs (           -- trigger log: fired / skipped
   skip_reason    text,
   command_id     uuid REFERENCES control.commands(id),
   occurred_at    timestamptz NOT NULL,
+  seq            bigint GENERATED ALWAYS AS IDENTITY, -- recording order: the latest run of a rule (IR215)
   UNIQUE (rule_id, unit_id, trigger_ref)
 );
+CREATE INDEX automation_runs_rule ON control.automation_runs (rule_id, occurred_at DESC, seq DESC);
 
 CREATE TABLE control.evaluation_events (         -- automations.fire results per tenant/eventId/phase (D02 replay, IR152)
   tenant_id   uuid NOT NULL,

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -132,8 +133,67 @@ type candidate struct {
 	owner    uuid.UUID
 	action   json.RawMessage
 	cond     json.RawMessage // nil for schedule actions
+	extras   json.RawMessage // onlyIf (IR215), customer rules only
 	tz       string
 	kind     string // automation | automation_policy
+}
+
+// conditionMetric is the fact a condition reads ("" for a local-time pattern).
+func conditionMetric(raw json.RawMessage) string {
+	var c struct {
+		Type string `json:"type"`
+	}
+	_ = json.Unmarshal(raw, &c)
+	switch c.Type {
+	case "occupancy":
+		return "occupied"
+	case "weather":
+		return "weather_temperature"
+	case "location", "peak", "tariff", "solar", "battery":
+		return c.Type
+	}
+	return ""
+}
+
+// extrasMatch checks the rule's onlyIf conditions (IR215) in order: "" when all hold, else the first reason —
+// no_match, or missing_data / stale for occupancy and weather (missing data never counts as a match).
+func extrasMatch(raw json.RawMessage, unit uuid.UUID, facts map[string]Fact, at time.Time, tz string) string {
+	var xs []json.RawMessage
+	if json.Unmarshal(raw, &xs) != nil {
+		return ""
+	}
+	for _, x := range xs {
+		var w struct {
+			Type     string `json:"type"`
+			Weekdays []int  `json:"weekdays"`
+		}
+		_ = json.Unmarshal(x, &w)
+		if w.Type == "weekday" {
+			loc, err := time.LoadLocation(tz)
+			if err != nil {
+				return "no_match"
+			}
+			wd := int(at.In(loc).Weekday())
+			if wd == 0 {
+				wd = 7
+			}
+			if !slices.Contains(w.Weekdays, wd) {
+				return "no_match"
+			}
+			continue
+		}
+		if why := match(x, unit, facts, at, tz); why != "" {
+			return why
+		}
+	}
+	return ""
+}
+
+// skip is a candidate that could not run, with its D02 reason.
+type skip struct {
+	cand     *candidate
+	reason   string
+	recorded bool // worth a run-log row: its own trigger held (or its own data came in incomplete), IR215
 }
 
 // factState evaluates the fact of a unit for a metric: value, or the D02 reason (missing_data / stale).
@@ -277,6 +337,7 @@ func (m Automations) candidates(ctx context.Context, c *ops.Call, unit uuid.UUID
 		}
 		var d definition
 		_ = json.Unmarshal(raw, &d)
+		x.extras = d.OnlyIf
 		switch {
 		case kind == "event" && in.Phase == "condition":
 			x.cond, x.action = d.Condition, d.Action
@@ -304,11 +365,12 @@ func (m Automations) candidates(ctx context.Context, c *ops.Call, unit uuid.UUID
 }
 
 // decide arbitrates one unit (D02): candidates in HQ-policy then customer order, priority desc, ID asc; the first
-// eligible wins. Otherwise the first exclusion reason in candidate-ID order, or no_match without candidates.
-func (m Automations) decide(ctx context.Context, c *ops.Call, unit uuid.UUID, in *EvaluationInput, facts map[string]Fact) (Decision, *candidate, error) {
+// eligible wins. Otherwise the first exclusion reason in candidate-ID order, or no_match without candidates. The
+// candidates that could not run are returned with their reasons (the run log of IR215).
+func (m Automations) decide(ctx context.Context, c *ops.Call, unit uuid.UUID, in *EvaluationInput, facts map[string]Fact) (Decision, *candidate, []skip, error) {
 	cands, err := m.candidates(ctx, c, unit, in)
 	if err != nil {
-		return Decision{}, nil, err
+		return Decision{}, nil, nil, err
 	}
 	sort.SliceStable(cands, func(i, j int) bool {
 		if cands[i].hq != cands[j].hq {
@@ -321,9 +383,10 @@ func (m Automations) decide(ctx context.Context, c *ops.Call, unit uuid.UUID, in
 	})
 	t, found, err := m.Units.Target(ctx, c, unit)
 	if err != nil {
-		return Decision{}, nil, err
+		return Decision{}, nil, nil, err
 	}
 	reasons := map[uuid.UUID]string{}
+	var skips []skip
 	for i := range cands {
 		x := &cands[i]
 		reason := ""
@@ -331,16 +394,22 @@ func (m Automations) decide(ctx context.Context, c *ops.Call, unit uuid.UUID, in
 			Type string `json:"type"`
 		}
 		_ = json.Unmarshal(x.cond, &cond)
+		own := false // the rule's own trigger was decided (a reason after it is worth logging)
 		switch {
 		case !x.enabled:
 			reason = "disabled"
 		case x.cond != nil && match(x.cond, unit, facts, in.OccurredAt, x.tz) != "":
 			reason = match(x.cond, unit, facts, in.OccurredAt, x.tz)
+			_, present := facts[unit.String()+"/"+conditionMetric(x.cond)] // its own data arrived, but missing or stale
+			own = present && (reason == "missing_data" || reason == "stale")
+		default:
+			own = true
+			reason = extrasMatch(x.extras, unit, facts, in.OccurredAt, x.tz)
 		}
 		if reason == "" {
 			ok, err := ownerValid(ctx, c, x.owner, x.hq, t.OrgID)
 			if err != nil {
-				return Decision{}, nil, err
+				return Decision{}, nil, nil, err
 			}
 			if !ok {
 				reason = "owner_forbidden"
@@ -349,7 +418,7 @@ func (m Automations) decide(ctx context.Context, c *ops.Call, unit uuid.UUID, in
 		if reason == "" && cond.Type == "location" {
 			granted, err := identity.ConsentGranted(ctx, c, x.owner, "location_automation")
 			if err != nil {
-				return Decision{}, nil, err
+				return Decision{}, nil, nil, err
 			}
 			if !granted {
 				reason = "consent_revoked"
@@ -363,7 +432,7 @@ func (m Automations) decide(ctx context.Context, c *ops.Call, unit uuid.UUID, in
 			default:
 				policy, err := m.Cmd.Restrictions.UnitPolicy(ctx, c, unit)
 				if err != nil {
-					return Decision{}, nil, err
+					return Decision{}, nil, nil, err
 				}
 				if !Allowed(a, policy) {
 					reason = "restricted"
@@ -376,20 +445,21 @@ func (m Automations) decide(ctx context.Context, c *ops.Call, unit uuid.UUID, in
 					} else if errors.As(err, &de) && de.Code == apperr.Offline {
 						reason = "offline"
 					} else {
-						return Decision{}, nil, err
+						return Decision{}, nil, nil, err
 					}
 				}
 			}
 		}
 		if reason == "" {
 			id := x.id
-			return Decision{UnitID: unit, Decision: "selected", RuleID: &id}, x, nil
+			return Decision{UnitID: unit, Decision: "selected", RuleID: &id}, x, skips, nil
 		}
 		reasons[x.id] = reason
+		skips = append(skips, skip{cand: x, reason: reason, recorded: reason != "disabled" && (own || (reason != "no_match" && reason != "missing_data" && reason != "stale"))})
 	}
 	if len(cands) == 0 {
 		r := "no_match"
-		return Decision{UnitID: unit, Decision: "suppressed", Reason: &r}, nil, nil
+		return Decision{UnitID: unit, Decision: "suppressed", Reason: &r}, nil, nil, nil
 	}
 	ids := make([]uuid.UUID, 0, len(reasons))
 	for id := range reasons {
@@ -397,7 +467,7 @@ func (m Automations) decide(ctx context.Context, c *ops.Call, unit uuid.UUID, in
 	}
 	sort.Slice(ids, func(i, j int) bool { return ids[i].String() < ids[j].String() })
 	r := reasons[ids[0]]
-	return Decision{UnitID: unit, Decision: "suppressed", Reason: &r}, nil, nil
+	return Decision{UnitID: unit, Decision: "suppressed", Reason: &r}, nil, skips, nil
 }
 
 // prepare authorizes the caller for every target unit (D02: out of scope NOT_FOUND) and merges the facts.
@@ -429,15 +499,26 @@ func (m Automations) evaluate(ctx context.Context, c *ops.Call, in *EvaluationIn
 	sort.Slice(units, func(i, j int) bool { return units[i].String() < units[j].String() })
 	out := Result{EventID: in.EventID, Results: []Decision{}, Notifications: []json.RawMessage{}}
 	for _, u := range units {
-		d, win, err := m.decide(ctx, c, u, in, facts)
+		d, win, skips, err := m.decide(ctx, c, u, in, facts)
 		if err != nil {
 			return Result{}, err
 		}
-		if fire && win != nil {
-			ref := in.EventID.String() + "/" + in.Phase
-			if in.Phase != "condition" {
-				ref = scheduleRef(in.Phase, in.OccurredAt)
+		ref := in.EventID.String() + "/" + in.Phase
+		if in.Phase != "condition" {
+			ref = scheduleRef(in.Phase, in.OccurredAt)
+		}
+		if fire { // the run log keeps why a rule could not run (IR215: missing data, consent, restriction, offline …)
+			for _, sk := range skips {
+				if !sk.recorded {
+					continue
+				}
+				if _, err := c.Tx.Exec(ctx, `INSERT INTO control.automation_runs (tenant_id, rule_kind, rule_id, unit_id, trigger_ref, outcome, skip_reason, occurred_at)
+					VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'skipped', $5, $6) ON CONFLICT DO NOTHING`, sk.cand.kind, sk.cand.id, u, ref, sk.reason, in.OccurredAt); err != nil {
+					return Result{}, err
+				}
 			}
+		}
+		if fire && win != nil {
 			var earlier uuid.UUID
 			err := c.Tx.QueryRow(ctx, `SELECT command_id FROM control.automation_runs WHERE rule_id = $1 AND unit_id = $2 AND trigger_ref = $3 AND command_id IS NOT NULL`,
 				win.id, u, ref).Scan(&earlier)
@@ -453,7 +534,9 @@ func (m Automations) evaluate(ctx context.Context, c *ops.Call, in *EvaluationIn
 				}
 				d.Decision, d.CommandID, d.fresh = "requested", &id, true
 				if _, err := c.Tx.Exec(ctx, `INSERT INTO control.automation_runs (tenant_id, rule_kind, rule_id, unit_id, trigger_ref, outcome, command_id, occurred_at)
-					VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'command_created', $5, $6) ON CONFLICT DO NOTHING`, win.kind, win.id, u, ref, id, in.OccurredAt); err != nil {
+					VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'command_created', $5, $6)
+					ON CONFLICT (rule_id, unit_id, trigger_ref) DO UPDATE SET outcome = 'command_created', skip_reason = NULL, command_id = EXCLUDED.command_id
+					WHERE control.automation_runs.command_id IS NULL`, win.kind, win.id, u, ref, id, in.OccurredAt); err != nil {
 					return Result{}, err
 				}
 			}

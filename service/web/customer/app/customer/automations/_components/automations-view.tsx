@@ -6,8 +6,9 @@ import { useAction } from "@ac/web/lib/useAction";
 import { useOp } from "@ac/web/lib/useOp";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import {
-  actionOf, actionOptions, apiErrors, compares, compareText, dayLong, draftErrors, draftOf, eventTest, newDraft, runText, saveInput, scheduleDraft, scheduleTest,
-  summaryNote, summaryText, testFact, triggerInfo, triggers, type ApiAutomation, type ApiOccurrence, type Caps, type Draft, type RuleCard, type TestRow,
+  actionOf, actionOptions, apiErrors, compares, compareText, dayLong, draftErrors, draftOf, eventTest, extraChoices, extraLabel, fitExtras, newDraft, newExtra, runText,
+  saveInput, scheduleDraft, scheduleTest, summaryNote, summaryText, testFact, triggerInfo, triggers,
+  type ApiAutomation, type ApiOccurrence, type Caps, type Draft, type ExtraDraft, type RuleCard, type TestRow,
 } from "@ac/web/lib/clientAutomations";
 import { deleteAutomation, saveAutomation, testEvent, updateConsent } from "../actions";
 
@@ -73,6 +74,7 @@ function List({ live, notice, setNotice, create, edit }: { live: AutomationsLive
                   <p className="text-[13px]"><span className="text-muted">Then</span> {c.then}</p>
                   <p className="text-xs text-muted">{c.place}</p>
                   {c.note && <p className="mt-1 text-xs font-semibold text-crit">⊘ {c.note}</p>}
+                  {c.skipped && <p className="mt-1 text-xs text-muted">ⓘ {c.skipped}</p>}
                 </div>
                 <div className="relative flex flex-col items-end gap-2">
                   <span className="flex items-center gap-2 text-xs font-semibold">
@@ -175,7 +177,7 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
             {step(1, "When …", rule ? undefined : "Choose what starts the automation")}
             <div className="grid-fluid" style={{ ["--min" as string]: "150px" }} role="radiogroup" aria-label="Trigger">
               {triggers.map((t) => (
-                <button key={t} type="button" role="radio" aria-checked={draft.trigger === t} disabled={!!rule && (t === "schedule") !== sched} onClick={() => set({ trigger: t })}
+                <button key={t} type="button" role="radio" aria-checked={draft.trigger === t} disabled={!!rule && (t === "schedule") !== sched} onClick={() => set({ trigger: t, extras: fitExtras({ ...draft, trigger: t }) })}
                   className={cx("rounded-xl border px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50", draft.trigger === t ? "border-primary bg-primary-soft text-primary ring-1 ring-primary" : "border-line bg-surface hover:bg-surface2")}>
                   <div className="text-[13px] font-semibold">{triggerInfo[t].icon} {triggerInfo[t].label}</div><div className="text-[11px] text-muted">{triggerInfo[t].sub}</div>
                 </button>
@@ -224,7 +226,9 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
                 <Field label="°C (demo weather)" error={errors.value}><Input inputMode="decimal" value={draft.value} onChange={(e) => set({ value: e.target.value })} /></Field>
               </div>
             )}
-            {step(2, "Then …", "Action for one AC")}
+            {step(2, "Only if … (optional)", "Extra conditions — all must be true")}
+            <OnlyIf draft={draft} errors={errors} set={set} />
+            {step(3, "Then …", "Action for one AC")}
             <Field label="Target AC" error={errors.unitId}>
               <Select value={draft.unitId} onChange={(e) => set({ unitId: e.target.value })}>
                 {live.acs.length === 0 && <option value="">No AC available</option>}
@@ -277,5 +281,50 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
         <p className="text-[11px] text-muted">At run time the automation is re-checked (permissions, capabilities, restrictions).</p>
       </Modal>
     </Page>
+  );
+}
+
+/** Step 2 “Only if …” (Figma 03b/03e, IR215): up to three extra conditions that must all hold when the rule runs. */
+function OnlyIf({ draft, errors, set }: { draft: Draft; errors: Record<string, string>; set: (p: Partial<Draft>) => void }) {
+  const [adding, setAdding] = useState(false);
+  const extras = fitExtras(draft);
+  const choices = extraChoices({ ...draft, extras });
+  const put = (i: number, x: ExtraDraft) => set({ extras: extras.map((e, j) => (j === i ? x : e)) });
+  return (
+    <div className="flex flex-col gap-2">
+      {extras.map((x, i) => (
+        <div key={x.type} className="flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface2/60 px-3 py-2 text-[13px]">
+          <b className="w-40 shrink-0">{extraLabel[x.type]}</b>
+          {x.type === "occupancy" && (
+            <Select className="w-auto py-1" value={x.occupied ? "yes" : "no"} onChange={(e) => put(i, { ...x, occupied: e.target.value === "yes" })}>
+              <option value="yes">Someone is home</option><option value="no">No one is home</option>
+            </Select>
+          )}
+          {x.type === "weather" && (
+            <>
+              <Select className="w-auto py-1" value={x.operator} onChange={(e) => put(i, { ...x, operator: e.target.value as typeof x.operator })}>{compares.map((c) => <option key={c} value={c}>{compareText(c)}</option>)}</Select>
+              <Input className="w-24 py-1" inputMode="decimal" value={x.value} onChange={(e) => put(i, { ...x, value: e.target.value })} aria-label="Outdoor temperature °C" /><span className="text-xs text-muted">°C (demo weather)</span>
+            </>
+          )}
+          {x.type === "weekday" && (
+            <span className="flex flex-wrap gap-1">
+              {dayLong.map((d, k) => {
+                const on = x.weekdays.includes(k + 1);
+                return <button key={d} type="button" aria-pressed={on} onClick={() => put(i, { ...x, weekdays: on ? x.weekdays.filter((w) => w !== k + 1) : [...x.weekdays, k + 1] })}
+                  className={cx("rounded-full border px-2 py-0.5 text-xs font-semibold", on ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{d.slice(0, 3)}</button>;
+              })}
+            </span>
+          )}
+          <Btn size="sm" variant="ghost" className="ml-auto" aria-label={`Remove ${extraLabel[x.type]}`} onClick={() => set({ extras: extras.filter((_, j) => j !== i) })}>✕</Btn>
+          {errors[`extra${i}`] && <span className="w-full text-xs font-medium text-crit">✕ {errors[`extra${i}`]}</span>}
+        </div>
+      ))}
+      {errors.onlyIf && <p className="text-xs font-medium text-crit">✕ {errors.onlyIf}</p>}
+      <div className="flex flex-wrap items-center gap-2">
+        {adding && choices.length > 0 ? choices.map((t) => <Btn key={t} size="sm" onClick={() => { set({ extras: [...extras, newExtra(t)] }); setAdding(false); }}>{extraLabel[t]}</Btn>)
+          : <Btn size="sm" disabled={choices.length === 0} onClick={() => setAdding(true)}>+ Add condition</Btn>}
+        <span className="text-xs text-muted">{choices.length === 0 && extras.length > 0 ? "No more condition types for this trigger" : "e.g. only if someone is home · only if outdoor ≥ 30°C"}</span>
+      </div>
+    </div>
   );
 }
