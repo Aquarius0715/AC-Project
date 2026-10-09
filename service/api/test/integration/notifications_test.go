@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -126,6 +127,19 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	}
 	if code, _ := post(s, &hq, "notifications.preview", `{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`","message":" "}`); code != 422 {
 		t.Error("blank message")
+	}
+	// the message may be as long as a job note (2000, DD-P07); the reason stays at 1000 (IR228)
+	long := strings.Repeat("m", 2000)
+	if code, m := post(s, &hq, "notifications.preview", `{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`","message":"`+long+`"}`); code != 200 {
+		t.Errorf("2000-character message: %d %v", code, m)
+	}
+	for body, field := range map[string]string{
+		`"message":"` + long + `m"`:                    "message",
+		`"reason":"` + strings.Repeat("r", 1001) + `"`: "reason",
+	} {
+		if code, m := post(s, &hq, "notifications.preview", `{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`",`+body+`}`); code != 422 || m["fieldErrors"].(map[string]any)[field] != "error.length" {
+			t.Errorf("%s too long: %d %v", field, code, m)
+		}
 	}
 	// unit target: the client of the unit's organization reads it, another client does not
 	unit := seed.ID("unit-online-rto").String()

@@ -516,10 +516,14 @@ func (in *PreviewInput) Validate() map[string]string {
 	if in.RecipientMembershipID == uuid.Nil {
 		fe["recipientMembershipId"] = "error.required"
 	}
-	for k, s := range map[string]*string{"message": in.Message, "reason": in.Reason} {
-		if s != nil {
-			*s = strings.TrimSpace(*s)
-			if n := utf8.RuneCountInString(*s); n < 1 || n > 1000 {
+	// the message carries a job note (1–2000, DD-P07) or a reminder text; the reason stays 1–1000 (IR228)
+	for k, f := range map[string]struct {
+		s   *string
+		max int
+	}{"message": {in.Message, 2000}, "reason": {in.Reason, 1000}} {
+		if f.s != nil {
+			*f.s = strings.TrimSpace(*f.s)
+			if n := utf8.RuneCountInString(*f.s); n < 1 || n > f.max {
 				fe[k] = "error.length"
 			}
 		}

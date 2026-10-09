@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.118.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
+Version: 0.119.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.119.0 (2026-10-09): Contractor job history from the Core API — the jobs after acceptance with tabs, counts and the latest event, one job’s timeline with what the customer sees, notes and notification previews for the job’s recipients (preview only on completed jobs); previews take a message as long as a note (IR228).
 0.118.0 (2026-10-09): Contractor schedule & assignments from the Core API — the jobs to (re)assign with their delegation windows, the agreed visit time locked, extensions that keep the start, technician candidates with reasons and the team’s week; job summaries carry the access window (IR227).
 0.117.0 (2026-10-09): Contractor offer and job detail from the Core API — accept, decline with a reason, propose another time and withdraw it, who can take the visit, the status timeline and the target unit; the offer states when it was offered and the access period, its pending time change survives a reload, and accept / decline take only their own fields (IR226).
 0.116.0 (2026-10-09): Contractor job list from the Core API — status tabs with counts, sort, the overview’s period, cursor paging — and the job summary names the technician of its active assignment; both test suites run on fresh databases at the same time (IR225).
