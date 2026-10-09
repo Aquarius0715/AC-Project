@@ -10,6 +10,8 @@
     "server-only": "^0.0.1"
   },
   "scripts": {
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   }
 }
