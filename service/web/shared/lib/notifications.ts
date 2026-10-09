@@ -1,6 +1,7 @@
 // Notification rows (DATA_SOURCE=api): notifications.list items projected into the inbox row shape. Pure code,
 // shared by the Server Component that reads the list and the client view that renders it (FR-X07).
 import type { Role } from "@ac/web/lib/nav";
+import { DEFAULT_DISPLAY, showTime, translate, type Display } from "@ac/web/lib/i18n";
 
 type TargetKind = "unit" | "job" | "invoice" | "restriction" | "device" | "inquiry" | "client_user";
 
@@ -20,24 +21,25 @@ export type ApiNotification = {
 
 export type InboxRow = { id: string; version: number; t: string; d: string; w: string; read: boolean; href: string };
 
+// titles by template, {name} the target (English keys of the display-language dictionary, IR258)
 const titles: Record<string, string> = {
-  alert: "Alert on",
-  quality: "Air quality alert on",
-  schedule_change: "Schedule changed —",
-  report_return: "Work report returned —",
-  completion: "Work completed —",
-  payment: "Payment update —",
-  payment_reminder: "Payment reminder —",
-  restriction: "Service restriction —",
-  inquiry: "Inquiry update —",
-  job_update: "Job update —",
-  device_operation: "Device operation —",
-  invite: "Invitation —",
+  alert: "Alert on {name}",
+  quality: "Air quality alert on {name}",
+  schedule_change: "Schedule changed — {name}",
+  report_return: "Work report returned — {name}",
+  completion: "Work completed — {name}",
+  payment: "Payment update — {name}",
+  payment_reminder: "Payment reminder — {name}",
+  restriction: "Service restriction — {name}",
+  inquiry: "Inquiry update — {name}",
+  job_update: "Job update — {name}",
+  device_operation: "Device operation — {name}",
+  invite: "Invitation — {name}",
 };
 
 /** Types whose title and link come from the type rather than the template: a filter cleaning reminder (alert template,
  * IR104 maintenance → cleaning_due) opens the customer's Filter care tab (IR239). */
-const typeTitles: Record<string, string> = { cleaning_due: "Filter cleaning due on" };
+const typeTitles: Record<string, string> = { cleaning_due: "Filter cleaning due on {name}" };
 const typeRoutes: Partial<Record<Role, Record<string, string>>> = { client: { cleaning_due: "/customer/maintenance?tab=filter-care" } };
 
 const routes: Record<Role, Partial<Record<TargetKind, (id: string) => string>>> = {
@@ -49,10 +51,11 @@ const routes: Record<Role, Partial<Record<TargetKind, (id: string) => string>>> 
 
 const alertsPage: Record<Role, string> = { client: "/customer/alerts", admin: "/admin/alerts", contractor: "", technician: "" };
 
-export function inboxRow(n: ApiNotification, role: Role): InboxRow {
-  const title = typeTitles[n.type] ?? titles[n.templateKey] ?? "Notification —";
+/** One inbox row in the user's display language and time zone (FR-X01, IR258); the reason or message and the status
+ * are shown as the Core API recorded them. */
+export function inboxRow(n: ApiNotification, role: Role, display: Display = DEFAULT_DISPLAY): InboxRow {
+  const title = typeTitles[n.type] ?? titles[n.templateKey] ?? "Notification — {name}";
   const detail = [n.params.message ?? n.params.reason, n.params.status, n.channel === "inApp" ? null : n.channel].filter(Boolean).join(" · ");
-  const at = new Date(n.occurredAt).toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kuala_Lumpur" });
   const href = typeRoutes[role]?.[n.type] ?? (n.sourceAlertId && alertsPage[role] ? alertsPage[role] : (routes[role][n.target.kind]?.(n.target.id) ?? ""));
-  return { id: n.id, version: n.version, t: `${title} ${n.params.targetName}`, d: detail, w: at, read: n.readAt !== null, href };
+  return { id: n.id, version: n.version, t: translate(display.locale, title, { name: n.params.targetName }), d: detail, w: showTime(n.occurredAt, display), read: n.readAt !== null, href };
 }

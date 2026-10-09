@@ -16,6 +16,13 @@ describe("inbox rows and alert rows", () => {
       .toMatchObject({ t: "Alert on Bedroom AC", href: "/customer/alerts" });
   });
 
+  it("titles and times a row in the user's display language and time zone (FR-X01, IR258)", () => {
+    expect(inboxRow(note({}), "client").w).toBe("14 Sept 2026, 9:00 am MYT");
+    const r = inboxRow(note({}), "client", { locale: "ms", timeZone: "Asia/Tokyo" });
+    expect([r.t, r.d, r.w]).toEqual(["Kemas kini kerja — job-1", "requested", "14 Sep 2026, 10:00 PG GMT+9"]);
+    expect(inboxRow(note({ templateKey: "unknown" }), "technician", { locale: "ms", timeZone: "UTC" }).t).toBe("Pemberitahuan — job-1");
+  });
+
   it("opens Filter care from a cleaning reminder (IR239)", () => {
     const r = inboxRow(note({ type: "cleaning_due", templateKey: "alert", sourceAlertId: "a1", target: { kind: "unit", id: "u1" },
       params: { targetName: "Bedroom AC", at: "2026-09-14T01:00:00Z", status: "open", reason: null, message: "Cleaning due (268 h of run time since the last cleaning). Not a fault." } }), "client");

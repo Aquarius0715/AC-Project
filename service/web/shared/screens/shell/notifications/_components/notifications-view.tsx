@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Badge, Card, Page, Tabs, cx } from "@ac/web/components/ui";
 import { useStoredRole } from "@ac/web/components/AppShell";
+import { useT } from "@ac/web/components/I18n";
 import { jobActions, useNotes } from "@ac/web/lib/jobs";
 import type { InboxRow } from "@ac/web/lib/notifications";
 import { markRead } from "../actions";
@@ -17,6 +18,7 @@ const initial = [
 
 /** The inbox. `rows` come from the Server Component in API mode; without them the Phase 1A demo rows are shown. */
 export function NotificationsView({ rows }: { rows?: InboxRow[] }) {
+  const t = useT();
   const role = useStoredRole();
   const live = useNotes(role);
   const [tab, setTab] = useState<"all" | "unread">("all");
@@ -37,7 +39,7 @@ export function NotificationsView({ rows }: { rows?: InboxRow[] }) {
   };
   return (
     <Page className="max-w-3xl">
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "all", label: "All", count: all.length }, { id: "unread", label: "Unread", count: all.filter((i) => !i.read).length }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "all", label: t("All"), count: all.length }, { id: "unread", label: t("Unread"), count: all.filter((i) => !i.read).length }]} />
       {failed && <p role="alert" className="text-xs text-crit">{failed}</p>}
       <Card pad={false} className={pending ? "opacity-70" : undefined}>
         <ul className="divide-y divide-line">
@@ -46,10 +48,10 @@ export function NotificationsView({ rows }: { rows?: InboxRow[] }) {
             const cls = "flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-surface2/60";
             return <li key={n.id}>{n.href ? <Link href={n.href} onClick={() => open(n)} className={cls}>{body}</Link> : <button onClick={() => open(n)} className={cls}>{body}</button>}</li>;
           })}
-          {shown.length === 0 && <li className="p-6 text-center text-muted">{tab === "unread" ? "No unread notifications" : "No notifications"}</li>}
+          {shown.length === 0 && <li className="p-6 text-center text-muted">{t(tab === "unread" ? "No unread notifications" : "No notifications")}</li>}
         </ul>
       </Card>
-      <p className="text-xs text-muted">Reading a notification is separate from resolving the linked alert (FR-X07). Maintenance scheduling events (new request, time proposed, accepted/declined, new offer, new assignment) appear here for the role that has to act (IR113). {!api && <Badge tone="muted">preview only</Badge>}</p>
+      <p className="text-xs text-muted">{t("Reading a notification is separate from resolving the linked alert (FR-X07). Maintenance scheduling events (new request, time proposed, accepted/declined, new offer, new assignment) appear here for the role that has to act (IR113).")} {!api && <Badge tone="muted">{t("preview only")}</Badge>}</p>
     </Page>
   );
 }

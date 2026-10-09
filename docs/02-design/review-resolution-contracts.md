@@ -2465,3 +2465,29 @@ Board 02 had listed common.md §1 / §8 and board 01 as not aligned with the bui
 5. **Open — UI and forms (DEC-03).** The SRC-02 condition “shared libraries, reactForms” has no archived original. DEC-03 (PROPOSED) reads it as shadcn/ui, Lucide, React Hook Form, Zod and TanStack Query, and the role designs and the UIUX specification still describe that. The build uses in-house Tailwind components and controlled forms with shared validators. This is a product-owner decision: adopt the libraries, or record the build's choice and update the role designs and the UIUX specification.
 6. **Open — language (FR-X01).** A change to Bahasa Melayu is stored but has no effect: the build shows English only.
 7. **Scenario.** The IR256 scenario continues. tech-external-a accepts the assignment (受領); the partner then sees it accepted and the customer sees the technician's name. Starting the work needs the visit window, which only a jump of the never-returning demo clock would reach.
+
+## IR258 Bahasa Melayu on the shell, Preferences, Demo controls and the inbox — 2026-10-10
+
+IR257 item 6 left FR-X01's language open: a change to Bahasa Melayu was stored but had no effect. The build now shows the saved language on part of the web apps. AT-X01-N ③ holds there: stored UTC times, units and IDs do not change.
+
+1. **Where the language comes from.** API mode: the role layouts read `preferences.get` on the server (`coreDisplay` in the DAL, once per render). The locale reaches the client components through `I18nProvider`. After a save, `refresh()` renders the shell again in the new language. Browser demo: Preferences keeps the choice in this browser (`ac-locale`), and the shell reads it from there.
+2. **Dictionary.** As in the Next.js internationalization guide, the Malay dictionary is a plain object (`shared/lib/i18n-ms.ts`). The English text is the key, so English needs no dictionary. A text without a Malay entry stays English, with a warning in development (IR44). `{name}` placeholders keep their names in both languages.
+3. **Key check (IR44, NFR-07).** IR44 asks the lint to compare the en and ms key sets. With the English text as the key, a unit test does the same job:
+   - every literal the code translates has a Malay entry;
+   - every Malay entry is still shown by the code.
+   A mismatch fails `npm test`.
+4. **Covered.** Translated now:
+   - the shell: sidebar items, app names, the role chip, Users / Notifications / Preferences / Demo controls, Sign out, the header buttons;
+   - Preferences, both the API view and the browser demo, with the two-step dialogs and the consent line;
+   - Demo controls (API and browser demo, with the refusals);
+   - the notifications inbox, whose titles come from the templates.
+   Inbox times follow the IR44 rule: `Intl.DateTimeFormat(en-MY | ms-MY, { timeZone: Preferences.timezone, dateStyle: medium, timeStyle: short })` with the zone's abbreviation, for example “14 Sept 2026, 9:00 am MYT”. A notification's reason, message and status are shown as the Core API recorded them.
+5. **Still English (open).**
+   - The other business screens, the sign-in page (no user is known before sign-in) and the error pages.
+   - Dates on the other screens: they still use en-MY in Asia/Kuala_Lumpur without the abbreviation, not the user's display time zone.
+   These move to the IR44 rule screen by screen.
+6. **Draft wording.** The Malay texts are a draft by the implementation agent. Business, UI and UX have not reviewed them. The Preferences hint says so: "Malay text is a draft under review; text not translated yet stays in English."
+7. **Checked.**
+   - Vitest: 158 passed, including the key check, placeholder parity, the nav labels and the time format.
+   - E2E: 53 passed, 9 skipped. Each app switches to Malay and sees “Log keluar”, “Keutamaan”, “Bahasa paparan” and the inbox tab “Semua”, then switches back to English in a `finally`.
+   - The dev data is back to en / Asia/Kuala_Lumpur for all four users. customer-a had been left on Asia/Tokyo by an earlier debugging run and was reset.

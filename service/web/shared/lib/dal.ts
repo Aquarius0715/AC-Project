@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { needsRefresh, SESSION_COOKIE, verify, type Session } from "@ac/web/lib/session";
 import type { DomainError } from "@ac/web/lib/ops";
 import { coreRequest } from "@ac/web/lib/rest";
+import { DEFAULT_DISPLAY, isLocale, type Display } from "@ac/web/lib/i18n";
 
 /** The session from the signed cookie, or null. proxy.ts refreshes tokens before pages render (Server Components
  * cannot write cookies), so an expired token here means the refresh failed. Memoized per render pass. */
@@ -75,6 +76,17 @@ export async function coreClockFresh(): Promise<Date> {
   const { meta } = await coreCall<unknown>("session.get", {}, {});
   return meta?.snapshotAt ? new Date(meta.snapshotAt) : new Date();
 }
+
+/** The signed-in user's display language and time zone (preferences.get, FR-X01, IR258), once per render pass: the
+ * shell and the screens that show times read the same answer. Unreadable preferences show the defaults. */
+export const coreDisplay = cache(async (): Promise<Display> => {
+  try {
+    const p = await coreOp<{ locale?: string; timezone?: string }>("preferences.get", {});
+    return { locale: isLocale(p.locale) ? p.locale : DEFAULT_DISPLAY.locale, timeZone: p.timezone || DEFAULT_DISPLAY.timeZone };
+  } catch {
+    return DEFAULT_DISPLAY;
+  }
+});
 
 /** The signed-in membership's permissions (session.get), for permission-scoped sections; the API still authorizes. */
 export const corePermissions = cache(async (): Promise<Set<string>> => new Set((await coreSession()).data.permissions ?? []));

@@ -10,6 +10,8 @@ import { AssistantPanel } from "./Assistant";
 import { QrScan } from "./QrScan";
 import { CURRENT_CLIENT } from "@ac/web/lib/clientUsers";
 import { setStoredValue, useStoredValue } from "@ac/web/lib/urlState";
+import { isLocale, LOCALE_KEY, translate } from "@ac/web/lib/i18n";
+import { I18nProvider } from "./I18n";
 import { useBffSession } from "@ac/web/lib/useOp";
 
 export function useStoredRole(): Role {
@@ -60,13 +62,18 @@ function RoleNavWithQuery(props: { items: NavItem[]; base: string; pathname: str
 }
 
 /** The app frame. In API mode the layout passes `live` (IR241): the organization as the scope label, the signed-in user
- * in the chip and the sidebar badges counted by the Core API (no badge for 0); the demo keeps the fixed ones. */
+ * in the chip, the sidebar badges counted by the Core API (no badge for 0) and the user's display language (IR258);
+ * the demo keeps the fixed ones and the language chosen in this browser. */
 export function AppShell({ role: forced, live, children }: { role?: Role; live?: ShellLive; children: React.ReactNode }) {
   const detected = useStoredRole();
   const role = forced ?? detected;
   const cfg = ROLES[role];
+  const stored = useStoredValue(LOCALE_KEY);
+  const locale = live ? live.locale : isLocale(stored) ? stored : "en";
+  const t = (text: string) => translate(locale, text);
   const scope = live ? (live.organization || cfg.scope).toUpperCase() : cfg.scope;
-  const chip = live ? `${cfg.chip.split(" — ")[0]} — ${live.user || "signed in"}` : cfg.chip;
+  const [roleWord, persona] = cfg.chip.split(" — ");
+  const chip = `${t(roleWord)} — ${live ? live.user || t("signed in") : persona}`;
   const count = (href: string) => (live?.badges[href] ? String(live.badges[href]) : undefined);
   const pathname = usePathname();
   const session = useBffSession();
@@ -83,7 +90,7 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
   const [qr, setQr] = useState(false);
   const unread = useJobStore().notes.filter((n) => n.role === role && !n.read).length;
 
-  const items = live ? cfg.nav.map((i) => ({ ...i, badge: count(i.href) })) : cfg.nav;
+  const items = (live ? cfg.nav.map((i) => ({ ...i, badge: count(i.href) })) : cfg.nav).map((i) => ({ ...i, label: t(i.label) }));
   // longest-prefix match so /customer/units/x highlights "Units & locations"
   const score = (href: string, match?: string[]) => {
     const hits = [href, ...(match ?? [])].filter((h) => (h === cfg.base ? pathname === h : pathname === h || pathname.startsWith(h + "/")));
@@ -92,50 +99,51 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
   const best = Math.max(0, ...items.map((i) => score(i.href, i.match)));
   const activeHref = best ? items.find((i) => score(i.href, i.match) === best)?.href : undefined;
   const sharedActive = SHARED.find((s) => pathname === s.href);
-  const title = sharedActive?.label ?? (pathname === "/customer/users" ? "Users" : pathname === "/demo" ? "Demo controls" : items.find((i) => i.href === activeHref)?.label ?? "AC Project");
+  const title = sharedActive ? t(sharedActive.label) : pathname === "/customer/users" ? t("Users") : pathname === "/demo" ? t("Demo controls") : items.find((i) => i.href === activeHref)?.label ?? "AC Project";
   const demo = pathname === "/demo";
 
 
   return (
+    <I18nProvider locale={locale}>
     <ToastProvider>
       <div className="min-h-dvh lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
         {open && <div className="fixed inset-0 z-30 bg-ink/40 lg:hidden" onClick={() => setOpen(false)} />}
         <aside className={cx("fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col gap-1 overflow-y-auto border-r border-line bg-surface p-4 transition-transform lg:sticky lg:top-0 lg:h-dvh lg:w-auto lg:translate-x-0", open ? "translate-x-0" : "-translate-x-full")}>
           <Link href={cfg.base} className="mb-3 flex items-center gap-2.5">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-lg text-white">❄</span>
-            <span className="leading-tight"><span className="block text-[15px] font-bold">{cfg.app}</span><span className="block text-[11px] text-muted">{cfg.sub}</span></span>
+            <span className="leading-tight"><span className="block text-[15px] font-bold">{cfg.app}</span><span className="block text-[11px] text-muted">{t(cfg.sub)}</span></span>
           </Link>
           <div className="px-3 pb-1 text-[10px] font-bold tracking-wider text-muted">{scope}</div>
           <Suspense fallback={<RoleNav items={items} base={cfg.base} pathname={pathname} search="" />}><RoleNavWithQuery items={items} base={cfg.base} pathname={pathname} /></Suspense>
           <div className="my-2 border-t border-line" />
           <nav className="flex flex-col gap-0.5">
-            {role === "client" && owner && <NavLink href="/customer/users" label="Users" icon="☺" active={pathname === "/customer/users"} />}
-            {SHARED.map((s) => <NavLink key={s.href} {...s} active={pathname === s.href} badge={s.href !== "/notifications" ? undefined : live ? count(s.href) : String(3 + unread)} />)}
+            {role === "client" && owner && <NavLink href="/customer/users" label={t("Users")} icon="☺" active={pathname === "/customer/users"} />}
+            {SHARED.map((s) => <NavLink key={s.href} {...s} label={t(s.label)} active={pathname === s.href} badge={s.href !== "/notifications" ? undefined : live ? count(s.href) : String(3 + unread)} />)}
             <Link href="/demo" className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-warn hover:bg-warn-soft/50", pathname === "/demo" && "bg-warn-soft/60")}>
               <span aria-hidden className="w-4 text-center">✦</span>
-              <span className="flex-1">Demo controls</span>
+              <span className="flex-1">{t("Demo controls")}</span>
               <Badge tone="warn">DEMO</Badge>
             </Link>
           </nav>
           <div className="mt-auto pt-4">
             {live ? (
               // API mode (FR-X01, IR250): sign-out ends the BFF session; the full navigation also clears the screen and its cache
-              <form action="/bff/auth/logout" method="post"><button type="submit" className={signOut}><span aria-hidden className="w-4 text-center">↦</span>Sign out</button></form>
-            ) : <Link href="/login" className={signOut}><span aria-hidden className="w-4 text-center">↦</span>Sign out</Link>}
+              <form action="/bff/auth/logout" method="post"><button type="submit" className={signOut}><span aria-hidden className="w-4 text-center">↦</span>{t("Sign out")}</button></form>
+            ) : <Link href="/login" className={signOut}><span aria-hidden className="w-4 text-center">↦</span>{t("Sign out")}</Link>}
           </div>
         </aside>
 
         <div className="flex min-w-0 flex-col">
           <header className={cx("sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b px-4 backdrop-blur sm:px-6 lg:px-8", demo ? "border-[#fdba74] bg-warn-soft" : "border-line bg-surface/95")}>
             <div className="flex min-w-0 items-center gap-3">
-              <button aria-label="Open menu" onClick={() => setOpen(true)} className="grid h-9 w-9 place-items-center rounded-control border border-line lg:hidden">☰</button>
+              <button aria-label={t("Open menu")} onClick={() => setOpen(true)} className="grid h-9 w-9 place-items-center rounded-control border border-line lg:hidden">☰</button>
               {/* Demo controls are always labelled demo (FR-X05, Figma 10e) */}
-              <h1 className={cx("flex min-w-0 items-center gap-2 text-[15px] font-bold", demo && "text-warn")}>{demo && <span aria-hidden>✦</span>}<span className="truncate">{title}</span>{demo && <Badge tone="warn" className="uppercase tracking-wide max-sm:hidden">Always labelled demo</Badge>}</h1>
+              <h1 className={cx("flex min-w-0 items-center gap-2 text-[15px] font-bold", demo && "text-warn")}>{demo && <span aria-hidden>✦</span>}<span className="truncate">{title}</span>{demo && <Badge tone="warn" className="uppercase tracking-wide max-sm:hidden">{t("Always labelled demo")}</Badge>}</h1>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {role === "technician" && <button onClick={() => setQr(true)} className="inline-flex items-center gap-1.5 rounded-control border border-line px-3 py-1.5 text-xs font-bold hover:bg-surface2">▣ <span className="max-sm:hidden">Scan QR</span></button>}
+              {role === "technician" && <button onClick={() => setQr(true)} className="inline-flex items-center gap-1.5 rounded-control border border-line px-3 py-1.5 text-xs font-bold hover:bg-surface2">▣ <span className="max-sm:hidden">{t("Scan QR")}</span></button>}
               {role === "client" && (
-                <button onClick={() => setAssistant(true)} className="inline-flex items-center gap-1.5 rounded-full border border-primary bg-primary-soft/50 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary-soft">🎙 <span className="max-sm:hidden">Assistant</span></button>
+                <button onClick={() => setAssistant(true)} className="inline-flex items-center gap-1.5 rounded-full border border-primary bg-primary-soft/50 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary-soft">🎙 <span className="max-sm:hidden">{t("Assistant")}</span></button>
               )}
               <span className="inline-flex items-center gap-1.5 rounded-control bg-surface2 px-3 py-1.5 text-xs font-semibold">☻ <span className="max-sm:hidden">{chip}</span><span className="sm:hidden">{chip.split(" — ")[0]}</span></span>
             </div>
@@ -151,5 +159,6 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
       </Modal>
       {role === "client" && <AssistantPanel open={assistant} onClose={() => setAssistant(false)} context={title} />}
     </ToastProvider>
+    </I18nProvider>
   );
 }
