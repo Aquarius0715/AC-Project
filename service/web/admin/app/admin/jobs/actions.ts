@@ -5,8 +5,10 @@
 // contractor's time change (jobs.resolvePartnerSlot), hold / resume / cancel (IR56), reassign an internal job, classify
 // a follow-up (IR114), review the submitted report (jobs.review), save the cost lines (jobs.saveCost), extend a
 // contractor's access (jobs.extendAccess) and create a job on a customer's behalf (jobs.create); on the Plans tab save a
-// plan (plans.save) and generate its next occurrence (plans.generateNext, D16). Each write on a job or plan carries its
-// version as the expected version; CONFLICT refreshes the page.
+// plan (plans.save) and generate its next occurrence (plans.generateNext, D16); on the Contractors tab save a profile
+// (contractors.save), suspend / resume offers (contractors.setOfferStatus), add a rate card (rateCards.save) and verify
+// uploaded certificates (certificates.verify). Each write on an existing record carries its version as the expected
+// version; CONFLICT refreshes the page.
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -128,5 +130,39 @@ export async function generateJob(planId: string, version: number, occurrenceDat
   } catch (e) {
     return failure(e);
   }
+}
+
+const value = async <T,>(fn: () => Promise<T>): Promise<{ ok: true; value: T } | Failure> => {
+  try {
+    const v = await fn();
+    refresh();
+    return { ok: true, value: v };
+  } catch (e) {
+    return failure(e);
+  }
+};
+
+/** contractors.save: a new profile for a contractor organization, or the profile (with its version). */
+export async function saveContractor(input: { id: string | null; version: number | null; organizationId: string; registrationNo: string; serviceAreas: string[]; contactEmail: string; insuranceValidUntil: string | null }) {
+  return value(async () => {
+    const p = await coreOp<{ id: string }>("contractors.save", { ...(input.id ? { id: input.id } : {}), organizationId: input.organizationId, registrationNo: input.registrationNo.trim(),
+      serviceAreas: input.serviceAreas, contactEmail: input.contactEmail.trim(), insuranceValidUntil: input.insuranceValidUntil }, input.id ? write(input.version!) : { write: true });
+    return { id: p.id };
+  });
+}
+
+/** contractors.setOfferStatus: suspend or resume new offers with a reason (open offers and jobs continue, IR111). */
+export async function setOfferStatus(contractorOrgId: string, version: number, status: "active" | "suspended", reason: string) {
+  return value(async () => { await coreOp("contractors.setOfferStatus", { contractorOrgId, status, reason: reason.trim() }, write(version)); return null; });
+}
+
+/** rateCards.save: a new rate card version effective from a future date. */
+export async function saveRateCard(input: { contractorOrgId: string; effectiveFrom: string; currency: "MYR" | "USD"; lines: { workType: string; amountMinor: number; note: string | null }[] }) {
+  return value(async () => { const r = await coreOp<{ id: string; version: number }>("rateCards.save", input, { write: true }); return { id: r.id, version: r.version }; });
+}
+
+/** certificates.verify: approve an uploaded certificate (it then counts as the qualification) or reject it with a reason. */
+export async function verifyCertificate(certificateId: string, version: number, decision: "approve" | "reject", reason: string) {
+  return value(async () => { await coreOp("certificates.verify", { certificateId, decision, ...(decision === "reject" ? { reason: reason.trim() } : {}) }, write(version)); return null; });
 }
 

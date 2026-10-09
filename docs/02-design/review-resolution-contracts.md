@@ -2222,3 +2222,16 @@ DEC-73. A completed job kept its Assignment active, so its scheduled window went
 5. **Schema and contracts.** `maintenance.assignments.status` adds `completed`; `Assignment.status` is `active | revoked | completed`. Before the first release the schema is the first migration, so existing local databases are rebuilt (database design §9).
 6. **Web.** The HQ delivery card says the assignment ended at completion and that the technician's time is free; the contractor's completed banner says the same; the contractor week grid labels booked cells only with jobs that are not completed or cancelled.
 
+## IR235 HQ contractor register (Contractors tab) on the server pattern — 2026-10-10
+
+`/admin/jobs?tab=contractors` (FR-A21, DD-A21, SCR-A06, IR131, IR133) showed fixture contractors in both modes. It now follows IR176; URL key `contractorId` (the contractor organization).
+
+- **Reads.** Every organization of kind contractor (`organizations.list`) with its profile from `contractors.list` (status, areas, delegation, the rate card in effect, the 90-day KPIs) and its technicians (`members.list`); a contractor without a profile is listed as “No profile” (offers to it still work). For the selected contractor: `rateCards.list` (newest first; without a profile the card in effect is the latest started one) and `certificates.list` of the organization.
+- **KPI tiles.** Offer acceptance, arrival in window, report accepted first time, customer rating with count, rework rate (IR131 item 6). There is no read of SLA targets outside the SLA tab and targets are per plan type, so the tiles name the measure instead of a target (Figma 06-9 updated).
+- **Profile.** **+ Add contractor** / **+ Add profile** (`contractors.save` without id) for an organization without a profile — registration 1–64, 1–20 distinct service areas (comma-separated), contact e-mail, insurance date (empty: the delegation runs a year); **Edit** saves with the profile version (the organization is fixed).
+- **Offers.** **Suspend offers** / **Resume offers** (`contractors.setOfferStatus`) need a reason; while suspended the list says so, the profile shows the reason, and the Jobs tab no longer proposes the contractor for offers or held capacity (`jobs.offer` refuses it with CONFLICT `errors.contractor_suspended`).
+- **Rate cards.** **Edit rate card** saves a new version (`rateCards.save`) from a future date (default the first day of next month in the display zone), prefilled from the card in effect: 1–4 lines of different work types, amounts ≥ 0 with two decimals, notes ≤ 200; the rework deduction is entered positive and shown as “−”. Scheduled versions are listed under the card in effect.
+- **Certificates.** Each technician shows the qualifications (or that the membership ended) and the soonest expiry; **Verify uploads (n)** lists the `pending_verification` uploads with Approve (the certificate becomes the qualification grant) and Reject (reason required) (`certificates.verify` with the certificate version).
+- **New job from other tabs.** The header's **+ New job** on the Contractors tab opens the same dialog; the created job is handed to the Jobs tab in browser module state, so step 2 still opens there.
+- **Still to connect.** The SLA tab.
+

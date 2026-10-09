@@ -11,11 +11,12 @@ import { jobEventTitle, type ApiJobEvent } from "@ac/web/lib/partnerOverview";
 import type { ApiWorkReport } from "@ac/web/lib/partnerReview";
 import { agreedSlots, controls, costTotals, delivery, facts, filtersOf, hqRow, preferredRows, reportCard, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
 import { planRows, type ApiPlan } from "@ac/web/lib/adminPlans";
+import { contractorRows, kpiTiles, pendingCertificates, profileFacts, rateCardView, technicianRows, type ApiCertificate, type ApiProfile, type ApiRateCard, type ApiTechnician } from "@ac/web/lib/adminContractors";
 import { klTime } from "@ac/web/lib/devices";
 
 type Page<T> = { items: T[]; total: number };
 type Org = { id: string; name: string; kind: string; status: string };
-type Member = { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string };
+type Member = { id: string; userId: string; displayName: string; role: string; employment: string | null; organizationId: string; validUntil: string | null; qualifications: ApiTechnician["qualifications"] };
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
   if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
   throw e;
@@ -68,9 +69,10 @@ export async function loadJobs(sp: SP) {
   const q: Query = { customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId), origin: one(sp.origin), delivery: one(sp.delivery), assignee: one(sp.assignee), overdue: one(sp.overdue), type: one(sp.type), stage: stageOf(one(sp.stage)) ?? undefined };
   const sort = sortOf(one(sp.sort));
   const spec = SORTS.find((s) => s.id === sort)!;
-  const [counts, list] = await Promise.all([
+  const [counts, list, profiles] = await Promise.all([
     Promise.all(STAGES.map((s) => coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, ...s.filter }, limit: 1 }).then((r) => r.total))),
     coreOp<Page<ApiHqRow>>("jobs.list", { filters: filtersOf(q, hq?.id ?? null), sort: { field: spec.field, direction: spec.direction }, limit: 100 }),
+    optional(coreAll<{ organizationId: string; status: string }>("contractors.list"), []), // offers suspended per profile (DD-A21)
   ]);
   const rows = list.items.filter((j) => j.status !== "cancelled" && (!q.type || j.type === q.type)).map((j) => hqRow(j, nowMs, names, unitOrg));
   const base = {
@@ -78,7 +80,7 @@ export async function loadJobs(sp: SP) {
     stages: STAGES.map((s, i) => ({ id: s.id, label: s.label, count: counts[i] })),
     deliveries: [{ id: "internal", name: "Internal" }, ...contractors.map((c) => ({ id: c.id, name: c.name }))],
     assignees: members.filter((m) => m.role === "technician").map((m) => ({ id: m.id, name: m.displayName })),
-    contractors: contractors.map((c) => ({ id: c.id, name: c.name, status: c.status })),
+    contractors: contractors.map((c) => ({ id: c.id, name: c.name, status: profiles.find((p) => p.organizationId === c.id)?.status === "suspended" ? "suspended" : c.status })),
     internalTechs: members.filter((m) => m.role === "technician" && m.employment === "internal").map((m) => ({ id: m.id, name: m.displayName })),
     rows,
   };
@@ -154,4 +156,39 @@ export async function loadPlans(sp: SP) {
 }
 
 export type PlansLive = Awaited<ReturnType<typeof loadPlans>>;
+
+/** The Contractors tab (DD-A21, IR131): every contractor organization with its profile (contractors.list with the
+ * 90-day KPIs, the delegation and the rate card in effect) and for contractorId its rate cards (rateCards.list, newest
+ * first), technicians (members.list) and uploaded certificates (certificates.list). */
+export async function loadContractors(sp: SP) {
+  const { now, members, contractors: orgs, names, head } = await shared(sp);
+  const nowMs = now.getTime();
+  const profiles = await optional(coreAll<ApiProfile>("contractors.list"), [] as ApiProfile[]);
+  const technicians: ApiTechnician[] = members.filter((m) => m.role === "technician" && orgs.some((o) => o.id === m.organizationId))
+    .map((m) => ({ id: m.id, displayName: m.displayName, organizationId: m.organizationId, role: m.role, validUntil: m.validUntil ?? null, qualifications: m.qualifications ?? [] }));
+  const rows = contractorRows(orgs.map((o) => ({ id: o.id, name: o.name })), profiles, technicians);
+  const base = { ...head, q: {}, rows, withoutProfile: orgs.filter((o) => !profiles.some((p) => p.organizationId === o.id)).map((o) => ({ id: o.id, name: o.name })) };
+  const pick = one(sp.contractorId) ?? rows[0]?.id;
+  if (!pick) return { ...base, detail: null };
+  const org = orgs.find((o) => o.id === pick);
+  if (!org) return { ...base, detail: null, missing: pick };
+  const profile = profiles.find((p) => p.organizationId === pick) ?? null;
+  const [cards, certs] = await Promise.all([
+    optional(coreAll<ApiRateCard>("rateCards.list", { filters: { contractorOrgId: pick } }), [] as ApiRateCard[]),
+    optional(coreAll<ApiCertificate>("certificates.list", { filters: { organizationId: pick } }), [] as ApiCertificate[]),
+  ]);
+  // without a profile there is no rateCardId: the card in effect is the latest that has started
+  const inEffect = profile?.rateCardId ?? [...cards].filter((c) => Date.parse(c.effectiveFrom) <= nowMs).sort((a, b) => Date.parse(b.effectiveFrom) - Date.parse(a.effectiveFrom))[0]?.id ?? null;
+  const mine = technicians.filter((t) => t.organizationId === pick);
+  return {
+    ...base,
+    detail: {
+      org: { id: org.id, name: org.name }, profile, kpis: profile ? kpiTiles(profile.kpis) : null, facts: profile ? profileFacts(profile, nowMs) : null,
+      rates: rateCardView(cards, inEffect, nowMs), techs: technicianRows(mine, certs, nowMs),
+      pending: pendingCertificates(certs).map((c) => ({ id: c.id, version: c.version, technician: names.people.get(c.membershipId) ?? "technician", name: c.name, code: c.code, number: c.number, issuedAt: c.issuedAt, expiresAt: c.expiresAt, fileName: c.fileName, renewal: !!c.renewalOf })),
+    },
+  };
+}
+
+export type ContractorsLive = Awaited<ReturnType<typeof loadContractors>>;
 

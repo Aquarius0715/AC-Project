@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.125.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
+Version: 0.126.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.126.0 (2026-10-10): HQ contractor register from the Core API — contractor organizations with or without a profile, 90-day KPIs, profile add / edit, offer suspension with a reason, rate card versions from a future date and certificate verification; the Jobs tab no longer offers to suspended contractors (IR235).
 0.125.0 (2026-10-10): A completed job releases its assignment (DEC-73): it no longer books the technician or grants unit access, the technician keeps the job as history at once, and the job still names who did the work (IR234).
 0.124.0 (2026-10-09): HQ maintenance plans from the Core API — plans in the scope, the plan form with the next date stored in UTC, Generate job with the CONFLICT banner, New plan; a plan’s job books its occurrence; link colours apply again (base-layer element styles); technician device events without an assignment show a notice (IR233).
 0.123.0 (2026-10-09): HQ job detail completed on the Core API — the submitted report with Open report, Return for rework / Accept (a contractor’s job only by escalation with a reason), cost lines with totals per currency, New job in two steps (create, then book one of its preferred times) and contractor access extension (IR232).

@@ -110,6 +110,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.123.0 (2026-10-09): IR232; SCR-A06 interaction, DD-A06 Jobs tab paragraph; counts unchanged.
 # 0.124.0 (2026-10-09): IR233; SCR-A06 interaction, DD-A06 Plans tab, DD-T12 boundary; counts unchanged.
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
+# 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.121.0 (2026-10-09): IR230; SCR-T01 reads, DD-T13 boundary; counts unchanged.
 # 0.120.0 (2026-10-09): IR229; SCR-T01 reads, DD-T01 boundary, BLOB_DIR; counts unchanged.
 # 0.119.0 (2026-10-09): IR228; SCR-P07 reads, sort and IoT states, DD-P07 boundary, preview message length; counts unchanged.
@@ -1329,7 +1330,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.125.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.126.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

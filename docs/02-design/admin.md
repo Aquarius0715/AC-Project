@@ -795,7 +795,7 @@ Scope: FR-A21 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 2. Contractor list (status, region, technician count); detail cards: registration, service areas, delegation period, contact, insurance; technicians & certificates with “Verify uploads (n)” (`certificates.verify` approve/reject); rate card table with version and Edit rate card (`rateCards.save`); Suspend offers (`contractors.setOfferStatus`).
 3. Queries to update: `contractors / rate cards / certificates / members`.
 
-**Boundary cases and failures**: Offers to a suspended contractor are rejected by `jobs.offer` (CONFLICT).
+**Boundary cases and failures**: Offers to a suspended contractor are rejected by `jobs.offer` (CONFLICT); the Jobs tab does not propose it. Contractor organizations without a profile are listed and get a profile from the register; KPI tiles name their measure (targets are per plan in the SLA tab). As built: IR235.
 
 **Verification**: Check the traceability entries under AT-A21 (N/E/B).
 

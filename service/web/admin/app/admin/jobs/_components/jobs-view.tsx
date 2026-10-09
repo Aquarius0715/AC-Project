@@ -14,7 +14,7 @@ import type { JobStatus } from "@ac/web/lib/jobs";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { assignInternal, cancelJob, classifyFollowUp, createJob, extendAccess, holdJob, offerToContractor, proposeSlot, resolvePartnerSlot, resumeJob, reviewReport, saveCosts, withdrawProposal } from "../actions";
 import type { JobsLive } from "../_lib/load";
-import { Contractors, Sla } from "./jobs-demo";
+import { Sla } from "./jobs-demo";
 import { JobsTabs, ScopeBar } from "./jobs-header";
 
 type Detail = NonNullable<JobsLive["detail"]>;
@@ -26,13 +26,13 @@ export function JobsView({ live, tab }: { live: JobsLive; tab: string }) {
   const patch = useUrlPatch();
   const [creating, setCreating] = useState(false);
   // The job New job just created: its detail opens step 2 (book) or says it was saved as requested.
-  const [fresh, setFresh] = useState<Fresh | null>(null);
+  const [fresh, setFresh] = useState<Fresh | null>(() => pendingFresh);
+  useEffect(() => { pendingFresh = null; }, []);
   return (
     <Page className="max-w-[1440px]">
       <JobsTabs tab={tab} counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => setCreating(true)}>+ New job</Btn>} />
       {creating && <NewJobModal live={live} onClose={() => setCreating(false)} onCreated={(f) => { setCreating(false); setFresh(f); }} />}
-      {tab !== "jobs" && <Banner tone="warn">{tab === "sla" ? "SLA by customer" : "Contractors"} is not connected to the Core API yet — illustrative data (FR-A21 / FR-A22, next rounds).</Banner>}
-      {tab === "contractors" && <Contractors />}
+      {tab === "sla" && <Banner tone="warn">SLA by customer is not connected to the Core API yet — illustrative data (FR-A22, next round).</Banner>}
       {tab === "sla" && <Sla />}
       {tab === "jobs" && <JobsTab live={live} patch={patch} fresh={fresh} onFresh={() => setFresh(null)} />}
     </Page>
@@ -40,6 +40,8 @@ export function JobsView({ live, tab }: { live: JobsLive; tab: string }) {
 }
 
 type Fresh = { id: string; book: boolean };
+// New job opened from another tab hands the created job over here (browser module state; never set during rendering).
+let pendingFresh: Fresh | null = null;
 
 function JobsTab({ live, patch, fresh, onFresh }: { live: JobsLive; patch: (p: Record<string, string | null>) => void; fresh: Fresh | null; onFresh: () => void }) {
   const q = live.q;
@@ -470,7 +472,7 @@ const JOB_TYPES = [{ id: "reactive" as const, label: "Repair" }, { id: "preventi
 
 /** New job (DD-A06 item 8, Figma 06-1 New job): step 1 creates the job (requested) with the customer's preferred times
  * asked by phone; “Save as requested” stops there, “Next: choose delivery” opens step 2 (the booking dialog) on it. */
-function NewJobModal({ live, onClose, onCreated }: { live: JobsLive; onClose: () => void; onCreated: (f: Fresh) => void }) {
+export function NewJobModal({ live, onClose, onCreated }: { live: { now: string; units: JobsLive["units"]; q: { unitId?: string } }; onClose: () => void; onCreated?: (f: Fresh) => void }) {
   const router = useRouter();
   const now = Date.parse(live.now);
   const [pending, run] = useAction();
@@ -493,7 +495,11 @@ function NewJobModal({ live, onClose, onCreated }: { live: JobsLive; onClose: ()
     setRefusal(null);
     if (Object.keys(errors).length || dueError) return;
     run(() => createJob({ unitId, type, symptom, slots, dueAt, contactWindow: contact }), book ? "Job created — choose who does the work" : "Job created (requested)",
-      (v) => { onCreated({ id: v.id, book }); router.push(`/admin/jobs?jobId=${v.id}`); }, (f) => setRefusal(hqRefusal(f)));
+      (v) => {
+        if (onCreated) onCreated({ id: v.id, book });
+        else { pendingFresh = { id: v.id, book }; onClose(); }
+        router.push(`/admin/jobs?jobId=${v.id}`);
+      }, (f) => setRefusal(hqRefusal(f)));
   };
   const groups = [...new Set(live.units.map((u) => u.customer))];
   return (
