@@ -114,8 +114,10 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	if _, m := post(s, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); data(m)["projection"] != "detail" {
 		t.Fatalf("detail in window: %v", m)
 	}
-	if listJob(s, &contrA, job)["projection"] != "summary" {
+	if row := listJob(s, &contrA, job); row["projection"] != "summary" {
 		t.Fatal("summary in window")
+	} else if row["accessValidFrom"] != clock.Add(-time.Hour).Format(time.RFC3339) || row["accessValidUntil"] != ts(100) {
+		t.Fatalf("the summary carries the accepted offer's access window (IR227): %v", row)
 	}
 	if _, m := post(s, &contrA, "jobs.events", `{"jobId":"`+job+`","query":{}}`); len(items(m)) < 3 {
 		t.Fatalf("all events in window: %v", m)
@@ -170,6 +172,8 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	}
 	if _, m := post(s, &hq, "jobs.list", `{"filters":{"unitId":"`+unit+`"},"limit":100}`); byJob(m, job)["technicianMembershipId"] != nil {
 		t.Errorf("a job without an active assignment has no technician: %v", byJob(m, job))
+	} else if byJob(m, k)["accessValidFrom"] != nil || byJob(m, k)["accessValidUntil"] != nil || byJob(m, job)["accessValidUntil"] == nil {
+		t.Errorf("an internal job has no access window, a delegated one keeps its offer's: %v / %v", byJob(m, k), byJob(m, job))
 	}
 	if code, _ := post(s, &techA, "jobs.get", `{"jobId":"`+k+`"}`); code != 404 {
 		t.Error("another technician")

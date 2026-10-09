@@ -7,8 +7,8 @@ export type Slot = { startAt: string; endAt: string };
 
 /** jobs.list rows of a contractor (IR23): the offer before the access window, the summary inside it, the history after. */
 export type ApiPartnerJob =
-  | { projection: "offer"; status: "offered" | "accepted"; jobId: string; jobVersion: number; offerId: string; type: string; siteAddress: string | null; requestedSlot: Slot; dueAt: string; offerExpiresAt: string; visitSlot: Slot | null }
-  | { projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; dueAt: string; requestedSlot: Slot; scheduledSlot: Slot | null; assignmentId: string | null; displayStatus: string; technicianMembershipId: string | null; assignmentAcknowledgement?: "pending" | "accepted" | "cant_make" | null }
+  | { projection: "offer"; status: "offered" | "accepted"; jobId: string; jobVersion: number; offerId: string; type: string; siteAddress: string | null; requestedSlot: Slot; dueAt: string; offerExpiresAt: string; visitSlot: Slot | null; accessValidFrom?: string; accessValidUntil?: string }
+  | { projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; dueAt: string; requestedSlot: Slot; scheduledSlot: Slot | null; assignmentId: string | null; displayStatus: string; technicianMembershipId: string | null; assignmentAcknowledgement?: "pending" | "accepted" | "cant_make" | null; accessValidFrom?: string | null; accessValidUntil?: string | null }
   | { projection: "history"; jobId: string; type: string; status: string; completedAt: string | null };
 export type ApiCounts = { offerCount: number; activeCount: number; reviewCount: number; overdueCount: number };
 export type ApiCapacity = { membershipId: string; date: string; availableSlots: Slot[]; assignedSlots: Slot[]; availableMinutes: number | null; assignedMinutes: number; unavailability: string | null };

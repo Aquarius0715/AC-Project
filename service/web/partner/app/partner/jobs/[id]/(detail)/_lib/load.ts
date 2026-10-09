@@ -7,7 +7,7 @@ import "server-only";
 import { coreAll, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
-import { fits, qualified, type ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDetail";
+import { fits, qualified, requiredFor, type ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDetail";
 import type { ApiCapacity, ApiJobEvent, ApiMember } from "@ac/web/lib/partnerOverview";
 
 type Page<T> = { items: T[] };
@@ -15,7 +15,6 @@ const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => 
   if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback;
   throw e;
 });
-const SCOPE_QUALIFICATION: Record<string, string> = { indoor: "demo_indoor", outdoor: "demo_outdoor", electrical: "demo_electrical" }; // fixture qualificationRequirements
 const klDate = (iso: string) => new Date(Date.parse(iso) + 8 * 3600_000).toISOString().slice(0, 10);
 const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
@@ -49,7 +48,7 @@ export async function loadJobDetail(jobId: string) {
     Promise.all(job.alertIds.map((id) => optional(coreOp<ApiAlert>("alerts.get", { id }), null))),
     Promise.all(dates.map(capacityOf)),
   ]);
-  const required = (unit?.serviceScope ?? []).map((s) => SCOPE_QUALIFICATION[s]).filter(Boolean);
+  const required = requiredFor(unit?.serviceScope ?? []);
   return {
     kind: "detail" as const, now, job, names, unit, events: ev, alerts: alerts.filter((a): a is ApiAlert => !!a), required,
     fits: fits(members, required, visit, dates.map((date, i) => ({ date, capacity: days[i] })), "detail", job.assignment?.technicianMembershipId),

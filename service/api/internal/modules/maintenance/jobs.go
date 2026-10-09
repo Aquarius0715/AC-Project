@@ -544,7 +544,7 @@ func (m Jobs) activeAssignment(ctx context.Context, c *ops.Call, job uuid.UUID) 
 // @Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR86 expired unanswered offer: NOT_FOUND for contractor
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T10, DD-C17, DD-T13, DD-P10
+// @Description	Design: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T10, DD-C17, DD-T13, DD-P10, DD-P03
 // @Tags			jobs
 // @Accept			json
 // @Produce		json
@@ -607,6 +607,8 @@ type Summary struct {
 	DisplayStatus             string     `json:"displayStatus"`
 	AssignmentAcknowledgement *string    `json:"assignmentAcknowledgement"`
 	TechnicianMembershipID    *uuid.UUID `json:"technicianMembershipId"` // the active Assignment's technician (IR225)
+	AccessValidFrom           *time.Time `json:"accessValidFrom"`        // the accepted Offer's access window (IR227)
+	AccessValidUntil          *time.Time `json:"accessValidUntil"`
 }
 
 var jobStatuses = []string{"requested", "offered", "accepted", "assigned", "in_progress", "on_hold", "submitted", "rework_requested", "completed", "cancelled"}
@@ -786,8 +788,11 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 		lower(j.scheduled_slot), upper(j.scheduled_slot), j.assignment_id, j.origin, j.preferred_slots, `+statusRank+`,
 		EXISTS (SELECT 1 FROM maintenance.slot_proposals p WHERE p.job_id = j.id AND p.status = 'pending'),
 		(SELECT a.acknowledgement FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status = 'active'),
-		(SELECT a.technician_membership_id FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status = 'active')
-		FROM maintenance.jobs j WHERE `+strings.Join(conds, " AND "), args...)
+		(SELECT a.technician_membership_id FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status = 'active'),
+		ao.access_valid_from, ao.access_valid_until
+		FROM maintenance.jobs j LEFT JOIN LATERAL (SELECT o.access_valid_from, o.access_valid_until FROM maintenance.offers o
+			WHERE o.job_id = j.id AND o.decision = 'accept' ORDER BY o.decided_at DESC LIMIT 1) ao ON true
+		WHERE `+strings.Join(conds, " AND "), args...)
 	if err != nil {
 		return nil, err
 	}
@@ -803,7 +808,8 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 		var pref []byte
 		var pending bool
 		if err := rows.Scan(&r.s.ID, &r.s.Version, &r.s.UnitID, &r.s.Type, &r.s.Status, &r.s.DueAt, &r.s.RequestedSlot.StartAt, &r.s.RequestedSlot.EndAt,
-			&ss, &se, &r.s.AssignmentID, &r.s.Origin, &pref, &r.rank, &pending, &r.s.AssignmentAcknowledgement, &r.s.TechnicianMembershipID); err != nil {
+			&ss, &se, &r.s.AssignmentID, &r.s.Origin, &pref, &r.rank, &pending, &r.s.AssignmentAcknowledgement, &r.s.TechnicianMembershipID,
+			&r.s.AccessValidFrom, &r.s.AccessValidUntil); err != nil {
 			rows.Close()
 			return nil, err
 		}

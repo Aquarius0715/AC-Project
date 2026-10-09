@@ -17,7 +17,7 @@ export type ApiDetail = {
   projection: "detail"; id: string; version: number; unitId: string; type: string; status: string; symptom: string; origin: string; alertIds: string[];
   requestedSlot: Slot; scheduledSlot: Slot | null; dueAt: string; startedAt: string | null; completedAt: string | null; assignmentId: string | null;
   partnerSlotProposal: ApiProposal | null; reportRefs: { reportId: string; reportVersion: number }[];
-  assignment: { technicianMembershipId: string; scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: string; cantMakeReason: string | null } | null;
+  assignment: { technicianMembershipId: string; scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: string; cantMakeReason: string | null; alternativeSlot?: Slot | null } | null;
   offer: { id: string; termsVersion: string; visitSlot: Slot; offeredAt: string; accessValidFrom: string; accessValidUntil: string; decision: string | null; decidedAt: string | null } | null;
 };
 export type ApiHistory = { projection: "history"; jobId: string; type: string; status: string; asOf: string; completedAt: string | null; ownDecisionEvents: ApiJobEvent[]; redactedReportSummary?: unknown };
@@ -25,6 +25,9 @@ export type ApiPartnerJobDetail = ApiOffer | ApiDetail | ApiHistory;
 
 const QUALIFICATIONS: Record<string, string> = { demo_indoor: "Indoor unit work", demo_outdoor: "Outdoor unit work", demo_electrical: "Electrical work" };
 export const qualificationLabel = (code: string) => QUALIFICATIONS[code] ?? code.replace(/^demo_/, "").replace(/_/g, " ");
+const SCOPE_QUALIFICATION: Record<string, string> = { indoor: "demo_indoor", outdoor: "demo_outdoor", electrical: "demo_electrical" }; // fixture qualificationRequirements
+/** The qualifications a delegated job requires: one per entry of the unit's maintenance scope (IR123 item 3). */
+export const requiredFor = (serviceScope: string[]) => serviceScope.map((s) => SCOPE_QUALIFICATION[s]).filter(Boolean);
 export const typeLabel = (t: string) => ({ periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance" })[t] ?? t;
 export const originLabel = (o: string) => (o === "periodic_plan" ? "from the periodic plan" : "agreed with the client");
 export const when = (iso: string) => klTime(iso); // YYYY-MM-DD HH:MM in Kuala Lumpur

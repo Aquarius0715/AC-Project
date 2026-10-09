@@ -273,7 +273,7 @@ type Capacity struct {
 // @Description	Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 role=technician only
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-P06, DD-P01, DD-P02 · Query: filters organizationId,qualification,activeOnly · sort id (default id asc)
+// @Description	Design: DD-P06, DD-P01, DD-P02, DD-P03 · Query: filters organizationId,qualification,activeOnly · sort id (default id asc)
 // @Tags			members
 // @Accept			json
 // @Produce		json
