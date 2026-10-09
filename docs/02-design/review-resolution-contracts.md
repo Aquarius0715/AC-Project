@@ -2293,3 +2293,22 @@ In API mode `/customer` (FR-C01, DD-C01, SCR-C01, Figma Client 01a) read only th
 6. **Needs attention.** The unresolved critical and warning alerts of the units shown, most severe and newest first (at most 3, then “+n more”). Unresolved normal-severity alerts are listed as “Reminders & info (n) — …” and never counted (IR51); the tile shows `Summary.alertCount`.
 7. **Automations.** The rules of the units shown, enabled first: “n on · m off” and at most 3 rules, each with its next run (`automations.nextRuns`) or its trigger sentence (location rules with the consent state).
 8. **Boundary.** `telemetry.summary` is no longer read here: the latest readings come with `units.list`, and its energy part is not filled. DD-C01 lists the reads above.
+
+## IR241 The shell names the signed-in user and counts its badges from the Core API — 2026-10-10
+
+In API mode the shell still showed the demo persona: the scope label (“CUSTOMER-A”), the chip (“Client — customer-a”) and fixed sidebar badges (customer Alerts 2, partner Jobs 1, HQ Alert policies 1, Notifications “3 + unread”; IR239 item 7).
+
+1. **Session.** `session.get` returns `displayName` (the user's) and `organizationName` (the membership's organization). The scope label is the organization in capitals and the chip is “<Role> — <display name>”.
+2. **Badges.** Customer Alerts is `summaries.get(kind=customer).counts.alertCount` (unresolved critical / warning, IR51). Partner Jobs is `summaries.get(kind=partner).counts.offerCount` (offers waiting for an answer). HQ Alert policies is the unresolved critical / warning alerts (`alerts.list` totals). Notifications in every app is the unread count (`notifications.list` with `unreadOnly`, IR102). A count of 0, or one that cannot be read, shows no badge.
+3. **Freshness.** The role layouts (Server Components) read the shell on every render, so a write's `refresh()` updates the badges (opening an alert, reading a notification). Changes made by others show on the next refresh or load.
+4. **Demo.** Phase 1A keeps the fixed persona and badges.
+
+## IR242 Customer alert inbox on the server pattern; read state on the notifications — 2026-10-10
+
+In API mode `/customer/alerts` (FR-C08, DD-C08, SCR-C08) listed `alerts.list` rows, but the read flag was a browser-only toggle tied to the alert's status. The detail always said “Unresolved”, and the update time and a “show load error” control were demo values.
+
+1. **Filters in the URL.** `severity` (critical, warning; all omits it, IR74) and `unreadOnly`. The bar shows the unresolved count (`summaries.get` alertCount, IR51) and the number of unread alerts.
+2. **Rows.** Unit and place, severity, kind (fault, maintenance reminder, air quality, inspection record), status, evidence and detection time. Unresolved critical and warning alerts are under Needs attention; normal-severity and resolved alerts are under Reminders & information.
+3. **Read state (DD-C08).** It is the signed-in membership's notifications about the alert (`sourceAlertId`): Unread while one is unread, ✓ Read when all are read, nothing when the membership got none. Opening an alert marks its unread notifications read (`notifications.markRead` with each version) and never changes the Alert; the Notifications badge drops at once (IR241).
+4. **Detail.** The real status: “Open — not resolved yet”, “Acknowledged <time> · still unresolved” or “Resolved <time> · <reason>”. The hint about reading not resolving shows only while the alert is unresolved.
+5. **Still to connect.** The Alert policies tab (FR-C15, DD-C15) shows illustrative data in API mode, with a banner.

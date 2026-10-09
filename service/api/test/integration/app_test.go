@@ -161,7 +161,13 @@ func TestSessionGet(t *testing.T) {
 	if code != 200 || d["role"] != "admin" || d["membershipId"] != seed.ID("hq-operator").String() || len(d["permissions"].([]any)) == 0 || d["clientRole"] != nil {
 		t.Fatalf("%d %v", code, m)
 	}
-	if _, c := post(s, &customerA, "session.get", `{}`); c["data"].(map[string]any)["clientRole"] != "owner" {
+	var user, org string // IR241: the shell names the user and the membership's organization
+	ownerScan(t, `SELECT u.display_name, o.name FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id JOIN identity.organizations o ON o.id = m.organization_id WHERE m.id = $1`,
+		[]any{seed.ID("hq-operator")}, &user, &org)
+	if d["displayName"] != user || d["organizationName"] != org || user == "" || org == "" {
+		t.Errorf("names: %v %v (%s, %s)", d["displayName"], d["organizationName"], user, org)
+	}
+	if _, c := post(s, &customerA, "session.get", `{}`); c["data"].(map[string]any)["clientRole"] != "owner" || c["data"].(map[string]any)["organizationName"] == "" {
 		t.Errorf("client owner session: %v", c["data"])
 	}
 	meta := m["meta"].(map[string]any) // Meta of service-contracts.ts

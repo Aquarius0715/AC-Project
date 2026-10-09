@@ -1,6 +1,9 @@
 export type Role = "client" | "admin" | "contractor" | "technician";
 
 export type NavItem = { href: string; label: string; icon: string; badge?: string; match?: string[] };
+/** The shell in API mode (lib/shell.ts, IR241): the signed-in user, the membership's organization and the sidebar badge
+ * counts by href. The demo keeps the fixed scope, chip and badges below. */
+export type ShellLive = { user: string; organization: string; badges: Record<string, number> };
 
 export type RoleConfig = {
   role: Role;

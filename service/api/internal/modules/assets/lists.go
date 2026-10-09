@@ -253,7 +253,7 @@ func (m *Module) customersSave(ctx context.Context, c *ops.Call, in *CustomerSav
 // @Description	Authorization: client:self-customer | admin:asset.read
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06, DD-C09, DD-C01 · Query: filters customerId,kind · sort id,createdAt,updatedAt (default id asc)
+// @Description	Design: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06, DD-C09, DD-C01, DD-C08 · Query: filters customerId,kind · sort id,createdAt,updatedAt (default id asc)
 // @Tags			properties
 // @Accept			json
 // @Produce		json
@@ -301,7 +301,7 @@ func (m *Module) propertiesList(ctx context.Context, c *ops.Call, in *paging.Que
 // @Description	Authorization: client:self-customer | admin:asset.read
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A02, DD-C02, DD-C07, DD-C04, DD-C09, DD-C01 · Query: filters propertyId,kind · sort id,createdAt,updatedAt (default id asc)
+// @Description	Design: DD-A02, DD-C02, DD-C07, DD-C04, DD-C09, DD-C01, DD-C08 · Query: filters propertyId,kind · sort id,createdAt,updatedAt (default id asc)
 // @Tags			spaces
 // @Accept			json
 // @Produce		json

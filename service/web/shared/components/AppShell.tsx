@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { ROLES, ROLE_KEY, Role, roleFromPath } from "@ac/web/lib/nav";
+import { ROLES, ROLE_KEY, Role, roleFromPath, type ShellLive } from "@ac/web/lib/nav";
 import { Badge, Banner, Btn, Modal, SummaryList, ToastProvider, cx } from "./ui";
 import { useJobStore } from "@ac/web/lib/jobs";
 import { AssistantPanel } from "./Assistant";
@@ -58,10 +58,15 @@ function RoleNavWithQuery(props: { items: NavItem[]; base: string; pathname: str
   return <RoleNav {...props} search={useSearchParams().toString()} />; // the search params need a Suspense boundary (static routes)
 }
 
-export function AppShell({ role: forced, children }: { role?: Role; children: React.ReactNode }) {
+/** The app frame. In API mode the layout passes `live` (IR241): the organization as the scope label, the signed-in user
+ * in the chip and the sidebar badges counted by the Core API (no badge for 0); the demo keeps the fixed ones. */
+export function AppShell({ role: forced, live, children }: { role?: Role; live?: ShellLive; children: React.ReactNode }) {
   const detected = useStoredRole();
   const role = forced ?? detected;
   const cfg = ROLES[role];
+  const scope = live ? (live.organization || cfg.scope).toUpperCase() : cfg.scope;
+  const chip = live ? `${cfg.chip.split(" — ")[0]} — ${live.user || "signed in"}` : cfg.chip;
+  const count = (href: string) => (live?.badges[href] ? String(live.badges[href]) : undefined);
   const pathname = usePathname();
   const session = useBffSession();
   // Users is owner-only (FR-C19): the session's client role in API mode, the demo persona otherwise
@@ -77,7 +82,7 @@ export function AppShell({ role: forced, children }: { role?: Role; children: Re
   const [qr, setQr] = useState(false);
   const unread = useJobStore().notes.filter((n) => n.role === role && !n.read).length;
 
-  const items = cfg.nav;
+  const items = live ? cfg.nav.map((i) => ({ ...i, badge: count(i.href) })) : cfg.nav;
   // longest-prefix match so /customer/units/x highlights "Units & locations"
   const score = (href: string, match?: string[]) => {
     const hits = [href, ...(match ?? [])].filter((h) => (h === cfg.base ? pathname === h : pathname === h || pathname.startsWith(h + "/")));
@@ -98,12 +103,12 @@ export function AppShell({ role: forced, children }: { role?: Role; children: Re
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-lg text-white">❄</span>
             <span className="leading-tight"><span className="block text-[15px] font-bold">{cfg.app}</span><span className="block text-[11px] text-muted">{cfg.sub}</span></span>
           </Link>
-          <div className="px-3 pb-1 text-[10px] font-bold tracking-wider text-muted">{cfg.scope}</div>
+          <div className="px-3 pb-1 text-[10px] font-bold tracking-wider text-muted">{scope}</div>
           <Suspense fallback={<RoleNav items={items} base={cfg.base} pathname={pathname} search="" />}><RoleNavWithQuery items={items} base={cfg.base} pathname={pathname} /></Suspense>
           <div className="my-2 border-t border-line" />
           <nav className="flex flex-col gap-0.5">
             {role === "client" && owner && <NavLink href="/customer/users" label="Users" icon="☺" active={pathname === "/customer/users"} />}
-            {SHARED.map((s) => <NavLink key={s.href} {...s} active={pathname === s.href} badge={s.href === "/notifications" ? String(3 + unread) : undefined} />)}
+            {SHARED.map((s) => <NavLink key={s.href} {...s} active={pathname === s.href} badge={s.href !== "/notifications" ? undefined : live ? count(s.href) : String(3 + unread)} />)}
             <Link href="/demo" className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-warn hover:bg-warn-soft/50", pathname === "/demo" && "bg-warn-soft/60")}>
               <span aria-hidden className="w-4 text-center">✦</span>
               <span className="flex-1">Demo controls</span>
@@ -126,7 +131,7 @@ export function AppShell({ role: forced, children }: { role?: Role; children: Re
               {role === "client" && (
                 <button onClick={() => setAssistant(true)} className="inline-flex items-center gap-1.5 rounded-full border border-primary bg-primary-soft/50 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary-soft">🎙 <span className="max-sm:hidden">Assistant</span></button>
               )}
-              <span className="inline-flex items-center gap-1.5 rounded-control bg-surface2 px-3 py-1.5 text-xs font-semibold">☻ <span className="max-sm:hidden">{cfg.chip}</span><span className="sm:hidden">{cfg.chip.split(" — ")[0]}</span></span>
+              <span className="inline-flex items-center gap-1.5 rounded-control bg-surface2 px-3 py-1.5 text-xs font-semibold">☻ <span className="max-sm:hidden">{chip}</span><span className="sm:hidden">{chip.split(" — ")[0]}</span></span>
             </div>
           </header>
           <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">{children}</main>

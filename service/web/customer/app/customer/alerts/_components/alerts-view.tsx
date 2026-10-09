@@ -21,9 +21,8 @@ const seedPolicies = [
   { id: "p3", name: "Night humidity", when: "Humidity ≥ 70 % for 30 min · only 22:00–06:00", then: "Info · notify in-app", att: "Not attached to any AC yet — attach it from an AC’s page", on: false },
 ];
 
-/** Alerts and alert policies. `rows` come from the Server Component in API mode; the demo uses the seed rows. */
+/** Alerts and alert policies of the Phase 1A demo (seed rows); API mode renders AlertsLiveView (alerts-live.tsx). */
 export function AlertsView({ rows = seed }: { rows?: Alert[] }) {
-  const toast = useToast();
   const [tab, setTab] = useUrlTab<"alerts" | "policies">({ alerts: "overview", policies: "policies" }, "alerts");
   // local list (read flags) restarts from each new remote result: adjust state during render, not in an effect
   const [list, setList] = useState(rows);
@@ -35,17 +34,10 @@ export function AlertsView({ rows = seed }: { rows?: Alert[] }) {
   const [unread, setUnread] = useState(false);
   const [open, setOpen] = useState<Alert | null>(null);
   const [failed, setFailed] = useState(false);
-  const [rules, setRules] = useState(defaultRules.map((r) => r[3] as boolean));
-  const [policies, setPolicies] = useState(seedPolicies);
-  const [edit, setEdit] = useState<string | null>(null);
-  const [f, setF] = useState({ name: "", metric: "co2", op: "≥", val: "1200", dur: "15", rec: "1000", sev: "warning" });
   const show = (a: Alert) => (unread ? !a.read : true);
   const attn = list.filter((a) => a.group === "attn" && show(a));
   const info = list.filter((a) => a.group === "info" && show(a));
   const openAlert = (a: Alert) => { setOpen(a); setList((l) => l.map((x) => (x.id === a.id ? { ...x, read: true } : x))); };
-  const recOk = +f.rec < +f.val;
-  // policies.setDefaultRule is owner-only in the customer app (FR-C15, IR115); members see the rules read-only.
-  const isOwner = CURRENT_CLIENT.role === "owner";
 
   const Item = ({ a }: { a: Alert }) => (
     <button onClick={() => openAlert(a)} className="flex w-full items-start gap-3 border-t border-line px-1 py-3 text-left first:border-0 hover:bg-surface2/50">
@@ -57,7 +49,7 @@ export function AlertsView({ rows = seed }: { rows?: Alert[] }) {
 
   return (
     <Page>
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "alerts", label: "Alerts", count: list.length }, { id: "policies", label: "Alert policies", count: policies.length + 1 }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "alerts", label: "Alerts", count: list.length }, { id: "policies", label: "Alert policies", count: seedPolicies.length + 1 }]} />
       {tab === "alerts" ? (
         <>
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted"><Check label="Unread only" checked={unread} onChange={setUnread} /><span>Updated 09:13 · {list.filter((a) => !a.read).length} unread</span><button className="underline" onClick={() => setFailed((x) => !x)}>{failed ? "show list" : "show load error"}</button></div>
@@ -68,8 +60,26 @@ export function AlertsView({ rows = seed }: { rows?: Alert[] }) {
             </>
           )}
         </>
-      ) : (
-        <>
+      ) : <PoliciesPanel />}
+      <Modal open={!!open} onClose={() => setOpen(null)} title={open?.title ?? ""} footer={<Btn onClick={() => setOpen(null)}>Back to list</Btn>}>
+        {open && <><div className="flex gap-2"><SeverityBadge s={open.sev} /><Badge tone="ok" icon="✓">Read</Badge><Badge tone="warn">Unresolved</Badge></div><SummaryList items={[["Where", open.where], ["Evidence", open.ev], ["Status", "Opened → auto Read, still Unresolved"]]} /><p className="text-xs text-muted">Reading an alert does not resolve it. It stays under “Needs attention” until the cause is resolved.</p></>}
+      </Modal>
+    </Page>
+  );
+}
+
+/** The alert policies of the Phase 1A demo (FR-C15): the default policy's rules and the customer's own policies. */
+export function PoliciesPanel() {
+  const toast = useToast();
+  const [rules, setRules] = useState(defaultRules.map((r) => r[3] as boolean));
+  const [policies, setPolicies] = useState(seedPolicies);
+  const [edit, setEdit] = useState<string | null>(null);
+  const [f, setF] = useState({ name: "", metric: "co2", op: "≥", val: "1200", dur: "15", rec: "1000", sev: "warning" });
+  const recOk = +f.rec < +f.val;
+  // policies.setDefaultRule is owner-only in the customer app (FR-C15, IR115); members see the rules read-only.
+  const isOwner = CURRENT_CLIENT.role === "owner";
+  return (
+    <>
           <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-[15px] font-bold">Alert policies</h2><p className="max-w-xl text-xs text-muted">A policy is a set of limits. It only runs on the ACs you attach it to (open an AC › Alert policies). Every AC also has the default policy.</p></div><Btn variant="primary" onClick={() => { setEdit("new"); setF({ name: "", metric: "co2", op: "≥", val: "1200", dur: "15", rec: "1000", sev: "warning" }); }}>+ Create policy</Btn></div>
           <Card title="Default policy" sub="Limits set by HQ · on / off is set by the account owner">
             <p className="mb-3 text-xs text-muted">Covers ventilation and the usual causes of breakdowns. It is attached to every AC and cannot be detached or edited, but the account owner can switch each rule on or off for your account (all your ACs). Ask HQ if a limit should change.</p>
@@ -87,11 +97,6 @@ export function AlertsView({ rows = seed }: { rows?: Alert[] }) {
             ))}
           </div>
           <p className="text-xs text-muted">A unit can carry several policies; each rule is checked separately. Missing or stale readings never raise an alert — they show “not measured”. Air-quality limits (CO₂ ppm, PM2.5 µg/m³) are regular alert policies.</p>
-        </>
-      )}
-      <Modal open={!!open} onClose={() => setOpen(null)} title={open?.title ?? ""} footer={<Btn onClick={() => setOpen(null)}>Back to list</Btn>}>
-        {open && <><div className="flex gap-2"><SeverityBadge s={open.sev} /><Badge tone="ok" icon="✓">Read</Badge><Badge tone="warn">Unresolved</Badge></div><SummaryList items={[["Where", open.where], ["Evidence", open.ev], ["Status", "Opened → auto Read, still Unresolved"]]} /><p className="text-xs text-muted">Reading an alert does not resolve it. It stays under “Needs attention” until the cause is resolved.</p></>}
-      </Modal>
       <Modal open={!!edit} onClose={() => setEdit(null)} wide title={edit === "new" ? "Create alert policy" : "Edit alert policy"} footer={<><Btn onClick={() => setEdit(null)}>Cancel</Btn><Btn variant="primary" disabled={!recOk || !f.name.trim()} onClick={() => { if (edit === "new") setPolicies((s) => [...s, { id: "n" + Date.now(), name: f.name, when: `${f.metric.toUpperCase()} ${f.op} ${f.val} for ${f.dur} min · recover below ${f.rec}`, then: `${f.sev} · notify in-app`, att: "Not attached to any AC yet — attach it from an AC’s page", on: true }]); toast("Policy saved"); setEdit(null); }}>Save policy</Btn></>}>
         <Field label="Name" error={!f.name.trim() ? "Name is required" : undefined}><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
@@ -105,6 +110,6 @@ export function AlertsView({ rows = seed }: { rows?: Alert[] }) {
         <Field label="Severity"><Choice value={f.sev as "warning"} onChange={(v) => setF({ ...f, sev: v })} options={[{ id: "normal" as "warning", label: "Info" }, { id: "warning", label: "Warning" }, { id: "critical" as "warning", label: "Critical" }]} /></Field>
         <p className="text-[11px] text-muted">WhatsApp is only available after you allow it in Preferences. Missing or stale readings never trigger — they show “not measured”.</p>
       </Modal>
-    </Page>
+    </>
   );
 }

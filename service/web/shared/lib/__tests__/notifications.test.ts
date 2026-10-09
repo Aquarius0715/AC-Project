@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alertRow } from "@ac/web/lib/alerts";
+import { inboxAlerts, type ApiAlert } from "@ac/web/lib/alerts";
 import { inboxRow, type ApiNotification } from "@ac/web/lib/notifications";
 
 const note = (over: Partial<ApiNotification>): ApiNotification => ({
@@ -22,9 +22,17 @@ describe("inbox rows and alert rows", () => {
     expect([r.t, r.d, r.href]).toEqual(["Filter cleaning due on Bedroom AC", "Cleaning due (268 h of run time since the last cleaning). Not a fault. · open", "/customer/maintenance?tab=filter-care"]);
   });
 
-  it("shows a filter cleaning reminder as information, not a fault (Figma Client 06a)", () => {
-    const a = alertRow({ id: "a1", unitId: "u1", type: "maintenance", severity: "normal", status: "open", causeCode: "unknown", evidenceKind: "inferred",
-      evidenceText: "Cleaning due (250 h of run time since the last cleaning). Not a fault.", detectedAt: "2026-09-14T01:00:00Z" });
-    expect([a.title, a.kind, a.sev, a.group, a.read, a.ev]).toEqual(["Filter cleaning reminder", "◷ Maintenance reminder", "normal", "info", false, "Evidence (inferred): Cleaning due (250 h of run time since the last cleaning). Not a fault."]);
+  it("lists alerts with their status and the read state of their notifications (DD-C08, IR242)", () => {
+    const alert = (id: string, severity: ApiAlert["severity"], status: string, over: Partial<ApiAlert> = {}): ApiAlert => ({
+      id, unitId: "u1", type: "sensor", severity, status, causeCode: "unknown", evidenceKind: "inferred", evidenceText: "Cleaning due (250 h of run time since the last cleaning). Not a fault.", detectedAt: "2026-09-14T01:00:00Z", ...over,
+    });
+    const rows = inboxAlerts([
+      alert("rem", "normal", "open", { type: "maintenance" }), alert("old", "critical", "resolved", { resolvedAt: "2026-09-14T02:00:00Z", resolutionReason: "filter cleaned" }),
+      alert("win", "warning", "acknowledged", { causeCode: "window_open", acknowledgedAt: "2026-09-14T01:30:00Z", detectedAt: "2026-09-14T00:30:00Z" }), alert("hot", "critical", "open"),
+    ], [{ id: "n1", version: 1, sourceAlertId: "win", readAt: null }, { id: "n2", version: 2, sourceAlertId: "hot", readAt: "2026-09-14T01:05:00Z" }, { id: "n3", version: 1, sourceAlertId: null, readAt: null }],
+    () => ({ name: "Bedroom AC", place: "Home A › Bedroom" }));
+    expect(rows.map((r) => [r.id, r.group, r.status.text, r.unread.length, r.notes])).toEqual([["hot", "attn", "Unresolved", 0, 1], ["win", "attn", "Acknowledged", 1, 1], ["old", "info", "Resolved", 0, 0], ["rem", "info", "Unresolved", 0, 0]]);
+    expect([rows[3].title, rows[3].kind, rows[3].status.tone, rows[2].status.detail, rows[1].unread, rows[0].where])
+      .toEqual(["Filter cleaning reminder", "◷ Maintenance reminder", "muted", "Resolved 14 Sept 2026, 10:00 am · filter cleaned", [{ id: "n1", version: 1 }], "Bedroom AC · Home A › Bedroom · detected 14 Sept 2026, 9:00 am"]);
   });
 });

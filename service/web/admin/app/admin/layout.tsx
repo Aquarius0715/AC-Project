@@ -1,2 +1,7 @@
+// The admin app frame: in API mode the signed-in user, the organization and the sidebar badges from the Core API (IR241).
 import { AppShell } from "@ac/web/components/AppShell";
-export default function L({ children }: { children: React.ReactNode }) { return <AppShell role="admin">{children}</AppShell>; }
+import { loadShell } from "@ac/web/lib/shell";
+
+export default async function L({ children }: { children: React.ReactNode }) {
+  return <AppShell role="admin" live={await loadShell("admin")}>{children}</AppShell>;
+}

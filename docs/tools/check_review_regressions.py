@@ -164,7 +164,7 @@ CASES = [
      'Superseded wording remains'),
     ('csv_patch_key_missing', [('04-agentic-sdlc/acceptance-review-017.csv', 'acceptancePatches AT-REV17-005', 'acceptancePatches AT-REV17-099')],
      'Acceptance patch key missing'),
-    ('c08_summary_dependency_missing', [('03-uiux/screen-catalog.csv', 'notifications.list;summaries.get;policies.list;policies.get;policies.save;policies.delete;policies.setDefaultRule;units.list,"tab,severity,unreadOnly,policyId,unitId"', 'notifications.list;policies.list;policies.get;policies.save;policies.delete;policies.setDefaultRule;units.list,"tab,severity,unreadOnly,policyId,unitId"')],
+    ('c08_summary_dependency_missing', [('03-uiux/screen-catalog.csv', 'notifications.list;summaries.get;policies.list;policies.get;policies.save;policies.delete;policies.setDefaultRule;units.list;properties.list;spaces.list,"tab,severity,unreadOnly,policyId,unitId"', 'notifications.list;policies.list;policies.get;policies.save;policies.delete;policies.setDefaultRule;units.list;properties.list;spaces.list,"tab,severity,unreadOnly,policyId,unitId"')],
      'IR102 screen contract missing'),
     ('app_shell_switch_event_missing', [('03-uiux/component-contracts.csv', ';switchMembership(demoMembershipId),', ',')],
      'AppShell role switch event absent'),
