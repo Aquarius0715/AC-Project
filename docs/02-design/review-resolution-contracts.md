@@ -2175,3 +2175,13 @@ The Scan QR dialog in the shell header (FR-T13, DD-T13, Figma Technician 01-6) s
 - **Reads.** `units.resolveQr` (unit and the user's next open job on it — the soonest job of the unit in assigned, in progress, on hold or rework whose window has not ended; NOT_FOUND for unknown labels and units outside the user's assignments), then `units.get` and `jobs.get` for the matched card, and `units.list` for the one-tap scans and the unit name.
 - **Before the work window.** `units.get` answers FORBIDDEN `errors.assignment_not_started` until the work window opens (IR94); the card then names the unit from the user's unit list and says its details open with the window, and Open job still leads to the read-only workspace.
 - **Demo.** The camera is simulated: a field takes the label code (`ac-unit:<unitId>`), a device serial bound to the unit or the unit ID, and each of the user's units can be scanned with one tap. The Phase 1A demo keeps its fixture dialog.
+
+## IR231 HQ maintenance jobs (Jobs tab) on the server pattern; labelled choice groups — 2026-10-09
+
+`/admin/jobs` (FR-A06, DD-A06, SCR-A06) read only the in-browser job store in both modes (IR223 list). The Jobs tab now follows IR176 as DD-A06 describes (scope, stage counts, filters, list, detail, booking, proposals, partner time changes, hold / resume / cancel, follow-up classification); Server Actions carry the job version.
+
+- **Availability.** The preferred-times table shows, per time, the HQ technicians `members.eligible` returns (qualified, in scope, free, not on leave); a time without one can still be offered to a contractor, who confirms its own capacity. Times in the past cannot be booked.
+- **Offers.** The booking dialog defaults the offer to IR141 item 2 (answer within 24 h but not after the visit starts, access from now until a day after the visit) with an editable terms version (`terms-demo-v1`).
+- **Proposals.** Reply within 24, 48 or 72 hours, never after the proposed time; a contractor's time change sent to the client gets 48 hours (or until the time).
+- **Accessibility.** `Field` wrapped every control in a `<label>`; around a `Choice` (a set of buttons) the label named the first button instead of the group. A `Choice` child now renders a labelled `role="group"`.
+- **Still to connect.** Report review (`reports.get`, `jobs.review`), costs (`jobs.saveCost`), New job (`jobs.create`), access extension (`jobs.extendAccess`), and the Plans, Contractors and SLA tabs, which show illustrative data in API mode until they are connected.

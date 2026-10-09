@@ -103,7 +103,7 @@ var profiles = map[string]bool{"rto": true, "general": true, "energy": true, "en
 // @Description	Authorization: admin:asset.read | admin:contract.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A02, DD-A07, DD-A15, DD-A05, DD-A18 · Query: filters kind,status,organizationId · sort id,createdAt,updatedAt (default id asc)
+// @Description	Design: DD-A02, DD-A07, DD-A15, DD-A05, DD-A18, DD-A06 · Query: filters kind,status,organizationId · sort id,createdAt,updatedAt (default id asc)
 // @Tags			customers
 // @Accept			json
 // @Produce		json
@@ -253,7 +253,7 @@ func (m *Module) customersSave(ctx context.Context, c *ops.Call, in *CustomerSav
 // @Description	Authorization: client:self-customer | admin:asset.read
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A02, DD-C02, DD-C07, DD-C04 · Query: filters customerId,kind · sort id,createdAt,updatedAt (default id asc)
+// @Description	Design: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06 · Query: filters customerId,kind · sort id,createdAt,updatedAt (default id asc)
 // @Tags			properties
 // @Accept			json
 // @Produce		json

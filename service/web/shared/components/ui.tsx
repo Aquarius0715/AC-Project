@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, useCallback, useContext, useEffect, useId, useState } from "react";
+import { createContext, isValidElement, useCallback, useContext, useEffect, useId, useState } from "react";
 
 export const cx = (...a: unknown[]) => a.filter((x): x is string => typeof x === "string" && x !== "").join(" ");
 
@@ -217,12 +217,15 @@ export function Tabs<T extends string>({ tabs, value, onChange, className }: { t
 /* ───────────── Forms ───────────── */
 const inputCls = "w-full rounded-control border border-line bg-surface px-3 py-2 text-[13px] text-ink placeholder:text-subtle focus:border-primary";
 export function Field({ label, hint, error, children, className }: { label: string; hint?: React.ReactNode; error?: React.ReactNode; children: React.ReactNode; className?: string }) {
+  // a set of choice buttons is a labelled group: inside a <label> the first button would take the label as its name
+  const group = isValidElement(children) && children.type === Choice;
+  const Tag = group ? "div" : "label";
   return (
-    <label className={cx("flex min-w-0 flex-col gap-1 text-xs font-semibold text-ink", className)}>
-      <span>{label}</span>
+    <Tag role={group ? "group" : undefined} aria-label={group ? label : undefined} className={cx("flex min-w-0 flex-col gap-1 text-xs font-semibold text-ink", className)}>
+      <span aria-hidden={group || undefined}>{label}</span>
       {children}
       {error ? <span className="font-medium text-crit">✕ {error}</span> : hint ? <span className="font-normal text-muted">{hint}</span> : null}
-    </label>
+    </Tag>
   );
 }
 /** The control classes; a width in className (w-auto, w-40, …) replaces w-full — two width utilities would be decided
