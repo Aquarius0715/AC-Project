@@ -1,8 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, Input, Modal, Page, Select, Toggle, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, CodeInput, Modal, Page, QrCode, Select, Toggle, useToast } from "@ac/web/components/ui";
 import { useStoredRole } from "@ac/web/components/AppShell";
+import { codeComplete, groupKey, otpauthUri, qrPath } from "@ac/web/lib/twoFactor";
+
+const DEMO_KEY = "JBSWY3DPEHPK3PXP"; // the fixed demo setup key (Figma 10g)
+const DEMO_QR = qrPath(otpauthUri(DEMO_KEY, "demo"));
 
 /** Preferences of the Phase 1A demo (browser state only); API mode renders PreferencesView from the Core API. */
 export function PreferencesDemo() {
@@ -37,15 +41,20 @@ export function PreferencesDemo() {
           </div>
         </Card>
       )}
-      <Modal open={modal} onClose={() => setModal(false)} title="Turn on two-step verification" footer={codes ? <Btn variant="primary" onClick={() => { setModal(false); setTwoFa(true); toast("Two-step verification is on"); }}>I saved my codes</Btn> : <><Btn onClick={() => setModal(false)}>Cancel</Btn><Btn variant="primary" disabled={!/^\d{6}$/.test(code)} onClick={() => setCodes(["7HQ2-K9PD", "3MZX-41RT", "Q8W2-6TNB", "L5CE-2PXK", "9VAD-7MJF", "R2KN-8QWE", "XT4P-1GHS", "B6UY-3ZLM"])}>Verify & turn on</Btn></>}>
-        {codes ? <><Banner tone="ok">Two-step verification is ready. Save these 8 recovery codes — they are shown only once.</Banner><div className="grid grid-cols-2 gap-2 font-mono text-sm">{codes.map((c) => <span key={c} className="rounded-lg bg-surface2 px-3 py-1.5">{c}</span>)}</div></> : <>
-          <ol className="flex flex-col gap-3 text-[13px]">
-            <li><b>1 · Scan with an authenticator app</b><div className="mt-2 grid h-28 w-28 place-items-center rounded-lg border border-line text-xs text-muted">[ QR ]</div><div className="mt-1 text-xs text-muted">or enter key <span className="font-mono">JBSW Y3DP EHPK 3PXP</span></div></li>
-            <li><b>2 · Enter the 6-digit code</b><Input inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="000000" className="mt-1 max-w-[160px] font-mono tracking-[0.3em]" /></li>
-            <li><b>3 · Save your 8 recovery codes</b> <span className="text-xs text-muted">(shown after verifying)</span></li>
-          </ol>
-          <p className="text-[11px] text-muted">Demo: no real authenticator is called — any 6 digits are accepted.</p>
-        </>}
+      <Modal open={modal} onClose={() => setModal(false)} title="Turn on two-step verification" footer={codes ? <Btn variant="primary" onClick={() => { setModal(false); setTwoFa(true); toast("Two-step verification is on"); }}>I saved my codes</Btn> : <><Btn onClick={() => setModal(false)}>Cancel</Btn><Btn variant="primary" disabled={!codeComplete(code)} onClick={() => setCodes(["7HQ2-K9PD", "3MZX-41RT", "Q8W2-6TNB", "L5CE-2PXK", "9VAD-7MJF", "R2KN-8QWE", "XT4P-1GHS", "B6UY-3ZLM"])}>Verify & turn on</Btn></>}>
+        {codes ? <><Banner tone="ok">Two-step verification is ready. Save these 8 recovery codes — they are shown only once.</Banner><div className="grid grid-cols-2 gap-2 font-mono text-sm">{codes.map((c) => <span key={c} className="rounded-lg bg-surface2 px-3 py-1.5">{c}</span>)}</div></> : <div className="flex flex-col gap-3.5">
+          <div className="flex flex-col gap-5 sm:flex-row">
+            <div className="grid h-[150px] w-[150px] shrink-0 place-items-center rounded-lg border border-line bg-white p-2"><QrCode qr={DEMO_QR} label="QR code with the setup key for an authenticator app" className="h-full w-full" /></div>
+            <div className="flex min-w-0 flex-col gap-2.5 text-[13px]">
+              <b>1&nbsp;&nbsp;Scan with an authenticator app</b>
+              <div className="text-xs text-muted">or enter key&nbsp;&nbsp;<span className="font-mono">{groupKey(DEMO_KEY)}</span></div>
+              <b>2&nbsp;&nbsp;Enter the 6-digit code</b>
+              <CodeInput label="6-digit code" value={code} onChange={setCode} autoFocus />
+              <b>3&nbsp;&nbsp;Save your 8 recovery codes (shown after verifying)</b>
+            </div>
+          </div>
+          <Banner>Demo: no real authenticator is called — any 6 digits are accepted. Real sign-in stays out of scope (login is a demo role picker). Turning off later asks for a current code.</Banner>
+        </div>}
       </Modal>
     </Page>
   );

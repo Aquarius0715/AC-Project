@@ -2,8 +2,10 @@
 // sidebar badges — the customer's unresolved critical / warning alerts (summaries.get alertCount, IR51), the
 // contractor's offers waiting for an answer (summaries.get offerCount), HQ's unresolved critical / warning alerts
 // (alerts.list totals) and everyone's unread notifications (notifications.list unreadOnly total, IR102). A count that
-// cannot be read shows no badge. Read by the role layouts on every render (refresh() after a write reads them again).
+// cannot be read shows no badge. Read by the role layouts on every render (refresh() after a write reads them again);
+// connection() keeps those layouts from being prerendered at build time, when there is no API (IR248).
 import "server-only";
+import { connection } from "next/server";
 import { apiMode, coreIdentity, coreOp } from "@ac/web/lib/dal";
 import type { Role, ShellLive } from "@ac/web/lib/nav";
 
@@ -11,6 +13,7 @@ const total = (op: string, input: unknown) => coreOp<{ total: number }>(op, inpu
 const quiet = (p: Promise<number>) => p.catch(() => null);
 
 export async function loadShell(role: Role): Promise<ShellLive | undefined> {
+  await connection();
   if (!apiMode()) return undefined;
   const counts: Promise<[string, number | null]>[] = [quiet(total("notifications.list", { filters: { unreadOnly: true }, limit: 1 })).then((n) => ["/notifications", n])];
   if (role === "client") counts.push(quiet(coreOp<{ counts: { alertCount: number } }>("summaries.get", { kind: "customer", filters: {} }).then((s) => s.counts.alertCount)).then((n) => ["/customer/alerts", n]));

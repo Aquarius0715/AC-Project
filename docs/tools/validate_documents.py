@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.136.0 (2026-10-10): IR247 / IR248 SCR-X-settings-preferences interaction, component contracts CodeInput and QrCode, AppShell note; components 71 → 73.
 # 0.135.0 (2026-10-10): IR245 SCR-A06 url keys from/to, SCR-A01 interaction, DD-A01 / DD-A06 notes, jobs.list filter mapping; IR246 SCR-X-settings-preferences interaction; counts unchanged.
 # 0.134.0 (2026-10-10): IR244 SCR-A01 reads and url keys, DD-A01 boundary and step 5, catalog design_ids; counts unchanged.
 # 0.133.0 (2026-10-10): IR243 Session.customerId, SCR-C08 (+preferences.get) / SCR-C09 (+new) url keys, DD-C15 boundary, catalog design_ids; counts unchanged.
@@ -1339,7 +1340,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.135.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.136.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

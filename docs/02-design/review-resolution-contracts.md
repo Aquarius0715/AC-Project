@@ -2350,3 +2350,21 @@ In API mode `/settings/preferences` (FR-X01, FR-X08, DDC-07, SCR-X-settings-pref
 4. **Two-step verification.** Turn on shows the setup key from `twoFactor.get` and asks for a 6-digit code (`twoFactor.enable`), then shows the recovery codes once. Turn off asks for a code (`twoFactor.disable`). While it is on, the screen shows how many recovery codes are left. Any 6 digits are accepted in this build (IR144 item 6).
 5. **Monthly report e-mail (client).** “Email me the monthly energy report (1st of each month)” is under Reports. It is the same flag as the Energy export dialog's option (BR-C16, AT-C16-B). Figma 10d and 10g gain the row.
 6. **Demo.** Phase 1A keeps the browser-only page.
+
+## IR247 Two-step verification dialog as in Figma 10g — 2026-10-10
+
+The Turn on dialog of `/settings/preferences` (FR-X08, IR144, IR246) showed the setup key as text with one input, while Figma Client 10g and the other roles' Preferences frames show a QR code beside the steps and six code boxes.
+
+1. **Setup QR.** While two-step verification is off, the page turns the `twoFactor.get` setupKey into the authenticator key URI of the signed-in user: `otpauth://totp/AC%20Project:<display name>?secret=<key>&issuer=AC%20Project&algorithm=SHA1&digits=6&period=30`. It draws the URI as a QR code on the server (error correction M, one SVG path), dark on white in a 150 px frame. A unit test decodes the drawn code back to the URI with an independent decoder.
+2. **Steps.** “1  Scan with an authenticator app”, “or enter key” with the key in groups of four, “2  Enter the 6-digit code” with six boxes, and “3  Save your 8 recovery codes (shown after verifying)”. The note: no real authenticator is called, any 6 digits are accepted and sign-in is unchanged; turning off later asks for a current code.
+3. **Code boxes (CodeInput).** One transparent input over six boxes, so typing, pasting and the browser's one-time-code autofill all work. Only digits are kept, at most six; the next box is outlined while the input has focus. Verify stays disabled until six digits are entered. Turn off uses the same boxes.
+4. **Libraries.** The QR encoder is `uqr` 0.1.3 (MIT, no dependencies) in `@ac/web`; the test decoder `jsqr` 1.4.0 (Apache-2.0, no dependencies) is a development dependency only.
+5. **Demo.** The Phase 1A dialog shows the same layout with the fixed demo key and Figma's note.
+
+## IR248 The shared screens' frame renders per request — 2026-10-10
+
+After a Server Action on `/settings/preferences` or `/notifications`, the frame of the shared screens switched to the demo persona (scope CUSTOMER-A, chip Client — customer-a, fixed badges), even in the HQ app. A reload restored it.
+
+1. **Cause.** The shared layout covers `/demo`, which had no request-time API and was prerendered at build time. There is no session or Core API at build time, so its frame was the demo one. The sidebar link prefetched `/demo` in production, and the client router reused that cached layout segment when an action called `refresh()`. Development servers do not prefetch, which is why only `next start` showed it.
+2. **Fix.** The shared layout calls `connection()` and so renders per request. With no session in API mode it takes the app's own role instead of the browser's last demo role. `loadShell` (every role layout) calls `connection()` too, so no frame that reads the session is prerendered. `/demo`, `/forbidden` and `/technician/jobs` are now dynamic; `/`, `/_not-found` and `/forgot-password` stay static and have no session-dependent frame.
+3. **Check.** In all four apps the frame keeps the signed-in organization, user and badges after the enable and disable actions.

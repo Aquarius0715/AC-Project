@@ -238,6 +238,30 @@ export const Select = ({ className, children, ...p }: React.SelectHTMLAttributes
   <select {...p} className={cx(control(className), "pr-8", className)}>{children}</select>
 );
 export const Textarea = ({ className, ...p }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...p} className={cx(control(className), "min-h-[84px] resize-y", className)} />;
+/** A one-time code as separate boxes (Figma 10g): one transparent input over the boxes, so typing, pasting and the
+ * browser's one-time-code autofill all work; the box for the next digit is outlined while the input has focus. */
+export function CodeInput({ value, onChange, label, length = 6, autoFocus }: { value: string; onChange: (v: string) => void; label: string; length?: number; autoFocus?: boolean }) {
+  const [focused, setFocused] = useState(false);
+  const next = Math.min(value.length, length - 1);
+  return (
+    <div className="relative inline-flex gap-2">
+      {Array.from({ length }, (_, i) => (
+        <span key={i} aria-hidden className={cx("grid h-10 w-10 place-items-center rounded-lg border bg-surface text-lg font-semibold", focused && i === next ? "border-primary ring-2 ring-primary/20" : "border-line")}>{value[i] ?? ""}</span>
+      ))}
+      <input aria-label={label} inputMode="numeric" autoComplete="one-time-code" maxLength={length} value={value} autoFocus={autoFocus}
+        onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, length))} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+        className="absolute inset-0 h-full w-full cursor-text opacity-0" />
+    </div>
+  );
+}
+/** A QR code drawn from its module path (lib/twoFactor qrPath), dark on white whatever the theme so it scans. */
+export function QrCode({ qr, label, className }: { qr: { size: number; path: string }; label: string; className?: string }) {
+  return (
+    <svg role="img" aria-label={label} viewBox={`0 0 ${qr.size} ${qr.size}`} shapeRendering="crispEdges" className={cx("block bg-white", className)}>
+      <path d={qr.path} fill="#0b1220" />
+    </svg>
+  );
+}
 export function Check({ label, checked, onChange, disabled }: { label: React.ReactNode; checked?: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {
   return (
     <label className="inline-flex items-center gap-2 text-[13px]">

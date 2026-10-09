@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, Field, Input, Modal, Page, Select, Toggle } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, CodeInput, Field, Modal, Page, QrCode, Select, Toggle } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { setStoredValue, useStoredValue } from "@ac/web/lib/urlState";
 import { consentNote, type Consent } from "@ac/web/lib/preferences";
+import { codeComplete, groupKey, type QrPath } from "@ac/web/lib/twoFactor";
 import { disableTwoFactor, enableTwoFactor, savePreferences } from "../actions";
 
 export type PreferencesLive = {
@@ -14,6 +15,7 @@ export type PreferencesLive = {
   consent: Consent | null;
   client: boolean;
   zones: { id: string; label: string }[];
+  qr: QrPath | null; // the setup key as an authenticator QR code while two-step verification is off
 };
 const MIC = "ac-voice-microphone"; // a device permission: kept in this browser, not on the account
 
@@ -65,28 +67,33 @@ export function PreferencesView({ live }: { live: PreferencesLive }) {
         <p className="mt-1 text-[11px] text-muted">Demo only — any 6 digits are accepted and the demo sign-in is unchanged (FR-X08).</p>
         <div className="mt-5 flex justify-end gap-2"><Btn disabled={!dirty || pending} onClick={reset}>Cancel</Btn><Btn variant="primary" disabled={!dirty || pending} onClick={save}>✓ Save preferences</Btn></div>
       </Card>
-      {modal === "on" && <TurnOn setupKey={tf.setupKey} onClose={() => setModal(null)} />}
+      {modal === "on" && <TurnOn setupKey={tf.setupKey} qr={live.qr} onClose={() => setModal(null)} />}
       {modal === "off" && <TurnOff onClose={() => setModal(null)} />}
     </Page>
   );
 }
 
-function TurnOn({ setupKey, onClose }: { setupKey: string | null; onClose: () => void }) {
+function TurnOn({ setupKey, qr, onClose }: { setupKey: string | null; qr: QrPath | null; onClose: () => void }) {
   const [pending, run] = useAction();
   const [code, setCode] = useState("");
   const [codes, setCodes] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   return (
-    <Modal open onClose={onClose} title="Turn on two-step verification" footer={codes ? <Btn variant="primary" onClick={onClose}>I saved my codes</Btn> : <><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" disabled={!/^\d{6}$/.test(code) || pending} onClick={() => run(() => enableTwoFactor(code), "Two-step verification is on", (c) => setCodes(c), (f) => setError(actionMessage(f)))}>Verify & turn on</Btn></>}>
-      {codes ? <><Banner tone="ok">Two-step verification is on. Save these {codes.length} recovery codes — they are shown only once.</Banner><div className="grid grid-cols-2 gap-2 font-mono text-sm">{codes.map((c) => <span key={c} className="rounded-lg bg-surface2 px-3 py-1.5">{c}</span>)}</div></> : <>
-        <ol className="flex flex-col gap-3 text-[13px]">
-          <li><b>1 · Add the key to an authenticator app</b><div className="mt-1 text-xs text-muted">Key <span className="font-mono">{setupKey ?? "—"}</span></div></li>
-          <li><b>2 · Enter the 6-digit code</b><Input aria-label="Code" inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="000000" className="mt-1 max-w-[160px] font-mono tracking-[0.3em]" /></li>
-          <li><b>3 · Save your recovery codes</b> <span className="text-xs text-muted">(shown after verifying)</span></li>
-        </ol>
-        {error && <p className="mt-2 text-xs text-crit">✕ {error}</p>}
-        <p className="mt-2 text-[11px] text-muted">Demo: no real authenticator is called — any 6 digits are accepted.</p>
-      </>}
+    <Modal open onClose={onClose} title="Turn on two-step verification" footer={codes ? <Btn variant="primary" onClick={onClose}>I saved my codes</Btn> : <><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" disabled={!codeComplete(code) || pending} onClick={() => run(() => enableTwoFactor(code), "Two-step verification is on", (c) => setCodes(c), (f) => setError(actionMessage(f)))}>Verify & turn on</Btn></>}>
+      {codes ? <><Banner tone="ok">Two-step verification is on. Save these {codes.length} recovery codes — they are shown only once.</Banner><div className="grid grid-cols-2 gap-2 font-mono text-sm">{codes.map((c) => <span key={c} className="rounded-lg bg-surface2 px-3 py-1.5">{c}</span>)}</div></> : <div className="flex flex-col gap-3.5">
+        <div className="flex flex-col gap-5 sm:flex-row">
+          <div className="grid h-[150px] w-[150px] shrink-0 place-items-center rounded-lg border border-line bg-white p-2">{qr ? <QrCode qr={qr} label="QR code with the setup key for an authenticator app" className="h-full w-full" /> : <span className="text-xs text-muted">No setup key</span>}</div>
+          <div className="flex min-w-0 flex-col gap-2.5 text-[13px]">
+            <b>1&nbsp;&nbsp;Scan with an authenticator app</b>
+            <div className="text-xs text-muted">or enter key&nbsp;&nbsp;<span className="font-mono">{setupKey ? groupKey(setupKey) : "—"}</span></div>
+            <b>2&nbsp;&nbsp;Enter the 6-digit code</b>
+            <CodeInput label="6-digit code" value={code} onChange={setCode} autoFocus />
+            <b>3&nbsp;&nbsp;Save your 8 recovery codes (shown after verifying)</b>
+          </div>
+        </div>
+        {error && <p className="text-xs text-crit">✕ {error}</p>}
+        <Banner>Demo: no real authenticator is called — any 6 digits are accepted, and sign-in is unchanged. Turning off later asks for a current code.</Banner>
+      </div>}
     </Modal>
   );
 }
@@ -96,8 +103,8 @@ function TurnOff({ onClose }: { onClose: () => void }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   return (
-    <Modal open onClose={onClose} title="Turn off two-step verification" footer={<><Btn onClick={onClose}>Keep it on</Btn><Btn variant="danger" disabled={!/^\d{6}$/.test(code) || pending} onClick={() => run(() => disableTwoFactor(code), "Two-step verification turned off", onClose, (f) => setError(actionMessage(f)))}>Turn off</Btn></>}>
-      <Field label="Enter a 6-digit code from your authenticator app"><Input inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} placeholder="000000" className="max-w-[160px] font-mono tracking-[0.3em]" /></Field>
+    <Modal open onClose={onClose} title="Turn off two-step verification" footer={<><Btn onClick={onClose}>Keep it on</Btn><Btn variant="danger" disabled={!codeComplete(code) || pending} onClick={() => run(() => disableTwoFactor(code), "Two-step verification turned off", onClose, (f) => setError(actionMessage(f)))}>Turn off</Btn></>}>
+      <Field label="Enter a 6-digit code from your authenticator app"><CodeInput label="6-digit code" value={code} onChange={setCode} autoFocus /></Field>
       {error && <p className="mt-2 text-xs text-crit">✕ {error}</p>}
     </Modal>
   );

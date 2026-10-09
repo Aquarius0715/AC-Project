@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.135.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
+Version: 0.136.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.136.0 (2026-10-10): The two-step verification dialog shows the setup QR code and six code boxes as in Figma 10g (IR247). The frame of the shared screens renders per request, so it keeps the signed-in user after a Server Action (IR248).
 0.135.0 (2026-10-10): The HQ overview job-status rows open the Jobs tab with the scope and the period, which narrows the list and the stage totals (IR245). Preferences read and save through the Core API — language, time zone, a client's location consent and monthly report e-mail, two-step verification (IR246).
 0.134.0 (2026-10-10): HQ overview from admin.summary — customer, property and period in the URL, the as-of line, KPIs with scoped links, the energy-saving forecast, power and connection bars, all job statuses and billing per currency (IR244). No screen shows fixed demo values in API mode any more.
 0.133.0 (2026-10-10): Customer alert policies from the Core API — default rules switched by the owner, own policies with When / Then and attached ACs, on / off, the editor with its summary sentence, delete; Session.customerId for client sessions; the alert inbox gets the unit filter and View unit / Book cleaning / Request repair (IR243).
