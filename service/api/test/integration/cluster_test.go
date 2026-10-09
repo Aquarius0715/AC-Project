@@ -37,7 +37,7 @@ type splitCluster struct {
 
 // serviceURL is the test database URL of a domain service's login role (cmd/migrate creates ac_<domain>_login).
 func serviceURL(domain string) string {
-	return "postgres://ac_" + domain + "_login:local@localhost:5432/ac_test?sslmode=disable"
+	return testDB("ac_" + domain + "_login")
 }
 
 // buildCluster starts the five services from base (clock, demo flags). keep=false closes them when t ends.

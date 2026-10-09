@@ -614,6 +614,7 @@ type Summary struct {
 	IsDemo                    bool       `json:"isDemo"`
 	DisplayStatus             string     `json:"displayStatus"`
 	AssignmentAcknowledgement *string    `json:"assignmentAcknowledgement"`
+	TechnicianMembershipID    *uuid.UUID `json:"technicianMembershipId"` // the active Assignment's technician (IR225)
 }
 
 var jobStatuses = []string{"requested", "offered", "accepted", "assigned", "in_progress", "on_hold", "submitted", "rework_requested", "completed", "cancelled"}
@@ -792,7 +793,8 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 	rows, err := c.Tx.Query(ctx, `SELECT j.id, j.version, j.unit_id, j.type, j.status, j.due_at, lower(j.requested_slot), upper(j.requested_slot),
 		lower(j.scheduled_slot), upper(j.scheduled_slot), j.assignment_id, j.origin, j.preferred_slots, `+statusRank+`,
 		EXISTS (SELECT 1 FROM maintenance.slot_proposals p WHERE p.job_id = j.id AND p.status = 'pending'),
-		(SELECT a.acknowledgement FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status = 'active')
+		(SELECT a.acknowledgement FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status = 'active'),
+		(SELECT a.technician_membership_id FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status = 'active')
 		FROM maintenance.jobs j WHERE `+strings.Join(conds, " AND "), args...)
 	if err != nil {
 		return nil, err
@@ -809,7 +811,7 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 		var pref []byte
 		var pending bool
 		if err := rows.Scan(&r.s.ID, &r.s.Version, &r.s.UnitID, &r.s.Type, &r.s.Status, &r.s.DueAt, &r.s.RequestedSlot.StartAt, &r.s.RequestedSlot.EndAt,
-			&ss, &se, &r.s.AssignmentID, &r.s.Origin, &pref, &r.rank, &pending, &r.s.AssignmentAcknowledgement); err != nil {
+			&ss, &se, &r.s.AssignmentID, &r.s.Origin, &pref, &r.rank, &pending, &r.s.AssignmentAcknowledgement, &r.s.TechnicianMembershipID); err != nil {
 			rows.Close()
 			return nil, err
 		}

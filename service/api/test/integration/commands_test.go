@@ -67,7 +67,7 @@ func TestCommands(t *testing.T) {
 	}
 	// acknowledgement before expiry; late acknowledgement is only recorded
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable")
+	conn, err := pgx.Connect(ctx, testDB("postgres"))
 	if err != nil {
 		t.Skip(err)
 	}

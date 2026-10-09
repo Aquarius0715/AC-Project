@@ -1,13 +1,13 @@
 // The reads of the contractor overview (FR-P01, DD-P01) through the DAL: summaries.get (kind partner) and jobs.list
-// with the same period (from/to on the requested slot, IR74), members.list (names), units.list (the delegated units
-// inside their access window), jobs.get of the jobs with an assignment (the technician and the scheduled slot),
+// with the same period (from/to on the requested slot, IR74; each summary names the technician of its active
+// assignment, IR225), members.list (names), units.list (the delegated units inside their access window),
 // members.capacity per day of the period (team capacity) and for today (timeline), and jobs.events of the recent
 // jobs (activity). The counts and the list are the authority; the optional reads degrade to empty sections.
 import "server-only";
 import { coreAll, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import {
   actions, activity, capacity, hhmm, kpis, partnerJob, period, progress, timeline, timelinePct, weekOf, shift,
-  type ApiCapacity, type ApiCounts, type ApiJobEvent, type ApiMember, type ApiPartnerJob, type Assignment,
+  type ApiCapacity, type ApiCounts, type ApiJobEvent, type ApiMember, type ApiPartnerJob,
 } from "@ac/web/lib/partnerOverview";
 
 type Page<T> = { items: T[] };
@@ -27,14 +27,7 @@ export async function loadOverview(sp: { from?: string; to?: string }) {
     optional(coreAll<ApiMember>("members.list"), []),
     optional(coreAll<{ id: string; displayName: string }>("units.list"), []),
   ]);
-  const assigned = rows.filter((r): r is Extract<ApiPartnerJob, { projection: "summary" }> => r.projection === "summary" && !!r.assignmentId);
-  const details = await Promise.all(assigned.map((r) => optional(coreOp<{ projection: string; assignment: Assignment | null }>("jobs.get", { jobId: r.id }), null)));
-  const assignments = new Map<string, Assignment>();
-  assigned.forEach((r, i) => {
-    const a = details[i]?.assignment;
-    if (a && a.status === "active") assignments.set(r.id, a);
-  });
-  const jobs = rows.map((r) => partnerJob(r, new Map(units.map((u) => [u.id, u.displayName])), assignments));
+  const jobs = rows.map((r) => partnerJob(r, new Map(units.map((u) => [u.id, u.displayName]))));
   const today = new Date(now.getTime() + 8 * 3600_000).toISOString().slice(0, 10);
   const capacityOf = (date: string) => optional(coreOp<Page<ApiCapacity>>("members.capacity", { date, query: { limit: 100 } }).then((r) => r.items), []);
   const [days, todayCapacity] = await Promise.all([
@@ -54,7 +47,7 @@ export async function loadOverview(sp: { from?: string; to?: string }) {
       { label: "Last week", ...shift(week, -7) }, { label: "This week", ...week }, { label: "Next week", ...shift(week, 7) },
     ],
     today: { date: today, weekday: new Date(`${today}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" }), nowPct: timelinePct(nowIso, today), now: hhmm(nowIso) },
-    kpis: kpis(summary.counts, jobs, ms, names),
+    kpis: kpis(summary.counts, jobs, ms, names, { from: p.from, to: p.to }),
     progress: progress(jobs, ms),
     actions: actions(jobs, ms, names),
     timeline: timeline(todayCapacity ?? days[p.days.indexOf(today)] ?? [], members, today),

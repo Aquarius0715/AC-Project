@@ -8,14 +8,12 @@ export type Slot = { startAt: string; endAt: string };
 /** jobs.list rows of a contractor (IR23): the offer before the access window, the summary inside it, the history after. */
 export type ApiPartnerJob =
   | { projection: "offer"; status: "offered" | "accepted"; jobId: string; jobVersion: number; offerId: string; type: string; siteAddress: string | null; requestedSlot: Slot; dueAt: string; offerExpiresAt: string; visitSlot: Slot | null }
-  | { projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; dueAt: string; requestedSlot: Slot; scheduledSlot: Slot | null; assignmentId: string | null; displayStatus: string }
+  | { projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; dueAt: string; requestedSlot: Slot; scheduledSlot: Slot | null; assignmentId: string | null; displayStatus: string; technicianMembershipId: string | null; assignmentAcknowledgement?: "pending" | "accepted" | "cant_make" | null }
   | { projection: "history"; jobId: string; type: string; status: string; completedAt: string | null };
 export type ApiCounts = { offerCount: number; activeCount: number; reviewCount: number; overdueCount: number };
 export type ApiCapacity = { membershipId: string; date: string; availableSlots: Slot[]; assignedSlots: Slot[]; availableMinutes: number | null; assignedMinutes: number; unavailability: string | null };
 export type ApiMember = { id: string; userId: string; displayName: string; role: string; qualifications?: { code: string; revokedAt?: string | null }[] };
 export type ApiJobEvent = { id: string; jobId: string; actorUserId: string | null; action: string; occurredAt: string };
-/** The assignment of a delegated job (jobs.get detail). */
-export type Assignment = { technicianMembershipId: string; scheduledStart: string; scheduledEnd: string; status: string };
 
 /** One job of the company as the overview shows it. */
 export type PartnerJob = {
@@ -54,18 +52,17 @@ export function shift(p: { from: string; to: string }, n: number) {
   return { from: mv(p.from), to: mv(p.to) };
 }
 
-/** A jobs.list row with its unit name and assignment. */
-export function partnerJob(j: ApiPartnerJob, units: Map<string, string>, assignments: Map<string, Assignment>): PartnerJob {
+/** A jobs.list row with its unit name; the summary names the active assignment's technician (IR225). */
+export function partnerJob(j: ApiPartnerJob, units: Map<string, string>): PartnerJob {
   if (j.projection === "offer") {
     return { id: j.jobId, short: j.jobId.slice(0, 8), status: j.status, type: j.type, unit: null, address: j.siteAddress, slot: j.visitSlot, dueAt: j.dueAt, offerExpiresAt: j.status === "offered" ? j.offerExpiresAt : null, assignmentId: null, technicianId: null };
   }
   if (j.projection === "history") {
     return { id: j.jobId, short: j.jobId.slice(0, 8), status: j.status, type: j.type, unit: null, address: null, slot: null, dueAt: null, offerExpiresAt: null, assignmentId: null, technicianId: null };
   }
-  const a = assignments.get(j.id);
   return {
     id: j.id, short: j.id.slice(0, 8), status: j.status, type: j.type, unit: units.get(j.unitId) ?? null, address: null,
-    slot: a ? { startAt: a.scheduledStart, endAt: a.scheduledEnd } : j.scheduledSlot, dueAt: j.dueAt, offerExpiresAt: null, assignmentId: j.assignmentId, technicianId: a?.technicianMembershipId ?? null,
+    slot: j.scheduledSlot, dueAt: j.dueAt, offerExpiresAt: null, assignmentId: j.assignmentId, technicianId: j.technicianMembershipId ?? null,
   };
 }
 
@@ -107,7 +104,8 @@ export function until(iso: string, now: number): string {
 export type KpiTile = { label: string; value: number; sub: string; href: string; link: string; tone?: "warn" | "crit" };
 /** The five KPI tiles (DD-P01): offers, review and overdue from summaries.get; the accepted jobs without a technician
  * from the list, and in progress / scheduled as the summary's active jobs without them. Each opens the job list. */
-export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: Map<string, string>): KpiTile[] {
+export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: Map<string, string>, period?: { from: string; to: string }): KpiTile[] {
+  const list = (tab: string) => `/partner/jobs?tab=${tab}${period ? `&from=${period.from}&to=${period.to}` : ""}`; // the list with the same period
   const offers = jobs.filter((j) => j.status === "offered" && j.offerExpiresAt).sort((a, b) => Date.parse(a.offerExpiresAt!) - Date.parse(b.offerExpiresAt!));
   const unassigned = jobs.filter((j) => bucket(j, now) === "unassigned");
   const running = jobs.filter((j) => (j.status === "assigned" || j.status === "in_progress") && j.slot).sort((a, b) => Date.parse(a.slot!.startAt) - Date.parse(b.slot!.startAt));
@@ -115,11 +113,11 @@ export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: 
   const review = jobs.filter((j) => j.status === "submitted");
   const active = Math.max(0, counts.activeCount - unassigned.length);
   return [
-    { label: "Offers to answer", value: counts.offerCount, sub: offers[0] ? `${offers[0].short} · expires in ${until(offers[0].offerExpiresAt!, now)}` : "No open offers", href: "/partner/jobs?status=offered", link: "Open offers →" },
+    { label: "Offers to answer", value: counts.offerCount, sub: offers[0] ? `${offers[0].short} · expires in ${until(offers[0].offerExpiresAt!, now)}` : "No open offers", href: list("offered"), link: "Open offers →" },
     { label: "Awaiting assignment", value: unassigned.length, sub: unassigned.length ? "Accepted, no technician yet" : "—", href: "/partner/schedule", link: "Assign →", tone: unassigned.length ? "warn" : undefined },
-    { label: "In progress / scheduled", value: active, sub: next ? `${names.get(next.technicianId ?? "") ?? "Technician"} ${next.status === "in_progress" ? "on site" : "starts"} ${mmdd(next.slot!.startAt) === mmdd(new Date(now).toISOString()) ? hhmm(next.slot!.startAt) : `${mmdd(next.slot!.startAt)} ${hhmm(next.slot!.startAt)}`}` : "—", href: "/partner/jobs?status=active", link: "View jobs →" },
-    { label: "Reports to review", value: counts.reviewCount, sub: review[0] ? `${label(review[0])} · awaiting review` : "—", href: review.length === 1 ? `/partner/jobs/${review[0].id}/review` : "/partner/jobs?status=submitted", link: "Review →" },
-    { label: "Overdue", value: counts.overdueCount, sub: counts.overdueCount ? "Past the due date or the work window (IR89)" : "—", href: "/partner/jobs?status=active", link: "View →", tone: counts.overdueCount ? "crit" : undefined },
+    { label: "In progress / scheduled", value: active, sub: next ? `${names.get(next.technicianId ?? "") ?? "Technician"} ${next.status === "in_progress" ? "on site" : "starts"} ${mmdd(next.slot!.startAt) === mmdd(new Date(now).toISOString()) ? hhmm(next.slot!.startAt) : `${mmdd(next.slot!.startAt)} ${hhmm(next.slot!.startAt)}`}` : "—", href: list("active"), link: "View jobs →" },
+    { label: "Reports to review", value: counts.reviewCount, sub: review[0] ? `${label(review[0])} · awaiting review` : "—", href: review.length === 1 ? `/partner/jobs/${review[0].id}/review` : list("review"), link: "Review →" },
+    { label: "Overdue", value: counts.overdueCount, sub: counts.overdueCount ? "Past the due date or the work window (IR89)" : "—", href: list("active"), link: "View →", tone: counts.overdueCount ? "crit" : undefined },
   ];
 }
 

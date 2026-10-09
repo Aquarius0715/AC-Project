@@ -14,7 +14,7 @@ import (
 func owner(t *testing.T, sql string, args ...any) {
 	t.Helper()
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable")
+	conn, err := pgx.Connect(ctx, testDB("postgres"))
 	if err != nil {
 		t.Skip(err)
 	}
@@ -38,7 +38,7 @@ func keepObserved(t *testing.T, commandID string) {
 func ownerScan(t *testing.T, sql string, args []any, dest ...any) {
 	t.Helper()
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable")
+	conn, err := pgx.Connect(ctx, testDB("postgres"))
 	if err != nil {
 		t.Skip(err)
 	}
@@ -197,7 +197,7 @@ func TestOrganizations(t *testing.T) {
 func defaultPolicyID(t *testing.T) string {
 	t.Helper()
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable")
+	conn, err := pgx.Connect(ctx, testDB("postgres"))
 	if err != nil {
 		t.Skip(err)
 	}

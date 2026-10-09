@@ -15,7 +15,7 @@ import (
 func freeze(t *testing.T, now time.Time) {
 	t.Helper()
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable")
+	conn, err := pgx.Connect(ctx, testDB("postgres"))
 	if err != nil {
 		t.Skip(err)
 	}
@@ -165,6 +165,11 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	}
 	if _, m := post(s, &techInt, "jobs.list", `{"filters":{"unitId":"`+unit+`"},"limit":100}`); byJob(m, k) == nil {
 		t.Fatal("technician summary")
+	} else if row := byJob(m, k); row["technicianMembershipId"] != seed.ID("tech-internal-a").String() || row["assignmentAcknowledgement"] != "pending" {
+		t.Fatalf("the summary names the active assignment's technician (IR225): %v", row)
+	}
+	if _, m := post(s, &hq, "jobs.list", `{"filters":{"unitId":"`+unit+`"},"limit":100}`); byJob(m, job)["technicianMembershipId"] != nil {
+		t.Errorf("a job without an active assignment has no technician: %v", byJob(m, job))
 	}
 	if code, _ := post(s, &techA, "jobs.get", `{"jobId":"`+k+`"}`); code != 404 {
 		t.Error("another technician")

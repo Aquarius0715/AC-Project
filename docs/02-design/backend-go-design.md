@@ -294,7 +294,7 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 
 ## 10. Build, run, and deploy
 
-- `make gen` (sqlc, operation and contract generators), `make swagger` (Swagger 2.0 from the swag annotations of the handlers, served by the gateway at `/docs` and `/swagger.json`, IR220), `make lint`, `make test`, `make cover` (merged coverage of all packages), `make resetdb` / `make test-fresh` (rebuild the local database from schema.sql and reseed before testing), `make up` (`docker compose --profile full up`), `make down`.
+- `make gen` (sqlc, operation and contract generators), `make swagger` (Swagger 2.0 from the swag annotations of the handlers, served by the gateway at `/docs` and `/swagger.json`, IR220), `make lint`, `make test`, `make cover` (merged coverage of all packages), `make resetdb` (rebuild the local database from schema.sql and reseed), `make test` / `make test-cluster` (each on a freshly rebuilt test database, `ac_test` / `ac_test_cluster`), `make test-all` (both suites at once, about a minute and a quarter, IR225), `make up` (`docker compose --profile full up`), `make down`.
 - Dockerfile: multi-stage `golang:1.25` builder → `gcr.io/distroless/static-debian12:nonroot` runtime, read-only root filesystem, `healthcheck` subcommand, graceful SIGTERM drain ([container design §3](container-design.md#3-dockerfile-standards)).
 - One image, several ECS services: `api`, `webhook`, and one service per worker role (independent autoscaling: API on CPU and request count, workers on SQS backlog and Kinesis iterator age).
 - Deploy order: migrations (expand) → workers → API → BFF; contract steps of migrations ship one release later (database design §9).

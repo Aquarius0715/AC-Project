@@ -54,7 +54,7 @@ func TestDemoOperations(t *testing.T) {
 	}
 	var rows []row
 	func() {
-		conn, err := pgx.Connect(context.Background(), "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable")
+		conn, err := pgx.Connect(context.Background(), testDB("postgres"))
 		if err != nil {
 			t.Skip(err)
 		}

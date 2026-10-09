@@ -14,22 +14,38 @@ test-unit:
 	$(GO) vet ./...
 	$(GO) test -count=1 $$($(GO) list ./... | grep -v /test/)
 
-# the integration suites outgrew go test's default 10 minute limit (the split-service run takes about ten minutes)
+# a fresh test database runs each suite in about a minute; one that kept every earlier run's rows took 12–20 minutes
 TEST_TIMEOUT ?= 30m
 
-# DB integration tests of the HTTP API (test/integration, black box through internal/server)
-test-integration: testdb-exists
+# DB integration tests of the HTTP API (test/integration, black box through internal/server) on a fresh ac_test
+test-integration: testdb
 	$(GO) test -count=1 -timeout $(TEST_TIMEOUT) ./test/...
 
 # the integration suite against the split services: one server per domain on its own database role behind the
-# gateway (IR194); any cross-domain table access fails
-test-cluster: testdb-exists
-	AC_TEST_CLUSTER=1 $(GO) test -count=1 -timeout $(TEST_TIMEOUT) ./test/...
+# gateway (IR194); any cross-domain table access fails. Its own fresh database ac_test_cluster, so it can run beside
+# make test (make test-all).
+test-cluster: testdb-cluster test-cluster-run
 
-# everything; ac_test is created when missing (AC_TEST_DATABASE_URL / AC_TEST_OWNER_DATABASE_URL override it)
-test: testdb-exists
+# everything on a fresh ac_test (AC_TEST_DATABASE_URL / AC_TEST_OWNER_DATABASE_URL override it for the package tests)
+test: testdb test-run
+
+test-run:
 	$(GO) vet ./...
 	$(GO) test -count=1 -timeout $(TEST_TIMEOUT) ./...
+
+test-cluster-run:
+	AC_TEST_DB=ac_test_cluster AC_TEST_CLUSTER=1 $(GO) test -count=1 -timeout $(TEST_TIMEOUT) ./test/...
+
+# both suites at once, each on its own database (about the time of the slower one). The databases are rebuilt one
+# after the other first: their migrations update the cluster-wide login roles. The full logs stay in .test-all/.
+test-all: testdb testdb-cluster
+	@mkdir -p .test-all; \
+	$(MAKE) test-run > .test-all/test.log 2>&1 & a=$$!; \
+	$(MAKE) test-cluster-run > .test-all/test-cluster.log 2>&1 & b=$$!; \
+	wait $$a; ra=$$?; wait $$b; rb=$$?; \
+	grep -E '^(FAIL|--- FAIL|panic)' .test-all/test.log; echo "make test: exit $$ra"; \
+	grep -E '^(FAIL|--- FAIL|panic)' .test-all/test-cluster.log; echo "make test-cluster: exit $$rb"; \
+	[ $$ra -eq 0 ] && [ $$rb -eq 0 ]
 
 # swagger builds the API description from the swag annotations of the operation handlers (IR220, REST routes IR222):
 # swag formats the annotations, writes Swagger 2.0 JSON that the gateway embeds (GET /swagger.json, Swagger UI at
@@ -45,17 +61,21 @@ swagger:
 migrations:
 	cp ../../docs/02-design/db/schema.sql internal/migrations/000001_init.up.sql
 
-# resetdb rebuilds the development database "ac"; testdb rebuilds the test database "ac_test" (tests accumulate rows)
+# resetdb rebuilds the development database "ac"; testdb / testdb-cluster rebuild the test databases (the suites
+# leave their rows behind, so every suite run starts from a fresh one)
 resetdb:
 	sh scripts/resetdb.sh
 
 testdb:
 	DB=ac_test sh scripts/resetdb.sh
 
+testdb-cluster:
+	DB=ac_test_cluster sh scripts/resetdb.sh
+
 testdb-exists:
 	@docker exec $${PG_CONTAINER:-ac-project-postgres-1} psql -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'ac_test'" | grep -q 1 || DB=ac_test sh scripts/resetdb.sh
 
-test-fresh: testdb test
+test-fresh: test
 
 # coverage of internal/... from every test package (unit + integration), merged into coverage.out
 cover: testdb-exists
@@ -64,4 +84,4 @@ cover: testdb-exists
 		$(GO) test -count=1 -coverpkg=./internal/... -coverprofile=.cover/$$(echo $$p | tr / _).out $$p >.cover/last.log 2>&1 || { cat .cover/last.log; exit 1; }; done
 	python3 scripts/covermerge.py coverage.out .cover/*.out
 
-.PHONY: swagger gen seed test test-unit test-integration test-cluster cover migrations resetdb testdb testdb-exists test-fresh
+.PHONY: swagger gen seed test test-run test-unit test-integration test-cluster test-cluster-run test-all cover migrations resetdb testdb testdb-cluster testdb-exists test-fresh

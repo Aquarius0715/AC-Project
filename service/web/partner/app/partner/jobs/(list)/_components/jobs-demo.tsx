@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useState } from "react";
+import { useState } from "react";
 import { Badge, EmptyState, ErrorState, Page, PageHead, Select, Tabs } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { PJob, pjobs } from "@ac/web/lib/partner";
@@ -10,8 +10,8 @@ import { fmt, useJobs } from "@ac/web/lib/jobs";
 type T = "all" | "Offered" | "Active" | "Review" | "Completed";
 type Row = PJob & { origin: "request" | "plan" };
 
-export default function PartnerJobs({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
-  const { status } = use(searchParams);
+/** The Phase 1A demo job list (DATA_SOURCE=mock): the fixture jobs and the shared job store. */
+export function JobsDemo({ status }: { status?: string }) {
   const live = useJobs().filter((j) => j.contractor === "contractor-a" && !pjobs.some((p) => p.id === j.id) && j.status !== "cancelled");
   const [tab, setTab] = useState<T>(status === "offered" ? "Offered" : "all");
   const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");

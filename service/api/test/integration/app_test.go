@@ -6,6 +6,7 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -41,11 +42,21 @@ func serverWith(t *testing.T, demo bool) *apiserver.Server {
 
 func clockFunc() time.Time { return clock }
 
+// testDB is the URL of the test database for a login role: AC_TEST_DB names the database (ac_test by default;
+// make test-cluster uses ac_test_cluster, so both suites can run at the same time).
+func testDB(role string) string {
+	name := os.Getenv("AC_TEST_DB")
+	if name == "" {
+		name = "ac_test"
+	}
+	return "postgres://" + role + ":local@localhost:5432/" + name + "?sslmode=disable"
+}
+
 // seedFixture applies the demo fixture (idempotent) and returns it.
 func seedFixture(t *testing.T) *seed.Fixture {
 	t.Helper()
 	ctx := context.Background()
-	conn, err := pgx.Connect(ctx, "postgres://postgres:local@localhost:5432/ac_test?sslmode=disable")
+	conn, err := pgx.Connect(ctx, testDB("postgres"))
 	if err != nil {
 		t.Skip("database not available:", err)
 	}
@@ -76,7 +87,7 @@ func testVerifier(t *testing.T) auth.StaticVerifier {
 func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
 	t.Helper()
 	v := testVerifier(t)
-	cfg := apiserver.Config{DatabaseURL: "postgres://ac_app_login:local@localhost:5432/ac_test?sslmode=disable", Clock: clockFunc}
+	cfg := apiserver.Config{DatabaseURL: testDB("ac_app_login"), Clock: clockFunc}
 	opt(&cfg)
 	if clusterMode && len(cfg.Domains) == 0 {
 		f := clusterFacade(t, cfg, v)

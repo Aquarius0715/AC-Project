@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   actions, activity, bucket, capacity, kpis, partnerJob, period, progress, shift, timeline, timelinePct, until, weekOf,
-  type ApiCapacity, type ApiMember, type ApiPartnerJob, type Assignment, type PartnerJob,
+  type ApiCapacity, type ApiMember, type ApiPartnerJob, type PartnerJob,
 } from "@ac/web/lib/partnerOverview";
 
 const NOW = "2026-09-21T01:30:00Z"; // Mon 09:30 in Kuala Lumpur
 const now = Date.parse(NOW);
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
 const offer = (id: string, status: "offered" | "accepted", exp = "2026-09-21T17:00:00Z"): ApiPartnerJob => ({ projection: "offer", status, jobId: id, jobVersion: 2, offerId: `o-${id}`, type: "reactive", siteAddress: "Jalan 1, KL", requestedSlot: slot("2026-09-22T01:00:00Z", "2026-09-22T03:00:00Z"), dueAt: "2026-09-24T10:00:00Z", offerExpiresAt: exp, visitSlot: slot("2026-09-22T01:00:00Z", "2026-09-22T03:00:00Z") });
-const summary = (id: string, status: string, over: Partial<Extract<ApiPartnerJob, { projection: "summary" }>> = {}): ApiPartnerJob => ({ projection: "summary", id, version: 3, unitId: `u-${id}`, type: "periodic", status, dueAt: "2026-09-25T00:00:00Z", requestedSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z"), scheduledSlot: null, assignmentId: null, displayStatus: status, ...over });
+const summary = (id: string, status: string, over: Partial<Extract<ApiPartnerJob, { projection: "summary" }>> = {}): ApiPartnerJob => ({ projection: "summary", id, version: 3, unitId: `u-${id}`, type: "periodic", status, dueAt: "2026-09-25T00:00:00Z", requestedSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z"), scheduledSlot: null, assignmentId: null, displayStatus: status, technicianMembershipId: null, ...over });
 const members: ApiMember[] = [
   { id: "m-a", userId: "user-a", displayName: "tech-external-a", role: "technician", qualifications: [{ code: "demo_refrigerant", revokedAt: null }] },
   { id: "m-b", userId: "user-b", displayName: "tech-external-a2", role: "technician", qualifications: [] },
@@ -18,18 +18,16 @@ const names = new Map(members.map((m) => [m.id, m.displayName]));
 
 function fixture(): PartnerJob[] {
   const units = new Map([["u-p05", "Server room AC"], ["u-p07", "Server room AC"], ["u-ca", "Bedroom AC"], ["u-p02", "Rooftop unit"]]);
-  const assignments = new Map<string, Assignment>([
-    ["p07", { technicianMembershipId: "m-a", scheduledStart: "2026-09-20T01:00:00Z", scheduledEnd: "2026-09-20T09:00:00Z", status: "active" }],
-    ["ca", { technicianMembershipId: "m-a", scheduledStart: "2026-09-21T02:00:00Z", scheduledEnd: "2026-09-21T04:00:00Z", status: "active" }],
-    ["p05", { technicianMembershipId: "m-a", scheduledStart: "2026-09-19T01:00:00Z", scheduledEnd: "2026-09-19T03:00:00Z", status: "active" }],
-  ]);
   const rows: ApiPartnerJob[] = [
     offer("p09", "offered"), offer("x01", "accepted"),
-    summary("p02", "accepted"), summary("p07", "assigned", { assignmentId: "as-7" }), summary("ca", "in_progress", { assignmentId: "as-ca" }),
-    summary("p05", "submitted", { assignmentId: "as-5" }), summary("c1", "completed"), summary("z1", "cancelled"),
+    summary("p02", "accepted"),
+    summary("p07", "assigned", { assignmentId: "as-7", technicianMembershipId: "m-a", scheduledSlot: slot("2026-09-20T01:00:00Z", "2026-09-20T09:00:00Z") }),
+    summary("ca", "in_progress", { assignmentId: "as-ca", technicianMembershipId: "m-a", scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") }),
+    summary("p05", "submitted", { assignmentId: "as-5", technicianMembershipId: "m-a", scheduledSlot: slot("2026-09-19T01:00:00Z", "2026-09-19T03:00:00Z") }),
+    summary("c1", "completed"), summary("z1", "cancelled"),
     { projection: "history", jobId: "h1", type: "reactive", status: "completed", completedAt: "2026-09-10T00:00:00Z" },
   ];
-  return rows.map((j) => partnerJob(j, units, assignments));
+  return rows.map((j) => partnerJob(j, units));
 }
 
 describe("partner overview", () => {
@@ -55,13 +53,13 @@ describe("partner overview", () => {
   });
 
   it("builds the KPI tiles from the summary counts and the list", () => {
-    const tiles = kpis({ offerCount: 1, activeCount: 5, reviewCount: 1, overdueCount: 1 }, fixture(), now, names);
+    const tiles = kpis({ offerCount: 1, activeCount: 5, reviewCount: 1, overdueCount: 1 }, fixture(), now, names, { from: "2026-09-21", to: "2026-09-27" });
     expect(tiles.map((t) => [t.label, t.value, t.sub, t.href])).toEqual([
-      ["Offers to answer", 1, "p09 · expires in 15 h", "/partner/jobs?status=offered"],
+      ["Offers to answer", 1, "p09 · expires in 15 h", "/partner/jobs?tab=offered&from=2026-09-21&to=2026-09-27"],
       ["Awaiting assignment", 2, "Accepted, no technician yet", "/partner/schedule"],
-      ["In progress / scheduled", 3, "tech-external-a on site 10:00", "/partner/jobs?status=active"],
+      ["In progress / scheduled", 3, "tech-external-a on site 10:00", "/partner/jobs?tab=active&from=2026-09-21&to=2026-09-27"],
       ["Reports to review", 1, "p05 · Server room AC · awaiting review", "/partner/jobs/p05/review"],
-      ["Overdue", 1, "Past the due date or the work window (IR89)", "/partner/jobs?status=active"],
+      ["Overdue", 1, "Past the due date or the work window (IR89)", "/partner/jobs?tab=active&from=2026-09-21&to=2026-09-27"],
     ]);
     expect(tiles[1].tone).toBe("warn");
     expect(tiles[4].tone).toBe("crit");

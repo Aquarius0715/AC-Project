@@ -7,3 +7,6 @@ docs/05-document-review/
 # Go build / coverage artifacts (service/*)
 service/coverage.out
 service/.cover/
+service/api/coverage.out
+service/api/.cover/
+service/api/.test-all/

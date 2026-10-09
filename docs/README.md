@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.115.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
+Version: 0.116.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.116.0 (2026-10-09): Contractor job list from the Core API — status tabs with counts, sort, the overview’s period, cursor paging — and the job summary names the technician of its active assignment; both test suites run on fresh databases at the same time (IR225).
 0.115.0 (2026-10-09): Contractor overview from the Core API — one period for KPIs, progress, actions and capacity, today’s timeline, recent job activity — and the offer decline event name fixed (IR224).
 0.114.0 (2026-10-09): The web apps call the Core API at its REST routes (route table generated from the operation catalog, one request mapping shared by the data access layer and the BFF relay); `POST /v1/ops/<operation>` is retired; malformed IDs in paths are not found; crawl findings fixed and the remaining fixture content on browser-read screens listed (IR223).
 0.113.0 (2026-10-09): Every Core API operation has REST routes with proper HTTP methods — reads GET with the input in the path and the query string, creates POST, updates PUT, deletes DELETE, business commands POST …/{id}/<verb> — catalogued in `rest_routes` of the operation catalog, served by the domain services and the gateway, used by the integration tests and described in Swagger (IR222).
