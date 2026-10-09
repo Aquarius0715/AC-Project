@@ -3,9 +3,11 @@
 /**
  * Shared client-user mock store (FR-A17 / FR-C19 / IR114). The customer owner (Client app,
  * /customer/users) and HQ (Admin › Customers & units › Users) read and write the same rows.
- * Demo only: invitations and resends are previews; state lives in localStorage and is reset from /demo.
+ * Demo only: invitations and resends are previews; state lives in the tab (lib/demoStore: a reload or /demo reset
+ * restores the seed, FR-X05).
  */
 import { useSyncExternalStore } from "react";
+import { readDemo, writeDemo } from "@ac/web/lib/demoStore";
 
 export type ClientRole = "owner" | "member";
 export type ClientUser = { id: string; name: string | null; email: string; role: ClientRole; status: "invited" | "active" | "disabled"; lastSignIn: string | null; invitedBy?: string; invitedAt?: string };
@@ -23,13 +25,12 @@ let state: ClientUser[] | null = null;
 const listeners = new Set<() => void>();
 const load = () => {
   if (state) return state;
-  state = CLIENT_USERS_SEED;
-  try { const s = localStorage.getItem(KEY); if (s) state = JSON.parse(s); } catch {}
-  return state!;
+  state = readDemo<ClientUser[]>(KEY) ?? CLIENT_USERS_SEED;
+  return state;
 };
 const save = (next: ClientUser[]) => {
   state = next;
-  try { localStorage.setItem(KEY, JSON.stringify(next)); } catch {}
+  writeDemo(KEY, next);
   listeners.forEach((l) => l());
 };
 const subscribe = (l: () => void) => { listeners.add(l); return () => listeners.delete(l); };

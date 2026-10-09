@@ -1,6 +1,8 @@
 // Across the four apps (FR-C09 → FR-A06 → FR-P02 / FR-P03 → FR-T01; IR113, IR124, IR225–IR232): a customer's request is
 // offered by HQ to contractor-a at the customer's first preferred time; the partner accepts it and gives it to
-// tech-external-a, who then has it to accept. HQ cancels it with a reason at the end, so a run leaves one cancelled job.
+// tech-external-a, who accepts the assignment (受領), after which the partner sees it accepted and the customer the
+// technician's name. HQ cancels it with a reason at the end, so a run leaves one cancelled job. Starting the work needs
+// the visit window, which only a jump of the never-returning demo clock would reach, so the scenario stops here.
 import type { Browser, Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
@@ -54,12 +56,22 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       await expect(partner.getByText("Technician assigned — waiting for acceptance")).toBeVisible();
     });
 
-    await test.step("tech-external-a has it to accept", async () => {
+    await test.step("tech-external-a accepts the assignment", async () => {
       const tech = await open(browser, app("technician"), false);
       await signIn(tech, app("technician"), "tech-external-a");
       await expect(tech.locator(`main a[href="/technician/jobs/${jobId}"]`).first()).toBeVisible();
       await tech.locator(`main a[href="/technician/jobs/${jobId}"]`).first().click();
       await expect(tech.getByRole("main")).not.toContainText("This page isn’t available");
+      await tech.getByRole("button", { name: "✓ Accept assignment" }).click();
+      await expect(tech.getByText("Assignment accepted").first()).toBeVisible();
+      await expect(tech.getByRole("button", { name: "✓ Accept assignment" })).toHaveCount(0);
+    });
+
+    await test.step("the partner and the customer see it accepted", async () => {
+      await partner.goto(`/partner/schedule?jobId=${jobId}`);
+      await expect(partner.getByRole("main")).toContainText("The current technician accepted the assignment ✓");
+      await customer.goto(`/customer/maintenance?jobId=${jobId}`);
+      await expect(customer.getByRole("main")).toContainText("tech-external-a");
     });
   } finally {
     if (jobId) {

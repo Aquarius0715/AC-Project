@@ -3,9 +3,11 @@
 /**
  * Shared maintenance-job mock store (IR113). All four roles read and write the same jobs, so a
  * request made on /customer/maintenance shows up in /admin/jobs, then /partner/jobs and
- * /technician. State lives in localStorage (demo only) and is reset from /demo.
+ * /technician. State lives in the tab (lib/demoStore: kept across role switches, a reload or /demo reset restores the
+ * seed, FR-X05).
  */
 import { useSyncExternalStore } from "react";
+import { readDemo, writeDemo } from "@ac/web/lib/demoStore";
 import { useOp } from "@ac/web/lib/useOp";
 import { apiMode, jobsApi } from "@ac/web/lib/jobsApi";
 
@@ -100,18 +102,12 @@ let state: State | null = null;
 const listeners = new Set<() => void>();
 const load = (): State => {
   if (state) return state;
-  let jobs = SEED, notes: Note[] = [];
-  try {
-    const j = localStorage.getItem(KEY);
-    const n = localStorage.getItem(NKEY);
-    if (j) jobs = JSON.parse(j);
-    if (n) notes = JSON.parse(n);
-  } catch {}
-  state = { jobs, notes };
+  state = { jobs: readDemo<Job[]>(KEY) ?? SEED, notes: readDemo<Note[]>(NKEY) ?? [] };
   return state;
 };
 const save = () => {
-  try { localStorage.setItem(KEY, JSON.stringify(state!.jobs)); localStorage.setItem(NKEY, JSON.stringify(state!.notes)); } catch {}
+  writeDemo(KEY, state!.jobs);
+  writeDemo(NKEY, state!.notes);
   listeners.forEach((l) => l());
 };
 const SERVER: State = { jobs: SEED, notes: [] };

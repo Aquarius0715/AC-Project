@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.30.0
+version: 0.31.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -19,29 +19,41 @@ The features, screen fields, states, and exceptions in this design follow the or
 
 ## 1. Structure and Responsibilities
 
+As built (IR257; the Next.js 16 guides, IR175–IR178, IR199 onwards). `service/web` is an npm workspace with one Next.js App Router app per entry point (IR178) and the shared package `@ac/web`:
+
 ```text
-src/
-  app/                router, providers, composition-root, route-guards
-  features/           units, jobs, billing, restrictions, energy, devices...
-    <feature>/        pages, components, queries, forms, schemas
-  domain/             entities, policies, transitions, repository-contracts
-  infrastructure/
-    mock/             repository, fixtures, scenario-clock, event-bus
-    adapters/         replacement point for external data (interface only in this phase)
-  shared/
-    ui/               shadcn-based UI primitives
-    components/       shared business displays such as StatusBadge and MetricCard
-    styles/           tokens.css
-    config/           demo-settings, locale-settings
-    i18n/             en, ms
-tests/                unit, component, contract, e2e
+service/web/
+  customer/ partner/ technician/ admin/   one app each: routes, the role layout, proxy.ts, Server Actions
+  shared/ (@ac/web)
+    components/   AppShell, ui primitives (Tailwind CSS 4, Figma UI Guideline tokens), shared parts (JobBits, QrScan …)
+    lib/          dal.ts (server-only data access), session, rest + routes.gen (Core API REST routes from the catalog),
+                  pure mappers and validators per screen (Vitest), URL state, the Phase 1A demo stores
+    screens/      shared screens: sign-in, notifications, preferences, demo, page unavailable
+    bff/          Route Handlers: OIDC sign-in, callback and sign-out; /bff/ops for interactive reads; session
+  e2e/            Playwright end-to-end tests against the local stack (IR252–IR256)
 ```
 
-Data dependencies run in this order: `page → feature hook → Repository interface → injected adapter`. The domain layer (business rules) depends on neither React, HTTP, nor mocks. Pages must not use fetch, mock seeds (initial data), or localStorage directly. Only the composition-root selects the adapter.
+**Data in API mode (`DATA_SOURCE=api`).**
+- Reads: a route's `page.tsx` is a Server Component. It reads through `lib/dal.ts`, which is `server-only`: the session comes from the app's signed cookie, and each operation goes to its Core API REST route. The page passes plain rows to Client Components. Mapping DTOs to view rows is done by pure functions in `shared/lib`.
+- Writes: Server Actions in `actions.ts` next to the route. Each one checks its input, calls the operation with the row version (`X-Expected-Version`) and an Idempotency-Key, and calls `refresh()` so the route renders again. Field errors return to the form.
+- Interactive reads: reads that follow a gesture, such as the technician's QR scan, go through the BFF Route Handler `/bff/ops/<operation>`.
+- The browser never calls the Core API.
 
-Screen navigation follows the same approach. Pages and feature hooks must not call router APIs (`useRouter`, `useParams`, `usePathname`, `useSearchParams`, etc.) directly. Instead, they use a small Navigation interface under `shared` (for example, `navigateTo(routeKey, params)` and `getParam(name)`). Only the composition-root knows its router implementation (Next.js App Router, DEC-67). As with the Repository pattern, this separates the interface from its implementation, so a future router change affects only the Navigation interface implementation.
+**Phase 1A demo (`DATA_SOURCE` unset).** The same routes render the demo components with in-browser fixture rows; nothing reaches a network. The shared demo stores (jobs, client users) live in the tab (`lib/demoStore`). The four apps of a tab on one origin see the same demo data, and switching roles keeps it; a reload or the reset on `/demo` brings back the seed (FR-X05).
 
-The stack is TypeScript (strict mode), React, and **Next.js (App Router)** (DEC-67, IR116; this replaces the earlier Vite + React Router SPA proposal). In Phase 1A all screens are client components that call the mock adapter, so the demo can be served as a static or Node-hosted build. In production the same Next.js app is also the BFF (backend for frontend): it keeps the server-side session and relays operations to the Core API ([backend architecture](backend-architecture.md)); the browser never calls the Core API directly. The `src/` tree above maps to Next.js as `app/` (routes and route groups), with features/domain/infrastructure/shared as plain modules. At implementation start, check library version compatibility and fix versions in a lockfile.
+**Navigation.** `next/link` and `next/navigation` are used directly. Filters, tabs and the selection live in the URL: `lib/urlState.ts` reads them through `useSyncExternalStore`, and `useUrlPatch` writes them, replacing the history entry. One router serves every app, so the earlier Navigation-interface proposal is not used.
+
+**UI and forms — open decision (DEC-03).** The SRC-02 production condition “shared libraries, reactForms” has no archived original. DEC-03 (PROPOSED) reads it as shadcn/ui, Lucide, React Hook Form, Zod and TanStack Query; the role designs and the UIUX specification still describe that proposal. The build follows the Next.js guides instead:
+- UI: in-house components on Tailwind CSS 4 (`shared/components/ui.tsx`) that follow the Figma UI Guideline, with glyph icons.
+- Forms: controlled inputs, pure validators per form in `shared/lib`, and the Core API's field errors from Server Actions.
+
+Whether to adopt the DEC-03 libraries or record the build's choice is for the product owner to decide. TanStack Query does not apply in API mode: reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+**Language — open gap.** FR-X01 asks that a language change reach key screens, notifications and dates. The build shows English only; the user's language (en / ms) is stored in Preferences, ready for Malay strings.
+
+**Tests.** Vitest covers the shared mappers and validators. Playwright end-to-end tests run against the local stack. The Core API has its Go integration and unit tests.
+
+The stack is TypeScript (strict mode), React 19 and Next.js 16 App Router (DEC-67, DEC-71) with Tailwind CSS 4. Each app is its own container (container design) with its own session cookie (IR175).
 
 ## 2. Shared Routes and Screen States
 
@@ -109,7 +121,9 @@ Telemetry's `isDemo` is separate from whether data is measured or estimated. Eve
 
 ## 4. Frontend Data Service Boundaries
 
-Separate layers in this order: `page → feature hook → Repository interface → mock adapter`. Repository here means a group of asynchronous services called by the frontend, not a database access layer. This phase builds only the interface and a mock adapter using shared memory.
+As built (IR257): in API mode the server-side DAL (§1) calls each operation at its Core API REST route and gets the data or a DomainError. The Phase 1A demo renders fixture rows and the shared demo stores. The Repository interface below is the Phase 1A proposal; its contract still holds — ServiceResult, DomainError, ignoring late responses.
+
+Phase 1A proposal: separate layers in this order: `page → feature hook → Repository interface → mock adapter`. Repository here means a group of asynchronous services called by the frontend, not a database access layer. This phase builds only the interface and a mock adapter using shared memory.
 
 ```ts
 interface CommandRepository {
@@ -122,7 +136,7 @@ interface CommandRepository {
 
 `DemoViewContext` describes the selected fictional user, role, and visible scope. `DemoWriteOptions` carries a key to prevent duplicate demo actions and the version before the change. These do not define production authentication or server permissions. See the [Frontend Input and Output Contract](implementation-contracts.md) for the fields.
 
-The [Operation Catalog](operation-catalog.csv) lists the 200 local service operations needed by the screens, with their inputs, return values, and screens that use them. It does not define URLs, HTTP methods, database tables, or server transactions.
+The [Operation Catalog](operation-catalog.csv) lists the 200 local service operations needed by the screens, with their inputs, return values, and screens that use them. Its `rest_routes` column gives each operation's Core API REST route (IR222); database tables and transactions are in the [database design](database-design.md).
 
 Successful mock operations return ServiceResult<T>; failures reject with DomainError. Pending processing is shown through Command.status or similar fields in the success DTO. Do not create a custom pending Promise response type.
 
@@ -238,4 +252,4 @@ API paths, HTTP methods, databases, server authentication and authorization, rea
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.30.0: Read IR01–139 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.31.0: Read IR01–IR257 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
