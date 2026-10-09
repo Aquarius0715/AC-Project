@@ -11,7 +11,7 @@ import type { MaintenanceLive } from "../_lib/load";
 
 type Filters = NonNullable<MaintenanceLive["filters"]>;
 /** The New request modal opened from a row: the unit, type preventive and a symptom line. */
-export type CleaningPrefill = { unitId: string; symptom: string };
+export type CleaningPrefill = { unitId: string; symptom: string; type?: "reactive" | "preventive" };
 type Props = { f: Filters; owner: boolean; onRequest: (p: CleaningPrefill) => void; onDone: (text: string) => void; onFail: (f: ActionFailure) => void };
 
 /** Filter care (FR-C18, DD-C18, Figma Client 07j) from the Core API: run time since the cleaning per AC, areas with many

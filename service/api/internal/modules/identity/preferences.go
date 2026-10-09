@@ -264,7 +264,7 @@ func RegisterPreferences(r *ops.Registry) {
 //	@Description	Authorization: authenticated:own-session
 //	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 //	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-//	@Description	Design: DDC-07, DD-C04
+//	@Description	Design: DDC-07, DD-C04, DD-C15
 //	@Tags			preferences
 //	@Accept			json
 //	@Produce		json

@@ -167,8 +167,12 @@ func TestSessionGet(t *testing.T) {
 	if d["displayName"] != user || d["organizationName"] != org || user == "" || org == "" {
 		t.Errorf("names: %v %v (%s, %s)", d["displayName"], d["organizationName"], user, org)
 	}
-	if _, c := post(s, &customerA, "session.get", `{}`); c["data"].(map[string]any)["clientRole"] != "owner" || c["data"].(map[string]any)["organizationName"] == "" {
+	if _, c := post(s, &customerA, "session.get", `{}`); c["data"].(map[string]any)["clientRole"] != "owner" || c["data"].(map[string]any)["organizationName"] == "" ||
+		c["data"].(map[string]any)["customerId"] != seed.ID("cust-a").String() { // IR243: the client's customer
 		t.Errorf("client owner session: %v", c["data"])
+	}
+	if d["customerId"] != nil {
+		t.Errorf("HQ session customer: %v", d["customerId"])
 	}
 	meta := m["meta"].(map[string]any) // Meta of service-contracts.ts
 	if meta["snapshotAt"] != clock.Format(time.RFC3339) || meta["correlationId"] == "" || meta["eventCursor"] == nil {

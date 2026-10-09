@@ -39,7 +39,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | DD-C12 / FR-C12 | `/customer/payments/:id` / `RestrictionNotice` | `restrictions.forInvoice`, `commands.get`, `inquiries.create`, `inquiries.list` | Restrictions are read-only. Provide inquiry and payment paths. Show target units and applied rule version | Hold processing when offline. Provide no customer forced-release feature |
 | DD-C13 / FR-C13 | `/customer/energy/offsets` / `OffsetPreview` | `energy.summary`, `offsets.preview`, `offsets.simulate`, `offsets.list`, `units.list` | Enter requested quantity (>0), period, and demo confirmation. Issue no proof numbers for real trades or certification | Show actual CO2 reductions separately from retired credits. Prevent duplicate requests after failure |
 | DD-C14 / FR-C14 | `/customer/properties?mode=group` / `GroupControl` | `units.list`, `units.get`, `commands.create`, `commands.get` | Owner only; one room/area; review per-unit change and skips; one Command per AC | Offline/restricted ACs skipped or clamped before sending; retry failed ACs one by one |
-| DD-C15 / FR-C15 | `/customer/alerts?tab=policies` / `AlertPolicyList` | `policies.list`, `policies.get`, `policies.save`, `policies.delete`, `policies.setDefaultRule`, `units.setAlertPolicies`, `units.list` | Default policy rules on/off per customer; own policies with one condition; recovery direction and fixed units | Default policy cannot be edited or deleted; delete detaches first |
+| DD-C15 / FR-C15 | `/customer/alerts?tab=policies` / `AlertPolicyList` | `policies.list`, `policies.get`, `policies.save`, `policies.delete`, `policies.setDefaultRule`, `units.setAlertPolicies`, `units.list`, `preferences.get` | Default policy rules on/off per customer; own policies with one condition; recovery direction and fixed units | Default policy cannot be edited or deleted; delete detaches first |
 | DD-C16 / FR-C16 | `/customer/energy` / `EnergyReportExport` | `energy.exportReport` | Completed month, at least one section, PDF/CSV | Same tariff and estimation labels as the screen |
 | DD-C17 / FR-C17 | `/customer/maintenance?jobId=` / `JobCompletionFeedback` | `jobs.get`, `jobs.rate`, `jobs.reportProblem` | 1–5 ★ required; editable 7 days; problem details 10–2000, up to 5 photos | Not completed → CONFLICT; ratings never shown to other customers |
 | DD-C18 / FR-C18 | `/customer/maintenance?tab=filter-care` / `FilterCare` | `filterCare.list`, `filterCare.markCleaned`, `filterCare.saveSettings`, `filterCare.getSettings` | Run time since cleaning per AC; threshold 50–2000 h or model default; fallback days 7–180 | Offline → unknown, never 0 |
@@ -523,7 +523,7 @@ Scope: FR-C14 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 **Source mapping**: SRC-06 BIZ-08, BIZ-17, BIZ-18 → FR-C15 → DD-C15. Source category: Figma-confirmed screen specification (Client 06e–06g, 02e, 02l, 2026-10-01).
 
-Scope: FR-C15 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `policies.list, policies.get, policies.save, policies.delete, policies.setDefaultRule, units.setAlertPolicies, units.list`.
+Scope: FR-C15 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `policies.list, policies.get, policies.save, policies.delete, policies.setDefaultRule, units.setAlertPolicies, units.list, preferences.get`.
 
 **Initial view and prerequisites**: Client of the customer. `policies.list` with kind alert returns the default policy (kind=default_alert) and the customer’s policies.
 

@@ -47,7 +47,7 @@ func TestFilterReminders(t *testing.T) {
 	}
 	type alert struct {
 		id, status, severity, ruleKey, evidence, reason string
-		failures                                       int
+		failures                                        int
 	}
 	alertsOf := func(u string) []alert {
 		t.Helper()
@@ -132,7 +132,9 @@ func TestFilterReminders(t *testing.T) {
 	member, user := uuid.NewString(), newUser(t)
 	owner(t, `INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from) VALUES ($1,$2,$3,$4,'client','member',$5)`,
 		member, tenant, user, org, clock.Add(-time.Hour))
-	t.Cleanup(func() { owner(t, `UPDATE identity.memberships SET valid_until = valid_from + interval '1 minute' WHERE id = $1`, member) })
+	t.Cleanup(func() {
+		owner(t, `UPDATE identity.memberships SET valid_until = valid_from + interval '1 minute' WHERE id = $1`, member)
+	})
 	settings(`{"thresholdHours":100,"fallbackDays":30,"recipients":"all_users","channels":["inApp","email"]}`)
 	owner(t, `UPDATE maintenance.filter_cleanings SET cleaned_at = $2 WHERE unit_id = $1`, u, clock.Add(-150*time.Hour))
 	at := clock.Add(30 * time.Minute)

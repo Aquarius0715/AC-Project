@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.132.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
+Version: 0.133.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.133.0 (2026-10-10): Customer alert policies from the Core API — default rules switched by the owner, own policies with When / Then and attached ACs, on / off, the editor with its summary sentence, delete; Session.customerId for client sessions; the alert inbox gets the unit filter and View unit / Book cleaning / Request repair (IR243).
 0.132.0 (2026-10-10): The shell names the signed-in user and organization and counts its sidebar badges from the Core API (Session.displayName / organizationName, IR241); the customer alert inbox reads its read state from the notifications and shows the real status (IR242).
 0.131.0 (2026-10-10): Customer overview from the Core API — property, unit and period in the URL, tiles for the selection, the unit table from the latest measured readings (not the AC setting), energy against the previous period, emissions, air quality, Needs attention and automations (IR240).
 0.130.0 (2026-10-10): Filter cleaning reminders from the maintenance scheduler — every 15 minutes an overdue AC gets one reminder per cleaning cycle: a maintenance Alert (“Filter cleaning reminder”) and cleaning_due notifications to the owners or all users by app and e-mail; a later cleaning resolves the Alert (IR239).

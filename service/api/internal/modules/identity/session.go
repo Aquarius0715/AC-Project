@@ -23,13 +23,16 @@ type Session struct {
 	Role         string    `json:"role"`
 	ClientRole   *string   `json:"clientRole"` // owner / member for client sessions, otherwise null (the owner-only Users page, IR210)
 	// DisplayName and OrganizationName name the signed-in user and the membership's organization in the shell (IR241)
-	DisplayName      string    `json:"displayName"`
-	OrganizationName string    `json:"organizationName"`
-	Permissions      []string  `json:"permissions"`
-	Generation       int       `json:"generation"`
-	ViewEpoch        int       `json:"viewEpoch"`
-	IssuedAt         time.Time `json:"issuedAt"`
-	ExpiresAt        time.Time `json:"expiresAt"`
+	DisplayName      string `json:"displayName"`
+	OrganizationName string `json:"organizationName"`
+	// CustomerID is a client session's customer (its organization's), for the writes that name it (alert policies,
+	// default rule settings, IR243); null for the other roles
+	CustomerID  *uuid.UUID `json:"customerId"`
+	Permissions []string   `json:"permissions"`
+	Generation  int        `json:"generation"`
+	ViewEpoch   int        `json:"viewEpoch"`
+	IssuedAt    time.Time  `json:"issuedAt"`
+	ExpiresAt   time.Time  `json:"expiresAt"`
 }
 
 // SessionTTL is the idle lifetime reported to the client.
@@ -86,6 +89,16 @@ func sessionGet(ctx context.Context, c *ops.Call, _ *struct{}) (Session, error) 
 		JOIN identity.organizations o ON o.id = m.organization_id WHERE m.id = $1`, p.MembershipID).Scan(&out.DisplayName, &out.OrganizationName)
 	if errors.Is(err, pgx.ErrNoRows) {
 		err = nil
+	}
+	if err == nil && p.Role == "client" { // identity's reference copy of the customers (IR188)
+		var id uuid.UUID
+		switch e := c.Tx.QueryRow(ctx, `SELECT c.id FROM notify.ref_customers c JOIN identity.memberships m ON m.organization_id = c.organization_id WHERE m.id = $1`,
+			p.MembershipID).Scan(&id); {
+		case e == nil:
+			out.CustomerID = &id
+		case !errors.Is(e, pgx.ErrNoRows):
+			err = e
+		}
 	}
 	return out, err
 }

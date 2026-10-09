@@ -25,7 +25,7 @@ const stamp = (iso: string) => new Date(iso).toLocaleString("en-MY", { dateStyle
 /** A notification about an alert (Notification of service-contracts.ts: the fields the inbox needs). */
 export type AlertNote = { id: string; version: number; sourceAlertId: string | null; readAt: string | null };
 export type InboxAlert = {
-  id: string; title: string; severity: "critical" | "warning" | "normal"; kind: string; where: string; evidence: string; group: "attn" | "info";
+  id: string; unitId: string; type: string; title: string; severity: "critical" | "warning" | "normal"; kind: string; where: string; evidence: string; group: "attn" | "info";
   status: { text: string; tone: "warn" | "primary" | "ok" | "muted"; detail: string };
   /** the signed-in membership's notifications about the alert: unread ones (marked read on opening) and how many exist */
   unread: { id: string; version: number }[]; notes: number;
@@ -44,7 +44,7 @@ export function inboxAlerts(alerts: ApiAlert[], notes: AlertNote[], unit: (id: s
       : a.status === "acknowledged" ? { text: "Acknowledged", tone: "primary" as const, detail: `Acknowledged ${a.acknowledgedAt ? stamp(a.acknowledgedAt) : ""} · still unresolved`.trim() }
       : { text: "Unresolved", tone: a.severity === "normal" ? "muted" as const : "warn" as const, detail: "Open — not resolved yet" };
     return {
-      id: a.id, title: alertTitle(a), severity: a.severity,
+      id: a.id, unitId: a.unitId, type: a.type, title: alertTitle(a), severity: a.severity,
       kind: a.evidenceKind === "inspection" ? "✎ Inspection record" : a.type === "maintenance" ? "◷ Maintenance reminder" : a.type === "quality" ? "≋ Air quality" : "✕ Fault",
       where: `${u ? `${u.name}${u.place ? ` · ${u.place}` : ""}` : "AC"} · detected ${stamp(a.detectedAt)}`,
       evidence: `${evidenceLabel[a.evidenceKind] ?? "Evidence"}: ${a.evidenceText}`,

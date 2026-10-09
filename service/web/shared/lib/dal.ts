@@ -49,12 +49,12 @@ export async function coreAll<T>(operation: string, query: { filters?: Record<st
 }
 
 /** session.get once per render pass: the principal and the response meta. */
-const coreSession = cache(() => coreCall<{ permissions?: string[]; userId?: string; membershipId?: string; tenantId?: string; clientRole?: "owner" | "member" | null; displayName?: string; organizationName?: string }>("session.get", {}, {}));
+const coreSession = cache(() => coreCall<{ permissions?: string[]; userId?: string; membershipId?: string; tenantId?: string; clientRole?: "owner" | "member" | null; displayName?: string; organizationName?: string; customerId?: string | null }>("session.get", {}, {}));
 
 /** The signed-in principal (session.get): user, membership and tenant, e.g. to block self-grants before the API does. */
 export const corePrincipal = cache(async () => {
   const { data } = await coreSession();
-  return { userId: data.userId ?? "", membershipId: data.membershipId ?? "", tenantId: data.tenantId ?? "", clientRole: data.clientRole ?? null };
+  return { userId: data.userId ?? "", membershipId: data.membershipId ?? "", tenantId: data.tenantId ?? "", clientRole: data.clientRole ?? null, customerId: data.customerId ?? null };
 });
 
 /** Who is signed in, for the shell: the user's display name and the membership's organization (session.get, IR241). */

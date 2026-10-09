@@ -30,10 +30,10 @@ export function MaintenanceView({ live }: { live: MaintenanceLive }) {
   const [going, startGo] = useTransition();
   const [target, setTarget] = useState<"requests" | "filters">(live.page);
   const page = going ? target : live.page;
-  const [prefill, setPrefill] = useState<CleaningPrefill | null>(null);
+  const [prefill, setPrefill] = useState<CleaningPrefill | null>(live.newFor ? { unitId: live.newFor, symptom: "", type: "reactive" } : null);
   const [tab, setTab] = useState<StatusTab>("all");
   const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");
-  const [modal, setModal] = useState<ModalKind>(null);
+  const [modal, setModal] = useState<ModalKind>(live.newFor ? "new" : null);
   const [result, setResult] = useState<{ tone: "ok" | "warn" | "crit"; text: string } | null>(null);
   const d = live.detail;
   const count = (t: StatusTab) => live.rows.filter((r) => t === "all" || r.tab === t).length;
@@ -193,7 +193,7 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
   const now = Date.parse(live.now);
   const [pending, run] = useAction();
   const [unitId, setUnitId] = useState(prefill?.unitId ?? live.units[0]?.id ?? "");
-  const [type, setType] = useState<"reactive" | "preventive">(prefill ? "preventive" : "reactive");
+  const [type, setType] = useState<"reactive" | "preventive">(prefill?.type ?? (prefill ? "preventive" : "reactive"));
   const [sym, setSym] = useState(prefill?.symptom ?? "");
   const [rows, setRows] = useState<Row[]>(threeRows(now));
   const [contact, setContact] = useState("");

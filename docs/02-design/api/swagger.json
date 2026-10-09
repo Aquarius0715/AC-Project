@@ -20324,7 +20324,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: authenticated:own-session\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DDC-07, DD-C04",
+                "description": "Authorization: authenticated:own-session\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DDC-07, DD-C04, DD-C15",
                 "consumes": [
                     "application/json"
                 ],
@@ -30266,6 +30266,10 @@
             "properties": {
                 "clientRole": {
                     "description": "owner / member for client sessions, otherwise null (the owner-only Users page, IR210)",
+                    "type": "string"
+                },
+                "customerId": {
+                    "description": "CustomerID is a client session's customer (its organization's), for the writes that name it (alert policies,\ndefault rule settings, IR243); null for the other roles",
                     "type": "string"
                 },
                 "displayName": {
