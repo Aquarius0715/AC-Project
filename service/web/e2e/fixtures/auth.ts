@@ -40,15 +40,17 @@ export function totp(secret: string, at = Date.now()): string {
 
 const home = (app: App) => (u: URL) => u.origin === new URL(app.url).origin && (u.pathname === app.home || u.pathname.startsWith(app.home + "/"));
 
-export async function signIn(page: Page, app: App): Promise<void> {
+/** `as` signs in another account of the same role (the identity provider's username field takes it). */
+export async function signIn(page: Page, app: App, as = app.user): Promise<void> {
   await page.goto(`${app.url}/login`);
   await page.getByRole("link", { name: `Continue as ${app.user} →` }).click();
-  await page.locator("#password").fill(passwordOf(app.user));
+  if (as !== app.user) await page.locator("#username").fill(as);
+  await page.locator("#password").fill(passwordOf(as));
   await page.locator("#kc-login").click();
   if (app.otp) {
     // a code is accepted once per 30 s window: if the last run used this window's code, the next window's is taken
     for (let attempt = 0; attempt < 2; attempt++) {
-      await page.locator("#otp").fill(totp(otpSecretOf(app.user)));
+      await page.locator("#otp").fill(totp(otpSecretOf(as)));
       await page.locator("#kc-login").click();
       if (await page.waitForURL(home(app), { timeout: 8_000 }).then(() => true, () => false)) return;
       await page.waitForTimeout(31_000 - (Date.now() % 30_000));

@@ -13,13 +13,17 @@ export default defineConfig<object, { app: App }>({
   timeout: 90_000,
   expect: { timeout: 10_000 },
   use: { ...devices["Desktop Chrome"], viewport: { width: 1920, height: 1080 }, trace: "retain-on-failure", screenshot: "only-on-failure" },
-  projects: APPS.flatMap((app) => [
-    { name: `${app.id}-setup`, testMatch: /setup\/auth\.setup\.ts$/, use: { app, baseURL: app.url } },
-    {
-      name: app.id,
-      dependencies: [`${app.id}-setup`],
-      testMatch: [/specs\/shared\/.*\.e2e\.ts$/, new RegExp(`specs/${app.id}/.*\\.e2e\\.ts$`)],
-      use: { app, baseURL: app.url, storageState: app.state },
-    },
-  ]),
+  projects: [
+    ...APPS.flatMap((app) => [
+      { name: `${app.id}-setup`, testMatch: /setup\/auth\.setup\.ts$/, use: { app, baseURL: app.url } },
+      {
+        name: app.id,
+        dependencies: [`${app.id}-setup`],
+        testMatch: [/specs\/shared\/.*\.e2e\.ts$/, new RegExp(`specs/${app.id}/.*\\.e2e\\.ts$`)],
+        use: { app, baseURL: app.url, storageState: app.state },
+      },
+    ]),
+    // flows that cross the apps (customer → HQ → partner → technician), each with its own browser contexts
+    { name: "scenarios", dependencies: APPS.map((a) => `${a.id}-setup`), testMatch: /specs\/scenarios\/.*\.e2e\.ts$/ },
+  ],
 });

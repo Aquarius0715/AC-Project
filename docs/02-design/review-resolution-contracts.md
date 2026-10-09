@@ -2439,3 +2439,17 @@ The IR252 suite gains specs for the customer, partner and technician apps. Each 
 3. **Partner jobs.** Every status tab keeps the URL and is selected. It lists jobs, or nothing when its count is 0, and the first job opens its detail.
 4. **Technician QR scan.** See IR254.
 5. **Result.** 51 passed and 9 skipped. The skips: the opt-in clock jump in each app, the client-only consent in the other three apps, the technician's device fault without a current assignment, and Request cleaning while no AC is overdue.
+
+## IR256 An end-to-end scenario across the four apps — 2026-10-10
+
+The IR252 suite now also checks one job's way through all four apps. A `scenarios` project runs after every app's sign-in and opens its own browser context per app.
+
+1. **Scenario.**
+   - The customer sends a maintenance request with the default three preferred times.
+   - HQ opens it in the Jobs tab, uses the first preferred time and offers it to contractor-a with the default offer and access windows.
+   - The partner accepts the offer and, in Schedule & assignments, gives the job to tech-external-a.
+   - tech-external-a signs in through the technician app (another account of the same role on the identity provider's form). They have the job to accept on the overview, and its page opens.
+2. **Clean-up.** HQ cancels the job with a reason at the end, whatever happened before.
+3. **Customer request spec.** New request refuses short symptoms and a phone number in the contact window. It is sent with three preferred times, takes a note to the coordinator and is cancelled with a reason. The spec cancels the request it sent whatever happened before, after a failed run had left one requested (it was cancelled by hand).
+4. **Writing specs.** A success that shows both as a toast and as a banner matches twice, so specs take the first match. A clean-up error must not hide the step that failed.
+5. **Result.** 53 passed and 9 skipped. Each run leaves two cancelled jobs whose symptoms start with “E2E”.

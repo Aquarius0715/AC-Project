@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.140.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
+Version: 0.141.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.141.0 (2026-10-10): An end-to-end scenario follows a customer request through HQ's offer, the partner's acceptance and assignment to the technician's overview, and cancels it; a customer request spec too (IR256).
 0.140.0 (2026-10-10): The technician's one-tap QR labels are the units of the open jobs, the only ones a scan resolves (IR254). More end-to-end specs: customer alert policies and filter care, partner job tabs, the technician QR scan (IR255).
 0.139.0 (2026-10-10): A Playwright end-to-end suite in service/web/e2e signs in through the UI and checks every app's pages, session, preferences, demo panel and the HQ jobs period (IR252). A technician's job notifications follow the assignment, as the job itself does (IR253).
 0.138.0 (2026-10-10): The sign-in page renders on the server with each role's Figma texts, goes through the BFF sign-in with the kept returnTo, and says why a sign-in came back (IR251).
