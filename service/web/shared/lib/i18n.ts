@@ -38,12 +38,27 @@ export const intlTag = (locale: Locale) => (locale === "ms" ? "ms-MY" : "en-MY")
 export type Display = { locale: Locale; timeZone: string };
 export const DEFAULT_DISPLAY: Display = { locale: "en", timeZone: "Asia/Kuala_Lumpur" };
 
-/** A date and time as the user reads it (IR44): medium date and short time in their language, in their display time
- * zone, with the zone's abbreviation — “14 Sept 2026, 9:00 am MYT”. Stored times stay UTC. */
-export function showTime(iso: string, d: Display = DEFAULT_DISPLAY): string {
+/** `opts` in the user's language and display time zone with the zone's abbreviation; a zone this runtime does not
+ * know falls back to the default one. */
+function zoned(iso: string | null, d: Display, opts: Intl.DateTimeFormatOptions): string {
+  if (!iso) return "—";
   const at = new Date(iso);
   const tag = intlTag(d.locale);
-  const zone = new Intl.DateTimeFormat(tag, { timeZone: d.timeZone, timeZoneName: "short" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value;
-  const text = at.toLocaleString(tag, { dateStyle: "medium", timeStyle: "short", timeZone: d.timeZone });
-  return zone ? `${text} ${zone}` : text;
+  for (const timeZone of [d.timeZone, DEFAULT_DISPLAY.timeZone]) {
+    try {
+      const zone = new Intl.DateTimeFormat(tag, { timeZone, timeZoneName: "short" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value;
+      const text = at.toLocaleString(tag, { ...opts, timeZone });
+      return zone ? `${text} ${zone}` : text;
+    } catch {
+      // RangeError: unknown time zone
+    }
+  }
+  return iso;
 }
+
+/** A date and time as the user reads it (IR44): medium date and short time in their language, in their display time
+ * zone, with the zone's abbreviation — “14 Sept 2026, 9:00 am MYT”; “—” without a time. Stored times stay UTC. */
+export const showTime = (iso: string | null, d: Display = DEFAULT_DISPLAY) => zoned(iso, d, { dateStyle: "medium", timeStyle: "short" });
+
+/** The IR44 time without the date, where a screen shows only the time of a recent reading: “9:12 am MYT”. */
+export const showClock = (iso: string | null, d: Display = DEFAULT_DISPLAY) => zoned(iso, d, { timeStyle: "short" });

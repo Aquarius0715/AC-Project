@@ -2491,3 +2491,32 @@ IR257 item 6 left FR-X01's language open: a change to Bahasa Melayu was stored b
    - Vitest: 158 passed, including the key check, placeholder parity, the nav labels and the time format.
    - E2E: 53 passed, 9 skipped. Each app switches to Malay and sees “Log keluar”, “Keutamaan”, “Bahasa paparan” and the inbox tab “Semua”, then switches back to English in a `finally`.
    - The dev data is back to en / Asia/Kuala_Lumpur for all four users. customer-a had been left on Asia/Tokyo by an earlier debugging run and was reset.
+
+## IR259 The customer's unit screen in the display language and time zone (AT-X01-N) — 2026-10-10
+
+AT-X01-N ③ opens `/customer/units/unit-online-rto` and expects the Malay display after `preferences.update(locale=ms)`, with stored UTC times, units and IDs unchanged. IR258 had left that screen in English.
+
+1. **Display context.** The shell now passes the user's display language and time zone to the client (`ShellLive.display` from `coreDisplay`; `useDisplay()` beside `useT()`). The browser demo uses the language chosen in this browser and Asia/Kuala_Lumpur.
+2. **Unit screen (FR-C03).** Every label, banner, dialog and toast of `/customer/units/[id]` is translated:
+   - devices in the room;
+   - the readings, remote control and the confirmation;
+   - live telemetry and device information;
+   - alert policies on the AC;
+   - command history.
+   The mode and fan words (Cool / Dry / Fan, Low / Mid / High) are translated; the stored values stay cool / dry / fan and low / mid / high. The server page words its policy rules in the user's language.
+3. **Times (IR44).**
+   - Recent readings and the reported setting show the time of day, for example “9:59 am GMT+9”.
+   - Last seen and the command history show the date and time.
+   Both use the user's display time zone and the zone's abbreviation. `showClock` / `showTime` in `lib/i18n` do this; a zone the runtime does not know falls back to Asia/Kuala_Lumpur.
+4. **Shared parts.** These now speak the display language on every screen: the state badges (power, connection, severity, on/off), the dialog's Close button and the empty table text. The unit helpers take the translator and the display: `actionText`, `historyRow` and `latest`. The technician's unit monitoring shows its readings in the display time zone; its text is still English.
+5. **Translation library — recorded with DEC-03.** The UIUX specification lists i18next + react-i18next as the translation candidate. The build follows the Next.js internationalization guide instead: plain dictionaries, the locale chosen on the server. That is the user's 2026-10-08 instruction to follow the Next.js documentation. Like the UI and form libraries, the UIUX table is left for the product owner's DEC-03 decision.
+6. **Checked.**
+   - Vitest: 161 passed, including units.test.ts — command and history wording in both languages, IR44 times in another zone, and the quality of a stale reading. The key check of IR258 covers the new texts.
+   - E2E: `customer/unit-language.e2e.ts` saves Malay with Asia/Tokyo, opens an AC from the overview and checks the following, then puts English and the zone back in a `finally`:
+     - the Malay headings;
+     - the same path (ID);
+     - °C;
+     - GMT+9 and no MYT.
+   - The whole suite: 54 passed, 9 skipped. All four users are back to en / Asia/Kuala_Lumpur afterwards.
+   - A screenshot of the unit screen in Malay with Asia/Tokyo shows no overflow.
+7. **Still open.** The other business screens and their dates (klTime in Asia/Kuala_Lumpur), and the voice demo's answers.

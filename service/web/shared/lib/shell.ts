@@ -2,7 +2,7 @@
 // sidebar badges — the customer's unresolved critical / warning alerts (summaries.get alertCount, IR51), the
 // contractor's offers waiting for an answer (summaries.get offerCount), HQ's unresolved critical / warning alerts
 // (alerts.list totals) and everyone's unread notifications (notifications.list unreadOnly total, IR102). A count that
-// cannot be read shows no badge; and the user's display language (preferences.get, IR258). Read by the role layouts on
+// cannot be read shows no badge; and the user's display language and time zone (preferences.get, IR258). Read by the role layouts on
 // every render (refresh() after a write reads them again); connection() keeps those layouts from being prerendered at
 // build time, when there is no API (IR248).
 import "server-only";
@@ -24,5 +24,5 @@ export async function loadShell(role: Role): Promise<ShellLive | undefined> {
     counts.push(quiet(Promise.all(parts).then((ns) => ns.reduce((a, b) => a + b, 0))).then((n) => ["/admin/alerts", n]));
   }
   const [who, display, ...badges] = await Promise.all([coreIdentity().catch(() => ({ displayName: "", organizationName: "" })), coreDisplay(), ...counts]);
-  return { user: who.displayName, organization: who.organizationName, badges: Object.fromEntries(badges.filter((b): b is [string, number] => b[1] !== null)), locale: display.locale };
+  return { user: who.displayName, organization: who.organizationName, badges: Object.fromEntries(badges.filter((b): b is [string, number] => b[1] !== null)), display };
 }

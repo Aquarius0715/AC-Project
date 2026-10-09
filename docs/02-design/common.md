@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.32.0
+version: 0.33.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -46,10 +46,15 @@ service/web/
 **UI and forms — open decision (DEC-03).** The SRC-02 production condition “shared libraries, reactForms” has no archived original. DEC-03 (PROPOSED) reads it as shadcn/ui, Lucide, React Hook Form, Zod and TanStack Query; the role designs and the UIUX specification still describe that proposal. The build follows the Next.js guides instead:
 - UI: in-house components on Tailwind CSS 4 (`shared/components/ui.tsx`) that follow the Figma UI Guideline, with glyph icons.
 - Forms: controlled inputs, pure validators per form in `shared/lib`, and the Core API's field errors from Server Actions.
+- Translation: plain dictionaries chosen on the server, as in the Next.js internationalization guide. The UIUX table lists i18next + react-i18next (IR259).
 
 Whether to adopt the DEC-03 libraries or record the build's choice is for the product owner to decide. TanStack Query does not apply in API mode: reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
 
-**Language — partly built (IR258).** FR-X01 asks that a language change reach key screens, notifications and dates. The shell, Preferences, Demo controls and the notifications inbox show the saved language. The English text is the key of the Malay dictionary (`shared/lib/i18n-ms.ts`, a draft not yet reviewed), and a text without an entry stays English. Inbox times follow IR44: the user's language and display time zone, with the zone's abbreviation. The other business screens and their dates are still English, in Asia/Kuala_Lumpur.
+**Language — partly built (IR258, IR259).** FR-X01 asks that a language change reach key screens, notifications and dates.
+- These show the saved language: the shell, Preferences, Demo controls, the notifications inbox and the customer's unit screen (AT-X01-N).
+- The English text is the key of the Malay dictionary (`shared/lib/i18n-ms.ts`, a draft not yet reviewed). A text without an entry stays English.
+- Their times follow IR44: the user's language and display time zone, with the zone's abbreviation (`showTime` / `showClock`).
+- The other business screens and their dates are still English, in Asia/Kuala_Lumpur.
 
 **Tests.** Vitest covers the shared mappers and validators. Playwright end-to-end tests run against the local stack. The Core API has its Go integration and unit tests.
 
@@ -252,4 +257,4 @@ API paths, HTTP methods, databases, server authentication and authorization, rea
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.32.0: Read IR01–IR258 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.33.0: Read IR01–IR259 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

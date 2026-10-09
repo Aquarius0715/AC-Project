@@ -10,7 +10,7 @@ import { AssistantPanel } from "./Assistant";
 import { QrScan } from "./QrScan";
 import { CURRENT_CLIENT } from "@ac/web/lib/clientUsers";
 import { setStoredValue, useStoredValue } from "@ac/web/lib/urlState";
-import { isLocale, LOCALE_KEY, translate } from "@ac/web/lib/i18n";
+import { DEFAULT_DISPLAY, isLocale, LOCALE_KEY, translate, type Display } from "@ac/web/lib/i18n";
 import { I18nProvider } from "./I18n";
 import { useBffSession } from "@ac/web/lib/useOp";
 
@@ -62,15 +62,15 @@ function RoleNavWithQuery(props: { items: NavItem[]; base: string; pathname: str
 }
 
 /** The app frame. In API mode the layout passes `live` (IR241): the organization as the scope label, the signed-in user
- * in the chip, the sidebar badges counted by the Core API (no badge for 0) and the user's display language (IR258);
- * the demo keeps the fixed ones and the language chosen in this browser. */
+ * in the chip, the sidebar badges counted by the Core API (no badge for 0) and the user's display language and time
+ * zone (IR258, IR259); the demo keeps the fixed ones, the language chosen in this browser and Asia/Kuala_Lumpur. */
 export function AppShell({ role: forced, live, children }: { role?: Role; live?: ShellLive; children: React.ReactNode }) {
   const detected = useStoredRole();
   const role = forced ?? detected;
   const cfg = ROLES[role];
   const stored = useStoredValue(LOCALE_KEY);
-  const locale = live ? live.locale : isLocale(stored) ? stored : "en";
-  const t = (text: string) => translate(locale, text);
+  const display: Display = live ? live.display : { ...DEFAULT_DISPLAY, locale: isLocale(stored) ? stored : "en" };
+  const t = (text: string) => translate(display.locale, text);
   const scope = live ? (live.organization || cfg.scope).toUpperCase() : cfg.scope;
   const [roleWord, persona] = cfg.chip.split(" — ");
   const chip = `${t(roleWord)} — ${live ? live.user || t("signed in") : persona}`;
@@ -104,7 +104,7 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
 
 
   return (
-    <I18nProvider locale={locale}>
+    <I18nProvider display={display}>
     <ToastProvider>
       <div className="min-h-dvh lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
         {open && <div className="fixed inset-0 z-30 bg-ink/40 lg:hidden" onClick={() => setOpen(false)} />}

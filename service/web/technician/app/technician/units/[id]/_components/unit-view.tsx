@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Banner, Card, ConnBadge, LineChart, Page, SeverityBadge, SummaryList, Tabs } from "@ac/web/components/ui";
 import { bucket, componentGroups, klTime, latest, windowMs, type ApiUnitDetail } from "@ac/web/lib/units";
+import { useDisplay } from "@ac/web/components/I18n";
 
 export type ApiAlert = { id: string; severity: "critical" | "warning" | "normal"; status: string; causeCode: string; type: string; evidenceText: string; detectedAt: string; acknowledgedAt: string | null };
 export type ApiJob = { projection: string; id?: string; type?: string; status?: string; scheduledSlot?: { startAt: string; endAt: string } | null; requestedSlot?: { startAt: string; endAt: string } | null };
@@ -18,6 +19,7 @@ export type TechUnitData = { d: ApiUnitDetail; alerts: ApiAlert[]; jobs: ApiJob[
 /** Technician unit page. `data` comes from the Server Component in API mode (series = latest 7 days, up to 100
  * temperature measurements); the window tabs filter it on the client. The demo uses fixture values. */
 export function TechUnitView({ id, data }: { id: string; data?: TechUnitData }) {
+  const display = useDisplay(); // reading times in the user's display time zone (IR44)
   const [tab, setTab] = useState<"register" | "monitoring">("register");
   const [win, setWin] = useState<"1h" | "24h" | "7d">("24h");
   const [lost, setLost] = useState(false);
@@ -31,9 +33,9 @@ export function TechUnitView({ id, data }: { id: string; data?: TechUnitData }) 
   const series = { data: (data?.series ?? []).filter((m) => new Date(m.observedAt) >= from), loading: false };
   if (d) {
     const groups = componentGroups(d.components);
-    const temp = latest(d, "temperature");
-    const pow = latest(d, "power");
-    const hum = latest(d, "humidity");
+    const temp = latest(d, "temperature", undefined, display);
+    const pow = latest(d, "power", undefined, display);
+    const hum = latest(d, "humidity", undefined, display);
     const offline = d.connection !== "online";
     const points = bucket(series.data, from, to);
     const sched = (j: ApiJob) => j.scheduledSlot ?? j.requestedSlot;

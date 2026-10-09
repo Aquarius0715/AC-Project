@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { createContext, isValidElement, useCallback, useContext, useEffect, useId, useState } from "react";
+import { useT } from "@ac/web/components/I18n";
 
 export const cx = (...a: unknown[]) => a.filter((x): x is string => typeof x === "string" && x !== "").join(" ");
 
@@ -25,14 +26,24 @@ export function Badge({ tone = "muted", icon, children, className }: { tone?: To
   );
 }
 
-export const PowerBadge = ({ s }: { s: "running" | "stopped" | "unknown" }) =>
-  s === "running" ? <Badge tone="ok" icon="▶">Running</Badge> : s === "stopped" ? <Badge tone="muted" icon="■">Stopped</Badge> : <Badge tone="unknown" icon="?">Unknown</Badge>;
-export const ConnBadge = ({ s }: { s: "online" | "offline" | "connecting" | "unknown" | "error" }) =>
-  s === "online" ? <Badge tone="ok" icon="●">Online</Badge> : s === "offline" ? <Badge tone="unknown" icon="⊘">Offline</Badge> : s === "error" ? <Badge tone="crit" icon="✕">Error</Badge>
-    : s === "unknown" ? <Badge tone="unknown" icon="?">Unknown</Badge> : <Badge tone="primary" icon="↻">Connecting</Badge>;
-export const SeverityBadge = ({ s }: { s: "critical" | "warning" | "normal" }) =>
-  s === "critical" ? <Badge tone="crit" icon="✕">Critical</Badge> : s === "warning" ? <Badge tone="warn" icon="⚠">Warning</Badge> : <Badge tone="primary" icon="ⓘ">Info</Badge>;
-export const OnOffBadge = ({ on }: { on: boolean }) => (on ? <Badge tone="ok">On</Badge> : <Badge tone="muted">Off</Badge>);
+// the state badges speak the display language (IR258); the state values themselves stay as stored
+export function PowerBadge({ s }: { s: "running" | "stopped" | "unknown" }) {
+  const t = useT();
+  return s === "running" ? <Badge tone="ok" icon="▶">{t("Running")}</Badge> : s === "stopped" ? <Badge tone="muted" icon="■">{t("Stopped")}</Badge> : <Badge tone="unknown" icon="?">{t("Unknown")}</Badge>;
+}
+export function ConnBadge({ s }: { s: "online" | "offline" | "connecting" | "unknown" | "error" }) {
+  const t = useT();
+  return s === "online" ? <Badge tone="ok" icon="●">{t("Online")}</Badge> : s === "offline" ? <Badge tone="unknown" icon="⊘">{t("Offline")}</Badge> : s === "error" ? <Badge tone="crit" icon="✕">{t("Error")}</Badge>
+    : s === "unknown" ? <Badge tone="unknown" icon="?">{t("Unknown")}</Badge> : <Badge tone="primary" icon="↻">{t("Connecting")}</Badge>;
+}
+export function SeverityBadge({ s }: { s: "critical" | "warning" | "normal" }) {
+  const t = useT();
+  return s === "critical" ? <Badge tone="crit" icon="✕">{t("Critical")}</Badge> : s === "warning" ? <Badge tone="warn" icon="⚠">{t("Warning")}</Badge> : <Badge tone="primary" icon="ⓘ">{t("Info")}</Badge>;
+}
+export function OnOffBadge({ on }: { on: boolean }) {
+  const t = useT();
+  return on ? <Badge tone="ok">{t("On")}</Badge> : <Badge tone="muted">{t("Off")}</Badge>;
+}
 export const DemoBadge = () => <Badge tone="warn" className="uppercase tracking-wide">Demo</Badge>;
 
 /* ───────────── Buttons ───────────── */
@@ -295,6 +306,7 @@ export function Search({ placeholder, value, onChange }: { placeholder: string; 
 /* ───────────── Modal ───────────── */
 export function Modal({ open, title, onClose, children, footer, wide }: { open: boolean; title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean }) {
   const id = useId();
+  const t = useT();
   useEffect(() => {
     if (!open) return;
     const h = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -307,7 +319,7 @@ export function Modal({ open, title, onClose, children, footer, wide }: { open: 
       <div role="dialog" aria-modal="true" aria-labelledby={id} className={cx("flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl", wide ? "sm:max-w-3xl" : "sm:max-w-[560px]")}>
         <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
           <h2 id={id} className="text-base font-bold">{title}</h2>
-          <button aria-label="Close" onClick={onClose} className="rounded-lg px-2 py-1 text-muted hover:bg-surface2">✕</button>
+          <button aria-label={t("Close")} onClick={onClose} className="rounded-lg px-2 py-1 text-muted hover:bg-surface2">✕</button>
         </div>
         <div className="flex flex-col gap-3 overflow-y-auto px-5 py-4">{children}</div>
         {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}
@@ -350,6 +362,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 export type Col<T> = { key: string; label: string; render: (r: T) => React.ReactNode; className?: string; hideBelow?: "sm" | "md" };
 /** Responsive table: scrolls horizontally if needed; optional columns hide on narrow containers. */
 export function DataTable<T>({ cols, rows, rowKey, onRowClick, selectedKey }: { cols: Col<T>[]; rows: T[]; rowKey: (r: T) => string; onRowClick?: (r: T) => void; selectedKey?: string }) {
+  const t = useT();
   return (
     <div className="scroll-x rounded-xl border border-line">
       <table className="w-full border-collapse text-left text-[13px]">
@@ -372,7 +385,7 @@ export function DataTable<T>({ cols, rows, rowKey, onRowClick, selectedKey }: { 
             );
           })}
           {rows.length === 0 && (
-            <tr><td colSpan={cols.length} className="px-3 py-6 text-center text-muted">No data</td></tr>
+            <tr><td colSpan={cols.length} className="px-3 py-6 text-center text-muted">{t("No data")}</td></tr>
           )}
         </tbody>
       </table>

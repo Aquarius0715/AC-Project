@@ -2,6 +2,7 @@
 // commands.create per changed setting, commands.get polling until the device answers or the command expires (D04),
 // and units.setAlertPolicies with the unit version (FR-C03, FR-C15).
 import { airNumber } from "@ac/web/lib/air";
+import { DEFAULT_DISPLAY, showClock, showTime, translator, type Display, type T } from "@ac/web/lib/i18n";
 
 type Mode = "cool" | "dry" | "fan";
 type Fan = "low" | "mid" | "high";
@@ -36,36 +37,50 @@ export type ApiUnitDetail = {
 
 export type ApiCommand = { id: string; action: UnitAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; failureCode: string | null; source?: string };
 
+/** The fixed Asia/Kuala_Lumpur time of the screens not yet on the user's display time zone; screens moved to it use
+ * showTime / showClock of lib/i18n (IR44, IR259). */
 const kl = (iso: string | null, withDate = false) =>
   iso ? new Date(iso).toLocaleString("en-MY", { ...(withDate ? { dateStyle: "medium" } : {}), timeStyle: "short", hour12: false, timeZone: "Asia/Kuala_Lumpur" } as Intl.DateTimeFormatOptions) : "—";
 export const klTime = kl;
 
-export function actionText(a: UnitAction): string {
+const en = translator("en");
+
+/** The words for the operating modes and fan levels (the stored values stay cool / dry / fan, low / mid / high). */
+export const MODE_LABEL: Record<Mode, string> = { cool: "Cool", dry: "Dry", fan: "Fan" };
+export const FAN_LABEL: Record<Fan, string> = { low: "Low", mid: "Mid", high: "High" };
+
+/** A command as a sentence in the display language (IR258). */
+export function actionText(a: UnitAction, t: T = en): string {
   switch (a.kind) {
     case "set_power":
-      return `Set power ${a.power ? "ON" : "OFF"}`;
+      return t(a.power ? "Set power ON" : "Set power OFF");
     case "set_temperature":
-      return `Set temperature ${a.celsius}°C`;
+      return t("Set temperature {celsius}°C", { celsius: a.celsius });
     case "set_mode":
-      return `Set mode ${a.mode.toUpperCase()}`;
+      return t("Set mode {mode}", { mode: t(MODE_LABEL[a.mode]).toUpperCase() });
     case "set_fan":
-      return `Set fan ${a.fanLevel.toUpperCase()}`;
+      return t("Set fan {level}", { level: t(FAN_LABEL[a.fanLevel]).toUpperCase() });
   }
 }
 
 const statusText: Record<ApiCommand["status"], string> = { requested: "requested", sent: "waiting for device", acknowledged: "acknowledged by device", failed: "failed", expired: "no device response (expired)", cancelled: "cancelled" };
+const sourceText: Record<string, string> = { automation: " · by an automation", restriction: " · by a restriction", diagnostic: " · technician test run" };
 
-export function historyRow(c: ApiCommand) {
+/** One command history row: the sentence, its state and who sent it, and when it was requested (IR44 time). */
+export function historyRow(c: ApiCommand, t: T = en, display: Display = DEFAULT_DISPLAY) {
   const bad = c.status === "failed" || c.status === "expired";
-  const by = c.source === "automation" ? " · by an automation" : c.source === "restriction" ? " · by a restriction" : c.source === "diagnostic" ? " · technician test run" : "";
-  return { id: c.id.slice(0, 8), text: `${actionText(c.action)} — ${statusText[c.status]}${c.failureCode && c.status === "failed" ? ` (${c.failureCode})` : ""}${by}`, when: kl(c.requestedAt, true), bad };
+  const by = c.source && sourceText[c.source] ? t(sourceText[c.source]) : "";
+  return { id: c.id.slice(0, 8), text: `${actionText(c.action, t)} — ${t(statusText[c.status])}${c.failureCode && c.status === "failed" ? ` (${c.failureCode})` : ""}${by}`, when: showTime(c.requestedAt, display), bad };
 }
 
+const qualityText: Record<string, string> = { missing: "missing", stale: "stale", suspect: "suspect" };
+
 /** The latest reading of a metric as text (IR213): a stale or suspect value keeps its quality beside it — shown, never
- * as a current value (D07); null without a reading or with a null value (no fallback to an older one). */
-export function latest(d: ApiUnitDetail, metric: string): { text: string; at: string } | null {
+ * as a current value (D07); null without a reading or with a null value (no fallback to an older one). The time is the
+ * IR44 time of day in the user's display time zone. */
+export function latest(d: ApiUnitDetail, metric: string, t: T = en, display: Display = DEFAULT_DISPLAY): { text: string; at: string } | null {
   const m = d.latestMeasurements.find((x) => x.metric === metric);
-  return m && m.value !== null ? { text: `${airNumber(metric, m.value)} ${m.unit}${m.quality === "valid" ? "" : ` (${m.quality})`}`, at: kl(m.observedAt) } : null;
+  return m && m.value !== null ? { text: `${airNumber(metric, m.value)} ${m.unit}${m.quality === "valid" ? "" : ` (${t(qualityText[m.quality] ?? m.quality)})`}`, at: showClock(m.observedAt, display) } : null;
 }
 
 // Technician unit register / monitoring (FR-T02, FR-T04): component groups of the 18 ComponentKeys and the

@@ -113,7 +113,7 @@ Additional checks: reject candidates from another company, without required qual
 
 | Case | Additional checks |
 |---|---|
-| AT-X01 / AT-X02 | Generic password-reset wording; clear old displays on sign-out; English/Malay; alternatives when voice is denied |
+| AT-X01 / AT-X02 | Generic password-reset wording; clear old displays on sign-out; English/Malay (AT-X01-N ③: `e2e/specs/customer/unit-language.e2e.ts`, IR259); alternatives when voice is denied |
 | AT-X03 / AT-X06 | Consistent quality/unit/capability displays across four roles; valid treatment of non-RTO (Rent to Own) units |
 | AT-X04 | Route/service/Query boundaries, customer boundaries within one tenant, outsourcing period/company boundaries |
 | AT-X05 | Shared data across role switches in one tab, seeds on reload/reset, no external communication |
