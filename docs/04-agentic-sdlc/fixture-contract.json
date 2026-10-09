@@ -918,7 +918,8 @@
           "fanLevel": "mid",
           "observedAt": "2026-09-14T00:59:30.000Z"
         },
-        "observedRestriction": null
+        "observedRestriction": null,
+        "warrantyEndsAt": "2026-11-29T16:00:00.000Z"
       },
       {
         "id": "unit-non-rto",
@@ -943,7 +944,8 @@
           "fanLevel": "low",
           "observedAt": "2026-09-14T00:59:30.000Z"
         },
-        "observedRestriction": null
+        "observedRestriction": null,
+        "warrantyEndsAt": "2026-10-27T16:00:00.000Z"
       },
       {
         "id": "unit-offline-rto",
@@ -968,7 +970,8 @@
           "fanLevel": "mid",
           "observedAt": "2026-09-14T00:30:00.000Z"
         },
-        "observedRestriction": null
+        "observedRestriction": null,
+        "warrantyEndsAt": "2027-06-29T16:00:00.000Z"
       },
       {
         "id": "unit-limited",
@@ -1001,7 +1004,8 @@
             "minimumCoolingSetpoint": 24
           },
           "observedAt": "2026-09-13T00:00:20.000Z"
-        }
+        },
+        "warrantyEndsAt": "2027-03-30T16:00:00.000Z"
       },
       {
         "id": "unit-other-customer",
@@ -1024,7 +1028,8 @@
           "fanLevel": null,
           "observedAt": null
         },
-        "observedRestriction": null
+        "observedRestriction": null,
+        "warrantyEndsAt": "2026-08-30T16:00:00.000Z"
       },
       {
         "id": "unit-tenant-b",

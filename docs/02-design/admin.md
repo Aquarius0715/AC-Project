@@ -137,6 +137,7 @@ Scope: FR-A02 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 | space.parentSpaceId / kind | ID and enum | Same property; no parent-child cycles | Hierarchy |
 | unit.modelId / spaceId | modelId: ID/required; spaceId: ID/null | Valid model. spaceId is in the same property; null means no assigned space (IR62) | Unit |
 | unit.type / installedAt | enum and date/type required; installedAt nullable | split; no future completed installation dates; null means “Not registered” (IR44) | Type / installation date |
+| unit.warrantyEndsAt | instant/optional | null = no warranty; not before installedAt; omitted on save keeps the stored end (IR209) | Warranty & coverage (DD-A19) |
 | serviceScope | enum array/required | Target inspection groups | Maintenance scope |
 | changeReason | string/required for relocation and similar changes | 1–1000 characters | Change reason |
 | property.address / accessInstructions | string/optional | 0–500 / 0–1000 characters; fictional values only | Address is siteAddress under IR25 even before acceptance of the company's Offer. Entry instructions are visible only after acceptance within the valid period |
@@ -719,7 +720,7 @@ Scope: FR-A18 / Main display pattern: **UI-FORM**. Service boundary: `units.impo
 3. After import show the result with “Undo (24 h)” (`units.importUndo`, reason).
 4. Queries to update: `properties / spaces / units / audit`.
 
-**Boundary cases and failures**: Expired or changed preview → CONFLICT (validate again). Undo after telemetry or jobs on a created unit → CONFLICT. Row results: `error` for a missing property or unit name, an unknown model code, an invalid date or a future installed_on, a serial already bound to another unit, or a unit name already used in the same location; `warning` when the row creates a floor or room that does not exist yet; otherwise `ready`. The preview is kept for 30 minutes (`expiresAt`) in a preview store and writes no business data; commit requires the same customer and an unexpired preview, imports ready and warning rows in one transaction, and records one audit entry. Undo archives every created unit, space and property of the import.
+**Boundary cases and failures**: Expired or changed preview → CONFLICT (validate again). Undo after telemetry or jobs on a created unit → CONFLICT. Row results: `error` for a missing property or unit name, an unknown model code, an invalid date or a future installed_on, a serial already bound to another unit, or a unit name already used in the same location; a serial that is not a registered device, is bound to a unit, has an unresolved tamper or appears twice in the file; `warning` when the row creates a property (kind office, no address yet), floor or room that does not exist yet (an existing location of any kind with that name under the parent is reused); otherwise `ready`. Dates are Kuala Lumpur calendar dates. Commit binds the device of a row's serial to the created unit, and undo ends those bindings (IR209). The preview is kept for 30 minutes (`expiresAt`) in a preview store and writes no business data; commit requires the same customer and an unexpired preview, imports ready and warning rows in one transaction, and records one audit entry. Undo archives every created unit, space and property of the import.
 
 **Verification**: Check the traceability entries under AT-A18 (N/E/B).
 
@@ -740,7 +741,7 @@ Scope: FR-A19 / Main display pattern: **UI-LIST**. Service boundary: `units.cove
 
 1. KPI tiles (under warranty, ends ≤ 90 days, out of warranty with no contract, maintenance contract) and the unit table sorted by coverage end.
 2. Actions: Renewal offer → SCR-A07 New contract prefilled with customer and unit; Open contract → SCR-A07; Export CSV (client-side, demo).
-3. “Warranty on jobs” lists claimable parts; Mark claim filed → `jobs.recordWarrantyClaim`.
+3. “Warranty on jobs” lists claimable jobs — completed while the unit's warranty ran (warrantyEndsAt not before completedAt), with replaced parts in the accepted work report and no filed claim yet (IR209); the claim form is prefilled with those parts and the job's actual cost lines; Mark claim filed → `jobs.recordWarrantyClaim`.
 
 **Boundary cases and failures**: Claim outside warranty → VALIDATION.
 

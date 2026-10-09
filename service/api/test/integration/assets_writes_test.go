@@ -180,6 +180,23 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	if code, _ := write(s, &hq, "units.archive", `{"id":"`+second+`","reason":"test cleanup"}`, 1); code != 200 {
 		t.Errorf("second unit archive: %d", code)
 	}
+	// warranty end (IR209): set, kept when omitted, cleared with null, never before the installation
+	if code, m := write(s, &hq, "units.save", unitBody(unit, floor, `,"warrantyEndsAt":"2027-01-01T00:00:00+08:00"`), 2); code != 200 || data(m)["warrantyEndsAt"] != "2026-12-31T16:00:00Z" {
+		t.Fatalf("warranty set: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "units.save", unitBody(unit, floor, ""), 3); code != 200 || data(m)["warrantyEndsAt"] != "2026-12-31T16:00:00Z" {
+		t.Fatalf("warranty kept when omitted: %d %v", code, data(m)["warrantyEndsAt"])
+	}
+	early := strings.Replace(unitBody(unit, floor, `,"warrantyEndsAt":"2026-08-01T00:00:00+08:00"`), `"installedAt":null`, `"installedAt":"2026-09-01T00:00:00+08:00"`, 1)
+	if code, m := write(s, &hq, "units.save", early, 4); code != 422 || m["fieldErrors"].(map[string]any)["warrantyEndsAt"] != "error.range" {
+		t.Errorf("warranty before installation: %d %v", code, m)
+	}
+	if code, _ := write(s, &hq, "units.save", strings.Replace(unitBody(unit, floor, ""), `"installedAt":null`, `"installedAt":"2027-02-01T00:00:00+08:00"`, 1), 4); code != 422 {
+		t.Errorf("an installation after the stored warranty end: %d", code)
+	}
+	if code, m := write(s, &hq, "units.save", unitBody(unit, floor, `,"warrantyEndsAt":null`), 4); code != 200 || data(m)["warrantyEndsAt"] != nil {
+		t.Fatalf("warranty cleared: %d %v", code, data(m)["warrantyEndsAt"])
+	}
 	// the history keeps the original location: only the changed field, with its old and new value (DD-A02 step 3)
 	day := `"from":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `","to":"` + clock.Add(time.Hour).Format(time.RFC3339) + `"`
 	_, am := post(s, &hq, "audit.list", `{"filters":{`+day+`,"targetKind":"unit","targetId":"`+unit+`"},"limit":10}`)
@@ -201,13 +218,13 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	if code, _ := write(s, &hq, "spaces.archive", `{"id":"`+floor+`","reason":"x"}`, 2); code != 409 {
 		t.Errorf("space with units/children must not archive: %d", code)
 	}
-	if code, _ := write(s, &hq, "units.archive", `{"id":"`+unit+`","reason":""}`, 2); code != 422 {
+	if code, _ := write(s, &hq, "units.archive", `{"id":"`+unit+`","reason":""}`, 5); code != 422 {
 		t.Error("archive reason required")
 	}
-	if code, m := write(s, &hq, "units.archive", `{"id":"`+unit+`","reason":"decommissioned"}`, 2); code != 200 || data(m)["archived"] != true {
+	if code, m := write(s, &hq, "units.archive", `{"id":"`+unit+`","reason":"decommissioned"}`, 5); code != 200 || data(m)["archived"] != true {
 		t.Fatalf("unit archive: %d", code)
 	}
-	if code, _ := write(s, &hq, "units.archive", `{"id":"`+unit+`","reason":"again"}`, 3); code != 409 {
+	if code, _ := write(s, &hq, "units.archive", `{"id":"`+unit+`","reason":"again"}`, 6); code != 409 {
 		t.Errorf("archive twice: %d", code)
 	}
 	if code, _ := write(s, &hq, "spaces.archive", `{"id":"`+room+`","reason":"empty"}`, 2); code != 200 {

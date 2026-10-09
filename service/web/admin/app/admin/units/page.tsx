@@ -2,18 +2,19 @@
 // statuses, organizations.list, properties.list, units.list) with the contract standing where the session may read it
 // (contracts.list, overdue invoices.list, restrictions.list). For customerId it adds the customer's spaces, models
 // (capabilities.list), alert policies (policies.list for the customer) and open alerts; for unitId units.get with the
-// D05 archive blockers (contracts, jobs, device bindings, restrictions, pending commands). URL keys: customerId, tab,
-// locationId (property, space or "unassigned:<propertyId>"), propertyId, unitId, powerState, connections, search.
-// Writes are Server Actions (actions.ts). The Phase 1A demo keeps the fixtures.
+// D05 archive blockers (contracts, jobs, device bindings, restrictions, pending commands), and the customer's client users
+// (clientUsers.list). tab=warranty (no customer) reads units.coverage with the claimable jobs (jobs.get, reports.get).
+// URL keys: customerId, tab, locationId (property, space or "unassigned:<propertyId>"), propertyId, unitId, powerState,
+// connections, search. Writes are Server Actions (actions.ts). The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
 import { apiMode, coreAll, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
 import { klStamp } from "@ac/web/lib/energy";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
 import type { ApiCapability } from "@ac/web/lib/devices";
 import {
-  connections, customerRows, defaultRules, filterUnits, locationTree, modelLabel, placeOptions, policyLines, powerStates, registerKpis, selection, standing, unitRows, unitsAt,
+  claimCandidate, clientUserRows, coverageKpis, coverageRows, connections, customerRows, defaultRules, filterUnits, locationTree, modelLabel, placeOptions, policyLines, powerStates, registerKpis, selection, standing, unitRows, unitsAt,
   conditionText, type ApiContractLite, type ApiCustomerPolicy, type ApiCustomerRow, type ApiInvoiceLite, type ApiOrgRow, type ApiPropertyRow, type ApiRestrictionLite,
-  type ApiSpaceRow, type ApiUnitDetail, type ApiUnitRow, type Connection,
+  type ApiClientUser, type ApiCoverage, type ApiSpaceRow, type ApiUnitDetail, type ApiUnitRow, type ClaimCandidate, type Connection,
 } from "@ac/web/lib/assets";
 import { UnitsDemo } from "./_components/units-demo";
 import { UnitsView, type CustomerLive, type UnitLive, type UnitsLive } from "./_components/units-view";
@@ -23,6 +24,8 @@ type Job = { id: string; type: string; status: string };
 type Device = { id: string; serial: string; unitId: string | null; connection: Connection };
 type Alert = { severity: "critical" | "warning" | "normal" };
 type Audit = { occurredAt: string; actorId: string; reason: string | null };
+type JobForClaim = { id: string; version: number; type: string; unitId: string; completedAt: string | null; costs: { kind: "estimate" | "actual"; amountMinor: number; currency: string }[]; reportRefs: { reportId: string; reportVersion: number }[] };
+type Report = { parts: { name: string; quantity: number; catalogCode: string | null }[]; acceptedAt: string | null };
 const done = ["completed", "cancelled"];
 const day = 86_400_000; // audit periods: the last 365 days up to tomorrow (at most 366 days, IR143)
 
@@ -52,9 +55,15 @@ export default async function AdminUnitsPage({ searchParams }: PageProps<"/admin
   const live: UnitsLive = {
     now: now.toISOString(), todayKL: klStamp(now.toISOString()).slice(0, 10), canWrite: has("asset.write"), standingKnown: !!(contracts && overdue),
     rows, kpis: registerKpis(rows, units), search: one("search") ?? "", missing: !!one("customerId") && !rows.some((r) => r.id === one("customerId")),
+    top: one("tab") === "warranty" ? "warranty" : "customers", activeCustomers: rows.filter((r) => r.status === "active").map((r) => ({ id: r.id, name: r.name })), coverageAttention: null,
   };
   const cust = rows.find((r) => r.id === one("customerId"));
-  if (!cust) return <UnitsView live={live} />;
+  if (!cust) {
+    const coverage = has("asset.read", "contract.read") ? await coreAll<ApiCoverage>("units.coverage") : null;
+    live.coverageAttention = coverage ? coverage.filter((c) => c.status === "expiring" || c.status === "no_coverage").length : null;
+    if (live.top === "warranty") live.warranty = coverage && await warrantyLive(coverage, { has, units, properties, rows, contracts });
+    return <UnitsView live={live} />;
+  }
 
   const orgUnits = units.filter((u) => u.customerOrgId === cust.orgId);
   const props = properties.filter((p) => p.customerOrgId === cust.orgId);
@@ -69,6 +78,7 @@ export default async function AdminUnitsPage({ searchParams }: PageProps<"/admin
       : Promise.resolve(null),
     unitId ? coreOp<ApiUnitDetail>("units.get", { id: unitId }).catch((e) => (e instanceof CoreError && e.status === 404 ? null : Promise.reject(e))) : Promise.resolve(null),
   ]);
+  const clientUsers = await coreAll<ApiClientUser>("clientUsers.list", { filters: { customerId: cust.id } });
   const d = detail && detail.customerOrgId === cust.orgId ? detail : null;
   const models = new Map(caps.map((k) => [k.id, k.model]));
   const memberName = new Map(members.map((m) => [m.id, m.displayName]));
@@ -85,7 +95,8 @@ export default async function AdminUnitsPage({ searchParams }: PageProps<"/admin
     }).then((p) => p.items[0] ?? null)
     : null;
   const customer: CustomerLive = {
-    row: cust, tab: one("tab") === "policies" ? "policies" : "overview", tree, selection: sel, places: placeOptions(tree, spaces),
+    row: cust, tab: one("tab") === "policies" ? "policies" : one("tab") === "users" ? "users" : "overview", tree, selection: sel, places: placeOptions(tree, spaces),
+    users: clientUserRows(clientUsers, (m) => memberName.get(m) ?? `${cust.name} owner`),
     models: caps.map((k) => ({ id: k.id, label: `${k.manufacturer} ${k.model}` })).sort((a, b) => a.label.localeCompare(b.label)),
     perProperty: tree.map((p) => `${p.name} ${p.units}`).join(" · ") || "no properties yet",
     alertsSub: openAlerts ? ([["critical", sev("critical")], ["warning", sev("warning")], ["info", sev("normal")]] as const).filter(([, n]) => n > 0).map(([l, n]) => `${n} ${l}`).join(" · ") || "none open" : null,
@@ -142,3 +153,31 @@ async function unitLive(d: ApiUnitDetail, x: Ctx): Promise<UnitLive> {
     seen: d.lastSeenAt ? klStamp(d.lastSeenAt).slice(11) : null,
   };
 }
+
+/** Warranty & coverage (FR-A19): one row per unit with its warranty end and covering contracts, and the jobs whose
+ * replaced parts can still be claimed from the manufacturer (job.read for the parts, job.write to file the claim). */
+async function warrantyLive(coverage: ApiCoverage[], x: { has: (...p: string[]) => boolean; units: ApiUnitRow[]; properties: ApiPropertyRow[]; rows: { id: string; name: string }[]; contracts: ApiContractLite[] | null }) {
+  const caps = x.has("dashboard.read", "device.read") ? await coreAll<ApiCapability>("capabilities.list") : [];
+  const unit = new Map(x.units.map((u) => [u.id, u]));
+  const prop = new Map(x.properties.map((p) => [p.id, p.name]));
+  const customer = new Map(x.rows.map((r) => [r.id, r.name]));
+  const model = new Map(caps.map((k) => [k.id, `${k.manufacturer} ${k.model}`]));
+  const contract = new Map((x.contracts ?? []).map((k) => [k.id, `${k.planType.toUpperCase()} until ${klStamp(k.endAt).slice(0, 10)}`]));
+  const rows = coverageRows(coverage, {
+    unit: (id) => { const u = unit.get(id); return u && { name: u.displayName, place: prop.get(u.propertyId) ?? "" }; },
+    customer: (id) => customer.get(id) ?? id.slice(0, 8), model: (id) => model.get(id) ?? id.slice(0, 8), contract: (id) => contract.get(id) ?? `contract ${id.slice(0, 8)}`,
+  }, await coreNow());
+  let claims: ClaimCandidate[] | null = null;
+  if (x.has("job.read")) {
+    const ids = [...new Set(coverage.flatMap((c) => c.claimableJobIds))];
+    claims = (await Promise.all(ids.map(async (jobId) => {
+      const j = await coreOp<JobForClaim>("jobs.get", { jobId }).catch(() => null);
+      if (!j) return null;
+      const ref = j.reportRefs.at(-1);
+      const r = ref ? await coreOp<Report>("reports.get", { jobId, reportId: ref.reportId, reportVersion: ref.reportVersion }).catch(() => null) : null;
+      return claimCandidate(j, r?.parts ?? [], unit.get(j.unitId)?.displayName ?? j.unitId.slice(0, 8));
+    }))).filter((c): c is ClaimCandidate => !!c);
+  }
+  return { rows, kpis: coverageKpis(rows), customers: x.rows, claims, canClaim: x.has("job.write") };
+}
+

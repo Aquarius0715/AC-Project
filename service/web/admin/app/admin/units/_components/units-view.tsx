@@ -9,13 +9,17 @@ import {
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import {
-  changedFields, connections, contractMatch, customerDraft, customerErrors, customerMatch, flatten, nameError, powerStates, profileLabel, propertyDraft, propertyErrors,
-  propertyInput, reasonError, relocates, unitDraft, unitErrors, unitInput,
-  type ApiUnitDetail, type Connection, type ContractFilter, type CustomerDraft, type CustomerRow, type PolicyLine, type PowerState, type Profile, type PropertyDraft,
-  type RuleLine, type Scope, type Selection, type TreeProperty, type TreeSpace, type UnitDraft, type UnitRow, type registerKpis,
+  autoMapping, changedFields, connections, contractMatch, coverageCsv, coverageMatch, csvShape, customerDraft, customerErrors, customerMatch, errorReportCsv, flatten,
+  importFields, importMessage, importPlace, importTemplate, inviteError, nameError, powerStates, profileLabel, propertyDraft, propertyErrors, propertyInput, reasonError,
+  relocates, unitDraft, unitErrors, unitInput,
+  type ApiImportPreview, type ApiUnitDetail, type ApiUnitImport, type ClaimCandidate, type ClientUserRow, type Connection, type ContractFilter, type CoverageFilter,
+  type CoverageRow, type coverageKpis, type CustomerDraft, type CustomerRow, type PolicyLine, type PowerState, type Profile, type PropertyDraft, type RuleLine, type Scope,
+  type Selection, type TreeProperty, type TreeSpace, type UnitDraft, type UnitRow, type registerKpis,
 } from "@ac/web/lib/assets";
+import { amount, klStamp } from "@ac/web/lib/energy";
 import {
-  archiveLocation, archiveUnit, createCustomer, deleteUnit, saveProperty, saveSpace, saveUnit, setDefaultRule, setUnitPolicies, updateCustomer,
+  archiveLocation, archiveUnit, createCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim,
+  removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer,
 } from "../actions";
 
 export type UnitLive = {
@@ -24,14 +28,15 @@ export type UnitLive = {
   blockers: { label: string; href: string | null }[] | null; archivedNote: string | null; seen: string | null;
 };
 export type CustomerLive = {
-  row: CustomerRow; tab: "overview" | "policies"; tree: TreeProperty[]; selection: Selection | null; places: { propertyId: string; spaceId: string; label: string }[];
+  row: CustomerRow; tab: "overview" | "users" | "policies"; users: ClientUserRow[]; tree: TreeProperty[]; selection: Selection | null; places: { propertyId: string; spaceId: string; label: string }[];
   models: { id: string; label: string }[]; perProperty: string; alertsSub: string | null; filter: { powerState?: PowerState; connections: Connection[]; search: string };
   total: number; units: UnitRow[]; lastEdit: string | null; policies: PolicyLine[] | null; rules: { policyId: string; items: RuleLine[] } | null;
   canRules: boolean; canAttach: boolean; unit?: UnitLive; unitMissing?: boolean;
 };
+export type WarrantyLive = { rows: CoverageRow[]; kpis: ReturnType<typeof coverageKpis>; customers: { id: string; name: string }[]; claims: ClaimCandidate[] | null; canClaim: boolean };
 export type UnitsLive = {
   now: string; todayKL: string; canWrite: boolean; standingKnown: boolean; rows: CustomerRow[]; kpis: ReturnType<typeof registerKpis>; search: string; missing: boolean;
-  customer?: CustomerLive;
+  top: "customers" | "warranty"; activeCustomers: { id: string; name: string }[]; coverageAttention: number | null; warranty?: WarrantyLive | null; customer?: CustomerLive;
 };
 type Nav = ReturnType<typeof useUrlPatch>;
 type Run = ReturnType<typeof useAction>[1];
@@ -59,10 +64,19 @@ function CustomerList({ live }: { live: UnitsLive }) {
   const [status, setStatus] = useState<"active" | "all">("active");
   const [contract, setContract] = useState<ContractFilter>("all");
   const [open, setOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
   const rows = live.rows.filter((r) => (status === "all" || r.status === "active") && contractMatch(contract, r) && customerMatch(r, q));
   const k = live.kpis;
   return (
     <Page>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Tabs value={live.top} onChange={(t) => nav({ tab: t === "warranty" ? "warranty" : null })} tabs={[
+          { id: "customers" as const, label: "Customers & units", count: k.customers },
+          { id: "warranty" as const, label: "Warranty & coverage", count: live.coverageAttention ?? "—" },
+        ]} />
+        {live.canWrite && live.top === "customers" && <Btn size="sm" onClick={() => setImporting(true)}>↑ Import CSV</Btn>}
+      </div>
+      {live.top === "warranty" ? <WarrantyTab live={live} /> : <>
       {live.missing && <Banner tone="warn">This customer no longer exists or is outside your scope — showing the register.</Banner>}
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
         <Kpi label="Customers" value={k.customers} sub={k.inactive ? `+${k.inactive} inactive (not counted)` : "all active"} />
@@ -94,6 +108,8 @@ function CustomerList({ live }: { live: UnitsLive }) {
         )}
         <p className="mt-2 text-[11px] text-muted">{rows.length} of {live.rows.length} · sorted by name · Inactive customers appear only with Status: All and are not counted (IR40). Archived properties, spaces and units never appear in lists, summaries or KPI denominators (IR39).</p>
       </Card>
+      </>}
+      {importing && <ImportWizard live={live} onClose={() => setImporting(false)} />}
       {open && <CustomerModal pending={pending} onClose={() => setOpen(false)} onSave={(d) => run(() => createCustomer({ billingName: d.billingName, name: d.name, serviceProfile: d.profile, status: d.status }), `Customer “${d.name.trim()}” created — add a property next`, (id) => { setOpen(false); nav({ customerId: id, tab: null, search: null }); })} />}
     </Page>
   );
@@ -168,8 +184,11 @@ function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
           href={s.restriction ? `/admin/restrictions?restrictionId=${s.restriction.id}` : s.overdue ? `/admin/billing?customerId=${r.id}&overdueOnly=true` : undefined} link={s.restriction ? "View restriction →" : s.overdue ? "View invoices →" : undefined} />
           : <Kpi label="Overdue billing" value="—" sub="needs billing.read" />}
       </div>
-      <Tabs value={c.tab} onChange={(t) => nav({ tab: t === "overview" ? null : t, unitId: null })} tabs={[{ id: "overview" as const, label: "Units & locations", count: unitsTotal }, { id: "policies" as const, label: "Alert policies", count: c.policies?.length ?? "—" }]} />
-      {c.tab === "policies" ? <PoliciesTab c={c} run={run} pending={pending} /> : (
+      <Tabs value={c.tab} onChange={(t) => nav({ tab: t === "overview" ? null : t, unitId: null })} tabs={[
+        { id: "overview" as const, label: "Units & locations", count: unitsTotal }, { id: "users" as const, label: "Users", count: c.users.length },
+        { id: "policies" as const, label: "Alert policies", count: c.policies?.length ?? "—" },
+      ]} />
+      {c.tab === "policies" ? <PoliciesTab c={c} run={run} pending={pending} /> : c.tab === "users" ? <UsersTab live={live} c={c} run={run} pending={pending} /> : (
         <div className="split-rev">
           <Card title="Locations" action={canWrite && <Btn size="sm" onClick={() => setM({ kind: "property" })}>+ Add property</Btn>} className="self-start">
             {c.tree.length === 0 ? <EmptyState title="No properties yet">{canWrite ? "Add the customer's home or office first." : "HQ has not registered a property yet."}</EmptyState> : (
@@ -354,6 +373,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: { live: UnitsLive; c: Custo
             </Select>
           </Field>
           <Field label="Installed at" hint="Leave empty for “Not registered” (IR44)" error={err("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={ro} onChange={(e) => set({ installedAt: e.target.value })} /></Field>
+          <Field label="Warranty end" hint="Manufacturer warranty; coverage also counts active maintenance contracts (FR-A19)" error={err("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={ro} onChange={(e) => set({ warrantyEnd: e.target.value })} /></Field>
           <Field label="IoT device" hint={x.device ? "Rebinding is done in Devices and keeps the command history on the unit." : undefined}>
             <div className="flex min-h-9 items-center gap-2 text-[13px]">{x.device ? <><b>{x.device.serial}</b><ConnBadge s={x.device.connection} /><TextLink href={`/admin/devices?tab=devices&deviceId=${x.device.id}`}>Devices ›</TextLink></> : x.deviceKnown ? <span className="text-muted">No device bound</span> : <span className="text-muted">Needs device.read</span>}</div>
           </Field>
@@ -532,6 +552,7 @@ function NewUnitModal({ live, c, init, pending, onClose, onSave }: { live: Units
         </Field>
         <Field label="Display name · required" hint="1–120 characters, unique in its room" error={err("displayName")}><Input value={d.displayName} onChange={(x) => set({ displayName: x.target.value })} /></Field>
         <Field label="Installed at · optional" hint="Leave empty for “Not registered” (IR44)" error={err("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} onChange={(x) => set({ installedAt: x.target.value })} /></Field>
+        <Field label="Warranty end · optional" error={err("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} onChange={(x) => set({ warrantyEnd: x.target.value })} /></Field>
         <Field label="Service scope · required · type: split (fixed)" error={err("serviceScope")} className="sm:col-span-2">
           <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={sc} checked={d.serviceScope.includes(sc)} onChange={(on) => set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) })} />)}</div>
         </Field>
@@ -602,6 +623,276 @@ function AttachModal({ c, unit, attached, pending, onClose, onSave }: { c: Custo
           );
         })}
         <p className="text-[11px] text-muted">Disabled policies can be attached; they start alerting once enabled. <TextLink href="/admin/alerts?tab=policies">+ New policy for {c.row.name}</TextLink></p>
+      </div>
+    </Modal>
+  );
+}
+
+// ---- client users (FR-A17) ----
+
+function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive; run: Run; pending: boolean }) {
+  const [invite, setInvite] = useState(false);
+  const [change, setChange] = useState<null | { u: ClientUserRow; kind: "role" | "status" | "remove" }>(null);
+  const canWrite = live.canWrite;
+  const act = (u: ClientUserRow, a: string) => {
+    if (a === "role" || a === "status" || a === "remove") setChange({ u, kind: a });
+    if (a === "resend") run(() => resendInvite(u.id), `Invitation preview re-created for ${u.email} — nothing is sent in the demo`);
+    if (a === "reset") run(() => previewPasswordReset(u.email), "Password reset preview created — the same generic message for every address");
+  };
+  return (
+    <Card title={`Client users of ${c.row.name}`} sub={`People who sign in to the customer app. They only ever see ${c.row.name}’s properties and units.`}
+      action={canWrite && <Btn size="sm" variant="primary" onClick={() => setInvite(true)}>+ Invite user</Btn>}>
+      {c.users.length === 0 ? <EmptyState title="No client users yet">Invite the customer’s owner first; the owner can then invite members from the customer app.</EmptyState> : (
+        <DataTable rows={c.users} rowKey={(u) => u.id} cols={[
+          { key: "u", label: "User", render: (u) => <><b>{u.name ?? u.email}</b><div className="text-xs text-muted">{u.sub}</div></> },
+          { key: "r", label: "Role", render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{u.role === "owner" ? "Owner" : "Member"}</Badge> },
+          { key: "s", label: "Status", render: (u) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{u.status === "active" ? "Active" : u.status === "invited" ? "Invite pending" : "Disabled"}</Badge> },
+          { key: "l", label: "Last sign-in", render: (u) => u.lastSignIn, hideBelow: "md" },
+          { key: "c", label: "Notification channels", render: (u) => u.channels, hideBelow: "md" },
+          { key: "a", label: "", render: (u) => canWrite && (
+            <Select aria-label={`Actions for ${u.email}`} className="w-auto" value="" disabled={pending} onChange={(e) => act(u, e.target.value)}>
+              <option value="">⋯</option>
+              {!u.lastOwner && <option value="role">Change role (Owner / Member)</option>}
+              {u.status === "invited" && <option value="resend">Resend invite</option>}
+              <option value="reset">Reset password</option>
+              {u.status !== "invited" && !u.lastOwner && <option value="status">{u.status === "disabled" ? "Enable sign-in" : "Disable sign-in"}</option>}
+              {!u.lastOwner && <option value="remove">Remove from customer</option>}
+            </Select>
+          ) },
+        ]} />
+      )}
+      <p className="mt-2 text-[11px] text-muted">Client users have no permission editor — the owner can also invite members from the customer app (Users). HQ, contractor and technician accounts are managed in Access &amp; roles. The last active owner cannot be demoted, disabled or removed.</p>
+      {invite && <InviteModal c={c} pending={pending} onClose={() => setInvite(false)} onSave={(email, role) => run(() => inviteClientUser(c.row.id, email, role), `Invitation preview created for ${email.trim()}`, () => setInvite(false))} />}
+      {change && <ClientUserModal change={change} pending={pending} onClose={() => setChange(null)} onSave={(role, reason) => {
+        const { u, kind } = change;
+        const close = () => setChange(null);
+        if (kind === "remove") return run(() => removeClientUser(u.id, u.version, reason), `${u.email} removed from ${c.row.name}`, close);
+        const status = kind === "status" ? (u.status === "disabled" ? "active" : "disabled") : undefined;
+        run(() => updateClientUser(u.id, u.version, { customerId: c.row.id, email: u.email, clientRole: role, ...(status ? { status } : {}), reason }),
+          kind === "role" ? `Role changed to ${role === "owner" ? "Owner" : "Member"}` : status === "active" ? "Sign-in enabled" : "Sign-in disabled", close);
+      }} />}
+    </Card>
+  );
+}
+
+function InviteModal({ c, pending, onClose, onSave }: { c: CustomerLive; pending: boolean; onClose: () => void; onSave: (email: string, role: "owner" | "member") => void }) {
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<"owner" | "member">("member");
+  const [tried, setTried] = useState(false);
+  const e = inviteError(email, c.users);
+  return (
+    <Modal open onClose={onClose} title="Invite client user" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e) onSave(email, role); }}>Send invite</Btn></>}>
+      <div className="flex flex-col gap-3">
+        <Field label="Email" hint="Unique per customer; the demo creates an invite preview and sends nothing" error={tried ? e : undefined}><Input type="email" value={email} onChange={(x) => setEmail(x.target.value)} /></Field>
+        <Field label="Role"><Choice value={role} onChange={(v: "owner" | "member") => setRole(v)} options={[{ id: "member", label: "Member" }, { id: "owner", label: "Owner" }]} /></Field>
+      </div>
+    </Modal>
+  );
+}
+
+function ClientUserModal({ change, pending, onClose, onSave }: { change: { u: ClientUserRow; kind: "role" | "status" | "remove" }; pending: boolean; onClose: () => void; onSave: (role: "owner" | "member", reason: string) => void }) {
+  const { u, kind } = change;
+  const [role, setRole] = useState<"owner" | "member">(u.role === "owner" ? "member" : "owner");
+  const [reason, setReason] = useState("");
+  const [tried, setTried] = useState(false);
+  const e = reasonError(reason);
+  const title = kind === "role" ? `Change role of ${u.email}` : kind === "remove" ? `Remove ${u.email}?` : u.status === "disabled" ? `Enable sign-in for ${u.email}` : `Disable sign-in for ${u.email}`;
+  return (
+    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant={kind === "remove" ? "danger" : "primary"} disabled={pending} onClick={() => { setTried(true); if (!e) onSave(kind === "role" ? role : u.role, reason.trim()); }}>{kind === "remove" ? "Remove user" : "Save"}</Btn></>}>
+      <div className="flex flex-col gap-3">
+        {kind === "role" && <Field label="New role"><Choice value={role} onChange={(v: "owner" | "member") => setRole(v)} options={[{ id: "member", label: "Member" }, { id: "owner", label: "Owner" }]} /></Field>}
+        {kind === "remove" && <p className="text-[13px] text-muted">The user loses access to the customer app; their membership ends now. The history stays in the audit log.</p>}
+        {kind === "status" && <p className="text-[13px] text-muted">{u.status === "disabled" ? "The user can sign in again." : "The user cannot sign in until sign-in is enabled again; the membership ends now."}</p>}
+        <Field label="Reason · required" hint="1–1000 characters, stored in the audit log" error={tried ? e : undefined}><Textarea rows={2} value={reason} onChange={(x) => setReason(x.target.value)} /></Field>
+      </div>
+    </Modal>
+  );
+}
+
+// ---- warranty & coverage (FR-A19) ----
+
+const coverageTone: Record<CoverageRow["status"], "ok" | "primary" | "warn" | "crit"> = { contract: "ok", under_warranty: "primary", expiring: "warn", no_coverage: "crit" };
+function download(name: string, text: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function WarrantyTab({ live }: { live: UnitsLive }) {
+  const [pending, run] = useAction();
+  const [f, setF] = useState<CoverageFilter>({ customerId: "", coverage: "", within: "" });
+  const [claim, setClaim] = useState<ClaimCandidate | null>(null);
+  const w = live.warranty;
+  if (!w) return <EmptyState title="Coverage needs asset.read or contract.read">Ask an identity administrator for Customers & units or Contracts access.</EmptyState>;
+  const rows = w.rows.filter((r) => coverageMatch(r, f));
+  const k = w.kpis;
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-3">
+        <Select aria-label="Customer" className="w-auto" value={f.customerId} onChange={(e) => setF({ ...f, customerId: e.target.value })}>
+          <option value="">Customer: All</option>{w.customers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+        </Select>
+        <Select aria-label="Coverage" className="w-auto" value={f.coverage} onChange={(e) => setF({ ...f, coverage: e.target.value as CoverageFilter["coverage"] })}>
+          <option value="">Coverage: All</option><option value="contract">Maintenance contract</option><option value="under_warranty">Under warranty</option><option value="expiring">Ending within 90 days</option><option value="no_coverage">No coverage</option>
+        </Select>
+        <Select aria-label="Ends within" className="w-auto" value={f.within} onChange={(e) => setF({ ...f, within: e.target.value as CoverageFilter["within"] })}>
+          <option value="">Ends within: any</option>{["30", "90", "180", "365"].map((d) => <option key={d} value={d}>Ends within: {d} days</option>)}
+        </Select>
+      </div>
+      <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
+        <Kpi label="Under warranty" value={k.underWarranty} sub={`of ${plural(k.total, "unit")}`} />
+        <Kpi label="Warranty ends ≤ 90 days" value={k.within90} tone={k.within90 ? "warn" : undefined} sub={`${k.within30} within 30 days`} />
+        <Kpi label="Out of warranty, no contract" value={k.noCoverage} tone={k.noCoverage ? "crit" : undefined} sub="Offer maintenance" />
+        <Kpi label="Maintenance contract" value={k.contract} sub={k.contractNames} />
+      </div>
+      <Card title="Units by coverage end" sub={`${rows.length} of ${w.rows.length}`} action={<Btn size="sm" disabled={!rows.length} onClick={() => download("warranty-coverage.csv", coverageCsv(rows))}>Export CSV</Btn>}>
+        <DataTable rows={rows} rowKey={(r) => r.unitId} cols={[
+          { key: "u", label: "Unit", render: (r) => <><b>{r.unit}</b><div className="text-xs text-muted">{r.sub}</div></> },
+          { key: "c", label: "Customer", render: (r) => r.customer, hideBelow: "sm" },
+          { key: "m", label: "Model", render: (r) => r.model, hideBelow: "md" },
+          { key: "w", label: "Warranty end", render: (r) => r.ends },
+          { key: "k", label: "Maintenance contract", render: (r) => r.contracts, hideBelow: "md" },
+          { key: "s", label: "Status", render: (r) => <Badge tone={coverageTone[r.status]}>{r.statusText}</Badge> },
+          { key: "a", label: "Action", render: (r) => (r.contractIds.length
+            ? <TextLink href={`/admin/billing/contracts?contractId=${r.contractIds[0]}`}>Open contract</TextLink>
+            : <TextLink href={`/admin/billing/contracts?customerId=${r.customerId}&unitId=${r.unitId}`}>Renewal offer</TextLink>) },
+        ]} />
+        <p className="mt-2 text-[11px] text-muted">The warranty end is set on the unit (unit edit › Warranty end) or by the CSV import. Coverage = an active maintenance contract, otherwise the warranty; fewer than 90 days left counts as ending (IR111).</p>
+      </Card>
+      <Card title="Warranty on jobs" sub="Jobs completed while the unit’s warranty ran whose accepted report lists replaced parts — the parts cost is claimable from the manufacturer until a claim is filed.">
+        {w.claims === null ? <p className="text-[13px] text-muted">Claimable jobs need job.read.</p> : w.claims.length === 0 ? <p className="text-[13px] text-muted">No claimable job right now.</p> : (
+          <div className="flex flex-col">
+            {w.claims.map((x) => (
+              <div key={x.jobId} className="flex flex-wrap items-center gap-3 border-t border-line py-2.5 text-[13px] first:border-0">
+                <div className="min-w-0 flex-1"><b>{x.unit}</b> <span className="text-muted">· {x.type} job {x.jobId.slice(0, 8)} · completed {x.completed}</span><div className="text-xs text-muted">Parts: {x.parts} · Claim {x.amountMinor ? amount(x.amountMinor, x.currency) : "amount to enter"} · not filed</div></div>
+                <TextLink href={`/admin/jobs?jobId=${x.jobId}`}>Job ›</TextLink>
+                {w.canClaim && <Btn size="sm" disabled={pending} onClick={() => setClaim(x)}>Mark claim filed</Btn>}
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+      {claim && <ClaimModal x={claim} pending={pending} onClose={() => setClaim(null)}
+        onSave={(label, minor, reason) => run(() => recordWarrantyClaim(claim.jobId, claim.version, label, minor, claim.currency, reason), `Warranty claim filed for ${claim.unit}`, () => setClaim(null))} />}
+    </>
+  );
+}
+
+function ClaimModal({ x, pending, onClose, onSave }: { x: ClaimCandidate; pending: boolean; onClose: () => void; onSave: (label: string, amountMinor: number, reason: string) => void }) {
+  const [label, setLabel] = useState(x.partLabel);
+  const [value, setValue] = useState(x.amountMinor ? (x.amountMinor / 100).toFixed(2) : "");
+  const [reason, setReason] = useState("");
+  const [tried, setTried] = useState(false);
+  const minor = Math.round(Number(value) * 100);
+  const e = { label: nameError(label), value: /^\d+(\.\d{1,2})?$/.test(value.trim()) && minor > 0 ? undefined : "An amount above 0 with at most 2 decimals", reason: reasonError(reason) };
+  return (
+    <Modal open onClose={onClose} title={`File warranty claim · ${x.unit}`} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!e.label && !e.value && !e.reason) onSave(label, minor, reason.trim()); }}>Mark claim filed</Btn></>}>
+      <div className="flex flex-col gap-3">
+        <SummaryList items={[["Job", `${x.type} · ${x.jobId.slice(0, 8)} · completed ${x.completed}`], ["Parts in the report", x.parts]]} />
+        <Field label="Part · required" hint="1–120 characters" error={tried ? e.label : undefined}><Input value={label} onChange={(v) => setLabel(v.target.value)} /></Field>
+        <Field label={`Claim amount (${x.currency}) · required`} error={tried ? e.value : undefined}><Input inputMode="decimal" value={value} onChange={(v) => setValue(v.target.value)} /></Field>
+        <Field label="Reason · required" hint="1–1000 characters, e.g. the manufacturer’s claim reference" error={tried ? e.reason : undefined}><Textarea rows={2} value={reason} onChange={(v) => setReason(v.target.value)} /></Field>
+      </div>
+    </Modal>
+  );
+}
+
+// ---- CSV import (FR-A18) ----
+
+function ImportWizard({ live, onClose }: { live: UnitsLive; onClose: () => void }) {
+  const [pending, run] = useAction();
+  const [customerId, setCustomerId] = useState(live.activeCustomers[0]?.id ?? "");
+  const [file, setFile] = useState<{ name: string; text: string; size: number } | null>(null);
+  const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [preview, setPreview] = useState<ApiImportPreview | null>(null);
+  const [result, setResult] = useState<ApiUnitImport | null>(null);
+  const [undoReason, setUndoReason] = useState("");
+  const [tried, setTried] = useState(false);
+  const shape = file ? csvShape(file.text) : null;
+  const tooBig = !!file && file.size > 900_000;
+  const missing = importFields.filter((x) => x.required && !mapping[x.key]);
+  const customer = live.activeCustomers.find((x) => x.id === customerId)?.name ?? "";
+  const pick = async (f: File | undefined) => {
+    if (!f) return;
+    const text = await f.text();
+    setFile({ name: f.name, text, size: f.size });
+    setMapping(autoMapping(csvShape(text).header));
+    setPreview(null);
+  };
+  const validate = () => {
+    setTried(true);
+    if (!file || !customerId || missing.length || tooBig) return;
+    run(() => importPreview(customerId, file.name, file.text, Object.fromEntries(Object.entries(mapping).filter(([, v]) => v))),
+      (p) => `${p.readyCount + p.warningCount} of ${p.rows.length} rows can be imported`, setPreview);
+  };
+  if (result) {
+    const undoable = result.state === "imported" && Date.parse(result.undoUntil) > Date.parse(live.now); // the business clock of the last render
+    return (
+      <Modal open wide onClose={onClose} title={result.state === "undone" ? "Import undone" : "Units imported"} footer={<Btn onClick={onClose}>Close</Btn>}>
+        <div className="flex flex-col gap-3">
+          <Banner tone={result.state === "undone" ? "warn" : "ok"}>{result.state === "undone"
+            ? "The imported units, rooms and properties are archived again and their devices unbound."
+            : `${plural(result.createdUnitIds.length, "unit")} created for ${customer} · ${plural(result.createdSpaceIds.length, "location")} and ${plural(result.createdPropertyIds.length, "property")} added · ${plural(result.skippedRowNumbers.length, "row")} skipped.`}</Banner>
+          {result.state === "imported" && <SummaryList items={[["Skipped rows", result.skippedRowNumbers.join(", ") || "none"], ["Undo possible until", `${klStamp(result.undoUntil)} MYT — only while no unit has telemetry or jobs`]]} />}
+          {undoable && <>
+            <Field label="Undo reason" error={tried && reasonError(undoReason) ? reasonError(undoReason) : undefined}><Textarea rows={2} value={undoReason} onChange={(v) => setUndoReason(v.target.value)} /></Field>
+            <div><Btn variant="danger" disabled={pending} onClick={() => { setTried(true); if (!reasonError(undoReason)) run(() => importUndo(result.id, result.version, undoReason), "Import undone", setResult); }}>Undo import</Btn></div>
+          </>}
+        </div>
+      </Modal>
+    );
+  }
+  if (preview) {
+    const importable = preview.readyCount + preview.warningCount;
+    return (
+      <Modal open wide onClose={onClose} title="Import units from CSV · 2 / 2 — preview" footer={<>
+        <Btn onClick={() => setPreview(null)}>← Back</Btn>
+        <Btn disabled={!preview.errorCount && !preview.warningCount} onClick={() => download(`${preview.fileName.replace(/\.csv$/i, "")}-report.csv`, errorReportCsv(preview.rows))}>Download error report</Btn>
+        <Btn variant="primary" disabled={pending || !importable} onClick={() => run(() => importCommit(preview.previewId, customerId), (x) => `${plural(x.createdUnitIds.length, "unit")} imported`, setResult)}>Import {plural(importable, "valid row")}</Btn>
+      </>}>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2 text-[13px]"><Badge tone="ok">{preview.readyCount} ready</Badge><Badge tone="warn">{plural(preview.warningCount, "warning")}</Badge><Badge tone="crit">{plural(preview.errorCount, "error")}</Badge><span className="text-muted">{customer} · {preview.fileName}</span></div>
+          <DataTable rows={preview.rows} rowKey={(r) => String(r.rowNumber)} cols={[
+            { key: "n", label: "Row", render: (r) => r.rowNumber },
+            { key: "l", label: "Location / unit", render: (r) => <><b>{importPlace(r)}</b><div className="text-xs text-muted">{r.unitName || "—"}</div></> },
+            { key: "m", label: "Model · serial", render: (r) => `${r.modelCode || "—"} · ${r.serial ?? "—"}`, hideBelow: "sm" },
+            { key: "r", label: "Result", render: (r) => <span className="flex items-start gap-2"><Badge tone={r.result === "ready" ? "ok" : r.result === "warning" ? "warn" : "crit"}>{r.result}</Badge><span className="text-xs">{importMessage(r)}</span></span> },
+          ]} />
+          <p className="text-[11px] text-muted">Nothing is written until you import. Error rows are skipped; the import runs as one change set, is recorded in the audit log and can be undone for 24 h while no unit has telemetry or jobs. The preview expires after 30 minutes.</p>
+        </div>
+      </Modal>
+    );
+  }
+  return (
+    <Modal open wide onClose={onClose} title="Import units from CSV · 1 / 2" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" disabled={pending} onClick={validate}>Validate →</Btn></>}>
+      <div className="flex flex-col gap-3">
+        <Field label="Customer" hint="Rows are created under this customer only. Properties, floors and rooms that do not exist yet are created." error={tried && !customerId ? "Choose a customer" : undefined}>
+          <Select value={customerId} onChange={(v) => { setCustomerId(v.target.value); setPreview(null); }}>{live.activeCustomers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select>
+        </Field>
+        <div className="flex flex-wrap items-center gap-3">
+          <input aria-label="CSV file" type="file" accept=".csv,text/csv" className="text-[13px]" onChange={(v) => pick(v.target.files?.[0])} />
+          <Btn size="sm" variant="ghost" onClick={() => download("units-template.csv", importTemplate)}>Download template</Btn>
+        </div>
+        {file && <p className="text-[12px] text-muted">📄 {file.name} · {plural(shape?.rows ?? 0, "row")} · {plural(shape?.header.length ?? 0, "column")} · UTF-8 · {Math.max(1, Math.round(file.size / 1024))} KB{tooBig ? " — too large: split the file (at most about 900 KB, 1000 rows)" : ""}</p>}
+        {tried && !file && <p className="text-[12px] text-crit">Choose a CSV file</p>}
+        {file && (
+          <div className="rounded-xl border border-line">
+            <div className="grid grid-cols-[1fr_1fr_auto] gap-2 bg-surface2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted"><span>CSV column</span><span>Field</span><span /></div>
+            {importFields.map((x) => (
+              <div key={x.key} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2 border-t border-line px-3 py-1.5 text-[13px]">
+                <Select aria-label={`Column for ${x.label}`} value={mapping[x.key] ?? ""} onChange={(v) => setMapping({ ...mapping, [x.key]: v.target.value })}>
+                  <option value="">— not in the file —</option>{shape?.header.map((h) => <option key={h} value={h}>{h}</option>)}
+                </Select>
+                <span>{x.label}</span>
+                <span className={cx("text-[11px]", x.required ? "font-semibold text-ink" : "text-muted")}>{x.required ? "Required" : "Optional"}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {tried && missing.length > 0 && <p className="text-[12px] text-crit">Map the required fields: {missing.map((x) => x.label).join(", ")}</p>}
       </div>
     </Modal>
   );

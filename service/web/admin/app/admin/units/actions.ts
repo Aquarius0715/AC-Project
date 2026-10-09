@@ -5,7 +5,7 @@
 // the record it changes.
 import { refresh } from "next/cache";
 import { coreAll, coreOp, CoreError } from "@ac/web/lib/dal";
-import type { ApiCustomerRow, ApiOrgRow, Profile, Scope } from "@ac/web/lib/assets";
+import type { ApiCustomerRow, ApiImportPreview, ApiOrgRow, ApiUnitImport, Profile, Scope } from "@ac/web/lib/assets";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string> };
 
@@ -67,7 +67,7 @@ export async function archiveLocation(kind: "property" | "space", id: string, ve
 
 export type UnitInput = {
   id?: string; customerOrgId: string; propertyId: string; spaceId: string | null; displayName: string; modelId: string; type: "split"; installedAt: string | null;
-  serviceScope: Scope[]; changeReason?: string;
+  serviceScope: Scope[]; warrantyEndsAt?: string | null; changeReason?: string;
 };
 export async function saveUnit(input: UnitInput, version?: number) {
   return run(() => coreOp<{ id: string }>("units.save", input, write(version)).then((u) => u.id));
@@ -87,3 +87,39 @@ export async function setUnitPolicies(unitId: string, version: number, alertPoli
 export async function setDefaultRule(policyId: string, ruleKey: string, customerId: string, enabled: boolean, version: number) {
   return run(() => coreOp("policies.setDefaultRule", { policyId, ruleKey, customerId, enabled }, write(version)).then(() => null));
 }
+
+// ---- client users (FR-A17): invite, role / sign-in changes with a reason, removal, invite and reset previews ----
+export async function inviteClientUser(customerId: string, email: string, clientRole: "owner" | "member") {
+  return run(() => coreOp<{ id: string }>("clientUsers.save", { customerId, email: email.trim(), clientRole }, write()).then((u) => u.id));
+}
+export async function updateClientUser(id: string, version: number, input: { customerId: string; email: string; clientRole: "owner" | "member"; status?: "active" | "disabled"; reason: string }) {
+  return run(() => coreOp("clientUsers.save", { id, ...input, reason: input.reason.trim() }, write(version)).then(() => null));
+}
+export async function removeClientUser(id: string, version: number, reason: string) {
+  return run(() => coreOp("clientUsers.remove", { id, reason: reason.trim() }, write(version)).then(() => null));
+}
+/** clientUsers.resendInvite only builds the invite preview again (nothing is sent, IR144). */
+export async function resendInvite(id: string) {
+  return run(() => coreOp<{ title?: string }>("clientUsers.resendInvite", { id }).then(() => null));
+}
+/** auth.previewPasswordReset answers the same generic preview for every address (IR145). */
+export async function previewPasswordReset(email: string) {
+  return run(() => coreOp("auth.previewPasswordReset", { demoEmail: email }).then(() => null));
+}
+
+// ---- CSV import (FR-A18): preview (writes nothing), import once, undo within 24 h ----
+export async function importPreview(customerId: string, fileName: string, csvText: string, mapping: Record<string, string>) {
+  return run(() => coreOp<ApiImportPreview>("units.importPreview", { customerId, fileName, csvText, mapping }));
+}
+export async function importCommit(previewId: string, customerId: string) {
+  return run(() => coreOp<ApiUnitImport>("units.importCommit", { previewId, customerId }, write()));
+}
+export async function importUndo(importId: string, version: number, reason: string) {
+  return run(() => coreOp<ApiUnitImport>("units.importUndo", { importId, reason: reason.trim() }, write(version)));
+}
+
+// ---- warranty (FR-A19) ----
+export async function recordWarrantyClaim(jobId: string, version: number, partLabel: string, amountMinor: number, currency: string, reason: string) {
+  return run(() => coreOp("jobs.recordWarrantyClaim", { jobId, partLabel: partLabel.trim(), amountMinor, currency, reason: reason.trim() }, write(version)).then(() => null));
+}
+

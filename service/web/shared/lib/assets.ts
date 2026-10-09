@@ -18,7 +18,7 @@ export type ApiSpaceRow = { id: string; version: number; propertyId: string; par
 /** UnitSummary of service-contracts.ts (fields shown on this screen). */
 export type ApiUnitRow = {
   id: string; version: number; customerOrgId: string; propertyId: string; spaceId: string | null; displayName: string; modelId: string; type: "split"; installedAt: string | null;
-  serviceScope: Scope[]; alertPolicyIds: string[]; archived: boolean; capabilityVersion: number; connection: Connection; lastSeenAt: string | null;
+  serviceScope: Scope[]; alertPolicyIds: string[]; archived: boolean; capabilityVersion: number; connection: Connection; lastSeenAt: string | null; warrantyEndsAt: string | null;
   effectivePowerState: PowerState; activeAlertCount: number;
 };
 /** UnitDetail of service-contracts.ts (fields shown on this screen). */
@@ -230,11 +230,12 @@ export function filterUnits(us: ApiUnitRow[], f: { powerState?: PowerState; conn
     && (!q || u.displayName.toLowerCase().includes(q) || u.id.toLowerCase().includes(q)));
 }
 
-/** The unit form (DD-A02 fields). installedAt is the Kuala Lumpur date. */
-export type UnitDraft = { displayName: string; propertyId: string; spaceId: string; modelId: string; installedAt: string; serviceScope: Scope[] };
-export const unitDraft = (u?: Pick<ApiUnitRow, "displayName" | "propertyId" | "spaceId" | "modelId" | "installedAt" | "serviceScope">, propertyId = "", spaceId = ""): UnitDraft => ({
+/** The unit form (DD-A02 fields, warranty end IR209). installedAt and warrantyEnd are Kuala Lumpur dates. */
+export type UnitDraft = { displayName: string; propertyId: string; spaceId: string; modelId: string; installedAt: string; warrantyEnd: string; serviceScope: Scope[] };
+const klDate = (iso: string | null | undefined) => (iso ? klStamp(iso).slice(0, 10) : "");
+export const unitDraft = (u?: Pick<ApiUnitRow, "displayName" | "propertyId" | "spaceId" | "modelId" | "installedAt" | "warrantyEndsAt" | "serviceScope">, propertyId = "", spaceId = ""): UnitDraft => ({
   displayName: u?.displayName ?? "", propertyId: u?.propertyId ?? propertyId, spaceId: u?.spaceId ?? (u ? "" : spaceId), modelId: u?.modelId ?? "",
-  installedAt: u?.installedAt ? klStamp(u.installedAt).slice(0, 10) : "", serviceScope: u?.serviceScope ?? ["indoor", "outdoor"],
+  installedAt: klDate(u?.installedAt), warrantyEnd: klDate(u?.warrantyEndsAt), serviceScope: u?.serviceScope ?? ["indoor", "outdoor"],
 });
 export function unitErrors(d: UnitDraft, todayKL: string): Record<string, string> {
   const e: Record<string, string> = {};
@@ -242,12 +243,14 @@ export function unitErrors(d: UnitDraft, todayKL: string): Record<string, string
   if (!d.propertyId) e.propertyId = "Choose a location";
   if (!d.modelId) e.modelId = "Choose a model";
   if (d.installedAt && d.installedAt > todayKL) e.installedAt = "An installation date cannot be in the future (IR44)";
+  if (d.warrantyEnd && d.installedAt && d.warrantyEnd < d.installedAt) e.warrantyEnd = "A warranty cannot end before the installation";
   if (d.serviceScope.length === 0) e.serviceScope = "Choose at least one inspection group";
   return e;
 }
 export const unitInput = (d: UnitDraft, orgId: string, id?: string, changeReason?: string) => ({
   ...(id ? { id } : {}), customerOrgId: orgId, propertyId: d.propertyId, spaceId: d.spaceId || null, displayName: d.displayName.trim(), modelId: d.modelId, type: "split" as const,
-  installedAt: d.installedAt ? `${d.installedAt}T00:00:00+08:00` : null, serviceScope: d.serviceScope, ...(changeReason ? { changeReason } : {}),
+  installedAt: d.installedAt ? `${d.installedAt}T00:00:00+08:00` : null, warrantyEndsAt: d.warrantyEnd ? `${d.warrantyEnd}T00:00:00+08:00` : null,
+  serviceScope: d.serviceScope, ...(changeReason ? { changeReason } : {}),
 });
 /** A relocation (another property or space) needs a change reason (DD-A02 step 3). */
 export const relocates = (u: Pick<ApiUnitRow, "propertyId" | "spaceId">, d: UnitDraft) => u.propertyId !== d.propertyId || (u.spaceId ?? "") !== d.spaceId;
@@ -259,6 +262,7 @@ export function changedFields(u: ApiUnitRow, d: UnitDraft): string[] {
   if (relocates(u, d)) out.push("Location");
   if (saved.modelId !== d.modelId) out.push("Model");
   if (saved.installedAt !== d.installedAt) out.push("Installed at");
+  if (saved.warrantyEnd !== d.warrantyEnd) out.push("Warranty end");
   if ([...saved.serviceScope].sort().join() !== [...d.serviceScope].sort().join()) out.push("Service scope");
   return out;
 }
@@ -305,3 +309,163 @@ export function defaultRules(p: ApiCustomerPolicy): RuleLine[] {
     return { ruleKey: r.ruleKey, name: r.name, condition: conditionText(r), enabled: s?.enabled ?? true, version: s?.version ?? 0, note: s ? `${s.enabled ? "On" : "Off"} since ${klStamp(s.updatedAt).slice(0, 10)}${s.reason ? ` · ${s.reason}` : ""}` : null };
   });
 }
+
+// ---- client users of the customer (FR-A17, IR144) ----
+
+export type Channel = "inApp" | "email" | "whatsapp";
+/** ClientUser of service-contracts.ts. */
+export type ApiClientUser = {
+  id: string; version: number; customerId: string; email: string; displayName: string | null; clientRole: "owner" | "member"; status: "invited" | "active" | "disabled";
+  lastSignInAt: string | null; allowedChannels: Channel[]; invitedAt: string; invitedByMembershipId: string;
+};
+export type ClientUserRow = {
+  id: string; version: number; email: string; name: string | null; role: "owner" | "member"; status: ApiClientUser["status"]; sub: string; lastSignIn: string; channels: string;
+  lastOwner: boolean;
+};
+const channelLabel: Record<Channel, string> = { inApp: "In-app", email: "Email", whatsapp: "WhatsApp" };
+/** Rows by name; the last active owner is marked because it cannot be demoted, disabled or removed (CONFLICT). */
+export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) => string): ClientUserRow[] {
+  const owners = us.filter((u) => u.clientRole === "owner" && u.status === "active").length;
+  return [...us].sort((a, b) => (a.displayName ?? a.email).localeCompare(b.displayName ?? b.email)).map((u) => ({
+    id: u.id, version: u.version, email: u.email, name: u.displayName, role: u.clientRole, status: u.status,
+    sub: u.displayName ? u.email : `invited ${klDate(u.invitedAt)} by ${who(u.invitedByMembershipId)}`, lastSignIn: u.lastSignInAt ? klStamp(u.lastSignInAt) : "—",
+    channels: u.status === "active" && u.allowedChannels.length ? u.allowedChannels.map((c) => channelLabel[c]).join(" · ") : "—",
+    lastOwner: u.clientRole === "owner" && u.status === "active" && owners === 1,
+  }));
+}
+/** A plain address up to 254 characters, not yet a user of this customer (case-insensitive). */
+export function inviteError(email: string, us: { email: string }[]): string | undefined {
+  const e = email.trim();
+  if (e.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return "A valid email address (up to 254 characters)";
+  if (us.some((u) => u.email.toLowerCase() === e.toLowerCase())) return "Already a user of this customer";
+  return undefined;
+}
+
+// ---- warranty & coverage (FR-A19) ----
+
+export type CoverageStatus = "under_warranty" | "contract" | "expiring" | "no_coverage";
+/** UnitCoverage of service-contracts.ts. */
+export type ApiCoverage = { unitId: string; customerId: string; modelId: string; warrantyEndsAt: string | null; contractIds: string[]; status: CoverageStatus; claimableJobIds: string[] };
+export type CoverageRow = {
+  unitId: string; unit: string; sub: string; customerId: string; customer: string; model: string; ends: string; endsAt: string | null; days: number | null;
+  contractIds: string[]; contracts: string; status: CoverageStatus; statusText: string;
+};
+const dayMs = 86_400_000;
+export function coverageRows(cs: ApiCoverage[], x: { unit: (id: string) => { name: string; place: string } | undefined; customer: (id: string) => string; model: (id: string) => string; contract: (id: string) => string }, now: Date): CoverageRow[] {
+  return cs.map((c) => {
+    const u = x.unit(c.unitId);
+    const days = c.warrantyEndsAt ? Math.ceil((Date.parse(c.warrantyEndsAt) - now.getTime()) / dayMs) : null;
+    const statusText = c.status === "contract" ? "Covered by contract" : c.status === "under_warranty" ? "Under warranty"
+      : c.status === "expiring" ? `Ends in ${days} d · no contract` : c.warrantyEndsAt ? "Warranty ended · no contract" : "No warranty · no contract";
+    return {
+      unitId: c.unitId, unit: u?.name ?? c.unitId.slice(0, 8), sub: [c.unitId.slice(0, 8), u?.place].filter(Boolean).join(" · "), customerId: c.customerId, customer: x.customer(c.customerId),
+      model: x.model(c.modelId), ends: klDate(c.warrantyEndsAt) || "—", endsAt: c.warrantyEndsAt, days, contractIds: c.contractIds, contracts: c.contractIds.map(x.contract).join(", ") || "—",
+      status: c.status, statusText,
+    };
+  }).sort((a, b) => (a.endsAt === b.endsAt ? a.unit.localeCompare(b.unit) : a.endsAt === null ? 1 : b.endsAt === null ? -1 : a.endsAt.localeCompare(b.endsAt)));
+}
+/** KPI tiles (Figma 02 warranty): under warranty (any unit whose warranty still runs), ending within 90 / 30 days, no coverage, contracts. */
+export function coverageKpis(rows: CoverageRow[]) {
+  const running = rows.filter((r) => r.days !== null && r.days > 0);
+  const contracts = [...new Set(rows.flatMap((r) => (r.status === "contract" ? r.contracts.split(", ") : [])))];
+  return {
+    total: rows.length, underWarranty: running.length, within90: running.filter((r) => r.days! <= 90).length, within30: running.filter((r) => r.days! <= 30).length,
+    noCoverage: rows.filter((r) => r.status === "no_coverage").length, contract: rows.filter((r) => r.status === "contract").length,
+    contractNames: contracts.length > 2 ? `${contracts.slice(0, 2).join(", ")} …` : contracts.join(", ") || "none",
+  };
+}
+export type CoverageFilter = { customerId: string; coverage: "" | CoverageStatus; within: "" | "30" | "90" | "180" | "365" };
+export const coverageMatch = (r: CoverageRow, f: CoverageFilter) => (!f.customerId || r.customerId === f.customerId) && (!f.coverage || r.status === f.coverage)
+  && (!f.within || (r.days !== null && r.days > 0 && r.days <= Number(f.within)));
+const csvCell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+export const toCsv = (header: string[], rows: string[][]) => [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
+export const coverageCsv = (rows: CoverageRow[]) => toCsv(["unit", "unit_id", "customer", "model", "warranty_end", "maintenance_contract", "status"],
+  rows.map((r) => [r.unit, r.unitId, r.customer, r.model, r.ends === "—" ? "" : r.ends, r.contracts === "—" ? "" : r.contracts, r.statusText]));
+
+/** A job completed under warranty whose accepted report lists replaced parts and has no filed claim (IR209). */
+export type ClaimCandidate = { jobId: string; version: number; unit: string; type: string; completed: string; parts: string; partLabel: string; amountMinor: number | null; currency: string };
+type Part = { name: string; quantity: number; catalogCode: string | null };
+type Cost = { kind: "estimate" | "actual"; amountMinor: number; currency: string };
+export function claimCandidate(j: { id: string; version: number; type: string; completedAt: string | null; costs: Cost[] }, parts: Part[], unit: string): ClaimCandidate {
+  const label = parts.map((p) => `${p.name}${p.catalogCode ? ` ${p.catalogCode}` : ""} ×${p.quantity}`).join(", ");
+  const actual = j.costs.filter((c) => c.kind === "actual");
+  return {
+    jobId: j.id, version: j.version, unit, type: j.type, completed: j.completedAt ? klStamp(j.completedAt).slice(0, 10) : "—", parts: label || "parts listed in the report",
+    partLabel: label.slice(0, 120), amountMinor: actual.length ? actual.reduce((n, c) => n + c.amountMinor, 0) : null, currency: actual[0]?.currency ?? "MYR",
+  };
+}
+
+// ---- CSV import (FR-A18) ----
+
+export const importFields = [
+  { key: "property", label: "Property name", required: true, aliases: ["property", "propertyname", "site"] },
+  { key: "floor", label: "Floor", required: false, aliases: ["floor"] },
+  { key: "room", label: "Room", required: false, aliases: ["room", "space"] },
+  { key: "unit_name", label: "Unit name", required: true, aliases: ["unitname", "unit", "name"] },
+  { key: "model_code", label: "Model (model register)", required: true, aliases: ["modelcode", "model"] },
+  { key: "serial", label: "Device serial (binds IoT)", required: false, aliases: ["serial", "deviceserial"] },
+  { key: "installed_on", label: "Install date (YYYY-MM-DD)", required: false, aliases: ["installedon", "installed", "installdate"] },
+  { key: "warranty_end", label: "Warranty end (YYYY-MM-DD)", required: false, aliases: ["warrantyend", "warranty"] },
+] as const;
+export const importTemplate = toCsv(importFields.map((f) => f.key), [["Office A", "2F", "Meeting room 2", "Meeting room AC #2", "SPL-100", "", "2026-01-10", "2027-01-10"]]);
+/** The header cells and the number of records of a CSV text (RFC 4180 quotes; a BOM is ignored). */
+export function csvShape(text: string): { header: string[]; rows: number } {
+  const records: string[][] = [[]];
+  let cell = "", quoted = false;
+  const t = text.replace(/^\ufeff/, "");
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (quoted) {
+      if (ch === '"' && t[i + 1] === '"') { cell += '"'; i++; } else if (ch === '"') quoted = false; else cell += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ",") { records.at(-1)!.push(cell); cell = ""; }
+    else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && t[i + 1] === "\n") i++;
+      records.at(-1)!.push(cell); cell = ""; records.push([]);
+    } else cell += ch;
+  }
+  records.at(-1)!.push(cell);
+  const full = records.filter((r) => r.some((c) => c.trim() !== ""));
+  return { header: (full[0] ?? []).map((h) => h.trim()), rows: Math.max(0, full.length - 1) };
+}
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+/** Matches CSV columns to the import fields by name ("Unit name", "unit_name" and "unit" all map to unit_name). */
+export function autoMapping(header: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const f of importFields) {
+    const hit = header.find((h) => (f.aliases as readonly string[]).includes(norm(h)) && !Object.values(out).includes(h));
+    if (hit) out[f.key] = hit;
+  }
+  return out;
+}
+/** ImportPreview / UnitImport of service-contracts.ts. */
+export type ApiImportRow = {
+  rowNumber: number; propertyName: string; floorName: string | null; roomName: string | null; unitName: string; modelCode: string; serial: string | null;
+  installedOn: string | null; warrantyEnd: string | null; result: "ready" | "warning" | "error"; messageKey: string | null;
+};
+export type ApiImportPreview = { previewId: string; customerId: string; fileName: string; rows: ApiImportRow[]; readyCount: number; warningCount: number; errorCount: number; expiresAt: string };
+export type ApiUnitImport = { id: string; version: number; customerId: string; createdPropertyIds: string[]; createdSpaceIds: string[]; createdUnitIds: string[]; skippedRowNumbers: number[]; undoUntil: string; state: "imported" | "undone" };
+export const importPlace = (r: ApiImportRow) => [r.propertyName, r.floorName, r.roomName].filter(Boolean).join(" › ");
+/** The row result in words (the message keys of units.importPreview). */
+export function importMessage(r: ApiImportRow): string {
+  const place = r.roomName ?? r.floorName ?? "";
+  switch (r.messageKey) {
+    case null: return "Ready";
+    case "warning.importCreatesProperty": return `Property “${r.propertyName}” does not exist — it will be created (office; add its address afterwards).`;
+    case "warning.importCreatesSpace": return `“${place}” does not exist — it will be created.`;
+    case "error.unknownModel": return `Model ${r.modelCode} is not in the model register (A04).`;
+    case "error.serialBound": return `Serial ${r.serial} is already bound to another unit.`;
+    case "error.unknownSerial": return `Serial ${r.serial} is not a registered device.`;
+    case "error.duplicateSerial": return `Serial ${r.serial} appears more than once in this file.`;
+    case "error.tamperUnresolved": return `Device ${r.serial} has an unresolved tamper.`;
+    case "error.duplicateSiblingName": return `A unit named “${r.unitName}” already exists there.`;
+    case "error.future": return "The installation date is in the future.";
+    case "error.importInvalidDate": return "A date is not a valid YYYY-MM-DD date.";
+    case "error.importMissingField": return "Property, unit name and model are required.";
+    case "error.length": return "The unit name is longer than 120 characters.";
+    default: return r.messageKey;
+  }
+}
+export const errorReportCsv = (rows: ApiImportRow[]) => toCsv(["row", "property", "floor", "room", "unit_name", "model_code", "serial", "result", "message"],
+  rows.filter((r) => r.result !== "ready").map((r) => [String(r.rowNumber), r.propertyName, r.floorName ?? "", r.roomName ?? "", r.unitName, r.modelCode, r.serial ?? "", r.result, importMessage(r)]));
+

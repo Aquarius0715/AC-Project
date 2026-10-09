@@ -2,6 +2,7 @@ package assets
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -320,6 +321,10 @@ type UnitSave struct {
 	InstalledAt   *time.Time `json:"installedAt"`
 	ServiceScope  []string   `json:"serviceScope"`
 	ChangeReason  *string    `json:"changeReason,omitempty"`
+	// WarrantyEndsAt is optional: omitted keeps the stored end (none for a new unit), null clears it (IR209).
+	WarrantyEndsAt json.RawMessage `json:"warrantyEndsAt,omitempty"`
+	warranty       *time.Time
+	warrantySet    bool
 }
 
 var scopes = map[string]bool{"indoor": true, "outdoor": true, "electrical": true}
@@ -342,6 +347,19 @@ func (in *UnitSave) Validate() map[string]string {
 	}
 	if !strLen(in.DisplayName, 1, 120) {
 		fe["displayName"] = "error.length"
+	}
+	if len(in.WarrantyEndsAt) > 0 {
+		in.warrantySet = true
+		if string(in.WarrantyEndsAt) != "null" {
+			var t time.Time
+			if err := json.Unmarshal(in.WarrantyEndsAt, &t); err != nil {
+				fe["warrantyEndsAt"] = "error.invalid"
+			} else if in.InstalledAt != nil && t.Before(*in.InstalledAt) {
+				fe["warrantyEndsAt"] = "error.range" // a warranty cannot end before the installation
+			} else {
+				in.warranty = &t
+			}
+		}
 	}
 	seen := map[string]bool{}
 	for _, s := range in.ServiceScope {
@@ -395,9 +413,9 @@ func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (Unit
 			return Unit{}, err
 		}
 		id := uuid.Must(uuid.NewV7())
-		if _, err := c.Tx.Exec(ctx, `INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, type, installed_at, service_scope, capability_version)
-			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-			id, in.CustomerOrgID, in.PropertyID, in.SpaceID, in.DisplayName, in.ModelID, in.Type, in.InstalledAt, in.ServiceScope, capVer); err != nil {
+		if _, err := c.Tx.Exec(ctx, `INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, type, installed_at, service_scope, capability_version, warranty_ends_at)
+			VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+			id, in.CustomerOrgID, in.PropertyID, in.SpaceID, in.DisplayName, in.ModelID, in.Type, in.InstalledAt, in.ServiceScope, capVer, in.warranty); err != nil {
 			return Unit{}, err
 		}
 		if err := siblingName(ctx, c, "unit", id); err != nil {
@@ -415,8 +433,9 @@ func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (Unit
 	var curModel uuid.UUID
 	var curInstalled *time.Time
 	var curScope []string
-	err = c.Tx.QueryRow(ctx, `SELECT property_id, space_id, display_name, model_id, installed_at, service_scope FROM assets.units WHERE id = $1 AND customer_org_id = $2 AND NOT archived`,
-		*in.ID, in.CustomerOrgID).Scan(&curProp, &curSpace, &curName, &curModel, &curInstalled, &curScope)
+	var curWarranty *time.Time
+	err = c.Tx.QueryRow(ctx, `SELECT property_id, space_id, display_name, model_id, installed_at, service_scope, warranty_ends_at FROM assets.units WHERE id = $1 AND customer_org_id = $2 AND NOT archived`,
+		*in.ID, in.CustomerOrgID).Scan(&curProp, &curSpace, &curName, &curModel, &curInstalled, &curScope, &curWarranty)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Unit{}, notFound()
 	}
@@ -431,11 +450,18 @@ func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (Unit
 		}
 		reason = *in.ChangeReason
 	}
+	warranty := curWarranty
+	if in.warrantySet {
+		warranty = in.warranty
+	}
+	if warranty != nil && in.InstalledAt != nil && warranty.Before(*in.InstalledAt) {
+		return Unit{}, apperr.Fields(map[string]string{"warrantyEndsAt": "error.range"})
+	}
 	var v int
 	err = c.Tx.QueryRow(ctx, `UPDATE assets.units SET property_id=$3, space_id=$4, display_name=$5, model_id=$6, installed_at=$7, service_scope=$8,
-		capability_version=$9, version = version + 1, updated_at = platform.app_now()
+		capability_version=$9, warranty_ends_at=$10, version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1 AND version = $2 AND NOT archived RETURNING version`,
-		*in.ID, *c.ExpectedVersion, in.PropertyID, in.SpaceID, in.DisplayName, in.ModelID, in.InstalledAt, in.ServiceScope, capVer).Scan(&v)
+		*in.ID, *c.ExpectedVersion, in.PropertyID, in.SpaceID, in.DisplayName, in.ModelID, in.InstalledAt, in.ServiceScope, capVer, warranty).Scan(&v)
 	if err != nil {
 		return Unit{}, versionedUpdate(ctx, c, "assets.units", *in.ID, err)
 	}
@@ -445,8 +471,8 @@ func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (Unit
 	c.Emit(ops.Event{AggregateType: "unit", AggregateID: *in.ID, Type: "UnitChanged"})
 	// before/after keep the original location and values in the history (DD-A02 step 3)
 	before, after := ops.Changes(
-		map[string]any{"propertyId": curProp, "spaceId": curSpace, "displayName": curName, "modelId": curModel, "installedAt": curInstalled, "serviceScope": curScope},
-		map[string]any{"propertyId": in.PropertyID, "spaceId": in.SpaceID, "displayName": in.DisplayName, "modelId": in.ModelID, "installedAt": in.InstalledAt, "serviceScope": in.ServiceScope})
+		map[string]any{"propertyId": curProp, "spaceId": curSpace, "displayName": curName, "modelId": curModel, "installedAt": curInstalled, "serviceScope": curScope, "warrantyEndsAt": curWarranty},
+		map[string]any{"propertyId": in.PropertyID, "spaceId": in.SpaceID, "displayName": in.DisplayName, "modelId": in.ModelID, "installedAt": in.InstalledAt, "serviceScope": in.ServiceScope, "warrantyEndsAt": warranty})
 	c.Audit(ops.AuditEntry{Action: "units.save", TargetKind: "unit", TargetID: in.ID.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &v, Reason: reason, Before: before, After: after})
 	return m.load(ctx, c, *in.ID)
 }

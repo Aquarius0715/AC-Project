@@ -3,6 +3,8 @@ package assets
 import (
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestCoverageStatus(t *testing.T) {
@@ -26,5 +28,23 @@ func TestCoverageStatus(t *testing.T) {
 		if got := CoverageStatus(now, c.ends, c.contracts); got != c.want {
 			t.Errorf("case %d: %s want %s", i, got, c.want)
 		}
+	}
+}
+
+func TestClaimable(t *testing.T) {
+	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
+	a, b, c := uuid.New(), uuid.New(), uuid.New()
+	jobs := map[uuid.UUID]time.Time{a: now.Add(-time.Hour), b: now.Add(-48 * time.Hour), c: now.Add(time.Hour)}
+	ends := now
+	got := claimable(jobs, &ends)
+	if len(got) != 2 || got[0] != b || got[1] != a {
+		t.Fatalf("completed while the warranty ran, earliest first: %v", got)
+	}
+	if got := claimable(jobs, nil); len(got) != 0 {
+		t.Fatalf("no warranty → nothing claimable: %v", got)
+	}
+	exact := now.Add(-time.Hour)
+	if got := claimable(map[uuid.UUID]time.Time{a: exact}, &exact); len(got) != 1 {
+		t.Fatalf("completion on the last warranty instant counts: %v", got)
 	}
 }

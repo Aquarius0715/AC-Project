@@ -150,6 +150,7 @@ type Fixture struct {
 			ModelID             string          `json:"modelId"`
 			CapabilityVersion   int             `json:"capabilityVersion"`
 			InstalledAt         *time.Time      `json:"installedAt"`
+			WarrantyEndsAt      *time.Time      `json:"warrantyEndsAt"`
 			ServiceScope        []string        `json:"serviceScope"`
 			Archived            bool            `json:"archived"`
 			ObservedState       json.RawMessage `json:"observedState"`
@@ -364,10 +365,10 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 			scope = []string{"indoor", "outdoor", "electrical"}
 		}
 		if err := ex(`INSERT INTO assets.units (id, tenant_id, customer_org_id, property_id, space_id, display_name, model_id, installed_at,
-			service_scope, archived, capability_version, observed_state, observed_restriction, version)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT DO NOTHING`,
+			service_scope, archived, capability_version, observed_state, observed_restriction, version, warranty_ends_at)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT DO NOTHING`,
 			ID(u.ID), ID(orgTenant[u.CustomerOrgID]), ID(u.CustomerOrgID), ID(u.PropertyID), space, u.DisplayName, ID(u.ModelID),
-			u.InstalledAt, scope, u.Archived, u.CapabilityVersion, state, restr, max(u.Version, 1)); err != nil {
+			u.InstalledAt, scope, u.Archived, u.CapabilityVersion, state, restr, max(u.Version, 1), u.WarrantyEndsAt); err != nil {
 			return fmt.Errorf("unit %s: %w", u.ID, err)
 		}
 	}

@@ -20,7 +20,7 @@ type (
 		ActiveContracts(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID][]uuid.UUID, error)
 	}
 	ClaimReader interface {
-		ClaimableJobs(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID][]uuid.UUID, error)
+		ClaimableJobs(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID]map[uuid.UUID]time.Time, error)
 	}
 )
 
@@ -49,6 +49,25 @@ func CoverageStatus(now time.Time, warrantyEnds *time.Time, contracts int) strin
 	default:
 		return "expiring"
 	}
+}
+
+// claimable keeps the jobs completed while the warranty ran (warrantyEndsAt not before completedAt, the
+// jobs.recordWarrantyClaim rule), the earliest completion first.
+func claimable(jobs map[uuid.UUID]time.Time, ends *time.Time) []uuid.UUID {
+	out := []uuid.UUID{}
+	if ends == nil {
+		return out
+	}
+	for id, at := range jobs {
+		if !ends.Before(at) {
+			out = append(out, id)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		a, b := jobs[out[i]], jobs[out[j]]
+		return a.Before(b) || (a.Equal(b) && out[i].String() < out[j].String())
+	})
+	return out
 }
 
 var coverageStatuses = map[string]bool{"under_warranty": true, "contract": true, "expiring": true, "no_coverage": true}
@@ -119,7 +138,7 @@ func (m *Module) unitsCoverage(ctx context.Context, c *ops.Call, in *paging.Quer
 	var keep []UnitCoverage
 	for _, x := range all {
 		x.ContractIDs = append([]uuid.UUID{}, contracts[x.UnitID]...)
-		x.ClaimableJobIDs = append([]uuid.UUID{}, claims[x.UnitID]...)
+		x.ClaimableJobIDs = claimable(claims[x.UnitID], x.WarrantyEndsAt)
 		x.Status = CoverageStatus(c.Now, x.WarrantyEndsAt, len(x.ContractIDs))
 		if f.Coverage != nil && x.Status != *f.Coverage {
 			continue

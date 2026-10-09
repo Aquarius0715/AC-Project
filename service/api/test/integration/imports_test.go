@@ -12,6 +12,7 @@ import (
 )
 
 func jsonStr(s string) string { b, _ := json.Marshal(s); return string(b) }
+func jsonStr2(v any) string   { b, _ := json.Marshal(v); return string(b) }
 
 const mapping = `{"property":"Property","floor":"Floor","room":"Room","unit_name":"Unit","model_code":"Model","serial":"Serial","installed_on":"Installed","warranty_end":"Warranty"}`
 
@@ -36,6 +37,13 @@ func TestUnitsImport(t *testing.T) {
 	owner(t, `INSERT INTO devices.device_bindings (tenant_id, device_id, unit_id, customer_org_id, bound_at, actor_membership_id) VALUES ($1,$2,$3,$4,now(),$5)`,
 		seed.ID("tenant-a"), dev, boundUnit, org, seed.ID("hq-operator"))
 
+	// a free device: its serial binds the imported unit (DD-A18 serial column)
+	free := "FREE-" + uuid.NewString()[:8]
+	freeDev := uuid.NewString()
+	owner(t, `INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'v1')`,
+		freeDev, seed.ID("tenant-a"), free, boundUnit, seed.ID("hq-operator"))
+	nowhere := "Nowhere " + uuid.NewString()[:6]
+
 	csv := "\ufeffProperty,Floor,Room,Unit,Model,Serial,Installed,Warranty\n" +
 		prop + ",1F,,Desk AC 1,SPL-100,,2026-01-10,2027-01-10\n" + // ready (existing floor)
 		prop + ",1F,Meeting 3,Meeting AC,spl-200v,,,\n" + // warning: creates room
@@ -43,20 +51,36 @@ func TestUnitsImport(t *testing.T) {
 		prop + ",,,Lobby AC,CS-XX99,,,\n" + // error: unknown model
 		prop + ",,,Lobby AC 2,SPL-100," + serial + ",,\n" + // error: serial bound
 		prop + ",1F,,Desk AC 1,SPL-100,,,\n" + // error: duplicate name in file
-		"Nowhere,,,X,SPL-100,,,\n" + // error: unknown property
+		nowhere + ",,,X,SPL-100,,,\n" + // warning: creates the property
 		prop + ",,,Future,SPL-100,,2030-01-01,\n" + // error: future install
 		prop + ",,,Bad date,SPL-100,,2026-13-40,\n" + // error: invalid date
-		prop + ",,,,SPL-100,,,\n" // error: missing unit name
+		prop + ",,,,SPL-100,,,\n" + // error: missing unit name
+		prop + ",,,Serial AC,SPL-100," + strings.ToLower(free) + ",,\n" + // ready: binds the free device
+		prop + ",,,Serial AC 2,SPL-100," + free + ",,\n" + // error: the same serial twice in the file
+		prop + ",,,Ghost AC,SPL-100,NO-SUCH-" + free + ",,\n" // error: unknown serial
 	body := `{"customerId":"` + cust + `","fileName":"units.csv","csvText":` + jsonStr(csv) + `,"mapping":` + mapping + `}`
 	code, m = post(s, &hq, "units.importPreview", body)
 	if code != 200 {
 		t.Fatalf("preview: %d %v", code, m)
 	}
 	p := data(m)
-	if p["readyCount"].(float64) != 1 || p["warningCount"].(float64) != 2 || p["errorCount"].(float64) != 7 {
+	if p["readyCount"].(float64) != 2 || p["warningCount"].(float64) != 3 || p["errorCount"].(float64) != 8 {
 		t.Fatalf("counts: %v %v %v / rows %v", p["readyCount"], p["warningCount"], p["errorCount"], p["rows"])
 	}
 	previewID := p["previewId"].(string)
+	keys := map[string]string{}
+	for _, r := range p["rows"].([]any) {
+		row := r.(map[string]any)
+		if k, ok := row["messageKey"].(string); ok {
+			keys[row["unitName"].(string)] = k
+		}
+	}
+	for unit, key := range map[string]string{"X": "warning.importCreatesProperty", "Meeting AC": "warning.importCreatesSpace", "Lobby AC 2": "error.serialBound",
+		"Serial AC 2": "error.duplicateSerial", "Ghost AC": "error.unknownSerial"} {
+		if keys[unit] != key {
+			t.Errorf("%s: %q, want %q", unit, keys[unit], key)
+		}
+	}
 
 	// preview validation
 	for name, b := range map[string]string{
@@ -86,7 +110,8 @@ func TestUnitsImport(t *testing.T) {
 		t.Fatalf("commit: %d %v", code, m)
 	}
 	imp := data(m)
-	if len(imp["createdUnitIds"].([]any)) != 3 || len(imp["createdSpaceIds"].([]any)) != 1 || len(imp["skippedRowNumbers"].([]any)) != 7 || imp["state"] != "imported" {
+	if len(imp["createdUnitIds"].([]any)) != 5 || len(imp["createdSpaceIds"].([]any)) != 1 || len(imp["createdPropertyIds"].([]any)) != 1 ||
+		len(imp["skippedRowNumbers"].([]any)) != 8 || imp["state"] != "imported" {
 		t.Fatalf("import result: %v", imp)
 	}
 	if code, _ := write(s, &hq, "units.importCommit", `{"previewId":"`+previewID+`","customerId":"`+cust+`"}`, 0); code != 409 {
@@ -94,8 +119,27 @@ func TestUnitsImport(t *testing.T) {
 	}
 	// the created units exist under the new room
 	_, m = post(s, &hq, "units.list", `{"filters":{"propertyId":"`+propID+`"},"limit":100}`)
-	if len(items(m)) != 4 { // 3 imported + the bound unit
+	if len(items(m)) != 5 { // 4 imported here + the bound unit (the fifth went to the new property)
 		t.Fatalf("units after import: %d", len(items(m)))
+	}
+	var desk, serialUnit string
+	for _, u := range items(m) {
+		switch u["displayName"] {
+		case "Desk AC 1":
+			desk = u["id"].(string)
+		case "Serial AC":
+			serialUnit = u["id"].(string)
+		}
+	}
+	// CSV dates are Kuala Lumpur calendar dates
+	if _, g := post(s, &hq, "units.get", `{"id":"`+desk+`"}`); data(g)["installedAt"] != "2026-01-09T16:00:00Z" {
+		t.Errorf("installedAt: %v", data(g)["installedAt"])
+	}
+	if _, d := post(s, &hq, "devices.list", `{"filters":{"unitId":"`+serialUnit+`"}}`); len(items(d)) != 1 || items(d)[0]["id"] != freeDev {
+		t.Fatalf("the serial binds the device: %v", d)
+	}
+	if _, pl := post(s, &hq, "properties.list", `{"filters":{"customerId":"`+cust+`"},"limit":100}`); !strings.Contains(jsonStr2(pl), nowhere) {
+		t.Fatal("the new property exists")
 	}
 
 	// undo: stale version, success, twice
@@ -110,6 +154,12 @@ func TestUnitsImport(t *testing.T) {
 	_, m = post(s, &hq, "units.list", `{"filters":{"propertyId":"`+propID+`"}}`)
 	if len(items(m)) != 1 {
 		t.Fatal("undo archives created units")
+	}
+	if _, d := post(s, &hq, "devices.list", `{"filters":{"unitId":"`+serialUnit+`"}}`); len(items(d)) != 0 {
+		t.Fatalf("undo releases the device: %v", d)
+	}
+	if _, pl := post(s, &hq, "properties.list", `{"filters":{"customerId":"`+cust+`"},"limit":100}`); strings.Contains(jsonStr2(pl), nowhere) {
+		t.Fatal("undo archives the created property")
 	}
 	if code, _ := write(s, &hq, "units.importUndo", `{"importId":"`+importID+`","reason":"again"}`, 2); code != 409 {
 		t.Error("undo twice")

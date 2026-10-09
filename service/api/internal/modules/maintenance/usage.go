@@ -3,6 +3,7 @@ package maintenance
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -41,8 +42,9 @@ func (Usage) UnitInUse(ctx context.Context, c *ops.Call, unit uuid.UUID) (bool, 
 	return ops.Delegate(ctx, c, QueryUnitInUse, UnitInput{UnitID: unit}, unitInUse)
 }
 
-// ClaimableJobs returns, per unit, jobs that hold a warranty claim still in state "claimable" (DD-A19).
-func (Usage) ClaimableJobs(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID][]uuid.UUID, error) {
+// ClaimableJobs returns, per unit, the completed jobs whose accepted work report lists parts and that have no filed warranty
+// claim yet, each with its completion time: Assets keeps those completed while the warranty ran (DD-A19, IR209).
+func (Usage) ClaimableJobs(ctx context.Context, c *ops.Call, units []uuid.UUID) (map[uuid.UUID]map[uuid.UUID]time.Time, error) {
 	return ops.Delegate(ctx, c, QueryClaimableJobs, UnitsInput{UnitIDs: units}, claimableJobs)
 }
 
@@ -69,20 +71,25 @@ func unitInUse(ctx context.Context, c *ops.Call, in *UnitInput) (bool, error) {
 	return b, err
 }
 
-func claimableJobs(ctx context.Context, c *ops.Call, in *UnitsInput) (map[uuid.UUID][]uuid.UUID, error) {
-	out := map[uuid.UUID][]uuid.UUID{}
-	rows, err := c.Tx.Query(ctx, `SELECT unit_id, id FROM maintenance.jobs WHERE unit_id = ANY($1)
-		AND EXISTS (SELECT 1 FROM jsonb_array_elements(warranty_claims) w WHERE w->>'state' = 'claimable') ORDER BY id`, in.UnitIDs)
+func claimableJobs(ctx context.Context, c *ops.Call, in *UnitsInput) (map[uuid.UUID]map[uuid.UUID]time.Time, error) {
+	out := map[uuid.UUID]map[uuid.UUID]time.Time{}
+	rows, err := c.Tx.Query(ctx, `SELECT j.unit_id, j.id, j.completed_at FROM maintenance.jobs j WHERE j.unit_id = ANY($1) AND j.status = 'completed'
+		AND j.completed_at IS NOT NULL AND EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state = 'accepted' AND jsonb_array_length(r.parts) > 0)
+		AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(j.warranty_claims) w WHERE w->>'state' = 'filed')`, in.UnitIDs)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var u, j uuid.UUID
-		if err := rows.Scan(&u, &j); err != nil {
+		var at time.Time
+		if err := rows.Scan(&u, &j, &at); err != nil {
 			return nil, err
 		}
-		out[u] = append(out[u], j)
+		if out[u] == nil {
+			out[u] = map[uuid.UUID]time.Time{}
+		}
+		out[u][j] = at
 	}
 	return out, rows.Err()
 }

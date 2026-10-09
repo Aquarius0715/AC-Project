@@ -363,7 +363,7 @@ export type OperationContracts = {
   'units.delete': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'units.get': {input:{id:ID;jobId?:ID};result:UnitDetail;mode:'read'};
   'units.list': {input:Query;result:Page<UnitSummary>;mode:'read'};
-  'units.save': {input:{id?:ID;customerOrgId:ID;propertyId:ID;spaceId:ID|null;displayName:string;modelId:ID;type:'split';installedAt:Instant|null;serviceScope:ACUnit['serviceScope'];changeReason?:string};result:ACUnit;mode:'write'};
+  'units.save': {input:{id?:ID;customerOrgId:ID;propertyId:ID;spaceId:ID|null;displayName:string;modelId:ID;type:'split';installedAt:Instant|null;warrantyEndsAt?:Instant|null;serviceScope:ACUnit['serviceScope'];changeReason?:string};result:ACUnit;mode:'write'};
   'voice.resolveIntent': {input:{text:string;locale:Locale;selectedUnitId?:ID};result:ResolvedIntent;mode:'read'};
   'locations.rename': {input:{target:LocationTarget;name:string};result:Property|Space|ACUnit;mode:'write'};
   'units.setAlertPolicies': {input:{unitId:ID;alertPolicyIds:ID[]};result:ACUnit;mode:'write'};
