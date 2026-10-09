@@ -35,7 +35,7 @@ Treat route parameters as untrusted input and always validate them. Service name
 | DD-T10 / FR-T10 | `/technician/units/:id/control` / `DiagnosticControl` | `commands.create`, `commands.get`, `diagnosticRuns.create`, `diagnosticRuns.get`, `units.get`, `jobs.get`, `diagnosticRuns.list`, `commands.list` | Check `control.diagnose` permission, unit capabilities, reason, and test-run duration (1–15 minutes, provisional) | Do not use test runs to bypass contract restrictions. Do not automatically resend after expiry |
 | DD-T11 / FR-T11 | `/technician/devices` / `DeviceMaintenance` | `devices.list`, `devices.register`, `devices.bind`, `devices.check`, `devices.calibrate`, `devices.updateFirmware`, `devices.get`, `units.list`, `units.get`, `jobs.list`, `devices.calibrations`, `devices.operations` | Serial numbers must be unique. Set unitId and sensor types. Enter unit, reference value, and date/time for calibration. Choose supported firmware versions | Do not start updates offline. Do not show the new version as applied after update failure |
 | DD-T12 / FR-T12 | `/technician/devices/:id` / `DeviceEvents` | `devices.get`, `devices.events`, `alerts.get`, `alerts.acknowledge`, `devices.addResponseNote`, `devices.list`, `units.list`, `units.get`, `jobs.list` | Show eventType and detection evidence. Use a dedicated simulated event for removal | Restored communication does not automatically clear removal alerts |
-| DD-T13 / FR-T13 | `/technician` (Scan QR), `/technician/jobs/:id` (Check in) / `QrScan`, `SiteCheckIn` | `units.resolveQr`, `jobs.checkIn`, `jobs.get` | Assigned units only; location ≤ 200 m, QR match, inside the window; manual reason 1–1000 | Unassigned label → Page unavailable; outside window rejected as jobs.start |
+| DD-T13 / FR-T13 | `/technician` (Scan QR), `/technician/jobs/:id` (Check in) / `QrScan`, `SiteCheckIn` | `units.resolveQr`, `jobs.checkIn`, `jobs.get`, `units.get`, `units.list` | Assigned units only; location ≤ 200 m, QR match, inside the window; manual reason 1–1000 | Unassigned label → Page unavailable; outside window rejected as jobs.start |
 | DD-T14 / FR-T14 | `/technician/jobs/:id` / `PartsAndTime` | `jobs.saveDraft`, `jobs.pauseWork`, `parts.list` | Parts qty > 0, receipt for bought-locally; refrigerant kg ≥ 0 | Read-only after submit |
 | DD-T15 / FR-T15 | `/technician/jobs/:id` / `CustomerSignOff` | `reports.signOff`, `reports.get` | Signature or absence reason with site photo; bound to report version | Editing the draft clears the sign-off |
 
@@ -397,7 +397,7 @@ Scope: FR-T12 / Main display pattern: **UI-DETAIL** and **UI-TIMELINE**. Service
 
 **Source mapping**: SRC-06 BIZ-12, BIZ-20 → FR-T13 → DD-T13. Source category: Figma-confirmed screen specification (Technician 01-6, 02-32, 2026-10-01).
 
-Scope: FR-T13 / Main display pattern: **UI-FORM**. Service boundary: `units.resolveQr, jobs.checkIn, jobs.get`.
+Scope: FR-T13 / Main display pattern: **UI-FORM**. Service boundary: `units.resolveQr, jobs.checkIn, jobs.get, units.get, units.list`.
 
 **Initial view and prerequisites**: “▣ Scan QR” in the Overview header or Check in from Start job. Camera access is simulated in the demo; the label code can be typed.
 
@@ -413,6 +413,8 @@ Scope: FR-T13 / Main display pattern: **UI-FORM**. Service boundary: `units.reso
 1. Scan: `units.resolveQr` → matched card (unit, location, model) and today’s job; Open job → workspace, Open unit → register (read-only).
 2. Check in (centered modal): job, site, window, now; three checks (Location, Unit QR, Arrival) with ✓/✕; Check in & start → `jobs.checkIn`; Scan QR again re-runs the scan.
 3. Queries to update: `jobs / summaries`.
+
+**Scan dialog in API mode (IR230)**: the camera is simulated — the label code (`ac-unit:<id>`), a bound device serial or the unit ID is typed, or one of the user's units (`units.list`) is scanned with one tap. `units.resolveQr` (through the BFF) answers the unit and the user's next open job on it; the matched card shows the label and scan time, the unit with its location and model (`units.get`), and “Your job today” or “Your next job” with its window, type, status and linked alerts (`jobs.get`). Before the work window `units.get` is FORBIDDEN (IR94), so the card names the unit from the list and says its details open with the window. Open unit → the unit register with the job; Open job → the workspace; Enter ID manually focuses the field. An empty scan asks for a label.
 
 **Boundary cases and failures**: Unassigned or unknown label → shared Page unavailable without unit data. Outside the window → same error and disabled state as `jobs.start`.
 

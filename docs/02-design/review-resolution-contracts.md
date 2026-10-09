@@ -2167,3 +2167,11 @@ Decision of the product owner after reviewing the Swagger description (every ope
 - **Sidebar.** Sidebar › Assigned jobs links to `/technician?tab=all` and is now shown as active there (Figma 01-2): an item whose link carries a query is active when the path and the query match; the sidebar reads the search parameters inside a Suspense boundary so static pages keep rendering.
 - **Uploaded files.** The API containers run read-only with `/tmp` on tmpfs, and the maintenance service kept its local blob store there, so every container restart lost the report photos while their rows stayed; the photos then failed with UNAVAILABLE (and the contractor's quality review, which treats UNAVAILABLE as retryable, failed as a whole). The store now lives on the named volume `blobs` (`BLOB_DIR=/var/lib/ac/blobs`, the directory created in the image for the non-root user), and a stored row whose content is missing reads as NOT_FOUND (`blob.ErrNotFound`, test) — the workspace shows “Photo unavailable” and the review leaves the photo out. Photos lost before this change stay unavailable.
 - **Open.** Staging and production need the S3 store (bucket `ac-files`; container design §4, OPEN-CT-02); the Go blob package has only the local directory store.
+
+## IR230 Technician unit QR scan from the Core API — 2026-10-09
+
+The Scan QR dialog in the shell header (FR-T13, DD-T13, Figma Technician 01-6) showed a fixed match in API mode (IR223 list); it now scans through the BFF as DD-T13 describes.
+
+- **Reads.** `units.resolveQr` (unit and the user's next open job on it — the soonest job of the unit in assigned, in progress, on hold or rework whose window has not ended; NOT_FOUND for unknown labels and units outside the user's assignments), then `units.get` and `jobs.get` for the matched card, and `units.list` for the one-tap scans and the unit name.
+- **Before the work window.** `units.get` answers FORBIDDEN `errors.assignment_not_started` until the work window opens (IR94); the card then names the unit from the user's unit list and says its details open with the window, and Open job still leads to the read-only workspace.
+- **Demo.** The camera is simulated: a field takes the label code (`ac-unit:<unitId>`), a device serial bound to the unit or the unit ID, and each of the user's units can be scanned with one tap. The Phase 1A demo keeps its fixture dialog.

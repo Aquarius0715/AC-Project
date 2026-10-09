@@ -228,7 +228,7 @@ export function Field({ label, hint, error, children, className }: { label: stri
 /** The control classes; a width in className (w-auto, w-40, …) replaces w-full — two width utilities would be decided
  * by the stylesheet order, not by the order in className. */
 const control = (className?: string) => (className && /(^|\s)w-/.test(className) ? inputCls.replace("w-full ", "") : inputCls);
-export const Input = ({ className, ...p }: React.InputHTMLAttributes<HTMLInputElement>) => <input {...p} className={cx(control(className), className)} />;
+export const Input = ({ className, ...p }: React.ComponentProps<"input">) => <input {...p} className={cx(control(className), className)} />; // React 19: ref is a prop
 export const Select = ({ className, children, ...p }: React.SelectHTMLAttributes<HTMLSelectElement>) => (
   <select {...p} className={cx(control(className), "pr-8", className)}>{children}</select>
 );

@@ -7,6 +7,7 @@ import { ROLES, ROLE_KEY, Role, roleFromPath } from "@ac/web/lib/nav";
 import { Badge, Banner, Btn, Modal, SummaryList, ToastProvider, cx } from "./ui";
 import { useJobStore } from "@ac/web/lib/jobs";
 import { AssistantPanel } from "./Assistant";
+import { QrScan } from "./QrScan";
 import { CURRENT_CLIENT } from "@ac/web/lib/clientUsers";
 import { setStoredValue, useStoredValue } from "@ac/web/lib/urlState";
 import { useBffSession } from "@ac/web/lib/useOp";
@@ -131,7 +132,8 @@ export function AppShell({ role: forced, children }: { role?: Role; children: Re
           <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>
-      <Modal open={qr} onClose={() => setQr(false)} title="Scan unit QR" footer={<><Btn onClick={() => setQr(false)}>Close</Btn><Link href="/technician/jobs/job-contractor-a" onClick={() => setQr(false)} className="inline-flex items-center rounded-control border border-primary bg-primary px-3.5 py-2 text-[13px] font-semibold text-white">Open job →</Link></>}>
+      {role === "technician" && session?.dataSource === "api" && <QrScan open={qr} onClose={() => setQr(false)} />}
+      <Modal open={qr && session?.dataSource !== "api"} onClose={() => setQr(false)} title="Scan unit QR" footer={<><Btn onClick={() => setQr(false)}>Close</Btn><Link href="/technician/jobs/job-contractor-a" onClick={() => setQr(false)} className="inline-flex items-center rounded-control border border-primary bg-primary px-3.5 py-2 text-[13px] font-semibold text-white">Open job →</Link></>}>
         <div className="grid h-40 place-items-center rounded-xl bg-ink/90 text-xs text-white">[ camera preview ]</div>
         <SummaryList items={[["Result", <Badge key="m" tone="ok">✓ Matched</Badge>], ["Label", "AC-QR-online-rto · scanned 10:04"], ["Unit", "Bedroom AC · unit-online-rto · customer-a · Home A › 1F › Bedroom"], ["Your job today", "job-contractor-a"]]} />
         <Banner>Units outside your assignments show “Not in your assignments” (NOT_FOUND).</Banner>
