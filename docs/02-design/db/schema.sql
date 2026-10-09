@@ -533,7 +533,10 @@ CREATE TABLE devices.device_events (
   tenant_id        uuid NOT NULL,
   device_id        uuid NOT NULL,
   unit_id          uuid,
+  binding_id       uuid,                -- the binding the device reported under (null while unbound)
+  event_id         uuid UNIQUE,         -- the reported event (DemoTrigger eventId): a repeat is idempotent (SR20)
   event_type       text NOT NULL CHECK (event_type IN ('communication_lost','power_lost','tamper','restored','operation_failed')),
+  axis             text NOT NULL CHECK (axis IN ('connection','power','tamper','operation')),   -- restored: recovery.axis
   evidence_source  text NOT NULL CHECK (evidence_source IN ('heartbeat','power_signal','tamper_signal')),
   recovery         jsonb,
   alert_ids        uuid[] NOT NULL DEFAULT '{}',
@@ -543,7 +546,7 @@ CREATE TABLE devices.device_events (
   version          int NOT NULL DEFAULT 1,
   created_at       timestamptz NOT NULL DEFAULT platform.app_now(),
   FOREIGN KEY (tenant_id, device_id) REFERENCES devices.devices(tenant_id, id),
-  UNIQUE (device_id, sequence)
+  UNIQUE NULLS NOT DISTINCT (device_id, binding_id, axis, sequence)    -- SR20: sequence per device/binding/axis
 );
 CREATE INDEX device_events_device ON devices.device_events (tenant_id, device_id, occurred_at DESC);
 

@@ -20,8 +20,8 @@ func TestDeviceHistory(t *testing.T) {
 	write(s, &hq, "devices.calibrate", `{"deviceId":"`+dev+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C","referenceValue":25,"measuredValue":25.2,"calibratedAt":"2026-09-14T00:10:00Z"}`, 2)
 	write(s, &hq, "devices.check", `{"id":"`+dev+`"}`, 3)
 	ev := uuid.NewString()
-	owner(t, `INSERT INTO devices.device_events (id, tenant_id, device_id, unit_id, event_type, evidence_source, sequence, occurred_at)
-		VALUES ($1,$2,$3,$4,'tamper','tamper_signal',1,$5)`, ev, seed.ID("tenant-a"), dev, u, clock) // after the binding (bound at the test clock)
+	owner(t, `INSERT INTO devices.device_events (id, tenant_id, device_id, unit_id, event_type, axis, evidence_source, sequence, occurred_at)
+		VALUES ($1,$2,$3,$4,'tamper','tamper','tamper_signal',1,$5)`, ev, seed.ID("tenant-a"), dev, u, clock) // after the binding (bound at the test clock)
 
 	for _, op := range []string{"devices.operations", "devices.calibrations"} {
 		code, m := post(s, &hq, op, `{"deviceId":"`+dev+`","query":{}}`)

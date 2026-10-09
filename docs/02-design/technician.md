@@ -34,7 +34,7 @@ Treat route parameters as untrusted input and always validate them. Service name
 | DD-T09 / FR-T09 | `/technician/jobs/:id` / `ReportEditor` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `attachments.add`, `attachments.getContent`, `units.get` | Report body: 10–4000 characters. Photos: JPEG/PNG, at most 5MiB each, at most 10 (provisional). Part quantities must be greater than 0 | Drafts may be incomplete. Validate the schema on submission. Reselect images after processing failure, while keeping text |
 | DD-T10 / FR-T10 | `/technician/units/:id/control` / `DiagnosticControl` | `commands.create`, `commands.get`, `diagnosticRuns.create`, `diagnosticRuns.get`, `units.get`, `jobs.get`, `diagnosticRuns.list`, `commands.list` | Check `control.diagnose` permission, unit capabilities, reason, and test-run duration (1–15 minutes, provisional) | Do not use test runs to bypass contract restrictions. Do not automatically resend after expiry |
 | DD-T11 / FR-T11 | `/technician/devices` / `DeviceMaintenance` | `devices.list`, `devices.register`, `devices.bind`, `devices.check`, `devices.calibrate`, `devices.updateFirmware`, `devices.get`, `units.list`, `units.get`, `jobs.list`, `devices.calibrations`, `devices.operations` | Serial numbers must be unique. Set unitId and sensor types. Enter unit, reference value, and date/time for calibration. Choose supported firmware versions | Do not start updates offline. Do not show the new version as applied after update failure |
-| DD-T12 / FR-T12 | `/technician/devices/:id` / `DeviceEvents` | `devices.get`, `devices.events`, `alerts.get`, `alerts.acknowledge`, `devices.addResponseNote` | Show eventType and detection evidence. Use a dedicated simulated event for removal | Restored communication does not automatically clear removal alerts |
+| DD-T12 / FR-T12 | `/technician/devices/:id` / `DeviceEvents` | `devices.get`, `devices.events`, `alerts.get`, `alerts.acknowledge`, `devices.addResponseNote`, `devices.list`, `units.list`, `units.get`, `jobs.list` | Show eventType and detection evidence. Use a dedicated simulated event for removal | Restored communication does not automatically clear removal alerts |
 | DD-T13 / FR-T13 | `/technician` (Scan QR), `/technician/jobs/:id` (Check in) / `QrScan`, `SiteCheckIn` | `units.resolveQr`, `jobs.checkIn`, `jobs.get` | Assigned units only; location ≤ 200 m, QR match, inside the window; manual reason 1–1000 | Unassigned label → Page unavailable; outside window rejected as jobs.start |
 | DD-T14 / FR-T14 | `/technician/jobs/:id` / `PartsAndTime` | `jobs.saveDraft`, `jobs.pauseWork`, `parts.list` | Parts qty > 0, receipt for bought-locally; refrigerant kg ≥ 0 | Read-only after submit |
 | DD-T15 / FR-T15 | `/technician/jobs/:id` / `CustomerSignOff` | `reports.signOff`, `reports.get` | Signature or absence reason with site photo; bound to report version | Editing the draft clears the sign-off |
@@ -351,13 +351,13 @@ Scope: FR-T11 / Main display pattern: **UI-LIST**, **UI-FORM**, **UI-DETAIL**. S
 | metric / unit | enum/required for calibration | Sensor capability combination | Measurement type |
 | referenceValue / measuredValue | number/required for calibration | Finite values, same unit | Calibration basis |
 | calibratedAt | ISO datetime/required | Cannot be in the future | Calibration time |
-| firmwareVersion | enum/required for update | Supported candidate other than current version | Target version |
+| firmwareVersion | enum/required for update | Supported candidate other than current version; the technician screen offers only candidates above the installed version (IR217) | Target version |
 
 **Steps**
 
 1. Register the serial number. Bind it to a unit, check the connection, and record calibration and reference values. Select supported firmware and update it. Check progress and result.
 2. Trim serial numbers and convert to uppercase before checking uniqueness. Calibration only adds history; it does not rewrite existing measurements. Firmware can only be selected from supported versions. Do not allow free-entry URLs or binary data.
-3. Save `Device`, `CalibrationRecord`, and `DeviceOperation`. Update `firmwareVersion` only when the result is `succeeded`. Follow IR67 for queued → running and the connecting display. Reject control requests during updates as CONFLICT. Follow D05 for mutual exclusion.
+3. Save `Device`, `CalibrationRecord`, and `DeviceOperation`. Update `firmwareVersion` only when the result is `succeeded`. Follow IR67 for queued → running and the connecting display (the equipment scheduler starts and times out operations; the screen refreshes while one is open, IR217). Reject control requests during updates as CONFLICT. Follow D05 for mutual exclusion.
 4. Queries to update: `devices / operations / calibrations / capabilities / audit`.
 
 **Boundary cases and failures**: Reject duplicate serial numbers, unauthorized rebinding to another unit, and unit mismatches, without changing the register. Do not start firmware updates offline. Show `failed` on update failure and keep the old version.
@@ -368,7 +368,7 @@ Scope: FR-T11 / Main display pattern: **UI-LIST**, **UI-FORM**, **UI-DETAIL**. S
 
 **Source mapping**: SRC-06 BIZ-20 → FR-T12 → DD-T12. Source category: original company requirements SRC-06 + design additions. Design addition: distinguishing communication loss, power loss, and removal. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-T12 / Main display pattern: **UI-DETAIL** and **UI-TIMELINE**. Service boundary: `devices.get, devices.events, alerts.get, alerts.acknowledge, devices.addResponseNote`.
+Scope: FR-T12 / Main display pattern: **UI-DETAIL** and **UI-TIMELINE**. Service boundary: `devices.get, devices.events, alerts.get, alerts.acknowledge, devices.addResponseNote, devices.list, units.list, units.get, jobs.list`.
 
 **Initial view and prerequisites**: The user may view events for the assigned Device. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -387,7 +387,7 @@ Scope: FR-T12 / Main display pattern: **UI-DETAIL** and **UI-TIMELINE**. Service
 3. Save detection time, observation evidence, response details, and recovery time as separate events. Acknowledging a notification does not change the device's physical state.
 4. Queries to update: `devices / alerts / device events / notifications / audit`.
 
-**Boundary cases and failures**: Reconnection does not clear unacknowledged tamper alerts. An old heartbeat received out of order must not restore online state.
+**Boundary cases and failures**: Reconnection does not clear unacknowledged tamper alerts. An old heartbeat received out of order must not restore online state (its sequence is not newer than the axis's latest event, so history and state stay unchanged, IR217).
 
 **Verification**: Check the traceability entries under AT-T12 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 

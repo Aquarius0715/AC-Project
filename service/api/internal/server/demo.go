@@ -12,6 +12,8 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/control"
+	"github.com/pradita/ac-project/service/api/internal/modules/devices"
+	"github.com/pradita/ac-project/service/api/internal/modules/monitoring"
 	"github.com/pradita/ac-project/service/api/internal/modules/restrictions"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
@@ -122,7 +124,8 @@ func (d *demoOps) reset(context.Context, *ops.Call, *ResetInput) (Generation, er
 	return Generation{}, apperr.E(apperr.Unavailable, "errors.demo_reset_offline")
 }
 
-// TriggerInput is the supported part of DemoTrigger: command_sent/ack/fail and telemetry.
+// TriggerInput is the supported part of DemoTrigger: command_sent/ack/fail, telemetry, restriction_observation,
+// device faults and recoveries, and device operation results.
 type TriggerInput struct {
 	ScenarioID  string          `json:"scenarioId"`
 	EventID     uuid.UUID       `json:"eventId"`
@@ -135,6 +138,14 @@ type TriggerInput struct {
 	RestrictionID *uuid.UUID                `json:"restrictionId,omitempty"`
 	UnitID        *uuid.UUID                `json:"unitId,omitempty"`
 	Observed      *restrictions.Observation `json:"observed"`
+	// device (SR20): kind communication_lost / power_lost / tamper / restored with recovery
+	DeviceID  *uuid.UUID        `json:"deviceId,omitempty"`
+	BindingID *uuid.UUID        `json:"bindingId,omitempty"`
+	Kind      string            `json:"kind,omitempty"`
+	Recovery  *devices.Recovery `json:"recovery,omitempty"`
+	// operation (IR67): the device's result for a running check / firmware operation
+	OperationID *uuid.UUID `json:"operationId,omitempty"`
+	Result      string     `json:"result,omitempty"`
 }
 
 // RawMeasurement is RawMeasurement of service-contracts.ts.
@@ -174,6 +185,28 @@ func (in *TriggerInput) Validate() map[string]string {
 		if in.RestrictionID == nil || in.UnitID == nil || in.CommandID != nil || in.Measurement != nil {
 			fe["unitId"] = "error.required"
 		}
+	case "device":
+		if in.DeviceID == nil {
+			fe["deviceId"] = "error.required"
+		}
+		if in.Sequence == nil || *in.Sequence < 0 {
+			fe["sequence"] = "error.required"
+		}
+		switch r := in.Recovery; {
+		case in.Kind == "restored" && (r == nil || r.SourceEventID == uuid.Nil || devices.RecoveredValue[r.Axis] == "" || devices.RecoveredValue[r.Axis] != r.Value):
+			fe["recovery"] = "error.invalid" // DeviceRecovery: connection → online, power → on, tamper → clear
+		case in.Kind != "restored" && devices.FaultAxis[in.Kind] == "":
+			fe["kind"] = "error.invalid"
+		case in.Kind != "restored" && r != nil:
+			fe["recovery"] = "error.invalid" // faults carry no recovery (SR20)
+		}
+	case "operation":
+		if in.OperationID == nil {
+			fe["operationId"] = "error.required"
+		}
+		if in.Result != "succeeded" && in.Result != "failed" {
+			fe["result"] = "error.invalid"
+		}
 	default:
 		fe["eventType"] = "errors.trigger_unsupported"
 	}
@@ -196,7 +229,7 @@ var metricUnits = map[string]struct {
 	"vibration": {"mm/s", 0, 100}, "refrigerant_pressure": {"kPa", 0, 5000}}
 
 // inTenant runs fn in the tenant that owns the row found by probe (demo triggers are anonymous, RLS needs a tenant).
-func (d *demoOps) inTenant(ctx context.Context, probe string, id uuid.UUID, fn func(pgx.Tx, uuid.UUID) error) error {
+func (d *demoOps) inTenant(ctx context.Context, now time.Time, probe string, id uuid.UUID, fn func(pgx.Tx, uuid.UUID) error) error {
 	rows, err := d.m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
 	if err != nil {
 		return err
@@ -213,6 +246,9 @@ func (d *demoOps) inTenant(ctx context.Context, probe string, id uuid.UUID, fn f
 				return err
 			}
 			found = true
+			if _, err := tx.Exec(ctx, `SELECT set_config('app.now', $1, true)`, now.UTC().Format(time.RFC3339Nano)); err != nil { // column defaults on the demo clock
+				return err
+			}
 			return fn(tx, t)
 		})
 		if err != nil || found {
@@ -229,18 +265,18 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 	out := Event{EventID: in.EventID, Generation: 1, OccurredAt: in.OccurredAt, Type: in.EventType}
 	switch in.EventType {
 	case "command_sent":
-		return out, d.inTenant(ctx, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`, *in.CommandID, func(tx pgx.Tx, _ uuid.UUID) error {
+		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`, *in.CommandID, func(tx pgx.Tx, _ uuid.UUID) error {
 			_, err := tx.Exec(ctx, `UPDATE control.commands SET status = 'sent', delivery = 'sent', sent_at = $2, version = version + 1, updated_at = $2 WHERE id = $1 AND status = 'requested'`,
 				*in.CommandID, in.OccurredAt)
 			return err
 		})
 	case "command_ack":
-		return out, d.inTenant(ctx, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`, *in.CommandID, func(tx pgx.Tx, _ uuid.UUID) error {
+		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`, *in.CommandID, func(tx pgx.Tx, _ uuid.UUID) error {
 			_, err := control.Acknowledge(ctx, tx, *in.CommandID, in.OccurredAt)
 			return err
 		})
 	case "command_fail":
-		return out, d.inTenant(ctx, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`, *in.CommandID, func(tx pgx.Tx, _ uuid.UUID) error {
+		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM control.commands WHERE id = $1)`, *in.CommandID, func(tx pgx.Tx, _ uuid.UUID) error {
 			tag, err := tx.Exec(ctx, `UPDATE control.commands SET status = 'failed', failure_code = 'DEVICE_REJECTED', version = version + 1, updated_at = $2
 				WHERE id = $1 AND status IN ('requested','sent')`, *in.CommandID, in.OccurredAt)
 			if err != nil || tag.RowsAffected() == 0 {
@@ -249,8 +285,20 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 			return control.EndRestrictionCommands(ctx, tx, []uuid.UUID{*in.CommandID}, in.OccurredAt)
 		})
 	}
+	switch in.EventType {
+	case "device": // SR20 faults and recoveries, SR23 tamper Alert
+		s := devices.Signal{EventID: in.EventID, DeviceID: *in.DeviceID, BindingID: in.BindingID, Sequence: int64(*in.Sequence), Kind: in.Kind, Recovery: in.Recovery, OccurredAt: in.OccurredAt}
+		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM devices.devices WHERE id = $1)`, *in.DeviceID, func(tx pgx.Tx, _ uuid.UUID) error {
+			_, err := devices.RecordSignal(ctx, tx, s, c.Now, monitoring.Alerts{})
+			return err
+		})
+	case "operation": // IR67: the result of a running check / firmware operation
+		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE id = $1)`, *in.OperationID, func(tx pgx.Tx, _ uuid.UUID) error {
+			return devices.FinishOperation(ctx, tx, *in.OperationID, in.Result == "succeeded", in.OccurredAt, c.Now)
+		})
+	}
 	if in.EventType == "restriction_observation" { // SR26: a device reports which restriction it enforces
-		return out, d.inTenant(ctx, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`, *in.UnitID, func(tx pgx.Tx, _ uuid.UUID) error {
+		return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM assets.units WHERE id = $1)`, *in.UnitID, func(tx pgx.Tx, _ uuid.UUID) error {
 			var obsRaw any // the device observation itself (equipment data); restrictions reacts to it
 			if in.Observed != nil {
 				obsRaw, _ = json.Marshal(in.Observed)
@@ -264,7 +312,7 @@ func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (E
 		})
 	}
 	r := in.Measurement // telemetry: D07 / IR12 normalization, IR77 sequence latest+1, IR11 boundary from the sensor
-	return out, d.inTenant(ctx, `SELECT EXISTS (SELECT 1 FROM devices.sensors s JOIN devices.devices d ON d.id = s.device_id WHERE s.id = $1)`, r.SensorID, func(tx pgx.Tx, t uuid.UUID) error {
+	return out, d.inTenant(ctx, c.Now, `SELECT EXISTS (SELECT 1 FROM devices.sensors s JOIN devices.devices d ON d.id = s.device_id WHERE s.id = $1)`, r.SensorID, func(tx pgx.Tx, t uuid.UUID) error {
 		var metric, unit string
 		var boundary *string
 		var bound *uuid.UUID

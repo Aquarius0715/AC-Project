@@ -98,6 +98,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.105.0 (2026-10-09): IR214; automations.delete (198 operations).
 # 0.106.0 (2026-10-09): IR215; counts unchanged.
 # 0.107.0 (2026-10-09): IR216; commands.list (199 operations).
+# 0.108.0 (2026-10-09): IR217; job lookup screens SCR-T11/T12 without job sort; counts unchanged.
 # 0.102.0 (2026-10-09): IR211; counts unchanged.
 # 0.101.0 (2026-10-09): IR210; counts unchanged.
 # 0.100.0 (2026-10-09): IR209; counts unchanged.
@@ -693,8 +694,16 @@ if accepted_sort['status']=='accepted':
         fail('Default job sort is not business order')
     if '<'.join(expected_order) not in job_query['sort_mapping']:
         fail('Job query status ranking differs from accepted decision')
+    # IR217: the technician device screens read jobs.list only to find the assigned job of each unit (IR94) and show no
+    # job list, so they have no job sort; every other screen that reads jobs.list shows the list and sorts it (IR34).
+    job_lookups = {'SCR-T11', 'SCR-T12'}
     for screen in screens:
-        if 'jobs.list' in screen['operations'].split(';') and ('sort' not in screen['url_selection'].split(',') or 'IR34 onSortChange' not in screen['interaction']):
+        if 'jobs.list' not in screen['operations'].split(';'):
+            continue
+        if screen['screen_id'] in job_lookups:
+            if 'sort' in screen['url_selection'].split(',') or 'IR34 onSortChange' in screen['interaction'] or 'jobs.list is a lookup' not in screen['interaction']:
+                fail('Job lookup screen drift: '+screen['screen_id'])
+        elif 'sort' not in screen['url_selection'].split(',') or 'IR34 onSortChange' not in screen['interaction']:
             fail('Job screen sort interaction missing: '+screen['screen_id'])
 accepted_permissions = next(d for d in decisions_016 if d['id']=='DEC-17')
 if accepted_permissions['status']=='accepted':
@@ -1265,7 +1274,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.107.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.108.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

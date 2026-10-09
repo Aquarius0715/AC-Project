@@ -176,6 +176,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	dm := &devices.Module{Units: am, Exclusion: []devices.Exclusion{control.Busy{}, restrictions.Busy{}}}
 	devices.RegisterDevices(reg, dm)
 	devices.RegisterCampaigns(reg, dm)
+	reg.AddJob(ops.DomainEquipment, devices.Lifecycle{Guard: control.Busy{}}.Advance) // IR67: operations start and time out on the equipment scheduler
 
 	authn := &auth.Authenticator{Verifier: v, DB: m, Now: reg.Clock}
 	servesIdentity := len(cfg.Domains) == 0 || slices.Contains(cfg.Domains, ops.DomainIdentity)
