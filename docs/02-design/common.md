@@ -122,7 +122,7 @@ interface CommandRepository {
 
 `DemoViewContext` describes the selected fictional user, role, and visible scope. `DemoWriteOptions` carries a key to prevent duplicate demo actions and the version before the change. These do not define production authentication or server permissions. See the [Frontend Input and Output Contract](implementation-contracts.md) for the fields.
 
-The [Operation Catalog](operation-catalog.csv) lists the 198 local service operations needed by the screens, with their inputs, return values, and screens that use them. It does not define URLs, HTTP methods, database tables, or server transactions.
+The [Operation Catalog](operation-catalog.csv) lists the 199 local service operations needed by the screens, with their inputs, return values, and screens that use them. It does not define URLs, HTTP methods, database tables, or server transactions.
 
 Successful mock operations return ServiceResult<T>; failures reject with DomainError. Pending processing is shown through Command.status or similar fields in the success DTO. Do not create a custom pending Promise response type.
 

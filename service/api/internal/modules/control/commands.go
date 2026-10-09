@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/pradita/ac-project/service/api/internal/platform/events"
+	"fmt"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -14,6 +14,8 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
+	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
 // Target is what Control needs to know about a unit.
@@ -77,16 +79,17 @@ type Command struct {
 	ExpiresAt         time.Time       `json:"expiresAt"`
 	FailureCode       *string         `json:"failureCode"`
 	CorrelationID     string          `json:"correlationId"`
+	Source            string          `json:"source"` // ui | voice | automation | restriction | diagnostic | group (IR216)
 	orgID             uuid.UUID
 }
 
 const commandCols = `id, tenant_id, version, created_at, updated_at, unit_id, actor_membership_id, action, diagnostic_run_id, job_id, reason, status, delivery,
-	requested_at, sent_at, acknowledged_at, expires_at, failure_code, correlation_id`
+	requested_at, sent_at, acknowledged_at, expires_at, failure_code, correlation_id, source`
 
 func scanCommand(r pgx.Row) (Command, error) {
 	var x Command
 	err := r.Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.UnitID, &x.ActorMembershipID, &x.Action, &x.DiagnosticRunID, &x.JobID, &x.Reason,
-		&x.Status, &x.Delivery, &x.RequestedAt, &x.SentAt, &x.AcknowledgedAt, &x.ExpiresAt, &x.FailureCode, &x.CorrelationID)
+		&x.Status, &x.Delivery, &x.RequestedAt, &x.SentAt, &x.AcknowledgedAt, &x.ExpiresAt, &x.FailureCode, &x.CorrelationID, &x.Source)
 	return x, err
 }
 
@@ -304,6 +307,93 @@ func (m Commands) get(ctx context.Context, c *ops.Call, in *GetInput) (Command, 
 	return x, nil
 }
 
+// ListInput is commands.list input (IR216).
+type ListInput struct {
+	UnitID uuid.UUID    `json:"unitId"`
+	JobID  *uuid.UUID   `json:"jobId,omitempty"`
+	Query  paging.Query `json:"query"`
+}
+
+// Validate implements ops.Validator.
+func (in *ListInput) Validate() map[string]string {
+	if in.UnitID == uuid.Nil {
+		return map[string]string{"unitId": "error.required"}
+	}
+	return nil
+}
+
+// list is the unit's Command history, newest first (IR216: C03 unit history, T10 job history): a client sees the
+// commands of its organization's unit — the reason of a command someone else sent is withheld; a technician sees
+// one job's commands (jobId required) of a job they hold or held an Assignment of (equipment's projection, IR187);
+// HQ sees the unit's commands.
+func (m Commands) list(ctx context.Context, c *ops.Call, in *ListInput) (paging.Page[Command], error) {
+	if err := paging.NoFilters(in.Query, "query.filters"); err != nil {
+		return paging.Page[Command]{}, err
+	}
+	order, err := paging.OrderBy(in.Query.Sort, map[string]string{"id": "id", "requestedAt": "requested_at"}, "requested_at DESC, id")
+	if err != nil {
+		return paging.Page[Command]{}, err
+	}
+	w, err := paging.Resolve(in.Query, in, c.Principal.ScopeVersion, 1)
+	if err != nil {
+		return paging.Page[Command]{}, err
+	}
+	t, found, err := m.Units.Target(ctx, c, in.UnitID)
+	if err != nil {
+		return paging.Page[Command]{}, err
+	}
+	nf := apperr.E(apperr.NotFound, "error.notFound")
+	switch c.Principal.Role {
+	case "client":
+		if !found || t.OrgID != c.Principal.OrgID {
+			return paging.Page[Command]{}, nf
+		}
+	case "technician":
+		if in.JobID == nil {
+			return paging.Page[Command]{}, apperr.Fields(map[string]string{"jobId": "error.required"})
+		}
+		var ok bool
+		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM assets.unit_assignment_access WHERE job_id = $1 AND unit_id = $2 AND technician_membership_id = $3)`,
+			*in.JobID, in.UnitID, c.Principal.MembershipID).Scan(&ok); err != nil {
+			return paging.Page[Command]{}, err
+		}
+		if !ok {
+			return paging.Page[Command]{}, nf
+		}
+	default:
+		if !found {
+			return paging.Page[Command]{}, nf
+		}
+	}
+	args := []any{in.UnitID}
+	where := "unit_id = $1"
+	if in.JobID != nil {
+		args = append(args, *in.JobID)
+		where += " AND job_id = $2"
+	}
+	var total int
+	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM control.commands WHERE "+where, args...).Scan(&total); err != nil {
+		return paging.Page[Command]{}, err
+	}
+	rows, err := c.Tx.Query(ctx, fmt.Sprintf("SELECT %s FROM control.commands WHERE %s ORDER BY %s LIMIT %d OFFSET %d", commandCols, where, order, w.Limit, w.Offset), args...)
+	if err != nil {
+		return paging.Page[Command]{}, err
+	}
+	defer rows.Close()
+	items := []Command{}
+	for rows.Next() {
+		x, err := scanCommand(rows)
+		if err != nil {
+			return paging.Page[Command]{}, err
+		}
+		if c.Principal.Role == "client" && x.ActorMembershipID != c.Principal.MembershipID {
+			x.Reason = nil // another actor's reason (a technician's or HQ's) is not the customer's
+		}
+		items = append(items, x)
+	}
+	return paging.Page[Command]{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}, rows.Err()
+}
+
 // ExpireCommands marks sent commands past their window as expired (worker tick, IR138 item 2).
 func ExpireCommands(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
 	rows, err := tx.Query(ctx, `UPDATE control.commands SET status = 'expired', failure_code = 'TIMEOUT', version = version + 1, updated_at = $1
@@ -359,6 +449,7 @@ func applyObserved(ctx context.Context, tx pgx.Tx, command uuid.UUID, at time.Ti
 func Register(r *ops.Registry, m Commands) {
 	ops.Register(r, "commands.create", m.create)
 	ops.Register(r, "commands.get", m.get)
+	ops.Register(r, "commands.list", m.list)
 }
 
 // PendingCommands returns the unit's requested / sent Commands, oldest first (UnitDetail.pendingCommands).

@@ -97,6 +97,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.104.0 (2026-10-09): IR213; counts unchanged.
 # 0.105.0 (2026-10-09): IR214; automations.delete (198 operations).
 # 0.106.0 (2026-10-09): IR215; counts unchanged.
+# 0.107.0 (2026-10-09): IR216; commands.list (199 operations).
 # 0.102.0 (2026-10-09): IR211; counts unchanged.
 # 0.101.0 (2026-10-09): IR210; counts unchanged.
 # 0.100.0 (2026-10-09): IR209; counts unchanged.
@@ -197,8 +198,8 @@ opnames = unique(operations, 'operation', 'operation')
 opmap = {row['operation']: row for row in operations}
 types = (ROOT / '02-design/service-contracts.ts').read_text()
 typed = {name:(input_, result, mode) for name,input_,result,mode in re.findall(r"^  '([^']+)': \{input:(.*);result:(.*);mode:'(read|write)'\};$", types, re.M)}
-if set(typed) != opnames or len(operations) != 198:  # IR214 added automations.delete
-    fail('198 operation/TypeScript contract keys differ')
+if set(typed) != opnames or len(operations) != 199:  # IR214 automations.delete, IR216 commands.list
+    fail('199 operation/TypeScript contract keys differ')
 for row in operations:
     name = row['operation']
     if typed.get(name) != (row['input_contract'], row['result_contract'], row['mode']):
@@ -1264,7 +1265,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.106.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.107.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

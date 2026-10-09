@@ -34,7 +34,7 @@ export type ApiUnitDetail = {
   components: string[];
 };
 
-export type ApiCommand = { id: string; action: UnitAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; failureCode: string | null };
+export type ApiCommand = { id: string; action: UnitAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; failureCode: string | null; source?: string };
 
 const kl = (iso: string | null, withDate = false) =>
   iso ? new Date(iso).toLocaleString("en-MY", { ...(withDate ? { dateStyle: "medium" } : {}), timeStyle: "short", hour12: false, timeZone: "Asia/Kuala_Lumpur" } as Intl.DateTimeFormatOptions) : "—";
@@ -57,7 +57,8 @@ const statusText: Record<ApiCommand["status"], string> = { requested: "requested
 
 export function historyRow(c: ApiCommand) {
   const bad = c.status === "failed" || c.status === "expired";
-  return { id: c.id.slice(0, 8), text: `${actionText(c.action)} — ${statusText[c.status]}${c.failureCode && c.status === "failed" ? ` (${c.failureCode})` : ""}`, when: kl(c.requestedAt, true), bad };
+  const by = c.source === "automation" ? " · by an automation" : c.source === "restriction" ? " · by a restriction" : c.source === "diagnostic" ? " · technician test run" : "";
+  return { id: c.id.slice(0, 8), text: `${actionText(c.action)} — ${statusText[c.status]}${c.failureCode && c.status === "failed" ? ` (${c.failureCode})` : ""}${by}`, when: kl(c.requestedAt, true), bad };
 }
 
 /** The latest reading of a metric as text (IR213): a stale or suspect value keeps its quality beside it — shown, never

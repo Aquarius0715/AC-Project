@@ -45,7 +45,7 @@ export type UnitSummary = ACUnit & {effectivePowerState:EffectivePowerState;late
 export type UnitDetail = UnitSummary & {capabilities:Capability;effectiveControlPolicy:EffectiveControlPolicy;controlAvailability:ControlAvailability;components:ComponentKey[];pendingCommands:Command[];pendingCommandIds:ID[];location:{pathLabels:string[];address:string|null;accessInstructions:string|null}};
 export type UnitAction = {kind:'set_power';power:boolean}|{kind:'set_temperature';celsius:number}|{kind:'set_mode';mode:Mode}|{kind:'set_fan';fanLevel:Fan}|{kind:'ventilate';level:Fan};
 export type RestrictionAction = {kind:'apply_restriction';restrictionId:ID;rulesVersion:ID;policy:RestrictionPolicy}|{kind:'remove_restriction';restrictionId:ID;rulesVersion:ID};
-export type Command = Entity & {unitId:ID;actorMembershipId:ID;action:UnitAction|RestrictionAction;diagnosticRunId:ID|null;jobId:ID|null;reason:string|null;status:'requested'|'sent'|'acknowledged'|'failed'|'expired'|'cancelled';delivery:'not_sent'|'sent';requestedAt:Instant;sentAt:Instant|null;acknowledgedAt:Instant|null;expiresAt:Instant;failureCode:ErrorCode|null;correlationId:ID};
+export type Command = Entity & {unitId:ID;actorMembershipId:ID;action:UnitAction|RestrictionAction;diagnosticRunId:ID|null;jobId:ID|null;reason:string|null;status:'requested'|'sent'|'acknowledged'|'failed'|'expired'|'cancelled';delivery:'not_sent'|'sent';requestedAt:Instant;sentAt:Instant|null;acknowledgedAt:Instant|null;expiresAt:Instant;failureCode:ErrorCode|null;correlationId:ID;source:'ui'|'voice'|'automation'|'restriction'|'diagnostic'|'group'};
 export type DiagnosticRun = Entity & {jobId:ID;unitId:ID;actorMembershipId:ID;startAction:UnitAction;endAction:UnitAction;durationMinutes:number;reason:string;state:'awaiting_start'|'running'|'end_requested'|'completed'|'start_failed'|'end_failed'|'end_blocked';startCommandId:ID;endCommandId:ID|null;startedAt:Instant|null;endAt:Instant|null;failureCode:ErrorCode|null};
 export type Severity = 'critical'|'warning'|'normal';
 export type Alert = Entity & {unitId:ID;policyId:ID|null;type:'sensor'|'quality'|'maintenance'|'tamper'|'reconciliation_required';severity:Severity;status:'open'|'acknowledged'|'resolved';causeCode:'window_open'|'insulation_loss'|'unknown';evidenceKind:'demo_observation'|'inferred'|'inspection';evidenceText:string;observedAt:Instant;evidenceIds:ID[];detectedAt:Instant;acknowledgedAt:Instant|null;resolvedAt:Instant|null;resolutionReason:string|null;previousAlertId:ID|null;deliveryFailures:DeliveryFailure[]};
@@ -255,6 +255,7 @@ export type OperationContracts = {
   'capabilities.save': {input:Save<Capability> & {changeReason?:string};result:Capability;mode:'write'};
   'commands.create': {input:{unitId:ID;action:UnitAction;jobId?:ID;reason?:string;expectedUnitVersion:number};result:Command;mode:'write'};
   'commands.get': {input:{id:ID};result:Command;mode:'read'};
+  'commands.list': {input:{unitId:ID;jobId?:ID;query:Query};result:Page<Command>;mode:'read'};
   'consents.get': {input:{purpose:'location_automation'};result:Consent;mode:'read'};
   'consents.update': {input:{purpose:'location_automation';granted:boolean};result:Consent;mode:'write'};
   'contracts.list': {input:Query;result:Page<Contract>;mode:'read'};

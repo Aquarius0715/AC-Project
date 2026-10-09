@@ -41,6 +41,9 @@ func TestQueryCatalogFilters(t *testing.T) {
 		"diagnosticRuns.list": func(q string) string {
 			return `{"unitId":"` + seed.ID("unit-online-rto").String() + `","query":` + q + `}`
 		},
+		"commands.list": func(q string) string { // IR216: the unit's history (HQ or the owning customer)
+			return `{"unitId":"` + seed.ID("unit-online-rto").String() + `","query":` + q + `}`
+		},
 		"mrv.versions": func(q string) string { return `{"id":"` + uuid.NewString() + `","query":` + q + `}` },
 		"notifications.recipients": func(q string) string {
 			return `{"target":{"kind":"invoice","id":"` + invoice + `"},"templateKey":"payment_reminder","channel":"email","query":` + q + `}`

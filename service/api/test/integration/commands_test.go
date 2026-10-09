@@ -137,3 +137,73 @@ func TestCommands(t *testing.T) {
 		}
 	}
 }
+
+// IR216: commands.list is the unit's Command history, newest first: a client sees its unit's commands with the
+// reason of others' withheld; a technician sees one job it holds (jobId required); HQ sees every command and reason.
+func TestCommandHistory(t *testing.T) {
+	s := server(t)
+	unit := seed.ID("unit-non-rto").String()
+	free := func() {
+		owner(t, `UPDATE control.commands SET status = 'expired' WHERE unit_id = $1 AND status IN ('requested','sent')`, unit)
+	}
+	free()
+	owner(t, `UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id IN (SELECT restriction_id FROM restrictions.restriction_units WHERE unit_id = $1)`, unit)
+	owner(t, `UPDATE control.diagnostic_runs SET state = 'completed' WHERE unit_id = $1 AND state IN ('awaiting_start','running','end_requested')`, unit)
+	job := assignedNow(t, s)
+	_, m := post(s, &hq, "units.get", `{"id":"`+unit+`"}`)
+	uv := ver(m)
+	code, m := write(s, &techInt, "commands.create", `{"unitId":"`+unit+`","jobId":"`+job+`","action":{"kind":"set_mode","mode":"cool"},"reason":"airflow check","expectedUnitVersion":`+itoa(uv)+`}`, 0)
+	if code != 200 || data(m)["source"] != "ui" || data(m)["jobId"] != job {
+		t.Fatalf("technician command: %d %v", code, m)
+	}
+	tech := data(m)["id"].(string)
+	free()
+	code, m = write(s, &customerA, "commands.create", `{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(uv)+`}`, 0)
+	if code != 200 {
+		t.Fatalf("client command: %d %v", code, m)
+	}
+	own := data(m)["id"].(string)
+	free()
+	list := func(a *actor, body string) (int, map[string]map[string]any, []map[string]any) {
+		t.Helper()
+		code, m := post(s, a, "commands.list", body)
+		byID := map[string]map[string]any{}
+		for _, it := range items(m) {
+			byID[it["id"].(string)] = it
+		}
+		return code, byID, items(m)
+	}
+	code, got, rows := list(&customerA, `{"unitId":"`+unit+`","query":{"limit":100}}`)
+	if code != 200 || got[tech] == nil || got[own] == nil || got[tech]["reason"] != nil || got[tech]["status"] != "expired" {
+		t.Fatalf("client history: %d %v", code, got[tech])
+	}
+	for i := 1; i < len(rows); i++ {
+		if rows[i-1]["requestedAt"].(string) < rows[i]["requestedAt"].(string) {
+			t.Fatalf("newest first: %v before %v", rows[i-1]["requestedAt"], rows[i]["requestedAt"])
+		}
+	}
+	if code, _, _ := list(&techInt, `{"unitId":"`+unit+`","query":{}}`); code != 422 {
+		t.Errorf("technician without a job: %d", code)
+	}
+	code, got, _ = list(&techInt, `{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":100}}`)
+	if code != 200 || got[tech] == nil || got[tech]["reason"] != "airflow check" || got[own] != nil {
+		t.Fatalf("technician job history: %d %v", code, got)
+	}
+	if code, _, _ := list(&techInt, `{"unitId":"`+unit+`","jobId":"`+uuid.NewString()+`","query":{}}`); code != 404 {
+		t.Errorf("technician, a job it does not hold: %d", code)
+	}
+	if code, _, _ := list(&customerB, `{"unitId":"`+unit+`","query":{}}`); code != 404 {
+		t.Errorf("another customer: %d", code)
+	}
+	if _, got, _ := list(&hq, `{"unitId":"`+unit+`","query":{"limit":100}}`); got[tech]["reason"] != "airflow check" || got[own] == nil {
+		t.Errorf("HQ history: %v", got[tech])
+	}
+	for _, q := range []string{`{"sort":{"field":"status","direction":"asc"}}`, `{"filters":{"status":"sent"}}`} {
+		if code, _, _ := list(&hq, `{"unitId":"`+unit+`","query":`+q+`}`); code != 422 {
+			t.Errorf("%s: %d", q, code)
+		}
+	}
+	if code, _, _ := list(&hq, `{"unitId":"`+unit+`","query":{"sort":{"field":"requestedAt","direction":"asc"}}}`); code != 200 {
+		t.Errorf("requestedAt asc: %d", code)
+	}
+}

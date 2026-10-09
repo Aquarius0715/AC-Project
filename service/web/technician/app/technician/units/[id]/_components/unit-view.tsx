@@ -24,6 +24,8 @@ export function TechUnitView({ id, data }: { id: string; data?: TechUnitData }) 
   const d = data?.d ?? null;
   const alerts = { data: data?.alerts ?? [] };
   const jobs = { data: data?.jobs ?? [] };
+  // the job diagnostic control works for (DD-T10): in progress first, else assigned
+  const controlJob = jobs.data.find((j) => j.status === "in_progress")?.id ?? jobs.data.find((j) => j.status === "assigned" || j.status === "rework_requested")?.id ?? null;
   const to = new Date(data?.now ?? 0);
   const from = new Date(to.getTime() - windowMs[win]);
   const series = { data: (data?.series ?? []).filter((m) => new Date(m.observedAt) >= from), loading: false };
@@ -49,7 +51,8 @@ export function TechUnitView({ id, data }: { id: string; data?: TechUnitData }) 
             <div className="flex min-w-0 flex-col gap-4">
               <Card title={`Open alerts (${alerts.data.length})`} action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${id}/alerts`}>Evidence →</Link>}>{alerts.data.length === 0 ? <p className="text-[13px] text-muted">No open alerts.</p> : alerts.data.map((a) => <div key={a.id} className="border-t border-line py-2 first:border-0"><b className="text-[13px]">{a.causeCode !== "unknown" ? a.causeCode.replace(/_/g, " ") : a.type}</b> <SeverityBadge s={a.severity} /><p className="text-xs text-muted">{a.evidenceText} · {klTime(a.detectedAt, true)}</p><p className="mt-1 text-xs text-muted">{a.acknowledgedAt ? "Acknowledged" : "Acknowledged by nobody yet"}. Completing the job does not resolve it.</p></div>)}</Card>
               <Card title="Live"><SummaryList items={[["Temperature", temp ? `${temp.text} · ${temp.at}` : "—"], ["Power", pow ? `${pow.text} · ${pow.at}` : "—"], ["Humidity", hum ? `${hum.text} · ${hum.at}` : "—"], ["Connection", `${d.connection} · last seen ${klTime(d.lastSeenAt)}`]]} /></Card>
-              <Card title="Diagnostics"><Link href={`/technician/units/${id}/control`} className="text-xs font-semibold text-primary">Open diagnostic control →</Link></Card>
+              <Card title="Diagnostics">{controlJob ? <Link href={`/technician/units/${id}/control?jobId=${controlJob}`} className="text-xs font-semibold text-primary">Open diagnostic control →</Link>
+                : <p className="text-xs text-muted">Diagnostic control opens for a job you are assigned to on this AC (assigned or in progress).</p>}</Card>
             </div>
           </div>
         ) : (

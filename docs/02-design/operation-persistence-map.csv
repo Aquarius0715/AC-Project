@@ -28,6 +28,7 @@ clientUsers.resendInvite,read,Identity & access,identity.client_users;identity.m
 clientUsers.save,write,Identity & access,identity.client_users;identity.memberships,identity.client_users;identity.memberships,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 commands.create,write,Control,control.commands,control.commands,Assets;Devices;Restrictions,audit.audit_log;platform.idempotency_keys;platform.outbox,
 commands.get,read,Control,control.commands,,,,
+commands.list,read,Control,control.commands,,Assets,,IR216 unit history; technicians through assets.unit_assignment_access
 consents.get,read,Identity & access,identity.consents,,,,
 consents.update,write,Identity & access,identity.consents,identity.consents,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 contractors.list,read,Maintenance,maintenance.contractors,,,,

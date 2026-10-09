@@ -16,7 +16,7 @@ const siblings = [units[0], units[1]];
 type Cmd = { id: string; text: string; when: string; bad?: boolean };
 
 /** Unit detail and remote control. In API mode the Server Component passes the unit, its room and the policies. */
-export function UnitView({ id, detail, room: roomRows, policies }: { id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[] }) {
+export function UnitView({ id, detail, room: roomRows, policies, history = [] }: { id: string; detail?: ApiUnitDetail; room?: UnitRow[]; policies?: PolicyOption[]; history?: ApiCommand[] }) {
   const toast = useToast();
   const router = useRouter();
   const d = detail ?? null;
@@ -64,7 +64,9 @@ export function UnitView({ id, detail, room: roomRows, policies }: { id: string;
     { id: "cmd-0228", text: "Set fan MID", when: "Yesterday 21:02" },
     { id: "cmd-0227", text: "Set temperature 15°C — rejected: below model minimum 16°C", when: "Yesterday 19:40", bad: true },
   ]);
-  const hist: Cmd[] = d ? [...sent, ...d.pendingCommands.filter((p) => !sent.some((x) => x.id === p.id))].map(historyRow) : mockHist;
+  // this screen's sends (live status) over the stored history (commands.list, IR216), newest first
+  const hist: Cmd[] = d ? [...sent, ...[...history, ...d.pendingCommands].filter((p, i, all) => !sent.some((x) => x.id === p.id) && all.findIndex((x) => x.id === p.id) === i)]
+    .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt)).map(historyRow) : mockHist;
   const cap = d?.capabilities.temperature ?? { min: 16, max: 30, step: 1 };
   const min = policy?.kind === "temperature_limit" ? Math.max(cap.min, policy.minimumCoolingSetpoint) : restricted ? 24 : cap.min;
   const max = cap.max;
@@ -167,7 +169,7 @@ export function UnitView({ id, detail, room: roomRows, policies }: { id: string;
             <p className="mt-2 text-[11px] text-muted">Detaching only removes it from this AC — the policy stays in your list.</p>
           </Card>
           <Card title="Command history" sub="This unit only · newest first">
-            <ul className="flex flex-col divide-y divide-line">{hist.length === 0 && <li className="py-2 text-[13px] text-muted">No commands sent from this screen yet</li>}{hist.map((h) => <li key={h.id} className="flex flex-wrap justify-between gap-2 py-2 text-[13px]"><span className={h.bad ? "text-crit" : ""}>{h.text}</span><span className="text-xs text-muted">{h.id} · {h.when}</span></li>)}</ul>
+            <ul className="flex flex-col divide-y divide-line">{hist.length === 0 && <li className="py-2 text-[13px] text-muted">No commands for this AC yet</li>}{hist.map((h) => <li key={h.id} className="flex flex-wrap justify-between gap-2 py-2 text-[13px]"><span className={h.bad ? "text-crit" : ""}>{h.text}</span><span className="text-xs text-muted">{h.id} · {h.when}</span></li>)}</ul>
           </Card>
         </div>
       </div>
