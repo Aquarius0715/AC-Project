@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@ac/web"],
   outputFileTracingRoot: path.join(__dirname, ".."),
   turbopack: { root: path.join(__dirname, "..") },
+  // Report a problem sends up to 5 photos to a Server Action as files; the Core API takes 8 MiB for jobs.reportProblem
+  experimental: { serverActions: { bodySizeLimit: "8mb" } },
 };
 
 export default nextConfig;

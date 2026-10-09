@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
@@ -80,6 +81,9 @@ type Assignment struct {
 	AcknowledgedAt         *time.Time `json:"acknowledgedAt"`
 	CantMakeReason         *string    `json:"cantMakeReason"`
 	AlternativeSlot        *Slot      `json:"alternativeSlot"`
+	// TechnicianName is the technician's display name in the client's projection once the technician accepted the
+	// assignment (DD-C09, IR237); null otherwise and for the other roles, which read names from members.list.
+	TechnicianName *string `json:"technicianName"`
 }
 
 // Job is MaintenanceJob of service-contracts.ts plus the JobDetail / JobSummary extras.
@@ -492,6 +496,20 @@ func (m Jobs) project(ctx context.Context, c *ops.Call, j *Job) error {
 	case "client":
 		if j.Assignment != nil {
 			j.Assignment.Reason = nil
+			if j.Assignment.Acknowledgement == "accepted" {
+				var user uuid.UUID
+				if err := c.Tx.QueryRow(ctx, `SELECT user_id FROM maintenance.ref_memberships WHERE id = $1`, j.Assignment.TechnicianMembershipID).Scan(&user); err == nil {
+					ms := []identity.Member{{UserID: user}}
+					if err := identity.LoadMembers(ctx, c, ms); err != nil {
+						return err
+					}
+					if ms[0].DisplayName != "" {
+						j.Assignment.TechnicianName = &ms[0].DisplayName
+					}
+				} else if !errors.Is(err, pgx.ErrNoRows) {
+					return err
+				}
+			}
 		}
 		var lines []map[string]any
 		_ = json.Unmarshal(j.Costs, &lines)
@@ -912,7 +930,7 @@ type Event struct {
 // @Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-P07, DD-P01, DD-P02, DD-A06 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)
+// @Description	Design: DD-P07, DD-P01, DD-P02, DD-A06, DD-C09 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)
 // @Tags			jobs
 // @Accept			json
 // @Produce		json

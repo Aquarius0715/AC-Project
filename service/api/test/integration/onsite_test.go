@@ -45,8 +45,22 @@ func TestOnSiteOperations(t *testing.T) {
 	if code, _ := write(s, &techA, "jobs.acknowledgeAssignment", `{"jobId":"`+job+`","decision":"accept"}`, 2); code != 404 {
 		t.Error("another technician")
 	}
+	// IR237: the client sees the technician's name only once the technician accepted
+	clientName := func() any {
+		_, m := post(s, &customerA, "jobs.get", `{"jobId":"`+job+`"}`)
+		return data(m)["assignment"].(map[string]any)["technicianName"]
+	}
+	if n := clientName(); n != nil {
+		t.Errorf("technician name before acceptance: %v", n)
+	}
 	if code, m := write(s, &techInt, "jobs.acknowledgeAssignment", `{"jobId":"`+job+`","decision":"accept"}`, 2); code != 200 || data(m)["acknowledgement"] != "accepted" || data(m)["jobId"] != job {
 		t.Fatalf("ack: %d %v", code, m)
+	}
+	if n, _ := clientName().(string); n == "" {
+		t.Error("the client sees the technician's name after acceptance")
+	}
+	if _, m := post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`); data(m)["assignment"].(map[string]any)["technicianName"] != nil {
+		t.Error("only the client projection carries the name")
 	}
 	if code, _ := write(s, &techInt, "jobs.acknowledgeAssignment", `{"jobId":"`+job+`","decision":"accept"}`, 3); code != 409 {
 		t.Error("ack twice")

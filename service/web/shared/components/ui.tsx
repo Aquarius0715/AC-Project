@@ -217,8 +217,10 @@ export function Tabs<T extends string>({ tabs, value, onChange, className }: { t
 /* ───────────── Forms ───────────── */
 const inputCls = "w-full rounded-control border border-line bg-surface px-3 py-2 text-[13px] text-ink placeholder:text-subtle focus:border-primary";
 export function Field({ label, hint, error, children, className }: { label: string; hint?: React.ReactNode; error?: React.ReactNode; children: React.ReactNode; className?: string }) {
-  // a set of choice buttons is a labelled group: inside a <label> the first button would take the label as its name
-  const group = isValidElement(children) && children.type === Choice;
+  // Only a single form control sits inside a <label>. Anything else — choice buttons, a set of checkboxes or buttons, a
+  // read-only box — is a labelled group: inside a <label> a button takes the label as its name (IR230, IR238).
+  const control = isValidElement(children) && (children.type === Input || children.type === Select || children.type === Textarea || ["input", "select", "textarea"].includes(children.type as string));
+  const group = !control;
   const Tag = group ? "div" : "label";
   return (
     <Tag role={group ? "group" : undefined} aria-label={group ? label : undefined} className={cx("flex min-w-0 flex-col gap-1 text-xs font-semibold text-ink", className)}>

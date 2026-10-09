@@ -11334,7 +11334,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-P07, DD-P01, DD-P02, DD-A06 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)",
+                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-P07, DD-P01, DD-P02, DD-A06, DD-C09 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -20431,7 +20431,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self-customer | admin:asset.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06 · Query: filters customerId,kind · sort id,createdAt,updatedAt (default id asc)",
+                "description": "Authorization: client:self-customer | admin:asset.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06, DD-C09 · Query: filters customerId,kind · sort id,createdAt,updatedAt (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -22693,7 +22693,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self-customer | admin:asset.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C02, DD-C07, DD-C04 · Query: filters propertyId,kind · sort id,createdAt,updatedAt (default id asc)",
+                "description": "Authorization: client:self-customer | admin:asset.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C02, DD-C07, DD-C04, DD-C09 · Query: filters propertyId,kind · sort id,createdAt,updatedAt (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -30358,6 +30358,10 @@
                     "type": "string"
                 },
                 "technicianMembershipId": {
+                    "type": "string"
+                },
+                "technicianName": {
+                    "description": "TechnicianName is the technician's display name in the client's projection once the technician accepted the\nassignment (DD-C09, IR237); null otherwise and for the other roles, which read names from members.list.",
                     "type": "string"
                 },
                 "tenantId": {
