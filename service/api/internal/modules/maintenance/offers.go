@@ -140,6 +140,29 @@ func (in *OfferInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		jobs.offer (write)
+// @ID				jobs.offer
+// @Description	Authorization: admin:job.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR48 requested only; offerExpiresAt<=accessValidUntil; expiry returns requested; IR113 visitSlot must be an agreed slot (preferred or accepted proposal; plan occurrence) else VALIDATION errors.slot_not_agreed; access window covers visitSlot
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A06
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		OfferInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.offer [post]
 func (m Delivery) offer(ctx context.Context, c *ops.Call, in *OfferInput) (Job, error) {
 	if !c.Now.Before(in.OfferExpiresAt) {
 		return Job{}, apperr.Fields(map[string]string{"offerExpiresAt": "error.past"})
@@ -285,6 +308,29 @@ func (m Delivery) decide(ctx context.Context, c *ops.Call, in *DecisionInput, de
 	return Receipt{JobID: in.JobID, JobVersion: v, OfferID: in.OfferID, Decision: decision}, nil
 }
 
+// @Summary		jobs.accept (write)
+// @ID				jobs.accept
+// @Description	Authorization: contractor:partner.accept:own-valid-offer:first-attempt | IR01:same-key-receipt:original-user:current-own-membership
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR86 expired undecided own offer: CONFLICT errors.offer_expired
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent; IR01 own valid membership receipt after decline/offer expiry
+// @Description	Design: DD-P02 · Input versions: none; options.expectedVersion=JobOfferSummary.jobVersion
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		DecisionInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Receipt}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.accept [post]
 func (m Delivery) accept(ctx context.Context, c *ops.Call, in *DecisionInput) (Receipt, error) {
 	if in.TermsVersion == nil {
 		return Receipt{}, apperr.Fields(map[string]string{"termsVersion": "error.required"})
@@ -292,6 +338,29 @@ func (m Delivery) accept(ctx context.Context, c *ops.Call, in *DecisionInput) (R
 	return m.decide(ctx, c, in, "accept")
 }
 
+// @Summary		jobs.decline (write)
+// @ID				jobs.decline
+// @Description	Authorization: contractor:partner.accept:own-valid-offer:first-attempt | IR01:same-key-receipt:original-user:current-own-membership
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR86 expired undecided own offer: CONFLICT errors.offer_expired
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent; IR01 own valid membership receipt after decline/offer expiry
+// @Description	Design: DD-P02 · Input versions: none; options.expectedVersion=JobOfferSummary.jobVersion
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		DecisionInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Receipt}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.decline [post]
 func (m Delivery) decline(ctx context.Context, c *ops.Call, in *DecisionInput) (Receipt, error) {
 	if in.Reason == nil {
 		return Receipt{}, apperr.Fields(map[string]string{"reason": "error.required"})
@@ -331,6 +400,29 @@ func (in *AssignInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		jobs.assign (write)
+// @ID				jobs.assign
+// @Description	Authorization: contractor:partner.assign:own-valid-offer | admin:job.write:internal-job
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR89 success updates Job.assignmentId/scheduledSlot and version; IR94 technician scope must include Job.unitId; IR113 client_request/periodic_plan: [startAt,endAt) must equal the agreed slot (offer visitSlot for contractors) else VALIDATION errors.slot_not_agreed; creates acknowledgement=pending
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A06, DD-P03
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		AssignInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.assign [post]
 func (m Delivery) assign(ctx context.Context, c *ops.Call, in *AssignInput) (Job, error) {
 	r, err := m.lock(ctx, c, in.JobID)
 	if err != nil {

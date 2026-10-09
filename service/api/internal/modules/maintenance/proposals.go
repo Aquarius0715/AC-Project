@@ -118,6 +118,29 @@ func (in *ProposeInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		jobs.proposeSlot (write)
+// @ID				jobs.proposeSlot
+// @Description	Authorization: admin:job.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 status requested (or offered/accepted/assigned after cant_make/decline); slot not one of preferredSlots (errors.slot_is_preferred); no pending proposal; message 1–1000; replyBy future ≤7 days
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A06
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		ProposeInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.proposeSlot [post]
 func (m Proposals) proposeSlot(ctx context.Context, c *ops.Call, in *ProposeInput) (Job, error) {
 	r, err := m.Delivery.lock(ctx, c, in.JobID)
 	if err != nil {
@@ -193,6 +216,29 @@ func (in *ProposalRef) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		jobs.withdrawProposal (write)
+// @ID				jobs.withdrawProposal
+// @Description	Authorization: admin:job.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 pending own-tenant proposal only; releases hold
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A06
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		ProposalRef	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.withdrawProposal [post]
 func (m Proposals) withdrawProposal(ctx context.Context, c *ops.Call, in *ProposalRef) (Job, error) {
 	if _, err := m.Delivery.lock(ctx, c, in.JobID); err != nil {
 		return Job{}, err
@@ -259,6 +305,29 @@ func (in *RespondInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		jobs.respondProposal (write)
+// @ID				jobs.respondProposal
+// @Description	Authorization: client:self:pending-proposal
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 pending proposal of own customer job; decline needs declineReason; preferredSlots empty or exactly 3 distinct future slots
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-C09
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		RespondInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.respondProposal [post]
 func (m Proposals) respond(ctx context.Context, c *ops.Call, in *RespondInput) (Job, error) {
 	r, err := m.Delivery.lock(ctx, c, in.JobID)
 	if err != nil {
@@ -390,6 +459,29 @@ func (in *RescheduleInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		jobs.requestReschedule (write)
+// @ID				jobs.requestReschedule
+// @Description	Authorization: client:self:plan-visit
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 periodic_plan job assigned/offered/accepted; ≥48 h before scheduledSlot start; exactly 3 preferred slots
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-C09
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		RescheduleInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.requestReschedule [post]
 func (m Proposals) requestReschedule(ctx context.Context, c *ops.Call, in *RescheduleInput) (Job, error) {
 	r, err := m.Delivery.lock(ctx, c, in.JobID)
 	if err != nil {
@@ -465,6 +557,29 @@ func (in *PartnerProposeInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		jobs.proposePartnerSlot (write)
+// @ID				jobs.proposePartnerSlot
+// @Description	Authorization: contractor:partner.accept:own-valid-offer
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 own open offer (status offered, not expired); no pending partner proposal; qualified own technician; reason 1–1000
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-P02
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer				true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		PartnerProposeInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.proposePartnerSlot [post]
 func (m Proposals) proposePartner(ctx context.Context, c *ops.Call, in *PartnerProposeInput) (Job, error) {
 	var expires time.Time
 	err := c.Tx.QueryRow(ctx, `SELECT offer_expires_at FROM maintenance.offers WHERE id = $1 AND job_id = $2 AND contractor_org_id = $3 AND decision IS NULL AND expired_at IS NULL FOR UPDATE`,
@@ -524,6 +639,29 @@ func (m Proposals) partnerProposal(ctx context.Context, c *ops.Call, in *Proposa
 	return status, offer, slot, tech, org, err
 }
 
+// @Summary		jobs.withdrawPartnerSlot (write)
+// @ID				jobs.withdrawPartnerSlot
+// @Description	Authorization: contractor:partner.accept:own-valid-offer
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 own pending partner proposal only
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-P02
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		ProposalRef	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.withdrawPartnerSlot [post]
 func (m Proposals) withdrawPartner(ctx context.Context, c *ops.Call, in *ProposalRef) (Job, error) {
 	status, _, _, _, _, err := m.partnerProposal(ctx, c, in, true)
 	if err != nil {
@@ -570,6 +708,29 @@ func (in *ResolveInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		jobs.resolvePartnerSlot (write)
+// @ID				jobs.resolvePartnerSlot
+// @Description	Authorization: admin:job.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 pending partner proposal; send_to_client creates a SlotProposal(source=contractor) and needs replyBy
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A06
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		ResolveInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.resolvePartnerSlot [post]
 func (m Proposals) resolvePartner(ctx context.Context, c *ops.Call, in *ResolveInput) (Job, error) {
 	status, _, slot, tech, org, err := m.partnerProposal(ctx, c, &ProposalRef{JobID: in.JobID, ProposalID: in.ProposalID}, false)
 	if err != nil {

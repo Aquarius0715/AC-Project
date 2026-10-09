@@ -66,6 +66,28 @@ func collectIDs(rows pgx.Rows) ([]uuid.UUID, error) {
 }
 
 // admin is admin.summary (DD-A01, IR40, IR51, IR78, IR115, IR148).
+//
+//	@Summary		admin.summary (read)
+//	@ID				admin.summary
+//	@Description	Authorization: admin:dashboard.read; billing fields require billing.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR51 alertCount critical/warning; IR78 energyForecast (prorated modeled baseline); energySummary savings null
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A01
+//	@Tags			admin
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		AdminInput	true	"input"
+//	@Success		200		{object}	ops.Envelope{data=AdminSummary}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/admin.summary [post]
 func (m Summaries) admin(ctx context.Context, c *ops.Call, in *AdminInput) (AdminSummary, error) {
 	out := AdminSummary{AsOf: c.Now, JobCounts: map[string]int{}, BillingVisibility: "forbidden"}
 	for _, s := range jobStatuses {

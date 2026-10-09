@@ -40,9 +40,36 @@ type QrAssignments interface {
 
 // RegisterQr binds units.resolveQr.
 func RegisterQr(r *ops.Registry, a QrAssignments) {
-	ops.Register(r, "units.resolveQr", func(ctx context.Context, c *ops.Call, in *QrInput) (QrResolution, error) {
-		return resolveQr(ctx, c, in, a)
-	})
+	q := qrOps{a}
+	ops.Register(r, "units.resolveQr", q.resolve)
+}
+
+// qrOps binds units.resolveQr to the assignment source.
+type qrOps struct{ a QrAssignments }
+
+// @Summary		units.resolveQr (read)
+// @ID				units.resolveQr
+// @Description	Authorization: technician:assigned
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-T13
+// @Tags			units
+// @Accept			json
+// @Produce		json
+// @Param			request	body		QrInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=QrResolution}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/units.resolveQr [post]
+func (q qrOps) resolve(ctx context.Context, c *ops.Call, in *QrInput) (QrResolution, error) {
+	return resolveQr(ctx, c, in, q.a)
 }
 
 // resolveQr maps a label code to a unit (IR145): the unit ID, `ac-unit:<unit ID>` or the bound device serial

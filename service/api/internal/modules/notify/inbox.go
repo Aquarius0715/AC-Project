@@ -161,6 +161,27 @@ var (
 	types      = []string{"cleaning_due", "fault", "quality", "schedule_change", "report_return", "completion", "payment", "payment_reminder", "restriction", "inquiry", "job_update", "device_operation"}
 )
 
+// @Summary		notifications.list (read)
+// @ID				notifications.list
+// @Description	Authorization: authenticated:recipient-only; current-target-scope
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR58 out-of-scope targets excluded from items/total; IR95 business event notification table
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-C08, DDC-07 · Query: filters unreadOnly,severity,type,from,to · sort id,createdAt,updatedAt,severity,occurredAt (default occurredAt desc;id desc)
+// @Tags			notifications
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=NotificationPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/notifications.list [post]
 func (Inbox) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Notification], error) {
 	var f struct {
 		Severity   *string    `json:"severity,omitempty"`
@@ -244,6 +265,29 @@ func (in *MarkReadInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		notifications.markRead (write)
+// @ID				notifications.markRead
+// @Description	Authorization: authenticated:recipient-only
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-C08
+// @Tags			notifications
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target notifications, read notifications.list)"
+// @Param			request				body		MarkReadInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Notification}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/notifications.markRead [post]
 func (Inbox) markRead(ctx context.Context, c *ops.Call, in *MarkReadInput) (Notification, error) {
 	args := []any{in.ID, c.Principal.MembershipID}
 	q := "SELECT " + inboxCols + " FROM " + inboxFrom() + " WHERE n.id = $1 AND n.recipient_membership_id = $2 AND " +
@@ -396,6 +440,27 @@ func (in *RecipientsInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		notifications.recipients (read)
+// @ID				notifications.recipients
+// @Description	Authorization: authenticated:current-target-party; D08 recipient projection; payment_reminder:admin:billing.write:overdue-unpaid-only (IR20)
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A05, DD-A08, DD-C11, DD-P07, DD-A05, DD-A12 · Query: filters none · sort none (default role asc;displayLabel asc;id asc)
+// @Tags			notifications
+// @Accept			json
+// @Produce		json
+// @Param			request	body		RecipientsInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=RecipientPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/notifications.recipients [post]
 func (Inbox) recipients(ctx context.Context, c *ops.Call, in *RecipientsInput) (paging.Page[Recipient], error) {
 	if len(in.Query.Filters) > 0 && string(in.Query.Filters) != "{}" || in.Query.Sort != nil {
 		return paging.Page[Recipient]{}, apperr.Fields(map[string]string{"query": "error.invalid"})
@@ -449,6 +514,28 @@ func (in *PreviewInput) Validate() map[string]string {
 
 // preview renders an unsaved Notification for one eligible recipient (IR04): nothing is stored and the temporary
 // ID cannot be used with markRead.
+//
+//	@Summary		notifications.preview (read)
+//	@ID				notifications.preview
+//	@Description	Authorization: authenticated:recipient-or-current-target-party; D08 billing/internal projection; payment_reminder:admin:billing.write:overdue-unpaid-only (IR20)
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A05, DD-A08, DD-C11, DD-P07
+//	@Tags			notifications
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		PreviewInput	true	"input"
+//	@Success		200		{object}	ops.Envelope{data=Notification}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/notifications.preview [post]
 func (Inbox) preview(ctx context.Context, c *ops.Call, in *PreviewInput) (Notification, error) {
 	t, err := resolve(ctx, c, &in.TargetInput)
 	if err != nil {

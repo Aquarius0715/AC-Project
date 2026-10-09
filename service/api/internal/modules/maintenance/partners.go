@@ -204,6 +204,27 @@ func (m Partners) loadProfile(ctx context.Context, c *ops.Call, where string, ar
 	return p, err
 }
 
+// @Summary		contractors.list (read)
+// @ID				contractors.list
+// @Description	Authorization: admin:job.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A21 · Query: filters status,search · sort id,name,updatedAt (default name asc;id asc)
+// @Tags			contractors
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=ProfilePage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/contractors.list [post]
 func (m Partners) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Profile], error) {
 	var f struct {
 		Status *string `json:"status,omitempty"`
@@ -301,6 +322,29 @@ func (in *ProfileInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		contractors.save (write)
+// @ID				contractors.save
+// @Description	Authorization: admin:job.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 organization kind=contractor; service areas at least one
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A21
+// @Tags			contractors
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			false	"id omitted: omit (target none, read none); id present: required (target contractor, read contractors.list)"
+// @Param			request				body		ProfileInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Profile}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/contractors.save [post]
 func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Profile, error) {
 	kind, _, found, err := m.Orgs.OrgState(ctx, c, in.OrganizationID)
 	if err != nil {
@@ -383,6 +427,29 @@ func (in *OfferStatusInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		contractors.setOfferStatus (write)
+// @ID				contractors.setOfferStatus
+// @Description	Authorization: admin:job.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 reason 1–1000; suspension blocks new jobs.offer only
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A21
+// @Tags			contractors
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer				true	"all: required (target contractor, read contractors.list)"
+// @Param			request				body		OfferStatusInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Profile}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/contractors.setOfferStatus [post]
 func (m Partners) setOfferStatus(ctx context.Context, c *ops.Call, in *OfferStatusInput) (Profile, error) {
 	p, err := m.loadProfile(ctx, c, "p.organization_id = $2", []any{in.ContractorOrgID}, true)
 	if err != nil {
@@ -491,6 +558,28 @@ func scanRateCard(r pgx.Row) (RateCard, error) {
 
 const rateCols = `id, tenant_id, version, created_at, contractor_org_id, effective_from, currency, lines`
 
+// @Summary		rateCards.save (write)
+// @ID				rateCards.save
+// @Description	Authorization: admin:job.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 effectiveFrom in the future; creates a new version
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A21
+// @Tags			rateCards
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		RateCardInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=RateCard}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/rateCards.save [post]
 func (m Partners) saveRateCard(ctx context.Context, c *ops.Call, in *RateCardInput) (RateCard, error) {
 	if !in.EffectiveFrom.After(c.Now) {
 		return RateCard{}, apperr.Fields(map[string]string{"effectiveFrom": "error.past"})
@@ -515,6 +604,27 @@ func (m Partners) saveRateCard(ctx context.Context, c *ops.Call, in *RateCardInp
 	return x, nil
 }
 
+// @Summary		rateCards.list (read)
+// @ID				rateCards.list
+// @Description	Authorization: admin:job.read | admin:billing.read | contractor:own-company
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A21, DD-A23, DD-P10 · Query: filters contractorOrgId · sort id,createdAt,effectiveFrom (default effectiveFrom desc;id asc)
+// @Tags			rateCards
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=RateCardPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/rateCards.list [post]
 func (m Partners) listRateCards(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[RateCard], error) {
 	var f struct {
 		ContractorOrgID *uuid.UUID `json:"contractorOrgId,omitempty"`
@@ -612,6 +722,28 @@ func (in *TargetsInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		sla.saveTargets (write)
+// @ID				sla.saveTargets
+// @Description	Authorization: admin:job.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 percentages 0–100; responseHours 1–168; applies to jobs created after effectiveFrom
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A22
+// @Tags			sla
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		TargetsInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=SlaTargets}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/sla.saveTargets [post]
 func (m Partners) saveTargets(ctx context.Context, c *ops.Call, in *TargetsInput) (SlaTargets, error) {
 	if in.EffectiveFrom.Before(c.Now) {
 		return SlaTargets{}, apperr.Fields(map[string]string{"effectiveFrom": "error.past"})
@@ -719,6 +851,27 @@ func durationText(d time.Duration) string {
 	return fmt.Sprintf("%d h %d min", h, mnt)
 }
 
+// @Summary		sla.scorecard (read)
+// @ID				sla.scorecard
+// @Description	Authorization: admin:job.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A22
+// @Tags			sla
+// @Accept			json
+// @Produce		json
+// @Param			request	body		ScorecardInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=Scorecard}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/sla.scorecard [post]
 func (m Partners) scorecard(ctx context.Context, c *ops.Call, in *ScorecardInput) (Scorecard, error) {
 	extra, args := "TRUE", []any{in.Period.From, in.Period.To}
 	if in.ContractorOrgID != nil {

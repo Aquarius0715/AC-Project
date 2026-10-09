@@ -53,12 +53,12 @@ type Automation struct {
 	StartLocal        string          `json:"startLocal,omitempty"`
 	EndLocal          string          `json:"endLocal,omitempty"`
 	EndsNextDay       *bool           `json:"endsNextDay,omitempty"`
-	StartAction       json.RawMessage `json:"startAction,omitempty"`
-	EndAction         json.RawMessage `json:"endAction,omitempty"`
-	Condition         json.RawMessage `json:"condition,omitempty"`
-	Action            json.RawMessage `json:"action,omitempty"`
-	OnlyIf            json.RawMessage `json:"onlyIf"`  // ExtraCondition[] (IR215), [] when none
-	LastRun           *LastRun        `json:"lastRun"` // the latest automation_runs outcome of the rule (IR215)
+	StartAction       json.RawMessage `json:"startAction,omitempty" swaggertype:"object"`
+	EndAction         json.RawMessage `json:"endAction,omitempty" swaggertype:"object"`
+	Condition         json.RawMessage `json:"condition,omitempty" swaggertype:"object"`
+	Action            json.RawMessage `json:"action,omitempty" swaggertype:"object"`
+	OnlyIf            json.RawMessage `json:"onlyIf" swaggertype:"object"` // ExtraCondition[] (IR215), [] when none
+	LastRun           *LastRun        `json:"lastRun"`                     // the latest automation_runs outcome of the rule (IR215)
 	customerOrg       uuid.UUID
 }
 
@@ -76,11 +76,11 @@ type definition struct {
 	StartLocal  string          `json:"startLocal,omitempty"`
 	EndLocal    string          `json:"endLocal,omitempty"`
 	EndsNextDay *bool           `json:"endsNextDay,omitempty"`
-	StartAction json.RawMessage `json:"startAction,omitempty"`
-	EndAction   json.RawMessage `json:"endAction,omitempty"`
-	Condition   json.RawMessage `json:"condition,omitempty"`
-	Action      json.RawMessage `json:"action,omitempty"`
-	OnlyIf      json.RawMessage `json:"onlyIf,omitempty"`
+	StartAction json.RawMessage `json:"startAction,omitempty" swaggertype:"object"`
+	EndAction   json.RawMessage `json:"endAction,omitempty" swaggertype:"object"`
+	Condition   json.RawMessage `json:"condition,omitempty" swaggertype:"object"`
+	Action      json.RawMessage `json:"action,omitempty" swaggertype:"object"`
+	OnlyIf      json.RawMessage `json:"onlyIf,omitempty" swaggertype:"object"`
 }
 
 const automationCols = `a.id, a.tenant_id, a.version, a.created_at, a.updated_at, a.name, a.owner_membership_id, a.created_by_user_id, a.timezone, a.enabled, a.priority,
@@ -125,6 +125,27 @@ func (m Automations) load(ctx context.Context, c *ops.Call, id uuid.UUID, lock b
 	return x, err
 }
 
+// @Summary		automations.list (read)
+// @ID				automations.list
+// @Description	Authorization: client:control.execute:self
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR215 lastRun = the latest run-log outcome (Command or skip with reason)
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-C04 · Query: filters unitId,enabled,kind · sort id,name,priority,createdAt,updatedAt (default createdAt desc;id desc)
+// @Tags			automations
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=AutomationPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/automations.list [post]
 func (m Automations) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Automation], error) {
 	var f struct {
 		Kind    *string    `json:"kind,omitempty"`
@@ -195,11 +216,11 @@ type AutomationInput struct {
 	StartLocal  string          `json:"startLocal,omitempty"`
 	EndLocal    string          `json:"endLocal,omitempty"`
 	EndsNextDay *bool           `json:"endsNextDay,omitempty"`
-	StartAction json.RawMessage `json:"startAction,omitempty"`
-	EndAction   json.RawMessage `json:"endAction,omitempty"`
-	Condition   json.RawMessage `json:"condition,omitempty"`
-	Action      json.RawMessage `json:"action,omitempty"`
-	OnlyIf      json.RawMessage `json:"onlyIf,omitempty"`
+	StartAction json.RawMessage `json:"startAction,omitempty" swaggertype:"object"`
+	EndAction   json.RawMessage `json:"endAction,omitempty" swaggertype:"object"`
+	Condition   json.RawMessage `json:"condition,omitempty" swaggertype:"object"`
+	Action      json.RawMessage `json:"action,omitempty" swaggertype:"object"`
+	OnlyIf      json.RawMessage `json:"onlyIf,omitempty" swaggertype:"object"`
 	actions     []UnitAction
 	condition   condition
 	extras      []extraCondition
@@ -454,9 +475,32 @@ type ScheduledOccurrence struct {
 	AutomationID *uuid.UUID      `json:"automationId"` // null for a draft preview
 	Phase        string          `json:"phase"`
 	At           time.Time       `json:"at"`
-	Action       json.RawMessage `json:"action"`
+	Action       json.RawMessage `json:"action" swaggertype:"object"`
 }
 
+// @Summary		automations.save (write)
+// @ID				automations.save
+// @Description	Authorization: client:control.execute:self
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR215 onlyIf at most 3, distinct types, no weekday on a schedule, not the rule's own condition type
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-C04, DD-C05
+// @Tags			automations
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			false	"id omitted: omit (target none, read none); id present: required (target automations, read automations.list)"
+// @Param			request				body		AutomationInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Automation}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/automations.save [post]
 func (m Automations) save(ctx context.Context, c *ops.Call, in *AutomationInput) (Automation, error) {
 	for _, u := range in.UnitIDs { // own, not archived units whose capabilities support every action
 		t, found, err := m.Units.Target(ctx, c, u)
@@ -547,8 +591,8 @@ type ScheduleDraft struct {
 	StartLocal  string          `json:"startLocal"`
 	EndLocal    string          `json:"endLocal"`
 	EndsNextDay *bool           `json:"endsNextDay"`
-	StartAction json.RawMessage `json:"startAction"`
-	EndAction   json.RawMessage `json:"endAction"`
+	StartAction json.RawMessage `json:"startAction" swaggertype:"object"`
+	EndAction   json.RawMessage `json:"endAction" swaggertype:"object"`
 }
 
 // NextRunsInput is automations.nextRuns input: a saved schedule rule or an unsaved draft.
@@ -591,6 +635,28 @@ func (in *NextRunsInput) Validate() map[string]string {
 // nextRuns previews the next 8 start/end occurrences after now (D09): of a saved schedule rule — invalid local
 // times skipped — or of an unsaved draft, whose nonexistent or ambiguous local time is VALIDATION as on save (IR214).
 // Event rules have no schedule (VALIDATION).
+//
+//	@Summary		automations.nextRuns (read)
+//	@ID				automations.nextRuns
+//	@Description	Authorization: client:control.execute:self
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR214 draft preview validated like automations.save (nonexistent or ambiguous local time VALIDATION)
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-C04
+//	@Tags			automations
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		NextRunsInput	true	"input"
+//	@Success		200		{object}	ops.Envelope{data=[]ScheduledOccurrence}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/automations.nextRuns [post]
 func (m Automations) nextRuns(ctx context.Context, c *ops.Call, in *NextRunsInput) ([]ScheduledOccurrence, error) {
 	var id *uuid.UUID
 	var def definition
@@ -647,6 +713,30 @@ type Deleted struct {
 
 // delete removes a customer automation (Figma Client 03g–03i, IR214): it no longer runs from this transition on; the
 // Commands it created and its run log stay as history, other automations and manual control are untouched.
+//
+//	@Summary		automations.delete (write)
+//	@ID				automations.delete
+//	@Description	Authorization: client:control.execute:self
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR214 removes the rule and its unit links, keeps its Commands and run log
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C04
+//	@Tags			automations
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer				true	"all: required (target automations, read automations.list)"
+//	@Param			request				body		AutomationIDInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=Deleted}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/automations.delete [post]
 func (m Automations) delete(ctx context.Context, c *ops.Call, in *AutomationIDInput) (Deleted, error) {
 	cur, err := m.load(ctx, c, in.ID, true)
 	if err != nil {

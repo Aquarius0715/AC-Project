@@ -165,7 +165,7 @@ func (h *HTTPQueries) Query(ctx context.Context, c *Call, domain, name string, i
 		return nil, apperr.E(apperr.Unavailable, "error.unavailable")
 	}
 	var env struct {
-		Data json.RawMessage `json:"data"`
+		Data json.RawMessage `json:"data" swaggertype:"object"`
 	}
 	if err := json.Unmarshal(body, &env); err != nil {
 		return nil, err

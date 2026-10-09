@@ -7,10 +7,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/pradita/ac-project/service/api/internal/modules/billing"
-	"github.com/pradita/ac-project/service/api/internal/modules/monitoring"
 	"os"
 	"time"
+
+	"github.com/pradita/ac-project/service/api/internal/modules/billing"
+	"github.com/pradita/ac-project/service/api/internal/modules/monitoring"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -70,7 +71,7 @@ type Fixture struct {
 			Period      struct{ From, To time.Time } `json:"period"`
 			Method      string                       `json:"method"`
 			BaselineKWh *float64                     `json:"baselineKWh"`
-			Quality     json.RawMessage              `json:"quality"`
+			Quality     json.RawMessage              `json:"quality" swaggertype:"object"`
 			BoundaryID  string                       `json:"boundaryId"`
 			Boundary    string                       `json:"boundary"`
 			Assumptions string                       `json:"assumptions"`
@@ -109,12 +110,12 @@ type Fixture struct {
 			Control            bool            `json:"control"`
 			ModeControl        bool            `json:"modeControl"`
 			FanControl         bool            `json:"fanControl"`
-			Temperature        json.RawMessage `json:"temperature"`
+			Temperature        json.RawMessage `json:"temperature" swaggertype:"object"`
 			Modes              []string        `json:"modes"`
 			FanLevels          []string        `json:"fanLevels"`
 			Ventilation        bool            `json:"ventilation"`
 			VentilationLevels  []string        `json:"ventilationLevels"`
-			Sensors            json.RawMessage `json:"sensors"`
+			Sensors            json.RawMessage `json:"sensors" swaggertype:"object"`
 			FirmwareCandidates []string        `json:"firmwareCandidates"`
 		} `json:"capabilities"`
 		Customers []struct {
@@ -154,8 +155,8 @@ type Fixture struct {
 			WarrantyEndsAt      *time.Time      `json:"warrantyEndsAt"`
 			ServiceScope        []string        `json:"serviceScope"`
 			Archived            bool            `json:"archived"`
-			ObservedState       json.RawMessage `json:"observedState"`
-			ObservedRestriction json.RawMessage `json:"observedRestriction"`
+			ObservedState       json.RawMessage `json:"observedState" swaggertype:"object"`
+			ObservedRestriction json.RawMessage `json:"observedRestriction" swaggertype:"object"`
 		} `json:"units"`
 		Devices []struct {
 			ID                    string     `json:"id"`

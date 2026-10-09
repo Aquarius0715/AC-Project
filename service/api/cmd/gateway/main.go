@@ -18,6 +18,19 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/gateway"
 )
 
+// @title						AC Project Core API
+// @version					1.0
+// @description				Every operation of the operation catalog is POST /v1/ops/{operation} with a JSON body (the handler's input type; unknown fields are rejected with VALIDATION error.malformedInput, an empty body is {}, bodies above 1 MiB are rejected). The caller is the BFF of one of the four web apps, which forwards the user's Keycloak access token; the gateway forwards each operation to the domain service that owns it (identity, equipment, maintenance, billing, energy).
+// @description				Writes carry an Idempotency-Key (8–128 characters): the same key replays the stored response (D04). Writes with a version target carry X-Expected-Version (the write-version catalog says which) and answer CONFLICT error.versionConflict when it is stale.
+// @description				A success is {data, meta}; a failure is a ServiceError {code, messageKey, fieldErrors, correlationId, retryAfterSeconds} with the HTTP status of its code: VALIDATION 422, UNAUTHENTICATED 401, FORBIDDEN 403, NOT_FOUND 404, CONFLICT and OFFLINE 409, RATE_LIMITED 429, UNAVAILABLE 503, TIMEOUT 504.
+// @description				Built by `make swagger` from the swag annotations of the handlers (service/api/internal/modules, server); do not edit swagger.json by hand.
+// @BasePath					/
+// @schemes					http https
+//
+// @securityDefinitions.apikey	BearerAuth
+// @in							header
+// @name						Authorization
+// @description				Keycloak access token of the signed-in membership, forwarded by the BFF: "Bearer <token>"
 func main() {
 	addr := os.Getenv("ADDR")
 	if addr == "" {

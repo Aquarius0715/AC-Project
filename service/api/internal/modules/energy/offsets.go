@@ -119,6 +119,29 @@ func customerOf(ctx context.Context, c *ops.Call, given *uuid.UUID) (uuid.UUID, 
 }
 
 // previewQuote saves a quote snapshot that expires in 15 minutes (provider unselected, no price).
+//
+//	@Summary		offsets.preview (write)
+//	@ID				offsets.preview
+//	@Description	Authorization: client:self | admin:offset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; new quote save needs no expectedVersion (write)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A15, DD-C13
+//	@Tags			offsets
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		QuoteInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Quote}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/offsets.preview [post]
 func previewQuote(ctx context.Context, c *ops.Call, in *QuoteInput) (Quote, error) {
 	customer, org, err := customerOf(ctx, c, in.CustomerID)
 	if err != nil {
@@ -256,6 +279,27 @@ func loadRecord(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Reco
 	return x, decorateRecord(ctx, c, &x)
 }
 
+// @Summary		offsets.list (read)
+// @ID				offsets.list
+// @Description	Authorization: client:self | admin:offset.read; IR90 client only when all unitIds in scope
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A15, DD-C13 · Query: filters customerId,status,from,to · sort id,createdAt,updatedAt (default createdAt desc;id desc)
+// @Tags			offsets
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=RecordPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/offsets.list [post]
 func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Record], error) {
 	var f struct {
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
@@ -375,6 +419,30 @@ func demoRef(prefix string) *string {
 }
 
 // simulate applies the SR18 offset state table with SR22 authorization.
+//
+//	@Summary		offsets.simulate (write)
+//	@ID				offsets.simulate
+//	@Description	Authorization: client:self:event=request-or-retry | admin:offset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A15, DD-C13 · Input versions: quoteVersion=OffsetQuote.version
+//	@Tags			offsets
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			false	"event=purchase_confirm|retire|fail: required (target offset record, read offsets.list); event=request: omit (target none, read offsets.preview); event=retry: required (target offset record, read offsets.list)"
+//	@Param			request				body		SimulateInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=Record}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/offsets.simulate [post]
 func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, error) {
 	client := c.Principal.Role == "client"
 	if client && in.Event != "request" && in.Event != "retry" {

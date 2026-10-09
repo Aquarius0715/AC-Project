@@ -3,8 +3,9 @@ package restrictions
 import (
 	"context"
 	"encoding/json"
-	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"time"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -31,7 +32,7 @@ type RecoveryCase struct {
 type Observation struct {
 	RestrictionID uuid.UUID       `json:"restrictionId"`
 	RulesVersion  string          `json:"rulesVersion"`
-	Policy        json.RawMessage `json:"policy"`
+	Policy        json.RawMessage `json:"policy" swaggertype:"object"`
 	ObservedAt    time.Time       `json:"observedAt"`
 }
 

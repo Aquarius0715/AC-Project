@@ -1,0 +1,3 @@
+// swag type overrides (--overridesFile): IDs are strings and raw JSON is any JSON value on the wire
+replace github.com/google/uuid.UUID string
+replace encoding/json.RawMessage interface{}

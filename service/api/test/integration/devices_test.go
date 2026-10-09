@@ -16,7 +16,7 @@ var techInt = actor{"tok-ti", "tech-internal-a"}
 // newUnit creates a unit for customer-b's home (fresh per test run).
 func newUnit(t *testing.T, s *apiserver.Server, name string) string {
 	t.Helper()
-	code, m := write(s, &hq, "units.save", `{"customerOrgId":"`+seed.ID("org-customer-b").String()+`","propertyId":"`+seed.ID("property-home-b").String()+`","spaceId":null,"displayName":"`+name+` `+uuid.NewString()[:6]+`","modelId":"`+seed.ID("ventilation-demo").String()+`","type":"split","installedAt":null,"serviceScope":["indoor"]}`, 0)
+	code, m := write(s, &hq, "units.save", `{"customerOrgId":"`+seed.ID("org-customer-b").String()+`","propertyId":"`+seed.ID("property-home-b").String()+`","spaceId":null,"displayName":"`+name+` `+uuid.NewString()[:12]+`","modelId":"`+seed.ID("ventilation-demo").String()+`","type":"split","installedAt":null,"serviceScope":["indoor"]}`, 0)
 	if code != 200 {
 		t.Fatalf("unit: %d %v", code, m)
 	}

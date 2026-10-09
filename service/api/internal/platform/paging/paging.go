@@ -19,7 +19,7 @@ const (
 )
 
 // Sort is Query.sort.
-type Sort struct {
+type SortSpec struct {
 	Field     string `json:"field"`
 	Direction string `json:"direction"`
 }
@@ -28,8 +28,8 @@ type Sort struct {
 type Query struct {
 	Cursor  *string         `json:"cursor,omitempty"`
 	Limit   *int            `json:"limit,omitempty"`
-	Sort    *Sort           `json:"sort,omitempty"`
-	Filters json.RawMessage `json:"filters,omitempty"`
+	Sort    *SortSpec       `json:"sort,omitempty"`
+	Filters json.RawMessage `json:"filters,omitempty" swaggertype:"object"`
 }
 
 // HasFilters reports whether the query carries any filter (an empty object and null carry none).
@@ -83,9 +83,9 @@ func Resolve(q Query, conditions any, scopeVersion, snapshot int) (Window, error
 		}
 	}
 	b, _ := json.Marshal(struct {
-		C any   `json:"c"`
-		S *Sort `json:"s"`
-		L int   `json:"l"`
+		C any       `json:"c"`
+		S *SortSpec `json:"s"`
+		L int       `json:"l"`
 	}{conditions, q.Sort, w.Limit})
 	sum := sha256.Sum256(b)
 	w.hash = hex.EncodeToString(sum[:8])
@@ -118,7 +118,7 @@ func (w Window) Next(total int) *string {
 }
 
 // OrderBy maps a sort to SQL with the id tie-break; allowed maps API fields to SQL columns.
-func OrderBy(s *Sort, allowed map[string]string, def string) (string, error) {
+func OrderBy(s *SortSpec, allowed map[string]string, def string) (string, error) {
 	if s == nil {
 		return def, nil
 	}
@@ -140,7 +140,7 @@ func OrderBy(s *Sort, allowed map[string]string, def string) (string, error) {
 // SortSlice orders in-memory items by the requested sort: keys compares two items per allowed field (like
 // strings.Compare); ties fall back to the "id" comparator when there is one. A nil sort keeps the current order; a
 // field outside keys is VALIDATION.
-func SortSlice[T any](items []T, s *Sort, keys map[string]func(a, b T) int) error {
+func SortSlice[T any](items []T, s *SortSpec, keys map[string]func(a, b T) int) error {
 	if s == nil {
 		return nil
 	}

@@ -149,6 +149,27 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 
 // ---- members.list ----
 
+// @Summary		members.list (read)
+// @ID				members.list
+// @Description	Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 contractor sees own-company technicians only
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A03, DD-P06, DD-P05 · Query: filters role,organizationId,qualification,activeOnly · sort id,validFrom,createdAt,updatedAt (default id asc)
+// @Tags			members
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=MemberPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/members.list [post]
 func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Member], error) {
 	var f struct {
 		Role           *string    `json:"role,omitempty"`
@@ -313,6 +334,29 @@ func (in *MemberInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		members.save (write)
+// @ID				members.save
+// @Description	Authorization: admin:identity.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR84 new client membership creates initial Consent granted=false
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A03
+// @Tags			members
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		false	"id omitted: omit (target none, read none); id present: required (target members, read members.list)"
+// @Param			request				body		MemberInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Member}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/members.save [post]
 func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, error) {
 	var exists bool
 	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.users WHERE id = $1)`, in.UserID).Scan(&exists); err != nil {

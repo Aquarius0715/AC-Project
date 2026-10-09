@@ -133,6 +133,27 @@ func orderFor(q paging.Query, prefix string) (string, error) {
 	return paging.OrderBy(q.Sort, map[string]string{"id": prefix + "id", "createdAt": prefix + "created_at", "updatedAt": prefix + "created_at"}, prefix+"created_at DESC, "+prefix+"id ASC")
 }
 
+// @Summary		devices.operations (read)
+// @ID				devices.operations
+// @Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.read; SR24 current-device AND occurrence-scope
+// @Description	Validation: D01; SR08/SR09
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-T11, DD-A04 · Query: filters none · sort id,createdAt,updatedAt (default createdAt desc;id asc)
+// @Tags			devices
+// @Accept			json
+// @Produce		json
+// @Param			request	body		HistoryInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=DeviceOperationPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/devices.operations [post]
 func (m *Module) operations(ctx context.Context, c *ops.Call, in *HistoryInput) (paging.Page[DeviceOperation], error) {
 	scope, sargs, err := m.historyAccess(ctx, c, in.device())
 	if err != nil {
@@ -147,6 +168,27 @@ func (m *Module) operations(ctx context.Context, c *ops.Call, in *HistoryInput) 
 	return historyPage(ctx, c, in.Query, opCols, from, "o.device_id = $1 AND "+scope, append([]any{in.device()}, sargs...), order, scanOp)
 }
 
+// @Summary		devices.calibrations (read)
+// @ID				devices.calibrations
+// @Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.read; SR24 current-device AND occurrence-scope
+// @Description	Validation: D01; SR08/SR09
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-T11, DD-A04 · Query: filters none · sort id,createdAt,updatedAt (default createdAt desc;id asc)
+// @Tags			devices
+// @Accept			json
+// @Produce		json
+// @Param			request	body		HistoryInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=CalibrationRecordPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/devices.calibrations [post]
 func (m *Module) calibrations(ctx context.Context, c *ops.Call, in *HistoryInput) (paging.Page[CalibrationRecord], error) {
 	scope, sargs, err := m.historyAccess(ctx, c, in.device())
 	if err != nil {
@@ -229,6 +271,27 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 	return nil
 }
 
+// @Summary		devices.events (read)
+// @ID				devices.events
+// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:device.read | admin:audit.read; SR24 current-device AND occurrence-scope
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A04, DD-A16, DD-T12 · Query: filters from,to · sort id,createdAt,updatedAt (default occurredAt desc;sequence desc;id asc)
+// @Tags			devices
+// @Accept			json
+// @Produce		json
+// @Param			request	body		HistoryInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=DeviceEventPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/devices.events [post]
 func (m *Module) events(ctx context.Context, c *ops.Call, in *HistoryInput) (paging.Page[DeviceEvent], error) {
 	scope, sargs, err := m.historyAccess(ctx, c, in.device())
 	if err != nil {
@@ -282,6 +345,30 @@ func (in *NoteInput) Validate() map[string]string {
 }
 
 // addResponseNote appends a note to a device event; the version is DeviceEvent.version (strict review).
+//
+//	@Summary		devices.addResponseNote (write)
+//	@ID				devices.addResponseNote
+//	@Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-T12
+//	@Tags			devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target device event, read devices.events)"
+//	@Param			request				body		NoteInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=DeviceEvent}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/devices.addResponseNote [post]
 func (m *Module) addResponseNote(ctx context.Context, c *ops.Call, in *NoteInput) (DeviceEvent, error) {
 	scope, sargs, err := m.historyAccess(ctx, c, in.DeviceID)
 	if err != nil {

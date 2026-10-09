@@ -36,12 +36,34 @@ type Result struct {
 	State       string          `json:"state"`
 	Operation   string          `json:"operation,omitempty"`
 	ResourceIDs []string        `json:"resourceIds,omitempty"`
-	Result      json.RawMessage `json:"result,omitempty"`
+	Result      json.RawMessage `json:"result,omitempty" swaggertype:"object"`
 }
 
 // get returns the caller's own stored write (IR145): absent, expired or another operation → not_received;
 // in progress → pending; completed → succeeded with the stored result and its id as resourceIds. Rejected writes are
 // not stored (zero side effects), so they read as not_received and the same intent may be retried.
+//
+//	@Summary		writes.getResult (read)
+//	@ID				writes.getResult
+//	@Description	Authorization: authenticated:original-user-and-current-target-scope
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DDC-03
+//	@Tags			writes
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		Input	true	"input"
+//	@Success		200		{object}	ops.Envelope{data=Result}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/writes.getResult [post]
 func get(ctx context.Context, c *ops.Call, in *Input) (Result, error) {
 	if _, ok := ops.SpecByName()[in.Operation]; !ok {
 		return Result{}, apperr.Fields(map[string]string{"operation": "error.invalid"})
@@ -60,7 +82,7 @@ func get(ctx context.Context, c *ops.Call, in *Input) (Result, error) {
 		return Result{State: "pending"}, nil
 	}
 	var stored struct {
-		Data json.RawMessage `json:"data"`
+		Data json.RawMessage `json:"data" swaggertype:"object"`
 	}
 	_ = json.Unmarshal(resp, &stored)
 	var ids struct {
@@ -94,6 +116,27 @@ type ResetPreview struct {
 	DeliveryState string `json:"deliveryState"`
 }
 
+// @Summary		auth.previewPasswordReset (read)
+// @ID				auth.previewPasswordReset
+// @Description	Authorization: public:demo-only
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DDC-07
+// @Tags			auth
+// @Accept			json
+// @Produce		json
+// @Param			request	body		ResetInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=ResetPreview}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/auth.previewPasswordReset [post]
 func previewReset(_ context.Context, _ *ops.Call, _ *ResetInput) (ResetPreview, error) {
 	return ResetPreview{MessageKey: "auth.reset_generic", DeliveryState: "preview"}, nil
 }

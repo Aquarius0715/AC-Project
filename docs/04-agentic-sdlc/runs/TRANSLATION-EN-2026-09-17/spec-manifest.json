@@ -1,12 +1,12 @@
 {
-  "version": "0.110.0",
-  "spec_baseline_id": "2c97f0ad745987b90d37a8ce6ec703a8de4d6345a27f71514acb726432e1ea78",
+  "version": "0.111.0",
+  "spec_baseline_id": "49ac65614a03e56198b185dfacd7e573ac45c5768126fdcefb44133c7d0d8f95",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "e6f337af3846f4c9efaa3dfa2d1e8b955c2b22d0172c6f19b865a02acb87c197"
+      "sha256": "808e09fe043f417c53860b5240b78d2f079b58bc786c3d3464198bdc86e0aecc"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -97,12 +97,16 @@
       "sha256": "d6c456c7edf00ef37ddd23be049877cefc1a6a2d3c4599493073da11d54b32e3"
     },
     {
+      "path": "02-design/api/swagger.json",
+      "sha256": "d41a570d91b672017d5c5ddc270dba2165136d6baebccb72b9f983ce98d9e076"
+    },
+    {
       "path": "02-design/backend-architecture.md",
       "sha256": "cd3e947f2ef49d8b58ea8d9c5f930c75b01fd0255e5717b80b4b4c0ad722f55c"
     },
     {
       "path": "02-design/backend-go-design.md",
-      "sha256": "e6ad3d9b94650e9cf253d2e1c381c8f42cdc54271bff175b6e5e601289deb15d"
+      "sha256": "96e9ed1842666f7fed3aa101c6fc7e4130c9d81a2fa19e743da0599eb57f60d7"
     },
     {
       "path": "02-design/client.md",
@@ -150,7 +154,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "c536b0b63e5f29c70a6697891d748b6eeeab4816825c37c2c92a473b8d64ed52"
+      "sha256": "b41108d981d9fbb36359384213ce57fa18c59e24a9d6fc5a3453bf5c08e71f83"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -278,7 +282,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "413fbd3560cb4c82dc335aefe7bd71747367eb60da24ec01e49cd6a55e0e62fe"
+      "sha256": "5295f1171a0f707d23bce2fea505cfa5425482710a5e9e6aba8cdf0d375f59b6"
     },
     {
       "path": "tools/check_review_regressions.py",
@@ -290,7 +294,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "acb839a799c3ddcf81b50cab071e7183d4aaf755d0766a89feb8d2bd22b5ae8d"
+      "sha256": "fbb7243d7dc674e1f62ed04d7e7719e9eab2c89ec72b14c576bf82e7eaa25082"
     }
   ]
 }

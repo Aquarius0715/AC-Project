@@ -52,7 +52,7 @@ type SlotProposal struct {
 	ID             uuid.UUID       `json:"id"`
 	Source         string          `json:"source"`
 	Slot           Slot            `json:"slot"`
-	Hold           json.RawMessage `json:"hold"`
+	Hold           json.RawMessage `json:"hold" swaggertype:"object"`
 	Message        string          `json:"message"`
 	ReplyBy        time.Time       `json:"replyBy"`
 	Status         string          `json:"status"`
@@ -102,7 +102,7 @@ type Job struct {
 	PreferredSlots      []Slot          `json:"preferredSlots"`
 	PreferenceRound     int             `json:"preferenceRound"`
 	SlotProposal        *SlotProposal   `json:"slotProposal"`
-	PartnerSlotProposal json.RawMessage `json:"partnerSlotProposal"`
+	PartnerSlotProposal json.RawMessage `json:"partnerSlotProposal" swaggertype:"object"`
 	ScheduledSlot       *Slot           `json:"scheduledSlot"`
 	DueAt               time.Time       `json:"dueAt"`
 	StartedAt           *time.Time      `json:"startedAt"`
@@ -111,13 +111,13 @@ type Job struct {
 	AssignmentID        *uuid.UUID      `json:"assignmentId"`
 	DraftReportRef      any             `json:"draftReportRef"`
 	ReportRefs          []any           `json:"reportRefs"`
-	Costs               json.RawMessage `json:"costs"`
+	Costs               json.RawMessage `json:"costs" swaggertype:"object"`
 	FollowUpOfJobID     *uuid.UUID      `json:"followUpOfJobId"`
 	FollowUpClass       *string         `json:"followUpClass"`
-	TimeOnSite          json.RawMessage `json:"timeOnSite"`
-	Rating              json.RawMessage `json:"rating"`
+	TimeOnSite          json.RawMessage `json:"timeOnSite" swaggertype:"object"`
+	Rating              json.RawMessage `json:"rating" swaggertype:"object"`
 	CustomerConfirmedAt *time.Time      `json:"customerConfirmedAt"`
-	WarrantyClaims      json.RawMessage `json:"warrantyClaims"`
+	WarrantyClaims      json.RawMessage `json:"warrantyClaims" swaggertype:"object"`
 	// detail
 	Projection  string      `json:"projection"`
 	Assignment  *Assignment `json:"assignment"`
@@ -273,6 +273,28 @@ func PreferredSlotsOK(now time.Time, slots []Slot) bool {
 	return true
 }
 
+// @Summary		jobs.create (write)
+// @ID				jobs.create
+// @Description	Authorization: client:self | admin:job.write
+// @Description	Validation: D01; input constraints in the corresponding DD; IR38 dueAt only for job.write; defaults to requestedEnd; IR113 client: requested slot + exactly 2 alternativeSlots, 3 distinct future slots ≥1 day ahead; HQ on behalf: 0–2
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A06, DD-C09
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		CreateInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Job}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.create [post]
 func (m Jobs) create(ctx context.Context, c *ops.Call, in *CreateInput) (Job, error) {
 	if c.Principal.Role == "client" && in.DueAt != nil {
 		return Job{}, apperr.Fields(map[string]string{"dueAt": "error.notAllowed"})
@@ -525,6 +547,27 @@ func (m Jobs) activeAssignment(ctx context.Context, c *ops.Call, job uuid.UUID) 
 	return &a, err
 }
 
+// @Summary		jobs.get (read)
+// @ID				jobs.get
+// @Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR86 expired unanswered offer: NOT_FOUND for contractor
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T10, DD-C17, DD-T13, DD-P10
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			request	body		JobIDInput	true	"input"
+// @Success		200		{object}	ops.Envelope
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.get [post]
 func (m Jobs) get(ctx context.Context, c *ops.Call, in *JobIDInput) (any, error) {
 	if c.Principal.Role == "contractor" || c.Principal.Role == "technician" {
 		v, _, err := m.projection(ctx, c, in.JobID)
@@ -579,6 +622,27 @@ const statusRank = `array_position(ARRAY['requested','offered','accepted','assig
 
 var severityRank = map[string]int{"normal": 0, "warning": 1, "critical": 2}
 
+// @Summary		jobs.list (read)
+// @ID				jobs.list
+// @Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR23: project before filters/sort/total
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A06, DD-C09, DD-P01, DD-P03, DD-P06, DD-T01, DD-T11, DD-T12, DD-P10 · Query: filters unitId,unitIds,status,severity,from,to,organizationId,membershipId,customerId,propertyId,statuses,overdueOnly,origin,proposalPending · sort id,severity,dueAt,status (default status asc;id asc)
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=anyPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.list [post]
 func (m Jobs) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[any], error) {
 	var f listFilters
 	if len(in.Filters) > 0 {
@@ -817,6 +881,27 @@ type Event struct {
 	ReportRef   any        `json:"reportRef"`
 }
 
+// @Summary		jobs.events (read)
+// @ID				jobs.events
+// @Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-P07 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			request	body		EventsInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=EventPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.events [post]
 func (m Jobs) events(ctx context.Context, c *ops.Call, in *EventsInput) (paging.Page[Event], error) {
 	ownOnly := false
 	if c.Principal.Role == "contractor" || c.Principal.Role == "technician" {
@@ -982,6 +1067,29 @@ func (m Jobs) finishScoped(ctx context.Context, c *ops.Call, id uuid.UUID, actio
 	return j, nil
 }
 
+// @Summary		jobs.cancel (write)
+// @ID				jobs.cancel
+// @Description	Authorization: client:self:requested-only | admin:job.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR56 state table
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A06, DD-C09
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		CancelInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.cancel [post]
 func (m Jobs) cancel(ctx context.Context, c *ops.Call, in *CancelInput) (Job, error) {
 	status, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
@@ -1030,6 +1138,29 @@ func (in *ReasonInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		jobs.hold (write)
+// @ID				jobs.hold
+// @Description	Authorization: admin:job.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A06
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		ReasonInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.hold [post]
 func (m Jobs) hold(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, error) {
 	status, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
@@ -1047,6 +1178,29 @@ func (m Jobs) hold(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, erro
 	return m.finish(ctx, c, in.JobID, "jobs.hold", "JobHeld", in.Reason)
 }
 
+// @Summary		jobs.resumeHold (write)
+// @ID				jobs.resumeHold
+// @Description	Authorization: admin:job.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A06
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		ReasonInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.resumeHold [post]
 func (m Jobs) resumeHold(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, error) {
 	status, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
@@ -1088,6 +1242,30 @@ func (in *NoteInput) Validate() map[string]string {
 }
 
 // addNote returns the created JobNote (service-contracts jobs.addNote); the job version is bumped.
+//
+//	@Summary		jobs.addNote (write)
+//	@ID				jobs.addNote
+//	@Description	Authorization: client:self:customer-visibility | contractor:delegated | admin:job.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C09, DD-P07
+//	@Tags			jobs
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+//	@Param			request				body		NoteInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=Note}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/jobs.addNote [post]
 func (m Jobs) addNote(ctx context.Context, c *ops.Call, in *NoteInput) (Note, error) {
 	if c.Principal.Role == "client" && in.Visibility != "customer" {
 		return Note{}, apperr.E(apperr.Forbidden, "error.forbidden")

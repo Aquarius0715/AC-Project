@@ -27,7 +27,7 @@ const (
 // UnitRestriction is the restriction that currently restricts a unit (IR46): its phase (state) and policy.
 type UnitRestriction struct {
 	Phase  string          `json:"phase"`
-	Policy json.RawMessage `json:"policy"`
+	Policy json.RawMessage `json:"policy" swaggertype:"object"`
 	Found  bool            `json:"found"`
 }
 

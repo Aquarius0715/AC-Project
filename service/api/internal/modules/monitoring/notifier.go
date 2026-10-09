@@ -24,7 +24,7 @@ type Notifier struct {
 type fact struct {
 	UnitID     uuid.UUID       `json:"unitId"`
 	Metric     string          `json:"metric"`
-	Value      json.RawMessage `json:"value"`
+	Value      json.RawMessage `json:"value" swaggertype:"object"`
 	ObservedAt time.Time       `json:"observedAt"`
 	Quality    string          `json:"quality"`
 }

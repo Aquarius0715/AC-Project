@@ -104,6 +104,29 @@ func (in *StartInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		jobs.start (write)
+// @ID				jobs.start
+// @Description	Authorization: technician:assigned-valid-job
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T08, DD-T13
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		StartInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.start [post]
 func (m OnSite) start(ctx context.Context, c *ops.Call, in *StartInput) (Job, error) {
 	status, t, err := m.lockOwn(ctx, c, in.JobID)
 	if err != nil {
@@ -155,6 +178,29 @@ func (in *CheckInInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		jobs.checkIn (write)
+// @ID				jobs.checkIn
+// @Description	Authorization: technician:assigned-valid-job
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 within the work window; manual method requires reason 1–1000; location within 200 m for location_qr
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T13
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get)"
+// @Param			request				body		CheckInInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.checkIn [post]
 func (m OnSite) checkIn(ctx context.Context, c *ops.Call, in *CheckInInput) (Job, error) {
 	status, t, err := m.lockOwn(ctx, c, in.JobID)
 	if err != nil {
@@ -202,6 +248,29 @@ func (in *PauseInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		jobs.pauseWork (write)
+// @ID				jobs.pauseWork
+// @Description	Authorization: technician:assigned-valid-job
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T14
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get)"
+// @Param			request				body		PauseInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.pauseWork [post]
 func (m OnSite) pause(ctx context.Context, c *ops.Call, in *PauseInput) (Job, error) {
 	status, t, err := m.lockOwn(ctx, c, in.JobID)
 	if err != nil {
@@ -261,6 +330,29 @@ func (in *AckInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		jobs.acknowledgeAssignment (write)
+// @ID				jobs.acknowledgeAssignment
+// @Description	Authorization: technician:assigned-valid-job
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR113 own active Assignment with acknowledgement=pending; cant_make needs reason 1–1000; alternativeSlot optional
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T08
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		AckInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Assignment}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.acknowledgeAssignment [post]
 func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Assignment, error) {
 	var aid uuid.UUID
 	var ack string

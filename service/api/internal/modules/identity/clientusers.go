@@ -60,6 +60,27 @@ func ownerOnly(c *ops.Call) error {
 	return nil
 }
 
+// @Summary		clientUsers.list (read)
+// @ID				clientUsers.list
+// @Description	Authorization: client:self-customer:owner | admin:asset.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A17, DD-C19 · Query: filters customerId,status,clientRole,search · sort id,name,email,invitedAt,createdAt,updatedAt (default name asc;id asc)
+// @Tags			clientUsers
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=ClientUserPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/clientUsers.list [post]
 func clientUsersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[ClientUser], error) {
 	if err := ownerOnly(c); err != nil {
 		return paging.Page[ClientUser]{}, err
@@ -183,6 +204,29 @@ func otherActiveOwner(ctx context.Context, c *ops.Call, customer, except uuid.UU
 	return ok, err
 }
 
+// @Summary		clientUsers.save (write)
+// @ID				clientUsers.save
+// @Description	Authorization: client:self-customer:owner:invite-member-only | admin:asset.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 email unique per customer; last active owner cannot be demoted or disabled (CONFLICT)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A17, DD-C19
+// @Tags			clientUsers
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			false	"id omitted: omit (target none, read none); id present: required (target client_user, read clientUsers.list)"
+// @Param			request				body		ClientUserInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=ClientUser}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/clientUsers.save [post]
 func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (ClientUser, error) {
 	if err := ownerOnly(c); err != nil {
 		return ClientUser{}, err
@@ -294,6 +338,29 @@ type Deleted struct {
 	Deleted bool      `json:"deleted"`
 }
 
+// @Summary		clientUsers.remove (write)
+// @ID				clientUsers.remove
+// @Description	Authorization: admin:asset.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 reason 1–1000; last active owner cannot be removed (CONFLICT)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A17
+// @Tags			clientUsers
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target client_user, read clientUsers.list)"
+// @Param			request				body		RemoveInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Deleted}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/clientUsers.remove [post]
 func clientUsersRemove(ctx context.Context, c *ops.Call, in *RemoveInput) (Deleted, error) {
 	x, err := loadClientUser(ctx, c, in.ID, true)
 	if err != nil {
@@ -358,6 +425,27 @@ type InvitePreview struct {
 	ReadAt                 *time.Time        `json:"readAt"`
 }
 
+// @Summary		clientUsers.resendInvite (read)
+// @ID				clientUsers.resendInvite
+// @Description	Authorization: client:self-customer:owner | admin:asset.write
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A17, DD-C19
+// @Tags			clientUsers
+// @Accept			json
+// @Produce		json
+// @Param			request	body		ResendInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=InvitePreview}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/clientUsers.resendInvite [post]
 func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (InvitePreview, error) {
 	if err := ownerOnly(c); err != nil {
 		return InvitePreview{}, err

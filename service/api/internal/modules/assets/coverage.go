@@ -72,6 +72,27 @@ func claimable(jobs map[uuid.UUID]time.Time, ends *time.Time) []uuid.UUID {
 
 var coverageStatuses = map[string]bool{"under_warranty": true, "contract": true, "expiring": true, "no_coverage": true}
 
+// @Summary		units.coverage (read)
+// @ID				units.coverage
+// @Description	Authorization: admin:asset.read | admin:contract.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A19 · Query: filters customerId,coverage,expiringWithinDays,search · sort id,name,dueAt (default dueAt asc;id asc)
+// @Tags			units
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=UnitCoveragePage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/units.coverage [post]
 func (m *Module) unitsCoverage(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[UnitCoverage], error) {
 	var f struct {
 		CustomerID         *uuid.UUID `json:"customerId,omitempty"`

@@ -146,6 +146,29 @@ func siblingName(ctx context.Context, c *ops.Call, kind string, id uuid.UUID) er
 	return nil
 }
 
+// @Summary		properties.save (write)
+// @ID				properties.save
+// @Description	Authorization: admin:asset.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A02
+// @Tags			properties
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			false	"id omitted: omit (target none, read none); id present: required (target properties, read properties.list)"
+// @Param			request				body		PropertySave	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Property}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/properties.save [post]
 func (m *Module) propertiesSave(ctx context.Context, c *ops.Call, in *PropertySave) (Property, error) {
 	if in.ID == nil {
 		if err := m.customerActive(ctx, c, in.CustomerOrgID); err != nil {
@@ -272,6 +295,29 @@ func (m *Module) checkParent(ctx context.Context, c *ops.Call, self *uuid.UUID, 
 	return nil
 }
 
+// @Summary		spaces.save (write)
+// @ID				spaces.save
+// @Description	Authorization: admin:asset.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A02
+// @Tags			spaces
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		false	"id omitted: omit (target none, read none); id present: required (target spaces, read spaces.list)"
+// @Param			request				body		SpaceSave	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Space}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/spaces.save [post]
 func (m *Module) spacesSave(ctx context.Context, c *ops.Call, in *SpaceSave) (Space, error) {
 	if err := m.activeProperty(ctx, c, in.PropertyID); err != nil {
 		return Space{}, err
@@ -322,7 +368,7 @@ type UnitSave struct {
 	ServiceScope  []string   `json:"serviceScope"`
 	ChangeReason  *string    `json:"changeReason,omitempty"`
 	// WarrantyEndsAt is optional: omitted keeps the stored end (none for a new unit), null clears it (IR209).
-	WarrantyEndsAt json.RawMessage `json:"warrantyEndsAt,omitempty"`
+	WarrantyEndsAt json.RawMessage `json:"warrantyEndsAt,omitempty" swaggertype:"object"`
 	warranty       *time.Time
 	warrantySet    bool
 }
@@ -377,6 +423,29 @@ func (in *UnitSave) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		units.save (write)
+// @ID				units.save
+// @Description	Authorization: admin:asset.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR62 spaceId=null is property root; IR74 no tenantId input
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A02
+// @Tags			units
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		false	"id omitted: omit (target none, read none); id present: required (target units, read units.list)"
+// @Param			request				body		UnitSave	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Unit}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/units.save [post]
 func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (Unit, error) {
 	if in.InstalledAt != nil && in.InstalledAt.After(c.Now) {
 		return Unit{}, apperr.Fields(map[string]string{"installedAt": "error.future"})
@@ -515,6 +584,66 @@ type ArchivedResource struct {
 	Archived bool      `json:"archived"`
 }
 
+// propertiesArchive answers properties.archive: refused while the property has units or spaces that are not archived.
+//
+//	@Summary		properties.archive (write)
+//	@ID				properties.archive
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02
+//	@Tags			properties
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target properties, read properties.list)"
+//	@Param			request				body		ArchiveInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=ArchivedResource}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/properties.archive [post]
+func (m *Module) propertiesArchive(ctx context.Context, c *ops.Call, in *ArchiveInput) (ArchivedResource, error) {
+	return m.archive("property", "assets.properties",
+		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM assets.spaces WHERE property_id = $1 AND NOT archived)`)(ctx, c, in)
+}
+
+// spacesArchive answers spaces.archive: refused while the space has units or child spaces that are not archived.
+//
+//	@Summary		spaces.archive (write)
+//	@ID				spaces.archive
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02
+//	@Tags			spaces
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target spaces, read spaces.list)"
+//	@Param			request				body		ArchiveInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=ArchivedResource}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/spaces.archive [post]
+func (m *Module) spacesArchive(ctx context.Context, c *ops.Call, in *ArchiveInput) (ArchivedResource, error) {
+	return m.archive("space", "assets.spaces",
+		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE space_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM assets.spaces WHERE parent_space_id = $1 AND NOT archived)`)(ctx, c, in)
+}
+
 func (m *Module) archive(kind, table, busySQL string) func(context.Context, *ops.Call, *ArchiveInput) (ArchivedResource, error) {
 	return func(ctx context.Context, c *ops.Call, in *ArchiveInput) (ArchivedResource, error) {
 		if busySQL != "" {
@@ -576,6 +705,30 @@ func (m *Module) UnitInfo(ctx context.Context, c *ops.Call, unit uuid.UUID) (dev
 
 // unitsArchive applies D05: an active job, device binding or operation, restriction, command / run or unexpired
 // contract on the unit is CONFLICT; history alone is allowed.
+//
+//	@Summary		units.archive (write)
+//	@ID				units.archive
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02
+//	@Tags			units
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target units, read units.get)"
+//	@Param			request				body		ArchiveInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=ArchivedResource}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/units.archive [post]
 func (m *Module) unitsArchive(ctx context.Context, c *ops.Call, in *ArchiveInput) (ArchivedResource, error) {
 	for _, a := range m.Active {
 		busy, err := a.UnitActive(ctx, c, in.ID)

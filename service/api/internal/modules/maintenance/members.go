@@ -155,6 +155,27 @@ func (in *EligibleInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		members.eligible (read)
+// @ID				members.eligible
+// @Description	Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 role=technician only; scope includes Job.unitId
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A06, DD-P03 · Query: filters organizationId,qualification,activeOnly · sort id,createdAt,updatedAt (default id asc)
+// @Tags			members
+// @Accept			json
+// @Produce		json
+// @Param			request	body		EligibleInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=MemberPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/members.eligible [post]
 func (m Workforce) eligible(ctx context.Context, c *ops.Call, in *EligibleInput) (paging.Page[identity.Member], error) {
 	var unit uuid.UUID
 	var contractor *uuid.UUID
@@ -239,6 +260,27 @@ type Capacity struct {
 	Unavailability   *string   `json:"unavailability"`
 }
 
+// @Summary		members.capacity (read)
+// @ID				members.capacity
+// @Description	Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 role=technician only
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-P06, DD-P01 · Query: filters organizationId,qualification,activeOnly · sort id (default id asc)
+// @Tags			members
+// @Accept			json
+// @Produce		json
+// @Param			request	body		CapacityInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=CapacityPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/members.capacity [post]
 func (m Workforce) capacity(ctx context.Context, c *ops.Call, in *CapacityInput) (paging.Page[Capacity], error) {
 	day, _ := time.ParseInLocation("2006-01-02", in.Date, kualaLumpur)
 	work := Slot{day.Add(9 * time.Hour).UTC(), day.Add(17 * time.Hour).UTC()}
@@ -387,6 +429,28 @@ type Unavailability struct {
 	ConflictingAssignmentIDs []uuid.UUID `json:"conflictingAssignmentIds"`
 }
 
+// @Summary		members.setUnavailability (write)
+// @ID				members.setUnavailability
+// @Description	Authorization: contractor:partner.assign:own-company | admin:job.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 from<=to, at most 31 days; conflicting assignments are reported, not changed
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-P06
+// @Tags			members
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		UnavailabilityInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Unavailability}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/members.setUnavailability [post]
 func (m Workforce) setUnavailability(ctx context.Context, c *ops.Call, in *UnavailabilityInput) (Unavailability, error) {
 	org := c.Principal.OrgID
 	if in.MembershipID != nil {

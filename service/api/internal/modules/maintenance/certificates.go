@@ -139,6 +139,28 @@ func (in *SubmitCertInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		certificates.submit (write)
+// @ID				certificates.submit
+// @Description	Authorization: contractor:partner.assign:own-company
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 PDF/JPEG/PNG up to 10 MB; issuedAt < expiresAt
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-P09
+// @Tags			certificates
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		SubmitCertInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Certificate}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/certificates.submit [post]
 func (m Certificates) submit(ctx context.Context, c *ops.Call, in *SubmitCertInput) (Certificate, error) {
 	t, found, err := m.Delivery.Directory.Technician(ctx, c, in.MembershipID)
 	if err != nil {
@@ -205,6 +227,29 @@ func (in *VerifyInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		certificates.verify (write)
+// @ID				certificates.verify
+// @Description	Authorization: admin:job.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 only pending_verification; approve updates the Membership qualification validUntil
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A21
+// @Tags			certificates
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target certificate, read certificates.list)"
+// @Param			request				body		VerifyInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Certificate}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/certificates.verify [post]
 func (m Certificates) verify(ctx context.Context, c *ops.Call, in *VerifyInput) (Certificate, error) {
 	x, stored, err := m.lock(ctx, c, in.CertificateID)
 	if err != nil {
@@ -254,6 +299,29 @@ func (in *TrainingInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		certificates.requestTraining (write)
+// @ID				certificates.requestTraining
+// @Description	Authorization: contractor:partner.assign:own-company
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 note 1–1000
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-P09
+// @Tags			certificates
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target certificate, read certificates.list)"
+// @Param			request				body		TrainingInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Certificate}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/certificates.requestTraining [post]
 func (m Certificates) requestTraining(ctx context.Context, c *ops.Call, in *TrainingInput) (Certificate, error) {
 	x, _, err := m.lock(ctx, c, in.CertificateID)
 	if err != nil {
@@ -274,6 +342,27 @@ func (m Certificates) requestTraining(ctx context.Context, c *ops.Call, in *Trai
 
 // ---- certificates.list ----
 
+// @Summary		certificates.list (read)
+// @ID				certificates.list
+// @Description	Authorization: admin:job.read | contractor:partner.assign:own-company
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A21, DD-P09 · Query: filters organizationId,membershipId,code,status,expiringWithinDays · sort id,expiresAt,status (default expiresAt asc;id asc)
+// @Tags			certificates
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=CertificatePage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/certificates.list [post]
 func (m Certificates) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Certificate], error) {
 	var f struct {
 		OrganizationID     *uuid.UUID `json:"organizationId,omitempty"`
@@ -347,6 +436,27 @@ type PartItem struct {
 	VanStockQuantity *int   `json:"vanStockQuantity"`
 }
 
+// @Summary		parts.list (read)
+// @ID				parts.list
+// @Description	Authorization: technician:assigned | admin:job.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-T14 · Query: filters search,membershipId · sort id,name (default name asc;id asc)
+// @Tags			parts
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=PartItemPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/parts.list [post]
 func (m Certificates) parts(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[PartItem], error) {
 	var f struct {
 		Search       *string    `json:"search,omitempty"`       // code or name contains, case-insensitive

@@ -67,7 +67,7 @@ type Command struct {
 	UpdatedAt         time.Time       `json:"updatedAt"`
 	UnitID            uuid.UUID       `json:"unitId"`
 	ActorMembershipID uuid.UUID       `json:"actorMembershipId"`
-	Action            json.RawMessage `json:"action"`
+	Action            json.RawMessage `json:"action" swaggertype:"object"`
 	DiagnosticRunID   *uuid.UUID      `json:"diagnosticRunId"`
 	JobID             *uuid.UUID      `json:"jobId"`
 	Reason            *string         `json:"reason"`
@@ -130,7 +130,7 @@ func Deliverable(found bool, connection, powerSignal string) error {
 // CreateInput is commands.create input.
 type CreateInput struct {
 	UnitID              uuid.UUID       `json:"unitId"`
-	Action              json.RawMessage `json:"action"`
+	Action              json.RawMessage `json:"action" swaggertype:"object"`
 	JobID               *uuid.UUID      `json:"jobId,omitempty"`
 	Reason              *string         `json:"reason,omitempty"`
 	ExpectedUnitVersion int             `json:"expectedUnitVersion"`
@@ -173,6 +173,28 @@ func inScope(p *ops.Principal, unit, property, org uuid.UUID) bool {
 	return has("unit", unit) || has("property", property) || has("organization", org)
 }
 
+// @Summary		commands.create (write)
+// @ID				commands.create
+// @Description	Authorization: client:control.execute | technician:control.diagnose:job-required | admin:control.execute
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 group control sends one command per selected unit (owner only)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input versions: expectedUnitVersion=UnitDetail.version
+// @Tags			commands
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		CreateInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Command}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/commands.create [post]
 func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Command, error) {
 	t, found, err := m.Units.Target(ctx, c, in.UnitID)
 	if err != nil {
@@ -286,6 +308,27 @@ func (in *GetInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		commands.get (read)
+// @ID				commands.get
+// @Description	Authorization: client:self | technician:assigned | admin:control.execute | admin:restriction.read | admin:restriction.override | admin:automation.policy.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A09, DD-A12, DD-C03, DD-C12, DD-T10, DD-A02, DD-A16, DD-C14
+// @Tags			commands
+// @Accept			json
+// @Produce		json
+// @Param			request	body		GetInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=Command}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/commands.get [post]
 func (m Commands) get(ctx context.Context, c *ops.Call, in *GetInput) (Command, error) {
 	x, err := scanCommand(c.Tx.QueryRow(ctx, "SELECT "+commandCols+" FROM control.commands WHERE id = $1", in.ID))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -326,6 +369,28 @@ func (in *ListInput) Validate() map[string]string {
 // commands of its organization's unit — the reason of a command someone else sent is withheld; a technician sees
 // one job's commands (jobId required) of a job they hold or held an Assignment of (equipment's projection, IR187);
 // HQ sees the unit's commands.
+//
+//	@Summary		commands.list (read)
+//	@ID				commands.list
+//	@Description	Authorization: client:self | technician:control.diagnose:assigned-valid-job | admin:control.execute | admin:job.read
+//	@Description	Validation: D01; SR08/SR09; IR216 the unit's history newest first; a client sees others' reasons withheld; a technician sees one job it holds or held an Assignment of (jobId required)
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-C03, DD-T10 · Query: filters none · sort id,requestedAt (default requestedAt desc;id asc)
+//	@Tags			commands
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		ListInput	true	"input"
+//	@Success		200		{object}	ops.Envelope{data=CommandPage}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/commands.list [post]
 func (m Commands) list(ctx context.Context, c *ops.Call, in *ListInput) (paging.Page[Command], error) {
 	if err := paging.NoFilters(in.Query, "query.filters"); err != nil {
 		return paging.Page[Command]{}, err

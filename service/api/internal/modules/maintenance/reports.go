@@ -156,7 +156,7 @@ type Report struct {
 	Measurements       []ReportMeasurement `json:"measurements"`
 	Parts              []Part              `json:"parts"`
 	Refrigerant        []Refrigerant       `json:"refrigerant"`
-	SignOff            json.RawMessage     `json:"signOff"`
+	SignOff            json.RawMessage     `json:"signOff" swaggertype:"object"`
 	WorkText           string              `json:"workText"`
 	NextAction         *NextAction         `json:"nextAction"`
 	AttachmentRefs     []AttachmentRef     `json:"attachmentRefs"`
@@ -389,6 +389,29 @@ func (m Reports) draftOf(ctx context.Context, c *ops.Call, job uuid.UUID, lock b
 	return &x, err
 }
 
+// @Summary		jobs.saveDraft (write)
+// @ID				jobs.saveDraft
+// @Description	Authorization: technician:assigned-valid-job
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed); IR100 partial items allowed
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T04, DD-T05, DD-T06, DD-T09, DD-T14
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		false	"reportId omitted: omit (target none, read jobs.get); reportId present: required (target report, read reports.get)"
+// @Param			request				body		DraftInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Report}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.saveDraft [post]
 func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Report, error) {
 	var status string
 	var unit uuid.UUID
@@ -592,6 +615,29 @@ func (m Reports) lockJob(ctx context.Context, c *ops.Call, id uuid.UUID) (string
 	return status, unit, nil
 }
 
+// @Summary		jobs.submit (write)
+// @ID				jobs.submit
+// @Description	Authorization: technician:assigned-valid-job
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed); IR100 component set and report completeness
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T04, DD-T05, DD-T06, DD-T08, DD-T09 · Input versions: reportVersion=WorkReport.version
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;reports.get)"
+// @Param			request				body		SubmitInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.submit [post]
 func (m Reports) submit(ctx context.Context, c *ops.Call, in *SubmitInput) (Job, error) {
 	status, unit, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
@@ -748,6 +794,29 @@ func (in *ReviewInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		jobs.review (write)
+// @ID				jobs.review
+// @Description	Authorization: contractor:partner.review:own-offer | admin:job.write:internal-or-escalation; no-self-review
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reason 1-1000
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A06, DD-P05 · Input versions: reportVersion=WorkReport.version
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;reports.get)"
+// @Param			request				body		ReviewInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.review [post]
 func (m Reports) review(ctx context.Context, c *ops.Call, in *ReviewInput) (Job, error) {
 	var contractor *uuid.UUID
 	if err := c.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.jobs WHERE id = $1`, in.JobID).Scan(&contractor); err != nil {
@@ -831,6 +900,29 @@ func NewDraftFromLatest(ctx context.Context, c *ops.Call, job uuid.UUID) error {
 	return err
 }
 
+// @Summary		jobs.resumeRework (write)
+// @ID				jobs.resumeRework
+// @Description	Authorization: technician:assigned-valid-job
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T08
+// @Tags			jobs
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			request				body		JobIDInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Job}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/jobs.resumeRework [post]
 func (m Reports) resumeRework(ctx context.Context, c *ops.Call, in *JobIDInput) (Job, error) {
 	status, _, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
@@ -875,6 +967,27 @@ func (in *GetReportInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		reports.get (read)
+// @ID				reports.get
+// @Description	Authorization: client:accepted-report-only | contractor:partner.review:submitted | technician:assigned-valid-job | admin:job.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A06, DD-C09, DD-P05, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T15
+// @Tags			reports
+// @Accept			json
+// @Produce		json
+// @Param			request	body		GetReportInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=Report}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/reports.get [post]
 func (m Reports) get(ctx context.Context, c *ops.Call, in *GetReportInput) (Report, error) {
 	var org uuid.UUID
 	var unit uuid.UUID

@@ -179,35 +179,36 @@ type RuleSetting struct {
 	Reason                *string   `json:"reason"`
 }
 
-// Policy is Policy of service-contracts.ts (the fields of the three kinds; MarshalJSON emits the kind's shape).
+// Policy is Policy of service-contracts.ts (the fields of the three kinds; MarshalJSON emits the kind's shape, the json
+// tags name the wire fields for the API description).
 type Policy struct {
-	ID                uuid.UUID
-	TenantID          uuid.UUID
-	Version           int
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	Kind              string
-	Name              string
-	UnitIDs           []uuid.UUID
-	OwnerMembershipID uuid.UUID
-	CreatedByUserID   uuid.UUID
-	Timezone          string
-	Enabled           bool
-	Priority          int
-	DisabledReason    *string
+	ID                uuid.UUID   `json:"id"`
+	TenantID          uuid.UUID   `json:"tenantId"`
+	Version           int         `json:"version"`
+	CreatedAt         time.Time   `json:"createdAt"`
+	UpdatedAt         time.Time   `json:"updatedAt"`
+	Kind              string      `json:"kind"`
+	Name              string      `json:"name"`
+	UnitIDs           []uuid.UUID `json:"unitIds"`
+	OwnerMembershipID uuid.UUID   `json:"ownerMembershipId"`
+	CreatedByUserID   uuid.UUID   `json:"createdByUserId"`
+	Timezone          string      `json:"timezone"`
+	Enabled           bool        `json:"enabled"`
+	Priority          int         `json:"priority"`
+	DisabledReason    *string     `json:"disabledReason"`
 	// alert
-	CustomerID             *uuid.UUID
-	Condition              AlertCondition
-	RecipientMembershipIDs []uuid.UUID
-	Channels               []string
-	EscalateAfterMinutes   int
-	CooldownMinutes        int
+	CustomerID             *uuid.UUID     `json:"customerId"`
+	Condition              AlertCondition `json:"-"` // flattened into metric, operator, threshold, … by MarshalJSON
+	RecipientMembershipIDs []uuid.UUID    `json:"recipientMembershipIds"`
+	Channels               []string       `json:"channels"`
+	EscalateAfterMinutes   int            `json:"escalateAfterMinutes"`
+	CooldownMinutes        int            `json:"cooldownMinutes"`
 	// default_alert
-	Rules        []DefaultAlertRule
-	RuleSettings []RuleSetting
+	Rules        []DefaultAlertRule `json:"rules"`
+	RuleSettings []RuleSetting      `json:"ruleSettings"`
 	// automation
-	AutoCondition json.RawMessage
-	Action        json.RawMessage
+	AutoCondition json.RawMessage `json:"condition" swaggertype:"object"`
+	Action        json.RawMessage `json:"action" swaggertype:"object"`
 }
 
 // MarshalJSON implements json.Marshaler.
@@ -349,6 +350,27 @@ func (m Policies) decorate(ctx context.Context, c *ops.Call, ps []Policy, settin
 
 var kindRank = map[string]int{"default_alert": 0, "alert": 1, "automation": 2}
 
+// @Summary		policies.list (read)
+// @ID				policies.list
+// @Description	Authorization: client:self-customer:kind=alert-or-default_alert | admin:alert.policy.read:kind=alert-or-default_alert | admin:automation.policy.read:kind=automation
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A05, DD-A11, DD-A12, DD-C15, DD-C03, DD-A02 · Query: filters unitId,customerId,propertyId,kind,enabled · sort id,name,priority,createdAt,updatedAt (default kind (default_alert, alert, automation) asc;name asc;id asc)
+// @Tags			policies
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=PolicyPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/policies.list [post]
 func (m Policies) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Policy], error) {
 	var f struct {
 		Kind       *string    `json:"kind,omitempty"`
@@ -609,6 +631,27 @@ func (m Policies) loadKinds(ctx context.Context, c *ops.Call, id uuid.UUID, lock
 	return p, nil
 }
 
+// @Summary		policies.get (read)
+// @ID				policies.get
+// @Description	Authorization: client:self-customer:kind=alert-or-default_alert | admin:alert.policy.read:kind=alert-or-default_alert | admin:automation.policy.read:kind=automation
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A05, DD-A11, DD-A12, DD-C15
+// @Tags			policies
+// @Accept			json
+// @Produce		json
+// @Param			request	body		PolicyIDInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=Policy}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/policies.get [post]
 func (m Policies) get(ctx context.Context, c *ops.Call, in *PolicyIDInput) (Policy, error) {
 	p, err := m.load(ctx, c, in.PolicyID, false)
 	if err != nil {
@@ -656,8 +699,8 @@ type SaveInput struct {
 	Rules []DefaultAlertRule `json:"rules,omitempty"`
 	// automation
 	UnitIDs   []uuid.UUID     `json:"unitIds,omitempty"`
-	Condition json.RawMessage `json:"condition,omitempty"`
-	Action    json.RawMessage `json:"action,omitempty"`
+	Condition json.RawMessage `json:"condition,omitempty" swaggertype:"object"`
+	Action    json.RawMessage `json:"action,omitempty" swaggertype:"object"`
 }
 
 // Validate implements ops.Validator for the fields that need no lookup.
@@ -773,6 +816,29 @@ func hasDup(ids []uuid.UUID) bool {
 	return false
 }
 
+// @Summary		policies.save (write)
+// @ID				policies.save
+// @Description	Authorization: client:self-customer:kind=alert | admin:alert.policy.write:kind=alert-or-default_alert | admin:automation.policy.write:kind=automation
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR120 default_alert limits HQ-only
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A05, DD-A11, DD-A12, DD-C15
+// @Tags			policies
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		false	"id omitted: omit (target none, read none); id present: required (target policies, read policies.get)"
+// @Param			request				body		SaveInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Policy}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/policies.save [post]
 func (m Policies) save(ctx context.Context, c *ops.Call, in *SaveInput) (Policy, error) {
 	if !grantedKinds(c)[in.Kind] {
 		return Policy{}, apperr.E(apperr.Forbidden, "error.forbidden")
@@ -986,6 +1052,29 @@ type Deleted struct {
 	Deleted bool      `json:"deleted"`
 }
 
+// @Summary		policies.delete (write)
+// @ID				policies.delete
+// @Description	Authorization: client:self-customer:kind=alert | admin:alert.policy.write:kind=alert | admin:automation.policy.write:kind=automation
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR108 detaches the policy from every unit first; default_alert cannot be deleted (VALIDATION)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-C15, DD-A05, DD-A11
+// @Tags			policies
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target policies, read policies.get)"
+// @Param			request				body		PolicyIDInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Deleted}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/policies.delete [post]
 func (m Policies) delete(ctx context.Context, c *ops.Call, in *PolicyIDInput) (Deleted, error) {
 	kinds := grantedKinds(c)
 	kinds["default_alert"] = kinds["alert"] // the default policy is visible to alert writers so its delete is VALIDATION (IR108)
@@ -1056,6 +1145,29 @@ func (in *SetDefaultRuleInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		policies.setDefaultRule (write)
+// @ID				policies.setDefaultRule
+// @Description	Authorization: client:self-customer:owner | admin:alert.policy.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR108 toggles one default rule for one customer; limits stay HQ-only
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-C15, DD-A05
+// @Tags			policies
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer				true	"all: required (target policies, read policies.get)"
+// @Param			request				body		SetDefaultRuleInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=RuleSetting}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/policies.setDefaultRule [post]
 func (m Policies) setDefaultRule(ctx context.Context, c *ops.Call, in *SetDefaultRuleInput) (RuleSetting, error) {
 	if c.Principal.Role == "client" {
 		own, err := m.clientCustomer(ctx, c)

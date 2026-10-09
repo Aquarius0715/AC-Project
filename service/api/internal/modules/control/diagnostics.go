@@ -38,8 +38,8 @@ type Run struct {
 	JobID             uuid.UUID       `json:"jobId"`
 	UnitID            uuid.UUID       `json:"unitId"`
 	ActorMembershipID uuid.UUID       `json:"actorMembershipId"`
-	StartAction       json.RawMessage `json:"startAction"`
-	EndAction         json.RawMessage `json:"endAction"`
+	StartAction       json.RawMessage `json:"startAction" swaggertype:"object"`
+	EndAction         json.RawMessage `json:"endAction" swaggertype:"object"`
 	DurationMinutes   int             `json:"durationMinutes"`
 	Reason            string          `json:"reason"`
 	State             string          `json:"state"`
@@ -64,8 +64,8 @@ func scanRun(row pgx.Row) (Run, error) {
 type RunInput struct {
 	JobID               uuid.UUID       `json:"jobId"`
 	UnitID              uuid.UUID       `json:"unitId"`
-	StartAction         json.RawMessage `json:"startAction"`
-	EndAction           json.RawMessage `json:"endAction"`
+	StartAction         json.RawMessage `json:"startAction" swaggertype:"object"`
+	EndAction           json.RawMessage `json:"endAction" swaggertype:"object"`
 	DurationMinutes     int             `json:"durationMinutes"`
 	Reason              string          `json:"reason"`
 	ExpectedUnitVersion int             `json:"expectedUnitVersion"`
@@ -99,6 +99,28 @@ func (in *RunInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		diagnosticRuns.create (write)
+// @ID				diagnosticRuns.create
+// @Description	Authorization: technician:control.diagnose:assigned-valid-job
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T10 · Input versions: expectedUnitVersion=UnitDetail.version;expectedJobVersion=JobDetail.version
+// @Tags			diagnosticRuns
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		RunInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Run}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/diagnosticRuns.create [post]
 func (m Diagnostics) create(ctx context.Context, c *ops.Call, in *RunInput) (Run, error) {
 	if err := m.Commands.Access.TechnicianJob(ctx, c, in.JobID, in.UnitID); err != nil {
 		return Run{}, err
@@ -178,6 +200,27 @@ func (in *RunIDInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		diagnosticRuns.get (read)
+// @ID				diagnosticRuns.get
+// @Description	Authorization: technician:control.diagnose:assigned-valid-job | admin:job.read | admin:control.execute
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-T10, DD-A02
+// @Tags			diagnosticRuns
+// @Accept			json
+// @Produce		json
+// @Param			request	body		RunIDInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=Run}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/diagnosticRuns.get [post]
 func (m Diagnostics) get(ctx context.Context, c *ops.Call, in *RunIDInput) (Run, error) {
 	x, err := scanRun(c.Tx.QueryRow(ctx, "SELECT "+runCols+" FROM control.diagnostic_runs r WHERE r.id = $1", in.DiagnosticRunID))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -210,6 +253,27 @@ func (in *RunListInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		diagnosticRuns.list (read)
+// @ID				diagnosticRuns.list
+// @Description	Authorization: technician:control.diagnose:assigned-valid-job | admin:job.read | admin:control.execute
+// @Description	Validation: D01; SR08/SR09
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-T10, DD-A02 · Query: filters none · sort id,createdAt (default createdAt desc;id asc)
+// @Tags			diagnosticRuns
+// @Accept			json
+// @Produce		json
+// @Param			request	body		RunListInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=RunPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/diagnosticRuns.list [post]
 func (m Diagnostics) list(ctx context.Context, c *ops.Call, in *RunListInput) (paging.Page[Run], error) {
 	if err := paging.NoFilters(in.Query, "query.filters"); err != nil {
 		return paging.Page[Run]{}, err

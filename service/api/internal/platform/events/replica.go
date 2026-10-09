@@ -16,7 +16,7 @@ const RowChanged = "RowChanged:"
 // RowChange is the payload of a RowChanged event.
 type RowChange struct {
 	Op  string          `json:"op"` // INSERT, UPDATE, DELETE
-	Row json.RawMessage `json:"row"`
+	Row json.RawMessage `json:"row" swaggertype:"object"`
 }
 
 // Replica keeps a reference copy (same column names) of a source table captured by platform.capture_row().

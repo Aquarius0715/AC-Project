@@ -81,6 +81,29 @@ func (in *AddInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		attachments.add (write)
+// @ID				attachments.add
+// @Description	Authorization: technician:assigned-valid-job
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T09
+// @Tags			attachments
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target report, read reports.get)"
+// @Param			request				body		AddInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=AttachmentRef}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/attachments.add [post]
 func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRef, error) {
 	draft, err := m.lockDraft(ctx, c, in.JobID, in.ReportID)
 	if err != nil {
@@ -160,6 +183,29 @@ type SignOff struct {
 	ReportVersion         int        `json:"reportVersion"`
 }
 
+// @Summary		reports.signOff (write)
+// @ID				reports.signOff
+// @Description	Authorization: technician:assigned-valid-job
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 signer 1–120; either signature or absentReason with sitePhoto
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T15
+// @Tags			reports
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target report, read reports.get)"
+// @Param			request				body		SignOffInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Report}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/reports.signOff [post]
 func (m Files) signOff(ctx context.Context, c *ops.Call, in *SignOffInput) (Report, error) {
 	draft, err := m.lockDraft(ctx, c, in.JobID, in.ReportID)
 	if err != nil {
@@ -221,6 +267,27 @@ type BlobOut struct {
 	Bytes []byte `json:"bytes"`
 }
 
+// @Summary		attachments.getContent (read)
+// @ID				attachments.getContent
+// @Description	Authorization: client:accepted-report-only | contractor:partner.review:submitted | technician:assigned-valid-job | admin:job.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A06, DD-C09, DD-P05, DD-T09
+// @Tags			attachments
+// @Accept			json
+// @Produce		json
+// @Param			request	body		ContentInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=BlobOut}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/attachments.getContent [post]
 func (m Files) content(ctx context.Context, c *ops.Call, in *ContentInput) (BlobOut, error) {
 	if _, err := m.Reports.get(ctx, c, &GetReportInput{JobID: in.JobID, ReportID: in.ReportID, ReportVersion: in.ReportVersion}); err != nil {
 		return BlobOut{}, err

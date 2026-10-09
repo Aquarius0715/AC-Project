@@ -34,20 +34,44 @@ const SessionTTL = 30 * time.Minute
 func Register(r *ops.Registry) {
 	ops.Register(r, "organizations.list", organizationsList)
 	ops.Register(r, "organizations.save", organizationsSave)
-	ops.Register(r, "session.get", func(ctx context.Context, c *ops.Call, _ *struct{}) (Session, error) {
-		p := c.Principal
-		perms := make([]string, 0, len(p.Permissions))
-		for k, ok := range p.Permissions {
-			if ok {
-				perms = append(perms, k)
-			}
+	ops.Register(r, "session.get", sessionGet)
+}
+
+// sessionGet answers session.get: the signed-in principal as the Session of service-contracts.ts.
+//
+//	@Summary		session.get (read)
+//	@ID				session.get
+//	@Description	Authorization: authenticated:own-session
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-P08
+//	@Tags			session
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	ops.Envelope{data=Session}
+//	@Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/session.get [post]
+func sessionGet(ctx context.Context, c *ops.Call, _ *struct{}) (Session, error) {
+	p := c.Principal
+	perms := make([]string, 0, len(p.Permissions))
+	for k, ok := range p.Permissions {
+		if ok {
+			perms = append(perms, k)
 		}
-		sort.Strings(perms)
-		var clientRole *string
-		if p.Role == "client" && p.ClientRole != "" {
-			clientRole = &p.ClientRole
-		}
-		return Session{TenantID: p.TenantID, MembershipID: p.MembershipID, ScopeVersion: p.ScopeVersion, UserID: p.UserID,
-			Role: p.Role, ClientRole: clientRole, Permissions: perms, Generation: 1, ViewEpoch: 0, IssuedAt: c.Now, ExpiresAt: c.Now.Add(SessionTTL)}, nil
-	})
+	}
+	sort.Strings(perms)
+	var clientRole *string
+	if p.Role == "client" && p.ClientRole != "" {
+		clientRole = &p.ClientRole
+	}
+	return Session{TenantID: p.TenantID, MembershipID: p.MembershipID, ScopeVersion: p.ScopeVersion, UserID: p.UserID,
+		Role: p.Role, ClientRole: clientRole, Permissions: perms, Generation: 1, ViewEpoch: 0, IssuedAt: c.Now, ExpiresAt: c.Now.Add(SessionTTL)}, nil
 }

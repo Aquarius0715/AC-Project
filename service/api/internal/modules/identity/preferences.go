@@ -66,6 +66,29 @@ func (in *PreferencesInput) Validate() map[string]string {
 }
 
 // updatePreferences saves the caller's preferences; monthlyReportEmail is accepted only from client sessions (IR112).
+//
+//	@Summary		preferences.update (write)
+//	@ID				preferences.update
+//	@Description	Authorization: authenticated:own-session
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR112 monthlyReportEmail only for client sessions
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DDC-07
+//	@Tags			preferences
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		PreferencesInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Preferences}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/preferences.update [post]
 func updatePreferences(ctx context.Context, c *ops.Call, in *PreferencesInput) (Preferences, error) {
 	if in.MonthlyReportEmail != nil && c.Principal.Role != "client" {
 		return Preferences{}, apperr.Fields(map[string]string{"monthlyReportEmail": "error.notAllowed"})
@@ -129,6 +152,27 @@ func loadConsent(ctx context.Context, c *ops.Call, purpose string, lock bool) (C
 	return x, err
 }
 
+// @Summary		consents.get (read)
+// @ID				consents.get
+// @Description	Authorization: client:own-membership
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR84 seed/initial record; absent record NOT_FOUND
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-C05
+// @Tags			consents
+// @Accept			json
+// @Produce		json
+// @Param			request	body		ConsentGetInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=Consent}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/consents.get [post]
 func getConsent(ctx context.Context, c *ops.Call, in *ConsentGetInput) (Consent, error) {
 	return loadConsent(ctx, c, in.Purpose, false)
 }
@@ -149,6 +193,30 @@ func (in *ConsentUpdateInput) Validate() map[string]string {
 
 // updateConsent grants or revokes location consent (SR02): granting sets grantedAt=now and clears revokedAt;
 // revoking keeps grantedAt and sets revokedAt=now. The same value returns the record unchanged.
+//
+//	@Summary		consents.update (write)
+//	@ID				consents.update
+//	@Description	Authorization: client:own-membership
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C05
+//	@Tags			consents
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer				true	"all: required (target consent, read consents.get)"
+//	@Param			request				body		ConsentUpdateInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=Consent}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/consents.update [post]
 func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Consent, error) {
 	x, err := loadConsent(ctx, c, in.Purpose, true)
 	if err != nil {
@@ -182,10 +250,34 @@ func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Co
 
 // RegisterPreferences binds preferences.* and consents.*.
 func RegisterPreferences(r *ops.Registry) {
-	ops.Register(r, "preferences.get", func(ctx context.Context, c *ops.Call, _ *struct{}) (Preferences, error) {
-		return loadPreferences(ctx, c)
-	})
+	ops.Register(r, "preferences.get", preferencesGet)
 	ops.Register(r, "preferences.update", updatePreferences)
 	ops.Register(r, "consents.get", getConsent)
 	ops.Register(r, "consents.update", updateConsent)
+}
+
+// preferencesGet answers preferences.get: the caller's preferences.
+//
+//	@Summary		preferences.get (read)
+//	@ID				preferences.get
+//	@Description	Authorization: authenticated:own-session
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DDC-07, DD-C04
+//	@Tags			preferences
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	ops.Envelope{data=Preferences}
+//	@Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/preferences.get [post]
+func preferencesGet(ctx context.Context, c *ops.Call, _ *struct{}) (Preferences, error) {
+	return loadPreferences(ctx, c)
 }

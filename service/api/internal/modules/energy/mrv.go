@@ -84,6 +84,28 @@ type Preview struct {
 // IR149): every unit must be a not archived unit of the customer organization (VALIDATION); unknown versions are
 // NOT_FOUND. incomplete when the boundary differs from the actual boundary or the baseline, coverage < 1, or the
 // baseline is not comparable.
+//
+//	@Summary		mrv.preview (read)
+//	@ID				mrv.preview
+//	@Description	Authorization: admin:mrv.read
+//	@Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+//	@Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+//	@Description	Design: DD-A14
+//	@Tags			mrv
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		Conditions	true	"input"
+//	@Success		200		{object}	ops.Envelope{data=Preview}
+//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/mrv.preview [post]
 func preview(ctx context.Context, c *ops.Call, in *Conditions) (Preview, error) {
 	var kind string
 	err := c.Tx.QueryRow(ctx, `SELECT kind FROM energy.ref_organizations WHERE id = $1`, in.OrganizationID).Scan(&kind)
@@ -225,6 +247,27 @@ func (in *GetInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		mrv.get (read)
+// @ID				mrv.get
+// @Description	Authorization: admin:mrv.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A14
+// @Tags			mrv
+// @Accept			json
+// @Produce		json
+// @Param			request	body		GetInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=Report}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/mrv.get [post]
 func getReport(ctx context.Context, c *ops.Call, in *GetInput) (Report, error) {
 	return LoadReport(ctx, c, in.ID, in.ReportVersion)
 }
@@ -263,6 +306,27 @@ func pageReports(ctx context.Context, c *ops.Call, q paging.Query, f any, where 
 	return paging.Page[Report]{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}, nil
 }
 
+// @Summary		mrv.list (read)
+// @ID				mrv.list
+// @Description	Authorization: admin:mrv.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A14 · Query: filters unitId,from,to,status,organizationId · sort id,createdAt,updatedAt,periodFrom (default createdAt desc;id desc)
+// @Tags			mrv
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=ReportPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/mrv.list [post]
 func listReports(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Report], error) {
 	var f struct {
 		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
@@ -317,6 +381,27 @@ func (in *VersionsInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		mrv.versions (read)
+// @ID				mrv.versions
+// @Description	Authorization: admin:mrv.read
+// @Description	Validation: D01; SR08/SR09
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A14 · Query: filters none · sort version (default version asc)
+// @Tags			mrv
+// @Accept			json
+// @Produce		json
+// @Param			request	body		VersionsInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=ReportPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/mrv.versions [post]
 func versions(ctx context.Context, c *ops.Call, in *VersionsInput) (paging.Page[Report], error) {
 	if in.Query.HasFilters() { // no filters (query catalog)
 		return paging.Page[Report]{}, apperr.Fields(map[string]string{"query.filters": "error.invalid"})
@@ -366,6 +451,30 @@ func insertReport(ctx context.Context, c *ops.Call, id uuid.UUID, version int, p
 
 // saveDraft stores the current conditions and the result computed now as a new draft version (SR09). Evidence IDs
 // must be existing attachments (VALIDATION).
+//
+//	@Summary		mrv.saveDraft (write)
+//	@ID				mrv.saveDraft
+//	@Description	Authorization: admin:mrv.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A14
+//	@Tags			mrv
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		false	"id omitted: omit (target none, read none); id present: required (target mrv, read mrv.get)"
+//	@Param			request				body		SaveInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=Report}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/mrv.saveDraft [post]
 func saveDraft(ctx context.Context, c *ops.Call, in *SaveInput) (Report, error) {
 	id, version := uuid.New(), 1
 	if in.ID != nil {
@@ -422,6 +531,30 @@ func (in *ReviewInput) Validate() map[string]string {
 // recordReview records a demo review of the latest version (SR09): reportVersion and the expected version must both
 // be the latest (CONFLICT); incomplete or already reviewed versions are CONFLICT. It stores a new demo_reviewed
 // version with the same conditions and results; the reviewed version stays unchanged.
+//
+//	@Summary		mrv.recordReview (write)
+//	@ID				mrv.recordReview
+//	@Description	Authorization: admin:mrv.review
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reviewComment 1-1000
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A14 · Input versions: reportVersion=MRVReport.version
+//	@Tags			mrv
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target mrv, read mrv.get)"
+//	@Param			request				body		ReviewInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=Report}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/mrv.recordReview [post]
 func recordReview(ctx context.Context, c *ops.Call, in *ReviewInput) (Report, error) {
 	latest, err := latestVersion(ctx, c, in.ReportID)
 	if err != nil {

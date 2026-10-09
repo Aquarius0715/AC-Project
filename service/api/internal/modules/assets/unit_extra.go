@@ -45,6 +45,30 @@ type DeletedResource struct {
 
 // unitsDelete physically deletes a unit that was never linked to contracts, jobs or IoT (DD-A02); otherwise CONFLICT
 // (archive it instead).
+//
+//	@Summary		units.delete (write)
+//	@ID				units.delete
+//	@Description	Authorization: admin:asset.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A02
+//	@Tags			units
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target units, read units.get)"
+//	@Param			request				body		DeleteInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=DeletedResource}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/units.delete [post]
 func (m *Module) unitsDelete(ctx context.Context, c *ops.Call, in *DeleteInput) (DeletedResource, error) {
 	var v int
 	err := c.Tx.QueryRow(ctx, `SELECT version FROM assets.units WHERE id = $1 FOR UPDATE`, in.ID).Scan(&v)
@@ -104,6 +128,30 @@ func (in *SetPoliciesInput) Validate() map[string]string {
 
 // unitsSetAlertPolicies replaces the unit's attached policies (IR108: only alert policies of the unit's customer;
 // the default policy is implicit and cannot be listed or removed).
+//
+//	@Summary		units.setAlertPolicies (write)
+//	@ID				units.setAlertPolicies
+//	@Description	Authorization: client:self-customer:own-customer-policies | admin:asset.write | admin:alert.policy.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR108 only policies of the unit customer; the default policy is implicit and cannot be listed or removed
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-C03, DD-C15, DD-A02, DD-A05
+//	@Tags			units
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer				true	"all: required (target units, read units.get)"
+//	@Param			request				body		SetPoliciesInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=Unit}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/units.setAlertPolicies [post]
 func (m *Module) unitsSetAlertPolicies(ctx context.Context, c *ops.Call, in *SetPoliciesInput) (Unit, error) {
 	var org uuid.UUID
 	var customerID *uuid.UUID

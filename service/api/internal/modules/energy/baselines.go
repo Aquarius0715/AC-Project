@@ -36,7 +36,7 @@ type Baseline struct {
 	Period      Range           `json:"period"`
 	Method      string          `json:"method"`
 	BaselineKWh *float64        `json:"baselineKWh"`
-	Quality     json.RawMessage `json:"quality"`
+	Quality     json.RawMessage `json:"quality" swaggertype:"object"`
 	BoundaryID  string          `json:"boundaryId"`
 	Boundary    string          `json:"boundary"`
 	Assumptions string          `json:"assumptions"`
@@ -81,6 +81,27 @@ func LoadBaseline(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) 
 	return x, err
 }
 
+// @Summary		baselines.list (read)
+// @ID				baselines.list
+// @Description	Authorization: client:self | admin:energy.read | admin:mrv.read; IR90 client only when all unitIds in scope
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A13, DD-C06, DD-A14 · Query: filters unitId,unitIds,from,to,customerId,propertyId,method,boundaryId · sort id,createdAt,updatedAt,periodFrom (default createdAt desc;id desc)
+// @Tags			baselines
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=BaselinePage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/baselines.list [post]
 func listBaselines(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Baseline], error) {
 	var f struct {
 		UnitID     *uuid.UUID   `json:"unitId,omitempty"`
@@ -242,6 +263,30 @@ const modeledQuality = `{"kind":"modeled","coverage":null,"expectedSlots":null,"
 // saveBaseline stores a new baseline or version (SR29): demo_fixed keeps the entered value as modeled; demo_period_
 // comparison integrates the measured slots of the period now (D07) and saves kind=measured with coverage and the
 // source snapshot. Saved versions never recalculate.
+//
+//	@Summary		baselines.save (write)
+//	@ID				baselines.save
+//	@Description	Authorization: admin:energy.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; SR29 Repository computes measured quality; fixed is modeled
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A13
+//	@Tags			baselines
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			false	"id omitted: omit (target none, read none); id present: required (target baselines, read baselines.list)"
+//	@Param			request				body		BaselineInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=Baseline}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/baselines.save [post]
 func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline, error) {
 	var known int
 	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).Scan(&known); err != nil {

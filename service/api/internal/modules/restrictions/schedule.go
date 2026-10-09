@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"math"
 	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -66,7 +67,7 @@ type ScheduleInput struct {
 	ExpectedContractVersion int             `json:"expectedContractVersion"`
 	CauseInvoiceIDs         []uuid.UUID     `json:"causeInvoiceIds"`
 	UnitIDs                 []uuid.UUID     `json:"unitIds"`
-	Policy                  json.RawMessage `json:"policy"`
+	Policy                  json.RawMessage `json:"policy" swaggertype:"object"`
 	ExecuteAfter            time.Time       `json:"executeAfter"`
 	Reason                  string          `json:"reason"`
 	RulesVersion            string          `json:"rulesVersion"`
@@ -120,6 +121,28 @@ func sameSet(a, b []uuid.UUID) bool {
 	return slices.Equal(x, y)
 }
 
+// @Summary		restrictions.schedule (write)
+// @ID				restrictions.schedule
+// @Description	Authorization: admin:restriction.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A09 · Input versions: expectedContractVersion=Contract.version
+// @Tags			restrictions
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		ScheduleInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Restriction}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/restrictions.schedule [post]
 func (m Restrictions) schedule(ctx context.Context, c *ops.Call, in *ScheduleInput) (Restriction, error) {
 	var (
 		version              int
@@ -278,6 +301,29 @@ func causesPaid(ctx context.Context, c *ops.Call, id uuid.UUID) (bool, error) {
 	return !unpaid, err
 }
 
+// @Summary		restrictions.execute (write)
+// @ID				restrictions.execute
+// @Description	Authorization: admin:restriction.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR90 device operation running: not_sent intent
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A09
+// @Tags			restrictions
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
+// @Param			request				body		ExecuteInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Restriction}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/restrictions.execute [post]
 func (m Restrictions) execute(ctx context.Context, c *ops.Call, in *ExecuteInput) (Restriction, error) {
 	x, err := lockCurrent(ctx, c, in.RestrictionID)
 	if err != nil {
@@ -408,6 +454,29 @@ func (in *CancelInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		restrictions.cancel (write)
+// @ID				restrictions.cancel
+// @Description	Authorization: admin:restriction.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reason 1-1000; IR96 state table; requested/applied to release_requested with releaseIntent=cancel
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A10
+// @Tags			restrictions
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target restrictions, read restrictions.get)"
+// @Param			request				body		CancelInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Restriction}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/restrictions.cancel [post]
 func (m Restrictions) cancel(ctx context.Context, c *ops.Call, in *CancelInput) (Restriction, error) {
 	x, err := load(ctx, c, in.RestrictionID, true)
 	if err != nil {

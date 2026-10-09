@@ -161,6 +161,28 @@ func (in *GenerateInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		payouts.generate (write)
+// @ID				payouts.generate
+// @Description	Authorization: admin:billing.payment
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 period YYYY-MM already ended; approved or paid statements are untouched
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A23
+// @Tags			payouts
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		GenerateInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=[]Statement}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/payouts.generate [post]
 func (m Payouts) generate(ctx context.Context, c *ops.Call, in *GenerateInput) ([]Statement, error) {
 	from, to, _ := periodBounds(in.Period)
 	if c.Now.Before(to) {
@@ -324,6 +346,29 @@ func (in *TransitionInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		payouts.transition (write)
+// @ID				payouts.transition
+// @Description	Authorization: admin:billing.payment
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 draft→approved; approved→paid only on or after payDate
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A23
+// @Tags			payouts
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target payout_statement, read payouts.get)"
+// @Param			request				body		TransitionInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Statement}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/payouts.transition [post]
 func (m Payouts) transition(ctx context.Context, c *ops.Call, in *TransitionInput) (Statement, error) {
 	x, err := m.load(ctx, c, in.StatementID, true)
 	if err != nil {
@@ -396,6 +441,29 @@ func (in *QueryInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		payouts.query (write)
+// @ID				payouts.query
+// @Description	Authorization: contractor:own-company:approved
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 message 1–2000; adds a job history note
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-P10
+// @Tags			payouts
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target payout_statement, read payouts.get)"
+// @Param			request				body		QueryInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Statement}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/payouts.query [post]
 func (m Payouts) query(ctx context.Context, c *ops.Call, in *QueryInput) (Statement, error) {
 	x, err := m.load(ctx, c, in.StatementID, true)
 	if err != nil {
@@ -454,6 +522,29 @@ func (in *ResolveInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		payouts.resolveQuery (write)
+// @ID				payouts.resolveQuery
+// @Description	Authorization: admin:billing.payment
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 reply 1–2000; an adjustment goes on the next statement
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A23
+// @Tags			payouts
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target payout_statement, read payouts.get)"
+// @Param			request				body		ResolveInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Statement}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/payouts.resolveQuery [post]
 func (m Payouts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (Statement, error) {
 	x, err := m.load(ctx, c, in.StatementID, true)
 	if err != nil {
@@ -510,10 +601,52 @@ func (in *PayoutIDInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		payouts.get (read)
+// @ID				payouts.get
+// @Description	Authorization: admin:billing.read | contractor:own-company:approved-or-paid
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A23, DD-P10
+// @Tags			payouts
+// @Accept			json
+// @Produce		json
+// @Param			request	body		PayoutIDInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=Statement}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/payouts.get [post]
 func (m Payouts) get(ctx context.Context, c *ops.Call, in *PayoutIDInput) (Statement, error) {
 	return m.load(ctx, c, in.ID, false)
 }
 
+// @Summary		payouts.list (read)
+// @ID				payouts.list
+// @Description	Authorization: admin:billing.read | contractor:own-company:approved-or-paid
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A23, DD-P10 · Query: filters contractorOrgId,period,status · sort id,createdAt,status,period (default period desc;contractorOrgId asc;id asc)
+// @Tags			payouts
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=StatementPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/payouts.list [post]
 func (m Payouts) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Statement], error) {
 	var f struct {
 		Period          *string    `json:"period,omitempty"`

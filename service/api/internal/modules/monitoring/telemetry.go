@@ -148,12 +148,37 @@ type AllergenObservation struct {
 	EvidenceText *string    `json:"evidenceText"`
 }
 
-// AirSeries is Page<Measurement> & {allergenObservation}.
+// AirSeries is Page<Measurement> & {allergenObservation} (the page fields spelled out so the API description can
+// read them).
 type AirSeries struct {
-	paging.Page[Measurement]
+	Items               []Measurement        `json:"items"`
+	NextCursor          *string              `json:"nextCursor"`
+	Total               int                  `json:"total"`
+	SnapshotVersion     int                  `json:"snapshotVersion"`
 	AllergenObservation *AllergenObservation `json:"allergenObservation"`
 }
 
+// @Summary		telemetry.series (read)
+// @ID				telemetry.series
+// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:automation.policy.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR98 allergenObservation source rows
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-C07, DD-T03, DD-A05, DD-A12 · Query: filters none · sort observedAt (default observedAt asc;sensorId asc;id asc)
+// @Tags			telemetry
+// @Accept			json
+// @Produce		json
+// @Param			request	body		SeriesInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=AirSeries}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/telemetry.series [post]
 func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (AirSeries, error) {
 	units := in.UnitIDs
 	if in.SpaceID != nil {
@@ -211,7 +236,7 @@ func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (Ai
 	if err := rows.Err(); err != nil {
 		return AirSeries{}, err
 	}
-	out := AirSeries{Page: paging.Page[Measurement]{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}}
+	out := AirSeries{Items: items, NextCursor: w.Next(total), Total: total, SnapshotVersion: w.Snapshot}
 	if len(units) == 1 {
 		a, err := allergen(ctx, c, units[0])
 		if err != nil {
@@ -267,6 +292,27 @@ type TelemetrySummary struct {
 	Energy       any           `json:"energy"`
 }
 
+// @Summary		telemetry.summary (read)
+// @ID				telemetry.summary
+// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:automation.policy.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-C01, DD-P04, DD-T03
+// @Tags			telemetry
+// @Accept			json
+// @Produce		json
+// @Param			request	body		SummaryInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=TelemetrySummary}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/telemetry.summary [post]
 func (m Telemetry) summary(ctx context.Context, c *ops.Call, in *SummaryInput) (TelemetrySummary, error) {
 	if err := m.readableUnits(ctx, c, in.UnitIDs); err != nil {
 		return TelemetrySummary{}, err
@@ -354,6 +400,28 @@ func (in *VentLogInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		ventilation.log (write)
+// @ID				ventilation.log
+// @Description	Authorization: client:self
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR110 manual record only; never creates a Command; duration 1–240 minutes; IR213 co2AtLog: latest CO₂ reading when valid at logging time, never an older one
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-C07
+// @Tags			ventilation
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		VentLogInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=VentilationLog}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/ventilation.log [post]
 func (m Telemetry) log(ctx context.Context, c *ops.Call, in *VentLogInput) (VentilationLog, error) {
 	org, spaceUnits, found, err := m.Units.SpaceInfo(ctx, c, in.SpaceID)
 	if err != nil {
@@ -407,6 +475,27 @@ func (m Telemetry) currentCO2(ctx context.Context, c *ops.Call, units []uuid.UUI
 	return out, nil
 }
 
+// @Summary		ventilation.list (read)
+// @ID				ventilation.list
+// @Description	Authorization: client:self | technician:assigned | admin:alert.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-C07 · Query: filters spaceId,unitId,from,to · sort id,createdAt (default createdAt desc;id asc)
+// @Tags			ventilation
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=VentilationLogPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/ventilation.list [post]
 func (m Telemetry) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[VentilationLog], error) {
 	var f struct {
 		SpaceID *uuid.UUID `json:"spaceId,omitempty"`

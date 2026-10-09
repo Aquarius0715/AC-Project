@@ -4,11 +4,12 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"log/slog"
 	"net/url"
 	"slices"
 	"time"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"

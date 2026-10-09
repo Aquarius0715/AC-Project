@@ -47,7 +47,7 @@ func TestResolveAndNext(t *testing.T) {
 	}{
 		{Query{Limit: ip(0)}, cond, 1, apperr.Validation},
 		{Query{Limit: ip(101)}, cond, 1, apperr.Validation},
-		{Query{Sort: &Sort{Field: "id", Direction: "up"}}, cond, 1, apperr.Validation},
+		{Query{Sort: &SortSpec{Field: "id", Direction: "up"}}, cond, 1, apperr.Validation},
 		{Query{Limit: ip(2), Cursor: sp("!!")}, cond, 1, apperr.Validation},
 		{Query{Limit: ip(2), Cursor: sp("e30")}, cond, 1, apperr.Validation},                          // {} → hash mismatch
 		{Query{Limit: ip(2), Cursor: next}, map[string]any{"propertyId": "p2"}, 1, apperr.Validation}, // changed conditions
@@ -67,13 +67,13 @@ func TestOrderBy(t *testing.T) {
 	if s, _ := OrderBy(nil, allowed, "id ASC"); s != "id ASC" {
 		t.Fatal(s)
 	}
-	if s, _ := OrderBy(&Sort{Field: "name", Direction: "desc"}, allowed, ""); s != "display_name DESC, id ASC" {
+	if s, _ := OrderBy(&SortSpec{Field: "name", Direction: "desc"}, allowed, ""); s != "display_name DESC, id ASC" {
 		t.Fatal(s)
 	}
-	if s, _ := OrderBy(&Sort{Field: "id", Direction: "desc"}, allowed, ""); s != "id DESC" {
+	if s, _ := OrderBy(&SortSpec{Field: "id", Direction: "desc"}, allowed, ""); s != "id DESC" {
 		t.Fatal(s)
 	}
-	if _, err := OrderBy(&Sort{Field: "evil; drop", Direction: "asc"}, allowed, ""); code(err) != apperr.Validation {
+	if _, err := OrderBy(&SortSpec{Field: "evil; drop", Direction: "asc"}, allowed, ""); code(err) != apperr.Validation {
 		t.Fatal("unknown sort field")
 	}
 }

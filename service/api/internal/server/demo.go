@@ -3,10 +3,11 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"github.com/pradita/ac-project/service/api/internal/platform/events"
 	"math"
 	"sync"
 	"time"
+
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -82,6 +83,28 @@ type Generation struct {
 	Generation int `json:"generation"`
 }
 
+// @Summary		demo.advanceClock (write)
+// @ID				demo.advanceClock
+// @Description	Authorization: public:demo-panel-only
+// @Description	Validation: D01; IR36 forward jumps; set initial time only immediately after reset; shift Session expiry
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DDC-07
+// @Tags			demo
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		AdvanceInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Generation}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/demo.advanceClock [post]
 func (d *demoOps) advance(ctx context.Context, c *ops.Call, in *AdvanceInput) (Generation, error) {
 	if !d.enabled {
 		return Generation{}, demoOnly()
@@ -116,6 +139,27 @@ func (in *ResetInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		demo.reset (write)
+// @ID				demo.reset
+// @Description	Authorization: public:demo-panel-only
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DDC-07
+// @Tags			demo
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Success		200				{object}	ops.Envelope{data=Generation}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/demo.reset [post]
 func (d *demoOps) reset(context.Context, *ops.Call, *ResetInput) (Generation, error) {
 	if !d.enabled {
 		return Generation{}, demoOnly()
@@ -258,6 +302,28 @@ func (d *demoOps) inTenant(ctx context.Context, now time.Time, probe string, id 
 	return apperr.E(apperr.NotFound, "error.notFound")
 }
 
+// @Summary		demo.trigger (write)
+// @ID				demo.trigger
+// @Description	Authorization: public:demo-panel-only
+// @Description	Validation: D01; IR37 includes transport/network injection; IR45 simulator on/off; IR59 payment branch removed; IR77 telemetry sequence optional (latest+1); IR98 allergen/load_alert events; IR213 telemetry causes unit_mismatch → non_finite → out_of_range → invalid_time; IR217 device faults/recoveries (sequence per device/binding/axis; eventId repeat; current binding; tamper Alert) and operation results (running only)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DDC-07
+// @Tags			demo
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		TriggerInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Event}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/demo.trigger [post]
 func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (Event, error) {
 	if !d.enabled {
 		return Event{}, demoOnly()
@@ -391,8 +457,112 @@ func registerDemo(reg *ops.Registry, d *demoOps) {
 	ops.Register(reg, "demo.advanceClock", d.advance)
 	ops.Register(reg, "demo.reset", d.reset)
 	ops.Register(reg, "demo.trigger", d.trigger)
-	ops.Register(reg, "demoSession.signIn", demoSessionViaBFF[demoSignIn])
-	ops.Register(reg, "demoSession.switchMembership", demoSessionViaBFF[demoSwitch])
-	ops.Register(reg, "demoSession.signOut", demoSessionViaBFF[struct{}])
-	ops.Register(reg, "demoSession.extend", demoSessionViaBFF[struct{}])
+	ops.Register(reg, "demoSession.signIn", demoSessionSignIn)
+	ops.Register(reg, "demoSession.switchMembership", demoSessionSwitch)
+	ops.Register(reg, "demoSession.signOut", demoSessionSignOut)
+	ops.Register(reg, "demoSession.extend", demoSessionExtend)
+}
+
+// The demoSession.* operations (one named handler each for the API description).
+//
+//	@Summary		demoSession.signIn (write)
+//	@ID				demoSession.signIn
+//	@Description	Authorization: public:demo-only
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DDC-07
+//	@Tags			demoSession
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		demoSignIn	true	"input"
+//	@Success		200				{object}	ops.Envelope
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/demoSession.signIn [post]
+func demoSessionSignIn(ctx context.Context, c *ops.Call, in *demoSignIn) (struct{}, error) {
+	return demoSessionViaBFF(ctx, c, in)
+}
+
+// @Summary		demoSession.switchMembership (write)
+// @ID				demoSession.switchMembership
+// @Description	Authorization: authenticated:demo-account-switch; D09
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DDC-07
+// @Tags			demoSession
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		demoSwitch	true	"input"
+// @Success		200				{object}	ops.Envelope
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/demoSession.switchMembership [post]
+func demoSessionSwitch(ctx context.Context, c *ops.Call, in *demoSwitch) (struct{}, error) {
+	return demoSessionViaBFF(ctx, c, in)
+}
+
+// @Summary		demoSession.signOut (write)
+// @ID				demoSession.signOut
+// @Description	Authorization: authenticated:own-session
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DDC-07
+// @Tags			demoSession
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Success		200				{object}	ops.Envelope
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/demoSession.signOut [post]
+func demoSessionSignOut(ctx context.Context, c *ops.Call, in *struct{}) (struct{}, error) {
+	return demoSessionViaBFF(ctx, c, in)
+}
+
+// @Summary		demoSession.extend (write)
+// @ID				demoSession.extend
+// @Description	Authorization: authenticated:own-session
+// @Description	Validation: IR55 valid session only; expiresAt=now+30min; no audit
+// @Description	Recovery: UNAUTHENTICATED after expiry: purge and /login
+// @Description	Design: DDC-07
+// @Tags			demoSession
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Success		200				{object}	ops.Envelope
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/demoSession.extend [post]
+func demoSessionExtend(ctx context.Context, c *ops.Call, in *struct{}) (struct{}, error) {
+	return demoSessionViaBFF(ctx, c, in)
 }

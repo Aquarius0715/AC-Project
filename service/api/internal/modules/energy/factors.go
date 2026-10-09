@@ -55,6 +55,27 @@ func LoadFactor(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) (F
 	return x, err
 }
 
+// @Summary		factors.list (read)
+// @ID				factors.list
+// @Description	Authorization: admin:mrv.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A14 · Query: filters region,year · sort id,year,region,createdAt,updatedAt (default year desc;region asc;id asc)
+// @Tags			factors
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=FactorPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/factors.list [post]
 func listFactors(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Factor], error) {
 	var f struct {
 		Region *string `json:"region,omitempty"`
@@ -142,6 +163,30 @@ func (in *FactorInput) Validate() map[string]string {
 
 // saveFactor creates a factor or a new version of it (existing MRV reports keep the version they reference). One
 // current factor per region and year (VALIDATION).
+//
+//	@Summary		factors.save (write)
+//	@ID				factors.save
+//	@Description	Authorization: admin:mrv.factors
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A14
+//	@Tags			factors
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		false	"id omitted: omit (target none, read none); id present: required (target factors, read factors.list)"
+//	@Param			request				body		FactorInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=Factor}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/factors.save [post]
 func saveFactor(ctx context.Context, c *ops.Call, in *FactorInput) (Factor, error) {
 	id, version := uuid.New(), 1
 	if in.ID != nil {

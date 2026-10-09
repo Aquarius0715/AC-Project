@@ -30,7 +30,7 @@ type Summaries struct {
 // Input is summaries.get input.
 type Input struct {
 	Kind    string          `json:"kind"`
-	Filters json.RawMessage `json:"filters"`
+	Filters json.RawMessage `json:"filters" swaggertype:"object"`
 }
 
 // Validate implements ops.Validator.
@@ -69,6 +69,27 @@ type Summary struct {
 
 var roleKind = map[string]string{"client": "customer", "contractor": "partner", "technician": "technician"}
 
+// @Summary		summaries.get (read)
+// @ID				summaries.get
+// @Description	Authorization: client:self | contractor:delegated | technician:assigned
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR49 technician future assignments counted; IR51 alertCount critical/warning
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-C01, DD-C08, DD-P01, DD-T01 · Query: filters customerId,propertyId,unitId,unitIds,from,to,status,statuses,severity,overdueOnly · sort none (default not_applicable)
+// @Tags			summaries
+// @Accept			json
+// @Produce		json
+// @Param			request	body		Input	true	"input"
+// @Success		200		{object}	ops.Envelope{data=Summary}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/summaries.get [post]
 func (m Summaries) get(ctx context.Context, c *ops.Call, in *Input) (Summary, error) {
 	if roleKind[c.Principal.Role] != in.Kind {
 		return Summary{}, apperr.E(apperr.Forbidden, "error.forbidden")

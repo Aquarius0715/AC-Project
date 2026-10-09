@@ -101,6 +101,28 @@ func (m Billing) notifyMembers(ctx context.Context, c *ops.Call, f identity.Memb
 	return nil
 }
 
+// @Summary		inquiries.create (write)
+// @ID				inquiries.create
+// @Description	Authorization: client:self
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-C12
+// @Tags			inquiries
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		InquiryInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Inquiry}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/inquiries.create [post]
 func (m Billing) createInquiry(ctx context.Context, c *ops.Call, in *InquiryInput) (Inquiry, error) {
 	customer, ok, err := m.Customers.CustomerOfOrg(ctx, c, c.Principal.OrgID)
 	if err != nil {
@@ -159,6 +181,27 @@ func (m Billing) loadInquiry(ctx context.Context, c *ops.Call, id uuid.UUID, loc
 	return x, err
 }
 
+// @Summary		inquiries.list (read)
+// @ID				inquiries.list
+// @Description	Authorization: client:self | admin:billing.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A08, DD-C12 · Query: filters invoiceId,restrictionId,status,subjectType,customerId · sort id,createdAt,updatedAt (default createdAt desc;id desc)
+// @Tags			inquiries
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=InquiryPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/inquiries.list [post]
 func (m Billing) listInquiries(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Inquiry], error) {
 	var f struct {
 		Status        *string    `json:"status,omitempty"` // => state
@@ -239,6 +282,29 @@ func (in *AnswerInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		inquiries.answer (write)
+// @ID				inquiries.answer
+// @Description	Authorization: admin:billing.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A08
+// @Tags			inquiries
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target inquiries, read inquiries.list)"
+// @Param			request				body		AnswerInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Inquiry}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/inquiries.answer [post]
 func (m Billing) answerInquiry(ctx context.Context, c *ops.Call, in *AnswerInput) (Inquiry, error) {
 	x, err := m.loadInquiry(ctx, c, in.InquiryID, true)
 	if err != nil {

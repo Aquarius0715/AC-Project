@@ -46,7 +46,7 @@ type Unit struct {
 	CapabilityVersion   int             `json:"capabilityVersion"`
 	Connection          string          `json:"connection"`
 	ObservedState       ObservedState   `json:"observedState"`
-	ObservedRestriction json.RawMessage `json:"observedRestriction"`
+	ObservedRestriction json.RawMessage `json:"observedRestriction" swaggertype:"object"`
 	LastSeenAt          *time.Time      `json:"lastSeenAt"`
 	EffectivePowerState string          `json:"effectivePowerState"`
 	LatestMeasurements  []any           `json:"latestMeasurements"`
@@ -114,10 +114,8 @@ func Register(r *ops.Registry, m *Module) {
 	ops.Register(r, "properties.save", m.propertiesSave)
 	ops.Register(r, "spaces.save", m.spacesSave)
 	ops.Register(r, "units.save", m.unitsSave)
-	ops.Register(r, "properties.archive", m.archive("property", "assets.properties",
-		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM assets.spaces WHERE property_id = $1 AND NOT archived)`))
-	ops.Register(r, "spaces.archive", m.archive("space", "assets.spaces",
-		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE space_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM assets.spaces WHERE parent_space_id = $1 AND NOT archived)`))
+	ops.Register(r, "properties.archive", m.propertiesArchive)
+	ops.Register(r, "spaces.archive", m.spacesArchive)
 	ops.Register(r, "units.archive", m.unitsArchive)
 	ops.Register(r, "customers.list", m.customersList)
 	ops.Register(r, "customers.save", m.customersSave)
@@ -243,6 +241,27 @@ func (m *Module) enrich(ctx context.Context, c *ops.Call, units []Unit) error {
 	return nil
 }
 
+// @Summary		units.list (read)
+// @ID				units.list
+// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | admin:automation.policy.read:scope-candidate-read-only | admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR62 unassignedOnly; IR213 latestMeasurements: latest reading per metric with read-time quality; [] before an external technician's work window
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A02, DD-C01, DD-C02, DD-C04, DD-C05, DD-C06, DD-C07, DD-C09, DD-C13, DD-T11, DD-A04, DD-A06, DD-A07, DD-A09, DD-A11, DD-A12, DD-A13, DD-A14, DD-A15, DD-A05, DD-C14, DD-C15, DD-C03, DD-T12 · Query: filters customerId,propertyId,status,spaceId,includeDescendants,connections,powerState,unitIds,organizationId,unassignedOnly · sort id,createdAt,updatedAt (default id asc)
+// @Tags			units
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=UnitPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/units.list [post]
 func (m *Module) unitsList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Unit], error) {
 	var f UnitFilters
 	if len(in.Filters) > 0 {
@@ -349,6 +368,27 @@ func (in *UnitGetInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		units.get (read)
+// @ID				units.get
+// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | admin:automation.policy.read:scope-candidate-read-only | admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR76 technician before work window: work-not-started state; IR213 latestMeasurements: latest reading per metric with read-time quality (stale past the sensor limit)
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A02, DD-A12, DD-C03, DD-C07, DD-P04, DD-T02, DD-T10, DD-C04, DD-C05, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T11, DD-A04, DD-A09, DD-A11, DD-A05, DD-C14, DD-T12, DD-P05, DD-P10
+// @Tags			units
+// @Accept			json
+// @Produce		json
+// @Param			request	body		UnitGetInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=UnitDetail}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/units.get [post]
 func (m *Module) unitsGet(ctx context.Context, c *ops.Call, in *UnitGetInput) (UnitDetail, error) {
 	var args []any
 	args = append(args, in.ID)

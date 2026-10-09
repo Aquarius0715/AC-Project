@@ -75,7 +75,7 @@ type AssignmentAccess struct {
 type UnitRestriction struct {
 	UnitID        uuid.UUID       `json:"unitId"`
 	RestrictionID uuid.UUID       `json:"restrictionId"`
-	Observed      json.RawMessage `json:"observed,omitempty"` // ObservedRestriction for Applied
+	Observed      json.RawMessage `json:"observed,omitempty" swaggertype:"object"` // ObservedRestriction for Applied
 }
 
 // Units is the payload of RecoveryCasesChanged / ReconciliationRequired / ReconciliationResolved.
@@ -91,7 +91,7 @@ type RestrictionCommand struct {
 	UnitID        uuid.UUID       `json:"unitId"`
 	DeviceID      *uuid.UUID      `json:"deviceId"`
 	ActorID       uuid.UUID       `json:"actorMembershipId"`
-	Action        json.RawMessage `json:"action"`
+	Action        json.RawMessage `json:"action" swaggertype:"object"`
 	RestrictionID uuid.UUID       `json:"restrictionId"`
 	Status        string          `json:"status"`
 	Delivery      string          `json:"delivery"`
@@ -112,7 +112,7 @@ type CommandsCancelled struct {
 // Observation is the payload of UnitRestrictionObserved (observed is null when the device enforces none).
 type Observation struct {
 	UnitID   uuid.UUID       `json:"unitId"`
-	Observed json.RawMessage `json:"observed"`
+	Observed json.RawMessage `json:"observed" swaggertype:"object"`
 	EventID  uuid.UUID       `json:"eventId"`
 	At       time.Time       `json:"at"`
 }

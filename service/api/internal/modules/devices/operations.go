@@ -106,6 +106,30 @@ func (in *BindInput) Validate() map[string]string {
 
 // bind attaches the device to a unit (D05): both units in scope, reason, exclusion on both units, no unresolved
 // tamper, at most one active device per unit; the old binding keeps its end time and the new binding gets new sensors.
+//
+//	@Summary		devices.bind (write)
+//	@ID				devices.bind
+//	@Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-T11, DD-A04
+//	@Tags			devices
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target device, read devices.get)"
+//	@Param			request				body		BindInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=DeviceDetail}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/devices.bind [post]
 func (m *Module) bind(ctx context.Context, c *ops.Call, in *BindInput) (DeviceDetail, error) {
 	if err := m.technicianGate(ctx, c, in.JobID, in.UnitID); err != nil {
 		return DeviceDetail{}, err
@@ -259,6 +283,29 @@ func (in *CheckInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		devices.check (write)
+// @ID				devices.check
+// @Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR67 queued→running after 1s tick; IR90 recheck failure CONFLICT; restriction commands not_sent while running; IR94 technician write table (assignment and work window, jobId required when typed)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T11, DD-A04
+// @Tags			devices
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target device, read devices.get)"
+// @Param			request				body		CheckInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=DeviceOperation}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/devices.check [post]
 func (m *Module) check(ctx context.Context, c *ops.Call, in *CheckInput) (DeviceOperation, error) {
 	return m.startOperation(ctx, c, in.ID, in.JobID, "check", nil) // accepted regardless of connection (IR94)
 }
@@ -282,6 +329,29 @@ func (in *FirmwareInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		devices.updateFirmware (write)
+// @ID				devices.updateFirmware
+// @Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR67 queued→running after 1s tick; IR90 recheck failure CONFLICT; restriction commands not_sent while running; IR94 technician write table (assignment and work window, jobId required when typed); IR94 non-online at request: OFFLINE without operation
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T11, DD-A04
+// @Tags			devices
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target device, read devices.get)"
+// @Param			request				body		FirmwareInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=DeviceOperation}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/devices.updateFirmware [post]
 func (m *Module) updateFirmware(ctx context.Context, c *ops.Call, in *FirmwareInput) (DeviceOperation, error) {
 	return m.startOperation(ctx, c, in.DeviceID, in.JobID, "firmware", &in.FirmwareVersion)
 }
@@ -344,6 +414,29 @@ func (in *CalibrateInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		devices.calibrate (write)
+// @ID				devices.calibrate
+// @Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T11, DD-A04
+// @Tags			devices
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target device, read devices.get)"
+// @Param			request				body		CalibrateInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=CalibrationRecord}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/devices.calibrate [post]
 func (m *Module) calibrate(ctx context.Context, c *ops.Call, in *CalibrateInput) (CalibrationRecord, error) {
 	if in.CalibratedAt.After(c.Now) {
 		return CalibrationRecord{}, apperr.Fields(map[string]string{"calibratedAt": "error.future"})

@@ -67,7 +67,7 @@ type Intent struct {
 	UnitID          *uuid.UUID              `json:"unitId,omitempty"`
 	Measurement     *monitoring.Measurement `json:"measurement,omitempty"`
 	Celsius         *int                    `json:"celsius,omitempty"`
-	Before          json.RawMessage         `json:"before,omitempty"`
+	Before          json.RawMessage         `json:"before,omitempty" swaggertype:"object"`
 	ExpectedVersion *int                    `json:"expectedVersion,omitempty"`
 	measurementNull bool
 }
@@ -128,6 +128,27 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 	return out, nil
 }
 
+// @Summary		voice.resolveIntent (read)
+// @ID				voice.resolveIntent
+// @Description	Authorization: client:control.execute | technician:control.diagnose | admin:control.execute
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR65 regex grammar and Space.name matching
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DDC-07
+// @Tags			voice
+// @Accept			json
+// @Produce		json
+// @Param			request	body		Input	true	"input"
+// @Success		200		{object}	ops.Envelope{data=Intent}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/voice.resolveIntent [post]
 func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, error) {
 	g := grammar[in.Locale]
 	if g.help.MatchString(in.Text) {

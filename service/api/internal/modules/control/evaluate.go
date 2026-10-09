@@ -24,7 +24,7 @@ import (
 type Fact struct {
 	UnitID     uuid.UUID       `json:"unitId"`
 	Metric     string          `json:"metric"`
-	Value      json.RawMessage `json:"value"`
+	Value      json.RawMessage `json:"value" swaggertype:"object"`
 	Unit       string          `json:"unit"`
 	ObservedAt time.Time       `json:"observedAt"`
 	Quality    string          `json:"quality"`
@@ -122,7 +122,7 @@ type Decision struct {
 type Result struct {
 	EventID       uuid.UUID         `json:"eventId"`
 	Results       []Decision        `json:"results"`
-	Notifications []json.RawMessage `json:"notifications"`
+	Notifications []json.RawMessage `json:"notifications" swaggertype:"object"`
 }
 
 type candidate struct {
@@ -589,6 +589,27 @@ func checkTick(c *ops.Call, in *EvaluationInput) error {
 	return nil
 }
 
+// @Summary		automations.simulate (read)
+// @ID				automations.simulate
+// @Description	Authorization: client:control.execute:self | admin:automation.policy.read | admin:alert.policy.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A11, DD-A12, DD-C04, DD-C05, DD-A05
+// @Tags			automations
+// @Accept			json
+// @Produce		json
+// @Param			request	body		EvaluationInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=Result}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/automations.simulate [post]
 func (m Automations) simulate(ctx context.Context, c *ops.Call, in *EvaluationInput) (Result, error) {
 	if err := checkTick(c, in); err != nil {
 		return Result{}, err
@@ -598,6 +619,29 @@ func (m Automations) simulate(ctx context.Context, c *ops.Call, in *EvaluationIn
 
 // fire evaluates and creates Commands (D02): a repeated tenant/eventId/phase returns the stored result (checked
 // before the tick, IR21), a reused eventId with other input or another input for the same tick is CONFLICT.
+//
+//	@Summary		automations.fire (write)
+//	@ID				automations.fire
+//	@Description	Authorization: client:control.execute:self | admin:automation.policy.write | admin:alert.policy.write
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR215 records skips whose own trigger held (reason in automation_runs)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A11, DD-A12, DD-C04, DD-C05, DD-A05
+//	@Tags			automations
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		EvaluationInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Result}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/automations.fire [post]
 func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput) (Result, error) {
 	norm, _ := json.Marshal(struct {
 		O time.Time

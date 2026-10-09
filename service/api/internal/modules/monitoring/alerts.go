@@ -40,7 +40,7 @@ type Alert struct {
 	ResolvedAt       *time.Time      `json:"resolvedAt"`
 	ResolutionReason *string         `json:"resolutionReason"`
 	PreviousAlertID  *uuid.UUID      `json:"previousAlertId"`
-	DeliveryFailures json.RawMessage `json:"deliveryFailures"`
+	DeliveryFailures json.RawMessage `json:"deliveryFailures" swaggertype:"object"`
 }
 
 const alertCols = `a.id, a.tenant_id, a.version, a.created_at, a.updated_at, a.unit_id, a.policy_id, a.type, a.severity, a.status, a.cause_code,
@@ -84,6 +84,27 @@ var alertStatuses = map[string]bool{"open": true, "acknowledged": true, "resolve
 
 const severityRank = `CASE a.severity WHEN 'normal' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END`
 
+// @Summary		alerts.list (read)
+// @ID				alerts.list
+// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:alert.read | admin:alert.policy.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A05, DD-C01, DD-C08, DD-P04, DD-T01, DD-T07 · Query: filters unitId,unitIds,severity,status,from,to,customerId,propertyId · sort id,createdAt,updatedAt,severity (default severity desc;id asc)
+// @Tags			alerts
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=AlertPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/alerts.list [post]
 func (m Alerts) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Alert], error) {
 	var f struct {
 		UnitID     *uuid.UUID   `json:"unitId,omitempty"`
@@ -199,6 +220,27 @@ func (in *GetInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		alerts.get (read)
+// @ID				alerts.get
+// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:alert.read | admin:alert.policy.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-T07, DD-A05, DD-T12, DD-P05
+// @Tags			alerts
+// @Accept			json
+// @Produce		json
+// @Param			request	body		GetInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=Alert}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/alerts.get [post]
 func (m Alerts) get(ctx context.Context, c *ops.Call, in *GetInput) (Alert, error) {
 	args := []any{in.ID}
 	a, err := scanAlert(c.Tx.QueryRow(ctx, "SELECT "+alertCols+" FROM monitoring.alerts a WHERE a.id = $1 AND "+alertScope(c, &args, unitscope.List), args...))
@@ -250,6 +292,29 @@ func (in *AckInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		alerts.acknowledge (write)
+// @ID				alerts.acknowledge
+// @Description	Authorization: technician:alert.resolve:assigned | admin:alert.resolve
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T07, DD-T12, DD-A05
+// @Tags			alerts
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target alerts, read alerts.get)"
+// @Param			request				body		AckInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Alert}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/alerts.acknowledge [post]
 func (m Alerts) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Alert, error) {
 	status, unit, err := m.lockAlert(ctx, c, in.AlertID)
 	if err != nil {
@@ -291,6 +356,29 @@ func (in *ResolveInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		alerts.resolve (write)
+// @ID				alerts.resolve
+// @Description	Authorization: technician:alert.resolve:assigned | admin:alert.resolve
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 resolutionReason 1-1000; IR94 technician write table (assignment and work window, jobId required when typed)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T07, DD-A05
+// @Tags			alerts
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target alerts, read alerts.get)"
+// @Param			request				body		ResolveInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Alert}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/alerts.resolve [post]
 func (m Alerts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (Alert, error) {
 	status, unit, err := m.lockAlert(ctx, c, in.AlertID)
 	if err != nil {

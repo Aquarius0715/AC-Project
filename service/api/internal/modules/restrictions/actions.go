@@ -36,10 +36,56 @@ func (in *ExceptionInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		restrictions.defer (write)
+// @ID				restrictions.defer
+// @Description	Authorization: admin:restriction.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reason 1-1000
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A10
+// @Tags			restrictions
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
+// @Param			request				body		ExceptionInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Restriction}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/restrictions.defer [post]
 func (m Restrictions) deferRestriction(ctx context.Context, c *ops.Call, in *ExceptionInput) (Restriction, error) {
 	return m.except(ctx, c, in, "restrictions.defer", `grace_until = $2, updated_at = $3`, in.Until)
 }
 
+// @Summary		restrictions.exempt (write)
+// @ID				restrictions.exempt
+// @Description	Authorization: admin:restriction.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reason 1-1000
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A10
+// @Tags			restrictions
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
+// @Param			request				body		ExceptionInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Restriction}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/restrictions.exempt [post]
 func (m Restrictions) exempt(ctx context.Context, c *ops.Call, in *ExceptionInput) (Restriction, error) {
 	return m.except(ctx, c, in, "restrictions.exempt", `exception_until = $2, updated_at = $3, exception_reason = $4`, in.Until, in.Reason)
 }
@@ -91,6 +137,29 @@ func exempted(x Restriction, now time.Time) bool {
 	return (x.Exception != nil && now.Before(x.Exception.Until)) || (x.GraceUntil != nil && now.Before(*x.GraceUntil))
 }
 
+// @Summary		restrictions.release (write)
+// @ID				restrictions.release
+// @Description	Authorization: admin:restriction.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR35 idempotent when release_requested
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A09
+// @Tags			restrictions
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
+// @Param			request				body		ReleaseInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Restriction}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/restrictions.release [post]
 func (m Restrictions) release(ctx context.Context, c *ops.Call, in *ReleaseInput) (Restriction, error) {
 	x, err := load(ctx, c, in.RestrictionID, true)
 	if err != nil {
@@ -140,6 +209,30 @@ func (in *OverrideInput) Validate() map[string]string {
 // override is the forced release (IR35 ③): requested/applied → release_requested with source=override; invoices
 // stay unpaid. scheduled and terminal restrictions return CONFLICT (cancel a scheduled one); release_requested is
 // idempotent. The response is always RestrictionReleaseView (IR03).
+//
+//	@Summary		restrictions.override (write)
+//	@ID				restrictions.override
+//	@Description	Authorization: admin:restriction.override
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reason 1-1000
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A10
+//	@Tags			restrictions
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
+//	@Param			request				body		OverrideInput	true	"input"
+//	@Success		200					{object}	ops.Envelope{data=ReleaseView}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/restrictions.override [post]
 func (m Restrictions) override(ctx context.Context, c *ops.Call, in *OverrideInput) (ReleaseView, error) {
 	x, err := load(ctx, c, in.RestrictionID, true)
 	if err != nil {
@@ -230,6 +323,30 @@ type observation struct {
 // reconcile stores fresh observation evidence for sent_unknown units (D03): the observation must be at most 30 s old
 // (TIMEOUT) and the device online (OFFLINE). This restriction observed → applied (and, while releasing, a remove
 // Command); no restriction observed → not_applied (and not_required); another restriction → CONFLICT.
+//
+//	@Summary		restrictions.reconcile (write)
+//	@ID				restrictions.reconcile
+//	@Description	Authorization: admin:restriction.write | admin:restriction.override:release-intent-or-terminal-recovery-only
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; SR26 terminal recovery-case handling
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A09, DD-A10
+//	@Tags			restrictions
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
+//	@Param			request				body		ReconcileInput	true	"input"
+//	@Success		200					{object}	ops.Envelope
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/restrictions.reconcile [post]
 func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileInput) (any, error) {
 	x, err := lockCurrent(ctx, c, in.RestrictionID)
 	if err != nil {
@@ -359,6 +476,30 @@ func (in *RetryInput) Validate() map[string]string {
 // (CONFLICT). apply requires state requested with unpaid causes, no grace/exception and valid notice evidence; it
 // creates delivered Commands or not_sent intents. release requires release_requested; an offline unit returns
 // OFFLINE with no side effects.
+//
+//	@Summary		restrictions.retry (write)
+//	@ID				restrictions.retry
+//	@Description	Authorization: admin:restriction.write | admin:restriction.override:phase=release:release-intent-or-terminal-recovery-only
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A09, DD-A10
+//	@Tags			restrictions
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer		true	"all: required (target restrictions, read restrictions.get)"
+//	@Param			request				body		RetryInput	true	"input"
+//	@Success		200					{object}	ops.Envelope
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/ops/restrictions.retry [post]
 func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (any, error) {
 	x, err := lockCurrent(ctx, c, in.RestrictionID)
 	if err != nil {

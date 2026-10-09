@@ -70,7 +70,7 @@ type Device struct {
 type DeviceDetail struct {
 	Device
 	CalibrationRefs []uuid.UUID     `json:"calibrationRefs"`
-	ActiveOperation json.RawMessage `json:"activeOperation"`
+	ActiveOperation json.RawMessage `json:"activeOperation" swaggertype:"object"`
 }
 
 const devCols = `d.id, d.tenant_id, d.version, d.created_at, d.updated_at, d.binding_id, d.unit_id, d.target_unit_id, d.created_by_membership_id,
@@ -142,6 +142,27 @@ func (m *Module) load(ctx context.Context, c *ops.Call, where string, args []any
 	return out, total, nil
 }
 
+// @Summary		devices.list (read)
+// @ID				devices.list
+// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:device.read | admin:audit.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A04, DD-T02, DD-T11, DD-A16, DD-A20, DD-T12 · Query: filters unitId,status · sort id,createdAt,updatedAt (default id asc)
+// @Tags			devices
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=DevicePage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/devices.list [post]
 func (m *Module) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Device], error) {
 	var f struct {
 		UnitID *uuid.UUID `json:"unitId,omitempty"`
@@ -200,6 +221,27 @@ func (in *IDInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		devices.get (read)
+// @ID				devices.get
+// @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:device.read | admin:audit.read; SR24 current-device AND occurrence-scope
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-T11, DD-T12, DD-A04
+// @Tags			devices
+// @Accept			json
+// @Produce		json
+// @Param			request	body		IDInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=DeviceDetail}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/devices.get [post]
 func (m *Module) get(ctx context.Context, c *ops.Call, in *IDInput) (DeviceDetail, error) {
 	args := []any{in.ID}
 	d, err := m.detail(ctx, c, "d.id = $1 AND "+deviceScope(c, &args, unitscope.List), args)
@@ -288,6 +330,28 @@ func (m *Module) technicianGate(ctx context.Context, c *ops.Call, jobID *uuid.UU
 	return m.Access.TechnicianJob(ctx, c, *jobID, unit)
 }
 
+// @Summary		devices.register (write)
+// @ID				devices.register
+// @Description	Authorization: technician:device.maintain:assigned-valid-job | admin:device.write
+// @Description	Validation: D01; input constraints in the corresponding DD; IR43 sensorTypes⊆Capability.sensors; IR94 technician write table (assignment and work window, jobId required when typed)
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-T11, DD-A04
+// @Tags			devices
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		RegisterInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=DeviceDetail}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/devices.register [post]
 func (m *Module) register(ctx context.Context, c *ops.Call, in *RegisterInput) (DeviceDetail, error) {
 	if err := m.technicianGate(ctx, c, in.JobID, in.UnitID); err != nil {
 		return DeviceDetail{}, err

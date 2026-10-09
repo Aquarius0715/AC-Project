@@ -128,6 +128,29 @@ func (in *SimulateInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		payments.simulate (write)
+// @ID				payments.simulate
+// @Description	Authorization: client:self:demo-event-only
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR59 single path for customer processing/confirm/fail; IR60 demo-only
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-C11
+// @Tags			payments
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"event=initiate|instructions: required (target invoice, read invoices.get); event=processing|confirm|fail: required (target payment, read invoices.get)"
+// @Param			request				body		SimulateInput	true	"input"
+// @Success		200					{object}	ops.Envelope
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/payments.simulate [post]
 func (m Billing) simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (any, error) {
 	if in.Event == "initiate" || in.Event == "instructions" {
 		inv, err := m.loadInvoice(ctx, c, *in.InvoiceID, true)
@@ -251,6 +274,29 @@ func amountOK(in *ConfirmInput, inv Invoice) error {
 	return nil
 }
 
+// @Summary		payments.confirm (write)
+// @ID				payments.confirm
+// @Description	Authorization: admin:billing.payment
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A08
+// @Tags			payments
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target payment, read invoices.get)"
+// @Param			request				body		ConfirmInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Payment}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/payments.confirm [post]
 func (m Billing) confirm(ctx context.Context, c *ops.Call, in *ConfirmInput) (Payment, error) {
 	if in.PaymentID == nil {
 		return Payment{}, apperr.Fields(map[string]string{"paymentId": "error.required"})
@@ -284,6 +330,29 @@ func (m Billing) confirm(ctx context.Context, c *ops.Call, in *ConfirmInput) (Pa
 	return m.paymentResult(ctx, c, p.ID, "payments.confirm", in.Reason)
 }
 
+// @Summary		payments.recordManual (write)
+// @ID				payments.recordManual
+// @Description	Authorization: admin:billing.payment
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A08
+// @Tags			payments
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target invoice, read invoices.get)"
+// @Param			request				body		ConfirmInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Payment}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/payments.recordManual [post]
 func (m Billing) recordManual(ctx context.Context, c *ops.Call, in *ConfirmInput) (Payment, error) {
 	if in.InvoiceID == nil {
 		return Payment{}, apperr.Fields(map[string]string{"invoiceId": "error.required"})

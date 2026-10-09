@@ -62,7 +62,7 @@ type Unit struct {
 	ReleaseState        string          `json:"releaseState"`
 	ApplyCommandIDs     []uuid.UUID     `json:"applyCommandIds"`
 	ReleaseCommandIDs   []uuid.UUID     `json:"releaseCommandIds"`
-	ObservedRestriction json.RawMessage `json:"observedRestriction"`
+	ObservedRestriction json.RawMessage `json:"observedRestriction" swaggertype:"object"`
 	ObservedAt          *time.Time      `json:"observedAt"`
 	EvidenceID          *uuid.UUID      `json:"evidenceId"`
 	PendingReason       *string         `json:"pendingReason"`
@@ -102,7 +102,7 @@ type Restriction struct {
 	Version               int             `json:"version"`
 	CreatedAt             time.Time       `json:"createdAt"`
 	UpdatedAt             time.Time       `json:"updatedAt"`
-	RecoveryCases         json.RawMessage `json:"recoveryCases"`
+	RecoveryCases         json.RawMessage `json:"recoveryCases" swaggertype:"object"`
 	NoticeNotificationIDs []uuid.UUID     `json:"noticeNotificationIds"`
 	ContractID            uuid.UUID       `json:"contractId"`
 	ContractVersion       int             `json:"contractVersion"`
@@ -112,13 +112,13 @@ type Restriction struct {
 	NoticeAt              time.Time       `json:"noticeAt"`
 	ExecuteAfter          time.Time       `json:"executeAfter"`
 	Reason                string          `json:"reason"`
-	Policy                json.RawMessage `json:"policy"`
+	Policy                json.RawMessage `json:"policy" swaggertype:"object"`
 	State                 string          `json:"state"`
 	Exception             *Exception      `json:"exception"`
 	GraceUntil            *time.Time      `json:"graceUntil"`
 	PerUnit               []Unit          `json:"perUnit"`
 	Events                []Event         `json:"events"`
-	ReleaseIntent         json.RawMessage `json:"releaseIntent"`
+	ReleaseIntent         json.RawMessage `json:"releaseIntent" swaggertype:"object"`
 	customerID            uuid.UUID
 	customerOrg           uuid.UUID
 }
@@ -131,14 +131,14 @@ type ReleaseView struct {
 	UpdatedAt     time.Time       `json:"updatedAt"`
 	UnitIDs       []uuid.UUID     `json:"unitIds"`
 	RulesVersion  string          `json:"rulesVersion"`
-	Policy        json.RawMessage `json:"policy"`
+	Policy        json.RawMessage `json:"policy" swaggertype:"object"`
 	State         string          `json:"state"`
 	PerUnit       []Unit          `json:"perUnit"`
-	RecoveryCases json.RawMessage `json:"recoveryCases"`
+	RecoveryCases json.RawMessage `json:"recoveryCases" swaggertype:"object"`
 	NoticeAt      time.Time       `json:"noticeAt"`
 	ExecuteAfter  time.Time       `json:"executeAfter"`
 	Projection    string          `json:"projection"`
-	ReleaseIntent json.RawMessage `json:"releaseIntent"`
+	ReleaseIntent json.RawMessage `json:"releaseIntent" swaggertype:"object"`
 }
 
 const cols = `r.id, r.tenant_id, r.version, r.created_at, r.updated_at, r.recovery_cases, r.notice_notification_ids, r.contract_id, r.contract_version,
@@ -285,6 +285,27 @@ func (in *GetInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		restrictions.get (read)
+// @ID				restrictions.get
+// @Description	Authorization: admin:restriction.read | admin:restriction.override:release-projection; IR19:all-target-units-required
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A09, DD-A10
+// @Tags			restrictions
+// @Accept			json
+// @Produce		json
+// @Param			request	body		GetInput	true	"input"
+// @Success		200		{object}	ops.Envelope
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/restrictions.get [post]
 func (m Restrictions) get(ctx context.Context, c *ops.Call, in *GetInput) (any, error) {
 	x, err := load(ctx, c, in.ID, false)
 	if err != nil {
@@ -367,6 +388,27 @@ func decodeFilter(raw json.RawMessage, f *listFilter) error {
 	return nil
 }
 
+// @Summary		restrictions.list (read)
+// @ID				restrictions.list
+// @Description	Authorization: admin:restriction.read | admin:restriction.override:release-projection; IR19:all-target-units-required
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A09, DD-A10 · Query: filters invoiceId,contractId,status · sort id,createdAt,updatedAt,executeAfter,noticeAt (default createdAt desc;id desc)
+// @Tags			restrictions
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=anyPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/restrictions.list [post]
 func (m Restrictions) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[any], error) {
 	var f listFilter
 	if err := decodeFilter(in.Filters, &f); err != nil {
@@ -400,6 +442,27 @@ func (in *ForInvoiceInput) Validate() map[string]string {
 	return nil
 }
 
+// @Summary		restrictions.forInvoice (read)
+// @ID				restrictions.forInvoice
+// @Description	Authorization: client:self | admin:restriction.read; IR19:all-target-units-required
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-C12 · Query: filters invoiceId,contractId,status · sort id,createdAt,updatedAt,executeAfter,noticeAt (default createdAt desc;id desc)
+// @Tags			restrictions
+// @Accept			json
+// @Produce		json
+// @Param			request	body		ForInvoiceInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=RestrictionPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/restrictions.forInvoice [post]
 func (m Restrictions) forInvoice(ctx context.Context, c *ops.Call, in *ForInvoiceInput) (paging.Page[Restriction], error) {
 	var org uuid.UUID
 	err := c.Tx.QueryRow(ctx, `SELECT k.customer_org_id FROM billing.invoices i JOIN billing.contracts k ON k.id = i.contract_id AND k.version = i.contract_version WHERE i.id = $1`, in.InvoiceID).Scan(&org)

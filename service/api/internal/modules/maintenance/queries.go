@@ -18,7 +18,7 @@ const (
 
 // CountJobsInput is QueryCountJobs input: the jobs.list filters of summaries.get.
 type CountJobsInput struct {
-	Filters json.RawMessage `json:"filters"`
+	Filters json.RawMessage `json:"filters" swaggertype:"object"`
 }
 
 // StatusCountsInput is QueryStatusCounts input.

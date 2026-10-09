@@ -134,6 +134,27 @@ type locKey struct {
 	name   string
 }
 
+// @Summary		units.importPreview (read)
+// @ID				units.importPreview
+// @Description	Authorization: admin:asset.write
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR111 CSV UTF-8, at most 1000 rows, 8 mapped columns; writes nothing
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A18
+// @Tags			units
+// @Accept			json
+// @Produce		json
+// @Param			request	body		ImportPreviewInput	true	"input"
+// @Success		200		{object}	ops.Envelope{data=ImportPreview}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/units.importPreview [post]
 func (m *Module) unitsImportPreview(ctx context.Context, c *ops.Call, in *ImportPreviewInput) (ImportPreview, error) {
 	var org uuid.UUID
 	var status string
@@ -367,6 +388,28 @@ func (in *ImportCommitInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		units.importCommit (write)
+// @ID				units.importCommit
+// @Description	Authorization: admin:asset.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 preview must be unexpired and unchanged; imports ready and warning rows only, as one change set
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A18
+// @Tags			units
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key	header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		ImportCommitInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=UnitImport}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/units.importCommit [post]
 func (m *Module) unitsImportCommit(ctx context.Context, c *ops.Call, in *ImportCommitInput) (UnitImport, error) {
 	var raw []byte
 	var fileName string
@@ -533,6 +576,29 @@ func (in *ImportUndoInput) Validate() map[string]string {
 	return fe
 }
 
+// @Summary		units.importUndo (write)
+// @ID				units.importUndo
+// @Description	Authorization: admin:asset.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR111 only within undoUntil (24 h) and while no created unit has telemetry or jobs
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A18
+// @Tags			units
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer			true	"all: required (target unit_import, read none)"
+// @Param			request				body		ImportUndoInput	true	"input"
+// @Success		200					{object}	ops.Envelope{data=UnitImport}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/units.importUndo [post]
 func (m *Module) unitsImportUndo(ctx context.Context, c *ops.Call, in *ImportUndoInput) (UnitImport, error) {
 	x, err := scanImport(c.Tx.QueryRow(ctx, `SELECT `+importCols+` FROM assets.unit_imports WHERE id = $1 FOR UPDATE`, in.ImportID))
 	if errors.Is(err, pgx.ErrNoRows) {

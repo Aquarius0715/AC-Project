@@ -75,6 +75,7 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 		proxies[d] = p
 	}
 	e.GET("/healthz", func(c *echo.Context) error { return c.NoContent(http.StatusOK) })
+	mountDocs(e) // /docs and /swagger.json (IR220)
 	e.POST("/v1/ops/:operation", func(c *echo.Context) error {
 		p := proxies[ops.DomainOf(c.Param("operation"))]
 		if p == nil {

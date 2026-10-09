@@ -40,6 +40,27 @@ func scanOrg(r pgx.Row) (Organization, error) {
 
 var orgKinds = map[string]bool{"customer": true, "contractor": true, "operator": true}
 
+// @Summary		organizations.list (read)
+// @ID				organizations.list
+// @Description	Authorization: admin:asset.read | admin:job.read | admin:identity.read | admin:mrv.read
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-A02, DD-A06, DD-A03, DD-A14 · Query: filters kind,status · sort id,createdAt,updatedAt (default id asc)
+// @Tags			organizations
+// @Accept			json
+// @Produce		json
+// @Param			request	body		paging.Query	true	"input"
+// @Success		200		{object}	ops.Envelope{data=OrganizationPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/organizations.list [post]
 func organizationsList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Organization], error) {
 	var f struct {
 		Kind   *string `json:"kind,omitempty"`
@@ -135,6 +156,29 @@ func uniqueName(ctx context.Context, c *ops.Call, id uuid.UUID) error {
 	return nil
 }
 
+// @Summary		organizations.save (write)
+// @ID				organizations.save
+// @Description	Authorization: admin:asset.write
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates
+// @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+// @Description	Design: DD-A02
+// @Tags			organizations
+// @Accept			json
+// @Produce		json
+// @Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer				false	"id omitted: omit (target none, read none); id present: required (target organizations, read organizations.list)"
+// @Param			request				body		OrganizationSave	true	"input"
+// @Success		200					{object}	ops.Envelope{data=Organization}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/ops/organizations.save [post]
 func organizationsSave(ctx context.Context, c *ops.Call, in *OrganizationSave) (Organization, error) {
 	if in.ID == nil {
 		id := uuid.Must(uuid.NewV7())
