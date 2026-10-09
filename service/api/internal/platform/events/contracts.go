@@ -34,7 +34,17 @@ const (
 	// maintenance → equipment, written by row triggers on maintenance.offers / maintenance.assignments (IR186)
 	OfferAccessChanged      = "OfferAccessChanged"      // a contractor's access window to a unit (accepted Offers)
 	AssignmentAccessChanged = "AssignmentAccessChanged" // a technician's viewing and work window on a unit
+
+	// identity → equipment (IR53, IR214)
+	ConsentRevoked = "ConsentRevoked" // a membership withdrew location consent: disable its location automations
 )
+
+// ConsentRevocation is the payload of ConsentRevoked.
+type ConsentRevocation struct {
+	MembershipID uuid.UUID `json:"membershipId"`
+	Purpose      string    `json:"purpose"`
+	At           time.Time `json:"at"`
+}
 
 // OfferAccess is the payload of OfferAccessChanged: the Offer's current snapshot; Accepted false removes it.
 type OfferAccess struct {

@@ -114,6 +114,7 @@ type Decision struct {
 	RuleID    *uuid.UUID `json:"ruleId"`
 	Reason    *string    `json:"reason"`
 	CommandID *uuid.UUID `json:"commandId,omitempty"`
+	fresh     bool       // the Command was created by this evaluation (not an earlier one of the same trigger)
 }
 
 // Result is SimulationResult / FireResult.
@@ -417,7 +418,9 @@ func (m Automations) prepare(ctx context.Context, c *ops.Call, in *EvaluationInp
 	return facts, nil
 }
 
-func (m Automations) evaluate(ctx context.Context, c *ops.Call, in *EvaluationInput, fire bool) (Result, error) {
+// evaluate decides every unit; fire creates the winners' Commands (one per rule, unit and trigger: a schedule
+// occurrence has the same trigger for the scheduler and a UI fire, IR54) and notify adds the alert-policy decisions.
+func (m Automations) evaluate(ctx context.Context, c *ops.Call, in *EvaluationInput, fire, notify bool) (Result, error) {
 	facts, err := m.prepare(ctx, c, in)
 	if err != nil {
 		return Result{}, err
@@ -430,21 +433,32 @@ func (m Automations) evaluate(ctx context.Context, c *ops.Call, in *EvaluationIn
 		if err != nil {
 			return Result{}, err
 		}
-		if fire {
+		if fire && win != nil {
 			ref := in.EventID.String() + "/" + in.Phase
-			if win != nil {
+			if in.Phase != "condition" {
+				ref = scheduleRef(in.Phase, in.OccurredAt)
+			}
+			var earlier uuid.UUID
+			err := c.Tx.QueryRow(ctx, `SELECT command_id FROM control.automation_runs WHERE rule_id = $1 AND unit_id = $2 AND trigger_ref = $3 AND command_id IS NOT NULL`,
+				win.id, u, ref).Scan(&earlier)
+			switch {
+			case err == nil: // this trigger already ran for the rule and unit
+				d.Decision, d.CommandID = "requested", &earlier
+			case !errors.Is(err, pgx.ErrNoRows):
+				return Result{}, err
+			default:
 				id, err := m.automationCommand(ctx, c, u, win, in)
 				if err != nil {
 					return Result{}, err
 				}
-				d.Decision, d.CommandID = "requested", &id
+				d.Decision, d.CommandID, d.fresh = "requested", &id, true
 				if _, err := c.Tx.Exec(ctx, `INSERT INTO control.automation_runs (tenant_id, rule_kind, rule_id, unit_id, trigger_ref, outcome, command_id, occurred_at)
 					VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'command_created', $5, $6) ON CONFLICT DO NOTHING`, win.kind, win.id, u, ref, id, in.OccurredAt); err != nil {
 					return Result{}, err
 				}
 			}
 		}
-		if m.Notifier != nil { // notification results are independent of the control decision (SR21/SR25)
+		if notify && m.Notifier != nil { // notification results are independent of the control decision (SR21/SR25)
 			factsJSON, _ := json.Marshal(in.Facts)
 			ns, err := m.Notifier.Evaluate(ctx, c, u, factsJSON, in.OccurredAt, in.EventID, fire)
 			if err != nil {
@@ -496,7 +510,7 @@ func (m Automations) simulate(ctx context.Context, c *ops.Call, in *EvaluationIn
 	if err := checkTick(c, in); err != nil {
 		return Result{}, err
 	}
-	return m.evaluate(ctx, c, in, false)
+	return m.evaluate(ctx, c, in, false, true)
 }
 
 // fire evaluates and creates Commands (D02): a repeated tenant/eventId/phase returns the stored result (checked
@@ -545,7 +559,7 @@ func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput)
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return Result{}, err
 	}
-	r, err := m.evaluate(ctx, c, in, true)
+	r, err := m.evaluate(ctx, c, in, true, true)
 	if err != nil {
 		return r, err
 	}

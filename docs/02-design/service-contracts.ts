@@ -158,7 +158,10 @@ export type AlertPolicyInput = Omit<RuleInput,'unitIds'> & Omit<Extract<Policy,{
 /** IR120: HQ edits the six default-rule limits; ruleKeys, order, names and categories are fixed. */
 export type DefaultPolicyInput = {id:ID;kind:'default_alert';rules:DefaultAlertRule[]};
 export type PolicyInput = (RuleInput & Omit<Extract<Policy,{kind:'automation'}>,keyof RuleBase>)|AlertPolicyInput|DefaultPolicyInput;
-export type ScheduledOccurrence = {automationId:ID;phase:'schedule_start'|'schedule_end';at:Instant;action:UnitAction};
+/** IR214: automationId is null for a draft preview. */
+export type ScheduledOccurrence = {automationId:ID|null;phase:'schedule_start'|'schedule_end';at:Instant;action:UnitAction};
+/** IR214: the unsaved schedule of the C04 editor, validated like automations.save. */
+export type ScheduleDraft = {timezone:string;weekdays:number[];startLocal:string;endLocal:string;endsNextDay:boolean;startAction:UnitAction;endAction:UnitAction};
 export type DeletedResource = {id:ID;deleted:true};
 export type WriteResult = {state:'not_received'|'pending'}|{state:'succeeded';operation:string;resourceIds:ID[];result:WriteResultData}|{state:'failed';error:DomainError};
 export type WriteResultData = { [K in keyof OperationContracts]: OperationContracts[K]['mode'] extends 'write' ? OperationContracts[K]['result'] : never }[keyof OperationContracts];
@@ -236,9 +239,10 @@ export type OperationContracts = {
   'attachments.getContent': {input:{jobId:ID;reportId:ID;reportVersion:number;attachmentId:ID};result:Blob;mode:'read'};
   'audit.list': {input:Query;result:Page<AuditView>;mode:'read'};
   'auth.previewPasswordReset': {input:{demoEmail:string};result:ResetPreview;mode:'read'};
+  'automations.delete': {input:{id:ID};result:DeletedResource;mode:'write'};
   'automations.fire': {input:EvaluationInput;result:FireResult;mode:'write'};
   'automations.list': {input:Query;result:Page<Automation>;mode:'read'};
-  'automations.nextRuns': {input:{automationId:ID;count:8};result:ScheduledOccurrence[];mode:'read'};
+  'automations.nextRuns': {input:{automationId:ID;count:8}|{draft:ScheduleDraft;count:8};result:ScheduledOccurrence[];mode:'read'};
   'automations.save': {input:RuleInput & ({kind:'schedule';weekdays:number[];startLocal:string;endLocal:string;endsNextDay:boolean;startAction:UnitAction;endAction:UnitAction}|{kind:'event';condition:Condition;action:UnitAction});result:Automation;mode:'write'};
   'automations.simulate': {input:EvaluationInput;result:SimulationResult;mode:'read'};
   'baselines.list': {input:Query;result:Page<EnergyBaseline>;mode:'read'};

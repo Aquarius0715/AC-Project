@@ -52,7 +52,7 @@ func TestWorkerRunStopsOnCancel(t *testing.T) {
 	var logs int
 	done := make(chan struct{})
 	go func() {
-		scheduler.Run(ctx, s.DB, 10*time.Millisecond, func() time.Time { return clock.Add(1000 * time.Hour) }, func(string, ...any) { logs++ })
+		scheduler.Run(ctx, s.DB, 10*time.Millisecond, func() time.Time { return clock.Add(1000 * time.Hour) }, func(string, ...any) { logs++ }, nil)
 		close(done)
 	}()
 	time.Sleep(50 * time.Millisecond)

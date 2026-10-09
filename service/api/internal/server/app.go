@@ -106,7 +106,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		}
 		reg.Clock = dc.Now
 	}
-	registerDemo(reg, &demoOps{inline: len(cfg.Domains) == 0, enabled: cfg.DemoOps, m: m, clock: dc})
+	registerDemo(reg, &demoOps{inline: len(cfg.Domains) == 0, enabled: cfg.DemoOps, m: m, clock: dc, reg: reg})
 	identity.Register(reg)
 	identity.RegisterMembers(reg)
 	am := &assets.Module{Mon: monitorReads{alerts: monitoring.Alerts{}, telemetry: monitoring.Telemetry{Sensors: devices.Models{}}}, Models: devices.Models{}, Policies: monitoring.Policies{},
@@ -135,7 +135,9 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	maintenance.RegisterProposals(reg, maintenance.Proposals{Delivery: delivery})
 	cmds := control.Commands{Units: controlTargets{am}, Devices: devices.Models{}, Restrictions: restrictions.Busy{}, Access: maintenance.Access{}}
 	control.Register(reg, cmds)
-	control.RegisterAutomations(reg, control.Automations{Units: controlTargets{am}, Cmd: cmds, Notifier: monitoring.Notifier{}})
+	automations := control.Automations{Units: controlTargets{am}, Cmd: cmds, Notifier: monitoring.Notifier{}}
+	control.RegisterAutomations(reg, automations)
+	reg.AddJob(ops.DomainEquipment, automations.FireSchedules) // IR54: schedule occurrences fire from the equipment scheduler
 	control.RegisterDiagnostics(reg, control.Diagnostics{Commands: cmds, Jobs: maintenance.Access{}})
 	identity.RegisterPreferences(reg)
 	identity.RegisterClientUsers(reg)

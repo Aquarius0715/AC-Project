@@ -57,6 +57,7 @@ type demoOps struct {
 	enabled bool
 	m       *db.TxManager
 	clock   ScenarioClock
+	reg     *ops.Registry // the modules' scheduler jobs (IR54 schedule automations)
 }
 
 func demoOnly() error { return apperr.E(apperr.Unavailable, "errors.demo_only") }
@@ -94,7 +95,7 @@ func (d *demoOps) advance(ctx context.Context, c *ops.Call, in *AdvanceInput) (G
 	if !d.inline {
 		return Generation{Generation: 1}, nil
 	}
-	if _, err := scheduler.Tick(ctx, d.m, in.To); err != nil {
+	if _, err := scheduler.Tick(ctx, d.m, in.To, d.reg); err != nil {
 		return Generation{}, err
 	}
 	return Generation{Generation: 1}, nil

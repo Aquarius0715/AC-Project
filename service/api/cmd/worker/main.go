@@ -1,6 +1,7 @@
-// Command worker runs background roles. --role=scheduler ticks the clock-driven transitions every second: with
-// --domain=<domain> only that domain's (IR195; the domain's database role, other domains asked through their
-// internal queries), without it every domain on an all-domain role (single-process development).
+// Command worker runs background roles. --role=scheduler ticks the clock-driven transitions every second, with the
+// modules' jobs (IR54 schedule automations): with --domain=<domain> only that domain's (IR195; the domain's database
+// role, other domains asked through their internal queries), without it every domain on an all-domain role
+// (single-process development).
 package main
 
 import (
@@ -15,8 +16,6 @@ import (
 	"time"
 
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
-	"github.com/pradita/ac-project/service/api/internal/platform/db"
-	"github.com/pradita/ac-project/service/api/internal/platform/democlock"
 	"github.com/pradita/ac-project/service/api/internal/scheduler"
 	"github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -35,40 +34,28 @@ func main() {
 		<-ctx.Done()
 		return
 	}
+	var domains []string // nil: every domain on an all-domain role (single-process development)
 	if *domain != "" {
 		if !slices.Contains(scheduler.Domains, *domain) {
 			log.Fatalf("no scheduler for domain %q (want one of %v)", *domain, scheduler.Domains)
 		}
-		logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", *domain+"-scheduler")
-		cfg, err := server.ConfigFromEnv(logger, []string{*domain})
-		if err != nil {
-			log.Fatal(err)
-		}
-		// the domain's wiring without HTTP: its role, registry (internal queries) and the shared scenario clock
-		srv, err := server.New(ctx, cfg, auth.StaticVerifier{})
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer srv.DB.Close()
-		scheduler.RunDomains(ctx, srv.DB, time.Second, srv.Registry.Clock, log.Printf, []string{*domain}, srv.Registry)
-		return
+		domains = []string{*domain}
 	}
-	m, err := db.Open(ctx, os.Getenv("DATABASE_URL"), "")
+	name := "scheduler"
+	if *domain != "" {
+		name = *domain + "-scheduler"
+	}
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", name)
+	cfg, err := server.ConfigFromEnv(logger, domains)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer m.Close()
-	clock := func() time.Time { return time.Now().UTC() }
-	if os.Getenv("DEMO_OPS") == "1" { // demo environment: the scenario clock shared with the API (IR168)
-		start, err := democlock.StartFromEnv(os.Getenv)
-		if err != nil {
-			log.Fatal(err)
-		}
-		dc, err := democlock.Open(ctx, m.Writer, clock, start)
-		if err != nil {
-			log.Fatal(err)
-		}
-		clock = dc.Now
+	// the domains' wiring without HTTP: the role, the registry (internal queries, the modules' jobs such as the IR54
+	// schedule automations) and the shared scenario clock
+	srv, err := server.New(ctx, cfg, auth.StaticVerifier{})
+	if err != nil {
+		log.Fatal(err)
 	}
-	scheduler.Run(ctx, m, time.Second, clock, log.Printf)
+	defer srv.DB.Close()
+	scheduler.RunDomains(ctx, srv.DB, time.Second, srv.Registry.Clock, log.Printf, domains, srv.Registry)
 }

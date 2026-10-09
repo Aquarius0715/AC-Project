@@ -2,6 +2,7 @@ operation,branch,version_target,read_source,expected_version,input_versions,conf
 alerts.acknowledge,all,alerts,alerts.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 alerts.resolve,all,alerts,alerts.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 attachments.add,all,report,reports.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+automations.delete,all,automations,automations.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 automations.fire,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 automations.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 automations.save,id present,automations,automations.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects

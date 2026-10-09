@@ -10,9 +10,21 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
-// EventHandlers are the control consumers of billing's restriction command events (IR185).
+// EventHandlers are the control consumers of billing's restriction command events (IR185) and of identity's
+// consent withdrawals (IR53).
 func EventHandlers() map[string]events.Handler {
 	return map[string]events.Handler{
+		events.ConsentRevoked: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
+			var p events.ConsentRevocation
+			if err := e.Decode(&p); err != nil || p.Purpose != "location_automation" {
+				return err
+			}
+			// IR53: every enabled location rule of the membership stops with consent_revoked (version + 1); renewed
+			// consent never re-enables them (an explicit save with enabled=true does, IR27)
+			_, err := tx.Exec(ctx, `UPDATE control.automations SET enabled = false, disabled_reason = 'consent_revoked', version = version + 1, updated_at = $2
+				WHERE owner_membership_id = $1 AND kind = 'event' AND definition->'condition'->>'type' = 'location' AND enabled`, p.MembershipID, p.At)
+			return err
+		},
 		events.RestrictionCommandRequested: func(ctx context.Context, tx pgx.Tx, e events.Event) error {
 			var p events.RestrictionCommand
 			if err := e.Decode(&p); err != nil {

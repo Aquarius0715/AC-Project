@@ -8,6 +8,7 @@ attachments.add,write,Maintenance,maintenance.attachments,maintenance.attachment
 attachments.getContent,read,Maintenance,maintenance.attachments,,,,
 audit.list,read,Audit,audit.audit_log,,,,
 auth.previewPasswordReset,read,Identity & access,identity.users,,,,preview only; real reset is a Cognito flow
+automations.delete,write,Control,control.automations,control.automations;control.automation_units,,audit.audit_log;platform.idempotency_keys;platform.outbox,IR214: Commands and automation_runs stay as history
 automations.fire,write,Control,control.automations;control.automation_units,control.automation_runs;control.commands,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 automations.list,read,Control,control.automations;control.automation_units;control.automation_runs,,,,
 automations.nextRuns,read,Control,control.automations,,Demo,,

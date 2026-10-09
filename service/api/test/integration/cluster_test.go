@@ -205,6 +205,7 @@ func (cl splitCluster) tick(ctx context.Context, now time.Time) (scheduler.Resul
 		total.Confirmed += r.Confirmed
 		total.ExpiredProposals += r.ExpiredProposals
 		total.FrozenHistories += r.FrozenHistories
+		total.Jobs += r.Jobs
 	}
 	f := &apiserver.Server{Consumers: cl.consumers()}
 	return total, f.DrainEvents(ctx)
@@ -216,5 +217,9 @@ func schedTick(ctx context.Context, s *apiserver.Server, now time.Time) (schedul
 	if cl, ok := clusters[s]; ok {
 		return cl.tick(ctx, now)
 	}
-	return scheduler.Tick(ctx, s.DB, now)
+	r, err := scheduler.Tick(ctx, s.DB, now, s.Registry)
+	if err == nil {
+		err = s.DrainEvents(ctx) // the jobs' events (inline mode)
+	}
+	return r, err
 }

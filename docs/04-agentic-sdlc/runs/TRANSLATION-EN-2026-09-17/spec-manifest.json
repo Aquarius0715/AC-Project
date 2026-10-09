@@ -1,12 +1,12 @@
 {
-  "version": "0.104.0",
-  "spec_baseline_id": "9b55cae52481f2ffce7bc1a92dbc0499f23dbaa6bcab4ec939065ddaa7e98601",
+  "version": "0.105.0",
+  "spec_baseline_id": "e7710ec207cfac7740757f04b1130cea22e2ff4d031f7bd65c475acab6d5a6f2",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "2bb72ad180d5baa2e107e04fbabadb44e1d766ef3433299d782ac733f13a71ec"
+      "sha256": "40e29517e1eee80bf2472cfdbe98109275edd3f14bd9e73208c1dbcc3f765f88"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -98,7 +98,7 @@
     },
     {
       "path": "02-design/backend-architecture.md",
-      "sha256": "0a4e0a478396298dc43d6df2795bf49acc82239ffdc288f4859b0e5db4fdaa60"
+      "sha256": "8d98447fa02f3552b51f2855e4d68d6eba3eb165a19e023e77451e40cd02db96"
     },
     {
       "path": "02-design/backend-go-design.md",
@@ -106,11 +106,11 @@
     },
     {
       "path": "02-design/client.md",
-      "sha256": "923dbe19af99b92e0f49a716b71b126e7f98c711d5718ea471c759c211a4e2c8"
+      "sha256": "7cee1a69f7a59f42ba365f955d50cf3a1e8670b5af7d7fdff131f0920524d50c"
     },
     {
       "path": "02-design/common.md",
-      "sha256": "f752442469e30e717d9152a120869e041f79c1a9506f40877c7e0de7c377169d"
+      "sha256": "0643e79b64f1416f4083ecc8751e335669af247f3f05a7fc0aed5f8dce5408fb"
     },
     {
       "path": "02-design/container-design.md",
@@ -122,7 +122,7 @@
     },
     {
       "path": "02-design/database-design.md",
-      "sha256": "179e64ebf44916850eb18bfa5c587d98ae2fd61d032c1944e4649beae008cf8e"
+      "sha256": "aab1c659efdd73b6fa49bead30f55e7a6f9e3a2581fc3ba609b23e53806e00c7"
     },
     {
       "path": "02-design/deterministic-contracts.md",
@@ -138,11 +138,11 @@
     },
     {
       "path": "02-design/operation-catalog.csv",
-      "sha256": "7803f9dfdee2844ccae2606ba74653c2c3c4f3ec156a4e462652db8b95fc26e0"
+      "sha256": "1da37362ae25f5ed969935dd71b267c33d6bf443d9d55d04190e9a0d43047400"
     },
     {
       "path": "02-design/operation-persistence-map.csv",
-      "sha256": "694a1b2b2b43d5add148f7cab533e8bc898068649b2e37e0d5c3fde1a3842f41"
+      "sha256": "6f4897a2f72a75f307be0c9bb2d865aac35948f8b7988960b2b28de9d1b35869"
     },
     {
       "path": "02-design/query-catalog.csv",
@@ -150,11 +150,11 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "0bd16c08fb112e06eb2b69343730cb7c5269cb88e2327301e329c9d2c08bebe1"
+      "sha256": "d2a3a8eb95e5a5e5b01e868e43e2b518959f4da950f75e7dbdfd8d8f74a4b25b"
     },
     {
       "path": "02-design/service-contracts.ts",
-      "sha256": "cd96d7c812cc54598c7a1f73f08cde7eb745884f146fb98c794053c62545c62e"
+      "sha256": "31fc5ca4791292b7c9f5081c56af21be1c0406fa6c22378e9fecc470a5930807"
     },
     {
       "path": "02-design/strict-review-contracts.md",
@@ -166,7 +166,7 @@
     },
     {
       "path": "02-design/write-version-catalog.csv",
-      "sha256": "ba2dee8bb587a3f614b2db3199a036a3623aa1d42028baf99634b741fd6bcb5d"
+      "sha256": "3d6e9d731dc4acc9c7a3be52eda0a4018f4dcf42b3767c6cc2f6e1b17c004e0a"
     },
     {
       "path": "03-uiux/UIUXSpecification.md",
@@ -178,7 +178,7 @@
     },
     {
       "path": "03-uiux/screen-catalog.csv",
-      "sha256": "ac9799bbc5b6b013e7ecd3f327bd39fba20701ab38d15a96cf117905f2db56a1"
+      "sha256": "5b782306920cbdbf5755ae501c9e0f45e93a210a6ce7d1cd75b047da3c4fbe72"
     },
     {
       "path": "04-agentic-sdlc/README.md",
@@ -278,11 +278,11 @@
     },
     {
       "path": "README.md",
-      "sha256": "b65cdfcfb6d792f17cce40f6a561b929856c3750c700fd3fb766ac1c50211353"
+      "sha256": "d99ef2bc78428706f12c2b71bdbcf04e2fdb0fd575422de9f3a19eafcbfef244"
     },
     {
       "path": "tools/check_review_regressions.py",
-      "sha256": "581cdfeac09cc1cad1c78a7e142cf5ab7f05e7aa128a30f413b92403cddceec8"
+      "sha256": "5615c51ed29925808e70005834a49a8134481134e9008b3f9148c5f7ce7bbfd7"
     },
     {
       "path": "tools/gen_operation_persistence_map.py",
@@ -290,7 +290,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "4a840f29e40783170effdc015c65a5a0f54e237ff4034dc0d6b55bb8a60dd8e7"
+      "sha256": "dbafed4fb5934de53dab21baa31a7b45b3922e80284b7906c6c42b48afa5bd38"
     }
   ]
 }

@@ -6,10 +6,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
+	"github.com/pradita/ac-project/service/api/internal/platform/events"
 )
 
 // Preferences is Preferences of service-contracts.ts (per user; defaults when no row exists).
@@ -169,6 +171,11 @@ func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Co
 	}
 	prev := x.Version
 	x.Granted, x.Version, x.UpdatedAt = in.Granted, x.Version+1, c.Now
+	if !in.Granted { // equipment disables the membership's location automations (IR53; another domain, so an event)
+		id, _ := uuid.Parse(x.ID)
+		c.Emit(ops.Event{AggregateType: "consent", AggregateID: id, Type: events.ConsentRevoked,
+			Payload: events.ConsentRevocation{MembershipID: c.Principal.MembershipID, Purpose: in.Purpose, At: c.Now}})
+	}
 	c.Audit(ops.AuditEntry{Action: "consents.update", TargetKind: "consent", TargetID: x.ID, PreviousVersion: &prev, NextVersion: &x.Version})
 	return x, nil
 }

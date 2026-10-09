@@ -263,36 +263,7 @@ func (in *AutomationInput) Validate() map[string]string {
 		if in.Condition != nil || in.Action != nil {
 			fe["kind"] = "error.invalid"
 		}
-		days := map[int]bool{}
-		for _, d := range in.Weekdays {
-			if d < 1 || d > 7 || days[d] {
-				fe["weekdays"] = "error.invalid"
-			}
-			days[d] = true
-		}
-		if len(in.Weekdays) == 0 {
-			fe["weekdays"] = "error.required"
-		}
-		if !hhmm.MatchString(in.StartLocal) {
-			fe["startLocal"] = "error.invalid"
-		}
-		if !hhmm.MatchString(in.EndLocal) {
-			fe["endLocal"] = "error.invalid"
-		}
-		if in.EndsNextDay == nil {
-			fe["endsNextDay"] = "error.required"
-		}
-		if fe["startLocal"] == "" && fe["endLocal"] == "" && in.EndsNextDay != nil {
-			s, e := minutesOf(in.StartLocal), minutesOf(in.EndLocal)
-			switch {
-			case s == e:
-				fe["endLocal"] = "errors.same_as_start"
-			case e < s && !*in.EndsNextDay:
-				fe["endsNextDay"] = "errors.overnight_required"
-			case e > s && *in.EndsNextDay:
-				fe["endsNextDay"] = "errors.over_24_hours"
-			}
-		}
+		validSchedule(fe, in.Weekdays, in.StartLocal, in.EndLocal, in.EndsNextDay)
 		action("startAction", in.StartAction)
 		action("endAction", in.EndAction)
 	case "event":
@@ -309,6 +280,41 @@ func (in *AutomationInput) Validate() map[string]string {
 		fe["kind"] = "error.invalid"
 	}
 	return fe
+}
+
+// validSchedule checks the schedule fields (DD-C04): ISO weekdays of the start day without duplicates, HH:mm times
+// that differ, an end at or before the start only as an overnight schedule and never beyond 24 hours.
+func validSchedule(fe map[string]string, weekdays []int, startLocal, endLocal string, endsNextDay *bool) {
+	days := map[int]bool{}
+	for _, d := range weekdays {
+		if d < 1 || d > 7 || days[d] {
+			fe["weekdays"] = "error.invalid"
+		}
+		days[d] = true
+	}
+	if len(weekdays) == 0 {
+		fe["weekdays"] = "error.required"
+	}
+	if !hhmm.MatchString(startLocal) {
+		fe["startLocal"] = "error.invalid"
+	}
+	if !hhmm.MatchString(endLocal) {
+		fe["endLocal"] = "error.invalid"
+	}
+	if endsNextDay == nil {
+		fe["endsNextDay"] = "error.required"
+	}
+	if fe["startLocal"] == "" && fe["endLocal"] == "" && endsNextDay != nil {
+		s, e := minutesOf(startLocal), minutesOf(endLocal)
+		switch {
+		case s == e:
+			fe["endLocal"] = "errors.same_as_start"
+		case e < s && !*endsNextDay:
+			fe["endsNextDay"] = "errors.overnight_required"
+		case e > s && *endsNextDay:
+			fe["endsNextDay"] = "errors.over_24_hours"
+		}
+	}
 }
 
 // occurrences lists the schedule's start/end instants from the start day d0 for days days, with the wall time
@@ -353,7 +359,7 @@ func occurrences(def definition, loc *time.Location, d0 time.Time, days int) ([]
 
 // ScheduledOccurrence is ScheduledOccurrence of service-contracts.ts.
 type ScheduledOccurrence struct {
-	AutomationID uuid.UUID       `json:"automationId"`
+	AutomationID *uuid.UUID      `json:"automationId"` // null for a draft preview
 	Phase        string          `json:"phase"`
 	At           time.Time       `json:"at"`
 	Action       json.RawMessage `json:"action"`
@@ -439,17 +445,47 @@ func (m Automations) save(ctx context.Context, c *ops.Call, in *AutomationInput)
 	return m.load(ctx, c, id, false)
 }
 
-// NextRunsInput is automations.nextRuns input.
-type NextRunsInput struct {
-	AutomationID uuid.UUID `json:"automationId"`
-	Count        int       `json:"count"`
+// ScheduleDraft is the unsaved schedule of the editor (automations.nextRuns draft, IR214).
+type ScheduleDraft struct {
+	Timezone    string          `json:"timezone"`
+	Weekdays    []int           `json:"weekdays"`
+	StartLocal  string          `json:"startLocal"`
+	EndLocal    string          `json:"endLocal"`
+	EndsNextDay *bool           `json:"endsNextDay"`
+	StartAction json.RawMessage `json:"startAction"`
+	EndAction   json.RawMessage `json:"endAction"`
 }
 
-// Validate implements ops.Validator (count is fixed to 8).
+// NextRunsInput is automations.nextRuns input: a saved schedule rule or an unsaved draft.
+type NextRunsInput struct {
+	AutomationID *uuid.UUID     `json:"automationId,omitempty"`
+	Draft        *ScheduleDraft `json:"draft,omitempty"`
+	Count        int            `json:"count"`
+}
+
+// Validate implements ops.Validator (count is fixed to 8; a draft is checked like automations.save, IR214).
 func (in *NextRunsInput) Validate() map[string]string {
 	fe := map[string]string{}
-	if in.AutomationID == uuid.Nil {
+	switch {
+	case (in.AutomationID == nil) == (in.Draft == nil):
+		fe["automationId"] = "error.exactlyOneTarget"
+	case in.AutomationID != nil && *in.AutomationID == uuid.Nil:
 		fe["automationId"] = "error.required"
+	case in.Draft != nil:
+		d := in.Draft
+		if !validTimezone(d.Timezone) {
+			fe["draft.timezone"] = "error.invalid"
+		}
+		sub := map[string]string{}
+		validSchedule(sub, d.Weekdays, d.StartLocal, d.EndLocal, d.EndsNextDay)
+		for k, v := range sub {
+			fe["draft."+k] = v
+		}
+		for k, raw := range map[string]json.RawMessage{"draft.startAction": d.StartAction, "draft.endAction": d.EndAction} {
+			if _, ok := ParseAction(raw); !ok {
+				fe[k] = "error.invalid"
+			}
+		}
 	}
 	if in.Count != 8 {
 		fe["count"] = "error.invalid"
@@ -457,33 +493,86 @@ func (in *NextRunsInput) Validate() map[string]string {
 	return fe
 }
 
-// nextRuns previews the next 8 start/end occurrences after now of a schedule rule (D09); invalid local times are
-// skipped. Event rules have no schedule (VALIDATION).
+// nextRuns previews the next 8 start/end occurrences after now (D09): of a saved schedule rule — invalid local
+// times skipped — or of an unsaved draft, whose nonexistent or ambiguous local time is VALIDATION as on save (IR214).
+// Event rules have no schedule (VALIDATION).
 func (m Automations) nextRuns(ctx context.Context, c *ops.Call, in *NextRunsInput) ([]ScheduledOccurrence, error) {
-	x, err := m.load(ctx, c, in.AutomationID, false)
-	if err != nil {
-		return nil, err
+	var id *uuid.UUID
+	var def definition
+	var tz string
+	if in.Draft != nil {
+		d := in.Draft
+		def = definition{Weekdays: d.Weekdays, StartLocal: d.StartLocal, EndLocal: d.EndLocal, EndsNextDay: d.EndsNextDay, StartAction: d.StartAction, EndAction: d.EndAction}
+		tz = d.Timezone
+		loc, _ := time.LoadLocation(tz)
+		if _, bad := occurrences(def, loc, c.Now.In(loc), 367); bad {
+			return nil, apperr.Fields(map[string]string{"draft.startLocal": "errors.local_time_invalid"})
+		}
+	} else {
+		x, err := m.load(ctx, c, *in.AutomationID, false)
+		if err != nil {
+			return nil, err
+		}
+		if x.Kind != "schedule" {
+			return nil, apperr.Fields(map[string]string{"automationId": "errors.not_schedule"})
+		}
+		def = definition{Weekdays: x.Weekdays, StartLocal: x.StartLocal, EndLocal: x.EndLocal, EndsNextDay: x.EndsNextDay, StartAction: x.StartAction, EndAction: x.EndAction}
+		tz, id = x.Timezone, &x.ID
 	}
-	if x.Kind != "schedule" {
-		return nil, apperr.Fields(map[string]string{"automationId": "errors.not_schedule"})
-	}
-	loc, _ := time.LoadLocation(x.Timezone)
-	def := definition{Weekdays: x.Weekdays, StartLocal: x.StartLocal, EndLocal: x.EndLocal, EndsNextDay: x.EndsNextDay, StartAction: x.StartAction, EndAction: x.EndAction}
+	loc, _ := time.LoadLocation(tz)
 	occ, _ := occurrences(def, loc, c.Now.In(loc).AddDate(0, 0, -1), 30)
 	out := []ScheduledOccurrence{}
 	for _, o := range occ {
 		if o.At.After(c.Now) && len(out) < in.Count {
-			o.AutomationID = x.ID
+			o.AutomationID = id
 			out = append(out, o)
 		}
 	}
 	return out, nil
 }
 
-// RegisterAutomations binds automations.save / list / nextRuns.
+// AutomationIDInput is automations.delete input.
+type AutomationIDInput struct {
+	ID uuid.UUID `json:"id"`
+}
+
+// Validate implements ops.Validator.
+func (in *AutomationIDInput) Validate() map[string]string {
+	if in.ID == uuid.Nil {
+		return map[string]string{"id": "error.required"}
+	}
+	return nil
+}
+
+// Deleted is DeletedResource of service-contracts.ts.
+type Deleted struct {
+	ID      uuid.UUID `json:"id"`
+	Deleted bool      `json:"deleted"`
+}
+
+// delete removes a customer automation (Figma Client 03g–03i, IR214): it no longer runs from this transition on; the
+// Commands it created and its run log stay as history, other automations and manual control are untouched.
+func (m Automations) delete(ctx context.Context, c *ops.Call, in *AutomationIDInput) (Deleted, error) {
+	cur, err := m.load(ctx, c, in.ID, true)
+	if err != nil {
+		return Deleted{}, err
+	}
+	if cur.Version != *c.ExpectedVersion {
+		return Deleted{}, apperr.E(apperr.Conflict, "error.versionConflict")
+	}
+	if _, err := c.Tx.Exec(ctx, `DELETE FROM control.automations WHERE id = $1`, cur.ID); err != nil { // units follow (cascade)
+		return Deleted{}, err
+	}
+	c.Emit(ops.Event{AggregateType: "automation", AggregateID: cur.ID, Type: "AutomationDeleted", Payload: map[string]any{"kind": cur.Kind}})
+	c.Audit(ops.AuditEntry{Action: "automations.delete", TargetKind: "automation", TargetID: cur.ID.String(), PreviousVersion: c.ExpectedVersion})
+	return Deleted{ID: cur.ID, Deleted: true}, nil
+}
+
+// RegisterAutomations binds automations.save / list / nextRuns / delete.
 func RegisterAutomations(r *ops.Registry, m Automations) {
 	ops.Register(r, "automations.save", m.save)
 	ops.Register(r, "automations.list", m.list)
 	ops.Register(r, "automations.nextRuns", m.nextRuns)
+	ops.Register(r, "automations.delete", m.delete)
 	RegisterEvaluation(r, m)
 }

@@ -738,6 +738,11 @@ CREATE TABLE control.evaluation_events (         -- automations.fire results per
 );
 CREATE INDEX evaluation_events_tick ON control.evaluation_events (tenant_id, occurred_at);
 
+CREATE TABLE control.schedule_watermarks (       -- schedule automations evaluated up to this minute (IR54 scheduler job, IR214)
+  tenant_id       uuid PRIMARY KEY,
+  evaluated_until timestamptz NOT NULL
+);
+
 -- ---------------------------------------------------------------------------------------------
 -- monitoring
 -- ---------------------------------------------------------------------------------------------

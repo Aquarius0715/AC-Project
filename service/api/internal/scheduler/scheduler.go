@@ -18,6 +18,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/modules/maintenance"
 	"github.com/pradita/ac-project/service/api/internal/modules/restrictions"
 	"github.com/pradita/ac-project/service/api/internal/ops"
+	"github.com/pradita/ac-project/service/api/internal/platform/authz"
 	"github.com/pradita/ac-project/service/api/internal/platform/db"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
@@ -33,16 +34,17 @@ type Result struct {
 	Confirmed        int
 	ExpiredProposals int
 	FrozenHistories  int
+	Jobs             int // changes of the registry's domain jobs (IR54 schedule automations)
 }
 
 func (r Result) changes() int {
-	return r.ExpiredOffers + r.ExpiredCommands + r.Runs + r.ExpiredProposals + r.Confirmed + r.FrozenHistories
+	return r.ExpiredOffers + r.ExpiredCommands + r.Runs + r.ExpiredProposals + r.Confirmed + r.FrozenHistories + r.Jobs
 }
 
 // Tick runs every domain's clock-driven transitions once per tenant, each tenant in its own transaction (RLS
-// context set), with local access to every domain.
-func Tick(ctx context.Context, m *db.TxManager, now time.Time) (Result, error) {
-	return TickDomains(ctx, m, now, nil, nil)
+// context set), with local access to every domain; reg (may be nil) adds the modules' jobs (IR54).
+func Tick(ctx context.Context, m *db.TxManager, now time.Time, reg *ops.Registry) (Result, error) {
+	return TickDomains(ctx, m, now, nil, reg)
 }
 
 // TickDomains runs the transitions of the given domains (nil: all) once per tenant. reg (may be nil) answers the
@@ -85,6 +87,27 @@ func TickDomains(ctx context.Context, m *db.TxManager, now time.Time, domains []
 				}
 				r.Runs += n
 			}
+			if reg != nil { // the modules' jobs of the served domains, recorded like a write (events, audits)
+				for _, d := range Domains {
+					if !serves(d) {
+						continue
+					}
+					for _, job := range reg.Jobs[d] {
+						c := &ops.Call{Tx: tx, Now: now, CorrelationID: uuid.NewString(), Queries: reg,
+							Principal: &ops.Principal{Principal: authz.Principal{Role: "system"}, TenantID: t, UserID: seed.ID("system-scheduler")}}
+						n, err := job(ctx, c)
+						if err != nil {
+							return err
+						}
+						r.Jobs += n
+						if reg.Rec != nil {
+							if err := reg.Rec.Record(ctx, tx, c, "scheduler"); err != nil {
+								return err
+							}
+						}
+					}
+				}
+			}
 			if serves(ops.DomainMaintenance) {
 				n, err := maintenance.ExpireOffers(ctx, tx, now, actor)
 				if err != nil {
@@ -116,8 +139,8 @@ func TickDomains(ctx context.Context, m *db.TxManager, now time.Time, domains []
 }
 
 // Run ticks every domain every interval until ctx is cancelled.
-func Run(ctx context.Context, m *db.TxManager, interval time.Duration, clock func() time.Time, logf func(string, ...any)) {
-	RunDomains(ctx, m, interval, clock, logf, nil, nil)
+func Run(ctx context.Context, m *db.TxManager, interval time.Duration, clock func() time.Time, logf func(string, ...any), reg *ops.Registry) {
+	RunDomains(ctx, m, interval, clock, logf, nil, reg)
 }
 
 // RunDomains ticks the given domains every interval until ctx is cancelled.

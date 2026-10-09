@@ -135,6 +135,21 @@ type Registry struct {
 	queries map[string]query // internal queries (IR190)
 	// Remote sends queries of domains this process does not serve (nil: such queries are UNAVAILABLE).
 	Remote QueryTransport
+
+	// Jobs are clock-driven transitions a module adds to its domain's scheduler (IR54 schedule automations): run
+	// once per tick in each tenant's transaction, their events and audits recorded like a write's.
+	Jobs map[string][]Job
+}
+
+// Job is one scheduler job; it returns how many changes it made.
+type Job func(ctx context.Context, c *Call) (int, error)
+
+// AddJob adds a scheduler job of the domain.
+func (r *Registry) AddJob(domain string, j Job) {
+	if r.Jobs == nil {
+		r.Jobs = map[string][]Job{}
+	}
+	r.Jobs[domain] = append(r.Jobs[domain], j)
 }
 
 // NewRegistry creates an empty registry backed by the generated catalog.
