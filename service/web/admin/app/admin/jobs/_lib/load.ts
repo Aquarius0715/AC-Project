@@ -3,12 +3,14 @@
 // people, one jobs.list total per pipeline stage within the scope, jobs.list with the filters and the sort (IR34),
 // and for the selected job jobs.get, jobs.events, units.get, — for a requested job — members.eligible per preferred
 // time (the HQ technicians free and qualified then, IR113), and the latest report (reports.get with up to four ready
-// photos through attachments.getContent).
+// photos through attachments.getContent). The Plans tab (loadPlans) reads plans.list in the same scope, plans.get for
+// the selected plan and jobs.list (the unit's periodic jobs) for the status of each generated occurrence.
 import "server-only";
 import { coreAll, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { jobEventTitle, type ApiJobEvent } from "@ac/web/lib/partnerOverview";
 import type { ApiWorkReport } from "@ac/web/lib/partnerReview";
-import { controls, costTotals, delivery, facts, filtersOf, hqRow, preferredRows, reportCard, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
+import { agreedSlots, controls, costTotals, delivery, facts, filtersOf, hqRow, preferredRows, reportCard, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
+import { planRows, type ApiPlan } from "@ac/web/lib/adminPlans";
 import { klTime } from "@ac/web/lib/devices";
 
 type Page<T> = { items: T[]; total: number };
@@ -20,12 +22,13 @@ const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => 
 });
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-export async function loadJobs(sp: Record<string, string | string[] | undefined>) {
+type SP = Record<string, string | string[] | undefined>;
+const OPEN = ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "on_hold"];
+
+/** The reads both tabs share: the clock, organizations, customers, properties, units and members with their names, the
+ * customer → property → unit scope from the URL, and the tab counts (jobs that are not cancelled, plans, contractors). */
+async function shared(sp: SP) {
   const now = await coreNow();
-  const nowMs = now.getTime();
-  const q: Query = { customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId), origin: one(sp.origin), delivery: one(sp.delivery), assignee: one(sp.assignee), overdue: one(sp.overdue), type: one(sp.type), stage: stageOf(one(sp.stage)) ?? undefined };
-  const sort = sortOf(one(sp.sort));
-  const spec = SORTS.find((s) => s.id === sort)!;
   const [orgs, customers, properties, units, members] = await Promise.all([
     optional(coreAll<Org>("organizations.list"), []), optional(coreAll<{ id: string; name: string; organizationId: string }>("customers.list"), []),
     optional(coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"), []), optional(coreAll<{ id: string; displayName: string; customerOrgId: string; propertyId: string }>("units.list"), []),
@@ -38,27 +41,46 @@ export async function loadJobs(sp: Record<string, string | string[] | undefined>
     people: new Map(members.map((m) => [m.id, m.displayName])), orgs: new Map(orgs.map((o) => [o.id, o.name])),
   };
   const unitOrg = new Map(units.map((u) => [u.id, u.customerOrgId]));
-  const scope = filtersOf({ customerId: q.customerId, propertyId: q.propertyId, unitId: q.unitId }, hq?.id ?? null, false);
+  const sq = { customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId) };
+  const scope = filtersOf(sq, hq?.id ?? null, false);
+  const custOrg = customers.find((c) => c.id === sq.customerId)?.organizationId;
+  const [jobsInScope, plansInScope] = await Promise.all([
+    coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, statuses: OPEN }, limit: 1 }).then((r) => r.total),
+    optional(coreOp<Page<unknown>>("plans.list", { filters: scope, limit: 1 }).then((r) => r.total), 0),
+  ]);
+  return {
+    now, orgs, customers, properties, units, members, hq, contractors, names, unitOrg, scope,
+    head: {
+      now: now.toISOString(), counts: { jobs: jobsInScope, plans: plansInScope, contractors: contractors.length },
+      scope: {
+        customers: customers.map((c) => ({ id: c.id, name: c.name })),
+        properties: properties.filter((p) => !custOrg || p.customerOrgId === custOrg).map((p) => ({ id: p.id, name: p.name })),
+        units: units.filter((u) => (!custOrg || u.customerOrgId === custOrg) && (!sq.propertyId || u.propertyId === sq.propertyId)).map((u) => ({ id: u.id, name: u.displayName })),
+      },
+      units: units.map((u) => ({ id: u.id, name: u.displayName, customer: names.customers.get(u.customerOrgId) ?? "customer" })).sort((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
+    },
+  };
+}
+
+export async function loadJobs(sp: SP) {
+  const { now, members, hq, contractors, names, unitOrg, scope, head } = await shared(sp);
+  const nowMs = now.getTime();
+  const q: Query = { customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId), origin: one(sp.origin), delivery: one(sp.delivery), assignee: one(sp.assignee), overdue: one(sp.overdue), type: one(sp.type), stage: stageOf(one(sp.stage)) ?? undefined };
+  const sort = sortOf(one(sp.sort));
+  const spec = SORTS.find((s) => s.id === sort)!;
   const [counts, list] = await Promise.all([
     Promise.all(STAGES.map((s) => coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, ...s.filter }, limit: 1 }).then((r) => r.total))),
     coreOp<Page<ApiHqRow>>("jobs.list", { filters: filtersOf(q, hq?.id ?? null), sort: { field: spec.field, direction: spec.direction }, limit: 100 }),
   ]);
   const rows = list.items.filter((j) => j.status !== "cancelled" && (!q.type || j.type === q.type)).map((j) => hqRow(j, nowMs, names, unitOrg));
-  const custOrg = customers.find((c) => c.id === q.customerId)?.organizationId;
   const base = {
-    now: now.toISOString(), q, sort, sorts: SORTS, total: list.total,
+    ...head, q, sort, sorts: SORTS, total: list.total,
     stages: STAGES.map((s, i) => ({ id: s.id, label: s.label, count: counts[i] })),
-    scope: {
-      customers: customers.map((c) => ({ id: c.id, name: c.name })),
-      properties: properties.filter((p) => !custOrg || p.customerOrgId === custOrg).map((p) => ({ id: p.id, name: p.name })),
-      units: units.filter((u) => (!custOrg || u.customerOrgId === custOrg) && (!q.propertyId || u.propertyId === q.propertyId)).map((u) => ({ id: u.id, name: u.displayName })),
-    },
     deliveries: [{ id: "internal", name: "Internal" }, ...contractors.map((c) => ({ id: c.id, name: c.name }))],
     assignees: members.filter((m) => m.role === "technician").map((m) => ({ id: m.id, name: m.displayName })),
     contractors: contractors.map((c) => ({ id: c.id, name: c.name, status: c.status })),
     internalTechs: members.filter((m) => m.role === "technician" && m.employment === "internal").map((m) => ({ id: m.id, name: m.displayName })),
     rows,
-    units: units.map((u) => ({ id: u.id, name: u.displayName, customer: names.customers.get(u.customerOrgId) ?? "customer" })).sort((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
   };
   const pick = one(sp.jobId) ?? rows[0]?.id;
   if (!pick) return { ...base, detail: null };
@@ -72,7 +94,7 @@ export async function loadJobs(sp: Record<string, string | string[] | undefined>
     optional(coreOp<Page<ApiJobEvent>>("jobs.events", { jobId: job.id, query: { limit: 100 } }).then((r) => r.items), [] as ApiJobEvent[]),
     optional(coreOp<{ displayName: string; location: { pathLabels: string[] } }>("units.get", { id: job.unitId }), null),
     job.status === "requested" && job.slotProposal?.status !== "pending"
-      ? Promise.all(job.preferredSlots.map((s) => Date.parse(s.startAt) <= nowMs ? Promise.resolve([] as { id: string; displayName: string }[])
+      ? Promise.all(agreedSlots(job).map((s) => Date.parse(s.startAt) <= nowMs ? Promise.resolve([] as { id: string; displayName: string }[])
         : optional(coreOp<Page<{ id: string; displayName: string }>>("members.eligible", { jobId: job.id, startAt: s.startAt, endAt: s.endAt, query: { limit: 20 } }).then((r) => r.items), [] as { id: string; displayName: string }[])))
       : Promise.resolve([] as { id: string; displayName: string }[][]),
     ref ? optional(coreOp<ApiWorkReport>("reports.get", { jobId: job.id, reportId: ref.reportId, reportVersion: ref.reportVersion }), null) : Promise.resolve(null),
@@ -100,3 +122,36 @@ export async function loadJobs(sp: Record<string, string | string[] | undefined>
 }
 
 export type JobsLive = Awaited<ReturnType<typeof loadJobs>>;
+
+/** The Plans tab: plans.list in the scope (next due first), plans.get for planId (default the first), the unit's place
+ * (units.get) and the status of each generated occurrence (the unit's periodic jobs, jobs.list). */
+export async function loadPlans(sp: SP) {
+  const { names, unitOrg, scope, head } = await shared(sp);
+  const plans = await optional(coreAll<ApiPlan>("plans.list", { filters: scope }), [] as ApiPlan[]);
+  const customerOfUnit = new Map([...unitOrg].map(([u, org]) => [u, names.customers.get(org) ?? "customer"]));
+  const rows = planRows(plans, names.units, customerOfUnit);
+  const q = { customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId) };
+  const base = { ...head, q, rows, plansTotal: plans.length };
+  const pick = one(sp.planId) ?? rows[0]?.id;
+  if (!pick) return { ...base, detail: null };
+  const plan = await coreOp<ApiPlan>("plans.get", { id: pick }).catch((e) => {
+    if (e instanceof CoreError && e.error.code === "NOT_FOUND") return null;
+    throw e;
+  });
+  if (!plan) return { ...base, detail: null, missing: pick };
+  const [unit, jobs] = await Promise.all([
+    optional(coreOp<{ displayName: string; location: { pathLabels: string[] } }>("units.get", { id: plan.unitId }), null),
+    optional(coreAll<{ id: string; status: string; displayStatus: string }>("jobs.list", { filters: { unitId: plan.unitId, origin: "periodic_plan" } }), []),
+  ]);
+  const status = new Map(jobs.map((j) => [j.id, j.displayStatus === "time_proposed" ? "time_proposed" : j.status]));
+  return {
+    ...base,
+    detail: {
+      plan, unit: names.units.get(plan.unitId) ?? unit?.displayName ?? "Unit", customer: customerOfUnit.get(plan.unitId) ?? "customer", location: unit?.location.pathLabels.join(" › ") ?? "",
+      occurrences: [...plan.generatedOccurrences].sort((a, b) => Date.parse(b.occurrenceAt) - Date.parse(a.occurrenceAt)).map((o) => ({ ...o, status: status.get(o.jobId) ?? null })),
+    },
+  };
+}
+
+export type PlansLive = Awaited<ReturnType<typeof loadPlans>>;
+

@@ -389,7 +389,7 @@ Scope: FR-T12 / Main display pattern: **UI-DETAIL** and **UI-TIMELINE**. Service
 3. Save detection time, observation evidence, response details, and recovery time as separate events. Acknowledging a notification does not change the device's physical state.
 4. Queries to update: `devices / alerts / device events / notifications / audit`.
 
-**Boundary cases and failures**: Reconnection does not clear unacknowledged tamper alerts. An old heartbeat received out of order must not restore online state (its sequence is not newer than the axis's latest event, so history and state stay unchanged, IR217).
+**Boundary cases and failures**: A listed device whose unit has no assignment of the technician shows the device with a notice instead of its events (`devices.events` FORBIDDEN, IR94, IR233). Reconnection does not clear unacknowledged tamper alerts. An old heartbeat received out of order must not restore online state (its sequence is not newer than the axis's latest event, so history and state stay unchanged, IR217).
 
 **Verification**: Check the traceability entries under AT-T12 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 

@@ -22,6 +22,8 @@ export type TechDevicesLive = {
     firmwareCard: { tone: "primary" | "crit" | "ok"; title: string; status: string; text: string } | null;
     operations: OperationRow[]; calibrations: string[];
     events: EventRow[] | null;
+    /** The events page of a device whose unit the technician has no assignment on (devices.events FORBIDDEN, IR94). */
+    eventsLocked: boolean;
   };
 };
 
@@ -177,7 +179,9 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
                   <p className="mt-1 text-[11px] text-muted">{dv.firmwareCard.text}</p>
                 </div>
               )}
-              {dv.events ? (
+              {live.events && dv.eventsLocked ? (
+                <Banner>Device events open while you have an assignment on {dv.unit?.name ?? "this unit"} (IR94). Ask HQ or your coordinator if you need them now.</Banner>
+              ) : dv.events ? (
                 <div>
                   <div className="mb-2 flex items-baseline gap-2"><b className="text-[15px]">Device events</b><span className="text-xs text-muted">connection, power and tamper are separate events</span></div>
                   {dv.events.length === 0 ? <p className="text-[13px] text-muted">No device events.</p> : (

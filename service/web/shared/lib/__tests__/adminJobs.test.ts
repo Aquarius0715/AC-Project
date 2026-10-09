@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyBy, controls, costLineOf, costTotals, delivery, extendDefault, money, newJobErrors, reportCard, returnReason, reviewModeOf, facts, filtersOf, hqRefusal, hqRow, longSlot, offerDefaults, preferredRows, slotText, sortOf, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names } from "@ac/web/lib/adminJobs";
+import { agreedSlots, classifyBy, controls, costLineOf, costTotals, delivery, extendDefault, money, newJobErrors, reportCard, returnReason, reviewModeOf, facts, filtersOf, hqRefusal, hqRow, longSlot, offerDefaults, preferredRows, slotText, sortOf, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names } from "@ac/web/lib/adminJobs";
 
 const NOW = Date.parse("2026-09-21T01:30:00Z"); // Mon 09:30 KL
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
@@ -127,4 +127,14 @@ describe("HQ maintenance jobs", () => {
     expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { symptom: "error.length", alternativeSlots: "error.count" } })).toBe("symptom: 10–2000 characters · alternativeSlots: up to two more times");
     expect(hqRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { accessValidUntil: "error.mustExtend" } })).toBe("accessValidUntil: the new end must be later than the current end and in the future");
   });
+
+  it("books a plan's job at its occurrence when it has no preferred times", () => {
+    const planJob = job({ origin: "periodic_plan", planId: "plan-1", occurrenceAt: "2026-12-08T02:00:00Z", requestedSlot: slot("2026-12-08T02:00:00Z", "2026-12-08T03:00:00Z"), preferredSlots: [] });
+    expect(agreedSlots(planJob)).toEqual([slot("2026-12-08T02:00:00Z", "2026-12-08T03:00:00Z")]);
+    expect(preferredRows(planJob, [[{ id: "m-int", displayName: "tech-internal-a" }]], NOW).map((r) => [r.rank, r.text, r.fits, r.plan])).toEqual([[1, "Tue 12-08 · 10:00–11:00", true, true]]);
+    expect(agreedSlots(job({ preferredSlots: [] }))).toEqual([]);
+    expect(agreedSlots(job({ planId: "plan-1", occurrenceAt: "2026-12-08T02:00:00Z" })).length).toBe(2); // the client asked for other times
+    expect(hqRow(row({ origin: "periodic_plan", preferredSlots: [], requestedSlot: slot("2026-12-08T02:00:00Z", "2026-12-08T03:00:00Z") }), NOW, names, unitOrg).line).toBe("plan occurrence 12-08 10:00–11:00 · book it");
+  });
 });
+

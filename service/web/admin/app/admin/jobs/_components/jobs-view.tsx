@@ -9,35 +9,29 @@ import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { klTime } from "@ac/web/lib/devices";
 import { classifyBy, costLineOf, extendDefault, hqRefusal, longSlot, money, newJobErrors, offerDefaults, returnReason, slotText, type CostLine, type PreferredRow } from "@ac/web/lib/adminJobs";
+import { fromKlInput as fromLocal, klInput as klLocal } from "@ac/web/lib/adminPlans";
 import type { JobStatus } from "@ac/web/lib/jobs";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { assignInternal, cancelJob, classifyFollowUp, createJob, extendAccess, holdJob, offerToContractor, proposeSlot, resolvePartnerSlot, resumeJob, reviewReport, saveCosts, withdrawProposal } from "../actions";
 import type { JobsLive } from "../_lib/load";
-import { Contractors, PlansDemo, Sla } from "./jobs-demo";
+import { Contractors, Sla } from "./jobs-demo";
+import { JobsTabs, ScopeBar } from "./jobs-header";
 
 type Detail = NonNullable<JobsLive["detail"]>;
 const TYPES = [{ id: "", label: "Type: All" }, { id: "reactive", label: "Type: Repair" }, { id: "periodic", label: "Type: Periodic" }, { id: "preventive", label: "Type: Preventive" }];
-const klLocal = (iso: string) => klTime(iso).replace(" ", "T");
-const fromLocal = (v: string) => new Date(`${v}:00+08:00`).toISOString();
 
-/** HQ maintenance jobs (FR-A06, Figma Admin 06-1, 06-11…06-18): the Jobs tab from the Core API. */
+/** HQ maintenance jobs (FR-A06, Figma Admin 06-1, 06-11…06-18): the Jobs tab from the Core API (the Plans tab is
+ * PlansView). */
 export function JobsView({ live, tab }: { live: JobsLive; tab: string }) {
   const patch = useUrlPatch();
   const [creating, setCreating] = useState(false);
   // The job New job just created: its detail opens step 2 (book) or says it was saved as requested.
   const [fresh, setFresh] = useState<Fresh | null>(null);
-  const tabs = [{ id: "jobs", label: "Jobs", count: live.total }, { id: "plans", label: "Plans" }, { id: "contractors", label: "Contractors" }, { id: "sla", label: "SLA by customer" }];
   return (
     <Page className="max-w-[1440px]">
-      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-line">
-        <div role="tablist" className="flex flex-wrap gap-4">
-          {tabs.map((t) => <Link key={t.id} role="tab" aria-selected={tab === t.id} href={t.id === "jobs" ? "/admin/jobs" : `/admin/jobs?tab=${t.id}`} className={cx("-mb-px border-b-2 px-1 pb-2 text-[13px] font-semibold", tab === t.id ? "border-primary text-primary" : "border-transparent text-muted hover:text-ink")}>{t.label}{t.count !== undefined && <span className="ml-1.5 rounded bg-surface2 px-1.5 text-[11px]">{t.count}</span>}</Link>)}
-        </div>
-        <Btn variant="primary" size="sm" className="mb-1.5" onClick={() => setCreating(true)}>+ New job</Btn>
-      </div>
+      <JobsTabs tab={tab} counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => setCreating(true)}>+ New job</Btn>} />
       {creating && <NewJobModal live={live} onClose={() => setCreating(false)} onCreated={(f) => { setCreating(false); setFresh(f); }} />}
-      {tab !== "jobs" && <Banner tone="warn">{tabs.find((t) => t.id === tab)?.label} is not connected to the Core API yet — illustrative data (FR-A06 / A21 / A22, next rounds).</Banner>}
-      {tab === "plans" && <PlansDemo />}
+      {tab !== "jobs" && <Banner tone="warn">{tab === "sla" ? "SLA by customer" : "Contractors"} is not connected to the Core API yet — illustrative data (FR-A21 / FR-A22, next rounds).</Banner>}
       {tab === "contractors" && <Contractors />}
       {tab === "sla" && <Sla />}
       {tab === "jobs" && <JobsTab live={live} patch={patch} fresh={fresh} onFresh={() => setFresh(null)} />}
@@ -52,13 +46,7 @@ function JobsTab({ live, patch, fresh, onFresh }: { live: JobsLive; patch: (p: R
   const sel = live.detail;
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2 text-[13px]">
-        <span className="text-muted">Scope</span>
-        <Select aria-label="Customer" className="w-auto" value={q.customerId ?? ""} onChange={(e) => patch({ customerId: e.target.value || null, propertyId: null, unitId: null, jobId: null })}><option value="">Customer: All</option>{live.scope.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
-        <Select aria-label="Property" className="w-auto" value={q.propertyId ?? ""} onChange={(e) => patch({ propertyId: e.target.value || null, unitId: null, jobId: null })}><option value="">Property: All</option>{live.scope.properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select>
-        <Select aria-label="Unit" className="w-auto" value={q.unitId ?? ""} onChange={(e) => patch({ unitId: e.target.value || null, jobId: null })}><option value="">Unit: All</option>{live.scope.units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select>
-        <span className="ml-auto text-xs text-muted">{live.stages.reduce((a, s) => a + s.count, 0)} jobs in scope</span>
-      </div>
+      <ScopeBar scope={live.scope} q={q} text={`${live.stages.reduce((a, s) => a + s.count, 0)} jobs in scope`} clear="jobId" />
       <div className="scroll-x"><div className="grid min-w-[980px] grid-cols-10 overflow-hidden rounded-2xl border border-line bg-surface">
         {live.stages.map((s) => <button key={s.id} type="button" aria-pressed={q.stage === s.id} onClick={() => patch({ stage: q.stage === s.id ? null : s.id, jobId: null })} className={cx("border-r border-line px-3 py-2 text-left last:border-r-0 hover:bg-surface2", q.stage === s.id && "bg-primary-soft")}><div className="text-[11px] text-muted">{s.label}</div><div className={cx("text-lg font-bold", s.id === "time_proposed" && s.count > 0 && "text-warn", s.count === 0 && "text-muted")}>{s.count}</div></button>)}
       </div></div>
@@ -139,14 +127,14 @@ function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fre
         <>
           {sp?.status === "declined" && <Banner tone="crit" icon="✕"><b>The client declined the proposed time{sp.decidedAt ? ` · ${klTime(sp.decidedAt).slice(5)}` : ""}</b> — {sp.declineReason?.replace(/_/g, " ")}{sp.declineComment ? `: “${sp.declineComment}”` : ""}. Held capacity was released; the client sent new preferred times (round {j.preferenceRound}).</Banner>}
           {d.preferred.length > 0 ? (
-            <Card title={`Client’s preferred times${j.preferenceRound > 1 ? ` (round ${j.preferenceRound})` : ""} — book one of these`} sub="HQ technicians free and qualified for each time (members.eligible)">
+            <Card title={d.preferred[0].plan ? "Plan occurrence — book this time" : `Client’s preferred times${j.preferenceRound > 1 ? ` (round ${j.preferenceRound})` : ""} — book one of these`} sub="HQ technicians free and qualified for each time (members.eligible)">
               <div className="scroll-x"><table className="w-full min-w-[640px] text-[13px]">
                 <thead><tr className="text-left text-[11px] uppercase text-muted"><th className="py-1.5">Rank</th><th>Time</th><th>HQ technicians</th><th>Contractors</th><th>Action</th></tr></thead>
-                <tbody>{d.preferred.map((r) => <tr key={r.rank} className="border-t border-line"><td className="py-2"><span className="rounded-lg bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary">{["1st", "2nd", "3rd"][r.rank - 1] ?? `${r.rank}th`}</span></td><td className="font-semibold">{r.text}</td><td className={cx("text-xs", r.fits ? "text-ok" : "text-muted")}>{r.hq}</td><td className="text-xs text-muted">{live.contractors.filter((x) => x.status === "active").map((x) => x.name).join(", ") || "—"} — confirm in the offer</td><td><Btn size="sm" variant="primary" disabled={pending || Date.parse(r.slot.startAt) <= now} onClick={() => setModal({ kind: "book", row: r })}>Use this time</Btn></td></tr>)}</tbody>
+                <tbody>{d.preferred.map((r) => <tr key={r.rank} className="border-t border-line"><td className="py-2"><span className="rounded-lg bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary">{r.plan ? "Plan" : ["1st", "2nd", "3rd"][r.rank - 1] ?? `${r.rank}th`}</span></td><td className="font-semibold">{r.text}</td><td className={cx("text-xs", r.fits ? "text-ok" : "text-muted")}>{r.hq}</td><td className="text-xs text-muted">{live.contractors.filter((x) => x.status === "active").map((x) => x.name).join(", ") || "—"} — confirm in the offer</td><td><Btn size="sm" variant="primary" disabled={pending || Date.parse(r.slot.startAt) <= now} onClick={() => setModal({ kind: "book", row: r })}>Use this time</Btn></td></tr>)}</tbody>
               </table></div>
-              <p className="mt-2 text-[11px] text-muted">“Use this time” opens Assign internally / Offer to contractor with that time locked. HQ cannot book a time outside these without the client’s approval (IR113).</p>
+              <p className="mt-2 text-[11px] text-muted">“Use this time” opens Assign internally / Offer to contractor with that time locked. HQ cannot book a time outside {d.preferred[0].plan ? "the plan occurrence" : "these"} without the client’s approval (IR113).</p>
             </Card>
-          ) : <Banner>No preferred times on this job (HQ request without alternatives) — propose a time to the client.</Banner>}
+          ) : <Banner>No agreed time on this job (HQ request without alternatives) — propose a time to the client.</Banner>}
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#f5c473] bg-[#fff8ec] p-4">
             <div className="min-w-0 flex-1"><b className="text-warn">{d.preferred.some((r) => r.fits) ? "Prefer another time?" : "None of the times works — propose another time"}</b><p className="text-xs">One option with the capacity held; nothing is booked until the client accepts.</p></div>
             <Btn variant={d.preferred.some((r) => r.fits) ? "secondary" : "primary"} disabled={pending} onClick={() => setModal({ kind: "propose" })}>Propose another time…</Btn>
@@ -269,7 +257,7 @@ function BookModal({ d, live, row: first, fresh, onClose, onFail }: ModalProps &
       <p className="text-xs text-muted">{fresh ? `Created ${j.id.slice(0, 8)} (requested) · choose who does the work — ` : ""}{d.title} · {d.customer} · {j.origin === "periodic_plan" ? "Periodic plan" : "Client request"}</p>
       {fresh && ahead.length > 1 ? (
         <Field label="Visit time · one of the customer’s preferred times" hint="Only these times are agreed (IR113); another time needs a proposal the customer accepts."><Select value={String(rank)} onChange={(e) => pick(Number(e.target.value))}>{ahead.map((r) => <option key={r.rank} value={r.rank}>{["1st", "2nd", "3rd"][r.rank - 1]} · {r.text}{r.fits ? "" : " · no HQ technician free"}</option>)}</Select></Field>
-      ) : <Field label="Visit time · from the client" hint="Fixed here. Need another time? Use “Propose another time…” — the client must accept it."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold">🔒 {longSlot(row.slot)}</div></Field>}
+      ) : <Field label={row.plan ? "Visit time · the plan occurrence" : "Visit time · from the client"} hint="Fixed here. Need another time? Use “Propose another time…” — the client must accept it."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold">🔒 {longSlot(row.slot)}</div></Field>}
       <Field label="Who does the work" hint={row.people.length ? undefined : "No qualified HQ technician is free at this time — offer it to a contractor."}><Choice value={who} onChange={setWho} options={[...(row.people.length ? [{ id: "internal" as const, label: "Assign internally" }] : []), { id: "contractor" as const, label: "Offer to contractor" }]} /></Field>
       {who === "internal" ? (
         <Field label="Technician" hint="Free and qualified for the whole slot (members.eligible)"><Select value={tech} onChange={(e) => setTech(e.target.value)}>{row.people.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)}</Select></Field>

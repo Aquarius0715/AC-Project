@@ -75,7 +75,7 @@ export function hqRow(j: ApiHqRow, now: number, n: Names, unitOrg: Map<string, s
   const overdue = (j.status === "assigned" || j.status === "in_progress") && !!j.scheduledSlot && Date.parse(j.scheduledSlot.endAt) <= now;
   let line = "", lineTone: Tone | undefined;
   switch (j.displayStatus === "time_proposed" ? "time_proposed" : j.status) {
-    case "requested": [line, lineTone] = [j.preferredSlots.length ? `${j.preferredSlots.length} preferred time${j.preferredSlots.length === 1 ? "" : "s"} · book one or propose` : `due ${md(j.dueAt)} ${hm(j.dueAt)} · unassigned`, undefined]; break;
+    case "requested": [line, lineTone] = [j.preferredSlots.length ? `${j.preferredSlots.length} preferred time${j.preferredSlots.length === 1 ? "" : "s"} · book one or propose` : j.origin === "periodic_plan" ? `plan occurrence ${slotText(j.requestedSlot)} · book it` : `due ${md(j.dueAt)} ${hm(j.dueAt)} · unassigned`, undefined]; break;
     case "time_proposed": line = "Time proposed · waiting for the client"; break;
     case "offered": line = `Offer open${j.scheduledSlot ? ` · ${slotText(j.scheduledSlot)}` : ""}`; break;
     case "accepted": line = "Contractor accepted · assigning their technician"; break;
@@ -127,13 +127,18 @@ export function delivery(j: ApiHqJob, n: Names, now: number): Delivery | null {
   return null;
 }
 
-export type PreferredRow = { rank: number; slot: Slot; text: string; hq: string; fits: boolean; people: { id: string; displayName: string }[] };
-/** The client's preferred times with the HQ technicians free and qualified for each (members.eligible). */
+/** The times HQ may book (IR113): the client's preferred times, or — for a plan's job without them — the plan
+ * occurrence (the requested window the plan generated, D16). */
+export const agreedSlots = (j: Pick<ApiHqJob, "preferredSlots" | "planId" | "occurrenceAt" | "requestedSlot">): Slot[] => (j.preferredSlots.length ? j.preferredSlots : j.planId && j.occurrenceAt ? [j.requestedSlot] : []);
+
+export type PreferredRow = { rank: number; slot: Slot; text: string; hq: string; fits: boolean; people: { id: string; displayName: string }[]; plan: boolean };
+/** The agreed times with the HQ technicians free and qualified for each (members.eligible). */
 export function preferredRows(j: ApiHqJob, eligible: { id: string; displayName: string }[][], now: number): PreferredRow[] {
-  return j.preferredSlots.map((s, i) => {
+  const plan = !j.preferredSlots.length;
+  return agreedSlots(j).map((s, i) => {
     const people = eligible[i] ?? [];
     const past = Date.parse(s.startAt) <= now;
-    return { rank: i + 1, slot: s, text: longSlot(s), hq: past ? "in the past" : people.length ? people.map((p) => p.displayName).join(", ") : "no qualified HQ technician free", fits: !past && people.length > 0, people: past ? [] : people };
+    return { rank: i + 1, slot: s, text: longSlot(s), hq: past ? "in the past" : people.length ? people.map((p) => p.displayName).join(", ") : "no qualified HQ technician free", fits: !past && people.length > 0, people: past ? [] : people, plan };
   });
 }
 

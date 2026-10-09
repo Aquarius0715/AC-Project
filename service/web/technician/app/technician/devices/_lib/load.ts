@@ -49,7 +49,8 @@ export async function loadDevices(opts: { selected?: string; unitId?: string; jo
   const [ops, cals, evs] = await Promise.all([
     maintain && !opts.events ? quiet(coreOp<{ items: (ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string })[] }>("devices.operations", { deviceId: id, query: { limit: 20, sort: { field: "createdAt", direction: "desc" } } })) : null,
     maintain && !opts.events ? quiet(coreOp<{ items: ApiCalibration[] }>("devices.calibrations", { deviceId: id, query: { limit: 20, sort: { field: "createdAt", direction: "desc" } } })) : null,
-    opts.events ? coreOp<{ items: ApiDeviceEventFull[] }>("devices.events", { id, query: { limit: 50 } }) : null,
+    opts.events ? quiet(coreOp<{ items: ApiDeviceEventFull[] }>("devices.events", { id, query: { limit: 50 } })) : null, // FORBIDDEN without an assignment on the unit
+
   ]);
   const alertIds = [...new Set((evs?.items ?? []).flatMap((e) => e.alertIds))];
   const alerts = new Map((await Promise.all(alertIds.map((a) => quiet(coreOp<ApiAlertLite>("alerts.get", { id: a }))))).filter((a): a is ApiAlertLite => !!a).map((a) => [a.id, a]));
@@ -58,7 +59,7 @@ export async function loadDevices(opts: { selected?: string; unitId?: string; jo
     unit: unit ? { name: unit.displayName, place: unit.location.pathLabels.join(" › "), model: `${unit.capabilities.manufacturer} ${unit.capabilities.model} v${unit.capabilityVersion}` } : null,
     firmware: newerVersions(d.firmwareVersion, candidates), firmwareCard: firmwareCard(d, ops?.items ?? []),
     operations: operationRows(ops?.items ?? [], d.firmwareVersion), calibrations: (cals?.items ?? []).map(calibrationText),
-    events: evs ? eventRows(evs.items, alerts) : null,
+    events: evs ? eventRows(evs.items, alerts) : null, eventsLocked: opts.events && !evs,
   };
   return live;
 }

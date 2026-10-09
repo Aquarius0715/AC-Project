@@ -4,8 +4,9 @@
 // contractor (jobs.offer with the time locked, IR113), propose another time to the client and withdraw it, answer a
 // contractor's time change (jobs.resolvePartnerSlot), hold / resume / cancel (IR56), reassign an internal job, classify
 // a follow-up (IR114), review the submitted report (jobs.review), save the cost lines (jobs.saveCost), extend a
-// contractor's access (jobs.extendAccess) and create a job on a customer's behalf (jobs.create). Each write on a job
-// carries its version as the expected version; CONFLICT refreshes the page.
+// contractor's access (jobs.extendAccess) and create a job on a customer's behalf (jobs.create); on the Plans tab save a
+// plan (plans.save) and generate its next occurrence (plans.generateNext, D16). Each write on a job or plan carries its
+// version as the expected version; CONFLICT refreshes the page.
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -94,3 +95,38 @@ export async function createJob(input: { unitId: string; type: string; symptom: 
     throw e;
   }
 }
+
+type Failure = { ok: false } & ActionFailure;
+const failure = (e: unknown, conflictRefresh = true): Failure => {
+  if (e instanceof CoreError) {
+    if (conflictRefresh && e.error.code === "CONFLICT") refresh();
+    return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors };
+  }
+  throw e;
+};
+
+/** plans.save: a new plan for a unit, or the plan's recurrence and next date (monthly, every 1–12 months, the next date in
+ * the future, stored in UTC with its UTC day as the anchor day). Returns the plan id. */
+export async function savePlan(input: { id: string | null; version: number | null; unitId: string; intervalMonths: number; nextDueAt: string }): Promise<{ ok: true; value: { id: string } } | Failure> {
+  try {
+    const p = await coreOp<{ id: string }>("plans.save", { ...(input.id ? { id: input.id } : {}), unitId: input.unitId, recurrence: { kind: "monthly", intervalMonths: input.intervalMonths }, nextDueAt: input.nextDueAt },
+      input.id ? write(input.version!) : { write: true });
+    refresh();
+    return { ok: true, value: { id: p.id } };
+  } catch (e) {
+    return failure(e);
+  }
+}
+
+/** plans.generateNext: one periodic job (requested) for the saved next date; a date that already has its job, or a plan
+ * that changed meanwhile, is CONFLICT and the page shows the latest plan. Returns the job id. */
+export async function generateJob(planId: string, version: number, occurrenceDate: string): Promise<{ ok: true; value: { id: string } } | Failure> {
+  try {
+    const j = await coreOp<{ id: string }>("plans.generateNext", { id: planId, occurrenceDate }, write(version));
+    refresh();
+    return { ok: true, value: { id: j.id } };
+  } catch (e) {
+    return failure(e);
+  }
+}
+

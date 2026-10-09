@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.123.0
+version: 0.124.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -268,6 +268,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.124.0: HQ maintenance plans (Plans tab) on the Core API, plan occurrences bookable, base-layer styles (IR233). Phase 1A unchanged.
 0.123.0: HQ job report review, costs, New job and access extension on the Core API (IR232). Phase 1A unchanged.
 0.122.0: HQ maintenance jobs (Jobs tab) on the server pattern (IR231). Phase 1A unchanged.
 0.121.0: Technician unit QR scan from the Core API (IR230). Phase 1A unchanged.
