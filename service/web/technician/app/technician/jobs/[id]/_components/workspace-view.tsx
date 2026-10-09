@@ -243,10 +243,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                 <div>
                   <p className="mb-1 text-xs font-semibold">Photos (JPEG/PNG, ≤5 MiB, ≤{MAX_PHOTOS})</p>
                   <div className="flex flex-wrap gap-2">
-                    {photos.map((a) => (
-                      // eslint-disable-next-line @next/next/no-img-element -- streamed through the DAL route (attachments.getContent)
-                      <img key={a.id} src={photoUrl(a)} alt={a.name} className="h-16 w-20 rounded-lg bg-surface2 object-cover" />
-                    ))}
+                    {photos.map((a) => <Photo key={a.id} src={photoUrl(a)} name={a.name} />)}
                     {editable && photos.length < MAX_PHOTOS && (
                       <label className={cx("grid h-16 w-20 cursor-pointer place-items-center rounded-lg border border-dashed border-line text-xl text-muted hover:bg-surface2", pending && "pointer-events-none opacity-50")}>
                         +<input type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
@@ -471,4 +468,12 @@ function SignModal({ open, pending, summary, onClose, onSign }: { open: boolean;
       <p className="text-[11px] text-muted">The sign-off is bound to this report version; saving the draft again clears it.</p>
     </Modal>
   );
+}
+
+/** A report photo streamed through the DAL route; a photo whose file is gone (404) or unreadable shows a tile instead. */
+function Photo({ src, name }: { src: string; name: string }) {
+  const [broken, setBroken] = useState(false);
+  if (broken) return <span title={name} className="grid h-16 w-20 place-items-center rounded-lg border border-dashed border-line bg-surface2 px-1 text-center text-[10px] leading-tight text-muted">Photo unavailable</span>;
+  // eslint-disable-next-line @next/next/no-img-element -- streamed through the DAL route (attachments.getContent)
+  return <img src={src} alt={name} onError={() => setBroken(true)} className="h-16 w-20 rounded-lg bg-surface2 object-cover" />;
 }

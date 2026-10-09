@@ -253,6 +253,8 @@ services:
       <<: *backend-env
       DATABASE_URL: postgres://ac_maintenance_login:local@postgres:5432/ac?sslmode=disable
       DATABASE_READER_URL: postgres://ac_maintenance_login:local@postgres:5432/ac?sslmode=disable
+      BLOB_DIR: /var/lib/ac/blobs   # report photos, certificates, problem attachments (IR229): kept across restarts
+    volumes: [blobs:/var/lib/ac/blobs]
     healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
 
   billing-api:        # billing, payments, restrictions (internal; reached through the gateway)
@@ -405,3 +407,4 @@ networks:
 
 volumes:
   pgdata: {}
+  blobs: {}            # maintenance-api local blob store (development; S3 in staging and production)

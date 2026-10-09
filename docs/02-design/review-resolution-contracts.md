@@ -2158,3 +2158,12 @@ Decision of the product owner after reviewing the Swagger description (every ope
 - **Preview message.** `notifications.preview` limited `message` to 1–1000 characters while the job note it carries allows 1–2000 (DD-P07); the message now takes 1–2000 and the reason stays 1–1000 (test).
 - **Names.** Timeline actors are “you”, a member of the company or the system; HQ and customer users are not named to the contractor.
 - **States.** Loading and error boundaries; empty list and empty tab; a job that is not the company's reads as absent; a refused note keeps the message, a refused preview after a saved note says so. The Phase 1A demo keeps the fixture page.
+
+## IR229 Technician overview on the server pattern; uploaded files survive restarts — 2026-10-09
+
+`/technician` (FR-T01, DD-T01, SCR-T01) follows IR176; in API mode it showed fixture jobs, tiles, alerts and reports (IR223 list).
+
+- **Overview.** As DD-T01 describes: the tiles of `summaries.get`, the new assignments to accept, Today / All assigned with the sort, the job rows with what can be done now, today's timeline, the alerts on the assigned units and the reports by state; `units.list` names the units. A row opens the job workspace (IR220).
+- **Sidebar.** Sidebar › Assigned jobs links to `/technician?tab=all` and is now shown as active there (Figma 01-2): an item whose link carries a query is active when the path and the query match; the sidebar reads the search parameters inside a Suspense boundary so static pages keep rendering.
+- **Uploaded files.** The API containers run read-only with `/tmp` on tmpfs, and the maintenance service kept its local blob store there, so every container restart lost the report photos while their rows stayed; the photos then failed with UNAVAILABLE (and the contractor's quality review, which treats UNAVAILABLE as retryable, failed as a whole). The store now lives on the named volume `blobs` (`BLOB_DIR=/var/lib/ac/blobs`, the directory created in the image for the non-root user), and a stored row whose content is missing reads as NOT_FOUND (`blob.ErrNotFound`, test) — the workspace shows “Photo unavailable” and the review leaves the photo out. Photos lost before this change stay unavailable.
+- **Open.** Staging and production need the S3 store (bucket `ac-files`; container design §4, OPEN-CT-02); the Go blob package has only the local directory store.

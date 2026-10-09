@@ -114,6 +114,7 @@ Configuration is twelve-factor: every service reads environment variables only. 
 | `AWS_REGION` | backend | `ap-southeast-5` | `ap-southeast-5` |
 | `AWS_ENDPOINT_URL` | backend | `http://localstack:4566` | not set (real AWS endpoints, VPC endpoints) |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | backend | `test` / `test` (LocalStack) | not set (ECS task role) |
+| `BLOB_DIR` | backend (maintenance-api) | `/var/lib/ac/blobs` on the named volume `blobs` (the image creates the directory owned by `nonroot`, so the read-only container keeps report photos, certificates and problem attachments across restarts, IR229) | not set — the S3 store for bucket `ac-files` is not implemented yet (IR229, open) |
 | `OIDC_ISSUER` | backend, web | `http://localhost:8081/realms/ac` (Keycloak `KC_HOSTNAME` fixes the `iss` claim) | Cognito user pool issuer |
 | `OIDC_JWKS_URL` | backend | `http://keycloak:8080/realms/ac/protocol/openid-connect/certs` (container network) | not set (derived from the issuer discovery document) |
 | `OIDC_INTERNAL_ISSUER` | web | `http://keycloak:8080/realms/ac` (container network) | not set (same as `OIDC_ISSUER`) |
@@ -156,5 +157,6 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 | ID | Open item |
 |---|---|
 | OPEN-CT-01 | Whether developers on x86 laptops need the `amd64` variant in the shared registry or build locally only |
+| OPEN-CT-02 | The S3 blob store (bucket `ac-files`, LocalStack locally) for staging and production; until then the maintenance service keeps uploaded files in the local directory store on the `blobs` volume (IR229) |
 
 Additional contracts for current version 0.30.0: Read IR01–139 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

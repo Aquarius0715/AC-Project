@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { ROLES, ROLE_KEY, Role, roleFromPath } from "@ac/web/lib/nav";
 import { Badge, Banner, Btn, Modal, SummaryList, ToastProvider, cx } from "./ui";
 import { useJobStore } from "@ac/web/lib/jobs";
@@ -34,6 +34,27 @@ function NavLink({ href, label, icon, badge, active }: { href: string; label: st
       {badge && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-crit px-1 text-[10px] font-bold text-white">{badge}</span>}
     </Link>
   );
+}
+
+type NavItem = { href: string; label: string; icon: string; badge?: string; match?: string[] };
+/** The role's sidebar items with the active one: the longest matching path, where an item whose href carries a query
+ * (Sidebar › Assigned jobs = /technician?tab=all) wins on its path only when the query matches too. */
+function RoleNav({ items, base, pathname, search }: { items: NavItem[]; base: string; pathname: string; search: string }) {
+  const query = new URLSearchParams(search);
+  const score = (href: string, match?: string[]) => {
+    const hits = [href, ...(match ?? [])].filter((h) => {
+      const [path, q] = h.split("?");
+      if (q) return pathname === path && [...new URLSearchParams(q)].every(([k, v]) => query.get(k) === v);
+      return path === base ? pathname === path : pathname === path || pathname.startsWith(path + "/");
+    });
+    return hits.length ? Math.max(...hits.map((h) => h.length)) : 0;
+  };
+  const best = Math.max(0, ...items.map((i) => score(i.href, i.match)));
+  const activeHref = best ? items.find((i) => score(i.href, i.match) === best)?.href : undefined;
+  return <nav className="flex flex-col gap-0.5">{items.map((i) => <NavLink key={i.href} {...i} active={i.href === activeHref} />)}</nav>;
+}
+function RoleNavWithQuery(props: { items: NavItem[]; base: string; pathname: string }) {
+  return <RoleNav {...props} search={useSearchParams().toString()} />; // the search params need a Suspense boundary (static routes)
 }
 
 export function AppShell({ role: forced, children }: { role?: Role; children: React.ReactNode }) {
@@ -77,7 +98,7 @@ export function AppShell({ role: forced, children }: { role?: Role; children: Re
             <span className="leading-tight"><span className="block text-[15px] font-bold">{cfg.app}</span><span className="block text-[11px] text-muted">{cfg.sub}</span></span>
           </Link>
           <div className="px-3 pb-1 text-[10px] font-bold tracking-wider text-muted">{cfg.scope}</div>
-          <nav className="flex flex-col gap-0.5">{items.map((i) => <NavLink key={i.href} {...i} active={i.href === activeHref} />)}</nav>
+          <Suspense fallback={<RoleNav items={items} base={cfg.base} pathname={pathname} search="" />}><RoleNavWithQuery items={items} base={cfg.base} pathname={pathname} /></Suspense>
           <div className="my-2 border-t border-line" />
           <nav className="flex flex-col gap-0.5">
             {role === "client" && owner && <NavLink href="/customer/users" label="Users" icon="☺" active={pathname === "/customer/users"} />}

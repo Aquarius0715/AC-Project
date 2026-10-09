@@ -2,6 +2,7 @@ package blob
 
 import (
 	"context"
+	"errors"
 	"testing"
 )
 
@@ -22,8 +23,8 @@ func TestDir(t *testing.T) {
 			t.Errorf("get %q accepted", k)
 		}
 	}
-	if _, err := d.Get(ctx, "missing"); err == nil {
-		t.Error("missing blob")
+	if _, err := d.Get(ctx, "missing"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("missing blob: %v", err)
 	}
 	t.Setenv("BLOB_DIR", "/tmp/x")
 	if NewDirFromEnv() != "/tmp/x" {

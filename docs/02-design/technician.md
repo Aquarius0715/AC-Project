@@ -23,7 +23,7 @@ Treat route parameters as untrusted input and always validate them. Service name
 
 | Design ID / requirement | Route / main component | Read and action contracts | Input, processing, validation | Errors and prohibited actions |
 |---|---|---|---|---|
-| DD-T01 / FR-T01 | `/technician` / `TechnicianOverview` | `jobs.list`, `alerts.list`, `summaries.get` | Filter by period and severity. Check assignments and deadlines in the service | Exclude jobs assigned to others from results and summaries |
+| DD-T01 / FR-T01 | `/technician` / `TechnicianOverview` | `jobs.list`, `alerts.list`, `summaries.get`, `units.list` | Filter by period and severity. Check assignments and deadlines in the service | Exclude jobs assigned to others from results and summaries |
 | DD-T02 / FR-T02 | `/technician/units/:id` / `DiagnosticUnit` | `units.get`, `devices.list` | View unit ID and supported features. Clearly identify items outside maintenance scope | Distinguish unregistered units from disconnected units |
 | DD-T03 / FR-T03 | `/technician/units/:id` / `TelemetryPanel` | `telemetry.series`, `telemetry.summary` | Select metric and period. Subscribe through the Repository. Phase 1A uses only predefined events | Do not show old values as live. Refetch when the stream disconnects |
 | DD-T04 / FR-T04 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Select normal/needs attention/not inspected/not applicable for each component. Record findings and measurement evidence. Do not default to normal | Require reasons for not applicable or not inspected. Do not replace actual measurements with demo diagnosis results |
@@ -60,7 +60,7 @@ Keep form values in RHF (React Hook Form) and validate them with schemas. Read-o
 
 **Source mapping**: SRC-06 BIZ-04, BIZ-08 → FR-T01 → DD-T01. Source category: original company requirements SRC-06 + design additions. Design addition: view scope based on assignment period. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-T01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.list, alerts.list, summaries.get`.
+Scope: FR-T01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.list, alerts.list, summaries.get, units.list`.
 
 **Initial view and prerequisites**: Internal technicians can view their assigned scope. External technicians can fetch jobs assigned individually within their company and their work periods. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -78,6 +78,8 @@ Scope: FR-T01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.l
 3. This screen is read-only. For zero scheduled jobs, show an empty state and a way to view past history.
 4. Queries to update: `jobs / assignments / alerts`.
 5. Tabs (IR115, Figma Technician 01-1/01-2): `tab=today` (default; jobs scheduled today) and `tab=all` (all assigned jobs, opened from Sidebar › Assigned jobs).
+
+**Overview (`/technician`, Figma 01-1…01-5, IR229)**: Tiles from `summaries.get` (kind technician): assigned units (the units of the current rows), not started (accepted and assigned jobs, with their IDs), overdue. One banner per new assignment to accept (several are listed in one banner, each opening the job). Tabs Today (slots touching today in Kuala Lumpur) and All assigned (every current assignment; Sidebar › Assigned jobs opens it and is shown as active), sorted by severity, deadline or progress (IR34). Rows: job · unit with the origin badge; the job type, the window (time today, date and time on another day, both dates across days), a linked alert and what can be done now — not accepted yet, opens at a time (read-only until then, IR49), check in, in progress, work window ended (ask the contractor or HQ, IR89), on hold, returned for rework, submitted (read-only), completed; the status badge. Below: today's timeline 08:00–18:00 with the slots and the now line, the slots of today; the open alerts on the assigned units (`alerts.list`, worst first, each to the unit's alerts with its job); the reports by state (draft, returned, submitted). Unit names come from `units.list`. Past assignments (history projection) are not listed. Empty: “No assigned jobs today” with a link to all assigned jobs.
 
 **Boundary cases and failures**: Hide live unit information when an external technician's assignment expires. Before work starts, show assigned jobs as read-only within the viewing window; actions before the work window return FORBIDDEN (IR49). Directly entering another technician's job ID must not allow work to start.
 

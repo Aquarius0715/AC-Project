@@ -3,11 +3,16 @@ package blob
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+// ErrNotFound is returned by Get when no blob exists under the key (a stored row whose content was lost).
+var ErrNotFound = errors.New("blob: not found")
 
 // Store keeps blobs by key.
 type Store interface {
@@ -51,5 +56,9 @@ func (d Dir) Get(_ context.Context, key string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return os.ReadFile(p)
+	b, err := os.ReadFile(p)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("%w: %s", ErrNotFound, key)
+	}
+	return b, err
 }

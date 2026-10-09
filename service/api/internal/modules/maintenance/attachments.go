@@ -309,7 +309,9 @@ func (m Files) content(ctx context.Context, c *ops.Call, in *ContentInput) (Blob
 	if err != nil {
 		return out, err
 	}
-	if out.Bytes, err = m.Blobs.Get(ctx, key); err != nil {
+	if out.Bytes, err = m.Blobs.Get(ctx, key); errors.Is(err, blob.ErrNotFound) {
+		return out, apperr.E(apperr.NotFound, "error.notFound") // the row is kept but its content was lost: not retryable (IR229)
+	} else if err != nil {
 		return out, err
 	}
 	return out, nil

@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { use, useState } from "react";
+import { useState } from "react";
 import { Banner, Card, Kpi, LinkBtn, Page, SeverityBadge, Tabs, TextLink, UtilBar } from "@ac/web/components/ui";
 import { fmt, useJobs } from "@ac/web/lib/jobs";
 import { JobList, useTechJobs } from "@ac/web/components/TechJobList";
 
-export default function TechOverview({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  const sp = use(searchParams);
-  const [tab, setTab] = useState<"today" | "all">(sp.tab === "all" ? "all" : "today");
+/** The Phase 1A demo of the technician overview (fixture jobs and the in-browser job store). */
+export function OverviewDemo({ tab: initial }: { tab?: string }) {
+  const [tab, setTab] = useState<"today" | "all">(initial === "all" ? "all" : "today");
   const all = useTechJobs();
   const jobs = tab === "today" ? all.filter((j) => j.today) : all;
   const pending = useJobs().filter((j) => j.technician === "tech-external-a" && j.techAck?.status === "pending");
