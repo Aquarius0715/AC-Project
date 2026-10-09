@@ -3,7 +3,8 @@
 // The technician's “Scan unit QR” dialog in API mode (FR-T13, DD-T13, Figma Technician 01-6): the camera is simulated —
 // the label code, a device serial or the unit ID is typed, or one of the user's units is “scanned” — and
 // units.resolveQr (through the BFF) answers the unit and the user's next open job on it; units.get and jobs.get fill
-// the matched card. Units outside the user's assignments and unknown labels read as “Page unavailable” (NOT_FOUND).
+// the matched card. Units outside the user's assignments and unknown labels read as “Page unavailable” (NOT_FOUND), so
+// the one-tap scans are the units of the user's open jobs (jobs.list), not every unit in scope (DD-T13, IR254).
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { Badge, Banner, Btn, Input, Modal } from "./ui";
@@ -12,6 +13,8 @@ import { useNow, useOp } from "@ac/web/lib/useOp";
 import { klTime } from "@ac/web/lib/devices";
 import { qrMatch, qrRefusal, scanCode, type ApiQrJob, type ApiQrResolution, type ApiQrUnit, type QrMatch } from "@ac/web/lib/techQr";
 
+const OPEN = ["assigned", "in_progress", "on_hold", "rework_requested"]; // the jobs units.resolveQr opens (IR230)
+
 type State = { kind: "idle" } | { kind: "busy" } | { kind: "matched"; code: string; at: string; match: QrMatch } | { kind: "refused"; title: string; text: string };
 
 export function QrScan({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -19,7 +22,9 @@ export function QrScan({ open, onClose }: { open: boolean; onClose: () => void }
   const [state, setState] = useState<State>({ kind: "idle" });
   const input = useRef<HTMLInputElement>(null);
   const now = useNow();
-  const units = useOp<{ items: { id: string; displayName: string }[] }, { id: string; displayName: string }[]>("units.list", { limit: 20 }, [], (p) => p.items, open);
+  const units = useOp<{ items: { id: string; displayName: string }[] }, { id: string; displayName: string }[]>("units.list", { limit: 100 }, [], (p) => p.items, open);
+  const jobUnits = useOp<{ items: { unitId: string }[] }, string[]>("jobs.list", { filters: { statuses: OPEN }, limit: 100 }, [], (p) => p.items.map((j) => j.unitId), open);
+  const assigned = units.data.filter((u) => jobUnits.data.includes(u.id));
   const close = () => { setState({ kind: "idle" }); setCode(""); onClose(); };
   const scan = async (raw: string) => {
     const c = scanCode(raw);
@@ -56,10 +61,10 @@ export function QrScan({ open, onClose }: { open: boolean; onClose: () => void }
             <Input ref={input} aria-label="Label code, device serial or unit ID" value={code} onChange={(e) => setCode(e.target.value)} placeholder="Label code, device serial or unit ID" className="bg-white text-ink" />
             <Btn type="submit" variant="primary" disabled={state.kind === "busy"}>Scan</Btn>
           </form>
-          {units.data.length > 0 && (
+          {assigned.length > 0 && (
             <div className="text-[11px] text-white/80">
-              Labels on your units:
-              <div className="mt-1 flex flex-wrap gap-1">{units.data.map((u) => <button key={u.id} type="button" onClick={() => { setCode(`ac-unit:${u.id}`); void scan(`ac-unit:${u.id}`); }} className="rounded-full border border-white/30 px-2 py-0.5 hover:bg-white/10">{u.displayName}</button>)}</div>
+              Labels on the units of your open jobs:
+              <div className="mt-1 flex flex-wrap gap-1">{assigned.map((u) => <button key={u.id} type="button" onClick={() => { setCode(`ac-unit:${u.id}`); void scan(`ac-unit:${u.id}`); }} className="rounded-full border border-white/30 px-2 py-0.5 hover:bg-white/10">{u.displayName}</button>)}</div>
             </div>
           )}
         </div>

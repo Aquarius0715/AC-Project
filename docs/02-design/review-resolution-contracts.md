@@ -2421,3 +2421,21 @@ The technician inbox listed a schedule_change notification for a job whose assig
 2. **Data.** notify's copy of the assignments (`notify.ref_assignments`, IR188) also keeps `scheduled`. The change-capture trigger sends it, and existing rows are backfilled from `maintenance.assignments`.
 3. **Remaining difference.** For an external technician, `jobs.get` also needs the accepted offer's access window. notify has no copy of that window, so the scheduled window, which lies inside it, stands in.
 4. **Check.** TestTechnicianJobNotificationScope: listed while active and inside the window; hidden when revoked and after the window; mark-read 404 outside the window and 200 inside. make test-all passes on both suites. In the dev stack the technician's revoked-job notification is gone, and the E2E technician smoke spec passes.
+
+## IR254 Technician QR one-tap labels are the units of the open jobs — 2026-10-10
+
+The Scan unit QR dialog (FR-T13, DD-T13, IR230) offered a one-tap label for every unit in `units.list`. For an internal technician that is the whole SR03 unit scope. `units.resolveQr` resolves only units with an active assignment of the technician (DD-T13: assigned units only; IR111), so most of the offered labels answered “Page unavailable”.
+
+1. **Labels.** The one-tap labels are the units of the technician's open jobs: `jobs.list` with statuses assigned, in progress, on hold and rework, the jobs `resolveQr` opens, with the names from `units.list`. The heading reads “Labels on the units of your open jobs”. Typing a code or unit ID still reaches any unit, and an unassigned one still answers Page unavailable.
+2. **Catalog.** DD-T13 lists `jobs.list` in its row and service boundary, and `jobs.list` carries DD-T13 among its design ids (swagger regenerated).
+3. **Check.** The E2E technician spec (IR255) scans an unknown code (refused, no unit data). It then taps the one offered label, which matches with the next job, and Open unit opens the unit register.
+
+## IR255 More end-to-end specs — 2026-10-10
+
+The IR252 suite gains specs for the customer, partner and technician apps. Each restores what it changes.
+
+1. **Customer alert policies.** An owner switches the AC offline default rule and back. A policy (named `E2E …`) is created with a recovery on the wrong side refused first, edited (threshold, weekdays only), switched off and deleted. A cleanup after each test removes any `E2E …` policy that is left.
+2. **Customer filter care.** The tab is in the URL and every AC has a row. Reminder settings refuse 20 hours, save 120 hours for all users, and are put back to the model default, 30 days and owners. Request cleaning opens New request prefilled for an overdue AC and is cancelled. Mark cleaned is left out, because it moves the cleaning date for good.
+3. **Partner jobs.** Every status tab keeps the URL and is selected. It lists jobs, or nothing when its count is 0, and the first job opens its detail.
+4. **Technician QR scan.** See IR254.
+5. **Result.** 51 passed and 9 skipped. The skips: the opt-in clock jump in each app, the client-only consent in the other three apps, the technician's device fault without a current assignment, and Request cleaning while no AC is overdue.
