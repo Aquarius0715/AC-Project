@@ -63,9 +63,10 @@ func (r notifyingRecorder) partners(ctx context.Context, c *ops.Call, org *uuid.
 }
 
 func (r notifyingRecorder) technician(ctx context.Context, c *ops.Call, job uuid.UUID) ([]uuid.UUID, error) {
-	// the active assignment, or the one revoked by this very transition (cancel / hold); maintenance's own rows
+	// the active assignment, or the one this very transition revoked (cancel / hold) or released (completion, IR234);
+	// maintenance's own rows
 	rows, err := c.Tx.Query(ctx, `SELECT a.technician_membership_id FROM maintenance.assignments a
-		WHERE a.job_id = $2 AND (a.status = 'active' OR (a.status = 'revoked' AND a.updated_at = $1))`, c.Now, job)
+		WHERE a.job_id = $2 AND (a.status = 'active' OR (a.status IN ('revoked', 'completed') AND a.updated_at = $1))`, c.Now, job)
 	if err != nil {
 		return nil, err
 	}

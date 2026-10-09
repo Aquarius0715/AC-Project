@@ -1053,7 +1053,7 @@ CREATE TABLE maintenance.assignments (
   valid_from                timestamptz NOT NULL,
   valid_until               timestamptz NOT NULL,
   scheduled                 tstzrange NOT NULL,
-  status                    text NOT NULL CHECK (status IN ('active','revoked')),
+  status                    text NOT NULL CHECK (status IN ('active','revoked','completed')),  -- completed: released when the job completed (IR234)
   reason                    text,
   acknowledgement           text NOT NULL DEFAULT 'pending' CHECK (acknowledgement IN ('pending','accepted','cant_make')),
   acknowledged_at           timestamptz,

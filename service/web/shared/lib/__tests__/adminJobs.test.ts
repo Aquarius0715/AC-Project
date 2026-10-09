@@ -136,5 +136,10 @@ describe("HQ maintenance jobs", () => {
     expect(agreedSlots(job({ planId: "plan-1", occurrenceAt: "2026-12-08T02:00:00Z" })).length).toBe(2); // the client asked for other times
     expect(hqRow(row({ origin: "periodic_plan", preferredSlots: [], requestedSlot: slot("2026-12-08T02:00:00Z", "2026-12-08T03:00:00Z") }), NOW, names, unitOrg).line).toBe("plan occurrence 12-08 10:00–11:00 · book it");
   });
+
+  it("shows a completed job's assignment as ended (IR234)", () => {
+    const done = delivery(job({ status: "completed", assignment: { technicianMembershipId: "m-int", scheduledStart: "2026-09-22T02:00:00Z", scheduledEnd: "2026-09-22T04:00:00Z", status: "completed", acknowledgement: "accepted", cantMakeReason: null, alternativeSlot: null } }), names, NOW)!;
+    expect([done.lines, done.ack, done.cantMake]).toEqual([[["Technician", "tech-internal-a · assignment 09-22 10:00–12:00 · ended at completion"]], { tone: "ok", text: "tech-internal-a completed the job — the assignment ended with it, so tech-internal-a’s time is free again (IR234)." }, false]);
+  });
 });
 

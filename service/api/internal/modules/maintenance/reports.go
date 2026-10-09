@@ -799,7 +799,7 @@ func (in *ReviewInput) Validate() map[string]string {
 // @Summary		jobs.review (write)
 // @ID				jobs.review
 // @Description	Authorization: contractor:partner.review:own-offer | admin:job.write:internal-or-escalation; no-self-review
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reason 1-1000
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reason 1-1000; IR234 accept releases the active assignment (status completed)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A06, DD-P05 · Input versions: reportVersion=WorkReport.version
 // @Tags			jobs
@@ -880,6 +880,11 @@ func (m Reports) review(ctx context.Context, c *ops.Call, in *ReviewInput) (Job,
 	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.jobs SET status = $2, completed_at = CASE WHEN $2 = 'completed' THEN $3::timestamptz ELSE completed_at END,
 		version = version + 1, updated_at = platform.app_now() WHERE id = $1`, in.JobID, jobStatus, c.Now); err != nil {
 		return Job{}, err
+	}
+	if jobStatus == "completed" { // DEC-73 / IR234: completion releases the assignment; a return keeps it for the rework
+		if err := ReleaseOnCompletion(ctx, c.Tx, in.JobID, c.Now); err != nil {
+			return Job{}, err
+		}
 	}
 	if err := m.reportEvent(ctx, c, in.JobID, "job.reviewed", id, latest); err != nil {
 		return Job{}, err

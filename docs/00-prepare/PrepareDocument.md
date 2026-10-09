@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.124.0
+version: 0.125.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -168,6 +168,7 @@ Small text and controls are adjusted for readability and usability in work scree
 | DEC-70 | Everything runs in Docker: all application components are Docker images in every environment (Compose locally and in CI, ECS Fargate in staging and production); production databases, queues and IoT stay AWS managed services | User request in this conversation, 2026-10-07 (“全てDockerで動かす前提です”; answer: apps all in Docker, production DB etc. AWS managed); reflected in IR119, container-design.md, compose.yaml, web/Dockerfile, docker/ and Figma System Architecture board 07 |
 | DEC-71 | Backend and web follow the frameworks' official documentation and current major versions: Core API on Echo v5 structured as in the Echo guide (central HTTPErrorHandler, echo/v5 middleware, route groups, StartConfig graceful shutdown, slog); web on the current Next.js App Router conventions (IR174+) | User request in this conversation, 2026-10-08 (“バックエンドの構成ですが、GoEchoのドキュメントに沿って作成してください。Web側も同様に公式ドキュメントに沿って作成してください”); reflected in IR173, backend-go-design.md §1/§4 |
 | DEC-72 | Core API split into business-domain microservices (identity, equipment, maintenance, billing, energy) behind a gateway; Go under service/api, web under service/web | User request in this conversation, 2026-10-08 (“APIもマイクロサービスに分けてください / APIの中にWebがあるのはおかしいです”; choices: api/ and web/ trees, split by business domain); reflected in IR179, IR180 |
+| DEC-73 | A completed job releases its assignment at completion: the Assignment becomes completed, stops booking the technician and granting unit access, and the technician keeps the job as history | User request in this conversation, 2026-10-10 (“完了したジョブの割り当ては完了時に解除してください”); reflected in IR234 |
 
 **DEC-10 (design proposal)**: Preserve work status on reassignment. Release restrictions only after all cause invoices fixed at notice time are paid. Release does not automatically power units on or restore previous set temperatures. Manual payment recording, test-run end confirmation, and viewing saved reports are specified for the 1A demo. This does not mean company approval of commercial rules. See [input/output contract DDC-08](../02-design/implementation-contracts.md#ddc-08-multi-resource-revisit-and-cross-role-contracts).
 
@@ -268,6 +269,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.125.0: Completion releases the assignment (DEC-73, IR234). Phase 1A unchanged.
 0.124.0: HQ maintenance plans (Plans tab) on the Core API, plan occurrences bookable, base-layer styles (IR233). Phase 1A unchanged.
 0.123.0: HQ job report review, costs, New job and access extension on the Core API (IR232). Phase 1A unchanged.
 0.122.0: HQ maintenance jobs (Jobs tab) on the server pattern (IR231). Phase 1A unchanged.

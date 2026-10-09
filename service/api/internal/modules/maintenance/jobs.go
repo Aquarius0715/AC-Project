@@ -396,7 +396,7 @@ func (m Jobs) load(ctx context.Context, c *ops.Call, id uuid.UUID, scope string,
 	if j.SlotProposal, err = m.pendingOrLastProposal(ctx, c, id); err != nil {
 		return j, err
 	}
-	if j.Assignment, err = m.activeAssignment(ctx, c, id); err != nil {
+	if j.Assignment, err = m.shownAssignment(ctx, c, id); err != nil {
 		return j, err
 	}
 	var pp PartnerSlotProposal
@@ -523,11 +523,21 @@ func (m Jobs) pendingOrLastProposal(ctx context.Context, c *ops.Call, job uuid.U
 }
 
 func (m Jobs) activeAssignment(ctx context.Context, c *ops.Call, job uuid.UUID) (*Assignment, error) {
+	return m.assignmentWhere(ctx, c, job, "status = 'active'")
+}
+
+// shownAssignment is the job's Assignment for its projections: the active one, or for a completed job the one its
+// completion released (IR234), so the detail still says who did the work.
+func (m Jobs) shownAssignment(ctx context.Context, c *ops.Call, job uuid.UUID) (*Assignment, error) {
+	return m.assignmentWhere(ctx, c, job, "status IN ('active', 'completed') ORDER BY status = 'active' DESC, updated_at DESC LIMIT 1")
+}
+
+func (m Jobs) assignmentWhere(ctx context.Context, c *ops.Call, job uuid.UUID, cond string) (*Assignment, error) {
 	var a Assignment
 	var altStart, altEnd *time.Time
 	err := c.Tx.QueryRow(ctx, `SELECT id, tenant_id, version, created_at, updated_at, job_id, technician_membership_id, valid_from, valid_until,
 		lower(scheduled), upper(scheduled), status, reason, acknowledgement, acknowledged_at, cant_make_reason, lower(alternative_slot), upper(alternative_slot)
-		FROM maintenance.assignments WHERE job_id = $1 AND status = 'active'`, job).
+		FROM maintenance.assignments WHERE job_id = $1 AND `+cond, job).
 		Scan(&a.ID, &a.TenantID, &a.Version, &a.CreatedAt, &a.UpdatedAt, &a.JobID, &a.TechnicianMembershipID, &a.ValidFrom, &a.ValidUntil,
 			&a.ScheduledStart, &a.ScheduledEnd, &a.Status, &a.Reason, &a.Acknowledgement, &a.AcknowledgedAt, &a.CantMakeReason, &altStart, &altEnd)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -752,7 +762,7 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 		}
 	}
 	if f.MembershipID != nil {
-		conds = append(conds, "EXISTS (SELECT 1 FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status = 'active' AND a.technician_membership_id = "+add(*f.MembershipID)+")")
+		conds = append(conds, "EXISTS (SELECT 1 FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status IN ('active', 'completed') AND a.technician_membership_id = "+add(*f.MembershipID)+")")
 	}
 	if f.CustomerID != nil {
 		org, ok, err := m.Units.OrgOfCustomer(ctx, c, *f.CustomerID)
@@ -787,8 +797,8 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 	rows, err := c.Tx.Query(ctx, `SELECT j.id, j.version, j.unit_id, j.type, j.status, j.due_at, lower(j.requested_slot), upper(j.requested_slot),
 		lower(j.scheduled_slot), upper(j.scheduled_slot), j.assignment_id, j.origin, j.preferred_slots, `+statusRank+`,
 		EXISTS (SELECT 1 FROM maintenance.slot_proposals p WHERE p.job_id = j.id AND p.status = 'pending'),
-		(SELECT a.acknowledgement FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status = 'active'),
-		(SELECT a.technician_membership_id FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status = 'active'),
+		(SELECT a.acknowledgement FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status IN ('active', 'completed') ORDER BY a.status = 'active' DESC, a.updated_at DESC LIMIT 1),
+		(SELECT a.technician_membership_id FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status IN ('active', 'completed') ORDER BY a.status = 'active' DESC, a.updated_at DESC LIMIT 1),
 		ao.access_valid_from, ao.access_valid_until
 		FROM maintenance.jobs j LEFT JOIN LATERAL (SELECT o.access_valid_from, o.access_valid_until FROM maintenance.offers o
 			WHERE o.job_id = j.id AND o.decision = 'accept' ORDER BY o.decided_at DESC LIMIT 1) ao ON true

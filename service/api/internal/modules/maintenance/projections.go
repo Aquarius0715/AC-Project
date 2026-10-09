@@ -349,21 +349,48 @@ func FreezeEnded(ctx context.Context, tx pgx.Tx, now time.Time) (int, error) {
 		return 0, err
 	}
 	n += int(tag.RowsAffected())
-	// technicians: viewing window ended, or revoked after the work window started
-	tag, err = tx.Exec(ctx, `INSERT INTO maintenance.job_history_snapshots (tenant_id, job_id, owner_kind, owner_id, owner_user_id, as_of, type, status,
+	t, err := freezeTechnicians(ctx, tx, now, nil)
+	return n + t, err
+}
+
+// freezeTechnicians stores the technicians' snapshots whose viewing window has ended: the active Assignment's
+// scheduled end passed, it was revoked after the work window started, or the job completed and released it (IR234);
+// job narrows it to one job.
+func freezeTechnicians(ctx context.Context, tx pgx.Tx, now time.Time, job *uuid.UUID) (int, error) {
+	q := `INSERT INTO maintenance.job_history_snapshots (tenant_id, job_id, owner_kind, owner_id, owner_user_id, as_of, type, status,
 			contractor_org_id, completed_at, has_report, acceptance)
 		SELECT DISTINCT ON (a.job_id, a.technician_membership_id) j.tenant_id, j.id, 'membership', a.technician_membership_id, mb.user_id,
-			CASE WHEN a.status = 'revoked' THEN a.updated_at ELSE upper(a.scheduled) END, j.type, j.status, j.contractor_org_id, j.completed_at,
+			CASE WHEN a.status IN ('revoked', 'completed') THEN a.updated_at ELSE upper(a.scheduled) END, j.type, j.status, j.contractor_org_id, j.completed_at,
 			EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state <> 'draft'),
 			CASE WHEN EXISTS (SELECT 1 FROM maintenance.work_reports r WHERE r.job_id = j.id AND r.state = 'accepted') THEN 'accepted' ELSE 'not_accepted' END
 		FROM maintenance.assignments a JOIN maintenance.jobs j ON j.id = a.job_id JOIN maintenance.ref_memberships mb ON mb.id = a.technician_membership_id
-		WHERE (a.status = 'active' AND upper(a.scheduled) <= $1) OR (a.status = 'revoked' AND lower(a.scheduled) <= a.updated_at AND a.updated_at <= $1)
-		ORDER BY a.job_id, a.technician_membership_id, a.updated_at DESC
-		ON CONFLICT (job_id, owner_kind, owner_id) DO NOTHING`, now)
-	if err != nil {
-		return n, err
+		WHERE ((a.status = 'active' AND upper(a.scheduled) <= $1) OR (a.status = 'revoked' AND lower(a.scheduled) <= a.updated_at AND a.updated_at <= $1)
+			OR (a.status = 'completed' AND a.updated_at <= $1))`
+	args := []any{now}
+	if job != nil {
+		q += " AND a.job_id = $2"
+		args = append(args, *job)
 	}
-	return n + int(tag.RowsAffected()), nil
+	tag, err := tx.Exec(ctx, q+`
+		ORDER BY a.job_id, a.technician_membership_id, a.updated_at DESC
+		ON CONFLICT (job_id, owner_kind, owner_id) DO NOTHING`, args...)
+	if err != nil {
+		return 0, err
+	}
+	return int(tag.RowsAffected()), nil
+}
+
+// ReleaseOnCompletion applies DEC-73 / IR234 when a job completes: its active Assignment becomes completed (reason
+// job_completed), so it no longer books the technician (overlap constraint, members.eligible, members.capacity) and
+// no longer grants unit access (change capture publishes active=false); the technician's viewing window ends with it
+// and the history snapshot is stored at once, so the finished job stays in the technician's list (IR124).
+func ReleaseOnCompletion(ctx context.Context, tx pgx.Tx, job uuid.UUID, now time.Time) error {
+	if _, err := tx.Exec(ctx, `UPDATE maintenance.assignments SET status = 'completed', reason = 'job_completed', version = version + 1, updated_at = $2
+		WHERE job_id = $1 AND status = 'active'`, job, now); err != nil {
+		return err
+	}
+	_, err := freezeTechnicians(ctx, tx, now, &job)
+	return err
 }
 
 // ExpireOffers applies IR48: undecided Offers whose offerExpiresAt has passed return their job from offered to

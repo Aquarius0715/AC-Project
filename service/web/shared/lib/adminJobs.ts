@@ -117,13 +117,14 @@ export type Delivery = { kind: "internal" | "contractor"; title: string; lines: 
 export function delivery(j: ApiHqJob, n: Names, now: number): Delivery | null {
   const a = j.assignment, o = j.offer;
   const tech = a ? n.people.get(a.technicianMembershipId) ?? "technician" : null;
-  const ackLine = a ? (a.acknowledgement === "accepted" ? { tone: "ok" as Tone, text: `${tech} accepted the assignment ✓` } : a.acknowledgement === "cant_make" ? { tone: "warn" as Tone, text: `${tech} can’t make this time${a.cantMakeReason ? `: “${a.cantMakeReason}”` : ""}${a.alternativeSlot ? ` · could do ${slotText(a.alternativeSlot)}` : ""}. Any new time needs the client’s approval.` } : { tone: "primary" as Tone, text: `Waiting for ${tech} to accept (受領).` }) : null;
+  const ackLine = a?.status === "completed" ? { tone: "ok" as Tone, text: `${tech} completed the job — the assignment ended with it, so ${tech}’s time is free again (IR234).` }
+    : a ? (a.acknowledgement === "accepted" ? { tone: "ok" as Tone, text: `${tech} accepted the assignment ✓` } : a.acknowledgement === "cant_make" ? { tone: "warn" as Tone, text: `${tech} can’t make this time${a.cantMakeReason ? `: “${a.cantMakeReason}”` : ""}${a.alternativeSlot ? ` · could do ${slotText(a.alternativeSlot)}` : ""}. Any new time needs the client’s approval.` } : { tone: "primary" as Tone, text: `Waiting for ${tech} to accept (受領).` }) : null;
   if (o && j.contractorOrgId) {
     const org = n.orgs.get(o.contractorOrgId) ?? "contractor";
     const state = o.decision === "accept" ? `accepted ${o.decidedAt ? md(o.decidedAt) : ""}`.trim() : Date.parse(o.offerExpiresAt) <= now ? "expired" : `offer open · expires ${md(o.offerExpiresAt)} ${hm(o.offerExpiresAt)}`;
-    return { kind: "contractor", title: `Delivery · contractor ${org}`, lines: [["Visit", `${slotText(o.visitSlot)} · ${state}`], ["Access", `${klTime(o.accessValidFrom).slice(5)} → ${klTime(o.accessValidUntil).slice(5)}${o.decision === "accept" && Date.parse(o.accessValidUntil) <= now ? " · ended" : ""}`], ["Technician", a ? `${tech} · ${slotText({ startAt: a.scheduledStart, endAt: a.scheduledEnd })}` : "not assigned by the contractor yet"]], ack: ackLine, cantMake: a?.acknowledgement === "cant_make" };
+    return { kind: "contractor", title: `Delivery · contractor ${org}`, lines: [["Visit", `${slotText(o.visitSlot)} · ${state}`], ["Access", `${klTime(o.accessValidFrom).slice(5)} → ${klTime(o.accessValidUntil).slice(5)}${o.decision === "accept" && Date.parse(o.accessValidUntil) <= now ? " · ended" : ""}`], ["Technician", a ? `${tech} · ${slotText({ startAt: a.scheduledStart, endAt: a.scheduledEnd })}${a.status === "completed" ? " · ended at completion" : ""}` : "not assigned by the contractor yet"]], ack: ackLine, cantMake: a?.status !== "completed" && a?.acknowledgement === "cant_make" };
   }
-  if (a) return { kind: "internal", title: "Delivery · internal", lines: [["Technician", `${tech} · assignment ${slotText({ startAt: a.scheduledStart, endAt: a.scheduledEnd })}`]], ack: ackLine, cantMake: a.acknowledgement === "cant_make" };
+  if (a) return { kind: "internal", title: "Delivery · internal", lines: [["Technician", `${tech} · assignment ${slotText({ startAt: a.scheduledStart, endAt: a.scheduledEnd })}${a.status === "completed" ? " · ended at completion" : ""}`]], ack: ackLine, cantMake: a.status !== "completed" && a.acknowledgement === "cant_make" };
   return null;
 }
 

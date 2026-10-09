@@ -113,7 +113,7 @@ export function detailBanner(j: ApiDetail, techName: string | null, now: number)
     case "on_hold":
       return { tone: "warn", text: "On hold by HQ — scheduling and reports are blocked until HQ resumes the job." };
     case "completed":
-      return { tone: "ok", text: `Completed${j.completedAt ? ` ${when(j.completedAt)}` : ""} — accepted in the quality review.` };
+      return { tone: "ok", text: `Completed${j.completedAt ? ` ${when(j.completedAt)}` : ""} — accepted in the quality review. ${techName ?? "The technician"}’s assignment ended with it, so the time is free for other visits (IR234).` };
     case "cancelled":
       return { tone: "crit", text: "Cancelled by HQ — no further work." };
   }

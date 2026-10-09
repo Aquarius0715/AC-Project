@@ -170,6 +170,21 @@ func TestWorkReports(t *testing.T) {
 	}
 	write(s, &techInt, "jobs.saveDraft", draftBody(job, "normal", map[string]string{"reportId": `"` + rep + `"`, "workText": `"` + strings.Repeat("v", 60) + `"`}), 6)
 	write(s, &techInt, "jobs.submit", `{"jobId":"`+job+`","reportVersion":7}`, 6)
+	// another job at the same time: the technician is busy while the assignment is active (DEC-73 checks it after completion)
+	_, m = write(s, &hq, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), map[string]string{"alternativeSlots": "[]"}), 0)
+	other := data(m)["id"].(string)
+	free := func() bool {
+		_, m := post(s, &hq, "members.eligible", `{"jobId":"`+other+`","startAt":"`+clock.Add(-30*time.Minute).Format(time.RFC3339)+`","endAt":"`+clock.Add(30*time.Minute).Format(time.RFC3339)+`","query":{"limit":50}}`)
+		for _, it := range items(m) {
+			if it["id"] == seed.ID("tech-internal-a").String() {
+				return true
+			}
+		}
+		return false
+	}
+	if free() {
+		t.Fatal("an active assignment books the technician")
+	}
 	// self review is forbidden even for HQ
 	owner(t, `UPDATE maintenance.work_reports SET author_id = $2 WHERE id = $1 AND version = 7`, rep, seed.ID("user-hq-operator"))
 	if code, _ := write(s, &hq, "jobs.review", `{"jobId":"`+job+`","reportVersion":7,"decision":"accept","reviewMode":"normal"}`, 7); code != 403 {
@@ -178,6 +193,34 @@ func TestWorkReports(t *testing.T) {
 	owner(t, `UPDATE maintenance.work_reports SET author_id = $2 WHERE id = $1 AND version = 7`, rep, seed.ID("user-tech-internal-a"))
 	if code, m := write(s, &hq, "jobs.review", `{"jobId":"`+job+`","reportVersion":7,"decision":"accept","reviewMode":"normal"}`, 7); code != 200 || data(m)["status"] != "completed" || data(m)["completedAt"] == nil {
 		t.Fatalf("accept: %d %v", code, m)
+	}
+	// DEC-73 / IR234: completion releases the assignment — the technician is free again, the detail still names who did
+	// the work, the technician keeps the job as a history snapshot at once (no worker tick), writes end, and the
+	// completion notification still reaches the technician
+	var status, reason string
+	ownerScan(t, `SELECT status, reason FROM maintenance.assignments WHERE job_id = $1 ORDER BY updated_at DESC LIMIT 1`, []any{job}, &status, &reason)
+	if status != "completed" || reason != "job_completed" {
+		t.Fatalf("assignment after completion: %s / %s", status, reason)
+	}
+	if !free() {
+		t.Error("a completed job's assignment still books the technician")
+	}
+	if code, m := post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`); code != 200 || data(m)["assignment"] == nil || data(m)["assignment"].(map[string]any)["status"] != "completed" {
+		t.Fatalf("the detail keeps the completed assignment: %d %v", code, m)
+	}
+	if _, m := post(s, &hq, "jobs.list", `{"filters":{"membershipId":"`+seed.ID("tech-internal-a").String()+`","status":"completed"},"limit":100}`); byJob(m, job) == nil || byJob(m, job)["technicianMembershipId"] != seed.ID("tech-internal-a").String() {
+		t.Errorf("the assignee filter and the summary keep the completed job's technician: %v", byJob(m, job))
+	}
+	if code, m := post(s, &techInt, "jobs.get", `{"jobId":"`+job+`"}`); code != 200 || data(m)["projection"] != "history" || data(m)["status"] != "completed" {
+		t.Fatalf("technician history right after completion: %d %v", code, m)
+	}
+	if code, m := write(s, &techInt, "jobs.saveDraft", draftBody(job, "normal", map[string]string{"reportId": `"` + rep + `"`}), 7); code != 403 || m["messageKey"] != "errors.assignment_ended" {
+		t.Errorf("a technician write after completion: %d %v", code, m)
+	}
+	var notified int
+	ownerScan(t, `SELECT count(*) FROM notify.notifications WHERE recipient_membership_id = $1 AND template_key = 'completion' AND target->>'id' = $2`, []any{seed.ID("tech-internal-a"), job}, &notified)
+	if notified != 1 {
+		t.Errorf("completion notification to the technician: %d", notified)
 	}
 	if code, m := getRep(&customerA, 7); code != 200 || data(m)["acceptedAt"] == nil {
 		t.Fatalf("client reads the accepted report: %d %v", code, m)
@@ -256,5 +299,13 @@ func TestContractorReview(t *testing.T) {
 	}
 	if code := review(&contrA, "normal", ""); code != 200 {
 		t.Fatalf("contractor accepts: %d", code)
+	}
+	var status string
+	ownerScan(t, `SELECT status FROM maintenance.assignments WHERE job_id = $1 ORDER BY updated_at DESC LIMIT 1`, []any{job}, &status)
+	if status != "completed" {
+		t.Errorf("the contractor's acceptance releases the assignment too: %s", status)
+	}
+	if code, m := post(s, &techA, "jobs.get", `{"jobId":"`+job+`"}`); code != 200 || data(m)["projection"] != "history" {
+		t.Errorf("external technician history after completion: %d %v", code, m)
 	}
 }

@@ -13910,7 +13910,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: contractor:partner.review:own-offer | admin:job.write:internal-or-escalation; no-self-review\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reason 1-1000\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06, DD-P05 · Input versions: reportVersion=WorkReport.version",
+                "description": "Authorization: contractor:partner.review:own-offer | admin:job.write:internal-or-escalation; no-self-review\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 reason 1-1000; IR234 accept releases the active assignment (status completed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A06, DD-P05 · Input versions: reportVersion=WorkReport.version",
                 "consumes": [
                     "application/json"
                 ],

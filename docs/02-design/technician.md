@@ -163,7 +163,7 @@ Scope: FR-T04 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, 
 4. Queries to update: `report draft / inspection items`.
 5. Tabs (IR115, Figma Technician 02-2/02-3/02-29): the URL `tab` selects the checklist group — `tab=indoor` (default), `tab=outdoor`, `tab=electrical` (DD-T05/DD-T06 use the same layout). The side view switch Readings / Parts & refrigerant / Time on site (DD-T14) is local state, not a URL key; photos attach to components and readings, and the work report (submit, customer sign-off DD-T15) is the footer panel, not a tab.
 
-**Boundary cases and failures**: Reject missing entries, measurements without units, not-inspected results without reasons, and photos from other jobs. Never default to normal and treat uninspected work as complete.
+**Boundary cases and failures**: Reject missing entries, measurements without units, not-inspected results without reasons, and photos from other jobs. Never default to normal and treat uninspected work as complete. After the viewing window ends — completion releases the assignment (IR234), or a reassignment / cancellation revokes it — `/technician/jobs/:id` shows the history snapshot (status, completion, whether the report was accepted, when the assignment ended) instead of not found.
 
 **Verification**: Check the traceability entries under AT-T04 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 

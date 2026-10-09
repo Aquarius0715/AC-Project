@@ -7,6 +7,7 @@ import { coreAll, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { componentsFor, type ApiTechReport, type TimeOnSite } from "@ac/web/lib/techJob";
 import type { WorkspaceLive } from "../_components/workspace-view";
+import type { ApiTechHistory } from "../_components/job-history";
 
 type JobDetail = {
   projection: "detail" | "offer" | "history"; id: string; version: number; status: string; type: string; unitId: string; symptom: string; alertIds: string[];
@@ -22,11 +23,12 @@ const quiet = <T,>(p: Promise<T>): Promise<T | Refused> => p.catch((e) => {
 });
 const isRefused = (x: unknown): x is Refused => !!x && typeof x === "object" && "refused" in x;
 
-export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | "not_found"> {
+export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | { kind: "history"; history: ApiTechHistory } | "not_found"> {
   const job = await coreOp<JobDetail>("jobs.get", { jobId }).catch((e) => {
     if (e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || e.error.fieldErrors.jobId)) return null;
     throw e;
   });
+  if (job?.projection === "history") return { kind: "history", history: job as unknown as ApiTechHistory }; // window ended: completed (IR234) or reassigned
   if (!job || job.projection !== "detail") return "not_found";
   const [now, unit] = await Promise.all([coreNow(), quiet(coreOp<ApiUnitDetail & { serviceScope?: string[] }>("units.get", { id: job.unitId }))]);
   const ref = job.draftReportRef ?? job.reportRefs[job.reportRefs.length - 1] ?? null;
