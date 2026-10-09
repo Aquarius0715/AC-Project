@@ -10,7 +10,7 @@ import (
 // web apps' route table (run make gen after changing a catalog).
 func TestGeneratedFilesAreCurrent(t *testing.T) {
 	src, ts, n := generate("../../../../../docs/02-design")
-	if n != 199 {
+	if n != 200 {
 		t.Fatalf("%d operations", n)
 	}
 	for path, want := range map[string][]byte{"../../../internal/ops/catalog_gen.go": src, "../../../../web/shared/lib/routes.gen.ts": ts} {

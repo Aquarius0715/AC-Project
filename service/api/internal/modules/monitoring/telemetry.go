@@ -699,15 +699,16 @@ func (m Telemetry) LatestMeasurements(ctx context.Context, c *ops.Call, units []
 }
 
 // RunHours implements IR134 item 1: hours with a valid measured power reading > 0 since `since` (nil = all), each reading
-// counting until the next one capped at its sensor's stale limit; nil without any power reading.
+// counting until the next one capped at its sensor's stale limit; the reading in force at `since` counts from `since`, so a
+// unit with power readings but none running since then has 0 h (IR238); nil without any power reading.
 func (m Telemetry) RunHours(ctx context.Context, c *ops.Call, unit uuid.UUID, since *time.Time) (*float64, error) {
-	q := `SELECT sensor_id, observed_at, value, origin, quality FROM monitoring.measurements WHERE unit_id = $1 AND metric = 'power' AND observed_at <= $2`
-	args := []any{unit, c.Now}
+	const cols = `SELECT sensor_id, observed_at, sequence, value, origin, quality FROM monitoring.measurements WHERE unit_id = $1 AND metric = 'power' AND observed_at <= $2`
+	q, args := cols, []any{unit, c.Now}
 	if since != nil {
-		q += " AND observed_at > $3"
+		q = `(` + cols + ` AND observed_at <= $3 ORDER BY observed_at DESC, sequence DESC LIMIT 1) UNION ALL (` + cols + ` AND observed_at > $3)`
 		args = append(args, *since)
 	}
-	rows, err := c.Tx.Query(ctx, q+" ORDER BY observed_at, sequence", args...)
+	rows, err := c.Tx.Query(ctx, `SELECT sensor_id, observed_at, value, origin, quality FROM (`+q+`) r ORDER BY observed_at, sequence`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -742,15 +743,20 @@ func (m Telemetry) RunHours(ctx context.Context, c *ops.Call, unit uuid.UUID, si
 		if !x.on {
 			continue
 		}
-		next := c.Now
+		end := c.Now
 		if i+1 < len(rs) {
-			next = rs[i+1].at
+			end = rs[i+1].at
 		}
-		d := next.Sub(x.at)
-		if lim, ok := limits[x.sensor]; ok && d > lim {
-			d = lim
+		if lim, ok := limits[x.sensor]; ok && end.Sub(x.at) > lim {
+			end = x.at.Add(lim)
 		}
-		total += d
+		start := x.at
+		if since != nil && start.Before(*since) {
+			start = *since
+		}
+		if end.After(start) {
+			total += end.Sub(start)
+		}
 	}
 	h := math.Round(total.Hours()*10) / 10
 	return &h, nil

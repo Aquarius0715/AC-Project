@@ -1,7 +1,9 @@
-// The reads of /customer/maintenance (FR-C09, FR-C17, SCR-C09) through the DAL: the customer's units with their place
-// (units.list, properties.list, spaces.list), the requests (jobs.list, client projection) and for jobId the request
-// (jobs.get — the technician's name once accepted, IR237), its events (jobs.events: notes and history, internal notes
-// never reach the client) and its accepted report (reports.get with up to four ready photos, attachments.getContent).
+// The reads of /customer/maintenance (FR-C09, FR-C17, FR-C18, SCR-C09) through the DAL: the customer's units with their
+// place (units.list, properties.list, spaces.list); on My requests the requests (jobs.list, client projection) and for
+// jobId the request (jobs.get — the technician's name once accepted, IR237), its events (jobs.events: notes and history,
+// internal notes never reach the client) and its accepted report (reports.get with up to four ready photos,
+// attachments.getContent); on Filter care (tab=filter-care) the status per AC (filterCare.list) and the reminder
+// settings or their defaults (filterCare.getSettings, IR238).
 import "server-only";
 import { coreAll, coreNow, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
 import { unitPlaces } from "@ac/web/lib/clientBilling";
@@ -10,9 +12,10 @@ import { inspectionRows, readingRows, resultText, type ApiWorkReport } from "@ac
 import {
   clientEventTitle, clientRows, declinedNotice, detailFacts, feedback, notesOf, planVisit, preferredLines, proposalCard, type ApiClientEvent, type ApiClientJob, type ApiClientRow,
 } from "@ac/web/lib/customerMaintenance";
+import { filterLines, reminderForm, reminderLines, type ApiFilterSettings, type ApiFilterStatus } from "@ac/web/lib/customerFilterCare";
 import { klTime } from "@ac/web/lib/devices";
 
-type Unit = { id: string; displayName: string; propertyId: string; spaceId: string | null; archived: boolean };
+type Unit = { id: string; displayName: string; propertyId: string; spaceId: string | null; archived: boolean; connection: string };
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 const quiet = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
   if (e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN")) return fallback;
@@ -20,13 +23,21 @@ const quiet = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
 });
 
 export async function loadMaintenance(sp: Record<string, string | string[] | undefined>) {
-  const [now, me, units, properties, spaces, list] = await Promise.all([
+  const page = one(sp.tab) === "filter-care" || one(sp.tab) === "filters" ? "filters" as const : "requests" as const;
+  const [now, me, units, properties, spaces] = await Promise.all([
     coreNow(), corePrincipal(), coreAll<Unit>("units.list"), coreAll<{ id: string; name: string }>("properties.list"),
-    coreAll<{ id: string; name: string; parentSpaceId: string | null }>("spaces.list"), coreAll<ApiClientRow>("jobs.list", { sort: { field: "status", direction: "asc" } }),
+    coreAll<{ id: string; name: string; parentSpaceId: string | null }>("spaces.list"),
   ]);
   const nowMs = now.getTime();
   const place = unitPlaces(units, properties, spaces);
   const unitOf = (id: string) => place.get(id) ?? { name: "Unit", place: "" };
+  const common = { now: now.toISOString(), page, owner: me.clientRole === "owner", units: units.filter((u) => !u.archived).map((u) => ({ id: u.id, ...unitOf(u.id) })) };
+  if (page === "filters") {
+    const [items, settings] = await Promise.all([coreAll<ApiFilterStatus>("filterCare.list"), coreOp<ApiFilterSettings>("filterCare.getSettings", {})]);
+    const lines = filterLines(items, units.map((u) => ({ id: u.id, ...unitOf(u.id), spaceId: u.spaceId, connection: u.connection })), nowMs);
+    return { ...common, rows: [], rateBanner: null, detail: null, filters: { lines, settings, reminders: reminderLines(settings), form: reminderForm(settings) } };
+  }
+  const list = await coreAll<ApiClientRow>("jobs.list", { sort: { field: "status", direction: "asc" } });
   const rows = clientRows(list.filter((j) => j.projection === "summary"), unitOf);
   // the newest completed requests: the first one still waiting for Confirm & rate gets the banner (IR110, DD-C17)
   const done = await Promise.all(list.filter((j) => j.projection === "summary" && j.status === "completed")
@@ -34,8 +45,7 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
     .map((j) => quiet(coreOp<ApiClientJob>("jobs.get", { jobId: j.id }), null)));
   const toRate = done.find((j) => j && j.projection === "detail" && feedback(j, nowMs).kind === "rate") ?? null;
   const base = {
-    now: now.toISOString(), rows, page: one(sp.tab) === "filter-care" || one(sp.tab) === "filters" ? "filters" as const : "requests" as const,
-    units: units.filter((u) => !u.archived).map((u) => ({ id: u.id, ...unitOf(u.id) })),
+    ...common, rows, filters: null,
     rateBanner: toRate ? { jobId: toRate.id, text: `Work finished — ${toRate.id.slice(0, 8)} · ${unitOf(toRate.unitId).name}${toRate.completedAt ? ` · ${klTime(toRate.completedAt).slice(5, 10)}` : ""}.` } : null,
   };
   const pick = one(sp.jobId);

@@ -369,9 +369,46 @@ func (m FilterCare) saveSettings(ctx context.Context, c *ops.Call, in *SettingsI
 	return s, nil
 }
 
+// ---- filterCare.getSettings ----
+
+// SettingsGetInput is filterCare.getSettings input: none, the caller's customer.
+type SettingsGetInput struct{}
+
+// @Summary		filterCare.getSettings (read)
+// @ID				filterCare.getSettings
+// @Description	Authorization: client:self
+// @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR238 the customer's settings or the defaults (version 0)
+// @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
+// @Description	Design: DD-C18
+// @Tags			filterCare
+// @Accept			json
+// @Produce		json
+// @Success		200	{object}	ops.Envelope{data=FilterSettings}
+// @Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504	{object}	apperr.DomainError	"TIMEOUT"
+// @Security		BearerAuth
+// @Router			/v1/filter-care/settings [get]
+func (m FilterCare) getSettings(ctx context.Context, c *ops.Call, _ *SettingsGetInput) (FilterSettings, error) {
+	cust, ok, err := m.Units.CustomerOfOrg(ctx, c, c.Principal.OrgID)
+	if err != nil {
+		return FilterSettings{}, err
+	}
+	if !ok {
+		return FilterSettings{}, apperr.E(apperr.NotFound, "error.notFound")
+	}
+	return m.settings(ctx, c, cust)
+}
+
 // RegisterFilterCare binds the filter care operations.
 func RegisterFilterCare(r *ops.Registry, m FilterCare) {
 	ops.Register(r, "filterCare.list", m.list)
+	ops.Register(r, "filterCare.getSettings", m.getSettings)
 	ops.Register(r, "filterCare.markCleaned", m.markCleaned)
 	ops.Register(r, "filterCare.saveSettings", m.saveSettings)
 }

@@ -47,9 +47,21 @@ func TestFilterCare(t *testing.T) {
 			t.Errorf("settings %s: %d", name, code)
 		}
 	}
+	// IR238: the settings read back — the defaults (version 0) before the first save
+	if code, m := post(s, &customerB, "filterCare.getSettings", `{}`); code != 200 || data(m)["version"].(float64) != 0 || data(m)["thresholdHours"] != nil ||
+		data(m)["fallbackDays"].(float64) != 30 || data(m)["recipients"] != "owners" {
+		t.Fatalf("default settings: %d %v", code, m)
+	}
 	if code, m := write(s, &customerB, "filterCare.saveSettings", `{"thresholdHours":100,"fallbackDays":14,"recipients":"all_users","channels":["inApp","email"]}`, 0); code != 200 ||
 		data(m)["version"].(float64) != 1 {
 		t.Fatalf("save settings: %d %v", code, m)
+	}
+	if _, m := post(s, &customerB, "filterCare.getSettings", `{}`); data(m)["version"].(float64) != 1 || data(m)["thresholdHours"].(float64) != 100 ||
+		data(m)["recipients"] != "all_users" || len(data(m)["channels"].([]any)) != 2 {
+		t.Fatalf("saved settings: %v", m)
+	}
+	if code, _ := post(s, &techInt, "filterCare.getSettings", `{}`); code != 403 {
+		t.Error("a technician reads the customer's settings")
 	}
 	if st := statusOf(&customerB); st["status"] != "overdue" || st["thresholdHours"].(float64) != 100 {
 		t.Fatalf("overdue: %v", st)
@@ -59,13 +71,18 @@ func TestFilterCare(t *testing.T) {
 		t.Error("member saves settings")
 	}
 	owner(t, `UPDATE identity.memberships SET client_role = 'owner' WHERE id = $1`, seed.ID("customer-b"))
-	// mark cleaned → no run time since → fallback days decide
+	// mark cleaned → the counter restarts at 0 h: the reading in force (off since 10 h) has not run since (IR238)
 	if code, _ := write(s, &customerA, "filterCare.markCleaned", `{"unitId":"`+u+`"}`, 0); code != 404 {
 		t.Error("other customer marks cleaned")
 	}
 	code, m := write(s, &customerB, "filterCare.markCleaned", `{"unitId":"`+u+`"}`, 0)
-	if code != 200 || data(m)["lastCleanedBy"] != "customer" || data(m)["status"] != "ok" || data(m)["runHoursSinceCleaning"] != nil {
+	if code != 200 || data(m)["lastCleanedBy"] != "customer" || data(m)["status"] != "ok" || data(m)["runHoursSinceCleaning"] != float64(0) {
 		t.Fatalf("mark cleaned: %d %v", code, m)
+	}
+	// a cleaning while the AC was running: the reading in force counts from the cleaning (100 h → 10 h ago = 90 of 100 h)
+	owner(t, `UPDATE maintenance.filter_cleanings SET cleaned_at = $2 WHERE unit_id = $1`, u, clock.Add(-100*time.Hour))
+	if st := statusOf(&customerB); st["status"] != "due_soon" || st["runHoursSinceCleaning"].(float64) != 90 {
+		t.Fatalf("run time since a cleaning while running: %v", st)
 	}
 	owner(t, `UPDATE maintenance.filter_cleanings SET cleaned_at = $2 WHERE unit_id = $1`, u, clock.Add(-12*24*time.Hour))
 	if st := statusOf(&customerB); st["status"] != "overdue" || st["runHoursSinceCleaning"].(float64) != 200 {

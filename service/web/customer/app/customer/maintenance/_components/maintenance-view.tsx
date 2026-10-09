@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Badge, Banner, Btn, Card, Choice, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, cx } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
 import { useAction } from "@ac/web/lib/useAction";
@@ -10,9 +10,10 @@ import { klTime } from "@ac/web/lib/devices";
 import type { JobStatus } from "@ac/web/lib/jobs";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { clientJobRefusal, contactError, followUpText, PROBLEMS, preferredError, RATING_TAGS, STATUS_TABS, type StatusTab } from "@ac/web/lib/customerMaintenance";
+import { filterRefusal } from "@ac/web/lib/customerFilterCare";
 import { addNote, cancelRequest, createRequest, rateJob, reportProblem, requestReschedule, respondProposal } from "../actions";
 import type { MaintenanceLive } from "../_lib/load";
-import { FilterCare } from "./maintenance-demo";
+import { FilterCareTab, type CleaningPrefill } from "./filter-care";
 
 type Detail = NonNullable<MaintenanceLive["detail"]>;
 type Slot = { startAt: string; endAt: string };
@@ -22,10 +23,14 @@ const toSlot = (r: Row): Slot => ({ startAt: new Date(`${r.date}T${r.from}:00+08
 const dayAfter = (now: number, n: number) => klTime(new Date(now + n * 86_400_000).toISOString()).slice(0, 10);
 const threeRows = (now: number, start = 2): Row[] => [0, 1, 2].map((i) => ({ date: dayAfter(now, start + i), from: i === 1 ? "14:00" : "10:00", to: i === 1 ? "16:00" : "12:00" }));
 
-/** Customer maintenance (FR-C09, FR-C17, Figma Client 07a–07p) from the Core API. */
+/** Customer maintenance (FR-C09, FR-C17, FR-C18, Figma Client 07a–07p) from the Core API. The tab is in the URL (tab=
+ * filter-care): the server reads only what the shown tab needs. */
 export function MaintenanceView({ live }: { live: MaintenanceLive }) {
   const router = useRouter();
-  const [page, setPage] = useState<"requests" | "filters">(live.page);
+  const [going, startGo] = useTransition();
+  const [target, setTarget] = useState<"requests" | "filters">(live.page);
+  const page = going ? target : live.page;
+  const [prefill, setPrefill] = useState<CleaningPrefill | null>(null);
   const [tab, setTab] = useState<StatusTab>("all");
   const [origin, setOrigin] = useState<"all" | "request" | "plan">("all");
   const [modal, setModal] = useState<ModalKind>(null);
@@ -37,17 +42,22 @@ export function MaintenanceView({ live }: { live: MaintenanceLive }) {
   const close = (text?: string, tone: "ok" | "warn" = "ok") => { setModal(null); if (text) setResult({ tone, text }); };
   const fail = (f: ActionFailure) => { setModal(null); setResult({ tone: f.code === "CONFLICT" ? "warn" : "crit", text: clientJobRefusal(f) }); };
   const open = (jobId: string) => router.push(`/customer/maintenance?jobId=${jobId}`);
+  const go = (v: "requests" | "filters") => {
+    setTarget(v);
+    setResult(null);
+    startGo(() => router.replace(v === "filters" ? "/customer/maintenance?tab=filter-care" : "/customer/maintenance", { scroll: false }));
+  };
   return (
     <Page>
-      <Tabs value={page} onChange={setPage} tabs={[{ id: "requests", label: "My requests" }, { id: "filters", label: "Filter care" }]} />
+      <Tabs value={page} onChange={go} tabs={[{ id: "requests", label: "My requests" }, { id: "filters", label: "Filter care" }]} />
+      {result && <Banner tone={result.tone}>{result.text}</Banner>}
       {page === "filters" ? (
+        live.filters && !going ? (
+          <FilterCareTab f={live.filters} owner={live.owner} onRequest={(p) => { setPrefill(p); setModal("new"); }}
+            onDone={(text) => setResult({ tone: "ok", text })} onFail={(f) => setResult({ tone: f.code === "FORBIDDEN" ? "warn" : "crit", text: filterRefusal(f) })} />
+        ) : <Card title="Filters by AC"><p className="text-[13px] text-muted">Loading filter care…</p></Card>
+      ) : going ? <Card title="My requests"><p className="text-[13px] text-muted">Loading your requests…</p></Card> : (
         <>
-          <Banner tone="warn">Filter care is not connected to the Core API yet — illustrative data (FR-C18, next round).</Banner>
-          <FilterCare onRequest={() => { setPage("requests"); setModal("new"); }} />
-        </>
-      ) : (
-        <>
-          {result && <Banner tone={result.tone}>{result.text}</Banner>}
           {replies > 0 && <Banner tone="warn" icon="⇄" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); const r = live.rows.find((x) => x.tab === "reply"); if (r) open(r.id); }}>Review</Btn>}>A new visit time needs your reply ({replies}). Nothing is booked until you accept.</Banner>}
           {live.rateBanner && <Banner tone="ok" icon="✓" action={<Btn size="sm" variant="primary" onClick={() => open(live.rateBanner!.jobId)}>Confirm & rate</Btn>}><b>{live.rateBanner.text}</b> Is everything working? Your confirmation closes the job.</Banner>}
           <PageHead title="My requests" sub={`${live.rows.length} request${live.rows.length === 1 ? "" : "s"} · sorted by status (business order)`} action={<Btn variant="primary" onClick={() => setModal("new")}>+ New maintenance request</Btn>} />
@@ -75,7 +85,7 @@ export function MaintenanceView({ live }: { live: MaintenanceLive }) {
           </div>
         </>
       )}
-      {modal === "new" && <NewRequest live={live} onClose={close} onFail={fail} />}
+      {modal === "new" && <NewRequest live={live} prefill={prefill} onClose={(text, tone) => { setPrefill(null); close(text, tone); }} onFail={(f) => { setPrefill(null); fail(f); }} />}
       {d && modal === "decline" && <DeclineModal d={d} now={Date.parse(live.now)} onClose={close} onFail={fail} />}
       {d && modal === "other" && <OtherTimeModal d={d} now={Date.parse(live.now)} onClose={close} onFail={fail} />}
       {d && modal === "rate" && <RateModal d={d} onClose={close} onFail={fail} />}
@@ -177,13 +187,14 @@ function TimesInput({ rows, onChange, error, label = "Your 3 preferred times" }:
   );
 }
 
-function NewRequest({ live, onClose, onFail }: ModalProps & { live: MaintenanceLive }) {
+/** A new request; from Filter care it opens prefilled with the unit, type preventive and the cleaning line (DD-C18). */
+function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: MaintenanceLive; prefill: CleaningPrefill | null }) {
   const router = useRouter();
   const now = Date.parse(live.now);
   const [pending, run] = useAction();
-  const [unitId, setUnitId] = useState(live.units[0]?.id ?? "");
-  const [type, setType] = useState<"reactive" | "preventive">("reactive");
-  const [sym, setSym] = useState("");
+  const [unitId, setUnitId] = useState(prefill?.unitId ?? live.units[0]?.id ?? "");
+  const [type, setType] = useState<"reactive" | "preventive">(prefill ? "preventive" : "reactive");
+  const [sym, setSym] = useState(prefill?.symptom ?? "");
   const [rows, setRows] = useState<Row[]>(threeRows(now));
   const [contact, setContact] = useState("");
   const [tried, setTried] = useState(false);

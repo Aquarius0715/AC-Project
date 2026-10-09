@@ -70,6 +70,7 @@ export const coreRoutes: Readonly<Record<string, readonly CoreRoute[]>> = {
   "energy.summary": [{ method: "GET", path: "/v1/energy/summary" }],
   "factors.list": [{ method: "GET", path: "/v1/factors" }],
   "factors.save": [{ method: "POST", path: "/v1/factors" }, { method: "PUT", path: "/v1/factors/{id}" }],
+  "filterCare.getSettings": [{ method: "GET", path: "/v1/filter-care/settings" }],
   "filterCare.list": [{ method: "GET", path: "/v1/filter-care" }],
   "filterCare.markCleaned": [{ method: "POST", path: "/v1/filter-care/{unitId}/mark-cleaned" }],
   "filterCare.saveSettings": [{ method: "PUT", path: "/v1/filter-care/settings" }],

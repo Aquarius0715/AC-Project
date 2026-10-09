@@ -42,7 +42,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | DD-C15 / FR-C15 | `/customer/alerts?tab=policies` / `AlertPolicyList` | `policies.list`, `policies.get`, `policies.save`, `policies.delete`, `policies.setDefaultRule`, `units.setAlertPolicies`, `units.list` | Default policy rules on/off per customer; own policies with one condition; recovery direction and fixed units | Default policy cannot be edited or deleted; delete detaches first |
 | DD-C16 / FR-C16 | `/customer/energy` / `EnergyReportExport` | `energy.exportReport` | Completed month, at least one section, PDF/CSV | Same tariff and estimation labels as the screen |
 | DD-C17 / FR-C17 | `/customer/maintenance?jobId=` / `JobCompletionFeedback` | `jobs.get`, `jobs.rate`, `jobs.reportProblem` | 1–5 ★ required; editable 7 days; problem details 10–2000, up to 5 photos | Not completed → CONFLICT; ratings never shown to other customers |
-| DD-C18 / FR-C18 | `/customer/maintenance?tab=filter-care` / `FilterCare` | `filterCare.list`, `filterCare.markCleaned`, `filterCare.saveSettings` | Run time since cleaning per AC; threshold 50–2000 h or model default; fallback days 7–180 | Offline → unknown, never 0 |
+| DD-C18 / FR-C18 | `/customer/maintenance?tab=filter-care` / `FilterCare` | `filterCare.list`, `filterCare.markCleaned`, `filterCare.saveSettings`, `filterCare.getSettings` | Run time since cleaning per AC; threshold 50–2000 h or model default; fallback days 7–180 | Offline → unknown, never 0 |
 | DD-C19 / FR-C19 | `/customer/users` / `ClientUsers` | `clientUsers.list`, `clientUsers.save`, `clientUsers.resendInvite` | Owner only; invite e-mail unique per customer (case-insensitive); role fixed to member | Owners cannot change roles, disable, reset passwords, or remove users (HQ, DD-A17) |
 
 ## Shared Implementation Steps
@@ -606,7 +606,7 @@ Scope: FR-C17 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, 
 
 **Source mapping**: SRC-06 BIZ-18, BIZ-12 → FR-C18 → DD-C18. Source category: Figma-confirmed screen specification (Client 07j, 2026-10-01).
 
-Scope: FR-C18 / Main display pattern: **UI-LIST**. Service boundary: `filterCare.list, filterCare.markCleaned, filterCare.saveSettings`.
+Scope: FR-C18 / Main display pattern: **UI-LIST**. Service boundary: `filterCare.list, filterCare.markCleaned, filterCare.saveSettings, filterCare.getSettings`.
 
 **Initial view and prerequisites**: Maintenance › Filter care tab (`tab=filter-care`).
 
@@ -619,11 +619,11 @@ Scope: FR-C18 / Main display pattern: **UI-LIST**. Service boundary: `filterCare
 
 **Steps**
 
-1. Table per AC: run time, progress bar (% of threshold), status OK/Due soon (≥ 80 %)/Overdue (≥ 100 %)/unknown, last cleaned (by whom, job link). Areas with many ACs show a summary row with “View n”.
-2. Request cleaning opens the New request modal prefilled with the unit and type=preventive. Mark cleaned calls `filterCare.markCleaned`. Owners edit reminders (`filterCare.saveSettings`).
+1. Table per AC: run time, progress bar (% of threshold), status OK/Due soon (≥ 80 %)/Overdue (≥ 100 %)/unknown, last cleaned (by whom, job link). Areas with many ACs (4 or more in one space, IR238) show a summary row with “View n”.
+2. Request cleaning (overdue rows) opens the New request modal prefilled with the unit and type=preventive. Mark cleaned (every row, IR238) calls `filterCare.markCleaned` and restarts the run time at 0 h. Owners edit reminders (`filterCare.saveSettings`).
 3. Crossing the threshold raises an Alert of type maintenance (cleaning_due notification, IR104 mapping unchanged).
 
-**Boundary cases and failures**: Members cannot save settings (FORBIDDEN). Out-of-range values → VALIDATION.
+**Boundary cases and failures**: Members cannot save settings (FORBIDDEN). Out-of-range values → VALIDATION. The reminders card and the edit dialog read the saved settings (or the defaults) with `filterCare.getSettings` (IR238).
 
 **Verification**: Check the traceability entries under AT-C18 (N/E/B).
 

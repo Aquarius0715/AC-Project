@@ -258,7 +258,7 @@ func TestRegisterGuards(t *testing.T) {
 }
 
 func TestCatalogShape(t *testing.T) {
-	if len(Catalog) != 199 { // IR214 automations.delete, IR216 commands.list
+	if len(Catalog) != 200 { // IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings
 		t.Fatalf("catalog size %d", len(Catalog))
 	}
 	for _, s := range Catalog {

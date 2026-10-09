@@ -420,6 +420,7 @@ export type OperationContracts = {
   'jobs.reportProblem': {input:{jobId:ID;reasonCode:'same_problem'|'new_damage'|'not_completed'|'other';details:string;photos:BlobInput[];preferredSlot:Slot|null};result:MaintenanceJob;mode:'write'};
   'jobs.classifyFollowUp': {input:{jobId:ID;classification:'rework'|'new_request';reason:string};result:MaintenanceJob;mode:'write'};
   'filterCare.list': {input:Query;result:Page<FilterCareStatus>;mode:'read'};
+  'filterCare.getSettings': {input:Record<string,never>;result:FilterCareSettings;mode:'read'};
   'filterCare.markCleaned': {input:{unitId:ID};result:FilterCareStatus;mode:'write'};
   'filterCare.saveSettings': {input:{thresholdHours:number|null;fallbackDays:number;recipients:FilterCareSettings['recipients'];channels:Channel[]};result:FilterCareSettings;mode:'write'};
   'energy.exportReport': {input:{month:string;propertyIds:ID[];sections:('energy_cost'|'month_comparison'|'co2_offsets'|'alerts_maintenance')[];format:'pdf'|'csv'};result:ReportFile;mode:'read'};

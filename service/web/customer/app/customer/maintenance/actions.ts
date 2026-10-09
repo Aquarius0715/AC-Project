@@ -3,8 +3,9 @@
 // Server Actions of /customer/maintenance (FR-C09, FR-C17): a new request with 3 preferred times (jobs.create), the
 // answer to a proposed time (jobs.respondProposal), another time for a plan visit (jobs.requestReschedule), cancel a
 // request (jobs.cancel), a note for the coordinator (jobs.addNote, customer visibility), Confirm & rate (jobs.rate) and
-// Report a problem with photos (jobs.reportProblem → a follow-up request). Writes on a request carry its version as
-// the expected version; CONFLICT refreshes the page.
+// Report a problem with photos (jobs.reportProblem → a follow-up request); on Filter care (FR-C18) Mark cleaned
+// (filterCare.markCleaned) and the owner's reminder settings (filterCare.saveSettings). Writes on a request carry its
+// version as the expected version; CONFLICT refreshes the page.
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -81,4 +82,15 @@ export async function reportProblem(form: FormData) {
     }, write(Number(form.get("version"))));
     return { id: j.id };
   });
+}
+
+/** filterCare.markCleaned: the customer cleaned the filter; the counter restarts (lastCleanedBy customer, shown to the technician). */
+export async function markCleaned(unitId: string) {
+  return run(async () => { await coreOp("filterCare.markCleaned", { unitId }, { write: true }); return null; });
+}
+
+/** filterCare.saveSettings (owner only): remind at the model default or 50–2000 h, every 7–180 days when run time is
+ * unknown, to the owners or all users, in the app and optionally by e-mail. */
+export async function saveReminders(input: { thresholdHours: number | null; fallbackDays: number; recipients: "owners" | "all_users"; channels: ("inApp" | "email")[] }) {
+  return run(async () => { await coreOp("filterCare.saveSettings", input, { write: true }); return null; });
 }

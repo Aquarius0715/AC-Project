@@ -1,6 +1,7 @@
 // /customer/maintenance (FR-C09, FR-C17, FR-C18, SCR-C09): in API mode a Server Component reads the customer's
-// requests (jobs.list) and, for jobId, the request with its notes, history and accepted report (_lib/load.ts); new
-// requests, answers to a proposed time, plan-visit reschedules, cancellation, notes, ratings and problem reports are
+// requests (jobs.list) and, for jobId, the request with its notes, history and accepted report, or with tab=filter-care
+// the filter status per AC and the reminder settings (_lib/load.ts); new requests, answers to a proposed time,
+// plan-visit reschedules, cancellation, notes, ratings, problem reports, Mark cleaned and the reminder settings are
 // Server Actions (./actions.ts). URL keys: jobId, tab (filter-care). The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
 import { apiMode } from "@ac/web/lib/dal";

@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.129.0 (2026-10-10): IR238; filterCare.getSettings (operations 199 → 200, routes 220), SCR-C09 reads and interaction, DD-C18 boundary and steps.
 # 0.128.0 (2026-10-10): IR237; SCR-C09 reads (+jobs.events, properties.list, spaces.list), DD-C09 boundary, catalog design_ids, Assignment.technicianName; counts unchanged.
 # 0.121.0 (2026-10-09): IR230; SCR-T01 reads, DD-T13 boundary; counts unchanged.
 # 0.120.0 (2026-10-09): IR229; SCR-T01 reads, DD-T01 boundary, BLOB_DIR; counts unchanged.
@@ -219,8 +220,8 @@ opnames = unique(operations, 'operation', 'operation')
 opmap = {row['operation']: row for row in operations}
 types = (ROOT / '02-design/service-contracts.ts').read_text()
 typed = {name:(input_, result, mode) for name,input_,result,mode in re.findall(r"^  '([^']+)': \{input:(.*);result:(.*);mode:'(read|write)'\};$", types, re.M)}
-if set(typed) != opnames or len(operations) != 199:  # IR214 automations.delete, IR216 commands.list
-    fail('199 operation/TypeScript contract keys differ')
+if set(typed) != opnames or len(operations) != 200:  # IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings
+    fail('200 operation/TypeScript contract keys differ')
 for row in operations:
     name = row['operation']
     if typed.get(name) != (row['input_contract'], row['result_contract'], row['mode']):
@@ -1332,7 +1333,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.128.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.129.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

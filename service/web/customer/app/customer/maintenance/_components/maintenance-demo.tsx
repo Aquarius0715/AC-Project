@@ -275,7 +275,7 @@ const filters = [
   { unit: "Lobby AC", loc: "Office A · last cleaned Aug 12", h: 120, st: "OK" as const },
   { unit: "Living room AC", loc: "Home A › 1F · cleaned by technician Sep 8 (job-c02)", h: 41, st: "OK" as const },
 ];
-export function FilterCare({ onRequest }: { onRequest: () => void }) {
+function FilterCare({ onRequest }: { onRequest: () => void }) {
   const toast = useToast();
   const [rows, setRows] = useState(filters);
   return (
