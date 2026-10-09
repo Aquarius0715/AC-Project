@@ -1,23 +1,26 @@
-"use client";
+// /demo (FR-X05, DDC-07, SCR-X-demo, IR249; Figma Client 10e): in API mode a Server Component reads the Core API scenario
+// clock (session.get meta.snapshotAt) and the devices the signed-in role can see (devices.list, units.list for the names).
+// Only devices whose history it can read are offered (devices.events: the next sequence and the open connection fault a
+// recovery names; a technician needs a current assignment, SR24); the changes are Server Actions (./actions.ts). The
+// Phase 1A demo keeps its browser-only controls.
+import { connection } from "next/server";
+import { apiMode, coreAll, coreNow, coreOp } from "@ac/web/lib/dal";
+import { clockText, deviceOptions, openFault, type ApiDevice, type ApiDeviceEvent } from "@ac/web/lib/demoPanel";
+import { DemoMock } from "./_components/demo-mock";
+import { DemoView } from "./_components/demo-view";
 
-import { useState } from "react";
-import { Banner, Btn, Card, DemoBadge, Page, SummaryList, useToast } from "@ac/web/components/ui";
-import { jobActions } from "@ac/web/lib/jobs";
-import { clientUserActions } from "@ac/web/lib/clientUsers";
-
-export default function Demo() {
-  const toast = useToast();
-  const [sim, setSim] = useState(false);
-  return (
-    <Page className="max-w-3xl">
-      <Banner tone="warn" action={<DemoBadge />}>Visually separated from business screens. Nothing here reaches real devices, payments, notifications, or IoT connections (FR-X05).</Banner>
-      <Card title="Demo clock" sub="Real-time speed · advancing jumps do not consume session lifetime"><div className="flex flex-wrap items-center gap-3"><span className="font-mono text-sm">2026-09-14 09:41 UTC</span><Btn size="sm" onClick={() => toast("Clock advanced +1 min (demo)")}>+1 min</Btn><Btn size="sm" onClick={() => toast("Clock advanced +1 hour (demo)")}>+1 hour</Btn></div></Card>
-      <Card title="Scenario" sub="fixture-contract.json demoSeed is the source of truth"><div className="flex flex-wrap items-center gap-3"><span className="font-mono text-sm">simulator = {String(sim)} (baseline seed)</span><Btn size="sm" onClick={() => setSim((s) => !s)}>Toggle simulator</Btn></div></Card>
-      <Card title="Reset" sub="Returns clock, subscriptions, image URLs, caches, and business data to their initial seed"><Btn variant="danger" onClick={() => { setSim(false); jobActions.reset(); clientUserActions.reset(); toast("Demo data reset to seed"); }}>Reset demo data</Btn></Card>
-      <Card title="Trigger failures">
-        <SummaryList items={[["Device offline", "communication_lost on unit-online-rto"], ["Delay transport", "3000ms on commands.create"], ["Expire session", "session_expired for current Membership"]]} />
-        <div className="mt-3 flex flex-wrap gap-2"><Btn size="sm" onClick={() => toast("Device offline triggered", "warn")}>Device offline</Btn><Btn size="sm" onClick={() => toast("Transport delay 3000 ms set", "warn")}>Delay transport</Btn><Btn size="sm" onClick={() => toast("Session expired (demo)", "crit")}>Expire session</Btn></div>
-      </Card>
-    </Page>
-  );
+export default async function DemoPage() {
+  await connection();
+  if (!apiMode()) return <DemoMock />;
+  const [now, devices, units] = await Promise.all([
+    coreNow(),
+    coreAll<ApiDevice>("devices.list").catch(() => null), // a role without device reads gets no device tile
+    coreAll<{ id: string; displayName: string }>("units.list").catch(() => []),
+  ]);
+  const listed = (devices ?? []).slice(0, 20);
+  const histories = await Promise.all(listed.map((d) => coreOp<{ items: ApiDeviceEvent[] }>("devices.events", { id: d.id, query: { limit: 100 } }).then((p) => p.items).catch(() => null)));
+  const faults = new Map<string, string>();
+  histories.forEach((h, i) => { const f = h && openFault(h); if (f) faults.set(listed[i].id, f.id); });
+  const usable = listed.filter((_, i) => histories[i] !== null);
+  return <DemoView live={{ clock: clockText(now.toISOString()), devices: devices && deviceOptions(usable, new Map(units.map((u) => [u.id, u.displayName])), faults), hidden: listed.length - usable.length }} />;
 }

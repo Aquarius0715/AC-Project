@@ -22,6 +22,7 @@ export function useStoredRole(): Role {
   return fromPath ?? (saved && ROLES[saved] ? saved : "client");
 }
 
+const signOut = "flex w-full items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-crit hover:bg-crit-soft/50";
 const SHARED = [
   { href: "/notifications", label: "Notifications", icon: "🔔" },
   { href: "/settings/preferences", label: "Preferences", icon: "✲" },
@@ -92,6 +93,7 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
   const activeHref = best ? items.find((i) => score(i.href, i.match) === best)?.href : undefined;
   const sharedActive = SHARED.find((s) => pathname === s.href);
   const title = sharedActive?.label ?? (pathname === "/customer/users" ? "Users" : pathname === "/demo" ? "Demo controls" : items.find((i) => i.href === activeHref)?.label ?? "AC Project");
+  const demo = pathname === "/demo";
 
 
   return (
@@ -116,15 +118,19 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
             </Link>
           </nav>
           <div className="mt-auto pt-4">
-            <Link href="/login" className="flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-crit hover:bg-crit-soft/50"><span aria-hidden className="w-4 text-center">↦</span>Sign out</Link>
+            {live ? (
+              // API mode (FR-X01, IR250): sign-out ends the BFF session; the full navigation also clears the screen and its cache
+              <form action="/bff/auth/logout" method="post"><button type="submit" className={signOut}><span aria-hidden className="w-4 text-center">↦</span>Sign out</button></form>
+            ) : <Link href="/login" className={signOut}><span aria-hidden className="w-4 text-center">↦</span>Sign out</Link>}
           </div>
         </aside>
 
         <div className="flex min-w-0 flex-col">
-          <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur sm:px-6 lg:px-8">
+          <header className={cx("sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b px-4 backdrop-blur sm:px-6 lg:px-8", demo ? "border-[#fdba74] bg-warn-soft" : "border-line bg-surface/95")}>
             <div className="flex min-w-0 items-center gap-3">
               <button aria-label="Open menu" onClick={() => setOpen(true)} className="grid h-9 w-9 place-items-center rounded-control border border-line lg:hidden">☰</button>
-              <h1 className="truncate text-[15px] font-bold">{title}</h1>
+              {/* Demo controls are always labelled demo (FR-X05, Figma 10e) */}
+              <h1 className={cx("flex min-w-0 items-center gap-2 text-[15px] font-bold", demo && "text-warn")}>{demo && <span aria-hidden>✦</span>}<span className="truncate">{title}</span>{demo && <Badge tone="warn" className="uppercase tracking-wide max-sm:hidden">Always labelled demo</Badge>}</h1>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               {role === "technician" && <button onClick={() => setQr(true)} className="inline-flex items-center gap-1.5 rounded-control border border-line px-3 py-1.5 text-xs font-bold hover:bg-surface2">▣ <span className="max-sm:hidden">Scan QR</span></button>}

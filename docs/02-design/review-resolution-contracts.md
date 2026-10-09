@@ -2368,3 +2368,22 @@ After a Server Action on `/settings/preferences` or `/notifications`, the frame 
 1. **Cause.** The shared layout covers `/demo`, which had no request-time API and was prerendered at build time. There is no session or Core API at build time, so its frame was the demo one. The sidebar link prefetched `/demo` in production, and the client router reused that cached layout segment when an action called `refresh()`. Development servers do not prefetch, which is why only `next start` showed it.
 2. **Fix.** The shared layout calls `connection()` and so renders per request. With no session in API mode it takes the app's own role instead of the browser's last demo role. `loadShell` (every role layout) calls `connection()` too, so no frame that reads the session is prerendered. `/demo`, `/forbidden` and `/technician/jobs` are now dynamic; `/`, `/_not-found` and `/forgot-password` stay static and have no session-dependent frame.
 3. **Check.** In all four apps the frame keeps the signed-in organization, user and badges after the enable and disable actions.
+
+## IR249 Demo controls on the Core API — 2026-10-10
+
+In API mode `/demo` (FR-X05, DDC-07, SCR-X-demo, Figma Client 10e) was still the Phase 1A page: a fixed clock (“2026-09-14 09:41 UTC”), a simulator switch and reset that changed only browser stores, and failure triggers that only showed a toast. The renamed-data audit of IR244 missed it, because a time is not a renamed name.
+
+1. **Layout (Figma 10e).** An orange header with “✦ Demo controls” and the Always labelled demo badge, and the dashed notice that nothing reaches real devices, payments, notifications or IoT. Demo clock, Scenario and Reset sit in one row, above the Trigger failures tiles. The browser demo uses the same layout.
+2. **Demo clock.** The Core API scenario clock (session.get meta) in UTC. +1 min / +1 hour call `demo.advanceClock` with the clock now plus the jump (forward only, IR36). Every service reads the shared offset at most a second late (IR168), so the action waits until session.get shows the jump before the page renders again.
+3. **Device offline / Restore connection.** The device list holds the devices the signed-in role can see (`devices.list`, unit names from `units.list`) whose history it can read (`devices.events`; a technician needs a current assignment, SR24). Devices left out are counted. Device offline sends `demo.trigger` with eventType device, kind communication_lost, the device's current binding, and a sequence above every event of the device. While that fault is open, the tile turns into Restore connection: kind restored with recovery {axis connection, value online, sourceEventId: the open fault} (SR20). Refusals are explained: demo operations off, the clock moving backwards, the device rebound, the fault already restored, the device no longer visible.
+4. **Expire session.** Drops this app's session cookie and opens sign-in, as when the session lifetime ends (D09). The identity provider's own session is untouched.
+5. **What stays in the browser demo.** Reset is disabled with its reason: the running Core API keeps shared data, and the reset is offline with `make resetdb` (IR154 item 4). Delay transport is browser-demo only (IR37). The Scenario select shows the one Core API seed (generation 1).
+6. **Catalog.** SCR-X-demo reads `devices.list` (primary), `units.list`, `devices.events` and `devices.get`, so it carries the IoT device states. The IR90 state set for SCR-X-demo is extended to match.
+
+## IR250 Sign out ends the session in API mode — 2026-10-10
+
+The shell's Sign out was a link to `/login`. In API mode the BFF session cookie stayed, so the role area opened again without signing in (FR-X01: sign-out clears screen content and cache).
+
+1. **Fix.** In API mode Sign out is a form that posts to `/bff/auth/logout`. The route drops the BFF session and redirects to `/login` with 303, and the full navigation clears the screen and its client cache. The browser demo keeps the link to the role picker.
+2. **Check.** In all four apps, after Sign out (or Expire session, IR249) the role home redirects to `/login?returnTo=…`.
+3. **Unchanged.** The local Keycloak session ends with its own lifetime, so signing in again within it needs no password (local runs, as before).

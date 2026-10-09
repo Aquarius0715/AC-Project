@@ -69,6 +69,13 @@ export const coreNow = cache(async (): Promise<Date> => {
   return meta?.snapshotAt ? new Date(meta.snapshotAt) : new Date();
 });
 
+/** The Core API clock read afresh (session.get, not memoized for the render pass): for a Server Action that has just
+ * moved the demo clock and waits until the other services show it (IR168, IR249). */
+export async function coreClockFresh(): Promise<Date> {
+  const { meta } = await coreCall<unknown>("session.get", {}, {});
+  return meta?.snapshotAt ? new Date(meta.snapshotAt) : new Date();
+}
+
 /** The signed-in membership's permissions (session.get), for permission-scoped sections; the API still authorizes. */
 export const corePermissions = cache(async (): Promise<Set<string>> => new Set((await coreSession()).data.permissions ?? []));
 
