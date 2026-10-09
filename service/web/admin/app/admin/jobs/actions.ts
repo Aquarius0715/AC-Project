@@ -7,8 +7,8 @@
 // contractor's access (jobs.extendAccess) and create a job on a customer's behalf (jobs.create); on the Plans tab save a
 // plan (plans.save) and generate its next occurrence (plans.generateNext, D16); on the Contractors tab save a profile
 // (contractors.save), suspend / resume offers (contractors.setOfferStatus), add a rate card (rateCards.save) and verify
-// uploaded certificates (certificates.verify). Each write on an existing record carries its version as the expected
-// version; CONFLICT refreshes the page.
+// uploaded certificates (certificates.verify); on the SLA tab save a plan type's targets (sla.saveTargets). Each write
+// on an existing record carries its version as the expected version; CONFLICT refreshes the page.
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
@@ -164,5 +164,10 @@ export async function saveRateCard(input: { contractorOrgId: string; effectiveFr
 /** certificates.verify: approve an uploaded certificate (it then counts as the qualification) or reject it with a reason. */
 export async function verifyCertificate(certificateId: string, version: number, decision: "approve" | "reject", reason: string) {
   return value(async () => { await coreOp("certificates.verify", { certificateId, decision, ...(decision === "reject" ? { reason: reason.trim() } : {}) }, write(version)); return null; });
+}
+
+/** sla.saveTargets: a plan type's new targets from now or later (jobs created afterwards use them; IR131 item 4). */
+export async function saveSlaTargets(input: { planType: string; responseHours: number; arrivalInWindowPercent: number; firstTimeFixPercent: number; effectiveFrom: string }) {
+  return value(async () => { const t = await coreOp<{ version: number }>("sla.saveTargets", input, { write: true }); return { version: t.version }; });
 }
 

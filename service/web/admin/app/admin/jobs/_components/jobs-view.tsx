@@ -14,15 +14,14 @@ import type { JobStatus } from "@ac/web/lib/jobs";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { assignInternal, cancelJob, classifyFollowUp, createJob, extendAccess, holdJob, offerToContractor, proposeSlot, resolvePartnerSlot, resumeJob, reviewReport, saveCosts, withdrawProposal } from "../actions";
 import type { JobsLive } from "../_lib/load";
-import { Sla } from "./jobs-demo";
 import { JobsTabs, ScopeBar } from "./jobs-header";
 
 type Detail = NonNullable<JobsLive["detail"]>;
 const TYPES = [{ id: "", label: "Type: All" }, { id: "reactive", label: "Type: Repair" }, { id: "periodic", label: "Type: Periodic" }, { id: "preventive", label: "Type: Preventive" }];
 
-/** HQ maintenance jobs (FR-A06, Figma Admin 06-1, 06-11…06-18): the Jobs tab from the Core API (the Plans tab is
- * PlansView). */
-export function JobsView({ live, tab }: { live: JobsLive; tab: string }) {
+/** HQ maintenance jobs (FR-A06, Figma Admin 06-1, 06-11…06-18): the Jobs tab from the Core API (Plans, Contractors and
+ * SLA are PlansView, ContractorsView and SlaView). */
+export function JobsView({ live }: { live: JobsLive }) {
   const patch = useUrlPatch();
   const [creating, setCreating] = useState(false);
   // The job New job just created: its detail opens step 2 (book) or says it was saved as requested.
@@ -30,11 +29,9 @@ export function JobsView({ live, tab }: { live: JobsLive; tab: string }) {
   useEffect(() => { pendingFresh = null; }, []);
   return (
     <Page className="max-w-[1440px]">
-      <JobsTabs tab={tab} counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => setCreating(true)}>+ New job</Btn>} />
+      <JobsTabs tab="jobs" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => setCreating(true)}>+ New job</Btn>} />
       {creating && <NewJobModal live={live} onClose={() => setCreating(false)} onCreated={(f) => { setCreating(false); setFresh(f); }} />}
-      {tab === "sla" && <Banner tone="warn">SLA by customer is not connected to the Core API yet — illustrative data (FR-A22, next round).</Banner>}
-      {tab === "sla" && <Sla />}
-      {tab === "jobs" && <JobsTab live={live} patch={patch} fresh={fresh} onFresh={() => setFresh(null)} />}
+      <JobsTab live={live} patch={patch} fresh={fresh} onFresh={() => setFresh(null)} />
     </Page>
   );
 }

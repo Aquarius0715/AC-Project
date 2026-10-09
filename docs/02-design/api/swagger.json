@@ -30761,6 +30761,9 @@
                 "openOverdue": {
                     "type": "integer"
                 },
+                "planType": {
+                    "type": "string"
+                },
                 "ratingCount": {
                     "type": "integer"
                 },
@@ -32195,6 +32198,12 @@
                 "period": {
                     "$ref": "#/definitions/maintenance.Range"
                 },
+                "targets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/maintenance.TargetView"
+                    }
+                },
                 "totals": {
                     "$ref": "#/definitions/maintenance.Metrics"
                 }
@@ -32374,6 +32383,33 @@
                     "type": "string"
                 },
                 "reportVersion": {
+                    "type": "integer"
+                }
+            }
+        },
+        "maintenance.TargetView": {
+            "type": "object",
+            "properties": {
+                "arrivalInWindowPercent": {
+                    "type": "number"
+                },
+                "effectiveFrom": {
+                    "type": "string"
+                },
+                "firstTimeFixPercent": {
+                    "type": "number"
+                },
+                "planType": {
+                    "type": "string"
+                },
+                "responseHours": {
+                    "type": "integer"
+                },
+                "state": {
+                    "description": "in_effect | default | scheduled",
+                    "type": "string"
+                },
+                "version": {
                     "type": "integer"
                 }
             }

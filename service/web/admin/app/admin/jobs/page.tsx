@@ -1,15 +1,16 @@
 // /admin/jobs (FR-A06, DD-A06, SCR-A06): in API mode a Server Component reads the Jobs tab — scope, pipeline counts,
 // filters, list and the selected job — the Plans tab — the plans in the scope and the selected plan with its
 // generated occurrences — or the Contractors tab — the contractor register with KPIs, rate cards and certificates —
-// through the DAL; their writes are Server Actions (./actions.ts). SLA still shows illustrative data. The Phase 1A
-// demo keeps the fixtures.
+// — or the SLA tab — the scorecard by customer with the targets per plan — through the DAL; their writes are Server
+// Actions (./actions.ts). The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
 import { apiMode } from "@ac/web/lib/dal";
 import { JobsDemo } from "./_components/jobs-demo";
 import { JobsView } from "./_components/jobs-view";
 import { PlansView } from "./_components/plans-view";
 import { ContractorsView } from "./_components/contractors-view";
-import { loadContractors, loadJobs, loadPlans } from "./_lib/load";
+import { SlaView } from "./_components/sla-view";
+import { loadContractors, loadJobs, loadPlans, loadSla } from "./_lib/load";
 
 export default async function AdminJobsPage({ searchParams }: PageProps<"/admin/jobs">) {
   await connection();
@@ -19,5 +20,6 @@ export default async function AdminJobsPage({ searchParams }: PageProps<"/admin/
   if (!apiMode()) return <JobsDemo jobId={one(sp.jobId)} tab={one(sp.tab)} />;
   if (tab === "plans") return <PlansView live={await loadPlans(sp)} />;
   if (tab === "contractors") return <ContractorsView live={await loadContractors(sp)} />;
-  return <JobsView live={await loadJobs(sp)} tab={tab} />;
+  if (tab === "sla") return <SlaView live={await loadSla(sp)} />;
+  return <JobsView live={await loadJobs(sp)} />;
 }

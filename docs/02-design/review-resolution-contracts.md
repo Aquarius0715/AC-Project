@@ -2235,3 +2235,14 @@ DEC-73. A completed job kept its Assignment active, so its scheduled window went
 - **New job from other tabs.** The header's **+ New job** on the Contractors tab opens the same dialog; the created job is handed to the Jobs tab in browser module state, so step 2 still opens there.
 - **Still to connect.** The SLA tab.
 
+## IR236 HQ SLA by customer (SLA tab) on the server pattern; the scorecard carries its targets — 2026-10-10
+
+`/admin/jobs?tab=sla` (FR-A22, DD-A22, SCR-A06) showed fixture rows in both modes, and DD-A22's “KPI tiles with targets” and the edit dialog had no way to read the targets: `sla.scorecard` judged customers against them but did not return them.
+
+1. **Contract.** `SlaScorecard.targets: SlaTargetView[]` lists, per plan type (rto, general, energy, environment), the targets in effect now — a saved row (`state=in_effect`, version, effectiveFrom) or the IR131 default 4 h / 90 % / 85 % (`state=default`, version 0, effectiveFrom null) — followed by the saved rows that start later (`state=scheduled`, earliest first). Each customer row adds `planType` (the customer's service profile, whose targets decide its status). The response share's target is 100 % of jobs within the plan's response hours (IR131 item 5).
+2. **Reads.** URL keys `period` (30 / 90 / 365 days ending now; default 90, IR50 shared key) and `contractorId` (`sla.scorecard` contractorOrgId). Customers are named from `customers.list` with their properties and unit count.
+3. **Tiles.** Response ≤ N h (the hours of the customers' plans; “within target” with the hours by plan when they differ), arrival in window and first-time fix with “target X %” (or the range by plan), average rating with its count, open & overdue with the number of breaches in the period; a value below its target is warned (critical when more than 10 points below); no data is “—”, never 0 %.
+4. **Customers and breaches.** One row per customer (plan, jobs, response, arrival, first-time fix, rating, overdue, status); **Export CSV** builds the file in the browser from these rows with the period. Recent breaches (newest first, at most 50) link to the job (`/admin/jobs?jobId=`).
+5. **Edit SLA targets.** Lists every plan type's targets in effect and scheduled; saving (`sla.saveTargets`) needs response 1–168 whole hours, percentages 0–100 and a start now or later, and creates the plan type's next version; jobs created from then on use it.
+6. **Figma.** Admin 06-10 (699:21404): the response tile's target is 100 % of jobs, the overdue tile counts the period's breaches, the customers table has a Plan column, the third breach is an overdue job. With this the Jobs, Plans, Contractors and SLA tabs all read the Core API; customer maintenance is the last screen that mixes fixture rows.
+

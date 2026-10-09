@@ -817,7 +817,7 @@ Scope: FR-A22 / Main display pattern: **UI-ANALYSIS**. Service boundary: `sla.sc
 1. KPI tiles with targets; Customers table (jobs, response, arrival, first-time fix, rating, overdue, status); Recent breaches with Open job → (SCR-A06 job detail); Export CSV (client-side).
 2. Edit SLA targets → `sla.saveTargets` (effective for jobs created afterwards).
 
-**Boundary cases and failures**: Metrics without data show “—”, never 0 %.
+**Boundary cases and failures**: Metrics without data show “—”, never 0 %. The scorecard returns the targets in effect and scheduled per plan type and each customer’s plan type, so the tiles show targets and the edit dialog its current values (IR236).
 
 **Verification**: Check the traceability entries under AT-A22 (N/E/B).
 

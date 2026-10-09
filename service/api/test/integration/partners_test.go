@@ -163,6 +163,27 @@ func TestSLAScorecard(t *testing.T) {
 	if sc["totals"].(map[string]any)["ratingCount"].(float64) < 1 || len(sc["customers"].([]any)) == 0 {
 		t.Fatalf("totals: %v", sc)
 	}
+	// IR236: the targets per plan type in effect now (general's saved row starts in an hour: default until then) and the
+	// scheduled row; each customer row names its plan type
+	var general, scheduled map[string]any
+	for _, x := range sc["targets"].([]any) {
+		tv := x.(map[string]any)
+		switch {
+		case tv["planType"] == "general" && tv["state"] != "scheduled":
+			general = tv
+		case tv["planType"] == "general" && tv["state"] == "scheduled":
+			scheduled = tv
+		}
+	}
+	if general == nil || general["state"] != "default" || general["responseHours"].(float64) != 4 || general["effectiveFrom"] != nil || len(sc["targets"].([]any)) != 5 {
+		t.Fatalf("targets in effect: %v", sc["targets"])
+	}
+	if scheduled == nil || scheduled["responseHours"].(float64) != 2 || scheduled["version"].(float64) != 1 || scheduled["effectiveFrom"] == nil {
+		t.Fatalf("scheduled targets: %v", sc["targets"])
+	}
+	if cm := sc["customers"].([]any)[0].(map[string]any); cm["planType"] == nil || cm["planType"] == "" {
+		t.Errorf("customer plan type: %v", cm)
+	}
 	for _, cm := range sc["customers"].([]any) {
 		if cm.(map[string]any)["customerId"] == seed.ID("cust-a").String() && cm.(map[string]any)["status"] != "breached" {
 			t.Errorf("customer-a status: %v", cm)

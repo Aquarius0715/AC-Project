@@ -11,6 +11,7 @@ import { jobEventTitle, type ApiJobEvent } from "@ac/web/lib/partnerOverview";
 import type { ApiWorkReport } from "@ac/web/lib/partnerReview";
 import { agreedSlots, controls, costTotals, delivery, facts, filtersOf, hqRow, preferredRows, reportCard, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
 import { planRows, type ApiPlan } from "@ac/web/lib/adminPlans";
+import { breachRows, PERIODS, periodOf, slaRows, slaTiles, targetsByPlan, type ApiScorecard } from "@ac/web/lib/adminSla";
 import { contractorRows, kpiTiles, pendingCertificates, profileFacts, rateCardView, technicianRows, type ApiCertificate, type ApiProfile, type ApiRateCard, type ApiTechnician } from "@ac/web/lib/adminContractors";
 import { klTime } from "@ac/web/lib/devices";
 
@@ -191,4 +192,21 @@ export async function loadContractors(sp: SP) {
 }
 
 export type ContractorsLive = Awaited<ReturnType<typeof loadContractors>>;
+
+/** The SLA tab (DD-A22, IR236): sla.scorecard for the period (URL key period, default 90 days) and contractor
+ * (contractorId) — totals with the targets of the customers' plans, one row per customer, the recent breaches and the
+ * targets per plan type for the edit dialog. */
+export async function loadSla(sp: SP) {
+  const { now, customers, properties, units, contractors: orgs, head } = await shared(sp);
+  const period = periodOf(one(sp.period), now.getTime());
+  const contractorId = orgs.find((o) => o.id === one(sp.contractorId))?.id ?? "";
+  const sc = await coreOp<ApiScorecard>("sla.scorecard", { period: { from: period.from, to: period.to }, ...(contractorId ? { contractorOrgId: contractorId } : {}) });
+  return {
+    ...head, q: {}, period, periods: PERIODS.map((p) => ({ id: p.id, label: p.label })), contractorId, contractors: orgs.map((o) => ({ id: o.id, name: o.name })),
+    tiles: slaTiles(sc), rows: slaRows(sc, customers, properties, units), breaches: breachRows(sc, new Map(customers.map((c) => [c.id, c.name]))),
+    targets: targetsByPlan(sc.targets), scorecardPeriod: sc.period,
+  };
+}
+
+export type SlaLive = Awaited<ReturnType<typeof loadSla>>;
 

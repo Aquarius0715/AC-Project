@@ -787,6 +787,40 @@ func targetFor(all []SlaTargets, plan string, at time.Time) SlaTargets {
 	return best
 }
 
+// targetViews lists, per plan type, the targets in effect at now (a saved row, or the default with no version) and then
+// the saved rows that start later, earliest first (IR236).
+func targetViews(all []SlaTargets, now time.Time) []TargetView {
+	out := []TargetView{}
+	view := func(t SlaTargets, state string) TargetView {
+		v := TargetView{PlanType: t.PlanType, ResponseHours: t.ResponseHours, ArrivalInWindowPercent: t.ArrivalInWindowPercent, FirstTimeFixPercent: t.FirstTimeFixPercent, Version: t.Version, State: state}
+		if state != "default" {
+			e := t.EffectiveFrom
+			v.EffectiveFrom = &e
+		}
+		return v
+	}
+	for _, plan := range planTypes {
+		cur := targetFor(all, plan, now)
+		if cur.EffectiveFrom.IsZero() {
+			cur.PlanType = plan
+			out = append(out, view(cur, "default"))
+		} else {
+			out = append(out, view(cur, "in_effect"))
+		}
+	}
+	later := []SlaTargets{}
+	for _, t := range all {
+		if t.EffectiveFrom.After(now) {
+			later = append(later, t)
+		}
+	}
+	sort.SliceStable(later, func(i, k int) bool { return later[i].EffectiveFrom.Before(later[k].EffectiveFrom) })
+	for _, t := range later {
+		out = append(out, view(t, "scheduled"))
+	}
+	return out
+}
+
 // Metrics is SlaMetrics.
 type Metrics struct {
 	ResponseWithinTarget *float64 `json:"responseWithinTarget"`
@@ -797,12 +831,26 @@ type Metrics struct {
 	OpenOverdue          int      `json:"openOverdue"`
 }
 
-// CustomerMetrics is one scorecard customer row.
+// CustomerMetrics is one scorecard customer row; PlanType is the customer's service profile, whose targets decide the
+// status (IR236).
 type CustomerMetrics struct {
 	Metrics
 	CustomerID uuid.UUID `json:"customerId"`
+	PlanType   string    `json:"planType"`
 	JobCount   int       `json:"jobCount"`
 	Status     string    `json:"status"`
+}
+
+// TargetView is SlaTargetView (IR236): a plan type's targets in effect now — a saved row or the IR131 default — or a
+// saved row that starts later.
+type TargetView struct {
+	PlanType               string     `json:"planType"`
+	ResponseHours          int        `json:"responseHours"`
+	ArrivalInWindowPercent float64    `json:"arrivalInWindowPercent"`
+	FirstTimeFixPercent    float64    `json:"firstTimeFixPercent"`
+	Version                int        `json:"version"`
+	EffectiveFrom          *time.Time `json:"effectiveFrom"`
+	State                  string     `json:"state"` // in_effect | default | scheduled
 }
 
 // Breach is one scorecard breach.
@@ -821,6 +869,7 @@ type Scorecard struct {
 	Totals          Metrics           `json:"totals"`
 	Customers       []CustomerMetrics `json:"customers"`
 	Breaches        []Breach          `json:"breaches"`
+	Targets         []TargetView      `json:"targets"`
 }
 
 // ScorecardInput is sla.scorecard input.
@@ -892,13 +941,13 @@ func (m Partners) scorecard(ctx context.Context, c *ops.Call, in *ScorecardInput
 		return Scorecard{}, err
 	}
 	var targets []SlaTargets
-	rows, err := c.Tx.Query(ctx, `SELECT plan_type, response_hours, arrival_in_window_percent::float8, first_time_fix_percent::float8, effective_from FROM maintenance.sla_targets`)
+	rows, err := c.Tx.Query(ctx, `SELECT plan_type, response_hours, arrival_in_window_percent::float8, first_time_fix_percent::float8, effective_from, version FROM maintenance.sla_targets`)
 	if err != nil {
 		return Scorecard{}, err
 	}
 	for rows.Next() {
 		var t SlaTargets
-		if err := rows.Scan(&t.PlanType, &t.ResponseHours, &t.ArrivalInWindowPercent, &t.FirstTimeFixPercent, &t.EffectiveFrom); err != nil {
+		if err := rows.Scan(&t.PlanType, &t.ResponseHours, &t.ArrivalInWindowPercent, &t.FirstTimeFixPercent, &t.EffectiveFrom, &t.Version); err != nil {
 			rows.Close()
 			return Scorecard{}, err
 		}
@@ -913,7 +962,7 @@ func (m Partners) scorecard(ctx context.Context, c *ops.Call, in *ScorecardInput
 	if err != nil {
 		return Scorecard{}, err
 	}
-	out := Scorecard{Period: in.Period, ContractorOrgID: in.ContractorOrgID, Customers: []CustomerMetrics{}, Breaches: []Breach{}}
+	out := Scorecard{Period: in.Period, ContractorOrgID: in.ContractorOrgID, Customers: []CustomerMetrics{}, Breaches: []Breach{}, Targets: targetViews(targets, c.Now)}
 	total := &tally{}
 	per := map[uuid.UUID]*tally{}
 	planOf := map[uuid.UUID]string{}
@@ -1010,7 +1059,7 @@ func (m Partners) scorecard(ctx context.Context, c *ops.Call, in *ScorecardInput
 		if mm.OpenOverdue > 0 {
 			status = "breached"
 		}
-		out.Customers = append(out.Customers, CustomerMetrics{Metrics: mm, CustomerID: cust, JobCount: t.jobs, Status: status})
+		out.Customers = append(out.Customers, CustomerMetrics{Metrics: mm, CustomerID: cust, PlanType: planOf[cust], JobCount: t.jobs, Status: status})
 	}
 	sort.SliceStable(out.Breaches, func(i, k int) bool { return out.Breaches[i].at.After(out.Breaches[k].at) })
 	if len(out.Breaches) > 50 {
