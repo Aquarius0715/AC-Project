@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.133.0
+version: 0.134.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -269,6 +269,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.134.0: HQ overview sections from admin.summary; SCR-A01 / DD-A01 filter lists and period keys (IR244). Phase 1A unchanged.
 0.133.0: Customer alert policies on the Core API; Session.customerId (IR243). Phase 1A unchanged.
 0.132.0: Shell user, organization and badges from the Core API; Session names (IR241); customer alert inbox (IR242). Phase 1A unchanged.
 0.131.0: Customer overview on the Core API; DD-C01 / SCR-C01 reads (IR240). Phase 1A unchanged.

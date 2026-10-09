@@ -4817,7 +4817,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:asset.read | admin:contract.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-A07, DD-A15, DD-A05, DD-A18, DD-A06 · Query: filters kind,status,organizationId · sort id,createdAt,updatedAt (default id asc)",
+                "description": "Authorization: admin:asset.read | admin:contract.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-A07, DD-A15, DD-A05, DD-A18, DD-A06, DD-A01 · Query: filters kind,status,organizationId · sort id,createdAt,updatedAt (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -20518,7 +20518,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self-customer | admin:asset.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06, DD-C09, DD-C01, DD-C08 · Query: filters customerId,kind · sort id,createdAt,updatedAt (default id asc)",
+                "description": "Authorization: client:self-customer | admin:asset.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-C02, DD-C07, DD-C04, DD-A06, DD-C09, DD-C01, DD-C08, DD-A01 · Query: filters customerId,kind · sort id,createdAt,updatedAt (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
