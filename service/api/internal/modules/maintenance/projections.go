@@ -2,6 +2,7 @@ package maintenance
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strings"
 	"time"
@@ -87,7 +88,21 @@ type OfferSummary struct {
 	TermsVersion           string    `json:"termsVersion"`
 	Origin                 string    `json:"origin"`
 	VisitSlot              Slot      `json:"visitSlot"`
+	OfferedAt              time.Time `json:"offeredAt"`        // when HQ sent the offer (IR226)
+	AccessValidFrom        time.Time `json:"accessValidFrom"`  // the delegation (access) period if accepted (IR226)
+	AccessValidUntil       time.Time `json:"accessValidUntil"` //
 	PartnerSlotProposal    any       `json:"partnerSlotProposal"`
+}
+
+// PartnerSlotProposal is the company's latest time-change proposal of an offer (IR113), withdrawn ones excluded.
+type PartnerSlotProposal struct {
+	ID                     uuid.UUID `json:"id"`
+	OfferID                uuid.UUID `json:"offerId"`
+	Slot                   Slot      `json:"slot"`
+	TechnicianMembershipID uuid.UUID `json:"technicianMembershipId"`
+	Reason                 string    `json:"reason"`
+	SentAt                 time.Time `json:"sentAt"`
+	Status                 string    `json:"status"`
 }
 
 // History is JobHistorySnapshot of service-contracts.ts.
@@ -113,7 +128,7 @@ type SiteAddresses interface {
 // offers returns the contractor's JobOfferSummary rows valid now (IR124 item 2); job limits the result to one job.
 func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferSummary, error) {
 	q := `SELECT j.id, j.version, j.type, j.unit_id, lower(j.requested_slot), upper(j.requested_slot), j.due_at, j.origin,
-		o.id, o.decision, o.offer_expires_at, o.terms_version, lower(o.visit_slot), upper(o.visit_slot)
+		o.id, o.decision, o.offer_expires_at, o.terms_version, lower(o.visit_slot), upper(o.visit_slot), o.offered_at, o.access_valid_from, o.access_valid_until
 		FROM maintenance.offers o JOIN maintenance.jobs j ON j.id = o.job_id
 		WHERE o.contractor_org_id = $1 AND ((o.decision IS NULL AND $2 < o.offer_expires_at AND j.status = 'offered') OR (o.decision = 'accept' AND $2 < o.access_valid_from))`
 	args := []any{c.Principal.OrgID, c.Now}
@@ -132,7 +147,7 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 		var unit uuid.UUID
 		var decision *string
 		if err := rows.Scan(&o.JobID, &o.JobVersion, &o.Type, &unit, &o.RequestedSlot.StartAt, &o.RequestedSlot.EndAt, &o.DueAt, &o.Origin,
-			&o.OfferID, &decision, &o.OfferExpiresAt, &o.TermsVersion, &o.VisitSlot.StartAt, &o.VisitSlot.EndAt); err != nil {
+			&o.OfferID, &decision, &o.OfferExpiresAt, &o.TermsVersion, &o.VisitSlot.StartAt, &o.VisitSlot.EndAt, &o.OfferedAt, &o.AccessValidFrom, &o.AccessValidUntil); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -152,6 +167,17 @@ func (m Jobs) offers(ctx context.Context, c *ops.Call, job *uuid.UUID) ([]OfferS
 			return nil, err
 		}
 		out[i].SiteAddress, out[i].RequiredQualifications = addr, requiredCodes(scope)
+		// the offer's latest time-change proposal (it was never filled before IR226)
+		var pp PartnerSlotProposal
+		err = c.Tx.QueryRow(ctx, `SELECT id, offer_id, lower(slot), upper(slot), technician_membership_id, reason, sent_at, status FROM maintenance.partner_slot_proposals
+			WHERE offer_id = $1 AND status <> 'withdrawn' ORDER BY sent_at DESC, id LIMIT 1`, out[i].OfferID).Scan(&pp.ID, &pp.OfferID, &pp.Slot.StartAt, &pp.Slot.EndAt,
+			&pp.TechnicianMembershipID, &pp.Reason, &pp.SentAt, &pp.Status)
+		switch {
+		case err == nil:
+			out[i].PartnerSlotProposal = pp
+		case !errors.Is(err, pgx.ErrNoRows):
+			return nil, err
+		}
 	}
 	return out, nil
 }

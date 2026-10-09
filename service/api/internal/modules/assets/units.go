@@ -385,7 +385,7 @@ func (in *UnitGetInput) Validate() map[string]string {
 // @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | admin:automation.policy.read:scope-candidate-read-only | admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR76 technician before work window: work-not-started state; IR213 latestMeasurements: latest reading per metric with read-time quality (stale past the sensor limit)
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A02, DD-A12, DD-C03, DD-C07, DD-P04, DD-T02, DD-T10, DD-C04, DD-C05, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T11, DD-A04, DD-A09, DD-A11, DD-A05, DD-C14, DD-T12, DD-P05, DD-P10
+// @Description	Design: DD-A02, DD-A12, DD-C03, DD-C07, DD-P04, DD-T02, DD-T10, DD-C04, DD-C05, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T11, DD-A04, DD-A09, DD-A11, DD-A05, DD-C14, DD-T12, DD-P05, DD-P10, DD-P02
 // @Tags			units
 // @Accept			json
 // @Produce		json

@@ -251,6 +251,21 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 	if code, _ := write(s, &contrA, "jobs.accept", `{"offerId":"`+uuid.NewString()+`","termsVersion":"t","reason":"x"}`, 1); code != 422 {
 		t.Error("both terms and reason")
 	}
+	// each decision takes only its own fields (service-contracts: accept termsVersion, decline reason)
+	for op, b := range map[string]string{
+		"jobs.accept":  `{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t","reason":"x"}`,
+		"jobs.decline": `{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t","reason":"no capacity"}`,
+	} {
+		if code, m := write(s, &contrA, op, b, 1); code != 422 || m["fieldErrors"].(map[string]any)["_"] != "error.malformedInput" {
+			t.Errorf("%s with the other decision's field: %d %v", op, code, m)
+		}
+	}
+	if code, m := write(s, &contrA, "jobs.decline", `{"jobId":"`+job+`","offerId":"`+uuid.NewString()+`"}`, 1); code != 422 || m["fieldErrors"].(map[string]any)["reason"] != "error.length" {
+		t.Errorf("decline without a reason: %d %v", code, m)
+	}
+	if code, m := write(s, &contrA, "jobs.accept", `{"jobId":"`+job+`","offerId":"`+uuid.NewString()+`"}`, 1); code != 422 || m["fieldErrors"].(map[string]any)["termsVersion"] != "error.required" {
+		t.Errorf("accept without terms: %d %v", code, m)
+	}
 	long := make([]byte, 1001)
 	for i := range long {
 		long[i] = 'r'

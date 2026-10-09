@@ -399,15 +399,7 @@ func (m Jobs) load(ctx context.Context, c *ops.Call, id uuid.UUID, scope string,
 	if j.Assignment, err = m.activeAssignment(ctx, c, id); err != nil {
 		return j, err
 	}
-	var pp struct {
-		ID                     uuid.UUID `json:"id"`
-		OfferID                uuid.UUID `json:"offerId"`
-		Slot                   Slot      `json:"slot"`
-		TechnicianMembershipID uuid.UUID `json:"technicianMembershipId"`
-		Reason                 string    `json:"reason"`
-		SentAt                 time.Time `json:"sentAt"`
-		Status                 string    `json:"status"`
-	}
+	var pp PartnerSlotProposal
 	err = c.Tx.QueryRow(ctx, `SELECT p.id, p.offer_id, lower(p.slot), upper(p.slot), p.technician_membership_id, p.reason, p.sent_at, p.status
 		FROM maintenance.partner_slot_proposals p JOIN maintenance.offers o ON o.id = p.offer_id WHERE o.job_id = $1 AND p.status <> 'withdrawn'
 		ORDER BY p.sent_at DESC, p.id LIMIT 1`, id).Scan(&pp.ID, &pp.OfferID, &pp.Slot.StartAt, &pp.Slot.EndAt, &pp.TechnicianMembershipID, &pp.Reason, &pp.SentAt, &pp.Status)
@@ -904,7 +896,7 @@ type Event struct {
 // @Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-P07, DD-P01 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)
+// @Description	Design: DD-P07, DD-P01, DD-P02 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)
 // @Tags			jobs
 // @Accept			json
 // @Produce		json

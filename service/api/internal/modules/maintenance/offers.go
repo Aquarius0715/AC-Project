@@ -213,28 +213,45 @@ func (m Delivery) offer(ctx context.Context, c *ops.Call, in *OfferInput) (Job, 
 
 // ---- jobs.accept / jobs.decline ----
 
-// DecisionInput is the input of jobs.accept (termsVersion) and jobs.decline (reason).
-type DecisionInput struct {
+// AcceptInput is jobs.accept input: the company takes the offer under the terms version it read.
+type AcceptInput struct {
 	JobID        uuid.UUID `json:"jobId"`
 	OfferID      uuid.UUID `json:"offerId"`
-	TermsVersion *string   `json:"termsVersion,omitempty"`
-	Reason       *string   `json:"reason,omitempty"`
+	TermsVersion string    `json:"termsVersion"`
 }
 
 // Validate implements ops.Validator.
-func (in *DecisionInput) Validate() map[string]string {
+func (in *AcceptInput) Validate() map[string]string {
+	fe := decisionRefs(in.JobID, in.OfferID)
+	if in.TermsVersion == "" {
+		fe["termsVersion"] = "error.required"
+	} else if utf8.RuneCountInString(in.TermsVersion) > 64 {
+		fe["termsVersion"] = "error.length"
+	}
+	return fe
+}
+
+// DeclineInput is jobs.decline input: the job returns to HQ with the reason (trimmed, 1–1000 characters).
+type DeclineInput struct {
+	JobID   uuid.UUID `json:"jobId"`
+	OfferID uuid.UUID `json:"offerId"`
+	Reason  string    `json:"reason"`
+}
+
+// Validate implements ops.Validator.
+func (in *DeclineInput) Validate() map[string]string {
+	fe := decisionRefs(in.JobID, in.OfferID)
+	trimmedReason(&in.Reason, 1000, "reason", fe)
+	return fe
+}
+
+func decisionRefs(job, offer uuid.UUID) map[string]string {
 	fe := map[string]string{}
-	if in.JobID == uuid.Nil {
+	if job == uuid.Nil {
 		fe["jobId"] = "error.required"
 	}
-	if in.OfferID == uuid.Nil {
+	if offer == uuid.Nil {
 		fe["offerId"] = "error.required"
-	}
-	if (in.TermsVersion == nil) == (in.Reason == nil) {
-		fe["termsVersion"] = "error.required"
-	}
-	if in.Reason != nil {
-		trimmedReason(in.Reason, 1000, "reason", fe)
 	}
 	return fe
 }
@@ -247,12 +264,13 @@ type Receipt struct {
 	Decision   string    `json:"decision"`
 }
 
-func (m Delivery) decide(ctx context.Context, c *ops.Call, in *DecisionInput, decision string) (Receipt, error) {
+// decide records the company's answer to its open offer: terms is the version read for an accept, reason the decline's.
+func (m Delivery) decide(ctx context.Context, c *ops.Call, job, offer uuid.UUID, decision, readTerms, reason string) (Receipt, error) {
 	var terms string
 	var expires time.Time
 	var decided *string
 	err := c.Tx.QueryRow(ctx, `SELECT terms_version, offer_expires_at, decision FROM maintenance.offers WHERE id = $1 AND job_id = $2 AND contractor_org_id = $3 FOR UPDATE`,
-		in.OfferID, in.JobID, c.Principal.OrgID).Scan(&terms, &expires, &decided)
+		offer, job, c.Principal.OrgID).Scan(&terms, &expires, &decided)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Receipt{}, apperr.E(apperr.NotFound, "error.notFound")
 	}
@@ -262,7 +280,7 @@ func (m Delivery) decide(ctx context.Context, c *ops.Call, in *DecisionInput, de
 	if decided != nil {
 		return Receipt{}, apperr.E(apperr.NotFound, "error.notFound") // declined / decided offers are only reachable through the IR01 receipt
 	}
-	r, err := m.lock(ctx, c, in.JobID)
+	r, err := m.lock(ctx, c, job)
 	if err != nil {
 		return Receipt{}, err
 	}
@@ -274,22 +292,18 @@ func (m Delivery) decide(ctx context.Context, c *ops.Call, in *DecisionInput, de
 	}
 	if decision == "accept" {
 		var open bool
-		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND status IN ('pending','sent_to_client'))`, in.OfferID).Scan(&open); err != nil {
+		if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND status IN ('pending','sent_to_client'))`, offer).Scan(&open); err != nil {
 			return Receipt{}, err
 		}
 		if open {
 			return Receipt{}, apperr.E(apperr.Conflict, "errors.partner_proposal_pending")
 		}
 	}
-	if decision == "accept" && *in.TermsVersion != terms {
+	if decision == "accept" && readTerms != terms {
 		return Receipt{}, apperr.E(apperr.Conflict, "errors.terms_changed")
 	}
-	reason := ""
-	if in.Reason != nil {
-		reason = *in.Reason
-	}
 	if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.offers SET decision = $2, decided_by = $3, decided_at = $4, decline_reason = NULLIF($5, ''),
-		version = version + 1, updated_at = platform.app_now() WHERE id = $1`, in.OfferID, decision, c.Principal.UserID, c.Now, reason); err != nil {
+		version = version + 1, updated_at = platform.app_now() WHERE id = $1`, offer, decision, c.Principal.UserID, c.Now, reason); err != nil {
 		return Receipt{}, err
 	}
 	next, contractor := "accepted", "contractor_org_id"
@@ -298,16 +312,16 @@ func (m Delivery) decide(ctx context.Context, c *ops.Call, in *DecisionInput, de
 	}
 	var v int
 	if err := c.Tx.QueryRow(ctx, `UPDATE maintenance.jobs SET status = $2, contractor_org_id = `+contractor+`, version = version + 1, updated_at = platform.app_now()
-		WHERE id = $1 RETURNING version`, in.JobID, next).Scan(&v); err != nil {
+		WHERE id = $1 RETURNING version`, job, next).Scan(&v); err != nil {
 		return Receipt{}, err
 	}
 	done := map[string]string{"accept": "accepted", "decline": "declined"}[decision] // the past tense the history reads (offer.declined)
-	if err := m.Jobs.event(ctx, c, in.JobID, "offer."+done, nil); err != nil {
+	if err := m.Jobs.event(ctx, c, job, "offer."+done, nil); err != nil {
 		return Receipt{}, err
 	}
-	c.Emit(ops.Event{AggregateType: "job", AggregateID: in.JobID, Type: "Offer" + strings.ToUpper(done[:1]) + done[1:], Payload: map[string]any{"offerId": in.OfferID}})
-	c.Audit(ops.AuditEntry{Action: "jobs." + decision, TargetKind: "job", TargetID: in.JobID.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &v, Reason: reason})
-	return Receipt{JobID: in.JobID, JobVersion: v, OfferID: in.OfferID, Decision: decision}, nil
+	c.Emit(ops.Event{AggregateType: "job", AggregateID: job, Type: "Offer" + strings.ToUpper(done[:1]) + done[1:], Payload: map[string]any{"offerId": offer}})
+	c.Audit(ops.AuditEntry{Action: "jobs." + decision, TargetKind: "job", TargetID: job.String(), PreviousVersion: c.ExpectedVersion, NextVersion: &v, Reason: reason})
+	return Receipt{JobID: job, JobVersion: v, OfferID: offer, Decision: decision}, nil
 }
 
 // @Summary		jobs.accept (write)
@@ -319,11 +333,11 @@ func (m Delivery) decide(ctx context.Context, c *ops.Call, in *DecisionInput, de
 // @Tags			jobs
 // @Accept			json
 // @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			jobId				path		string			true	"input field jobId"
-// @Param			offerId				path		string			true	"input field offerId"
-// @Param			request				body		DecisionInput	true	"input; the path parameters come from the route"
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			offerId				path		string		true	"input field offerId"
+// @Param			request				body		AcceptInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Receipt}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -335,11 +349,8 @@ func (m Delivery) decide(ctx context.Context, c *ops.Call, in *DecisionInput, de
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/offers/{offerId}/accept [post]
-func (m Delivery) accept(ctx context.Context, c *ops.Call, in *DecisionInput) (Receipt, error) {
-	if in.TermsVersion == nil {
-		return Receipt{}, apperr.Fields(map[string]string{"termsVersion": "error.required"})
-	}
-	return m.decide(ctx, c, in, "accept")
+func (m Delivery) accept(ctx context.Context, c *ops.Call, in *AcceptInput) (Receipt, error) {
+	return m.decide(ctx, c, in.JobID, in.OfferID, "accept", in.TermsVersion, "")
 }
 
 // @Summary		jobs.decline (write)
@@ -355,7 +366,7 @@ func (m Delivery) accept(ctx context.Context, c *ops.Call, in *DecisionInput) (R
 // @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
 // @Param			jobId				path		string			true	"input field jobId"
 // @Param			offerId				path		string			true	"input field offerId"
-// @Param			request				body		DecisionInput	true	"input; the path parameters come from the route"
+// @Param			request				body		DeclineInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Receipt}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -367,11 +378,8 @@ func (m Delivery) accept(ctx context.Context, c *ops.Call, in *DecisionInput) (R
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/offers/{offerId}/decline [post]
-func (m Delivery) decline(ctx context.Context, c *ops.Call, in *DecisionInput) (Receipt, error) {
-	if in.Reason == nil {
-		return Receipt{}, apperr.Fields(map[string]string{"reason": "error.required"})
-	}
-	return m.decide(ctx, c, in, "decline")
+func (m Delivery) decline(ctx context.Context, c *ops.Call, in *DeclineInput) (Receipt, error) {
+	return m.decide(ctx, c, in.JobID, in.OfferID, "decline", "", in.Reason)
 }
 
 // ---- jobs.assign ----

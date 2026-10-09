@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useState } from "react";
+import { useState } from "react";
 import { Badge, Banner, Btn, Card, Field, Input, Modal, Page, Select, SummaryList, Textarea, LinkBtn, useToast } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge, WINDOWS } from "@ac/web/components/JobBits";
 import { Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
@@ -9,8 +9,8 @@ import { Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 const cap = [["tech-external-a", "Refrigerant handling · valid to 2027-03-31", ["4 h", "4 h", "8 h", "—", "—"]], ["tech-external-a2", "No refrigerant qualification", ["—", "—", "—", "—", "—"]]] as const;
 type S = "offer" | "accepted" | "declined" | "expired" | "proposed";
 
-export default function JobDetail({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+/** The Phase 1A demo offer / job detail (DATA_SOURCE=mock): the shared job store and the seeded offer job-p09. */
+export function JobDemo({ id }: { id: string }) {
   const live = useJobs().find((j) => j.id === id && j.contractor === "contractor-a" && j.id !== "job-p09");
   if (id === "job-b-offer") return <Page className="max-w-xl"><Card title="This page isn’t available" sub="The page doesn’t exist, or your account can’t open it." /></Page>;
   return live ? <LiveOffer j={live} /> : <StaticOffer id={id} />;

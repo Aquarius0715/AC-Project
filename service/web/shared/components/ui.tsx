@@ -58,8 +58,9 @@ export function TextLink({ href, children, className }: { href: string; children
 }
 
 /* ───────────── Layout primitives ───────────── */
-export function Page({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cx("page mx-auto flex w-full max-w-[1280px] flex-col gap-4", className)}>{children}</div>;
+/** The main column: 1280 px wide, or the 640 px single-column of offers and snapshots (Figma) with `narrow`. */
+export function Page({ children, className, narrow }: { children: React.ReactNode; className?: string; narrow?: boolean }) {
+  return <div className={cx("page mx-auto flex w-full flex-col gap-4", narrow ? "max-w-[640px]" : "max-w-[1280px]", className)}>{children}</div>;
 }
 
 export function Card({ title, sub, action, children, className, pad = true, tone }: { title?: React.ReactNode; sub?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode; className?: string; pad?: boolean; tone?: "crit" | "warn" | "ok" }) {

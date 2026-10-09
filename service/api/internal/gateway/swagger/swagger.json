@@ -537,7 +537,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:alert.read | admin:alert.policy.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-T07, DD-A05, DD-T12, DD-P05",
+                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:alert.read | admin:alert.policy.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-T07, DD-A05, DD-T12, DD-P05, DD-P02",
                 "consumes": [
                     "application/json"
                 ],
@@ -11334,7 +11334,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-P07, DD-P01 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)",
+                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-P07, DD-P01, DD-P02 · Query: filters from,to · sort id,occurredAt (default occurredAt asc;id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -11993,7 +11993,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/maintenance.DecisionInput"
+                            "$ref": "#/definitions/maintenance.AcceptInput"
                         }
                     }
                 ],
@@ -12121,7 +12121,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/maintenance.DecisionInput"
+                            "$ref": "#/definitions/maintenance.DeclineInput"
                         }
                     }
                 ],
@@ -14887,7 +14887,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 contractor sees own-company technicians only\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A03, DD-P06, DD-P05, DD-P01 · Query: filters role,organizationId,qualification,activeOnly · sort id,validFrom,createdAt,updatedAt (default id asc)",
+                "description": "Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 contractor sees own-company technicians only\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A03, DD-P06, DD-P05, DD-P01, DD-P02 · Query: filters role,organizationId,qualification,activeOnly · sort id,validFrom,createdAt,updatedAt (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -15125,7 +15125,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 role=technician only\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-P06, DD-P01 · Query: filters organizationId,qualification,activeOnly · sort id (default id asc)",
+                "description": "Authorization: admin:identity.read | admin:job.read | contractor:partner.assign:own-company\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR94 role=technician only\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-P06, DD-P01, DD-P02 · Query: filters organizationId,qualification,activeOnly · sort id (default id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -24739,7 +24739,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | admin:automation.policy.read:scope-candidate-read-only | admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR76 technician before work window: work-not-started state; IR213 latestMeasurements: latest reading per metric with read-time quality (stale past the sensor limit)\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-A12, DD-C03, DD-C07, DD-P04, DD-T02, DD-T10, DD-C04, DD-C05, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T11, DD-A04, DD-A09, DD-A11, DD-A05, DD-C14, DD-T12, DD-P05, DD-P10",
+                "description": "Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:dashboard.read | admin:asset.read | admin:control.execute:scope-candidate-read-only | admin:device.read:scope-candidate-read-only | admin:job.read:scope-candidate-read-only | admin:contract.read:scope-candidate-read-only | admin:restriction.read:scope-candidate-read-only | admin:automation.policy.read:scope-candidate-read-only | admin:alert.policy.read:scope-candidate-read-only | admin:energy.read:scope-candidate-read-only | admin:mrv.read:scope-candidate-read-only | admin:offset.read:scope-candidate-read-only\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR76 technician before work window: work-not-started state; IR213 latestMeasurements: latest reading per metric with read-time quality (stale past the sensor limit)\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A02, DD-A12, DD-C03, DD-C07, DD-P04, DD-T02, DD-T10, DD-C04, DD-C05, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T11, DD-A04, DD-A09, DD-A11, DD-A05, DD-C14, DD-T12, DD-P05, DD-P10, DD-P02",
                 "consumes": [
                     "application/json"
                 ],
@@ -30256,6 +30256,20 @@
                 }
             }
         },
+        "maintenance.AcceptInput": {
+            "type": "object",
+            "properties": {
+                "jobId": {
+                    "type": "string"
+                },
+                "offerId": {
+                    "type": "string"
+                },
+                "termsVersion": {
+                    "type": "string"
+                }
+            }
+        },
         "maintenance.AckInput": {
             "type": "object",
             "properties": {
@@ -30758,7 +30772,7 @@
                 }
             }
         },
-        "maintenance.DecisionInput": {
+        "maintenance.DeclineInput": {
             "type": "object",
             "properties": {
                 "jobId": {
@@ -30768,9 +30782,6 @@
                     "type": "string"
                 },
                 "reason": {
-                    "type": "string"
-                },
-                "termsVersion": {
                     "type": "string"
                 }
             }

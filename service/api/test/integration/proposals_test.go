@@ -159,6 +159,13 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 	}
 	var partner string
 	ownerScan(t, `SELECT id::text FROM maintenance.partner_slot_proposals WHERE offer_id = $1 ORDER BY sent_at DESC LIMIT 1`, []any{offer}, &partner)
+	// the contractor's offer projection shows the pending proposal, when HQ offered and the access period (IR226)
+	if code, m := post(s, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); code != 200 || data(m)["projection"] != "offer" {
+		t.Fatalf("offer projection: %d %v", code, m)
+	} else if o := data(m); o["partnerSlotProposal"] == nil || o["partnerSlotProposal"].(map[string]any)["id"] != partner || o["partnerSlotProposal"].(map[string]any)["status"] != "pending" ||
+		o["offeredAt"] == nil || o["accessValidFrom"] != ts(0) || o["accessValidUntil"] != ts(200) {
+		t.Fatalf("offer projection fields: %v", o)
+	}
 	if code, _ := write(s, &hq, "jobs.resolvePartnerSlot", `{"jobId":"`+job+`","proposalId":"`+partner+`","decision":"send_to_client"}`, 3); code != 422 {
 		t.Error("send without replyBy")
 	}

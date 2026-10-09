@@ -12,7 +12,7 @@ export type ApiPartnerJob =
   | { projection: "history"; jobId: string; type: string; status: string; completedAt: string | null };
 export type ApiCounts = { offerCount: number; activeCount: number; reviewCount: number; overdueCount: number };
 export type ApiCapacity = { membershipId: string; date: string; availableSlots: Slot[]; assignedSlots: Slot[]; availableMinutes: number | null; assignedMinutes: number; unavailability: string | null };
-export type ApiMember = { id: string; userId: string; displayName: string; role: string; qualifications?: { code: string; revokedAt?: string | null }[] };
+export type ApiMember = { id: string; userId: string; displayName: string; role: string; qualifications?: { code: string; validFrom?: string; validUntil?: string | null; revokedAt?: string | null }[] };
 export type ApiJobEvent = { id: string; jobId: string; actorUserId: string | null; action: string; occurredAt: string };
 
 /** One job of the company as the overview shows it. */
