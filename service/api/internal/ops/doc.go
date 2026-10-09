@@ -3,7 +3,7 @@ package ops
 import "time"
 
 // Envelope describes the {data, meta} body of every successful operation for the API description (the swag
-// annotations of the handlers say `ops.Envelope{data=…}`); Dispatch writes Result with the same shape.
+// annotations of the handlers say `ops.Envelope{data=…}`); the pipeline writes Result with the same shape.
 type Envelope struct {
 	Data any  `json:"data"`
 	Meta Meta `json:"meta"`

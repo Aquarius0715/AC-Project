@@ -31,11 +31,13 @@ func TestSessionGet(t *testing.T) {
 	Register(r)
 	e := echo.New()
 	e.HTTPErrorHandler = ops.HTTPErrorHandler
-	e.POST("/v1/ops/:operation", r.Dispatch)
+	if err := r.MountREST(e.Group("/v1")); err != nil {
+		t.Fatal(err)
+	}
 	p := &ops.Principal{Principal: authz.Principal{Role: "client", ClientRole: "owner",
 		Permissions: map[string]bool{"control.execute": true, "alert.read": true, "unused": false}},
 		TenantID: uuid.New(), MembershipID: uuid.New(), UserID: uuid.New(), ScopeVersion: 3}
-	req := httptest.NewRequest(http.MethodPost, "/v1/ops/session.get", strings.NewReader(`{}`))
+	req := httptest.NewRequest(http.MethodGet, "/v1/session", nil)
 	req = req.WithContext(ops.WithPrincipal(req.Context(), p))
 	w := httptest.NewRecorder()
 	e.ServeHTTP(w, req)

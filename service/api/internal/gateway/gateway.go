@@ -1,6 +1,6 @@
 // Package gateway is the single entry of the Core API for the web apps (IR180): the REST routes of the operation
-// catalog (IR222) and POST /v1/ops/:operation are forwarded unchanged (headers, query, body, status) to the
-// business-domain service that owns the operation. It holds no business logic and does not authenticate; every
+// catalog (IR222) are forwarded unchanged (headers, query, body, status) to the business-domain service that owns
+// the route's operation. It holds no business logic and does not authenticate; every
 // service verifies the token itself. In production the ALB can route the same paths from the catalog's route table
 // without this process.
 package gateway
@@ -76,8 +76,7 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 		proxies[d] = p
 	}
 	e.GET("/healthz", func(c *echo.Context) error { return c.NoContent(http.StatusOK) })
-	mountDocs(e) // /docs and /swagger.json (IR220)
-	e.POST("/v1/ops/:operation", func(c *echo.Context) error { return forward(c, proxies[ops.DomainOf(c.Param("operation"))]) })
+	mountDocs(e)                    // /docs and /swagger.json (IR220)
 	for _, s := range ops.Catalog { // REST routes go to the owning service unchanged (IR222)
 		p := proxies[ops.DomainOf(s.Name)]
 		for _, rt := range s.Routes {

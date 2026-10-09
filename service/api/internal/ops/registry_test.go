@@ -63,7 +63,8 @@ func (f *fakeIdem) Abort(ctx context.Context, p *Principal, op, key string) {
 }
 
 type unitIn struct {
-	Name string `json:"name"`
+	ID   *string `json:"id,omitempty"` // the item route PUT /v1/units/{id} fills it
+	Name string  `json:"name"`
 }
 
 func (u *unitIn) Validate() map[string]string {
@@ -109,14 +110,26 @@ func setup(t *testing.T) (*Registry, *echo.Echo, *fakeRec, *fakeIdem, *bool) {
 		}
 		return out{OK: true}, nil
 	})
+	Register(r, "attachments.add", func(ctx context.Context, c *Call, in *struct {
+		JobID    string `json:"jobId"`
+		ReportID string `json:"reportId"`
+		File     struct {
+			Bytes []byte `json:"bytes"`
+		} `json:"file"`
+	}) (out, error) {
+		return out{OK: true, Calls: len(in.File.Bytes)}, nil
+	})
 	e := echo.New()
 	e.HTTPErrorHandler = HTTPErrorHandler
-	e.POST("/v1/ops/:operation", r.Dispatch)
+	if err := r.MountREST(e.Group("/v1")); err != nil {
+		t.Fatal(err)
+	}
 	return r, e, rec, idem, ro
 }
 
+// do sends one operation call at its REST route (ClientRequest).
 func do(e *echo.Echo, p *Principal, op, body, key string) *httptest.ResponseRecorder {
-	req := httptest.NewRequest(http.MethodPost, "/v1/ops/"+op, strings.NewReader(body))
+	req := httptest.NewRequest(ClientRequest(op, body))
 	req.Header.Set("Content-Type", "application/json")
 	if key != "" {
 		req.Header.Set("Idempotency-Key", key)
@@ -144,7 +157,7 @@ func errCode(t *testing.T, w *httptest.ResponseRecorder) string {
 var admin = &Principal{Principal: authz.Principal{Role: "admin", Permissions: map[string]bool{"asset.write": true, "asset.read": true}}}
 var client = &Principal{Principal: authz.Principal{Role: "client", Permissions: map[string]bool{}}}
 
-func TestDispatch(t *testing.T) {
+func TestPipeline(t *testing.T) {
 	_, e, rec, idem, ro := setup(t)
 	cases := []struct {
 		name, op, body, key string
@@ -207,9 +220,9 @@ func TestDispatch(t *testing.T) {
 	if res.Meta["operation"] != "units.get" || res.Meta["correlationId"] == "" {
 		t.Fatalf("meta: %v", res.Meta)
 	}
-	// empty body counts as {}
-	if w := do(e, client, "units.get", ``, ""); w.Code != 404 {
-		t.Fatalf("empty body: %d", w.Code)
+	// an empty body counts as {}
+	if w := do(e, admin, "units.save", ``, "key-empty1"); w.Code != 200 || !strings.Contains(w.Body.String(), `"name":""`) {
+		t.Fatalf("empty body: %d %s", w.Code, w.Body.String())
 	}
 	// oversize body
 	if w := do(e, admin, "units.save", `{"name":"`+strings.Repeat("x", 1<<20)+`"}`, "key-big1"); w.Code != 422 {
@@ -304,9 +317,9 @@ func TestExpectedVersionRules(t *testing.T) {
 	}
 }
 
-func TestDispatchVersionHeader(t *testing.T) {
+func TestVersionHeader(t *testing.T) {
 	_, e, _, _, _ := setup(t)
-	req := httptest.NewRequest(http.MethodPost, "/v1/ops/units.save", strings.NewReader(`{"name":"a"}`))
+	req := httptest.NewRequest(http.MethodPost, "/v1/units", strings.NewReader(`{"name":"a"}`))
 	req.Header.Set("Idempotency-Key", "key-ver-0001")
 	req.Header.Set("X-Expected-Version", "4")
 	req = req.WithContext(WithPrincipal(req.Context(), admin))
@@ -318,16 +331,9 @@ func TestDispatchVersionHeader(t *testing.T) {
 }
 
 // IR221: ordinary operations keep the 1 MiB body limit; operations with BlobInput files accept their larger bodies.
-func TestDispatchBodyLimits(t *testing.T) {
-	r, e, _, _, _ := setup(t)
+func TestBodyLimits(t *testing.T) {
+	_, e, _, _, _ := setup(t)
 	tech := &Principal{Principal: authz.Principal{Role: "technician", Permissions: map[string]bool{}}}
-	Register(r, "attachments.add", func(ctx context.Context, c *Call, in *struct {
-		File struct {
-			Bytes []byte `json:"bytes"`
-		} `json:"file"`
-	}) (out, error) {
-		return out{OK: true, Calls: len(in.File.Bytes)}, nil
-	})
 	big := strings.Repeat("a", 2<<20)
 	if w := do(e, admin, "units.save", `{"name":"`+big+`"}`, "key-12345678"); w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "error.bodyTooLarge") {
 		t.Fatalf("2 MiB to an ordinary operation: %d %s", w.Code, w.Body.String()[:120])
@@ -336,12 +342,12 @@ func TestDispatchBodyLimits(t *testing.T) {
 	if bodyLimit("attachments.add") <= 1<<20 || bodyLimit("reports.signOff") < bodyLimit("attachments.add") || bodyLimit("units.save") != 1<<20 {
 		t.Fatal("limits by operation")
 	}
-	w := do(e, tech, "attachments.add", `{"file":{"bytes":"`+photo+`"}}`, "key-23456789")
+	w := do(e, tech, "attachments.add", `{"jobId":"j1","reportId":"r1","file":{"bytes":"`+photo+`"}}`, "key-23456789")
 	if w.Code == http.StatusUnprocessableEntity && strings.Contains(w.Body.String(), "error.bodyTooLarge") {
 		t.Fatalf("a 4 MiB photo must pass the body limit: %d", w.Code)
 	}
 	huge := base64.StdEncoding.EncodeToString(make([]byte, 7<<20))
-	if w := do(e, tech, "attachments.add", `{"file":{"bytes":"`+huge+`"}}`, "key-34567890"); w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "error.bodyTooLarge") {
+	if w := do(e, tech, "attachments.add", `{"jobId":"j1","reportId":"r1","file":{"bytes":"`+huge+`"}}`, "key-34567890"); w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "error.bodyTooLarge") {
 		t.Fatalf("a body above the file limit: %d", w.Code)
 	}
 }

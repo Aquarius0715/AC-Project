@@ -1,6 +1,6 @@
-// Command gateway is the Core API entry for the web apps (IR180): it forwards POST /v1/ops/:operation to the
-// business-domain service that owns the operation (IDENTITY_API_URL, EQUIPMENT_API_URL, MAINTENANCE_API_URL,
-// BILLING_API_URL, ENERGY_API_URL).
+// Command gateway is the Core API entry for the web apps (IR180): it forwards the REST routes of the operation
+// catalog (IR222) to the business-domain service that owns each route's operation (IDENTITY_API_URL,
+// EQUIPMENT_API_URL, MAINTENANCE_API_URL, BILLING_API_URL, ENERGY_API_URL).
 package main
 
 import (

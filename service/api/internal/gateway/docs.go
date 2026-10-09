@@ -35,7 +35,7 @@ const swaggerUI = `<!doctype html>
 `
 
 // mountDocs serves the API description: GET /swagger.json (the document) and GET /docs (Swagger UI). The gateway is
-// the development and demo entry; production routes /v1/ops/* at the load balancer without it.
+// the development and demo entry; production routes the catalog's paths at the load balancer without it.
 func mountDocs(e *echo.Echo) {
 	e.GET("/swagger.json", func(c *echo.Context) error { return c.JSONBlob(http.StatusOK, swagger) })
 	e.GET("/docs", func(c *echo.Context) error { return c.HTML(http.StatusOK, swaggerUI) })

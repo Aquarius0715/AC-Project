@@ -22,7 +22,7 @@ import (
 const versionZero = -100
 
 func write(s *apiserver.Server, a *actor, op, body string, version int) (int, map[string]any) {
-	req := httptest.NewRequest(restRequest(op, body))
+	req := httptest.NewRequest(ops.ClientRequest(op, body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+a.token)
 	req.Header.Set("X-Tenant-Id", seed.ID("tenant-a").String())

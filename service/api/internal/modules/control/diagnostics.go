@@ -286,7 +286,11 @@ func (m Diagnostics) list(ctx context.Context, c *ops.Call, in *RunListInput) (p
 	if err != nil {
 		return paging.Page[Run]{}, err
 	}
-	w, err := paging.Resolve(in.Query, in, c.Principal.ScopeVersion, 1)
+	// the cursor binds the unit and job, not the paging fields themselves (the next page carries the cursor)
+	w, err := paging.Resolve(in.Query, struct {
+		UnitID uuid.UUID  `json:"unitId"`
+		JobID  *uuid.UUID `json:"jobId"`
+	}{in.UnitID, in.JobID}, c.Principal.ScopeVersion, 1)
 	if err != nil {
 		return paging.Page[Run]{}, err
 	}

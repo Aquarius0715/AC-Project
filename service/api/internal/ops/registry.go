@@ -307,21 +307,6 @@ func readBody(c *echo.Context, operation string) ([]byte, error) {
 	return body, nil
 }
 
-// Dispatch is the Echo handler for POST /v1/ops/:operation.
-func (r *Registry) Dispatch(c *echo.Context) error {
-	corr := correlationID(c)
-	name := c.Param("operation")
-	op, ok := r.ops[name]
-	if !ok || !r.serves(name) { // unknown, or owned by another domain service (IR180)
-		return fail(c, apperr.E(apperr.NotFound, "error.unknownOperation"), corr)
-	}
-	body, err := readBody(c, name)
-	if err != nil {
-		return fail(c, err, corr)
-	}
-	return r.run(c, op, body, corr)
-}
-
 // run is the pipeline every route of an operation shares: decode and validate the JSON input, authorize, claim the
 // Idempotency-Key, check the expected version, run the handler in one transaction and write the ServiceResult.
 func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string) error {

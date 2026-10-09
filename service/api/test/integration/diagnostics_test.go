@@ -133,6 +133,12 @@ func TestDiagnosticRuns(t *testing.T) {
 	if _, m := post(s, &techInt, "diagnosticRuns.list", `{"unitId":"`+unit+`","jobId":"`+job+`","query":{}}`); len(items(m)) != 3 {
 		t.Errorf("list: %d", len(items(m)))
 	}
+	// pages of two: the cursor binds unit and job, so the second page reads the third run (IR223 fix)
+	_, m = post(s, &techInt, "diagnosticRuns.list", `{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":2}}`)
+	next, _ := data(m)["nextCursor"].(string)
+	if code, m := post(s, &techInt, "diagnosticRuns.list", `{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":2,"cursor":"`+next+`"}}`); next == "" || code != 200 || len(items(m)) != 1 {
+		t.Errorf("second page: %d %v", code, m)
+	}
 	// a revoked Assignment keeps the runs of the job visible (IR139, IR187)
 	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE job_id = $1`, job)
 	if _, m := post(s, &techInt, "diagnosticRuns.list", `{"unitId":"`+unit+`","jobId":"`+job+`","query":{}}`); len(items(m)) != 3 {

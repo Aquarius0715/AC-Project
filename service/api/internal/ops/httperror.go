@@ -35,7 +35,7 @@ func HTTPErrorHandler(c *echo.Context, err error) {
 		de = apperr.From(err)
 	}
 	if de.CorrelationID == "" {
-		de.CorrelationID = c.Response().Header().Get(echo.HeaderXRequestID)
+		de.CorrelationID = correlationID(c) // every ServiceError carries one, also for unknown routes (D07)
 	}
 	if de.HTTPStatus() >= http.StatusInternalServerError {
 		cause := err

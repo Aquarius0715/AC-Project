@@ -11,9 +11,9 @@ export async function GET() {
   let clientRole: string | null = null;
   if (api && s) {
     try {
-      const r = await fetch(`${process.env.CORE_API_URL ?? "http://localhost:8080"}/v1/ops/session.get`, {
-        method: "POST", cache: "no-store", body: "{}",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${s.accessToken}`, "X-Tenant-Id": s.tenantId, "X-Membership-Id": s.membershipId },
+      const r = await fetch(`${process.env.CORE_API_URL ?? "http://localhost:8080"}/v1/session`, {
+        method: "GET", cache: "no-store",
+        headers: { Authorization: `Bearer ${s.accessToken}`, "X-Tenant-Id": s.tenantId, "X-Membership-Id": s.membershipId },
       });
       if (r.ok) {
         const body = (await r.json()) as { data?: { clientRole?: string | null }; meta?: { snapshotAt?: string } };

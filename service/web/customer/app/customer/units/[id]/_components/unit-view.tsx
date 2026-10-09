@@ -146,7 +146,7 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
           </Card>
           {blocked && <Banner tone="warn">Remote control is paused while HQ checks this AC’s restriction state. Try again later.</Banner>}
           {policy?.kind === "power_off" && <Banner tone="warn">Service restriction active — this AC is kept off. <Link className="font-semibold text-primary" href="/customer/payments">View details →</Link></Banner>}
-          {restricted && <Banner tone="warn">Cooling restriction active — minimum {min} °C. <Link className="font-semibold text-primary" href="/customer/payments/invoice-overdue-a?tab=restriction">View details →</Link></Banner>}
+          {restricted && <Banner tone="warn">Cooling restriction active — minimum {min} °C. <Link className="font-semibold text-primary" href={d ? "/customer/payments" : "/customer/payments/invoice-overdue-a?tab=restriction"}>View details →</Link></Banner>}
           <Card title="REMOTE CONTROL" sub="Controls apply to this AC only; you confirm before sending">
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="font-semibold">Power</div><div className="text-xs text-muted">Sent as its own command</div></div><Toggle on={on} onChange={(v) => (!disabled && !waiting && policy?.kind !== "power_off" ? togglePower(v) : undefined)} label="Power" /></div>

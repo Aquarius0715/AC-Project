@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -164,14 +165,33 @@ func TestCommandHistory(t *testing.T) {
 	}
 	own := data(m)["id"].(string)
 	free()
+	// list reads the unit's history: rows is the first page (ordering checks), byID every page — the test database
+	// keeps other tests' commands on this unit, some at later business times, which can push these off page one
 	list := func(a *actor, body string) (int, map[string]map[string]any, []map[string]any) {
 		t.Helper()
 		code, m := post(s, a, "commands.list", body)
+		rows := items(m)
 		byID := map[string]map[string]any{}
-		for _, it := range items(m) {
-			byID[it["id"].(string)] = it
+		for page := 0; ; page++ {
+			for _, it := range items(m) {
+				byID[it["id"].(string)] = it
+			}
+			next, _ := data(m)["nextCursor"].(string)
+			if code != 200 || next == "" || page == 50 {
+				break
+			}
+			var in map[string]any
+			_ = json.Unmarshal([]byte(body), &in)
+			q, _ := in["query"].(map[string]any)
+			if q == nil {
+				q = map[string]any{}
+			}
+			q["cursor"] = next
+			in["query"] = q
+			b, _ := json.Marshal(in)
+			code, m = post(s, a, "commands.list", string(b))
 		}
-		return code, byID, items(m)
+		return code, byID, rows
 	}
 	code, got, rows := list(&customerA, `{"unitId":"`+unit+`","query":{"limit":100}}`)
 	if code != 200 || got[tech] == nil || got[own] == nil || got[tech]["reason"] != nil || got[tech]["status"] != "expired" {
@@ -181,6 +201,13 @@ func TestCommandHistory(t *testing.T) {
 		if rows[i-1]["requestedAt"].(string) < rows[i]["requestedAt"].(string) {
 			t.Fatalf("newest first: %v before %v", rows[i-1]["requestedAt"], rows[i]["requestedAt"])
 		}
+	}
+	// the next page of a history (limit 1): the cursor binds the unit and job, not the paging fields (IR223 fix)
+	_, m = post(s, &customerA, "commands.list", `{"unitId":"`+unit+`","query":{"limit":1}}`)
+	if next, _ := data(m)["nextCursor"].(string); next == "" {
+		t.Fatal("history of one per page has a next page")
+	} else if code, m := post(s, &customerA, "commands.list", `{"unitId":"`+unit+`","query":{"limit":1,"cursor":"`+next+`"}}`); code != 200 || len(items(m)) != 1 {
+		t.Fatalf("second page: %d %v", code, m)
 	}
 	if code, _, _ := list(&techInt, `{"unitId":"`+unit+`","query":{}}`); code != 422 {
 		t.Errorf("technician without a job: %d", code)

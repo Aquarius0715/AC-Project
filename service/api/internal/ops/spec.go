@@ -1,4 +1,5 @@
-// Package ops holds the operation registry and dispatcher for POST /v1/ops/:operation (backend Go design §4).
+// Package ops holds the operation registry, the REST bindings of the catalog routes (IR222) and the pipeline every
+// operation runs (backend Go design §4).
 package ops
 
 import "github.com/google/uuid"

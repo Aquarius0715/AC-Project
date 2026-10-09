@@ -20,16 +20,17 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
-// REST routes (IR222): every operation is served at the routes of its catalog entry. A route builds the same JSON
-// input the operation reads from POST /v1/ops/<operation> and runs the same pipeline (validation, authorization,
-// idempotency, expected version, transaction, ServiceResult). The input is made of
+// REST routes (IR222): every operation is served at the routes of its catalog entry. A route builds the operation's
+// JSON input and runs the pipeline every operation shares (strict decoding, validation, authorization, idempotency,
+// expected version, transaction, ServiceResult). The input is made of
 //   - the path parameters, written {field} after the input field they fill ({target.kind} fills a nested field);
 //   - GET and DELETE: the query string — top-level fields by name (lists repeat the parameter or separate the values
 //     with commas and an empty value is the empty list, fields of a nested object as object.field), the paging
 //     fields cursor, limit and sort=field:direction, and the operation's catalogued filters by their own names;
 //   - POST, PUT and PATCH: the JSON object body (no query parameters);
 //   - the route's fixed field (payouts.transition at /approve sets action=approve).
-// A path parameter or the fixed field that the body names with another value is VALIDATION error.pathMismatch.
+// A path parameter or the fixed field that the body names with another value is VALIDATION error.pathMismatch; an ID
+// path parameter that is not a UUID is NOT_FOUND (no resource has it).
 
 // Param describes one query or path parameter of a route (also used for the API description).
 type Param struct {
@@ -38,6 +39,7 @@ type Param struct {
 	Kind  ParamKind
 	List  bool
 	Sort  bool   // sort=field:direction → {field, direction}
+	UUID  bool   // the field is an ID: a path value that is not a UUID names no resource (NOT_FOUND)
 	Role  string // field, cursor, limit, sort or filter
 	Order int    // input order: fields, then the paging fields, then the filters in catalog order
 }
@@ -157,9 +159,9 @@ func parameters(t reflect.Type, filters []string) (map[string]Param, []string, e
 			case name == "filters" && ft == rawType && !nested:
 				filterAt = append(filterAt, here)
 			case scalar(ft):
-				add(Param{Name: key, At: here, Kind: kindOf(ft)})
+				add(Param{Name: key, At: here, Kind: kindOf(ft), UUID: ft == uuidType})
 			case ft.Kind() == reflect.Slice && ft != rawType && scalar(deref(ft.Elem())):
-				add(Param{Name: key, At: here, Kind: kindOf(deref(ft.Elem())), List: true})
+				add(Param{Name: key, At: here, Kind: kindOf(deref(ft.Elem())), List: true, UUID: deref(ft.Elem()) == uuidType})
 			case ft.Kind() == reflect.Struct && !nested:
 				walk(ft, here, key+".", true)
 			default:
@@ -347,6 +349,11 @@ func (b *Binding) Input(c *echo.Context, body []byte) ([]byte, error) {
 	}
 	for _, name := range b.Path {
 		raw, err := url.PathUnescape(c.Param(name))
+		if p := b.Params[name]; p.UUID && err == nil && raw != "" {
+			if _, perr := uuid.Parse(raw); perr != nil { // no resource has this ID: the path names nothing
+				return nil, apperr.E(apperr.NotFound, "error.notFound")
+			}
+		}
 		v, ok := convert(b.Params[name].Kind, raw)
 		switch {
 		case err != nil || raw == "" || !ok:

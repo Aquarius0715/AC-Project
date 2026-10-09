@@ -139,7 +139,7 @@ func (cl splitCluster) drain(t *testing.T) {
 	}
 }
 
-// clusterFacade is the suite's server in cluster mode: the gateway in front of the cluster for /v1/ops, the
+// clusterFacade is the suite's server in cluster mode: the gateway in front of the cluster for the /v1 routes, the
 // all-domain server for health checks, its database for worker paths (scheduler ticks, device callbacks) and the
 // cluster's consumers for drainEvents.
 func clusterFacade(t *testing.T, base apiserver.Config, v auth.Verifier) *apiserver.Server {
@@ -173,7 +173,7 @@ func clusterFacade(t *testing.T, base apiserver.Config, v auth.Verifier) *apiser
 		}
 		rec := &statusRecorder{ResponseWriter: w}
 		gw.ServeHTTP(rec, r)
-		if (r.URL.Path == "/v1/demo/advance-clock" || r.URL.Path == "/v1/ops/demo.advanceClock") && rec.status == http.StatusOK && base.DemoClock != nil { // the workers' tick on the new time
+		if r.URL.Path == "/v1/demo/advance-clock" && rec.status == http.StatusOK && base.DemoClock != nil { // the workers' tick on the new time
 			if _, err := cl.tick(context.WithoutCancel(r.Context()), base.DemoClock.Now()); err != nil {
 				panic("tick after the jump: " + err.Error())
 			}

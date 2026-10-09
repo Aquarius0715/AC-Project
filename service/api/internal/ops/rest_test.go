@@ -70,13 +70,13 @@ func TestRESTParameters(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string]Param{
-		"jobId":       {Name: "jobId", At: []string{"jobId"}},
+		"jobId":       {Name: "jobId", At: []string{"jobId"}, UUID: true},
 		"count":       {Name: "count", At: []string{"count"}, Kind: KindInteger},
 		"ratio":       {Name: "ratio", At: []string{"ratio"}, Kind: KindNumber},
 		"on":          {Name: "on", At: []string{"on"}, Kind: KindBool},
-		"ids":         {Name: "ids", At: []string{"ids"}, List: true},
+		"ids":         {Name: "ids", At: []string{"ids"}, List: true, UUID: true},
 		"target.kind": {Name: "target.kind", At: []string{"target", "kind"}},
-		"target.id":   {Name: "target.id", At: []string{"target", "id"}},
+		"target.id":   {Name: "target.id", At: []string{"target", "id"}, UUID: true},
 		"action":      {Name: "action", At: []string{"action"}},
 		"cursor":      {Name: "cursor", At: []string{"query", "cursor"}},
 		"limit":       {Name: "limit", At: []string{"query", "limit"}, Kind: KindInteger},
@@ -153,6 +153,12 @@ func TestRESTQueryInput(t *testing.T) {
 	if _, fe := bind(t, b, "GET", "/v1/jobs/x/things", "", map[string]string{"jobId": ""}); fe["jobId"] != "error.invalid" {
 		t.Errorf("empty path parameter: %v", fe)
 	}
+	// an ID in the path that is not a UUID names no resource
+	c := echo.New().NewContext(httptest.NewRequest("GET", "/v1/jobs/invoice-a/things", nil), httptest.NewRecorder())
+	c.SetPathValues(echo.PathValues{{Name: "jobId", Value: "invoice-a"}})
+	if _, err := b.Input(c, nil); apperr.From(err).Code != apperr.NotFound {
+		t.Errorf("malformed ID: %v", err)
+	}
 }
 
 func TestRESTBodyInput(t *testing.T) {
@@ -220,7 +226,7 @@ func TestRESTBindingRules(t *testing.T) {
 	}
 }
 
-// TestRESTRoutes drives catalog routes end to end: the same pipeline as POST /v1/ops (authorization, idempotency,
+// TestRESTRoutes drives catalog routes end to end through the shared pipeline (authorization, idempotency,
 // ServiceResult) with the input taken from the path, the query string, the body and the fixed field.
 func TestRESTRoutes(t *testing.T) {
 	r := NewRegistry()

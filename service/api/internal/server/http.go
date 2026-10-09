@@ -62,7 +62,6 @@ func newEcho(reg *ops.Registry, m *db.TxManager, a *auth.Authenticator, logger *
 		e.POST(ops.SystemQueryPath, reg.ServeSystemQuery(internalToken)) // worker calls without a user
 	}
 	v1 := e.Group("/v1", a.Middleware())
-	v1.POST("/ops/:operation", reg.Dispatch)
 	if err := reg.MountREST(v1); err != nil { // the catalog's REST routes of the served operations (IR222)
 		return nil, err
 	}

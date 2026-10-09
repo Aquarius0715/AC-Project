@@ -28,11 +28,12 @@ func TestRoutesEachOperationToItsDomain(t *testing.T) {
 		targets[d] = u
 	}
 	e := New(targets, nil)
-	for op, want := range map[string]string{"jobs.list": ops.DomainMaintenance, "units.list": ops.DomainEquipment, "session.get": ops.DomainIdentity, "invoices.list": ops.DomainBilling, "energy.summary": ops.DomainEnergy} {
+	for op, want := range map[string]string{"jobs.create": ops.DomainMaintenance, "units.save": ops.DomainEquipment, "preferences.update": ops.DomainIdentity, "invoices.create": ops.DomainBilling, "factors.save": ops.DomainEnergy} {
 		if ops.DomainOf(op) == "" {
 			t.Fatalf("%s is not in the catalog", op)
 		}
-		req := httptest.NewRequest(http.MethodPost, "/v1/ops/"+op, strings.NewReader(`{"limit":1}`))
+		rt := ops.SpecByName()[op].Routes[0]
+		req := httptest.NewRequest(rt.Method, rt.Path, strings.NewReader(`{"limit":1}`))
 		req.Header.Set("Authorization", "Bearer tok")
 		w := httptest.NewRecorder()
 		e.ServeHTTP(w, req)
@@ -41,14 +42,14 @@ func TestRoutesEachOperationToItsDomain(t *testing.T) {
 		if w.Code != http.StatusCreated || body.Data.Domain != want {
 			t.Fatalf("%s → %d %s, want %s", op, w.Code, w.Body, want)
 		}
-		got := seen[want]
-		if !strings.HasPrefix(got, "/v1/ops/"+op+` {"limit":1} Bearer tok `) || strings.HasSuffix(got, " ") {
+		got := seen[want] // path, body, the user's token and the gateway's correlation ID reach the service
+		if !strings.HasPrefix(got, rt.Path+` {"limit":1} Bearer tok `) || strings.HasSuffix(got, " ") {
 			t.Fatalf("%s forwarded as %q", op, got)
 		}
 	}
-	// unknown operations never leave the gateway
+	// unknown routes (the retired POST /v1/ops/<operation> too) never leave the gateway
 	w := httptest.NewRecorder()
-	e.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/v1/ops/nope.nope", strings.NewReader(`{}`)))
+	e.ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/v1/ops/jobs.list", strings.NewReader(`{}`)))
 	if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "error.unknownOperation") {
 		t.Fatalf("unknown: %d %s", w.Code, w.Body)
 	}
@@ -105,7 +106,7 @@ func TestUpstreamDownIsUnavailable(t *testing.T) {
 		targets[d] = dead
 	}
 	w := httptest.NewRecorder()
-	New(targets, nil).ServeHTTP(w, httptest.NewRequest(http.MethodPost, "/v1/ops/jobs.list", strings.NewReader(`{}`)))
+	New(targets, nil).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/jobs?limit=1", nil))
 	if w.Code != http.StatusServiceUnavailable || !strings.Contains(w.Body.String(), `"UNAVAILABLE"`) {
 		t.Fatalf("down: %d %s", w.Code, w.Body)
 	}

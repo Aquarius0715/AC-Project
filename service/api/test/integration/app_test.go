@@ -11,6 +11,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
@@ -107,7 +108,7 @@ func drainEvents(t *testing.T) {
 }
 
 func post(s *apiserver.Server, a *actor, op, body string) (int, map[string]any) {
-	req := httptest.NewRequest(restRequest(op, body))
+	req := httptest.NewRequest(ops.ClientRequest(op, body))
 	req.Header.Set("Content-Type", "application/json")
 	if a != nil {
 		req.Header.Set("Authorization", "Bearer "+a.token)

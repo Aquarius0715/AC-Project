@@ -6,6 +6,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { needsRefresh, SESSION_COOKIE, verify, type Session } from "@ac/web/lib/session";
 import type { DomainError } from "@ac/web/lib/ops";
+import { coreRequest } from "@ac/web/lib/rest";
 
 /** The session from the signed cookie, or null. proxy.ts refreshes tokens before pages render (Server Components
  * cannot write cookies), so an expired token here means the refresh failed. Memoized per render pass. */
@@ -29,7 +30,8 @@ export class CoreError extends Error {
 
 export type CoreOptions = { write?: boolean; expectedVersion?: number; idempotencyKey?: string };
 
-/** Calls one Core API operation as the signed-in membership and returns `data` (DomainError → CoreError). */
+/** Calls one Core API operation as the signed-in membership at its REST route (IR222) and returns `data`
+ * (DomainError → CoreError). */
 export async function coreOp<T>(operation: string, input: unknown, opts: CoreOptions = {}): Promise<T> {
   return (await coreCall<T>(operation, input, opts)).data;
 }
@@ -66,17 +68,17 @@ export const corePermissions = cache(async (): Promise<Set<string>> => new Set((
 
 async function coreCall<T>(operation: string, input: unknown, opts: CoreOptions): Promise<{ data: T; meta?: { snapshotAt?: string } }> {
   const s = await verifySession();
+  const req = coreRequest(operation, input);
+  if (!req) throw new CoreError(404, { code: "NOT_FOUND", messageKey: "error.unknownOperation", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
     Authorization: `Bearer ${s.accessToken}`,
     "X-Tenant-Id": s.tenantId,
     "X-Membership-Id": s.membershipId,
   };
+  if (req.body !== undefined) headers["Content-Type"] = "application/json";
   if (opts.write) headers["Idempotency-Key"] = opts.idempotencyKey ?? crypto.randomUUID();
   if (opts.expectedVersion !== undefined) headers["X-Expected-Version"] = String(opts.expectedVersion);
-  const res = await fetch(`${process.env.CORE_API_URL ?? "http://localhost:8080"}/v1/ops/${operation}`, {
-    method: "POST", headers, body: JSON.stringify(input ?? {}), cache: "no-store",
-  });
+  const res = await fetch(`${process.env.CORE_API_URL ?? "http://localhost:8080"}${req.path}`, { method: req.method, headers, body: req.body, cache: "no-store" });
   const body = await res.json().catch(() => null);
   if (!res.ok) throw new CoreError(res.status, body ?? { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });
   return body as { data: T; meta?: { snapshotAt?: string } };
