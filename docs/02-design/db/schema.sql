@@ -1750,7 +1750,7 @@ CREATE TABLE notify.ref_customers (id uuid PRIMARY KEY, tenant_id uuid NOT NULL,
 CREATE TABLE notify.ref_jobs (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, unit_id uuid, customer_org_id uuid);
 CREATE TABLE notify.ref_offers (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, job_id uuid, contractor_org_id uuid);
 CREATE INDEX ref_offers_job ON notify.ref_offers (job_id);
-CREATE TABLE notify.ref_assignments (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, job_id uuid, technician_membership_id uuid, status text);
+CREATE TABLE notify.ref_assignments (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, job_id uuid, technician_membership_id uuid, status text, scheduled tstzrange); -- scheduled: the IR49 viewing window ends with it (IR253)
 CREATE INDEX ref_assignments_job ON notify.ref_assignments (job_id);
 CREATE TABLE notify.ref_invoices (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, number text, customer_id uuid, status text, due_at timestamptz);
 CREATE TABLE notify.ref_inquiries (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, customer_id uuid, subject_type text);
@@ -1814,8 +1814,8 @@ CREATE TRIGGER measurements_capture AFTER INSERT ON monitoring.measurements
   EXECUTE FUNCTION platform.capture_row('sensor_id', 'observed_at', 'sequence', 'tenant_id', 'unit_id', 'value', 'unit', 'origin', 'quality', 'boundary_id', 'event_id');
 CREATE TRIGGER offers_capture AFTER INSERT OR DELETE OR UPDATE OF job_id, contractor_org_id ON maintenance.offers
   FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'job_id', 'contractor_org_id');
-CREATE TRIGGER assignments_capture AFTER INSERT OR DELETE OR UPDATE OF job_id, technician_membership_id, status ON maintenance.assignments
-  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'job_id', 'technician_membership_id', 'status');
+CREATE TRIGGER assignments_capture AFTER INSERT OR DELETE OR UPDATE OF job_id, technician_membership_id, status, scheduled ON maintenance.assignments
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'job_id', 'technician_membership_id', 'status', 'scheduled');
 CREATE TRIGGER invoices_capture AFTER INSERT OR DELETE OR UPDATE OF number, customer_id, status, due_at ON billing.invoices
   FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'number', 'customer_id', 'status', 'due_at');
 CREATE TRIGGER inquiries_capture AFTER INSERT OR DELETE OR UPDATE OF customer_id, subject_type ON billing.inquiries

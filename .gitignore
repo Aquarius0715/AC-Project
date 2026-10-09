@@ -10,3 +10,8 @@ service/.cover/
 service/api/coverage.out
 service/api/.cover/
 service/api/.test-all/
+
+# Playwright end-to-end runs (service/web/e2e, IR252): signed-in browser state and run output
+service/web/e2e/.auth/
+service/web/e2e/test-results/
+service/web/e2e/playwright-report/

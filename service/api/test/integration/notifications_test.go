@@ -199,3 +199,46 @@ func TestPreferencesAndConsents(t *testing.T) {
 		t.Fatalf("revoke: %d %v", code, m)
 	}
 }
+
+// TestTechnicianJobNotificationScope: a technician's notification about a job is listed and can be marked read only while
+// the assignment lets the technician open the job — active and its scheduled window not over (IR49, IR58, IR253).
+func TestTechnicianJobNotificationScope(t *testing.T) {
+	s := server(t)
+	tenant, tech, job := seed.ID("tenant-a"), seed.ID("tech-internal-a"), seed.ID("job-contractor-a")
+	nid, aid := uuid.NewString(), uuid.NewString()
+	owner(t, `INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, template_key, target, params, severity, occurred_at)
+		VALUES ($1,$2,$3,1,'schedule_change','schedule_change',$4,'{}','normal',$5)`, nid, tenant, tech, `{"kind":"job","id":"`+job.String()+`"}`, clock)
+	owner(t, `INSERT INTO notify.ref_assignments (id, tenant_id, job_id, technician_membership_id, status, scheduled) VALUES ($1,$2,$3,$4,'active',tstzrange($5,$6))`,
+		aid, tenant, job, tech, clock.Add(-time.Hour), clock.Add(time.Hour))
+	t.Cleanup(func() {
+		owner(t, `DELETE FROM notify.notifications WHERE id = $1`, nid)
+		owner(t, `DELETE FROM notify.ref_assignments WHERE id = $1`, aid)
+	})
+	listed := func() bool {
+		_, m := post(s, &techInt, "notifications.list", `{"filters":{"type":"schedule_change"},"limit":100}`)
+		for _, it := range items(m) {
+			if it["id"] == nid {
+				return true
+			}
+		}
+		return false
+	}
+	if !listed() {
+		t.Fatal("active assignment inside its window: notification not listed")
+	}
+	owner(t, `UPDATE notify.ref_assignments SET status = 'revoked' WHERE id = $1`, aid)
+	if listed() {
+		t.Error("revoked assignment: notification still listed")
+	}
+	owner(t, `UPDATE notify.ref_assignments SET status = 'active', scheduled = tstzrange($2,$3) WHERE id = $1`, aid, clock.Add(-3*time.Hour), clock.Add(-time.Hour))
+	if listed() {
+		t.Error("assignment window over: notification still listed")
+	}
+	if code, _ := write(s, &techInt, "notifications.markRead", `{"id":"`+nid+`"}`, 1); code != 404 {
+		t.Errorf("mark read with the job out of reach: %d", code)
+	}
+	owner(t, `UPDATE notify.ref_assignments SET scheduled = tstzrange($2,$3) WHERE id = $1`, aid, clock.Add(-time.Hour), clock.Add(time.Hour))
+	if code, _ := write(s, &techInt, "notifications.markRead", `{"id":"`+nid+`"}`, 1); code != 200 {
+		t.Errorf("mark read inside the window: %d", code)
+	}
+}

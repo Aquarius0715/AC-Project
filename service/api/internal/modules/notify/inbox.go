@@ -51,9 +51,10 @@ func kindsFor(perms map[string]bool) []string {
 	return out
 }
 
-// readableSQL is the IR58 current-scope condition on the resolved target t for the principal; kind / id are the SQL
-// expressions of the target.
-func readableSQL(p *ops.Principal, kind, id string, args *[]any) string {
+// readableSQL is the IR58 current-scope condition on the resolved target t for the principal at now; kind / id are the
+// SQL expressions of the target. A technician reads a job while the assignment lets them open it (IR49: active and its
+// scheduled window not over, as jobs.get; IR253), so a revoked or ended assignment hides the job's notifications.
+func readableSQL(p *ops.Principal, now time.Time, kind, id string, args *[]any) string {
 	add := func(v any) string { *args = append(*args, v); return fmt.Sprintf("$%d", len(*args)) }
 	switch p.Role {
 	case "admin":
@@ -64,7 +65,8 @@ func readableSQL(p *ops.Principal, kind, id string, args *[]any) string {
 		return kind + " = 'job' AND EXISTS (SELECT 1 FROM notify.ref_offers o WHERE o.job_id = " + id + " AND o.contractor_org_id = " + add(p.OrgID) + ")"
 	default:
 		unitScope := "(t.unit_id = ANY(" + add(p.Scopes["unit"]) + ") OR t.property_id = ANY(" + add(p.Scopes["property"]) + ") OR t.org = ANY(" + add(p.Scopes["organization"]) + "))"
-		return "((" + kind + " = 'job' AND EXISTS (SELECT 1 FROM notify.ref_assignments a WHERE a.job_id = " + id + " AND a.technician_membership_id = " + add(p.MembershipID) + ")) OR (" +
+		return "((" + kind + " = 'job' AND EXISTS (SELECT 1 FROM notify.ref_assignments a WHERE a.job_id = " + id + " AND a.technician_membership_id = " + add(p.MembershipID) +
+			" AND a.status = 'active' AND (a.scheduled IS NULL OR " + add(now) + " < upper(a.scheduled)))) OR (" +
 			kind + " IN ('unit','device') AND " + unitScope + "))"
 	}
 }
@@ -219,7 +221,7 @@ func (Inbox) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Pa
 	}
 	args := []any{c.Principal.MembershipID}
 	add := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
-	conds := []string{"n.recipient_membership_id = $1", readableSQL(c.Principal, "(n.target->>'kind')", "(n.target->>'id')::uuid", &args)}
+	conds := []string{"n.recipient_membership_id = $1", readableSQL(c.Principal, c.Now, "(n.target->>'kind')", "(n.target->>'id')::uuid", &args)}
 	if f.Severity != nil {
 		conds = append(conds, "n.severity = "+add(*f.Severity))
 	}
@@ -299,7 +301,7 @@ func (in *MarkReadInput) Validate() map[string]string {
 func (Inbox) markRead(ctx context.Context, c *ops.Call, in *MarkReadInput) (Notification, error) {
 	args := []any{in.ID, c.Principal.MembershipID}
 	q := "SELECT " + inboxCols + " FROM " + inboxFrom() + " WHERE n.id = $1 AND n.recipient_membership_id = $2 AND " +
-		readableSQL(c.Principal, "(n.target->>'kind')", "(n.target->>'id')::uuid", &args) + " FOR UPDATE OF n"
+		readableSQL(c.Principal, c.Now, "(n.target->>'kind')", "(n.target->>'id')::uuid", &args) + " FOR UPDATE OF n"
 	x, err := scanNotification(c.Tx.QueryRow(ctx, q, args...))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return x, apperr.E(apperr.NotFound, "error.notFound")
@@ -359,7 +361,7 @@ type target struct {
 func resolve(ctx context.Context, c *ops.Call, in *TargetInput) (target, error) {
 	args := []any{in.Target.Kind, in.Target.ID}
 	var t target
-	err := c.Tx.QueryRow(ctx, "SELECT t.org, t.name FROM "+fmt.Sprintf(targetLateral, "$1::text", "$2::uuid")+" WHERE "+readableSQL(c.Principal, "$1::text", "$2::uuid", &args), args...).Scan(&t.org, &t.name)
+	err := c.Tx.QueryRow(ctx, "SELECT t.org, t.name FROM "+fmt.Sprintf(targetLateral, "$1::text", "$2::uuid")+" WHERE "+readableSQL(c.Principal, c.Now, "$1::text", "$2::uuid", &args), args...).Scan(&t.org, &t.name)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return t, apperr.E(apperr.NotFound, "error.notFound")
 	}

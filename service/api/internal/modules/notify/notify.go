@@ -78,7 +78,7 @@ var Replicas = []events.Replica{
 	{Source: "assets.customers", Table: "notify.ref_customers", Keys: []string{"id"}, Cols: []string{"tenant_id", "organization_id"}},
 	{Source: "maintenance.jobs", Table: "notify.ref_jobs", Keys: []string{"id"}, Cols: []string{"tenant_id", "unit_id", "customer_org_id"}},
 	{Source: "maintenance.offers", Table: "notify.ref_offers", Keys: []string{"id"}, Cols: []string{"tenant_id", "job_id", "contractor_org_id"}},
-	{Source: "maintenance.assignments", Table: "notify.ref_assignments", Keys: []string{"id"}, Cols: []string{"tenant_id", "job_id", "technician_membership_id", "status"}},
+	{Source: "maintenance.assignments", Table: "notify.ref_assignments", Keys: []string{"id"}, Cols: []string{"tenant_id", "job_id", "technician_membership_id", "status", "scheduled"}},
 	{Source: "billing.invoices", Table: "notify.ref_invoices", Keys: []string{"id"}, Cols: []string{"tenant_id", "number", "customer_id", "status", "due_at"}},
 	{Source: "billing.inquiries", Table: "notify.ref_inquiries", Keys: []string{"id"}, Cols: []string{"tenant_id", "customer_id", "subject_type"}},
 	{Source: "restrictions.restrictions", Table: "notify.ref_restrictions", Keys: []string{"id"}, Cols: []string{"tenant_id", "customer_id"}},

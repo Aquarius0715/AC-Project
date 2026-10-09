@@ -1697,7 +1697,7 @@ Notifications (identity-api) resolved targets and recipients (IR142, IR58) by jo
 | `ref_customers` | assets.customers id, tenant_id, organization_id |
 | `ref_jobs` | maintenance.jobs id, tenant_id, unit_id, customer_org_id |
 | `ref_offers` | maintenance.offers id, tenant_id, job_id, contractor_org_id |
-| `ref_assignments` | maintenance.assignments id, tenant_id, job_id, technician_membership_id, status |
+| `ref_assignments` | maintenance.assignments id, tenant_id, job_id, technician_membership_id, status, scheduled (IR253) |
 | `ref_invoices` | billing.invoices id, tenant_id, number, customer_id, status, due_at |
 | `ref_inquiries` | billing.inquiries id, tenant_id, customer_id, subject_type |
 | `ref_restrictions` | restrictions.restrictions id, tenant_id, customer_id |
@@ -2396,3 +2396,28 @@ The shell's Sign out was a link to `/login`. In API mode the BFF session cookie 
 2. **Reason (error state).** `state`: the sign-in expired or was opened in another tab. `token`: the identity service did not accept it. `membership`: no active AC Project membership. `role`: the account belongs to another service. `expired`: the session ended (Expire session, IR249). Any other value: the sign-in did not complete.
 3. **Figma texts.** “AC Project — Client / Partner / Technician / Admin”, each role's line (for example, “Sign in to manage customers, contracts, and access”), the Not real authentication badge, the demo account tile (the technician app's is tech-internal-a, “Internal · inspections & work reports”), “Continue as … →”, the other three services in Figma's order (links when their URLs are configured), Forgot password? and the demo note, with the English chip at the top right (the only language in this build).
 4. **Check.** In the customer, partner and technician apps the full UI sign-in works: a protected path redirects to `/login?returnTo=…`, Continue opens the local identity provider with the username filled in, and after sign-in the browser is back on the requested path. The HQ app has the same page; its sign-in also asks for the one-time code.
+
+## IR252 End-to-end tests of the four web apps — 2026-10-10
+
+The UI flows had been driven only by scripts outside the repository. `service/web/e2e` is now a Playwright suite (Playwright Test 1.62, the version of the cached Chromium) that runs against the local stack in API mode: the compose backend with Keycloak, and the four apps on ports 3000–3003 (`E2E_<APP>_URL` points a project at another host).
+
+1. **Projects.** One project per app (customer, partner, technician, admin) runs the shared specs and its own. A setup project per app signs in once through the UI, as a person would: the sign-in page, Continue, the identity provider with the account filled in, the password and, for HQ, the one-time code. It then stores the browser state for the app's specs.
+2. **Credentials.** The local demo realm's test values are read from its import file (`docker/keycloak/realm-ac.json`), so they live in one place; `E2E_PASSWORD` and `E2E_TOTP_SECRET` replace them for another identity provider. A one-time code is accepted once per 30-second window, so a sign-in that comes too soon after the last one waits for the next window.
+3. **Specs.**
+   - smoke: every page the app links to renders, with no error boundary, not-found text, page error or failed document.
+   - session: the shell names the signed-in user; Sign out ends the session; a protected page keeps its returnTo; a sign-in that came back says why.
+   - preferences: time zone and language; a client's consent and monthly report e-mail; two-step verification on and off.
+   - demo: the labelled panel, the clock and the disabled browser-only parts, a device fault and its recovery, Expire session.
+   - admin: an overview job-status row opens the Jobs tab for its period.
+4. **Rules.** Specs put back what they change and run one at a time, because they share the demo users. A save is done when the Server Action has answered and its toast has appeared, not when the button is disabled (it is also disabled while pending). Moving the demo clock is opt-in (`E2E_ADVANCE_CLOCK=1`), because the clock never goes back. Specs are named `*.e2e.ts`, so the shared package's Vitest never picks them up.
+5. **Commands.** From `service/web`: `npm run e2e` (`-- --project=admin` for one app). `npm run typecheck` also checks the suite (`e2e/tsconfig.json`). Browser state and run output stay out of git.
+6. **First run.** 45 passed and 8 skipped (the clock jump in every app, the client-only consent in the other three, the technician's device fault while no assignment is current). The technician smoke spec found the gap closed in IR253.
+
+## IR253 A technician's job notifications follow the assignment — 2026-10-10
+
+The technician inbox listed a schedule_change notification for a job whose assignment HQ had revoked. Its link opened “This page isn't available”, because `jobs.get` refuses a job without a current assignment (IR49), while IR58 says such notifications must not be listed at all. notify checked only that an assignment row existed, whatever its status or window.
+
+1. **Rule.** A technician reads a job target while an assignment of theirs is active and its scheduled window has not ended, the condition of `jobs.get` (IR49). Otherwise the notification is left out of items, total and unread counts, and cannot be marked read (NOT_FOUND). It comes back if access does (IR58).
+2. **Data.** notify's copy of the assignments (`notify.ref_assignments`, IR188) also keeps `scheduled`. The change-capture trigger sends it, and existing rows are backfilled from `maintenance.assignments`.
+3. **Remaining difference.** For an external technician, `jobs.get` also needs the accepted offer's access window. notify has no copy of that window, so the scheduled window, which lies inside it, stands in.
+4. **Check.** TestTechnicianJobNotificationScope: listed while active and inside the window; hidden when revoked and after the window; mark-read 404 outside the window and 200 inside. make test-all passes on both suites. In the dev stack the technician's revoked-job notification is gone, and the E2E technician smoke spec passes.

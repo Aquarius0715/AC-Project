@@ -22,6 +22,8 @@ This version gives each of the 67 requirements across four roles three acceptanc
 | E2E | S01–S08 with four roles switched in one tab, deep links, reload | Implementation revision, browser, video/trace/screenshots |
 | Manual/automated accessibility | Keyboard, screen reader, contrast, 360/768/1280px widths, 200% zoom, English/Malay | Environment, actual interactions, and results. Automated checks alone do not establish compliance |
 
+API mode end-to-end tests (IR252): `npm run e2e` in `service/web` runs the Playwright suite in `service/web/e2e` against the local stack. One project per app signs in once through the identity provider; the specs restore what they change.
+
 During implementation, define package scripts first, then record actual type-check, lint, build, and test commands. Do not claim that nonexistent commands passed. Acceptance requires coverage of every P0/P1 requirement, zero P0/P1 defects, and a clear list of remaining defects and open issues. Do not exclude failed cases as out of scope.
 
 ## 2. Fixed fixtures
