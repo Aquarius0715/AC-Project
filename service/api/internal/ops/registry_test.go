@@ -2,6 +2,7 @@ package ops
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -313,5 +314,34 @@ func TestDispatchVersionHeader(t *testing.T) {
 	e.ServeHTTP(w, req)
 	if w.Code != 422 || !strings.Contains(w.Body.String(), "expectedVersion") {
 		t.Fatalf("version on a create must be rejected: %d %s", w.Code, w.Body.String())
+	}
+}
+
+// IR221: ordinary operations keep the 1 MiB body limit; operations with BlobInput files accept their larger bodies.
+func TestDispatchBodyLimits(t *testing.T) {
+	r, e, _, _, _ := setup(t)
+	tech := &Principal{Principal: authz.Principal{Role: "technician", Permissions: map[string]bool{}}}
+	Register(r, "attachments.add", func(ctx context.Context, c *Call, in *struct {
+		File struct {
+			Bytes []byte `json:"bytes"`
+		} `json:"file"`
+	}) (out, error) {
+		return out{OK: true, Calls: len(in.File.Bytes)}, nil
+	})
+	big := strings.Repeat("a", 2<<20)
+	if w := do(e, admin, "units.save", `{"name":"`+big+`"}`, "key-12345678"); w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "error.bodyTooLarge") {
+		t.Fatalf("2 MiB to an ordinary operation: %d %s", w.Code, w.Body.String()[:120])
+	}
+	photo := base64.StdEncoding.EncodeToString(make([]byte, 4<<20)) // a 4 MiB photo is about 5.3 MiB in JSON
+	if bodyLimit("attachments.add") <= 1<<20 || bodyLimit("reports.signOff") < bodyLimit("attachments.add") || bodyLimit("units.save") != 1<<20 {
+		t.Fatal("limits by operation")
+	}
+	w := do(e, tech, "attachments.add", `{"file":{"bytes":"`+photo+`"}}`, "key-23456789")
+	if w.Code == http.StatusUnprocessableEntity && strings.Contains(w.Body.String(), "error.bodyTooLarge") {
+		t.Fatalf("a 4 MiB photo must pass the body limit: %d", w.Code)
+	}
+	huge := base64.StdEncoding.EncodeToString(make([]byte, 7<<20))
+	if w := do(e, tech, "attachments.add", `{"file":{"bytes":"`+huge+`"}}`, "key-34567890"); w.Code != http.StatusUnprocessableEntity || !strings.Contains(w.Body.String(), "error.bodyTooLarge") {
+		t.Fatalf("a body above the file limit: %d", w.Code)
 	}
 }

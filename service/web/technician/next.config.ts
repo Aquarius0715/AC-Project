@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@ac/web"],
   outputFileTracingRoot: path.join(__dirname, ".."),
   turbopack: { root: path.join(__dirname, "..") },
+  // report photos and the sign-off reach the Server Actions as files (JPEG/PNG up to 5 MiB, DD-T09 / DD-T15)
+  experimental: { serverActions: { bodySizeLimit: "12mb" } },
 };
 
 export default nextConfig;

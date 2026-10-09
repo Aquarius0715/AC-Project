@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.111.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
+Version: 0.112.0 / Created: 2026-09-14 / Updated: 2026-10-09 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.112.0 (2026-10-09): Technician job workspace through the server — assignment, check-in with the scanned label, checklist of the unit's service scope, readings, parts and refrigerant, photos, sign-off and submission with the draft and job versions — and per-operation request body limits for file uploads (IR221).
 0.111.0 (2026-10-09): API description in Swagger built from the swag annotations of every operation handler (`make swagger`; Swagger UI at the gateway's `/docs`, copy in [02-design/api/swagger.json](02-design/api/swagger.json)) and further coverage tests (IR220). 
 0.110.0 (2026-10-09): Web unit tests (Vitest in the shared package, typecheck of the shared package) and backend tests for the automation evaluation inputs and idempotency, technician access reasons, command and restriction input rules; Go coverage 85.2 % (IR219). 
 0.109.0 (2026-10-09): Contractor quality review (evidence check, accept / return with the report and job versions, photos) and payouts (approved and paid statements, line labels, Not included rows, Ask HQ, PDF) through the server; the demo seed gains the contractor-a rate card (IR218). 

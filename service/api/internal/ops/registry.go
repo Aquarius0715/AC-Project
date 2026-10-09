@@ -267,6 +267,18 @@ func expectedVersion(s Spec, body []byte, header string) (*int, error) {
 	return &n, nil
 }
 
+// fileBodies are the operations whose input carries BlobInput files (JPEG/PNG up to 5 MiB, sent base64 in JSON, so
+// about 6.7 MiB each): attachments.add and jobs.reportProblem one file, reports.signOff a signature and a site photo
+// (IR221). Every other operation keeps the 1 MiB body limit.
+var fileBodies = map[string]int64{"attachments.add": 8 << 20, "jobs.reportProblem": 8 << 20, "reports.signOff": 16 << 20}
+
+func bodyLimit(operation string) int64 {
+	if n, ok := fileBodies[operation]; ok {
+		return n
+	}
+	return 1 << 20
+}
+
 // Dispatch is the Echo handler for POST /v1/ops/:operation.
 func (r *Registry) Dispatch(c *echo.Context) error {
 	ctx := c.Request().Context()
@@ -282,8 +294,9 @@ func (r *Registry) Dispatch(c *echo.Context) error {
 	if r.BeforeDispatch != nil {
 		r.BeforeDispatch(ctx)
 	}
-	body, err := io.ReadAll(io.LimitReader(c.Request().Body, 1<<20+1))
-	if err != nil || len(body) > 1<<20 {
+	limit := bodyLimit(name)
+	body, err := io.ReadAll(io.LimitReader(c.Request().Body, limit+1))
+	if err != nil || int64(len(body)) > limit {
 		return fail(c, apperr.E(apperr.Validation, "error.bodyTooLarge"), corr)
 	}
 	if len(bytes.TrimSpace(body)) == 0 {

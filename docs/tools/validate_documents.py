@@ -102,6 +102,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.109.0 (2026-10-09): IR218; SCR-P10 job lookup; demoSeed.rateCards; counts unchanged.
 # 0.110.0 (2026-10-09): IR219; tests only; counts unchanged.
 # 0.111.0 (2026-10-09): IR220; Swagger built from handler annotations; counts unchanged.
+# 0.112.0 (2026-10-09): IR221; SCR-T04 + units.resolveQr; counts unchanged.
 # 0.102.0 (2026-10-09): IR211; counts unchanged.
 # 0.101.0 (2026-10-09): IR210; counts unchanged.
 # 0.100.0 (2026-10-09): IR209; counts unchanged.
@@ -1277,7 +1278,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.111.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.112.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')
