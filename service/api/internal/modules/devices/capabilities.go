@@ -87,7 +87,9 @@ func scanCap(r pgx.Row) (Capability, error) {
 // @Tags			capabilities
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
+// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit	query		integer	false	"page size 1–100, default 25"
+// @Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
 // @Success		200		{object}	ops.Envelope{data=CapabilityPage}
 // @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -98,7 +100,7 @@ func scanCap(r pgx.Row) (Capability, error) {
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/capabilities.list [post]
+// @Router			/v1/capabilities [get]
 func capabilitiesList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Capability], error) {
 	if len(in.Filters) > 0 && string(in.Filters) != "{}" && string(in.Filters) != "null" {
 		return paging.Page[Capability]{}, apperr.Fields(map[string]string{"filters": "error.invalid"}) // query catalog: no filters
@@ -250,20 +252,19 @@ func nz(a []string) []string {
 // @Tags			capabilities
 // @Accept			json
 // @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			false	"id omitted: omit (target none, read none); id present: required (target capabilities, read capabilities.list)"
-// @Param			request				body		CapabilitySave	true	"input"
-// @Success		200					{object}	ops.Envelope{data=Capability}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		CapabilitySave	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Capability}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/capabilities.save [post]
+// @Router			/v1/capabilities [post]
 func (m Capabilities) save(ctx context.Context, c *ops.Call, in *CapabilitySave) (Capability, error) {
 	var temp any
 	if in.Temperature != nil {

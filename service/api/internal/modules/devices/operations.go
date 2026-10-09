@@ -118,7 +118,8 @@ func (in *BindInput) Validate() map[string]string {
 //	@Produce		json
 //	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 //	@Param			X-Expected-Version	header		integer		true	"all: required (target device, read devices.get)"
-//	@Param			request				body		BindInput	true	"input"
+//	@Param			deviceId			path		string		true	"input field deviceId"
+//	@Param			request				body		BindInput	true	"input; the path parameters come from the route"
 //	@Success		200					{object}	ops.Envelope{data=DeviceDetail}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -129,7 +130,7 @@ func (in *BindInput) Validate() map[string]string {
 //	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/devices.bind [post]
+//	@Router			/v1/devices/{deviceId}/bind [post]
 func (m *Module) bind(ctx context.Context, c *ops.Call, in *BindInput) (DeviceDetail, error) {
 	if err := m.technicianGate(ctx, c, in.JobID, in.UnitID); err != nil {
 		return DeviceDetail{}, err
@@ -294,7 +295,8 @@ func (in *CheckInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target device, read devices.get)"
-// @Param			request				body		CheckInput	true	"input"
+// @Param			id					path		string		true	"input field id"
+// @Param			request				body		CheckInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=DeviceOperation}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -305,7 +307,7 @@ func (in *CheckInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/devices.check [post]
+// @Router			/v1/devices/{id}/check [post]
 func (m *Module) check(ctx context.Context, c *ops.Call, in *CheckInput) (DeviceOperation, error) {
 	return m.startOperation(ctx, c, in.ID, in.JobID, "check", nil) // accepted regardless of connection (IR94)
 }
@@ -340,7 +342,8 @@ func (in *FirmwareInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target device, read devices.get)"
-// @Param			request				body		FirmwareInput	true	"input"
+// @Param			deviceId			path		string			true	"input field deviceId"
+// @Param			request				body		FirmwareInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=DeviceOperation}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -351,7 +354,7 @@ func (in *FirmwareInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/devices.updateFirmware [post]
+// @Router			/v1/devices/{deviceId}/update-firmware [post]
 func (m *Module) updateFirmware(ctx context.Context, c *ops.Call, in *FirmwareInput) (DeviceOperation, error) {
 	return m.startOperation(ctx, c, in.DeviceID, in.JobID, "firmware", &in.FirmwareVersion)
 }
@@ -425,7 +428,8 @@ func (in *CalibrateInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target device, read devices.get)"
-// @Param			request				body		CalibrateInput	true	"input"
+// @Param			deviceId			path		string			true	"input field deviceId"
+// @Param			request				body		CalibrateInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=CalibrationRecord}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -436,7 +440,7 @@ func (in *CalibrateInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/devices.calibrate [post]
+// @Router			/v1/devices/{deviceId}/calibrations [post]
 func (m *Module) calibrate(ctx context.Context, c *ops.Call, in *CalibrateInput) (CalibrationRecord, error) {
 	if in.CalibratedAt.After(c.Now) {
 		return CalibrationRecord{}, apperr.Fields(map[string]string{"calibratedAt": "error.future"})

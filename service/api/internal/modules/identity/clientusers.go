@@ -69,18 +69,24 @@ func ownerOnly(c *ops.Call) error {
 // @Tags			clientUsers
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=ClientUserPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit		query		integer	false	"page size 1–100, default 25"
+// @Param			sort		query		string	false	"field:direction — fields id,name,email,invitedAt,createdAt,updatedAt; default name asc;id asc"
+// @Param			customerId	query		string	false	"filter → customerId"
+// @Param			status		query		string	false	"filter → status"
+// @Param			clientRole	query		string	false	"filter → clientRole"
+// @Param			search		query		string	false	"filter → email or displayName contains (case-insensitive)"
+// @Success		200			{object}	ops.Envelope{data=ClientUserPage}
+// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/clientUsers.list [post]
+// @Router			/v1/client-users [get]
 func clientUsersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[ClientUser], error) {
 	if err := ownerOnly(c); err != nil {
 		return paging.Page[ClientUser]{}, err
@@ -213,20 +219,19 @@ func otherActiveOwner(ctx context.Context, c *ops.Call, customer, except uuid.UU
 // @Tags			clientUsers
 // @Accept			json
 // @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			false	"id omitted: omit (target none, read none); id present: required (target client_user, read clientUsers.list)"
-// @Param			request				body		ClientUserInput	true	"input"
-// @Success		200					{object}	ops.Envelope{data=ClientUser}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		ClientUserInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=ClientUser}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/clientUsers.save [post]
+// @Router			/v1/client-users [post]
 func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (ClientUser, error) {
 	if err := ownerOnly(c); err != nil {
 		return ClientUser{}, err
@@ -347,9 +352,10 @@ type Deleted struct {
 // @Tags			clientUsers
 // @Accept			json
 // @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		true	"all: required (target client_user, read clientUsers.list)"
-// @Param			request				body		RemoveInput	true	"input"
+// @Param			Idempotency-Key		header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer	true	"all: required (target client_user, read clientUsers.list)"
+// @Param			id					path		string	true	"input field id"
+// @Param			reason				query		string	false	"input field reason"
 // @Success		200					{object}	ops.Envelope{data=Deleted}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -360,7 +366,7 @@ type Deleted struct {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/clientUsers.remove [post]
+// @Router			/v1/client-users/{id} [delete]
 func clientUsersRemove(ctx context.Context, c *ops.Call, in *RemoveInput) (Deleted, error) {
 	x, err := loadClientUser(ctx, c, in.ID, true)
 	if err != nil {
@@ -434,7 +440,8 @@ type InvitePreview struct {
 // @Tags			clientUsers
 // @Accept			json
 // @Produce		json
-// @Param			request	body		ResendInput	true	"input"
+// @Param			id		path		string		true	"input field id"
+// @Param			request	body		ResendInput	true	"input; the path parameters come from the route"
 // @Success		200		{object}	ops.Envelope{data=InvitePreview}
 // @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -445,7 +452,7 @@ type InvitePreview struct {
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/clientUsers.resendInvite [post]
+// @Router			/v1/client-users/{id}/resend-invite [post]
 func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (InvitePreview, error) {
 	if err := ownerOnly(c); err != nil {
 		return InvitePreview{}, err

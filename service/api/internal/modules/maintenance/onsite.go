@@ -115,7 +115,8 @@ func (in *StartInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		StartInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		StartInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -126,7 +127,7 @@ func (in *StartInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.start [post]
+// @Router			/v1/jobs/{jobId}/start [post]
 func (m OnSite) start(ctx context.Context, c *ops.Call, in *StartInput) (Job, error) {
 	status, t, err := m.lockOwn(ctx, c, in.JobID)
 	if err != nil {
@@ -189,7 +190,8 @@ func (in *CheckInInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get)"
-// @Param			request				body		CheckInInput	true	"input"
+// @Param			jobId				path		string			true	"input field jobId"
+// @Param			request				body		CheckInInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -200,7 +202,7 @@ func (in *CheckInInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.checkIn [post]
+// @Router			/v1/jobs/{jobId}/check-in [post]
 func (m OnSite) checkIn(ctx context.Context, c *ops.Call, in *CheckInInput) (Job, error) {
 	status, t, err := m.lockOwn(ctx, c, in.JobID)
 	if err != nil {
@@ -259,7 +261,8 @@ func (in *PauseInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get)"
-// @Param			request				body		PauseInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		PauseInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -270,7 +273,7 @@ func (in *PauseInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.pauseWork [post]
+// @Router			/v1/jobs/{jobId}/pause-work [post]
 func (m OnSite) pause(ctx context.Context, c *ops.Call, in *PauseInput) (Job, error) {
 	status, t, err := m.lockOwn(ctx, c, in.JobID)
 	if err != nil {
@@ -341,7 +344,8 @@ func (in *AckInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		AckInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		AckInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Assignment}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -352,7 +356,7 @@ func (in *AckInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.acknowledgeAssignment [post]
+// @Router			/v1/jobs/{jobId}/assignment/acknowledge [post]
 func (m OnSite) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Assignment, error) {
 	var aid uuid.UUID
 	var ack string

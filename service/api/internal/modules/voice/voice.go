@@ -148,7 +148,7 @@ func (v Voice) candidates(ctx context.Context, c *ops.Call, room string) ([]Cand
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/voice.resolveIntent [post]
+// @Router			/v1/voice/resolve-intent [post]
 func (v Voice) resolve(ctx context.Context, c *ops.Call, in *Input) (Intent, error) {
 	g := grammar[in.Locale]
 	if g.help.MatchString(in.Text) {

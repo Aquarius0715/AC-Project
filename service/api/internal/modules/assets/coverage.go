@@ -81,18 +81,24 @@ var coverageStatuses = map[string]bool{"under_warranty": true, "contract": true,
 // @Tags			units
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=UnitCoveragePage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor				query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit				query		integer	false	"page size 1–100, default 25"
+// @Param			sort				query		string	false	"field:direction — fields id,name,dueAt; default dueAt asc;id asc"
+// @Param			customerId			query		string	false	"filter → customerId"
+// @Param			coverage			query		string	false	"filter → status"
+// @Param			expiringWithinDays	query		number	false	"filter → warrantyEndsAt within N days of now"
+// @Param			search				query		string	false	"filter → unit name or ID contains"
+// @Success		200					{object}	ops.Envelope{data=UnitCoveragePage}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/units.coverage [post]
+// @Router			/v1/units/coverage [get]
 func (m *Module) unitsCoverage(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[UnitCoverage], error) {
 	var f struct {
 		CustomerID         *uuid.UUID `json:"customerId,omitempty"`

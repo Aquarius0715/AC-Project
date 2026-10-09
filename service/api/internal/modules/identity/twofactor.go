@@ -86,7 +86,7 @@ func (in *CodeInput) Validate() map[string]string {
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/twoFactor.enable [post]
+// @Router			/v1/two-factor/enable [post]
 func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactorEnabled, error) {
 	st, err := twoFactorStatus(ctx, c)
 	if err != nil {
@@ -135,7 +135,7 @@ func enableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactor
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/twoFactor.disable [post]
+// @Router			/v1/two-factor/disable [post]
 func disableTwoFactor(ctx context.Context, c *ops.Call, in *CodeInput) (TwoFactorStatus, error) {
 	tag, err := c.Tx.Exec(ctx, `DELETE FROM identity.two_factor WHERE user_id = $1`, c.Principal.UserID)
 	if err != nil {
@@ -176,7 +176,7 @@ func RegisterTwoFactor(r *ops.Registry) {
 //	@Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/twoFactor.get [post]
+//	@Router			/v1/two-factor [get]
 func twoFactorGet(ctx context.Context, c *ops.Call, _ *struct{}) (TwoFactorStatus, error) {
 	return twoFactorStatus(ctx, c)
 }

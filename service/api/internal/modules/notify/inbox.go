@@ -170,18 +170,25 @@ var (
 // @Tags			notifications
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=NotificationPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit		query		integer	false	"page size 1–100, default 25"
+// @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt,severity,occurredAt; default occurredAt desc;id desc"
+// @Param			unreadOnly	query		boolean	false	"filter → true => readAt=null"
+// @Param			severity	query		string	false	"filter → severity"
+// @Param			type		query		string	false	"filter → type"
+// @Param			from		query		string	false	"filter → [from,to) on occurredAt"
+// @Param			to			query		string	false	"filter → [from,to) on occurredAt"
+// @Success		200			{object}	ops.Envelope{data=NotificationPage}
+// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/notifications.list [post]
+// @Router			/v1/notifications [get]
 func (Inbox) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Notification], error) {
 	var f struct {
 		Severity   *string    `json:"severity,omitempty"`
@@ -276,7 +283,8 @@ func (in *MarkReadInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target notifications, read notifications.list)"
-// @Param			request				body		MarkReadInput	true	"input"
+// @Param			id					path		string			true	"input field id"
+// @Param			request				body		MarkReadInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Notification}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -287,7 +295,7 @@ func (in *MarkReadInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/notifications.markRead [post]
+// @Router			/v1/notifications/{id}/mark-read [post]
 func (Inbox) markRead(ctx context.Context, c *ops.Call, in *MarkReadInput) (Notification, error) {
 	args := []any{in.ID, c.Principal.MembershipID}
 	q := "SELECT " + inboxCols + " FROM " + inboxFrom() + " WHERE n.id = $1 AND n.recipient_membership_id = $2 AND " +
@@ -449,18 +457,25 @@ func (in *RecipientsInput) Validate() map[string]string {
 // @Tags			notifications
 // @Accept			json
 // @Produce		json
-// @Param			request	body		RecipientsInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=RecipientPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			target.kind	query		string	false	"input field target.kind"
+// @Param			target.id	query		string	false	"input field target.id"
+// @Param			templateKey	query		string	false	"input field templateKey"
+// @Param			channel		query		string	false	"input field channel"
+// @Param			role		query		string	false	"input field role"
+// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit		query		integer	false	"page size 1–100, default 25"
+// @Param			sort		query		string	false	"field:direction — fields none; default role asc;displayLabel asc;id asc"
+// @Success		200			{object}	ops.Envelope{data=RecipientPage}
+// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/notifications.recipients [post]
+// @Router			/v1/notifications/recipients [get]
 func (Inbox) recipients(ctx context.Context, c *ops.Call, in *RecipientsInput) (paging.Page[Recipient], error) {
 	if len(in.Query.Filters) > 0 && string(in.Query.Filters) != "{}" || in.Query.Sort != nil {
 		return paging.Page[Recipient]{}, apperr.Fields(map[string]string{"query": "error.invalid"})
@@ -535,7 +550,7 @@ func (in *PreviewInput) Validate() map[string]string {
 //	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/notifications.preview [post]
+//	@Router			/v1/notifications/preview [post]
 func (Inbox) preview(ctx context.Context, c *ops.Call, in *PreviewInput) (Notification, error) {
 	t, err := resolve(ctx, c, &in.TargetInput)
 	if err != nil {

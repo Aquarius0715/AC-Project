@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
-"""Bootstraps the swag annotations of every registered operation handler (IR220).
+"""Bootstraps the swag annotations of every registered operation handler (IR220, REST routes IR222).
 
 For each `ops.Register(r, "<operation>", handler)` call the handler function gets a comment block with the swag
-annotations (summary, description from the operation / query / write-version catalogs, body and header parameters,
-the {data, meta} envelope and the ServiceError failures, the bearer security and `@Router /v1/ops/<operation> [post]`).
-An existing annotation block is replaced; the function's own doc comment is kept above it. The annotations live in the
-code from then on and `make swagger` builds swagger.json from them (swag). Run from service/api:
-    python3 scripts/swag_annotate.py            # rewrite the annotation blocks
-    python3 scripts/swag_annotate.py --check    # exit 1 when a registered operation has no @Router annotation
+annotations of the operation's first REST route (summary, description from the operation / query / write-version
+catalogs, path, query, body and header parameters, the {data, meta} envelope and the ServiceError failures, the
+bearer security and `@Router <path> [<method>]`); every further route of the operation (the update route of a save,
+the verb routes of payouts.transition and firmwareCampaigns.control) is annotated on a documentation stub in the
+package's generated swagger_routes.go. The path and query parameters come from cmd/gen/restdoc (the bindings the
+server mounts). An existing annotation block is replaced; the function's own doc comment is kept above it. The
+annotations live in the code from then on and `make swagger` builds swagger.json from them (swag). Run from
+service/api:
+    go run ./cmd/gen/restdoc | python3 scripts/swag_annotate.py --routes -            # rewrite the annotations
+    go run ./cmd/gen/restdoc | python3 scripts/swag_annotate.py --routes - --check    # exit 1 when they are stale
 """
-import csv, os, re, sys
+import csv, json, os, re, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,10 +83,56 @@ def clean(text):
     return re.sub(r"\s+", " ", text.replace('"', "'")).strip()
 
 
-def block(op, pkg, input_type, result_type):
+def mapping_of(op, name):
+    """The query catalog's filter_mapping entry of one filter ("unitId => unitId")."""
+    for part in (queries.get(op, {}).get("filter_mapping") or "").split(";"):
+        left, _, right = part.partition("=>")
+        if name in [x.strip() for x in left.split("/")]:
+            return clean(right)
+    return ""
+
+
+def param_line(op, prm):
+    kind = ("[]" if prm.get("list") else "") + prm["type"]
+    role = prm["role"]
+    if role == "path":
+        desc = f"input field {prm['field']}"
+    elif role == "cursor":
+        desc = "page cursor: nextCursor of the previous page (D12)"
+    elif role == "limit":
+        desc = "page size 1–100, default 25"
+    elif role == "sort":
+        q = queries.get(op, {})
+        desc = f"field:direction — fields {q.get('allowed_sort') or 'none'}; default {q.get('default_sort') or 'none'}"
+    elif role == "filter":
+        m = mapping_of(op, prm["name"])
+        desc = "filter" + (f" → {m}" if m else "")
+    else:
+        desc = f"input field {prm['field']}"
+    if prm.get("list"):
+        desc += " (repeat the parameter or separate values with commas; an empty value is the empty list)"
+    required = "true" if prm.get("required") else "false"
+    line = f'//\t@Param\t\t\t{prm["name"]}\t{prm["in"]}\t{kind}\t{required}\t"{clean(desc)}"'
+    if prm.get("list"):
+        line += "\tcollectionFormat(multi)"
+    return line
+
+
+def route_suffix(route, index):
+    """@ID suffix of a further route: the fixed value, update for the item route of a save, else its position."""
+    if route.get("fixedValue"):
+        return route["fixedValue"]
+    if route["method"] == "PUT" and route["path"].endswith("/{id}"):
+        return "update"
+    return str(index + 1)
+
+
+def block(op, pkg, input_type, result_type, route, suffix=None):
     row = catalog[op]
     mode = row["mode"]
-    lines = [f"//\t@Summary\t\t{op} ({mode})", f"//\t@ID\t\t\t{op}"]
+    op_id = op if suffix is None else f"{op}.{suffix}"
+    title = f"{op} ({mode})" if suffix is None else f"{op} ({mode}) — {suffix.replace('_', ' ')}"
+    lines = [f"//\t@Summary\t\t{title}", f"//\t@ID\t\t\t{op_id}"]
     lines.append(f"//\t@Description\tAuthorization: {clean(row['authorization'])}")
     lines.append(f"//\t@Description\tValidation: {clean(row['ui_validation'])}")
     lines.append(f"//\t@Description\tRecovery: {clean(row['ui_recovery'])}")
@@ -94,8 +144,13 @@ def block(op, pkg, input_type, result_type):
     inputs = sorted({v["input_versions"] for v in vs if v["input_versions"] and v["input_versions"] != "none"})
     if inputs:
         extra.append("Input versions: " + "; ".join(inputs))
+    if route.get("fixedField"):
+        extra.append(f"This route sets {route['fixedField']}={route['fixedValue']}")
     lines.append("//\t@Description\t" + " · ".join(extra))
     lines += [f"//\t@Tags\t\t\t{op.split('.')[0]}", "//\t@Accept\t\t\tjson", "//\t@Produce\t\tjson"]
+    if {"id omitted", "id present"} <= {v["branch"] for v in vs}:  # a save: create on the collection, update on the item
+        has_id = any(x["in"] == "path" and x["name"] == "id" for x in route["params"])
+        vs = [v for v in vs if v["branch"] == ("id present" if has_id else "id omitted")]
     if mode == "write":
         lines.append('//\t@Param\t\t\tIdempotency-Key\theader\tstring\ttrue\t"D04: the same key replays the stored response; another body for the same key is CONFLICT"')
         need = [v["expected_version"] for v in vs]
@@ -103,8 +158,11 @@ def block(op, pkg, input_type, result_type):
             required = "true" if all(x == "required" for x in need) else "false"
             desc = clean("; ".join(f"{v['branch']}: {v['expected_version']} (target {v['version_target']}, read {v['read_source']})" for v in vs))
             lines.append(f'//\t@Param\t\t\tX-Expected-Version\theader\tinteger\t{required}\t"{desc}"')
-    if input_type != "struct{}":
-        lines.append(f'//\t@Param\t\t\trequest\tbody\t{input_type}\ttrue\t"input"')
+    for prm in route["params"]:
+        lines.append(param_line(op, prm))
+    if route["body"] and input_type != "struct{}":
+        note = "input; the path parameters" + (" and the fixed field" if route.get("fixedField") else "") + " come from the route" if any(x["in"] == "path" for x in route["params"]) or route.get("fixedField") else "input"
+        lines.append(f'//\t@Param\t\t\trequest\tbody\t{input_type}\ttrue\t"{note}"')
     page = re.fullmatch(r"paging\.Page\[(.+)\]", result_type)
     if result_type in PRIMITIVES or result_type.startswith("map["):
         lines.append("//\t@Success\t\t200\t{object}\tops.Envelope")
@@ -114,7 +172,7 @@ def block(op, pkg, input_type, result_type):
         lines.append(f"//\t@Success\t\t200\t{{object}}\tops.Envelope{{data={result_type}}}")
     for status, codes in STATUSES:
         lines.append(f'//\t@Failure\t\t{status}\t{{object}}\tapperr.DomainError\t"{codes}"')
-    lines += ["//\t@Security\t\tBearerAuth", f"//\t@Router\t\t\t/v1/ops/{op} [post]"]
+    lines += ["//\t@Security\t\tBearerAuth", f"//\t@Router\t\t\t{route['path']} [{route['method'].lower()}]"]
     return lines
 
 
@@ -145,11 +203,60 @@ def write_page_aliases(pkg_dir, pkg, aliases):
         body += [f"// {alias} is paging.Page[{inner}].", f"type {alias} struct {{", f"\tItems           []{inner} `json:\"items\"`", "\tNextCursor      *string `json:\"nextCursor\"`",
                  "\tTotal           int     `json:\"total\"`", "\tSnapshotVersion int     `json:\"snapshotVersion\"`", "}", "", f"var _ = paging.Page[{inner}]({alias}{{}})", ""]
     (pkg_dir / "swagger_pages.go").write_text("\n".join(body), encoding="utf-8")
+    subprocess.run(["gofmt", "-w", str(pkg_dir / "swagger_pages.go")], check=True)
+
+
+def norm(text):
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def stub_name(op, suffix):
+    words = re.split(r"[._]", op + "." + suffix)
+    return "swagger" + "".join(w[:1].upper() + w[1:] for w in words if w)
+
+
+def write_route_stubs(pkg_dir, pkg, stubs, check):
+    """<pkg>/swagger_routes.go: one documentation stub per further REST route of the package's operations."""
+    path = pkg_dir / "swagger_routes.go"
+    if not stubs:
+        if path.exists():
+            if check:
+                return [str(path)]
+            path.unlink()
+        return []
+    refs, imports = set(), {f'"{MODULE}/internal/ops"', f'"{MODULE}/internal/platform/apperr"'}
+    for _, _, types, src in stubs:
+        for qual in re.findall(r"\b([a-z]\w*)\.([A-Z]\w*)", " ".join(types)):
+            if qual[0] in ("ops", "apperr"):
+                continue
+            m = re.search(rf'^\s*(?:\w+ )?"([^"]+/{qual[0]})"$', src, re.M)
+            if m:
+                imports.add(f'"{m.group(1)}"')
+                refs.add(f"{qual[0]}.{qual[1]}")
+    body = ["// Code generated by scripts/swag_annotate.py; DO NOT EDIT.", "",
+            "// Documentation stubs of the further REST routes of this package's operations (IR222): swag documents one",
+            "// route per function, so the update route of a save and the verb routes of a transition are annotated here; the",
+            "// handlers carry the first route of each operation.", "", f"package {pkg}", "", "import (",
+            *sorted(f"\t{i}" for i in imports), ")", "", "var (", "\t_ ops.Envelope", "\t_ apperr.DomainError",
+            *sorted(f"\t_ *{r}" for r in refs), *sorted(f"\t_ = {name}" for name, _, _, _ in stubs), ")", ""]
+    for name, annotations, _, _ in sorted(stubs):
+        body += [f"// {name} documents a further REST route.", "//", *annotations, f"func {name}() {{}}", ""]
+    text = "\n".join(body)
+    if check:  # swag fmt and gofmt realign the file: compare without layout
+        return [] if path.exists() and norm(path.read_text(encoding="utf-8")) == norm(text) else [str(path)]
+    path.write_text(text, encoding="utf-8")
+    subprocess.run(["gofmt", "-w", str(path)], check=True)
+    return []
 
 
 def main():
     check = "--check" in sys.argv
+    if "--routes" not in sys.argv:
+        sys.exit("--routes <file|-> is required (go run ./cmd/gen/restdoc)")
+    source = sys.argv[sys.argv.index("--routes") + 1]
+    routes = json.load(sys.stdin if source == "-" else open(source, encoding="utf-8"))
     edits = {}  # path → {line index of func: (op, block lines)}
+    stubs = {}  # package dir → (pkg, [(stub name, block lines, types, handler source)])
     missing, primitives = [], []
     for p in go_files:
         src = sources[p]
@@ -159,6 +266,10 @@ def main():
                 op, handler = m.group(1), m.group(2)
                 if op not in catalog:
                     print(f"{p}:{i + 1}: {op} is not in the operation catalog", file=sys.stderr)
+                    continue
+                if op not in routes:
+                    print(f"{p}:{i + 1}: {op} has no REST route in the restdoc output", file=sys.stderr)
+                    missing.append(op)
                     continue
                 recv = None
                 if "." in handler:
@@ -187,16 +298,29 @@ def main():
                     page_aliases.setdefault(hp.parent, (pkg, {}))[1][page_alias(page.group(1))] = page.group(1)
                 if hm.group(5).strip() in PRIMITIVES or hm.group(5).strip().startswith("map["):
                     primitives.append((op, hm.group(5).strip()))
-                edits.setdefault(hp, {})[hi] = (op, block(op, pkg, input_type, result_type))
+                first, *further = routes[op]
+                edits.setdefault(hp, {})[hi] = (op, block(op, pkg, input_type, result_type, first))
+                entry = stubs.setdefault(hp.parent, (pkg, []))
+                for n, rt in enumerate(further):
+                    suffix = route_suffix(rt, n + 1)
+                    types = [input_type, page_alias(page.group(1)) if page else result_type]
+                    entry[1].append((stub_name(op, suffix), block(op, pkg, input_type, result_type, rt, suffix), types, sources[hp]))
+    for pkg_dir in {p.parent for p in edits}:
+        stubs.setdefault(pkg_dir, (package_of(sources[next(p for p in edits if p.parent == pkg_dir)]), []))
     if check:
+        stale = []
         for p, blocks in edits.items():
-            for hi, (op, _) in blocks.items():
-                if not re.search(rf"@Router\s+/v1/ops/{re.escape(op)} \[post\]", sources[p]):
-                    missing.append(op)
-        print(f"{sum(len(b) for b in edits.values())} handlers, {len(missing)} without annotations: {sorted(set(missing))}")
-        sys.exit(1 if missing else 0)
+            for hi, (op, annotations) in blocks.items():
+                if norm("\n".join(annotations)) not in norm(sources[p]):
+                    stale.append(op)
+        for pkg_dir, (pkg, entries) in stubs.items():
+            stale += write_route_stubs(pkg_dir, pkg, entries, True)
+        print(f"{sum(len(b) for b in edits.values())} handlers, {len(missing)} unresolved, {len(stale)} stale: {sorted(set(missing))} {sorted(set(stale))}")
+        sys.exit(1 if missing or stale else 0)
     for pkg_dir, (pkg, aliases) in page_aliases.items():
         write_page_aliases(pkg_dir, pkg, aliases)
+    for pkg_dir, (pkg, entries) in stubs.items():
+        write_route_stubs(pkg_dir, pkg, entries, False)
     for p, blocks in edits.items():
         lines = sources[p].split("\n")
         for hi in sorted(blocks, reverse=True):  # bottom-up keeps earlier indexes valid
@@ -207,7 +331,7 @@ def main():
             doc = [l for l in lines[start:hi] if not re.match(r"^//\s*@", l) and l.strip() != "//"]
             lines[start:hi] = doc + ["//"] + annotations
         p.write_text("\n".join(lines), encoding="utf-8")
-    print(f"annotated {sum(len(b) for b in edits.values())} handlers in {len(edits)} files; primitive results: {primitives}; unresolved: {sorted(set(missing))}")
+    print(f"annotated {sum(len(b) for b in edits.values())} handlers in {len(edits)} files, {sum(len(e) for _, e in stubs.values())} route stubs; primitive results: {primitives}; unresolved: {sorted(set(missing))}")
 
 
 if __name__ == "__main__":

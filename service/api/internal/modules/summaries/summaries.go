@@ -78,18 +78,28 @@ var roleKind = map[string]string{"client": "customer", "contractor": "partner", 
 // @Tags			summaries
 // @Accept			json
 // @Produce		json
-// @Param			request	body		Input	true	"input"
-// @Success		200		{object}	ops.Envelope{data=Summary}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			kind		path		string		true	"input field kind"
+// @Param			customerId	query		string		false	"filter → customerId"
+// @Param			propertyId	query		string		false	"filter → propertyId"
+// @Param			unitId		query		string		false	"filter → unitId"
+// @Param			unitIds		query		[]string	false	"filter → unitIds (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+// @Param			from		query		string		false	"filter → [from,to) on D14: jobs requestedSlot.startAt"
+// @Param			to			query		string		false	"filter → [from,to) on D14: jobs requestedSlot.startAt"
+// @Param			status		query		string		false	"filter"
+// @Param			statuses	query		[]string	false	"filter (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+// @Param			severity	query		string		false	"filter"
+// @Param			overdueOnly	query		boolean		false	"filter"
+// @Success		200			{object}	ops.Envelope{data=Summary}
+// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/summaries.get [post]
+// @Router			/v1/summaries/{kind} [get]
 func (m Summaries) get(ctx context.Context, c *ops.Call, in *Input) (Summary, error) {
 	if roleKind[c.Principal.Role] != in.Kind {
 		return Summary{}, apperr.E(apperr.Forbidden, "error.forbidden")

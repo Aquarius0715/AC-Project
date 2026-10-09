@@ -6,7 +6,6 @@ import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -108,7 +107,7 @@ func drainEvents(t *testing.T) {
 }
 
 func post(s *apiserver.Server, a *actor, op, body string) (int, map[string]any) {
-	req := httptest.NewRequest(http.MethodPost, "/v1/ops/"+op, strings.NewReader(body))
+	req := httptest.NewRequest(restRequest(op, body))
 	req.Header.Set("Content-Type", "application/json")
 	if a != nil {
 		req.Header.Set("Authorization", "Bearer "+a.token)
@@ -267,7 +266,7 @@ func TestUnitsGet(t *testing.T) {
 	if code, m := post(s, &customerB, "units.get", `{"id":"`+id+`"}`); code != 404 || m["code"] != "NOT_FOUND" {
 		t.Fatalf("other customer's unit must be NOT_FOUND (D01): %d", code)
 	}
-	if code, _ := post(s, &hq, "units.get", `{}`); code != 422 {
-		t.Fatalf("missing id: %d", code)
+	if code, m := post(s, &hq, "units.get", `{}`); code != 404 || m["messageKey"] != "error.unknownOperation" { // GET /v1/units/ has no route
+		t.Fatalf("missing id: %d %v", code, m)
 	}
 }

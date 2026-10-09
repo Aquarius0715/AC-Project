@@ -188,7 +188,11 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		}
 		authn.Source = &auth.RemoteSource{BaseURL: cfg.IdentityURL, Token: cfg.InternalToken, TTL: ttl}
 	}
-	e := newEcho(reg, m, authn, cfg.Logger, cfg.InternalToken, servesIdentity)
+	e, err := newEcho(reg, m, authn, cfg.Logger, cfg.InternalToken, servesIdentity)
+	if err != nil {
+		m.Close()
+		return nil, err
+	}
 	srv := &Server{Echo: e, Registry: reg, DB: m, Consumers: consumers(m, cfg.Domains)}
 	if len(cfg.Domains) > 0 && len(cfg.ServiceURLs) > 0 { // read models ask the owning services (IR190)
 		q := &ops.HTTPQueries{Targets: map[string]*url.URL{}, Token: cfg.InternalToken}

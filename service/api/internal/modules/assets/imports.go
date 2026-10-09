@@ -154,7 +154,7 @@ type locKey struct {
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/units.importPreview [post]
+// @Router			/v1/units/imports/preview [post]
 func (m *Module) unitsImportPreview(ctx context.Context, c *ops.Call, in *ImportPreviewInput) (ImportPreview, error) {
 	var org uuid.UUID
 	var status string
@@ -409,7 +409,7 @@ func (in *ImportCommitInput) Validate() map[string]string {
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/units.importCommit [post]
+// @Router			/v1/units/imports [post]
 func (m *Module) unitsImportCommit(ctx context.Context, c *ops.Call, in *ImportCommitInput) (UnitImport, error) {
 	var raw []byte
 	var fileName string
@@ -587,7 +587,8 @@ func (in *ImportUndoInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target unit_import, read none)"
-// @Param			request				body		ImportUndoInput	true	"input"
+// @Param			importId			path		string			true	"input field importId"
+// @Param			request				body		ImportUndoInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=UnitImport}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -598,7 +599,7 @@ func (in *ImportUndoInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/units.importUndo [post]
+// @Router			/v1/units/imports/{importId}/undo [post]
 func (m *Module) unitsImportUndo(ctx context.Context, c *ops.Call, in *ImportUndoInput) (UnitImport, error) {
 	x, err := scanImport(c.Tx.QueryRow(ctx, `SELECT `+importCols+` FROM assets.unit_imports WHERE id = $1 FOR UPDATE`, in.ImportID))
 	if errors.Is(err, pgx.ErrNoRows) {

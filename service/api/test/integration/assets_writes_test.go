@@ -3,7 +3,6 @@ package integration
 import (
 	"encoding/json"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
-	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
@@ -23,7 +22,7 @@ import (
 const versionZero = -100
 
 func write(s *apiserver.Server, a *actor, op, body string, version int) (int, map[string]any) {
-	req := httptest.NewRequest(http.MethodPost, "/v1/ops/"+op, strings.NewReader(body))
+	req := httptest.NewRequest(restRequest(op, body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+a.token)
 	req.Header.Set("X-Tenant-Id", seed.ID("tenant-a").String())

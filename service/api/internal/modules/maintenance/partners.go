@@ -213,7 +213,11 @@ func (m Partners) loadProfile(ctx context.Context, c *ops.Call, where string, ar
 // @Tags			contractors
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
+// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit	query		integer	false	"page size 1–100, default 25"
+// @Param			sort	query		string	false	"field:direction — fields id,name,updatedAt; default name asc;id asc"
+// @Param			status	query		string	false	"filter → status"
+// @Param			search	query		string	false	"filter → name, registrationNo or service area contains"
 // @Success		200		{object}	ops.Envelope{data=ProfilePage}
 // @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -224,7 +228,7 @@ func (m Partners) loadProfile(ctx context.Context, c *ops.Call, where string, ar
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/contractors.list [post]
+// @Router			/v1/contractors [get]
 func (m Partners) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Profile], error) {
 	var f struct {
 		Status *string `json:"status,omitempty"`
@@ -331,20 +335,19 @@ func (in *ProfileInput) Validate() map[string]string {
 // @Tags			contractors
 // @Accept			json
 // @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			false	"id omitted: omit (target none, read none); id present: required (target contractor, read contractors.list)"
-// @Param			request				body		ProfileInput	true	"input"
-// @Success		200					{object}	ops.Envelope{data=Profile}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		ProfileInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Profile}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/contractors.save [post]
+// @Router			/v1/contractors [post]
 func (m Partners) save(ctx context.Context, c *ops.Call, in *ProfileInput) (Profile, error) {
 	kind, _, found, err := m.Orgs.OrgState(ctx, c, in.OrganizationID)
 	if err != nil {
@@ -438,7 +441,8 @@ func (in *OfferStatusInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer				true	"all: required (target contractor, read contractors.list)"
-// @Param			request				body		OfferStatusInput	true	"input"
+// @Param			contractorOrgId		path		string				true	"input field contractorOrgId"
+// @Param			request				body		OfferStatusInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Profile}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -449,7 +453,7 @@ func (in *OfferStatusInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/contractors.setOfferStatus [post]
+// @Router			/v1/contractors/{contractorOrgId}/offer-status [put]
 func (m Partners) setOfferStatus(ctx context.Context, c *ops.Call, in *OfferStatusInput) (Profile, error) {
 	p, err := m.loadProfile(ctx, c, "p.organization_id = $2", []any{in.ContractorOrgID}, true)
 	if err != nil {
@@ -579,7 +583,7 @@ const rateCols = `id, tenant_id, version, created_at, contractor_org_id, effecti
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/rateCards.save [post]
+// @Router			/v1/rate-cards [post]
 func (m Partners) saveRateCard(ctx context.Context, c *ops.Call, in *RateCardInput) (RateCard, error) {
 	if !in.EffectiveFrom.After(c.Now) {
 		return RateCard{}, apperr.Fields(map[string]string{"effectiveFrom": "error.past"})
@@ -613,18 +617,21 @@ func (m Partners) saveRateCard(ctx context.Context, c *ops.Call, in *RateCardInp
 // @Tags			rateCards
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=RateCardPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit			query		integer	false	"page size 1–100, default 25"
+// @Param			sort			query		string	false	"field:direction — fields id,createdAt,effectiveFrom; default effectiveFrom desc;id asc"
+// @Param			contractorOrgId	query		string	false	"filter → contractorOrgId"
+// @Success		200				{object}	ops.Envelope{data=RateCardPage}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/rateCards.list [post]
+// @Router			/v1/rate-cards [get]
 func (m Partners) listRateCards(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[RateCard], error) {
 	var f struct {
 		ContractorOrgID *uuid.UUID `json:"contractorOrgId,omitempty"`
@@ -732,7 +739,8 @@ func (in *TargetsInput) Validate() map[string]string {
 // @Accept			json
 // @Produce		json
 // @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			request			body		TargetsInput	true	"input"
+// @Param			planType		path		string			true	"input field planType"
+// @Param			request			body		TargetsInput	true	"input; the path parameters come from the route"
 // @Success		200				{object}	ops.Envelope{data=SlaTargets}
 // @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
@@ -743,7 +751,7 @@ func (in *TargetsInput) Validate() map[string]string {
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/sla.saveTargets [post]
+// @Router			/v1/sla/targets/{planType} [put]
 func (m Partners) saveTargets(ctx context.Context, c *ops.Call, in *TargetsInput) (SlaTargets, error) {
 	if in.EffectiveFrom.Before(c.Now) {
 		return SlaTargets{}, apperr.Fields(map[string]string{"effectiveFrom": "error.past"})
@@ -860,18 +868,20 @@ func durationText(d time.Duration) string {
 // @Tags			sla
 // @Accept			json
 // @Produce		json
-// @Param			request	body		ScorecardInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=Scorecard}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			period.from		query		string	false	"input field period.from"
+// @Param			period.to		query		string	false	"input field period.to"
+// @Param			contractorOrgId	query		string	false	"input field contractorOrgId"
+// @Success		200				{object}	ops.Envelope{data=Scorecard}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/sla.scorecard [post]
+// @Router			/v1/sla/scorecard [get]
 func (m Partners) scorecard(ctx context.Context, c *ops.Call, in *ScorecardInput) (Scorecard, error) {
 	extra, args := "TRUE", []any{in.Period.From, in.Period.To}
 	if in.ContractorOrgID != nil {

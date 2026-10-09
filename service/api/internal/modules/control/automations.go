@@ -134,7 +134,12 @@ func (m Automations) load(ctx context.Context, c *ops.Call, id uuid.UUID, lock b
 // @Tags			automations
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
+// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit	query		integer	false	"page size 1–100, default 25"
+// @Param			sort	query		string	false	"field:direction — fields id,name,priority,createdAt,updatedAt; default createdAt desc;id desc"
+// @Param			unitId	query		string	false	"filter → unitIds contains"
+// @Param			enabled	query		boolean	false	"filter → enabled"
+// @Param			kind	query		string	false	"filter → kind"
 // @Success		200		{object}	ops.Envelope{data=AutomationPage}
 // @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -145,7 +150,7 @@ func (m Automations) load(ctx context.Context, c *ops.Call, id uuid.UUID, lock b
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/automations.list [post]
+// @Router			/v1/automations [get]
 func (m Automations) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Automation], error) {
 	var f struct {
 		Kind    *string    `json:"kind,omitempty"`
@@ -487,20 +492,19 @@ type ScheduledOccurrence struct {
 // @Tags			automations
 // @Accept			json
 // @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			false	"id omitted: omit (target none, read none); id present: required (target automations, read automations.list)"
-// @Param			request				body		AutomationInput	true	"input"
-// @Success		200					{object}	ops.Envelope{data=Automation}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		AutomationInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Automation}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/automations.save [post]
+// @Router			/v1/automations [post]
 func (m Automations) save(ctx context.Context, c *ops.Call, in *AutomationInput) (Automation, error) {
 	for _, u := range in.UnitIDs { // own, not archived units whose capabilities support every action
 		t, found, err := m.Units.Target(ctx, c, u)
@@ -656,7 +660,7 @@ func (in *NextRunsInput) Validate() map[string]string {
 //	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/automations.nextRuns [post]
+//	@Router			/v1/automations/next-runs [post]
 func (m Automations) nextRuns(ctx context.Context, c *ops.Call, in *NextRunsInput) ([]ScheduledOccurrence, error) {
 	var id *uuid.UUID
 	var def definition
@@ -723,9 +727,9 @@ type Deleted struct {
 //	@Tags			automations
 //	@Accept			json
 //	@Produce		json
-//	@Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-//	@Param			X-Expected-Version	header		integer				true	"all: required (target automations, read automations.list)"
-//	@Param			request				body		AutomationIDInput	true	"input"
+//	@Param			Idempotency-Key		header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer	true	"all: required (target automations, read automations.list)"
+//	@Param			id					path		string	true	"input field id"
 //	@Success		200					{object}	ops.Envelope{data=Deleted}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -736,7 +740,7 @@ type Deleted struct {
 //	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/automations.delete [post]
+//	@Router			/v1/automations/{id} [delete]
 func (m Automations) delete(ctx context.Context, c *ops.Call, in *AutomationIDInput) (Deleted, error) {
 	cur, err := m.load(ctx, c, in.ID, true)
 	if err != nil {

@@ -167,18 +167,26 @@ type AirSeries struct {
 // @Tags			telemetry
 // @Accept			json
 // @Produce		json
-// @Param			request	body		SeriesInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=AirSeries}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			from		query		string		false	"input field from"
+// @Param			to			query		string		false	"input field to"
+// @Param			unitIds		query		[]string	false	"input field unitIds (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+// @Param			spaceId		query		string		false	"input field spaceId"
+// @Param			metric		query		string		false	"input field metric"
+// @Param			sensorId	query		string		false	"input field sensorId"
+// @Param			cursor		query		string		false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit		query		integer		false	"page size 1–100, default 25"
+// @Param			sort		query		string		false	"field:direction — fields observedAt; default observedAt asc;sensorId asc;id asc"
+// @Success		200			{object}	ops.Envelope{data=AirSeries}
+// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/telemetry.series [post]
+// @Router			/v1/telemetry/series [get]
 func (m Telemetry) series(ctx context.Context, c *ops.Call, in *SeriesInput) (AirSeries, error) {
 	units := in.UnitIDs
 	if in.SpaceID != nil {
@@ -301,7 +309,10 @@ type TelemetrySummary struct {
 // @Tags			telemetry
 // @Accept			json
 // @Produce		json
-// @Param			request	body		SummaryInput	true	"input"
+// @Param			from	query		string		false	"input field from"
+// @Param			to		query		string		false	"input field to"
+// @Param			unitIds	query		[]string	false	"input field unitIds (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+// @Param			metric	query		string		false	"input field metric"
 // @Success		200		{object}	ops.Envelope{data=TelemetrySummary}
 // @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -312,7 +323,7 @@ type TelemetrySummary struct {
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/telemetry.summary [post]
+// @Router			/v1/telemetry/summary [get]
 func (m Telemetry) summary(ctx context.Context, c *ops.Call, in *SummaryInput) (TelemetrySummary, error) {
 	if err := m.readableUnits(ctx, c, in.UnitIDs); err != nil {
 		return TelemetrySummary{}, err
@@ -421,7 +432,7 @@ func (in *VentLogInput) Validate() map[string]string {
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/ventilation.log [post]
+// @Router			/v1/ventilation [post]
 func (m Telemetry) log(ctx context.Context, c *ops.Call, in *VentLogInput) (VentilationLog, error) {
 	org, spaceUnits, found, err := m.Units.SpaceInfo(ctx, c, in.SpaceID)
 	if err != nil {
@@ -484,7 +495,13 @@ func (m Telemetry) currentCO2(ctx context.Context, c *ops.Call, units []uuid.UUI
 // @Tags			ventilation
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
+// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit	query		integer	false	"page size 1–100, default 25"
+// @Param			sort	query		string	false	"field:direction — fields id,createdAt; default createdAt desc;id asc"
+// @Param			spaceId	query		string	false	"filter → spaceId"
+// @Param			unitId	query		string	false	"filter → unitId"
+// @Param			from	query		string	false	"filter → [from,to) on loggedAt"
+// @Param			to		query		string	false	"filter → [from,to) on loggedAt"
 // @Success		200		{object}	ops.Envelope{data=VentilationLogPage}
 // @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -495,7 +512,7 @@ func (m Telemetry) currentCO2(ctx context.Context, c *ops.Call, units []uuid.UUI
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/ventilation.list [post]
+// @Router			/v1/ventilation [get]
 func (m Telemetry) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[VentilationLog], error) {
 	var f struct {
 		SpaceID *uuid.UUID `json:"spaceId,omitempty"`

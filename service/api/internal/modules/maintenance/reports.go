@@ -400,7 +400,8 @@ func (m Reports) draftOf(ctx context.Context, c *ops.Call, job uuid.UUID, lock b
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		false	"reportId omitted: omit (target none, read jobs.get); reportId present: required (target report, read reports.get)"
-// @Param			request				body		DraftInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		DraftInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Report}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -411,7 +412,7 @@ func (m Reports) draftOf(ctx context.Context, c *ops.Call, job uuid.UUID, lock b
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.saveDraft [post]
+// @Router			/v1/jobs/{jobId}/report-draft [put]
 func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Report, error) {
 	var status string
 	var unit uuid.UUID
@@ -626,7 +627,8 @@ func (m Reports) lockJob(ctx context.Context, c *ops.Call, id uuid.UUID) (string
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;reports.get)"
-// @Param			request				body		SubmitInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		SubmitInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -637,7 +639,7 @@ func (m Reports) lockJob(ctx context.Context, c *ops.Call, id uuid.UUID) (string
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.submit [post]
+// @Router			/v1/jobs/{jobId}/submit [post]
 func (m Reports) submit(ctx context.Context, c *ops.Call, in *SubmitInput) (Job, error) {
 	status, unit, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
@@ -805,7 +807,8 @@ func (in *ReviewInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;reports.get)"
-// @Param			request				body		ReviewInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		ReviewInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -816,7 +819,7 @@ func (in *ReviewInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.review [post]
+// @Router			/v1/jobs/{jobId}/review [post]
 func (m Reports) review(ctx context.Context, c *ops.Call, in *ReviewInput) (Job, error) {
 	var contractor *uuid.UUID
 	if err := c.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.jobs WHERE id = $1`, in.JobID).Scan(&contractor); err != nil {
@@ -911,7 +914,8 @@ func NewDraftFromLatest(ctx context.Context, c *ops.Call, job uuid.UUID) error {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		JobIDInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		JobIDInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -922,7 +926,7 @@ func NewDraftFromLatest(ctx context.Context, c *ops.Call, job uuid.UUID) error {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.resumeRework [post]
+// @Router			/v1/jobs/{jobId}/resume-rework [post]
 func (m Reports) resumeRework(ctx context.Context, c *ops.Call, in *JobIDInput) (Job, error) {
 	status, _, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
@@ -976,18 +980,20 @@ func (in *GetReportInput) Validate() map[string]string {
 // @Tags			reports
 // @Accept			json
 // @Produce		json
-// @Param			request	body		GetReportInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=Report}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			jobId			path		string	true	"input field jobId"
+// @Param			reportId		path		string	true	"input field reportId"
+// @Param			reportVersion	query		integer	false	"input field reportVersion"
+// @Success		200				{object}	ops.Envelope{data=Report}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/reports.get [post]
+// @Router			/v1/jobs/{jobId}/reports/{reportId} [get]
 func (m Reports) get(ctx context.Context, c *ops.Call, in *GetReportInput) (Report, error) {
 	var org uuid.UUID
 	var unit uuid.UUID

@@ -122,7 +122,7 @@ func (m Billing) notifyMembers(ctx context.Context, c *ops.Call, f identity.Memb
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/inquiries.create [post]
+// @Router			/v1/inquiries [post]
 func (m Billing) createInquiry(ctx context.Context, c *ops.Call, in *InquiryInput) (Inquiry, error) {
 	customer, ok, err := m.Customers.CustomerOfOrg(ctx, c, c.Principal.OrgID)
 	if err != nil {
@@ -190,18 +190,25 @@ func (m Billing) loadInquiry(ctx context.Context, c *ops.Call, id uuid.UUID, loc
 // @Tags			inquiries
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=InquiryPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit			query		integer	false	"page size 1–100, default 25"
+// @Param			sort			query		string	false	"field:direction — fields id,createdAt,updatedAt; default createdAt desc;id desc"
+// @Param			invoiceId		query		string	false	"filter → invoiceId"
+// @Param			restrictionId	query		string	false	"filter → restrictionId"
+// @Param			status			query		string	false	"filter → state"
+// @Param			subjectType		query		string	false	"filter → subjectType"
+// @Param			customerId		query		string	false	"filter → customerId"
+// @Success		200				{object}	ops.Envelope{data=InquiryPage}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/inquiries.list [post]
+// @Router			/v1/inquiries [get]
 func (m Billing) listInquiries(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Inquiry], error) {
 	var f struct {
 		Status        *string    `json:"status,omitempty"` // => state
@@ -293,7 +300,8 @@ func (in *AnswerInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target inquiries, read inquiries.list)"
-// @Param			request				body		AnswerInput	true	"input"
+// @Param			inquiryId			path		string		true	"input field inquiryId"
+// @Param			request				body		AnswerInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Inquiry}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -304,7 +312,7 @@ func (in *AnswerInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/inquiries.answer [post]
+// @Router			/v1/inquiries/{inquiryId}/answer [post]
 func (m Billing) answerInquiry(ctx context.Context, c *ops.Call, in *AnswerInput) (Inquiry, error) {
 	x, err := m.loadInquiry(ctx, c, in.InquiryID, true)
 	if err != nil {

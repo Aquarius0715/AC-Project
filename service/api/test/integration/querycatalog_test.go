@@ -182,6 +182,9 @@ func TestQueryCatalogFilters(t *testing.T) {
 // filterError reports whether a VALIDATION result names the filters.
 func filterError(m map[string]any) bool {
 	fe, _ := m["fieldErrors"].(map[string]any)
+	if fe["zzUnknown"] == "error.notAllowed" { // REST: filters are query parameters, an unknown one is not allowed (IR222)
+		return true
+	}
 	for k := range fe {
 		// filters of a bare Query; query.filters (or the whole query) of a nested one
 		if k == "filters" || strings.HasPrefix(k, "filters.") || k == "query" || strings.HasPrefix(k, "query.filters") {

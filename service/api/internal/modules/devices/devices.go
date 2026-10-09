@@ -151,7 +151,11 @@ func (m *Module) load(ctx context.Context, c *ops.Call, where string, args []any
 // @Tags			devices
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
+// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit	query		integer	false	"page size 1–100, default 25"
+// @Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
+// @Param			unitId	query		string	false	"filter → unitId"
+// @Param			status	query		string	false	"filter → connection"
 // @Success		200		{object}	ops.Envelope{data=DevicePage}
 // @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -162,7 +166,7 @@ func (m *Module) load(ctx context.Context, c *ops.Call, where string, args []any
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/devices.list [post]
+// @Router			/v1/devices [get]
 func (m *Module) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Device], error) {
 	var f struct {
 		UnitID *uuid.UUID `json:"unitId,omitempty"`
@@ -230,18 +234,18 @@ func (in *IDInput) Validate() map[string]string {
 // @Tags			devices
 // @Accept			json
 // @Produce		json
-// @Param			request	body		IDInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=DeviceDetail}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			id	path		string	true	"input field id"
+// @Success		200	{object}	ops.Envelope{data=DeviceDetail}
+// @Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504	{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/devices.get [post]
+// @Router			/v1/devices/{id} [get]
 func (m *Module) get(ctx context.Context, c *ops.Call, in *IDInput) (DeviceDetail, error) {
 	args := []any{in.ID}
 	d, err := m.detail(ctx, c, "d.id = $1 AND "+deviceScope(c, &args, unitscope.List), args)
@@ -351,7 +355,7 @@ func (m *Module) technicianGate(ctx context.Context, c *ops.Call, jobID *uuid.UU
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/devices.register [post]
+// @Router			/v1/devices [post]
 func (m *Module) register(ctx context.Context, c *ops.Call, in *RegisterInput) (DeviceDetail, error) {
 	if err := m.technicianGate(ctx, c, in.JobID, in.UnitID); err != nil {
 		return DeviceDetail{}, err

@@ -359,18 +359,25 @@ var kindRank = map[string]int{"default_alert": 0, "alert": 1, "automation": 2}
 // @Tags			policies
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=PolicyPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit		query		integer	false	"page size 1–100, default 25"
+// @Param			sort		query		string	false	"field:direction — fields id,name,priority,createdAt,updatedAt; default kind (default_alert, alert, automation) asc;name asc;id asc"
+// @Param			unitId		query		string	false	"filter → alert kind: id in ACUnit.alertPolicyIds of that unit plus the default policy"
+// @Param			customerId	query		string	false	"filter → alert kind: Policy.customerId (default policy always included)"
+// @Param			propertyId	query		string	false	"filter → attached or target units in the property"
+// @Param			kind		query		string	false	"filter → kind"
+// @Param			enabled		query		boolean	false	"filter → enabled"
+// @Success		200			{object}	ops.Envelope{data=PolicyPage}
+// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/policies.list [post]
+// @Router			/v1/policies [get]
 func (m Policies) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Policy], error) {
 	var f struct {
 		Kind       *string    `json:"kind,omitempty"`
@@ -640,18 +647,18 @@ func (m Policies) loadKinds(ctx context.Context, c *ops.Call, id uuid.UUID, lock
 // @Tags			policies
 // @Accept			json
 // @Produce		json
-// @Param			request	body		PolicyIDInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=Policy}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			policyId	path		string	true	"input field policyId"
+// @Success		200			{object}	ops.Envelope{data=Policy}
+// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/policies.get [post]
+// @Router			/v1/policies/{policyId} [get]
 func (m Policies) get(ctx context.Context, c *ops.Call, in *PolicyIDInput) (Policy, error) {
 	p, err := m.load(ctx, c, in.PolicyID, false)
 	if err != nil {
@@ -825,20 +832,19 @@ func hasDup(ids []uuid.UUID) bool {
 // @Tags			policies
 // @Accept			json
 // @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		false	"id omitted: omit (target none, read none); id present: required (target policies, read policies.get)"
-// @Param			request				body		SaveInput	true	"input"
-// @Success		200					{object}	ops.Envelope{data=Policy}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		SaveInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Policy}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/policies.save [post]
+// @Router			/v1/policies [post]
 func (m Policies) save(ctx context.Context, c *ops.Call, in *SaveInput) (Policy, error) {
 	if !grantedKinds(c)[in.Kind] {
 		return Policy{}, apperr.E(apperr.Forbidden, "error.forbidden")
@@ -1061,9 +1067,9 @@ type Deleted struct {
 // @Tags			policies
 // @Accept			json
 // @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target policies, read policies.get)"
-// @Param			request				body		PolicyIDInput	true	"input"
+// @Param			Idempotency-Key		header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer	true	"all: required (target policies, read policies.get)"
+// @Param			policyId			path		string	true	"input field policyId"
 // @Success		200					{object}	ops.Envelope{data=Deleted}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -1074,7 +1080,7 @@ type Deleted struct {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/policies.delete [post]
+// @Router			/v1/policies/{policyId} [delete]
 func (m Policies) delete(ctx context.Context, c *ops.Call, in *PolicyIDInput) (Deleted, error) {
 	kinds := grantedKinds(c)
 	kinds["default_alert"] = kinds["alert"] // the default policy is visible to alert writers so its delete is VALIDATION (IR108)
@@ -1156,7 +1162,9 @@ func (in *SetDefaultRuleInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer				true	"all: required (target policies, read policies.get)"
-// @Param			request				body		SetDefaultRuleInput	true	"input"
+// @Param			policyId			path		string				true	"input field policyId"
+// @Param			ruleKey				path		string				true	"input field ruleKey"
+// @Param			request				body		SetDefaultRuleInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=RuleSetting}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -1167,7 +1175,7 @@ func (in *SetDefaultRuleInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/policies.setDefaultRule [post]
+// @Router			/v1/policies/{policyId}/default-rules/{ruleKey} [put]
 func (m Policies) setDefaultRule(ctx context.Context, c *ops.Call, in *SetDefaultRuleInput) (RuleSetting, error) {
 	if c.Principal.Role == "client" {
 		own, err := m.clientCustomer(ctx, c)

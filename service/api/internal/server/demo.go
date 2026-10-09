@@ -104,7 +104,7 @@ type Generation struct {
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/demo.advanceClock [post]
+// @Router			/v1/demo/advance-clock [post]
 func (d *demoOps) advance(ctx context.Context, c *ops.Call, in *AdvanceInput) (Generation, error) {
 	if !d.enabled {
 		return Generation{}, demoOnly()
@@ -159,7 +159,7 @@ func (in *ResetInput) Validate() map[string]string {
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/demo.reset [post]
+// @Router			/v1/demo/reset [post]
 func (d *demoOps) reset(context.Context, *ops.Call, *ResetInput) (Generation, error) {
 	if !d.enabled {
 		return Generation{}, demoOnly()
@@ -323,7 +323,7 @@ func (d *demoOps) inTenant(ctx context.Context, now time.Time, probe string, id 
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/demo.trigger [post]
+// @Router			/v1/demo/trigger [post]
 func (d *demoOps) trigger(ctx context.Context, c *ops.Call, in *TriggerInput) (Event, error) {
 	if !d.enabled {
 		return Event{}, demoOnly()
@@ -486,7 +486,7 @@ func registerDemo(reg *ops.Registry, d *demoOps) {
 //	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/demoSession.signIn [post]
+//	@Router			/v1/demo-session [post]
 func demoSessionSignIn(ctx context.Context, c *ops.Call, in *demoSignIn) (struct{}, error) {
 	return demoSessionViaBFF(ctx, c, in)
 }
@@ -512,7 +512,7 @@ func demoSessionSignIn(ctx context.Context, c *ops.Call, in *demoSignIn) (struct
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/demoSession.switchMembership [post]
+// @Router			/v1/demo-session/switch-membership [post]
 func demoSessionSwitch(ctx context.Context, c *ops.Call, in *demoSwitch) (struct{}, error) {
 	return demoSessionViaBFF(ctx, c, in)
 }
@@ -537,7 +537,7 @@ func demoSessionSwitch(ctx context.Context, c *ops.Call, in *demoSwitch) (struct
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/demoSession.signOut [post]
+// @Router			/v1/demo-session [delete]
 func demoSessionSignOut(ctx context.Context, c *ops.Call, in *struct{}) (struct{}, error) {
 	return demoSessionViaBFF(ctx, c, in)
 }
@@ -562,7 +562,7 @@ func demoSessionSignOut(ctx context.Context, c *ops.Call, in *struct{}) (struct{
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/demoSession.extend [post]
+// @Router			/v1/demo-session/extend [post]
 func demoSessionExtend(ctx context.Context, c *ops.Call, in *struct{}) (struct{}, error) {
 	return demoSessionViaBFF(ctx, c, in)
 }

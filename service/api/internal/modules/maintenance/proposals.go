@@ -129,7 +129,8 @@ func (in *ProposeInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		ProposeInput	true	"input"
+// @Param			jobId				path		string			true	"input field jobId"
+// @Param			request				body		ProposeInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -140,7 +141,7 @@ func (in *ProposeInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.proposeSlot [post]
+// @Router			/v1/jobs/{jobId}/slot-proposals [post]
 func (m Proposals) proposeSlot(ctx context.Context, c *ops.Call, in *ProposeInput) (Job, error) {
 	r, err := m.Delivery.lock(ctx, c, in.JobID)
 	if err != nil {
@@ -227,7 +228,9 @@ func (in *ProposalRef) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		ProposalRef	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			proposalId			path		string		true	"input field proposalId"
+// @Param			request				body		ProposalRef	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -238,7 +241,7 @@ func (in *ProposalRef) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.withdrawProposal [post]
+// @Router			/v1/jobs/{jobId}/slot-proposals/{proposalId}/withdraw [post]
 func (m Proposals) withdrawProposal(ctx context.Context, c *ops.Call, in *ProposalRef) (Job, error) {
 	if _, err := m.Delivery.lock(ctx, c, in.JobID); err != nil {
 		return Job{}, err
@@ -316,7 +319,9 @@ func (in *RespondInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		RespondInput	true	"input"
+// @Param			jobId				path		string			true	"input field jobId"
+// @Param			proposalId			path		string			true	"input field proposalId"
+// @Param			request				body		RespondInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -327,7 +332,7 @@ func (in *RespondInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.respondProposal [post]
+// @Router			/v1/jobs/{jobId}/slot-proposals/{proposalId}/respond [post]
 func (m Proposals) respond(ctx context.Context, c *ops.Call, in *RespondInput) (Job, error) {
 	r, err := m.Delivery.lock(ctx, c, in.JobID)
 	if err != nil {
@@ -470,7 +475,8 @@ func (in *RescheduleInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		RescheduleInput	true	"input"
+// @Param			jobId				path		string			true	"input field jobId"
+// @Param			request				body		RescheduleInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -481,7 +487,7 @@ func (in *RescheduleInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.requestReschedule [post]
+// @Router			/v1/jobs/{jobId}/request-reschedule [post]
 func (m Proposals) requestReschedule(ctx context.Context, c *ops.Call, in *RescheduleInput) (Job, error) {
 	r, err := m.Delivery.lock(ctx, c, in.JobID)
 	if err != nil {
@@ -568,7 +574,8 @@ func (in *PartnerProposeInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer				true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		PartnerProposeInput	true	"input"
+// @Param			jobId				path		string				true	"input field jobId"
+// @Param			request				body		PartnerProposeInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -579,7 +586,7 @@ func (in *PartnerProposeInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.proposePartnerSlot [post]
+// @Router			/v1/jobs/{jobId}/partner-slot-proposals [post]
 func (m Proposals) proposePartner(ctx context.Context, c *ops.Call, in *PartnerProposeInput) (Job, error) {
 	var expires time.Time
 	err := c.Tx.QueryRow(ctx, `SELECT offer_expires_at FROM maintenance.offers WHERE id = $1 AND job_id = $2 AND contractor_org_id = $3 AND decision IS NULL AND expired_at IS NULL FOR UPDATE`,
@@ -650,7 +657,9 @@ func (m Proposals) partnerProposal(ctx context.Context, c *ops.Call, in *Proposa
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		ProposalRef	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			proposalId			path		string		true	"input field proposalId"
+// @Param			request				body		ProposalRef	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -661,7 +670,7 @@ func (m Proposals) partnerProposal(ctx context.Context, c *ops.Call, in *Proposa
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.withdrawPartnerSlot [post]
+// @Router			/v1/jobs/{jobId}/partner-slot-proposals/{proposalId}/withdraw [post]
 func (m Proposals) withdrawPartner(ctx context.Context, c *ops.Call, in *ProposalRef) (Job, error) {
 	status, _, _, _, _, err := m.partnerProposal(ctx, c, in, true)
 	if err != nil {
@@ -719,7 +728,9 @@ func (in *ResolveInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		ResolveInput	true	"input"
+// @Param			jobId				path		string			true	"input field jobId"
+// @Param			proposalId			path		string			true	"input field proposalId"
+// @Param			request				body		ResolveInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -730,7 +741,7 @@ func (in *ResolveInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.resolvePartnerSlot [post]
+// @Router			/v1/jobs/{jobId}/partner-slot-proposals/{proposalId}/resolve [post]
 func (m Proposals) resolvePartner(ctx context.Context, c *ops.Call, in *ResolveInput) (Job, error) {
 	status, _, slot, tech, org, err := m.partnerProposal(ctx, c, &ProposalRef{JobID: in.JobID, ProposalID: in.ProposalID}, false)
 	if err != nil {

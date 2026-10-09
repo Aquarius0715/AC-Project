@@ -294,7 +294,7 @@ func PreferredSlotsOK(now time.Time, slots []Slot) bool {
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.create [post]
+// @Router			/v1/jobs [post]
 func (m Jobs) create(ctx context.Context, c *ops.Call, in *CreateInput) (Job, error) {
 	if c.Principal.Role == "client" && in.DueAt != nil {
 		return Job{}, apperr.Fields(map[string]string{"dueAt": "error.notAllowed"})
@@ -556,7 +556,7 @@ func (m Jobs) activeAssignment(ctx context.Context, c *ops.Call, job uuid.UUID) 
 // @Tags			jobs
 // @Accept			json
 // @Produce		json
-// @Param			request	body		JobIDInput	true	"input"
+// @Param			jobId	path		string	true	"input field jobId"
 // @Success		200		{object}	ops.Envelope
 // @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -567,7 +567,7 @@ func (m Jobs) activeAssignment(ctx context.Context, c *ops.Call, job uuid.UUID) 
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.get [post]
+// @Router			/v1/jobs/{jobId} [get]
 func (m Jobs) get(ctx context.Context, c *ops.Call, in *JobIDInput) (any, error) {
 	if c.Principal.Role == "contractor" || c.Principal.Role == "technician" {
 		v, _, err := m.projection(ctx, c, in.JobID)
@@ -631,18 +631,34 @@ var severityRank = map[string]int{"normal": 0, "warning": 1, "critical": 2}
 // @Tags			jobs
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=anyPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor			query		string		false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit			query		integer		false	"page size 1–100, default 25"
+// @Param			sort			query		string		false	"field:direction — fields id,severity,dueAt,status; default status asc;id asc"
+// @Param			unitId			query		string		false	"filter"
+// @Param			unitIds			query		[]string	false	"filter (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+// @Param			status			query		string		false	"filter"
+// @Param			severity		query		string		false	"filter"
+// @Param			from			query		string		false	"filter"
+// @Param			to				query		string		false	"filter"
+// @Param			organizationId	query		string		false	"filter"
+// @Param			membershipId	query		string		false	"filter"
+// @Param			customerId		query		string		false	"filter"
+// @Param			propertyId		query		string		false	"filter"
+// @Param			statuses		query		[]string	false	"filter (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+// @Param			overdueOnly		query		boolean		false	"filter"
+// @Param			origin			query		string		false	"filter"
+// @Param			proposalPending	query		boolean		false	"filter"
+// @Success		200				{object}	ops.Envelope{data=anyPage}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.list [post]
+// @Router			/v1/jobs [get]
 func (m Jobs) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[any], error) {
 	var f listFilters
 	if len(in.Filters) > 0 {
@@ -890,7 +906,12 @@ type Event struct {
 // @Tags			jobs
 // @Accept			json
 // @Produce		json
-// @Param			request	body		EventsInput	true	"input"
+// @Param			jobId	path		string	true	"input field jobId"
+// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit	query		integer	false	"page size 1–100, default 25"
+// @Param			sort	query		string	false	"field:direction — fields id,occurredAt; default occurredAt asc;id asc"
+// @Param			from	query		string	false	"filter → [from,to) on occurredAt"
+// @Param			to		query		string	false	"filter → [from,to) on occurredAt"
 // @Success		200		{object}	ops.Envelope{data=EventPage}
 // @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -901,7 +922,7 @@ type Event struct {
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.events [post]
+// @Router			/v1/jobs/{jobId}/events [get]
 func (m Jobs) events(ctx context.Context, c *ops.Call, in *EventsInput) (paging.Page[Event], error) {
 	ownOnly := false
 	if c.Principal.Role == "contractor" || c.Principal.Role == "technician" {
@@ -1078,7 +1099,8 @@ func (m Jobs) finishScoped(ctx context.Context, c *ops.Call, id uuid.UUID, actio
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		CancelInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		CancelInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -1089,7 +1111,7 @@ func (m Jobs) finishScoped(ctx context.Context, c *ops.Call, id uuid.UUID, actio
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.cancel [post]
+// @Router			/v1/jobs/{jobId}/cancel [post]
 func (m Jobs) cancel(ctx context.Context, c *ops.Call, in *CancelInput) (Job, error) {
 	status, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
@@ -1149,7 +1171,8 @@ func (in *ReasonInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		ReasonInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		ReasonInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -1160,7 +1183,7 @@ func (in *ReasonInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.hold [post]
+// @Router			/v1/jobs/{jobId}/hold [post]
 func (m Jobs) hold(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, error) {
 	status, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
@@ -1189,7 +1212,8 @@ func (m Jobs) hold(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, erro
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		ReasonInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		ReasonInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -1200,7 +1224,7 @@ func (m Jobs) hold(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, erro
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.resumeHold [post]
+// @Router			/v1/jobs/{jobId}/resume-hold [post]
 func (m Jobs) resumeHold(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, error) {
 	status, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
@@ -1254,7 +1278,8 @@ func (in *NoteInput) Validate() map[string]string {
 //	@Produce		json
 //	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 //	@Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-//	@Param			request				body		NoteInput	true	"input"
+//	@Param			jobId				path		string		true	"input field jobId"
+//	@Param			request				body		NoteInput	true	"input; the path parameters come from the route"
 //	@Success		200					{object}	ops.Envelope{data=Note}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -1265,7 +1290,7 @@ func (in *NoteInput) Validate() map[string]string {
 //	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/jobs.addNote [post]
+//	@Router			/v1/jobs/{jobId}/notes [post]
 func (m Jobs) addNote(ctx context.Context, c *ops.Call, in *NoteInput) (Note, error) {
 	if c.Principal.Role == "client" && in.Visibility != "customer" {
 		return Note{}, apperr.E(apperr.Forbidden, "error.forbidden")

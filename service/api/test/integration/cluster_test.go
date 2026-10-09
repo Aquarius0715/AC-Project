@@ -163,7 +163,7 @@ func clusterFacade(t *testing.T, base apiserver.Config, v auth.Verifier) *apiser
 	f := &apiserver.Server{Registry: all.Registry, DB: all.DB, Consumers: cl.consumers()}
 	e := echo.New()
 	e.Any("/*", echo.WrapHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.HasPrefix(r.URL.Path, "/v1/ops/") {
+		if !strings.HasPrefix(r.URL.Path, "/v1/") {
 			all.Echo.ServeHTTP(w, r)
 			return
 		}
@@ -173,7 +173,7 @@ func clusterFacade(t *testing.T, base apiserver.Config, v auth.Verifier) *apiser
 		}
 		rec := &statusRecorder{ResponseWriter: w}
 		gw.ServeHTTP(rec, r)
-		if r.URL.Path == "/v1/ops/demo.advanceClock" && rec.status == http.StatusOK && base.DemoClock != nil { // the workers' tick on the new time
+		if (r.URL.Path == "/v1/demo/advance-clock" || r.URL.Path == "/v1/ops/demo.advanceClock") && rec.status == http.StatusOK && base.DemoClock != nil { // the workers' tick on the new time
 			if _, err := cl.tick(context.WithoutCancel(r.Context()), base.DemoClock.Now()); err != nil {
 				panic("tick after the jump: " + err.Error())
 			}

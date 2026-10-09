@@ -93,18 +93,28 @@ const severityRank = `CASE a.severity WHEN 'normal' THEN 0 WHEN 'warning' THEN 1
 // @Tags			alerts
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=AlertPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor		query		string		false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit		query		integer		false	"page size 1–100, default 25"
+// @Param			sort		query		string		false	"field:direction — fields id,createdAt,updatedAt,severity; default severity desc;id asc"
+// @Param			unitId		query		string		false	"filter → unitId"
+// @Param			unitIds		query		[]string	false	"filter → unitIds (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+// @Param			severity	query		string		false	"filter → severity"
+// @Param			status		query		string		false	"filter → status"
+// @Param			from		query		string		false	"filter → [from,to) on observedAt"
+// @Param			to			query		string		false	"filter → [from,to) on observedAt"
+// @Param			customerId	query		string		false	"filter"
+// @Param			propertyId	query		string		false	"filter"
+// @Success		200			{object}	ops.Envelope{data=AlertPage}
+// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/alerts.list [post]
+// @Router			/v1/alerts [get]
 func (m Alerts) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Alert], error) {
 	var f struct {
 		UnitID     *uuid.UUID   `json:"unitId,omitempty"`
@@ -229,18 +239,18 @@ func (in *GetInput) Validate() map[string]string {
 // @Tags			alerts
 // @Accept			json
 // @Produce		json
-// @Param			request	body		GetInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=Alert}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			id	path		string	true	"input field id"
+// @Success		200	{object}	ops.Envelope{data=Alert}
+// @Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504	{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/alerts.get [post]
+// @Router			/v1/alerts/{id} [get]
 func (m Alerts) get(ctx context.Context, c *ops.Call, in *GetInput) (Alert, error) {
 	args := []any{in.ID}
 	a, err := scanAlert(c.Tx.QueryRow(ctx, "SELECT "+alertCols+" FROM monitoring.alerts a WHERE a.id = $1 AND "+alertScope(c, &args, unitscope.List), args...))
@@ -303,7 +313,8 @@ func (in *AckInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target alerts, read alerts.get)"
-// @Param			request				body		AckInput	true	"input"
+// @Param			alertId				path		string		true	"input field alertId"
+// @Param			request				body		AckInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Alert}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -314,7 +325,7 @@ func (in *AckInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/alerts.acknowledge [post]
+// @Router			/v1/alerts/{alertId}/acknowledge [post]
 func (m Alerts) acknowledge(ctx context.Context, c *ops.Call, in *AckInput) (Alert, error) {
 	status, unit, err := m.lockAlert(ctx, c, in.AlertID)
 	if err != nil {
@@ -367,7 +378,8 @@ func (in *ResolveInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target alerts, read alerts.get)"
-// @Param			request				body		ResolveInput	true	"input"
+// @Param			alertId				path		string			true	"input field alertId"
+// @Param			request				body		ResolveInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Alert}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -378,7 +390,7 @@ func (in *ResolveInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/alerts.resolve [post]
+// @Router			/v1/alerts/{alertId}/resolve [post]
 func (m Alerts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (Alert, error) {
 	status, unit, err := m.lockAlert(ctx, c, in.AlertID)
 	if err != nil {

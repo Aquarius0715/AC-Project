@@ -134,7 +134,8 @@ func (in *RateInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get)"
-// @Param			request				body		RateInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		RateInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -145,7 +146,7 @@ func (in *RateInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.rate [post]
+// @Router			/v1/jobs/{jobId}/rate [post]
 func (m FollowUps) rate(ctx context.Context, c *ops.Call, in *RateInput) (Job, error) {
 	s, err := m.lock(ctx, c, in.JobID)
 	if err != nil {
@@ -235,7 +236,8 @@ func (in *ProblemInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get)"
-// @Param			request				body		ProblemInput	true	"input"
+// @Param			jobId				path		string			true	"input field jobId"
+// @Param			request				body		ProblemInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -246,7 +248,7 @@ func (in *ProblemInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.reportProblem [post]
+// @Router			/v1/jobs/{jobId}/report-problem [post]
 func (m FollowUps) reportProblem(ctx context.Context, c *ops.Call, in *ProblemInput) (Job, error) {
 	s, err := m.lock(ctx, c, in.JobID)
 	if err != nil {
@@ -336,7 +338,8 @@ func (in *ClassifyInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get)"
-// @Param			request				body		ClassifyInput	true	"input"
+// @Param			jobId				path		string			true	"input field jobId"
+// @Param			request				body		ClassifyInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -347,7 +350,7 @@ func (in *ClassifyInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.classifyFollowUp [post]
+// @Router			/v1/jobs/{jobId}/classify-follow-up [post]
 func (m FollowUps) classify(ctx context.Context, c *ops.Call, in *ClassifyInput) (Job, error) {
 	s, err := m.lock(ctx, c, in.JobID)
 	if err != nil {
@@ -411,7 +414,8 @@ func (in *CostInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		CostInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		CostInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -422,7 +426,7 @@ func (in *CostInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.saveCost [post]
+// @Router			/v1/jobs/{jobId}/cost-lines [put]
 func (m FollowUps) saveCost(ctx context.Context, c *ops.Call, in *CostInput) (Job, error) {
 	s, err := m.lock(ctx, c, in.JobID)
 	if err != nil {
@@ -471,7 +475,8 @@ func (in *ExtendInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		ExtendInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		ExtendInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -482,7 +487,7 @@ func (in *ExtendInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.extendAccess [post]
+// @Router			/v1/jobs/{jobId}/extend-access [post]
 func (m FollowUps) extendAccess(ctx context.Context, c *ops.Call, in *ExtendInput) (Job, error) {
 	if _, err := m.lock(ctx, c, in.JobID); err != nil {
 		return Job{}, err
@@ -559,7 +564,8 @@ type WarrantyClaim struct {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get)"
-// @Param			request				body		ClaimInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		ClaimInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -570,7 +576,7 @@ type WarrantyClaim struct {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.recordWarrantyClaim [post]
+// @Router			/v1/jobs/{jobId}/warranty-claims [post]
 func (m FollowUps) recordWarrantyClaim(ctx context.Context, c *ops.Call, in *ClaimInput) (Job, error) {
 	s, err := m.lock(ctx, c, in.JobID)
 	if err != nil {

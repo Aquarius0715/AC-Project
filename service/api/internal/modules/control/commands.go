@@ -194,7 +194,7 @@ func inScope(p *ops.Principal, unit, property, org uuid.UUID) bool {
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/commands.create [post]
+// @Router			/v1/commands [post]
 func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Command, error) {
 	t, found, err := m.Units.Target(ctx, c, in.UnitID)
 	if err != nil {
@@ -317,18 +317,18 @@ func (in *GetInput) Validate() map[string]string {
 // @Tags			commands
 // @Accept			json
 // @Produce		json
-// @Param			request	body		GetInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=Command}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			id	path		string	true	"input field id"
+// @Success		200	{object}	ops.Envelope{data=Command}
+// @Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504	{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/commands.get [post]
+// @Router			/v1/commands/{id} [get]
 func (m Commands) get(ctx context.Context, c *ops.Call, in *GetInput) (Command, error) {
 	x, err := scanCommand(c.Tx.QueryRow(ctx, "SELECT "+commandCols+" FROM control.commands WHERE id = $1", in.ID))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -379,7 +379,11 @@ func (in *ListInput) Validate() map[string]string {
 //	@Tags			commands
 //	@Accept			json
 //	@Produce		json
-//	@Param			request	body		ListInput	true	"input"
+//	@Param			unitId	query		string	false	"input field unitId"
+//	@Param			jobId	query		string	false	"input field jobId"
+//	@Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+//	@Param			limit	query		integer	false	"page size 1–100, default 25"
+//	@Param			sort	query		string	false	"field:direction — fields id,requestedAt; default requestedAt desc;id asc"
 //	@Success		200		{object}	ops.Envelope{data=CommandPage}
 //	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -390,7 +394,7 @@ func (in *ListInput) Validate() map[string]string {
 //	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/commands.list [post]
+//	@Router			/v1/commands [get]
 func (m Commands) list(ctx context.Context, c *ops.Call, in *ListInput) (paging.Page[Command], error) {
 	if err := paging.NoFilters(in.Query, "query.filters"); err != nil {
 		return paging.Page[Command]{}, err

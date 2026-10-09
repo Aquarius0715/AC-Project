@@ -158,18 +158,24 @@ func fillMembers(ctx context.Context, c *ops.Call, ms []Member) error {
 // @Tags			members
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=MemberPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit			query		integer	false	"page size 1–100, default 25"
+// @Param			sort			query		string	false	"field:direction — fields id,validFrom,createdAt,updatedAt; default id asc"
+// @Param			role			query		string	false	"filter → Membership.role (omitted: every role except client)"
+// @Param			organizationId	query		string	false	"filter → Membership.organizationId"
+// @Param			qualification	query		string	false	"filter → matching valid Membership.qualifications[].code (SR13)"
+// @Param			activeOnly		query		boolean	false	"filter → true => validFrom<=now<validUntil (null end infinite)"
+// @Success		200				{object}	ops.Envelope{data=MemberPage}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/members.list [post]
+// @Router			/v1/members [get]
 func membersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Member], error) {
 	var f struct {
 		Role           *string    `json:"role,omitempty"`
@@ -343,20 +349,19 @@ func (in *MemberInput) Validate() map[string]string {
 // @Tags			members
 // @Accept			json
 // @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		false	"id omitted: omit (target none, read none); id present: required (target members, read members.list)"
-// @Param			request				body		MemberInput	true	"input"
-// @Success		200					{object}	ops.Envelope{data=Member}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		MemberInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Member}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/members.save [post]
+// @Router			/v1/members [post]
 func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, error) {
 	var exists bool
 	if err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM identity.users WHERE id = $1)`, in.UserID).Scan(&exists); err != nil {

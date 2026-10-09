@@ -34,27 +34,49 @@ func TestServesTheAPIDescription(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &doc); err != nil || doc.Swagger != "2.0" {
 		t.Fatalf("swagger document: %v %q", err, doc.Swagger)
 	}
-	// every operation of the catalog is documented as POST /v1/ops/<operation> with its write headers
+	// every REST route of the catalog (IR222) is documented with its path parameters, write headers and responses
+	documented := 0
 	for _, s := range ops.Catalog {
-		p, ok := doc.Paths["/v1/ops/"+s.Name]["post"]
-		if !ok {
-			t.Errorf("%s has no annotated handler (run make swagger)", s.Name)
-			continue
-		}
-		idem := false
-		for _, x := range p.Parameters {
-			idem = idem || (x.Name == "Idempotency-Key" && x.In == "header")
-		}
-		if idem != (s.Mode == ops.Write) {
-			t.Errorf("%s: Idempotency-Key documented %v for a %s operation", s.Name, idem, s.Mode)
-		}
-		for _, code := range []string{"200", "401", "403", "404", "409", "422"} {
-			if _, ok := p.Responses[code]; !ok {
-				t.Errorf("%s: response %s missing", s.Name, code)
+		for _, rt := range s.Routes {
+			p, ok := doc.Paths[rt.Path][strings.ToLower(rt.Method)]
+			if !ok {
+				t.Errorf("%s %s (%s) is not documented (run make swagger)", rt.Method, rt.Path, s.Name)
+				continue
+			}
+			documented++
+			if p.OperationID != s.Name && !strings.HasPrefix(p.OperationID, s.Name+".") {
+				t.Errorf("%s %s: operationId %s for %s", rt.Method, rt.Path, p.OperationID, s.Name)
+			}
+			idem, path := false, map[string]bool{}
+			for _, x := range p.Parameters {
+				idem = idem || (x.Name == "Idempotency-Key" && x.In == "header")
+				if x.In == "path" {
+					path[x.Name] = true
+				}
+			}
+			if idem != (s.Mode == ops.Write) {
+				t.Errorf("%s: Idempotency-Key documented %v for a %s operation", s.Name, idem, s.Mode)
+			}
+			for _, name := range ops.PathParams(rt.Path) {
+				if !path[name] {
+					t.Errorf("%s %s: path parameter %s undocumented", rt.Method, rt.Path, name)
+				}
+			}
+			for _, code := range []string{"200", "401", "403", "404", "409", "422"} {
+				if _, ok := p.Responses[code]; !ok {
+					t.Errorf("%s: response %s missing", s.Name, code)
+				}
 			}
 		}
 	}
-	if len(doc.Paths) != len(ops.Catalog) {
-		t.Errorf("documented %d paths for %d operations", len(doc.Paths), len(ops.Catalog))
+	operations := 0
+	for path, methods := range doc.Paths {
+		if strings.HasPrefix(path, "/v1/ops") {
+			t.Errorf("%s is documented: the description shows the REST routes only", path)
+		}
+		operations += len(methods)
+	}
+	if documented != 219 || operations != documented {
+		t.Errorf("documented %d of the catalog's routes, %d operations in the document", documented, operations)
 	}
 }

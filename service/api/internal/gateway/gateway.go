@@ -1,7 +1,8 @@
-// Package gateway is the single entry of the Core API for the web apps (IR180): POST /v1/ops/:operation is
-// forwarded unchanged (headers, body, status) to the business-domain service that owns the operation in the
-// operation catalog. It holds no business logic and does not authenticate; every service verifies the token itself.
-// In production the ALB can route the same paths (`/v1/ops/<prefix>.*`) without this process.
+// Package gateway is the single entry of the Core API for the web apps (IR180): the REST routes of the operation
+// catalog (IR222) and POST /v1/ops/:operation are forwarded unchanged (headers, query, body, status) to the
+// business-domain service that owns the operation. It holds no business logic and does not authenticate; every
+// service verifies the token itself. In production the ALB can route the same paths from the catalog's route table
+// without this process.
 package gateway
 
 import (
@@ -76,15 +77,22 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 	}
 	e.GET("/healthz", func(c *echo.Context) error { return c.NoContent(http.StatusOK) })
 	mountDocs(e) // /docs and /swagger.json (IR220)
-	e.POST("/v1/ops/:operation", func(c *echo.Context) error {
-		p := proxies[ops.DomainOf(c.Param("operation"))]
-		if p == nil {
-			return apperr.E(apperr.NotFound, "error.unknownOperation")
+	e.POST("/v1/ops/:operation", func(c *echo.Context) error { return forward(c, proxies[ops.DomainOf(c.Param("operation"))]) })
+	for _, s := range ops.Catalog { // REST routes go to the owning service unchanged (IR222)
+		p := proxies[ops.DomainOf(s.Name)]
+		for _, rt := range s.Routes {
+			e.Add(rt.Method, ops.EchoPath(rt.Path), func(c *echo.Context) error { return forward(c, p) })
 		}
-		// the services keep the correlation ID: forward the one this request got
-		c.Request().Header.Set(echo.HeaderXRequestID, c.Response().Header().Get(echo.HeaderXRequestID))
-		p.ServeHTTP(c.Response(), c.Request())
-		return nil
-	})
+	}
 	return e
+}
+
+func forward(c *echo.Context, p *httputil.ReverseProxy) error {
+	if p == nil {
+		return apperr.E(apperr.NotFound, "error.unknownOperation")
+	}
+	// the services keep the correlation ID: forward the one this request got
+	c.Request().Header.Set(echo.HeaderXRequestID, c.Response().Header().Get(echo.HeaderXRequestID))
+	p.ServeHTTP(c.Response(), c.Request())
+	return nil
 }

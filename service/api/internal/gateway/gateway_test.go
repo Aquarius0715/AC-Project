@@ -54,6 +54,50 @@ func TestRoutesEachOperationToItsDomain(t *testing.T) {
 	}
 }
 
+// TestRoutesEveryRESTRouteToItsDomain sends every catalog route (IR222) with sample path values and a query string:
+// the owning service receives the same method, path, query and body.
+func TestRoutesEveryRESTRouteToItsDomain(t *testing.T) {
+	var got string
+	targets := Targets{}
+	for _, d := range ops.Domains {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			b, _ := io.ReadAll(r.Body)
+			got = d + " " + r.Method + " " + r.URL.RequestURI() + " " + string(b)
+			w.WriteHeader(http.StatusOK)
+		}))
+		t.Cleanup(srv.Close)
+		u, _ := url.Parse(srv.URL)
+		targets[d] = u
+	}
+	e := New(targets, nil)
+	routes := 0
+	for _, s := range ops.Catalog {
+		if len(s.Routes) == 0 {
+			t.Fatalf("%s has no REST route", s.Name)
+		}
+		for _, rt := range s.Routes {
+			routes++
+			path := rt.Path
+			for _, p := range ops.PathParams(rt.Path) {
+				path = strings.Replace(path, "{"+p+"}", "v-"+strings.ReplaceAll(p, ".", "-"), 1)
+			}
+			body := ""
+			if rt.Method != http.MethodGet && rt.Method != http.MethodDelete {
+				body = `{"x":1}`
+			}
+			got = ""
+			w := httptest.NewRecorder()
+			e.ServeHTTP(w, httptest.NewRequest(rt.Method, path+"?q=1", strings.NewReader(body)))
+			if want := ops.DomainOf(s.Name) + " " + rt.Method + " " + path + "?q=1 " + body; w.Code != http.StatusOK || got != want {
+				t.Fatalf("%s %s (%s): %d, upstream saw %q, want %q", rt.Method, rt.Path, s.Name, w.Code, got, want)
+			}
+		}
+	}
+	if routes != 219 {
+		t.Fatalf("%d REST routes, want 219", routes)
+	}
+}
+
 func TestUpstreamDownIsUnavailable(t *testing.T) {
 	dead, _ := url.Parse("http://127.0.0.1:1")
 	targets := Targets{}

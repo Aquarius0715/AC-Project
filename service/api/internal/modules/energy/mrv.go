@@ -94,18 +94,27 @@ type Preview struct {
 //	@Tags			mrv
 //	@Accept			json
 //	@Produce		json
-//	@Param			request	body		Conditions	true	"input"
-//	@Success		200		{object}	ops.Envelope{data=Preview}
-//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Param			from			query		string		false	"input field from"
+//	@Param			to				query		string		false	"input field to"
+//	@Param			unitIds			query		[]string	false	"input field unitIds (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+//	@Param			baselineId		query		string		false	"input field baselineId"
+//	@Param			baselineVersion	query		integer		false	"input field baselineVersion"
+//	@Param			factorId		query		string		false	"input field factorId"
+//	@Param			factorVersion	query		integer		false	"input field factorVersion"
+//	@Param			boundaryId		query		string		false	"input field boundaryId"
+//	@Param			boundary		query		string		false	"input field boundary"
+//	@Param			organizationId	query		string		false	"input field organizationId"
+//	@Success		200				{object}	ops.Envelope{data=Preview}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/mrv.preview [post]
+//	@Router			/v1/mrv/preview [get]
 func preview(ctx context.Context, c *ops.Call, in *Conditions) (Preview, error) {
 	var kind string
 	err := c.Tx.QueryRow(ctx, `SELECT kind FROM energy.ref_organizations WHERE id = $1`, in.OrganizationID).Scan(&kind)
@@ -256,18 +265,19 @@ func (in *GetInput) Validate() map[string]string {
 // @Tags			mrv
 // @Accept			json
 // @Produce		json
-// @Param			request	body		GetInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=Report}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			id				path		string	true	"input field id"
+// @Param			reportVersion	query		integer	false	"input field reportVersion"
+// @Success		200				{object}	ops.Envelope{data=Report}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/mrv.get [post]
+// @Router			/v1/mrv/{id} [get]
 func getReport(ctx context.Context, c *ops.Call, in *GetInput) (Report, error) {
 	return LoadReport(ctx, c, in.ID, in.ReportVersion)
 }
@@ -315,18 +325,25 @@ func pageReports(ctx context.Context, c *ops.Call, q paging.Query, f any, where 
 // @Tags			mrv
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=ReportPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit			query		integer	false	"page size 1–100, default 25"
+// @Param			sort			query		string	false	"field:direction — fields id,createdAt,updatedAt,periodFrom; default createdAt desc;id desc"
+// @Param			unitId			query		string	false	"filter → conditions.unitIds contains"
+// @Param			from			query		string	false	"filter → [from,to) on conditions.from"
+// @Param			to				query		string	false	"filter → [from,to) on conditions.from"
+// @Param			status			query		string	false	"filter → status"
+// @Param			organizationId	query		string	false	"filter → conditions.organizationId"
+// @Success		200				{object}	ops.Envelope{data=ReportPage}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/mrv.list [post]
+// @Router			/v1/mrv [get]
 func listReports(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Report], error) {
 	var f struct {
 		OrganizationID *uuid.UUID `json:"organizationId,omitempty"`
@@ -390,7 +407,10 @@ func (in *VersionsInput) Validate() map[string]string {
 // @Tags			mrv
 // @Accept			json
 // @Produce		json
-// @Param			request	body		VersionsInput	true	"input"
+// @Param			id		path		string	true	"input field id"
+// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit	query		integer	false	"page size 1–100, default 25"
+// @Param			sort	query		string	false	"field:direction — fields version; default version asc"
 // @Success		200		{object}	ops.Envelope{data=ReportPage}
 // @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -401,7 +421,7 @@ func (in *VersionsInput) Validate() map[string]string {
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/mrv.versions [post]
+// @Router			/v1/mrv/{id}/versions [get]
 func versions(ctx context.Context, c *ops.Call, in *VersionsInput) (paging.Page[Report], error) {
 	if in.Query.HasFilters() { // no filters (query catalog)
 		return paging.Page[Report]{}, apperr.Fields(map[string]string{"query.filters": "error.invalid"})
@@ -461,20 +481,19 @@ func insertReport(ctx context.Context, c *ops.Call, id uuid.UUID, version int, p
 //	@Tags			mrv
 //	@Accept			json
 //	@Produce		json
-//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-//	@Param			X-Expected-Version	header		integer		false	"id omitted: omit (target none, read none); id present: required (target mrv, read mrv.get)"
-//	@Param			request				body		SaveInput	true	"input"
-//	@Success		200					{object}	ops.Envelope{data=Report}
-//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		SaveInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Report}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/mrv.saveDraft [post]
+//	@Router			/v1/mrv [post]
 func saveDraft(ctx context.Context, c *ops.Call, in *SaveInput) (Report, error) {
 	id, version := uuid.New(), 1
 	if in.ID != nil {
@@ -543,7 +562,8 @@ func (in *ReviewInput) Validate() map[string]string {
 //	@Produce		json
 //	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 //	@Param			X-Expected-Version	header		integer		true	"all: required (target mrv, read mrv.get)"
-//	@Param			request				body		ReviewInput	true	"input"
+//	@Param			reportId			path		string		true	"input field reportId"
+//	@Param			request				body		ReviewInput	true	"input; the path parameters come from the route"
 //	@Success		200					{object}	ops.Envelope{data=Report}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -554,7 +574,7 @@ func (in *ReviewInput) Validate() map[string]string {
 //	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/mrv.recordReview [post]
+//	@Router			/v1/mrv/{reportId}/review [post]
 func recordReview(ctx context.Context, c *ops.Call, in *ReviewInput) (Report, error) {
 	latest, err := latestVersion(ctx, c, in.ReportID)
 	if err != nil {

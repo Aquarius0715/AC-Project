@@ -41,9 +41,9 @@ service/api/        (IR174, moved under service/api by IR179; the Next.js apps a
   build/            api.Dockerfile, worker.Dockerfile, migrate.Dockerfile (context service/)
   scripts/          resetdb.sh, covermerge.py
   cmd/
-    gateway/        Core API entry: routes POST /v1/ops/:operation to the owning domain service (IR180)
+    gateway/        Core API entry: routes the catalog's REST routes (IR222) and POST /v1/ops/:operation to the owning domain service (IR180)
     identity-api/ equipment-api/ maintenance-api/ billing-api/ energy-api/
-                    business-domain Core API services (Echo) — POST /v1/ops/:operation for their domain, /healthz, /readyz
+                    business-domain Core API services (Echo) — the REST routes of their domain's operations, /healthz, /readyz
     webhook/        Webhook receiver (Echo) — /stripe, /ses, /whatsapp
     worker/         one binary, --role=outbox|scheduler|notification|telemetry|iot|automation|importexport|rollup
     migrate/        applies internal/migrations (one-off ECS task before deploy, IR167)
@@ -106,7 +106,7 @@ The authorization column (for example `client:self-customer:owner | admin:alert.
 
 ## 4. Request pipeline (Core API)
 
-Echo setup (`service/api/internal/server/http.go`, Echo guide: Quickstart, Routing, Error Handling, Cookbook › Graceful Shutdown, Testing): one `echo.New()`, the middleware below in order, `/healthz` and `/readyz`, the group `v1 := e.Group("/v1", auth)` with `v1.POST("/ops/:operation", Dispatch)`, and `e.HTTPErrorHandler = ops.HTTPErrorHandler`. Handlers and middleware never write error bodies themselves; they return a `*apperr.DomainError` (which implements `echo.HTTPStatusCoder`) and the central handler writes it with the correlation ID, maps Echo's own errors (unknown route or method → NOT_FOUND `error.unknownOperation`, 413 → VALIDATION `error.bodyTooLarge`, 503/504 → TIMEOUT) and turns any other error into UNAVAILABLE without internal detail, skipping responses already committed. `cmd/api` starts with `echo.StartConfig{GracefulTimeout: 25s}.Start(ctx, e)` on a SIGINT/SIGTERM context.
+Echo setup (`service/api/internal/server/http.go`, Echo guide: Quickstart, Routing, Error Handling, Cookbook › Graceful Shutdown, Testing): one `echo.New()`, the middleware below in order, `/healthz` and `/readyz`, the group `v1 := e.Group("/v1", auth)` with the REST routes of the catalog (`reg.MountREST(v1)`, IR222) and `v1.POST("/ops/:operation", Dispatch)` until the web apps use the routes, and `e.HTTPErrorHandler = ops.HTTPErrorHandler`. Handlers and middleware never write error bodies themselves; they return a `*apperr.DomainError` (which implements `echo.HTTPStatusCoder`) and the central handler writes it with the correlation ID, maps Echo's own errors (unknown route or method → NOT_FOUND `error.unknownOperation`, 413 → VALIDATION `error.bodyTooLarge`, 503/504 → TIMEOUT) and turns any other error into UNAVAILABLE without internal detail, skipping responses already committed. `cmd/api` starts with `echo.StartConfig{GracefulTimeout: 25s}.Start(ctx, e)` on a SIGINT/SIGTERM context.
 
 Echo middleware order:
 
@@ -119,11 +119,11 @@ Echo middleware order:
 | 5 | Body limit / timeout | 1 MiB JSON checked by the dispatcher per operation, file operations more: attachments.add and jobs.reportProblem 8 MiB, reports.signOff 16 MiB (base64 files in the demo; production uploads go to S3, IR221), larger bodies VALIDATION `error.bodyTooLarge`; `middleware.ContextTimeout` 30 s on the request context used by the database (per-operation 5 s / 10 s deadlines remain the production target) |
 | 6 | Authentication | Verifies the Cognito access token (issuer, audience = app client, expiry, `token_use=access`), loads the selected Membership (`X-Tenant-Id` + `X-Membership-Id` from the BFF session context; the membership must belong to the token subject, be inside its validity window and the user must be active, otherwise UNAUTHENTICATED) with permissions, scopes, client role and validity; requests without a token stay anonymous and reach only `public:` operations; caches it for 30 s keyed by membershipId + scopeVersion |
 | 7 | HQ network | Admin-role principals must carry a token from the admin app client (served only on `admin.<domain>`, IR117); otherwise FORBIDDEN |
-| 8 | Dispatcher | `POST /v1/ops/:operation` (below) |
+| 8 | Dispatcher | The REST route of an operation (`ops.Binding` builds the JSON input from the path, the query string or the body, and the route's fixed field) or `POST /v1/ops/:operation`; both run the same pipeline (below) |
 
 Dispatcher steps for one operation:
 
-1. Look up the operation (unknown → NOT_FOUND).
+1. Look up the operation: the route's operation, or the name of `POST /v1/ops/:operation` (unknown route or name → NOT_FOUND `error.unknownOperation`). A REST route builds the JSON input first: path parameters named after the input fields they fill, then the query string for GET and DELETE (top-level fields, `object.field`, lists as repeated or comma-separated values with an empty value as the empty list, `cursor`, `limit`, `sort=field:direction`, the catalogued filters by name) or the JSON object body for POST, PUT and PATCH (no query parameters), then the fixed field (`payouts.transition` at `/approve` sets `action=approve`). Unknown or misplaced parameters are VALIDATION `error.notAllowed`, unreadable values `error.invalid`, a body that repeats a path parameter or the fixed field with another value `error.pathMismatch`. `NewBinding` rejects at start-up a route whose path parameter is not a scalar input field, a GET on a write, a DELETE on a read, or a query-string route of an input with lists of objects, maps or raw JSON.
 2. Decode JSON strictly (`DisallowUnknownFields`) into the generated input type; run `Validate()` → VALIDATION with `fieldErrors`.
 3. Authorize with the compiled policy → FORBIDDEN, or NOT_FOUND when the target is outside scope (D01). Denied attempts are written to the audit log in a separate short transaction.
 4. Writes: require `Idempotency-Key`; insert `platform.idempotency_keys` (in_progress). A completed key with the same request hash returns the stored response; a different hash returns CONFLICT; an in-progress key returns CONFLICT with `retryAfterSeconds`.

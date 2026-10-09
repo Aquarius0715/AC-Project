@@ -128,18 +128,18 @@ func (in *IDInput) Validate() map[string]string {
 // @Tags			plans
 // @Accept			json
 // @Produce		json
-// @Param			request	body		IDInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=Plan}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			id	path		string	true	"input field id"
+// @Success		200	{object}	ops.Envelope{data=Plan}
+// @Failure		401	{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403	{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404	{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409	{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422	{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429	{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504	{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/plans.get [post]
+// @Router			/v1/plans/{id} [get]
 func (m Plans) get(ctx context.Context, c *ops.Call, in *IDInput) (Plan, error) {
 	return m.load(ctx, c, in.ID, false)
 }
@@ -153,18 +153,23 @@ func (m Plans) get(ctx context.Context, c *ops.Call, in *IDInput) (Plan, error) 
 // @Tags			plans
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=PlanPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit		query		integer	false	"page size 1–100, default 25"
+// @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
+// @Param			unitId		query		string	false	"filter → unitId"
+// @Param			customerId	query		string	false	"filter → unit belongs to the customer"
+// @Param			propertyId	query		string	false	"filter → unit is in the property"
+// @Success		200			{object}	ops.Envelope{data=PlanPage}
+// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/plans.list [post]
+// @Router			/v1/plans [get]
 func (m Plans) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Plan], error) {
 	var f struct {
 		UnitID     *uuid.UUID `json:"unitId,omitempty"`
@@ -275,20 +280,19 @@ func (in *PlanSaveInput) Validate() map[string]string {
 // @Tags			plans
 // @Accept			json
 // @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			false	"id omitted: omit (target none, read none); id present: required (target plans, read plans.get)"
-// @Param			request				body		PlanSaveInput	true	"input"
-// @Success		200					{object}	ops.Envelope{data=Plan}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		PlanSaveInput	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Plan}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/plans.save [post]
+// @Router			/v1/plans [post]
 func (m Plans) save(ctx context.Context, c *ops.Call, in *PlanSaveInput) (Plan, error) {
 	if !in.NextDueAt.After(c.Now) {
 		return Plan{}, apperr.Fields(map[string]string{"nextDueAt": "error.past"})
@@ -372,7 +376,8 @@ func (in *GenerateInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target plan, read plans.get)"
-// @Param			request				body		GenerateInput	true	"input"
+// @Param			id					path		string			true	"input field id"
+// @Param			request				body		GenerateInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -383,7 +388,7 @@ func (in *GenerateInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/plans.generateNext [post]
+// @Router			/v1/plans/{id}/generate-next [post]
 func (m Plans) generateNext(ctx context.Context, c *ops.Call, in *GenerateInput) (Job, error) {
 	p, err := m.load(ctx, c, in.ID, true)
 	if err != nil {

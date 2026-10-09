@@ -141,7 +141,7 @@ func customerOf(ctx context.Context, c *ops.Call, given *uuid.UUID) (uuid.UUID, 
 //	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/offsets.preview [post]
+//	@Router			/v1/offsets/preview [post]
 func previewQuote(ctx context.Context, c *ops.Call, in *QuoteInput) (Quote, error) {
 	customer, org, err := customerOf(ctx, c, in.CustomerID)
 	if err != nil {
@@ -288,18 +288,24 @@ func loadRecord(ctx context.Context, c *ops.Call, id uuid.UUID, lock bool) (Reco
 // @Tags			offsets
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=RecordPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit		query		integer	false	"page size 1–100, default 25"
+// @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default createdAt desc;id desc"
+// @Param			customerId	query		string	false	"filter → OffsetQuote.customerId via quoteId"
+// @Param			status		query		string	false	"filter → state"
+// @Param			from		query		string	false	"filter → [from,to) on createdAt"
+// @Param			to			query		string	false	"filter → [from,to) on createdAt"
+// @Success		200			{object}	ops.Envelope{data=RecordPage}
+// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/offsets.list [post]
+// @Router			/v1/offsets [get]
 func listRecords(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Record], error) {
 	var f struct {
 		CustomerID *uuid.UUID `json:"customerId,omitempty"`
@@ -442,7 +448,7 @@ func demoRef(prefix string) *string {
 //	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/offsets.simulate [post]
+//	@Router			/v1/offsets/simulate [post]
 func simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (Record, error) {
 	client := c.Principal.Role == "client"
 	if client && in.Event != "request" && in.Event != "retry" {

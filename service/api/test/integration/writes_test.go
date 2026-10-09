@@ -16,7 +16,7 @@ import (
 func TestWritesGetResult(t *testing.T) {
 	s := server(t)
 	key := "wr-" + uuid.NewString()
-	req := httptest.NewRequest(http.MethodPost, "/v1/ops/preferences.update", strings.NewReader(`{"locale":"en","timezone":"Asia/Kuala_Lumpur"}`))
+	req := httptest.NewRequest(http.MethodPut, "/v1/preferences", strings.NewReader(`{"locale":"en","timezone":"Asia/Kuala_Lumpur"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+techB.token)
 	req.Header.Set("X-Tenant-Id", seed.ID("tenant-a").String())
@@ -54,7 +54,7 @@ func TestWritesGetResult(t *testing.T) {
 		t.Errorf("pending: %v", m)
 	}
 	// password reset preview is public and generic
-	req = httptest.NewRequest(http.MethodPost, "/v1/ops/auth.previewPasswordReset", strings.NewReader(`{"demoEmail":"nobody@example.com"}`))
+	req = httptest.NewRequest(http.MethodPost, "/v1/auth/password-reset-preview", strings.NewReader(`{"demoEmail":"nobody@example.com"}`))
 	req.Header.Set("Content-Type", "application/json")
 	w = httptest.NewRecorder()
 	s.Echo.ServeHTTP(w, req)

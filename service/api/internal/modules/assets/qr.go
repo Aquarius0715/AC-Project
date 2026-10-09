@@ -56,7 +56,7 @@ type qrOps struct{ a QrAssignments }
 // @Tags			units
 // @Accept			json
 // @Produce		json
-// @Param			request	body		QrInput	true	"input"
+// @Param			code	path		string	true	"input field code"
 // @Success		200		{object}	ops.Envelope{data=QrResolution}
 // @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -67,7 +67,7 @@ type qrOps struct{ a QrAssignments }
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/units.resolveQr [post]
+// @Router			/v1/units/qr/{code} [get]
 func (q qrOps) resolve(ctx context.Context, c *ops.Call, in *QrInput) (QrResolution, error) {
 	return resolveQr(ctx, c, in, q.a)
 }

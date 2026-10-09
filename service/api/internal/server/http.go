@@ -23,7 +23,7 @@ const requestTimeout = 30 * time.Second
 // newEcho assembles the HTTP layer following the Echo guide: one Echo instance, the Recover / RequestID /
 // RequestLogger / ContextTimeout middleware chain, a versioned route group, and a central HTTPErrorHandler that
 // turns every returned error into the DomainError body of service-contracts.ts.
-func newEcho(reg *ops.Registry, m *db.TxManager, a *auth.Authenticator, logger *slog.Logger, internalToken string, servesIdentity bool) *echo.Echo {
+func newEcho(reg *ops.Registry, m *db.TxManager, a *auth.Authenticator, logger *slog.Logger, internalToken string, servesIdentity bool) (*echo.Echo, error) {
 	e := echo.New()
 	if logger != nil {
 		e.Logger = logger
@@ -63,7 +63,10 @@ func newEcho(reg *ops.Registry, m *db.TxManager, a *auth.Authenticator, logger *
 	}
 	v1 := e.Group("/v1", a.Middleware())
 	v1.POST("/ops/:operation", reg.Dispatch)
-	return e
+	if err := reg.MountREST(v1); err != nil { // the catalog's REST routes of the served operations (IR222)
+		return nil, err
+	}
+	return e, nil
 }
 
 // principalHandler is identity-api's internal principal endpoint: it resolves a token subject's membership from the

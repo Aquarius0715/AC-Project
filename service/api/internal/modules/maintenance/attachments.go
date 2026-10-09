@@ -92,7 +92,9 @@ func (in *AddInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target report, read reports.get)"
-// @Param			request				body		AddInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			reportId			path		string		true	"input field reportId"
+// @Param			request				body		AddInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=AttachmentRef}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -103,7 +105,7 @@ func (in *AddInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/attachments.add [post]
+// @Router			/v1/jobs/{jobId}/reports/{reportId}/attachments [post]
 func (m Files) add(ctx context.Context, c *ops.Call, in *AddInput) (AttachmentRef, error) {
 	draft, err := m.lockDraft(ctx, c, in.JobID, in.ReportID)
 	if err != nil {
@@ -194,7 +196,9 @@ type SignOff struct {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target report, read reports.get)"
-// @Param			request				body		SignOffInput	true	"input"
+// @Param			jobId				path		string			true	"input field jobId"
+// @Param			reportId			path		string			true	"input field reportId"
+// @Param			request				body		SignOffInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Report}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -205,7 +209,7 @@ type SignOff struct {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/reports.signOff [post]
+// @Router			/v1/jobs/{jobId}/reports/{reportId}/sign-off [post]
 func (m Files) signOff(ctx context.Context, c *ops.Call, in *SignOffInput) (Report, error) {
 	draft, err := m.lockDraft(ctx, c, in.JobID, in.ReportID)
 	if err != nil {
@@ -276,18 +280,21 @@ type BlobOut struct {
 // @Tags			attachments
 // @Accept			json
 // @Produce		json
-// @Param			request	body		ContentInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=BlobOut}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			jobId			path		string	true	"input field jobId"
+// @Param			reportId		path		string	true	"input field reportId"
+// @Param			attachmentId	path		string	true	"input field attachmentId"
+// @Param			reportVersion	query		integer	false	"input field reportVersion"
+// @Success		200				{object}	ops.Envelope{data=BlobOut}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/attachments.getContent [post]
+// @Router			/v1/jobs/{jobId}/reports/{reportId}/attachments/{attachmentId}/content [get]
 func (m Files) content(ctx context.Context, c *ops.Call, in *ContentInput) (BlobOut, error) {
 	if _, err := m.Reports.get(ctx, c, &GetReportInput{JobID: in.JobID, ReportID: in.ReportID, ReportVersion: in.ReportVersion}); err != nil {
 		return BlobOut{}, err

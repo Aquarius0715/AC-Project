@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -178,6 +179,16 @@ func Register[I any, O any](r *Registry, name string, h func(context.Context, *C
 	}
 }
 
+// Operations returns the registered operations sorted by name.
+func (r *Registry) Operations() []*Operation {
+	out := make([]*Operation, 0, len(r.ops))
+	for _, o := range r.ops {
+		out = append(out, o)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Spec.Name < out[j].Spec.Name })
+	return out
+}
+
 // Registered returns the names with handlers.
 func (r *Registry) Registered() map[string]bool {
 	m := map[string]bool{}
@@ -279,25 +290,45 @@ func bodyLimit(operation string) int64 {
 	return 1 << 20
 }
 
+func correlationID(c *echo.Context) string {
+	if corr := c.Response().Header().Get(echo.HeaderXRequestID); corr != "" {
+		return corr
+	}
+	return uuid.Must(uuid.NewV7()).String()
+}
+
+// readBody reads the request body within the operation's limit.
+func readBody(c *echo.Context, operation string) ([]byte, error) {
+	limit := bodyLimit(operation)
+	body, err := io.ReadAll(io.LimitReader(c.Request().Body, limit+1))
+	if err != nil || int64(len(body)) > limit {
+		return nil, apperr.E(apperr.Validation, "error.bodyTooLarge")
+	}
+	return body, nil
+}
+
 // Dispatch is the Echo handler for POST /v1/ops/:operation.
 func (r *Registry) Dispatch(c *echo.Context) error {
-	ctx := c.Request().Context()
-	corr := c.Response().Header().Get(echo.HeaderXRequestID)
-	if corr == "" {
-		corr = uuid.Must(uuid.NewV7()).String()
-	}
+	corr := correlationID(c)
 	name := c.Param("operation")
 	op, ok := r.ops[name]
 	if !ok || !r.serves(name) { // unknown, or owned by another domain service (IR180)
 		return fail(c, apperr.E(apperr.NotFound, "error.unknownOperation"), corr)
 	}
+	body, err := readBody(c, name)
+	if err != nil {
+		return fail(c, err, corr)
+	}
+	return r.run(c, op, body, corr)
+}
+
+// run is the pipeline every route of an operation shares: decode and validate the JSON input, authorize, claim the
+// Idempotency-Key, check the expected version, run the handler in one transaction and write the ServiceResult.
+func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string) error {
+	ctx := c.Request().Context()
+	name := op.Spec.Name
 	if r.BeforeDispatch != nil {
 		r.BeforeDispatch(ctx)
-	}
-	limit := bodyLimit(name)
-	body, err := io.ReadAll(io.LimitReader(c.Request().Body, limit+1))
-	if err != nil || int64(len(body)) > limit {
-		return fail(c, apperr.E(apperr.Validation, "error.bodyTooLarge"), corr)
 	}
 	if len(bytes.TrimSpace(body)) == 0 {
 		body = []byte("{}")

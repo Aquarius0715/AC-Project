@@ -58,7 +58,7 @@ func Register(r *ops.Registry) {
 //	@Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/session.get [post]
+//	@Router			/v1/session [get]
 func sessionGet(ctx context.Context, c *ops.Call, _ *struct{}) (Session, error) {
 	p := c.Principal
 	perms := make([]string, 0, len(p.Permissions))

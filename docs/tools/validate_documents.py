@@ -103,6 +103,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.110.0 (2026-10-09): IR219; tests only; counts unchanged.
 # 0.111.0 (2026-10-09): IR220; Swagger built from handler annotations; counts unchanged.
 # 0.112.0 (2026-10-09): IR221; SCR-T04 + units.resolveQr; counts unchanged.
+# 0.113.0 (2026-10-09): IR222; operation-catalog rest_routes (219 routes) and their checks; counts unchanged.
 # 0.102.0 (2026-10-09): IR211; counts unchanged.
 # 0.101.0 (2026-10-09): IR210; counts unchanged.
 # 0.100.0 (2026-10-09): IR209; counts unchanged.
@@ -220,6 +221,44 @@ for name in ['telemetry.series','telemetry.summary','automations.simulate','noti
         fail('Read operation marked write '+name)
 if opmap['offsets.preview']['mode'] != 'write':
     fail('Quote snapshot must be a write')
+# IR222 REST routes: "METHOD /v1/path" entries joined by ";", path parameters named after input contract fields
+# (a dotted name addresses a field of a nested object), an optional "[field=value]" fixes one input field.
+REST_ROUTE = re.compile(r'^(GET|POST|PUT|PATCH|DELETE) (/v1(?:/(?:[a-z0-9]+(?:-[a-z0-9]+)*|\{[A-Za-z]\w*(?:\.[A-Za-z]\w*)?\}))+)(?: \[([A-Za-z]\w*)=([a-z_]+)\])?$')
+def contract_fields(contract):
+    contract = contract.strip()
+    if not contract.startswith('{'):
+        named = re.search(r'^export type ' + re.escape(contract) + r'\s*=\s*\{(.*?)\};', types, re.S | re.M)
+        if not named:
+            return None
+        contract = '{' + named.group(1) + '}'
+    return set(re.findall(r'[{;&]\s*([A-Za-z]\w*)\??:', contract))
+rest_shapes = {}
+for row in operations:
+    name, entries = row['operation'], row.get('rest_routes', '')
+    if not entries:
+        fail('Missing REST route '+name)
+        continue
+    known = contract_fields(row['input_contract'])
+    for entry in entries.split(';'):
+        route = REST_ROUTE.match(entry)
+        if not route:
+            fail(f'Malformed REST route {name}: {entry}')
+            continue
+        method, path, fixed, _ = route.groups()
+        if (method == 'GET' and row['mode'] != 'read') or (method == 'DELETE' and row['mode'] != 'write'):
+            fail(f'REST method does not fit the mode {name}: {entry}')
+        shape = (method, re.sub(r'\{[^}]+\}', '{}', path))
+        if shape in rest_shapes:
+            fail(f'Duplicate REST route {entry} ({rest_shapes[shape]} and {name})')
+        rest_shapes[shape] = name
+        for param in re.findall(r'\{([^}]+)\}', path) + ([fixed] if fixed else []):
+            if known is not None and param.split('.')[0] not in known:
+                fail(f'REST parameter outside the input contract {name}: {param}')
+    saves = {v['branch'] for v in rows('02-design/write-version-catalog.csv') if v['operation'] == name}
+    if 'id present' in saves:  # create on the collection, update on the item
+        listed = entries.split(';')
+        if not any(e.startswith('POST ') and '{' not in e for e in listed) or not any(e.startswith('PUT ') and e.endswith('/{id}') for e in listed):
+            fail('Save needs POST collection and PUT item routes '+name)
 
 screens = rows('03-uiux/screen-catalog.csv')
 unique(screens, 'screen_id', 'screen ID')
@@ -1278,7 +1317,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.112.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.113.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

@@ -47,7 +47,8 @@ func (in *ExceptionInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
-// @Param			request				body		ExceptionInput	true	"input"
+// @Param			restrictionId		path		string			true	"input field restrictionId"
+// @Param			request				body		ExceptionInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Restriction}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -58,7 +59,7 @@ func (in *ExceptionInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/restrictions.defer [post]
+// @Router			/v1/restrictions/{restrictionId}/defer [post]
 func (m Restrictions) deferRestriction(ctx context.Context, c *ops.Call, in *ExceptionInput) (Restriction, error) {
 	return m.except(ctx, c, in, "restrictions.defer", `grace_until = $2, updated_at = $3`, in.Until)
 }
@@ -74,7 +75,8 @@ func (m Restrictions) deferRestriction(ctx context.Context, c *ops.Call, in *Exc
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
-// @Param			request				body		ExceptionInput	true	"input"
+// @Param			restrictionId		path		string			true	"input field restrictionId"
+// @Param			request				body		ExceptionInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Restriction}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -85,7 +87,7 @@ func (m Restrictions) deferRestriction(ctx context.Context, c *ops.Call, in *Exc
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/restrictions.exempt [post]
+// @Router			/v1/restrictions/{restrictionId}/exempt [post]
 func (m Restrictions) exempt(ctx context.Context, c *ops.Call, in *ExceptionInput) (Restriction, error) {
 	return m.except(ctx, c, in, "restrictions.exempt", `exception_until = $2, updated_at = $3, exception_reason = $4`, in.Until, in.Reason)
 }
@@ -148,7 +150,8 @@ func exempted(x Restriction, now time.Time) bool {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
-// @Param			request				body		ReleaseInput	true	"input"
+// @Param			restrictionId		path		string			true	"input field restrictionId"
+// @Param			request				body		ReleaseInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Restriction}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -159,7 +162,7 @@ func exempted(x Restriction, now time.Time) bool {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/restrictions.release [post]
+// @Router			/v1/restrictions/{restrictionId}/release [post]
 func (m Restrictions) release(ctx context.Context, c *ops.Call, in *ReleaseInput) (Restriction, error) {
 	x, err := load(ctx, c, in.RestrictionID, true)
 	if err != nil {
@@ -221,7 +224,8 @@ func (in *OverrideInput) Validate() map[string]string {
 //	@Produce		json
 //	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 //	@Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
-//	@Param			request				body		OverrideInput	true	"input"
+//	@Param			restrictionId		path		string			true	"input field restrictionId"
+//	@Param			request				body		OverrideInput	true	"input; the path parameters come from the route"
 //	@Success		200					{object}	ops.Envelope{data=ReleaseView}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -232,7 +236,7 @@ func (in *OverrideInput) Validate() map[string]string {
 //	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/restrictions.override [post]
+//	@Router			/v1/restrictions/{restrictionId}/override [post]
 func (m Restrictions) override(ctx context.Context, c *ops.Call, in *OverrideInput) (ReleaseView, error) {
 	x, err := load(ctx, c, in.RestrictionID, true)
 	if err != nil {
@@ -335,7 +339,8 @@ type observation struct {
 //	@Produce		json
 //	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 //	@Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
-//	@Param			request				body		ReconcileInput	true	"input"
+//	@Param			restrictionId		path		string			true	"input field restrictionId"
+//	@Param			request				body		ReconcileInput	true	"input; the path parameters come from the route"
 //	@Success		200					{object}	ops.Envelope
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -346,7 +351,7 @@ type observation struct {
 //	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/restrictions.reconcile [post]
+//	@Router			/v1/restrictions/{restrictionId}/reconcile [post]
 func (m Restrictions) reconcile(ctx context.Context, c *ops.Call, in *ReconcileInput) (any, error) {
 	x, err := lockCurrent(ctx, c, in.RestrictionID)
 	if err != nil {
@@ -488,7 +493,8 @@ func (in *RetryInput) Validate() map[string]string {
 //	@Produce		json
 //	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 //	@Param			X-Expected-Version	header		integer		true	"all: required (target restrictions, read restrictions.get)"
-//	@Param			request				body		RetryInput	true	"input"
+//	@Param			restrictionId		path		string		true	"input field restrictionId"
+//	@Param			request				body		RetryInput	true	"input; the path parameters come from the route"
 //	@Success		200					{object}	ops.Envelope
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -499,7 +505,7 @@ func (in *RetryInput) Validate() map[string]string {
 //	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/restrictions.retry [post]
+//	@Router			/v1/restrictions/{restrictionId}/retry [post]
 func (m Restrictions) retry(ctx context.Context, c *ops.Call, in *RetryInput) (any, error) {
 	x, err := lockCurrent(ctx, c, in.RestrictionID)
 	if err != nil {

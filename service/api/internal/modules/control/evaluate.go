@@ -609,7 +609,7 @@ func checkTick(c *ops.Call, in *EvaluationInput) error {
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/automations.simulate [post]
+// @Router			/v1/automations/simulate [post]
 func (m Automations) simulate(ctx context.Context, c *ops.Call, in *EvaluationInput) (Result, error) {
 	if err := checkTick(c, in); err != nil {
 		return Result{}, err
@@ -641,7 +641,7 @@ func (m Automations) simulate(ctx context.Context, c *ops.Call, in *EvaluationIn
 //	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/automations.fire [post]
+//	@Router			/v1/automations/fire [post]
 func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput) (Result, error) {
 	norm, _ := json.Marshal(struct {
 		O time.Time

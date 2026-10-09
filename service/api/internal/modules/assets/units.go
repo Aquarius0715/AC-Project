@@ -250,18 +250,30 @@ func (m *Module) enrich(ctx context.Context, c *ops.Call, units []Unit) error {
 // @Tags			units
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=UnitPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor				query		string		false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit				query		integer		false	"page size 1–100, default 25"
+// @Param			sort				query		string		false	"field:direction — fields id,createdAt,updatedAt; default id asc"
+// @Param			customerId			query		string		false	"filter → Customer.organizationId = ACUnit.customerOrgId"
+// @Param			propertyId			query		string		false	"filter → propertyId"
+// @Param			status				query		string		false	"filter → connection"
+// @Param			spaceId				query		string		false	"filter"
+// @Param			includeDescendants	query		boolean		false	"filter"
+// @Param			connections			query		[]string	false	"filter (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+// @Param			powerState			query		string		false	"filter → SR27 effectivePowerState (not observedState.power)"
+// @Param			unitIds				query		[]string	false	"filter → id in unitIds (empty array returns zero) (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+// @Param			organizationId		query		string		false	"filter → ACUnit.customerOrgId"
+// @Param			unassignedOnly		query		boolean		false	"filter → true => spaceId=null (combined with spaceId is VALIDATION)"
+// @Success		200					{object}	ops.Envelope{data=UnitPage}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/units.list [post]
+// @Router			/v1/units [get]
 func (m *Module) unitsList(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Unit], error) {
 	var f UnitFilters
 	if len(in.Filters) > 0 {
@@ -377,7 +389,8 @@ func (in *UnitGetInput) Validate() map[string]string {
 // @Tags			units
 // @Accept			json
 // @Produce		json
-// @Param			request	body		UnitGetInput	true	"input"
+// @Param			id		path		string	true	"input field id"
+// @Param			jobId	query		string	false	"input field jobId"
 // @Success		200		{object}	ops.Envelope{data=UnitDetail}
 // @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -388,7 +401,7 @@ func (in *UnitGetInput) Validate() map[string]string {
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/units.get [post]
+// @Router			/v1/units/{id} [get]
 func (m *Module) unitsGet(ctx context.Context, c *ops.Call, in *UnitGetInput) (UnitDetail, error) {
 	var args []any
 	args = append(args, in.ID)

@@ -142,7 +142,7 @@ func sameSet(a, b []uuid.UUID) bool {
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/restrictions.schedule [post]
+// @Router			/v1/restrictions [post]
 func (m Restrictions) schedule(ctx context.Context, c *ops.Call, in *ScheduleInput) (Restriction, error) {
 	var (
 		version              int
@@ -312,7 +312,8 @@ func causesPaid(ctx context.Context, c *ops.Call, id uuid.UUID) (bool, error) {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target restrictions, read restrictions.get)"
-// @Param			request				body		ExecuteInput	true	"input"
+// @Param			restrictionId		path		string			true	"input field restrictionId"
+// @Param			request				body		ExecuteInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Restriction}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -323,7 +324,7 @@ func causesPaid(ctx context.Context, c *ops.Call, id uuid.UUID) (bool, error) {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/restrictions.execute [post]
+// @Router			/v1/restrictions/{restrictionId}/execute [post]
 func (m Restrictions) execute(ctx context.Context, c *ops.Call, in *ExecuteInput) (Restriction, error) {
 	x, err := lockCurrent(ctx, c, in.RestrictionID)
 	if err != nil {
@@ -465,7 +466,8 @@ func (in *CancelInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target restrictions, read restrictions.get)"
-// @Param			request				body		CancelInput	true	"input"
+// @Param			restrictionId		path		string		true	"input field restrictionId"
+// @Param			request				body		CancelInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Restriction}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -476,7 +478,7 @@ func (in *CancelInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/restrictions.cancel [post]
+// @Router			/v1/restrictions/{restrictionId}/cancel [post]
 func (m Restrictions) cancel(ctx context.Context, c *ops.Call, in *CancelInput) (Restriction, error) {
 	x, err := load(ctx, c, in.RestrictionID, true)
 	if err != nil {

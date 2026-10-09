@@ -150,7 +150,7 @@ func (in *SimulateInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/payments.simulate [post]
+// @Router			/v1/payments/simulate [post]
 func (m Billing) simulate(ctx context.Context, c *ops.Call, in *SimulateInput) (any, error) {
 	if in.Event == "initiate" || in.Event == "instructions" {
 		inv, err := m.loadInvoice(ctx, c, *in.InvoiceID, true)
@@ -296,7 +296,7 @@ func amountOK(in *ConfirmInput, inv Invoice) error {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/payments.confirm [post]
+// @Router			/v1/payments/confirm [post]
 func (m Billing) confirm(ctx context.Context, c *ops.Call, in *ConfirmInput) (Payment, error) {
 	if in.PaymentID == nil {
 		return Payment{}, apperr.Fields(map[string]string{"paymentId": "error.required"})
@@ -352,7 +352,7 @@ func (m Billing) confirm(ctx context.Context, c *ops.Call, in *ConfirmInput) (Pa
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/payments.recordManual [post]
+// @Router			/v1/payments/manual [post]
 func (m Billing) recordManual(ctx context.Context, c *ops.Call, in *ConfirmInput) (Payment, error) {
 	if in.InvoiceID == nil {
 		return Payment{}, apperr.Fields(map[string]string{"invoiceId": "error.required"})

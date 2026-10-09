@@ -164,18 +164,26 @@ func (in *EligibleInput) Validate() map[string]string {
 // @Tags			members
 // @Accept			json
 // @Produce		json
-// @Param			request	body		EligibleInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=MemberPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			jobId			query		string	false	"input field jobId"
+// @Param			startAt			query		string	false	"input field startAt"
+// @Param			endAt			query		string	false	"input field endAt"
+// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit			query		integer	false	"page size 1–100, default 25"
+// @Param			sort			query		string	false	"field:direction — fields id,createdAt,updatedAt; default id asc"
+// @Param			organizationId	query		string	false	"filter → Membership.organizationId"
+// @Param			qualification	query		string	false	"filter → matching valid Membership.qualifications[].code (SR13)"
+// @Param			activeOnly		query		boolean	false	"filter → true => validFrom<=now<validUntil (null end infinite)"
+// @Success		200				{object}	ops.Envelope{data=MemberPage}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/members.eligible [post]
+// @Router			/v1/members/eligible [get]
 func (m Workforce) eligible(ctx context.Context, c *ops.Call, in *EligibleInput) (paging.Page[identity.Member], error) {
 	var unit uuid.UUID
 	var contractor *uuid.UUID
@@ -269,18 +277,24 @@ type Capacity struct {
 // @Tags			members
 // @Accept			json
 // @Produce		json
-// @Param			request	body		CapacityInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=CapacityPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			date			query		string	false	"input field date"
+// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit			query		integer	false	"page size 1–100, default 25"
+// @Param			sort			query		string	false	"field:direction — fields id; default id asc"
+// @Param			organizationId	query		string	false	"filter → Membership.organizationId"
+// @Param			qualification	query		string	false	"filter → matching valid Membership.qualifications[].code (SR13)"
+// @Param			activeOnly		query		boolean	false	"filter → true => validFrom<=now<validUntil (null end infinite)"
+// @Success		200				{object}	ops.Envelope{data=CapacityPage}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/members.capacity [post]
+// @Router			/v1/members/capacity [get]
 func (m Workforce) capacity(ctx context.Context, c *ops.Call, in *CapacityInput) (paging.Page[Capacity], error) {
 	day, _ := time.ParseInLocation("2006-01-02", in.Date, kualaLumpur)
 	work := Slot{day.Add(9 * time.Hour).UTC(), day.Add(17 * time.Hour).UTC()}
@@ -450,7 +464,7 @@ type Unavailability struct {
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/members.setUnavailability [post]
+// @Router			/v1/members/unavailability [post]
 func (m Workforce) setUnavailability(ctx context.Context, c *ops.Call, in *UnavailabilityInput) (Unavailability, error) {
 	org := c.Principal.OrgID
 	if in.MembershipID != nil {

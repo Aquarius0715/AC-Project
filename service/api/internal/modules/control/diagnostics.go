@@ -120,7 +120,7 @@ func (in *RunInput) Validate() map[string]string {
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/diagnosticRuns.create [post]
+// @Router			/v1/diagnostic-runs [post]
 func (m Diagnostics) create(ctx context.Context, c *ops.Call, in *RunInput) (Run, error) {
 	if err := m.Commands.Access.TechnicianJob(ctx, c, in.JobID, in.UnitID); err != nil {
 		return Run{}, err
@@ -209,18 +209,18 @@ func (in *RunIDInput) Validate() map[string]string {
 // @Tags			diagnosticRuns
 // @Accept			json
 // @Produce		json
-// @Param			request	body		RunIDInput	true	"input"
-// @Success		200		{object}	ops.Envelope{data=Run}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			diagnosticRunId	path		string	true	"input field diagnosticRunId"
+// @Success		200				{object}	ops.Envelope{data=Run}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/diagnosticRuns.get [post]
+// @Router			/v1/diagnostic-runs/{diagnosticRunId} [get]
 func (m Diagnostics) get(ctx context.Context, c *ops.Call, in *RunIDInput) (Run, error) {
 	x, err := scanRun(c.Tx.QueryRow(ctx, "SELECT "+runCols+" FROM control.diagnostic_runs r WHERE r.id = $1", in.DiagnosticRunID))
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -262,7 +262,11 @@ func (in *RunListInput) Validate() map[string]string {
 // @Tags			diagnosticRuns
 // @Accept			json
 // @Produce		json
-// @Param			request	body		RunListInput	true	"input"
+// @Param			unitId	query		string	false	"input field unitId"
+// @Param			jobId	query		string	false	"input field jobId"
+// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit	query		integer	false	"page size 1–100, default 25"
+// @Param			sort	query		string	false	"field:direction — fields id,createdAt; default createdAt desc;id asc"
 // @Success		200		{object}	ops.Envelope{data=RunPage}
 // @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -273,7 +277,7 @@ func (in *RunListInput) Validate() map[string]string {
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/diagnosticRuns.list [post]
+// @Router			/v1/diagnostic-runs [get]
 func (m Diagnostics) list(ctx context.Context, c *ops.Call, in *RunListInput) (paging.Page[Run], error) {
 	if err := paging.NoFilters(in.Query, "query.filters"); err != nil {
 		return paging.Page[Run]{}, err

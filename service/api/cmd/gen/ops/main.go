@@ -10,7 +10,9 @@ import (
 	"go/format"
 	"log"
 	"os"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -35,6 +37,70 @@ func read(path string) []map[string]string {
 	return out
 }
 
+// route is one rest_routes entry: "METHOD /v1/path" with an optional " [field=value]".
+var route = regexp.MustCompile(`^(GET|POST|PUT|PATCH|DELETE) (/v1/\S+)(?: \[([A-Za-z]\w*)=([a-z_]+)\])?$`)
+
+func routes(op, column string) string {
+	if column == "" {
+		log.Fatalf("%s has no rest_routes", op)
+	}
+	var out []string
+	for _, entry := range strings.Split(column, ";") {
+		m := route.FindStringSubmatch(entry)
+		if m == nil {
+			log.Fatalf("%s: malformed REST route %q", op, entry)
+		}
+		r := fmt.Sprintf("{Method: %q, Path: %q", m[1], m[2])
+		if m[3] != "" {
+			r += fmt.Sprintf(", FixedField: %q, FixedValue: %q", m[3], m[4])
+		}
+		out = append(out, r+"}")
+	}
+	return strings.Join(out, ", ")
+}
+
+func quoted(list []string) string {
+	if len(list) == 0 {
+		return "nil"
+	}
+	q := make([]string, len(list))
+	for i, s := range list {
+		q[i] = strconv.Quote(s)
+	}
+	return "[]string{" + strings.Join(q, ", ") + "}"
+}
+
+// filterKinds reads Query.filters of service-contracts.ts: arrays are lists of strings, boolean and number keep
+// their kind, everything else (IDs, instants, enums) is a string.
+func filterKinds(path string) map[string]string {
+	src, err := os.ReadFile(path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	m := regexp.MustCompile(`filters\?:\{(.*?)\}\};`).FindSubmatch(src)
+	if m == nil {
+		log.Fatal("service-contracts.ts: Query.filters not found")
+	}
+	kinds := map[string]string{}
+	for _, field := range strings.Split(string(m[1]), ";") {
+		name, typ, ok := strings.Cut(field, "?:")
+		if !ok {
+			log.Fatalf("service-contracts.ts: unexpected filter %q", field)
+		}
+		switch {
+		case strings.HasSuffix(typ, "[]"):
+			kinds[name] = "{List: true}"
+		case typ == "boolean":
+			kinds[name] = "{Kind: KindBool}"
+		case typ == "number":
+			kinds[name] = "{Kind: KindNumber}"
+		default:
+			kinds[name] = "{}"
+		}
+	}
+	return kinds
+}
+
 func main() {
 	docs := flag.String("docs", "../../docs/02-design", "docs/02-design directory")
 	out := flag.String("out", "internal/ops/catalog_gen.go", "output file")
@@ -48,6 +114,14 @@ func main() {
 	modules := map[string]string{}
 	for _, p := range read(*docs + "/operation-persistence-map.csv") {
 		modules[p["operation"]] = p["module"]
+	}
+	filters := map[string][]string{}
+	for _, q := range read(*docs + "/query-catalog.csv") {
+		for _, f := range strings.Split(q["allowed_filters"], ",") {
+			if f = strings.TrimSpace(f); f != "" {
+				filters[q["operation"]] = append(filters[q["operation"]], f)
+			}
+		}
 	}
 	sort.Slice(ops, func(i, j int) bool { return ops[i]["operation"] < ops[j]["operation"] })
 
@@ -63,8 +137,20 @@ func main() {
 		if modules[name] == "" {
 			log.Fatalf("%s missing in operation-persistence-map.csv", name)
 		}
-		fmt.Fprintf(&b, "\t{Name: %q, Mode: %s, Module: %q, Authorization: %q, Versions: []VersionRule{%s}, DesignIDs: %q},\n",
-			name, mode, modules[name], strings.TrimSpace(o["authorization"]), strings.Join(versions[name], ", "), o["design_ids"])
+		fmt.Fprintf(&b, "\t{Name: %q, Mode: %s, Module: %q, Authorization: %q, Versions: []VersionRule{%s}, DesignIDs: %q, Routes: []Route{%s}, Filters: %s},\n",
+			name, mode, modules[name], strings.TrimSpace(o["authorization"]), strings.Join(versions[name], ", "), o["design_ids"], routes(name, o["rest_routes"]), quoted(filters[name]))
+	}
+	b.WriteString("}\n\n")
+	b.WriteString("// FilterKinds types the Query.filters fields of service-contracts.ts as query parameters (IR222); a filter\n// missing here is a string. Lists repeat the parameter or separate the values with commas.\n")
+	b.WriteString("var FilterKinds = map[string]FilterKind{\n")
+	kinds := filterKinds(*docs + "/service-contracts.ts")
+	names := make([]string, 0, len(kinds))
+	for n := range kinds {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		fmt.Fprintf(&b, "\t%q: %s,\n", n, kinds[n])
 	}
 	b.WriteString("}\n")
 	src, err := format.Source(b.Bytes())

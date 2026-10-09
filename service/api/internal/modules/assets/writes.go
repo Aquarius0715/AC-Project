@@ -155,20 +155,19 @@ func siblingName(ctx context.Context, c *ops.Call, kind string, id uuid.UUID) er
 // @Tags			properties
 // @Accept			json
 // @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			false	"id omitted: omit (target none, read none); id present: required (target properties, read properties.list)"
-// @Param			request				body		PropertySave	true	"input"
-// @Success		200					{object}	ops.Envelope{data=Property}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		PropertySave	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Property}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/properties.save [post]
+// @Router			/v1/properties [post]
 func (m *Module) propertiesSave(ctx context.Context, c *ops.Call, in *PropertySave) (Property, error) {
 	if in.ID == nil {
 		if err := m.customerActive(ctx, c, in.CustomerOrgID); err != nil {
@@ -304,20 +303,19 @@ func (m *Module) checkParent(ctx context.Context, c *ops.Call, self *uuid.UUID, 
 // @Tags			spaces
 // @Accept			json
 // @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		false	"id omitted: omit (target none, read none); id present: required (target spaces, read spaces.list)"
-// @Param			request				body		SpaceSave	true	"input"
-// @Success		200					{object}	ops.Envelope{data=Space}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		SpaceSave	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Space}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/spaces.save [post]
+// @Router			/v1/spaces [post]
 func (m *Module) spacesSave(ctx context.Context, c *ops.Call, in *SpaceSave) (Space, error) {
 	if err := m.activeProperty(ctx, c, in.PropertyID); err != nil {
 		return Space{}, err
@@ -432,20 +430,19 @@ func (in *UnitSave) Validate() map[string]string {
 // @Tags			units
 // @Accept			json
 // @Produce		json
-// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer		false	"id omitted: omit (target none, read none); id present: required (target units, read units.list)"
-// @Param			request				body		UnitSave	true	"input"
-// @Success		200					{object}	ops.Envelope{data=Unit}
-// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+// @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			request			body		UnitSave	true	"input"
+// @Success		200				{object}	ops.Envelope{data=Unit}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/units.save [post]
+// @Router			/v1/units [post]
 func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (Unit, error) {
 	if in.InstalledAt != nil && in.InstalledAt.After(c.Now) {
 		return Unit{}, apperr.Fields(map[string]string{"installedAt": "error.future"})
@@ -597,7 +594,8 @@ type ArchivedResource struct {
 //	@Produce		json
 //	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 //	@Param			X-Expected-Version	header		integer			true	"all: required (target properties, read properties.list)"
-//	@Param			request				body		ArchiveInput	true	"input"
+//	@Param			id					path		string			true	"input field id"
+//	@Param			request				body		ArchiveInput	true	"input; the path parameters come from the route"
 //	@Success		200					{object}	ops.Envelope{data=ArchivedResource}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -608,7 +606,7 @@ type ArchivedResource struct {
 //	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/properties.archive [post]
+//	@Router			/v1/properties/{id}/archive [post]
 func (m *Module) propertiesArchive(ctx context.Context, c *ops.Call, in *ArchiveInput) (ArchivedResource, error) {
 	return m.archive("property", "assets.properties",
 		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE property_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM assets.spaces WHERE property_id = $1 AND NOT archived)`)(ctx, c, in)
@@ -627,7 +625,8 @@ func (m *Module) propertiesArchive(ctx context.Context, c *ops.Call, in *Archive
 //	@Produce		json
 //	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 //	@Param			X-Expected-Version	header		integer			true	"all: required (target spaces, read spaces.list)"
-//	@Param			request				body		ArchiveInput	true	"input"
+//	@Param			id					path		string			true	"input field id"
+//	@Param			request				body		ArchiveInput	true	"input; the path parameters come from the route"
 //	@Success		200					{object}	ops.Envelope{data=ArchivedResource}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -638,7 +637,7 @@ func (m *Module) propertiesArchive(ctx context.Context, c *ops.Call, in *Archive
 //	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/spaces.archive [post]
+//	@Router			/v1/spaces/{id}/archive [post]
 func (m *Module) spacesArchive(ctx context.Context, c *ops.Call, in *ArchiveInput) (ArchivedResource, error) {
 	return m.archive("space", "assets.spaces",
 		`SELECT EXISTS (SELECT 1 FROM assets.units WHERE space_id = $1 AND NOT archived) OR EXISTS (SELECT 1 FROM assets.spaces WHERE parent_space_id = $1 AND NOT archived)`)(ctx, c, in)
@@ -717,7 +716,8 @@ func (m *Module) UnitInfo(ctx context.Context, c *ops.Call, unit uuid.UUID) (dev
 //	@Produce		json
 //	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 //	@Param			X-Expected-Version	header		integer			true	"all: required (target units, read units.get)"
-//	@Param			request				body		ArchiveInput	true	"input"
+//	@Param			id					path		string			true	"input field id"
+//	@Param			request				body		ArchiveInput	true	"input; the path parameters come from the route"
 //	@Success		200					{object}	ops.Envelope{data=ArchivedResource}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -728,7 +728,7 @@ func (m *Module) UnitInfo(ctx context.Context, c *ops.Call, unit uuid.UUID) (dev
 //	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/units.archive [post]
+//	@Router			/v1/units/{id}/archive [post]
 func (m *Module) unitsArchive(ctx context.Context, c *ops.Call, in *ArchiveInput) (ArchivedResource, error) {
 	for _, a := range m.Active {
 		busy, err := a.UnitActive(ctx, c, in.ID)

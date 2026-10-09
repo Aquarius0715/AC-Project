@@ -52,18 +52,19 @@ type Result struct {
 //	@Tags			writes
 //	@Accept			json
 //	@Produce		json
-//	@Param			request	body		Input	true	"input"
-//	@Success		200		{object}	ops.Envelope{data=Result}
-//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Param			idempotencyKey	path		string	true	"input field idempotencyKey"
+//	@Param			operation		query		string	false	"input field operation"
+//	@Success		200				{object}	ops.Envelope{data=Result}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/writes.getResult [post]
+//	@Router			/v1/writes/{idempotencyKey} [get]
 func get(ctx context.Context, c *ops.Call, in *Input) (Result, error) {
 	if _, ok := ops.SpecByName()[in.Operation]; !ok {
 		return Result{}, apperr.Fields(map[string]string{"operation": "error.invalid"})
@@ -136,7 +137,7 @@ type ResetPreview struct {
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/auth.previewPasswordReset [post]
+// @Router			/v1/auth/password-reset-preview [post]
 func previewReset(_ context.Context, _ *ops.Call, _ *ResetInput) (ResetPreview, error) {
 	return ResetPreview{MessageKey: "auth.reset_generic", DeliveryState: "preview"}, nil
 }

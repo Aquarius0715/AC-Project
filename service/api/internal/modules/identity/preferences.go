@@ -88,7 +88,7 @@ func (in *PreferencesInput) Validate() map[string]string {
 //	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/preferences.update [post]
+//	@Router			/v1/preferences [put]
 func updatePreferences(ctx context.Context, c *ops.Call, in *PreferencesInput) (Preferences, error) {
 	if in.MonthlyReportEmail != nil && c.Principal.Role != "client" {
 		return Preferences{}, apperr.Fields(map[string]string{"monthlyReportEmail": "error.notAllowed"})
@@ -161,7 +161,7 @@ func loadConsent(ctx context.Context, c *ops.Call, purpose string, lock bool) (C
 // @Tags			consents
 // @Accept			json
 // @Produce		json
-// @Param			request	body		ConsentGetInput	true	"input"
+// @Param			purpose	path		string	true	"input field purpose"
 // @Success		200		{object}	ops.Envelope{data=Consent}
 // @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
@@ -172,7 +172,7 @@ func loadConsent(ctx context.Context, c *ops.Call, purpose string, lock bool) (C
 // @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/consents.get [post]
+// @Router			/v1/consents/{purpose} [get]
 func getConsent(ctx context.Context, c *ops.Call, in *ConsentGetInput) (Consent, error) {
 	return loadConsent(ctx, c, in.Purpose, false)
 }
@@ -205,7 +205,8 @@ func (in *ConsentUpdateInput) Validate() map[string]string {
 //	@Produce		json
 //	@Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 //	@Param			X-Expected-Version	header		integer				true	"all: required (target consent, read consents.get)"
-//	@Param			request				body		ConsentUpdateInput	true	"input"
+//	@Param			purpose				path		string				true	"input field purpose"
+//	@Param			request				body		ConsentUpdateInput	true	"input; the path parameters come from the route"
 //	@Success		200					{object}	ops.Envelope{data=Consent}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -216,7 +217,7 @@ func (in *ConsentUpdateInput) Validate() map[string]string {
 //	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/consents.update [post]
+//	@Router			/v1/consents/{purpose} [put]
 func updateConsent(ctx context.Context, c *ops.Call, in *ConsentUpdateInput) (Consent, error) {
 	x, err := loadConsent(ctx, c, in.Purpose, true)
 	if err != nil {
@@ -277,7 +278,7 @@ func RegisterPreferences(r *ops.Registry) {
 //	@Failure		503	{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504	{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/preferences.get [post]
+//	@Router			/v1/preferences [get]
 func preferencesGet(ctx context.Context, c *ops.Call, _ *struct{}) (Preferences, error) {
 	return loadPreferences(ctx, c)
 }

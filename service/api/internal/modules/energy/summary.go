@@ -217,18 +217,22 @@ func (in *SummaryInput) Validate() map[string]string {
 //	@Tags			energy
 //	@Accept			json
 //	@Produce		json
-//	@Param			request	body		SummaryInput	true	"input"
-//	@Success		200		{object}	ops.Envelope{data=Summary}
-//	@Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+//	@Param			from			query		string		false	"input field from"
+//	@Param			to				query		string		false	"input field to"
+//	@Param			unitIds			query		[]string	false	"input field unitIds (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+//	@Param			baselineId		query		string		false	"input field baselineId"
+//	@Param			tariffVersion	query		string		false	"input field tariffVersion"
+//	@Success		200				{object}	ops.Envelope{data=Summary}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/energy.summary [post]
+//	@Router			/v1/energy/summary [get]
 func summary(ctx context.Context, c *ops.Call, in *SummaryInput) (Summary, error) {
 	if c.Principal.Role == "client" {
 		var mine int

@@ -160,7 +160,7 @@ func (in *SubmitCertInput) Validate() map[string]string {
 // @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/certificates.submit [post]
+// @Router			/v1/certificates [post]
 func (m Certificates) submit(ctx context.Context, c *ops.Call, in *SubmitCertInput) (Certificate, error) {
 	t, found, err := m.Delivery.Directory.Technician(ctx, c, in.MembershipID)
 	if err != nil {
@@ -238,7 +238,8 @@ func (in *VerifyInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target certificate, read certificates.list)"
-// @Param			request				body		VerifyInput	true	"input"
+// @Param			certificateId		path		string		true	"input field certificateId"
+// @Param			request				body		VerifyInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Certificate}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -249,7 +250,7 @@ func (in *VerifyInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/certificates.verify [post]
+// @Router			/v1/certificates/{certificateId}/verify [post]
 func (m Certificates) verify(ctx context.Context, c *ops.Call, in *VerifyInput) (Certificate, error) {
 	x, stored, err := m.lock(ctx, c, in.CertificateID)
 	if err != nil {
@@ -310,7 +311,8 @@ func (in *TrainingInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target certificate, read certificates.list)"
-// @Param			request				body		TrainingInput	true	"input"
+// @Param			certificateId		path		string			true	"input field certificateId"
+// @Param			request				body		TrainingInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Certificate}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -321,7 +323,7 @@ func (in *TrainingInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/certificates.requestTraining [post]
+// @Router			/v1/certificates/{certificateId}/request-training [post]
 func (m Certificates) requestTraining(ctx context.Context, c *ops.Call, in *TrainingInput) (Certificate, error) {
 	x, _, err := m.lock(ctx, c, in.CertificateID)
 	if err != nil {
@@ -351,18 +353,25 @@ func (m Certificates) requestTraining(ctx context.Context, c *ops.Call, in *Trai
 // @Tags			certificates
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=CertificatePage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor				query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit				query		integer	false	"page size 1–100, default 25"
+// @Param			sort				query		string	false	"field:direction — fields id,expiresAt,status; default expiresAt asc;id asc"
+// @Param			organizationId		query		string	false	"filter → organizationId"
+// @Param			membershipId		query		string	false	"filter → membershipId"
+// @Param			code				query		string	false	"filter → code (QualificationCode or other)"
+// @Param			status				query		string	false	"filter → status"
+// @Param			expiringWithinDays	query		number	false	"filter → expiresAt within N days of now"
+// @Success		200					{object}	ops.Envelope{data=CertificatePage}
+// @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/certificates.list [post]
+// @Router			/v1/certificates [get]
 func (m Certificates) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Certificate], error) {
 	var f struct {
 		OrganizationID     *uuid.UUID `json:"organizationId,omitempty"`
@@ -445,18 +454,22 @@ type PartItem struct {
 // @Tags			parts
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=PartItemPage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor			query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit			query		integer	false	"page size 1–100, default 25"
+// @Param			sort			query		string	false	"field:direction — fields id,name; default name asc;id asc"
+// @Param			search			query		string	false	"filter → code or name contains"
+// @Param			membershipId	query		string	false	"filter → van stock of that technician listed first"
+// @Success		200				{object}	ops.Envelope{data=PartItemPage}
+// @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/parts.list [post]
+// @Router			/v1/parts [get]
 func (m Certificates) parts(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[PartItem], error) {
 	var f struct {
 		Search       *string    `json:"search,omitempty"`       // code or name contains, case-insensitive

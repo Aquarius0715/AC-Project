@@ -90,18 +90,28 @@ func LoadBaseline(ctx context.Context, c *ops.Call, id uuid.UUID, version *int) 
 // @Tags			baselines
 // @Accept			json
 // @Produce		json
-// @Param			request	body		paging.Query	true	"input"
-// @Success		200		{object}	ops.Envelope{data=BaselinePage}
-// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
+// @Param			cursor		query		string		false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit		query		integer		false	"page size 1–100, default 25"
+// @Param			sort		query		string		false	"field:direction — fields id,createdAt,updatedAt,periodFrom; default createdAt desc;id desc"
+// @Param			unitId		query		string		false	"filter → unitIds contains"
+// @Param			unitIds		query		[]string	false	"filter → unitIds intersection nonempty (repeat the parameter or separate values with commas; an empty value is the empty list)"	collectionFormat(multi)
+// @Param			from		query		string		false	"filter → [from,to) on period.from"
+// @Param			to			query		string		false	"filter → [from,to) on period.from"
+// @Param			customerId	query		string		false	"filter → any of unitIds belongs to the customer"
+// @Param			propertyId	query		string		false	"filter → any of unitIds is in the property"
+// @Param			method		query		string		false	"filter → method"
+// @Param			boundaryId	query		string		false	"filter → boundaryId"
+// @Success		200			{object}	ops.Envelope{data=BaselinePage}
+// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/baselines.list [post]
+// @Router			/v1/baselines [get]
 func listBaselines(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[Baseline], error) {
 	var f struct {
 		UnitID     *uuid.UUID   `json:"unitId,omitempty"`
@@ -273,20 +283,19 @@ const modeledQuality = `{"kind":"modeled","coverage":null,"expectedSlots":null,"
 //	@Tags			baselines
 //	@Accept			json
 //	@Produce		json
-//	@Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-//	@Param			X-Expected-Version	header		integer			false	"id omitted: omit (target none, read none); id present: required (target baselines, read baselines.list)"
-//	@Param			request				body		BaselineInput	true	"input"
-//	@Success		200					{object}	ops.Envelope{data=Baseline}
-//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
-//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
-//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
-//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
-//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		BaselineInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Baseline}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/baselines.save [post]
+//	@Router			/v1/baselines [post]
 func saveBaseline(ctx context.Context, c *ops.Call, in *BaselineInput) (Baseline, error) {
 	var known int
 	if err := c.Tx.QueryRow(ctx, `SELECT count(*) FROM energy.ref_units WHERE id = ANY($1) AND NOT archived`, in.UnitIDs).Scan(&known); err != nil {

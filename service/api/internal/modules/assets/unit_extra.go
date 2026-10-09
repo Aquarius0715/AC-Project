@@ -55,9 +55,10 @@ type DeletedResource struct {
 //	@Tags			units
 //	@Accept			json
 //	@Produce		json
-//	@Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-//	@Param			X-Expected-Version	header		integer		true	"all: required (target units, read units.get)"
-//	@Param			request				body		DeleteInput	true	"input"
+//	@Param			Idempotency-Key		header		string	true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer	true	"all: required (target units, read units.get)"
+//	@Param			id					path		string	true	"input field id"
+//	@Param			reason				query		string	false	"input field reason"
 //	@Success		200					{object}	ops.Envelope{data=DeletedResource}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -68,7 +69,7 @@ type DeletedResource struct {
 //	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/units.delete [post]
+//	@Router			/v1/units/{id} [delete]
 func (m *Module) unitsDelete(ctx context.Context, c *ops.Call, in *DeleteInput) (DeletedResource, error) {
 	var v int
 	err := c.Tx.QueryRow(ctx, `SELECT version FROM assets.units WHERE id = $1 FOR UPDATE`, in.ID).Scan(&v)
@@ -140,7 +141,8 @@ func (in *SetPoliciesInput) Validate() map[string]string {
 //	@Produce		json
 //	@Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 //	@Param			X-Expected-Version	header		integer				true	"all: required (target units, read units.get)"
-//	@Param			request				body		SetPoliciesInput	true	"input"
+//	@Param			unitId				path		string				true	"input field unitId"
+//	@Param			request				body		SetPoliciesInput	true	"input; the path parameters come from the route"
 //	@Success		200					{object}	ops.Envelope{data=Unit}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -151,7 +153,7 @@ func (in *SetPoliciesInput) Validate() map[string]string {
 //	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
-//	@Router			/v1/ops/units.setAlertPolicies [post]
+//	@Router			/v1/units/{unitId}/alert-policies [put]
 func (m *Module) unitsSetAlertPolicies(ctx context.Context, c *ops.Call, in *SetPoliciesInput) (Unit, error) {
 	var org uuid.UUID
 	var customerID *uuid.UUID

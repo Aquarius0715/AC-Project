@@ -67,7 +67,7 @@ The Core API, databases, broker, and management interfaces have no public names.
 | F01a | HQ browser on the company network or VPN | `admin.<domain>` → Web/BFF (Z2) | HTTPS 443 | WAF IP set + Cognito session + MFA | Any other source address is blocked at the edge |
 | F02 | Browser (Z0) | Identity provider | HTTPS 443 | OIDC redirect | Sign-in, reset, two-step verification pages |
 | F03 | Web/BFF (Z2) | Identity provider | HTTPS 443 via Z5 | Client credentials (private-key JWT) | Token exchange, logout |
-| F04 | Web/BFF (Z2) | Core API (Z3) | HTTPS (internal), mutual TLS | Service token + user context | `/v1/ops/<operation>`; no other Z2 → Z3 path |
+| F04 | Web/BFF (Z2) | Core API (Z3) | HTTPS (internal), mutual TLS | Service token + user context | `/v1/*`: the REST routes of the operation catalog (IR222; `/v1/ops/<operation>` until the web apps use them); no other Z2 → Z3 path |
 | F05 | Web/BFF (Z2) | Cache (Z4) | TLS 6379-class port | Service identity | Sessions only |
 | F06 | Core API and workers (Z3) | Relational database (Z4) | TLS 5432-class port | Per-service database roles | Row-level security by tenant |
 | F07 | Z3 services | Message broker, Kinesis, cache (Z4 endpoints) | TLS | Service identity | Private endpoints only |

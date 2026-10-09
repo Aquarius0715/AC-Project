@@ -31,11 +31,12 @@ test: testdb-exists
 	$(GO) vet ./...
 	$(GO) test -count=1 -timeout $(TEST_TIMEOUT) ./...
 
-# swagger builds the API description from the swag annotations of the operation handlers (IR220): swag formats the
-# annotations, writes Swagger 2.0 JSON that the gateway embeds (GET /swagger.json, Swagger UI at /docs) and the copy
-# in the design docs. scripts/swag_annotate.py --check lists handlers without annotations.
+# swagger builds the API description from the swag annotations of the operation handlers (IR220, REST routes IR222):
+# swag formats the annotations, writes Swagger 2.0 JSON that the gateway embeds (GET /swagger.json, Swagger UI at
+# /docs) and the copy in the design docs. scripts/swag_annotate.py --check (fed the mounted routes and parameters by
+# cmd/gen/restdoc) fails when an annotation block or a route stub is missing or stale.
 swagger:
-	python3 scripts/swag_annotate.py --check
+	$(GO) run ./cmd/gen/restdoc | python3 scripts/swag_annotate.py --routes - --check
 	$(GO) tool swag fmt -d ./internal,./cmd
 	$(GO) tool swag init -g cmd/gateway/main.go -d . --parseInternal --overridesFile .swaggo -o internal/gateway/swagger --outputTypes json
 	mkdir -p ../../docs/02-design/api && cp internal/gateway/swagger/swagger.json ../../docs/02-design/api/swagger.json

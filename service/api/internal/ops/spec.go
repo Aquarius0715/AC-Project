@@ -26,6 +26,34 @@ type Spec struct {
 	Authorization string
 	Versions      []VersionRule // write-version-catalog.csv rows (empty for reads)
 	DesignIDs     string
+	Routes        []Route  // operation-catalog.csv rest_routes (IR222)
+	Filters       []string // query-catalog.csv allowed_filters: the filter query parameters of a list read
+}
+
+// Route is one REST route of an operation (IR222). Path parameters are written {field} after the input field they
+// fill (a dotted name fills a field of a nested object); FixedField / FixedValue set one more input field, so one
+// operation can serve several verb routes (payouts.transition: /approve with action=approve).
+type Route struct {
+	Method     string
+	Path       string
+	FixedField string
+	FixedValue string
+}
+
+// ParamKind is how the text of a query or path parameter becomes a JSON value (IR222).
+type ParamKind int
+
+const (
+	KindString  ParamKind = iota // strings, IDs, instants, enums
+	KindInteger                  // integers
+	KindNumber                   // decimals
+	KindBool                     // true or false
+)
+
+// FilterKind is the query parameter type of one Query.filters field (generated FilterKinds).
+type FilterKind struct {
+	Kind ParamKind
+	List bool
 }
 
 // VersionRule is one write-version-catalog.csv branch: Branch is "all", "<field> present", "<field> omitted",

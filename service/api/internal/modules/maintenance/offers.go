@@ -151,7 +151,8 @@ func (in *OfferInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		OfferInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		OfferInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -162,7 +163,7 @@ func (in *OfferInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.offer [post]
+// @Router			/v1/jobs/{jobId}/offers [post]
 func (m Delivery) offer(ctx context.Context, c *ops.Call, in *OfferInput) (Job, error) {
 	if !c.Now.Before(in.OfferExpiresAt) {
 		return Job{}, apperr.Fields(map[string]string{"offerExpiresAt": "error.past"})
@@ -319,7 +320,9 @@ func (m Delivery) decide(ctx context.Context, c *ops.Call, in *DecisionInput, de
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		DecisionInput	true	"input"
+// @Param			jobId				path		string			true	"input field jobId"
+// @Param			offerId				path		string			true	"input field offerId"
+// @Param			request				body		DecisionInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Receipt}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -330,7 +333,7 @@ func (m Delivery) decide(ctx context.Context, c *ops.Call, in *DecisionInput, de
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.accept [post]
+// @Router			/v1/jobs/{jobId}/offers/{offerId}/accept [post]
 func (m Delivery) accept(ctx context.Context, c *ops.Call, in *DecisionInput) (Receipt, error) {
 	if in.TermsVersion == nil {
 		return Receipt{}, apperr.Fields(map[string]string{"termsVersion": "error.required"})
@@ -349,7 +352,9 @@ func (m Delivery) accept(ctx context.Context, c *ops.Call, in *DecisionInput) (R
 // @Produce		json
 // @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		DecisionInput	true	"input"
+// @Param			jobId				path		string			true	"input field jobId"
+// @Param			offerId				path		string			true	"input field offerId"
+// @Param			request				body		DecisionInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Receipt}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -360,7 +365,7 @@ func (m Delivery) accept(ctx context.Context, c *ops.Call, in *DecisionInput) (R
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.decline [post]
+// @Router			/v1/jobs/{jobId}/offers/{offerId}/decline [post]
 func (m Delivery) decline(ctx context.Context, c *ops.Call, in *DecisionInput) (Receipt, error) {
 	if in.Reason == nil {
 		return Receipt{}, apperr.Fields(map[string]string{"reason": "error.required"})
@@ -411,7 +416,8 @@ func (in *AssignInput) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
-// @Param			request				body		AssignInput	true	"input"
+// @Param			jobId				path		string		true	"input field jobId"
+// @Param			request				body		AssignInput	true	"input; the path parameters come from the route"
 // @Success		200					{object}	ops.Envelope{data=Job}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -422,7 +428,7 @@ func (in *AssignInput) Validate() map[string]string {
 // @Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
-// @Router			/v1/ops/jobs.assign [post]
+// @Router			/v1/jobs/{jobId}/assign [post]
 func (m Delivery) assign(ctx context.Context, c *ops.Call, in *AssignInput) (Job, error) {
 	r, err := m.lock(ctx, c, in.JobID)
 	if err != nil {
