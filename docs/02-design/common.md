@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.38.0
+version: 0.39.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -50,10 +50,10 @@ service/web/
 
 Whether to adopt the DEC-03 libraries or record the build's choice is for the product owner to decide. TanStack Query does not apply in API mode: reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
 
-**Language — partly built (IR258–IR264).** FR-X01 asks that a language change reach key screens, notifications and dates.
-- These show the saved language: the shell, Preferences, Demo controls, the notifications inbox, the customer overview, units & locations (with group control), automations, the customer's alerts (inbox and policies), the customer's maintenance (requests and Filter care) and the customer's unit screen (AT-X01-N).
+**Language — partly built (IR258–IR265).** FR-X01 asks that a language change reach key screens, notifications and dates.
+- These show the saved language: the shell, Preferences, Demo controls, the notifications inbox, the customer overview, units & locations (with group control), automations, the customer's alerts (inbox and policies), the customer's maintenance (requests and Filter care), energy & cost with carbon offsets, and the customer's unit screen (AT-X01-N).
 - The English text is the key of the Malay dictionary (`shared/lib/i18n-ms.ts`, a draft not yet reviewed). A text without an entry stays English.
-- Their times follow IR44: the user's language and display time zone, with the zone's abbreviation (`showTime` / `showClock`). Times on the days next to now show "today", "yesterday" or "tomorrow" instead of the date (`relativeTime`). The overview's period note stays in Asia/Kuala_Lumpur, where the periods are cut. Booked and preferred times show as one span (`showSpan`), and preferred times are typed in the display time zone (`zonedInstant`, NFR-08).
+- Their times follow IR44: the user's language and display time zone, with the zone's abbreviation (`showTime` / `showClock`). Times on the days next to now show "today", "yesterday" or "tomorrow" instead of the date (`relativeTime`). The overview's and the energy screens' periods stay in Asia/Kuala_Lumpur, where they are cut, and say so. Booked and preferred times show as one span (`showSpan`), and preferred times are typed in the display time zone (`zonedInstant`, NFR-08).
 - The other business screens and their dates are still English, in Asia/Kuala_Lumpur.
 
 **Tests.** Vitest covers the shared mappers and validators. Playwright end-to-end tests run against the local stack. The Core API has its Go integration and unit tests.
@@ -257,4 +257,4 @@ API paths, HTTP methods, databases, server authentication and authorization, rea
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.38.0: Read IR01–IR264 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.39.0: Read IR01–IR265 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

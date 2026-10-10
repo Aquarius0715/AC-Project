@@ -2655,3 +2655,29 @@ After the unit screen (IR259), the customer's home screen `/customer` (FR-C01, D
    - E2E: 55 passed, 9 skipped (+1 automations). The language spec also opens automations and the editor's next runs in Malay with Asia/Tokyo. The users are en / Asia/Kuala_Lumpur, all 31 E2E jobs are cancelled and no E2E automation is left.
    - A screenshot of the editor in Malay shows no overflow.
 6. **Still open.** Energy, air quality, contracts & payments and users for the customer; the browser demo's screens; the other roles; the voice demo's answers.
+
+## IR265 Energy & cost and carbon offsets in the display language; one default unit; rounding as written — 2026-10-10
+
+`/customer/energy` and `/customer/energy/offsets` (FR-C06, FR-C13, FR-C16, DD-C06, DD-C13, DD-C16, Figma Client 04) follow automations (IR264).
+
+1. **Texts.** These are translated:
+   - the selection bar: periods, baseline, units and the comparison picker;
+   - the four figures, the daily chart and table, the per-unit comparison, the warnings and the calculation conditions;
+   - the carbon impact card;
+   - the export dialog, its checks and the monthly e-mail notice;
+   - the offsets page: the demo banner, the three steps, the quote, the confirmation, the records and the market concept.
+   The IR68 wording follows the language: "Pengurangan 12.3 kWh", "Peningkatan 3.3%", "Tiada perubahan 0.0 kWh", "Tidak dapat dikira". Unit, location, baseline, tariff and factor names are data and stay as written. The suggested offset purpose is in the user's language ("Ofset demo") and is kept as typed.
+2. **Times.** The business periods stay Kuala Lumpur days (REV18-035) and say so: the period label, the calculation conditions and the quote's period end with "Asia/Kuala_Lumpur", and the custom From/To fields are typed in Kuala Lumpur. Their dates and the daily chart's day names follow the language ("Isn 14"). A quote's expiry shows the IR44 date and time in the user's display time zone; a record shows its date (`showDate`).
+3. **One default unit.** Without `unitIds`, Energy & cost took the first unit by name but Offsets took the API's first unit, so the two pages could open on different ACs (Bedroom AC and Meeting room AC for customer-a). Both now use `pickUnits`.
+4. **Rounding as written.** `roundAway` multiplied before rounding, so 1.005 became 1.00 and 0.285 became 0.28. A value just below zero became −0, which Intl shows as "-0.0". It now rounds the decimal as written and never returns −0. One-decimal and whole-number results do not change: a scan of every value ending in 5 up to 20 000 found no difference.
+5. **Shared helpers.** These take the translator or the display: `saving`, `warning` and `summaryView` (`lib/energy`), and `periodRange`, `dayRanges` and `compareRow` (`lib/clientEnergy`). HQ's energy, MRV and offsets screens still call them in English. `energy.test.ts` is new. It covers:
+   - IR44 rounding and number formats;
+   - the IR68 wording in both languages;
+   - a summary and its conditions in both languages, and a summary without data;
+   - the periods and their errors, and the days;
+   - the comparison rows, `pickUnits` and the offsets query.
+6. **Checked.**
+   - Vitest: 35 files, 185 tests.
+   - E2E: 55 passed, 9 skipped. The language spec also opens Energy & cost and Offsets in Malay with Asia/Tokyo and checks that the period stays "(n hari) · Asia/Kuala_Lumpur". After the default-unit fix the customer and scenario projects passed again (23 passed, 2 skipped). The users are en / Asia/Kuala_Lumpur, and all 37 E2E jobs are cancelled.
+   - Screenshots of the energy page, the export dialog and Offsets in Malay show no overflow.
+7. **Still open.** Air quality, contracts & payments and users for the customer; the browser demo's screens; the other roles; the voice demo's answers.

@@ -1,10 +1,17 @@
 // Energy analysis (FR-A13, FR-C06, DATA_SOURCE=api): energy.summary and baselines projected for the screens, with the
-// IR68 savings wording and the IR44 number rules. Pure code shared by Server Components and client views.
+// IR68 savings wording and the IR44 number rules. Pure code shared by Server Components and client views; texts in the
+// display language (`t` / `i`, IR265). Numbers keep the en-MY format, which ms-MY shares.
+import { EN, translator, type I18n, type T } from "@ac/web/lib/i18n";
 
-/** Round half away from zero to `digits` decimals (IR44: never Number.prototype.toFixed for rounding). */
+const en = translator("en");
+
+/** Round half away from zero to `digits` decimals of the value as written (1.005 → 1.01; IR44: never
+ * Number.prototype.toFixed for rounding). Never -0, which Intl shows as "-0.0" (IR265). */
 export function roundAway(x: number, digits: number): number {
-  const f = 10 ** digits;
-  return (Math.sign(x) * Math.round(Math.abs(x) * f + Number.EPSILON)) / f;
+  if (!Number.isFinite(x)) return x;
+  const a = String(Math.abs(x));
+  const r = /e/i.test(a) ? Math.round(Math.abs(x) * 10 ** digits + Number.EPSILON) / 10 ** digits : Number(`${Math.round(Number(`${a}e${digits}`))}e-${digits}`);
+  return r === 0 ? 0 : Math.sign(x) * r;
 }
 const nf = (digits: number) => new Intl.NumberFormat("en-MY", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 /** One decimal (energy, percentages, kgCO₂e). */
@@ -13,11 +20,11 @@ export const one = (x: number) => nf(1).format(roundAway(x, 1));
 export const amount = (minor: number, currency: string) => `${nf(2).format(roundAway(minor / 100, 2))} ${currency}`;
 
 /** IR68: >0 "Reduction {abs}", <0 "Increase {abs}", 0 "No change 0.0", null "Cannot calculate". */
-export function saving(v: number | null, unit: string, fmt: (x: number) => string = one): string {
-  if (v === null || !Number.isFinite(v)) return "Cannot calculate";
+export function saving(v: number | null, unit: string, fmt: (x: number) => string = one, t: T = en): string {
+  if (v === null || !Number.isFinite(v)) return t("Cannot calculate");
   const r = roundAway(v, 1);
-  if (r === 0) return `No change ${fmt(0)}${unit}`;
-  return `${r > 0 ? "Reduction" : "Increase"} ${fmt(Math.abs(v))}${unit}`;
+  if (r === 0) return t("No change {value}", { value: `${fmt(0)}${unit}` });
+  return t(r > 0 ? "Reduction {value}" : "Increase {value}", { value: `${fmt(Math.abs(v))}${unit}` });
 }
 
 export type BoundaryId = "ac_input_electricity" | "whole_building_electricity";
@@ -51,34 +58,36 @@ const warningText: Record<string, string> = {
   factor_missing: "Emission factor missing — emissions cannot be calculated",
   boundary_mismatch: "Boundary differs from the baseline",
 };
-export const warning = (code: string) => warningText[code] ?? code;
+export const warning = (code: string, t: T = en) => (warningText[code] ? t(warningText[code]) : code);
 
 export type SummaryView = {
   actual: string; baseline: string; difference: string; percent: string; cost: string; savedCost: string; emissions: string; savedEmissions: string;
   coverage: string; conditions: [string, string][]; warnings: string[]; comparable: boolean; increase: boolean;
 };
 
-export function summaryView(s: ApiEnergySummary): SummaryView {
+/** The figures of an energy.summary as the screens show them; the period is Kuala Lumpur days and says so. */
+export function summaryView(s: ApiEnergySummary, i: I18n = EN): SummaryView {
+  const { t: tr } = i;
   const t = s.totals;
   const b = s.baselineSnapshot;
   const f = s.factorSnapshot;
   return {
-    actual: t.kWh === null ? "No valid readings" : `${one(t.kWh)} kWh`,
-    baseline: !b ? "No baseline" : b.baselineKWh === null ? "No value" : `${one(b.baselineKWh)} kWh`,
-    difference: saving(t.savedKWh, " kWh"), percent: saving(t.savingPercentage, "%"),
+    actual: t.kWh === null ? tr("No valid readings") : `${one(t.kWh)} kWh`,
+    baseline: !b ? tr("No baseline") : b.baselineKWh === null ? tr("No value") : `${one(b.baselineKWh)} kWh`,
+    difference: saving(t.savedKWh, " kWh", one, tr), percent: saving(t.savingPercentage, "%", one, tr),
     cost: t.amountMinor === null ? "—" : amount(t.amountMinor, s.currency),
-    savedCost: t.savedAmountMinor === null ? "Cannot calculate" : saving(t.savedAmountMinor, "", (x) => amount(x, s.currency)),
-    emissions: t.emissionsKg === null ? "—" : `${one(t.emissionsKg)} kgCO₂e`, savedEmissions: saving(t.savedEmissionsKg, " kgCO₂e"),
+    savedCost: t.savedAmountMinor === null ? tr("Cannot calculate") : saving(t.savedAmountMinor, "", (x) => amount(x, s.currency), tr),
+    emissions: t.emissionsKg === null ? "—" : `${one(t.emissionsKg)} kgCO₂e`, savedEmissions: saving(t.savedEmissionsKg, " kgCO₂e", one, tr),
     coverage: s.coverage === null ? "—" : `${one(s.coverage * 100)}%`, comparable: t.savedKWh !== null, increase: (t.savedKWh ?? 0) < 0,
     conditions: [
-      ["Period", `${klStamp(s.period.from)} → ${klStamp(s.period.to)} (Asia/Kuala_Lumpur)`],
-      ["Boundary", `${s.boundaryId} — ${s.boundary}`],
-      ["Baseline", b ? `v${b.version} · ${b.method} · ${klStamp(b.period.from)} → ${klStamp(b.period.to)} · ${b.unitIds.length} units` : "none selected"],
-      ...(b ? [["Baseline assumptions", b.assumptions] as [string, string]] : []),
-      ["Emission factor", f ? `${f.region} ${f.year} v${f.version} · ${f.kgCO2ePerKWh} kgCO₂e/kWh · ${f.source}` : "missing"],
-      ["Tariff", s.tariffVersion], ["Coverage", s.coverage === null ? "—" : `${one(s.coverage * 100)}% of expected readings`],
+      [tr("Period"), `${klStamp(s.period.from)} → ${klStamp(s.period.to)} (Asia/Kuala_Lumpur)`],
+      [tr("Boundary"), `${s.boundaryId} — ${s.boundary}`],
+      [tr("Baseline"), b ? tr("v{version} · {method} · {from} → {to} · {n} units", { version: b.version, method: b.method, from: klStamp(b.period.from), to: klStamp(b.period.to), n: b.unitIds.length }) : tr("none selected")],
+      ...(b ? [[tr("Baseline assumptions"), b.assumptions] as [string, string]] : []),
+      [tr("Emission factor"), f ? `${f.region} ${f.year} v${f.version} · ${f.kgCO2ePerKWh} kgCO₂e/kWh · ${f.source}` : tr("missing")],
+      [tr("Tariff"), s.tariffVersion], [tr("Coverage"), s.coverage === null ? "—" : tr("{pct}% of expected readings", { pct: one(s.coverage * 100) })],
     ],
-    warnings: s.qualityWarnings.map(warning),
+    warnings: s.qualityWarnings.map((w) => warning(w, tr)),
   };
 }
 

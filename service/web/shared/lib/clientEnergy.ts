@@ -1,19 +1,20 @@
 // Customer energy & cost and carbon offsets (FR-C06, FR-C13, FR-C16, DATA_SOURCE=api): the period choices, the daily
 // buckets of energy.summary, the unit comparison rows and the selection carried to the offsets page. Pure code shared
-// by the Server Components and the client views.
+// by the Server Components and the client views. The periods are Kuala Lumpur days (REV18-035); their labels follow the
+// display language (`i`, IR265).
 import { klInstant, klLocal, klStamp, one, saving, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
-import { intlTag, type Locale } from "@ac/web/lib/i18n";
+import { EN, intlTag, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
 
 export type PeriodKind = "today" | "7d" | "30d" | "custom";
 export const periodKinds: PeriodKind[] = ["today", "7d", "30d", "custom"];
 const dayMs = 86_400_000;
 const addDays = (ymd: string, n: number) => new Date(Date.parse(`${ymd}T00:00:00Z`) + n * dayMs).toISOString().slice(0, 10);
-const fmt = (iso: string) => new Date(iso).toLocaleString("en-US", { timeZone: "Asia/Kuala_Lumpur", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+const fmt = (iso: string, locale: Locale) => new Date(iso).toLocaleString(intlTag(locale), { timeZone: "Asia/Kuala_Lumpur", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).replace(/[\u00a0\u2009\u202f]/g, " ");
 
 export type Period = { kind: PeriodKind; from: string; to: string; label: string; days: number; error?: string };
 /** [from, to) of a period choice: whole Kuala Lumpur days up to the current minute of the business clock (today, the
  * last 7 or 30 days), or the custom range (KL datetime-local values, at most 366 days, DD-C06). */
-export function periodRange(kind: PeriodKind, now: Date, custom: { from?: string; to?: string } = {}): Period {
+export function periodRange(kind: PeriodKind, now: Date, custom: { from?: string; to?: string } = {}, i: I18n = EN): Period {
   const minute = new Date(Math.floor(now.getTime() / 60000) * 60000).toISOString();
   let from: string, to: string;
   if (kind === "custom") {
@@ -27,8 +28,9 @@ export function periodRange(kind: PeriodKind, now: Date, custom: { from?: string
   }
   const span = Date.parse(to) - Date.parse(from);
   const days = Math.max(1, Math.ceil(span / dayMs));
-  const error = !(span > 0) ? "The end must be after the start" : span > 366 * dayMs ? "At most 366 days" : undefined;
-  return { kind, from, to, days, error, label: `${fmt(from)} – ${fmt(to)} (${days} day${days === 1 ? "" : "s"}) · Asia/Kuala_Lumpur` };
+  const error = !(span > 0) ? i.t("The end must be after the start") : span > 366 * dayMs ? i.t("At most 366 days") : undefined;
+  const l = i.display.locale;
+  return { kind, from, to, days, error, label: i.t(days === 1 ? "{from} – {to} ({n} day) · {zone}" : "{from} – {to} ({n} days) · {zone}", { from: fmt(from, l), to: fmt(to, l), n: days, zone: "Asia/Kuala_Lumpur" }) };
 }
 /** The Kuala Lumpur days of [from, to) (the last one ends at `to`), at most 31 for the daily chart, labelled “Mon 14”
  * in the display language (Figma Client 04a). */
@@ -51,17 +53,23 @@ export const baselineLabel = (b: ApiBaseline) => `${b.method} · ${one(b.baselin
 
 /** One unit of the comparison table (Figma Client 04b): actual, baseline, IR68 difference and coverage. */
 export type CompareRow = { unitId: string; name: string; actual: string; baseline: string; difference: string; tone: "ok" | "warn" | "muted"; coverage: string };
-export function compareRow(unitId: string, name: string, s: ApiEnergySummary): CompareRow {
+export function compareRow(unitId: string, name: string, s: ApiEnergySummary, tr: T = translator("en")): CompareRow {
   const t = s.totals;
   const b = s.baselineSnapshot;
   const comparable = t.savedKWh !== null;
-  const difference = !b ? "No baseline for this unit" : !comparable ? "Cannot calculate — baseline not comparable" : b.baselineKWh === 0 ? "Cannot calculate — baseline is 0"
-    : `${saving(t.savedKWh, " kWh")} · ${saving(t.savingPercentage, "%")}`;
+  const difference = !b ? tr("No baseline for this unit") : !comparable ? tr("Cannot calculate — baseline not comparable") : b.baselineKWh === 0 ? tr("Cannot calculate — baseline is 0")
+    : `${saving(t.savedKWh, " kWh", one, tr)} · ${saving(t.savingPercentage, "%", one, tr)}`;
   return {
     unitId, name, actual: t.kWh === null ? "—" : one(t.kWh), baseline: b?.baselineKWh === null || !b ? "—" : one(b.baselineKWh), difference,
     tone: comparable && (t.savedKWh ?? 0) > 0 ? "ok" : comparable && (t.savedKWh ?? 0) < 0 ? "warn" : "muted",
     coverage: s.coverage === null ? "—" : `${one(s.coverage * 100)}%`,
   };
+}
+/** The URL's units (up to 4 of the customer's), else the first unit by name — the same default on Energy & cost and
+ * Offsets (IR265). */
+export function pickUnits(units: { id: string; displayName: string }[], param: string | undefined): string[] {
+  const picked = [...new Set((param ?? "").split(","))].filter((id) => units.some((u) => u.id === id)).slice(0, 4);
+  return picked.length ? picked : [...units].sort((a, b) => a.displayName.localeCompare(b.displayName)).slice(0, 1).map((u) => u.id);
 }
 /** The energy screen's selection as URL parameters (also passed to the offsets page, FR-C13 “Based on Energy & cost”). */
 export function selectionQuery(p: { unitIds: string[]; period: PeriodKind; from?: string; to?: string; baselineId?: string | null }): string {
