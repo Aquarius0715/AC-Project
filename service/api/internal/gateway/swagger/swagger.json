@@ -3574,7 +3574,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:control.execute | technician:control.diagnose:job-required | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 group control sends one command per selected unit (owner only)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input versions: expectedUnitVersion=UnitDetail.version",
+                "description": "Authorization: client:control.execute | technician:control.diagnose:job-required | admin:control.execute\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 group control sends one command per selected unit (owner only); IR306 source ui (default) or voice, voice only from a client (the assistant of the Client app)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input versions: expectedUnitVersion=UnitDetail.version",
                 "consumes": [
                     "application/json"
                 ],
@@ -27771,6 +27771,14 @@
                 },
                 "reason": {
                     "type": "string"
+                },
+                "source": {
+                    "description": "the channel the user chose; ui when omitted (IR306)",
+                    "type": "string",
+                    "enum": [
+                        "ui",
+                        "voice"
+                    ]
                 },
                 "unitId": {
                     "type": "string"

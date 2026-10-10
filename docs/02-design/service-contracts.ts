@@ -256,7 +256,7 @@ export type OperationContracts = {
   'baselines.save': {input:BaselineInput;result:EnergyBaseline;mode:'write'};
   'capabilities.list': {input:Query;result:Page<Capability>;mode:'read'};
   'capabilities.save': {input:Save<Capability> & {changeReason?:string};result:Capability;mode:'write'};
-  'commands.create': {input:{unitId:ID;action:UnitAction;jobId?:ID;reason?:string;expectedUnitVersion:number};result:Command;mode:'write'};
+  'commands.create': {input:{unitId:ID;action:UnitAction;jobId?:ID;reason?:string;expectedUnitVersion:number;source?:'ui'|'voice'};result:Command;mode:'write'};
   'commands.get': {input:{id:ID};result:Command;mode:'read'};
   'commands.list': {input:{unitId:ID;jobId?:ID;query:Query};result:Page<Command>;mode:'read'};
   'consents.get': {input:{purpose:'location_automation'};result:Consent;mode:'read'};

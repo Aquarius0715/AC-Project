@@ -3920,3 +3920,58 @@ The audit log showed actors as user IDs (IR304 left this open). `AuditView` gain
    - E2E: 67 passed, 9 skipped.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR306 The customer assistant reads voice.resolveIntent and speaks its chosen language — 2026-10-10
+
+In API mode the header assistant (FR-X02, D09, IR65, Figma Client 09a–09g) was still a browser mock. It never called `voice.resolveIntent`, and it always answered in English (IR304 left this open). It now uses the Core API, speaks the language chosen in its header, and labels its commands.
+
+1. **Reads and writes.**
+   - Each question goes through the BFF to `voice.resolveIntent` with the panel's language as `locale`. The results are help, unsupported, candidates, temperature and change.
+   - A temperature answer shows the latest reading with its time in the display time zone, and its quality when it is not valid. Without a reading it says so; it never shows a zero.
+   - A change first shows the confirmation card (Figma 09c): the target with its place, the current setting, the requested setting and the allowed range. Nothing is sent before Confirm, and Cancel sends nothing (AT-X02-E ④).
+   - Confirm is a Server Action: one `commands.create` whose `expectedUnitVersion` is the `expectedVersion` the intent was resolved at (AT-X02-N ③, IR09). It uses the same checks as Unit Control.
+   - The command is followed until the device answers (`waitForCommand`):
+     - while sending, the card shows the command, its state and the confirmed setting, which stays until the device acknowledges (09e);
+     - an acknowledged command shows the acknowledgement time (09f);
+     - a failed, expired or cancelled command says why and that nothing changed (09g). An expired one says "within 30 s", taken from the command's expiry.
+2. **The fixed grammar.**
+   - The suggestions are sentences of the grammar (D09): "temperature Bedroom", "set Bedroom to 24 degrees" and "help". In Malay they are "suhu Bedroom", "tetapkan Bedroom kepada 24 darjah" and "bantuan".
+   - Figma's natural sentences ("What's the temperature in Bedroom?", "Set Bedroom AC to 24 degrees", "Help: how do schedules work?") are refused by the grammar, which matches room names, not AC names (IR65). Figma 09a–09g now use the grammar's sentences.
+   - The help answer names the grammar of the panel's language.
+   - No microphone is connected. The voice button shows a scripted transcript, which goes through the same grammar.
+3. **Ambiguous rooms (Figma 09d, IR101).**
+   - Candidates are grouped by room. The panel asks "Which Bedroom did you mean?" and lists each room with its ACs, then asks "Then: which AC in …?".
+   - Nothing is chosen for the user. A room with one AC needs no second choice.
+   - Continue asks again with `selectedUnitId`. The Core API accepts only a candidate of that request (IR65, AT-X02-B ③).
+   - ACs with the same name in one room also show their ID.
+4. **Language (D09, AT-X01-B ③).**
+   - The panel starts in the display language, and its header switches between English and Bahasa Melayu.
+   - A switch discards an unconfirmed change or room choice and keeps the typed text.
+   - Times stay in the user's display time zone.
+5. **Microphone consent (FR-X02, AT-X02-E ③).**
+   - The Preferences switch is kept on this device (`ac-voice-microphone`), not on the account.
+   - When it is off, the panel is text only: the voice button says so and moves the focus to the text box.
+   - Turning it off while listening discards the voice request. Nothing is sent.
+6. **The command source.**
+   - `commands.create` takes `source?: 'ui' | 'voice'`, with ui as the default.
+   - Only a client may send voice, because the assistant exists only in the Client app (IR115). HQ and technicians get VALIDATION `source` `error.notAllowed`. Any other value is `error.invalid`.
+   - Unit histories label these commands "by voice".
+   - `Command.source` already listed voice (IR216), but nothing created it.
+   - service-contracts.ts, the operation catalog and the swag annotation are updated, and Swagger is regenerated.
+7. **Fix.** In Chromium, `Element.scrollIntoView()` returns a Promise. The panel's arrow-function effects returned it, React called it as the effect's cleanup, and the page crashed ("i is not a function"). The effects now use a block body.
+8. **Checked.**
+   - Go: `TestCommands` creates the client's change with source voice. It checks that HQ and a technician may not send voice, that an unknown source is VALIDATION, and that a Unit Control command stays ui. `make test-all` passes.
+   - Vitest: 53 files, 302 tests. `assistant.test.ts` is new. It covers:
+     - the suggestions, which parse with the grammar in both languages, and the help in each language;
+     - the temperature answers and the confirmation card;
+     - the room → AC grouping, with IDs for equal names;
+     - the progress in every state, and Malay / Tokyo.
+     `units.test.ts` covers the "by voice" label.
+   - E2E: `customer/assistant.e2e.ts` has three tests:
+     - help, a temperature question, a cancelled change, an unknown intent, and the switch to Malay, which keeps the typed text;
+     - the scripted voice transcript, and the microphone turned off in Preferences in another tab while listening, which leaves the panel text only;
+     - an ambiguous room. The dev seed has no customer with two rooms of the same name (AT-X02-B uses an acceptance patch), so the spec rewrites the first answer into candidates; the choice goes to the Core API.
+     No command is sent. 70 passed, 9 skipped.
+9. **Progress.** Every business screen and the assistant follow the display language (IR258–IR306). Still English: the Phase 1A browser demo's fixture screens, including its simulated assistant.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

@@ -157,7 +157,7 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
         <SummaryList items={[["Result", <Badge key="m" tone="ok">✓ Matched</Badge>], ["Label", "AC-QR-online-rto · scanned 10:04"], ["Unit", "Bedroom AC · unit-online-rto · customer-a · Home A › 1F › Bedroom"], ["Your job today", "job-contractor-a"]]} />
         <Banner>Units outside your assignments show “Not in your assignments” (NOT_FOUND).</Banner>
       </Modal>
-      {role === "client" && <AssistantPanel open={assistant} onClose={() => setAssistant(false)} context={title} />}
+      {role === "client" && <AssistantPanel open={assistant} onClose={() => setAssistant(false)} context={title} live={!!live} />}
     </ToastProvider>
     </I18nProvider>
   );

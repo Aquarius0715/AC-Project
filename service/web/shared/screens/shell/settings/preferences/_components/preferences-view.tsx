@@ -6,6 +6,7 @@ import { useAction } from "@ac/web/lib/useAction";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { setStoredValue, useStoredValue } from "@ac/web/lib/urlState";
 import { consentNote, type Consent } from "@ac/web/lib/preferences";
+import { MICROPHONE } from "@ac/web/lib/assistant";
 import { codeComplete, groupKey, type QrPath } from "@ac/web/lib/twoFactor";
 import { useT } from "@ac/web/components/I18n";
 import { disableTwoFactor, enableTwoFactor, savePreferences } from "../actions";
@@ -18,7 +19,6 @@ export type PreferencesLive = {
   zones: { id: string; label: string }[];
   qr: QrPath | null; // the setup key as an authenticator QR code while two-step verification is off
 };
-const MIC = "ac-voice-microphone"; // a device permission: kept in this browser, not on the account
 
 /** Preferences (FR-X01, FR-X08, DDC-07, Figma Client 10d/10g) from the Core API: language and time zone of the user,
  * for a client the location consent and the monthly energy report e-mail (BR-C16), two-step verification; the
@@ -30,7 +30,7 @@ export function PreferencesView({ live }: { live: PreferencesLive }) {
   const [zone, setZone] = useState(live.prefs.timezone);
   const [location, setLocation] = useState(live.consent?.granted ?? false);
   const [monthly, setMonthly] = useState(live.prefs.monthlyReportEmail);
-  const mic = useStoredValue(MIC) !== "off";
+  const mic = useStoredValue(MICROPHONE) !== "off";
   const [modal, setModal] = useState<null | "on" | "off">(null);
   const [failed, setFailed] = useState<string | null>(null);
   const consentChanged = live.client && location !== (live.consent?.granted ?? false);
@@ -57,7 +57,7 @@ export function PreferencesView({ live }: { live: PreferencesLive }) {
           <div className="flex flex-col gap-3">
             <div className="text-[13px] font-semibold">{t("Consent")}</div>
             <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Location, for voice room disambiguation and location automations")}</div><div className="text-xs text-muted">{t("{when} · withdrawal turns off location automations and discards pending voice requests", { when: consentNote(live.consent, t) })}</div></div><Toggle on={location} onChange={setLocation} label={t("Location consent")} /></div>
-            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Microphone, for voice actions (this device)")}</div><div className="text-xs text-muted">{t("Text input always available as a fallback")}</div></div><Toggle on={mic} onChange={(v) => setStoredValue(MIC, v ? "on" : "off")} label={t("Microphone consent")} /></div>
+            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Microphone, for voice actions (this device)")}</div><div className="text-xs text-muted">{t("Text input always available as a fallback")}</div></div><Toggle on={mic} onChange={(v) => setStoredValue(MICROPHONE, v ? "on" : "off")} label={t("Microphone consent")} /></div>
             <div className="mt-1 text-[13px] font-semibold">{t("Reports")}</div>
             <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Email me the monthly energy report (1st of each month)")}</div><div className="text-xs text-muted">{t("Last month's report, to your account e-mail · also set from Energy & cost › Export report")}</div></div><Toggle on={monthly} onChange={setMonthly} label={t("Monthly energy report e-mail")} /></div>
           </div>

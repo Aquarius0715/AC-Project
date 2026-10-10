@@ -134,6 +134,7 @@ type CreateInput struct {
 	JobID               *uuid.UUID      `json:"jobId,omitempty"`
 	Reason              *string         `json:"reason,omitempty"`
 	ExpectedUnitVersion int             `json:"expectedUnitVersion"`
+	Source              string          `json:"source,omitempty" enums:"ui,voice"` // the channel the user chose; ui when omitted (IR306)
 	action              UnitAction
 }
 
@@ -150,6 +151,11 @@ func (in *CreateInput) Validate() map[string]string {
 	in.action = a
 	if in.ExpectedUnitVersion < 1 {
 		fe["expectedUnitVersion"] = "error.required"
+	}
+	if in.Source == "" {
+		in.Source = "ui"
+	} else if in.Source != "ui" && in.Source != "voice" {
+		fe["source"] = "error.invalid"
 	}
 	if in.Reason != nil {
 		*in.Reason = strings.TrimSpace(*in.Reason)
@@ -176,7 +182,7 @@ func inScope(p *ops.Principal, unit, property, org uuid.UUID) bool {
 // @Summary		commands.create (write)
 // @ID				commands.create
 // @Description	Authorization: client:control.execute | technician:control.diagnose:job-required | admin:control.execute
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 group control sends one command per selected unit (owner only)
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR46 restriction action table; IR47 derived connection/powerSignal OFFLINE; IR74 client omits reason; IR94 technician write table (assignment and work window, jobId required when typed); IR109 group control sends one command per selected unit (owner only); IR306 source ui (default) or voice, voice only from a client (the assistant of the Client app)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-C03, DD-T10, DD-A11 through automations.fire, DD-C04, DD-C05, DD-A02, DD-C14 · Input versions: expectedUnitVersion=UnitDetail.version
 // @Tags			commands
@@ -210,6 +216,9 @@ func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Com
 			return Command{}, apperr.Fields(map[string]string{"reason": "error.notAllowed"})
 		}
 	case "technician":
+		if in.Source == "voice" {
+			return Command{}, apperr.Fields(map[string]string{"source": "error.notAllowed"})
+		}
 		if !found {
 			return Command{}, nf
 		}
@@ -225,6 +234,9 @@ func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Com
 	default:
 		if !found {
 			return Command{}, nf
+		}
+		if in.Source == "voice" { // the assistant is offered only in the Client app (IR115)
+			return Command{}, apperr.Fields(map[string]string{"source": "error.notAllowed"})
 		}
 		if in.Reason == nil {
 			return Command{}, apperr.Fields(map[string]string{"reason": "error.required"})
@@ -251,8 +263,8 @@ func (m Commands) create(ctx context.Context, c *ops.Call, in *CreateInput) (Com
 	}
 	x, err := scanCommand(c.Tx.QueryRow(ctx, `INSERT INTO control.commands (tenant_id, unit_id, device_id, actor_membership_id, source, action, job_id, reason, status, delivery,
 		requested_at, sent_at, expires_at, correlation_id, created_at, updated_at)
-		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, 'ui', $4, $5, $6, 'sent', 'sent', $7, $7, $8, $9, $7, $7) RETURNING `+commandCols,
-		in.UnitID, dev, c.Principal.MembershipID, []byte(in.Action), in.JobID, in.Reason, c.Now, c.Now.Add(CommandTTL), c.CorrelationID))
+		VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $10, $4, $5, $6, 'sent', 'sent', $7, $7, $8, $9, $7, $7) RETURNING `+commandCols,
+		in.UnitID, dev, c.Principal.MembershipID, []byte(in.Action), in.JobID, in.Reason, c.Now, c.Now.Add(CommandTTL), c.CorrelationID, in.Source))
 	if err != nil {
 		return x, err
 	}

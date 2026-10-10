@@ -17,6 +17,9 @@ describe("unit commands and readings in the display language and time zone (FR-X
     expect(historyRow(cmd({ status: "failed", failureCode: "device_rejected", source: "automation" }), ms, { locale: "ms", timeZone: "Asia/Tokyo" }))
       .toEqual({ id: "cmd-1234", text: "Tetapkan suhu 24°C — gagal (device_rejected) · oleh automasi", when: "14 Sep 2026, 10:00 PG GMT+9", bad: true });
     expect(historyRow(cmd({ status: "expired" }), undefined, tokyo)).toMatchObject({ text: "Set temperature 24°C — no device response (expired)", when: "14 Sept 2026, 10:00 am GMT+9", bad: true });
+    // the assistant's confirmed change (IR306); a command from Unit Control (ui) carries no label
+    expect([historyRow(cmd({ source: "voice" })).text, historyRow(cmd({ source: "voice" }), ms).text, historyRow(cmd({ source: "ui" })).text])
+      .toEqual(["Set temperature 24°C — acknowledged by device · by voice", "Tetapkan suhu 24°C — disahkan oleh peranti · melalui suara", "Set temperature 24°C — acknowledged by device"]);
   });
 
   it("keeps a stale reading's quality beside it and times it in the display time zone", () => {

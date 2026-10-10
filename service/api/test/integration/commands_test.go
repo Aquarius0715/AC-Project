@@ -36,6 +36,9 @@ func TestCommands(t *testing.T) {
 		"other customer":     {&customerB, `{"kind":"set_power","power":true}`, "", 404},
 		"technician no job":  {&techInt, `{"kind":"set_power","power":true}`, `,"reason":"test"`, 422},
 		"stale unit version": {&customerA, `{"kind":"set_power","power":true}`, "", 409},
+		"unknown source":     {&customerA, `{"kind":"set_power","power":true}`, `,"source":"automation"`, 422},
+		"hq voice":           {&hq, `{"kind":"set_power","power":true}`, `,"reason":"check","source":"voice"`, 422},
+		"technician voice":   {&techInt, `{"kind":"set_power","power":true}`, `,"reason":"test","jobId":"` + uuid.NewString() + `","source":"voice"`, 422},
 	} {
 		uv := v
 		if name == "stale unit version" {
@@ -45,8 +48,9 @@ func TestCommands(t *testing.T) {
 			t.Errorf("%s: %d want %d", name, code, tc.code)
 		}
 	}
-	code, m := cmd(&customerA, `{"kind":"set_temperature","celsius":24}`, "", v)
-	if code != 200 || data(m)["status"] != "sent" || data(m)["delivery"] != "sent" || data(m)["expiresAt"] != clock.Add(30*time.Second).Format(time.RFC3339) {
+	// the assistant's confirmed change (IR306): the same command, labelled voice
+	code, m := cmd(&customerA, `{"kind":"set_temperature","celsius":24}`, `,"source":"voice"`, v)
+	if code != 200 || data(m)["status"] != "sent" || data(m)["delivery"] != "sent" || data(m)["source"] != "voice" || data(m)["expiresAt"] != clock.Add(30*time.Second).Format(time.RFC3339) {
 		t.Fatalf("create: %d %v", code, m)
 	}
 	id := data(m)["id"].(string)
@@ -160,7 +164,7 @@ func TestCommandHistory(t *testing.T) {
 	tech := data(m)["id"].(string)
 	free()
 	code, m = write(s, &customerA, "commands.create", `{"unitId":"`+unit+`","action":{"kind":"set_power","power":true},"expectedUnitVersion":`+itoa(uv)+`}`, 0)
-	if code != 200 {
+	if code != 200 || data(m)["source"] != "ui" {
 		t.Fatalf("client command: %d %v", code, m)
 	}
 	own := data(m)["id"].(string)

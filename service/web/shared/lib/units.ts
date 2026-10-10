@@ -35,7 +35,7 @@ export type ApiUnitDetail = {
   components: string[];
 };
 
-export type ApiCommand = { id: string; action: UnitAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; failureCode: string | null; source?: string };
+export type ApiCommand = { id: string; action: UnitAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; acknowledgedAt?: string | null; expiresAt?: string; failureCode: string | null; source?: string };
 
 /** The fixed Asia/Kuala_Lumpur time of the screens not yet on the user's display time zone; screens moved to it use
  * showTime / showClock of lib/i18n (IR44, IR259). */
@@ -64,7 +64,7 @@ export function actionText(a: UnitAction, t: T = en): string {
 }
 
 const statusText: Record<ApiCommand["status"], string> = { requested: "requested", sent: "waiting for device", acknowledged: "acknowledged by device", failed: "failed", expired: "no device response (expired)", cancelled: "cancelled" };
-const sourceText: Record<string, string> = { automation: " · by an automation", restriction: " · by a restriction", diagnostic: " · technician test run" };
+const sourceText: Record<string, string> = { voice: " · by voice", automation: " · by an automation", restriction: " · by a restriction", diagnostic: " · technician test run" };
 
 /** One command history row: the sentence, its state and who sent it, and when it was requested (IR44 time). */
 export function historyRow(c: ApiCommand, t: T = en, display: Display = DEFAULT_DISPLAY) {
