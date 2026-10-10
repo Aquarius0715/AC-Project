@@ -1,5 +1,5 @@
-// AT-X01-N ③ for the technician (FR-X01, FR-T01–FR-T04, FR-T07, FR-T10–FR-T12, IR44, IR281–IR287): with Malay and
-// Asia/Tokyo saved in Preferences, the overview speaks Malay — tiles, tabs, sort and the side cards — while today's
+// AT-X01-N ③ for the technician (FR-X01, FR-T01–FR-T04, FR-T07, FR-T10–FR-T13, IR44, IR281–IR288): with Malay and
+// Asia/Tokyo saved in Preferences, the overview speaks Malay — tiles, tabs, sort, the side cards and the QR scan dialog — while today's
 // timeline stays in Kuala Lumpur hours and says so; an assigned job's workspace speaks Malay with its window in GMT+9,
 // and so do its unit, on both tabs and with the 7-day period, the unit's alert evidence, the job's diagnostic control
 // and the devices with one device's events. English and the earlier zone come back at the end, or in afterEach when
@@ -24,6 +24,14 @@ test("the technician overview in Malay keeps the timeline in Kuala Lumpur hours"
   for (const name of ["Hari ini — diisih mengikut keterukan, tarikh akhir, kemajuan", /^Hari ini · /, /^Amaran pada unit saya \(\d+\)$/, "Laporan saya"]) await expect(main.getByRole("heading", { name })).toBeVisible();
   await expect(main).toContainText("Unit yang ditugaskan");
   await expect(main).toContainText("Garis masa dalam waktu Kuala Lumpur (Asia/Kuala_Lumpur)."); // another display zone
+  // the QR scan dialog (IR288): an unknown label reads as unavailable, in Malay
+  await page.getByRole("button", { name: /Imbas QR/ }).click();
+  const qr = page.getByRole("dialog", { name: "Imbas QR unit" });
+  await qr.getByLabel("Kod label, nombor siri peranti atau ID unit").fill("ac-unit:00000000-0000-4000-8000-000000000000");
+  await qr.getByRole("button", { name: "Imbas", exact: true }).click();
+  await expect(qr.getByRole("status")).toContainText("Halaman tidak tersedia");
+  await page.keyboard.press("Escape");
+  await expect(qr).toBeHidden();
   await page.getByRole("tab", { name: /^Semua yang ditugaskan \(\d+\)$/ }).click();
   await page.waitForURL(/tab=all/);
   await expect(main.getByRole("heading", { name: "Semua yang ditugaskan — diisih mengikut keterukan" })).toBeVisible();

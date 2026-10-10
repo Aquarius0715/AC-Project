@@ -3363,3 +3363,28 @@ IR284 left one D08 rule unbuilt: the Core API opened policy alerts from the demo
    - The HQ screens.
    - The browser demo.
    - The assistant panel and the voice demo's answers.
+
+## IR288 The technician's QR scan in the display language — every technician screen done — 2026-10-10
+
+The "Scan unit QR" dialog of the technician shell (FR-T13, DD-T13, Figma Technician 01-6) follows the display language and time zone. Every technician screen does now.
+
+1. **Texts.** These are translated:
+   - the dialog, the simulated camera, the input and its label, and the one-tap labels of the user's open jobs;
+   - the idle, busy, matched and refused states, and the footer buttons;
+   - the matched card: the unit, its model and place, the job of today or the next one, its type, status and linked alerts;
+   - the refusals: "Page unavailable" for a label outside the assignments or unknown, "Not a label", "Scan failed".
+   The dictionary gains 25 entries.
+2. **Times.**
+   - The matched job's window is a span in the display time zone (`showSpan`). Before, it was a fixed Kuala Lumpur "10:00–12:00".
+   - "Your job today" still means today's Kuala Lumpur day, the business day the work happens on, as on the overview (IR281).
+   - The scan time is a display-zone clock time.
+   - The dialog formats in the browser, after the user scans, so there is no first render to match the server.
+3. **Code.** `qrMatch` and `qrRefusal` take the display. The refusal says whether the label is absent (`absent`), and the dialog shows that as a warning, without comparing translated text. `techOverview.windowText` now only serves the timeline.
+4. **Checked.**
+   - Vitest: 41 files, 244 tests. `techQr.test.ts` moves to the display-zone span and adds a Malay case.
+   - E2E: `technician/language.e2e.ts` opens the dialog in Malay and scans an unknown label ("Halaman tidak tersedia"). The suite: 64 passed, 9 skipped; the users are en / Asia/Kuala_Lumpur.
+5. **Progress.** Every customer, contractor and technician screen follows the display language: 29 of the 44 business screens.
+6. **Still open.**
+   - The HQ screens (15).
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.
