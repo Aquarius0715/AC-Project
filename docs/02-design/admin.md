@@ -71,7 +71,7 @@ Show retry only for recoverable errors. For forbidden and not-found, follow IR57
 
 1. Check the session and assigned scope; validate IDs and URL filters against schemas.
 2. Call mock services through Queries and receive display data.
-3. Use React Hook Form and shared schemas for forms, including capability and period validation.
+3. Forms use controlled inputs with a pure validator per form in `shared/lib`, including capability and period validation; the Core API checks again (DEC-03, decided 2026-10-10).
 4. Immediately before a change, check the target version, permissions, and current state. Confirm the target and reason before major actions.
 5. Change shared demo state through the Repository and emit an event with a correlation ID. Invalidate related Queries and fetch the latest state.
 6. Keep the display visible while awaiting a response. Show success, denial, and failure separately. Keep form inputs after submission failure.
@@ -82,7 +82,7 @@ For each DD-A number, check matching AT-A acceptance criteria, the error cases a
 
 ## Detailed Feature Specifications (0.6.0)
 
-Keep form values in RHF (React Hook Form) and validate them with schemas. Read-only screens need no form validation. Follow input/output contract DDC-03/09 for audit, notifications, and shared errors. Display read-only values from a single Query source. The [Implementation Contracts](implementation-contracts.md) define shared types, paging, time, and errors; the following adds individual conditions. Follow [UIUX](../03-uiux/UIUXSpecification.md) UX-04/08 tokens and patterns for appearance.
+Keep form values in the form component and validate them with its pure validator (DEC-03). Read-only screens need no form validation. Follow input/output contract DDC-03/09 for audit, notifications, and shared errors. Display read-only values from a single Query source. The [Implementation Contracts](implementation-contracts.md) define shared types, paging, time, and errors; the following adds individual conditions. Follow [UIUX](../03-uiux/UIUXSpecification.md) UX-04/08 tokens and patterns for appearance.
 
 ### DD-A01 Details
 

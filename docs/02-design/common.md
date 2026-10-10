@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.46.0
+version: 0.47.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -43,12 +43,12 @@ service/web/
 
 **Navigation.** `next/link` and `next/navigation` are used directly. Filters, tabs and the selection live in the URL: `lib/urlState.ts` reads them through `useSyncExternalStore`, and `useUrlPatch` writes them, replacing the history entry. One router serves every app, so the earlier Navigation-interface proposal is not used.
 
-**UI and forms — open decision (DEC-03).** The SRC-02 production condition “shared libraries, reactForms” has no archived original. DEC-03 (PROPOSED) reads it as shadcn/ui, Lucide, React Hook Form, Zod and TanStack Query; the role designs and the UIUX specification still describe that proposal. The build follows the Next.js guides instead:
+**UI and forms — DEC-03, decided 2026-10-10.** The SRC-02 production condition “shared libraries, reactForms” has no archived original. DEC-03 first proposed shadcn/ui, Lucide, React Hook Form, Zod and TanStack Query. On 2026-10-10 the product owner decided to keep the build's approach, which follows the Next.js guides; the role designs and the UIUX specification (UX-01–UX-03) now describe it:
 - UI: in-house components on Tailwind CSS 4 (`shared/components/ui.tsx`) that follow the Figma UI Guideline, with glyph icons.
 - Forms: controlled inputs, pure validators per form in `shared/lib`, and the Core API's field errors from Server Actions.
-- Translation: plain dictionaries chosen on the server, as in the Next.js internationalization guide. The UIUX table lists i18next + react-i18next (IR259).
+- Translation: plain dictionaries chosen on the server, as in the Next.js internationalization guide (UX-01).
 
-Whether to adopt the DEC-03 libraries or record the build's choice is for the product owner to decide. TanStack Query does not apply in API mode: reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
 
 **Language — partly built (IR258–IR272).** FR-X01 asks that a language change reach key screens, notifications and dates.
 - These show the saved language: the shell, a failed Server Action's toast, each route's loading and error states, Preferences, Demo controls, the notifications inbox and every customer screen (AT-X01-N) — overview, units & locations (with group control), automations, alerts (inbox and policies), maintenance (requests and Filter care), energy & cost with carbon offsets, air quality, contracts & payments with the invoice page, users and the unit screen — and the contractor overview, job list and offer / job page.
@@ -257,4 +257,4 @@ API paths, HTTP methods, databases, server authentication and authorization, rea
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.46.0: Read IR01–IR272 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.47.0: Read IR01–IR273 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

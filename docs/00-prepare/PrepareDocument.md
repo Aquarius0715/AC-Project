@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.157.0
+version: 0.158.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -269,6 +269,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.158.0: DEC-03 decided — the build's components, forms and dictionaries stand (IR273). Phase 1A unchanged.
 0.157.0: The contractor's offer and job page in Malay (IR272). Phase 1A unchanged.
 0.156.0: The contractor job list in Malay (IR271). Phase 1A unchanged.
 0.155.0: The contractor overview in Malay (IR270). Phase 1A unchanged.

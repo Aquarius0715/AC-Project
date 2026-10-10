@@ -10,7 +10,7 @@ This record covers production conditions separate from company requirements SRC-
 |---|---|---|
 | Frontend documents only, four roles, document structure | SRC-02 summary in PrepareDocument | Original message, date/time, and reference ID are not archived. Keep as the current production baseline |
 | Agentic SDLC and matching the reference Loyalty appearance | PrepareDocument, DEC-06 | Original instructions not archived; not explicit company requirements or brand approval |
-| Shared libraries, “reactForms” | Internal DEC-03 and UIUX specification | Original instructions not archived; interpreting this as React Hook Form is the author's technical proposal |
+| Shared libraries, “reactForms” | Internal DEC-03 and UIUX specification | Original instructions not archived. DEC-03 was decided on 2026-10-10 by the product owner: the build's in-house components, forms and dictionaries stand; React Hook Form is not adopted |
 | No wireframes | Exclusion statement in UIUX specification | Evidence of an explicit instruction is not archived. Keep as current document scope, not a company instruction |
 
 These source documents are secondary summaries, not proof that the original instructions were verified. Add quotations, dates/times, and reference IDs when actual original records become available. Continue reversible document changes within the existing scope; do not pause for approval each time merely because a record is missing. If an actual conflict with the original arises, present the affected areas and a proposal for a decision.

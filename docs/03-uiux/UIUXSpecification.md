@@ -9,7 +9,7 @@ scope: frontend-demo-1A
 
 # Common UIUX Specification
 
-This document defines shared implementation, interaction, and display rules for all four roles. Wireframes (rough screen sketches) and screen layout diagrams are outside its scope. See the [detailed design](../02-design/common.md) for each screen's business logic. Libraries follow the proposed standards in DEC-02/03. Colors, fonts, and shapes follow the HTML/CSS obtained from the Loyalty page specified by the user. See the [reference design analysis](../00-prepare/reference-design-analysis.md) for evidence and adjusted values.
+This document defines shared implementation, interaction, and display rules for all four roles. Wireframes (rough screen sketches) and screen layout diagrams are outside its scope. See the [detailed design](../02-design/common.md) for each screen's business logic. Libraries follow DEC-02 and DEC-03; on 2026-10-10 the product owner decided DEC-03 for the build's in-house approach (UX-01). Colors, fonts, and shapes follow the HTML/CSS obtained from the Loyalty page specified by the user. See the [reference design analysis](../00-prepare/reference-design-analysis.md) for evidence and adjusted values.
 
 **Implementation basis for 0.22.0**: Read all chapters of the [deterministic contracts](../02-design/deterministic-contracts.md) and strict-review-contracts.md, the operation catalog's authorization column, and the screen catalog together. Do not guess numeric rules, permissions, asynchronous behavior, or recovery behavior during implementation. These are demo design proposals, not production business approvals.
 
@@ -35,27 +35,25 @@ Validate each screen's cases that add detail to the source (AT-*-SRC) together w
 
 | Purpose | Standard/source | Project usage rules |
 |---|---|---|
-| Basic UI | [Official shadcn/ui docs](https://ui.shadcn.com/docs) | Copy and manage official components in shared/ui. Share buttons, Dialog, Sheet, Tabs, Select, Popover, and similar elements. Do not build separate versions of equivalent UI for each role |
-| Icons | [Official Lucide React docs](https://lucide.dev/guide/react) | Use named imports from lucide-react. Default size: 16px; main actions: 20px; emphasis: 24px. Default stroke width: 1.75, matching the reference sidebar SVG. Set aria-hidden on decorative icons and always label icon-only buttons |
-| Forms | [Official React Hook Form repository](https://github.com/react-hook-form/react-hook-form) | Use react-hook-form as the standard. See DEC-03 for the interpretation of "reactForms." Keep input state in the form; do not copy it into screen state |
-| Schema validation | Zod + @hookform/resolvers | Separate input schemas from DTO (data transfer object) schemas. Keep required fields, formats, and conditional rules for each use case in its schema |
-| Data reads/updates | [Official TanStack Query docs](https://tanstack.com/query/latest/docs/framework/react/overview) | Put asynchronous Repository requests, caching, and mutations in shared hooks |
-| Lists/charts | TanStack Table / Recharts | Use for complex sorting/pagination and time-series charts. Use the shared Table for simple lists. Do not build custom replacements for charts |
-| Date input | shadcn Calendar family | Manage dates separately from time and time zone. Use Intl for display formats and shared functions for conversion to UTC |
-| Translation | i18next + react-i18next | Update en (English)/ms (Malay) keys together. English is the default. Notification templates and voice demo responses use the same dictionary system |
+| Basic UI | In-house components on Tailwind CSS 4 (`shared/components/ui.tsx`), following the Figma UI Guideline | One shared set for the four apps: buttons, Modal, Tabs, Select, Field, Badge, Banner, DataTable and the like. Do not build separate versions of equivalent UI for each role |
+| Icons | Glyphs inside the components (for example ⚠, ✓, ›) | No icon library. Decorative glyphs are aria-hidden; icon-only buttons always have a label |
+| Forms | Controlled inputs in the shared Field, with one pure validator per form in `shared/lib` | Keep input state in the form component; the Server Action returns the Core API's field errors, shown on the same fields |
+| Input validation | The form's pure validator (Vitest covers it); the Core API checks again (VALIDATION with fieldErrors) | Keep required fields, formats and conditional rules for each use case in its validator; keep them apart from the API types |
+| Data reads/updates | Server Components through the DAL (`shared/lib/dal.ts`); writes are Server Actions | No client-side query cache in API mode. The Phase 1A browser demo keeps its in-browser Repository |
+| Lists/charts | The shared DataTable and the in-house LineChart / BarChart | Use the shared table for lists; a chart never joins gaps in the data |
+| Date input | Native date and time inputs | Times are typed in the display time zone and converted with `zonedInstant` (NFR-08); display uses `showTime` / `showSpan` (IR44) |
+| Translation | Plain dictionaries chosen on the server, as in the Next.js internationalization guide (English keys, `shared/lib/i18n-ms.ts`) | Update en (English)/ms (Malay) together; English is the default. The i18n key check keeps the code's texts and the dictionary the same |
 | Testing | Vitest, React Testing Library, Playwright, axe-core | Assign separate roles for logic tests, user interaction tests, E2E tests across screens, and automated accessibility checks |
 
-Official sources were retrieved and checked on 2026-09-14. Official documentation was checked for shadcn, Lucide, and TanStack Query. The React Hook Form guide could not be retrieved, so its official repository was checked instead. The other libraries are project candidates; check compatibility, licenses, and maintenance again when implementation starts. Do not guess and pin version numbers.
-
-There is no existing implementation. On setup, create one compatible set of dependencies and a lockfile, and record the selected versions and licenses. Do not add overlapping UI kits or icon sets. For exceptions, record the required feature, why the standard library is insufficient, cost, impact, and whether replacement is possible. Do not force library use where semantic HTML is enough.
+DEC-03 was decided on 2026-10-10 by the product owner: the build's approach stands instead of the earlier proposal (shadcn/ui, Lucide, React Hook Form, Zod, TanStack Query, i18next). It follows the user's instruction to follow the Next.js documentation (2026-10-08). Do not add a UI kit, an icon set, or a form, schema, query or translation library. For an exception, record the required feature, why the in-house approach is insufficient, the cost and impact, and whether replacement is possible. Do not force a component where semantic HTML is enough.
 
 ## UX-02. Responsibilities of State, Effect, and Context
 
 | State type | Storage | Duplicate management to avoid |
 |---|---|---|
-| Unit, job, invoice, and history data from Repositories | TanStack Query cache | Copying fetched results into useState/Context/Zustand |
+| Unit, job, invoice, and history data | Server Components through the DAL (API mode); the in-browser Repository (Phase 1A demo) | Copying fetched results into useState/Context/Zustand |
 | Search, sort, page, period, selected property | Validated URL search params | Two-way synchronization between URL and local state through Effects |
-| Input values, dirty state, validation, submission state | React Hook Form | Managing each input again with useState or creating a separate error dictionary |
+| Input values, dirty state, validation, submission state | The form component's state, its pure validator and `useAction` (pending) | Keeping a second copy of the inputs or a separate error dictionary |
 | Short-lived local state, such as whether a dialog is open | Component useState; useReducer if needed | Storing it in a screen-wide Context |
 | Filtered results, totals, button availability | Pure functions computed during rendering | Saving derived results into separate state through Effects |
 | Theme, locale, session, Repository references | Library Providers or small Contexts | Mixing frequently updated values, such as telemetry (sensor measurements, Measurement), into one large Context |
@@ -63,13 +61,13 @@ There is no existing implementation. On setup, create one compatible set of depe
 
 Limit Effects to synchronization with external systems. Save in response to events through event handlers or mutations. Do not hide dependencies in a way that makes behavior unclear. React's official documentation also recommends avoiding unnecessary Effects. [Official React docs: You Might Not Need an Effect](https://react.dev/learn/you-might-not-need-an-effect)
 
-Valid Effect uses include subscriptions and cleanup, media APIs, and synchronization with external DOM widgets. State the reason and provide cleanup together. Prevent duplicate registration when Strict Mode runs the Effect again during development. Normally use Query hooks to fetch data. Use `useMemo`/`useCallback` only when measurements show a need or stable references are required.
+Valid Effect uses include subscriptions and cleanup, media APIs, and synchronization with external DOM widgets. State the reason and provide cleanup together. Prevent duplicate registration when Strict Mode runs the Effect again during development. Normally read data in Server Components through the DAL. Use `useMemo`/`useCallback` only when measurements show a need or stable references are required.
 
 ```tsx
-// Example: keep filters in the URL, fetch through Query, and derive display values with pure functions.
+// Example: a Server Component reads through the DAL with the URL's filters; display values come from pure functions.
 const filters = parseUnitFilters(searchParams);
-const unitsQuery = useUnits(filters);
-const visibleUnits = selectVisibleUnits(unitsQuery.data?.items ?? [], filters);
+const units = await coreAll<ApiUnitRow>("units.list", { filters });
+const visibleUnits = selectVisibleUnits(units, filters);
 // Do not add an Effect that copies visibleUnits into separate state.
 ```
 
@@ -77,7 +75,7 @@ Limit Context to information that needs broad distribution, such as session data
 
 ## UX-03. Form standards
 
-- Use `useForm` and `zodResolver` as the default. Use register for native inputs and Controller only where controlled components need it. Use useFieldArray for array inputs.
+- Use controlled inputs in the shared Field with the form's pure validator in `shared/lib` (DEC-03). Run it on submission and show the Core API's field errors from the Server Action on the same fields.
 - Use a shared Field component for labels, required/optional markers, help text, units, errors, and disabled reasons. A placeholder is not a substitute for a label.
 - Match initial values to the schema. After asynchronous loading, reset only when the target ID changes or the user explicitly reloads. Background refresh must not overwrite unsaved (dirty) input.
 - Validate first on blur or submission. After an error, validate again whenever the user edits the value. On submission, focus the first invalid field and provide links to fields from the error summary at the top.
@@ -126,7 +124,7 @@ The single source for values is `src/shared/styles/tokens.css`. The following va
 | Breakpoints | sm640 / md768 / lg1024 / xl1280px | REF. Navigation switches at xl, KPIs at md, secondary areas at lg |
 | Stacking layers | --z-sidebar:10 / --z-header:30 / --z-modal:50 / --z-toast:60 | First two: REF; last two: ADAPT. Manage stacking and focus together |
 
-Map shadcn's `--primary`/`--background`/`--card`/`--muted`/`--border` to these values. The reference page's .bg-background is white and .bg-bg is pale blue; do not merge them into one token. Keep raw color values only in this table and their source; screens must use semantic tokens.
+The Tailwind theme tokens (primary, surface, line, muted and the like) map to these values. The reference page's .bg-background is white and .bg-bg is pale blue; do not merge them into one token. Keep raw color values only in this table and their source; screens must use semantic tokens.
 
 Serve fonts locally after checking the official licenses. Do not permanently hotlink the reference site's hashed woff2 files. English and Malay both use Latin script, so no additional font design is needed. Dark mode and copying the brand logo are outside this standard.
 

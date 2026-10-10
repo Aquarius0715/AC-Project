@@ -2923,3 +2923,23 @@ These two parts are shared by the four apps; IR266 item 6 left them open.
    - The technician and HQ screens.
    - The browser demo's screens.
    - The assistant panel and the voice demo's answers.
+
+## IR273 DEC-03 decided: the build's components, forms and dictionaries stand — 2026-10-10
+
+DEC-03 was open since IR257. The SRC-02 phrase "shared libraries, reactForms" has no archived original. DEC-03 had proposed reading it as React Hook Form, with Zod, shadcn/ui, Lucide, TanStack Query and i18next. The build follows the Next.js guides instead, by the user's instruction of 2026-10-08.
+
+1. **Decision.** On 2026-10-10 the product owner chose to keep the build's approach:
+   - UI: in-house components on Tailwind CSS 4 (`shared/components/ui.tsx`, Figma UI Guideline), with glyph icons;
+   - forms: controlled inputs in the shared Field, one pure validator per form in `shared/lib`, and the Core API's field errors from Server Actions;
+   - translation: plain dictionaries chosen on the server (`shared/lib/i18n-ms.ts`, the Next.js internationalization guide);
+   - data: Server Components through the DAL. There is no client query cache in API mode, and the Phase 1A demo keeps its in-browser Repository.
+   No UI kit, icon set, or form, schema, query or translation library is added. An exception records the feature, why the in-house approach is insufficient, the cost and impact, and whether replacement is possible.
+2. **Documents.** These now describe the build:
+   - the UIUX specification: UX-01 libraries, UX-02 state ownership and the example, UX-03 forms, and the token mapping;
+   - the four role designs (form rules);
+   - common.md §1;
+   - the implementation agent's library rule;
+   - the design assumptions (DEC-03 DECIDED);
+   - the production-instructions row and the reference analysis' icon row.
+   Earlier IRs and review records keep their history.
+3. **Code.** Nothing changes; the build already works this way. Vitest (200), E2E (58 passed, 9 skipped) and `make test-all` stay as they were in IR272.

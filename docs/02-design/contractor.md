@@ -40,7 +40,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 
 1. Check the session and permitted scope. Validate IDs and URL filters against schemas (data format rules).
 2. Call mock services through Queries and receive display data.
-3. Use React Hook Form and shared schemas for forms. The schemas also validate unit capabilities and periods.
+3. Forms use controlled inputs with a pure validator per form in `shared/lib`; the validators also check unit capabilities and periods, and the Core API checks again (DEC-03, decided 2026-10-10).
 4. Immediately before a mutation, check the target version, permissions, and current state. For major actions, show the target and reason in a confirmation view.
 5. Change shared demo data through the Repository and emit an event with a correlation ID (tracking ID). Invalidate related Queries and fetch fresh data.
 6. Keep a pending indicator visible while awaiting a response. Show success, denial, and failure separately. Keep form inputs when submission fails.
@@ -51,7 +51,7 @@ For each design ID (DD-P number), test the matching AT-P acceptance criteria, er
 
 ## Detailed Feature Specifications (0.6.0)
 
-Keep form values in RHF (React Hook Form) and validate them with schemas. Read-only screens do not need form validation. Follow input/output contract DDC-03/09 for audit records, notifications, and shared error displays. Show read-only values from a single Query source. The [Implementation Contracts](implementation-contracts.md) define shared types, paging, time, and error handling; the following adds screen-specific conditions. Use the tokens (base colors, sizes, etc.) and patterns in [UIUX](../03-uiux/UIUXSpecification.md) UX-04/08 for appearance.
+Keep form values in the form component and validate them with its pure validator (DEC-03). Read-only screens do not need form validation. Follow input/output contract DDC-03/09 for audit records, notifications, and shared error displays. Show read-only values from a single Query source. The [Implementation Contracts](implementation-contracts.md) define shared types, paging, time, and error handling; the following adds screen-specific conditions. Use the tokens (base colors, sizes, etc.) and patterns in [UIUX](../03-uiux/UIUXSpecification.md) UX-04/08 for appearance.
 
 ### DD-P01 Details
 

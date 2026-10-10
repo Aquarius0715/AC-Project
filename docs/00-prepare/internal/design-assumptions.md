@@ -17,7 +17,7 @@ updated: 2026-09-17
 |---|---|---|---|
 | DEC-01 | PROPOSED | Contractors manage accepted work, own staff, and quality. Reassignment stays within HQ's delegated scope | All FR-P, S02/S08, MaintenanceJob |
 | DEC-02 | PROPOSED | New SPA: React + TypeScript + Vite + React Router. Reconsider if SSR is needed | Shared design/build; check compatibility and pin dependency versions when implementation starts |
-| DEC-03 | PROPOSED | Interpret “reactForms” as React Hook Form. Use Zod, shadcn/ui, Lucide, and TanStack Query | UIUX, forms, data boundary |
+| DEC-03 | DECIDED 2026-10-10 (product owner) | Keep the build's approach: in-house Tailwind components with glyph icons; controlled inputs, a pure validator per form and the Core API's field errors; plain dictionaries chosen on the server; Server Components through the DAL. The earlier proposal (React Hook Form, Zod, shadcn/ui, Lucide, TanStack Query, i18next) is not adopted. “reactForms” has no archived original | UIUX, forms, data boundary |
 | DEC-04 | PROPOSED | Initial demo languages: English (en, default) and Malay (ms). Extra languages and rollout order are unconfirmed | Translation keys and AT-X01/X02 |
 | DEC-05 | PROPOSED | Demo currency MYR; display timezone Asia/Kuala_Lumpur. Language/timezone can change. Currency is fixed demo MYR (invoices keep original currency) | Not a market decision; money/time formatting |
 | DEC-06 | Production instruction (document authors) | Match customer Loyalty HTML/CSS: #005BEA primary, Plus Jakarta Sans, 14px cards. Remove the earlier separate color proposal | Evidence in [design analysis](../reference-design-analysis.md) and UIUX; mark accessibility adjustments as ADAPT |

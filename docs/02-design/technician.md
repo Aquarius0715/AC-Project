@@ -43,7 +43,7 @@ Treat route parameters as untrusted input and always validate them. Service name
 
 1. Check the session and permission scope. Validate IDs and URL filters against schemas.
 2. Call mock services through Queries and receive screen models.
-3. Build forms with React Hook Form and shared schemas. Also validate capabilities and periods.
+3. Build forms with controlled inputs and a pure validator per form in `shared/lib`; also validate capabilities and periods, and the Core API checks again (DEC-03, decided 2026-10-10).
 4. Immediately before a mutation, check the target version, permissions, and current state. For major actions, also confirm the target and reason.
 5. Change shared demo state through the Repository. Emit events with a correlation ID for tracking. Invalidate related Queries so they can be refetched.
 6. Keep a waiting indicator visible while awaiting a response. Show success, denial, and failure separately. Keep form inputs when submission fails.
@@ -54,7 +54,7 @@ For each DD-T number, verify the matching AT-T acceptance criteria, the error ca
 
 ## Detailed Feature Specifications (0.6.0)
 
-Keep form values in RHF (React Hook Form) and validate them with schemas. Read-only screens do not require form validation. Follow input/output contracts DDC-03 and DDC-09 for audit, notifications, and shared errors. Display read-only values from a single Query source. The [Implementation Contracts](implementation-contracts.md) define shared types, paging, time, and error handling; the following adds individual conditions. Use the tokens and patterns in [UIUX](../03-uiux/UIUXSpecification.md) UX-04 and UX-08 for appearance.
+Keep form values in the form component and validate them with its pure validator (DEC-03). Read-only screens do not require form validation. Follow input/output contracts DDC-03 and DDC-09 for audit, notifications, and shared errors. Display read-only values from a single Query source. The [Implementation Contracts](implementation-contracts.md) define shared types, paging, time, and error handling; the following adds individual conditions. Use the tokens and patterns in [UIUX](../03-uiux/UIUXSpecification.md) UX-04 and UX-08 for appearance.
 
 ### DD-T01 Details
 
