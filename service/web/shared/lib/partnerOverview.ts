@@ -4,7 +4,7 @@
 // Texts in the display language (`t` / `i`, IR270). The periods and today's timeline are Kuala Lumpur days and hours;
 // deadlines, starts and the activity are instants in the user's display time zone (IR44).
 import { klTime } from "@ac/web/lib/devices";
-import { EN, relativeTime, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, intlTag, relativeTime, showTime, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
 
 const en = translator("en");
 
@@ -55,6 +55,27 @@ export function period(nowIso: string, from?: string, to?: string): { from: stri
 export function shift(p: { from: string; to: string }, n: number) {
   const mv = (d: string) => new Date(Date.parse(`${d}T00:00:00Z`) + n * day).toISOString().slice(0, 10);
   return { from: mv(p.from), to: mv(p.to) };
+}
+
+/** A Kuala Lumpur date (YYYY-MM-DD) as “21 Sept”, or “Mon 21 Sept” with the weekday, in the user's language. Call it
+ * on the server: a browser's ICU can write a month differently, and the page would not hydrate. */
+export function klDay(d: string, locale: Locale, weekday = false): string {
+  return new Date(`${d}T00:00:00Z`).toLocaleDateString(intlTag(locale), { timeZone: "UTC", day: "numeric", month: "short", ...(weekday ? { weekday: "short" } : {}) })
+    .replace(/[\u00a0\u2009\u202f]/g, " ").replace(",", "");
+}
+/** The period inside section titles ("Job progress — this week"). */
+const periodWord: Record<string, string> = { "This week": "this week", "Last week": "last week", "Next week": "next week" };
+/** The period choice of the overview and the job list (IR270): the URL's period, its words for the titles and the
+ * three weeks around now, with Kuala Lumpur dates in the user's language. */
+export function periodChoice(p: { from: string; to: string; label: string }, nowIso: string, i: I18n = EN) {
+  const { t, display: { locale } } = i;
+  const week = weekOf(nowIso);
+  const range = (q: { from: string; to: string }) => `${klDay(q.from, locale)} – ${klDay(q.to, locale)}`;
+  return {
+    period: { value: `${p.from}|${p.to}`, custom: p.label === "Period", text: periodWord[p.label] ? t(periodWord[p.label]) : range(p), label: range(p) },
+    periods: [{ label: "Last week", ...shift(week, -7) }, { label: "This week", ...week }, { label: "Next week", ...shift(week, 7) }]
+      .map((o) => ({ value: `${o.from}|${o.to}`, label: `${t(o.label)} (${range(o)})` })),
+  };
 }
 
 /** A jobs.list row with its unit name; the summary names the active assignment's technician (IR225). */

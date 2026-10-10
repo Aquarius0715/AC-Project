@@ -6,19 +6,14 @@
 // user's display language; the period and today's timeline stay Kuala Lumpur days and hours (IR270).
 import "server-only";
 import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
-import { i18nOf, intlTag, showClock, type Locale } from "@ac/web/lib/i18n";
+import { i18nOf, showClock } from "@ac/web/lib/i18n";
 import {
-  actions, activity, capacity, hhmm, kpis, partnerJob, period, progress, timeline, timelinePct, weekOf, shift,
+  actions, activity, capacity, hhmm, klDay, kpis, partnerJob, period, periodChoice, progress, timeline, timelinePct,
   type ApiCapacity, type ApiCounts, type ApiJobEvent, type ApiMember, type ApiPartnerJob,
 } from "@ac/web/lib/partnerOverview";
 
 type Page<T> = { items: T[] };
 const KL = "Asia/Kuala_Lumpur";
-/** The period inside the section titles ("Job progress — this week"). */
-const periodWord: Record<string, string> = { "This week": "this week", "Last week": "last week", "Next week": "next week" };
-/** A Kuala Lumpur date (YYYY-MM-DD) as “21 Sept” or with the weekday (“Mon 21 Sept”) in the user's language. */
-const kd = (d: string, locale: Locale, weekday = false) =>
-  new Date(`${d}T00:00:00Z`).toLocaleDateString(intlTag(locale), { timeZone: "UTC", day: "numeric", month: "short", ...(weekday ? { weekday: "short" } : {}) }).replace(/[\u00a0\u2009\u202f]/g, " ").replace(",", "");
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
   if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback; // not readable now: empty section
   throw e;
@@ -49,21 +44,12 @@ export async function loadOverview(sp: { from?: string; to?: string }) {
   const recent = [...jobs].sort((a, b) => Number(a.status === "completed") - Number(b.status === "completed") || Date.parse(b.dueAt ?? "") - Date.parse(a.dueAt ?? "")).slice(0, 8);
   const events = (await Promise.all(recent.map((j) => optional(coreOp<Page<ApiJobEvent>>("jobs.events", { jobId: j.id, query: { limit: 100 } }).then((r) => r.items), [])))).flat();
   const names = new Map(members.map((m) => [m.id, m.displayName]));
-  const week = weekOf(nowIso);
   const ms = now.getTime();
-  const range = (q: { from: string; to: string }) => `${kd(q.from, loc)} – ${kd(q.to, loc)}`;
-  const options = [{ label: "Last week", ...shift(week, -7) }, { label: "This week", ...week }, { label: "Next week", ...shift(week, 7) }]
-    .map((o) => ({ value: `${o.from}|${o.to}`, label: `${t(o.label)} (${range(o)})` }));
   return {
     updated: showClock(nowIso, display),
     otherZone: display.timeZone !== KL,
-    period: {
-      value: `${p.from}|${p.to}`, custom: p.label === "Period",
-      // the section titles' period: a week's word, or the dates of a URL period (Kuala Lumpur days)
-      text: periodWord[p.label] ? t(periodWord[p.label]) : range(p), label: range(p),
-    },
-    periods: options,
-    today: { title: t("Today · {day}", { day: kd(today, loc, true) }), nowPct: timelinePct(nowIso, today), now: hhmm(nowIso) },
+    ...periodChoice(p, nowIso, i), // period + periods
+    today: { title: t("Today · {day}", { day: klDay(today, loc, true) }), nowPct: timelinePct(nowIso, today), now: hhmm(nowIso) },
     kpis: kpis(summary.counts, jobs, ms, names, { from: p.from, to: p.to }, i),
     progress: progress(jobs, ms),
     actions: actions(jobs, ms, names, i),

@@ -2865,3 +2865,32 @@ These two parts are shared by the four apps; IR266 item 6 left them open.
    - The technician and HQ screens.
    - The browser demo's screens.
    - The assistant panel and the voice demo's answers.
+
+## IR271 The contractor job list in the display language — 2026-10-10
+
+`/partner/jobs` (FR-P01, DD-P01 job list, Figma Contractor 02-1…02-6) follows the overview (IR270).
+
+1. **Texts.** These are translated:
+   - the status tabs;
+   - the sort choices and the footer's sort text;
+   - the period choice ("Period: This week (14 Sept – 20 Sept)");
+   - the heading and the column heads;
+   - every row: offer, accepted before the window, unassigned, assigned with the technician's acknowledgement, in progress, overdue, submitted, completed, on hold, rework, cancelled, history only;
+   - the empty states, the restart banner and the paging.
+2. **Times.**
+   - A visit slot and an assigned slot show as one span in the display time zone ("22 Sept, 9:00 – 11:00 am MYT").
+   - The answer-by, due, ended and completed times use IR44.
+   - The period stays in Kuala Lumpur days. The overview and the list share `periodChoice`, which formats on the server.
+3. **No English text as a key.** The line under a technician's name was coloured warn when the name was not "Unassigned". That compared English text, which Malay would break. Rows now carry `tech.subTone`, which is set for a technician who can't make the slot.
+4. **Shared helpers.**
+   - `jobRow` takes the display.
+   - `slotText` keeps the Kuala Lumpur form for the schedule and the job detail until they are translated.
+   - `periodChoice` and `klDay` move to `lib/partnerOverview`.
+5. **Checked.**
+   - Vitest: 36 files, 200 tests. `partnerJobs.test.ts` covers the new English times, the Malay rows and the period choice.
+   - E2E: the partner language spec is now `partner/language.e2e.ts` and also opens the job list in Malay. The suite: 58 passed, 9 skipped. The users are en / Asia/Kuala_Lumpur, and all 53 E2E jobs are cancelled.
+6. **Still open.**
+   - The other partner screens: job detail, review, schedule, team, history, payouts and unit.
+   - The technician and HQ screens.
+   - The browser demo's screens.
+   - The assistant panel and the voice demo's answers.

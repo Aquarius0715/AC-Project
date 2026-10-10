@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.155.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
+Version: 0.156.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.156.0 (2026-10-10): The contractor job list in Malay, with slots and deadlines in the user's time zone. A row no longer takes its colour from English text (IR271).
 0.155.0 (2026-10-10): The contractor overview in Malay, the first partner screen. The period and today's timeline stay Kuala Lumpur days and hours; the other times use the user's time zone (IR270).
 0.154.0 (2026-10-10): A failed action's toast and each route's loading and error states in Malay, for all four apps; the i18n key check also covers the route names (IR269).
 0.153.0 (2026-10-10): The last sign-in is recorded from the token's sign-in time (OIDC auth_time) in business time, so the customer's and HQ's Users lists show it. New column identity.users.sign_in_auth_time (IR268).
