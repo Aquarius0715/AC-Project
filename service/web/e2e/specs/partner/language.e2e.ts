@@ -1,6 +1,7 @@
-// AT-X01-N ③ for the contractor (FR-X01, FR-P01, FR-P02, FR-P05, IR44, IR270–IR274): with Malay and Asia/Tokyo saved
-// in Preferences, the overview, the job list, a job's page and a completed job's quality review speak Malay; the update
-// time is in GMT+9, while the period and today's timeline stay Kuala Lumpur days and hours — the timeline says so.
+// AT-X01-N ③ for the contractor (FR-X01, FR-P01, FR-P02, FR-P03, FR-P05, IR44, IR270–IR275): with Malay and Asia/Tokyo
+// saved in Preferences, the overview, the job list, a job's page, a completed job's quality review and the schedule
+// speak Malay; the update time and the delegation windows are in GMT+9, while the period, today's timeline and the
+// team's week stay Kuala Lumpur days and hours — the screens say so.
 // English and the earlier zone come back at the end, or in afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
@@ -37,6 +38,15 @@ test("the contractor screens in Malay keep Kuala Lumpur days and show instants i
   if (await done.count()) {
     await page.goto(`${(await done.getAttribute("href"))!.split("?")[0]}/review`);
     await expect(main.getByRole("heading", { name: /^(Semakan bukti|Tiada laporan untuk disemak)$/ })).toBeVisible();
+  }
+  await page.goto("/partner/schedule");
+  await expect(main.getByRole("heading", { name: /^(Kerja yang diterima|○ Tiada kerja yang diterima)$/ })).toBeVisible();
+  if (await main.getByRole("heading", { name: "Kerja yang diterima", exact: true }).count()) { // not the empty state's "○ Tiada kerja yang diterima"
+    await expect(main.getByRole("heading", { name: "Tetingkap delegasi" })).toBeVisible();
+    await expect(main.getByRole("combobox", { name: "Isih" })).toContainText("Status ↑");
+    await expect(main).toContainText(/GMT\+9/); // the delegation windows in the display zone
+    const week = main.getByRole("heading", { name: /^Jadual pasukan — minggu \d{1,2} \S+$/ });
+    if (await week.count()) await expect(main).toContainText("Hari dan masa dalam waktu Kuala Lumpur (Asia/Kuala_Lumpur).");
   }
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;

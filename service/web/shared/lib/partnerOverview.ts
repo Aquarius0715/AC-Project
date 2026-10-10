@@ -199,6 +199,13 @@ export function timelinePct(iso: string, date: string): number {
   return Math.min(100, Math.max(0, ((Date.parse(iso) - start) / ((DAY_END - DAY_START) * 3600_000)) * 100));
 }
 
+const SHORT_QUALIFICATIONS: Record<string, string> = { demo_indoor: "Indoor", demo_outdoor: "Outdoor", demo_electrical: "Electrical" };
+/** A qualification in a compact list (“Indoor, Electrical”); an unknown code reads as its words. */
+export const shortQualification = (code: string, t: T = en) => (SHORT_QUALIFICATIONS[code] ? t(SHORT_QUALIFICATIONS[code]) : code.replace(/^demo_/, "").replace(/_/g, " "));
+const UNAVAILABILITY: Record<string, string> = { annual_leave: "annual leave", sick: "sick leave", training: "training", public_holiday: "public holiday", other: "other" };
+/** Why a technician is unavailable on a day (the members.setUnavailability types), in running text. */
+export const unavailabilityLabel = (type: string, t: T = en) => (UNAVAILABILITY[type] ? t(UNAVAILABILITY[type]) : type.replace(/_/g, " "));
+
 export type TimelineRow = { id: string; name: string; sub: string; blocks: { left: number; width: number; text: string }[]; off: string | null };
 /** Today's timeline per technician from members.capacity of the date (assigned slots inside 08:00–18:00), in Kuala
  * Lumpur hours like its axis. */
@@ -210,8 +217,8 @@ export function timeline(today: ApiCapacity[], members: ApiMember[], date: strin
       const left = timelinePct(s.startAt, date), right = timelinePct(s.endAt, date);
       return { left, width: Math.max(right - left, 0), text: `${hhmm(s.startAt)}–${hhmm(s.endAt)}` };
     }).filter((b) => b.width > 0);
-    const quals = (m.qualifications ?? []).filter((q) => !q.revokedAt).map((q) => q.code.replace(/^demo_/, "").replace(/_/g, " "));
-    return { id: m.id, name: m.displayName, sub: quals.slice(0, 2).join(", ") || t("Technician"), blocks, off: c?.unavailability ? c.unavailability.replace(/_/g, " ") : null };
+    const quals = (m.qualifications ?? []).filter((q) => !q.revokedAt).map((q) => shortQualification(q.code, t));
+    return { id: m.id, name: m.displayName, sub: quals.slice(0, 2).join(", ") || t("Technician"), blocks, off: c?.unavailability ? unavailabilityLabel(c.unavailability, t) : null };
   });
 }
 

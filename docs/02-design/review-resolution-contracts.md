@@ -2969,3 +2969,29 @@ DEC-03 was open since IR257. The SRC-02 phrase "shared libraries, reactForms" ha
    - The technician and HQ screens.
    - The browser demo's screens.
    - The assistant panel and the voice demo's answers.
+
+## IR275 The contractor's schedule in the display language — 2026-10-10
+
+`/partner/schedule` (FR-P03, DD-P03, Figma Contractor 03-1…03-10) follows the quality review (IR274).
+
+1. **Texts.** These are translated:
+   - the accepted jobs with their state lines and the sort, and the delegation windows;
+   - the assign form: titles, banners (cannot make it, work window ended, not yet delegated, nothing to schedule), the technician choices with their badges, the fixed visit time or the kept start and the new end, the reason, the warnings and the buttons;
+   - the team's week with its legend and notes;
+   - the refusals of `jobs.assign`, the toasts and the confirmation.
+   Validation refusals name the field ("Reason: required (1–1000 characters)"). Qualifications, unavailability types (annual leave, sick leave, training, public holiday, other) and job states are words (`shortQualification`, `unavailabilityLabel`, `statusWord`); the overview's timeline uses the first two as well, so it no longer shows codes. Names, IDs and reasons stay as written.
+2. **Times.** The loader formats the job's instants on the server in the display time zone (IR44):
+   - the delegation windows and when an accepted offer's delegation starts;
+   - the agreed visit time, the current slot and the kept start;
+   - the technician's alternative time.
+   The Server Action returns the saved slot formatted the same way for the confirmation. While the work is under way, the new end is typed in the display time zone (`zonedInstant`, NFR-08). The team's week and the candidates' free hours stay on Kuala Lumpur working days and hours, and the screen says so. The week marks today from the demo clock instead of the browser's clock.
+3. **Shared helpers.** These take the translator or the display: `scheduleRow`, `formMode`, `freeText`, `candidates`, `weekGrid` and `assignRefusal`. Their English output moves to IR44 too ("Accepted · delegation starts 22 Sept 2026, 8:00 am MYT"). `freeText` reads "free 09:00–13:00", "no hours" or "fully booked". A row says whether its window ended (`ended`) instead of the view comparing the English "Ended".
+4. **Checked.**
+   - Vitest: 36 files, 202 tests. `partnerSchedule.test.ts` covers the new English times and the Malay rows, form modes, candidates, week cells and refusals.
+   - E2E: `partner/language.e2e.ts` also opens the schedule in Malay. The suite: 58 passed, 9 skipped. The users are en / Asia/Kuala_Lumpur, and all 62 E2E jobs are cancelled.
+   - A visual check on an accepted job in Malay with Asia/Tokyo: the windows and the visit time in GMT+9, the week in Kuala Lumpur hours with "Cadangan ini" on the visit day.
+5. **Still open.**
+   - The other partner screens: team, history, payouts and unit.
+   - The technician and HQ screens.
+   - The browser demo's screens.
+   - The assistant panel and the voice demo's answers.

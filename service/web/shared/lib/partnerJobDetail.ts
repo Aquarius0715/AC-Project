@@ -35,6 +35,12 @@ export const requiredFor = (serviceScope: string[]) => serviceScope.map((s) => S
 const TYPES: Record<string, string> = { periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance" };
 export const typeLabel = (type: string, t: T = en) => (TYPES[type] ? t(TYPES[type]) : type);
 export const originLabel = (o: string, t: T = en) => t(o === "periodic_plan" ? "from the periodic plan" : "agreed with the client");
+const STATUS_WORDS: Record<string, string> = {
+  offered: "offered", accepted: "accepted", assigned: "assigned", in_progress: "in progress", on_hold: "on hold", submitted: "submitted",
+  rework_requested: "rework requested", completed: "completed", cancelled: "cancelled",
+};
+/** A job status inside a sentence (“the job is on hold”), in the display language. */
+export const statusWord = (status: string, t: T = en) => (STATUS_WORDS[status] ? t(STATUS_WORDS[status]) : status.replace(/_/g, " "));
 export const when = (iso: string) => klTime(iso); // YYYY-MM-DD HH:MM in Kuala Lumpur
 export const range = (from: string, to: string) => (when(from).slice(0, 10) === when(to).slice(0, 10) ? `${when(from)}–${when(to).slice(11)}` : `${when(from)} – ${when(to)}`);
 /** “1st”, “2nd”, “3rd”, “4th” … in English, “ke-1” in Malay. */

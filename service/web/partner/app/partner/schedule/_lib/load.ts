@@ -3,11 +3,14 @@
 // and members.list for the names, jobs.get of the selected job (form mode, current assignment and acknowledgement),
 // units.get for its required qualifications, members.eligible for its slot, members.capacity of the slot's week and
 // jobs.list per technician (the job of each booked block). Candidate search does not authorize: jobs.assign rechecks.
+// Texts in the user's display language; the job's instants are formatted here in their display time zone and the
+// team's week keeps Kuala Lumpur days and hours (IR275).
 import "server-only";
-import { coreAll, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { i18nOf, showDay, showSpan, showTime, zonedParts } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { requiredFor, type ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDetail";
-import { weekOf, type ApiCapacity, type ApiMember, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
+import { klDay, weekOf, type ApiCapacity, type ApiMember, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
 import { candidates, formMode, SCHEDULE_STATUSES, scheduleRow, sortOf, SORTS, type ScheduleRow } from "@ac/web/lib/partnerSchedule";
 
 type Page<T> = { items: T[]; total: number };
@@ -17,10 +20,13 @@ const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => 
 });
 const plusDays = (date: string, n: number) => new Date(Date.parse(`${date}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 const klDate = (iso: string) => new Date(Date.parse(iso) + 8 * 3600_000).toISOString().slice(0, 10);
+const KL = "Asia/Kuala_Lumpur";
 
 export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
-  const now = await coreNow();
+  const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
   const nowMs = now.getTime();
+  const i = i18nOf(display);
+  const { t } = i;
   const sort = sortOf(sp.sort);
   const [list, members, units] = await Promise.all([
     coreOp<Page<ApiPartnerJob>>("jobs.list", { filters: { statuses: [...SCHEDULE_STATUSES] }, sort: { field: sort, direction: "asc" }, limit: 100 }),
@@ -29,8 +35,8 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   ]);
   const names = new Map(members.map((m) => [m.id, m.displayName]));
   const unitNames = new Map(units.map((u) => [u.id, u.displayName]));
-  const rows = list.items.map((j) => scheduleRow(j, nowMs, unitNames, names)).filter((r): r is ScheduleRow => !!r);
-  const base = { now: now.toISOString(), sort, sorts: SORTS, rows, total: list.total, members };
+  const rows = list.items.map((j) => scheduleRow(j, nowMs, unitNames, names, i)).filter((r): r is ScheduleRow => !!r);
+  const base = { now: now.toISOString(), sort, sorts: SORTS.map((s) => ({ id: s.id, text: t(s.text) })), rows, total: list.total, members, zone: display.timeZone, otherZone: display.timeZone !== KL };
   const picked = rows.find((r) => r.id === sp.jobId) ?? rows[0];
   if (!picked) return { ...base, selected: null, week: null };
   const job = await coreOp<ApiPartnerJobDetail>("jobs.get", { jobId: picked.id }).catch((e) => {
@@ -39,7 +45,7 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   });
   if (!job || job.projection === "history") return { ...base, selected: null, week: null };
   const label = `${picked.short} · ${picked.title}`;
-  const mode = formMode(job, label, nowMs, names);
+  const mode = formMode(job, label, nowMs, names, i);
   const slot: Slot | null = mode.slot;
   const unit = job.projection === "detail" ? await optional(coreOp<ApiUnitDetail>("units.get", { id: job.unitId }), null) : null;
   const required = job.projection === "offer" ? job.requiredQualifications : requiredFor(unit?.serviceScope ?? []);
@@ -53,14 +59,25 @@ export async function loadSchedule(sp: { jobId?: string; sort?: string }) {
   ]);
   const currentId = job.projection === "detail" ? job.assignment?.technicianMembershipId ?? null : null;
   const day = slot ? capacity[dates.indexOf(klDate(slot.startAt))] ?? [] : [];
+  const alternative = job.projection === "detail" ? job.assignment?.alternativeSlot ?? null : null;
+  const local = (iso: string) => { const p = zonedParts(iso, display.timeZone); return `${p.date}T${p.time}`; }; // datetime-local in the display zone
   return {
     ...base,
     selected: {
       id: picked.id, short: picked.short, label, version: job.projection === "detail" ? job.version : job.jobVersion, mode, currentId,
-      ack: job.projection === "detail" && job.assignment ? { status: job.assignment.acknowledgement, reason: job.assignment.cantMakeReason, alternative: job.assignment.alternativeSlot ?? null } : null,
-      window: picked.window, required, candidates: slot ? candidates(members, new Set(eligible), required, slot, day, currentId) : [],
+      ack: job.projection === "detail" && job.assignment ? { status: job.assignment.acknowledgement, reason: job.assignment.cantMakeReason, alternative } : null,
+      window: picked.window, required, candidates: slot ? candidates(members, new Set(eligible), required, slot, day, currentId, t) : [],
+      text: {
+        window: picked.window ? showSpan(picked.window.from, picked.window.until, display) : null,
+        slot: slot ? showSpan(slot.startAt, slot.endAt, display) : null, start: slot ? showTime(slot.startAt, display) : null,
+        end: slot ? local(slot.endAt) : "", alternative: alternative ? showSpan(alternative.startAt, alternative.endAt, display) : null,
+      },
     },
-    week: { from: week.from, dates, capacity, jobsOf: Object.fromEntries(booked) as Record<string, { short: string; slot: Slot }[]> },
+    week: {
+      from: week.from, dates, capacity, jobsOf: Object.fromEntries(booked) as Record<string, { short: string; slot: Slot }[]>,
+      title: t("Team schedule — week of {day}", { day: klDay(week.from, display.locale) }), today: klDate(now.toISOString()),
+      days: dates.map((d) => showDay(`${d}T04:00:00Z`, { locale: display.locale, timeZone: KL })), // noon in Kuala Lumpur
+    },
   };
 }
 

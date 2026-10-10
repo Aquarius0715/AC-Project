@@ -6,6 +6,7 @@ import { Badge, Banner, Btn, Card, cx, EmptyState, Field, Modal, Page, SummaryLi
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import type { T } from "@ac/web/lib/i18n";
+import { statusWord } from "@ac/web/lib/partnerJobDetail";
 import { resultText, type EvidenceRow, type InspectionRow, type VersionRow } from "@ac/web/lib/partnerReview";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { reviewReport } from "../actions";
@@ -26,7 +27,6 @@ const refusal = (f: ActionFailure, t: T): string | null =>
     : f.code === "FORBIDDEN" ? t("FORBIDDEN — a contributor to this report version cannot approve it (IR31), or your company does not hold this delegation.")
     : f.code === "NOT_FOUND" ? t("NOT_FOUND — the job is outside your company's delegation.") : null;
 const dot: Record<EvidenceRow["tone"], string> = { ok: "bg-ok", warn: "bg-warn", muted: "bg-line" };
-const statusWord: Record<string, string> = { submitted: "submitted", completed: "completed", rework_requested: "rework requested", in_progress: "in progress", assigned: "assigned", accepted: "accepted", on_hold: "on hold", cancelled: "cancelled" };
 
 /** Quality review of a submitted report (FR-P05): the technician's evidence, the DD-P05 evidence check, accept or
  * return with a reason; the reviewer never edits the original records and cannot approve their own contribution.
@@ -39,7 +39,7 @@ export function ReviewView({ live }: { live: ReviewLive }) {
   const [error, setError] = useState<string | null>(null);
   const [refused, setRefused] = useState<string | null>(null);
   const r = live.report;
-  const status = statusWord[live.job.status] ? t(statusWord[live.job.status]) : live.job.status.replace(/_/g, " ");
+  const status = statusWord(live.job.status, t);
   const head = <div className="text-[13px] text-muted"><Link href="/partner/jobs" className="font-semibold text-primary">{t("← Jobs")}</Link> › {t("{id} · Quality review", { id: live.job.id.slice(0, 8) })}{live.job.unit ? ` · ${live.job.unit}` : ""}</div>;
   if (!r) {
     return <Page>{head}<Card title={t("No report to review")}><EmptyState title={t(live.job.status === "submitted" ? "Report not readable" : "Nothing submitted yet")}>{live.job.status === "submitted" ? t("The submitted report is outside your company's delegation window.") : t("This job is {status}; a review opens once the technician submits the report.", { status })}</EmptyState></Card></Page>;
