@@ -63,6 +63,19 @@ export const showTime = (iso: string | null, d: Display = DEFAULT_DISPLAY) => zo
 /** The IR44 time without the date, where a screen shows only the time of a recent reading: “9:12 am MYT”. */
 export const showClock = (iso: string | null, d: Display = DEFAULT_DISPLAY) => zoned(iso, d, { timeStyle: "short" });
 
+/** The IR44 date without the time, for the day something was done: “28 Sept 2026” in the user's display time zone. */
+export function showDate(iso: string | null, d: Display = DEFAULT_DISPLAY): string {
+  if (!iso) return "—";
+  for (const timeZone of [d.timeZone, DEFAULT_DISPLAY.timeZone]) {
+    try {
+      return new Date(iso).toLocaleDateString(intlTag(d.locale), { dateStyle: "medium", timeZone });
+    } catch {
+      // RangeError: unknown time zone
+    }
+  }
+  return iso.slice(0, 10);
+}
+
 /** The translator with the display, for the pure helpers that word and time a screen's text (IR259, IR260). */
 export type I18n = { t: T; display: Display };
 export const i18nOf = (display: Display): I18n => ({ t: translator(display.locale), display });

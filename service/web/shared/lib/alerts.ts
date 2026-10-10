@@ -1,7 +1,7 @@
 // Customer alerts (DATA_SOURCE=api): the alert titles every role shows and the customer's alert inbox rows (IR51:
 // unresolved critical / warning alerts need attention, the rest are information; DD-C08 read state on the
 // notifications). Pure code shared by server and client.
-import { translator, type T } from "@ac/web/lib/i18n";
+import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 export type Alert = { id: string; title: string; sev: "warning" | "normal"; kind: string; icon: string; where: string; ev: string; group: "attn" | "info"; read: boolean };
 
 /** Alert of service-contracts.ts (fields shown on this screen). */
@@ -21,34 +21,36 @@ export function alertTitle(a: Pick<ApiAlert, "causeCode" | "type">, t: T = trans
 
 // ---- the customer alert inbox (DD-C08, IR242) ----
 
-const KL = "Asia/Kuala_Lumpur";
-const stamp = (iso: string) => new Date(iso).toLocaleString("en-MY", { dateStyle: "medium", timeStyle: "short", timeZone: KL });
 /** A notification about an alert (Notification of service-contracts.ts: the fields the inbox needs). */
 export type AlertNote = { id: string; version: number; sourceAlertId: string | null; readAt: string | null };
 export type InboxAlert = {
   id: string; unitId: string; type: string; title: string; severity: "critical" | "warning" | "normal"; kind: string; where: string; evidence: string; group: "attn" | "info";
-  status: { text: string; tone: "warn" | "primary" | "ok" | "muted"; detail: string };
+  /** state is the alert's status (open / acknowledged / resolved); text and detail are in the display language */
+  status: { state: "open" | "acknowledged" | "resolved"; text: string; tone: "warn" | "primary" | "ok" | "muted"; detail: string };
   /** the signed-in membership's notifications about the alert: unread ones (marked read on opening) and how many exist */
   unread: { id: string; version: number }[]; notes: number;
 };
 const rank = { critical: 0, warning: 1, normal: 2 };
 /** One row per alert: the unit and its place, the status with its time and resolution, Needs attention for unresolved
- * critical / warning alerts (IR51), and the read state that lives on the notifications, never on the alert (DD-C08). */
-export function inboxAlerts(alerts: ApiAlert[], notes: AlertNote[], unit: (id: string) => { name: string; place: string } | undefined): InboxAlert[] {
+ * critical / warning alerts (IR51), and the read state that lives on the notifications, never on the alert (DD-C08).
+ * Texts in the display language, times IR44 in the user's display time zone (IR261). */
+export function inboxAlerts(alerts: ApiAlert[], notes: AlertNote[], unit: (id: string) => { name: string; place: string } | undefined, i: I18n = EN): InboxAlert[] {
+  const { t, display } = i;
+  const stamp = (iso: string) => showTime(iso, display);
   const attn = (a: ApiAlert) => a.status !== "resolved" && a.severity !== "normal";
   const order = [...alerts].sort((x, y) => Number(attn(y)) - Number(attn(x)) || rank[x.severity] - rank[y.severity] || y.detectedAt.localeCompare(x.detectedAt));
   return order.map((a): InboxAlert => {
     const u = unit(a.unitId);
     const mine = notes.filter((n) => n.sourceAlertId === a.id);
     const resolved = a.status === "resolved";
-    const status = resolved ? { text: "Resolved", tone: "ok" as const, detail: `Resolved ${a.resolvedAt ? stamp(a.resolvedAt) : ""}${a.resolutionReason ? ` · ${a.resolutionReason}` : ""}`.trim() }
-      : a.status === "acknowledged" ? { text: "Acknowledged", tone: "primary" as const, detail: `Acknowledged ${a.acknowledgedAt ? stamp(a.acknowledgedAt) : ""} · still unresolved`.trim() }
-      : { text: "Unresolved", tone: a.severity === "normal" ? "muted" as const : "warn" as const, detail: "Open — not resolved yet" };
+    const status = resolved ? { state: "resolved" as const, text: t("Resolved"), tone: "ok" as const, detail: [a.resolvedAt ? t("Resolved {when}", { when: stamp(a.resolvedAt) }) : t("Resolved"), a.resolutionReason].filter(Boolean).join(" · ") }
+      : a.status === "acknowledged" ? { state: "acknowledged" as const, text: t("Acknowledged"), tone: "primary" as const, detail: a.acknowledgedAt ? t("Acknowledged {when} · still unresolved", { when: stamp(a.acknowledgedAt) }) : t("Acknowledged · still unresolved") }
+      : { state: "open" as const, text: t("Unresolved"), tone: a.severity === "normal" ? "muted" as const : "warn" as const, detail: t("Open — not resolved yet") };
     return {
-      id: a.id, unitId: a.unitId, type: a.type, title: alertTitle(a), severity: a.severity,
-      kind: a.evidenceKind === "inspection" ? "✎ Inspection record" : a.type === "maintenance" ? "◷ Maintenance reminder" : a.type === "quality" ? "≋ Air quality" : "✕ Fault",
-      where: `${u ? `${u.name}${u.place ? ` · ${u.place}` : ""}` : "AC"} · detected ${stamp(a.detectedAt)}`,
-      evidence: `${evidenceLabel[a.evidenceKind] ?? "Evidence"}: ${a.evidenceText}`,
+      id: a.id, unitId: a.unitId, type: a.type, title: alertTitle(a, t), severity: a.severity,
+      kind: t(a.evidenceKind === "inspection" ? "✎ Inspection record" : a.type === "maintenance" ? "◷ Maintenance reminder" : a.type === "quality" ? "≋ Air quality" : "✕ Fault"),
+      where: t("{where} · detected {when}", { where: u ? `${u.name}${u.place ? ` · ${u.place}` : ""}` : "AC", when: stamp(a.detectedAt) }),
+      evidence: `${t(evidenceLabel[a.evidenceKind] ?? "Evidence")}: ${a.evidenceText}`,
       group: attn(a) ? "attn" : "info", status,
       unread: mine.filter((n) => n.readAt === null).map((n) => ({ id: n.id, version: n.version })), notes: mine.length,
     };

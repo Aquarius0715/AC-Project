@@ -1,5 +1,6 @@
 // HQ alerts and alert policies (FR-A05, DATA_SOURCE=api): alerts.list, policies.list, units.list, customers.list and
 // members.list projected for the admin alerts screen. Pure code shared by the Server Component and the client view.
+import { translator, type T } from "@ac/web/lib/i18n";
 import { alertTitle } from "@ac/web/lib/alerts";
 
 export type Severity = "critical" | "warning" | "normal";
@@ -51,10 +52,10 @@ const stRank = { open: 0, acknowledged: 1, resolved: 2 } as const;
 const stLabel = { open: "Open", acknowledged: "Acknowledged", resolved: "Resolved" } as const;
 
 /** Recovery must lie on the safe side of the threshold for the operator (≥ / >: below, ≤ / <: above). */
-export function recoveryError(op: Operator, threshold: number, recovery: number): string | undefined {
+export function recoveryError(op: Operator, threshold: number, recovery: number, t: T = translator("en")): string | undefined {
   const above = op === "gt" || op === "gte";
   if (above ? recovery < threshold : recovery > threshold) return undefined;
-  return `Recovery ${recovery} must be ${above ? "below" : "above"} the ${threshold} threshold (direction for ${opSymbol[op]})`;
+  return t(above ? "Recovery {recovery} must be below the {threshold} threshold (direction for {op})" : "Recovery {recovery} must be above the {threshold} threshold (direction for {op})", { recovery, threshold, op: opSymbol[op] });
 }
 
 export function adminAlertRows(alerts: ApiAdminAlert[], units: ApiUnitName[], customers: ApiCustomerName[], policies: ApiPolicy[]): AdminAlert[] {

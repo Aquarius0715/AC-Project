@@ -2545,3 +2545,34 @@ After the unit screen (IR259), the customer's home screen `/customer` (FR-C01, D
    - E2E: `customer/unit-language.e2e.ts` also opens the overview in Malay with Asia/Tokyo. It checks the card headings, the read time in GMT+9 and the period note in Asia/Kuala_Lumpur. The whole suite: 54 passed, 9 skipped; the users are back to en / Asia/Kuala_Lumpur.
    - A screenshot of the overview in Malay with Asia/Tokyo shows no overflow.
 6. **Still open.** The customer's alerts (inbox and policies), maintenance and the other screens, and the voice demo's answers.
+
+## IR261 The customer's alerts in the display language and time zone — 2026-10-10
+
+`/customer/alerts` (FR-C08, FR-C15, DD-C08, DD-C15, Figma Client 06a–06g) follows the overview (IR260).
+
+1. **Inbox.** These are translated:
+   - the filters and the summary line;
+   - Needs attention and Reminders & information;
+   - each alert's title, kind, status, read state and links;
+   - the alert dialog.
+   Times follow IR44 in the user's display time zone with the zone's abbreviation: detected, acknowledged, resolved and the read time. The evidence text and the resolution reason are shown as the Core API recorded them.
+2. **Status by state, not by words.** An inbox row now carries `status.state` (open / acknowledged / resolved) beside its text. The view used to compare the English text ("Resolved") to hide Book cleaning and to word the dialog; it now uses the state, so the screen behaves the same in Malay.
+3. **Alert policies.** These are translated:
+   - the default policy: its conditions, types, the turned-off note with its day (`showDate`, IR44 date in the display time zone) and the owner-only notice;
+   - the customer's own policies: When / Then, attached ACs and notes;
+   - the delete dialog;
+   - the editor: its steps, checks, live summary sentence and refusals.
+   The rule names of the default policy are HQ's data and stay as HQ wrote them. The rule type badge uses the rule category, not its translated word.
+4. **Shared helpers.** These take the translator and the display:
+   - `inboxAlerts`;
+   - in `lib/customerPolicies`: `conditionText`, `windowText`, `defaultRuleRows`, `policyCards`, `policyErrors`, `summaryText`, `policyRefusal`;
+   - `recoveryError` in `lib/adminAlerts`.
+   HQ's alert screens still call them without a display, so they stay English.
+5. **Checked.**
+   - Vitest: 33 files, 168 tests.
+     - `notifications.test.ts` checks the inbox in Malay with Asia/Tokyo and the status states.
+     - `customerPolicies.test.ts` checks the default rules, the editor's summary and checks, the cards and a refusal in Malay.
+     - The IR44 times replace the old ones in both.
+   - E2E: `customer/unit-language.e2e.ts` also opens the alerts in Malay with Asia/Tokyo: the inbox headings, the read time in GMT+9, the Alert policies tab and its table. `customer/alert-policies.e2e.ts` still passes in English. The whole suite: 54 passed, 9 skipped; the users are back to en / Asia/Kuala_Lumpur.
+   - Screenshots of the inbox and the policies tab in Malay with Asia/Tokyo show no overflow.
+6. **Still open.** Maintenance and the other customer screens, the browser demo's alerts screen (its seed rows and labels), the other roles' screens and the voice demo's answers.

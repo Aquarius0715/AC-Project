@@ -3,6 +3,7 @@ import {
   conditionText, defaultRuleRows, durationText, policyCards, policyErrors, policyForm, policyInput, policyRefusal, summaryText, toggledInput, windowText,
   type ApiAlertPolicy, type ApiDefaultPolicy,
 } from "@ac/web/lib/customerPolicies";
+import { i18nOf, translator } from "@ac/web/lib/i18n";
 
 const rule = (ruleKey: string, name: string, over: Partial<ApiDefaultPolicy["rules"][number]> = {}): ApiDefaultPolicy["rules"][number] =>
   ({ ruleKey, name, category: "air_quality", metric: "co2", operator: "gte", threshold: 1000, recoveryThreshold: 900, durationSeconds: 600, activeWindow: null, severity: "warning", ...over });
@@ -27,7 +28,11 @@ describe("customer alert policies", () => {
       ["Refrigerant low pressure", "Refrigerant pressure ≤ 350 kPa for 2 min", "Fault cause", "critical", true, 0],
       ["AC offline", "No heartbeat for 15 min", "Connection", "warning", false, 2],
     ]);
-    expect([d.on, d.notes]).toEqual([2, ["Turned off: “AC offline” — no alerts from this rule on any of your ACs (turned off by you, Sep 28). HQ still sees device status."]]);
+    expect([d.on, d.notes]).toEqual([2, ["Turned off: “AC offline” — no alerts from this rule on any of your ACs (turned off by you, 28 Sept 2026). HQ still sees device status."]]);
+    // in Malay the rule names stay HQ's; the rest follows the language (IR261)
+    const ms = defaultRuleRows(defaults, "cust-a", "someone-else", i18nOf({ locale: "ms", timeZone: "Asia/Kuala_Lumpur" }));
+    expect([ms.rows[0].name, ms.rows[0].condition, ms.rows[0].type, ms.rows[2].condition, ms.notes[0]]).toEqual(["Ventilation", "CO₂ ≥ 1000 ppm selama 10 min", "Kualiti udara", "Tiada denyutan selama 15 min",
+      "Dimatikan: “AC offline” — tiada amaran daripada peraturan ini pada mana-mana AC anda (dimatikan oleh pemilik akaun, 28 Sep 2026). HQ masih melihat status peranti."]);
     expect([durationText(60), durationText(90), durationText(10800), windowText({ weekdays: [6, 7], startLocal: "09:00", endLocal: "12:00" }), windowText({ weekdays: [1, 2, 3, 4, 5, 6, 7], startLocal: "22:00", endLocal: "06:00" })])
       .toEqual(["1 min", "90 s", "3 h", "only 09:00–12:00 on weekends", "only 22:00–06:00"]);
     expect(conditionText({ metric: "airflow_drop", operator: "gte", threshold: 30, durationSeconds: 3600 })).toBe("Airflow drop ≥ 30 % for 1 h");
@@ -57,5 +62,11 @@ describe("customer alert policies", () => {
     expect(toggledInput(policy({ channels: ["inApp", "whatsapp"] }), false)).toMatchObject({ id: "p1", enabled: false, channels: ["inApp", "whatsapp"], durationSeconds: 900 });
     expect(policyRefusal({ code: "FORBIDDEN", messageKey: "error.ownerOnly", fieldErrors: {} })).toMatch(/account owner/);
     expect(policyRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { recoveryThreshold: "error.recoveryDirection" } })).toMatch(/safe side/);
+    // the editor in Malay
+    const t = translator("ms");
+    expect(summaryText(f, t)).toBe("Ingatkan saya apabila CO₂ kekal ≥ 1200 ppm selama 15 min pada hari bekerja 08:00–19:00. Selesai di bawah 1000 ppm.");
+    expect(policyErrors({ ...f, recovery: "1300", duration: "0" }, t)).toEqual({ recovery: "Pemulihan 1300 mesti di bawah ambang 1200 (arah untuk ≥)", duration: "Antara 1 s dan 24 j." });
+    expect(policyCards([policy({ channels: ["inApp", "email"] })], () => "AC 1", t)[0]).toMatchObject({ badge: "Kualiti udara", then: "Peringatan · maklumkan melalui dalam aplikasi + e-mel", attachedText: "Dilampirkan pada 2 AC: AC 1, AC 1" });
+    expect(policyRefusal({ code: "CONFLICT", messageKey: "", fieldErrors: {} }, t)).toBe("Tidak disimpan: polisi ini telah berubah — versi terkini dipaparkan.");
   });
 });

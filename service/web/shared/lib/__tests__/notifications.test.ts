@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { inboxAlerts, type ApiAlert } from "@ac/web/lib/alerts";
 import { inboxRow, type ApiNotification } from "@ac/web/lib/notifications";
+import { i18nOf } from "@ac/web/lib/i18n";
 
 const note = (over: Partial<ApiNotification>): ApiNotification => ({
   id: "n1", version: 1, type: "job_update", sourceAlertId: null, target: { kind: "job", id: "job-1" }, templateKey: "job_update",
@@ -40,6 +41,13 @@ describe("inbox rows and alert rows", () => {
     () => ({ name: "Bedroom AC", place: "Home A › Bedroom" }));
     expect(rows.map((r) => [r.id, r.group, r.status.text, r.unread.length, r.notes])).toEqual([["hot", "attn", "Unresolved", 0, 1], ["win", "attn", "Acknowledged", 1, 1], ["old", "info", "Resolved", 0, 0], ["rem", "info", "Unresolved", 0, 0]]);
     expect([rows[3].title, rows[3].kind, rows[3].status.tone, rows[2].status.detail, rows[1].unread, rows[0].where])
-      .toEqual(["Filter cleaning reminder", "◷ Maintenance reminder", "muted", "Resolved 14 Sept 2026, 10:00 am · filter cleaned", [{ id: "n1", version: 1 }], "Bedroom AC · Home A › Bedroom · detected 14 Sept 2026, 9:00 am"]);
+      .toEqual(["Filter cleaning reminder", "◷ Maintenance reminder", "muted", "Resolved 14 Sept 2026, 10:00 am MYT · filter cleaned", [{ id: "n1", version: 1 }], "Bedroom AC · Home A › Bedroom · detected 14 Sept 2026, 9:00 am MYT"]);
+    expect(rows.map((r) => r.status.state)).toEqual(["open", "acknowledged", "resolved", "open"]);
+    // the user's language and display time zone (IR261); the evidence text and resolution reason stay as recorded
+    const [, win, old] = inboxAlerts([alert("hot", "critical", "open"), alert("win", "warning", "acknowledged", { causeCode: "window_open", acknowledgedAt: "2026-09-14T01:30:00Z" }), alert("old", "critical", "resolved", { resolvedAt: "2026-09-14T02:00:00Z", resolutionReason: "filter cleaned" })],
+      [], () => ({ name: "Bedroom AC", place: "" }), i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" }));
+    expect([win.title, win.status.text, win.status.detail, old.status.detail, old.where, old.evidence.split(":")[0]]).toEqual([
+      "Kemungkinan tingkap terbuka", "Diakui", "Diakui 14 Sep 2026, 10:30 PG GMT+9 · masih belum selesai", "Diselesaikan 14 Sep 2026, 11:00 PG GMT+9 · filter cleaned", "Bedroom AC · dikesan 14 Sep 2026, 10:00 PG GMT+9", "Bukti (disimpulkan)",
+    ]);
   });
 });
