@@ -3,6 +3,7 @@ import {
   actions, activity, bucket, capacity, kpis, partnerJob, period, progress, shift, timeline, timelinePct, until, weekOf,
   type ApiCapacity, type ApiMember, type ApiPartnerJob, type PartnerJob,
 } from "@ac/web/lib/partnerOverview";
+import { i18nOf } from "@ac/web/lib/i18n";
 
 const NOW = "2026-09-21T01:30:00Z"; // Mon 09:30 in Kuala Lumpur
 const now = Date.parse(NOW);
@@ -57,7 +58,7 @@ describe("partner overview", () => {
     expect(tiles.map((t) => [t.label, t.value, t.sub, t.href])).toEqual([
       ["Offers to answer", 1, "p09 · expires in 15 h", "/partner/jobs?tab=offered&from=2026-09-21&to=2026-09-27"],
       ["Awaiting assignment", 2, "Accepted, no technician yet", "/partner/schedule"],
-      ["In progress / scheduled", 3, "tech-external-a on site 10:00", "/partner/jobs?tab=active&from=2026-09-21&to=2026-09-27"],
+      ["In progress / scheduled", 3, "tech-external-a on site from today 10:00 am MYT", "/partner/jobs?tab=active&from=2026-09-21&to=2026-09-27"],
       ["Reports to review", 1, "p05 · Server room AC · awaiting review", "/partner/jobs/p05/review"],
       ["Overdue", 1, "Past the due date or the work window (IR89)", "/partner/jobs?tab=active&from=2026-09-21&to=2026-09-27"],
     ]);
@@ -77,7 +78,7 @@ describe("partner overview", () => {
       ["unassigned", "p02 · Rooftop unit", "Assign", "/partner/schedule?jobId=p02"],
     ]);
     const overdue = actions(fixture(), now, names)[1];
-    expect(overdue.detail).toBe("Work window ended 09-20 17:00 · tech-external-a");
+    expect(overdue.detail).toBe("Work window ended 20 Sept 2026, 5:00 pm MYT · tech-external-a"); // IR44
   });
 
   it("draws today's timeline and the week's capacity per technician", () => {
@@ -103,11 +104,31 @@ describe("partner overview", () => {
       { id: "e2", jobId: "p09", actorUserId: null, action: "job.offered", occurredAt: "2026-09-20T03:00:00Z" },
       { id: "e3", jobId: "ca", actorUserId: "user-a", action: "job.checked_in", occurredAt: "2026-09-21T01:05:00Z" },
       { id: "e4", jobId: "zz-unknown-job", actorUserId: "someone", action: "custom.thing", occurredAt: "2026-09-19T00:00:00Z" },
-    ], jobs, members, 3);
+    ], jobs, members, now, 3);
     expect(rows.map((r) => [r.time, r.text, r.href])).toEqual([
-      ["09-21 09:05", "Checked in on site — ca · Bedroom AC (tech-external-a)", "/partner/history?jobId=ca"],
-      ["09-20 18:10", "Report submitted — p05 · Server room AC (tech-external-a)", "/partner/history?jobId=p05"],
-      ["09-20 11:00", "Offer received from HQ — p09 · Jalan 1, KL", "/partner/history?jobId=p09"],
+      ["today 9:05 am MYT", "Checked in on site — ca · Bedroom AC (tech-external-a)", "/partner/history?jobId=ca"],
+      ["yesterday 6:10 pm MYT", "Report submitted — p05 · Server room AC (tech-external-a)", "/partner/history?jobId=p05"],
+      ["yesterday 11:00 am MYT", "Offer received from HQ — p09 · Jalan 1, KL", "/partner/history?jobId=p09"],
     ]);
+  });
+
+  it("speaks the display language, with instants in its time zone and the timeline in Kuala Lumpur hours (IR270)", () => {
+    const i = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
+    expect([until("2026-09-21T17:00:00Z", now, i.t), until("2026-09-24T17:00:00Z", now, i.t), until("2026-09-23T01:30:00Z", now, i.t), until("2026-09-21T01:00:00Z", now, i.t), until("2026-09-21T01:50:00Z", now, i.t)])
+      .toEqual(["15 j", "3 hari 15 j", "2 hari", "tamat", "20 min"]);
+    const tiles = kpis({ offerCount: 1, activeCount: 5, reviewCount: 1, overdueCount: 1 }, fixture(), now, names, undefined, i);
+    expect(tiles.map((t) => [t.label, t.sub, t.link])).toEqual([
+      ["Tawaran untuk dijawab", "p09 · tamat dalam 15 j", "Buka tawaran →"], ["Menunggu penugasan", "Diterima, belum ada juruteknik", "Tugaskan →"],
+      ["Sedang berjalan / dijadualkan", "tech-external-a di tapak sejak hari ini 11:00 PG GMT+9", "Lihat kerja →"], ["Laporan untuk disemak", "p05 · Server room AC · menunggu semakan", "Semak →"],
+      ["Tertunggak", "Melepasi tarikh akhir atau tetingkap kerja (IR89)", "Lihat →"],
+    ]);
+    expect(actions(fixture(), now, names, i).slice(0, 2).map((r) => [r.badge, r.detail, r.button])).toEqual([
+      ["Tawaran", "Jawab sebelum 22 Sep 2026, 2:00 PG GMT+9 (15 j lagi)", "Jawab"], ["Tertunggak", "Tetingkap kerja tamat 20 Sep 2026, 6:00 PTG GMT+9 · tech-external-a", "Tugaskan semula"],
+    ]);
+    const today: ApiCapacity[] = [{ membershipId: "m-a", date: "2026-09-21", availableSlots: [], assignedSlots: [slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z")], availableMinutes: 480, assignedMinutes: 120, unavailability: null }];
+    expect(timeline(today, members, "2026-09-21", i.t).map((r) => [r.sub, r.blocks.map((b) => b.text)])).toEqual([["refrigerant", ["10:00–12:00"]], ["Juruteknik", []]]); // Kuala Lumpur hours, like the axis
+    expect(capacity([today], members, i.t).map((r) => r.text)).toEqual(["2 j / 8 j · 25%", "0 j / — · —"]);
+    const rows = activity([{ id: "e2", jobId: "p09", actorUserId: null, action: "job.offered", occurredAt: "2026-09-20T03:00:00Z" }], new Map(fixture().map((j) => [j.id, j])), members, now, 6, i);
+    expect(rows.map((r) => [r.time, r.text])).toEqual([["semalam 12:00 PTG GMT+9", "Tawaran diterima daripada HQ — p09 · Jalan 1, KL"]]);
   });
 });

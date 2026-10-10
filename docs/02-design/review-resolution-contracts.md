@@ -2829,3 +2829,39 @@ These two parts are shared by the four apps; IR266 item 6 left them open.
    - The browser demo's screens.
    - The assistant panel and the voice demo's answers.
    - The technician's QR dialog and device screens.
+
+## IR270 The contractor overview in the display language — 2026-10-10
+
+`/partner` (FR-P01, FR-P08, DD-P01, Figma Contractor 01-1…01-4) is the first partner screen.
+
+1. **Texts.** These are translated:
+   - the update line and the period choice;
+   - the five KPI tiles;
+   - job progress with its buckets;
+   - Needs your action: offers, overdue windows, reports and unassigned jobs;
+   - team capacity, today's timeline and the recent activity;
+   - the empty states and notes.
+   The job event titles share their entries with the customer's maintenance timeline. Unit, technician and qualification names stay as written.
+2. **Times.**
+   - The period (this week, last week, next week or the URL's dates) and today's 08:00–18:00 timeline are Kuala Lumpur days and hours. Their dates are written in the user's language. When the display time zone is another one, the timeline says "The timeline is in Kuala Lumpur time (Asia/Kuala_Lumpur)."
+   - Instants use the display time zone with the abbreviation (IR44):
+     - the update time;
+     - an offer's answer-by time, an ended work window and a due time;
+     - the next start ("starts today 10:00 am MYT");
+     - the activity ("today …", `relativeTime`).
+   - The English screen changes too: "09-20 17:00" now reads "20 Sept 2026, 5:00 pm MYT".
+   - The loader formats the dates on the server. A browser's ICU can write a month differently ("Sept" / "Sep"), and the page would then not hydrate.
+3. **Shared helpers.** These take the translator or the display:
+   - `until`, which the job list, schedule, history and HQ also use; they keep English;
+   - `kpis`, `actions`, `timeline` and `capacity`;
+   - `activity`, which now also takes the business clock.
+   The period words of the section titles are explicit dictionary keys, so the key check sees them.
+4. **Checked.**
+   - Vitest: 36 files, 198 tests. `partnerOverview.test.ts` adds the Malay / Tokyo case and the new English times.
+   - E2E: `partner/overview-language.e2e.ts` is new. The suite: 58 passed, 9 skipped. The users are en / Asia/Kuala_Lumpur, and all 51 E2E jobs are cancelled.
+   - A screenshot in Malay shows no overflow.
+5. **Still open.**
+   - The other partner screens: jobs, job detail, review, schedule, team, history, payouts and unit.
+   - The technician and HQ screens.
+   - The browser demo's screens.
+   - The assistant panel and the voice demo's answers.

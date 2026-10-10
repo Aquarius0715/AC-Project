@@ -1,7 +1,12 @@
 // The contractor overview (FR-P01, DD-P01, Figma Contractor 01-1…01-4) from the Core API: the period, the KPI tiles,
 // the weekly progress by status, the jobs that need the company's action, today's timeline and the week's team
 // capacity, and the recent job activity. Pure code shared by the server loader and the client view; Vitest covers it.
+// Texts in the display language (`t` / `i`, IR270). The periods and today's timeline are Kuala Lumpur days and hours;
+// deadlines, starts and the activity are instants in the user's display time zone (IR44).
 import { klTime } from "@ac/web/lib/devices";
+import { EN, relativeTime, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+
+const en = translator("en");
 
 export type Slot = { startAt: string; endAt: string };
 
@@ -88,23 +93,24 @@ export function bucket(j: PartnerJob, now: number): Bucket {
   return "other";
 }
 
-const label = (j: PartnerJob) => [j.short, j.unit ?? j.address ?? typeLabel(j.type)].filter(Boolean).join(" · ");
-const typeLabel = (t: string) => ({ periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance" })[t] ?? t;
+const typeText: Record<string, string> = { periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance" };
+const label = (j: PartnerJob, t: T = en) => [j.short, j.unit ?? j.address ?? (typeText[j.type] ? t(typeText[j.type]) : j.type)].filter(Boolean).join(" · ");
 export const hhmm = (iso: string) => klTime(iso).slice(11);
-const mmdd = (iso: string) => klTime(iso).slice(5, 10);
-/** "15 h", "3 d 8 h" or "45 min" until an instant (negative → "ended"). */
-export function until(iso: string, now: number): string {
+/** "15 h", "3 d 8 h" or "45 min" until an instant (negative → "ended"), in the display language. */
+export function until(iso: string, now: number, t: T = en): string {
   const m = Math.round((Date.parse(iso) - now) / 60_000);
-  if (m <= 0) return "ended";
-  if (m < 60) return `${m} min`;
+  if (m <= 0) return t("ended");
+  if (m < 60) return t("{n} min", { n: m });
   const h = Math.floor(m / 60);
-  return h < 24 ? `${h} h` : `${Math.floor(h / 24)} d${h % 24 ? ` ${h % 24} h` : ""}`;
+  if (h < 24) return t("{n} h", { n: h });
+  return h % 24 ? t("{d} d {h} h", { d: Math.floor(h / 24), h: h % 24 }) : t("{d} d", { d: Math.floor(h / 24) });
 }
 
 export type KpiTile = { label: string; value: number; sub: string; href: string; link: string; tone?: "warn" | "crit" };
 /** The five KPI tiles (DD-P01): offers, review and overdue from summaries.get; the accepted jobs without a technician
  * from the list, and in progress / scheduled as the summary's active jobs without them. Each opens the job list. */
-export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: Map<string, string>, period?: { from: string; to: string }): KpiTile[] {
+export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: Map<string, string>, period?: { from: string; to: string }, i: I18n = EN): KpiTile[] {
+  const { t } = i;
   const list = (tab: string) => `/partner/jobs?tab=${tab}${period ? `&from=${period.from}&to=${period.to}` : ""}`; // the list with the same period
   const offers = jobs.filter((j) => j.status === "offered" && j.offerExpiresAt).sort((a, b) => Date.parse(a.offerExpiresAt!) - Date.parse(b.offerExpiresAt!));
   const unassigned = jobs.filter((j) => bucket(j, now) === "unassigned");
@@ -112,12 +118,16 @@ export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: 
   const next = running.find((j) => j.status === "in_progress") ?? running.find((j) => Date.parse(j.slot!.endAt) > now);
   const review = jobs.filter((j) => j.status === "submitted");
   const active = Math.max(0, counts.activeCount - unassigned.length);
+  const who = (id: string | null) => names.get(id ?? "") ?? t("Technician");
   return [
-    { label: "Offers to answer", value: counts.offerCount, sub: offers[0] ? `${offers[0].short} · expires in ${until(offers[0].offerExpiresAt!, now)}` : "No open offers", href: list("offered"), link: "Open offers →" },
-    { label: "Awaiting assignment", value: unassigned.length, sub: unassigned.length ? "Accepted, no technician yet" : "—", href: "/partner/schedule", link: "Assign →", tone: unassigned.length ? "warn" : undefined },
-    { label: "In progress / scheduled", value: active, sub: next ? `${names.get(next.technicianId ?? "") ?? "Technician"} ${next.status === "in_progress" ? "on site" : "starts"} ${mmdd(next.slot!.startAt) === mmdd(new Date(now).toISOString()) ? hhmm(next.slot!.startAt) : `${mmdd(next.slot!.startAt)} ${hhmm(next.slot!.startAt)}`}` : "—", href: list("active"), link: "View jobs →" },
-    { label: "Reports to review", value: counts.reviewCount, sub: review[0] ? `${label(review[0])} · awaiting review` : "—", href: review.length === 1 ? `/partner/jobs/${review[0].id}/review` : list("review"), link: "Review →" },
-    { label: "Overdue", value: counts.overdueCount, sub: counts.overdueCount ? "Past the due date or the work window (IR89)" : "—", href: list("active"), link: "View →", tone: counts.overdueCount ? "crit" : undefined },
+    { label: t("Offers to answer"), value: counts.offerCount, sub: offers[0] ? t("{job} · expires in {left}", { job: offers[0].short, left: until(offers[0].offerExpiresAt!, now, t) }) : t("No open offers"), href: list("offered"), link: t("Open offers →") },
+    { label: t("Awaiting assignment"), value: unassigned.length, sub: unassigned.length ? t("Accepted, no technician yet") : "—", href: "/partner/schedule", link: t("Assign →"), tone: unassigned.length ? "warn" : undefined },
+    {
+      label: t("In progress / scheduled"), value: active, href: list("active"), link: t("View jobs →"),
+      sub: next ? t(next.status === "in_progress" ? "{name} on site from {time}" : "{name} starts {time}", { name: who(next.technicianId), time: relativeTime(next.slot!.startAt, now, i) }) : "—",
+    },
+    { label: t("Reports to review"), value: counts.reviewCount, sub: review[0] ? t("{job} · awaiting review", { job: label(review[0], t) }) : "—", href: review.length === 1 ? `/partner/jobs/${review[0].id}/review` : list("review"), link: t("Review →") },
+    { label: t("Overdue"), value: counts.overdueCount, sub: counts.overdueCount ? t("Past the due date or the work window (IR89)") : "—", href: list("active"), link: t("View →"), tone: counts.overdueCount ? "crit" : undefined },
   ];
 }
 
@@ -139,19 +149,24 @@ export function progress(jobs: PartnerJob[], now: number) {
 
 export type ActionRow = { kind: "offer" | "overdue" | "review" | "unassigned"; badge: string; title: string; detail: string; href: string; button: string };
 /** Needs your action (DD-P01): offers to answer, ended work windows, submitted reports, accepted jobs without a technician. */
-export function actions(jobs: PartnerJob[], now: number, names: Map<string, string>): ActionRow[] {
+export function actions(jobs: PartnerJob[], now: number, names: Map<string, string>, i: I18n = EN): ActionRow[] {
+  const { t, display } = i;
   const rows: ActionRow[] = [];
   for (const j of jobs.filter((x) => x.status === "offered").sort((a, b) => Date.parse(a.offerExpiresAt ?? a.dueAt ?? "") - Date.parse(b.offerExpiresAt ?? b.dueAt ?? ""))) {
-    rows.push({ kind: "offer", badge: "Offer", title: label(j), detail: j.offerExpiresAt ? `Answer by ${klTime(j.offerExpiresAt)} (${until(j.offerExpiresAt, now)} left)` : "Answer the offer", href: `/partner/jobs/${j.id}`, button: "Respond" });
+    const detail = j.offerExpiresAt ? t("Answer by {time} ({left} left)", { time: showTime(j.offerExpiresAt, display), left: until(j.offerExpiresAt, now, t) }) : t("Answer the offer");
+    rows.push({ kind: "offer", badge: t("Offer"), title: label(j, t), detail, href: `/partner/jobs/${j.id}`, button: t("Respond") });
   }
   for (const j of jobs.filter((x) => bucket(x, now) === "overdue")) {
-    rows.push({ kind: "overdue", badge: "Overdue", title: label(j), detail: `Work window ended ${mmdd(j.slot!.endAt)} ${hhmm(j.slot!.endAt)}${j.technicianId ? ` · ${names.get(j.technicianId) ?? "technician"}` : ""}`, href: `/partner/schedule?jobId=${j.id}`, button: "Reassign" });
+    const ended = t("Work window ended {time}", { time: showTime(j.slot!.endAt, display) });
+    rows.push({ kind: "overdue", badge: t("Overdue"), title: label(j, t), detail: j.technicianId ? `${ended} · ${names.get(j.technicianId) ?? t("technician")}` : ended, href: `/partner/schedule?jobId=${j.id}`, button: t("Reassign") });
   }
   for (const j of jobs.filter((x) => x.status === "submitted")) {
-    rows.push({ kind: "review", badge: "Submitted", title: label(j), detail: `Report${j.technicianId ? ` by ${names.get(j.technicianId) ?? "your technician"}` : ""} · awaiting review`, href: `/partner/jobs/${j.id}/review`, button: "Review" });
+    const by = j.technicianId ? t("Report by {name} · awaiting review", { name: names.get(j.technicianId) ?? t("your technician") }) : t("Report · awaiting review");
+    rows.push({ kind: "review", badge: t("Submitted"), title: label(j, t), detail: by, href: `/partner/jobs/${j.id}/review`, button: t("Review") });
   }
   for (const j of jobs.filter((x) => bucket(x, now) === "unassigned")) {
-    rows.push({ kind: "unassigned", badge: "Accepted", title: label(j), detail: `No technician${j.dueAt ? ` · due ${mmdd(j.dueAt)} ${hhmm(j.dueAt)}` : ""}`, href: `/partner/schedule?jobId=${j.id}`, button: "Assign" });
+    const detail = j.dueAt ? t("No technician · due {time}", { time: showTime(j.dueAt, display) }) : t("No technician");
+    rows.push({ kind: "unassigned", badge: t("Accepted"), title: label(j, t), detail, href: `/partner/schedule?jobId=${j.id}`, button: t("Assign") });
   }
   return rows;
 }
@@ -164,8 +179,9 @@ export function timelinePct(iso: string, date: string): number {
 }
 
 export type TimelineRow = { id: string; name: string; sub: string; blocks: { left: number; width: number; text: string }[]; off: string | null };
-/** Today's timeline per technician from members.capacity of the date (assigned slots inside 08:00–18:00). */
-export function timeline(today: ApiCapacity[], members: ApiMember[], date: string): TimelineRow[] {
+/** Today's timeline per technician from members.capacity of the date (assigned slots inside 08:00–18:00), in Kuala
+ * Lumpur hours like its axis. */
+export function timeline(today: ApiCapacity[], members: ApiMember[], date: string, t: T = en): TimelineRow[] {
   const cap = new Map(today.map((c) => [c.membershipId, c]));
   return members.filter((m) => m.role === "technician").map((m) => {
     const c = cap.get(m.id);
@@ -174,13 +190,13 @@ export function timeline(today: ApiCapacity[], members: ApiMember[], date: strin
       return { left, width: Math.max(right - left, 0), text: `${hhmm(s.startAt)}–${hhmm(s.endAt)}` };
     }).filter((b) => b.width > 0);
     const quals = (m.qualifications ?? []).filter((q) => !q.revokedAt).map((q) => q.code.replace(/^demo_/, "").replace(/_/g, " "));
-    return { id: m.id, name: m.displayName, sub: quals.slice(0, 2).join(", ") || "Technician", blocks, off: c?.unavailability ? c.unavailability.replace(/_/g, " ") : null };
+    return { id: m.id, name: m.displayName, sub: quals.slice(0, 2).join(", ") || t("Technician"), blocks, off: c?.unavailability ? c.unavailability.replace(/_/g, " ") : null };
   });
 }
 
 export type CapacityRow = { id: string; name: string; text: string; pct: number | null };
 /** The period's team capacity: assigned ÷ available hours per technician (undefined availability shows “—”). */
-export function capacity(days: ApiCapacity[][], members: ApiMember[]): CapacityRow[] {
+export function capacity(days: ApiCapacity[][], members: ApiMember[], t: T = en): CapacityRow[] {
   const sum = new Map<string, { assigned: number; available: number | null }>();
   for (const list of days) {
     for (const c of list) {
@@ -190,7 +206,7 @@ export function capacity(days: ApiCapacity[][], members: ApiMember[]): CapacityR
       sum.set(c.membershipId, s);
     }
   }
-  const h = (min: number) => `${Math.round((min / 60) * 10) / 10} h`;
+  const h = (min: number) => t("{n} h", { n: Math.round((min / 60) * 10) / 10 });
   return members.filter((m) => m.role === "technician").map((m) => {
     const s = sum.get(m.id) ?? { assigned: 0, available: null };
     const pct = s.available ? Math.min(100, Math.round((s.assigned / s.available) * 100)) : null;
@@ -212,12 +228,15 @@ export const jobEventTitle: Record<string, string> = {
 };
 
 export type ActivityRow = { id: string; time: string; text: string; href: string };
-/** The latest job events of the company's jobs, newest first, with the actor's name when it is a member. */
-export function activity(events: ApiJobEvent[], jobs: Map<string, PartnerJob>, members: ApiMember[], max = 6): ActivityRow[] {
+/** The latest job events of the company's jobs, newest first, with the actor's name when it is a member; the time is
+ * “today …” on the days next to now (IR44). */
+export function activity(events: ApiJobEvent[], jobs: Map<string, PartnerJob>, members: ApiMember[], now: number, max = 6, i: I18n = EN): ActivityRow[] {
+  const { t } = i;
   const byUser = new Map(members.map((m) => [m.userId, m.displayName]));
   return [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt) || b.id.localeCompare(a.id)).slice(0, max).map((e) => {
     const j = jobs.get(e.jobId);
     const who = e.actorUserId ? byUser.get(e.actorUserId) : null;
-    return { id: e.id, time: klTime(e.occurredAt).slice(5), text: `${jobEventTitle[e.action] ?? e.action.replace(/[._]/g, " ")} — ${j ? label(j) : e.jobId.slice(0, 8)}${who ? ` (${who})` : ""}`, href: `/partner/history?jobId=${e.jobId}` };
+    const title = jobEventTitle[e.action] ? t(jobEventTitle[e.action]) : e.action.replace(/[._]/g, " ");
+    return { id: e.id, time: relativeTime(e.occurredAt, now, i), text: `${title} — ${j ? label(j, t) : e.jobId.slice(0, 8)}${who ? ` (${who})` : ""}`, href: `/partner/history?jobId=${e.jobId}` };
   });
 }

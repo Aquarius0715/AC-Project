@@ -2,22 +2,33 @@
 // with the same period (from/to on the requested slot, IR74; each summary names the technician of its active
 // assignment, IR225), members.list (names), units.list (the delegated units inside their access window),
 // members.capacity per day of the period (team capacity) and for today (timeline), and jobs.events of the recent
-// jobs (activity). The counts and the list are the authority; the optional reads degrade to empty sections.
+// jobs (activity). The counts and the list are the authority; the optional reads degrade to empty sections. Texts in the
+// user's display language; the period and today's timeline stay Kuala Lumpur days and hours (IR270).
 import "server-only";
-import { coreAll, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { i18nOf, intlTag, showClock, type Locale } from "@ac/web/lib/i18n";
 import {
   actions, activity, capacity, hhmm, kpis, partnerJob, period, progress, timeline, timelinePct, weekOf, shift,
   type ApiCapacity, type ApiCounts, type ApiJobEvent, type ApiMember, type ApiPartnerJob,
 } from "@ac/web/lib/partnerOverview";
 
 type Page<T> = { items: T[] };
+const KL = "Asia/Kuala_Lumpur";
+/** The period inside the section titles ("Job progress — this week"). */
+const periodWord: Record<string, string> = { "This week": "this week", "Last week": "last week", "Next week": "next week" };
+/** A Kuala Lumpur date (YYYY-MM-DD) as “21 Sept” or with the weekday (“Mon 21 Sept”) in the user's language. */
+const kd = (d: string, locale: Locale, weekday = false) =>
+  new Date(`${d}T00:00:00Z`).toLocaleDateString(intlTag(locale), { timeZone: "UTC", day: "numeric", month: "short", ...(weekday ? { weekday: "short" } : {}) }).replace(/[\u00a0\u2009\u202f]/g, " ").replace(",", "");
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
   if (e instanceof CoreError && e.error.code !== "UNAVAILABLE" && e.error.code !== "TIMEOUT") return fallback; // not readable now: empty section
   throw e;
 });
 
 export async function loadOverview(sp: { from?: string; to?: string }) {
-  const now = await coreNow();
+  const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
+  const i = i18nOf(display);
+  const { t } = i;
+  const loc = display.locale;
   const nowIso = now.toISOString();
   const p = period(nowIso, sp.from, sp.to);
   const filters = { from: p.fromAt, to: p.toAt };
@@ -40,19 +51,25 @@ export async function loadOverview(sp: { from?: string; to?: string }) {
   const names = new Map(members.map((m) => [m.id, m.displayName]));
   const week = weekOf(nowIso);
   const ms = now.getTime();
+  const range = (q: { from: string; to: string }) => `${kd(q.from, loc)} – ${kd(q.to, loc)}`;
+  const options = [{ label: "Last week", ...shift(week, -7) }, { label: "This week", ...week }, { label: "Next week", ...shift(week, 7) }]
+    .map((o) => ({ value: `${o.from}|${o.to}`, label: `${t(o.label)} (${range(o)})` }));
   return {
-    updated: hhmm(nowIso),
-    period: { from: p.from, to: p.to, label: p.label },
-    periods: [
-      { label: "Last week", ...shift(week, -7) }, { label: "This week", ...week }, { label: "Next week", ...shift(week, 7) },
-    ],
-    today: { date: today, weekday: new Date(`${today}T00:00:00Z`).toLocaleDateString("en-GB", { weekday: "short", timeZone: "UTC" }), nowPct: timelinePct(nowIso, today), now: hhmm(nowIso) },
-    kpis: kpis(summary.counts, jobs, ms, names, { from: p.from, to: p.to }),
+    updated: showClock(nowIso, display),
+    otherZone: display.timeZone !== KL,
+    period: {
+      value: `${p.from}|${p.to}`, custom: p.label === "Period",
+      // the section titles' period: a week's word, or the dates of a URL period (Kuala Lumpur days)
+      text: periodWord[p.label] ? t(periodWord[p.label]) : range(p), label: range(p),
+    },
+    periods: options,
+    today: { title: t("Today · {day}", { day: kd(today, loc, true) }), nowPct: timelinePct(nowIso, today), now: hhmm(nowIso) },
+    kpis: kpis(summary.counts, jobs, ms, names, { from: p.from, to: p.to }, i),
     progress: progress(jobs, ms),
-    actions: actions(jobs, ms, names),
-    timeline: timeline(todayCapacity ?? days[p.days.indexOf(today)] ?? [], members, today),
-    capacity: capacity(days, members),
-    activity: activity(events, new Map(jobs.map((j) => [j.id, j])), members),
+    actions: actions(jobs, ms, names, i),
+    timeline: timeline(todayCapacity ?? days[p.days.indexOf(today)] ?? [], members, today, t),
+    capacity: capacity(days, members, t),
+    activity: activity(events, new Map(jobs.map((j) => [j.id, j])), members, ms, 6, i),
     jobCount: jobs.length,
   };
 }
