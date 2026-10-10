@@ -3,7 +3,7 @@
 // display language (`t` / `i`, IR299): billing periods, due dates, billing months and pay dates are Kuala Lumpur business
 // days written in the user's language; inquiries are instants in the display time zone.
 import type { Currency } from "@ac/web/lib/contracts.gen";
-import { EN, intlTag, showDate, showTime, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
+import { EN, intlTag, showDate, showTime, translator, zonedInstant, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
 
 const en = translator("en");
 export type Range = { from: string; to: string };
@@ -34,6 +34,31 @@ export const billingMonth = (iso: string, locale: Locale = "en") => plain(new Da
 /** A YYYY-MM payout period in the user's language: “Sept 2026”. */
 const periodName = (p: string, locale: Locale) =>
   /^\d{4}-\d{2}$/.test(p) ? plain(new Date(`${p}-15T00:00:00Z`).toLocaleDateString(intlTag(locale), { month: "short", year: "numeric", timeZone: "UTC" })) : p;
+
+const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
+const nextMonth = (ym: string) => {
+  const [y, m] = ym.split("-").map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+};
+/** The billing months of the URL (`from` / `to`, YYYY-MM, Kuala Lumpur months, IR299, IR321) as invoices.list filters
+ * on the period start: [the first day of `from`, the first day of the month after `to`). A malformed month is dropped,
+ * and a reversed range drops both. */
+export function billingMonths(fromM?: string, toM?: string): { from?: string; to?: string; filters: { from?: string; to?: string } } {
+  const from = fromM && MONTH.test(fromM) ? fromM : undefined, to = toM && MONTH.test(toM) ? toM : undefined;
+  if (from && to && from > to) return { filters: {} };
+  return {
+    ...(from && { from }), ...(to && { to }),
+    filters: { ...(from && { from: zonedInstant(`${from}-01`, "00:00", KL) }), ...(to && { to: zonedInstant(`${nextMonth(to)}-01`, "00:00", KL) }) },
+  };
+}
+/** The billing months in the user's language: “Aug – Sept 2026”, “from Aug 2026”, “until Sept 2026”; null without any. */
+export function monthsText(from: string | undefined, to: string | undefined, i: I18n = EN): string | null {
+  const name = (m: string) => periodName(m, i.display.locale);
+  if (from && to) return from === to ? name(from) : i.t("{from} – {to}", { from: from.slice(0, 4) === to.slice(0, 4) ? name(from).replace(/\s*\d{4}$/, "") : name(from), to: name(to) });
+  if (from) return i.t("from {month}", { month: name(from) });
+  if (to) return i.t("until {month}", { month: name(to) });
+  return null;
+}
 export const money = (minor: number, currency: string) => `${(minor / 100).toFixed(2)} ${currency}`;
 const methodName = (m: string | null, t: T) => (m === "demo_credit_card" ? t("Credit card") : m === "demo_debit_card" ? t("Debit card") : m);
 /** A payment's status as the screen words it; another code stays as it is. */

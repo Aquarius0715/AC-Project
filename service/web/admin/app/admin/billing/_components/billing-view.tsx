@@ -17,7 +17,9 @@ import {
 
 type Tab = "invoices" | "inquiries" | "payouts";
 export type BillingLive = {
-  tab: Tab; scope: { customerId?: string; propertyId?: string; contractId?: string; overdueOnly: boolean };
+  tab: Tab; scope: { customerId?: string; propertyId?: string; contractId?: string; overdueOnly: boolean; from?: string; to?: string };
+  /** the billing months of the scope in words (Kuala Lumpur months), null without a period */
+  months: string | null;
   rows: InvoiceRow[]; contracts: ContractOption[]; inquiries: InquiryRow[];
   customers: { id: string; name: string }[]; properties: { id: string; name: string; customerId: string }[]; contractsOfCustomer: { id: string; customerId: string }[];
   selectedInvoice?: InvoiceDetail; recipients?: ApiRecipient[]; selectedInquiryId?: string; statements?: StatementRow[]; statement?: StatementDetail;
@@ -167,7 +169,7 @@ export function BillingView({ live }: { live?: BillingLive }) {
     else { setDemoIq(id); setTab("inquiries"); }
   };
   const openInvoice = (id: string) => {
-    if (live) return nav({ tab: null, invoiceId: id, inquiryId: null, customerId: null, propertyId: null, contractId: null, overdueOnly: null });
+    if (live) return nav({ tab: null, invoiceId: id, inquiryId: null, customerId: null, propertyId: null, contractId: null, overdueOnly: null, from: null, to: null });
     setDemoSel(id);
     setTab("invoices");
   };
@@ -219,10 +221,11 @@ export function BillingView({ live }: { live?: BillingLive }) {
               <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => nav({ customerId: e.target.value || null, propertyId: null, contractId: null, invoiceId: null })}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
               <Field label={t("Property")}><Select value={live.scope.propertyId ?? ""} onChange={(e) => nav({ propertyId: e.target.value || null, invoiceId: null })}><option value="">{t("All properties")}</option>{scopeProps.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
               <Field label={t("Contract")}><Select value={live.scope.contractId ?? ""} onChange={(e) => nav({ contractId: e.target.value || null, invoiceId: null })}><option value="">{t("All contracts")}</option>{scopeContracts.map((k) => <option key={k.id} value={k.id}>{contracts.find((c) => c.id === k.id)?.label ?? k.id}</option>)}</Select></Field>
+              <BillingMonths from={live.scope.from} to={live.scope.to} onChange={(from, to) => nav({ from, to, invoiceId: null })} />
               {live.scope.overdueOnly && <Btn size="sm" onClick={() => nav({ overdueOnly: null, invoiceId: null })} aria-label={t("Show all invoices, not only overdue")}>{t("Overdue only ✕")}</Btn>}
             </div>
           )}
-          <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>{[[t("Outstanding"), totals(list, ["Unpaid", "Overdue", "Processing"]), t("unpaid · processing")], [t("Overdue"), totals(list, ["Overdue"]), t("reminders allowed")], [t("Processing"), totals(list, ["Processing"]), t("awaiting HQ confirmation")], [t("Paid"), totals(list, ["Paid"]), t("in this scope")]].map(([a, b, c]) => <div key={a} className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted">{a}</div><div className="text-xl font-bold">{b}</div><div className="text-[11px] text-muted">{c}</div></div>)}</div>
+          <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>{[[t("Outstanding"), totals(list, ["Unpaid", "Overdue", "Processing"]), t("unpaid · processing")], [t("Overdue"), totals(list, ["Overdue"]), t("reminders allowed")], [t("Processing"), totals(list, ["Processing"]), t("awaiting HQ confirmation")], live?.months ? [t("Paid in period"), totals(list, ["Paid"]), live.months] : [t("Paid"), totals(list, ["Paid"]), t("in this scope")]].map(([a, b, c]) => <div key={a} className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted">{a}</div><div className="text-xl font-bold">{b}</div><div className="text-[11px] text-muted">{c}</div></div>)}</div>
           <p className="text-[11px] text-muted">{t("Totals per currency — never converted")}{otherZone && ` · ${t("Billing periods and due dates are Kuala Lumpur dates ({zone}).", { zone: KL })}`}</p>
           <div className="flex flex-wrap items-center justify-between gap-3"><Tabs value={f} onChange={setF} tabs={(["All", "Unpaid", "Overdue", "Processing", "Paid"] as const).map((k) => ({ id: k, label: k === "All" ? t("All") : statusText[k], count: k === "All" ? list.length : list.filter((x) => x.st === k).length }))} /><Btn size="sm" variant="primary" onClick={() => { setNw({ contractId: contracts[0]?.id ?? "", from: "", to: "", dueAt: "" }); setModal("create"); }}>{t("+ Create invoice")}</Btn></div>
           {!sel ? <Card title={t("Invoices")}><EmptyState title={t("No invoices")}>{t("No invoice matches this scope.")}</EmptyState></Card> : (
@@ -246,10 +249,7 @@ export function BillingView({ live }: { live?: BillingLive }) {
                     <div className="mt-3 flex justify-end gap-2">{live && <Btn disabled={pending || !reminder.reason.trim()} onClick={preview}>{t("Preview")}</Btn>}<Btn variant="primary" disabled={pending || !reminder.reason.trim() || (live && !reminder.preview)} onClick={send}>{t("Send reminder")}</Btn></div>
                   </>}
                 </Card>}
-                <Card title={t("Related restriction")} action={<Link className="text-xs font-semibold text-primary" href="/admin/restrictions">{t("Open restrictions →")}</Link>}>
-                  {live ? (detail?.restrictionIds.length ? detail.restrictionIds.map((id) => <p key={id} className="text-[13px]"><Link className="font-mono font-semibold text-primary" href={`/admin/restrictions/${id}`}>{id}</Link></p>) : <p className="text-xs text-muted">{t("No restriction cites this invoice.")}</p>) : <p className="text-[13px]"><b>restriction-limited-a</b></p>}
-                  <p className="text-xs text-muted">{t("Once all cause invoices of a restriction are paid, it moves to release_requested. State and units are shown on the Restrictions screen (restriction.read).")}</p>
-                </Card>
+                <RelatedRestrictions ids={live ? detail?.restrictionIds ?? [] : ["restriction-limited-a"]} />
                 <Card title={t("Customer inquiries")}>
                   {linked.length === 0 ? <p className="text-xs text-muted">{t("No inquiry about this invoice.")}</p> : <div className="flex flex-col gap-2">{linked.map((q) => (
                     <div key={q.id} className={`rounded-xl p-2 ${live?.selectedInquiryId === q.id ? "bg-primary-soft" : ""}`}><p className="text-[13px]">{q.text}</p><p className="flex flex-wrap items-center gap-2 text-[11px] text-muted">{t("{kind} · received {time} · {customer}", { kind: q.kind, time: q.at, customer: q.cust })} {q.state === "answered" && <Badge tone="ok">{t("Answered")}</Badge>}<button className="font-semibold text-primary" onClick={() => openInquiry(q.id)}>{t("Open in Inquiries →")}</button></p></div>
@@ -267,7 +267,7 @@ export function BillingView({ live }: { live?: BillingLive }) {
             {iq && (
               <Card title={t("{kind} inquiry · {customer}", { kind: iq.kind, customer: iq.cust })} sub={t("received {time}", { time: iq.at })}>
                 <p className="rounded-xl bg-surface2 p-3 text-[13px]">{iq.text}</p>
-                <SummaryList items={[[t("Invoice"), iq.invoiceId ? <button key="i" className="font-semibold text-primary" onClick={() => openInvoice(iq.invoiceId!)}>{invoiceLabel(iq.invoiceId)} →</button> : "—"], [t("Restriction"), iq.restrictionId ? (live ? <Link key="r" className="font-mono font-semibold text-primary" href={`/admin/restrictions/${iq.restrictionId}`}>{iq.restrictionId}</Link> : iq.restrictionId) : "—"]]} />
+                <SummaryList items={[[t("Invoice"), iq.invoiceId ? <button key="i" className="font-semibold text-primary" onClick={() => openInvoice(iq.invoiceId!)}>{invoiceLabel(iq.invoiceId)} →</button> : "—"], [t("Restriction"), iq.restrictionId ? (live ? <Link key="r" className="font-mono font-semibold text-primary" href={`/admin/restrictions?restrictionId=${iq.restrictionId}`}>{shortId(iq.restrictionId)}</Link> : iq.restrictionId) : "—"]]} />
                 {iq.reply ? <p className="mt-3 text-[13px]"><b>{t("Reply:")}</b> {iq.reply}</p> : <>
                   <div className="mt-3"><Field label={t("Reply (in-app only)")} error={tried && !reply.trim() ? t("A reply is required") : undefined}><Textarea value={reply} onChange={(e) => setReply(e.target.value)} maxLength={2000} /></Field></div>
                   <p className="mt-1 text-[11px] text-muted">{t("A reply never changes invoices or restrictions.")}</p>
@@ -291,5 +291,49 @@ export function BillingView({ live }: { live?: BillingLive }) {
         {contract && <p className="text-xs text-muted">{t("Amount from the contract version: {amount}", { amount: `${(contract.priceMinor / 100).toFixed(2)} ${contract.currency}` })}</p>}
       </Modal>
     </Page>
+  );
+}
+
+/** A record's ID as the screens show it: the first 8 characters of a UUID, a fixture ID of the demo as it is. */
+const shortId = (id: string) => (/^[0-9a-f-]{36}$/.test(id) ? id.slice(0, 8) : id);
+
+/** The restrictions this invoice is a cause of (DD-A08 step 6): their IDs with a link each to the restriction on the
+ * Restrictions screen, which checks restriction.read itself; their state and units are not read here (IR321). */
+function RelatedRestrictions({ ids }: { ids: string[] }) {
+  const { t } = useI18n();
+  return (
+    <Card title={t(ids.length > 1 ? "Related restrictions" : "Related restriction")}>
+      {ids.length === 0 ? <p className="text-xs text-muted">{t("No restriction cites this invoice.")}</p> : (
+        <div className="flex flex-col gap-1.5">{ids.map((id) => (
+          <p key={id} className="flex flex-wrap items-center justify-between gap-2 text-[13px]"><span className="font-mono font-semibold">{shortId(id)}</span><Link className="text-xs font-semibold text-primary" href={`/admin/restrictions?restrictionId=${id}`}>{t("Open restriction →")}</Link></p>
+        ))}
+          <p className="text-xs text-muted">{t(ids.length > 1 ? "This invoice is a cause of these restrictions. Once all cause invoices of a restriction are paid, it moves to release_requested. State and units are shown on the Restrictions screen (restriction.read)."
+            : "This invoice is a cause of this restriction. Once all of its cause invoices are paid, it moves to release_requested. State and units are shown on the Restrictions screen (restriction.read).")}</p>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+/** The billing months of the scope (IR321): Kuala Lumpur months, the first not after the last; either may stay open. */
+function BillingMonths({ from, to, onChange }: { from?: string; to?: string; onChange: (from: string | null, to: string | null) => void }) {
+  const { t } = useI18n();
+  const [f, setF] = useState({ from: from ?? "", to: to ?? "" });
+  const [source, setSource] = useState(`${from}:${to}`);
+  if (source !== `${from}:${to}`) { // the fields restart from each new URL (adjust state during render)
+    setSource(`${from}:${to}`);
+    setF({ from: from ?? "", to: to ?? "" });
+  }
+  const reversed = !!f.from && !!f.to && f.from > f.to;
+  const change = (next: { from: string; to: string }) => {
+    setF(next);
+    if (!(next.from && next.to && next.from > next.to)) onChange(next.from || null, next.to || null);
+  };
+  return (
+    <>
+      <Field label={t("Billing months from")} error={reversed ? t("The first month must not be after the last") : undefined}><Input type="month" value={f.from} onChange={(e) => change({ ...f, from: e.target.value })} /></Field>
+      <Field label={t("Billing months to")}><Input type="month" value={f.to} onChange={(e) => change({ ...f, to: e.target.value })} /></Field>
+      {(from || to) && <Btn size="sm" onClick={() => change({ from: "", to: "" })}>{t("All months ✕")}</Btn>}
+    </>
   );
 }

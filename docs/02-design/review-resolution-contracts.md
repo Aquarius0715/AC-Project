@@ -4419,3 +4419,33 @@ The audit screen (FR-A16, DD-A16, SCR-A16, Figma Admin 337:2, 338:2, 338:332, 33
    - The new `admin/audit` E2E spec checks the URL state, the Filter by links, the chip, the empty states and the device tab. The HQ language spec checks the banner and the device tab in Malay.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR321 HQ access, billing and restrictions: the filters and links Figma and the DDs name — 2026-10-11
+
+R311 compared the HQ frames 10–25 with the screens. Most differences came from data the fixture does not seed (IR69). Three screens also missed filters or links that their DDs and Figma name.
+
+1. **Access & roles (DD-A03, SCR-A03, Figma Admin 539:16956).**
+   - **Organization filter.** The organization filter "Organization: All" now sits beside the role and status filters. Its URL key is `organizationId`, and it is a `members.list` filter.
+   - **Search-selects.** The filter and the "+ Add scope" target are search-selects, as DD-A03 names them. Typing narrows the list to the first 20 matches; the arrow keys and Enter choose, and Escape closes. `SearchSelect` of `components/ui` is an ARIA combobox with a listbox, built in house (DEC-03).
+   - **Lists read in full.** The list and the users of a new membership now read every membership (`coreAll`). Before, the role filter also narrowed the users that a new membership could be for.
+   - **A membership outside the list.** A `membershipId` that the list does not hold now says "That membership is not in this list", with Clear the filters when a filter is set. Before, the screen opened the first membership in its place, so an edit could land on the wrong person.
+   - **Notes.** The role and permission notes use Figma's fuller wording.
+2. **Billing (DD-A08 steps 5–6, SCR-A08, Figma Admin 38:7).**
+   - **Billing months.** The billing months `from` / `to` are URL keys: YYYY-MM months in Kuala Lumpur, with the first not after the last. They go to `invoices.list` as from / to on the period start. With a period, the paid tile reads "Paid in period" with the months, such as "Aug – Sept 2026"; without one, it counts the whole scope. A reversed range is not sent and says why.
+   - **Related restrictions.** Each restriction the invoice causes shows its short ID and **Open restriction →**, which opens it on the Restrictions screen (`/admin/restrictions?restrictionId=`). Before, the full UUID linked the exception screen. The inquiry detail links its restriction the same way.
+3. **Restrictions (DD-A09 items 5–6, SCR-A09, Figma Admin 38:8).**
+   - **Cause invoice filter.** The `invoiceId` filter was reachable only from links, and showed as a chip. It is now the "Cause invoice" select, which lists the invoices that restrictions cite, with their customers. An invoice that no restriction cites, opened from a link, still shows and says so.
+   - **Details →.** Each unit of the selected restriction links its unit screen with **Details →** for asset.read holders.
+4. **Code.**
+   - `lib/billing` gains `billingMonths` and `monthsText`.
+   - `components/ui` gains `SearchSelect`.
+   - The Malay dictionary gains the new texts and loses the four replaced ones.
+5. **Checked.**
+   - The typecheck and lint pass.
+   - Vitest covers the billing months and their words in both languages.
+   - New E2E specs:
+     - `admin/access` checks the search-select by mouse and keyboard, the narrowed list and a membership outside the list;
+     - `admin/billing` checks the months, the empty month, the reversed range and the restriction link;
+     - `admin/restrictions` runs as the restriction manager and checks the cause invoice filter, Details → and an uncited invoice.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

@@ -19,8 +19,10 @@ type ScheduleContract = {
   units: { id: string; name: string; blocked: string | null; temperature: { min: number; max: number; step: number } | null }[];
 };
 export type RestrictionsLive = {
-  now: string; full: boolean; canWrite: boolean; scope: { contractId?: string; invoiceId?: string; status?: RestrictionState };
+  now: string; full: boolean; canWrite: boolean; canUnits: boolean; scope: { contractId?: string; invoiceId?: string; status?: RestrictionState };
   rows: RestrictionRow[]; counts: Record<RestrictionState, number>; contracts: { id: string; label: string }[];
+  /** the invoices that restrictions cite as a cause, for the Cause invoice filter */
+  causes: { id: string; label: string }[];
   selected?: {
     r: ApiRestriction; contract: string; causes: { id: string; number: string; paid: boolean; amountMinor: number | null; currency: string }[]; allPaid: boolean; units: UnitRow[];
     /** formatted on the server in the display language and time zone (IR282) */
@@ -61,7 +63,11 @@ function Manager({ live }: { live: NonNullable<RestrictionsLive> }) {
       {live.full && (
         <div className="flex flex-wrap items-end gap-3">
           <Field label={t("Contract")}><Select value={live.scope.contractId ?? ""} onChange={(e) => nav({ contractId: e.target.value || null, restrictionId: null })}><option value="">{t("All contracts")}</option>{live.contracts.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</Select></Field>
-          {live.scope.invoiceId && <Btn size="sm" onClick={() => nav({ invoiceId: null, restrictionId: null })}>{t("Cause invoice {id} ✕", { id: live.scope.invoiceId.slice(0, 8) })}</Btn>}
+          <Field label={t("Cause invoice")}><Select value={live.scope.invoiceId ?? ""} onChange={(e) => nav({ invoiceId: e.target.value || null, restrictionId: null })}>
+            <option value="">{t("All cause invoices")}</option>
+            {live.causes.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+            {live.scope.invoiceId && !live.causes.some((c) => c.id === live.scope.invoiceId) && <option value={live.scope.invoiceId}>{t("invoice {id} — no restriction cites it", { id: live.scope.invoiceId.slice(0, 8) })}</option>}
+          </Select></Field>
         </div>
       )}
       {!live.full && <Banner>{t("Release view (restriction.override only): billing fields are not shown (IR03).")}</Banner>}
@@ -100,6 +106,7 @@ function Manager({ live }: { live: NonNullable<RestrictionsLive> }) {
                 { key: "u", label: t("Unit"), render: (u) => <b>{u.name}</b> }, { key: "a", label: t("restriction::Apply"), render: (u) => u.apply }, { key: "r", label: t("Release"), render: (u) => u.release },
                 { key: "o", label: t("Observed"), render: (u) => <span className="text-xs">{u.observed}{u.pending ? ` · ${t("pending: {reason}", { reason: u.pending })}` : ""}</span>, hideBelow: "sm" },
                 { key: "c", label: t("Commands"), render: (u) => <span className="text-xs">{u.commands}</span>, hideBelow: "md" },
+                ...(live.canUnits ? [{ key: "d", label: "", render: (u: UnitRow) => <Link className="text-xs font-semibold text-primary" href={`/admin/units?unitId=${u.unitId}`}>{t("Details →")}</Link> }] : []),
                 { key: "x", label: "", render: (u) => live.canWrite && <span className="flex flex-wrap gap-1">{u.retryApply && <Btn size="sm" onClick={() => setRetry({ phase: "apply", unitIds: [u.unitId], reason: "" })}>{t("Retry apply")}</Btn>}{u.retryRelease && <Btn size="sm" onClick={() => setRetry({ phase: "release", unitIds: [u.unitId], reason: "" })}>{t("Retry release")}</Btn>}{u.reconcile && <Btn size="sm" disabled={pending} onClick={() => run(() => reconcileUnits(r.id, r.version, [u.unitId]), t("Reconciled with the latest observation"))}>{t("Reconcile")}</Btn>}</span> },
               ]} />
               <p className="mt-2 text-[11px] text-muted">{t("Retry and Reconcile appear only for units that are pending, failed or waiting for reconciliation (SR26). Reaching the deadline never stops real equipment by itself.")}</p>

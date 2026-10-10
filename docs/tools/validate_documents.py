@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.205.0 (2026-10-11): IR321 HQ access organization filter, billing months, cause invoice filter (DD-A 0.35.0, DD-COMMON 0.94.0); counts unchanged.
 # 0.204.0 (2026-10-11): IR320 HQ audit explorer, SCR-A16 reads and URL keys (DD-A 0.34.0, DD-COMMON 0.93.0); counts unchanged.
 # 0.203.0 (2026-10-11): IR319 HQ devices tab, restriction fallback (DD-A 0.33.0, DD-COMMON 0.92.0); counts unchanged.
 # 0.202.0 (2026-10-11): IR318 HQ alerts tab; seed timestamps at seedCreatedAt (DD-A 0.32.0, DD-COMMON 0.91.0); counts unchanged.
@@ -1416,7 +1417,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.204.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.205.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

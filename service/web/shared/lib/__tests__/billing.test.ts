@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  billingMonth, businessDay, contractOptions, inquiryRows, invoiceDetail, invoiceRows, invoiceStatus, paymentWord, statementDetail, statementRows, statementWord, totals,
+  billingMonth, billingMonths, businessDay, contractOptions, monthsText, inquiryRows, invoiceDetail, invoiceRows, invoiceStatus, paymentWord, statementDetail, statementRows, statementWord, totals,
   type ApiContract, type ApiCustomer, type ApiInquiry, type ApiInvoice, type ApiStatement,
 } from "@ac/web/lib/billing";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
@@ -45,6 +45,21 @@ describe("HQ billing (FR-A08, FR-A23, DD-A08)", () => {
     expect([s.contractor, s.payDate, s.payable, s.lines.map((l) => [l.work, l.kind, l.amount])]).toEqual(["contractor", "15 Sept 2026", true, [["Repair", "charge", "300.00 MYR"], ["Rework deduction", "deduction", "−50.00 MYR"]]]);
     expect(s.queries.map((q) => [q.topic, q.line, q.state, q.open, q.adjustment])).toEqual([["Deduction", "job-2", "open", true, null], ["Amount", "job-1", "adjusted", false, "−5.00 MYR"]]);
     expect(statementDetail({ ...statement, payDate: "2026-09-20T16:00:00Z" }, [], NOW).payable).toBe(false);
+  });
+});
+
+describe("HQ billing months (DD-A08 step 5, IR321)", () => {
+  it("turns the URL months into invoices.list filters on the period start, Kuala Lumpur months", () => {
+    expect(billingMonths("2026-08", "2026-09")).toEqual({ from: "2026-08", to: "2026-09", filters: { from: "2026-07-31T16:00:00.000Z", to: "2026-09-30T16:00:00.000Z" } });
+    expect(billingMonths("2026-12", "2026-12").filters.to).toBe("2026-12-31T16:00:00.000Z"); // into the next year
+    expect(billingMonths("2026-08")).toEqual({ from: "2026-08", filters: { from: "2026-07-31T16:00:00.000Z" } });
+    expect([billingMonths("2026-09", "2026-08"), billingMonths("2026-13", "x"), billingMonths()]).toEqual([{ filters: {} }, { filters: {} }, { filters: {} }]); // reversed or malformed: no period
+  });
+
+  it("names the months in the user's language", () => {
+    expect([monthsText("2026-08", "2026-09"), monthsText("2025-12", "2026-01"), monthsText("2026-08", "2026-08"), monthsText("2026-08", undefined), monthsText(undefined, "2026-09"), monthsText(undefined, undefined)])
+      .toEqual(["Aug – Sept 2026", "Dec 2025 – Jan 2026", "Aug 2026", "from Aug 2026", "until Sept 2026", null]);
+    expect([monthsText("2026-08", "2026-09", MS), monthsText("2026-08", undefined, MS)]).toEqual(["Ogo – Sep 2026", "dari Ogo 2026"]);
   });
 });
 

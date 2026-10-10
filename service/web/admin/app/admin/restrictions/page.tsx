@@ -1,12 +1,13 @@
 // /admin/restrictions (FR-A09, SCR-A09): in API mode a Server Component reads restrictions.list for the URL scope
-// (contractId, invoiceId, status) with per-state counts, and for restrictionId restrictions.get with the cause invoices
+// (contractId, invoiceId — a cause invoice, offered from the invoices that restrictions cite, IR321 — status) with
+// per-state counts, and for restrictionId restrictions.get with the cause invoices
 // (invoices.list), the latest command per unit (commands.get) and unit names. restriction.write holders also get the
 // schedule form data: eligible RTO contracts, their overdue unpaid invoices, unit capabilities, units already under an
 // active restriction and the active clients per customer (IR05). Override-only callers (IR03) see the release
 // projection without billing fields. Writes are Server Actions (actions.ts). Texts in the display language; the times
 // of the first render are formatted here, in the display time zone (IR282, IR301). The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
-import { apiMode, coreDisplay, coreNow, coreOp, corePermissions } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions } from "@ac/web/lib/dal";
 import type { ApiContract, ApiCustomer, ApiInvoice } from "@ac/web/lib/billing";
 import type { ApiCapability } from "@ac/web/lib/devices";
 import { i18nOf, showTime } from "@ac/web/lib/i18n";
@@ -48,7 +49,16 @@ export default async function AdminRestrictionsPage({ searchParams }: PageProps<
   };
   const rows = restrictionRows(scoped.items, contractLabel, i);
   const counts = Object.fromEntries(states.map((s) => [s, rows.filter((r) => r.state === s).length])) as Record<RestrictionState, number>;
-  const live: RestrictionsLive = { now: now.toISOString(), full, canWrite, scope, rows, counts, contracts: contracts.items.map((k) => ({ id: k.id, label: contractLabel(k.id) })) };
+  // every restriction (the scope may narrow the list): the cause invoices of the filter and the units under restriction
+  const all = Object.keys(filters).length ? await coreOp<Page<ApiRestriction>>("restrictions.list", { limit: 100 }) : scoped;
+  const invoicesOf = full ? await coreAll<ApiInvoice>("invoices.list") : [];
+  const contractOf = new Map(contracts.items.map((k) => [k.id, k]));
+  const causeIds = [...new Set(all.items.flatMap((x) => x.causeInvoiceIds ?? []))];
+  const causes = invoicesOf.filter((x) => causeIds.includes(x.id)).sort((a, b) => a.number.localeCompare(b.number))
+    .map((x) => ({ id: x.id, label: `${x.number} · ${customerName.get(contractOf.get(x.contractId)?.customerId ?? "") ?? t("customer")}` }));
+  const live: RestrictionsLive = {
+    now: now.toISOString(), full, canWrite, canUnits: perms.has("asset.read"), scope, rows, counts, contracts: contracts.items.map((k) => ({ id: k.id, label: contractLabel(k.id) })), causes,
+  };
 
   const id = rows.find((r) => r.id === one("restrictionId"))?.id ?? rows[0]?.id;
   if (id) {
@@ -74,10 +84,9 @@ export default async function AdminRestrictionsPage({ searchParams }: PageProps<
   }
 
   if (canWrite) { // the schedule form: eligible contracts, their overdue unpaid invoices, units and recipients
-    const [overdue, caps, all, clients] = await Promise.all([
+    const [overdue, caps, clients] = await Promise.all([
       coreOp<Page<ApiInvoice>>("invoices.list", { limit: 100, filters: { overdueOnly: true } }),
       coreOp<Page<ApiCapability>>("capabilities.list", { limit: 100 }),
-      Object.keys(filters).length ? coreOp<Page<ApiRestriction>>("restrictions.list", { limit: 100 }) : Promise.resolve(scoped),
       coreOp<Page<{ customerId: string; status: string }>>("clientUsers.list", { limit: 100, filters: { status: "active" } }),
     ]);
     const busy = new Map<string, string>();

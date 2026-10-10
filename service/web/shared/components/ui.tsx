@@ -303,6 +303,53 @@ export function Search({ placeholder, value, onChange }: { placeholder: string; 
   return <Input type="search" placeholder={"🔍  " + placeholder} value={value} onChange={(e) => onChange(e.target.value)} />;
 }
 
+/** A select for long lists (DD-A03 search-selects): typing narrows the options, the first `limit` matches are listed,
+ * the arrow keys and Enter choose one and Escape closes. Closed, it shows the chosen option. An ARIA 1.2 combobox with
+ * a listbox popup; `label` names it. */
+export function SearchSelect({ value, onChange, options, label, placeholder, limit = 20, className }: {
+  value: string; onChange: (id: string) => void; options: { id: string; label: string }[]; label: string; placeholder?: string; limit?: number; className?: string;
+}) {
+  const t = useT();
+  const id = useId();
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [active, setActive] = useState(0);
+  const current = options.find((o) => o.id === value);
+  const needle = q.trim().toLowerCase();
+  const matches = needle ? options.filter((o) => o.label.toLowerCase().includes(needle)) : options;
+  const shown = matches.slice(0, limit);
+  const close = () => { setOpen(false); setQ(""); };
+  const choose = (o: { id: string }) => { close(); if (o.id !== value) onChange(o.id); };
+  const start = () => { setOpen(true); setQ(""); setActive(Math.max(0, options.slice(0, limit).findIndex((o) => o.id === value))); };
+  return (
+    <div className={cx("relative min-w-0", className)}>
+      <input
+        role="combobox" aria-label={label} aria-expanded={open} aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={open && shown[active] ? `${id}-${active}` : undefined}
+        value={open ? q : current?.label ?? ""} placeholder={placeholder ?? t("Type to search…")} onFocus={start} onBlur={close}
+        onChange={(e) => { setQ(e.target.value); setActive(0); setOpen(true); }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") { e.preventDefault(); if (!open) start(); else setActive((a) => Math.min(a + 1, shown.length - 1)); }
+          else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
+          else if (e.key === "Enter" && open && shown[active]) { e.preventDefault(); choose(shown[active]); }
+          else if (e.key === "Escape" && open) { e.preventDefault(); close(); }
+        }}
+        className={cx(inputCls, "pr-8")}
+      />
+      <span aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted">▼</span>
+      {open && (
+        <ul id={`${id}-list`} role="listbox" aria-label={label} className="absolute z-30 mt-1 max-h-72 w-full min-w-[220px] overflow-auto rounded-control border border-line bg-surface py-1 shadow-lg">
+          {shown.map((o, k) => (
+            <li key={o.id || "all"} id={`${id}-${k}`} role="option" aria-selected={o.id === value} onMouseDown={(e) => { e.preventDefault(); choose(o); }} onMouseEnter={() => setActive(k)}
+              className={cx("cursor-pointer px-3 py-1.5 text-[13px]", k === active && "bg-primary-soft", o.id === value && "font-semibold")}>{o.label}</li>
+          ))}
+          {shown.length === 0 && <li className="px-3 py-1.5 text-xs text-muted">{t("No match — try another name")}</li>}
+          {matches.length > shown.length && <li className="px-3 py-1.5 text-[11px] text-muted">{t("{n} more — type to narrow the list", { n: matches.length - shown.length })}</li>}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 /* ───────────── Modal ───────────── */
 export function Modal({ open, title, onClose, children, footer, wide }: { open: boolean; title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean }) {
   const id = useId();
