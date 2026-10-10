@@ -2,6 +2,7 @@ package integration
 
 import (
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -246,5 +247,22 @@ func TestAdminSummary(t *testing.T) {
 		if code, _ := q(a, ""); code != 403 {
 			t.Errorf("%s admin.summary: %d", a.membership, code)
 		}
+	}
+}
+
+// TestForecastWithoutReadings: a unit set without any valid reading has no actual to forecast from (IR78), so the
+// forecast says so instead of predicting zero.
+func TestForecastWithoutReadings(t *testing.T) {
+	s := server(t)
+	_, prop := isolatedUnit(t, s)
+	start := time.Date(2026, 9, 13, 12, 0, 0, 0, time.UTC)
+	_, m := post(s, &hq, "admin.summary", `{"from":"`+start.Format(time.RFC3339)+`","to":"`+start.Add(5*time.Minute).Format(time.RFC3339)+`","propertyId":"`+prop+`"}`)
+	fc, _ := data(m)["energyForecast"].(map[string]any)
+	warnings := []string{}
+	for _, w := range fc["qualityWarnings"].([]any) {
+		warnings = append(warnings, w.(string))
+	}
+	if !slices.Contains(warnings, "actual_unavailable") || fc["predictedActualKWh"] != nil || fc["validUnitMinutes"].(float64) != 0 {
+		t.Errorf("forecast without readings: %v", fc)
 	}
 }

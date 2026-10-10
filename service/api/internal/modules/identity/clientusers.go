@@ -308,7 +308,8 @@ func clientUsersSave(ctx context.Context, c *ops.Call, in *ClientUserInput) (Cli
 		return x, err
 	}
 	if x.MembershipID != nil { // keep the membership in step: role and access window
-		if _, err := c.Tx.Exec(ctx, `UPDATE identity.memberships SET client_role = $2, valid_until = CASE WHEN $3 = 'disabled' THEN $4 ELSE NULL END,
+		// $4 is cast: inside CASE … ELSE NULL the parameter's type would be taken as text
+		if _, err := c.Tx.Exec(ctx, `UPDATE identity.memberships SET client_role = $2, valid_until = CASE WHEN $3 = 'disabled' THEN $4::timestamptz ELSE NULL END,
 			scope_version = scope_version + 1, version = version + 1, updated_at = $4 WHERE id = $1`, *x.MembershipID, in.ClientRole, status, c.Now); err != nil {
 			return x, err
 		}

@@ -4089,3 +4089,30 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
 4. **No API-mode change.** E2E: 70 passed, 9 skipped. The suite runs on the Core API; the demo screens are covered by the unit tests.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR310 HQ can change a signed-in client user again; release, forecast, campaign and internal query tests — 2026-10-10
+
+1. **A signed-in client user could not be changed.**
+   - When HQ changes a client user who has signed in (role or status, clientUsers.save, FR-A17), the membership is kept in step. Its `valid_until` was set with `CASE WHEN $3 = 'disabled' THEN $4 ELSE NULL END`.
+   - Inside that CASE, PostgreSQL took the parameter's type as text, and the update failed: "column valid_until is of type timestamp with time zone but expression is of type text". Every such change answered 503.
+   - Only invited users, who have no membership yet, could be changed. The tests changed only those, so the fault went unnoticed.
+   - The parameter is now cast (`$4::timestamptz`), as the other CASE updates of the code already were.
+   - `TestClientUserMembershipSync` checks it:
+     - disabling ends the membership now and raises its scope version;
+     - activating opens the membership again;
+     - removal ends it, and needs the current version;
+     - a user cannot move to another customer.
+2. **Backend tests.**
+   - `TestRestrictionExplicitRelease`: restrictions.release requests the release itself once every cause invoice is paid (IR35), on the current version only, and the audit log records it.
+   - `TestForecastWithoutReadings`: a unit set without valid readings gets the forecast warning `actual_unavailable` and no predicted actual (IR78).
+   - Firmware campaigns:
+     - a device with an unresolved tamper is refused (`error.tamperUnresolved`);
+     - a device on a unit of another model is refused (`error.otherModel`). The old "other model" case named a model that does not exist and got 404, so it never reached this check. It is now named "unknown model".
+   - Unit tests:
+     - the internal queries between domain services (IR192): run in-process for a served domain, UNAVAILABLE without a transport, local without a registry, and the errors of a missing registry, an unknown name and an undecodable input;
+     - their HTTP transport: the caller's tenant, membership and token, the internal token, correlation ID and business time on the request, the system path for a worker without a user, a DomainError passed through, and anything else UNAVAILABLE;
+     - the four wordings of a filter cleaning reminder's evidence.
+   - `make cover`: 87.3 % → 87.4 %. Integration tests: 128; unit tests: 78. `make test-all` passes.
+3. **No web change.** E2E: 70 passed, 9 skipped, against the rebuilt backend.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

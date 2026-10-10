@@ -608,3 +608,29 @@ func TestRestrictionReconcilePaths(t *testing.T) {
 		t.Errorf("released after the remove: %v", data(get3())["state"])
 	}
 }
+
+// TestRestrictionExplicitRelease: restrictions.release requests the release itself once every cause invoice is paid
+// (IR35), on the current version only, and the audit log records it.
+func TestRestrictionExplicitRelease(t *testing.T) {
+	s := server(t)
+	u := boundUnit(t, s, "online")
+	k, inv := overdueContract(t, s, u)
+	id, _ := executed(t, s, k, inv, []string{u})
+	get := func() map[string]any { _, m := post(s, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`); return m }
+	release := func(v int) (int, map[string]any) {
+		return write(s, &restrMgr, "restrictions.release", `{"restrictionId":"`+id+`"}`, v)
+	}
+	owner(t, `UPDATE billing.invoices SET status = 'paid' WHERE id = $1`, inv) // paid outside the payment flow, which would release by itself
+	v := ver(get())
+	if code, m := release(v + 1); code != 409 || m["messageKey"] != "error.versionConflict" {
+		t.Errorf("release on a stale version: %d %v", code, m)
+	}
+	if code, m := release(v); code != 200 || data(m)["state"] != "release_requested" || ver(m) != v+1 {
+		t.Fatalf("release with the causes paid: %d %v", code, m)
+	}
+	day := `"from":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `","to":"` + clock.Add(time.Hour).Format(time.RFC3339) + `"`
+	_, m := post(s, &restrMgr, "audit.list", `{"filters":{`+day+`,"action":"restrictions.release","targetKind":"restriction","targetId":"`+id+`"},"limit":10}`)
+	if len(items(m)) != 1 {
+		t.Errorf("audit of the release: %v", items(m))
+	}
+}

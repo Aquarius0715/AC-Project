@@ -41,6 +41,21 @@ func TestFirmwareCampaigns(t *testing.T) {
 	if data(m)["progress"].(map[string]any)["pending"].(float64) != 3 {
 		t.Fatal("progress")
 	}
+	// a device with an unresolved tamper, and one on a unit of another model (cap-split-std, SPL-100)
+	tu := newUnit(t, s, "FW AC")
+	_, tm := write(s, &hq, "devices.register", `{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+tu+`"}`, 0)
+	tampered := data(tm)["id"].(string)
+	owner(t, `UPDATE devices.devices SET tamper = 'detected' WHERE id = $1`, tampered)
+	_, om := write(s, &hq, "units.save", `{"customerOrgId":"`+seed.ID("org-customer-b").String()+`","propertyId":"`+seed.ID("property-home-b").String()+`","spaceId":null,"displayName":"Split `+uuid.NewString()[:8]+`","modelId":"`+seed.ID("cap-split-std").String()+`","type":"split","installedAt":null,"serviceScope":["indoor"]}`, 0)
+	_, od := write(s, &hq, "devices.register", `{"serial":"FW-`+uuid.NewString()[:8]+`","sensorTypes":[],"unitId":"`+data(om)["id"].(string)+`"}`, 0)
+	for name, c := range map[string]struct{ device, key string }{
+		"tampered device": {tampered, "error.tamperUnresolved"},
+		"other model":     {data(od)["id"].(string), "error.otherModel"},
+	} {
+		if code, m := write(s, &hq, "firmwareCampaigns.schedule", body(map[string]string{"deviceIds": `["` + c.device + `"]`}), 0); code != 422 || m["fieldErrors"].(map[string]any)["deviceIds"] != c.key {
+			t.Errorf("%s: %d %v", name, code, m)
+		}
+	}
 	bad := map[string]map[string]string{
 		"start < 24 h":        {"startAt": `"` + clock.Add(time.Hour).Format(time.RFC3339) + `"`},
 		"waves not ascending": {"waves": `[{"label":"A","percent":50},{"label":"B","percent":40}]`},
@@ -51,11 +66,11 @@ func TestFirmwareCampaigns(t *testing.T) {
 		"already on target":   {"targetVersion": `"v1"`},
 		"unknown device":      {"deviceIds": `["` + uuid.NewString() + `"]`},
 		"duplicate device":    {"deviceIds": "[" + devs[0] + "," + devs[0] + "]"},
-		"other model":         {"modelId": `"` + seed.ID("ventilation-demo-b").String() + `"`},
+		"unknown model":       {"modelId": `"` + seed.ID("ventilation-demo-b").String() + `"`},
 	}
 	for name, e := range bad {
 		code, _ := write(s, &hq, "firmwareCampaigns.schedule", body(e), 0)
-		if code != 422 && !(name == "other model" && code == 404) {
+		if code != 422 && !(name == "unknown model" && code == 404) {
 			t.Errorf("%s: %d", name, code)
 		}
 	}

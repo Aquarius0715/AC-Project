@@ -3,6 +3,7 @@ package integration
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -144,5 +145,52 @@ func TestTwoFactor(t *testing.T) {
 	}
 	if code, m := write(s, &techB, "twoFactor.disable", `{"code":"000000"}`, 0); code != 200 || data(m)["enabled"] != false {
 		t.Fatalf("disable: %d %v", code, m)
+	}
+}
+
+// TestClientUserMembershipSync: a client user who has signed in keeps the membership in step (FR-A17): disabling ends
+// its access now, activating opens it again, and removing the user ends it; the customer of a user is fixed, and a
+// removal needs the current version.
+func TestClientUserMembershipSync(t *testing.T) {
+	s := server(t)
+	cust := seed.ID("cust-b").String()
+	membership, user := uuid.NewString(), uuid.NewString()
+	owner(t, `INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, client_role, valid_from)
+		SELECT $1, tenant_id, user_id, organization_id, 'client', 'member', valid_from FROM identity.memberships WHERE id = $2`, membership, seed.ID("customer-b"))
+	email := "signed-in-" + uuid.NewString()[:8] + "@example.com"
+	owner(t, `INSERT INTO identity.client_users (id, tenant_id, customer_id, membership_id, email, client_role, status, invited_at, invited_by_membership_id)
+		VALUES ($1,$2,$3,$4,$5,'member','active',$6,$7)`, user, seed.ID("tenant-a"), cust, membership, email, clock.Add(-time.Hour), seed.ID("customer-b"))
+	save := func(customer, status string, v int) (int, map[string]any) {
+		return write(s, &hq, "clientUsers.save", `{"id":"`+user+`","customerId":"`+customer+`","email":"`+email+`","clientRole":"member","status":"`+status+`","reason":"admin change"}`, v)
+	}
+	access := func() (*time.Time, int) {
+		var until *time.Time
+		var scope int
+		ownerScan(t, `SELECT valid_until, scope_version FROM identity.memberships WHERE id = $1`, []any{membership}, &until, &scope)
+		return until, scope
+	}
+	if code, m := save(seed.ID("cust-a").String(), "active", 1); code != 422 || m["fieldErrors"].(map[string]any)["customerId"] != "error.immutable" {
+		t.Errorf("move a user to another customer: %d %v", code, m)
+	}
+	if code, m := save(cust, "disabled", 1); code != 200 || data(m)["status"] != "disabled" {
+		t.Fatalf("disable: %d %v", code, m)
+	}
+	if until, scope := access(); until == nil || !until.Equal(clock) || scope != 2 {
+		t.Errorf("membership after disabling: %v %d", until, scope)
+	}
+	if code, m := save(cust, "active", 2); code != 200 || data(m)["status"] != "active" {
+		t.Fatalf("activate again: %d %v", code, m)
+	}
+	if until, _ := access(); until != nil {
+		t.Errorf("membership after activating: %v", until)
+	}
+	if code, m := write(s, &hq, "clientUsers.remove", `{"id":"`+user+`","reason":"left the company"}`, 2); code != 409 || m["messageKey"] != "error.versionConflict" {
+		t.Errorf("remove on a stale version: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "clientUsers.remove", `{"id":"`+user+`","reason":"left the company"}`, 3); code != 200 || data(m)["deleted"] != true {
+		t.Fatalf("remove: %d %v", code, m)
+	}
+	if until, _ := access(); until == nil || !until.Equal(clock) {
+		t.Errorf("membership after removal: %v", until)
 	}
 }
