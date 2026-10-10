@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.81.0
+version: 0.82.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -39,7 +39,7 @@ service/web/
 - Interactive reads: reads that follow a gesture, such as the technician's QR scan, go through the BFF Route Handler `/bff/ops/<operation>`.
 - The browser never calls the Core API.
 
-**Phase 1A demo (`DATA_SOURCE` unset).** The same routes render the demo components with in-browser fixture rows; nothing reaches a network. The shared demo stores (jobs, client users) live in the tab (`lib/demoStore`). The four apps of a tab on one origin see the same demo data, and switching roles keeps it; a reload or the reset on `/demo` brings back the seed (FR-X05).
+**Phase 1A demo (`DATA_SOURCE` unset).** The same routes render the demo components with in-browser fixture rows; nothing reaches a network. The shared demo stores (jobs, client users) live in the tab (`lib/demoStore`); their actions run in the tab and return refusals at once (IR309). The four apps of a tab on one origin see the same demo data, and switching roles keeps it; a reload or the reset on `/demo` brings back the seed (FR-X05).
 
 **Navigation.** `next/link` and `next/navigation` are used directly. Filters, tabs and the selection live in the URL: `lib/urlState.ts` reads them through `useSyncExternalStore`, and `useUrlPatch` writes them, replacing the history entry. One router serves every app, so the earlier Navigation-interface proposal is not used.
 
@@ -258,4 +258,4 @@ API paths, HTTP methods, databases, server authentication and authorization, rea
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.81.0: Read IR01–IR308 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.82.0: Read IR01–IR309 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

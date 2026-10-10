@@ -4,12 +4,12 @@
  * Shared maintenance-job mock store (IR113). All four roles read and write the same jobs, so a
  * request made on /customer/maintenance shows up in /admin/jobs, then /partner/jobs and
  * /technician. State lives in the tab (lib/demoStore: kept across role switches, a reload or /demo reset restores the
- * seed, FR-X05).
+ * seed, FR-X05). Phase 1A only: with DATA_SOURCE=api the job screens write through Server Actions, so the actions here
+ * stay local and return their refusals at once.
  */
 import { useSyncExternalStore } from "react";
 import { readDemo, writeDemo } from "@ac/web/lib/demoStore";
 import { useOp } from "@ac/web/lib/useOp";
-import { apiMode, jobsApi } from "@ac/web/lib/jobsApi";
 
 export type Slot = { date: string; win: string };
 export type Origin = "request" | "plan";
@@ -297,23 +297,3 @@ export const statusLabel: Record<JobStatus, string> = {
   requested: "Requested", time_proposed: "Time proposed", offered: "Offered", accepted: "Accepted", assigned: "Assigned", in_progress: "In progress", submitted: "Submitted", rework_requested: "Rework requested", completed: "Completed", cancelled: "Cancelled", on_hold: "On hold",
 };
 
-/**
- * jobActions with DATA_SOURCE=api: the actions that map one-to-one to Core API operations go to the API (errors are
- * reported through onError); the others keep using the demo store until their screens are wired.
- */
-const viaApi: Partial<Record<keyof typeof jobActions, (...a: never[]) => Promise<void>>> = {
-  cancel: (id: string, reason: string) => jobsApi.cancel(id, reason),
-  partnerAccept: (id: string) => jobsApi.partnerAccept(id),
-  partnerDecline: (id: string, reason: string) => jobsApi.partnerDecline(id, reason),
-  techAccept: (id: string) => jobsApi.techAccept(id),
-  techCantMake: (id: string, reason: string) => jobsApi.techCantMake(id, reason),
-  addNote: (id: string, text: string) => jobsApi.addNote(id, text),
-};
-export let onJobApiError: (e: unknown) => void = (e) => console.error(e);
-export const setJobApiErrorHandler = (h: (e: unknown) => void) => { onJobApiError = h; };
-for (const [name, fn] of Object.entries(viaApi)) {
-  const local = (jobActions as Record<string, (...a: unknown[]) => unknown>)[name];
-  (jobActions as Record<string, (...a: unknown[]) => unknown>)[name] = (...args: unknown[]) => {
-    void apiMode().then((api) => (api ? (fn as (...a: unknown[]) => Promise<void>)(...args).catch(onJobApiError) : local(...args)));
-  };
-}

@@ -243,3 +243,68 @@ func TestSLAScorecard(t *testing.T) {
 		t.Error("contractor-a profile listed")
 	}
 }
+
+// TestContractorQualityMetrics covers the quality figures of a contractor's jobs (IR131 item 6, IR236): arrival in the
+// scheduled window, reports accepted the first time, rework follow-ups, and the customer status they give. Two
+// completed jobs of contractor B on two units: one on time and accepted at once, one late and returned once with a
+// rework visit. A later job on the same unit within 30 days also counts as not fixed the first time, so the units differ.
+func TestContractorQualityMetrics(t *testing.T) {
+	s := server(t)
+	units := []string{newUnit(t, s, "Quality AC"), newUnit(t, s, "Quality AC")}
+	at := func(h int) time.Time { return clock.Add(time.Duration(h) * time.Hour) }
+	tenant, contractor := seed.ID("tenant-a"), seed.ID("org-contractor-b")
+	job := func(unit string, arrived time.Time) string {
+		id := uuid.NewString()
+		owner(t, `INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, contractor_org_id, type, status, origin, symptom, requested_slot, scheduled_slot,
+			due_at, created_at, completed_at, time_on_site) VALUES ($1,$2,$3,$4,$5,'reactive','completed','client_request','quality metrics',tstzrange($6,$7),tstzrange($6,$7),
+			$7,$8,$9,jsonb_build_object('arrivedAt', $10::timestamptz))`, id, tenant, unit, seed.ID("org-customer-b"), contractor, at(-24), at(-22), at(-25), at(-21), arrived)
+		return id
+	}
+	review := func(job string, version int, decision string, when time.Time) {
+		report := uuid.NewString()
+		owner(t, `INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state) VALUES ($1,$2,$3,$4,$5,'submitted')`, report, version, tenant, job, uuid.New())
+		owner(t, `INSERT INTO maintenance.report_reviews (tenant_id, report_id, report_version, reviewer_user_id, decision, occurred_at) VALUES ($1,$2,$3,$4,$5,$6)`,
+			tenant, report, version, uuid.New(), decision, when)
+	}
+	good, late := job(units[0], at(-23)), job(units[1], at(-21))
+	review(good, 1, "accept", at(-21))
+	review(late, 1, "return", at(-21))
+	review(late, 2, "accept", at(-20))
+	owner(t, `INSERT INTO maintenance.jobs (tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, created_at, follow_up_of_job_id, follow_up_class)
+		VALUES ($1,$2,$3,'reactive','requested','client_request',tstzrange($4,$5),$5,$6,$7,'rework')`, tenant, units[1], seed.ID("org-customer-b"), at(24), at(26), at(-19), late)
+
+	_, m := post(s, &hq, "sla.scorecard", `{"period":{"from":"`+at(-26).Format(time.RFC3339)+`","to":"`+at(-24).Format(time.RFC3339)+`"},"contractorOrgId":"`+contractor.String()+`"}`)
+	sc := data(m)
+	breaches := map[string]bool{}
+	for _, b := range sc["breaches"].([]any) {
+		bm := b.(map[string]any)
+		breaches[bm["jobId"].(string)+":"+bm["kind"].(string)] = true
+	}
+	if !breaches[late+":arrival"] || breaches[good+":arrival"] || !breaches[late+":first_time_fix"] || breaches[good+":first_time_fix"] {
+		t.Errorf("arrival and first-time-fix breaches: %v", sc["breaches"])
+	}
+	totals := sc["totals"].(map[string]any)
+	if totals["arrivalInWindow"] != 50.0 || totals["firstTimeFix"] != 50.0 {
+		t.Errorf("totals: %v", totals)
+	}
+	if cm := sc["customers"].([]any); len(cm) != 1 || cm[0].(map[string]any)["status"] != "breached" {
+		t.Errorf("customer status: %v", cm)
+	}
+	// the contractor's 90-day KPIs count the same jobs
+	owner(t, `INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email, delegation)
+		SELECT $1, $2, 'B', 'active', 'R-B', 'b@partner.example', tstzrange($3, $4) WHERE NOT EXISTS (SELECT 1 FROM maintenance.contractors WHERE organization_id = $2)`,
+		tenant, contractor, at(-1), at(1000))
+	_, m = post(s, &hq, "contractors.list", `{"limit":100}`)
+	for _, it := range items(m) {
+		if it["organizationId"] != contractor.String() {
+			continue
+		}
+		k := it["kpis"].(map[string]any)
+		share := func(name string) float64 { v, _ := k[name].(float64); return v }
+		if a, f, r := share("arrivalInWindow"), share("firstTimeAccepted"), share("reworkRate"); a <= 0 || a >= 100 || f <= 0 || f >= 100 || r <= 0 || r >= 100 {
+			t.Errorf("contractor B KPIs: %v", k)
+		}
+		return
+	}
+	t.Error("contractor B listed")
+}

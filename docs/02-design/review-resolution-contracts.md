@@ -4054,3 +4054,38 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
    - E2E: 70 passed, 9 skipped. The suite uploads no files; the upload rule is covered by the Go tests and `files.test.ts`.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR309 Contractor quality figures, import, payout and alert evaluation tests; the Phase 1A job actions stay local — 2026-10-10
+
+1. **The Phase 1A job actions stay local.**
+   - Six actions of the demo job store (cancel, partner accept and decline, the technician's accept and "can't make it", and the customer's note) asked `/bff/session` whether the app ran on the Core API, then either called it or the local store. This was left over from before the job screens were wired.
+   - That detour made them asynchronous and always return nothing. A refused note ("CONFLICT — notes are only possible on open jobs") never reached the note dialog, which closed as if the note had been sent.
+   - With DATA_SOURCE=api every job screen writes through Server Actions and none of these actions is called. The detour is removed, so the demo actions run in the tab and return their refusals at once.
+2. **Backend tests.**
+   - `TestContractorQualityMetrics` uses two completed jobs of contractor B on two units: one arrived in its window and was accepted at once, the other arrived late, was returned once and got a rework visit. It checks:
+     - the arrival and first-time-fix breaches of the second job only, 50 % in the totals, and the customer status "breached";
+     - the contractor's 90-day KPIs (arrival in window, first-time accepted, rework rate between 0 and 100 %).
+     A later job on the same unit within 30 days also counts as not fixed the first time, which is why the two jobs use different units.
+   - `TestUnitsImportRefusals`: an inactive customer at preview and at commit, a header that is not CSV, a unit name over 120 characters, a device with an unresolved tamper, and a preview that went stale because its new property was created meanwhile.
+   - Payouts:
+     - approving on a stale version, approving twice, and a question or answer on a stale version;
+     - a question on a paid statement;
+     - a contractor without a rate card gets lines noted "no rate card" with no amount (`TestPayoutWithoutRateCard`).
+   - Unit tests:
+     - the four threshold operators at the boundary, and the recovery side of a high and a low limit (`TestCompareAndRecover`);
+     - the busy time of a day from overlapping, contained, touching, separate and unsorted slots (`TestUnionMinutes`).
+   - `make cover`: 87.0 % → 87.3 %. Integration tests: 125; unit tests: 75. `make test-all` passes.
+3. **Web unit tests.** Vitest: 59 files, 345 tests.
+   - `jobs.test.ts` (10 tests) covers the demo maintenance flow:
+     - a request with three preferred times, and booking or offering;
+     - HQ's proposal, accepted, declined with new times or withdrawn;
+     - a contractor's time forwarded and approved, or the agreed time kept;
+     - another time for a periodic visit;
+     - notes, refused at once on a closed job;
+     - follow-ups classified once;
+     - the contractor's and technician's answers, the customer's cancellation, read notices and the reset;
+     - availability and slot texts.
+   - `clientUsers.test.ts` (3 tests) covers the invitation e-mail checks, re-sending to invited users only, and keeping one active owner.
+4. **No API-mode change.** E2E: 70 passed, 9 skipped. The suite runs on the Core API; the demo screens are covered by the unit tests.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

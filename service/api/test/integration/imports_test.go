@@ -192,3 +192,65 @@ func TestUnitsImport(t *testing.T) {
 		t.Error("client cannot import")
 	}
 }
+
+// TestUnitsImportRefusals covers the import's other refusals (DD-A18): an inactive customer at preview and at commit,
+// a header that is not CSV, a unit name over 120 characters, a device with an unresolved tamper, and a preview that
+// went stale because its new property was created meanwhile.
+func TestUnitsImportRefusals(t *testing.T) {
+	s := server(t)
+	cust := seed.ID("cust-b")
+	preview := func(csv string) (int, map[string]any) {
+		return post(s, &hq, "units.importPreview", `{"customerId":"`+cust.String()+`","fileName":"units.csv","csvText":`+jsonStr(csv)+`,"mapping":`+mapping+`}`)
+	}
+	header := "Property,Floor,Room,Unit,Model,Serial,Installed,Warranty\n"
+	site := "Late site " + uuid.NewString()[:6]
+	owner(t, `UPDATE assets.customers SET status = 'inactive' WHERE id = $1`, cust)
+	code, m := preview(header + site + ",,,Desk AC,SPL-100,,,\n")
+	owner(t, `UPDATE assets.customers SET status = 'active' WHERE id = $1`, cust)
+	if code != 409 || m["messageKey"] != "error.customerInactive" {
+		t.Errorf("preview for an inactive customer: %d %v", code, m)
+	}
+	if code, m := preview(`"Property,Unit`); code != 422 || m["fieldErrors"].(map[string]any)["csvText"] != "error.malformedCsv" {
+		t.Errorf("a header that is not CSV: %d %v", code, m)
+	}
+	// a long unit name and a tampered device are row errors
+	tampered := "TMP-" + uuid.NewString()[:8]
+	owner(t, `INSERT INTO devices.devices (tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version, tamper) VALUES ($1,$2,$3,$4,'v1','detected')`,
+		seed.ID("tenant-a"), tampered, newUnit(t, s, "Target AC"), seed.ID("hq-operator"))
+	code, m = preview(header + site + ",,," + strings.Repeat("u", 121) + ",SPL-100,,,\n" + site + ",,,Tampered AC,SPL-100," + tampered + ",,\n")
+	if code != 200 {
+		t.Fatalf("preview: %d %v", code, m)
+	}
+	keys := map[string]string{}
+	for _, r := range data(m)["rows"].([]any) {
+		row := r.(map[string]any)
+		if k, ok := row["messageKey"].(string); ok {
+			keys[row["unitName"].(string)] = k
+		}
+	}
+	if keys[strings.Repeat("u", 121)] != "error.length" || keys["Tampered AC"] != "error.tamperUnresolved" {
+		t.Errorf("row errors: %v", keys)
+	}
+	// a preview whose new property exists by now, and a customer gone inactive before the commit
+	code, m = preview(header + site + ",,,Desk AC,SPL-100,,,\n")
+	if code != 200 {
+		t.Fatalf("preview: %d %v", code, m)
+	}
+	stale := data(m)["previewId"].(string)
+	if code, m := write(s, &hq, "properties.save", `{"customerOrgId":"`+seed.ID("org-customer-b").String()+`","kind":"office","name":"`+site+`","address":null,"accessInstructions":null}`, 0); code != 200 {
+		t.Fatalf("property: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "units.importCommit", `{"previewId":"`+stale+`","customerId":"`+cust.String()+`"}`, 0); code != 409 || m["messageKey"] != "error.previewExpired" {
+		t.Errorf("commit after the property was created: %d %v", code, m)
+	}
+	code, m = preview(header + site + ",,,Desk AC 2,SPL-100,,,\n")
+	if code != 200 {
+		t.Fatalf("preview: %d %v", code, m)
+	}
+	owner(t, `UPDATE assets.customers SET status = 'inactive' WHERE id = $1`, cust)
+	code, m = write(s, &hq, "units.importCommit", `{"previewId":"`+data(m)["previewId"].(string)+`","customerId":"`+cust.String()+`"}`, 0)
+	owner(t, `UPDATE assets.customers SET status = 'active' WHERE id = $1`, cust)
+	if code != 409 || m["messageKey"] != "error.customerInactive" {
+		t.Errorf("commit for an inactive customer: %d %v", code, m)
+	}
+}

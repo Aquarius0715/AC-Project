@@ -65,6 +65,12 @@ func TestPayouts(t *testing.T) {
 	if code, m := write(s, &hq, "payouts.transition", `{"statementId":"`+jid+`","action":"approve"}`, 1); code != 200 || data(m)["status"] != "approved" {
 		t.Fatalf("approve: %d %v", code, m)
 	}
+	if code, m := write(s, &hq, "payouts.transition", `{"statementId":"`+jid+`","action":"approve"}`, 1); code != 409 || m["messageKey"] != "error.versionConflict" {
+		t.Errorf("approve on a stale version: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "payouts.transition", `{"statementId":"`+jid+`","action":"approve"}`, 2); code != 409 || m["messageKey"] != "error.invalidState" {
+		t.Errorf("approve twice: %d %v", code, m)
+	}
 	// question on the July line, answered with an adjustment
 	line := july["lines"].([]any)[0].(map[string]any)["id"].(string)
 	if code, _ := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+uuid.NewString()+`","topic":"amount","message":"why"}`, 2); code != 404 {
@@ -72,6 +78,9 @@ func TestPayouts(t *testing.T) {
 	}
 	if code, _ := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+line+`","topic":"price","message":"why"}`, 2); code != 422 {
 		t.Error("bad topic")
+	}
+	if code, m := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"why"}`, 1); code != 409 || m["messageKey"] != "error.versionConflict" {
+		t.Errorf("question on a stale version: %d %v", code, m)
 	}
 	if code, m := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"Travel was not included"}`, 2); code != 200 ||
 		data(m)["queries"].([]any)[0].(map[string]any)["state"] != "open" {
@@ -84,6 +93,9 @@ func TestPayouts(t *testing.T) {
 	q := data(m)["queries"].([]any)[0].(map[string]any)["id"].(string)
 	if code, _ := write(s, &hq, "payouts.resolveQuery", `{"statementId":"`+jid+`","queryId":"`+q+`","reply":"ok","adjustmentMinor":0}`, 3); code != 422 {
 		t.Error("zero adjustment")
+	}
+	if code, m := write(s, &hq, "payouts.resolveQuery", `{"statementId":"`+jid+`","queryId":"`+q+`","reply":"Added travel","adjustmentMinor":12000}`, 2); code != 409 || m["messageKey"] != "error.versionConflict" {
+		t.Errorf("answer on a stale version: %d %v", code, m)
 	}
 	if code, m := write(s, &hq, "payouts.resolveQuery", `{"statementId":"`+jid+`","queryId":"`+q+`","reply":"Added travel","adjustmentMinor":12000}`, 3); code != 200 ||
 		data(m)["queries"].([]any)[0].(map[string]any)["state"] != "adjusted" {
@@ -124,8 +136,12 @@ func TestPayouts(t *testing.T) {
 		t.Error("mark paid before the pay date")
 	}
 	owner(t, `UPDATE billing.payout_statements SET pay_date = '2026-09-14' WHERE id = $1`, jid)
-	if code, m := write(s, &hq, "payouts.transition", `{"statementId":"`+jid+`","action":"mark_paid","reason":"bank transfer"}`, ver(m)); code != 200 || data(m)["paidAt"] == nil {
+	code, m := write(s, &hq, "payouts.transition", `{"statementId":"`+jid+`","action":"mark_paid","reason":"bank transfer"}`, ver(m))
+	if code != 200 || data(m)["paidAt"] == nil {
 		t.Fatalf("mark paid: %d %v", code, m)
+	}
+	if code, m := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"late question"}`, ver(m)); code != 409 || m["messageKey"] != "error.invalidState" {
+		t.Errorf("question on a paid statement: %d %v", code, m)
 	}
 	// contractor sees approved/paid only
 	_, m = post(s, &contrB, "payouts.list", `{"limit":100}`)
@@ -146,4 +162,32 @@ func TestPayouts(t *testing.T) {
 	if code, _ := write(s, &hq, "payouts.transition", `{"statementId":"`+jid+`","action":"refund"}`, 6); code != 422 {
 		t.Error("bad action")
 	}
+}
+
+// TestPayoutWithoutRateCard: a contractor without a rate card in effect still gets a statement for its accepted work,
+// with each line noted "no rate card" and no amount, for HQ to settle by hand.
+func TestPayoutWithoutRateCard(t *testing.T) {
+	s := server(t)
+	tenant, org := seed.ID("tenant-a"), uuid.New() // a contractor organization without any rate card
+	at := time.Date(2026, 5, 20, 3, 0, 0, 0, time.UTC)
+	job, rep := uuid.NewString(), uuid.NewString()
+	owner(t, `INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, type, status, origin, requested_slot, due_at, contractor_org_id, completed_at)
+		VALUES ($1,$2,$3,$4,'reactive','completed','client_request',tstzrange($5,$6),$6,$7,$6)`, job, tenant, newUnit(t, s, "No rate AC"), seed.ID("org-customer-b"), at.Add(-2*time.Hour), at, org)
+	owner(t, `INSERT INTO maintenance.work_reports (id, version, tenant_id, job_id, author_id, state, accepted_at) VALUES ($1, 1, $2, $3, $4, 'accepted', $5)`, rep, tenant, job, uuid.New(), at)
+	code, m := write(s, &hq, "payouts.generate", `{"period":"2026-05"}`, 0)
+	if code != 200 {
+		t.Fatalf("generate: %d %v", code, m)
+	}
+	for _, x := range m["data"].([]any) {
+		st := x.(map[string]any)
+		if st["contractorOrgId"] != org.String() {
+			continue
+		}
+		lines := st["lines"].([]any)
+		if l := lines[0].(map[string]any); len(lines) != 1 || l["note"] != "no rate card" || l["amountMinor"].(float64) != 0 || st["netMinor"].(float64) != 0 {
+			t.Errorf("statement without a rate card: %v", st)
+		}
+		return
+	}
+	t.Errorf("no statement for the contractor: %v", m["data"])
 }

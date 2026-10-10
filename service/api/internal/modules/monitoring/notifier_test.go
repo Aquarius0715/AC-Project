@@ -38,3 +38,32 @@ func TestInWindow(t *testing.T) {
 		t.Error("an unknown time zone never matches")
 	}
 }
+
+// TestCompareAndRecover covers the four threshold operators at the boundary and the recovery side of each (D08): a high
+// limit (gt / gte) recovers below its recovery threshold, a low limit (lt / lte) above it.
+func TestCompareAndRecover(t *testing.T) {
+	for _, c := range []struct {
+		op         string
+		at, beyond bool // the value equal to the threshold, and one past it on the limit's side
+	}{
+		{"gt", false, true}, {"gte", true, true}, {"lt", false, true}, {"lte", true, true},
+	} {
+		past := 29.0
+		if c.op == "lt" || c.op == "lte" {
+			past = 27.0
+		}
+		if got := cmp(c.op, 28, 28); got != c.at {
+			t.Errorf("%s at the threshold: %v", c.op, got)
+		}
+		if got := cmp(c.op, past, 28); got != c.beyond {
+			t.Errorf("%s past the threshold: %v", c.op, got)
+		}
+	}
+	high, low := AlertCondition{Operator: "gte", Threshold: 28, RecoveryThreshold: 26}, AlertCondition{Operator: "lt", Threshold: 16, RecoveryThreshold: 18}
+	if !recovered(high, 25.9) || recovered(high, 26) || recovered(high, 27) {
+		t.Error("a high limit recovers below its recovery threshold only")
+	}
+	if !recovered(low, 18.1) || recovered(low, 18) || recovered(low, 17) {
+		t.Error("a low limit recovers above its recovery threshold only")
+	}
+}
