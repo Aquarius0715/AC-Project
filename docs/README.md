@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.146.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
+Version: 0.147.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.147.0 (2026-10-10): The customer's maintenance in Malay, with times in the user's display time zone. Preferred times are typed in that zone (NFR-08), and an empty date no longer crashes the request form (IR262).
 0.146.0 (2026-10-10): The customer's alerts — inbox and alert policies — in Malay with times in the user's display time zone. Inbox rows carry their status state, so the screen no longer compares English words (IR261).
 0.145.0 (2026-10-10): The customer overview in Malay with times in the user's display time zone. Times on the days next to now read "today", "yesterday" or "tomorrow"; the period note stays in Kuala Lumpur time (IR260).
 0.144.0 (2026-10-10): The customer's unit screen in Malay with times in the user's display time zone (AT-X01-N). The state badges are translated on every screen. The translation library (i18next in the UIUX table) is recorded with DEC-03 (IR259).

@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { intlTag, isLocale, showTime, translate, translator } from "@ac/web/lib/i18n";
+import { intlTag, isLocale, showSpan, showTime, translate, translator, zonedInstant, zonedParts } from "@ac/web/lib/i18n";
 import { ms } from "@ac/web/lib/i18n-ms";
 import { ROLES } from "@ac/web/lib/nav";
 import { consentNote } from "@ac/web/lib/preferences";
@@ -61,6 +61,21 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   it("accepts only the two locales and formats both for Malaysia", () => {
     expect([isLocale("en"), isLocale("ms"), isLocale("ja"), isLocale(null)]).toEqual([true, true, false, false]);
     expect([intlTag("en"), intlTag("ms")]).toEqual(["en-MY", "ms-MY"]);
+  });
+
+  it("reads a typed date and time in the display time zone and prefills it back (NFR-08)", () => {
+    expect([zonedInstant("2026-09-16", "10:00", "Asia/Kuala_Lumpur"), zonedInstant("2026-09-16", "10:00", "Asia/Tokyo"), zonedInstant("2026-09-16", "10:00", "UTC")])
+      .toEqual(["2026-09-16T02:00:00.000Z", "2026-09-16T01:00:00.000Z", "2026-09-16T10:00:00.000Z"]);
+    expect([zonedInstant("2026-09-16", "", "Asia/Tokyo"), zonedInstant("", "10:00", "Asia/Tokyo"), zonedInstant("2026-02-31", "10:00", "UTC")]).toEqual(["", "", "2026-03-03T10:00:00.000Z"]);
+    expect(zonedInstant("2026-09-16", "10:00", "Not/AZone")).toBe("2026-09-16T02:00:00.000Z"); // an unknown zone falls back to Kuala Lumpur
+    expect([zonedParts("2026-09-16T01:00:00Z", "Asia/Tokyo"), zonedParts("2026-09-15T23:30:00Z", "Asia/Kuala_Lumpur")]).toEqual([{ date: "2026-09-16", time: "10:00" }, { date: "2026-09-16", time: "07:30" }]);
+  });
+
+  it("shows a span in one line, with plain spaces whatever the ICU (no hydration difference)", () => {
+    const span = showSpan("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z", { locale: "ms", timeZone: "Asia/Tokyo" }, true);
+    expect(span).toBe("Rab, 16 Sep, 11:00 PG – 1:00 PTG GMT+9");
+    expect(/[\u00a0\u2009\u202f]/.test(span + showTime("2026-09-16T02:00:00Z"))).toBe(false);
+    expect(showSpan("2026-09-14T00:00:00Z", "2026-09-20T00:00:00Z")).toBe("14 Sept, 8:00 am – 20 Sept, 8:00 am MYT");
   });
 
   it("shows a time in the user's language and time zone with the zone's abbreviation (IR44)", () => {

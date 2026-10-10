@@ -2576,3 +2576,35 @@ After the unit screen (IR259), the customer's home screen `/customer` (FR-C01, D
    - E2E: `customer/unit-language.e2e.ts` also opens the alerts in Malay with Asia/Tokyo: the inbox headings, the read time in GMT+9, the Alert policies tab and its table. `customer/alert-policies.e2e.ts` still passes in English. The whole suite: 54 passed, 9 skipped; the users are back to en / Asia/Kuala_Lumpur.
    - Screenshots of the inbox and the policies tab in Malay with Asia/Tokyo show no overflow.
 6. **Still open.** Maintenance and the other customer screens, the browser demo's alerts screen (its seed rows and labels), the other roles' screens and the voice demo's answers.
+
+## IR262 The customer's maintenance in the display language and time zone; preferred times typed in that zone — 2026-10-10
+
+`/customer/maintenance` (FR-C09, FR-C17, FR-C18, DD-C09, DD-C17, DD-C18, Figma Client 07a–07p) follows the alerts (IR261).
+
+1. **Texts.** These are translated:
+   - My requests: the tabs, the Origin filter, each row's next step and both banners;
+   - the request detail: facts, preferred times, the proposal to answer, the plan visit, the completed report, the rating, notes and history;
+   - every dialog: new request, decline, another time, rate, report a problem, note, cancel;
+   - Filter care: the table, area rows, the reminders card and its dialog;
+   - the job status and origin badges on every screen.
+   A request's symptom, notes, the proposal's message, part names and the work text stay as written. Rating tags are stored in English (the API's values); only their labels follow the language. The default rule names (IR261) and other HQ data stay as recorded. The history uses the client's titles and, for the rest, the shared job-event titles, also translated.
+2. **Times (IR44, NFR-08).** These follow the user's display time zone:
+   - Booked, preferred and proposed times show as one span with the zone's abbreviation, for example “Tue, 22 Sept, 10:00 am – 12:00 pm MYT” (`showSpan`, Intl `formatRange`).
+   - Reply-by, editable-until, notes, history and the report's acceptance show the IR44 date and time; the rate banner and the plan visit show the date.
+   NFR-08 asks that a time zone change keep the meaning of booked times. Times are stored in UTC, so the same visit reads 11:00 am GMT+9 in Asia/Tokyo.
+3. **Preferred times typed in the display time zone.** The request, decline, another-time and problem dialogs used to read the typed date and time as Kuala Lumpur time (+08:00), while the screen now shows times in the user's zone. They now read them in the user's display time zone (`zonedInstant`), prefill in it (`zonedParts`) and say so ("times in Asia/Tokyo"). The "from tomorrow" check stays the backend's rule: a later day than today in Kuala Lumpur (`PreferredSlotsOK`), and its message says so.
+   Checked: with Asia/Tokyo saved, the default first time (16 Sept, 10:00–12:00) was stored as 01:00–03:00 UTC. The request was cancelled and the zone put back.
+4. **Fixed: an empty date crashed the request form.** `new Date("T10:00:00+08:00").toISOString()` threw during render when a date field was cleared, so the error boundary replaced the screen. An incomplete date or time is now "" and reads as "Enter the date and both times of each preferred time."
+5. **Plain spaces in times.** ICU puts narrow and thin spaces (U+202F, U+2009) around times and ranges, and versions differ between Node and browsers. A time a client component renders on the server and again on hydration could then differ. `lib/i18n` now returns plain spaces in every time it formats.
+6. **Shared helpers.** These take the translator and the display:
+   - `lib/customerMaintenance` — every function;
+   - `lib/customerFilterCare`;
+   - `inspectionRows` and `readingRows` (also used by the partner's review);
+   - `JobStatusBadge`, `OriginBadge` and `Rank`.
+   The partner's screens still call the report helpers without a translator, so they stay English.
+7. **Checked.**
+   - Vitest: 33 files, 172 tests.
+     - `i18n.test.ts`: zone conversions both ways (Kuala Lumpur, Tokyo, UTC, incomplete input, an unknown zone) and spans with plain spaces.
+     - `customerMaintenance.test.ts` and `customerFilterCare.test.ts`: the IR44 spans and dates, plus Malay / Asia/Tokyo cases.
+   - E2E: `customer/unit-language.e2e.ts` also opens maintenance in Malay with Asia/Tokyo — the tabs and the New request dialog with "masa dalam Asia/Tokyo". The maintenance-request and filter-care specs pass in English. The whole suite: 54 passed, 9 skipped; the users are back to en / Asia/Kuala_Lumpur, and all 27 E2E jobs are cancelled.
+8. **Still open.** The other customer screens (units & locations, automations, energy, air quality, contracts & payments, users), the browser demo's screens, the other roles, and the voice demo's answers.

@@ -3,6 +3,7 @@ import {
   cleaningSymptom, filterLines, filterRefusal, filterRow, reminderErrors, reminderForm, reminderInput, reminderLines,
   type ApiFilterSettings, type ApiFilterStatus, type FilterUnit,
 } from "@ac/web/lib/customerFilterCare";
+import { i18nOf, translator } from "@ac/web/lib/i18n";
 
 const NOW = Date.parse("2026-09-14T01:00:00Z"); // Mon 09:00 KL
 const st = (over: Partial<ApiFilterStatus>): ApiFilterStatus => ({
@@ -12,13 +13,25 @@ const unit = (id: string, over: Partial<FilterUnit> = {}): FilterUnit => ({ id, 
 const settings: ApiFilterSettings = { id: "", version: 0, customerId: "c", thresholdHours: null, fallbackDays: 30, recipients: "owners", channels: ["inApp"] };
 
 describe("customer filter care", () => {
+  it("words the rows, an area and the reminders in Malay, days in the display time zone (IR262)", () => {
+    const i = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
+    const r = filterRow(st({}), unit("u1", { name: "Bedroom AC" }), NOW, i);
+    expect([r.run, r.progress, r.last]).toEqual(["212 j sejak pembersihan", "85 % daripada 250 j", "kali terakhir dibersihkan 30 Ogo"]);
+    const many = ["a", "b", "c", "d"].map((id) => st({ unitId: id, status: id === "a" ? "overdue" : "ok" }));
+    const [line] = filterLines(many, many.map((m) => unit(m.unitId)), NOW, i);
+    expect(line.kind === "group" && [line.group.title, line.group.run, line.group.badge.label]).toEqual(["1F · 4 AC", "1 tertunggak", "1 perlu"]);
+    const t = translator("ms");
+    expect(reminderLines(settings, t)).toEqual([["Ingatkan pada", "250 j (lalai model)"], ["Juga ingatkan", "setiap 30 hari jika masa berjalan tidak diketahui"], ["Hantar melalui", "Aplikasi sahaja"], ["Siapa", "Pemilik lokasi"]]);
+    expect([cleaningSymptom(r, t), filterRefusal({ code: "FORBIDDEN", messageKey: "", fieldErrors: {} }, t)]).toEqual(["Pembersihan penapis: 212 j berjalan sejak pembersihan terakhir (peringatan pada 250 j).", "Tidak disimpan: hanya pemilik akaun boleh mengubah peringatan."]);
+  });
+
   it("shows run time, progress and the last cleaning per AC (Figma 07j)", () => {
     const r = filterRow(st({}), unit("u1", { name: "Bedroom AC" }), NOW);
-    expect([r.unit, r.run, r.pct, r.progress, r.last, r.jobId, r.state]).toEqual(["Bedroom AC", "212 h since cleaning", 85, "85 % of 250 h", "last cleaned Aug 30", null, "due_soon"]);
+    expect([r.unit, r.run, r.pct, r.progress, r.last, r.jobId, r.state]).toEqual(["Bedroom AC", "212 h since cleaning", 85, "85 % of 250 h", "last cleaned 30 Aug", null, "due_soon"]);
     const over = filterRow(st({ runHoursSinceCleaning: 268, status: "overdue", lastCleanedAt: "2026-07-21T02:00:00Z" }), unit("u2"), NOW);
-    expect([over.pct, over.progress, over.last]).toEqual([100, "100 % of 250 h", "last cleaned Jul 21"]);
+    expect([over.pct, over.progress, over.last]).toEqual([100, "100 % of 250 h", "last cleaned 21 Jul"]);
     const tech = filterRow(st({ runHoursSinceCleaning: 40, status: "ok", lastCleanedAt: "2026-09-08T03:00:00Z", lastCleanedBy: "technician", lastCleaningJobId: "job-c02" }), unit("u3"), NOW);
-    expect([tech.last, tech.jobId, tech.pct]).toEqual(["cleaned by technician Sep 8", "job-c02", 16]);
+    expect([tech.last, tech.jobId, tech.pct]).toEqual(["cleaned by technician 8 Sept", "job-c02", 16]);
   });
 
   it("falls back to days without run time and never shows 0 for unknown (AT-C18-B)", () => {

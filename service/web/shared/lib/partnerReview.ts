@@ -2,6 +2,9 @@
 // the evidence check of DD-P05 step 2, the version / alert rows and the IR31 review availability. Pure code shared by
 // the Server Component and the client view.
 import { klTime } from "@ac/web/lib/devices";
+import { translator, type T } from "@ac/web/lib/i18n";
+
+const en = translator("en");
 
 /** WorkReport of service-contracts.ts (the parts the review shows). */
 export type ApiInspectionItem = {
@@ -40,19 +43,22 @@ export const resultText: Record<NonNullable<ApiInspectionItem["result"]>, { labe
 };
 /** One inspection row (Figma 03 “Indoor unit — filter condition · OK”, reason under not-applicable items). */
 export type InspectionRow = { id: string; label: string; result: ApiInspectionItem["result"]; reason: string | null };
-export function inspectionRows(items: ApiInspectionItem[]): InspectionRow[] {
+export function inspectionRows(items: ApiInspectionItem[], t: T = en): InspectionRow[] {
   const order = { indoor: 0, outdoor: 1, electrical: 2 };
   return [...items].sort((a, b) => order[a.componentGroup] - order[b.componentGroup]).map((it) => ({
-    id: it.id, label: `${groupLabel[it.componentGroup]} — ${componentLabel[it.componentKey] ?? it.componentKey.replace(/_/g, " ")}`, result: it.result, reason: it.reason,
+    id: it.id, label: `${t(groupLabel[it.componentGroup])} — ${componentLabel[it.componentKey] ? t(componentLabel[it.componentKey]) : it.componentKey.replace(/_/g, " ")}`, result: it.result, reason: it.reason,
   }));
 }
 
 const metricLabel: Record<string, string> = { refrigerant_pressure: "Refrigerant pressure", temperature: "Supply air temperature", humidity: "Humidity", vibration: "Vibration", power: "Power draw", co2: "CO₂", pm25: "PM2.5" };
 const qualityNote: Record<string, string> = { valid: "recorded", suspect: "suspect reading", missing: "no value" };
+// the component in a reading's label, without the part the metric already says (“Refrigerant pressure (refrigerant)”)
+const componentShort: Record<string, string> = { filter: "filter", refrigerant_pipe: "refrigerant", wiring: "wiring" };
 /** Readings recorded (Figma 03): “Refrigerant pressure · 4.6 bar · within spec” from the inspection measurements. */
-export function readingRows(ms: ApiReportMeasurement[]): [string, string][] {
-  return ms.map((m) => [`${metricLabel[m.metric] ?? m.metric}${m.componentKey ? ` (${(componentLabel[m.componentKey] ?? m.componentKey).replace(/ condition| pressure| insulation/, "")})` : ""}`,
-    m.value === null ? "no value" : `${m.value} ${m.unit} · ${qualityNote[m.quality] ?? m.quality}${m.qualityReason ? ` (${m.qualityReason.replace(/_/g, " ")})` : ""}`]);
+export function readingRows(ms: ApiReportMeasurement[], t: T = en): [string, string][] {
+  const part = (key: string) => (componentShort[key] ?? componentLabel[key] ? t(componentShort[key] ?? componentLabel[key]) : key);
+  return ms.map((m) => [`${metricLabel[m.metric] ? t(metricLabel[m.metric]) : m.metric}${m.componentKey ? ` (${part(m.componentKey)})` : ""}`,
+    m.value === null ? t("no value") : `${m.value} ${m.unit} · ${qualityNote[m.quality] ? t(qualityNote[m.quality]) : m.quality}${m.qualityReason ? ` (${m.qualityReason.replace(/_/g, " ")})` : ""}`]);
 }
 const hhmm = (iso: string) => klTime(iso).slice(11);
 /** “09:05 – 11:40 (2 h 35 m)” from the job's time on site. */

@@ -3,13 +3,15 @@
 import { Badge, Input, Select, cx } from "./ui";
 import type { JobStatus, Origin, Slot } from "@ac/web/lib/jobs";
 import { statusLabel } from "@ac/web/lib/jobs";
+import { useT } from "./I18n";
 
-/** Where a job came from — shown on every role (IR113). */
+/** Where a job came from — shown on every role (IR113), in the display language. */
 export function OriginBadge({ origin }: { origin: Origin }) {
+  const t = useT();
   return origin === "plan" ? (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#f3ebff] px-2 py-0.5 text-[11px] font-semibold leading-4 text-[#6d28d9]"><span aria-hidden>↻</span>Periodic plan</span>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#f3ebff] px-2 py-0.5 text-[11px] font-semibold leading-4 text-[#6d28d9]"><span aria-hidden>↻</span>{t("Periodic plan")}</span>
   ) : (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#e0f7f5] px-2 py-0.5 text-[11px] font-semibold leading-4 text-[#0b6e66]"><span aria-hidden>✉</span>Client request</span>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#e0f7f5] px-2 py-0.5 text-[11px] font-semibold leading-4 text-[#0b6e66]"><span aria-hidden>✉</span>{t("Client request")}</span>
   );
 }
 
@@ -18,12 +20,14 @@ const statusTone: Record<JobStatus, Parameters<typeof Badge>[0]["tone"]> = {
 };
 const statusIcon: Partial<Record<JobStatus, string>> = { requested: "○", time_proposed: "⇄", offered: "○", accepted: "◔", assigned: "◔", in_progress: "↻", submitted: "◷", rework_requested: "↻", completed: "✓", cancelled: "×", on_hold: "■" };
 export function JobStatusBadge({ s }: { s: JobStatus }) {
-  return <Badge tone={statusTone[s]} icon={statusIcon[s]}>{statusLabel[s]}</Badge>;
+  const t = useT();
+  return <Badge tone={statusTone[s]} icon={statusIcon[s]}>{t(statusLabel[s])}</Badge>;
 }
 
 export const RANKS = ["1st", "2nd", "3rd"];
 export function Rank({ i }: { i: number }) {
-  return <span className="inline-grid w-10 shrink-0 place-items-center rounded-lg bg-primary-soft py-0.5 text-xs font-semibold text-primary">{RANKS[i]}</span>;
+  const t = useT();
+  return <span className="inline-grid w-10 shrink-0 place-items-center rounded-lg bg-primary-soft py-0.5 text-xs font-semibold text-primary">{t(RANKS[i])}</span>;
 }
 
 export const WINDOWS = ["09:00–11:00", "10:00–12:00", "13:00–15:00", "14:00–16:00", "16:00–18:00"];

@@ -1,6 +1,7 @@
-// AT-X01-N ③ (FR-X01, IR44, IR259–IR261): with Malay and another display time zone saved in Preferences, the customer's
-// overview, alerts and unit screen speak Malay and show their times in that zone with the zone's abbreviation, while
-// the unit's ID and units (°C) stay as stored. English and the time zone are put back in finally.
+// AT-X01-N ③ (FR-X01, IR44, NFR-08, IR259–IR262): with Malay and another display time zone saved in Preferences, the
+// customer's overview, alerts, maintenance and unit screen speak Malay and show their times in that zone with the zone's
+// abbreviation — the request form takes its times in that zone too — while the unit's ID and units (°C) stay as stored.
+// English and the time zone are put back in finally.
 import { test, expect } from "../../fixtures/test";
 import type { Page } from "@playwright/test";
 
@@ -21,7 +22,7 @@ async function setDisplay(page: Page, language: RegExp, zone: string) {
   await expect(page.getByText(SAVED).last()).toBeVisible();
 }
 
-test("the overview, alerts and unit screen in Malay keep IDs and units and show times in the display time zone", async ({ page }) => {
+test("the overview, alerts, maintenance and unit screen in Malay keep IDs and units and use the display time zone", async ({ page }) => {
   await page.goto("/settings/preferences");
   const zone = await page.locator("main select").first().inputValue();
   await page.goto("/customer"); // the overview lists every AC with a link to its screen
@@ -41,6 +42,14 @@ test("the overview, alerts and unit screen in Malay keep IDs and units and show 
     await page.waitForURL(/tab=policies/);
     await expect(main.getByRole("heading", { name: "Polisi amaran" })).toBeVisible();
     await expect(main.getByRole("columnheader", { name: "Peraturan" })).toBeVisible();
+    await page.goto("/customer/maintenance");
+    await expect(page.getByRole("tab", { name: "Permintaan saya" })).toHaveAttribute("aria-selected", "true");
+    await page.getByRole("button", { name: "+ Permintaan penyelenggaraan baharu" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: "Permintaan penyelenggaraan baharu" })).toBeVisible();
+    await expect(dialog).toContainText("masa dalam Asia/Tokyo"); // the preferred times are typed in the display time zone
+    await dialog.getByRole("button", { name: "Batal" }).click();
+    await expect(dialog).toBeHidden();
     await page.goto(href!);
     for (const name of ["KAWALAN JAUH", "Sejarah arahan", "Telemetri langsung"]) await expect(main.getByRole("heading", { name })).toBeVisible();
     expect(new URL(page.url()).pathname).toBe(href); // the ID is the stored one

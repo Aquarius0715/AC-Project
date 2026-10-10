@@ -3,9 +3,11 @@
 // jobId the request (jobs.get — the technician's name once accepted, IR237), its events (jobs.events: notes and history,
 // internal notes never reach the client) and its accepted report (reports.get with up to four ready photos,
 // attachments.getContent); on Filter care (tab=filter-care) the status per AC (filterCare.list) and the reminder
-// settings or their defaults (filterCare.getSettings, IR238).
+// settings or their defaults (filterCare.getSettings, IR238). Texts and times in the user's display language and time
+// zone (IR262).
 import "server-only";
-import { coreAll, coreNow, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, corePrincipal, CoreError } from "@ac/web/lib/dal";
+import { i18nOf, showDate, showTime } from "@ac/web/lib/i18n";
 import { unitPlaces } from "@ac/web/lib/clientBilling";
 import { jobEventTitle } from "@ac/web/lib/partnerOverview";
 import { inspectionRows, readingRows, resultText, type ApiWorkReport } from "@ac/web/lib/partnerReview";
@@ -13,7 +15,6 @@ import {
   clientEventTitle, clientRows, declinedNotice, detailFacts, feedback, notesOf, planVisit, preferredLines, proposalCard, type ApiClientEvent, type ApiClientJob, type ApiClientRow,
 } from "@ac/web/lib/customerMaintenance";
 import { filterLines, reminderForm, reminderLines, type ApiFilterSettings, type ApiFilterStatus } from "@ac/web/lib/customerFilterCare";
-import { klTime } from "@ac/web/lib/devices";
 
 type Unit = { id: string; displayName: string; propertyId: string; spaceId: string | null; archived: boolean; connection: string };
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -24,24 +25,26 @@ const quiet = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
 
 export async function loadMaintenance(sp: Record<string, string | string[] | undefined>) {
   const page = one(sp.tab) === "filter-care" || one(sp.tab) === "filters" ? "filters" as const : "requests" as const;
-  const [now, me, units, properties, spaces] = await Promise.all([
+  const [now, me, units, properties, spaces, display] = await Promise.all([
     coreNow(), corePrincipal(), coreAll<Unit>("units.list"), coreAll<{ id: string; name: string }>("properties.list"),
-    coreAll<{ id: string; name: string; parentSpaceId: string | null }>("spaces.list"),
+    coreAll<{ id: string; name: string; parentSpaceId: string | null }>("spaces.list"), coreDisplay(),
   ]);
+  const i = i18nOf(display);
+  const { t } = i;
   const nowMs = now.getTime();
   const place = unitPlaces(units, properties, spaces);
-  const unitOf = (id: string) => place.get(id) ?? { name: "Unit", place: "" };
+  const unitOf = (id: string) => place.get(id) ?? { name: t("Unit"), place: "" };
   const active = units.filter((u) => !u.archived);
   // new=<unitId>: open New request for that unit (an alert's “Request repair”, Figma Client 06g)
   const newFor = active.some((u) => u.id === one(sp.new)) ? one(sp.new)! : null;
-  const common = { now: now.toISOString(), page, owner: me.clientRole === "owner", newFor, units: active.map((u) => ({ id: u.id, ...unitOf(u.id) })) };
+  const common = { now: now.toISOString(), display, page, owner: me.clientRole === "owner", newFor, units: active.map((u) => ({ id: u.id, ...unitOf(u.id) })) };
   if (page === "filters") {
     const [items, settings] = await Promise.all([coreAll<ApiFilterStatus>("filterCare.list"), coreOp<ApiFilterSettings>("filterCare.getSettings", {})]);
-    const lines = filterLines(items, units.map((u) => ({ id: u.id, ...unitOf(u.id), spaceId: u.spaceId, connection: u.connection })), nowMs);
-    return { ...common, rows: [], rateBanner: null, detail: null, filters: { lines, settings, reminders: reminderLines(settings), form: reminderForm(settings) } };
+    const lines = filterLines(items, units.map((u) => ({ id: u.id, ...unitOf(u.id), spaceId: u.spaceId, connection: u.connection })), nowMs, i);
+    return { ...common, rows: [], rateBanner: null, detail: null, filters: { lines, settings, reminders: reminderLines(settings, t), form: reminderForm(settings) } };
   }
   const list = await coreAll<ApiClientRow>("jobs.list", { sort: { field: "status", direction: "asc" } });
-  const rows = clientRows(list.filter((j) => j.projection === "summary"), unitOf);
+  const rows = clientRows(list.filter((j) => j.projection === "summary"), unitOf, i);
   // the newest completed requests: the first one still waiting for Confirm & rate gets the banner (IR110, DD-C17)
   const done = await Promise.all(list.filter((j) => j.projection === "summary" && j.status === "completed")
     .sort((a, b) => Date.parse(b.scheduledSlot?.startAt ?? b.dueAt) - Date.parse(a.scheduledSlot?.startAt ?? a.dueAt)).slice(0, 3)
@@ -49,7 +52,7 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
   const toRate = done.find((j) => j && j.projection === "detail" && feedback(j, nowMs).kind === "rate") ?? null;
   const base = {
     ...common, rows, filters: null,
-    rateBanner: toRate ? { jobId: toRate.id, text: `Work finished — ${toRate.id.slice(0, 8)} · ${unitOf(toRate.unitId).name}${toRate.completedAt ? ` · ${klTime(toRate.completedAt).slice(5, 10)}` : ""}.` } : null,
+    rateBanner: toRate ? { jobId: toRate.id, text: t(toRate.completedAt ? "Work finished — {job} · {unit} · {date}." : "Work finished — {job} · {unit}.", { job: toRate.id.slice(0, 8), unit: unitOf(toRate.unitId).name, date: toRate.completedAt ? showDate(toRate.completedAt, display) : "" }) } : null,
   };
   const pick = one(sp.jobId);
   if (!pick) return { ...base, detail: null };
@@ -68,12 +71,12 @@ export async function loadMaintenance(sp: Record<string, string | string[] | und
   return {
     ...base,
     detail: {
-      job, unit: u, facts: detailFacts(job, u), preferred: preferredLines(job), proposal: proposalCard(job, nowMs), declined: declinedNotice(job), plan: planVisit(job, nowMs),
-      feedback: feedback(job, nowMs), notes: notesOf(events, me.userId),
-      history: [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 8).map((e) => ({ id: e.id, time: klTime(e.occurredAt).slice(5), title: e.note ? (e.actorUserId === me.userId ? "You added a note" : "Note from the coordinator") : clientEventTitle(e.action, jobEventTitle) })),
+      job, unit: u, facts: detailFacts(job, u, i), preferred: preferredLines(job, i), proposal: proposalCard(job, nowMs, i), declined: declinedNotice(job, t), plan: planVisit(job, nowMs, t),
+      feedback: feedback(job, nowMs, i), notes: notesOf(events, me.userId, i),
+      history: [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 8).map((e) => ({ id: e.id, time: showTime(e.occurredAt, display), title: e.note ? t(e.actorUserId === me.userId ? "You added a note" : "Note from the coordinator") : clientEventTitle(e.action, jobEventTitle, t) })),
       report: report ? {
-        version: report.version, acceptedAt: report.acceptedAt, items: inspectionRows(report.items).map((r) => ({ id: r.id, label: r.label, result: r.result ? resultText[r.result].label : "—", tone: r.result ? resultText[r.result].tone : "muted", reason: r.reason })),
-        readings: readingRows(report.measurements), parts: report.parts.map((p) => `${p.name} × ${p.quantity}`), workText: report.workText, photos,
+        version: report.version, accepted: report.acceptedAt ? showTime(report.acceptedAt, display) : null, items: inspectionRows(report.items, t).map((r) => ({ id: r.id, label: r.label, result: r.result ? t(resultText[r.result].label) : "—", tone: r.result ? resultText[r.result].tone : "muted", reason: r.reason })),
+        readings: readingRows(report.measurements, t), parts: report.parts.map((p) => `${p.name} × ${p.quantity}`), workText: report.workText, photos,
       } : null,
     },
   };

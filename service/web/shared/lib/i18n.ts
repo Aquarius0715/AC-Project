@@ -38,6 +38,10 @@ export const intlTag = (locale: Locale) => (locale === "ms" ? "ms-MY" : "en-MY")
 export type Display = { locale: Locale; timeZone: string };
 export const DEFAULT_DISPLAY: Display = { locale: "en", timeZone: "Asia/Kuala_Lumpur" };
 
+/** Intl output with plain spaces: ICU puts narrow and thin spaces around times and ranges, and versions differ, so a
+ * time rendered on the server reads the same after hydration in any browser. */
+const plain = (s: string) => s.replace(/[\u00a0\u2009\u202f]/g, " ");
+
 /** `opts` in the user's language and display time zone with the zone's abbreviation; a zone this runtime does not
  * know falls back to the default one. */
 function zoned(iso: string | null, d: Display, opts: Intl.DateTimeFormatOptions): string {
@@ -47,7 +51,7 @@ function zoned(iso: string | null, d: Display, opts: Intl.DateTimeFormatOptions)
   for (const timeZone of [d.timeZone, DEFAULT_DISPLAY.timeZone]) {
     try {
       const zone = new Intl.DateTimeFormat(tag, { timeZone, timeZoneName: "short" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value;
-      const text = at.toLocaleString(tag, { ...opts, timeZone });
+      const text = plain(at.toLocaleString(tag, { ...opts, timeZone }));
       return zone ? `${text} ${zone}` : text;
     } catch {
       // RangeError: unknown time zone
@@ -68,12 +72,61 @@ export function showDate(iso: string | null, d: Display = DEFAULT_DISPLAY): stri
   if (!iso) return "—";
   for (const timeZone of [d.timeZone, DEFAULT_DISPLAY.timeZone]) {
     try {
-      return new Date(iso).toLocaleDateString(intlTag(d.locale), { dateStyle: "medium", timeZone });
+      return plain(new Date(iso).toLocaleDateString(intlTag(d.locale), { dateStyle: "medium", timeZone }));
     } catch {
       // RangeError: unknown time zone
     }
   }
   return iso.slice(0, 10);
+}
+
+/** A time span — a booked visit or a preferred time: “Tue, 22 Sept, 10:00 am – 12:00 pm MYT” in the user's language
+ * and display time zone, the weekday only when asked for. The span is the stored instants, so it keeps its meaning when
+ * the user changes the time zone (NFR-08). */
+export function showSpan(startIso: string, endIso: string, d: Display = DEFAULT_DISPLAY, weekday = false): string {
+  const a = new Date(startIso), b = new Date(endIso);
+  const tag = intlTag(d.locale);
+  for (const timeZone of [d.timeZone, DEFAULT_DISPLAY.timeZone]) {
+    try {
+      const zone = new Intl.DateTimeFormat(tag, { timeZone, timeZoneName: "short" }).formatToParts(a).find((p) => p.type === "timeZoneName")?.value;
+      const range = plain(new Intl.DateTimeFormat(tag, { timeZone, ...(weekday ? { weekday: "short" } : {}), month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).formatRange(a, b));
+      return zone ? `${range} ${zone}` : range;
+    } catch {
+      // RangeError: unknown time zone or invalid dates
+    }
+  }
+  return `${startIso} – ${endIso}`;
+}
+
+/** The wall clock (as if UTC) of an instant in a time zone. */
+function wallMs(ms: number, timeZone: string): number {
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    .formatToParts(ms).map((x) => [x.type, x.value]));
+  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+}
+const knownZone = (tz: string) => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: tz });
+    return tz;
+  } catch {
+    return DEFAULT_DISPLAY.timeZone;
+  }
+};
+
+/** The instant of a date (YYYY-MM-DD) and time (HH:mm) typed in a time zone — a form in the user's display time zone
+ * (NFR-08); "" while the date or time is not complete. */
+export function zonedInstant(date: string, time: string, timeZone: string): string {
+  const wall = Date.parse(`${date}T${time}:00Z`);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time) || Number.isNaN(wall)) return "";
+  const tz = knownZone(timeZone);
+  let at = wall - (wallMs(wall, tz) - wall);
+  at = wall - (wallMs(at, tz) - at); // the offset at the instant itself (a zone that changes its offset)
+  return new Date(at).toISOString();
+}
+/** The date (YYYY-MM-DD) and time (HH:mm) of an instant in a time zone, to prefill such a form. */
+export function zonedParts(iso: string, timeZone: string): { date: string; time: string } {
+  const w = new Date(wallMs(Date.parse(iso), knownZone(timeZone))).toISOString();
+  return { date: w.slice(0, 10), time: w.slice(11, 16) };
 }
 
 /** The translator with the display, for the pure helpers that word and time a screen's text (IR259, IR260). */
