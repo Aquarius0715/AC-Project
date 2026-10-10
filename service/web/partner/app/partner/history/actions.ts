@@ -5,14 +5,15 @@
 // nothing is stored or sent, deliveryState stays preview). Completed and cancelled jobs take no notes (IR123), so
 // only the preview is made then. A refused note keeps the form; a refused preview reports that the note was saved.
 import { refresh } from "next/cache";
-import { coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreDisplay, coreOp, CoreError } from "@ac/web/lib/dal";
+import { showTime } from "@ac/web/lib/i18n";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 
 export type Communication = {
   jobId: string; version: number | null; saveNote: boolean; message: string; visibility: "internal" | "customer";
   templateKey: string; channel: string; recipientMembershipId: string;
 };
-type Preview = { id: string; templateKey: string; channel: string; recipientMembershipId: string; deliveryState: string; occurredAt: string };
+type Preview = { id: string; templateKey: string; channel: string; recipientMembershipId: string; deliveryState: string; occurredAt: string; at: string };
 export type CommunicationFailure = { ok: false; stage: "note" | "preview"; noteSaved: boolean } & ActionFailure;
 type Failure = CommunicationFailure;
 const failure = (e: CoreError, stage: Failure["stage"], noteSaved: boolean): Failure => ({ ok: false, stage, noteSaved, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors });
@@ -33,7 +34,8 @@ export async function communicate(c: Communication): Promise<{ ok: true; value: 
   try {
     const p = await coreOp<Preview>("notifications.preview", { target: { kind: "job", id: c.jobId }, templateKey: c.templateKey, channel: c.channel, recipientMembershipId: c.recipientMembershipId, message });
     if (noteSaved) refresh();
-    return { ok: true, value: { noteSaved, preview: { id: p.id, templateKey: p.templateKey, channel: p.channel, recipientMembershipId: p.recipientMembershipId, deliveryState: p.deliveryState, occurredAt: p.occurredAt } } };
+    const at = showTime(p.occurredAt, await coreDisplay()); // in the user's display time zone (IR278)
+    return { ok: true, value: { noteSaved, preview: { id: p.id, templateKey: p.templateKey, channel: p.channel, recipientMembershipId: p.recipientMembershipId, deliveryState: p.deliveryState, occurredAt: p.occurredAt, at } } };
   } catch (e) {
     if (!(e instanceof CoreError)) throw e;
     if (noteSaved) refresh();

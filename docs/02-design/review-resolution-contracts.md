@@ -3062,3 +3062,27 @@ The Certifications tab of `/partner/team` (FR-P09, DD-P09, Figma Contractor 04-6
    - E2E: `partner/team.e2e.ts` adds the Certifications tab (KPIs, the window in the URL, the form's checks); nothing is uploaded. `partner/language.e2e.ts` also opens the tab in Malay.
    - The first E2E run failed both new checks: they matched a hidden status `<option>` with the same text. Each KPI tile is now a named region. The suite then passed 63 tests and skipped 9. The users are en / Asia/Kuala_Lumpur, all 69 E2E jobs are cancelled and no unavailable days exist.
    - A visual flow uploaded a 1.5 MB PDF from the tab. The row turned "Pending HQ verification", and HQ rejected it in Verify uploads. The dev database keeps that one rejected certificate (EB-2026-0931).
+
+## IR278 The contractor's job history in the display language — 2026-10-10
+
+`/partner/history` (FR-P07, FR-P08, DD-P07, Figma Contractor 05-1…05-6) already matched Figma (IR228). It now follows the display language and time zone, like the other contractor screens (IR270–IR277).
+
+1. **Texts.** These are translated:
+   - the list: tabs, sort, period, table headings and rows, empty states, footer;
+   - the detail: summary, event filters, timeline, visibility badges, previews card;
+   - the communication form: labels, hints, errors, buttons, results and refusals.
+   Template, role and channel codes stay as Figma shows them (`schedule_change`, `hq`, `inApp`). Notes, names and IDs stay as written. The refusal names the field ("Recipient: …").
+2. **Times.** These are formatted on the server in the display time zone (IR44):
+   - the latest event reads relative to now ("today 9:05 am MYT", `relativeTime`);
+   - the timeline's events and the delegation's end use `showTime`;
+   - the Server Action returns the preview's time formatted the same way.
+   The list and the form no longer format times in the browser.
+3. **Shared helpers.** These take the translator or the display: `historyRow`, `eventItem`, `byUser`, `channelText`, `noteMode` and `communicationRefusal`. Their English output moves to IR44. A row says whether it is overdue (`overdue`) instead of the view reading the badge's tone.
+4. **Checked.**
+   - Vitest: 38 files, 218 tests. `partnerHistory.test.ts` covers the new English times and adds a Malay case.
+   - E2E: `partner/language.e2e.ts` also opens the history list and a job's history in Malay. The suite: 63 passed, 9 skipped. The users are en / Asia/Kuala_Lumpur, and all 71 E2E jobs are cancelled.
+5. **Still open.**
+   - The other partner screens: payouts and the unit.
+   - The technician and HQ screens.
+   - The browser demo's screens.
+   - The assistant panel and the voice demo's answers.

@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.163.0 (2026-10-10): IR278 contractor job history in Malay (DD-COMMON 0.52.0); counts unchanged.
 # 0.162.0 (2026-10-10): IR277 contractor certifications per Figma 04-6/04-7 in Malay, SCR-P06 URL keys, certificates.submit body limit (DD-COMMON 0.51.0); counts unchanged.
 # 0.161.0 (2026-10-10): IR276 contractor team & capacity per Figma 04-1…04-5/04-8 in Malay, Session.organizationId (DD-COMMON 0.50.0); counts unchanged.
 # 0.160.0 (2026-10-10): IR275 contractor schedule in Malay (DD-COMMON 0.49.0); counts unchanged.
@@ -1367,7 +1368,7 @@ baseline = hashlib.sha256(json.dumps(spec_files,ensure_ascii=False,sort_keys=Tru
 manifest_path = RUN / 'spec-manifest.json'
 if args.write_baseline and not errors:
     RUN.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps({'version':'0.162.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
+    manifest_path.write_text(json.dumps({'version':'0.163.0','spec_baseline_id':baseline,'hash_algorithm':'sha256','canonicalization':'UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)','spec_files':spec_files},ensure_ascii=False,indent=2)+'\n')
 elif not args.write_baseline:
     if not manifest_path.exists():
         fail('Missing current baseline; run --write-baseline after correcting specifications')

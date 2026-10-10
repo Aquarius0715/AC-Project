@@ -1,7 +1,8 @@
-// AT-X01-N ③ for the contractor (FR-X01, FR-P01, FR-P02, FR-P03, FR-P05, FR-P06, IR44, IR270–IR276): with Malay and
-// Asia/Tokyo saved in Preferences, the overview, the job list, a job's page, a completed job's quality review, the
-// schedule and the team speak Malay; the update time and the delegation windows are in GMT+9, while the period,
-// today's timeline and the team's weeks stay Kuala Lumpur days and hours — the screens say so.
+// AT-X01-N ③ for the contractor (FR-X01, FR-P01…FR-P07, FR-P09, IR44, IR270–IR278): with Malay and Asia/Tokyo saved in
+// Preferences, the overview, the job list, a job's page, a completed job's quality review, the schedule, the team with
+// its certifications and the job history speak Malay; the update time, the delegation windows and the history's events
+// are in GMT+9, while the period, today's timeline and the team's weeks stay Kuala Lumpur days and hours — the screens
+// say so.
 // English and the earlier zone come back at the end, or in afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
@@ -57,6 +58,17 @@ test("the contractor screens in Malay keep Kuala Lumpur days and show instants i
   await expect(main.getByRole("heading", { name: /^Sijil — / })).toBeVisible();
   await expect(main.getByRole("heading", { name: "Kesan penugasan" })).toBeVisible();
   await expect(main.getByRole("region", { name: "Menunggu pengesahan HQ" })).toBeVisible(); // a KPI
+  await page.goto("/partner/history");
+  await expect(main.getByRole("heading", { name: /^Kerja anda — .+ sahaja · pilih kerja untuk membuka sejarahnya$/ })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /^Semua \(\d+\)$/ })).toHaveAttribute("aria-selected", "true");
+  await expect(main.getByRole("combobox", { name: "Isih" })).toContainText("Isih: Peristiwa terkini ↓");
+  const history = main.locator("a[href^='/partner/history?jobId=']").first();
+  if (await history.count()) {
+    await history.click();
+    await expect(main.getByRole("heading", { name: /^Sejarah kerja — / })).toBeVisible();
+    await expect(main.getByRole("heading", { name: "Pratonton komunikasi baharu" })).toBeVisible();
+    await expect(main).toContainText(/GMT\+9/); // the events in the display zone
+  }
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/partner");
