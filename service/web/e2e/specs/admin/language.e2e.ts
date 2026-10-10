@@ -1,4 +1,4 @@
-// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A06, FR-A13, FR-A14, FR-A15, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
+// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A06, FR-A08, FR-A13, FR-A14, FR-A15, FR-A23, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
 // HQ overview speaks Malay — the scope and period filters, the KPI tiles, the forecast, the power and connection axes,
 // the job statuses and the billing card — and its as-of time is in GMT+9 while the period stays Kuala Lumpur days, named
 // so; the Jobs tab speaks Malay too — tabs, scope, filters, the list and one job's detail with its times in GMT+9 — and
@@ -7,9 +7,10 @@
 // (IR292), customers & units — the register, one customer's locations, users and policies, and warranty & coverage
 // (IR293) — the device registry's three tabs with the new-campaign dialog (IR295), the energy analysis with its
 // period named Kuala Lumpur time and the baselines with the form checks (IR296), and the MRV reports with a preview
-// (a read) and the emission factors with the form checks (IR297), and the offset demo's records, market concept and
-// new-quote checks (IR298). Nothing is saved. English and the earlier zone come back at the end, or in afterEach when
-// the test fails.
+// (a read) and the emission factors with the form checks (IR297), the offset demo's records, market concept and
+// new-quote checks (IR298), and billing — invoices with their Kuala Lumpur dates named in another zone, a reminder
+// preview (a read), the payment and invoice checks, inquiries and payouts (IR299). Nothing is saved. English and the
+// earlier zone come back at the end, or in afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
@@ -177,6 +178,39 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await main.getByRole("tab", { name: "Konsep pasaran" }).click();
   await page.waitForURL(/tab=market/);
   await expect(main.getByRole("heading", { name: "Pasaran karbon — konsep masa depan", exact: true })).toBeVisible();
+  // billing (IR299): the invoices with their Kuala Lumpur days named in another zone; a reminder preview, which is a read
+  // (nothing is sent); the manual-payment and new-invoice checks, which stop before any call; inquiries and payouts
+  await page.goto("/admin/billing");
+  await expect(main.getByRole("tab", { name: /^Invois/ })).toHaveAttribute("aria-selected", "true");
+  await expect(main).toContainText("Tempoh pengebilan dan tarikh akhir ialah tarikh Kuala Lumpur (Asia/Kuala_Lumpur).");
+  for (const label of ["Belum dijelaskan", "Tertunggak", "Sedang diproses", "Dibayar"]) await expect(main).toContainText(label);
+  if (await main.getByRole("heading", { name: "Peringatan pembayaran", exact: true }).count()) {
+    await main.getByLabel("Sebab · cth. “Peringatan ke-2 selepas tarikh akhir”").fill("E2E preview");
+    await main.getByRole("button", { name: "Pratonton", exact: true }).click();
+    await expect(main.getByText("belum ada apa-apa dihantar", { exact: true })).toBeVisible();
+    await expect(main).toContainText(/Helo, .+ perlu dibayar pada /); // the message the customer gets, in this screen's language
+  }
+  if (await main.getByRole("button", { name: "Rekod pembayaran manual…" }).count()) {
+    await main.getByRole("button", { name: "Rekod pembayaran manual…" }).click();
+    const pay = page.getByRole("dialog", { name: "Rekod pembayaran manual" });
+    await pay.getByRole("button", { name: "Rekod pembayaran", exact: true }).click();
+    for (const text of ["Rujukan diperlukan", "Sebab diperlukan"]) await expect(pay).toContainText(text);
+    await pay.getByRole("button", { name: "Batal", exact: true }).click();
+    await expect(pay).toBeHidden();
+  }
+  await main.getByRole("button", { name: "+ Cipta invois" }).click();
+  const newInvoice = page.getByRole("dialog", { name: "Cipta invois" });
+  await expect(newInvoice).toContainText("Tarikh ialah hari Kuala Lumpur (Asia/Kuala_Lumpur).");
+  await newInvoice.getByRole("button", { name: "Cipta", exact: true }).click();
+  await expect(newInvoice).toContainText("Diperlukan");
+  await newInvoice.getByRole("button", { name: "Batal", exact: true }).click();
+  await expect(newInvoice).toBeHidden();
+  await main.getByRole("tab", { name: /^Pertanyaan/ }).click();
+  await page.waitForURL(/tab=inquiries/);
+  await expect(main.getByRole("heading", { name: "Pertanyaan pelanggan", exact: true })).toBeVisible();
+  await main.getByRole("tab", { name: /^Pembayaran kontraktor/ }).click();
+  await page.waitForURL(/tab=payouts/);
+  await expect(main.getByRole("heading", { name: "Penyata", exact: true })).toBeVisible();
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/admin");

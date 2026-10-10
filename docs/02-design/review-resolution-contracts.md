@@ -3708,3 +3708,39 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
    - The assistant panel and the voice demo's answers.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR299 HQ billing in the display language; billing dates stay Kuala Lumpur days — 2026-10-10
+
+`/admin/billing` (SCR-A08, FR-A08, FR-A23, DD-A08, DD-A23, Figma Admin 08) follows the display language. The Invoices, Inquiries and Contractor payouts tabs are covered.
+
+1. **Texts.** These are translated:
+   - the tabs, the scope filters, the totals and the status filter;
+   - the invoice list and an invoice's summary, payments, card confirmation and manual-payment notes;
+   - the conflict banner and the reminder card;
+   - the related restriction and the linked inquiries;
+   - the inquiries list and an inquiry's reply form;
+   - the statements list and a statement's summary, lines and contractor questions;
+   - the manual-payment, card-confirmation and new-invoice dialogs with their checks, and the toasts.
+   The dictionary gains 116 entries. These stay as they are: invoice numbers, plan type and recipient role codes, payment references, `release_requested`, and stored messages and replies.
+2. **Dates.**
+   - Billing periods, due dates, billing months and payout pay dates are Kuala Lumpur business days, in the user's language ("1 Aug 2026 → 1 Sept 2026", "10 Sept 2026", "August 2026"). They use `businessDay` / `billingMonth`, as on the customer payments screen (IR267).
+   - When the display time zone is another one, the screen says so. HQ types new invoice dates as Kuala Lumpur days, and the dialog says so too.
+   - Inquiries are instants. The page formats them in the display time zone (IR282). Before, they were Kuala Lumpur days.
+   - `businessDay`, `billingMonth` and `KL` now live in `lib/billing`, and `lib/clientBilling` re-exports them, so no module imports in a circle.
+3. **Words for codes.**
+   - Payment methods and payment statuses are worded (`paymentWord`). An unknown status stays as its code.
+   - Statement statuses (`statementWord`), line work types and kinds, and question topics and states are worded, with the partner payouts' words.
+   - A row carries the payment method and the payment status as separate fields. Before, the view split one joined string on " · ".
+   - Deduction lines use the minus sign, as the adjustments already did. Before, they used "-".
+4. **The reminder preview** is now the message the customer gets: `previewText` of the customer screen, with the subject for e-mail, in this screen's language. Before, it was a separate English sentence.
+5. **A fix.** The Contractor payouts tab showed a count of 1 on the other tabs in API mode, which was the demo's count. Statements are read on that tab only, so the count now shows only there.
+6. **Checked.**
+   - Vitest: 47 files, 275 tests. `billing.test.ts` is new. It covers the invoice statuses, rows, totals and payments, inquiries, contracts, statements and their lines and questions, Kuala Lumpur business days against another display zone, and Malay / Tokyo.
+   - E2E: `admin/language.e2e.ts` also opens billing. It checks the named Kuala Lumpur dates and the totals. It runs a reminder preview, which is a read (`notifications.preview`): "belum ada apa-apa dihantar" and the customer's message. It checks the manual-payment and new-invoice errors, which stop before any call, and opens the inquiries and payouts tabs. Nothing is saved or sent.
+7. **Progress.** 38 of the 44 business screens follow the display language.
+8. **Still open.**
+   - The other 6 HQ screens: contracts, restrictions with exceptions, access, automation and audit.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

@@ -4,19 +4,16 @@
 // are Kuala Lumpur business days (REV18-035) written in the user's language; payments, inquiries, restriction events and
 // reminders are instants in the user's display time zone (IR44).
 import { amount } from "@ac/web/lib/energy";
-import { invoiceStatus, type ApiContract, type ApiInquiry, type ApiInvoice, type ApiPayment, type InvoiceStatus } from "@ac/web/lib/billing";
+import { billingMonth, businessDay, invoiceStatus, KL, type ApiContract, type ApiInquiry, type ApiInvoice, type ApiPayment, type InvoiceStatus } from "@ac/web/lib/billing";
 import { policyText, stateLabel, type ApiCommand, type ApiRestriction, type RestrictionState } from "@ac/web/lib/restrictions";
 import { EN, intlTag, showDate, showTime, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
 
 const en = translator("en");
-export const KL = "Asia/Kuala_Lumpur";
-/** A contract or invoice date — a Kuala Lumpur business day — in the user's language: “10 Sept 2026”. */
-export const businessDay = (iso: string, locale: Locale = "en") => showDate(iso, { locale, timeZone: KL });
+// The business-day helpers live with the billing types (HQ billing words its dates the same way, IR299).
+export { billingMonth, businessDay, KL };
 /** The same day without the year (“1 Sept”), for the start of a range whose end shows the year. */
 const plain = (s: string) => s.replace(/[\u00a0\u2009\u202f]/g, " ");
 const businessDayShort = (iso: string, locale: Locale) => plain(new Date(iso).toLocaleDateString(intlTag(locale), { timeZone: KL, month: "short", day: "numeric" }));
-/** The billing month of an invoice period in the user's language: “September 2026”. */
-export const billingMonth = (iso: string, locale: Locale = "en") => plain(new Date(iso).toLocaleDateString(intlTag(locale), { timeZone: KL, month: "long", year: "numeric" }));
 
 export const planName: Record<string, string> = { rto: "RTO Plan", general: "General maintenance", energy: "Energy service", environment: "Environment service" };
 const planLong: Record<string, string> = { rto: "Rent-to-own (RTO)", general: "General maintenance", energy: "Energy service", environment: "Environment service" };
