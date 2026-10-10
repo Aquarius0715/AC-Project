@@ -113,7 +113,7 @@ export function candidates(members: ApiMember[], eligible: Set<string>, required
     const quals = (m.qualifications ?? []).filter((q) => !q.revokedAt).map((q) => qualificationLabel(q.code)).join(" · ") || "no qualifications";
     const sub = `${quals} · free ${freeText(c)}`;
     if (eligible.has(m.id)) return { id: m.id, name: m.displayName, sub, badge: m.id === currentId ? { text: "Current", tone: "primary" } : { text: "Qualified", tone: "ok" }, eligible: true };
-    const missing = required.filter((r) => !qualified(m, [r], slot.startAt)).map(qualificationLabel);
+    const missing = required.filter((r) => !qualified(m, [r], slot.startAt)).map((c) => qualificationLabel(c));
     const badge = missing.length ? { text: `Missing: ${missing.join(", ")}`, tone: "warn" as Tone }
       : c?.unavailability ? { text: `Unavailable (${c.unavailability.replace(/_/g, " ")})`, tone: "warn" as Tone }
       : c?.assignedSlots.some((s) => overlaps(s, slot)) ? { text: m.id === currentId ? "Current · booked here" : "Busy at this time", tone: "muted" as Tone }

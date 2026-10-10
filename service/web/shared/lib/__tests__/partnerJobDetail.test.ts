@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { decisionRefusal, delegationLeft, detailBanner, eventRows, fits, freeHours, qualificationLabel, qualified, timeline, type ApiDetail } from "@ac/web/lib/partnerJobDetail";
 import type { ApiCapacity, ApiMember } from "@ac/web/lib/partnerOverview";
+import { i18nOf } from "@ac/web/lib/i18n";
+
+const MS_TOKYO = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
 const NOW = Date.parse("2026-09-21T01:30:00Z"); // Mon 09:30 KL
 const slot = (s: string, e: string) => ({ startAt: s, endAt: e });
@@ -40,7 +43,11 @@ describe("partner job detail", () => {
     const busy = fits(members, ["demo_indoor"], visit, [{ date: "2026-09-22", capacity: [cap("m-a", "2026-09-22", [["2026-09-22T01:00:00Z", "2026-09-22T09:00:00Z"]], [["2026-09-22T03:00:00Z", "2026-09-22T05:00:00Z"]], 480, 120)] }]);
     expect(busy[0].badge).toEqual({ text: "Busy at the visit", tone: "warn" });
     const detail = fits(members, ["demo_indoor", "demo_electrical"], visit, days, "detail");
-    expect(detail.map((r) => [r.sub, r.badge.text, r.days.length])).toEqual([["Qualified · 8 h free 09-22–09-23", "Best fit", 0], ["Missing Electrical work", "Not eligible", 0]]);
+    expect(detail.map((r) => [r.sub, r.badge.text, r.days.length])).toEqual([["Qualified · 8 h free 22 Sept – 23 Sept", "Best fit", 0], ["Missing Electrical work", "Not eligible", 0]]);
+    expect(fits(members, ["demo_indoor", "demo_electrical"], visit, days, "offer", undefined, MS_TOKYO).map((r) => [r.sub, r.badge.text, r.days.map((d) => `${d.label} ${d.text}`)])).toEqual([
+      ["Kerja unit dalaman · Kerja unit luaran · Kerja elektrik", "Sesuai", ["Sel 8 j", "Rab 0 j"]], ["tiada Kerja elektrik", "Tidak layak", ["Sel 8 j", "Rab —"]],
+    ]); // Kuala Lumpur days, in Malay
+    expect(fits(members, ["demo_indoor", "demo_electrical"], visit, days, "detail", undefined, MS_TOKYO)[0].sub).toBe("Layak · 8 j lapang 22 Sep – 23 Sep");
     const own = fits(members, ["demo_indoor"], visit, [{ date: "2026-09-22", capacity: [cap("m-a", "2026-09-22", [["2026-09-22T01:00:00Z", "2026-09-22T09:00:00Z"]], [["2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"]], 480, 120)] }], "detail", "m-a");
     expect([own[0].badge.text, own[0].sub]).toEqual(["Assigned", "Qualified · assigned to this job"]);
   });
@@ -57,16 +64,22 @@ describe("partner job detail", () => {
     expect(timeline("completed", events, true).every((s) => s.state === "done")).toBe(true);
     expect(timeline("rework_requested", events, true).find((s) => s.state === "current")?.label).toBe("In progress");
     expect(eventRows(events).map((r) => r.text)).toEqual(["Job accepted", "Offer received from HQ", "Job created"]);
+    expect(timeline("accepted", events, false, "periodic_plan", MS_TOKYO).slice(0, 3).map((s) => [s.label, s.sub, s.atText])).toEqual([
+      ["Diminta", "pelan berkala", "13 Sep 2026, 10:00 PG GMT+9"], ["Ditawarkan", "HQ menawarkan kepada syarikat anda", "13 Sep 2026, 7:20 PTG GMT+9"], ["Diterima", "anda", "14 Sep 2026, 11:02 PG GMT+9"],
+    ]); // IR272: each step's time in the display time zone
+    expect(eventRows(events, MS_TOKYO)[0]).toEqual({ id: "offer.accepted", at: "14 Sep 2026, 11:02 PG GMT+9", text: "Kerja diterima" });
   });
 
   it("states the delegated job's banner, countdown and refusals", () => {
     const base = { projection: "detail", id: "j", version: 4, unitId: "u", type: "reactive", status: "accepted", symptom: "", origin: "client_request", alertIds: [], requestedSlot: slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), scheduledSlot: null, dueAt: "2026-09-25T00:00:00Z", startedAt: null, completedAt: null, assignmentId: null, partnerSlotProposal: null, reportRefs: [], assignment: null, offer: { id: "o", termsVersion: "t", visitSlot: slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), offeredAt: "2026-09-13T10:20:00Z", accessValidFrom: "2026-09-14T00:00:00Z", accessValidUntil: "2026-09-28T16:00:00Z", decision: "accept", decidedAt: "2026-09-14T02:02:00Z" } } as ApiDetail;
-    expect(detailBanner(base, null, NOW)?.text).toBe("Accepted · decided 2026-09-14 10:02 (receipt). Acceptance does not assign a technician or confirm a booking — assign one next.");
+    expect(detailBanner(base, null, NOW)?.text).toBe("Accepted · decided 14 Sept 2026, 10:02 am MYT (receipt). Acceptance does not assign a technician or confirm a booking — assign one next.");
     const assigned = { ...base, status: "assigned", assignment: { technicianMembershipId: "m-a", scheduledStart: "2026-09-22T02:00:00Z", scheduledEnd: "2026-09-22T04:00:00Z", status: "active", acknowledgement: "cant_make", cantMakeReason: "sick" } };
-    expect(detailBanner(assigned, "tech-external-a", NOW)).toEqual({ tone: "warn", text: "Assigned — tech-external-a · 09-22 10:00–12:00 · the technician can’t make it (“sick”) — reassign in Schedule." });
+    expect(detailBanner(assigned, "tech-external-a", NOW)).toEqual({ tone: "warn", text: "Assigned — tech-external-a · 22 Sept, 10:00 am – 12:00 pm MYT · the technician can’t make it (“sick”) — reassign in Schedule." });
+    expect(detailBanner(assigned, "tech-external-a", NOW, MS_TOKYO)?.text).toBe("Ditugaskan — tech-external-a · 22 Sep, 11:00 PG – 1:00 PTG GMT+9 · juruteknik tidak dapat hadir (“sick”) — tugaskan semula dalam Jadual.");
     expect(detailBanner({ ...assigned, assignment: { ...assigned.assignment!, scheduledEnd: "2026-09-20T09:00:00Z" } }, "tech-external-a", NOW)?.tone).toBe("crit");
-    expect(delegationLeft("2026-09-28T16:00:00Z", NOW)).toBe("Delegation ends 2026-09-29 00:00 — 7 d 14 h left.");
-    expect(delegationLeft("2026-09-28T16:00:00Z", NOW, true)).toBe("Delegation ends 2026-09-29 00:00 — 7 d 14 h to schedule the work.");
+    expect(delegationLeft("2026-09-28T16:00:00Z", NOW)).toBe("Delegation ends 29 Sept 2026, 12:00 am MYT — 7 d 14 h left.");
+    expect(delegationLeft("2026-09-28T16:00:00Z", NOW, true)).toBe("Delegation ends 29 Sept 2026, 12:00 am MYT — 7 d 14 h to schedule the work.");
+    expect(delegationLeft("2026-09-28T16:00:00Z", NOW, true, MS_TOKYO)).toBe("Delegasi tamat 29 Sep 2026, 1:00 PG GMT+9 — 7 hari 14 j lagi untuk menjadualkan kerja.");
     expect(delegationLeft("2026-09-20T16:00:00Z", NOW)).toBe("The delegation period has ended.");
     expect(decisionRefusal({ code: "CONFLICT", messageKey: "errors.offer_expired", fieldErrors: {} })).toMatch(/expired or was cancelled/);
     expect(decisionRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { reason: "error.length" } })).toBe("reason: required (1–1000 characters)");
@@ -74,5 +87,6 @@ describe("partner job detail", () => {
     expect(decisionRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { _: "error.malformedInput" } })).toMatch(/^the request was not understood/);
     expect(decisionRefusal({ code: "FORBIDDEN", messageKey: "errors.qualification_missing", fieldErrors: {} })).toMatch(/lacks a required qualification/);
     expect(decisionRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} })).toBe("This offer is no longer available to your company.");
+    expect(decisionRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { slot: "error.slotRules" } }, MS_TOKYO.t)).toBe("slot: pilih masa pada hari kemudian, 1–4 jam"); // the field keeps its API key
   });
 });

@@ -2894,3 +2894,32 @@ These two parts are shared by the four apps; IR266 item 6 left them open.
    - The technician and HQ screens.
    - The browser demo's screens.
    - The assistant panel and the voice demo's answers.
+
+## IR272 The contractor's offer and job page in the display language — 2026-10-10
+
+`/partner/jobs/[id]` (FR-P02, FR-P08, DD-P02, Figma Contractor 02-7…02-14) follows the job list (IR271). It covers the offer, the delegated job and the history after the delegation.
+
+1. **Texts.** These are translated:
+   - the offer: banners for a pending, approved or declined time change and for an accepted offer; the projection note; the facts; the decline reason and its checks; the decision buttons and toasts; the "Can your team take it?" card; the offer facts strip;
+   - the decline and propose dialogs;
+   - the delegated job: the state banner, the facts, the target unit (connection, alerts, scope), the status steps, the delegation countdown and "Who can take it";
+   - the history snapshot;
+   - the refusals of the decisions (`decisionRefusal`).
+   A field in a refusal keeps its API key ("slot: …"). Unit names, addresses, entry instructions, models and the customer's request stay as written. The offer's ordinal reads "2nd" in English and "ke-2" in Malay.
+2. **Times.** The loader formats every time on the server, and the view only translates fixed texts. A client view could otherwise write a month differently from the server, and the page would not hydrate (IR270).
+   - Instants use the display time zone (IR44): the visit, access and scheduled spans (`showSpan`); the expiry, offered, access-start, decided, ended and completed times; each status step; the history rows; an alert's time; the unit's last-seen time.
+   - "Can your team take it?" and "Who can take it" keep the capacity days as Kuala Lumpur dates in the user's language ("Sel 8 j", "8 j lapang 22 Sep – 23 Sep").
+   - Propose another time is typed in the display time zone and says so ("times in Asia/Tokyo", NFR-08).
+3. **Shared helpers.**
+   - These take the translator or the display: `fits`, `timeline` (now with `atText`), `detailBanner`, `delegationLeft`, `decisionRefusal`, `eventRows`, `qualificationLabel`, `typeLabel` and `originLabel`.
+   - `when` and `range` keep the Kuala Lumpur form for the schedule. HQ, the technician and the history call the labels in English.
+   - `partnerSchedule` passed `qualificationLabel` straight to `map`, which would have handed it the index as the translator. It now calls it with the code only.
+4. **Checked.**
+   - Vitest: 36 files, 200 tests. `partnerJobDetail.test.ts` covers the new English times, the Malay fits, the banner, the countdown, the refusal and the timeline in Tokyo.
+   - E2E: `partner/language.e2e.ts` also opens a job from the list in Malay. The suite: 58 passed, 9 skipped. The users are en / Asia/Kuala_Lumpur, and all 55 E2E jobs are cancelled.
+   - The completed job's page in Malay with Asia/Tokyo shows no English except stored data.
+5. **Still open.**
+   - The other partner screens: review, schedule, team, history, payouts and unit.
+   - The technician and HQ screens.
+   - The browser demo's screens.
+   - The assistant panel and the voice demo's answers.

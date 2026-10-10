@@ -1,12 +1,12 @@
 {
-  "version": "0.156.0",
-  "spec_baseline_id": "904870f05df785e0ce784d7a7a6e11063deb4db15dbe1137f360068764961939",
+  "version": "0.157.0",
+  "spec_baseline_id": "642de0222729d9fb66f5399bd50c99057fbf13e7e074e19ac563e92832e5d526",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "82e5167fd5f4712843cce4de5ba83b5ba281589906a8ac30905d9664bb1b5bd9"
+      "sha256": "dbc9f62baecfd9a449ca0a39dc9a8f4d432dd466ca6e1ec07ecc81226f8c7e64"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -114,7 +114,7 @@
     },
     {
       "path": "02-design/common.md",
-      "sha256": "3414bab06d7e2dcbbc1b27cb5474a4908efe3d751918dc723758a9a74756f632"
+      "sha256": "c47a9db3a354b8e18c36c1351994845059f1df777acc7d0a51ef5575aa3fe903"
     },
     {
       "path": "02-design/container-design.md",
@@ -154,7 +154,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "09ba6e83b559631201a3c5b197c22f9ea18eecef91e58b6e742f253e952ba418"
+      "sha256": "76c4621e8077aabd514e1e7a5a2c31511f05b878296f02f09a2a83c6b1cbad9f"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -278,11 +278,11 @@
     },
     {
       "path": "04-agentic-sdlc/verification.md",
-      "sha256": "678dee03646f2df8d415a90dfa5bef218a49f94c5405af873ac7c60c57d8715c"
+      "sha256": "f3d926eb2423f9b4ac502e07ccccd624d1496e07e48f5688a703a18facc94fb8"
     },
     {
       "path": "README.md",
-      "sha256": "0475ab6a251da54f24316e579a18d35f10e18459f72e2ee057ab9c60d6441cdf"
+      "sha256": "192b52d736286134731bf0a979535c708fad8834a299bf1abe1a77b44dd703ee"
     },
     {
       "path": "tools/check_review_regressions.py",
@@ -294,7 +294,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "418de8c53c96fbb9fcfa7d919ff77ef66ac3ac109691eda164b6f71c48ba49a5"
+      "sha256": "06ff3e40552b5dd094d2c58051378ce3542821075bae2ff7945ccd2c1cae9b4e"
     }
   ]
 }
