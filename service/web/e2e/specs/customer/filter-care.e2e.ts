@@ -22,6 +22,13 @@ test("reminder settings refuse too few hours, then are saved and put back", asyn
     await expect(page.getByRole("button", { name: "Edit reminders" })).toBeVisible();
     return (await page.getByRole("main").innerText()).match(/Reminders[\s\S]{0,200}/)?.[0] ?? "";
   };
+  // a save is finished when its Server Action has answered: a toast of the previous save may still be on screen
+  const save = async () => {
+    const answered = page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/customer/maintenance");
+    await dialog.getByRole("button", { name: "Save reminders" }).click();
+    await answered;
+    await expect(dialog).toBeHidden();
+  };
   const before = await reminders();
   expect(before).not.toBe("");
   await page.getByRole("button", { name: "Edit reminders" }).click();
@@ -31,8 +38,8 @@ test("reminder settings refuse too few hours, then are saved and put back", asyn
   await expect(dialog).toContainText("✕");
   await dialog.getByLabel("Hours of running").fill("120");
   await dialog.getByRole("button", { name: "All users of the location" }).click();
-  await dialog.getByRole("button", { name: "Save reminders" }).click();
-  await expect(page.getByText("Reminder settings saved.")).toBeVisible();
+  await save();
+  await expect(page.getByText("Reminder settings saved.").first()).toBeVisible();
   await expect(page.getByRole("main")).toContainText("120");
   // put the defaults back: model default hours, 30 days, owners only, no e-mail
   await page.getByRole("button", { name: "Edit reminders" }).click();
@@ -40,8 +47,7 @@ test("reminder settings refuse too few hours, then are saved and put back", asyn
   await dialog.getByRole("textbox").first().fill("30");
   await dialog.getByRole("button", { name: "Owners of the location" }).click();
   if (await dialog.getByLabel("E-mail").isChecked()) await dialog.getByLabel("E-mail").uncheck();
-  await dialog.getByRole("button", { name: "Save reminders" }).click();
-  await expect(page.getByText("Reminder settings saved.").last()).toBeVisible();
+  await save(); // R293: waiting only for a "saved" toast let the reload read before this save had committed
   await page.reload();
   expect(await reminders()).toBe(before);
 });

@@ -3806,3 +3806,38 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
    - The assistant panel and the voice demo's answers.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR302 HQ access & roles in the display language; the valid period in the display time zone; a fixture name fix — 2026-10-10
+
+`/admin/settings/access` (SCR-A03, FR-A03, DD-A03, Figma Admin 03) follows the display language and time zone.
+
+1. **Texts.** These are translated:
+   - the role and status filters;
+   - the memberships list with each one's role and organization;
+   - the editor: identity and role, employment, scope with its targets, valid period, the permission matrix with its resource names, and the change reason;
+   - the revoke dialog, the toasts and the checks (`memberErrors`).
+   The dictionary gains 61 entries. Roles (`roleWord`) and matrix resources (`resourceWord`) are worded.
+   - The matrix's "Read" column uses the context key `permission::Read` ("Baca"). "Read" alone is already the notification state "Dibaca".
+   These stay as they are: permission codes, `scopeVersion`, user and organization names, and the stored reasons.
+2. **The valid period** is an access window, so per NFR-08 it is typed and shown in the display time zone, like an offer's access window (IR290).
+   - `memberDraft` and `memberInput` take the zone (`zonedLocal` / `zonedInstant`). A revoke ends the access at now in that zone.
+   - The list and the editor show the period with `showTime`, formatted by the page (IR282). Before, it was typed and shown in Kuala Lumpur time.
+3. **Fixture fix.**
+   - In `fixture-contract.json`, the override-only actor (`user-hq-override-only`) had the display name "hq-operator". The access screen therefore listed two "hq-operator" memberships, and the user picker offered two "hq-operator" users.
+   - It is now "hq-override-only", its realm username. A seed test (`TestActorNamesUnique`) keeps every actor's display name unique.
+   - The local dev database row was corrected the same way, because the seed does not overwrite existing rows.
+4. **A spec race.**
+   - `customer/filter-care.e2e.ts` waited only for a "Reminder settings saved." toast before reloading. The first save's toast could satisfy that wait, so the reload could read before the restoring save committed. This happened once in this round. The data was restored, but the check compared the stale page.
+   - Each save now waits for its Server Action's answer and for the dialog to close.
+   - The spec passed three repeated runs.
+5. **Checked.**
+   - Vitest: 50 files, 287 tests. `members.test.ts` is new. It covers the 38 permissions and the role limits, the rows without clients and their validity in the display zone, a Tokyo-typed period saved as the same instants, the members.save checks (including the self-grant rule), and Malay / Tokyo.
+   - Go: `make test-all`, with the new seed test.
+   - E2E: `admin/language.e2e.ts` also opens access & roles. It checks the role filters, the valid period in GMT+9, the "Masa dalam Asia/Tokyo" hint, the matrix's "Baca" column, and the new-membership errors, which stop before any call. Nothing is saved.
+6. **Progress.** 42 of the 44 business screens follow the display language.
+7. **Still open.**
+   - The other 2 HQ screens: automation and audit.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

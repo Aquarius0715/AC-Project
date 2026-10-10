@@ -179,6 +179,7 @@ Scope: FR-A03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 2. Apply these business rules to reads and actions. Keep role and permissions separate. Admin status does not automatically grant restriction.write or override. External technicians must not have unit access without an end date. Increasing one's own permissions requires another HQ permission administrator to perform the change.
 3. Update Membership version and scopeVersion. Discard caches from old sessions; evaluate subsequent mutations using new permissions.
 4. Queries to update: `members / session scope / all affected query caches / audit`。
+5. Language and time (IR302): texts, roles and matrix resources follow the display language; permission codes stay codes. The valid period is typed and shown in the display time zone, and the form names it. A revoke ends the access at now.
 
 **Boundary cases and failures**: Reject other-tenant scopes, external access without an end date, validFrom at or after validUntil, and adding override to oneself. Reject saves from old screens after permissions expire.
 

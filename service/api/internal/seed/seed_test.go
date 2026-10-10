@@ -44,6 +44,25 @@ func TestLoadErrors(t *testing.T) {
 	}
 }
 
+// Every demo actor has its own display name: screens list memberships by name (members.list displayName, IR172), so a
+// copied name shows two people as one (R293: the override-only actor was named "hq-operator").
+func TestActorNamesUnique(t *testing.T) {
+	f, err := Load(fixturePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seen := map[string]string{}
+	for _, a := range f.Actors {
+		if a.DisplayName == "" {
+			t.Errorf("%s has no display name", a.MembershipID)
+		}
+		if other, ok := seen[a.DisplayName]; ok {
+			t.Errorf("%s and %s share the display name %q", other, a.MembershipID, a.DisplayName)
+		}
+		seen[a.DisplayName] = a.MembershipID
+	}
+}
+
 // Applies the fixture twice in a rolled-back transaction and checks the row counts.
 func TestApplyFixture(t *testing.T) {
 	f, err := Load(fixturePath)

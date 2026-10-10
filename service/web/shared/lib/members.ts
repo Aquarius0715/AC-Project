@@ -1,7 +1,10 @@
 // HQ access and roles (FR-A03, DATA_SOURCE=api): memberships of HQ, contractor and technician users projected for
 // /admin/settings/access, with the 38 canonical permissions (BR-A03, IR107) and the members.save rules (IR members.save
-// item 1). Pure code shared by the Server Component and the client view.
-import { klInstant, klLocal, klStamp } from "@ac/web/lib/energy";
+// item 1). Pure code shared by the Server Component and the client view. Texts in the display language; the valid period
+// is shown and typed in the display time zone (`t` / `i` / `zone`, IR302).
+import { EN, showTime, translator, zonedInstant, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
+
+const en = translator("en");
 
 export type Role = "admin" | "contractor" | "technician";
 export type ScopeRef = { kind: "tenant" | "organization" | "property" | "unit"; id: string };
@@ -33,6 +36,18 @@ export const permissionRows: PermissionRow[] = [
   { res: "Audit", read: "audit.read" },
   { res: "Partners", actions: ["partner.accept", "partner.assign", "partner.review"] },
 ];
+/** A matrix resource as the screen words it. */
+export function resourceWord(res: string, t: T = en): string {
+  const words: Record<string, string> = {
+    Dashboard: t("Dashboard"), "Customers & units": t("Customers & units"), "Users & roles": t("Users & roles"), "Devices & models": t("Devices & models"), "AC control": t("AC control"),
+    Alerts: t("Alerts"), "Alert policies": t("Alert policies"), "Maintenance jobs": t("Maintenance jobs"), Contracts: t("Contracts"), Billing: t("Billing"), Restrictions: t("Restrictions"),
+    "Automation policies": t("Automation policies"), Energy: t("Energy"), MRV: t("MRV"), Offsets: t("Offsets"), Audit: t("Audit"), Partners: t("Partners"),
+  };
+  return words[res] ?? res;
+}
+/** A role (and a technician's employment) as the screen words it. */
+export const roleWord = (role: Role, employment: ApiMember["employment"], t: T = en) =>
+  role === "admin" ? t("Admin") : role === "contractor" ? t("Contractor") : employment === "external" ? t("Technician · external") : t("Technician · internal");
 export const allPermissions = permissionRows.flatMap((r) => [r.read, r.write, ...(r.actions ?? [])].filter((p): p is string => !!p));
 /** Permissions each role may hold (members.save rules). */
 export const allowedFor: Record<Role, string[]> = {
@@ -46,51 +61,66 @@ export const selfBlocked = ["identity.write", "restriction.override"];
 
 export const isActive = (m: Pick<ApiMember, "validFrom" | "validUntil">, now: Date) => Date.parse(m.validFrom) <= now.getTime() && (!m.validUntil || Date.parse(m.validUntil) > now.getTime());
 
-export type MemberRow = { id: string; version: number; name: string; role: Role; label: string; org: string; active: boolean; m: ApiMember };
-export function memberRows(ms: ApiMember[], orgs: ApiOrganization[], now: Date): MemberRow[] {
+export type MemberRow = { id: string; version: number; name: string; role: Role; label: string; org: string; active: boolean; validity: string; m: ApiMember };
+/** The memberships (clients are managed elsewhere), with the valid period in the display time zone. */
+export function memberRows(ms: ApiMember[], orgs: ApiOrganization[], now: Date, i: I18n = EN): MemberRow[] {
+  const { t } = i;
   const org = new Map(orgs.map((o) => [o.id, o.name]));
-  return ms.filter((m): m is ApiMember & { role: Role } => m.role !== "client").map((m) => ({
-    id: m.id, version: m.version, name: m.displayName, role: m.role, m, org: org.get(m.organizationId) ?? "organization", active: isActive(m, now),
-    label: `${m.role === "admin" ? "Admin" : m.role === "contractor" ? "Contractor" : `Technician · ${m.employment}`} · ${org.get(m.organizationId) ?? "organization"}`,
-  }));
+  return ms.filter((m): m is ApiMember & { role: Role } => m.role !== "client").map((m) => {
+    const orgName = org.get(m.organizationId) ?? t("organization");
+    return {
+      id: m.id, version: m.version, name: m.displayName, role: m.role, m, org: orgName, active: isActive(m, now), validity: validity(m, i),
+      label: `${roleWord(m.role, m.employment, t)} · ${orgName}`,
+    };
+  });
 }
 
 export type MemberDraft = {
   userId: string; organizationId: string; role: Role; employment: "internal" | "external"; permissions: string[]; scopes: ScopeRef[]; validFrom: string; validUntil: string; reason: string;
 };
-export function memberDraft(m?: ApiMember, tenantId = ""): MemberDraft {
+/** An instant as the datetime-local value of the form in a time zone ("2026-09-14T08:00"). */
+export const zonedLocal = (iso: string, zone: string) => {
+  const p = zonedParts(iso, zone);
+  return `${p.date}T${p.time}`;
+};
+const zonedFrom = (local: string, zone: string) => zonedInstant(local.slice(0, 10), local.slice(11, 16), zone);
+
+/** The form of a membership; the valid period is typed in the display time zone (NFR-08). */
+export function memberDraft(m?: ApiMember, tenantId = "", zone = "Asia/Kuala_Lumpur"): MemberDraft {
   if (!m || m.role === "client") return { userId: "", organizationId: "", role: "contractor", employment: "internal", permissions: roleDefaults.contractor, scopes: [], validFrom: "", validUntil: "", reason: "" };
   return {
     userId: m.userId, organizationId: m.organizationId, role: m.role, employment: m.employment ?? "internal", permissions: m.permissions, scopes: m.role === "admin" && m.scopes.length === 0 && tenantId ? [{ kind: "tenant", id: tenantId }] : m.scopes,
-    validFrom: klLocal(m.validFrom), validUntil: m.validUntil ? klLocal(m.validUntil) : "", reason: "",
+    validFrom: zonedLocal(m.validFrom, zone), validUntil: m.validUntil ? zonedLocal(m.validUntil, zone) : "", reason: "",
   };
 }
 
 /** The organization kind each role (and employment) belongs to. */
 export const orgKind = (role: Role, employment: MemberDraft["employment"]): ApiOrganization["kind"] => (role === "contractor" || (role === "technician" && employment === "external") ? "contractor" : "operator");
 
-export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?: ApiMember }): Record<string, string> {
+export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?: ApiMember }, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!d.userId) e.userId = "Choose a user";
-  if (!d.organizationId) e.organizationId = "Choose the organization";
+  if (!d.userId) e.userId = t("Choose a user");
+  if (!d.organizationId) e.organizationId = t("Choose the organization");
   const bad = d.permissions.filter((p) => !allowedFor[d.role].includes(p));
-  if (bad.length) e.permissions = `Not allowed for this role: ${bad.join(", ")}`;
-  for (const r of permissionRows) if (r.write && d.permissions.includes(r.write) && r.read && !d.permissions.includes(r.read)) e.permissions = `${r.write} needs ${r.read}`;
+  if (bad.length) e.permissions = t("Not allowed for this role: {list}", { list: bad.join(", ") });
+  for (const r of permissionRows) if (r.write && d.permissions.includes(r.write) && r.read && !d.permissions.includes(r.read)) e.permissions = t("{write} needs {read}", { write: r.write, read: r.read });
   const gained = d.permissions.filter((p) => selfBlocked.includes(p) && !(ctx.current?.permissions ?? []).includes(p));
-  if (d.userId === ctx.selfUserId && gained.length) e.permissions = `Another identity administrator must grant ${gained.join(" and ")} to you`;
-  if (d.role === "technician" && d.scopes.length === 0) e.scopes = "Add at least one unit, property or customer organization";
-  if (!d.validFrom) e.validFrom = "Required";
-  if (d.validUntil && d.validFrom && d.validUntil <= d.validFrom) e.validUntil = "Must be after valid from";
-  if (d.role === "technician" && d.employment === "external" && !d.validUntil) e.validUntil = "External technicians need an end date (IR74)";
-  if (d.reason.trim().length < 1 || d.reason.length > 1000) e.reason = "A change reason is required (1–1000 characters)";
+  if (d.userId === ctx.selfUserId && gained.length) e.permissions = t("Another identity administrator must grant {list} to you", { list: gained.join(", ") });
+  if (d.role === "technician" && d.scopes.length === 0) e.scopes = t("Add at least one unit, property or customer organization");
+  if (!d.validFrom) e.validFrom = t("Required");
+  if (d.validUntil && d.validFrom && d.validUntil <= d.validFrom) e.validUntil = t("Must be after valid from");
+  if (d.role === "technician" && d.employment === "external" && !d.validUntil) e.validUntil = t("External technicians need an end date (IR74)");
+  if (d.reason.trim().length < 1 || d.reason.length > 1000) e.reason = t("A change reason is required (1–1000 characters)");
   return e;
 }
 
-export function memberInput(d: MemberDraft, id?: string) {
+/** members.save input; the valid period typed in `zone` becomes instants. */
+export function memberInput(d: MemberDraft, id?: string, zone = "Asia/Kuala_Lumpur") {
   return {
     ...(id ? { id } : {}), userId: d.userId, organizationId: d.organizationId, role: d.role, employment: d.role === "technician" ? d.employment : null,
-    permissions: d.permissions, scopes: d.scopes, validFrom: klInstant(d.validFrom), validUntil: d.validUntil ? klInstant(d.validUntil) : null, reason: d.reason.trim(),
+    permissions: d.permissions, scopes: d.scopes, validFrom: zonedFrom(d.validFrom, zone), validUntil: d.validUntil ? zonedFrom(d.validUntil, zone) : null, reason: d.reason.trim(),
   };
 }
 
-export const validity = (m: ApiMember) => `${klStamp(m.validFrom)} → ${m.validUntil ? klStamp(m.validUntil) : "open-ended"}`;
+/** The valid period in the display time zone. */
+export const validity = (m: Pick<ApiMember, "validFrom" | "validUntil">, i: I18n = EN) => `${showTime(m.validFrom, i.display)} → ${m.validUntil ? showTime(m.validUntil, i.display) : i.t("open-ended")}`;

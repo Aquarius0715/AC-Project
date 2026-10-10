@@ -385,7 +385,7 @@
         }
       ],
       "qualifications": [],
-      "displayName": "hq-operator",
+      "displayName": "hq-override-only",
       "clientRole": null
     }
   ],

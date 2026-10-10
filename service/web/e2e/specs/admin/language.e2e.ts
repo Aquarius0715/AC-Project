@@ -1,4 +1,4 @@
-// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A06, FR-A07, FR-A08, FR-A13, FR-A14, FR-A15, FR-A23, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
+// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A03, FR-A06, FR-A07, FR-A08, FR-A13, FR-A14, FR-A15, FR-A23, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
 // HQ overview speaks Malay — the scope and period filters, the KPI tiles, the forecast, the power and connection axes,
 // the job statuses and the billing card — and its as-of time is in GMT+9 while the period stays Kuala Lumpur days, named
 // so; the Jobs tab speaks Malay too — tabs, scope, filters, the list and one job's detail with its times in GMT+9 — and
@@ -10,7 +10,8 @@
 // (a read) and the emission factors with the form checks (IR297), the offset demo's records, market concept and
 // new-quote checks (IR298), and billing — invoices with their Kuala Lumpur dates named in another zone, a reminder
 // preview (a read), the payment and invoice checks, inquiries and payouts (IR299), and contracts with their Kuala Lumpur
-// days and the new-contract checks (IR300), and the restrictions' no-access state (IR301). Nothing is saved. English and the earlier zone come back at the end, or in
+// days and the new-contract checks (IR300), the restrictions' no-access state (IR301), and access & roles with the
+// valid period in the display zone and the new-membership checks (IR302). Nothing is saved. English and the earlier zone come back at the end, or in
 // afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
@@ -227,6 +228,19 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   // (restrictions-language.e2e.ts opens them as the restriction manager)
   await page.goto("/admin/restrictions");
   await expect(main).toContainText("Sekatan memerlukan restriction.read, restriction.write atau restriction.override.");
+  // access & roles (IR302): the memberships, the selected one's valid period in GMT+9 and its form typed in Asia/Tokyo,
+  // and the new-membership checks, which stop before any call
+  await page.goto("/admin/settings/access");
+  for (const name of ["Semua peranan", "Pentadbir", "Kontraktor", "Juruteknik"]) await expect(main.getByRole("button", { name, exact: true }).first()).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Keahlian", exact: true })).toBeVisible();
+  await expect(main).toContainText(/GMT\+9 → /); // the valid period in the display zone
+  await expect(main).toContainText("Masa dalam Asia/Tokyo");
+  await expect(main.getByRole("columnheader", { name: "Baca" })).toBeVisible();
+  await main.getByRole("button", { name: "+ Keahlian baharu" }).click();
+  await page.waitForURL(/membershipId=new/);
+  await expect(main.getByRole("heading", { name: "Keahlian baharu", exact: true })).toBeVisible();
+  await main.getByRole("button", { name: "Cipta keahlian" }).click();
+  for (const text of ["Pilih pengguna", "Pilih organisasi", "Sebab perubahan diperlukan (1–1000 aksara)"]) await expect(main).toContainText(text);
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/admin");
