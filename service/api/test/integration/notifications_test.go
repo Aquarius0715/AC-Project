@@ -146,6 +146,10 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	if code, m := post(s, &customerA, "notifications.recipients", `{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","query":{}}`); code != 200 || len(items(m)) == 0 {
 		t.Errorf("unit recipients: %d %v", code, m)
 	}
+	// an alert message is a fault notification of warning severity
+	if code, m := post(s, &hq, "notifications.preview", `{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","recipientMembershipId":"`+seed.ID("customer-a").String()+`","message":"Please check the unit"}`); code != 200 || data(m)["type"] != "fault" || data(m)["severity"] != "warning" {
+		t.Errorf("alert preview: %d %v", code, m)
+	}
 	if code, _ := post(s, &customerB, "notifications.recipients", `{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","query":{}}`); code != 404 {
 		t.Error("unit of another customer")
 	}
@@ -240,5 +244,38 @@ func TestTechnicianJobNotificationScope(t *testing.T) {
 	owner(t, `UPDATE notify.ref_assignments SET scheduled = tstzrange($2,$3) WHERE id = $1`, aid, clock.Add(-time.Hour), clock.Add(time.Hour))
 	if code, _ := write(s, &techInt, "notifications.markRead", `{"id":"`+nid+`"}`, 1); code != 200 {
 		t.Errorf("mark read inside the window: %d", code)
+	}
+}
+
+// IR58: a contractor reads the notifications of jobs offered to its company, and nothing else — not another job, not
+// a unit.
+func TestContractorInbox(t *testing.T) {
+	s := server(t)
+	note := func(kind, id string) string {
+		n := uuid.NewString()
+		owner(t, `INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, template_key, target, params, severity, occurred_at)
+			VALUES ($1, $2, $3, 1, 'job_update', 'job_update', $4, '{}', 'normal', $5)`, n, seed.ID("tenant-a"), seed.ID("contractor-a"), `{"kind":"`+kind+`","id":"`+id+`"}`, clock)
+		return n
+	}
+	offered := note("job", seed.ID("job-contractor-a").String())
+	other := note("job", uuid.NewString())
+	unit := note("unit", seed.ID("unit-online-rto").String())
+	code, m := post(s, &contrA, "notifications.list", `{"limit":100}`)
+	if code != 200 {
+		t.Fatalf("contractor inbox: %d %v", code, m)
+	}
+	seen := map[string]bool{}
+	for _, it := range items(m) {
+		seen[it["id"].(string)] = true
+	}
+	if !seen[offered] || seen[other] || seen[unit] {
+		t.Errorf("contractor inbox: offered %v, another job %v, a unit %v", seen[offered], seen[other], seen[unit])
+	}
+	if _, m := post(s, &contrB, "notifications.list", `{"limit":100}`); len(items(m)) > 0 {
+		for _, it := range items(m) {
+			if it["id"] == offered {
+				t.Error("another contractor reads the notification")
+			}
+		}
 	}
 }

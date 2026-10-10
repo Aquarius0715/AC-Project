@@ -129,19 +129,35 @@ func TestDiagnosticRuns(t *testing.T) {
 	if _, m := post(s, &hq, "diagnosticRuns.get", `{"diagnosticRunId":"`+r3+`"}`); data(m)["state"] != "end_blocked" {
 		t.Fatalf("end blocked: %v", m)
 	}
+	// the device offline at the end: the end action fails with OFFLINE and sends nothing
+	owner(t, `UPDATE restrictions.restrictions SET state = 'cancelled' WHERE id = $1`, rid)
+	code, m = run(&techInt, off, on, 1, uv, jv)
+	if code != 200 {
+		t.Fatalf("fourth run: %d %v", code, m)
+	}
+	r4 := data(m)["id"].(string)
+	ackCommand(t, data(m)["startCommandId"].(string), clock.Add(time.Second))
+	owner(t, `UPDATE devices.devices SET connection = 'offline' WHERE unit_id = $1`, unit)
+	if _, err := schedTick(ctx, s, clock.Add(3*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE unit_id = $1`, unit)
+	if _, m := post(s, &hq, "diagnosticRuns.get", `{"diagnosticRunId":"`+r4+`"}`); data(m)["state"] != "end_failed" || data(m)["failureCode"] != "OFFLINE" || data(m)["endCommandId"] != nil {
+		t.Fatalf("end offline: %v", m)
+	}
 	// reads
-	if _, m := post(s, &techInt, "diagnosticRuns.list", `{"unitId":"`+unit+`","jobId":"`+job+`","query":{}}`); len(items(m)) != 3 {
+	if _, m := post(s, &techInt, "diagnosticRuns.list", `{"unitId":"`+unit+`","jobId":"`+job+`","query":{}}`); len(items(m)) != 4 {
 		t.Errorf("list: %d", len(items(m)))
 	}
-	// pages of two: the cursor binds unit and job, so the second page reads the third run (IR223 fix)
+	// pages of two: the cursor binds unit and job, so the second page reads the third and fourth runs (IR223 fix)
 	_, m = post(s, &techInt, "diagnosticRuns.list", `{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":2}}`)
 	next, _ := data(m)["nextCursor"].(string)
-	if code, m := post(s, &techInt, "diagnosticRuns.list", `{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":2,"cursor":"`+next+`"}}`); next == "" || code != 200 || len(items(m)) != 1 {
+	if code, m := post(s, &techInt, "diagnosticRuns.list", `{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":2,"cursor":"`+next+`"}}`); next == "" || code != 200 || len(items(m)) != 2 {
 		t.Errorf("second page: %d %v", code, m)
 	}
 	// a revoked Assignment keeps the runs of the job visible (IR139, IR187)
 	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE job_id = $1`, job)
-	if _, m := post(s, &techInt, "diagnosticRuns.list", `{"unitId":"`+unit+`","jobId":"`+job+`","query":{}}`); len(items(m)) != 3 {
+	if _, m := post(s, &techInt, "diagnosticRuns.list", `{"unitId":"`+unit+`","jobId":"`+job+`","query":{}}`); len(items(m)) != 4 {
 		t.Errorf("list after revoke: %d", len(items(m)))
 	}
 	if code, _ := post(s, &techInt, "diagnosticRuns.get", `{"diagnosticRunId":"`+r1+`"}`); code != 200 {

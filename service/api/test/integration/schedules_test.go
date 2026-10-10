@@ -366,3 +366,73 @@ func TestAutomationExtraConditions(t *testing.T) {
 		}
 	}
 }
+
+// IR54: rules whose unit was archived, or whose time zone cannot be loaded, are skipped without failing the tick; at a
+// minute where one schedule ends and another starts on the same unit, the end is evaluated first. Its Command then
+// makes the unit busy (D04), so D02 excludes the next schedule's start — the current rule, recorded here; whether the
+// start should win instead is an open product question (IR326). clock is Monday 2026-09-14 09:00 Kuala Lumpur.
+func TestScheduleBoundaries(t *testing.T) {
+	s := server(t)
+	ctx := context.Background()
+	tick := func(at time.Time) {
+		t.Helper()
+		if _, err := schedTick(ctx, s, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	save := func(u, start, end, action string) string {
+		t.Helper()
+		code, m := write(s, &customerB, "automations.save", scheduleRule(u, map[string]string{"weekdays": "[1]", "startLocal": `"` + start + `"`, "endLocal": `"` + end + `"`, "enabled": "true",
+			"startAction": action}), 0)
+		if code != 200 {
+			t.Fatalf("save %s–%s: %d %v", start, end, code, m)
+		}
+		return data(m)["id"].(string)
+	}
+	// an archived unit and a rule with an unknown time zone: nothing is sent, the tick goes on
+	archived, lost := boundUnit(t, s, "online"), boundUnit(t, s, "online")
+	save(archived, "09:30", "09:45", `{"kind":"set_temperature","celsius":24}`)
+	zone := save(lost, "09:30", "09:45", `{"kind":"set_temperature","celsius":24}`)
+	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, archived)
+	owner(t, `UPDATE control.automations SET timezone = 'Mars/Olympus_Mons' WHERE id = $1`, zone)
+	setWatermark(t, clock)
+	tick(clock.Add(31 * time.Minute))
+	owner(t, `UPDATE assets.units SET archived = false WHERE id = $1`, archived)
+	if a, b := len(automationCommands(t, archived)), len(automationCommands(t, lost)); a != 0 || b != 0 {
+		t.Fatalf("skipped rules sent commands: archived %d, unknown zone %d", a, b)
+	}
+
+	// 10:00: the first schedule ends and the second starts on the same unit — the end is evaluated first
+	u := boundUnit(t, s, "online")
+	first := save(u, "09:30", "10:00", `{"kind":"set_temperature","celsius":25}`)
+	second := save(u, "10:00", "10:30", `{"kind":"set_temperature","celsius":22}`)
+	setWatermark(t, clock.Add(59*time.Minute))
+	tick(clock.Add(61 * time.Minute))
+	type run struct{ rule, trigger, outcome, reason string }
+	var got []run
+	conn, err := pgx.Connect(ctx, testDB("postgres"))
+	if err != nil {
+		t.Skip(err)
+	}
+	defer conn.Close(ctx)
+	rows, err := conn.Query(ctx, `SELECT rule_id::text, trigger_ref, outcome, COALESCE(skip_reason, '') FROM control.automation_runs WHERE rule_id = ANY($1) AND unit_id = $2 ORDER BY seq`,
+		[]string{first, second}, u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for rows.Next() {
+		var r run
+		if err := rows.Scan(&r.rule, &r.trigger, &r.outcome, &r.reason); err != nil {
+			t.Fatal(err)
+		}
+		got = append(got, r)
+	}
+	rows.Close()
+	end, start := "schedule:schedule_end:2026-09-14T02:00:00Z", "schedule:schedule_start:2026-09-14T02:00:00Z"
+	if len(got) != 2 || got[0] != (run{first, end, "command_created", ""}) || got[1] != (run{second, start, "skipped", "busy"}) {
+		t.Fatalf("same-minute end and start: %v", got)
+	}
+	if cs := automationCommands(t, u); len(cs) != 1 || cs[0] != `{"kind": "set_power", "power": false}` {
+		t.Fatalf("commands at 10:00: %v", cs)
+	}
+}

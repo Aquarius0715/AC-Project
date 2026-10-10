@@ -4535,3 +4535,24 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
    - A default rule that the customer switched off no longer fires for their units.
 
 Both Go suites pass (`make test-all`): 130 integration tests and 80 unit tests.
+
+## IR326 Coverage: inbox scopes, schedule boundaries, diagnostic ends; two open questions — 2026-10-11
+
+The second coverage round (IR325) adds Core API tests where business rules had none.
+
+1. **Contractor inbox (IR58).**
+   - A contractor reads the notifications of jobs offered to its company, and nothing else: not another job, and not a unit. Another contractor does not see them. This is the new test `TestContractorInbox`.
+   - An alert message is previewed as a fault notification of warning severity.
+2. **Schedule boundaries (IR54).**
+   - A schedule rule whose unit was archived, or whose time zone cannot be loaded, is skipped, and the tick goes on.
+   - When one schedule ends and another starts on the same unit in the same minute, the end is evaluated first. Its Command makes the unit busy (D04), so D02 excludes the next schedule's start as `busy`. The new test `TestScheduleBoundaries` records this current rule.
+3. **Diagnostic runs (IR123).** When the device is offline at a run's end, the end action fails with OFFLINE and sends nothing.
+4. **Open question — back-to-back schedules (for the product owner).**
+   - **Today.** With the rule in item 2, a schedule that starts as another ends on the same unit does not run its start action: the unit keeps the earlier schedule's end state. IR54 names the order "an end before a start of the same minute", which suggests that the start was meant to take effect.
+   - **Proposal.** When another schedule starts on the same unit in the same minute, its start wins: the earlier schedule's end is not sent for that unit. The run would be recorded as superseded, a new suppression reason.
+   - **Status.** Nothing changes until the product owner decides.
+5. **Open question — plan recurrence in UTC (for production).** D16 computes the monthly recurrence in UTC for Phase 1A, and the plan form says so.
+   - **Effect.** A Kuala Lumpur plan due at 00:00 on the 1st is anchored to the UTC day, the 30th or 31st. Some of its later occurrences therefore fall on the last day of the previous month in Kuala Lumpur. The form shows the next occurrence before saving.
+   - **Decision.** Computing the recurrence in the property's time zone is a production decision; nothing changes in 1A.
+
+Both Go suites pass (`make test-all`): 132 integration tests and 80 unit tests. Coverage is 87.7 %.
