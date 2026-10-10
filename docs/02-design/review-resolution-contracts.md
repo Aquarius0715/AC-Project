@@ -4731,3 +4731,23 @@ R324 checked compose.yaml and docker/ against the container design and the code.
    - The web typecheck, lint and Vitest pass; Vitest covers sealing, refusals, keys and the opaque value.
    - The four builds pass.
    - The E2E suite passes: 86 pass, 8 skip by design.
+
+## IR334 docker/ against the container design; the variables and stand-ins that wait for integrations — 2026-10-11
+
+R325 compared the files under docker/ and the variables of compose.yaml with the container design and with the code.
+
+1. **The stand-ins match the design.**
+   - **Keycloak (`docker/keycloak/realm-ac.json`).** Realm `ac` has the two confidential clients with PKCE S256: `ac-web` for the customer, partner and technician apps (ports 3000–3002) and `ac-admin-web` for the admin app (3003). It has the ten fixture users with their role attribute. The three HQ users carry a TOTP credential, as §4 says.
+   - **Mosquitto.** The broker listens on 1883 and allows anonymous clients, standing in locally for IoT Core's mutual TLS.
+   - **WireMock.** It answers `GET /v1/current` with the fixed demo weather.
+   - **OpenTelemetry collector.** It takes OTLP on 4317 and 4318 and sends traces to Jaeger.
+2. **What is built, and what waits.**
+   - **Read by the code.** The code reads the database, OIDC, demo, blob, internal-call and web-session variables.
+   - **Not read yet.** `APP_ENV`, the `AWS_*` variables, `MQTT_URL`, `IOT_DATA_ENDPOINT`, `STRIPE_API_BASE`, `WEATHER_API_BASE` and `OTEL_EXPORTER_OTLP_ENDPOINT` are set in compose.yaml for integrations that are not built:
+     - the outbox, domain events and notifications run inside the services on PostgreSQL;
+     - uploads stay in the blobs volume (OPEN-CT-02);
+     - payments, weather and devices are simulated;
+     - neither the Go services nor the web apps export traces, so the `obs` profile receives nothing.
+   - **Prepared resources.** `docker/localstack/init-aws.sh` already creates the production resource names: the domain-events FIFO topic, five FIFO queues with dead-letter queues, the telemetry stream, four buckets, the SES identity and the Stripe test secret.
+   - **Where it is written.** The container design says so under its variable table, and the LocalStack row reads "the AWS clients will use `AWS_ENDPOINT_URL`" instead of "services use". OPEN-CT-04 records the missing OpenTelemetry instrumentation. Figma board 07 adds the same note.
+3. **No code change.**

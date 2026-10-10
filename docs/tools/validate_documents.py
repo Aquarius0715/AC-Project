@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.218.0 (2026-10-11): IR334 docker/ vs container design (container design 0.32.0); counts unchanged.
 # 0.217.0 (2026-10-11): IR333 sealed session cookie, container design vs compose, every document reads IR01–IR333 (14 document versions); counts unchanged.
 # 0.216.0 (2026-10-11): IR332 every VALIDATION check names its field (DD-A 0.46.0, DD-COMMON 0.105.0); counts unchanged.
 # 0.215.0 (2026-10-11): IR331 VALIDATION checks name their field; audit.list period ends (DD-A 0.45.0, DD-COMMON 0.104.0); counts unchanged.

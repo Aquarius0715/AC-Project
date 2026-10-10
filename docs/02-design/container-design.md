@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTAINER
-version: 0.31.0
+version: 0.32.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -96,7 +96,7 @@ Local stand-ins for the AWS managed services:
 |---|---|---|
 | Aurora PostgreSQL 16 | `postgres:16` | Same schema and RLS; only DEFAULT partitions (no pg_partman) |
 | ElastiCache (Valkey) | `valkey/valkey:8` | Sessions, idempotency fast path |
-| SQS / SNS FIFO, Kinesis, Firehose, S3, SES, Secrets Manager, KMS, EventBridge Scheduler | `localstack/localstack:4` | Resources created by `docker/localstack/init-aws.sh`; services use `AWS_ENDPOINT_URL` |
+| SQS / SNS FIFO, Kinesis, Firehose, S3, SES, Secrets Manager, KMS, EventBridge Scheduler | `localstack/localstack:4` | Resources created by `docker/localstack/init-aws.sh`; the AWS clients will use `AWS_ENDPOINT_URL` (none is built yet, IR334) |
 | AWS IoT Core (MQTT, rules) | `eclipse-mosquitto:2` + `iot-bridge` | Same topic layout; the bridge forwards topics to Kinesis / SQS like the IoT rules. Mutual TLS and IoT policies are verified in staging against IoT Core |
 | Amazon Cognito | `keycloak:26` realm `ac` (`docker/keycloak/realm-ac.json`) | Two OIDC clients `ac-web` and `ac-admin-web` (HQ network rule), TOTP (required for HQ users; the local realm pre-provisions a test TOTP credential per HQ user for end-to-end runs, IR177); one local user per fixture actor (username = `membershipId` in `docs/04-agentic-sdlc/fixture-contract.json`, password `local-pass`); the Go verifier is configured by issuer and JWKS URL only |
 | Stripe API / webhooks | `stripe/stripe-mock` (offline) and Stripe CLI (test mode) | Live mode never outside production |
@@ -135,6 +135,15 @@ Configuration is twelve-factor: every service reads environment variables only. 
 | `CUSTOMER_WEB_URL` / `PARTNER_WEB_URL` / `TECHNICIAN_WEB_URL` / `ADMIN_WEB_URL` | web | `http://localhost:3000`–`3003` | the four host names — Links between the four apps (IR178) |
 | `SESSION_STORE_URL` | web (BFF) | `redis://valkey:6379` | ElastiCache endpoint (TLS) — Reserved for the server-side session store: not read yet, sessions live in the sealed cookie (OPEN-CT-03) |
 
+As built (IR334), the code reads the database, OIDC, demo, blob, internal-call and web-session variables above. `APP_ENV`, the `AWS_*` variables, `MQTT_URL`, `IOT_DATA_ENDPOINT`, `STRIPE_API_BASE`, `WEATHER_API_BASE` and `OTEL_EXPORTER_OTLP_ENDPOINT` are set for integrations that are not built yet, and nothing reads them:
+
+- the outbox, the domain events and the notifications run inside the services on PostgreSQL;
+- uploaded files stay in the local blob store (OPEN-CT-02);
+- payments, weather and devices are simulated (DEC-68 open items, the `planned` profile);
+- no service exports traces yet, so the `obs` profile receives nothing (OPEN-CT-04).
+
+`docker/localstack/init-aws.sh` already creates the production resource names for those integrations: the domain-events FIFO topic, five FIFO queues with their dead-letter queues, the telemetry stream, four buckets, the SES identity and the Stripe secret.
+
 Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`, LocalStack `SERVICES` / `AWS_DEFAULT_REGION`) exist only in compose. Local values come from compose and an optional git-ignored `.env.local` (`.env.local.example`).
 
 ## 5. Production on ECS Fargate
@@ -165,5 +174,6 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 | OPEN-CT-01 | Whether developers on x86 laptops need the `amd64` variant in the shared registry or build locally only |
 | OPEN-CT-02 | The S3 blob store (bucket `ac-files`, LocalStack locally) for staging and production; until then the maintenance service keeps uploaded files in the local directory store on the `blobs` volume (IR229) |
 | OPEN-CT-03 | The server-side session store (ElastiCache in production, Valkey locally) with revocation on sign-out (backend architecture §6). Until then the BFF keeps the tokens in its sealed session cookie (IR333) |
+| OPEN-CT-04 | OpenTelemetry instrumentation of the Go services and the web apps. The collector, Jaeger and `OTEL_EXPORTER_OTLP_ENDPOINT` are ready, but nothing exports traces or metrics yet (IR334) |
 
-Additional contracts for current version 0.31.0: Read IR01–IR333 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.32.0: Read IR01–IR334 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
