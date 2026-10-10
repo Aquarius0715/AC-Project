@@ -3139,3 +3139,28 @@ The Certifications tab of `/partner/team` (FR-P09, DD-P09, Figma Contractor 04-6
    - The technician and HQ screens.
    - The browser demo's screens.
    - The assistant panel and the voice demo's answers.
+
+## IR281 The technician overview in the display language — 2026-10-10
+
+`/technician` (FR-T01, DD-T01, Figma Technician 01-1…01-5) is the first technician screen to follow the display language and time zone.
+
+1. **Texts.** These are translated:
+   - the tiles, the tabs and the sort, and the job rows (badge, what to do now, the alert on the unit);
+   - the assignment banners and the read-only banners;
+   - the cards for today, alerts on my units and my reports;
+   - the empty states.
+2. **Times.**
+   - A job's work window is an instant span in the display time zone (`showSpan`).
+   - "Opens …" reads relative to now ("opens today 2:00 pm MYT", `relativeTime`).
+   - An alert's time uses `showTime`.
+   - Today and its 08:00–18:00 timeline stay Kuala Lumpur, where the work happens. The card says so in another display time zone, and the now line shows Kuala Lumpur time.
+   - The loader formats the day title, so the view no longer formats times itself.
+3. **Shared helpers.** These take the translator or the display: `techRow`, `kpis`, `alertRows` and `reportRows`. Their English moves to IR44. `windowText` keeps the Kuala Lumpur form for the timeline and the QR scan screen (next).
+4. **Checked.**
+   - Vitest: 39 files, 224 tests. `techOverview.test.ts` covers the new English times and adds a Malay case.
+   - E2E: `technician/language.e2e.ts` is new. It sets Malay and Asia/Tokyo, opens the overview (tiles, tabs, sort, cards, the Kuala Lumpur note and the All assigned tab) and puts English back. The suite: 64 passed, 9 skipped, and the users are en / Asia/Kuala_Lumpur.
+5. **Still open.**
+   - The other technician screens: the job workspace, the unit with its alerts and control, the devices and the QR scan.
+   - The HQ screens.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.

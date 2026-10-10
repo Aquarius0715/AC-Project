@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.165.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
+Version: 0.166.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.166.0 (2026-10-10): The technician overview in Malay; job windows and alert times in the user's time zone, today's timeline in Kuala Lumpur hours (IR281).
 0.165.0 (2026-10-10): The contractor's unit view is built as in Figma — the job context with its access window, past work, alert evidence, readings with their quality and the last 24 hours, and after the delegation the job's history snapshot — in Malay too. Every contractor screen now follows the display language (IR280).
 0.164.0 (2026-10-10): The contractor's payouts in Malay, the statement PDF too; pay dates read as Kuala Lumpur days, acceptance and payment dates in the user's time zone (IR279).
 0.163.0 (2026-10-10): The contractor's job history in Malay; the latest event reads relative to now ("today 9:05 am MYT") and every time is in the user's time zone (IR278).
