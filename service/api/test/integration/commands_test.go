@@ -23,6 +23,16 @@ func TestCommands(t *testing.T) {
 	cmd := func(a *actor, action, extra string, uv int) (int, map[string]any) {
 		return write(s, a, "commands.create", `{"unitId":"`+unit+`","action":`+action+`,"expectedUnitVersion":`+itoa(uv)+extra+`}`, 0)
 	}
+	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"bad action":        "action=error.invalid",
+		"client reason":     "reason=error.notAllowed",
+		"hq voice":          "source=error.notAllowed",
+		"hq without reason": "reason=error.required",
+		"out of range":      "action=error.unsupportedAction",
+		"technician no job": "jobId=error.required",
+		"technician voice":  "source=error.notAllowed",
+		"unknown source":    "source=error.invalid",
+	}
 	for name, tc := range map[string]struct {
 		a      *actor
 		action string
@@ -44,7 +54,10 @@ func TestCommands(t *testing.T) {
 		if name == "stale unit version" {
 			uv = v + 5
 		}
-		if code, _ := cmd(tc.a, tc.action, tc.extra, uv); code != tc.code {
+		code, m := cmd(tc.a, tc.action, tc.extra, uv)
+		if w, ok := refused[name]; ok {
+			refusal(t, name, code, m, w)
+		} else if code != tc.code {
 			t.Errorf("%s: %d want %d", name, code, tc.code)
 		}
 	}
@@ -225,8 +238,8 @@ func TestCommandHistory(t *testing.T) {
 	} else if code, m := post(s, &customerA, "commands.list", `{"unitId":"`+unit+`","query":{"limit":1,"cursor":"`+next+`"}}`); code != 200 || len(items(m)) != 1 {
 		t.Fatalf("second page: %d %v", code, m)
 	}
-	if code, _, _ := list(&techInt, `{"unitId":"`+unit+`","query":{}}`); code != 422 {
-		t.Errorf("technician without a job: %d", code)
+	if code, m := post(s, &techInt, "commands.list", `{"unitId":"`+unit+`","query":{}}`); code != 422 || fields(m) != "jobId=error.required" {
+		t.Errorf("technician without a job: %d %s", code, fields(m))
 	}
 	code, got, _ = list(&techInt, `{"unitId":"`+unit+`","jobId":"`+job+`","query":{"limit":100}}`)
 	if code != 200 || got[tech] == nil || got[tech]["reason"] != "airflow check" || got[own] != nil {
@@ -241,10 +254,9 @@ func TestCommandHistory(t *testing.T) {
 	if _, got, _ := list(&hq, `{"unitId":"`+unit+`","query":{"limit":100}}`); got[tech]["reason"] != "airflow check" || got[own] == nil {
 		t.Errorf("HQ history: %v", got[tech])
 	}
-	for _, q := range []string{`{"sort":{"field":"status","direction":"asc"}}`, `{"filters":{"status":"sent"}}`} {
-		if code, _, _ := list(&hq, `{"unitId":"`+unit+`","query":`+q+`}`); code != 422 {
-			t.Errorf("%s: %d", q, code)
-		}
+	for q, want := range map[string]string{`{"sort":{"field":"status","direction":"asc"}}`: "sort.field=error.invalid", `{"filters":{"status":"sent"}}`: "status=error.notAllowed"} {
+		code, m := post(s, &hq, "commands.list", `{"unitId":"`+unit+`","query":`+q+`}`)
+		refusal(t, q, code, m, want)
 	}
 	if code, _, _ := list(&hq, `{"unitId":"`+unit+`","query":{"sort":{"field":"requestedAt","direction":"asc"}}}`); code != 200 {
 		t.Errorf("requestedAt asc: %d", code)

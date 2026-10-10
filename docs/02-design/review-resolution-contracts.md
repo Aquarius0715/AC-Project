@@ -4686,3 +4686,20 @@ IR330 found two checks that passed only because another rule refused their body 
    - Before, every missing end read `filters.from`, which pointed at the wrong field when only `to` was missing. The HQ audit screen always sends both ends, so the screens do not change.
 
 Both Go suites pass (`make test-all`): 138 integration tests and 84 unit tests.
+
+## IR332 Every VALIDATION check of the integration suite names its field — 2026-10-11
+
+IR331 left ten tables, about 150 single checks and the tables with an expected-code column checking the status only. R323 traced them the same way: a temporary tracer recorded each VALIDATION response with its call site and was then removed.
+
+1. **The rest of the checks name their field.**
+   - **Ten tables keyed by a body with run-made IDs.** They are now maps from the expression that builds the body to its expected "field=key". The key is built in the same run as the body, so it always matches.
+   - **144 single checks** compare the whole set of field errors: `fields(m)`, the sorted "field=key" pairs (new in refusal_test.go).
+   - **14 tables with an expected-code column** check the field for their VALIDATION cases (about 100). Their 403, 404 and 409 cases keep the status check.
+   - **The odd shapes:** the campaign schedule table, an event rule's next runs, the command history and the contractor review now name their field too.
+   - **The query catalog test** checks that an unknown sort field is refused on the sort (sort.field, query.sort.field, or query where nothing sorts).
+2. **Two more checks that missed their rule.**
+   - "default policy is not an alert policy": the helper `upd` always saves the customer's alert policy, so this check updated that policy at a stale version and passed on the 409 its `code != 422 && code != 409` allowed. It now saves the default policy at its own version and names `kind: error.kindFixed`.
+   - "both terms and reason" (jobs.accept) carried no jobId and was refused for it. It now carries the job and is refused as malformed, because a reason is not an input of accept.
+3. **Result.** The integration suite now has no VALIDATION check that tests the status code alone. The suite has 69 `refusal` call sites and 149 single `fields(m)` checks. Every case kept the response it had, apart from the two above.
+
+Both Go suites pass (`make test-all`): 138 integration tests and 84 unit tests.

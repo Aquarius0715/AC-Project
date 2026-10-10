@@ -114,8 +114,8 @@ func TestRateAndReportProblem(t *testing.T) {
 		t.Error("problem after 7 days")
 	}
 	// HQ classifies once
-	if code, _ := write(s, &hq, "jobs.classifyFollowUp", `{"jobId":"`+follow+`","classification":"redo","reason":"x"}`, 1); code != 422 {
-		t.Error("bad classification")
+	if code, m := write(s, &hq, "jobs.classifyFollowUp", `{"jobId":"`+follow+`","classification":"redo","reason":"x"}`, 1); code != 422 || fields(m) != "classification=error.invalid" {
+		t.Errorf("bad classification: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &hq, "jobs.classifyFollowUp", `{"jobId":"`+follow+`","classification":"rework","reason":"same fault"}`, 1); code != 200 || data(m)["followUpClass"] != "rework" {
 		t.Fatalf("classify: %d %v", code, m)
@@ -132,11 +132,11 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	s := server(t)
 	job := completedJob(t, s)
 	lines := `[{"kind":"estimate","amountMinor":5000,"currency":"MYR","description":" Parts ","visibility":"customer"},{"kind":"actual","amountMinor":800,"currency":"MYR","description":"Margin","visibility":"internal"}]`
-	if code, _ := write(s, &hq, "jobs.saveCost", `{"jobId":"`+job+`","costLines":[{"kind":"guess","amountMinor":1,"currency":"MYR","description":"x","visibility":"internal"}]}`, 1); code != 422 {
-		t.Error("bad cost line")
+	if code, m := write(s, &hq, "jobs.saveCost", `{"jobId":"`+job+`","costLines":[{"kind":"guess","amountMinor":1,"currency":"MYR","description":"x","visibility":"internal"}]}`, 1); code != 422 || fields(m) != "costLines=error.invalid" {
+		t.Errorf("bad cost line: %d %s", code, fields(m))
 	}
-	if code, _ := write(s, &hq, "jobs.saveCost", `{"jobId":"`+job+`","costLines":[{"kind":"actual","amountMinor":-1,"currency":"EUR","description":"","visibility":"internal"}]}`, 1); code != 422 {
-		t.Error("bad amount/currency")
+	if code, m := write(s, &hq, "jobs.saveCost", `{"jobId":"`+job+`","costLines":[{"kind":"actual","amountMinor":-1,"currency":"EUR","description":"","visibility":"internal"}]}`, 1); code != 422 || fields(m) != "costLines=error.invalid" {
+		t.Errorf("bad amount/currency: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &hq, "jobs.saveCost", `{"jobId":"`+job+`","costLines":`+lines+`}`, 1); code != 200 || len(data(m)["costs"].([]any)) != 2 {
 		t.Fatalf("saveCost: %d %v", code, m)
@@ -148,15 +148,15 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	// warranty claims need a warranty that covers completion
 	claim := `{"jobId":"` + job + `","partLabel":"Compressor","amountMinor":12000,"currency":"MYR","reason":"failed in warranty"}`
 	owner(t, `UPDATE assets.units SET warranty_ends_at = NULL WHERE id = $1`, seed.ID("unit-non-rto"))
-	if code, _ := write(s, &hq, "jobs.recordWarrantyClaim", claim, 2); code != 422 {
-		t.Error("no warranty")
+	if code, m := write(s, &hq, "jobs.recordWarrantyClaim", claim, 2); code != 422 || fields(m) != "jobId=errors.outside_warranty" {
+		t.Errorf("no warranty: %d %s", code, fields(m))
 	}
 	owner(t, `UPDATE assets.units SET warranty_ends_at = $2 WHERE id = $1`, seed.ID("unit-non-rto"), clock.Add(30*24*time.Hour))
 	t.Cleanup(func() {
 		owner(t, `UPDATE assets.units SET warranty_ends_at = NULL WHERE id = $1`, seed.ID("unit-non-rto"))
 	})
-	if code, _ := write(s, &hq, "jobs.recordWarrantyClaim", `{"jobId":"`+job+`","partLabel":"","amountMinor":0,"currency":"JPY","reason":""}`, 2); code != 422 {
-		t.Error("bad claim input")
+	if code, m := write(s, &hq, "jobs.recordWarrantyClaim", `{"jobId":"`+job+`","partLabel":"","amountMinor":0,"currency":"JPY","reason":""}`, 2); code != 422 || fields(m) != "amountMinor=error.range,currency=error.invalid,partLabel=error.length,reason=error.length" {
+		t.Errorf("bad claim input: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &hq, "jobs.recordWarrantyClaim", claim, 2); code != 200 || data(m)["warrantyClaims"].([]any)[0].(map[string]any)["state"] != "filed" {
 		t.Fatalf("claim: %d %v", code, m)
@@ -185,11 +185,11 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	var offer string
 	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{j2}, &offer)
 	write(s, &contrA, "jobs.accept", `{"jobId":"`+j2+`","offerId":"`+offer+`","termsVersion":"t"}`, 2)
-	if code, _ := write(s, &hq, "jobs.extendAccess", `{"jobId":"`+j2+`","accessValidUntil":"`+ts(50)+`","reason":"x"}`, 3); code != 422 {
-		t.Error("extension must be later")
+	if code, m := write(s, &hq, "jobs.extendAccess", `{"jobId":"`+j2+`","accessValidUntil":"`+ts(50)+`","reason":"x"}`, 3); code != 422 || fields(m) != "accessValidUntil=error.mustExtend" {
+		t.Errorf("extension must be later: %d %s", code, fields(m))
 	}
-	if code, _ := write(s, &hq, "jobs.extendAccess", `{"jobId":"`+j2+`","accessValidUntil":"`+ts(200)+`","reason":" "}`, 3); code != 422 {
-		t.Error("extension reason")
+	if code, m := write(s, &hq, "jobs.extendAccess", `{"jobId":"`+j2+`","accessValidUntil":"`+ts(200)+`","reason":" "}`, 3); code != 422 || fields(m) != "reason=error.length" {
+		t.Errorf("extension reason: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &hq, "jobs.extendAccess", `{"jobId":"`+j2+`","accessValidUntil":"`+ts(200)+`","reason":"parts delayed"}`, 3); code != 200 ||
 		data(m)["offer"].(map[string]any)["accessValidUntil"] != ts(200) {

@@ -88,8 +88,8 @@ func TestAlertEvidence(t *testing.T) {
 	if code, m := post(s, &hq, "alerts.evidence", `{"alertId":"00000000-0000-0000-0000-000000000000","query":{}}`); code != 422 || m["fieldErrors"].(map[string]any)["alertId"] != "error.required" {
 		t.Errorf("no alert: %d %v", code, m)
 	}
-	if code, _ := post(s, &hq, "alerts.evidence", `{"alertId":"`+free+`","query":{"filters":{"kind":"x"}}}`); code != 422 {
-		t.Error("no filters")
+	if code, m := post(s, &hq, "alerts.evidence", `{"alertId":"`+free+`","query":{"filters":{"kind":"x"}}}`); code != 422 || fields(m) != "kind=error.notAllowed" {
+		t.Errorf("no filters: %d %s", code, fields(m))
 	}
 	if code, _ := evidence(&customerB, free); code != 403 {
 		t.Errorf("clients do not resolve: %d", code)
@@ -143,8 +143,8 @@ func TestAlertEvidence(t *testing.T) {
 	if len(items(m)) != 1 || items(m)[0]["id"] != after {
 		t.Errorf("rule alert: temperature readings only: %v", m)
 	}
-	if code, _ := resolve(ruled, 1, co2); code != 422 {
-		t.Error("another metric is not the rule alert's evidence")
+	if code, m := resolve(ruled, 1, co2); code != 422 || fields(m) != "resolutionEvidenceIds=errors.evidence_unknown" {
+		t.Errorf("another metric is not the rule alert's evidence: %d %s", code, fields(m))
 	}
 	if code, m := resolve(ruled, 1); code != 200 || data(m)["status"] != "resolved" {
 		t.Errorf("policy alert by hand: %d %v", code, m)

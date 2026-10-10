@@ -100,8 +100,8 @@ func TestAutomationPolicies(t *testing.T) {
 	if code, _ := write(s, &hq, "policies.save", autoPolicyBody(map[string]string{"unitIds": `["` + uuid.NewString() + `"]`}), 0); code != 404 {
 		t.Error("unknown unit → NOT_FOUND")
 	}
-	if code, _ := write(s, &hq, "policies.save", alertPolicyBody(map[string]string{"condition": `{"type":"peak","active":true}`}), 0); code != 422 {
-		t.Error("alert policy with automation fields")
+	if code, m := write(s, &hq, "policies.save", alertPolicyBody(map[string]string{"condition": `{"type":"peak","active":true}`}), 0); code != 422 || fields(m) != "kind=error.fieldsOfOtherKind" {
+		t.Errorf("alert policy with automation fields: %d %s", code, fields(m))
 	}
 
 	// update replaces units and clears disabledReason; kind and version rules
@@ -115,8 +115,8 @@ func TestAutomationPolicies(t *testing.T) {
 	}
 	def := seed.DefaultPolicyID("tenant-a").String()
 	_, dm := post(s, &hq, "policies.get", `{"policyId":"`+def+`"}`)
-	if code, _ := write(s, &hq, "policies.save", autoPolicyBody(map[string]string{"id": `"` + def + `"`}), ver(dm)); code != 422 {
-		t.Error("default policy saved as automation")
+	if code, m := write(s, &hq, "policies.save", autoPolicyBody(map[string]string{"id": `"` + def + `"`}), ver(dm)); code != 422 || fields(m) != "kind=error.kindFixed" {
+		t.Errorf("default policy saved as automation: %d %s", code, fields(m))
 	}
 
 	// reads: kind filter, unit/customer filters, client and permission scope

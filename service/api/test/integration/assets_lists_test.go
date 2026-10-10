@@ -53,8 +53,8 @@ func TestAssetLists(t *testing.T) {
 	if len(items(m)) == 0 {
 		t.Fatal("customerId + kind filter")
 	}
-	if code, _ := post(s, &hq, "properties.list", `{"filters":{"kind":"castle"}}`); code != 422 {
-		t.Fatal("bad kind")
+	if code, m := post(s, &hq, "properties.list", `{"filters":{"kind":"castle"}}`); code != 422 || fields(m) != "filters.kind=error.invalid" {
+		t.Fatalf("bad kind: %d %s", code, fields(m))
 	}
 	// spaces
 	_, m = post(s, &customerA, "spaces.list", `{"filters":{"propertyId":"`+seed.ID("property-home-a").String()+`","kind":"room"}}`)
@@ -65,11 +65,11 @@ func TestAssetLists(t *testing.T) {
 	if len(items(m)) != 0 {
 		t.Fatal("customer-b must not see Home A spaces")
 	}
-	if code, _ := post(s, &hq, "spaces.list", `{"filters":{"kind":"x"}}`); code != 422 {
-		t.Fatal("bad space kind")
+	if code, m := post(s, &hq, "spaces.list", `{"filters":{"kind":"x"}}`); code != 422 || fields(m) != "filters.kind=error.invalid" {
+		t.Fatalf("bad space kind: %d %s", code, fields(m))
 	}
-	if code, _ := post(s, &hq, "spaces.list", `{"limit":0}`); code != 422 {
-		t.Fatal("bad limit")
+	if code, m := post(s, &hq, "spaces.list", `{"limit":0}`); code != 422 || fields(m) != "limit=error.range" {
+		t.Fatalf("bad limit: %d %s", code, fields(m))
 	}
 }
 
@@ -85,8 +85,8 @@ func TestCustomersSaveAndRename(t *testing.T) {
 	if code, _ := write(s, &hq, "customers.save", body, 0); code != 409 {
 		t.Fatalf("one customer per organization: %d", code)
 	}
-	if code, _ := write(s, &hq, "customers.save", `{"name":"","organizationId":"`+org+`","serviceProfile":"x","status":"y"}`, 0); code != 422 {
-		t.Fatal("customer validation")
+	if code, m := write(s, &hq, "customers.save", `{"name":"","organizationId":"`+org+`","serviceProfile":"x","status":"y"}`, 0); code != 422 || fields(m) != "name=error.length,serviceProfile=error.invalid,status=error.invalid" {
+		t.Fatalf("customer validation: %d %s", code, fields(m))
 	}
 	upd := `{"id":"` + id + `","name":"Test Co 2","organizationId":"` + org + `","serviceProfile":"energy","status":"inactive"}`
 	if code, m := write(s, &hq, "customers.save", upd, 1); code != 200 || data(m)["status"] != "inactive" {
@@ -120,11 +120,11 @@ func TestCustomersSaveAndRename(t *testing.T) {
 	if code, _ := write(s, &hq, "locations.rename", `{"target":{"kind":"space","id":"`+sib+`"},"name":"`+strings.ToUpper(newName)+`"}`, 1); code != 409 {
 		t.Fatalf("duplicate sibling name: %d", code)
 	}
-	if code, m := write(s, &hq, "locations.rename", `{"target":{"kind":"unit","id":"`+seed.ID("unit-bedroom-2").String()+`"},"name":"Bedroom AC #2"}`, 0); code != 422 {
+	if code, m := write(s, &hq, "locations.rename", `{"target":{"kind":"unit","id":"`+seed.ID("unit-bedroom-2").String()+`"},"name":"Bedroom AC #2"}`, 0); code != 422 || fields(m) != "expectedVersion=error.required" {
 		t.Fatalf("missing version: %d %v", code, m)
 	}
-	if code, _ := write(s, &hq, "locations.rename", `{"target":{"kind":"garage","id":"`+room+`"},"name":"x"}`, 1); code != 422 {
-		t.Fatal("bad kind")
+	if code, m := write(s, &hq, "locations.rename", `{"target":{"kind":"garage","id":"`+room+`"},"name":"x"}`, 1); code != 422 || fields(m) != "target.kind=error.invalid" {
+		t.Fatalf("bad kind: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &hq, "locations.rename", `{"target":{"kind":"property","id":"`+uuid.NewString()+`"},"name":"x"}`, 1); code != 404 {
 		t.Fatal("unknown property")

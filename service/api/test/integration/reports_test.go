@@ -170,8 +170,8 @@ func TestWorkReports(t *testing.T) {
 	if code, _ := write(s, &hq, "jobs.review", `{"jobId":"`+job+`","reportVersion":5,"decision":"accept","reviewMode":"hq_escalation","reason":"x"}`, 4); code != 403 {
 		t.Error("hq_escalation on an internal job")
 	}
-	if code, _ := write(s, &hq, "jobs.review", `{"jobId":"`+job+`","reportVersion":5,"decision":"return","reviewMode":"normal"}`, 4); code != 422 {
-		t.Error("return without reason")
+	if code, m := write(s, &hq, "jobs.review", `{"jobId":"`+job+`","reportVersion":5,"decision":"return","reviewMode":"normal"}`, 4); code != 422 || fields(m) != "reason=error.required" {
+		t.Errorf("return without reason: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &hq, "jobs.review", `{"jobId":"`+job+`","reportVersion":4,"decision":"accept","reviewMode":"normal"}`, 4); code != 409 {
 		t.Error("review an older version")
@@ -312,14 +312,14 @@ func TestContractorReview(t *testing.T) {
 	if code := review(&contrB, "normal", ""); code != 404 {
 		t.Errorf("other contractor review: %d", code)
 	}
-	if code := review(&contrA, "hq_escalation", "x"); code != 422 {
-		t.Errorf("contractor escalation mode: %d", code)
+	if code, m := write(s, &contrA, "jobs.review", `{"jobId":"`+job+`","reportVersion":1,"decision":"accept","reviewMode":"hq_escalation","reason":"x"}`, 6); code != 422 || fields(m) != "reviewMode=error.invalid" {
+		t.Errorf("contractor escalation mode: %d %s", code, fields(m))
 	}
 	if code := review(&hq, "normal", ""); code != 403 {
 		t.Errorf("HQ normal review of outsourced job: %d", code)
 	}
-	if code := review(&hq, "hq_escalation", ""); code != 422 {
-		t.Errorf("escalation without reason: %d", code)
+	if code, m := write(s, &hq, "jobs.review", `{"jobId":"`+job+`","reportVersion":1,"decision":"accept","reviewMode":"hq_escalation"}`, 6); code != 422 || fields(m) != "reason=error.required" {
+		t.Errorf("escalation without reason: %d %s", code, fields(m))
 	}
 	if code := review(&contrA, "normal", ""); code != 200 {
 		t.Fatalf("contractor accepts: %d", code)

@@ -277,7 +277,7 @@ func TestAutomationExtraConditions(t *testing.T) {
 			t.Errorf("%s: %d %v", name, code, m)
 		}
 	}
-	if code, _ := write(s, &customerB, "automations.save", scheduleRule(u, map[string]string{"onlyIf": `[{"type":"weekday","weekdays":[1]}]`}), 0); code != 422 {
+	if code, m := write(s, &customerB, "automations.save", scheduleRule(u, map[string]string{"onlyIf": `[{"type":"weekday","weekdays":[1]}]`}), 0); code != 422 || fields(m) != "onlyIf=errors.weekday_on_schedule" {
 		t.Errorf("weekday on a schedule: %d", code)
 	}
 	code, m := write(s, &customerB, "automations.save", base+`,"onlyIf":[{"type":"weekday","weekdays":[1]},{"type":"occupancy","occupied":true}]}`, 0)

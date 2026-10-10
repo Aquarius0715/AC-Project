@@ -39,8 +39,8 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 	if _, m := elig(&hq, 24*20, 24*20+2); has(m, tech) {
 		t.Error("qualification expired for that slot")
 	}
-	if code, _ := elig(&hq, 27, 25); code != 422 {
-		t.Error("reversed slot")
+	if code, m := elig(&hq, 27, 25); code != 422 || fields(m) != "endAt=error.range" {
+		t.Errorf("reversed slot: %d %s", code, fields(m))
 	}
 	if code, _ := elig(&contrA, 25, 27); code != 404 {
 		t.Error("contractor on an internal job")
@@ -64,8 +64,8 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 	if c := capOf(&hq, "2026-09-13"); c["availableMinutes"].(float64) != 0 || c["utilization"] != nil {
 		t.Fatalf("sunday: %v", c)
 	}
-	if code, _ := post(s, &hq, "members.capacity", `{"date":"14-09-2026","query":{}}`); code != 422 {
-		t.Error("bad date")
+	if code, m := post(s, &hq, "members.capacity", `{"date":"14-09-2026","query":{}}`); code != 422 || fields(m) != "date=error.invalid" {
+		t.Errorf("bad date: %d %s", code, fields(m))
 	}
 	if c := capOf(&contrA, "2026-09-14"); c != nil {
 		t.Error("contractor sees internal technicians")

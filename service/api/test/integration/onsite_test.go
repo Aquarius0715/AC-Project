@@ -33,14 +33,14 @@ func TestOnSiteOperations(t *testing.T) {
 	unit := seed.ID("unit-non-rto").String()
 
 	// acknowledgement
-	if code, _ := write(s, &techInt, "jobs.acknowledgeAssignment", `{"jobId":"`+job+`","decision":"cant_make"}`, 2); code != 422 {
-		t.Error("cant_make needs a reason")
+	if code, m := write(s, &techInt, "jobs.acknowledgeAssignment", `{"jobId":"`+job+`","decision":"cant_make"}`, 2); code != 422 || fields(m) != "reason=error.required" {
+		t.Errorf("cant_make needs a reason: %d %s", code, fields(m))
 	}
-	if code, _ := write(s, &techInt, "jobs.acknowledgeAssignment", `{"jobId":"`+job+`","decision":"accept","reason":"x"}`, 2); code != 422 {
-		t.Error("accept takes no reason")
+	if code, m := write(s, &techInt, "jobs.acknowledgeAssignment", `{"jobId":"`+job+`","decision":"accept","reason":"x"}`, 2); code != 422 || fields(m) != "decision=error.fieldsNotAllowed" {
+		t.Errorf("accept takes no reason: %d %s", code, fields(m))
 	}
-	if code, _ := write(s, &techInt, "jobs.acknowledgeAssignment", `{"jobId":"`+job+`","decision":"maybe"}`, 2); code != 422 {
-		t.Error("bad decision")
+	if code, m := write(s, &techInt, "jobs.acknowledgeAssignment", `{"jobId":"`+job+`","decision":"maybe"}`, 2); code != 422 || fields(m) != "decision=error.invalid" {
+		t.Errorf("bad decision: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &techA, "jobs.acknowledgeAssignment", `{"jobId":"`+job+`","decision":"accept"}`, 2); code != 404 {
 		t.Error("another technician")
@@ -70,8 +70,8 @@ func TestOnSiteOperations(t *testing.T) {
 	if code, _ := write(s, &techInt, "jobs.pauseWork", `{"jobId":"`+job+`","paused":true}`, 3); code != 409 {
 		t.Error("pause before start")
 	}
-	if code, _ := write(s, &techInt, "jobs.start", `{"jobId":"`+job+`","startConfirmed":false}`, 3); code != 422 {
-		t.Error("start not confirmed")
+	if code, m := write(s, &techInt, "jobs.start", `{"jobId":"`+job+`","startConfirmed":false}`, 3); code != 422 || fields(m) != "startConfirmed=error.required" {
+		t.Errorf("start not confirmed: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &techInt, "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 2); code != 409 {
 		t.Error("start stale version")
@@ -120,8 +120,8 @@ func TestOnSiteOperations(t *testing.T) {
 		data(m)["timeOnSite"].(map[string]any)["pauses"].([]any)[0].(map[string]any)["to"] == nil {
 		t.Fatalf("resume: %d", code)
 	}
-	if code, _ := write(s, &techInt, "jobs.pauseWork", `{"jobId":"`+job+`"}`, 7); code != 422 {
-		t.Error("paused required")
+	if code, m := write(s, &techInt, "jobs.pauseWork", `{"jobId":"`+job+`"}`, 7); code != 422 || fields(m) != "paused=error.required" {
+		t.Errorf("paused required: %d %s", code, fields(m))
 	}
 
 	// manual check-in starts an assigned job; outside the work window is FORBIDDEN

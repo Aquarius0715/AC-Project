@@ -130,7 +130,7 @@ func TestFilterCare(t *testing.T) {
 		refusal(t, b, code, m, want[b])
 	}
 	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, u2)
-	if code, _ := write(s, &customerB, "filterCare.markCleaned", `{"unitId":"`+u2+`"}`, 0); code != 422 {
-		t.Error("archived unit")
+	if code, m := write(s, &customerB, "filterCare.markCleaned", `{"unitId":"`+u2+`"}`, 0); code != 422 || fields(m) != "unitId=error.unitArchived" {
+		t.Errorf("archived unit: %d %s", code, fields(m))
 	}
 }

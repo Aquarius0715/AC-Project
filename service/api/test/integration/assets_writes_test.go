@@ -82,8 +82,8 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	if code, m := write(s, &hq, "properties.save", upd, 1); code != 409 || m["code"] != "CONFLICT" {
 		t.Fatalf("stale version: %d", code)
 	}
-	if code, _ := write(s, &hq, "properties.save", upd, 0); code != 422 {
-		t.Fatal("update without version")
+	if code, m := write(s, &hq, "properties.save", upd, 0); code != 422 || fields(m) != "expectedVersion=error.required" {
+		t.Fatalf("update without version: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &customerB, "properties.save", upd, 2); code != 403 {
 		t.Fatalf("client cannot save properties: %d", code)
@@ -100,13 +100,13 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		t.Fatalf("room: %d", code)
 	}
 	room := data(m)["id"].(string)
-	if code, _ := write(s, &hq, "spaces.save", `{"id":"`+floor+`","propertyId":"`+prop+`","parentSpaceId":"`+room+`","kind":"floor","name":"1F"}`, 1); code != 422 {
+	if code, m := write(s, &hq, "spaces.save", `{"id":"`+floor+`","propertyId":"`+prop+`","parentSpaceId":"`+room+`","kind":"floor","name":"1F"}`, 1); code != 422 || fields(m) != "parentSpaceId=error.cycle" {
 		t.Errorf("cycle: %d", code)
 	}
-	if code, _ := write(s, &hq, "spaces.save", `{"id":"`+floor+`","propertyId":"`+prop+`","parentSpaceId":"`+floor+`","kind":"floor","name":"1F"}`, 1); code != 422 {
+	if code, m := write(s, &hq, "spaces.save", `{"id":"`+floor+`","propertyId":"`+prop+`","parentSpaceId":"`+floor+`","kind":"floor","name":"1F"}`, 1); code != 422 || fields(m) != "parentSpaceId=error.cycle" {
 		t.Errorf("self parent: %d", code)
 	}
-	if code, _ := write(s, &hq, "spaces.save", `{"propertyId":"`+prop+`","parentSpaceId":"`+seed.ID("floor-1").String()+`","kind":"room","name":"x"}`, 0); code != 422 {
+	if code, m := write(s, &hq, "spaces.save", `{"propertyId":"`+prop+`","parentSpaceId":"`+seed.ID("floor-1").String()+`","kind":"room","name":"x"}`, 0); code != 422 || fields(m) != "parentSpaceId=error.otherProperty" {
 		t.Errorf("parent in another property: %d", code)
 	}
 	if code, m := write(s, &hq, "spaces.save", `{"id":"`+room+`","propertyId":"`+prop+`","parentSpaceId":"`+floor+`","kind":"room","name":"Server room A"}`, 1); code != 200 || ver(m) != 2 {
@@ -170,8 +170,8 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		code, m := write(s, &hq, "units.save", b, 0)
 		refusal(t, name, code, m, want[name])
 	}
-	if code, _ := write(s, &hq, "units.save", unitBody(unit, floor, ""), 1); code != 422 {
-		t.Error("relocation without reason")
+	if code, m := write(s, &hq, "units.save", unitBody(unit, floor, ""), 1); code != 422 || fields(m) != "changeReason=error.required" {
+		t.Errorf("relocation without reason: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &hq, "units.save", unitBody(unit, floor, `,"changeReason":"moved to floor"`), 1); code != 200 || ver(m) != 2 {
 		t.Fatalf("relocate: %d %v", code, m)
@@ -229,8 +229,8 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	if code, _ := write(s, &hq, "spaces.archive", `{"id":"`+floor+`","reason":"x"}`, 2); code != 409 {
 		t.Errorf("space with units/children must not archive: %d", code)
 	}
-	if code, _ := write(s, &hq, "units.archive", `{"id":"`+unit+`","reason":""}`, 5); code != 422 {
-		t.Error("archive reason required")
+	if code, m := write(s, &hq, "units.archive", `{"id":"`+unit+`","reason":""}`, 5); code != 422 || fields(m) != "reason=error.length" {
+		t.Errorf("archive reason required: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &hq, "units.archive", `{"id":"`+unit+`","reason":"decommissioned"}`, 5); code != 200 || data(m)["archived"] != true {
 		t.Fatalf("unit archive: %d", code)

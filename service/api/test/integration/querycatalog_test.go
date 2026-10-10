@@ -175,11 +175,23 @@ func TestQueryCatalogFilters(t *testing.T) {
 					}
 				}
 			}
-			if code, m := sorted("zzUnknown", "asc"); code != 422 {
+			// an unknown sort field is refused on the sort (sort.field, query.sort.field; query where nothing sorts)
+			if code, m := sorted("zzUnknown", "asc"); code != 422 || !sortError(m) {
 				t.Errorf("unknown sort field: %d %v", code, m)
 			}
 		})
 	}
+}
+
+// sortError reports whether a VALIDATION result names the sort.
+func sortError(m map[string]any) bool {
+	fe, _ := m["fieldErrors"].(map[string]any)
+	for k := range fe {
+		if k == "sort.field" || k == "query.sort.field" || k == "query" {
+			return true
+		}
+	}
+	return false
 }
 
 // filterError reports whether a VALIDATION result names the filters.

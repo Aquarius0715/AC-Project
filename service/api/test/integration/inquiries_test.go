@@ -15,6 +15,13 @@ func TestInquiries(t *testing.T) {
 	k, inv := overdueContract(t, s, u)
 	_, m := write(s, &restrMgr, "restrictions.schedule", scheduleBody(k, inv, []string{u}, nil), 0)
 	rid := data(m)["id"].(string)
+	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"bad subject":              "subjectType=error.invalid",
+		"blank message":            "message=error.length",
+		"payment with restriction": "restrictionId=error.notAllowed",
+		"payment without invoice":  "invoiceId=error.required",
+		"restriction without id":   "restrictionId=error.required",
+	}
 	for name, tc := range map[string]struct {
 		body string
 		code int
@@ -28,7 +35,10 @@ func TestInquiries(t *testing.T) {
 		"unknown restriction":      {`{"subjectType":"restriction","restrictionId":"` + uuid.NewString() + `","message":"why"}`, 404},
 		"unknown cited invoice":    {`{"subjectType":"restriction","restrictionId":"` + rid + `","invoiceId":"` + uuid.NewString() + `","message":"why"}`, 404},
 	} {
-		if code, m := write(s, &customerB, "inquiries.create", tc.body, 0); code != tc.code {
+		code, m := write(s, &customerB, "inquiries.create", tc.body, 0)
+		if w, ok := refused[name]; ok {
+			refusal(t, name, code, m, w)
+		} else if code != tc.code {
 			t.Errorf("%s: %d want %d %v", name, code, tc.code, m)
 		}
 	}
@@ -57,8 +67,8 @@ func TestInquiries(t *testing.T) {
 	if _, m := post(s, &hq, "inquiries.list", `{"filters":{"status":"received","subjectType":"restriction","invoiceId":"`+inv+`"},"limit":100}`); len(items(m)) != 1 {
 		t.Errorf("HQ list: %v", m)
 	}
-	if code, _ := post(s, &hq, "inquiries.list", `{"filters":{"status":"open"}}`); code != 422 {
-		t.Error("bad state filter")
+	if code, m := post(s, &hq, "inquiries.list", `{"filters":{"status":"open"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+		t.Errorf("bad state filter: %d %s", code, fields(m))
 	}
 	if code, _ := post(s, &techB, "inquiries.list", `{}`); code != 403 {
 		t.Error("technician inquiries")
@@ -66,8 +76,8 @@ func TestInquiries(t *testing.T) {
 	answer := func(reply string, v int) (int, map[string]any) {
 		return write(s, &hq, "inquiries.answer", `{"inquiryId":"`+id+`","reply":"`+reply+`"}`, v)
 	}
-	if code, _ := answer(" ", 1); code != 422 {
-		t.Error("blank reply")
+	if code, m := answer(" ", 1); code != 422 || fields(m) != "reply=error.length" {
+		t.Errorf("blank reply: %d %s", code, fields(m))
 	}
 	if code, _ := answer("ok", 2); code != 409 {
 		t.Error("stale inquiry")

@@ -83,14 +83,14 @@ func TestAlerts(t *testing.T) {
 	if code, _ := write(s, &hq, "alerts.acknowledge", `{"alertId":"`+crit+`"}`, 2); code != 409 {
 		t.Error("ack twice")
 	}
-	if code, _ := write(s, &hq, "alerts.resolve", `{"alertId":"`+crit+`","resolutionReason":"   ","resolutionEvidenceIds":[]}`, 2); code != 422 {
-		t.Error("blank reason")
+	if code, m := write(s, &hq, "alerts.resolve", `{"alertId":"`+crit+`","resolutionReason":"   ","resolutionEvidenceIds":[]}`, 2); code != 422 || fields(m) != "resolutionReason=error.length" {
+		t.Errorf("blank reason: %d %s", code, fields(m))
 	}
-	if code, _ := write(s, &hq, "alerts.resolve", `{"alertId":"`+crit+`","resolutionReason":"`+strings.Repeat("r", 1001)+`","resolutionEvidenceIds":[]}`, 2); code != 422 {
-		t.Error("reason too long")
+	if code, m := write(s, &hq, "alerts.resolve", `{"alertId":"`+crit+`","resolutionReason":"`+strings.Repeat("r", 1001)+`","resolutionEvidenceIds":[]}`, 2); code != 422 || fields(m) != "resolutionReason=error.length" {
+		t.Errorf("reason too long: %d %s", code, fields(m))
 	}
-	if code, _ := write(s, &hq, "alerts.resolve", `{"alertId":"`+crit+`","resolutionReason":"fixed"}`, 2); code != 422 {
-		t.Error("evidence ids required")
+	if code, m := write(s, &hq, "alerts.resolve", `{"alertId":"`+crit+`","resolutionReason":"fixed"}`, 2); code != 422 || fields(m) != "resolutionEvidenceIds=error.required" {
+		t.Errorf("evidence ids required: %d %s", code, fields(m))
 	}
 	// an alert without a policy cites a candidate (IR66, IR327): here a remeasurement after detection
 	back := reading(t, u, "temperature", 25, "°C", clock.Add(-2*time.Minute), "valid")

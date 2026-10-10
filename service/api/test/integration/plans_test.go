@@ -47,8 +47,8 @@ func TestPlans(t *testing.T) {
 		data(m)["recurrence"].(map[string]any)["intervalMonths"].(float64) != 1 || data(m)["version"].(float64) != 2 {
 		t.Fatalf("update: %d %v", code, m)
 	}
-	if code, _ := write(s, &hq, "plans.save", `{"id":"`+plan+`","unitId":"`+seed.ID("unit-non-rto").String()+`","recurrence":{"kind":"monthly","intervalMonths":1},"nextDueAt":"`+next.Format(time.RFC3339)+`"}`, 2); code != 422 {
-		t.Error("unit fixed")
+	if code, m := write(s, &hq, "plans.save", `{"id":"`+plan+`","unitId":"`+seed.ID("unit-non-rto").String()+`","recurrence":{"kind":"monthly","intervalMonths":1},"nextDueAt":"`+next.Format(time.RFC3339)+`"}`, 2); code != 422 || fields(m) != "unitId=error.unitFixed" {
+		t.Errorf("unit fixed: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &hq, "plans.save", body(`,"id":"`+plan+`"`), 1); code != 409 {
 		t.Error("stale plan version")
@@ -134,8 +134,8 @@ func TestPlans(t *testing.T) {
 			t.Errorf("%s: %v", body, found)
 		}
 	}
-	if code, _ := post(s, &hq, "plans.list", `{"filters":{"x":1}}`); code != 422 {
-		t.Error("bad filter")
+	if code, m := post(s, &hq, "plans.list", `{"filters":{"x":1}}`); code != 422 || fields(m) != "x=error.notAllowed" {
+		t.Errorf("bad filter: %d %s", code, fields(m))
 	}
 	if code, _ := post(s, &hq, "plans.list", `{"sort":{"field":"updatedAt","direction":"desc"}}`); code != 200 {
 		t.Error("sort")
@@ -145,7 +145,7 @@ func TestPlans(t *testing.T) {
 	}
 	// archived unit
 	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, unit)
-	if code, _ := write(s, &hq, "plans.save", body(""), 0); code != 422 {
-		t.Error("archived unit")
+	if code, m := write(s, &hq, "plans.save", body(""), 0); code != 422 || fields(m) != "unitId=error.unitArchived" {
+		t.Errorf("archived unit: %d %s", code, fields(m))
 	}
 }

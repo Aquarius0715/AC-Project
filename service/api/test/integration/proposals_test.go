@@ -30,6 +30,16 @@ func TestSlotProposals(t *testing.T) {
 
 	_, m := write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)
 	job := data(m)["id"].(string)
+	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"bad hold":                    "hold=error.invalid",
+		"contractor with a member":    "hold=error.invalid",
+		"internal with a contractor":  "hold=error.invalid",
+		"internal without technician": "hold=error.invalid",
+		"preferred slot":              "slot=errors.slot_is_preferred",
+		"reply after 7 days":          "replyBy=error.range",
+		"reply in the past":           "replyBy=error.range",
+		"today":                       "slot=error.slotRules",
+	}
 	for name, tc := range map[string]struct {
 		slot, hold, reply string
 		code              int
@@ -47,7 +57,10 @@ func TestSlotProposals(t *testing.T) {
 		"contractor with a member":     {slotJSON(97, 2), `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `","membershipId":"` + seed.ID("tech-internal-a").String() + `"}`, ts(48), 422},
 		"another company's technician": {slotJSON(97, 2), `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `","technicianMembershipId":"` + seed.ID("tech-external-b").String() + `"}`, ts(48), 403},
 	} {
-		if code, _ := propose(job, tc.slot, tc.hold, tc.reply, 1); code != tc.code {
+		code, m := propose(job, tc.slot, tc.hold, tc.reply, 1)
+		if w, ok := refused[name]; ok {
+			refusal(t, name, code, m, w)
+		} else if code != tc.code {
 			t.Errorf("propose %s: %d want %d", name, code, tc.code)
 		}
 	}
@@ -86,14 +99,14 @@ func TestSlotProposals(t *testing.T) {
 	if code, _ := respond(&customerB, job, p1, `"decision":"accept"`, 2); code != 404 {
 		t.Error("other customer responds")
 	}
-	if code, _ := respond(&customerA, job, p1, `"decision":"decline"`, 2); code != 422 {
-		t.Error("decline without reason")
+	if code, m := respond(&customerA, job, p1, `"decision":"decline"`, 2); code != 422 || fields(m) != "declineReason=error.invalid" {
+		t.Errorf("decline without reason: %d %s", code, fields(m))
 	}
-	if code, _ := respond(&customerA, job, p1, `"decision":"decline","declineReason":"not_home","preferredSlots":[`+slotJSON(30, 1)+`]`, 2); code != 422 {
-		t.Error("decline with one slot")
+	if code, m := respond(&customerA, job, p1, `"decision":"decline","declineReason":"not_home","preferredSlots":[`+slotJSON(30, 1)+`]`, 2); code != 422 || fields(m) != "preferredSlots=error.count" {
+		t.Errorf("decline with one slot: %d %s", code, fields(m))
 	}
-	if code, _ := respond(&customerA, job, p1, `"decision":"accept","declineReason":"other"`, 2); code != 422 {
-		t.Error("accept with decline fields")
+	if code, m := respond(&customerA, job, p1, `"decision":"accept","declineReason":"other"`, 2); code != 422 || fields(m) != "decision=error.fieldsNotAllowed" {
+		t.Errorf("accept with decline fields: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &hq, "jobs.withdrawProposal", `{"jobId":"`+job+`","proposalId":"`+p1+`"}`, 2); code != 200 || data(m)["slotProposal"].(map[string]any)["status"] != "withdrawn" {
 		t.Fatalf("withdraw: %d %v", code, m)
@@ -178,8 +191,8 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 	if code, _ := pp(&contrA, slotJSON(101, 2), "tech-internal-a", "busy", 2); code != 403 {
 		t.Error("other organization's technician")
 	}
-	if code, _ := pp(&contrA, slotJSON(101, 2), "tech-external-a", " ", 2); code != 422 {
-		t.Error("blank reason")
+	if code, m := pp(&contrA, slotJSON(101, 2), "tech-external-a", " ", 2); code != 422 || fields(m) != "reason=error.length" {
+		t.Errorf("blank reason: %d %s", code, fields(m))
 	}
 	if code, _ := pp(&contrB, slotJSON(101, 2), "tech-external-b", "busy", 2); code != 404 {
 		t.Error("other contractor")
@@ -202,11 +215,11 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		o["offeredAt"] == nil || o["accessValidFrom"] != ts(0) || o["accessValidUntil"] != ts(200) {
 		t.Fatalf("offer projection fields: %v", o)
 	}
-	if code, _ := write(s, &hq, "jobs.resolvePartnerSlot", `{"jobId":"`+job+`","proposalId":"`+partner+`","decision":"send_to_client"}`, 3); code != 422 {
-		t.Error("send without replyBy")
+	if code, m := write(s, &hq, "jobs.resolvePartnerSlot", `{"jobId":"`+job+`","proposalId":"`+partner+`","decision":"send_to_client"}`, 3); code != 422 || fields(m) != "replyBy=error.required" {
+		t.Errorf("send without replyBy: %d %s", code, fields(m))
 	}
-	if code, _ := write(s, &hq, "jobs.resolvePartnerSlot", `{"jobId":"`+job+`","proposalId":"`+partner+`","decision":"keep","replyBy":"`+ts(5)+`"}`, 3); code != 422 {
-		t.Error("keep with replyBy")
+	if code, m := write(s, &hq, "jobs.resolvePartnerSlot", `{"jobId":"`+job+`","proposalId":"`+partner+`","decision":"keep","replyBy":"`+ts(5)+`"}`, 3); code != 422 || fields(m) != "replyBy=error.notAllowed" {
+		t.Errorf("keep with replyBy: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &hq, "jobs.resolvePartnerSlot", `{"jobId":"`+job+`","proposalId":"`+partner+`","decision":"send_to_client","replyBy":"`+ts(24)+`"}`, 3); code != 200 ||
 		data(m)["slotProposal"].(map[string]any)["source"] != "contractor" {
@@ -261,8 +274,8 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		t.Fatalf("assign plan job: %d %v", code, m)
 	}
 	three := `[` + slotJSON(170, 2) + `,` + slotJSON(194, 2) + `,` + slotJSON(218, 2) + `]`
-	if code, _ := write(s, &customerA, "jobs.requestReschedule", `{"jobId":"`+pj+`","preferredSlots":[`+slotJSON(170, 2)+`]}`, 2); code != 422 {
-		t.Error("reschedule with one slot")
+	if code, m := write(s, &customerA, "jobs.requestReschedule", `{"jobId":"`+pj+`","preferredSlots":[`+slotJSON(170, 2)+`]}`, 2); code != 422 || fields(m) != "preferredSlots=error.count" {
+		t.Errorf("reschedule with one slot: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &customerB, "jobs.requestReschedule", `{"jobId":"`+pj+`","preferredSlots":`+three+`}`, 2); code != 404 {
 		t.Error("other customer reschedules")

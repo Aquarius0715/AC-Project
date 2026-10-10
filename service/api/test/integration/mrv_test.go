@@ -39,6 +39,12 @@ func TestMRV(t *testing.T) {
 	if _, m := post(s, &hq, "mrv.preview", cond(map[string]string{"boundaryId": `"whole_building_electricity"`})); data(m)["incomplete"] != true {
 		t.Error("boundary mismatch is incomplete")
 	}
+	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"blank boundary":      "boundary=error.length",
+		"non-customer org":    "organizationId=error.invalid",
+		"unaligned":           "from=errors.energy_range",
+		"unit of another org": "unitIds=errors.units_outside_organization",
+	}
 	for name, tc := range map[string]struct {
 		e    map[string]string
 		code int
@@ -50,13 +56,16 @@ func TestMRV(t *testing.T) {
 		"blank boundary":       {map[string]string{"boundary": `" "`}, 422},
 		"unaligned":            {map[string]string{"from": `"` + start.Add(time.Second).Format(time.RFC3339) + `"`}, 422},
 	} {
-		if code, _ := post(s, &hq, "mrv.preview", cond(tc.e)); code != tc.code {
+		code, m := post(s, &hq, "mrv.preview", cond(tc.e))
+		if w, ok := refused[name]; ok {
+			refusal(t, name, code, m, w)
+		} else if code != tc.code {
 			t.Errorf("%s: %d want %d", name, code, tc.code)
 		}
 	}
 	// drafts, review, versions
-	if code, _ := write(s, &hq, "mrv.saveDraft", `{"conditions":`+cond(nil)+`,"evidenceIds":["`+uuid.NewString()+`"]}`, 0); code != 422 {
-		t.Error("unknown evidence")
+	if code, m := write(s, &hq, "mrv.saveDraft", `{"conditions":`+cond(nil)+`,"evidenceIds":["`+uuid.NewString()+`"]}`, 0); code != 422 || fields(m) != "evidenceIds=errors.evidence_unknown" {
+		t.Errorf("unknown evidence: %d %s", code, fields(m))
 	}
 	code, m = write(s, &hq, "mrv.saveDraft", `{"conditions":`+cond(nil)+`,"evidenceIds":[]}`, 0)
 	if code != 200 || data(m)["status"] != "draft" || ver(m) != 1 || data(m)["isDemo"] != true {
@@ -101,8 +110,8 @@ func TestMRV(t *testing.T) {
 	if _, m := post(s, &hq, "mrv.list", `{"filters":{"organizationId":"`+org+`","unitId":"`+u+`","status":"draft"}}`); len(items(m)) != 1 || ver(map[string]any{"data": items(m)[0]}) != 3 {
 		t.Errorf("list: %v", m)
 	}
-	if code, _ := post(s, &hq, "mrv.list", `{"filters":{"status":"reviewed"}}`); code != 422 {
-		t.Error("bad status filter")
+	if code, m := post(s, &hq, "mrv.list", `{"filters":{"status":"reviewed"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+		t.Errorf("bad status filter: %d %s", code, fields(m))
 	}
 	if code, _ := post(s, &customerB, "mrv.list", `{}`); code != 403 {
 		t.Error("client MRV")

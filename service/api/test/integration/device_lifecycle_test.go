@@ -185,10 +185,9 @@ func TestDeviceOperationLifecycle(t *testing.T) {
 	}
 	owner(t, `DELETE FROM devices.device_operations WHERE id = $1`, other)
 	// validation
-	for _, b := range []string{`"operationId":"` + check + `","result":"done"`, `"result":"succeeded"`} {
-		if code, _ := write(s, &customerB, "demo.trigger", `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(time.RFC3339)+`","eventType":"operation",`+b+`}`, 0); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+	for b, want := range map[string]string{`"operationId":"` + check + `","result":"done"`: "result=error.invalid", `"result":"succeeded"`: "operationId=error.required"} {
+		code, m := write(s, &customerB, "demo.trigger", `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(time.RFC3339)+`","eventType":"operation",`+b+`}`, 0)
+		refusal(t, b, code, m, want)
 	}
 	if code, _ := result(uuid.NewString(), "succeeded", clock); code != 404 {
 		t.Error("unknown operation")

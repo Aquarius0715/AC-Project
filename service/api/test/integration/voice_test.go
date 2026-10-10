@@ -54,11 +54,11 @@ func TestVoiceAndExport(t *testing.T) {
 	if code, _ := say(&hq, "temperature bedroom", "en", `,"selectedUnitId":"`+uuid.NewString()+`"`); code != 404 {
 		t.Error("selection outside the candidates")
 	}
-	if code, _ := say(&customerA, " ", "en", ""); code != 422 {
-		t.Error("blank text")
+	if code, m := say(&customerA, " ", "en", ""); code != 422 || fields(m) != "text=error.length" {
+		t.Errorf("blank text: %d %s", code, fields(m))
 	}
-	if code, _ := say(&customerA, "help", "jp", ""); code != 422 {
-		t.Error("bad locale")
+	if code, m := say(&customerA, "help", "jp", ""); code != 422 || fields(m) != "locale=error.invalid" {
+		t.Errorf("bad locale: %d %s", code, fields(m))
 	}
 	if code, _ := say(&contrA, "help", "en", ""); code != 403 {
 		t.Error("contractor voice")
@@ -77,6 +77,12 @@ func TestVoiceAndExport(t *testing.T) {
 	if _, m := exp(&customerA, "2026-08", homeA, `"energy_cost"`, "pdf"); data(m)["mime"] != "application/pdf" {
 		t.Error("pdf export")
 	}
+	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"bad format":      "format=error.invalid",
+		"bad month":       "month=error.invalid",
+		"month not ended": "month=errors.month_not_ended",
+		"no sections":     "sections=error.required",
+	}
 	for name, tc := range map[string][5]string{
 		"month not ended": {"2026-09", homeA, all, "csv", "422"},
 		"bad month":       {"2026-13", homeA, all, "csv", "422"},
@@ -84,7 +90,10 @@ func TestVoiceAndExport(t *testing.T) {
 		"bad format":      {"2026-08", homeA, all, "xlsx", "422"},
 		"other customer":  {"2026-08", `"` + seed.ID("property-home-b").String() + `"`, all, "csv", "404"},
 	} {
-		if code, _ := exp(&customerA, tc[0], tc[1], tc[2], tc[3]); itoa(code) != tc[4] {
+		code, m := exp(&customerA, tc[0], tc[1], tc[2], tc[3])
+		if w, ok := refused[name]; ok {
+			refusal(t, name, code, m, w)
+		} else if itoa(code) != tc[4] {
 			t.Errorf("%s: %d", name, code)
 		}
 	}

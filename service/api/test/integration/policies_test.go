@@ -144,11 +144,13 @@ func TestPolicies(t *testing.T) {
 	if code, _ := upd(&customerA, map[string]string{}, 1); code != 409 {
 		t.Error("stale version")
 	}
-	if code, _ := upd(&hq, map[string]string{"customerId": `"` + seed.ID("cust-b").String() + `"`, "recipientMembershipIds": `["` + seed.ID("hq-operator").String() + `"]`}, 2); code != 422 {
-		t.Error("owner customer is fixed")
+	if code, m := upd(&hq, map[string]string{"customerId": `"` + seed.ID("cust-b").String() + `"`, "recipientMembershipIds": `["` + seed.ID("hq-operator").String() + `"]`}, 2); code != 422 || fields(m) != "customerId=error.ownerFixed" {
+		t.Errorf("owner customer is fixed: %d %s", code, fields(m))
 	}
-	if code, _ := upd(&hq, map[string]string{"kind": `"alert"`, "id": `"` + def + `"`}, 1); code != 422 && code != 409 {
-		t.Errorf("default policy is not an alert policy: %d", code)
+	// the default policy cannot become an alert policy (upd always targets the customer's policy: it tested that one, stale)
+	_, dp := post(s, &hq, "policies.get", `{"policyId":"`+def+`"}`)
+	if code, m := write(s, &hq, "policies.save", alertPolicyBody(map[string]string{"id": `"` + def + `"`}), ver(dp)); code != 422 || fields(m) != "kind=error.kindFixed" {
+		t.Errorf("default policy is not an alert policy: %d %s", code, fields(m))
 	}
 
 	// attach to a unit, then list filters
@@ -255,8 +257,8 @@ func TestPolicies(t *testing.T) {
 		code, m := write(s, &hq, "policies.save", `{"kind":"default_alert","id":"`+def+`","rules":`+body+`}`, dv)
 		refusal(t, name, code, m, want[name])
 	}
-	if code, _ := write(s, &hq, "policies.save", `{"kind":"default_alert","id":"`+pid+`","rules":`+string(raw)+`}`, 3); code != 422 {
-		t.Error("alert policy saved as default")
+	if code, m := write(s, &hq, "policies.save", `{"kind":"default_alert","id":"`+pid+`","rules":`+string(raw)+`}`, 3); code != 422 || fields(m) != "kind=error.kindFixed" {
+		t.Errorf("alert policy saved as default: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &hq, "policies.save", `{"kind":"default_alert","id":"`+def+`","rules":`+string(raw)+`}`, dv-1); code != 409 {
 		t.Error("default stale version")
@@ -290,11 +292,11 @@ func TestPolicies(t *testing.T) {
 	if code, _ := sdr(&customerB, "cust-a", "dust_pm25", false, versionZero); code != 404 {
 		t.Error("client switches only its own customer")
 	}
-	if code, _ := write(s, &hq, "policies.setDefaultRule", `{"policyId":"`+def+`","ruleKey":"noise","customerId":"`+seed.ID("cust-b").String()+`","enabled":true}`, versionZero); code != 422 {
-		t.Error("unknown rule key")
+	if code, m := write(s, &hq, "policies.setDefaultRule", `{"policyId":"`+def+`","ruleKey":"noise","customerId":"`+seed.ID("cust-b").String()+`","enabled":true}`, versionZero); code != 422 || fields(m) != "ruleKey=error.invalid" {
+		t.Errorf("unknown rule key: %d %s", code, fields(m))
 	}
-	if code, _ := write(s, &hq, "policies.setDefaultRule", `{"policyId":"`+pid+`","ruleKey":"dust_pm25","customerId":"`+seed.ID("cust-b").String()+`","enabled":true}`, versionZero); code != 422 {
-		t.Error("not the default policy")
+	if code, m := write(s, &hq, "policies.setDefaultRule", `{"policyId":"`+pid+`","ruleKey":"dust_pm25","customerId":"`+seed.ID("cust-b").String()+`","enabled":true}`, versionZero); code != 422 || fields(m) != "policyId=error.notDefaultPolicy" {
+		t.Errorf("not the default policy: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &hq, "policies.setDefaultRule", `{"policyId":"`+def+`","ruleKey":"dust_pm25","customerId":"`+uuid.NewString()+`","enabled":true}`, versionZero); code != 404 {
 		t.Error("unknown customer")
@@ -302,8 +304,8 @@ func TestPolicies(t *testing.T) {
 	if code, _ := write(s, &hq, "policies.setDefaultRule", `{"policyId":"`+uuid.NewString()+`","ruleKey":"dust_pm25","customerId":"`+seed.ID("cust-b").String()+`","enabled":true}`, versionZero); code != 404 {
 		t.Error("unknown policy")
 	}
-	if code, _ := write(s, &hq, "policies.setDefaultRule", `{"policyId":"`+def+`","ruleKey":"dust_pm25","customerId":"`+seed.ID("cust-b").String()+`","enabled":true,"reason":"`+strings.Repeat("r", 501)+`"}`, versionZero); code != 422 {
-		t.Error("reason too long")
+	if code, m := write(s, &hq, "policies.setDefaultRule", `{"policyId":"`+def+`","ruleKey":"dust_pm25","customerId":"`+seed.ID("cust-b").String()+`","enabled":true,"reason":"`+strings.Repeat("r", 501)+`"}`, versionZero); code != 422 || fields(m) != "reason=error.length" {
+		t.Errorf("reason too long: %d %s", code, fields(m))
 	}
 	owner(t, `UPDATE identity.memberships SET client_role = 'member' WHERE id = $1`, seed.ID("customer-b"))
 	t.Cleanup(func() {
@@ -319,7 +321,7 @@ func TestPolicies(t *testing.T) {
 	}
 
 	// delete: default fixed, detach from units, version
-	if code, m := write(s, &hq, "policies.delete", `{"policyId":"`+def+`"}`, dv+1); code != 422 {
+	if code, m := write(s, &hq, "policies.delete", `{"policyId":"`+def+`"}`, dv+1); code != 422 || fields(m) != "policyId=error.defaultPolicyFixed" {
 		t.Errorf("default policy cannot be deleted: %d %v", code, m)
 	}
 	if code, _ := write(s, &customerA, "policies.delete", `{"policyId":"`+pid+`"}`, 1); code != 409 {

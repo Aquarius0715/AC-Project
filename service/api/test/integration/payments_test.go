@@ -142,11 +142,11 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	manual := func(amount string, v int) (int, map[string]any) {
 		return write(s, &hq, "payments.recordManual", `{"invoiceId":"`+inv+`","paymentReference":"`+ref+`","confirmedAmountMinor":`+amount+`,"currency":"MYR","reason":"bank transfer seen"}`, v)
 	}
-	if code, _ := manual("4000", 1); code != 422 {
-		t.Error("partial amount")
+	if code, m := manual("4000", 1); code != 422 || fields(m) != "confirmedAmountMinor=errors.full_amount_only" {
+		t.Errorf("partial amount: %d %s", code, fields(m))
 	}
-	if code, _ := write(s, &hq, "payments.recordManual", `{"invoiceId":"`+inv+`","paymentReference":" ","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`, 1); code != 422 {
-		t.Error("blank reference")
+	if code, m := write(s, &hq, "payments.recordManual", `{"invoiceId":"`+inv+`","paymentReference":" ","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`, 1); code != 422 || fields(m) != "paymentReference=error.length" {
+		t.Errorf("blank reference: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &customerB, "payments.recordManual", `{"invoiceId":"`+inv+`","paymentReference":"X","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`, 1); code != 403 {
 		t.Error("client records payment")

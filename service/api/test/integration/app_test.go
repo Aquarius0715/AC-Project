@@ -285,14 +285,17 @@ func TestUnitsListScopes(t *testing.T) {
 	if len(items(m)) != 1 {
 		t.Fatal("derived powerState filter")
 	}
-	for _, body := range []string{
-		`{"filters":{"unassignedOnly":true,"spaceId":"` + seed.ID("floor-1").String() + `"}}`,
-		`{"filters":{"status":"bogus"}}`, `{"filters":{"connections":["x"]}}`, `{"filters":{"powerState":"x"}}`,
-		`{"filters":{"nope":1}}`, `{"sort":{"field":"name","direction":"asc"}}`, `{"limit":500}`,
+	for body, want := range map[string]string{
+		`{"filters":{"unassignedOnly":true,"spaceId":"` + seed.ID("floor-1").String() + `"}}`: "filters.unassignedOnly=error.conflictsWithSpaceId",
+		`{"filters":{"status":"bogus"}}`:              "filters.status=error.invalid",
+		`{"filters":{"connections":["x"]}}`:           "filters.connections=error.invalid",
+		`{"filters":{"powerState":"x"}}`:              "filters.powerState=error.invalid",
+		`{"filters":{"nope":1}}`:                      "nope=error.notAllowed",
+		`{"sort":{"field":"name","direction":"asc"}}`: "sort.field=error.invalid",
+		`{"limit":500}`:                               "limit=error.range",
 	} {
-		if code, _ := post(s, &hq, "units.list", body); code != 422 {
-			t.Errorf("%s: %d", body, code)
-		}
+		code, m := post(s, &hq, "units.list", body)
+		refusal(t, body, code, m, want)
 	}
 	for _, body := range []string{`{"filters":{"status":"online"}}`, `{"filters":{"connections":["online","offline"]}}`, `{"filters":{"unassignedOnly":true}}`,
 		`{"filters":{"organizationId":"` + seed.ID("org-customer-b").String() + `"}}`, `{"sort":{"field":"createdAt","direction":"desc"}}`} {

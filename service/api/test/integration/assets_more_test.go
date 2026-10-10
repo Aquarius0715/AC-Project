@@ -91,6 +91,10 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 	} else {
 		v++
 	}
+	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"default policy": "alertPolicyIds=error.defaultPolicyImplicit",
+		"duplicate":      "alertPolicyIds=error.duplicate",
+	}
 	for name, tc := range map[string]struct {
 		ids  string
 		code int
@@ -100,7 +104,10 @@ func TestUnitsSetAlertPoliciesAndDelete(t *testing.T) {
 		"unknown policy":          {`"` + uuid.NewString() + `"`, 404},
 		"duplicate":               {`"` + pA + `","` + pA + `"`, 422},
 	} {
-		if code, _ := set(&customerA, tc.ids, v); code != tc.code {
+		code, m := set(&customerA, tc.ids, v)
+		if w, ok := refused[name]; ok {
+			refusal(t, name, code, m, w)
+		} else if code != tc.code {
 			t.Errorf("%s: %d want %d", name, code, tc.code)
 		}
 	}
@@ -185,8 +192,8 @@ func TestOrganizations(t *testing.T) {
 	if code, m := write(s, &hq, "organizations.save", `{"id":"`+id+`","name":"Chong Office `+suffix+`","kind":"customer","status":"inactive"}`, 1); code != 200 || data(m)["status"] != "inactive" {
 		t.Fatalf("update: %d", code)
 	}
-	if code, _ := write(s, &hq, "organizations.save", `{"id":"`+id+`","name":"x","kind":"contractor","status":"active"}`, 2); code != 422 {
-		t.Error("kind is immutable")
+	if code, m := write(s, &hq, "organizations.save", `{"id":"`+id+`","name":"x","kind":"contractor","status":"active"}`, 2); code != 422 || fields(m) != "kind=error.immutable" {
+		t.Errorf("kind is immutable: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &hq, "organizations.save", `{"id":"`+id+`","name":"x","kind":"customer","status":"active"}`, 1); code != 409 {
 		t.Error("stale version")
@@ -194,8 +201,8 @@ func TestOrganizations(t *testing.T) {
 	if code, _ := write(s, &hq, "organizations.save", `{"id":"`+uuid.NewString()+`","name":"x","kind":"customer","status":"active"}`, 1); code != 404 {
 		t.Error("unknown organization")
 	}
-	if code, _ := write(s, &hq, "organizations.save", `{"name":"","kind":"bank","status":"maybe"}`, 0); code != 422 {
-		t.Error("validation")
+	if code, m := write(s, &hq, "organizations.save", `{"name":"","kind":"bank","status":"maybe"}`, 0); code != 422 || fields(m) != "kind=error.invalid,name=error.length,status=error.invalid" {
+		t.Errorf("validation: %d %s", code, fields(m))
 	}
 }
 

@@ -83,11 +83,11 @@ func TestSummariesTechnicianPartner(t *testing.T) {
 	if int(data(list)["total"].(float64)) != count(m2, "assignedCount") {
 		t.Error("summary and list disagree")
 	}
-	if code, _ := post(s, &techB, "summaries.get", `{"kind":"technician","filters":{"status":"assigned","statuses":["assigned"]}}`); code != 422 {
-		t.Error("status with statuses")
+	if code, m := post(s, &techB, "summaries.get", `{"kind":"technician","filters":{"status":"assigned","statuses":["assigned"]}}`); code != 422 || fields(m) != "filters.statuses=error.invalid" {
+		t.Errorf("status with statuses: %d %s", code, fields(m))
 	}
-	if code, _ := post(s, &techB, "summaries.get", `{"kind":"technician","filters":{"statuses":[]}}`); code != 422 {
-		t.Error("empty statuses")
+	if code, m := post(s, &techB, "summaries.get", `{"kind":"technician","filters":{"statuses":[]}}`); code != 422 || fields(m) != "filters.statuses=error.invalid" {
+		t.Errorf("empty statuses: %d %s", code, fields(m))
 	}
 	code, m = post(s, &contrB, "summaries.get", `{"kind":"partner","filters":{"unitIds":["`+u+`"]}}`)
 	if code != 200 || count(m, "activeCount") != 1 || count(m, "assignedCount") != 1 || count(m, "total") != 0 {

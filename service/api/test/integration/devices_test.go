@@ -67,13 +67,17 @@ func TestDevicesRegisterListGet(t *testing.T) {
 	if code, _ := write(s, &hq, "devices.register", body(strings.ToUpper(serial), newUnit(t, s, "Dup"), `[]`, ""), 0); code != 409 {
 		t.Error("duplicate serial")
 	}
-	if code, _ := write(s, &hq, "devices.register", body("X-"+uuid.NewString()[:6], newUnit(t, s, "Cap"), `["vibration"]`, ""), 0); code != 422 {
-		t.Error("sensor not in capability (IR43)")
+	if code, m := write(s, &hq, "devices.register", body("X-"+uuid.NewString()[:6], newUnit(t, s, "Cap"), `["vibration"]`, ""), 0); code != 422 || fields(m) != "sensorTypes=error.notInCapability" {
+		t.Errorf("sensor not in capability (IR43): %d %s", code, fields(m))
 	}
-	for _, b := range []string{body("a", unit, `[]`, ""), body("bad serial!", unit, `[]`, ""), body("OK-123", unit, `["power","power"]`, ""), `{"serial":"OK-1","unitId":"` + unit + `"}`} {
-		if code, _ := write(s, &hq, "devices.register", b, 0); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+	for b, want := range map[string]string{
+		body("a", unit, `[]`, ""):                     "serial=error.serialFormat",
+		body("bad serial!", unit, `[]`, ""):           "serial=error.serialFormat",
+		body("OK-123", unit, `["power","power"]`, ""): "sensorTypes=error.duplicate",
+		`{"serial":"OK-1","unitId":"` + unit + `"}`:   "sensorTypes=error.required",
+	} {
+		code, m := write(s, &hq, "devices.register", b, 0)
+		refusal(t, b, code, m, want)
 	}
 	if code, _ := write(s, &hq, "devices.register", body("UNK-"+uuid.NewString()[:6], uuid.NewString(), `[]`, ""), 0); code != 404 {
 		t.Error("unknown unit")
@@ -170,8 +174,8 @@ func TestDeviceBindAndOperations(t *testing.T) {
 	if code, _ := write(s, &hq, "devices.check", `{"id":"`+dev+`"}`, 1); code != 409 {
 		t.Error("operations need a bound device")
 	}
-	if code, _ := write(s, &hq, "devices.bind", `{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":""}`, 1); code != 422 {
-		t.Error("bind reason required")
+	if code, m := write(s, &hq, "devices.bind", `{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":""}`, 1); code != 422 || fields(m) != "reason=error.length" {
+		t.Errorf("bind reason required: %d %s", code, fields(m))
 	}
 	_, m = write(s, &hq, "devices.bind", `{"deviceId":"`+dev+`","unitId":"`+u1+`","reason":"install"}`, 1)
 	v := ver(m)
@@ -219,11 +223,11 @@ func TestDeviceBindAndOperations(t *testing.T) {
 	}
 	owner(t, `UPDATE devices.device_operations SET status = 'succeeded' WHERE device_id = $1`, dev)
 	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE id = $1`, dev)
-	if code, _ := write(s, &hq, "devices.updateFirmware", `{"deviceId":"`+dev+`","firmwareVersion":"v9"}`, v); code != 422 {
-		t.Error("unsupported firmware")
+	if code, m := write(s, &hq, "devices.updateFirmware", `{"deviceId":"`+dev+`","firmwareVersion":"v9"}`, v); code != 422 || fields(m) != "firmwareVersion=error.unsupportedFirmware" {
+		t.Errorf("unsupported firmware: %d %s", code, fields(m))
 	}
-	if code, _ := write(s, &hq, "devices.updateFirmware", `{"deviceId":"`+dev+`","firmwareVersion":"v1"}`, v); code != 422 {
-		t.Error("current firmware is not a target")
+	if code, m := write(s, &hq, "devices.updateFirmware", `{"deviceId":"`+dev+`","firmwareVersion":"v1"}`, v); code != 422 || fields(m) != "firmwareVersion=error.unsupportedFirmware" {
+		t.Errorf("current firmware is not a target: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &hq, "devices.updateFirmware", `{"deviceId":"`+dev+`","firmwareVersion":"v2"}`, v); code != 200 || data(m)["targetVersion"] != "v2" {
 		t.Fatalf("firmware: %d %v", code, m)

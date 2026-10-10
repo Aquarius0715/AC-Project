@@ -71,8 +71,8 @@ func TestContractsAndInvoices(t *testing.T) {
 	if code, _ := write(s, &hq, "contracts.save", body(map[string]string{"id": `"` + k + `"`}), 1); code != 409 {
 		t.Error("stale contract version")
 	}
-	if code, _ := write(s, &hq, "contracts.save", body(map[string]string{"id": `"` + k + `"`, "customerId": `"` + seed.ID("cust-a").String() + `"`, "unitIds": `["` + seed.ID("unit-non-rto").String() + `"]`}), 2); code != 422 {
-		t.Error("customer fixed")
+	if code, m := write(s, &hq, "contracts.save", body(map[string]string{"id": `"` + k + `"`, "customerId": `"` + seed.ID("cust-a").String() + `"`, "unitIds": `["` + seed.ID("unit-non-rto").String() + `"]`}), 2); code != 422 || fields(m) != "customerId=error.customerFixed" {
+		t.Errorf("customer fixed: %d %s", code, fields(m))
 	}
 	// lists
 	if _, m := post(s, &customerB, "contracts.list", `{"filters":{"unitId":"`+u+`"}}`); len(items(m)) != 1 || items(m)[0]["priceMinor"].(float64) != 15000 {
@@ -81,8 +81,8 @@ func TestContractsAndInvoices(t *testing.T) {
 	if _, m := post(s, &customerA, "contracts.list", `{"filters":{"unitId":"`+u+`"}}`); len(items(m)) != 0 {
 		t.Error("other customer's contract")
 	}
-	if code, _ := post(s, &hq, "contracts.list", `{"filters":{"kind":"vip"}}`); code != 422 {
-		t.Error("bad plan filter")
+	if code, m := post(s, &hq, "contracts.list", `{"filters":{"kind":"vip"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+		t.Errorf("bad plan filter: %d %s", code, fields(m))
 	}
 	// a restriction on the contract blocks revisions
 	rid := uuid.NewString()
@@ -109,6 +109,12 @@ func TestContractsAndInvoices(t *testing.T) {
 		}
 		return write(s, &hq, "invoices.create", "{"+strings.Join(parts, ",")+"}", 0)
 	}
+	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"due in the past": "dueAt=error.past",
+		"other currency":  "currency=errors.contract_currency",
+		"outside term":    "period=errors.outside_contract",
+		"zero amount":     "amountMinor=error.range",
+	}
 	for name, tc := range map[string]struct {
 		e    map[string]string
 		code int
@@ -119,7 +125,10 @@ func TestContractsAndInvoices(t *testing.T) {
 		"zero amount":          {map[string]string{"amountMinor": "0"}, 422},
 		"outside term":         {map[string]string{"period": `{"from":"` + ts(-24*60) + `","to":"` + ts(24) + `"}`}, 422},
 	} {
-		if code, _ := inv(tc.e); code != tc.code {
+		code, m := inv(tc.e)
+		if w, ok := refused[name]; ok {
+			refusal(t, name, code, m, w)
+		} else if code != tc.code {
 			t.Errorf("invoice %s: %d want %d", name, code, tc.code)
 		}
 	}
@@ -143,8 +152,8 @@ func TestContractsAndInvoices(t *testing.T) {
 	if _, m := post(s, &hq, "invoices.list", `{"filters":{"contractId":"`+k+`","overdueOnly":true}}`); len(items(m)) != 0 {
 		t.Error("not yet overdue")
 	}
-	if code, _ := post(s, &hq, "invoices.list", `{"filters":{"status":"late"}}`); code != 422 {
-		t.Error("bad invoice status")
+	if code, m := post(s, &hq, "invoices.list", `{"filters":{"status":"late"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+		t.Errorf("bad invoice status: %d %s", code, fields(m))
 	}
 	// scope filters: the property of the contract version's units, [from, to) on the period start
 	for name, tc := range map[string]struct {
@@ -161,8 +170,8 @@ func TestContractsAndInvoices(t *testing.T) {
 			t.Errorf("invoice filter %s: %v", name, m)
 		}
 	}
-	if code, _ := post(s, &hq, "invoices.list", `{"filters":{"from":"`+ts(1)+`","to":"`+ts(1)+`"}}`); code != 422 {
-		t.Error("empty invoice range")
+	if code, m := post(s, &hq, "invoices.list", `{"filters":{"from":"`+ts(1)+`","to":"`+ts(1)+`"}}`); code != 422 || fields(m) != "filters.to=error.range" {
+		t.Errorf("empty invoice range: %d %s", code, fields(m))
 	}
 	// reminders: only overdue unpaid, active client recipient
 	remind := func(recipient, channel string, v int) (int, map[string]any) {
@@ -172,11 +181,11 @@ func TestContractsAndInvoices(t *testing.T) {
 		t.Error("remind before due")
 	}
 	owner(t, `UPDATE billing.invoices SET due_at = $2 WHERE id = $1`, invoice, clock.Add(-time.Hour))
-	if code, _ := remind(seed.ID("customer-a").String(), "inApp", 1); code != 422 {
-		t.Error("recipient of another customer")
+	if code, m := remind(seed.ID("customer-a").String(), "inApp", 1); code != 422 || fields(m) != "recipientMembershipId=errors.recipient_not_eligible" {
+		t.Errorf("recipient of another customer: %d %s", code, fields(m))
 	}
-	if code, _ := remind(seed.ID("customer-b").String(), "sms", 1); code != 422 {
-		t.Error("bad channel")
+	if code, m := remind(seed.ID("customer-b").String(), "sms", 1); code != 422 || fields(m) != "channel=error.invalid" {
+		t.Errorf("bad channel: %d %s", code, fields(m))
 	}
 	code, m = remind(seed.ID("customer-b").String(), "email", 1)
 	if code != 200 || data(m)["invoiceVersion"].(float64) != 2 || data(m)["notificationId"] == nil {

@@ -94,6 +94,17 @@ func TestRestrictionLifecycle(t *testing.T) {
 	online, offline := boundUnit(t, s, "online"), boundUnit(t, s, "offline")
 	units := []string{online, offline}
 	k, inv := overdueContract(t, s, online, offline)
+	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"blank reason":       "reason=error.length",
+		"duplicate unit":     "unitIds=error.invalid",
+		"missing cause":      "causeInvoiceIds=errors.cause_invoices_mismatch",
+		"notice under 24h":   "executeAfter=errors.notice_24h",
+		"power off setpoint": "policy=error.invalid",
+		"rules mismatch":     "rulesVersion=errors.rules_version_mismatch",
+		"setpoint off step":  "policy=errors.setpoint_out_of_range",
+		"setpoint too low":   "policy=errors.setpoint_out_of_range",
+		"unit not in deal":   "unitIds=errors.unit_not_in_contract",
+	}
 	for name, tc := range map[string]struct {
 		e    map[string]string
 		code int
@@ -110,7 +121,10 @@ func TestRestrictionLifecycle(t *testing.T) {
 		"stale contract":     {map[string]string{"expectedContractVersion": "2"}, 409},
 		"unknown contract":   {map[string]string{"contractId": `"` + uuid.NewString() + `"`}, 404},
 	} {
-		if code, m := write(s, &restrMgr, "restrictions.schedule", scheduleBody(k, inv, units, tc.e), 0); code != tc.code {
+		code, m := write(s, &restrMgr, "restrictions.schedule", scheduleBody(k, inv, units, tc.e), 0)
+		if w, ok := refused[name]; ok {
+			refusal(t, name, code, m, w)
+		} else if code != tc.code {
 			t.Errorf("schedule %s: %d want %d %v", name, code, tc.code, m)
 		}
 	}
@@ -135,8 +149,8 @@ func TestRestrictionLifecycle(t *testing.T) {
 		t.Error("execute before executeAfter")
 	}
 	due(t, id)
-	if code, _ := exec("rules-2", 1); code != 422 {
-		t.Error("execute with other rules version")
+	if code, m := exec("rules-2", 1); code != 422 || fields(m) != "confirmedRulesVersion=errors.rules_version_mismatch" {
+		t.Errorf("execute with other rules version: %d %s", code, fields(m))
 	}
 	if code, _ := exec("rules-1", 5); code != 409 {
 		t.Error("execute with stale version")
@@ -183,8 +197,8 @@ func TestRestrictionLifecycle(t *testing.T) {
 	if _, m := post(s, &restrMgr, "restrictions.list", `{"filters":{"contractId":"`+k+`","invoiceId":"`+inv+`"}}`); len(items(m)) != 1 || len(items(m)[0]["events"].([]any)) < 2 {
 		t.Fatalf("manager list: %v", m)
 	}
-	if code, _ := post(s, &restrMgr, "restrictions.list", `{"filters":{"status":"paused"}}`); code != 422 {
-		t.Error("bad state filter")
+	if code, m := post(s, &restrMgr, "restrictions.list", `{"filters":{"status":"paused"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+		t.Errorf("bad state filter: %d %s", code, fields(m))
 	}
 	if code, _ := post(s, &customerB, "restrictions.get", `{"id":"`+id+`"}`); code != 403 {
 		t.Error("client get")
@@ -304,7 +318,7 @@ func TestRestrictionScheduleRecipients(t *testing.T) {
 	t.Cleanup(func() {
 		owner(t, `UPDATE identity.memberships SET valid_until = NULL WHERE id = $1`, seed.ID("customer-b"))
 	})
-	if code, m := write(s, &restrMgr, "restrictions.schedule", scheduleBody(k, inv, []string{u}, nil), 0); code != 422 {
+	if code, m := write(s, &restrMgr, "restrictions.schedule", scheduleBody(k, inv, []string{u}, nil), 0); code != 422 || fields(m) != "unitIds=errors.no_notice_recipient" {
 		t.Errorf("no recipients: %d %v", code, m)
 	}
 }
@@ -347,8 +361,8 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	if st := unitState(get(), offline); st["applyState"] != "not_sent" {
 		t.Fatalf("expired intent: %v", st)
 	}
-	if code, _ := retry(&restrMgr, "apply", "rules-9", offline); code != 422 {
-		t.Error("retry with another rules version")
+	if code, m := retry(&restrMgr, "apply", "rules-9", offline); code != 422 || fields(m) != "confirmedRulesVersion=errors.rules_version_mismatch" {
+		t.Errorf("retry with another rules version: %d %s", code, fields(m))
 	}
 	if code, _ := retry(&restrMgr, "release", "rules-1", offline); code != 409 {
 		t.Error("retry release while requested")
@@ -356,8 +370,8 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	if code, _ := retry(&overrider, "apply", "rules-1", offline); code != 403 {
 		t.Error("override-only apply retry")
 	}
-	if code, _ := retry(&restrMgr, "apply", "rules-1", uuid.NewString()); code != 422 {
-		t.Error("retry unknown unit")
+	if code, m := retry(&restrMgr, "apply", "rules-1", uuid.NewString()); code != 422 || fields(m) != "unitIds=errors.unit_not_in_restriction" {
+		t.Errorf("retry unknown unit: %d %s", code, fields(m))
 	}
 	v := ver(get())
 	if code, m := retry(&restrMgr, "apply", "rules-1", online); code != 200 || ver(m) != v {
@@ -388,11 +402,11 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	deferBody := func(until time.Time) string {
 		return `{"restrictionId":"` + id + `","until":"` + until.Format(time.RFC3339) + `","reason":"payment plan agreed"}`
 	}
-	if code, _ := write(s, &restrMgr, "restrictions.defer", deferBody(clock.Add(-time.Hour)), ver(get())); code != 422 {
-		t.Error("past grace")
+	if code, m := write(s, &restrMgr, "restrictions.defer", deferBody(clock.Add(-time.Hour)), ver(get())); code != 422 || fields(m) != "until=errors.until_range" {
+		t.Errorf("past grace: %d %s", code, fields(m))
 	}
-	if code, _ := write(s, &restrMgr, "restrictions.defer", deferBody(clock.Add(100*24*time.Hour)), ver(get())); code != 422 {
-		t.Error("grace beyond 90 days")
+	if code, m := write(s, &restrMgr, "restrictions.defer", deferBody(clock.Add(100*24*time.Hour)), ver(get())); code != 422 || fields(m) != "until=errors.until_range" {
+		t.Errorf("grace beyond 90 days: %d %s", code, fields(m))
 	}
 	code, m = write(s, &restrMgr, "restrictions.defer", deferBody(clock.Add(48*time.Hour)), ver(get()))
 	if code != 200 || data(m)["state"] != "release_requested" || data(m)["graceUntil"] == nil || data(m)["releaseIntent"].(map[string]any)["source"] != "exception" ||

@@ -38,19 +38,22 @@ func TestFactors(t *testing.T) {
 	body := func(extra string) string {
 		return `{"region":"` + region + `","year":2030,"kgCO2ePerKWh":0.42,"source":"demo test factor","isDemo":true` + extra + `}`
 	}
-	for _, b := range []string{strings.Replace(body(""), `"year":2030`, `"year":1999`, 1), strings.Replace(body(""), `0.42`, `0`, 1),
-		strings.Replace(body(""), `"isDemo":true`, `"isDemo":false`, 1), strings.Replace(body(""), `"demo test factor"`, `" "`, 1)} {
-		if code, _ := write(s, &hq, "factors.save", b, 0); code != 422 {
-			t.Errorf("%s accepted", b)
-		}
+	for b, want := range map[string]string{
+		strings.Replace(body(""), `"year":2030`, `"year":1999`, 1):      "year=error.range",
+		strings.Replace(body(""), `0.42`, `0`, 1):                       "kgCO2ePerKWh=error.range",
+		strings.Replace(body(""), `"isDemo":true`, `"isDemo":false`, 1): "isDemo=error.invalid",
+		strings.Replace(body(""), `"demo test factor"`, `" "`, 1):       "source=error.length",
+	} {
+		code, m := write(s, &hq, "factors.save", b, 0)
+		refusal(t, b, code, m, want)
 	}
 	code, m := write(s, &hq, "factors.save", body(""), 0)
 	if code != 200 || ver(m) != 1 {
 		t.Fatalf("create: %d %v", code, m)
 	}
 	id := data(m)["id"].(string)
-	if code, _ := write(s, &hq, "factors.save", body(""), 0); code != 422 {
-		t.Error("second current factor for the region and year")
+	if code, m := write(s, &hq, "factors.save", body(""), 0); code != 422 || fields(m) != "region=errors.factor_exists" {
+		t.Errorf("second current factor for the region and year: %d %s", code, fields(m))
 	}
 	code, m = write(s, &hq, "factors.save", strings.Replace(body(`,"id":"`+id+`"`), "0.42", "0.40", 1), 1)
 	if code != 200 || ver(m) != 2 || data(m)["kgCO2ePerKWh"].(float64) != 0.40 {
@@ -65,8 +68,8 @@ func TestFactors(t *testing.T) {
 	if code, _ := post(s, &customerA, "factors.list", `{}`); code != 403 {
 		t.Error("client lists factors")
 	}
-	if code, _ := post(s, &hq, "factors.list", `{"filters":{"x":1}}`); code != 422 {
-		t.Error("bad factor filter")
+	if code, m := post(s, &hq, "factors.list", `{"filters":{"x":1}}`); code != 422 || fields(m) != "x=error.notAllowed" {
+		t.Errorf("bad factor filter: %d %s", code, fields(m))
 	}
 }
 
@@ -133,8 +136,8 @@ func TestBaselines(t *testing.T) {
 	if _, m := post(s, &customerA, "baselines.list", `{"limit":100}`); len(items(m)) != 0 {
 		t.Error("seed baseline spans two customers: not visible to customer-a")
 	}
-	if code, _ := post(s, &hq, "baselines.list", `{"filters":{"method":"magic"}}`); code != 422 {
-		t.Error("bad baseline filter")
+	if code, m := post(s, &hq, "baselines.list", `{"filters":{"method":"magic"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+		t.Errorf("bad baseline filter: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &customerB, "baselines.save", body("demo_fixed", `,"baselineKWh":1`), 0); code != 403 {
 		t.Error("client saves baseline")
@@ -207,10 +210,14 @@ func TestEnergySummary(t *testing.T) {
 	if _, m := post(s, &hq, "energy.summary", `{"from":"2026-09-01T00:00:00Z","to":"2026-09-01T00:10:00Z","unitIds":[]}`); data(m)["coverage"] != nil {
 		t.Errorf("no units: %v", m)
 	}
-	for _, b := range []string{body(end, `,"tariffVersion":"tariff-x"`), body(start.Add(90*time.Second), ""), body(start, ""), `{"from":"2026-09-01T00:00:00Z","to":"2026-09-01T00:10:00Z"}`} {
-		if code, _ := post(s, &hq, "energy.summary", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+	for b, want := range map[string]string{
+		body(end, `,"tariffVersion":"tariff-x"`):                      "tariffVersion=error.invalid",
+		body(start.Add(90*time.Second), ""):                           "from=errors.energy_range", // not whole minutes
+		body(start, ""):                                               "from=errors.energy_range", // empty
+		`{"from":"2026-09-01T00:00:00Z","to":"2026-09-01T00:10:00Z"}`: "unitIds=error.invalid",
+	} {
+		code, m := post(s, &hq, "energy.summary", b)
+		refusal(t, b, code, m, want)
 	}
 	if code, _ := post(s, &customerA, "energy.summary", body(end, "")); code != 404 {
 		t.Error("other customer's units")
@@ -258,8 +265,8 @@ func TestAdminSummary(t *testing.T) {
 	if _, m := q(&hq, `,"customerId":"`+seed.ID("cust-b").String()+`"`); data(m)["customerCount"].(float64) != 1 || data(m)["overdueInvoiceCount"] == nil {
 		t.Errorf("customer filter: %v", m)
 	}
-	if code, _ := post(s, &hq, "admin.summary", `{"from":"2026-09-13T12:00:30Z","to":"2026-09-13T12:05:00Z"}`); code != 422 {
-		t.Error("unaligned period")
+	if code, m := post(s, &hq, "admin.summary", `{"from":"2026-09-13T12:00:30Z","to":"2026-09-13T12:05:00Z"}`); code != 422 || fields(m) != "from=errors.energy_range" {
+		t.Errorf("unaligned period: %d %s", code, fields(m))
 	}
 	for _, a := range []*actor{&customerA, &overrider} {
 		if code, _ := q(a, ""); code != 403 {

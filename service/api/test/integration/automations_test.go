@@ -89,8 +89,8 @@ func TestAutomationSchedules(t *testing.T) {
 	if first["phase"] != "schedule_start" || first["at"] != "2026-09-14T14:00:00Z" || list[1].(map[string]any)["at"] != "2026-09-14T22:00:00Z" {
 		t.Errorf("first runs: %v", list[:2])
 	}
-	if code, _ := post(s, &customerB, "automations.nextRuns", `{"automationId":"`+id+`","count":5}`); code != 422 {
-		t.Error("count must be 8")
+	if code, m := post(s, &customerB, "automations.nextRuns", `{"automationId":"`+id+`","count":5}`); code != 422 || fields(m) != "count=error.invalid" {
+		t.Errorf("count must be 8: %d %s", code, fields(m))
 	}
 	if code, _ := post(s, &customerA, "automations.nextRuns", `{"automationId":"`+id+`","count":8}`); code != 404 {
 		t.Error("another customer's rule")
@@ -100,8 +100,8 @@ func TestAutomationSchedules(t *testing.T) {
 	if code, _ := write(s, &customerB, "automations.save", scheduleRule(u, map[string]string{"id": `"` + id + `"`}), 2); code != 409 {
 		t.Error("stale rule")
 	}
-	if code, _ := write(s, &customerB, "automations.save", `{"id":"`+id+`","name":"x","unitIds":["`+u+`"],"timezone":"UTC","enabled":false,"priority":1,"kind":"event","condition":{"type":"occupancy","occupied":true},"action":{"kind":"set_power","power":false}}`, 1); code != 422 {
-		t.Error("kind change")
+	if code, m := write(s, &customerB, "automations.save", `{"id":"`+id+`","name":"x","unitIds":["`+u+`"],"timezone":"UTC","enabled":false,"priority":1,"kind":"event","condition":{"type":"occupancy","occupied":true},"action":{"kind":"set_power","power":false}}`, 1); code != 422 || fields(m) != "kind=error.immutable" {
+		t.Errorf("kind change: %d %s", code, fields(m))
 	}
 	code, m = write(s, &customerB, "automations.save", scheduleRule(u, map[string]string{"id": `"` + id + `"`, "name": `"Edited"`}), 1)
 	if code != 200 || ver(m) != 2 || data(m)["disabledReason"] != "capability_changed" {
@@ -117,8 +117,8 @@ func TestAutomationSchedules(t *testing.T) {
 	if _, m := post(s, &customerA, "automations.list", `{"filters":{"unitId":"`+u+`"}}`); len(items(m)) != 0 {
 		t.Error("another customer's list")
 	}
-	if code, _ := post(s, &customerB, "automations.list", `{"filters":{"kind":"cron"}}`); code != 422 {
-		t.Error("bad kind filter")
+	if code, m := post(s, &customerB, "automations.list", `{"filters":{"kind":"cron"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+		t.Errorf("bad kind filter: %d %s", code, fields(m))
 	}
 	if code, _ := post(s, &hq, "automations.list", `{}`); code != 403 {
 		t.Error("HQ lists customer rules")
@@ -145,12 +145,12 @@ func TestAutomationEvents(t *testing.T) {
 	}
 	if code, m := write(s, &customerB, "automations.save", rule(`{"type":"weather","metric":"temperature","operator":"gte","value":30}`), 0); code != 200 || data(m)["condition"] == nil {
 		t.Fatalf("weather rule: %d %v", code, m)
-	} else if code, _ := post(s, &customerB, "automations.nextRuns", `{"automationId":"`+data(m)["id"].(string)+`","count":8}`); code != 422 {
-		t.Error("event rules have no next runs")
+	} else if code, m := post(s, &customerB, "automations.nextRuns", `{"automationId":"`+data(m)["id"].(string)+`","count":8}`); code != 422 || fields(m) != "automationId=errors.not_schedule" {
+		t.Errorf("event rules have no next runs: %d %s", code, fields(m))
 	}
 	owner(t, `UPDATE identity.consents SET granted = false WHERE membership_id = $1`, seed.ID("customer-b"))
-	if code, _ := write(s, &customerB, "automations.save", rule(`{"type":"location","event":"arrival"}`), 0); code != 422 {
-		t.Error("location without consent")
+	if code, m := write(s, &customerB, "automations.save", rule(`{"type":"location","event":"arrival"}`), 0); code != 422 || fields(m) != "condition=errors.consent_required" {
+		t.Errorf("location without consent: %d %s", code, fields(m))
 	}
 	owner(t, `UPDATE identity.consents SET granted = true, granted_at = $2 WHERE membership_id = $1`, seed.ID("customer-b"), clock)
 	t.Cleanup(func() {

@@ -69,17 +69,25 @@ func TestFirmwareCampaigns(t *testing.T) {
 		"unknown model":       {"modelId": `"` + seed.ID("ventilation-demo-b").String() + `"`},
 	}
 	for name, e := range bad {
-		code, _ := write(s, &hq, "firmwareCampaigns.schedule", body(e), 0)
-		if code != 422 && !(name == "unknown model" && code == 404) {
-			t.Errorf("%s: %d", name, code)
+		code, m := write(s, &hq, "firmwareCampaigns.schedule", body(e), 0)
+		if name == "unknown model" { // not a VALIDATION: the model is NOT_FOUND
+			if code != 404 {
+				t.Errorf("%s: %d", name, code)
+			}
+			continue
 		}
+		refusal(t, name, code, m, map[string]string{
+			"start < 24 h": "startAt=error.atLeast24h", "waves not ascending": "waves[1]=error.ascending", "waves end < 100": "waves=error.mustEndAt100",
+			"auto pause 60": "autoPauseFailurePercent=error.range", "bad window": "window=error.invalid", "unsupported fw": "targetVersion=error.unsupportedFirmware",
+			"already on target": "deviceIds=error.alreadyOnTarget", "unknown device": "deviceIds=error.unknownDevice", "duplicate device": "deviceIds=error.duplicate",
+		}[name])
 	}
 	// list / get
 	if code, m := post(s, &hq, "firmwareCampaigns.list", `{"filters":{"modelId":"`+model+`","status":"scheduled"},"limit":100}`); code != 200 || len(items(m)) == 0 {
 		t.Fatalf("list: %d", code)
 	}
-	if code, _ := post(s, &hq, "firmwareCampaigns.list", `{"filters":{"status":"x"}}`); code != 422 {
-		t.Error("bad status")
+	if code, m := post(s, &hq, "firmwareCampaigns.list", `{"filters":{"status":"x"}}`); code != 422 || fields(m) != "filters.status=error.invalid" {
+		t.Errorf("bad status: %d %s", code, fields(m))
 	}
 	if code, _ := post(s, &hq, "firmwareCampaigns.get", `{"id":"`+uuid.NewString()+`"}`); code != 404 {
 		t.Error("unknown campaign")
@@ -111,8 +119,8 @@ func TestFirmwareCampaigns(t *testing.T) {
 	if code, m := ctl("retry_device", `,"deviceId":`+devs[0], 3); code != 200 || data(m)["progress"].(map[string]any)["failed"].(float64) != 0 {
 		t.Fatalf("retry: %d %v", code, m)
 	}
-	if code, _ := ctl("abort", "", 4); code != 422 {
-		t.Error("abort needs a reason")
+	if code, m := ctl("abort", "", 4); code != 422 || fields(m) != "reason=error.length" {
+		t.Errorf("abort needs a reason: %d %s", code, fields(m))
 	}
 	if code, m := ctl("abort", `,"reason":"vendor recall"`, 4); code != 200 || data(m)["state"] != "aborted" || data(m)["reason"] != "vendor recall" {
 		t.Fatalf("abort: %d", code)
@@ -123,8 +131,8 @@ func TestFirmwareCampaigns(t *testing.T) {
 	if code, _ := ctl("pause", "", 1); code != 409 {
 		t.Error("stale version")
 	}
-	if code, _ := ctl("explode", "", 5); code != 422 {
-		t.Error("bad action")
+	if code, m := ctl("explode", "", 5); code != 422 || fields(m) != "action=error.pathMismatch" {
+		t.Errorf("bad action: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &hq, "firmwareCampaigns.control", `{"campaignId":"`+uuid.NewString()+`","action":"pause"}`, 1); code != 404 {
 		t.Errorf("control of an unknown campaign: %d", code)

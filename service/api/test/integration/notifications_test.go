@@ -106,13 +106,14 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	if code, _ := post(s, &customerA, "notifications.recipients", `{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment","channel":"inApp","query":{}}`); code != 404 {
 		t.Error("other customer's invoice")
 	}
-	for _, b := range []string{`{"target":{"kind":"planet","id":"` + inv + `"},"templateKey":"payment","channel":"inApp","query":{}}`,
-		`{"target":{"kind":"invoice","id":"` + inv + `"},"templateKey":"spam","channel":"sms","query":{}}`,
-		`{"target":{"kind":"invoice","id":"` + inv + `"},"templateKey":"payment","channel":"inApp","role":"guest","query":{}}`,
-		`{"target":{"kind":"invoice","id":"` + inv + `"},"templateKey":"payment","channel":"inApp","query":{"filters":{"x":1}}}`} {
-		if code, _ := post(s, &hq, "notifications.recipients", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+	for b, want := range map[string]string{
+		`{"target":{"kind":"planet","id":"` + inv + `"},"templateKey":"payment","channel":"inApp","query":{}}`:                   "target=error.invalid",
+		`{"target":{"kind":"invoice","id":"` + inv + `"},"templateKey":"spam","channel":"sms","query":{}}`:                       "templateKey=error.invalid", // and the channel
+		`{"target":{"kind":"invoice","id":"` + inv + `"},"templateKey":"payment","channel":"inApp","role":"guest","query":{}}`:   "role=error.invalid",
+		`{"target":{"kind":"invoice","id":"` + inv + `"},"templateKey":"payment","channel":"inApp","query":{"filters":{"x":1}}}`: "x=error.notAllowed",
+	} {
+		code, m := post(s, &hq, "notifications.recipients", b)
+		refusal(t, b, code, m, want)
 	}
 	if _, m := post(s, &hq, "notifications.recipients", `{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment","channel":"email","role":"admin","query":{"limit":1}}`); len(items(m)) != 1 {
 		t.Errorf("admin recipients for payment: %v", m)
@@ -129,16 +130,16 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	if saved != 0 {
 		t.Error("preview saved a notification")
 	}
-	if code, _ := preview(seed.ID("customer-a").String()); code != 422 {
-		t.Error("ineligible preview recipient")
+	if code, m := preview(seed.ID("customer-a").String()); code != 422 || fields(m) != "recipientMembershipId=errors.recipient_ineligible" {
+		t.Errorf("ineligible preview recipient: %d %s", code, fields(m))
 	}
 	// a payment reminder is about an invoice only
 	if code, m := post(s, &hq, "notifications.preview", `{"target":{"kind":"job","id":"`+seed.ID("job-contractor-a").String()+`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`","message":"Please pay"}`); code != 422 ||
 		m["fieldErrors"].(map[string]any)["target"] != "error.invalid" {
 		t.Errorf("a payment reminder about a job: %d %v", code, m)
 	}
-	if code, _ := post(s, &hq, "notifications.preview", `{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`","message":" "}`); code != 422 {
-		t.Error("blank message")
+	if code, m := post(s, &hq, "notifications.preview", `{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`","message":" "}`); code != 422 || fields(m) != "message=error.length" {
+		t.Errorf("blank message: %d %s", code, fields(m))
 	}
 	// the message may be as long as a job note (2000, DD-P07); the reason stays at 1000 (IR228)
 	long := strings.Repeat("m", 2000)
@@ -181,8 +182,8 @@ func TestPreferencesAndConsents(t *testing.T) {
 		code, m := write(s, &customerB, "preferences.update", b, 0)
 		refusal(t, b, code, m, want[b])
 	}
-	if code, _ := write(s, &hq, "preferences.update", `{"locale":"en","timezone":"UTC","monthlyReportEmail":true}`, 0); code != 422 {
-		t.Error("monthlyReportEmail for HQ")
+	if code, m := write(s, &hq, "preferences.update", `{"locale":"en","timezone":"UTC","monthlyReportEmail":true}`, 0); code != 422 || fields(m) != "monthlyReportEmail=error.notAllowed" {
+		t.Errorf("monthlyReportEmail for HQ: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &customerB, "preferences.update", `{"locale":"ms","timezone":"Asia/Singapore","monthlyReportEmail":true}`, 0); code != 200 || data(m)["locale"] != "ms" {
 		t.Fatalf("update: %d %v", code, m)
@@ -198,8 +199,8 @@ func TestPreferencesAndConsents(t *testing.T) {
 	if code, m := post(s, &customerB, "consents.get", `{"purpose":"location_automation"}`); code != 200 || data(m)["granted"] != false || ver(m) != 1 {
 		t.Fatalf("consent get: %d %v", code, m)
 	}
-	if code, _ := post(s, &customerB, "consents.get", `{"purpose":"marketing"}`); code != 422 {
-		t.Error("bad purpose")
+	if code, m := post(s, &customerB, "consents.get", `{"purpose":"marketing"}`); code != 422 || fields(m) != "purpose=error.invalid" {
+		t.Errorf("bad purpose: %d %s", code, fields(m))
 	}
 	if code, _ := post(s, &hq, "consents.get", `{"purpose":"location_automation"}`); code != 403 {
 		t.Error("HQ consent")

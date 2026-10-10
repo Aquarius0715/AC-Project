@@ -83,8 +83,8 @@ func TestRestrictionRecoveryCases(t *testing.T) {
 	if code != 200 || len(cs) != 2 || cs[1].(map[string]any)["state"] != "resolved" || len(cs[1].(map[string]any)["commandIds"].([]any)) != 0 {
 		t.Fatalf("null observation: %d %v", code, m)
 	}
-	if code, _ := reconcile(&restrMgr); code != 422 {
-		t.Error("nothing left to reconcile")
+	if code, m := reconcile(&restrMgr); code != 422 || fields(m) != "unitIds=errors.reconcile_not_needed" {
+		t.Errorf("nothing left to reconcile: %d %s", code, fields(m))
 	}
 	if _, m := post(s, &hq, "units.get", `{"id":"`+u+`"}`); data(m)["controlAvailability"].(map[string]any)["state"] != "available" {
 		t.Error("control available after every case is resolved")

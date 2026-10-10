@@ -49,6 +49,11 @@ func TestDiagnosticRuns(t *testing.T) {
 			`,"reason":"check cooling","expectedUnitVersion":`+itoa(u)+`,"expectedJobVersion":`+itoa(j)+`}`, 0)
 	}
 	on, off := `{"kind":"set_power","power":true}`, `{"kind":"set_power","power":false}`
+	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"16 minutes":     "durationMinutes=error.range",
+		"bad end action": "endAction=error.invalid",
+		"unsupported":    "startAction=error.unsupportedAction",
+	}
 	for name, tc := range map[string]struct {
 		start, end string
 		mins, u, j int
@@ -60,7 +65,10 @@ func TestDiagnosticRuns(t *testing.T) {
 		"stale job":      {on, off, 5, uv, jv + 3, 409},
 		"bad end action": {on, `{"kind":"dance"}`, 5, uv, jv, 422},
 	} {
-		if code, _ := run(&techInt, tc.start, tc.end, tc.mins, tc.u, tc.j); code != tc.code {
+		code, m := run(&techInt, tc.start, tc.end, tc.mins, tc.u, tc.j)
+		if w, ok := refused[name]; ok {
+			refusal(t, name, code, m, w)
+		} else if code != tc.code {
 			t.Errorf("%s: %d want %d", name, code, tc.code)
 		}
 	}
@@ -175,7 +183,7 @@ func TestDiagnosticRuns(t *testing.T) {
 	if code, _ := post(s, &hq, "diagnosticRuns.get", `{"diagnosticRunId":"`+uuid.NewString()+`"}`); code != 404 {
 		t.Error("unknown run")
 	}
-	if code, _ := post(s, &hq, "diagnosticRuns.list", `{"query":{}}`); code != 422 {
-		t.Error("unitId required")
+	if code, m := post(s, &hq, "diagnosticRuns.list", `{"query":{}}`); code != 422 || fields(m) != "unitId=error.required" {
+		t.Errorf("unitId required: %d %s", code, fields(m))
 	}
 }

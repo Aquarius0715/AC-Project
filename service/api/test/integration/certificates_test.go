@@ -55,8 +55,8 @@ func TestCertificatesAndParts(t *testing.T) {
 	}
 	cert := data(m)["id"].(string)
 	// verify
-	if code, _ := write(s, &hq, "certificates.verify", `{"certificateId":"`+cert+`","decision":"reject"}`, 1); code != 422 {
-		t.Error("reject without reason")
+	if code, m := write(s, &hq, "certificates.verify", `{"certificateId":"`+cert+`","decision":"reject"}`, 1); code != 422 || fields(m) != "reason=error.required" {
+		t.Errorf("reject without reason: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &contrA, "certificates.verify", `{"certificateId":"`+cert+`","decision":"approve"}`, 1); code != 403 {
 		t.Error("contractor verifies")
@@ -81,8 +81,8 @@ func TestCertificatesAndParts(t *testing.T) {
 	if code, m := write(s, &hq, "certificates.verify", `{"certificateId":"`+renewal+`","decision":"reject","reason":"blurry scan"}`, 1); code != 200 || data(m)["status"] != "rejected" {
 		t.Fatalf("reject: %d %v", code, m)
 	}
-	if code, _ := write(s, &contrA, "certificates.requestTraining", `{"certificateId":"`+cert+`","note":" "}`, 2); code != 422 {
-		t.Error("blank note")
+	if code, m := write(s, &contrA, "certificates.requestTraining", `{"certificateId":"`+cert+`","note":" "}`, 2); code != 422 || fields(m) != "note=error.length" {
+		t.Errorf("blank note: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &contrA, "certificates.requestTraining", `{"certificateId":"`+cert+`","note":"refresher course"}`, 2); code != 200 || data(m)["trainingRequestedAt"] == nil {
 		t.Fatalf("training: %d %v", code, m)
@@ -109,8 +109,8 @@ func TestCertificatesAndParts(t *testing.T) {
 	if got := ids(`{"limit":100}`, &contrB); got[cert] != "" {
 		t.Error("contractor-b sees contractor-a's certificates")
 	}
-	if code, _ := post(s, &hq, "certificates.list", `{"filters":{"code":"x"}}`); code != 422 {
-		t.Error("bad code filter")
+	if code, m := post(s, &hq, "certificates.list", `{"filters":{"code":"x"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+		t.Errorf("bad code filter: %d %s", code, fields(m))
 	}
 	owner(t, `UPDATE maintenance.certificates SET expires_at = $2 WHERE id = $1`, cert, time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC))
 
@@ -128,8 +128,8 @@ func TestCertificatesAndParts(t *testing.T) {
 	if code, _ := post(s, &techInt, "parts.list", `{}`); code != 200 {
 		t.Error("technician parts")
 	}
-	if code, _ := post(s, &hq, "parts.list", `{"filters":{"x":1}}`); code != 422 {
-		t.Error("bad parts filter")
+	if code, m := post(s, &hq, "parts.list", `{"filters":{"x":1}}`); code != 422 || fields(m) != "x=error.notAllowed" {
+		t.Errorf("bad parts filter: %d %s", code, fields(m))
 	}
 }
 

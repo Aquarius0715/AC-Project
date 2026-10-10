@@ -46,10 +46,13 @@ func TestDeviceHistory(t *testing.T) {
 	if code, _ := post(s, &customerB, "devices.operations", `{"deviceId":"`+dev+`","query":{}}`); code != 403 {
 		t.Error("clients do not read device operations")
 	}
-	for _, b := range []string{`{"deviceId":"` + dev + `","query":{"filters":{"x":1}}}`, `{"query":{}}`, `{"deviceId":"` + dev + `","query":{"sort":{"field":"kind","direction":"asc"}}}`} {
-		if code, _ := post(s, &hq, "devices.operations", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+	for b, want := range map[string]string{
+		`{"deviceId":"` + dev + `","query":{"filters":{"x":1}}}`: "x=error.notAllowed",
+		`{"query":{}}`: "deviceId=error.invalid",
+		`{"deviceId":"` + dev + `","query":{"sort":{"field":"kind","direction":"asc"}}}`: "sort.field=error.invalid",
+	} {
+		code, m := post(s, &hq, "devices.operations", b)
+		refusal(t, b, code, m, want)
 	}
 	// response notes (DeviceEvent.version)
 	note := func(a *actor, msg string, v int) (int, map[string]any) {
@@ -61,11 +64,11 @@ func TestDeviceHistory(t *testing.T) {
 	if code, _ := note(&hq, "again", 1); code != 409 {
 		t.Error("stale event version")
 	}
-	if code, _ := note(&hq, "   ", 2); code != 422 {
-		t.Error("blank note")
+	if code, m := note(&hq, "   ", 2); code != 422 || fields(m) != "responseNote=error.length" {
+		t.Errorf("blank note: %d %s", code, fields(m))
 	}
-	if code, _ := note(&hq, strings.Repeat("x", 1001), 2); code != 422 {
-		t.Error("note too long")
+	if code, m := note(&hq, strings.Repeat("x", 1001), 2); code != 422 || fields(m) != "responseNote=error.length" {
+		t.Errorf("note too long: %d %s", code, fields(m))
 	}
 	if code, _ := write(s, &hq, "devices.addResponseNote", `{"deviceId":"`+dev+`","eventId":"`+uuid.NewString()+`","responseNote":"x"}`, 1); code != 404 {
 		t.Error("unknown event")

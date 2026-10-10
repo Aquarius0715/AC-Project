@@ -33,8 +33,8 @@ func TestClientUsers(t *testing.T) {
 		code, m := save(&hq, b, 0)
 		refusal(t, name, code, m, want[name])
 	}
-	if code, _ := save(&hq, `{"customerId":"`+cust+`","email":"`+email+`","clientRole":"member","status":"active"}`, 0); code != 422 {
-		t.Error("status on invite")
+	if code, m := save(&hq, `{"customerId":"`+cust+`","email":"`+email+`","clientRole":"member","status":"active"}`, 0); code != 422 || fields(m) != "status=error.notAllowed" {
+		t.Errorf("status on invite: %d %s", code, fields(m))
 	}
 	if code, _ := save(&customerB, `{"customerId":"`+cust+`","email":"`+email+`","clientRole":"owner"}`, 0); code != 403 {
 		t.Error("client invites an owner")
@@ -47,8 +47,8 @@ func TestClientUsers(t *testing.T) {
 		t.Fatalf("invite: %d %v", code, m)
 	}
 	id := data(m)["id"].(string)
-	if code, _ := save(&hq, strings.Replace(invite, email, strings.ToUpper(email[:1])+email[1:], 1), 0); code != 422 {
-		t.Error("duplicate email (case-insensitive)")
+	if code, m := save(&hq, strings.Replace(invite, email, strings.ToUpper(email[:1])+email[1:], 1), 0); code != 422 || fields(m) != "email=errors.email_taken" {
+		t.Errorf("duplicate email (case-insensitive): %d %s", code, fields(m))
 	}
 	_, m = post(s, &customerB, "clientUsers.list", `{"limit":100}`)
 	var owner map[string]any
@@ -63,8 +63,8 @@ func TestClientUsers(t *testing.T) {
 	if _, m := post(s, &hq, "clientUsers.list", `{"filters":{"customerId":"`+cust+`","status":"invited","clientRole":"member"},"limit":100}`); len(items(m)) == 0 {
 		t.Error("HQ filtered list")
 	}
-	if code, _ := post(s, &hq, "clientUsers.list", `{"filters":{"status":"gone"}}`); code != 422 {
-		t.Error("bad status filter")
+	if code, m := post(s, &hq, "clientUsers.list", `{"filters":{"status":"gone"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+		t.Errorf("bad status filter: %d %s", code, fields(m))
 	}
 	if _, m := post(s, &customerA, "clientUsers.list", `{"limit":100}`); len(items(m)) == 0 || items(m)[0]["customerId"] != seed.ID("cust-a").String() {
 		t.Error("client list scoped to own customer")
@@ -96,8 +96,8 @@ func TestClientUsers(t *testing.T) {
 	if code, _ := write(s, &hq, "clientUsers.remove", `{"id":"`+owner["id"].(string)+`","reason":"leaving"}`, ov); code != 409 {
 		t.Error("remove the last owner")
 	}
-	if code, _ := save(&hq, `{"id":"`+id+`","customerId":"`+cust+`","email":"`+email+`","clientRole":"member"}`, 1); code != 422 {
-		t.Error("update without reason")
+	if code, m := save(&hq, `{"id":"`+id+`","customerId":"`+cust+`","email":"`+email+`","clientRole":"member"}`, 1); code != 422 || fields(m) != "reason=error.required" {
+		t.Errorf("update without reason: %d %s", code, fields(m))
 	}
 	if code, _ := upd(map[string]any{"id": id, "email": email}, "member", "active", 1); code != 409 {
 		t.Error("activate a pending invite")

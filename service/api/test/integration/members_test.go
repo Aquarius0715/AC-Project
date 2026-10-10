@@ -40,6 +40,20 @@ func TestMembersSave(t *testing.T) {
 		}
 		return "{" + strings.Join(parts, ",") + "}"
 	}
+	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"admin unit scope":       "scopes=error.invalid",
+		"blank reason":           "reason=error.length",
+		"employment for admin":   "employment=error.notAllowed",
+		"external without end":   "validUntil=errors.external_needs_end",
+		"internal at contractor": "organizationId=errors.organization_kind",
+		"no employment":          "employment=error.required",
+		"technician permission":  "permissions=errors.write_needs_read",
+		"unknown permission":     "permissions=error.invalid",
+		"unknown property":       "scopes=errors.unknown_scope",
+		"unknown scope":          "scopes=errors.unknown_scope",
+		"until before from":      "validUntil=error.range",
+		"write without read":     "permissions=errors.write_needs_read",
+	}
 	for name, tc := range map[string]struct {
 		f    map[string]string
 		code int
@@ -59,7 +73,10 @@ func TestMembersSave(t *testing.T) {
 		"unknown user":           {map[string]string{"userId": `"` + uuid.NewString() + `"`}, 404},
 		"unknown organization":   {map[string]string{"organizationId": `"` + uuid.NewString() + `"`}, 404},
 	} {
-		if code, _ := write(s, &hq, "members.save", body(tc.f), 0); code != tc.code {
+		code, m := write(s, &hq, "members.save", body(tc.f), 0)
+		if w, ok := refused[name]; ok {
+			refusal(t, name, code, m, w)
+		} else if code != tc.code {
 			t.Errorf("save %s: %d want %d", name, code, tc.code)
 		}
 	}
@@ -77,8 +94,8 @@ func TestMembersSave(t *testing.T) {
 		data(m)["scopeVersion"].(float64) != 2 {
 		t.Fatalf("same permissions keep scopeVersion: %d %v", code, m)
 	}
-	if code, _ := write(s, &hq, "members.save", body(map[string]string{"id": `"` + id + `"`, "role": `"admin"`, "employment": "null", "permissions": `[]`, "scopes": `[]`}), 3); code != 422 {
-		t.Error("role fixed")
+	if code, m := write(s, &hq, "members.save", body(map[string]string{"id": `"` + id + `"`, "role": `"admin"`, "employment": "null", "permissions": `[]`, "scopes": `[]`}), 3); code != 422 || fields(m) != "role=errors.membership_fixed" {
+		t.Errorf("role fixed: %d %s", code, fields(m))
 	}
 	// a technician may also be scoped to a whole property (the identity copy of the property, IR186)
 	if code, m := write(s, &hq, "members.save", body(map[string]string{"id": `"` + id + `"`, "permissions": `["alert.read","alert.resolve"]`, "scopes": `[{"kind":"property","id":"` + seed.ID("property-home-a").String() + `"}]`, "reason": `"whole home"`}), 3); code != 200 ||

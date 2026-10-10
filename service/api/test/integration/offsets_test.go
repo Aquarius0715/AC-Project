@@ -27,8 +27,8 @@ func TestOffsets(t *testing.T) {
 	if code, _ := quote(&customerA, ""); code != 404 {
 		t.Error("client quotes another customer's unit")
 	}
-	if code, _ := quote(&hq, ""); code != 422 {
-		t.Error("HQ quote without customerId")
+	if code, m := quote(&hq, ""); code != 422 || fields(m) != "customerId=error.required" {
+		t.Errorf("HQ quote without customerId: %d %s", code, fields(m))
 	}
 	code, m := quote(&customerB, "")
 	if code != 200 || data(m)["provider"] != "unselected" || data(m)["estimatedAmountMinor"] != nil || data(m)["marketConcept"].(map[string]any)["stage"] != "future_concept" {
@@ -38,8 +38,8 @@ func TestOffsets(t *testing.T) {
 	sim := func(a *actor, body string, v int) (int, map[string]any) {
 		return write(s, a, "offsets.simulate", body, v)
 	}
-	if code, _ := sim(&customerB, `{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":false}`, 0); code != 422 {
-		t.Error("not demo confirmed")
+	if code, m := sim(&customerB, `{"event":"request","quoteId":"`+qid+`","quoteVersion":1,"demoConfirmed":false}`, 0); code != 422 || fields(m) != "demoConfirmed=error.required" {
+		t.Errorf("not demo confirmed: %d %s", code, fields(m))
 	}
 	if code, _ := sim(&customerB, `{"event":"request","quoteId":"`+qid+`","quoteVersion":2,"demoConfirmed":true}`, 0); code != 409 {
 		t.Error("stale quote version")
@@ -177,8 +177,8 @@ func TestOffsets(t *testing.T) {
 	if !named {
 		t.Error("HQ event history has no actor names")
 	}
-	if code, _ := post(s, &hq, "offsets.list", `{"filters":{"status":"sold"}}`); code != 422 {
-		t.Error("bad state filter")
+	if code, m := post(s, &hq, "offsets.list", `{"filters":{"status":"sold"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+		t.Errorf("bad state filter: %d %s", code, fields(m))
 	}
 	// expired quotes cannot be requested; HQ quotes need the customer's units
 	code, m = quote(&hq, `,"customerId":"`+seed.ID("cust-b").String()+`"`)
@@ -189,8 +189,8 @@ func TestOffsets(t *testing.T) {
 	if code, _ := sim(&hq, `{"event":"request","quoteId":"`+data(m)["id"].(string)+`","quoteVersion":1,"demoConfirmed":true}`, 0); code != 409 {
 		t.Error("expired quote")
 	}
-	if code, _ := quote(&hq, `,"customerId":"`+seed.ID("cust-a").String()+`"`); code != 422 {
-		t.Error("HQ quote with another customer's unit")
+	if code, m := quote(&hq, `,"customerId":"`+seed.ID("cust-a").String()+`"`); code != 422 || fields(m) != "unitIds=errors.units_outside_customer" {
+		t.Errorf("HQ quote with another customer's unit: %d %s", code, fields(m))
 	}
 	_ = strconv.Itoa
 }

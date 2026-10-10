@@ -39,11 +39,11 @@ func TestPayouts(t *testing.T) {
 	gen := func(period string) (int, map[string]any) {
 		return write(s, &hq, "payouts.generate", `{"period":"`+period+`"}`, 0)
 	}
-	if code, _ := gen("2026-09"); code != 422 {
-		t.Error("month not ended")
+	if code, m := gen("2026-09"); code != 422 || fields(m) != "period=errors.period_not_ended" {
+		t.Errorf("month not ended: %d %s", code, fields(m))
 	}
-	if code, _ := gen("2026/07"); code != 422 {
-		t.Error("bad period")
+	if code, m := gen("2026/07"); code != 422 || fields(m) != "period=error.invalid" {
+		t.Errorf("bad period: %d %s", code, fields(m))
 	}
 	stmtOf := func(m map[string]any) map[string]any {
 		for _, x := range m["data"].([]any) {
@@ -76,8 +76,8 @@ func TestPayouts(t *testing.T) {
 	if code, _ := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+uuid.NewString()+`","topic":"amount","message":"why"}`, 2); code != 404 {
 		t.Error("unknown line")
 	}
-	if code, _ := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+line+`","topic":"price","message":"why"}`, 2); code != 422 {
-		t.Error("bad topic")
+	if code, m := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+line+`","topic":"price","message":"why"}`, 2); code != 422 || fields(m) != "topic=error.invalid" {
+		t.Errorf("bad topic: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"why"}`, 1); code != 409 || m["messageKey"] != "error.versionConflict" {
 		t.Errorf("question on a stale version: %d %v", code, m)
@@ -91,8 +91,8 @@ func TestPayouts(t *testing.T) {
 	}
 	_, m = post(s, &hq, "payouts.get", `{"id":"`+jid+`"}`)
 	q := data(m)["queries"].([]any)[0].(map[string]any)["id"].(string)
-	if code, _ := write(s, &hq, "payouts.resolveQuery", `{"statementId":"`+jid+`","queryId":"`+q+`","reply":"ok","adjustmentMinor":0}`, 3); code != 422 {
-		t.Error("zero adjustment")
+	if code, m := write(s, &hq, "payouts.resolveQuery", `{"statementId":"`+jid+`","queryId":"`+q+`","reply":"ok","adjustmentMinor":0}`, 3); code != 422 || fields(m) != "adjustmentMinor=error.nonZero" {
+		t.Errorf("zero adjustment: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &hq, "payouts.resolveQuery", `{"statementId":"`+jid+`","queryId":"`+q+`","reply":"Added travel","adjustmentMinor":12000}`, 2); code != 409 || m["messageKey"] != "error.versionConflict" {
 		t.Errorf("answer on a stale version: %d %v", code, m)
@@ -170,11 +170,11 @@ func TestPayouts(t *testing.T) {
 	if _, m := post(s, &hq, "payouts.list", `{"filters":{"period":"2026-08","status":"draft","contractorOrgId":"`+org.String()+`"}}`); len(items(m)) != 1 {
 		t.Error("hq list filters")
 	}
-	if code, _ := post(s, &hq, "payouts.list", `{"filters":{"status":"void"}}`); code != 422 {
-		t.Error("bad status filter")
+	if code, m := post(s, &hq, "payouts.list", `{"filters":{"status":"void"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+		t.Errorf("bad status filter: %d %s", code, fields(m))
 	}
-	if code, _ := write(s, &hq, "payouts.transition", `{"statementId":"`+jid+`","action":"refund"}`, 6); code != 422 {
-		t.Error("bad action")
+	if code, m := write(s, &hq, "payouts.transition", `{"statementId":"`+jid+`","action":"refund"}`, 6); code != 422 || fields(m) != "action=error.pathMismatch" {
+		t.Errorf("bad action: %d %s", code, fields(m))
 	}
 }
 

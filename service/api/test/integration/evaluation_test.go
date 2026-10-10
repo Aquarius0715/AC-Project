@@ -79,15 +79,16 @@ func TestAutomationEvaluation(t *testing.T) {
 		t.Errorf("schedule end not due: %v", m)
 	}
 	// validation and scope
-	for _, b := range []string{
-		`{"eventId":"` + uuid.NewString() + `","occurredAt":"` + clock.Add(time.Hour).Format(time.RFC3339) + `","unitIds":["` + u + `"],"facts":[],"phase":"condition"}`,
-		input(`"`+u+`","`+u+`"`, "", "condition"), input(`"`+u+`"`, fact(u, "occupied", "1", "boolean", clock), "condition"),
-		input(`"`+u+`"`, fact(off, "occupied", "true", "boolean", clock), "condition"), input(`"`+u+`"`, fact(u, "humidity", "50", "kPa", clock), "condition"),
-		input(`"`+u+`"`, "", "midnight"),
+	for b, want := range map[string]string{
+		`{"eventId":"` + uuid.NewString() + `","occurredAt":"` + clock.Add(time.Hour).Format(time.RFC3339) + `","unitIds":["` + u + `"],"facts":[],"phase":"condition"}`: "occurredAt=errors.not_current_tick",
+		input(`"`+u+`","`+u+`"`, "", "condition"):                                      "unitIds=error.invalid",
+		input(`"`+u+`"`, fact(u, "occupied", "1", "boolean", clock), "condition"):      "facts=error.invalid", // a boolean fact of 1
+		input(`"`+u+`"`, fact(off, "occupied", "true", "boolean", clock), "condition"): "facts=error.invalid", // a unit outside the input
+		input(`"`+u+`"`, fact(u, "humidity", "50", "kPa", clock), "condition"):         "facts=error.invalid", // a unit symbol of another metric
+		input(`"`+u+`"`, "", "midnight"):                                               "phase=error.invalid",
 	} {
-		if code, _ := post(s, &customerB, "automations.simulate", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+		code, m := post(s, &customerB, "automations.simulate", b)
+		refusal(t, b, code, m, want)
 	}
 	if code, _ := post(s, &customerA, "automations.simulate", input(`"`+u+`"`, "", "condition")); code != 404 {
 		t.Error("another customer's unit")

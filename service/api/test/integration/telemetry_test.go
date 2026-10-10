@@ -52,6 +52,19 @@ func TestTelemetry(t *testing.T) {
 		t.Fatal("sensor filter")
 	}
 	// scope and validation
+	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"bad metric":          "metric=error.invalid",
+		"bad sort":            "query.sort.field=error.invalid",
+		"both targets":        "unitIds=error.exactlyOneTarget",
+		"duplicate units":     "unitIds=error.invalid",
+		"empty unitIds":       "unitIds=error.invalid",
+		"filters not allowed": "x=error.notAllowed",
+		"missing from":        "from=error.required",
+		"missing to":          "to=error.required",
+		"no target":           "unitIds=error.exactlyOneTarget",
+		"range > 35 days":     "to=error.rangeTooLong",
+		"reversed range":      "to=error.range",
+	}
 	for name, tc := range map[string]struct {
 		a    *actor
 		body string
@@ -74,7 +87,10 @@ func TestTelemetry(t *testing.T) {
 		"missing from":            {&hq, `{"to":"` + to + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
 		"missing to":              {&hq, `{"from":"` + from + `","unitIds":["` + online + `"],"metric":"co2","query":{}}`, 422},
 	} {
-		if code, _ := post(s, tc.a, "telemetry.series", tc.body); code != tc.code {
+		code, m := post(s, tc.a, "telemetry.series", tc.body)
+		if w, ok := refused[name]; ok {
+			refusal(t, name, code, m, w)
+		} else if code != tc.code {
 			t.Errorf("%s: %d want %d", name, code, tc.code)
 		}
 	}
@@ -88,10 +104,13 @@ func TestTelemetry(t *testing.T) {
 	if len(data(m)["measurements"].([]any)) != 1 {
 		t.Fatal("summary metric")
 	}
-	for _, b := range []string{`{` + rng + `,"unitIds":[]}`, `{` + rng + `,"unitIds":["` + online + `"],"metric":"x"}`, `{"from":"` + to + `","to":"` + from + `","unitIds":["` + online + `"]}`} {
-		if code, _ := post(s, &customerA, "telemetry.summary", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+	for b, want := range map[string]string{
+		`{` + rng + `,"unitIds":[]}`:                                             "unitIds=error.invalid",
+		`{` + rng + `,"unitIds":["` + online + `"],"metric":"x"}`:                "metric=error.invalid",
+		`{"from":"` + to + `","to":"` + from + `","unitIds":["` + online + `"]}`: "to=error.range",
+	} {
+		code, m := post(s, &customerA, "telemetry.summary", b)
+		refusal(t, b, code, m, want)
 	}
 	if code, _ := post(s, &customerA, "telemetry.summary", `{`+rng+`,"unitIds":["`+other+`"]}`); code != 404 {
 		t.Error("summary scope")
@@ -113,6 +132,13 @@ func TestVentilation(t *testing.T) {
 	if code != 200 || data(m)["co2AtLog"] != nil {
 		t.Fatalf("no co2 sensor → null: %d %v", code, m)
 	}
+	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"bad method":        "method=error.invalid",
+		"duration 0":        "durationMinutes=error.range",
+		"duration 241":      "durationMinutes=error.range",
+		"missing space":     "spaceId=error.required",
+		"unit not in space": "unitId=error.unitNotInSpace",
+	}
 	for name, tc := range map[string]struct {
 		a    *actor
 		body string
@@ -127,7 +153,10 @@ func TestVentilation(t *testing.T) {
 		"unknown room":          {&customerA, `{"spaceId":"` + uuid.NewString() + `","method":"other","durationMinutes":5}`, 404},
 		"hq cannot log":         {&hq, `{"spaceId":"` + room1 + `","method":"other","durationMinutes":5}`, 403},
 	} {
-		if code, _ := logv(tc.a, tc.body); code != tc.code {
+		code, m := logv(tc.a, tc.body)
+		if w, ok := refused[name]; ok {
+			refusal(t, name, code, m, w)
+		} else if code != tc.code {
 			t.Errorf("%s: %d want %d", name, code, tc.code)
 		}
 	}

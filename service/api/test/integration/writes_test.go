@@ -43,11 +43,11 @@ func TestWritesGetResult(t *testing.T) {
 			t.Errorf("%s: %v", name, m)
 		}
 	}
-	if code, _ := get(&techB, "no.such", key); code != 422 {
-		t.Error("unknown operation")
+	if code, m := get(&techB, "no.such", key); code != 422 || fields(m) != "operation=error.invalid" {
+		t.Errorf("unknown operation: %d %s", code, fields(m))
 	}
-	if code, _ := get(&techB, "preferences.update", "short"); code != 422 {
-		t.Error("short key")
+	if code, m := get(&techB, "preferences.update", "short"); code != 422 || fields(m) != "idempotencyKey=error.invalid" {
+		t.Errorf("short key: %d %s", code, fields(m))
 	}
 	owner(t, `UPDATE platform.idempotency_keys SET status = 'in_progress' WHERE key = $1`, key)
 	if _, m := get(&techB, "preferences.update", key); data(m)["state"] != "pending" {
@@ -63,8 +63,8 @@ func TestWritesGetResult(t *testing.T) {
 	if w.Code != 200 || data(r)["messageKey"] != "auth.reset_generic" {
 		t.Fatalf("reset preview: %d %s", w.Code, w.Body.String())
 	}
-	if code, _ := post(s, nil, "auth.previewPasswordReset", `{"demoEmail":"bad"}`); code != 422 {
-		t.Error("bad reset email")
+	if code, m := post(s, nil, "auth.previewPasswordReset", `{"demoEmail":"bad"}`); code != 422 || fields(m) != "demoEmail=error.invalid" {
+		t.Errorf("bad reset email: %d %s", code, fields(m))
 	}
 }
 
@@ -93,8 +93,8 @@ func TestResolveQr(t *testing.T) {
 	if code, _ := qr("SN-UNKNOWN"); code != 404 {
 		t.Error("unknown label")
 	}
-	if code, _ := qr(" "); code != 422 {
-		t.Error("blank code")
+	if code, m := qr(" "); code != 422 || fields(m) != "code=error.invalid" {
+		t.Errorf("blank code: %d %s", code, fields(m))
 	}
 	if code, _ := post(s, &customerB, "units.resolveQr", `{"code":"`+u+`"}`); code != 403 {
 		t.Error("client resolves QR")

@@ -97,8 +97,8 @@ func TestDemoOperations(t *testing.T) {
 	if code, _ := trig(s, tele("25", "°C", uuid.NewString())); code != 404 {
 		t.Error("unknown sensor")
 	}
-	if code, _ := trig(s, `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(time.RFC3339)+`","eventType":"network","connected":false}`); code != 422 {
-		t.Error("unsupported trigger type")
+	if code, m := trig(s, `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(time.RFC3339)+`","eventType":"network","connected":false}`); code != 422 || fields(m) != "_=error.malformedInput" {
+		t.Errorf("a trigger with a field no type has: %d %s", code, fields(m))
 	}
 	// the trigger's own rules (IR36): a known event type, its IDs, and a measurement of the sensor's metric and unit
 	now := clock.Format(time.RFC3339)
@@ -159,8 +159,8 @@ func TestDemoOperations(t *testing.T) {
 		t.Errorf("unit version changed by ack: %d → %d", ver(g), ver(g2))
 	}
 	// the clock only moves forward; deadlines are processed by the jump
-	if code, _ := write(s, &customerB, "demo.advanceClock", `{"to":"`+clock.Add(-time.Hour).Format(time.RFC3339)+`"}`, 0); code != 422 {
-		t.Error("backwards jump")
+	if code, m := write(s, &customerB, "demo.advanceClock", `{"to":"`+clock.Add(-time.Hour).Format(time.RFC3339)+`"}`, 0); code != 422 || fields(m) != "to=errors.clock_backwards" {
+		t.Errorf("backwards jump: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &customerB, "demo.advanceClock", `{"to":"`+clock.Add(time.Hour).Format(time.RFC3339)+`"}`, 0); code != 200 || data(m)["generation"].(float64) != 1 {
 		t.Fatalf("advance: %d %v", code, m)

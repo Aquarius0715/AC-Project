@@ -35,6 +35,13 @@ func TestOfferAcceptAssign(t *testing.T) {
 		}
 		return out + "}"
 	}
+	refused := map[string]string{ // the field each VALIDATION case is refused for
+		"access does not cover": "accessValidFrom=error.accessMustCoverVisit",
+		"blank terms":           "termsVersion=error.length",
+		"expiry after access":   "offerExpiresAt=error.afterAccess",
+		"expiry in the past":    "offerExpiresAt=error.past",
+		"slot not agreed":       "visitSlot=errors.slot_not_agreed",
+	}
 	for name, tc := range map[string]struct {
 		extra map[string]string
 		code  int
@@ -47,7 +54,10 @@ func TestOfferAcceptAssign(t *testing.T) {
 		"customer organization": {map[string]string{"contractorOrgId": `"` + seed.ID("org-customer-a").String() + `"`}, 404},
 		"unknown organization":  {map[string]string{"contractorOrgId": `"` + uuid.NewString() + `"`}, 404},
 	} {
-		if code, _ := write(s, &hq, "jobs.offer", offerBody(tc.extra), 1); code != tc.code {
+		code, m := write(s, &hq, "jobs.offer", offerBody(tc.extra), 1)
+		if w, ok := refused[name]; ok {
+			refusal(t, name, code, m, w)
+		} else if code != tc.code {
 			t.Errorf("offer %s: %d want %d", name, code, tc.code)
 		}
 	}
@@ -81,8 +91,8 @@ func TestOfferAcceptAssign(t *testing.T) {
 	if code, _ := acc(&contrA, "terms-v1", 1); code != 409 {
 		t.Error("stale job version")
 	}
-	if code, _ := write(s, &contrA, "jobs.accept", `{"jobId":"`+job+`","offerId":"`+offer+`"}`, 2); code != 422 {
-		t.Error("accept without terms")
+	if code, m := write(s, &contrA, "jobs.accept", `{"jobId":"`+job+`","offerId":"`+offer+`"}`, 2); code != 422 || fields(m) != "termsVersion=error.required" {
+		t.Errorf("accept without terms: %d %s", code, fields(m))
 	}
 	code, m = acc(&contrA, "terms-v1", 2)
 	if code != 200 || data(m)["decision"] != "accept" || data(m)["jobVersion"].(float64) != 3 || len(data(m)) != 4 {
@@ -109,8 +119,8 @@ func TestOfferAcceptAssign(t *testing.T) {
 	if code, _ := asg(&contrA, job, "tech-internal-a", s2, 3, ""); code != 403 {
 		t.Error("contractor assigns another organization's technician")
 	}
-	if code, _ := asg(&contrA, job, "tech-external-a", slotJSON(25, 2), 3, ""); code != 422 {
-		t.Error("contractor slot must be the visit slot")
+	if code, m := asg(&contrA, job, "tech-external-a", slotJSON(25, 2), 3, ""); code != 422 || fields(m) != "startAt=errors.slot_not_agreed" {
+		t.Errorf("contractor slot must be the visit slot: %d %s", code, fields(m))
 	}
 	if code, _ := asg(&contrB, job, "tech-external-b", s2, 3, ""); code != 404 {
 		t.Error("other contractor assign")
@@ -130,8 +140,8 @@ func TestOfferAcceptAssign(t *testing.T) {
 	if code, _ := asg(&hq, k, "tech-external-a", s1, 1, ""); code != 403 {
 		t.Error("HQ assigns external technician")
 	}
-	if code, _ := asg(&hq, k, "tech-internal-a", slotJSON(26, 2), 1, ""); code != 422 {
-		t.Error("slot not agreed")
+	if code, m := asg(&hq, k, "tech-internal-a", slotJSON(26, 2), 1, ""); code != 422 || fields(m) != "startAt=errors.slot_not_agreed" {
+		t.Errorf("slot not agreed: %d %s", code, fields(m))
 	}
 	if code, _ := asg(&hq, k, "customer-a", s1, 1, ""); code != 404 {
 		t.Error("not a technician")
@@ -139,19 +149,19 @@ func TestOfferAcceptAssign(t *testing.T) {
 	if code, _ := asg(&hq, k, "tech-internal-a", s1, 1, ""); code != 200 {
 		t.Fatal("hq assign")
 	}
-	if code, _ := asg(&hq, k, "tech-internal-a", slotJSON(49, 2), 2, ""); code != 422 {
-		t.Error("reassignment keeps the agreed slot")
+	if code, m := asg(&hq, k, "tech-internal-a", slotJSON(49, 2), 2, ""); code != 422 || fields(m) != "startAt=errors.slot_not_agreed" {
+		t.Errorf("reassignment keeps the agreed slot: %d %s", code, fields(m))
 	}
 	if code, m := asg(&hq, k, "tech-internal-a", s1, 2, "swap"); code != 200 || data(m)["status"] != "assigned" {
 		t.Fatalf("reassign: %d", code)
 	}
 	owner(t, `UPDATE maintenance.jobs SET status = 'in_progress' WHERE id = $1`, k)
 	ext := `{"startAt":"` + ts(25) + `","endAt":"` + ts(28) + `"}`
-	if code, _ := asg(&hq, k, "tech-internal-a", ext, 3, ""); code != 422 {
-		t.Error("extension needs a reason")
+	if code, m := asg(&hq, k, "tech-internal-a", ext, 3, ""); code != 422 || fields(m) != "reason=error.required" {
+		t.Errorf("extension needs a reason: %d %s", code, fields(m))
 	}
-	if code, _ := asg(&hq, k, "tech-internal-a", slotJSON(24, 4), 3, "x"); code != 422 {
-		t.Error("extension keeps the start")
+	if code, m := asg(&hq, k, "tech-internal-a", slotJSON(24, 4), 3, "x"); code != 422 || fields(m) != "endAt=errors.extension_only" {
+		t.Errorf("extension keeps the start: %d %s", code, fields(m))
 	}
 	if code, m := asg(&hq, k, "tech-internal-a", ext, 3, "more work"); code != 200 || data(m)["status"] != "in_progress" {
 		t.Fatalf("extend: %d %v", code, m)
@@ -187,8 +197,8 @@ func TestOfferAcceptAssign(t *testing.T) {
 	job = data(m)["id"].(string)
 	write(s, &hq, "jobs.offer", offerBody(nil), 1)
 	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
-	if code, _ := write(s, &contrA, "jobs.decline", `{"jobId":"`+job+`","offerId":"`+offer+`","reason":"  "}`, 2); code != 422 {
-		t.Error("blank decline reason")
+	if code, m := write(s, &contrA, "jobs.decline", `{"jobId":"`+job+`","offerId":"`+offer+`","reason":"  "}`, 2); code != 422 || fields(m) != "reason=error.length" {
+		t.Errorf("blank decline reason: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &contrA, "jobs.decline", `{"jobId":"`+job+`","offerId":"`+offer+`","reason":"no capacity"}`, 2); code != 200 || data(m)["decision"] != "decline" {
 		t.Fatalf("decline: %d %v", code, m)
@@ -256,8 +266,9 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 			}
 		}
 	}
-	if code, _ := write(s, &contrA, "jobs.accept", `{"offerId":"`+uuid.NewString()+`","termsVersion":"t","reason":"x"}`, 1); code != 422 {
-		t.Error("both terms and reason")
+	// both terms and a reason: the reason is not an input of accept (it was refused for the missing jobId before)
+	if code, m := write(s, &contrA, "jobs.accept", `{"jobId":"`+job+`","offerId":"`+uuid.NewString()+`","termsVersion":"t","reason":"x"}`, 1); code != 422 || fields(m) != "_=error.malformedInput" {
+		t.Errorf("both terms and reason: %d %s", code, fields(m))
 	}
 	// each decision takes only its own fields (service-contracts: accept termsVersion, decline reason)
 	for op, b := range map[string]string{
@@ -278,8 +289,8 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 	for i := range long {
 		long[i] = 'r'
 	}
-	if code, _ := write(s, &hq, "jobs.assign", `{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-internal-a").String()+`","startAt":"`+ts(55)+`","endAt":"`+ts(57)+`","reason":"`+string(long)+`"}`, 2); code != 422 {
-		t.Error("reason too long")
+	if code, m := write(s, &hq, "jobs.assign", `{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-internal-a").String()+`","startAt":"`+ts(55)+`","endAt":"`+ts(57)+`","reason":"`+string(long)+`"}`, 2); code != 422 || fields(m) != "reason=error.length" {
+		t.Errorf("reason too long: %d %s", code, fields(m))
 	}
 	// contractor outside the access window
 	_, m = write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)

@@ -30,8 +30,8 @@ func TestCapabilities(t *testing.T) {
 	if code, _ := post(s, &customerA, "capabilities.list", `{}`); code != 200 {
 		t.Error("clients read the model register (client:self)")
 	}
-	if code, _ := post(s, &hq, "capabilities.list", `{"filters":{"x":1}}`); code != 422 {
-		t.Error("no filters")
+	if code, m := post(s, &hq, "capabilities.list", `{"filters":{"x":1}}`); code != 422 || fields(m) != "x=error.notAllowed" {
+		t.Errorf("no filters: %d %s", code, fields(m))
 	}
 	model := "TA-" + uuid.NewString()[:6]
 	code, m = write(s, &hq, "capabilities.save", capBody("", model, ""), 0)

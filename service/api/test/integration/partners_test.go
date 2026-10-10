@@ -68,8 +68,8 @@ func TestContractorRegister(t *testing.T) {
 	if code, _ := write(s, &hq, "contractors.setOfferStatus", `{"contractorOrgId":"`+uuid.NewString()+`","status":"suspended","reason":"insurance lapsed"}`, 1); code != 404 {
 		t.Errorf("suspend an unknown contractor: %d", code)
 	}
-	if code, _ := write(s, &hq, "contractors.setOfferStatus", `{"contractorOrgId":"`+org+`","status":"suspended","reason":" "}`, 2); code != 422 {
-		t.Error("suspend without reason")
+	if code, m := write(s, &hq, "contractors.setOfferStatus", `{"contractorOrgId":"`+org+`","status":"suspended","reason":" "}`, 2); code != 422 || fields(m) != "reason=error.length" {
+		t.Errorf("suspend without reason: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &hq, "contractors.setOfferStatus", `{"contractorOrgId":"`+org+`","status":"suspended","reason":"insurance lapsed"}`, 2); code != 200 ||
 		data(m)["suspendedReason"] != "insurance lapsed" {
@@ -89,8 +89,8 @@ func TestContractorRegister(t *testing.T) {
 	if code, m := write(s, &hq, "contractors.setOfferStatus", `{"contractorOrgId":"`+org+`","status":"active","reason":"renewed"}`, 3); code != 200 || data(m)["suspendedReason"] != nil {
 		t.Fatalf("reactivate: %d", code)
 	}
-	if code, _ := post(s, &hq, "contractors.list", `{"filters":{"status":"x"}}`); code != 422 {
-		t.Error("bad status filter")
+	if code, m := post(s, &hq, "contractors.list", `{"filters":{"status":"x"}}`); code != 422 || fields(m) != "filters=error.invalid" {
+		t.Errorf("bad status filter: %d %s", code, fields(m))
 	}
 	if code, _ := post(s, &contrA, "contractors.list", `{}`); code != 403 {
 		t.Error("contractor lists register")
@@ -134,8 +134,8 @@ func TestContractorRegister(t *testing.T) {
 	if _, m := post(s, &contrA, "rateCards.list", `{"filters":{"contractorOrgId":"`+org+`"}}`); len(items(m)) != 0 && items(m)[0]["contractorOrgId"] == org {
 		t.Error("contractor sees another company's rate cards")
 	}
-	if code, _ := post(s, &hq, "rateCards.list", `{"filters":{"x":1}}`); code != 422 {
-		t.Error("bad rate card filter")
+	if code, m := post(s, &hq, "rateCards.list", `{"filters":{"x":1}}`); code != 422 || fields(m) != "x=error.notAllowed" {
+		t.Errorf("bad rate card filter: %d %s", code, fields(m))
 	}
 }
 
@@ -267,8 +267,8 @@ func TestSLAScorecard(t *testing.T) {
 			t.Error("contractor filter")
 		}
 	}
-	if code, _ := post(s, &hq, "sla.scorecard", `{"period":{"from":"`+clock.Format(time.RFC3339)+`","to":"`+clock.Add(-time.Hour).Format(time.RFC3339)+`"}}`); code != 422 {
-		t.Error("reversed period")
+	if code, m := post(s, &hq, "sla.scorecard", `{"period":{"from":"`+clock.Format(time.RFC3339)+`","to":"`+clock.Add(-time.Hour).Format(time.RFC3339)+`"}}`); code != 422 || fields(m) != "period=error.range" {
+		t.Errorf("reversed period: %d %s", code, fields(m))
 	}
 	if code, _ := post(s, &customerA, "sla.scorecard", period+`}`); code != 403 {
 		t.Error("client scorecard")
