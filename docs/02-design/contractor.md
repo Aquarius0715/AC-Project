@@ -237,6 +237,8 @@ Scope: FR-P06 / Main display pattern: **UI-LIST**. Service boundary: `members.li
 
 **Unavailable days (Figma 04-8)**: “+ Unavailable days” opens a centered modal: technician (or All for team public holidays), from, to (≤ 31 days), type (annual leave/training/public holiday/sick/other), note. Before saving, list confirmed assignments in the range as a warning; saving (`members.setUnavailability`) keeps them and offers “Open schedule →”. Capacity shows the dates as 0 h with the type label (Capacity.unavailability).
 
+**As built (IR276)**: the Server Component reads `session.get` (the own `organizationId`), `members.list` (role technician), `members.capacity` for each Kuala Lumpur day of the chosen date's week and `jobs.list` per technician; the confirmed assignments the form lists are those jobs' booked times (not completed or cancelled), and the save reports the Core API's `conflictingAssignmentIds`. A qualification filter keeps the technicians holding it at 09:00 on the chosen day; a grant within 30 days of its end is “Expiring” (IR133 item 2).
+
 **Verification**: Check the traceability entries under AT-P06 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
 ### DD-P07 Details

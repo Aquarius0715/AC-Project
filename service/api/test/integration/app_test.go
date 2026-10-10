@@ -187,6 +187,9 @@ func TestSessionGet(t *testing.T) {
 	if d["displayName"] != user || d["organizationName"] != org || user == "" || org == "" {
 		t.Errorf("names: %v %v (%s, %s)", d["displayName"], d["organizationName"], user, org)
 	}
+	if _, c := post(s, &contrA, "session.get", `{}`); c["data"].(map[string]any)["organizationId"] != seed.ID("org-contractor-a").String() { // IR276: the own company
+		t.Errorf("contractor session organization: %v", c["data"])
+	}
 	if _, c := post(s, &customerA, "session.get", `{}`); c["data"].(map[string]any)["clientRole"] != "owner" || c["data"].(map[string]any)["organizationName"] == "" ||
 		c["data"].(map[string]any)["customerId"] != seed.ID("cust-a").String() { // IR243: the client's customer
 		t.Errorf("client owner session: %v", c["data"])

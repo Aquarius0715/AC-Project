@@ -22,9 +22,11 @@ type Session struct {
 	UserID       uuid.UUID `json:"userId"`
 	Role         string    `json:"role"`
 	ClientRole   *string   `json:"clientRole"` // owner / member for client sessions, otherwise null (the owner-only Users page, IR210)
-	// DisplayName and OrganizationName name the signed-in user and the membership's organization in the shell (IR241)
-	DisplayName      string `json:"displayName"`
-	OrganizationName string `json:"organizationName"`
+	// DisplayName and OrganizationName name the signed-in user and the membership's organization in the shell (IR241);
+	// OrganizationID is that organization, so a screen can tell its own company from another one in a URL (IR276)
+	DisplayName      string    `json:"displayName"`
+	OrganizationName string    `json:"organizationName"`
+	OrganizationID   uuid.UUID `json:"organizationId"`
 	// CustomerID is a client session's customer (its organization's), for the writes that name it (alert policies,
 	// default rule settings, IR243); null for the other roles
 	CustomerID  *uuid.UUID `json:"customerId"`
@@ -80,7 +82,7 @@ func sessionGet(ctx context.Context, c *ops.Call, _ *struct{}) (Session, error) 
 	if p.Role == "client" && p.ClientRole != "" {
 		clientRole = &p.ClientRole
 	}
-	out := Session{TenantID: p.TenantID, MembershipID: p.MembershipID, ScopeVersion: p.ScopeVersion, UserID: p.UserID,
+	out := Session{TenantID: p.TenantID, MembershipID: p.MembershipID, ScopeVersion: p.ScopeVersion, UserID: p.UserID, OrganizationID: p.OrgID,
 		Role: p.Role, ClientRole: clientRole, Permissions: perms, Generation: 1, ViewEpoch: 0, IssuedAt: c.Now, ExpiresAt: c.Now.Add(SessionTTL)}
 	if c.Tx == nil { // a registry without a database (unit tests): no names
 		return out, nil

@@ -2995,3 +2995,40 @@ DEC-03 was open since IR257. The SRC-02 phrase "shared libraries, reactForms" ha
    - The technician and HQ screens.
    - The browser demo's screens.
    - The assistant panel and the voice demo's answers.
+
+## IR276 The contractor's team & capacity as in Figma, in the display language — 2026-10-10
+
+`/partner/team` (FR-P06, DD-P06, SCR-P06) followed an early layout in API mode. It now follows Figma Contractor 04-1…04-5 and 04-8.
+
+1. **Conditions in the URL.** `date` is a Kuala Lumpur day; the default is today on the demo clock. `qualification` is a register code. `activeOnly` defaults to true, and its button reads "Include expired" when off. `orgId` names the own company; any other value shows "Roster not found" (AT-P06-E①).
+2. **Technicians.** Each row shows:
+   - the qualifications and the membership ("active since Apr 2025", "expired 1 Aug 2026");
+   - the week's assigned and available hours with a bar;
+   - the chosen day: the booked blocks with their job ("10:00–12:00 assigned (b5f000c1)"), the free time and the day's utilization.
+   A day without configured hours shows "No available hours set" and "—". A day off shows the unavailability. An expired membership shows "Expired — cannot be assigned".
+   A qualification nobody holds on that day shows the empty state with "Clear filter".
+3. **The week and the grants.**
+   - The week grid shows "2 / 8 h" per technician and day, marks the chosen day and names a chosen Saturday or Sunday in its title.
+   - Its totals are assigned hours, available hours, team utilization and the chosen day's free hours.
+   - The Qualifications card lists each grant: valid, expiring within 30 days (IR133 item 2), expired or revoked. A register qualification that no listed technician holds shows "not held". The note counts the expired members that Active only hides.
+4. **Unavailable days (04-8).**
+   - The form takes a technician or all technicians (public holiday), the first and last Kuala Lumpur day, the type and a note.
+   - Before saving, it lists the confirmed assignments those days overlap, from the technicians' booked jobs.
+   - Its own checks are the dates, at most 31 days and a note of at most 500 characters (`unavailabilityErrors`). The Core API's field errors become readable text (`unavailabilityRefusal`).
+   - The confirmation counts the assignments the Core API kept (`conflictingAssignmentIds`).
+   - "Open schedule →" opens the first overlapping job.
+5. **The own company.** `session.get` returns `organizationId` (Session in service-contracts.ts, Swagger regenerated), so the screen can tell its own company from another one. `corePrincipal` exposes it.
+6. **Language and time.**
+   - Every text is translated (77 entries).
+   - Capacity is cut on Kuala Lumpur working days, and so are unavailable days; the screen says so in another display time zone.
+   - An overlapping assignment's time is an instant, shown in the display time zone.
+   - Grant and membership dates are Kuala Lumpur days in the user's language.
+7. **Shared helpers.** `shared/lib/partnerTeam.ts` is new: `teamQuery`, `listed`, `memberRows`, `weekRows`, `teamStats`, `grantRows`, `unavailabilityErrors`, `unavailabilityConflicts` and `unavailabilityRefusal`. `partnerSchedule.freeSlots` is split out of `freeText`.
+8. **Still to do.**
+   - The Certifications tab still lists the qualification grants. Figma 04-6/04-7 (certificates.list, renewal upload, training request, assignment impact) comes next.
+   - The browser demo keeps its fixture screen.
+9. **Checked.**
+   - Vitest: 37 files, 210 tests. `partnerTeam.test.ts` is new, with Malay cases.
+   - Go: `make test-all` passes. The session tests check `organizationId`.
+   - E2E: `partner/team.e2e.ts` is new and covers the technicians, week and grants, a Saturday, another company's roster and the form's day checks. Nothing is saved, because unavailable days have no undo. `partner/language.e2e.ts` also opens the team in Malay. The suite: 62 passed, 9 skipped. The users are en / Asia/Kuala_Lumpur, all 65 E2E jobs are cancelled and no unavailable days exist.
+   - A visual check with an accepted and assigned job showed the booked block, the week and the overlap warning. Nothing was saved, and the job was cancelled.

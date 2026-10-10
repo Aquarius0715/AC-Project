@@ -1,90 +1,211 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, DataTable, EmptyState, Field, Input, Modal, Page, Select, Stat, Tabs, Textarea, UtilBar, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, cx, DataTable, EmptyState, Field, Input, LinkBtn, Modal, Page, Select, Tabs, TextLink, UtilBar } from "@ac/web/components/ui";
+import { useT } from "@ac/web/components/I18n";
+import { useAction } from "@ac/web/lib/useAction";
+import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
+import { unavailabilityConflicts, unavailabilityErrors, unavailabilityRefusal, type UnavailabilityForm, type WeekCell } from "@ac/web/lib/partnerTeam";
 import { setUnavailability } from "../actions";
+import type { TeamLive } from "../_lib/load";
 
-export type ApiMember = { id: string; displayName: string; role: string; employment: string | null; validFrom: string; validUntil: string | null; qualifications: { code: string; validFrom: string; validUntil: string; revokedAt: string | null }[] };
-export type ApiCapacity = { membershipId: string; date: string; availableMinutes: number | null; assignedMinutes: number; utilization: number | null; unavailability: string | null };
-const day = 86400e3;
-const hours = (m: number | null) => (m === null ? "—" : `${Math.round((m / 60) * 10) / 10} h`);
-const qualName = (c: string) => c.replace(/^demo_/, "").replace(/_/g, " ");
+type Live = Extract<TeamLive, { notFound: false }>;
+const cellTone: Record<WeekCell["kind"], string> = {
+  busy: "bg-primary/70 text-white", free: "border border-line bg-surface text-muted", off: "bg-warn-soft text-warn", none: "bg-surface2 text-muted",
+};
 
-export type TeamData = { members: ApiMember[]; dates: string[]; capacity: Record<string, ApiCapacity[]>; now: string };
-
-/** Team screen in API mode: members and a week of capacity come from the Server Component. */
-export function TeamView({ data }: { data: TeamData }) {
-  const toast = useToast();
-  const now = new Date(data.now);
+/** Team & capacity (FR-P06, Figma Contractor 04-1…04-5, 04-8) from the Core API: the URL's date, qualification and
+ * activeOnly, the technicians with the chosen day, the team's week, the qualification grants and unavailable days.
+ * Texts in the user's display language; every date and time comes formatted from the loader (IR276). */
+export function TeamView({ live }: { live: TeamLive }) {
+  const t = useT();
   const [tab, setTab] = useUrlTab<"members" | "certs">({ members: "overview", certs: "certifications" }, "members");
-  const [activeOnly, setActiveOnly] = useState(true);
+  const tabs = <div><Tabs value={tab} onChange={setTab} tabs={[{ id: "members", label: t("Members") }, { id: "certs", label: t("Certifications") }]} /></div>;
+  if (live.notFound) {
+    return (
+      <Page narrow>
+        <div className="flex justify-center">{tabs}</div>
+        <Card title={t("Roster not found")}>
+          <p className="text-[13px] text-muted">{t("You can only see {company}’s own technicians. Changing the company ID in the URL does not reveal another company’s roster.", { company: live.company })}</p>
+          <div className="mt-3"><LinkBtn href="/partner/team" variant="primary" size="sm">{t("Back to my team")}</LinkBtn></div>
+        </Card>
+      </Page>
+    );
+  }
+  return <Team live={live} tab={tab} tabs={tabs} />;
+}
+
+function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs: React.ReactNode }) {
+  const t = useT();
+  const patch = useUrlPatch();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ membershipId: "", from: "", to: "", type: "training", note: "" });
-  const [err, setErr] = useState<string | null>(null);
-  const members = { data: data.members, loading: false };
-  const today = now;
-  const dates = data.dates;
-  const cap = data.capacity;
-  const active = (m: ApiMember) => !m.validUntil || new Date(m.validUntil) > today;
-  const list = members.data.filter((m) => !activeOnly || active(m));
-  const of = (id: string, d: string) => cap[d]?.find((c) => c.membershipId === id);
-  const sum = (f: (c: ApiCapacity) => number) => Object.values(cap).flat().reduce((a, c) => a + f(c), 0);
-  const assigned = sum((c) => c.assignedMinutes);
-  const available = sum((c) => c.availableMinutes ?? 0);
-  const certs = members.data.flatMap((m) => m.qualifications.map((q) => ({ m, q, days: Math.ceil((new Date(q.validUntil).getTime() - today.getTime()) / day) })));
-  const status = (x: { q: { revokedAt: string | null }; days: number }) => (x.q.revokedAt ? "Revoked" : x.days < 0 ? "Expired" : x.days <= 60 ? `Expiring · ${x.days} d` : "Valid");
-  const save = async () => {
-    setErr(null);
-    const res = await setUnavailability({ membershipId: form.membershipId || null, from: form.from, to: form.to, type: form.type, note: form.note || undefined }); // Server Action
-    if (!res.ok) return setErr(res.message);
-    setOpen(false);
-    toast("Unavailable days saved — availability updated");
-  };
+  const q = live.query;
+  if (live.total === 0) {
+    return <Page>{tabs}<EmptyState title={t("No technicians")}>{t("No technician membership in your company. New technicians are registered by HQ.")}</EmptyState></Page>;
+  }
+  if (tab === "certs") return <Page>{tabs}<Certifications live={live} /></Page>;
+  const none = live.rows.length === 0;
   return (
     <Page>
-      <div className="flex flex-wrap items-center justify-between gap-2"><Tabs value={tab} onChange={setTab} tabs={[{ id: "members", label: "Members", count: members.data.length }, { id: "certs", label: "Certifications", count: certs.length }]} /><Btn size="sm" onClick={() => { setForm({ membershipId: members.data[0]?.id ?? "", from: dates[0], to: dates[0], type: "training", note: "" }); setOpen(true); }}>+ Unavailable days</Btn></div>
-      {tab === "certs" ? (
-        <Card title="Certificates">
-          <DataTable rowKey={(r) => r.m.id + r.q.code} rows={certs} cols={[
-            { key: "t", label: "Technician", render: (r) => <b>{r.m.displayName}</b> }, { key: "c", label: "Certificate", render: (r) => qualName(r.q.code) },
-            { key: "u", label: "Valid until", render: (r) => r.q.validUntil.slice(0, 10) },
-            { key: "s", label: "Status", render: (r) => <Badge tone={status(r) === "Valid" ? "ok" : status(r).startsWith("Expiring") ? "warn" : "muted"}>{status(r)}</Badge> },
-          ]} />
-          <p className="mt-2 text-[11px] text-muted">Only valid, HQ-verified certificates make a technician eligible for offers that require them. Renewals are requested from HQ.</p>
-        </Card>
-      ) : (
-        <>
-          <Check label="Active only" checked={activeOnly} onChange={setActiveOnly} />
-          <div className="split">
-            <div className="flex min-w-0 flex-col gap-4">
-              {list.length === 0 && <EmptyState title={members.loading ? "Loading…" : "No technicians"}>No technician membership in your company.</EmptyState>}
-              {list.map((m) => {
-                const a = dates.reduce((x, d) => x + (of(m.id, d)?.assignedMinutes ?? 0), 0);
-                const v = dates.reduce((x, d) => x + (of(m.id, d)?.availableMinutes ?? 0), 0);
-                const pct = v ? Math.round((a / v) * 100) : null;
-                return <Card key={m.id} title={m.displayName} sub={`${m.qualifications.map((q) => qualName(q.code)).join(" · ") || "No qualifications"} · ${active(m) ? "active" : "membership ended"}`} action={<div className="text-right"><div className="text-xl font-bold">{pct === null ? "—" : pct + "%"}</div><div className="text-[11px] text-muted">utilization</div></div>}>
-                  <div className="mb-2 flex justify-between text-xs"><span>Week of {dates[0].slice(5)}</span><b>{hours(a)} / {hours(v)}</b></div><UtilBar pct={pct} />
-                </Card>;
-              })}
-              <Card title={`Week of ${dates[0].slice(5)} — assigned / available hours`}>
-                <div className="scroll-x"><table className="w-full min-w-[560px] text-xs"><thead><tr className="text-left text-muted"><th />{dates.map((d) => <th key={d}>{new Date(d).toLocaleDateString("en-MY", { weekday: "short", day: "numeric", timeZone: "UTC" })}</th>)}</tr></thead>
-                  <tbody>{list.map((m) => <tr key={m.id} className="border-t border-line"><td className="py-1.5 font-semibold">{m.displayName}</td>{dates.map((d) => { const c = of(m.id, d); return <td key={d}>{c?.unavailability ? <Badge tone="muted">{c.unavailability.replace(/_/g, " ")}</Badge> : c ? `${hours(c.assignedMinutes)} / ${hours(c.availableMinutes)}` : "—"}</td>; })}</tr>)}</tbody></table></div>
-                <p className="mt-2 text-[11px] text-muted">Utilization = assigned ÷ available hours; days without configured hours show “—”, not 0%.</p>
-              </Card>
-            </div>
-            <div className="grid-fluid self-start" style={{ ["--min" as string]: "120px" }}><Stat label="Assigned" value={hours(assigned)} /><Stat label="Available" value={hours(available)} /><Stat label="Team utilization" value={available ? `${Math.round((assigned / available) * 100)}%` : "—"} /></div>
+      {tabs}
+      <div className="flex flex-wrap items-center gap-2">
+        <Input type="date" aria-label={t("Date")} className="w-auto" value={q.date} onChange={(e) => e.target.value && patch({ date: e.target.value === q.today ? null : e.target.value })} />
+        <Select aria-label={t("Qualification")} className="w-auto" value={q.qualification ?? ""} onChange={(e) => patch({ qualification: e.target.value || null })}>
+          <option value="">{t("All qualifications")}</option>
+          {live.qualifications.map((x) => <option key={x.code} value={x.code}>{x.text}</option>)}
+        </Select>
+        <Btn size="sm" aria-pressed={q.activeOnly} className={cx(q.activeOnly && "border-primary bg-primary-soft text-primary")} onClick={() => patch({ activeOnly: q.activeOnly ? "false" : null })}>
+          {q.activeOnly ? `✓ ${t("Active only")}` : t("Include expired")}
+        </Btn>
+      </div>
+      <Card title={`${t("Technicians — {company}", { company: live.company })}${q.activeOnly ? ` · ${t("{n} active", { n: live.activeCount })}` : ""}`}
+        action={<div className="flex flex-wrap gap-2"><LinkBtn href="/partner/schedule" size="sm">{t("Open schedule →")}</LinkBtn><Btn size="sm" onClick={() => setOpen(true)} disabled={!live.technicians.length}>{t("+ Unavailable days")}</Btn></div>}>
+        {none ? (
+          <div className="py-6 text-center">
+            <b className="text-[13px]">{t("No {company} technicians hold this qualification", { company: live.company })}</b>
+            <p className="mt-1 text-xs text-muted">{t("Ask HQ to update qualifications — this screen cannot change memberships.")}</p>
+            <Btn size="sm" className="mt-3" onClick={() => patch({ qualification: null })}>{t("Clear filter")}</Btn>
           </div>
-        </>
+        ) : (
+          <ul className="divide-y divide-line">
+            {live.rows.map((r) => (
+              <li key={r.id} className={cx("flex flex-wrap items-center gap-3 py-3", !r.active && "opacity-70")}>
+                <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">☻</span>
+                <div className="min-w-[200px] flex-1"><b className="block text-[13px]">{r.name}</b><span className="block text-[11px] text-muted">{r.sub}</span></div>
+                {r.active && (
+                  <div className="w-44">
+                    <div className="mb-1 flex justify-between gap-2 text-[11px]"><span className="text-muted">{live.week.short}</span><b>{r.week.text}</b></div>
+                    <UtilBar pct={r.week.pct} />
+                  </div>
+                )}
+                <div className="min-w-[180px] text-right"><span className={cx("block text-xs", r.day.tone === "crit" ? "text-crit" : r.day.tone === "warn" ? "text-warn" : "text-ink")}>{r.day.main}</span><span className="block text-[11px] text-muted">{r.day.sub}</span></div>
+                <div className="w-16 text-right"><b className="block text-lg">{r.util}</b><span className="block text-[10px] text-muted">{t("utilization")}</span></div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+      <p className="text-[11px] text-muted">{t("Utilization = assigned hours ÷ configured available hours (4 h / 8 h = 50%). Undefined available hours show “—”, not 0%. Read-only — membership changes are requested from HQ.")}</p>
+      {!none && (
+        <div className="split">
+          <WeekCard live={live} />
+          <Card title={t("Qualifications")}>
+            <ul className="divide-y divide-line">
+              {live.grants.map((g) => (
+                <li key={g.key} className="flex items-center justify-between gap-2 py-2">
+                  <span className="min-w-0"><b className="block text-[13px]">{g.name}</b><span className="block text-[11px] text-muted">{g.sub}</span></span>
+                  <Badge tone={g.badge.tone}>{g.badge.text}</Badge>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[11px] text-muted">
+              {live.hidden > 0 && `${t(live.hidden === 1 ? "1 expired member hidden (Active only)." : "{n} expired members hidden (Active only).", { n: live.hidden })} `}
+              {live.expired.length > 0 ? t("Expired memberships ({names}) are listed but cannot be selected for assignment. Changes are requested from HQ.", { names: live.expired.join(", ") }) : t("Qualification or membership changes are requested from HQ — contractors cannot grant permissions.")}
+            </p>
+          </Card>
+        </div>
       )}
-      <Modal open={open} onClose={() => setOpen(false)} title="Add unavailable days" footer={<><Btn onClick={() => setOpen(false)}>Cancel</Btn><Btn variant="primary" onClick={save}>Save</Btn></>}>
-        <Field label="Technician"><Select value={form.membershipId} onChange={(e) => setForm({ ...form, membershipId: e.target.value })}><option value="">Whole company (e.g. public holiday)</option>{members.data.map((m) => <option key={m.id} value={m.id}>{m.displayName}</option>)}</Select></Field>
-        <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}><Field label="From"><Input type="date" value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} /></Field><Field label="To"><Input type="date" value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} /></Field></div>
-        <Field label="Type"><Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}><option value="training">Training</option><option value="annual_leave">Annual leave</option><option value="public_holiday">Public holiday</option><option value="sick">Sick</option><option value="other">Other</option></Select></Field>
-        <Field label="Note (optional)"><Textarea value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></Field>
-        {err && <Banner tone="crit">{err}</Banner>}
-        <p className="text-[11px] text-muted">Days that overlap a confirmed assignment are saved with the conflict listed; reassign the job or ask HQ to propose a new time to the client.</p>
-      </Modal>
+      {open && <UnavailableDays live={live} onClose={() => setOpen(false)} />}
     </Page>
+  );
+}
+
+function WeekCard({ live }: { live: Live }) {
+  const t = useT();
+  const w = live.week;
+  return (
+    <Card title={w.title} action={<TextLink href="/partner/schedule">{t("Open schedule →")}</TextLink>}>
+      <div className="scroll-x">
+        <table className="w-full min-w-[560px] text-xs">
+          <thead><tr><th />{w.days.map((d, k) => <th key={w.dates[k]} className={cx("p-1 text-center font-semibold", k === w.dayIndex ? "text-primary" : "text-muted")}>{d}</th>)}</tr></thead>
+          <tbody>{w.rows.map((r) => (
+            <tr key={r.id} className="border-t border-line">
+              <td className="py-1.5 pr-2 font-semibold">{r.name}</td>
+              {r.cells.map((c, k) => <td key={w.dates[k]} className="p-1"><div className={cx("rounded-lg px-1.5 py-2 text-center font-semibold", cellTone[c.kind], k === w.dayIndex && "ring-2 ring-primary/40")}>{c.text}</div></td>)}
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      <dl className="mt-3 flex flex-wrap gap-6 text-xs">
+        {([[t("Assigned"), w.stats.assigned], [t("Available"), w.stats.available], [t("Team utilization"), w.stats.utilization], [w.freeLabel, w.stats.free]] as const).map(([k, v]) => (
+          <div key={k}><dt className="text-[11px] text-muted">{k}</dt><dd className="text-[15px] font-bold">{v}</dd></div>
+        ))}
+      </dl>
+      <p className="mt-2 text-[11px] text-muted">
+        {t("Sat/Sun have no configured available hours, so utilization shows “—”.")}
+        {live.otherZone && ` ${t("Days and hours are in Kuala Lumpur time (Asia/Kuala_Lumpur).")}`}
+      </p>
+    </Card>
+  );
+}
+
+/** Add unavailable days (Figma 04-8): technician or the whole company, Kuala Lumpur days, type and note; the confirmed
+ * assignments in the days are listed before saving and kept by the save (DD-P06). */
+function UnavailableDays({ live, onClose }: { live: Live; onClose: () => void }) {
+  const t = useT();
+  const [pending, run] = useAction();
+  const [form, setForm] = useState<UnavailabilityForm>({ membershipId: live.technicians[0]?.id ?? "", from: live.query.date, to: live.query.date, type: "annual_leave", note: "" });
+  const [tried, setTried] = useState(false);
+  const [server, setServer] = useState<Record<string, string>>({});
+  const [refused, setRefused] = useState<string | null>(null);
+  const local = tried ? unavailabilityErrors(form, t) : {};
+  const err = (k: "from" | "to" | "type" | "note") => (local as Record<string, string | undefined>)[k] ?? server[k];
+  const set = (p: Partial<UnavailabilityForm>) => { setForm({ ...form, ...p }); setServer({}); setRefused(null); };
+  const conflicts = unavailabilityConflicts(live.jobs, form);
+  const names = new Map(live.technicians.map((x) => [x.id, x.name]));
+  const list = conflicts.map((c) => `${c.short} · ${form.membershipId ? "" : `${names.get(c.technicianId) ?? ""} · `}${c.text}`).join("; ");
+  const save = () => {
+    setTried(true);
+    if (Object.keys(unavailabilityErrors(form, t)).length) return;
+    run(() => setUnavailability({ membershipId: form.membershipId || null, from: form.from, to: form.to, type: form.type, note: form.note.trim() || undefined }),
+      (v) => (v.conflicts === 0 ? t("Unavailable days saved — the available hours of those days are 0.")
+        : t(v.conflicts === 1 ? "Unavailable days saved — 1 confirmed assignment overlaps them; reassign it in Schedule & assignments." : "Unavailable days saved — {n} confirmed assignments overlap them; reassign them in Schedule & assignments.", { n: v.conflicts })),
+      () => onClose(),
+      (f) => { const r = unavailabilityRefusal(f, t); setServer(r.fields); setRefused(r.text); });
+  };
+  return (
+    <Modal open onClose={onClose} title={t("Add unavailable days")} footer={<>
+      <Btn onClick={onClose}>{t("Cancel")}</Btn>
+      <LinkBtn href={conflicts[0] ? `/partner/schedule?jobId=${conflicts[0].jobId}` : "/partner/schedule"}>{t("Open schedule →")}</LinkBtn>
+      <Btn variant="primary" disabled={pending} onClick={save}>{t("Save")}</Btn>
+    </>}>
+      <Field label={t("Technician")}>
+        <Select value={form.membershipId} onChange={(e) => set({ membershipId: e.target.value })}>
+          {live.technicians.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          <option value="">{t("All technicians (public holiday)")}</option>
+        </Select>
+      </Field>
+      <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}>
+        <Field label={t("From")} error={err("from")}><Input type="date" value={form.from} onChange={(e) => set({ from: e.target.value })} /></Field>
+        <Field label={t("To")} error={err("to")}><Input type="date" value={form.to} min={form.from} onChange={(e) => set({ to: e.target.value })} /></Field>
+        <Field label={t("Type")} error={err("type")}>
+          <Select value={form.type} onChange={(e) => set({ type: e.target.value })}>{live.types.map((x) => <option key={x.id} value={x.id}>{x.text}</option>)}</Select>
+        </Field>
+      </div>
+      <Field label={t("Note (optional)")} error={err("note")}><Input value={form.note} maxLength={500} onChange={(e) => set({ note: e.target.value })} /></Field>
+      {conflicts.length > 0 && <Banner tone="warn">{t(conflicts.length === 1 ? "Conflicts with 1 confirmed assignment: {list}. Saving keeps the assignment — reassign it in Schedule & assignments." : "Conflicts with {n} confirmed assignments: {list}. Saving keeps the assignments — reassign them in Schedule & assignments.", { n: conflicts.length, list })}</Banner>}
+      {refused && <Banner tone="crit">{refused}</Banner>}
+      <p className="text-[11px] text-muted">
+        {t("Unavailable days set the technician’s available hours to 0 for those dates, so utilization and candidate lists (members.eligible) skip them. For a public holiday of the whole team choose Public holiday and All technicians.")}
+        {live.otherZone && ` ${t("The days are Kuala Lumpur days.")}`}
+      </p>
+    </Modal>
+  );
+}
+
+/** The Certifications tab until it reads the certificates (FR-P09): the qualification grants of the listed
+ * technicians with their validity, as Kuala Lumpur dates. */
+function Certifications({ live }: { live: Live }) {
+  const t = useT();
+  const rows = live.grants.filter((g) => g.technician !== "—");
+  return (
+    <Card title={t("Certificates — {company}", { company: live.company })}>
+      <DataTable rowKey={(r) => r.key} rows={rows} cols={[
+        { key: "t", label: t("Technician"), render: (r) => <b>{r.technician}</b> }, { key: "c", label: t("Certificate"), render: (r) => r.name },
+        { key: "u", label: t("Valid until"), render: (r) => r.until }, { key: "s", label: t("Status"), render: (r) => <Badge tone={r.badge.tone}>{r.badge.text}</Badge> },
+      ]} />
+      <p className="mt-2 text-[11px] text-muted">{t("Only valid, HQ-verified certificates make a technician eligible for offers that require them. Renewals are requested from HQ.")}</p>
+    </Card>
   );
 }

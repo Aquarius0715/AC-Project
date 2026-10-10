@@ -99,11 +99,11 @@ export function formMode(j: ApiDetail | ApiOffer, label: string, now: number, na
   return { kind: "blocked", title: assign, slot, banner: { tone: "muted", text: t("The job is {status} — nothing to schedule.", { status: statusWord(j.status, t) }) } };
 }
 
-/** The free time of a capacity day in Kuala Lumpur hours: the available slots minus the assigned ones (“free
- * 10:00–17:00”, “no hours”, “fully booked”). */
-export function freeText(c: ApiCapacity | undefined, t: T = en): string {
-  if (!c || !c.availableSlots.length) return t("no hours");
+/** The free spans of a capacity day in Kuala Lumpur hours: the available slots minus the assigned ones
+ * (["10:00–12:00", "14:00–17:00"]; [] when nothing is free or no hours are set). */
+export function freeSlots(c: ApiCapacity | undefined): string[] {
   const parts: string[] = [];
+  if (!c) return parts;
   for (const a of c.availableSlots) {
     let start = Date.parse(a.startAt);
     const end = Date.parse(a.endAt);
@@ -115,6 +115,12 @@ export function freeText(c: ApiCapacity | undefined, t: T = en): string {
     }
     if (start < end) parts.push(`${hhmm(new Date(start).toISOString())}–${hhmm(new Date(end).toISOString())}`);
   }
+  return parts;
+}
+/** The free time of a capacity day in Kuala Lumpur hours (“free 10:00–17:00”, “no hours”, “fully booked”). */
+export function freeText(c: ApiCapacity | undefined, t: T = en): string {
+  if (!c || !c.availableSlots.length) return t("no hours");
+  const parts = freeSlots(c);
   return parts.length ? t("free {hours}", { hours: parts.join(", ") }) : t("fully booked");
 }
 

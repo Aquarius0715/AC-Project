@@ -1,7 +1,7 @@
-// AT-X01-N ③ for the contractor (FR-X01, FR-P01, FR-P02, FR-P03, FR-P05, IR44, IR270–IR275): with Malay and Asia/Tokyo
-// saved in Preferences, the overview, the job list, a job's page, a completed job's quality review and the schedule
-// speak Malay; the update time and the delegation windows are in GMT+9, while the period, today's timeline and the
-// team's week stay Kuala Lumpur days and hours — the screens say so.
+// AT-X01-N ③ for the contractor (FR-X01, FR-P01, FR-P02, FR-P03, FR-P05, FR-P06, IR44, IR270–IR276): with Malay and
+// Asia/Tokyo saved in Preferences, the overview, the job list, a job's page, a completed job's quality review, the
+// schedule and the team speak Malay; the update time and the delegation windows are in GMT+9, while the period,
+// today's timeline and the team's weeks stay Kuala Lumpur days and hours — the screens say so.
 // English and the earlier zone come back at the end, or in afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
@@ -48,6 +48,11 @@ test("the contractor screens in Malay keep Kuala Lumpur days and show instants i
     const week = main.getByRole("heading", { name: /^Jadual pasukan — minggu \d{1,2} \S+$/ });
     if (await week.count()) await expect(main).toContainText("Hari dan masa dalam waktu Kuala Lumpur (Asia/Kuala_Lumpur).");
   }
+  await page.goto("/partner/team");
+  await expect(main.getByRole("heading", { name: /^Juruteknik — .+ · \d+ aktif$/ })).toBeVisible();
+  await expect(main.getByRole("heading", { name: /^Minggu \d{1,2} \S+ — jam ditugaskan \/ tersedia$/ })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Kelayakan", exact: true })).toBeVisible();
+  await expect(main).toContainText("Hari dan jam dalam waktu Kuala Lumpur (Asia/Kuala_Lumpur)."); // another display zone
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/partner");

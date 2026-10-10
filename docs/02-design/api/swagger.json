@@ -30273,7 +30273,7 @@
                     "type": "string"
                 },
                 "displayName": {
-                    "description": "DisplayName and OrganizationName name the signed-in user and the membership's organization in the shell (IR241)",
+                    "description": "DisplayName and OrganizationName name the signed-in user and the membership's organization in the shell (IR241);\nOrganizationID is that organization, so a screen can tell its own company from another one in a URL (IR276)",
                     "type": "string"
                 },
                 "expiresAt": {
@@ -30286,6 +30286,9 @@
                     "type": "string"
                 },
                 "membershipId": {
+                    "type": "string"
+                },
+                "organizationId": {
                     "type": "string"
                 },
                 "organizationName": {

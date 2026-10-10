@@ -36,7 +36,7 @@ func TestSessionGet(t *testing.T) {
 	}
 	p := &ops.Principal{Principal: authz.Principal{Role: "client", ClientRole: "owner",
 		Permissions: map[string]bool{"control.execute": true, "alert.read": true, "unused": false}},
-		TenantID: uuid.New(), MembershipID: uuid.New(), UserID: uuid.New(), ScopeVersion: 3}
+		TenantID: uuid.New(), MembershipID: uuid.New(), UserID: uuid.New(), OrgID: uuid.New(), ScopeVersion: 3}
 	req := httptest.NewRequest(http.MethodGet, "/v1/session", nil)
 	req = req.WithContext(ops.WithPrincipal(req.Context(), p))
 	w := httptest.NewRecorder()
@@ -47,7 +47,7 @@ func TestSessionGet(t *testing.T) {
 	}
 	s := res.Data
 	if s.Role != "client" || s.ScopeVersion != 3 || s.UserID != p.UserID || strings.Join(s.Permissions, ",") != "alert.read,control.execute" ||
-		!s.ExpiresAt.Equal(now.Add(SessionTTL)) || s.Generation != 1 {
+		!s.ExpiresAt.Equal(now.Add(SessionTTL)) || s.Generation != 1 || s.OrganizationID != p.OrgID {
 		t.Fatalf("%+v", s)
 	}
 }
