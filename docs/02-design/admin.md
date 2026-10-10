@@ -482,6 +482,7 @@ Scope: FR-A11 / Main display pattern: **UI-FORM**. Service boundary: `policies.s
 4. Queries to update: `policies / automations / simulation results / audit`。
 5. Screen: scope filter `customerId` → `propertyId` → `unitId` (URL keys; `policies.list` with kind=automation), list grouped by the customer of the target units (policies spanning customers under “Across customers”), and the `policyId` editor loaded from `policies.get` (AT-A11-R01). The editor has basics (name, priority, timezone, enabled), target units, a When sentence for the chosen condition type, a Then sentence for the UnitAction with the capability range of the targets, and an explanation of the tier order.
 6. Simulate: enter synthetic facts per unit (value, unit, observedAt, quality) and call `automations.simulate`; show one row per unit with the selected rule or the suppression reason (`DecisionReason`, e.g. missing_data). Fire (demo) calls `automations.fire` with a one-time key and reports the created command IDs.
+7. Language (IR303): texts, condition and action sentences, decisions and reasons follow the display language. Metric codes, units and IDs stay as they are.
 
 **Boundary cases and failures**: Check HQ priority over customer rules, deterministic results for ties, and no automatic execution when solar data is unavailable.
 

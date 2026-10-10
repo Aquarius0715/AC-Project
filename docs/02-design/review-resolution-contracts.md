@@ -3841,3 +3841,30 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
    - The assistant panel and the voice demo's answers.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR303 HQ automation policies in the display language — 2026-10-10
+
+`/admin/settings/automation` (SCR-A11, FR-A11, DD-A11, Figma Admin 11) follows the display language.
+
+1. **Texts.** These are translated:
+   - the scope filters, and the policy list grouped by customer with each policy's When → Then sentence and priority;
+   - the editor: name, priority, timezone, enabled, units, When / Then with the sentence preview, and the conflict order;
+   - the simulator: facts, quality, results per unit with the decision and the rule or reason, and fire (demo);
+   - the toasts and the checks (`autoErrors`).
+   The dictionary gains 84 entries. These stay as they are: metric codes, units (MYR/kWh, kW), comparison signs, policy and command IDs, and policy names.
+2. **Words for codes.**
+   - These are worded: conditions and actions (`conditionText`, `actionText`, `subjectText`, `modeWord`, `levelWord`), decisions (`decisionWord`: selected, suppressed, requested), suppression reasons (`reasonWord`) and automatic disable reasons (`disabledReasonWord`). An unknown code stays as it is.
+   - Before, the decision badge and the disabled reason showed the raw code.
+3. **The "Across customers" group.** It is now keyed apart from its label, so it still sorts first in any language. Before, the code compared the English label.
+4. **No times change.** The evaluation runs at the business clock's current minute, as before.
+5. **Checked.**
+   - Vitest: 51 files, 292 tests. `automation.test.ts` is new. It covers every condition and action sentence, the grouping and its order, the checks and the policies.save input, the evaluation input with null facts, the words for unknown codes, and Malay.
+   - E2E: `admin/language.e2e.ts` also opens automation policies. It checks the condition choices, the Malay When → Then sentence, the conflict order, and the new-policy errors, which stop before any call. Nothing is saved.
+   - The dev data has no HQ automation policy, so the simulator card, which needs a saved policy, was checked only by the unit tests.
+6. **Progress.** 43 of the 44 business screens follow the display language.
+7. **Still open.**
+   - The audit screen (the last HQ screen).
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

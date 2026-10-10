@@ -1,4 +1,4 @@
-// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A03, FR-A06, FR-A07, FR-A08, FR-A13, FR-A14, FR-A15, FR-A23, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
+// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A03, FR-A06, FR-A07, FR-A08, FR-A11, FR-A13, FR-A14, FR-A15, FR-A23, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
 // HQ overview speaks Malay — the scope and period filters, the KPI tiles, the forecast, the power and connection axes,
 // the job statuses and the billing card — and its as-of time is in GMT+9 while the period stays Kuala Lumpur days, named
 // so; the Jobs tab speaks Malay too — tabs, scope, filters, the list and one job's detail with its times in GMT+9 — and
@@ -11,7 +11,8 @@
 // new-quote checks (IR298), and billing — invoices with their Kuala Lumpur dates named in another zone, a reminder
 // preview (a read), the payment and invoice checks, inquiries and payouts (IR299), and contracts with their Kuala Lumpur
 // days and the new-contract checks (IR300), the restrictions' no-access state (IR301), and access & roles with the
-// valid period in the display zone and the new-membership checks (IR302). Nothing is saved. English and the earlier zone come back at the end, or in
+// valid period in the display zone and the new-membership checks (IR302), and the automation policies' editor and
+// new-policy checks (IR303). Nothing is saved. English and the earlier zone come back at the end, or in
 // afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
@@ -241,6 +242,17 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(main.getByRole("heading", { name: "Keahlian baharu", exact: true })).toBeVisible();
   await main.getByRole("button", { name: "Cipta keahlian" }).click();
   for (const text of ["Pilih pengguna", "Pilih organisasi", "Sebab perubahan diperlukan (1–1000 aksara)"]) await expect(main).toContainText(text);
+  // automation policies (IR303): the When / Then editor and its sentence, and the new-policy checks, which stop before
+  // any call
+  await page.goto("/admin/settings/automation");
+  await expect(main.getByRole("heading", { name: "Polisi automasi HQ", exact: true })).toBeVisible();
+  await main.getByRole("button", { name: "+ Baharu" }).click();
+  await page.waitForURL(/policyId=new/);
+  for (const name of ["Penghunian", "Tarif", "Puncak", "Solar", "Bateri"]) await expect(main.getByRole("button", { name, exact: true })).toBeVisible();
+  await expect(main).toContainText("Apabila tarif elektrik > 0.6 MYR/kWh → tetapkan suhu kepada 26 °C.");
+  await expect(main.getByRole("heading", { name: "Cara konflik diselesaikan", exact: true })).toBeVisible();
+  await main.getByRole("button", { name: "Cipta polisi" }).click();
+  for (const text of ["1–120 aksara", "Pilih sekurang-kurangnya satu unit"]) await expect(main).toContainText(text);
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/admin");

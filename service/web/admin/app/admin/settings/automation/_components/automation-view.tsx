@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, EmptyState, Field, Input, ListRow, Page, Select } from "@ac/web/components/ui";
+import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import {
-  actionText, autoDraft, autoErrors, autoInput, conditionText, evaluationInput, factOf, reasonText,
+  actionText, autoDraft, autoErrors, autoInput, conditionText, decisionWord, disabledReasonWord, evaluationInput, factOf, reasonWord, subjectText,
   type ApiAutoPolicy, type AutoDraft, type Compare, type FactRow, type PolicyGroup,
 } from "@ac/web/lib/automation";
 import { fireAuto, saveAutoPolicy, simulateAuto } from "../actions";
@@ -19,8 +20,10 @@ type Result = { unitId: string; decision: string; ruleId: string | null; reason:
 const compares: { id: Compare; label: string }[] = [{ id: "gt", label: ">" }, { id: "gte", label: "≥" }, { id: "lt", label: "<" }, { id: "lte", label: "≤" }];
 
 /** HQ automation policies (FR-A11) in API mode: the scope and the selected policy live in the URL; saving, simulating
- * and firing (demo) are Server Actions. Tier order: capabilities / restrictions → HQ policies → customer rules. */
+ * and firing (demo) are Server Actions. Tier order: capabilities / restrictions → HQ policies → customer rules. Texts
+ * in the display language (IR303). */
 export function AutomationView({ live }: { live: Live }) {
+  const t = useT();
   const nav = useUrlPatch();
   const [pending, run] = useAction();
   const sel = live.isNew ? null : live.selected;
@@ -41,7 +44,7 @@ export function AutomationView({ live }: { live: Live }) {
   const set = (patch: Partial<AutoDraft>) => setD((x) => ({ ...x, ...patch }));
   const targets = live.units.filter((u) => d.unitIds.includes(u.id));
   const range = targets.reduce<{ min: number; max: number } | null>((acc, u) => (u.temperature ? { min: Math.max(acc?.min ?? -Infinity, u.temperature.min), max: Math.min(acc?.max ?? Infinity, u.temperature.max) } : acc), null);
-  const errors = autoErrors(d, range);
+  const errors = autoErrors(d, range, t);
   const name = (id: string) => live.units.find((u) => u.id === id)?.name ?? id.slice(0, 8);
   const scopeProps = live.properties.filter((p) => !live.scope.customerId || p.customerId === live.scope.customerId);
   const scopeUnits = live.units.filter((u) => (!live.scope.customerId || u.customerId === live.scope.customerId) && (!live.scope.propertyId || u.propertyId === live.scope.propertyId));
@@ -51,79 +54,80 @@ export function AutomationView({ live }: { live: Live }) {
   const save = () => {
     setTried(true);
     if (Object.keys(errors).length > 0) return;
-    run(() => saveAutoPolicy(autoInput(d, sel?.id), sel?.version), (p) => (sel ? `Policy saved as v${p.version}` : "Policy created"), (p) => nav({ policyId: p.id }));
+    run(() => saveAutoPolicy(autoInput(d, sel?.id), sel?.version), (p) => (sel ? t("Policy saved as v{v}", { v: p.version }) : t("Policy created")), (p) => nav({ policyId: p.id }));
   };
   const evaluate = (fire: boolean) => {
     if (facts.length === 0) return;
     const id = fire ? eventId || crypto.randomUUID() : crypto.randomUUID();
     if (fire) setEventId(id);
     const input = evaluationInput(d.type, facts, new Date(live.now), id);
-    run(() => (fire ? fireAuto(input) : simulateAuto(input)), fire ? "Fired (demo) — commands go through the shared command rules" : "Simulated — no commands created", (rows) => setResults({ fired: fire, rows }));
+    run(() => (fire ? fireAuto(input) : simulateAuto(input)), fire ? t("Fired (demo) — commands go through the shared command rules") : t("Simulated — no commands created"), (rows) => setResults({ fired: fire, rows }));
   };
   const err = (k: string) => (tried ? errors[k] : undefined);
+  const preview = autoInput(d);
   return (
     <Page>
       <div className="flex flex-wrap items-end gap-3">
-        <Field label="Customer"><Select value={live.scope.customerId ?? ""} onChange={(e) => nav({ customerId: e.target.value || null, propertyId: null, unitId: null, policyId: null })}><option value="">All customers</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
-        <Field label="Property"><Select value={live.scope.propertyId ?? ""} onChange={(e) => nav({ propertyId: e.target.value || null, unitId: null, policyId: null })}><option value="">All properties</option>{scopeProps.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
-        <Field label="Unit"><Select value={live.scope.unitId ?? ""} onChange={(e) => nav({ unitId: e.target.value || null, policyId: null })}><option value="">All units</option>{scopeUnits.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select></Field>
+        <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => nav({ customerId: e.target.value || null, propertyId: null, unitId: null, policyId: null })}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        <Field label={t("Property")}><Select value={live.scope.propertyId ?? ""} onChange={(e) => nav({ propertyId: e.target.value || null, unitId: null, policyId: null })}><option value="">{t("All properties")}</option>{scopeProps.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
+        <Field label={t("Unit")}><Select value={live.scope.unitId ?? ""} onChange={(e) => nav({ unitId: e.target.value || null, policyId: null })}><option value="">{t("All units")}</option>{scopeUnits.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select></Field>
       </div>
       <div className="split-rev">
-        <Card title="HQ automation policies" sub="priority ↓" action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => nav({ policyId: "new" })}>+ New</Btn>} className="self-start">
-          {live.groups.length === 0 ? <EmptyState title="No automation policies">No HQ automation policy targets this scope.</EmptyState> : live.groups.map((g) => (
-            <div key={g.label} className="mb-3"><div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted">{g.label}</div><div className="flex flex-col gap-2">{g.rows.map((p) => <ListRow key={p.id} selected={sel?.id === p.id} onClick={() => nav({ policyId: p.id })}><div className="min-w-0 flex-1"><b className="text-[13px]">{p.name}</b><div className="text-[11px] text-muted">{p.sentence}</div><div className="text-[11px] text-muted">Priority {p.priority}{!p.enabled && " · Off"}{p.disabledReason && ` · ${p.disabledReason}`}</div></div></ListRow>)}</div></div>
+        <Card title={t("HQ automation policies")} sub={t("priority ↓")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => nav({ policyId: "new" })}>{t("+ New")}</Btn>} className="self-start">
+          {live.groups.length === 0 ? <EmptyState title={t("No automation policies")}>{t("No HQ automation policy targets this scope.")}</EmptyState> : live.groups.map((g) => (
+            <div key={g.label} className="mb-3"><div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted">{g.label}</div><div className="flex flex-col gap-2">{g.rows.map((p) => <ListRow key={p.id} selected={sel?.id === p.id} onClick={() => nav({ policyId: p.id })}><div className="min-w-0 flex-1"><b className="text-[13px]">{p.name}</b><div className="text-[11px] text-muted">{p.sentence}</div><div className="text-[11px] text-muted">{t("Priority {n}", { n: p.priority })}{!p.enabled && ` · ${t("Off")}`}{p.disabledReason && ` · ${p.disabledReason}`}</div></div></ListRow>)}</div></div>
           ))}
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={sel ? sel.name : "New automation policy"} sub={sel ? `HQ tier · version ${sel.version}` : "Saving creates version 1 (disabled by default)"} action={sel && <Badge tone={sel.enabled ? "ok" : "muted"}>{sel.enabled ? "Enabled" : "Disabled"}</Badge>}>
+          <Card title={sel ? sel.name : t("New automation policy")} sub={sel ? t("HQ tier · version {v}", { v: sel.version }) : t("Saving creates version 1 (disabled by default)")} action={sel && <Badge tone={sel.enabled ? "ok" : "muted"}>{sel.enabled ? t("Enabled") : t("Disabled")}</Badge>}>
             <div className="flex flex-col gap-5">
-              {sel?.disabledReason && <Banner tone="warn">Disabled automatically: {sel.disabledReason}. Review the policy before enabling it again.</Banner>}
+              {sel?.disabledReason && <Banner tone="warn">{t("Disabled automatically: {reason}. Review the policy before enabling it again.", { reason: disabledReasonWord(sel.disabledReason, t) })}</Banner>}
               <section className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
-                <Field label="Name" error={err("name")}><Input value={d.name} maxLength={120} onChange={(e) => set({ name: e.target.value })} /></Field>
-                <Field label="Priority" hint="0–100 · higher wins in its tier" error={err("priority")}><Input type="number" value={d.priority} onChange={(e) => set({ priority: e.target.value })} /></Field>
-                <Field label="Timezone" error={err("timezone")}><Input value={d.timezone} onChange={(e) => set({ timezone: e.target.value })} /></Field>
-                <div className="self-end pb-2"><Check label="Enabled" checked={d.enabled} onChange={(v) => set({ enabled: v })} /></div>
+                <Field label={t("Name")} error={err("name")}><Input value={d.name} maxLength={120} onChange={(e) => set({ name: e.target.value })} /></Field>
+                <Field label={t("Priority")} hint={t("0–100 · higher wins in its tier")} error={err("priority")}><Input type="number" value={d.priority} onChange={(e) => set({ priority: e.target.value })} /></Field>
+                <Field label={t("Timezone")} error={err("timezone")}><Input value={d.timezone} onChange={(e) => set({ timezone: e.target.value })} /></Field>
+                <div className="self-end pb-2"><Check label={t("Enabled")} checked={d.enabled} onChange={(v) => set({ enabled: v })} /></div>
               </section>
               <section>
-                <h3 className="mb-1 text-[13px] font-bold">Units</h3>
+                <h3 className="mb-1 text-[13px] font-bold">{t("Units")}</h3>
                 <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{live.units.map((u) => <Check key={u.id} label={u.name} checked={d.unitIds.includes(u.id)} onChange={(on) => { set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) }); setFacts((f) => (on ? [...f, { unitId: u.id, value: "", quality: "valid" }] : f.filter((x) => x.unitId !== u.id))); }} />)}</div>
                 {err("unitIds") && <p className="mt-1 text-xs text-crit">{err("unitIds")}</p>}
               </section>
               <section>
-                <h3 className="mb-1 text-[13px] font-bold">When</h3>
-                <p className="mb-2 text-xs text-muted">Missing or stale data never triggers the action — the unit is skipped with a reason.</p>
-                <Choice value={d.type} onChange={(t) => set({ type: t })} options={[{ id: "occupancy", label: "Occupancy" }, { id: "tariff", label: "Tariff" }, { id: "peak", label: "Peak" }, { id: "solar", label: "Solar" }, { id: "battery", label: "Battery" }]} />
+                <h3 className="mb-1 text-[13px] font-bold">{t("When")}</h3>
+                <p className="mb-2 text-xs text-muted">{t("Missing or stale data never triggers the action — the unit is skipped with a reason.")}</p>
+                <Choice value={d.type} onChange={(type) => set({ type })} options={[{ id: "occupancy", label: t("Occupancy") }, { id: "tariff", label: t("Tariff") }, { id: "peak", label: t("Peak") }, { id: "solar", label: t("Solar") }, { id: "battery", label: t("Battery") }]} />
                 <div className="mt-2 flex flex-wrap items-end gap-2 text-[13px]">
-                  {d.type === "occupancy" || d.type === "peak" ? <Select className="w-auto" value={String(d.flag)} onChange={(e) => set({ flag: e.target.value === "true" })}><option value="true">{d.type === "occupancy" ? "When the room is occupied" : "When a peak period is active"}</option><option value="false">{d.type === "occupancy" ? "When the room is not occupied" : "When no peak period is active"}</option></Select>
-                    : <><span className="pb-2">When {d.type === "tariff" ? "the electricity tariff" : `${d.type} output`} is</span><Select className="w-auto" value={d.operator} onChange={(e) => set({ operator: e.target.value as Compare })}>{compares.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</Select><div className="w-24"><Field label="" error={err("value")}><Input type="number" step="0.1" value={d.value} onChange={(e) => set({ value: e.target.value })} /></Field></div><span className="pb-2">{d.type === "tariff" ? "MYR / kWh" : "kW"}</span></>}
+                  {d.type === "occupancy" || d.type === "peak" ? <Select className="w-auto" value={String(d.flag)} onChange={(e) => set({ flag: e.target.value === "true" })}><option value="true">{d.type === "occupancy" ? t("When the room is occupied") : t("When a peak period is active")}</option><option value="false">{d.type === "occupancy" ? t("When the room is not occupied") : t("When no peak period is active")}</option></Select>
+                    : <><span className="pb-2">{subjectText(d.type, t)}</span><Select className="w-auto" value={d.operator} onChange={(e) => set({ operator: e.target.value as Compare })}>{compares.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}</Select><div className="w-24"><Field label="" error={err("value")}><Input type="number" step="0.1" value={d.value} onChange={(e) => set({ value: e.target.value })} /></Field></div><span className="pb-2">{d.type === "tariff" ? "MYR / kWh" : "kW"}</span></>}
                 </div>
               </section>
               <section>
-                <h3 className="mb-1 text-[13px] font-bold">Then</h3>
-                <p className="mb-2 text-xs text-muted">Only actions every target unit supports, and that no active restriction blocks, can run.</p>
+                <h3 className="mb-1 text-[13px] font-bold">{t("Then")}</h3>
+                <p className="mb-2 text-xs text-muted">{t("Only actions every target unit supports, and that no active restriction blocks, can run.")}</p>
                 <div className="flex flex-wrap items-end gap-2 text-[13px]">
-                  <Select className="w-auto" value={d.actionKind} onChange={(e) => set({ actionKind: e.target.value as AutoDraft["actionKind"] })}><option value="set_temperature">Set the temperature</option><option value="set_power">Set the power</option><option value="set_mode">Set the mode</option><option value="set_fan">Set the fan</option><option value="ventilate">Ventilate</option></Select>
-                  {d.actionKind === "set_temperature" && <><div className="w-24"><Field label="" error={err("celsius")}><Input type="number" value={d.celsius} onChange={(e) => set({ celsius: e.target.value })} /></Field></div><span className="pb-2">°C {range ? `(targets allow ${range.min}–${range.max} °C)` : ""}</span></>}
-                  {d.actionKind === "set_power" && <Select className="w-auto" value={String(d.power)} onChange={(e) => set({ power: e.target.value === "true" })}><option value="false">off</option><option value="true">on</option></Select>}
-                  {d.actionKind === "set_mode" && <Select className="w-auto" value={d.mode} onChange={(e) => set({ mode: e.target.value as AutoDraft["mode"] })}><option value="cool">cool</option><option value="dry">dry</option><option value="fan">fan</option></Select>}
-                  {(d.actionKind === "set_fan" || d.actionKind === "ventilate") && <Select className="w-auto" value={d.level} onChange={(e) => set({ level: e.target.value as AutoDraft["level"] })}><option value="low">low</option><option value="mid">mid</option><option value="high">high</option></Select>}
+                  <Select className="w-auto" value={d.actionKind} onChange={(e) => set({ actionKind: e.target.value as AutoDraft["actionKind"] })}><option value="set_temperature">{t("Set the temperature")}</option><option value="set_power">{t("Set the power")}</option><option value="set_mode">{t("Set the mode")}</option><option value="set_fan">{t("Set the fan")}</option><option value="ventilate">{t("Ventilate")}</option></Select>
+                  {d.actionKind === "set_temperature" && <><div className="w-24"><Field label="" error={err("celsius")}><Input type="number" value={d.celsius} onChange={(e) => set({ celsius: e.target.value })} /></Field></div><span className="pb-2">°C {range ? t("(targets allow {min}–{max} °C)", { min: range.min, max: range.max }) : ""}</span></>}
+                  {d.actionKind === "set_power" && <Select className="w-auto" value={String(d.power)} onChange={(e) => set({ power: e.target.value === "true" })}><option value="false">{t("off")}</option><option value="true">{t("on")}</option></Select>}
+                  {d.actionKind === "set_mode" && <Select className="w-auto" value={d.mode} onChange={(e) => set({ mode: e.target.value as AutoDraft["mode"] })}><option value="cool">{t("cool")}</option><option value="dry">{t("dry")}</option><option value="fan">{t("fan")}</option></Select>}
+                  {(d.actionKind === "set_fan" || d.actionKind === "ventilate") && <Select className="w-auto" value={d.level} onChange={(e) => set({ level: e.target.value as AutoDraft["level"] })}><option value="low">{t("low")}</option><option value="mid">{t("mid")}</option><option value="high">{t("high")}</option></Select>}
                 </div>
-                <p className="mt-2 text-xs text-muted">{conditionText(autoInput(d).condition)} → {actionText(autoInput(d).action)}.</p>
+                <p className="mt-2 text-xs text-muted">{conditionText(preview.condition, t)} → {actionText(preview.action, t)}.</p>
               </section>
-              <section className="rounded-xl bg-surface2 p-3"><h3 className="mb-2 text-[13px] font-bold">How conflicts are resolved</h3><p className="mb-2 text-xs text-muted">Evaluated per unit — at most one action per unit per evaluation.</p><ol className="grid-fluid text-xs" style={{ ["--min" as string]: "180px" }}><li><b>1 Capabilities & active restrictions</b><br />always first</li><li><b>2 HQ policies</b><br />higher priority wins · ties: ascending ID</li><li><b>3 Customer rules</b><br />only when no HQ policy applies</li></ol></section>
-              {live.canWrite && <div className="flex justify-end"><Btn variant="primary" disabled={pending} onClick={save}>{sel ? `Save as v${sel.version + 1}` : "Create policy"}</Btn></div>}
+              <section className="rounded-xl bg-surface2 p-3"><h3 className="mb-2 text-[13px] font-bold">{t("How conflicts are resolved")}</h3><p className="mb-2 text-xs text-muted">{t("Evaluated per unit — at most one action per unit per evaluation.")}</p><ol className="grid-fluid text-xs" style={{ ["--min" as string]: "180px" }}><li><b>{t("1 Capabilities & active restrictions")}</b><br />{t("always first")}</li><li><b>{t("2 HQ policies")}</b><br />{t("higher priority wins · ties: ascending ID")}</li><li><b>{t("3 Customer rules")}</b><br />{t("only when no HQ policy applies")}</li></ol></section>
+              {live.canWrite && <div className="flex justify-end"><Btn variant="primary" disabled={pending} onClick={save}>{sel ? t("Save as v{n}", { n: sel.version + 1 }) : t("Create policy")}</Btn></div>}
             </div>
           </Card>
           {sel && (
-            <Card title="Simulate" sub="Evaluates all enabled HQ policies and customer rules for these units with synthetic facts at the current minute.">
-              <div className="scroll-x"><table className="w-full min-w-[460px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted"><tr><th>Unit</th><th>Fact</th><th>Value</th><th>Quality</th></tr></thead><tbody>{facts.map((f, i) => (
+            <Card title={t("Simulate")} sub={t("Evaluates all enabled HQ policies and customer rules for these units with synthetic facts at the current minute.")}>
+              <div className="scroll-x"><table className="w-full min-w-[460px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted"><tr><th>{t("Unit")}</th><th>{t("Fact")}</th><th>{t("Value")}</th><th>{t("Quality")}</th></tr></thead><tbody>{facts.map((f, i) => (
                 <tr key={f.unitId} className="border-t border-line"><td className="py-2 pr-2 font-semibold">{name(f.unitId)}</td><td className="text-xs">{fact.metric}</td>
-                  <td className="pr-2">{fact.boolean ? <Select value={f.value} onChange={(e) => editFact(i, { value: e.target.value })}><option value="">— no reading</option><option value="true">true</option><option value="false">false</option></Select> : <Input type="number" step="0.1" value={f.value} placeholder="— no reading" onChange={(e) => editFact(i, { value: e.target.value })} />}</td>
-                  <td><Select value={f.quality} onChange={(e) => editFact(i, { quality: e.target.value as FactRow["quality"] })}><option value="valid">valid</option><option value="stale">stale</option><option value="suspect">suspect</option><option value="missing">missing</option></Select></td></tr>
+                  <td className="pr-2">{fact.boolean ? <Select value={f.value} onChange={(e) => editFact(i, { value: e.target.value })}><option value="">{t("— no reading")}</option><option value="true">{t("true")}</option><option value="false">{t("false")}</option></Select> : <Input type="number" step="0.1" value={f.value} placeholder={t("— no reading")} onChange={(e) => editFact(i, { value: e.target.value })} />}</td>
+                  <td><Select value={f.quality} onChange={(e) => editFact(i, { quality: e.target.value as FactRow["quality"] })}><option value="valid">{t("valid")}</option><option value="stale">{t("stale")}</option><option value="suspect">{t("suspect")}</option><option value="missing">{t("missing")}</option></Select></td></tr>
               ))}</tbody></table></div>
-              <div className="mt-3 flex flex-wrap gap-2"><Btn variant="primary" disabled={pending || facts.length === 0} onClick={() => evaluate(false)}>Simulate</Btn></div>
-              {results && <div className="mt-3"><div className="mb-1 text-[11px] font-bold tracking-wide text-muted">{results.fired ? "FIRE RESULT PER UNIT" : "RESULT PER UNIT"}</div><DataTable rows={results.rows} rowKey={(r) => r.unitId} cols={[{ key: "u", label: "Unit", render: (r) => <b>{name(r.unitId)}</b> }, { key: "d", label: "Decision", render: (r) => <Badge tone={r.decision === "selected" || r.decision === "requested" ? "ok" : r.decision === "failed" ? "crit" : "warn"}>{r.decision}</Badge> }, { key: "r", label: "Rule / reason", render: (r) => <span className="text-xs">{r.ruleId ? (r.ruleId === sel.id ? "this policy" : `rule ${r.ruleId.slice(0, 8)}`) : r.reason ? reasonText[r.reason] ?? r.reason : "—"}{r.commandId ? ` · command ${r.commandId.slice(0, 8)}` : ""}</span> }]} /></div>}
-              {live.canWrite && <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3"><p className="max-w-xl text-xs text-muted"><DemoBadge /> Fire runs the same evaluation for real: selected units get a command through the shared command rules. The event ID is a one-time key, so repeating it returns the same result without new commands.</p><Btn variant="danger" disabled={pending || !results || facts.length === 0} onClick={() => evaluate(true)}>Fire (demo)</Btn></div>}
+              <div className="mt-3 flex flex-wrap gap-2"><Btn variant="primary" disabled={pending || facts.length === 0} onClick={() => evaluate(false)}>{t("Simulate")}</Btn></div>
+              {results && <div className="mt-3"><div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-muted">{results.fired ? t("Fire result per unit") : t("Result per unit")}</div><DataTable rows={results.rows} rowKey={(r) => r.unitId} cols={[{ key: "u", label: t("Unit"), render: (r) => <b>{name(r.unitId)}</b> }, { key: "d", label: t("Decision"), render: (r) => <Badge tone={r.decision === "selected" || r.decision === "requested" ? "ok" : r.decision === "failed" ? "crit" : "warn"}>{decisionWord(r.decision, t)}</Badge> }, { key: "r", label: t("Rule / reason"), render: (r) => <span className="text-xs">{r.ruleId ? (r.ruleId === sel.id ? t("this policy") : t("rule {id}", { id: r.ruleId.slice(0, 8) })) : r.reason ? reasonWord(r.reason, t) : "—"}{r.commandId ? ` · ${t("command {id}", { id: r.commandId.slice(0, 8) })}` : ""}</span> }]} /></div>}
+              {live.canWrite && <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3"><p className="max-w-xl text-xs text-muted"><DemoBadge /> {t("Fire runs the same evaluation for real: selected units get a command through the shared command rules. The event ID is a one-time key, so repeating it returns the same result without new commands.")}</p><Btn variant="danger" disabled={pending || !results || facts.length === 0} onClick={() => evaluate(true)}>{t("Fire (demo)")}</Btn></div>}
             </Card>
           )}
         </div>

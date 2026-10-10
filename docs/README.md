@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.186.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
+Version: 0.187.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.187.0 (2026-10-10): HQ automation policies in Malay — the When → Then sentences, the editor, the conflict order and the simulator with its decisions and reasons (IR303).
 0.186.0 (2026-10-10): HQ access & roles in Malay — memberships, roles, scopes, the permission matrix and revoke. The valid period is typed and shown in the user's time zone. The override-only demo actor no longer shares the name "hq-operator" (IR302).
 0.185.0 (2026-10-10): HQ restrictions and the exception screen in Malay — state chips, progress, the lifecycle, units with their apply and release states, the schedule dialog and the four exception actions. Restriction times are shown in the user's time zone, and HQ types the execute-after and grace/exception ends in it (IR301).
 0.184.0 (2026-10-10): HQ contracts in Malay — the list with plan types, the editor with restriction eligibility, the SR19 block and the save summary; contract periods stay Kuala Lumpur days, written in the user's language (IR300).
