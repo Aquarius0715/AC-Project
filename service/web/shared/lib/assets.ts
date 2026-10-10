@@ -1,7 +1,10 @@
 // HQ customers & units (FR-A02, DATA_SOURCE=api): customers with their contract standing, the property / space tree,
 // unit rows, the unit form and the customer's alert policies projected for /admin/units. Pure code shared by the
-// Server Component and the client view.
-import { EN, showDate, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+// Server Component and the client view; Vitest covers it. Texts in the display language (`i` / `t`, IR293); instants
+// in the user's display time zone, while dates that are Kuala Lumpur days (installation, warranty end, contract end)
+// stay so (IR44).
+import { EN, intlTag, showDate, showTime, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
+import { businessDay } from "@ac/web/lib/clientBilling";
 import { amount, klStamp, one } from "@ac/web/lib/energy";
 import { metricLabel, metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
 
@@ -29,6 +32,9 @@ export type ApiInvoiceLite = { id: string; contractId: string; amountMinor: numb
 export type ApiRestrictionLite = { id: string; contractId?: string; state: string; unitIds: string[] };
 
 const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name);
+const en = translator("en");
+/** “Apr 2026”: the month an account was created, in the user's language (a Kuala Lumpur month). */
+const monthYear = (iso: string, locale: Locale) => new Date(iso).toLocaleDateString(intlTag(locale), { month: "short", year: "numeric", timeZone: "Asia/Kuala_Lumpur" }).replace(/[\u00a0\u2009\u202f]/g, " ");
 
 // ---- customers ----
 
@@ -51,13 +57,13 @@ export function standing(customerId: string, contracts: ApiContractLite[], overd
 export type Mark = { label: string; tone: "crit" | "warn" | "ok" | "muted" };
 const restrictionLabel: Record<string, string> = { applied: "Restriction applied", requested: "Restriction requested", release_requested: "Release requested", scheduled: "Restriction scheduled" };
 /** Contract column badges (Figma 02-1): Overdue / restriction state / Good standing / No contract / Inactive. */
-export function standingMarks(status: "active" | "inactive", s: Standing | null): Mark[] {
-  if (status === "inactive") return [{ label: "Inactive", tone: "muted" }];
+export function standingMarks(status: "active" | "inactive", s: Standing | null, t: T = en): Mark[] {
+  if (status === "inactive") return [{ label: t("Inactive"), tone: "muted" }];
   if (!s) return [];
   const out: Mark[] = [];
-  if (s.overdue) out.push({ label: "‼ Overdue", tone: "crit" });
-  if (s.restriction) out.push({ label: restrictionLabel[s.restriction.state], tone: "warn" });
-  if (!out.length) out.push(s.contracts ? { label: "Good standing", tone: "ok" } : { label: "No contract", tone: "muted" });
+  if (s.overdue) out.push({ label: t("‼ Overdue"), tone: "crit" });
+  if (s.restriction) out.push({ label: t(restrictionLabel[s.restriction.state]), tone: "warn" });
+  if (!out.length) out.push(s.contracts ? { label: t("Good standing"), tone: "ok" } : { label: t("No contract"), tone: "muted" });
   return out;
 }
 
@@ -71,7 +77,7 @@ export const operation = (us: ApiUnitRow[]) => {
   const known = us.filter((u) => u.effectivePowerState !== "unknown").length;
   return known ? `${one((on * 100) / known)}%` : "—";
 };
-export function customerRows(cs: ApiCustomerRow[], orgs: ApiOrgRow[], ps: ApiPropertyRow[], us: ApiUnitRow[], standingOf: (c: ApiCustomerRow) => Standing | null): CustomerRow[] {
+export function customerRows(cs: ApiCustomerRow[], orgs: ApiOrgRow[], ps: ApiPropertyRow[], us: ApiUnitRow[], standingOf: (c: ApiCustomerRow) => Standing | null, i: I18n = EN): CustomerRow[] {
   const org = new Map(orgs.map((o) => [o.id, o]));
   return [...cs].sort(byName).map((c) => {
     const units = us.filter((u) => u.customerOrgId === c.organizationId);
@@ -80,9 +86,9 @@ export function customerRows(cs: ApiCustomerRow[], orgs: ApiOrgRow[], ps: ApiPro
     return {
       id: c.id, version: c.version, name: c.name, billingName: org.get(c.organizationId)?.name ?? "", status: c.status, orgId: c.organizationId, orgVersion: org.get(c.organizationId)?.version ?? null,
       orgStatus: org.get(c.organizationId)?.status ?? "active",
-      profile: c.serviceProfile, since: klStamp(c.createdAt).slice(0, 7), properties: props.length, propertyNames: props.map((p) => p.name), units: units.length,
+      profile: c.serviceProfile, since: monthYear(c.createdAt, i.display.locale), properties: props.length, propertyNames: props.map((p) => p.name), units: units.length,
       operation: operation(units), running: units.filter((u) => u.effectivePowerState === "on").length, known: units.filter((u) => u.effectivePowerState !== "unknown").length,
-      alerts: units.reduce((n, u) => n + u.activeAlertCount, 0), standing: s, marks: standingMarks(c.status, s),
+      alerts: units.reduce((n, u) => n + u.activeAlertCount, 0), standing: s, marks: standingMarks(c.status, s, i.t),
     };
   });
 }
@@ -99,7 +105,7 @@ export function contractMatch(f: ContractFilter, r: CustomerRow): boolean {
 /** Search over customer name, billing name, ID and property names (Figma 02-1). */
 export const customerMatch = (r: CustomerRow, q: string) => !q.trim() || [r.name, r.billingName, r.id, ...r.propertyNames].some((x) => x.toLowerCase().includes(q.trim().toLowerCase()));
 /** KPI tiles of the register: inactive customers and their assets stay out of the counts (IR40); archived assets never appear (IR39). */
-export function registerKpis(rows: CustomerRow[], us: ApiUnitRow[]) {
+export function registerKpis(rows: CustomerRow[], us: ApiUnitRow[], t: T = en) {
   const active = rows.filter((r) => r.status === "active");
   const orgs = new Set(active.map((r) => r.orgId));
   const units = us.filter((u) => orgs.has(u.customerOrgId));
@@ -107,8 +113,8 @@ export function registerKpis(rows: CustomerRow[], us: ApiUnitRow[]) {
   const names = active.flatMap((r) => r.propertyNames);
   return {
     customers: active.length, inactive: rows.length - active.length, properties: names.length,
-    propertyNames: names.length > 3 ? `${names.slice(0, 3).join(" · ")} +${names.length - 3}` : names.join(" · ") || "none yet",
-    units: units.length, power: `Running ${n("on")} · Stopped ${n("off")} · unknown ${n("unknown")}`,
+    propertyNames: names.length > 3 ? `${names.slice(0, 3).join(" · ")} +${names.length - 3}` : names.join(" · ") || t("none yet"),
+    units: units.length, power: t("Running {on} · Stopped {off} · unknown {unknown}", { on: n("on"), off: n("off"), unknown: n("unknown") }),
     attention: active.filter((r) => r.alerts > 0 || (r.standing?.overdue ?? 0) > 0 || !!r.standing?.restriction).length,
   };
 }
@@ -117,10 +123,10 @@ export function registerKpis(rows: CustomerRow[], us: ApiUnitRow[]) {
 export type CustomerDraft = { billingName: string; name: string; profile: Profile; status: "active" | "inactive" };
 export const customerDraft = (r?: CustomerRow): CustomerDraft => ({ billingName: r?.billingName ?? "", name: r?.name ?? "", profile: r?.profile ?? "general", status: r?.status ?? "active" });
 export const profileLabel: Record<Profile, string> = { rto: "Rent-to-own (RTO)", general: "General care", energy: "Energy", environment: "Environment" };
-export function customerErrors(d: CustomerDraft): Record<string, string> {
+export function customerErrors(d: CustomerDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!between(d.billingName, 1, 120)) e.billingName = "1–120 characters";
-  if (!between(d.name, 1, 120)) e.name = "1–120 characters";
+  if (!between(d.billingName, 1, 120)) e.billingName = t("1–120 characters");
+  if (!between(d.name, 1, 120)) e.name = t("1–120 characters");
   return e;
 }
 const between = (s: string, min: number, max: number) => s.trim().length >= min && s.trim().length <= max;
@@ -188,20 +194,20 @@ export function unitsAt(sel: Selection, us: ApiUnitRow[]): ApiUnitRow[] {
   return us.filter((u) => u.spaceId !== null && ids.has(u.spaceId));
 }
 /** Every place a unit of the customer can sit: a property (no space, IR62) or one of its spaces. */
-export function placeOptions(tree: TreeProperty[], ss: ApiSpaceRow[]) {
+export function placeOptions(tree: TreeProperty[], ss: ApiSpaceRow[], t: T = en) {
   return tree.flatMap((p) => [
-    { propertyId: p.id, spaceId: "", label: `${p.name} (no space)` },
+    { propertyId: p.id, spaceId: "", label: t("{name} (no space)", { name: p.name }) },
     ...flatten(p.spaces).map((s) => ({ propertyId: p.id, spaceId: s.id, label: `${p.name} › ${spacePath(s.id, ss)}` })),
   ]);
 }
 
 export type PropertyDraft = { kind: "home" | "office"; name: string; address: string; accessInstructions: string };
 export const propertyDraft = (p?: TreeProperty): PropertyDraft => ({ kind: p?.kind ?? "home", name: p?.name ?? "", address: p?.address ?? "", accessInstructions: p?.accessInstructions ?? "" });
-export function propertyErrors(d: PropertyDraft): Record<string, string> {
+export function propertyErrors(d: PropertyDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!between(d.name, 1, 120)) e.name = "1–120 characters";
-  if (d.address.trim().length > 500) e.address = "At most 500 characters";
-  if (d.accessInstructions.trim().length > 1000) e.accessInstructions = "At most 1000 characters";
+  if (!between(d.name, 1, 120)) e.name = t("1–120 characters");
+  if (d.address.trim().length > 500) e.address = t("At most 500 characters");
+  if (d.accessInstructions.trim().length > 1000) e.accessInstructions = t("At most 1000 characters");
   return e;
 }
 export const propertyInput = (d: PropertyDraft, orgId: string, id?: string) => ({
@@ -216,10 +222,10 @@ export type UnitRow = { id: string; version: number; name: string; model: string
 const power = { on: "running", off: "stopped", unknown: "unknown" } as const;
 /** The model as the table shows it ("ventilation-demo v3": capability model and the unit's capability version). */
 export const modelLabel = (u: Pick<ApiUnitRow, "modelId" | "capabilityVersion">, models: Map<string, string>) => `${models.get(u.modelId) ?? u.modelId.slice(0, 8)} v${u.capabilityVersion}`;
-export function unitRows(us: ApiUnitRow[], ss: ApiSpaceRow[], models: Map<string, string>): UnitRow[] {
+export function unitRows(us: ApiUnitRow[], ss: ApiSpaceRow[], models: Map<string, string>, t: T = en): UnitRow[] {
   return [...us].sort((a, b) => a.displayName.localeCompare(b.displayName)).map((u) => ({
-    id: u.id, version: u.version, name: u.displayName, model: modelLabel(u, models), location: spacePath(u.spaceId, ss) || "Unassigned",
-    power: power[u.effectivePowerState], conn: u.connection, alerts: u.activeAlertCount, policies: u.alertPolicyIds.length ? `Default + ${u.alertPolicyIds.length}` : "Default",
+    id: u.id, version: u.version, name: u.displayName, model: modelLabel(u, models), location: spacePath(u.spaceId, ss) || t("Unassigned"),
+    power: power[u.effectivePowerState], conn: u.connection, alerts: u.activeAlertCount, policies: u.alertPolicyIds.length ? t("Default + {n}", { n: u.alertPolicyIds.length }) : t("Default"),
   }));
 }
 export const powerStates: PowerState[] = ["on", "off", "unknown"];
@@ -238,14 +244,14 @@ export const unitDraft = (u?: Pick<ApiUnitRow, "displayName" | "propertyId" | "s
   displayName: u?.displayName ?? "", propertyId: u?.propertyId ?? propertyId, spaceId: u?.spaceId ?? (u ? "" : spaceId), modelId: u?.modelId ?? "",
   installedAt: klDate(u?.installedAt), warrantyEnd: klDate(u?.warrantyEndsAt), serviceScope: u?.serviceScope ?? ["indoor", "outdoor"],
 });
-export function unitErrors(d: UnitDraft, todayKL: string): Record<string, string> {
+export function unitErrors(d: UnitDraft, todayKL: string, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!between(d.displayName, 1, 120)) e.displayName = "1–120 characters";
-  if (!d.propertyId) e.propertyId = "Choose a location";
-  if (!d.modelId) e.modelId = "Choose a model";
-  if (d.installedAt && d.installedAt > todayKL) e.installedAt = "An installation date cannot be in the future (IR44)";
-  if (d.warrantyEnd && d.installedAt && d.warrantyEnd < d.installedAt) e.warrantyEnd = "A warranty cannot end before the installation";
-  if (d.serviceScope.length === 0) e.serviceScope = "Choose at least one inspection group";
+  if (!between(d.displayName, 1, 120)) e.displayName = t("1–120 characters");
+  if (!d.propertyId) e.propertyId = t("Choose a location");
+  if (!d.modelId) e.modelId = t("Choose a model");
+  if (d.installedAt && d.installedAt > todayKL) e.installedAt = t("An installation date cannot be in the future (IR44)");
+  if (d.warrantyEnd && d.installedAt && d.warrantyEnd < d.installedAt) e.warrantyEnd = t("A warranty cannot end before the installation");
+  if (d.serviceScope.length === 0) e.serviceScope = t("Choose at least one inspection group");
   return e;
 }
 export const unitInput = (d: UnitDraft, orgId: string, id?: string, changeReason?: string) => ({
@@ -256,15 +262,15 @@ export const unitInput = (d: UnitDraft, orgId: string, id?: string, changeReason
 /** A relocation (another property or space) needs a change reason (DD-A02 step 3). */
 export const relocates = (u: Pick<ApiUnitRow, "propertyId" | "spaceId">, d: UnitDraft) => u.propertyId !== d.propertyId || (u.spaceId ?? "") !== d.spaceId;
 /** The fields of the draft that differ from the saved unit ("1 unsaved change · Name"). */
-export function changedFields(u: ApiUnitRow, d: UnitDraft): string[] {
+export function changedFields(u: ApiUnitRow, d: UnitDraft, t: T = en): string[] {
   const saved = unitDraft(u);
   const out: string[] = [];
-  if (saved.displayName !== d.displayName.trim()) out.push("Name");
-  if (relocates(u, d)) out.push("Location");
-  if (saved.modelId !== d.modelId) out.push("Model");
-  if (saved.installedAt !== d.installedAt) out.push("Installed at");
-  if (saved.warrantyEnd !== d.warrantyEnd) out.push("Warranty end");
-  if ([...saved.serviceScope].sort().join() !== [...d.serviceScope].sort().join()) out.push("Service scope");
+  if (saved.displayName !== d.displayName.trim()) out.push(t("Name"));
+  if (relocates(u, d)) out.push(t("Location"));
+  if (saved.modelId !== d.modelId) out.push(t("Model"));
+  if (saved.installedAt !== d.installedAt) out.push(t("Installed at"));
+  if (saved.warrantyEnd !== d.warrantyEnd) out.push(t("Warranty end"));
+  if ([...saved.serviceScope].sort().join() !== [...d.serviceScope].sort().join()) out.push(t("Service scope"));
   return out;
 }
 
@@ -279,35 +285,42 @@ export type ApiCustomerPolicy = {
   ruleSettings?: { ruleKey: string; customerId: string; enabled: boolean; version: number; reason: string | null; updatedAt: string }[];
 };
 const sevLabel: Record<Severity, string> = { critical: "Critical", warning: "Warning", normal: "Info" };
-const duration = (s: number) => (s % 3600 === 0 && s >= 3600 ? `${s / 3600} h` : s % 60 === 0 && s >= 120 ? `${s / 60} min` : `${s} s`);
-const days = (w: number[]) => {
+const duration = (s: number, t: T) => (s % 3600 === 0 && s >= 3600 ? t("{n} h", { n: s / 3600 }) : s % 60 === 0 && s >= 120 ? t("{n} min", { n: s / 60 }) : t("{n} s", { n: s }));
+/** The short weekday name of ISO day 1–7 (Monday first) in the user's language: 1 Jan 2024 was a Monday. */
+const dayName = (x: number, locale: Locale) => new Date(Date.UTC(2024, 0, x)).toLocaleDateString(intlTag(locale), { weekday: "short", timeZone: "UTC" });
+const days = (w: number[], i: I18n) => {
   const d = [...w].sort((a, b) => a - b).join();
-  return w.length === 7 ? "" : d === "1,2,3,4,5" ? "weekdays " : d === "6,7" ? "weekends " : `${[...w].sort((a, b) => a - b).map((x) => ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][x - 1]).join(", ")} `;
+  return w.length === 7 ? "" : d === "1,2,3,4,5" ? `${i.t("weekdays")} ` : d === "6,7" ? `${i.t("weekends")} ` : `${[...w].sort((a, b) => a - b).map((x) => dayName(x, i.display.locale)).join(", ")} `;
 };
-/** "Temperature ≥ 30 °C for 60 s, weekdays 08:00–19:00 → Warning". */
-export function conditionText(p: { metric?: string; operator?: Operator; threshold?: number; durationSeconds?: number; activeWindow?: ApiCustomerPolicy["activeWindow"]; severity?: Severity }): string {
+/** "Temperature ≥ 30 °C for 60 s, weekdays 08:00–19:00 → Warning", in the display language; the window's hours are
+ * the policy's local hours. */
+export function conditionText(p: { metric?: string; operator?: Operator; threshold?: number; durationSeconds?: number; activeWindow?: ApiCustomerPolicy["activeWindow"]; severity?: Severity }, i: I18n = EN): string {
+  const { t } = i;
   const m = p.metric ?? "";
-  const w = p.activeWindow ? `, ${days(p.activeWindow.weekdays)}${p.activeWindow.startLocal}–${p.activeWindow.endLocal}` : "";
-  const cond = m === "heartbeat_gap" ? `No heartbeat for ${p.threshold ?? 0} min${w}` // the gap itself is the duration (minutes)
-    : `${metricLabel[m] ?? m} ${opSymbol[p.operator ?? "gte"]} ${p.threshold ?? 0} ${metricUnit[m] ?? ""} for ${duration(p.durationSeconds ?? 0)}${w}`;
-  return p.severity ? `${cond} → ${sevLabel[p.severity]}` : cond;
+  const w = p.activeWindow ? `, ${days(p.activeWindow.weekdays, i)}${p.activeWindow.startLocal}–${p.activeWindow.endLocal}` : "";
+  const cond = m === "heartbeat_gap" ? `${t("No heartbeat for {n} min", { n: p.threshold ?? 0 })}${w}` // the gap itself is the duration (minutes)
+    : `${metricLabel[m] ? t(metricLabel[m]) : m} ${opSymbol[p.operator ?? "gte"]} ${p.threshold ?? 0} ${metricUnit[m] ?? ""} ${t("for {duration}", { duration: duration(p.durationSeconds ?? 0, t) })}${w}`;
+  return p.severity ? `${cond} → ${t(sevLabel[p.severity])}` : cond;
 }
 export type PolicyLine = { id: string; version: number; kind: "alert" | "default_alert"; name: string; type: string; condition: string; madeBy: string; units: number; enabled: boolean };
 export type RuleLine = { ruleKey: string; name: string; condition: string; enabled: boolean; version: number; note: string | null };
 /** The customer's policies (default first) with the units of this customer that carry each one. */
-export function policyLines(ps: ApiCustomerPolicy[], customerUnits: string[], owner: (membershipId: string) => string): PolicyLine[] {
+export function policyLines(ps: ApiCustomerPolicy[], customerUnits: string[], owner: (membershipId: string) => string, i: I18n = EN): PolicyLine[] {
+  const { t } = i;
   const mine = new Set(customerUnits);
   return ps.filter((p): p is ApiCustomerPolicy & { kind: "alert" | "default_alert" } => p.kind === "alert" || p.kind === "default_alert")
     .sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "default_alert" ? -1 : 1))
     .map((p) => p.kind === "default_alert"
-      ? { id: p.id, version: p.version, kind: p.kind, name: p.name, type: "Default", condition: `${p.rules?.length ?? 0} rules · ${defaultRules(p).filter((r) => r.enabled).length} on for this customer`, madeBy: "HQ (template)", units: mine.size, enabled: p.enabled }
-      : { id: p.id, version: p.version, kind: p.kind, name: p.name, type: metricLabel[p.metric ?? ""] ?? p.metric ?? "", condition: conditionText(p), madeBy: owner(p.ownerMembershipId), units: p.unitIds.filter((u) => mine.has(u)).length, enabled: p.enabled });
+      ? { id: p.id, version: p.version, kind: p.kind, name: p.name, type: t("Default"), condition: t((p.rules?.length ?? 0) === 1 ? "1 rule · {on} on for this customer" : "{n} rules · {on} on for this customer", { n: p.rules?.length ?? 0, on: defaultRules(p, i).filter((r) => r.enabled).length }), madeBy: t("HQ (template)"), units: mine.size, enabled: p.enabled }
+      : { id: p.id, version: p.version, kind: p.kind, name: p.name, type: metricLabel[p.metric ?? ""] ? t(metricLabel[p.metric ?? ""]) : p.metric ?? "", condition: conditionText(p, i), madeBy: owner(p.ownerMembershipId), units: p.unitIds.filter((u) => mine.has(u)).length, enabled: p.enabled });
 }
 /** The default policy's rules with this customer's on/off settings (no setting = on). */
-export function defaultRules(p: ApiCustomerPolicy): RuleLine[] {
+export function defaultRules(p: ApiCustomerPolicy, i: I18n = EN): RuleLine[] {
+  const { t } = i;
   return (p.rules ?? []).map((r) => {
     const s = p.ruleSettings?.find((x) => x.ruleKey === r.ruleKey);
-    return { ruleKey: r.ruleKey, name: r.name, condition: conditionText(r), enabled: s?.enabled ?? true, version: s?.version ?? 0, note: s ? `${s.enabled ? "On" : "Off"} since ${klStamp(s.updatedAt).slice(0, 10)}${s.reason ? ` · ${s.reason}` : ""}` : null };
+    const since = s ? t(s.enabled ? "On since {date}" : "Off since {date}", { date: showDate(s.updatedAt, i.display) }) : null;
+    return { ruleKey: r.ruleKey, name: r.name, condition: conditionText(r, i), enabled: s?.enabled ?? true, version: s?.version ?? 0, note: since ? `${since}${s?.reason ? ` · ${s.reason}` : ""}` : null };
   });
 }
 
@@ -325,8 +338,8 @@ export type ClientUserRow = {
 };
 const channelLabel: Record<Channel, string> = { inApp: "In-app", email: "Email", whatsapp: "WhatsApp" };
 /** Rows by name; the last active owner is marked because it cannot be demoted, disabled or removed (CONFLICT). The
- * customer's Users page passes its display (IR267): the invite day and the last sign-in in the user's time zone; HQ's
- * register keeps English and Kuala Lumpur. */
+ * customer's Users page (IR267) and HQ's register (IR293) pass their display: the invite day and the last sign-in in
+ * the user's time zone. */
 export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) => string, self?: string, i?: I18n): ClientUserRow[] {
   const owners = us.filter((u) => u.clientRole === "owner" && u.status === "active").length;
   const t = (i ?? EN).t;
@@ -352,31 +365,34 @@ export type CoverageStatus = "under_warranty" | "contract" | "expiring" | "no_co
 /** UnitCoverage of service-contracts.ts. */
 export type ApiCoverage = { unitId: string; customerId: string; modelId: string; warrantyEndsAt: string | null; contractIds: string[]; status: CoverageStatus; claimableJobIds: string[] };
 export type CoverageRow = {
-  unitId: string; unit: string; sub: string; customerId: string; customer: string; model: string; ends: string; endsAt: string | null; days: number | null;
+  unitId: string; unit: string; sub: string; customerId: string; customer: string; model: string; ends: string; endsDate: string; endsAt: string | null; days: number | null;
   contractIds: string[]; contracts: string; status: CoverageStatus; statusText: string;
 };
 const dayMs = 86_400_000;
-export function coverageRows(cs: ApiCoverage[], x: { unit: (id: string) => { name: string; place: string } | undefined; customer: (id: string) => string; model: (id: string) => string; contract: (id: string) => string }, now: Date): CoverageRow[] {
+/** One row per unit with its warranty end (a Kuala Lumpur day, in the user's language; `endsDate` YYYY-MM-DD for the
+ * CSV) and the covering contracts. */
+export function coverageRows(cs: ApiCoverage[], x: { unit: (id: string) => { name: string; place: string } | undefined; customer: (id: string) => string; model: (id: string) => string; contract: (id: string) => string }, now: Date, i: I18n = EN): CoverageRow[] {
+  const { t } = i;
   return cs.map((c) => {
     const u = x.unit(c.unitId);
     const days = c.warrantyEndsAt ? Math.ceil((Date.parse(c.warrantyEndsAt) - now.getTime()) / dayMs) : null;
-    const statusText = c.status === "contract" ? "Covered by contract" : c.status === "under_warranty" ? "Under warranty"
-      : c.status === "expiring" ? `Ends in ${days} d · no contract` : c.warrantyEndsAt ? "Warranty ended · no contract" : "No warranty · no contract";
+    const statusText = c.status === "contract" ? t("Covered by contract") : c.status === "under_warranty" ? t("Under warranty")
+      : c.status === "expiring" ? t("Ends in {n} d · no contract", { n: days ?? 0 }) : c.warrantyEndsAt ? t("Warranty ended · no contract") : t("No warranty · no contract");
     return {
       unitId: c.unitId, unit: u?.name ?? c.unitId.slice(0, 8), sub: [c.unitId.slice(0, 8), u?.place].filter(Boolean).join(" · "), customerId: c.customerId, customer: x.customer(c.customerId),
-      model: x.model(c.modelId), ends: klDate(c.warrantyEndsAt) || "—", endsAt: c.warrantyEndsAt, days, contractIds: c.contractIds, contracts: c.contractIds.map(x.contract).join(", ") || "—",
+      model: x.model(c.modelId), ends: c.warrantyEndsAt ? businessDay(c.warrantyEndsAt, i.display.locale) : "—", endsDate: klDate(c.warrantyEndsAt), endsAt: c.warrantyEndsAt, days, contractIds: c.contractIds, contracts: c.contractIds.map(x.contract).join(", ") || "—",
       status: c.status, statusText,
     };
   }).sort((a, b) => (a.endsAt === b.endsAt ? a.unit.localeCompare(b.unit) : a.endsAt === null ? 1 : b.endsAt === null ? -1 : a.endsAt.localeCompare(b.endsAt)));
 }
 /** KPI tiles (Figma 02 warranty): under warranty (any unit whose warranty still runs), ending within 90 / 30 days, no coverage, contracts. */
-export function coverageKpis(rows: CoverageRow[]) {
+export function coverageKpis(rows: CoverageRow[], t: T = en) {
   const running = rows.filter((r) => r.days !== null && r.days > 0);
   const contracts = [...new Set(rows.flatMap((r) => (r.status === "contract" ? r.contracts.split(", ") : [])))];
   return {
     total: rows.length, underWarranty: running.length, within90: running.filter((r) => r.days! <= 90).length, within30: running.filter((r) => r.days! <= 30).length,
     noCoverage: rows.filter((r) => r.status === "no_coverage").length, contract: rows.filter((r) => r.status === "contract").length,
-    contractNames: contracts.length > 2 ? `${contracts.slice(0, 2).join(", ")} …` : contracts.join(", ") || "none",
+    contractNames: contracts.length > 2 ? `${contracts.slice(0, 2).join(", ")} …` : contracts.join(", ") || t("none"),
   };
 }
 export type CoverageFilter = { customerId: string; coverage: "" | CoverageStatus; within: "" | "30" | "90" | "180" | "365" };
@@ -385,17 +401,17 @@ export const coverageMatch = (r: CoverageRow, f: CoverageFilter) => (!f.customer
 const csvCell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 export const toCsv = (header: string[], rows: string[][]) => [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
 export const coverageCsv = (rows: CoverageRow[]) => toCsv(["unit", "unit_id", "customer", "model", "warranty_end", "maintenance_contract", "status"],
-  rows.map((r) => [r.unit, r.unitId, r.customer, r.model, r.ends === "—" ? "" : r.ends, r.contracts === "—" ? "" : r.contracts, r.statusText]));
+  rows.map((r) => [r.unit, r.unitId, r.customer, r.model, r.endsDate, r.contracts === "—" ? "" : r.contracts, r.statusText]));
 
 /** A job completed under warranty whose accepted report lists replaced parts and has no filed claim (IR209). */
 export type ClaimCandidate = { jobId: string; version: number; unit: string; type: string; completed: string; parts: string; partLabel: string; amountMinor: number | null; currency: string };
 type Part = { name: string; quantity: number; catalogCode: string | null };
 type Cost = { kind: "estimate" | "actual"; amountMinor: number; currency: string };
-export function claimCandidate(j: { id: string; version: number; type: string; completedAt: string | null; costs: Cost[] }, parts: Part[], unit: string): ClaimCandidate {
+export function claimCandidate(j: { id: string; version: number; type: string; completedAt: string | null; costs: Cost[] }, parts: Part[], unit: string, i: I18n = EN): ClaimCandidate {
   const label = parts.map((p) => `${p.name}${p.catalogCode ? ` ${p.catalogCode}` : ""} ×${p.quantity}`).join(", ");
   const actual = j.costs.filter((c) => c.kind === "actual");
   return {
-    jobId: j.id, version: j.version, unit, type: j.type, completed: j.completedAt ? klStamp(j.completedAt).slice(0, 10) : "—", parts: label || "parts listed in the report",
+    jobId: j.id, version: j.version, unit, type: j.type, completed: j.completedAt ? showDate(j.completedAt, i.display) : "—", parts: label || i.t("parts listed in the report"),
     partLabel: label.slice(0, 120), amountMinor: actual.length ? actual.reduce((n, c) => n + c.amountMinor, 0) : null, currency: actual[0]?.currency ?? "MYR",
   };
 }
@@ -452,25 +468,26 @@ export type ApiImportPreview = { previewId: string; customerId: string; fileName
 export type ApiUnitImport = { id: string; version: number; customerId: string; createdPropertyIds: string[]; createdSpaceIds: string[]; createdUnitIds: string[]; skippedRowNumbers: number[]; undoUntil: string; state: "imported" | "undone" };
 export const importPlace = (r: ApiImportRow) => [r.propertyName, r.floorName, r.roomName].filter(Boolean).join(" › ");
 /** The row result in words (the message keys of units.importPreview). */
-export function importMessage(r: ApiImportRow): string {
+export function importMessage(r: ApiImportRow, t: T = en): string {
   const place = r.roomName ?? r.floorName ?? "";
   switch (r.messageKey) {
-    case null: return "Ready";
-    case "warning.importCreatesProperty": return `Property “${r.propertyName}” does not exist — it will be created (office; add its address afterwards).`;
-    case "warning.importCreatesSpace": return `“${place}” does not exist — it will be created.`;
-    case "error.unknownModel": return `Model ${r.modelCode} is not in the model register (A04).`;
-    case "error.serialBound": return `Serial ${r.serial} is already bound to another unit.`;
-    case "error.unknownSerial": return `Serial ${r.serial} is not a registered device.`;
-    case "error.duplicateSerial": return `Serial ${r.serial} appears more than once in this file.`;
-    case "error.tamperUnresolved": return `Device ${r.serial} has an unresolved tamper.`;
-    case "error.duplicateSiblingName": return `A unit named “${r.unitName}” already exists there.`;
-    case "error.future": return "The installation date is in the future.";
-    case "error.importInvalidDate": return "A date is not a valid YYYY-MM-DD date.";
-    case "error.importMissingField": return "Property, unit name and model are required.";
-    case "error.length": return "The unit name is longer than 120 characters.";
+    case null: return t("Ready");
+    case "warning.importCreatesProperty": return t("Property “{name}” does not exist — it will be created (office; add its address afterwards).", { name: r.propertyName });
+    case "warning.importCreatesSpace": return t("“{place}” does not exist — it will be created.", { place });
+    case "error.unknownModel": return t("Model {model} is not in the model register (A04).", { model: r.modelCode });
+    case "error.serialBound": return t("Serial {serial} is already bound to another unit.", { serial: r.serial ?? "" });
+    case "error.unknownSerial": return t("Serial {serial} is not a registered device.", { serial: r.serial ?? "" });
+    case "error.duplicateSerial": return t("Serial {serial} appears more than once in this file.", { serial: r.serial ?? "" });
+    case "error.tamperUnresolved": return t("Device {serial} has an unresolved tamper.", { serial: r.serial ?? "" });
+    case "error.duplicateSiblingName": return t("A unit named “{name}” already exists there.", { name: r.unitName });
+    case "error.future": return t("The installation date is in the future.");
+    case "error.importInvalidDate": return t("A date is not a valid YYYY-MM-DD date.");
+    case "error.importMissingField": return t("Property, unit name and model are required.");
+    case "error.length": return t("The unit name is longer than 120 characters.");
     default: return r.messageKey;
   }
 }
-export const errorReportCsv = (rows: ApiImportRow[]) => toCsv(["row", "property", "floor", "room", "unit_name", "model_code", "serial", "result", "message"],
-  rows.filter((r) => r.result !== "ready").map((r) => [String(r.rowNumber), r.propertyName, r.floorName ?? "", r.roomName ?? "", r.unitName, r.modelCode, r.serial ?? "", r.result, importMessage(r)]));
+/** The rows that are not ready, as a CSV with machine column names; the message in the user's language. */
+export const errorReportCsv = (rows: ApiImportRow[], t: T = en) => toCsv(["row", "property", "floor", "room", "unit_name", "model_code", "serial", "result", "message"],
+  rows.filter((r) => r.result !== "ready").map((r) => [String(r.rowNumber), r.propertyName, r.floorName ?? "", r.roomName ?? "", r.unitName, r.modelCode, r.serial ?? "", r.result, importMessage(r, t)]));
 

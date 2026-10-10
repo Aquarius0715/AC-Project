@@ -3533,3 +3533,45 @@ The other three tabs of `/admin/jobs` (FR-A06, FR-A21, FR-A22, DD-A06 item 9, DD
    - The other 12 HQ screens: units, devices, energy, MRV, offsets, billing, contracts, restrictions with exceptions, access, automation and audit.
    - The browser demo.
    - The assistant panel and the voice demo's answers.
+
+## IR293 HQ customers & units in the display language — 2026-10-10
+
+`/admin/units` (SCR-A02, FR-A02, FR-A17, FR-A18, FR-A19, DD-A02, Figma Admin 02) follows the display language and time zone.
+
+1. **Texts.** These are translated:
+   - the register: its tabs, KPI tiles, filters, the customer table and the contract badges;
+   - one customer: its header and KPIs, and the location tree with its menus;
+   - the property, space and unassigned cards; the units table with its power and connection filters;
+   - the unit edit, with its alert policies, blockers and archive note;
+   - the Alert policies tab with the default rules, and the Users tab;
+   - Warranty & coverage with the claims, and the CSV import wizard;
+   - the thirteen dialogs (customer, property, location, rename, delete location, new unit, relocate, delete unit, attach policies, invite, user change, warranty claim, CSV import), the toasts, the validation and the import messages.
+   The dictionary gains 401 entries. Unit types (split), plan codes (RTO …), permission names and API field names stay as they are.
+2. **Times and dates.**
+   - Instants are in the display time zone:
+     - the last edit of a location;
+     - when a unit was last seen ("today …", `relativeTime`);
+     - the day a default rule was switched;
+     - a job's completion on a warranty claim;
+     - the time an import can be undone until. Before, this was a fixed "… MYT".
+   - "Customer since" is the month in the user's language.
+   - These stay Kuala Lumpur days, in the user's language:
+     - a unit's installation date and warranty end, which are also typed as Kuala Lumpur days and say so;
+     - a contract's end ("until …").
+   - Weekday names in a policy condition come from the user's language ("Isn, Rab").
+   - The coverage CSV keeps its ISO warranty date (`endsDate`). The CSV column names stay machine names; status and message texts follow the language.
+   - HQ's client-user rows use the display too. IR267 had kept them English.
+3. **Code.**
+   - These assets helpers take the translator or the display: `standingMarks`, `customerRows`, `registerKpis`, `customerErrors`, `propertyErrors`, `placeOptions`, `unitRows`, `unitErrors`, `changedFields`, `conditionText`, `policyLines`, `defaultRules`, `coverageRows`, `coverageKpis`, `claimCandidate`, `importMessage` and `errorReportCsv`.
+   - English stays the default, so the customer screens that share them are unchanged.
+   - Counts have singular and plural keys ("1 rule", "{n} rules").
+4. **Checked.**
+   - Vitest: 43 files, 259 tests. `assets.test.ts` is new: standing marks and the register, units and the unit form, conditions and default rules, coverage with Kuala Lumpur warranty days and the CSV, import messages and the error report, a claim, and Malay / Tokyo.
+   - E2E: `admin/language.e2e.ts` also opens the register, one customer's locations, users and policies, and warranty & coverage in Malay; nothing is saved.
+   - The suite: 65 passed, 9 skipped; the users are en / Asia/Kuala_Lumpur.
+5. **Progress.** 33 of the 44 business screens follow the display language.
+6. **Still open.**
+   - Table rows that open a record (`DataTable` with `onRowClick`) take a mouse click only, with no keyboard focus or Enter. This is a shared-component gap across HQ screens.
+   - The other 11 HQ screens: devices, energy, MRV, offsets, billing, contracts, restrictions with exceptions, access, automation and audit.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.

@@ -3,9 +3,9 @@
 // the job statuses and the billing card — and its as-of time is in GMT+9 while the period stays Kuala Lumpur days, named
 // so; the Jobs tab speaks Malay too — tabs, scope, filters, the list and one job's detail with its times in GMT+9 — and
 // New job types its times in Asia/Tokyo; so do the Plans tab (its next date typed in Asia/Tokyo), the Contractors tab
-// (its dates named Kuala Lumpur days) and the SLA tab with its targets dialog (IR291), and the alerts with their
-// policies (IR292). Nothing is saved. English and the earlier zone come back at the end, or in afterEach when the test
-// fails.
+// (its dates named Kuala Lumpur days) and the SLA tab with its targets dialog (IR291), the alerts with their policies
+// (IR292), and customers & units — the register, one customer's locations, users and policies, and warranty & coverage
+// (IR293). Nothing is saved. English and the earlier zone come back at the end, or in afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
@@ -76,6 +76,25 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await main.getByRole("tab", { name: /^Polisi/ }).click();
   await page.waitForURL(/tab=policies/);
   await expect(main.getByRole("heading", { name: "Polisi amaran", exact: true })).toBeVisible();
+  // customers & units (IR293)
+  await page.goto("/admin/units");
+  await expect(main.getByRole("tab", { name: /^Pelanggan & unit/ })).toHaveAttribute("aria-selected", "true");
+  await expect(main.getByRole("heading", { name: "Pelanggan", exact: true })).toBeVisible();
+  await expect(main.getByRole("combobox", { name: "Status" })).toContainText("Status: Aktif");
+  await main.getByRole("row", { name: /Demo Customer A/ }).click();
+  await page.waitForURL(/customerId=/);
+  await expect(main.getByRole("tab", { name: /^Unit & lokasi/ })).toHaveAttribute("aria-selected", "true");
+  await expect(main.getByRole("heading", { name: "Lokasi", exact: true })).toBeVisible();
+  await expect(main).toContainText(/pelanggan sejak /);
+  await main.getByRole("tab", { name: /^Pengguna/ }).click();
+  await page.waitForURL(/tab=users/);
+  await expect(main.getByRole("heading", { name: /^Pengguna pelanggan / })).toBeVisible();
+  await main.getByRole("tab", { name: /^Polisi amaran/ }).click();
+  await page.waitForURL(/tab=policies/);
+  await expect(main.getByRole("heading", { name: /^Polisi amaran / })).toBeVisible();
+  await page.goto("/admin/units?tab=warranty");
+  await expect(main.getByRole("combobox", { name: "Liputan" })).toContainText("Liputan: Semua");
+  await expect(main.getByRole("heading", { name: "Unit mengikut tamat liputan", exact: true })).toBeVisible();
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/admin");
