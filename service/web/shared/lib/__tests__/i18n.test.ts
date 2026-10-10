@@ -34,7 +34,10 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
   const code = ["shared", "customer/app", "partner/app", "technician/app", "admin/app"].flatMap((d) => sources(join(root, d))).map((f) => readFileSync(f, "utf8")).join("\n");
 
   it("has a Malay text for every literal the code translates", () => {
-    const literals = [...code.matchAll(/\b(?:t\(|translate\(\s*[\w.]+,)\s*"((?:[^"\\]|\\.)*)"/g)].map((m) => JSON.parse(`"${m[1]}"`) as string);
+    const literals = [
+      ...code.matchAll(/\b(?:t\(|translate\(\s*[\w.]+,)\s*"((?:[^"\\]|\\.)*)"/g),
+      ...code.matchAll(/<Route(?:Loading|Error) what="((?:[^"\\]|\\.)*)"/g), // the route states translate what loads (IR269)
+    ].map((m) => JSON.parse(`"${m[1]}"`) as string);
     expect(literals.length).toBeGreaterThan(100);
     expect([...new Set(literals.filter((text) => !(text in ms)))]).toEqual([]);
   });

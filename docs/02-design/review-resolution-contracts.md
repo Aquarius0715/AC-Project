@@ -2806,3 +2806,26 @@ IR267 found that `identity.users.last_sign_in_at` was read by `clientUsers.list`
      - the owner's row shows the last sign-in in the IR44 format instead of "—";
      - the invite dialog refuses a bad address and an existing user in another letter case, and Cancel invites nobody.
      The suite: 57 passed, 9 skipped. After the run every user that signed in has a last sign-in in demo time; the preferences are en / Asia/Kuala_Lumpur, and all 47 E2E jobs are cancelled.
+
+## IR269 The failed-action toast and the route states in the display language — 2026-10-10
+
+These two parts are shared by the four apps; IR266 item 6 left them open.
+
+1. **Failure toast.** `actionMessage` builds its line from sentence templates in the display language:
+   - the field errors: "{field} is required", "{field} is out of range" and the others;
+   - the version conflict;
+   - the codes FORBIDDEN, NOT_FOUND, UNAVAILABLE, UNAUTHENTICATED and VALIDATION.
+   `useAction` passes the user's translator, so on a translated screen every failed Server Action reads in Malay. Preferences, two-step verification and the energy export pass it too. HQ's billing, contracts and alerts screens and HQ's energy page call it without one and stay English.
+   A field name ("Reason", from `reason`) and a domain message key ("Operation not running") stay humanized English: the API sends keys, not texts, and they have no fixed list.
+2. **Route states.** `RouteLoading` and `RouteError` (each segment's `loading.tsx` and `error.tsx`) translate:
+   - "Loading {what}…" and "{what} could not be loaded";
+   - the reference line, "Please try again." and "Try again".
+   `what` is a dictionary key. The 70 names of the four apps have Malay entries. The i18n key check now collects them from `<RouteLoading what="…">` and `<RouteError what="…">`, so a new route cannot miss its entry. On the partner, technician and HQ screens, these states show Malay before the screens themselves do.
+3. **Checked.**
+   - Vitest: 36 files, 197 tests. `actionMessage.test.ts` adds the Malay lines, and the key check covers the route names.
+   - E2E: 57 passed, 9 skipped. The users are en / Asia/Kuala_Lumpur, and all 49 E2E jobs are cancelled.
+4. **Still open.**
+   - The partner, technician and HQ screens.
+   - The browser demo's screens.
+   - The assistant panel and the voice demo's answers.
+   - The technician's QR dialog and device screens.

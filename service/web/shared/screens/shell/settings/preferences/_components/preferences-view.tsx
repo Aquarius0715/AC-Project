@@ -37,7 +37,7 @@ export function PreferencesView({ live }: { live: PreferencesLive }) {
   const dirty = locale !== live.prefs.locale || zone !== live.prefs.timezone || consentChanged || (live.client && monthly !== live.prefs.monthlyReportEmail);
   // monthlyReportEmail only from a client session (preferences.update refuses it otherwise, IR142 item 5)
   const save = () => run(() => savePreferences({ locale, timezone: zone, ...(live.client ? { monthlyReportEmail: monthly } : {}) }, consentChanged ? { granted: location, version: live.consent?.version ?? 0 } : null), t("Preferences saved"),
-    () => setFailed(null), (f) => setFailed(actionMessage(f)));
+    () => setFailed(null), (f) => setFailed(actionMessage(f, t)));
   const reset = () => { setLocale(live.prefs.locale); setZone(live.prefs.timezone); setLocation(live.consent?.granted ?? false); setMonthly(live.prefs.monthlyReportEmail); setFailed(null); };
   const tf = live.twoFactor;
   return (
@@ -82,7 +82,7 @@ function TurnOn({ setupKey, qr, onClose }: { setupKey: string | null; qr: QrPath
   const [codes, setCodes] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   return (
-    <Modal open onClose={onClose} title={t("Turn on two-step verification")} footer={codes ? <Btn variant="primary" onClick={onClose}>{t("I saved my codes")}</Btn> : <><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!codeComplete(code) || pending} onClick={() => run(() => enableTwoFactor(code), t("Two-step verification is on"), (c) => setCodes(c), (f) => setError(actionMessage(f)))}>{t("Verify & turn on")}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Turn on two-step verification")} footer={codes ? <Btn variant="primary" onClick={onClose}>{t("I saved my codes")}</Btn> : <><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!codeComplete(code) || pending} onClick={() => run(() => enableTwoFactor(code), t("Two-step verification is on"), (c) => setCodes(c), (f) => setError(actionMessage(f, t)))}>{t("Verify & turn on")}</Btn></>}>
       {codes ? <><Banner tone="ok">{t("Two-step verification is on. Save these {n} recovery codes — they are shown only once.", { n: codes.length })}</Banner><div className="grid grid-cols-2 gap-2 font-mono text-sm">{codes.map((c) => <span key={c} className="rounded-lg bg-surface2 px-3 py-1.5">{c}</span>)}</div></> : <div className="flex flex-col gap-3.5">
         <div className="flex flex-col gap-5 sm:flex-row">
           <div className="grid h-[150px] w-[150px] shrink-0 place-items-center rounded-lg border border-line bg-white p-2">{qr ? <QrCode qr={qr} label={t("QR code with the setup key for an authenticator app")} className="h-full w-full" /> : <span className="text-xs text-muted">{t("No setup key")}</span>}</div>
@@ -107,7 +107,7 @@ function TurnOff({ onClose }: { onClose: () => void }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   return (
-    <Modal open onClose={onClose} title={t("Turn off two-step verification")} footer={<><Btn onClick={onClose}>{t("Keep it on")}</Btn><Btn variant="danger" disabled={!codeComplete(code) || pending} onClick={() => run(() => disableTwoFactor(code), t("Two-step verification turned off"), onClose, (f) => setError(actionMessage(f)))}>{t("Turn off")}</Btn></>}>
+    <Modal open onClose={onClose} title={t("Turn off two-step verification")} footer={<><Btn onClick={onClose}>{t("Keep it on")}</Btn><Btn variant="danger" disabled={!codeComplete(code) || pending} onClick={() => run(() => disableTwoFactor(code), t("Two-step verification turned off"), onClose, (f) => setError(actionMessage(f, t)))}>{t("Turn off")}</Btn></>}>
       <Field label={t("Enter a 6-digit code from your authenticator app")}><CodeInput label={t("6-digit code")} value={code} onChange={setCode} autoFocus /></Field>
       {error && <p className="mt-2 text-xs text-crit">✕ {error}</p>}
     </Modal>
