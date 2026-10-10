@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.176.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
+Version: 0.177.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.177.0 (2026-10-10): The HQ alerts and alert policies in Malay, with the alerts' times in the user's time zone; the policy editor offers only the seven metrics the Core API takes for HQ (DD-A05, IR292).
 0.176.0 (2026-10-10): The HQ Plans, Contractors and SLA tabs in Malay — every tab of maintenance jobs now follows the display language. A plan's dates and an SLA target's start are in the user's time zone; the contractor register's dates stay Kuala Lumpur days. An SLA breach carries its response minutes, and a job cancelled before its response was due no longer counts as a miss (IR291).
 0.175.0 (2026-10-10): The HQ Jobs tab in Malay — tabs, scope, stage tiles, filters, rows, the job detail, the eight dialogs and New job — with its times in the user's time zone and the times HQ types read in it; business days stay Kuala Lumpur days. jobs.list gains a `type` filter, and the tab no longer filters in the browser, so its total counts what it shows (IR290).
 0.174.0 (2026-10-10): The HQ overview in Malay — filters, KPI tiles, the energy-saving forecast, the power and connection axes, the job statuses and the billing card — with its as-of time in the user's time zone and the period in Kuala Lumpur days, named so (IR289).

@@ -3500,3 +3500,36 @@ The other three tabs of `/admin/jobs` (FR-A06, FR-A21, FR-A22, DD-A06 item 9, DD
    - The other 13 HQ screens: alerts, units, devices, energy, MRV, offsets, billing, contracts, restrictions with exceptions, access, automation and audit.
    - The browser demo.
    - The assistant panel and the voice demo's answers.
+
+## IR292 The HQ alerts and alert policies in the display language; the HQ metrics as DD-A05 lists them — 2026-10-10
+
+`/admin/alerts` (SCR-A05, FR-A05, DD-A05, Figma Admin 05) follows the display language and time zone.
+
+1. **Texts.** These are translated:
+   - the tabs and the open / acknowledged / resolved tiles;
+   - the list of open alerts with the severity and state badges;
+   - the alert card (unit, context, evidence, cause, observed, evidence records), its note and the timeline;
+   - the policy list with the default policy first, and the policy editor: basics, owner and units, condition with the recovery check, severity, recipients and channels, cooldown and escalation;
+   - the resolve dialog, the toasts, the validation and the refusals.
+   The dictionary gains 68 entries. Cause codes (window_open …) stay codes, as in Figma, with "(suspected)" translated. Evidence texts stay as the Core API records them.
+2. **Times.**
+   - The list's and the timeline's times are in the display time zone, with "today / yesterday" for the days next to now (`relativeTime`).
+   - The observed and detected times are dates and times in that zone (`showTime`).
+   - The page formats all of them on the server. Before, they were fixed Kuala Lumpur "08:55" times without a date.
+   - The card's "detected" time showed the observed time. It now shows `detectedAt`.
+3. **State codes.** A row carries its state (open, acknowledged, resolved) beside its translated label. The tiles, the list filter and the buttons read the code, so the screen works in any language. The Phase 1A demo rows keep their English data.
+4. **HQ metrics.** The editor offered all ten metric labels, but the Core API takes seven for an HQ alert policy. Compressor cycles, airflow drop and heartbeat gap were refused as VALIDATION. The editor now offers the seven that DD-A05 item 10 and the API list (`HQ_METRICS`).
+5. **Code.**
+   - `adminAlertRows` takes the clock and the display; `policyRows` takes the translator.
+   - `policyErrors` is new: the form's checks in one place.
+   - `adminAlerts.test.ts` is new: order and rows, the timeline, the policies and their condition, the form checks and the HQ metrics, and Malay / Tokyo.
+6. **Checked.**
+   - Vitest: 42 files, 254 tests.
+   - E2E: `admin/language.e2e.ts` also opens the alerts and the policies in Malay; nothing is acknowledged, resolved or saved.
+   - The suite: 65 passed, 9 skipped; the users are en / Asia/Kuala_Lumpur, and the dev alerts are unchanged.
+7. **Progress.** 32 of the 44 business screens follow the display language.
+8. **Still open.**
+   - Resolving with evidence. IR66 and DD-A05 item 6 ask for an evidence ID when an alert without a policy is resolved. Like the technician's screen (IR284), the HQ dialog sends a reason only, and the Core API takes an empty list. It needs the evidence records behind `evidenceIds` (IR284, still open).
+   - The other 12 HQ screens: units, devices, energy, MRV, offsets, billing, contracts, restrictions with exceptions, access, automation and audit.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.

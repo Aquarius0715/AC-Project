@@ -3,8 +3,9 @@
 // the job statuses and the billing card — and its as-of time is in GMT+9 while the period stays Kuala Lumpur days, named
 // so; the Jobs tab speaks Malay too — tabs, scope, filters, the list and one job's detail with its times in GMT+9 — and
 // New job types its times in Asia/Tokyo; so do the Plans tab (its next date typed in Asia/Tokyo), the Contractors tab
-// (its dates named Kuala Lumpur days) and the SLA tab with its targets dialog (IR291). Nothing is saved. English and the
-// earlier zone come back at the end, or in afterEach when the test fails.
+// (its dates named Kuala Lumpur days) and the SLA tab with its targets dialog (IR291), and the alerts with their
+// policies (IR292). Nothing is saved. English and the earlier zone come back at the end, or in afterEach when the test
+// fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
@@ -64,6 +65,17 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(targets).toContainText("masa dalam Asia/Tokyo");
   await targets.getByRole("button", { name: "Batal", exact: true }).click();
   await expect(targets).toBeHidden();
+  // the alerts and their policies (IR292): nothing acknowledged or resolved
+  await page.goto("/admin/alerts");
+  await expect(main.getByRole("tab", { name: /^Amaran/ })).toHaveAttribute("aria-selected", "true");
+  await expect(main.getByRole("heading", { name: "Amaran terbuka · semua pelanggan", exact: true })).toBeVisible();
+  if (await main.getByRole("button", { name: "Akui", exact: true }).count()) {
+    await expect(main.getByRole("button", { name: "Selesaikan…" })).toBeVisible();
+    await expect(main).toContainText(/dikesan .*GMT\+9/); // the detection time in the display zone
+  }
+  await main.getByRole("tab", { name: /^Polisi/ }).click();
+  await page.waitForURL(/tab=policies/);
+  await expect(main.getByRole("heading", { name: "Polisi amaran", exact: true })).toBeVisible();
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/admin");
