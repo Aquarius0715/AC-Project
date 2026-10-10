@@ -4237,3 +4237,25 @@ IR313 typed every call's input. The results were still typed by hand in the web,
    - The cmd/gen/ops test passes.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR315 The customer screens checked against Figma — 2026-10-11
+
+The visible text of sixteen customer screens in API mode was compared with their default Figma states (Client 01a, 02a, 02e, 03a, 04a, 04c, 05a, 06a, 06e, 07a, 07j, 08a, 08b, 10c, 10d, 11a). Most differences come from the data: Figma shows its own demo rows, while the API seed is the fixture contract with fewer units. The differences that are not data are fixed here.
+
+1. **The AC can be renamed on its screen (Figma 02e, DD-C03).** The unit screen now has ✎ Rename, as DD-C03 already described. It opens the rename dialog of Units & locations (Figma 02b / 02c), which now lives in the customer app's shared components. Saving calls `locations.rename` with kind `unit` and the unit's version. A duplicate name among the AC's siblings keeps the input, and so does a version conflict, which says the page now shows the current name. The new `customer/unit-rename` E2E spec renames Bedroom AC and gives it back its seed name, also in afterEach.
+2. **A load cause is not a fault (Figma 06a, DD-C08).** The customer's alert inbox showed “✕ Fault” for every alert that was not an inspection record, a maintenance reminder or an air-quality alert. That included the seed's “Possible open window”. An open window or poor insulation (`causeCode` window_open / insulation_loss) is now “⌂ Load cause (possible)”, with Malay; an inspection record still says so first.
+3. **Repair requests are for faults (IR243 item 5).** “Request repair” showed on every unresolved alert that was not a maintenance reminder, the load causes included. It now shows only for faults, as IR243 says and Figma 06a draws. IR243 named the button after Figma, so the Figma texts “Request maintenance” become “Request repair” in 02h, 06a, 06b, 06c and 06g.
+4. **An offline AC offers a repair request (Figma 02h).** Below the disabled controls, the unit screen now says “Controls disabled while offline — try again when the unit reconnects, or request a repair.” It links to a new repair request for the unit, the same link as IR243's.
+5. **The users page names its customer (Figma 11a).** The heading reads “Users of {customer}” and the invite dialog “Invite a member to {customer}”, from the session's organization name, in both languages. The users E2E spec checks both.
+6. **Not changed, by design or by data.**
+   - The unit's device information shows only what the contract has: the model, remote control and capabilities. Wi-Fi strength, firmware, protocol and uptime stay in the Phase 1A demo.
+   - Figma 02e's Single AC / Group control switch is replaced by a sentence that points to group control in Units & locations (02m).
+   - Wording that later IRs changed stays as built: the preferences hint (IR258), the consent text (IR84) and the notifications footnote (IR113).
+7. **The dev data drifts with the E2E runs.** The specs restore what they change, but they leave records behind: every run cancels its scenario jobs (151 so far) and leaves their notifications (more than 1,400 for the customer). Filter cleanings that a spec marks cannot be undone, and each consent toggle leaves a revoke time. The customer's lists are full of these records. A reset of the dev DB to the seed, with the suite run on that fresh seed, is the next step.
+8. **Checked.**
+   - The typecheck of the four apps, the shared package and the E2E passes. This also fixes the type error that IR314's ventilation test left in the shared tests (a readonly fixture). Lint passes.
+   - Vitest: 61 files, 349 tests.
+   - All four apps build.
+   - E2E: 72 passed, 9 skipped. The dev data is unchanged apart from the scenario's two cancelled jobs.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

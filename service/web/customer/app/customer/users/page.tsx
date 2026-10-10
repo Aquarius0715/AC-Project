@@ -4,7 +4,7 @@
 // and removal stay with HQ (DD-A17). Texts and times in the user's display language and time zone (IR267). The Phase 1A
 // demo keeps the local user store.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreDisplay, corePrincipal } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreIdentity, corePrincipal } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { clientUserRows, type ApiClientUser } from "@ac/web/lib/assets";
 import { UsersDemo } from "./_components/users-demo";
@@ -15,8 +15,8 @@ export default async function CustomerUsersPage() {
   if (!apiMode()) return <UsersDemo />;
   const me = await corePrincipal();
   if (me.clientRole !== "owner") return <UsersView live={null} />;
-  const [users, display] = await Promise.all([coreAll<ApiClientUser>("clientUsers.list"), coreDisplay()]);
+  const [users, display, identity] = await Promise.all([coreAll<ApiClientUser>("clientUsers.list"), coreDisplay(), coreIdentity()]);
   const i = i18nOf(display);
   const customerId = users.find((u) => u.membershipId === me.membershipId)?.customerId ?? users[0]?.customerId ?? "";
-  return <UsersView live={{ customerId, rows: clientUserRows(users, (m) => (m === me.membershipId ? i.t("you") : "HQ"), me.membershipId, i), emails: users.map((u) => u.email) }} />;
+  return <UsersView live={{ customerId, customer: identity.organizationName, rows: clientUserRows(users, (m) => (m === me.membershipId ? i.t("you") : "HQ"), me.membershipId, i), emails: users.map((u) => u.email) }} />;
 }

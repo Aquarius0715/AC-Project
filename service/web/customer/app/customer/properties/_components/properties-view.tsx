@@ -3,16 +3,16 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Banner, Btn, Card, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Input, Modal, Page, PowerBadge, SummaryList, useToast } from "@ac/web/components/ui";
-import { useAction } from "@ac/web/lib/useAction";
+import { Badge, Banner, Btn, Card, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Modal, Page, PowerBadge, SummaryList, useToast } from "@ac/web/components/ui";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import { nameError, type Connection, type PowerState, type Selection, type TreeProperty, type TreeSpace } from "@ac/web/lib/assets";
+import type { Connection, PowerState, Selection, TreeProperty, TreeSpace } from "@ac/web/lib/assets";
 import { changeText, groupPlan, type GroupChange, type PlanRow, type RoomUnit } from "@ac/web/lib/clientProperties";
 import { historyRow, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 import { waitForCommand } from "@ac/web/lib/unitCommands";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import type { T } from "@ac/web/lib/i18n";
-import { renameLocation, sendCommand } from "../actions";
+import { sendCommand } from "../actions";
+import { RenameModal, type Renaming } from "../../_components/rename-modal";
 
 export type PropertiesLive = {
   tree: TreeProperty[]; selection: Selection | null; owner: boolean;
@@ -27,7 +27,6 @@ const powerLabel: Record<PowerState, string> = { on: "Running", off: "Stopped", 
 const units_ = (t: T, n: number) => t(n === 1 ? "{n} unit" : "{n} units", { n });
 const acs_ = (t: T, n: number) => t(n === 1 ? "{n} AC" : "{n} ACs", { n });
 const kind = (t: T, k: string) => t(kindLabel[k] ?? k);
-type Renaming = { kind: "property" | "space"; id: string; version: number; name: string; where: string };
 
 /** Units & locations (FR-C02) in API mode: the structure is read only (HQ manages it) except renaming; a room lists its
  * air conditioners, and owners can send one change to several of them (Group control, FR-C14). */
@@ -167,31 +166,6 @@ function Panel({ live, sel, rename, go }: { live: PropertiesLive; sel: Selection
         </>}
       </Card>
     </>
-  );
-}
-
-function RenameModal({ r, onClose }: { r: Renaming; onClose: () => void }) {
-  const t = useT();
-  const [pending, run] = useAction();
-  const [name, setName] = useState(r.name);
-  const [err, setErr] = useState<string | undefined>();
-  const save = () => {
-    const e = nameError(name, t);
-    if (e) return setErr(e);
-    run(() => renameLocation(r.kind, r.id, r.version, name), t("Renamed to “{name}”", { name: name.trim() }), onClose, (f) => {
-      if (f.messageKey === "error.duplicateSiblingName") setErr(t("“{name}” already exists there — choose another name. Your input is kept.", { name: name.trim() }));
-      else if (f.messageKey === "error.versionConflict") setErr(t("Someone renamed it in the meantime — the tree now shows the current name. Your input is kept."));
-      else setErr(undefined);
-    });
-  };
-  return (
-    <Modal open onClose={onClose} title={t("Rename {name}", { name: r.name })} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || name.trim() === r.name} onClick={save}>{t("Save name")}</Btn></>}>
-      <div className="flex flex-col gap-3">
-        <p className="text-[13px] text-muted">{t("Only the name changes. Floors, rooms and units stay as they are — HQ manages the structure.")}</p>
-        <SummaryList items={[[t("Location"), r.where]]} />
-        <Field label={t("New name")} hint={t("1–120 characters, unique among its siblings. HQ and technicians see the new name too.")} error={err}><Input value={name} onChange={(e) => { setName(e.target.value); setErr(undefined); }} autoFocus /></Field>
-      </div>
-    </Modal>
   );
 }
 

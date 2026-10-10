@@ -13,6 +13,14 @@ export type ApiAlert = {
 const causeTitle: Record<string, string> = { window_open: "Possible open window", insulation_loss: "Poor insulation suspected" };
 const typeTitle: Record<string, string> = { maintenance: "Filter cleaning reminder", quality: "Air quality alert", tamper: "Device tamper", reconciliation_required: "Restriction check needed", sensor: "Sensor alert" };
 const evidenceLabel: Record<string, string> = { inferred: "Evidence (inferred)", inspection: "Inspection record", demo_observation: "Evidence (demo observation)" };
+/** The kind of an alert (Figma Client 06a, DD-C08): an inspection record; a load cause — an open window or poor
+ * insulation — that is only suspected, never a fault (BIZ-17, IR315); a maintenance reminder; an air-quality alert;
+ * else a fault. */
+export type AlertKind = "inspection" | "load" | "maintenance" | "quality" | "fault";
+const kindOf = (a: Pick<ApiAlert, "type" | "causeCode" | "evidenceKind">): AlertKind =>
+  a.evidenceKind === "inspection" ? "inspection" : a.causeCode === "window_open" || a.causeCode === "insulation_loss" ? "load"
+    : a.type === "maintenance" ? "maintenance" : a.type === "quality" ? "quality" : "fault";
+const kindLabel: Record<AlertKind, string> = { inspection: "✎ Inspection record", load: "⌂ Load cause (possible)", maintenance: "◷ Maintenance reminder", quality: "≋ Air quality", fault: "✕ Fault" };
 
 /** The display title of an alert: its suspected cause, else its type — in the display language (IR260). */
 export function alertTitle(a: Pick<ApiAlert, "causeCode" | "type">, t: T = translator("en")): string {
@@ -24,7 +32,9 @@ export function alertTitle(a: Pick<ApiAlert, "causeCode" | "type">, t: T = trans
 /** A notification about an alert (Notification of service-contracts.ts: the fields the inbox needs). */
 export type AlertNote = { id: string; version: number; sourceAlertId: string | null; readAt: string | null };
 export type InboxAlert = {
-  id: string; unitId: string; type: string; title: string; severity: "critical" | "warning" | "normal"; kind: string; where: string; evidence: string; group: "attn" | "info";
+  id: string; unitId: string; type: string; title: string; severity: "critical" | "warning" | "normal";
+  /** cause is the kind code; kind is its badge in the display language */
+  cause: AlertKind; kind: string; where: string; evidence: string; group: "attn" | "info";
   /** state is the alert's status (open / acknowledged / resolved); text and detail are in the display language */
   status: { state: "open" | "acknowledged" | "resolved"; text: string; tone: "warn" | "primary" | "ok" | "muted"; detail: string };
   /** the signed-in membership's notifications about the alert: unread ones (marked read on opening) and how many exist */
@@ -48,7 +58,7 @@ export function inboxAlerts(alerts: ApiAlert[], notes: AlertNote[], unit: (id: s
       : { state: "open" as const, text: t("Unresolved"), tone: a.severity === "normal" ? "muted" as const : "warn" as const, detail: t("Open — not resolved yet") };
     return {
       id: a.id, unitId: a.unitId, type: a.type, title: alertTitle(a, t), severity: a.severity,
-      kind: t(a.evidenceKind === "inspection" ? "✎ Inspection record" : a.type === "maintenance" ? "◷ Maintenance reminder" : a.type === "quality" ? "≋ Air quality" : "✕ Fault"),
+      cause: kindOf(a), kind: t(kindLabel[kindOf(a)]),
       where: t("{where} · detected {when}", { where: u ? `${u.name}${u.place ? ` · ${u.place}` : ""}` : "AC", when: stamp(a.detectedAt) }),
       evidence: `${t(evidenceLabel[a.evidenceKind] ?? "Evidence")}: ${a.evidenceText}`,
       group: attn(a) ? "attn" : "info", status,

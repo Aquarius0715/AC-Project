@@ -13,7 +13,7 @@ const failure = (e: unknown): ActionResult<never> => (e instanceof CoreError
   : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} });
 
 /** locations.rename: only the name changes (trimmed 1–120, unique among siblings, IR109). */
-export async function renameLocation(kind: "property" | "space", id: string, version: number, name: string): Promise<ActionResult> {
+export async function renameLocation(kind: "property" | "space" | "unit", id: string, version: number, name: string): Promise<ActionResult> {
   try {
     await coreOp("locations.rename", { target: { kind, id }, name: name.trim() }, { write: true, expectedVersion: version });
     return { ok: true, value: null };

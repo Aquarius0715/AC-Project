@@ -1,6 +1,6 @@
 ---
 document_id: DD-C
-version: 0.32.0
+version: 0.33.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -144,7 +144,7 @@ Scope: FR-C03 / Main display pattern: **UI-DETAIL**. Service boundary: `units.ge
 3. Create one Command and show the requested value separately. Update confirmed settings only after the device returns acknowledged. Keep the request and reason in history even on failure.
 4. Queries to update: `commands / unit detail / telemetry summary / audit`。
 
-**Boundary cases and failures**: For demo capability 16–30 degrees in 1-degree steps, reject 15, 31, and 24.5 degrees. Offline units, other customers' units, restriction violations, and late acknowledgements are not successes. Follow IR46 for actions under restrictions and IR47 for connection/power-signal rejection.
+**Boundary cases and failures**: For demo capability 16–30 degrees in 1-degree steps, reject 15, 31, and 24.5 degrees. Offline units, other customers' units, restriction violations, and late acknowledgements are not successes. Follow IR46 for actions under restrictions and IR47 for connection/power-signal rejection. An offline AC sends nothing; below the disabled controls the screen offers Request repair, a new repair request for the AC (Figma 02h, IR315).
 
 **Alert policies on this AC (IR108)**: A card lists the default policy (always attached, “n of 6 rules on”, View) and the customer policies attached to the AC (`ACUnit.alertPolicyIds`, details from `policies.list` with `unitId`) with Detach. “+ Attach policy” opens a centered modal listing the customer’s other policies with checkboxes (“Already attached” disabled) and a link to create a new policy in Alerts › Alert policies; saving calls `units.setAlertPolicies` with the full list. ✎ Rename renames the AC (`locations.rename`, kind=unit).
 
@@ -293,7 +293,7 @@ Scope: FR-C07 / Main display pattern: **UI-ANALYSIS**. Service boundary: `teleme
 
 **Display and Processing for Load Alerts from Open Windows or Poor Insulation (BIZ-17)**
 
-Add causeCode (window_open/insulation_loss/unknown), evidenceKind (demo_observation/inferred/inspection), evidenceText, and observedAt to Alert from alerts.list. causeCode and evidenceKind are required; use unknown if evidence is unavailable. Do not hard-code specific claims such as “Electricity cost doubles.” Label inference “Suspected” and inspected findings “Inspection record.” From notification details, allow navigation to the same unitId or its maintenance request screen.
+Add causeCode (window_open/insulation_loss/unknown), evidenceKind (demo_observation/inferred/inspection), evidenceText, and observedAt to Alert from alerts.list. causeCode and evidenceKind are required; use unknown if evidence is unavailable. Do not hard-code specific claims such as “Electricity cost doubles.” Label inference “Suspected” and inspected findings “Inspection record.” In the inbox an open window or poor insulation is “Load cause (possible)”, never a fault, and only a fault offers Request repair (IR243, IR315). From notification details, allow navigation to the same unitId or its maintenance request screen.
 
 Verification: AT-C08-SRC. Prepare three fixtures: suspected open window, inspection record of poor insulation, and no evidence. Check that wording, evidence, and time differ. Marking read does not resolve the alert itself.
 
@@ -659,6 +659,6 @@ Convert condition forms to the Condition type's discriminated union. occupancy i
 
 2026-09-16 approved updates: C01/C06 period boundaries follow SR17. C13 retry follows SR18 like A15; get the current version and attemptId through offsets.list.
 
-Additional contracts for current version 0.32.0: Read IR01–IR314 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.33.0: Read IR01–IR315 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

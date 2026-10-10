@@ -11,6 +11,7 @@ import { waitForCommand } from "@ac/web/lib/unitCommands";
 import { showClock, showTime } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
 import { createCommand, setUnitAlertPolicies } from "../actions";
+import { RenameModal } from "../../../_components/rename-modal";
 
 export type PolicyOption = { id: string; name: string; rule: string };
 
@@ -41,6 +42,7 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
   const [mode, setMode] = useState<"cool" | "dry" | "fan">("cool");
   const [fan, setFan] = useState<"low" | "mid" | "high">("mid");
   const [confirm, setConfirm] = useState(false);
+  const [renaming, setRenaming] = useState(false); // ✎ Rename of the AC (Figma 02e, DD-C03, IR315)
   // api mode: start the controls from the device-reported setting when another unit or a newer report arrives
   // (adjust state during render, React "You might not need an effect")
   const reported = d ? `${d.id}|${d.observedState.observedAt}` : null;
@@ -146,7 +148,7 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
         </Card>
 
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={unit.name} sub={api ? unit.loc : `${unit.loc} · ${unit.id}`} action={<span className="flex items-center gap-2"><PowerBadge s={unit.state} /><ConnBadge s={unit.conn} /></span>}>
+          <Card title={unit.name} sub={api ? unit.loc : `${unit.loc} · ${unit.id}`} action={<span className="flex items-center gap-2"><Btn size="sm" variant="ghost" onClick={() => setRenaming(true)}>{t("✎ Rename")}</Btn><PowerBadge s={unit.state} /><ConnBadge s={unit.conn} /></span>}>
             {offline ? <Banner tone="warn">{t("This AC is offline. Remote actions are disabled until the connection returns. Last seen {when}.", { when: unit.obs })}</Banner> : (
               <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
                 <Stat label={t("Room temperature (measured)")} value={room?.text ?? "—"} sub={room ? t("observed {at}", { at: room.at }) : t("no recent measurement")} />
@@ -169,6 +171,12 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
               <div><div className="mb-1 font-semibold">{t("Fan speed")}</div><Choice value={fan} onChange={setFan} options={(["low", "mid", "high"] as const).map((f) => ({ id: f, label: t(FAN_LABEL[f]) }))} /></div>
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t((d ? changes().length : 1) === 1 ? "{n} change:" : "{n} changes:", { n: d ? changes().length : 1 })}</b> {d ? changes().map(changeText).join(" · ") || t("No change yet") : t("Set temperature {from}°C → {to}°C", { from: 26, to: temp })}<br /><span className="text-muted">{t("Target: {name} only · you will confirm before sending", { name: unit.name })}</span></span><Btn variant="primary" disabled={disabled || waiting || (d !== null && changes().length === 0)} onClick={() => setConfirm(true)}>{waiting ? t("Waiting for device…") : t("Review & send")}</Btn></div>
               {waiting && <Banner>{t("Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).")}</Banner>}
+              {offline && ( // Figma 02h: nothing is sent to an offline AC; a repair request is the way forward (IR243, IR315)
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs">
+                  <span><b>{t("Controls disabled while offline")}</b><br /><span className="text-muted">{t("Try again when the unit reconnects, or request a repair.")}</span></span>
+                  <Link href={`/customer/maintenance?new=${d?.id ?? unit.id}`} className="rounded-control bg-primary-soft px-2.5 py-1 font-semibold text-primary">{t("Request repair")}</Link>
+                </div>
+              )}
             </div>
           </Card>
           <div className="split-even">
@@ -192,6 +200,7 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
         <p className="mb-2 text-[13px] text-muted">{t("Only your account’s policies are listed. The default policy is always attached.")}</p>
         <div className="flex flex-col gap-2">{customerPolicies.filter((pl) => !attached.includes(pl.id)).map((pl) => <Check key={pl.id} label={<span><b>{pl.name}</b> <span className="text-xs text-muted">{pl.rule}</span></span>} checked={picked.includes(pl.id)} onChange={(v) => setPicked((x) => (v ? [...x, pl.id] : x.filter((y) => y !== pl.id)))} />)}</div>
       </Modal>
+      {renaming && <RenameModal demo={!api} r={{ kind: "unit", id: d?.id ?? unit.id, version: d?.version ?? 1, name: unit.name, where: `${unit.loc} › ${unit.name}` }} onClose={() => setRenaming(false)} />}
     </Page>
   );
 }

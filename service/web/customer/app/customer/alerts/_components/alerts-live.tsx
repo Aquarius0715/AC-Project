@@ -50,7 +50,7 @@ export function AlertsLiveView({ live }: { live: AlertsLive }) {
         <div className="mt-2 flex flex-wrap gap-2">
           <Link href={`/customer/units/${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("View unit")}</Link>
           {a.type === "maintenance" && a.status.state !== "resolved" && <Link href="/customer/maintenance?tab=filter-care" className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Book cleaning")}</Link>}
-          {a.type !== "maintenance" && a.group === "attn" && <Link href={`/customer/maintenance?new=${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Request repair")}</Link>}
+          {a.cause === "fault" && a.group === "attn" && <Link href={`/customer/maintenance?new=${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Request repair")}</Link>}
         </div>
       </div>
       <button type="button" aria-label={t("Open {title}", { title: a.title })} onClick={() => show(a)} className="text-muted">›</button>

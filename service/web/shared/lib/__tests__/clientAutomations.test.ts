@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  actionLabel, actionOptions, apiErrors, consentCard, draftErrors, draftOf, eventTest, ruleCard, runClock, runText, saveInput, scheduleTest, summaryText, weekdaysText, whenText, type ApiAutomation,
+  actionLabel, actionOptions, apiErrors, consentCard, draftErrors, draftOf, eventTest, ruleCard, runClock, runText, saveInput, scheduleTest, summaryText, weekdaysText, whenText, type ApiAutomation, type Caps,
 } from "@ac/web/lib/clientAutomations";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
@@ -58,7 +58,7 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
 });
 
 describe("ventilation in a customer rule (DD-C05 “within unit capabilities”, IR314)", () => {
-  const fresh = { control: true, modeControl: false, fanControl: false, temperature: null, modes: [], fanLevels: [], ventilation: true, ventilationLevels: ["low", "high"] } as const;
+  const fresh: Caps = { control: true, modeControl: false, fanControl: false, temperature: null, modes: [], fanLevels: [], ventilation: true, ventilationLevels: ["low", "high"] };
   it("offers ventilation on a model with a fresh-air function, and the AC settings only with control", () => {
     expect(actionOptions(fresh).map((g) => g.group)).toEqual(["Power", "Ventilation"]);
     expect(actionOptions(fresh)[1].options).toEqual([{ key: "vent:low", label: "Ventilate low" }, { key: "vent:high", label: "Ventilate high" }]);

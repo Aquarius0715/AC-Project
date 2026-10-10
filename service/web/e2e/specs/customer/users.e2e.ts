@@ -5,6 +5,7 @@ import { test, expect } from "../../fixtures/test";
 
 test("the owner's own row shows the last sign-in", async ({ page }) => {
   await page.goto("/customer/users");
+  await expect(page.getByRole("heading", { name: /^Users of \S/, level: 1 })).toBeVisible(); // names the customer (Figma 11a, IR315)
   const me = page.locator("main tr", { hasText: "(you)" });
   await expect(me).toBeVisible();
   await expect(me.locator("td").nth(3)).toHaveText(/^\d{1,2} \w+ \d{4}, \d{1,2}:\d{2} (am|pm) MYT$/); // IR44, not "—"
@@ -17,6 +18,7 @@ test("the invite dialog refuses a bad or existing address and invites nobody whe
   expect(email).not.toBe("");
   await page.getByRole("button", { name: "+ Invite member" }).click();
   const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: /^Invite a member to \S/ })).toBeVisible();
   await dialog.getByLabel("Email").fill("not-an-address");
   await dialog.getByRole("button", { name: "Send invite" }).click();
   await expect(dialog).toContainText("A valid email address (up to 254 characters)");

@@ -1,12 +1,12 @@
 {
-  "version": "0.198.0",
-  "spec_baseline_id": "d802f3f2afca84de16414d4dd5137f76623e50056075856c13a8494b76d3ebbc",
+  "version": "0.199.0",
+  "spec_baseline_id": "192ec3e827064434e584492283b21c69b17a3ad395770f3fab1deeda8b12fa92",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "749f894707c0287d9a36f4c94a3f4c18c226ea43a53ec790234385d2c2282ad6"
+      "sha256": "2c981192a57cde637435efe1a29648ab1b695d355477edf63b5284a852718190"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -110,11 +110,11 @@
     },
     {
       "path": "02-design/client.md",
-      "sha256": "76cd333e232fbd4d1f3d8eacce25919772f1b3e04797eac9984c7d1990ab9010"
+      "sha256": "d94f9ce0d1a6ba7356ab75be04192fabded8debf6e15ffc75300199c61804de6"
     },
     {
       "path": "02-design/common.md",
-      "sha256": "4a5746b419fb4ad00b769d2193a4461498e56dc1c5460b5ddf7cad1b2444a030"
+      "sha256": "ed695e86afed6928eed3c88ab90abf7f10da203ab0f4bd581f5fb92f2f96723a"
     },
     {
       "path": "02-design/container-design.md",
@@ -154,7 +154,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "3c51d9cc5063242936506902f8ddfbafb255ecaafe2808d3eaf51edf89a313fd"
+      "sha256": "038f5496d159c308916f98b3663fa8f960368cae8bddce0a4c17eb0112ad458b"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -282,7 +282,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "91eb8c76316bf9abb358964097504c138d6dd40281e86e75e154f282fc94cce3"
+      "sha256": "101c52c9f16464200d33f4526606bb0e630af12fc61ec20299fcde4a07e5efef"
     },
     {
       "path": "tools/check_review_regressions.py",
@@ -294,7 +294,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "f0e1fb5d9c6a4b2ba8ea7587553fd882aeddd924fe128f5257ba1044e515ff9b"
+      "sha256": "5ee1b94064e5cf4818f239fe679f09e8bce82744e92791d16132ad3fa8d0e13b"
     }
   ]
 }

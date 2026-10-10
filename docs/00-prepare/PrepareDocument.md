@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.198.0
+version: 0.199.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -269,6 +269,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.199.0: The customer screens checked against Figma: the AC renamed on its screen, load causes not faults, repair requests for faults and offline ACs, the users page names its customer (IR315). Phase 1A unchanged.
 0.198.0: The web's result types are checked against the contract; restriction commands named, ventilating rules kept, ended technician jobs handled (IR314). Phase 1A unchanged.
 0.197.0: Every Core API call of the web is typed by the contract (IR313). Phase 1A unchanged.
 0.196.0: The customer overview shows the next run again; the web's calls are checked against the contract (IR312). Phase 1A unchanged.
