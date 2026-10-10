@@ -83,3 +83,24 @@ func TestDeviceHistory(t *testing.T) {
 		t.Fatalf("assigned technician note: %d %v", code, m)
 	}
 }
+
+// A unit holds one device at a time (error.unitHasDevice), and only a bound device is calibrated (error.deviceNotBound).
+func TestDeviceBindingRefusals(t *testing.T) {
+	s := server(t)
+	u := newUnit(t, s, "Bind AC")
+	register := func(prefix string) map[string]any {
+		_, m := write(s, &hq, "devices.register", `{"serial":"`+prefix+`-`+uuid.NewString()[:8]+`","sensorTypes":["temperature"],"unitId":"`+u+`"}`, 0)
+		return data(m)
+	}
+	first, second := register("BA"), register("BB")
+	sensor := second["sensors"].([]any)[0].(map[string]any)["id"].(string)
+	if code, m := write(s, &hq, "devices.calibrate", `{"deviceId":"`+second["id"].(string)+`","sensorId":"`+sensor+`","metric":"temperature","unit":"°C","referenceValue":25,"measuredValue":25.2,"calibratedAt":"2026-09-14T00:10:00Z"}`, 1); code != 409 || m["messageKey"] != "error.deviceNotBound" {
+		t.Errorf("calibrate an unbound device: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "devices.bind", `{"deviceId":"`+first["id"].(string)+`","unitId":"`+u+`","reason":"install"}`, 1); code != 200 {
+		t.Fatalf("bind: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "devices.bind", `{"deviceId":"`+second["id"].(string)+`","unitId":"`+u+`","reason":"install"}`, 1); code != 409 || m["messageKey"] != "error.unitHasDevice" {
+		t.Errorf("a second device on the unit: %d %v", code, m)
+	}
+}

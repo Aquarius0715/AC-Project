@@ -203,6 +203,9 @@ func TestJobsReadAndTransitions(t *testing.T) {
 	}
 
 	// hold / resume / cancel state table
+	if code, _ := write(s, &hq, "jobs.hold", `{"jobId":"`+uuid.NewString()+`","reason":"parts"}`, 1); code != 404 {
+		t.Error("hold of an unknown job")
+	}
 	if code, _ := write(s, &hq, "jobs.hold", `{"jobId":"`+job+`","reason":"parts"}`, 3); code != 409 {
 		t.Error("hold from requested")
 	}

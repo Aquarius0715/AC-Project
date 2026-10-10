@@ -119,8 +119,20 @@ func TestSlotProposals(t *testing.T) {
 	if code, m := respond(&customerA, j2, p3, `"decision":"accept"`, 2); code != 200 || data(m)["status"] != "offered" {
 		t.Fatalf("accept contractor hold: %d %v", code, m)
 	}
-	if _, m := post(s, &hq, "jobs.get", `{"jobId":"`+j2+`"}`); data(m)["offer"].(map[string]any)["visitSlot"].(map[string]any)["startAt"] != ts(98) {
-		t.Fatalf("offer at the proposal slot: %v", data(m)["offer"])
+	if _, m := post(s, &hq, "jobs.get", `{"jobId":"`+j2+`"}`); data(m)["offer"].(map[string]any)["visitSlot"].(map[string]any)["startAt"] != ts(98) ||
+		data(m)["offer"].(map[string]any)["offerExpiresAt"] != ts(24) {
+		t.Fatalf("offer at the proposal slot, open for 24 hours: %v", data(m)["offer"])
+	}
+	// a slot that starts sooner than that closes the offer at its start
+	_, m = write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)
+	soon := data(m)["id"].(string)
+	propose(soon, slotJSON(98, 2), contractorHold, ts(48), 1)
+	owner(t, `UPDATE maintenance.slot_proposals SET slot = tstzrange($2, $3) WHERE job_id = $1 AND status = 'pending'`, soon, clock.Add(10*time.Hour), clock.Add(12*time.Hour))
+	if code, m := respond(&customerA, soon, proposalOf(soon), `"decision":"accept"`, 2); code != 200 || data(m)["status"] != "offered" {
+		t.Fatalf("accept a slot in 10 hours: %d %v", code, m)
+	}
+	if _, m := post(s, &hq, "jobs.get", `{"jobId":"`+soon+`"}`); data(m)["offer"].(map[string]any)["offerExpiresAt"] != ts(10) {
+		t.Errorf("offer closes at the slot start: %v", data(m)["offer"])
 	}
 
 	// decline with three new preferred times

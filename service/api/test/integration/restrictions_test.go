@@ -541,6 +541,21 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 	if code != 200 || data(m)["state"] != "released" || unitState(m, u)["releaseState"] != "not_required" || unitState(m, u)["applyState"] != "not_applied" {
 		t.Fatalf("reconcile not applied: %d %v", code, m)
 	}
+	// the client reads the state changes only: the reconcile stays HQ's record (IR42)
+	actions := func(events []any) map[string]bool {
+		out := map[string]bool{}
+		for _, e := range events {
+			out[e.(map[string]any)["action"].(string)] = true
+		}
+		return out
+	}
+	_, cm := post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{}}`)
+	if hq := actions(data(get())["events"].([]any)); !hq["restrictions.reconcile"] || len(items(cm)) != 1 {
+		t.Fatalf("HQ history and client read: %v %v", hq, cm)
+	}
+	if client := actions(items(cm)[0]["events"].([]any)); client["restrictions.reconcile"] || !client["restrictions.exempt"] {
+		t.Errorf("client history: %v", client)
+	}
 }
 
 // TestRestrictionScheduleRefusals covers the contract and unit refusals of restrictions.schedule: a contract that is
@@ -568,6 +583,19 @@ func TestRestrictionScheduleRefusals(t *testing.T) {
 		t.Errorf("archived unit: %d %v", code, m)
 	}
 	owner(t, `UPDATE assets.units SET archived = false WHERE id = $1`, u)
+	// a model without a temperature setpoint cannot carry a temperature limit
+	var model string
+	var capVersion int
+	ownerScan(t, `SELECT model_id::text, capability_version FROM assets.units WHERE id = $1`, []any{u}, &model, &capVersion)
+	fanOnly := uuid.NewString()
+	owner(t, `INSERT INTO devices.capabilities (id, version, tenant_id, manufacturer, model, control, mode_control, fan_control, temperature)
+		VALUES ($1, 1, $2, 'Demo', 'Fan only', true, false, true, NULL)`, fanOnly, seed.ID("tenant-a"))
+	owner(t, `UPDATE assets.units SET model_id = $2, capability_version = 1 WHERE id = $1`, u, fanOnly)
+	code, m := schedule()
+	owner(t, `UPDATE assets.units SET model_id = $2, capability_version = $3 WHERE id = $1`, u, model, capVersion)
+	if code != 422 || m["fieldErrors"].(map[string]any)["unitIds"] != "errors.unsupported_capability" {
+		t.Errorf("temperature limit on a fan-only model: %d %v", code, m)
+	}
 	if code, m := schedule(); code != 200 || data(m)["state"] != "scheduled" {
 		t.Fatalf("schedule once the causes are gone: %d %v", code, m)
 	}

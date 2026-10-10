@@ -126,4 +126,7 @@ func TestFirmwareCampaigns(t *testing.T) {
 	if code, _ := ctl("explode", "", 5); code != 422 {
 		t.Error("bad action")
 	}
+	if code, _ := write(s, &hq, "firmwareCampaigns.control", `{"campaignId":"`+uuid.NewString()+`","action":"pause"}`, 1); code != 404 {
+		t.Errorf("control of an unknown campaign: %d", code)
+	}
 }

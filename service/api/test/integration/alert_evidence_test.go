@@ -1,6 +1,8 @@
 package integration
 
 import (
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -30,6 +32,7 @@ func TestAlertEvidence(t *testing.T) {
 	owner(t, `UPDATE monitoring.alerts SET evidence_ids = ARRAY[$2::uuid] WHERE id = $1`, free, detected)
 	before := reading(t, u, "temperature", 31, "°C", clock.Add(-40*time.Minute), "valid") // before the detection
 	after := reading(t, u, "temperature", 26, "°C", clock.Add(-5*time.Minute), "valid")
+	twin := reading(t, u, "humidity", 55, "%", clock.Add(-5*time.Minute), "valid") // observed with it: the ID decides
 	suspect := reading(t, u, "temperature", 99, "°C", clock.Add(-4*time.Minute), "suspect")
 	co2 := reading(t, u, "co2", 650, "ppm", clock.Add(-3*time.Minute), "valid")
 	estimate := reading(t, u, "temperature", 25, "°C", clock.Add(-2*time.Minute), "valid") // estimated, not a remeasurement
@@ -43,22 +46,47 @@ func TestAlertEvidence(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("evidence: %d %v", code, m)
 	}
-	got := []string{}
-	for _, it := range items(m) {
-		got = append(got, it["kind"].(string)+":"+it["id"].(string))
+	kinds := func(m map[string]any) string {
+		got := []string{}
+		for _, it := range items(m) {
+			got = append(got, it["kind"].(string)+":"+it["id"].(string))
+		}
+		return strings.Join(got, ",")
 	}
-	want := []string{"remeasurement:" + co2, "remeasurement:" + after, "detection:" + detected} // newest first; any metric without a rule
-	if len(got) != len(want) || got[0] != want[0] || got[1] != want[1] || got[2] != want[2] {
-		t.Fatalf("candidates: %v want %v", got, want)
+	byID := func(m map[string]any, id string) map[string]any {
+		for _, it := range items(m) {
+			if it["id"] == id {
+				return it
+			}
+		}
+		return nil
 	}
-	if it := items(m)[1]; it["metric"] != "temperature" || it["value"].(float64) != 26 || it["unit"] != "°C" || it["origin"] != "measured" || it["quality"] != "valid" || it["eventType"] != nil {
+	pair := []string{after, twin}
+	slices.Sort(pair)
+	// newest first, then by ID; any metric without a rule
+	if got, want := kinds(m), "remeasurement:"+co2+",remeasurement:"+pair[0]+",remeasurement:"+pair[1]+",detection:"+detected; got != want {
+		t.Fatalf("candidates: %s want %s", got, want)
+	}
+	if it := byID(m, after); it["metric"] != "temperature" || it["value"].(float64) != 26 || it["unit"] != "°C" || it["origin"] != "measured" || it["quality"] != "valid" || it["eventType"] != nil {
 		t.Errorf("remeasurement fields: %v", it)
 	}
-	if it := items(m)[2]; it["metric"] != nil || it["value"] != nil || it["origin"] != nil || it["observedAt"] == nil {
+	if it := byID(m, detected); it["metric"] != nil || it["value"] != nil || it["origin"] != nil || it["observedAt"] == nil {
 		t.Errorf("detection fields: %v", it)
 	}
-	if code, m := post(s, &hq, "alerts.evidence", `{"alertId":"`+free+`","query":{"limit":1}}`); code != 200 || len(items(m)) != 1 || data(m)["total"].(float64) != 3 || data(m)["nextCursor"] == nil {
+	if code, m := post(s, &hq, "alerts.evidence", `{"alertId":"`+free+`","query":{"limit":1}}`); code != 200 || len(items(m)) != 1 || data(m)["total"].(float64) != 4 || data(m)["nextCursor"] == nil {
 		t.Errorf("paged: %d %v", code, m)
+	}
+	// the allowed sorts: observedAt (oldest first: the detection) and id
+	if _, m := post(s, &hq, "alerts.evidence", `{"alertId":"`+free+`","query":{"sort":{"field":"observedAt","direction":"asc"}}}`); !strings.HasPrefix(kinds(m), "detection:"+detected+",") || !strings.HasSuffix(kinds(m), co2) {
+		t.Errorf("observedAt asc: %s", kinds(m))
+	}
+	all := []string{co2, after, twin, detected}
+	slices.Sort(all)
+	if _, m := post(s, &hq, "alerts.evidence", `{"alertId":"`+free+`","query":{"sort":{"field":"id","direction":"desc"}}}`); items(m)[0]["id"] != all[3] || items(m)[3]["id"] != all[0] {
+		t.Errorf("id desc: %s", kinds(m))
+	}
+	if code, m := post(s, &hq, "alerts.evidence", `{"alertId":"00000000-0000-0000-0000-000000000000","query":{}}`); code != 422 || m["fieldErrors"].(map[string]any)["alertId"] != "error.required" {
+		t.Errorf("no alert: %d %v", code, m)
 	}
 	if code, _ := post(s, &hq, "alerts.evidence", `{"alertId":"`+free+`","query":{"filters":{"kind":"x"}}}`); code != 422 {
 		t.Error("no filters")

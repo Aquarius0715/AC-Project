@@ -4577,3 +4577,51 @@ IR66 lets an alert without a policy resolve only by hand, with a reason and evid
    - Web: `alertEvidence.test.ts` (Vitest) covers the rows, the heading, the checks and the refusals. The E2E test "the Resolve dialog requires evidence for an alert without a policy" opens the dialog on the seed's alert, finds its five readings and cancels.
 
 Both Go suites pass (`make test-all`): 133 integration tests and 80 unit tests. Coverage is 87.7 %. Vitest passes 358 tests, and the E2E suite passes 86.
+
+## IR328 Coverage round 3: paths no test reached — 2026-10-11
+
+The third coverage round (after IR325 and IR326) adds Core API tests for paths that no test reached. No rule changes.
+
+1. **Alert evidence (IR327).**
+   - Candidates observed at the same time are ordered by ID, and both allowed sorts work.
+   - A nil alert ID is refused.
+   - A tamper alert is resolved through the API, citing the device's recovery.
+2. **Work reports (IR100, SR07).** The new test `TestWorkReportEdges` covers:
+   - a draft or a submission of a job that does not exist;
+   - an item that cites an attachment of another report;
+   - an empty reason, saved as none;
+   - a measurement corrected in place (same ID, version 2);
+   - a submission of a job not in progress, or of a stale job version;
+   - the time on site without an ended pause (60 − 10 = 50 minutes);
+   - a report read through another job, and a review of a job that does not exist.
+3. **Partners (DD-A06).**
+   - A contractor profile keeps its organization.
+   - A stale profile or offer-status version is refused, and so is an unknown profile or contractor.
+   - A blank rate-card note is none.
+   - SLA targets of the same plan type and start are refused (`errors.targets_exist`).
+4. **Offsets (DD-A15).**
+   - A failed retirement retries the retirement: the record goes back to demo_purchased with a new retirement attempt, then is retired.
+   - An unknown quote or record is NOT_FOUND, and so is a client's quote for another customer.
+   - A reversed created period is refused.
+5. **Ratings (IR110).** Re-rating a stale version is refused. A blank comment is none. A job that is not completed cannot be rated.
+6. **Commands, campaigns, devices.**
+   - A restriction policy that cannot be read allows nothing (IR46).
+   - A command or a history of an unknown unit is NOT_FOUND, and so is control of an unknown campaign.
+   - A unit holds one device (`error.unitHasDevice`), and an unbound device is not calibrated (`error.deviceNotBound`).
+7. **Payouts (IR321).** A negative adjustment is a deduction of the next statement.
+8. **Restrictions (IR42, IR46).**
+   - The client's history leaves out the reconcile, which stays HQ's record.
+   - A temperature limit on a model without a setpoint is refused (`errors.unsupported_capability`).
+9. **Alert notifications (SR12).** A later event finds the policy's open alert again and records a failure of its own.
+10. **Proposals (IR113).** The offer that an accepted contractor hold creates is open for 24 hours, or until the slot starts when that is sooner.
+11. **Policies, members, jobs.**
+    - A default rule switched without a reason records none.
+    - A blank unavailability note is none.
+    - A unit filter combines with a property filter.
+    - jobs.get, jobs.events, commands.get, commands.list and policies.get require their IDs.
+    - Holding a job that does not exist is NOT_FOUND.
+12. **Unit tests.** `readStatus` (IR133 item 2) and `ContentMatches` (IR308).
+
+The REST routes already refuse two paths, so they stay untested: a filter that does not decode, and the deviceId check of a device retry (the route carries the ID).
+
+Both Go suites pass (`make test-all`): 135 integration tests and 83 unit tests. Coverage is 88.1 %.

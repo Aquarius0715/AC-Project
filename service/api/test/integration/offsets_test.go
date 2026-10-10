@@ -106,6 +106,36 @@ func TestOffsets(t *testing.T) {
 	if code, _ := retry(att3, 5); code != 409 {
 		t.Error("retry a retired record")
 	}
+	// a failed retirement retries the retirement: back to demo_purchased with a new retirement attempt, then retired
+	_, m = quote(&customerB, "")
+	q2 := data(m)["id"].(string)
+	_, m = sim(&customerB, `{"event":"request","quoteId":"`+q2+`","quoteVersion":1,"demoConfirmed":true}`, 0)
+	rid2 := data(m)["id"].(string)
+	ev2 := func(event, attempt string) string {
+		return `{"event":"` + event + `","recordId":"` + rid2 + `","attemptId":"` + attempt + `","eventId":"` + uuid.NewString() + `","demoConfirmed":true}`
+	}
+	_, m = sim(&hq, ev2("purchase_confirm", data(m)["currentAttemptId"].(string)), 1)
+	retirement := data(m)["currentAttemptId"].(string)
+	if code, m := sim(&hq, ev2("fail", retirement), 2); code != 200 || data(m)["state"] != "failed" || data(m)["previousState"] != "demo_purchased" {
+		t.Fatalf("the retirement fails: %d %v", code, m)
+	}
+	code, m = sim(&customerB, `{"event":"retry","recordId":"`+rid2+`","attemptId":"`+retirement+`","demoConfirmed":true}`, 3)
+	if code != 200 || data(m)["state"] != "demo_purchased" || data(m)["currentAttemptId"] == retirement || len(data(m)["attempts"].([]any)) != 3 {
+		t.Fatalf("retry the retirement: %d %v", code, m)
+	}
+	if code, m := sim(&hq, ev2("retire", data(m)["currentAttemptId"].(string)), 4); code != 200 || data(m)["state"] != "demo_retired" || data(m)["purchaseRef"] == nil {
+		t.Errorf("retired after the retry: %d %v", code, m)
+	}
+	// what is not there, or not the customer's, is NOT_FOUND
+	if code, _ := sim(&customerB, `{"event":"request","quoteId":"`+uuid.NewString()+`","quoteVersion":1,"demoConfirmed":true}`, 0); code != 404 {
+		t.Error("request of an unknown quote")
+	}
+	if code, _ := sim(&hq, `{"event":"fail","recordId":"`+uuid.NewString()+`","attemptId":"`+uuid.NewString()+`","eventId":"`+uuid.NewString()+`","demoConfirmed":true}`, 1); code != 404 {
+		t.Error("event of an unknown record")
+	}
+	if code, _ := quote(&customerB, `,"customerId":"`+seed.ID("cust-a").String()+`"`); code != 404 {
+		t.Error("client quotes for another customer")
+	}
 	// lists
 	_, m = post(s, &customerB, "offsets.list", `{"filters":{"status":"demo_retired"},"limit":100}`)
 	if len(items(m)) == 0 {
@@ -127,6 +157,9 @@ func TestOffsets(t *testing.T) {
 		return false
 	}() {
 		t.Error("other customer sees the record")
+	}
+	if code, m := post(s, &hq, "offsets.list", `{"filters":{"from":"2026-09-14T00:00:00Z","to":"2026-09-01T00:00:00Z"}}`); code != 422 || m["fieldErrors"].(map[string]any)["filters.to"] != "error.range" {
+		t.Errorf("a reversed created period: %d %v", code, m)
 	}
 	_, m = post(s, &hq, "offsets.list", `{"filters":{"customerId":"`+seed.ID("cust-b").String()+`"},"limit":100}`)
 	if len(items(m)) == 0 {

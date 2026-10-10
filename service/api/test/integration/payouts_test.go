@@ -114,10 +114,20 @@ func TestPayouts(t *testing.T) {
 	if notes != 2 {
 		t.Errorf("question and reply in job history: %d", notes)
 	}
-	// August draft: periodic + rework deduction + repair + July adjustment
+	// a second question answered with a reduction: a negative adjustment is a deduction of the next statement
+	if code, m := write(s, &contrB, "payouts.query", `{"statementId":"`+jid+`","lineId":"`+line+`","topic":"amount","message":"Parts were charged twice"}`, 4); code != 200 {
+		t.Fatalf("second query: %d %v", code, m)
+	}
+	_, m = post(s, &hq, "payouts.get", `{"id":"`+jid+`"}`)
+	q2 := data(m)["queries"].([]any)[1].(map[string]any)["id"].(string)
+	if code, m := write(s, &hq, "payouts.resolveQuery", `{"statementId":"`+jid+`","queryId":"`+q2+`","reply":"Refund the double charge","adjustmentMinor":-3000}`, 5); code != 200 ||
+		data(m)["queries"].([]any)[1].(map[string]any)["state"] != "adjusted" {
+		t.Fatalf("resolve with a reduction: %d %v", code, m)
+	}
+	// August draft: periodic + rework deduction + repair + the July adjustments (+12000, −3000)
 	_, m = gen("2026-08")
 	aug := stmtOf(m)
-	if aug == nil || aug["grossMinor"].(float64) != 30000+45000+12000 || aug["deductionsMinor"].(float64) != 5000 || len(aug["lines"].([]any)) != 4 {
+	if aug == nil || aug["grossMinor"].(float64) != 30000+45000+12000 || aug["deductionsMinor"].(float64) != 5000+3000 || len(aug["lines"].([]any)) != 5 {
 		t.Fatalf("august: %v", aug)
 	}
 	// regenerating keeps the approved July statement and replaces the August draft

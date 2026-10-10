@@ -333,7 +333,12 @@ func TestDeviceEvents(t *testing.T) {
 		t.Errorf("open alert reused: %v", a)
 	}
 	signal(uuid.NewString(), "restored", 4, rec("tamper", func() string { id, _, _, _ := eventOf(again); return id }(), "clear"), 41)
-	owner(t, `UPDATE monitoring.alerts SET status = 'resolved', resolved_at = $2 WHERE id = $1`, alert, clock.Add(42*time.Second))
+	// the alert has no policy: its resolution cites the recovery (IR327)
+	var version int
+	ownerScan(t, `SELECT version FROM monitoring.alerts WHERE id = $1`, []any{alert}, &version)
+	if code, m := write(s, &hq, "alerts.resolve", `{"alertId":"`+alert+`","resolutionReason":"Cover closed on site","resolutionEvidenceIds":["`+clearID+`"]}`, version); code != 200 || data(m)["status"] != "resolved" {
+		t.Fatalf("resolve citing the recovery: %d %v", code, m)
+	}
 	third := uuid.NewString()
 	signal(third, "tamper", 5, "", 50)
 	_, a, _, _ := eventOf(third)

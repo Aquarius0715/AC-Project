@@ -122,6 +122,15 @@ func TestAutomationPolicies(t *testing.T) {
 	if ids(m)[id] {
 		t.Fatal("automation unitId filter excludes")
 	}
+	// the unit and the property together: the unit counts only when it is in the property
+	_, m = post(s, &hq, "policies.list", `{"filters":{"kind":"automation","unitId":"`+seed.ID("unit-limited").String()+`","propertyId":"`+seed.ID("property-office-a").String()+`"},"limit":100}`)
+	if !ids(m)[id] {
+		t.Error("unit in the property")
+	}
+	_, m = post(s, &hq, "policies.list", `{"filters":{"kind":"automation","unitId":"`+seed.ID("unit-limited").String()+`","propertyId":"`+seed.ID("property-home-a").String()+`"},"limit":100}`)
+	if ids(m)[id] {
+		t.Error("unit outside the property")
+	}
 	_, m = post(s, &hq, "policies.list", `{"filters":{"kind":"automation","customerId":"`+seed.ID("cust-a").String()+`","enabled":true},"limit":100}`)
 	if !ids(m)[id] {
 		t.Fatal("automation customerId filter")

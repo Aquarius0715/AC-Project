@@ -45,7 +45,23 @@ func TestContractorRegister(t *testing.T) {
 		data(m)["delegation"].(map[string]any)["to"] != until {
 		t.Fatalf("update: %d %v", code, m)
 	}
+	other := `{"organizationId":"` + seed.ID("org-contractor-a").String() + `","registrationNo":"R","serviceAreas":["KL"],"contactEmail":"a@b.example","insuranceValidUntil":null,"id":"` + id + `"}`
+	if code, m := write(s, &hq, "contractors.save", other, 2); code != 422 || m["fieldErrors"].(map[string]any)["organizationId"] != "error.organizationFixed" {
+		t.Errorf("a profile keeps its organization: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "contractors.save", body(`,"id":"`+id+`"`), 1); code != 409 || m["messageKey"] != "error.versionConflict" {
+		t.Errorf("update of a stale version: %d %v", code, m)
+	}
+	if code, _ := write(s, &hq, "contractors.save", body(`,"id":"`+uuid.NewString()+`"`), 1); code != 404 {
+		t.Errorf("update of an unknown profile: %d", code)
+	}
 	// suspension
+	if code, m := write(s, &hq, "contractors.setOfferStatus", `{"contractorOrgId":"`+org+`","status":"suspended","reason":"insurance lapsed"}`, 1); code != 409 || m["messageKey"] != "error.versionConflict" {
+		t.Errorf("suspend a stale version: %d %v", code, m)
+	}
+	if code, _ := write(s, &hq, "contractors.setOfferStatus", `{"contractorOrgId":"`+uuid.NewString()+`","status":"suspended","reason":"insurance lapsed"}`, 1); code != 404 {
+		t.Errorf("suspend an unknown contractor: %d", code)
+	}
 	if code, _ := write(s, &hq, "contractors.setOfferStatus", `{"contractorOrgId":"`+org+`","status":"suspended","reason":" "}`, 2); code != 422 {
 		t.Error("suspend without reason")
 	}
@@ -93,8 +109,9 @@ func TestContractorRegister(t *testing.T) {
 	if code != 200 || data(m)["version"].(float64) != 1 || data(m)["lines"].([]any)[0].(map[string]any)["note"] != "base" {
 		t.Fatalf("rate card: %d %v", code, m)
 	}
-	if code, m := rc(clock.Add(48*time.Hour).Format(time.RFC3339), line); code != 200 || data(m)["version"].(float64) != 2 {
-		t.Fatalf("rate card v2: %d", code)
+	if code, m := rc(clock.Add(48*time.Hour).Format(time.RFC3339), `[{"workType":"repair_base","amountMinor":45000,"note":"   "}]`); code != 200 || data(m)["version"].(float64) != 2 ||
+		data(m)["lines"].([]any)[0].(map[string]any)["note"] != nil {
+		t.Fatalf("rate card v2, a blank note is none: %d %v", code, m)
 	}
 	if code, _ := write(s, &hq, "rateCards.save", `{"contractorOrgId":"`+uuid.NewString()+`","effectiveFrom":"`+until+`","currency":"MYR","lines":`+line+`}`, 0); code != 404 {
 		t.Error("rate card for unknown contractor")
@@ -128,6 +145,9 @@ func TestSLAScorecard(t *testing.T) {
 	}
 	if code, m := write(s, &hq, "sla.saveTargets", `{"planType":"general","responseHours":2,"arrivalInWindowPercent":95,"firstTimeFixPercent":90,"effectiveFrom":"`+clock.Add(time.Hour).Format(time.RFC3339)+`"}`, 0); code != 200 || data(m)["version"].(float64) != 1 {
 		t.Fatalf("save targets: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "sla.saveTargets", `{"planType":"general","responseHours":3,"arrivalInWindowPercent":90,"firstTimeFixPercent":85,"effectiveFrom":"`+clock.Add(time.Hour).Format(time.RFC3339)+`"}`, 0); code != 409 || m["messageKey"] != "errors.targets_exist" {
+		t.Errorf("targets of the same plan type and start: %d %v", code, m)
 	}
 
 	// a job created 10 h before the clock, accepted after 6 h 10 min → response breach against the default 4 h

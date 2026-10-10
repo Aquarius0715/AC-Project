@@ -95,8 +95,8 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 	if _, m := elig(&hq, 25, 27); has(m, tech) {
 		t.Error("unavailable technician is not eligible")
 	}
-	if code, m := write(s, &contrA, "members.setUnavailability", `{"membershipId":null,"from":"2026-09-20","to":"2026-09-20","type":"public_holiday"}`, 0); code != 200 ||
-		data(m)["organizationId"] != seed.ID("org-contractor-a").String() {
+	if code, m := write(s, &contrA, "members.setUnavailability", `{"membershipId":null,"from":"2026-09-20","to":"2026-09-20","type":"public_holiday","note":"   "}`, 0); code != 200 ||
+		data(m)["organizationId"] != seed.ID("org-contractor-a").String() || data(m)["note"] != nil {
 		t.Fatalf("organization-wide: %d %v", code, m)
 	}
 }

@@ -46,8 +46,17 @@ func TestRateAndReportProblem(t *testing.T) {
 	if code != 200 || r["stars"].(float64) != 2 || r["comment"] != "slow" || data(m)["customerConfirmedAt"] == nil {
 		t.Fatalf("rate: %d %v", code, m)
 	}
-	if code, m := rate(&customerA, `"stars":3,"tags":[]`, 2); code != 200 || data(m)["rating"].(map[string]any)["ratedAt"] != r["ratedAt"] {
-		t.Fatalf("re-rate keeps ratedAt: %d %v", code, m)
+	if code, m := rate(&customerA, `"stars":3,"tags":[]`, 1); code != 409 || m["messageKey"] != "error.versionConflict" {
+		t.Errorf("re-rate a stale version: %d %v", code, m)
+	}
+	if code, m := rate(&customerA, `"stars":3,"tags":[],"comment":"   "`, 2); code != 200 || data(m)["rating"].(map[string]any)["ratedAt"] != r["ratedAt"] ||
+		data(m)["rating"].(map[string]any)["comment"] != nil {
+		t.Fatalf("re-rate keeps ratedAt, a blank comment is none: %d %v", code, m)
+	}
+	open := completedJob(t, s)
+	owner(t, `UPDATE maintenance.jobs SET status = 'in_progress', completed_at = NULL WHERE id = $1`, open)
+	if code, m := write(s, &customerA, "jobs.rate", `{"jobId":"`+open+`","stars":5,"tags":[]}`, 1); code != 409 || m["messageKey"] != "error.invalidState" {
+		t.Errorf("rate a job not completed: %d %v", code, m)
 	}
 	owner(t, `UPDATE maintenance.jobs SET rating = jsonb_set(rating, '{editableUntil}', to_jsonb($2::text)) WHERE id = $1`, job, clock.Format(time.RFC3339))
 	if code, _ := rate(&customerA, `"stars":4,"tags":[]`, 3); code != 409 {

@@ -78,6 +78,24 @@ func TestAutomationNotifications(t *testing.T) {
 	if alerts < 2 || failures != 1 {
 		t.Errorf("source alerts %d, failures %d", alerts, failures)
 	}
+	// a later event finds the unit's open alert of the policy again and records a failure of its own (SR12)
+	var first string
+	ownerScan(t, `SELECT id::text FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND status = 'open'`, []any{lonely, noRecipient}, &first)
+	owner(t, `DELETE FROM control.evaluation_events`) // the test clock stands still: let the tick be fired again
+	code, m = write(s, &customerB, "automations.fire", `{"eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(time.RFC3339)+`","unitIds":["`+lonely+`"],"facts":[`+fact(lonely, "1300", clock, "valid")+`],"phase":"condition"}`, 0)
+	if code != 200 {
+		t.Fatalf("second event: %d %v", code, m)
+	}
+	if again := outcome(m, lonely, noRecipient); again["decision"] != "failed" || len(again["failureIds"].([]any)) != 1 {
+		t.Fatalf("second event: %v", again)
+	}
+	var open int
+	ownerScan(t, `SELECT count(*), COALESCE(sum(jsonb_array_length(delivery_failures)), 0) FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND status = 'open'`, []any{lonely, noRecipient}, &open, &failures)
+	var reused string
+	ownerScan(t, `SELECT id::text FROM monitoring.alerts WHERE unit_id = $1 AND policy_id = $2 AND status = 'open'`, []any{lonely, noRecipient}, &reused)
+	if open != 1 || reused != first || failures != 2 {
+		t.Errorf("one open alert with two failures: %d %s/%s %d", open, reused, first, failures)
+	}
 	// cooldown after a created notification (30 minutes); the default policy has none
 	if _, m := post(s, &customerB, "automations.simulate", input(high)); outcome(m, u, withRecipient)["reason"] != "cooldown" || outcome(m, u, def)["decision"] != "selected" {
 		t.Errorf("cooldown: %v", m)

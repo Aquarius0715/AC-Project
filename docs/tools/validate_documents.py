@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.212.0 (2026-10-11): IR328 coverage round 3 (DD-A 0.42.0, DD-COMMON 0.101.0); counts unchanged.
 # 0.211.0 (2026-10-11): IR327 alerts.evidence and the resolution's evidence picker (DD-A 0.41.0, DD-T 0.40.0, DD-COMMON 0.100.0); 201 operations.
 # 0.210.0 (2026-10-11): IR326 coverage round 2, two open questions (DD-A 0.40.0, DD-COMMON 0.99.0); counts unchanged.
 # 0.209.0 (2026-10-11): IR325 coverage of untested business rules (DD-A 0.39.0, DD-COMMON 0.98.0); counts unchanged.

@@ -135,11 +135,23 @@ func TestCommands(t *testing.T) {
 		{`{"kind":"set_temperature","celsius":25}`, `{"kind":"temperature_limit","minimumCoolingSetpoint":26}`, false},
 		{`{"kind":"set_fan","fanLevel":"high"}`, `{"kind":"temperature_limit","minimumCoolingSetpoint":26}`, true},
 		{`{"kind":"ventilate","level":"low"}`, ``, true},
+		{`{"kind":"set_power","power":false}`, `{"kind":`, false}, // a policy that cannot be read allows nothing
 	} {
 		a, _ := control.ParseAction([]byte(tc.action))
 		if got := control.Allowed(a, []byte(tc.policy)); got != tc.ok {
 			t.Errorf("%s under %s: %v", tc.action, tc.policy, got)
 		}
+	}
+	// a unit that does not exist is NOT_FOUND to HQ and to a technician, for a command and for the history
+	missing := uuid.NewString()
+	if code, _ := write(s, &hq, "commands.create", `{"unitId":"`+missing+`","action":{"kind":"set_power","power":true},"reason":"check","expectedUnitVersion":1}`, 0); code != 404 {
+		t.Errorf("HQ command for an unknown unit: %d", code)
+	}
+	if code, _ := write(s, &techInt, "commands.create", `{"unitId":"`+missing+`","jobId":"`+uuid.NewString()+`","action":{"kind":"set_power","power":true},"reason":"check","expectedUnitVersion":1}`, 0); code != 404 {
+		t.Errorf("technician command for an unknown unit: %d", code)
+	}
+	if code, _ := post(s, &hq, "commands.list", `{"unitId":"`+missing+`","query":{}}`); code != 404 {
+		t.Errorf("history of an unknown unit: %d", code)
 	}
 }
 

@@ -291,6 +291,10 @@ func TestPolicies(t *testing.T) {
 		t.Errorf("member → FORBIDDEN, got %d", code)
 	}
 	owner(t, `UPDATE identity.memberships SET client_role = 'owner' WHERE id = $1`, seed.ID("customer-b"))
+	// a switch without a reason records none
+	if code, m := write(s, &hq, "policies.setDefaultRule", `{"policyId":"`+def+`","ruleKey":"dust_pm25","customerId":"`+seed.ID("cust-b").String()+`","enabled":false}`, versionZero); code != 200 || data(m)["reason"] != nil {
+		t.Errorf("switch without a reason: %d %v", code, m)
+	}
 
 	// delete: default fixed, detach from units, version
 	if code, m := write(s, &hq, "policies.delete", `{"policyId":"`+def+`"}`, dv+1); code != 422 {
