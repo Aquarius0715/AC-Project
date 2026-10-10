@@ -41,9 +41,33 @@ func TestSlotProposals(t *testing.T) {
 		"external as internal": {slotJSON(97, 2), `{"kind":"internal","membershipId":"` + seed.ID("tech-external-a").String() + `"}`, ts(48), 403},
 		"bad hold":             {slotJSON(97, 2), `{"kind":"robot"}`, ts(48), 422},
 		"unknown contractor":   {slotJSON(97, 2), `{"kind":"contractor","contractorOrgId":"` + uuid.NewString() + `","technicianMembershipId":null}`, ts(48), 404},
+		// a hold names exactly the side it holds (IR128 item 1)
+		"internal without technician":  {slotJSON(97, 2), `{"kind":"internal"}`, ts(48), 422},
+		"internal with a contractor":   {slotJSON(97, 2), `{"kind":"internal","membershipId":"` + seed.ID("tech-internal-a").String() + `","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `"}`, ts(48), 422},
+		"contractor with a member":     {slotJSON(97, 2), `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `","membershipId":"` + seed.ID("tech-internal-a").String() + `"}`, ts(48), 422},
+		"another company's technician": {slotJSON(97, 2), `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `","technicianMembershipId":"` + seed.ID("tech-external-b").String() + `"}`, ts(48), 403},
 	} {
 		if code, _ := propose(job, tc.slot, tc.hold, tc.reply, 1); code != tc.code {
 			t.Errorf("propose %s: %d want %d", name, code, tc.code)
+		}
+	}
+	// a contractor whose offers are suspended cannot be held
+	owner(t, `INSERT INTO maintenance.contractors (tenant_id, organization_id, name, status, registration_no, contact_email, delegation, suspended_reason)
+		VALUES ($1, $2, 'Demo Contractor A', 'suspended', 'SSM-TEST', 'ops@contractor-a.example', tstzrange($3, $4), 'test')`, seed.ID("tenant-a"), seed.ID("org-contractor-a"), clock.Add(-time.Hour), clock.Add(24*365*time.Hour))
+	if code, m := propose(job, slotJSON(97, 2), contractorHold, ts(48), 1); code != 409 || m["messageKey"] != "errors.contractor_suspended" {
+		t.Errorf("suspended contractor: %d %v", code, m)
+	}
+	owner(t, `DELETE FROM maintenance.contractors WHERE organization_id = $1`, seed.ID("org-contractor-a"))
+	// a contractor hold may name the contractor's own technician, who must be qualified for the slot; withdrawn again
+	{
+		_, m := write(s, &customerA, "jobs.create", jobBody(unit, nil), 0)
+		other := data(m)["id"].(string)
+		named := `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `","technicianMembershipId":"` + seed.ID("tech-external-a").String() + `"}`
+		if code, m := propose(other, slotJSON(97, 2), named, ts(48), 1); code != 200 || data(m)["slotProposal"].(map[string]any)["status"] != "pending" {
+			t.Fatalf("contractor hold with its technician: %d %v", code, m)
+		}
+		if code, _ := write(s, &hq, "jobs.withdrawProposal", `{"jobId":"`+other+`","proposalId":"`+proposalOf(other)+`"}`, 2); code != 200 {
+			t.Error("withdraw the named hold")
 		}
 	}
 	if code, m := propose(job, slotJSON(97, 2), internalHold, ts(48), 1); code != 200 || data(m)["slotProposal"].(map[string]any)["status"] != "pending" {

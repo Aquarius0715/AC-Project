@@ -4511,3 +4511,27 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
    - New E2E spec `admin/offsets`: the filters in the URL, the default that leaves the URL, and a record outside the list.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR325 Coverage: business rules the Core API tests had not reached — 2026-10-11
+
+`make cover` measured 87.5 % of 14,848 statements. The gap scanner lists the zero-count blocks, without the plain error returns. Among them were rules that no test exercised. They are tested now, and coverage is 87.7 %.
+
+1. **SLA (DD-A22).**
+   - **customerStatus.** A customer's standing is now a function of its own, `customerStatus`, with unit tests. The response share is held to 100 %. A share up to 10 points below its target is at risk; further below, or any open overdue job, means breached. A share without jobs says nothing.
+   - **Target in effect.** `targetFor` and `targetViews` have unit tests too: the target in effect at a job's creation, the default without a version, and the later rows earliest first.
+   - **Scorecard.** The scorecard test gains a job answered within its hours. Before, no test counted a response within the target.
+2. **Slot proposals (IR128 item 1).** The proposal test gains these cases:
+   - a hold that names the wrong side: internal without a technician, internal naming a contractor, or a contractor naming a member;
+   - another company's technician (FORBIDDEN);
+   - a suspended contractor (CONFLICT `errors.contractor_suspended`);
+   - a contractor hold naming its own qualified technician, which succeeds and is withdrawn again.
+3. **Report review (IR31).** The same user acting through another membership is still the report's author, so review availability says `self_authored`.
+4. **Restriction retry (SR26).**
+   - An apply retry is not applicable once every cause invoice is paid (`errors.restriction_not_applicable`), and it is refused once the restriction is applied (`errors.restriction_state`).
+   - A release retry needs reconciliation for a unit waiting for reconciliation, or one never confirmed applied (`errors.reconcile_required`).
+5. **Energy (SR09).** Without a current default emission factor, the emissions are null and `factor_missing` is reported. They are never shown as zero.
+6. **Alert policies (D02, IR115).**
+   - A policy whose owner membership is gone notifies nobody (`owner_forbidden`), and that check comes before the cooldown.
+   - A default rule that the customer switched off no longer fires for their units.
+
+Both Go suites pass (`make test-all`): 130 integration tests and 80 unit tests.

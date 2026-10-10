@@ -363,6 +363,12 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	if code, m := retry(&restrMgr, "apply", "rules-1", online); code != 200 || ver(m) != v {
 		t.Error("retry of an applied unit returns the existing result")
 	}
+	// SR26: with every cause invoice paid there is nothing left to apply
+	owner(t, `UPDATE billing.invoices SET status = 'paid' WHERE id = $1`, inv)
+	if code, m := retry(&restrMgr, "apply", "rules-1", offline); code != 409 || m["messageKey"] != "errors.restriction_not_applicable" {
+		t.Errorf("apply retry after payment: %d %v", code, m)
+	}
+	owner(t, `UPDATE billing.invoices SET status = 'unpaid' WHERE id = $1`, inv)
 	owner(t, `UPDATE devices.devices SET connection = 'online' WHERE unit_id = $1`, offline)
 	code, m := retry(&restrMgr, "apply", "rules-1", offline)
 	if code != 200 || unitState(m, offline)["applyState"] != "sent_unknown" || len(unitState(m, offline)["applyCommandIds"].([]any)) != 2 {
@@ -371,6 +377,9 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	ackCommand(t, cmdOf(m, offline, "applyCommandIds"), clock.Add(2*time.Second))
 	if data(get())["state"] != "applied" {
 		t.Fatal("applied after retry")
+	}
+	if code, m := retry(&restrMgr, "apply", "rules-1", offline); code != 409 || m["messageKey"] != "errors.restriction_state" {
+		t.Errorf("apply retry once applied: %d %v", code, m)
 	}
 	// explicit release needs payment or an exception
 	if code, _ := write(s, &restrMgr, "restrictions.release", `{"restrictionId":"`+id+`"}`, ver(get())); code != 403 {
@@ -402,6 +411,14 @@ func TestRestrictionExceptionReleaseRetry(t *testing.T) {
 	if code, _ := retry(&overrider, "release", "rules-1", offline); code != 403 {
 		t.Error("override-only retry of a non-override release")
 	}
+	// SR26: a unit waiting for reconciliation, or never confirmed applied, is reconciled, not retried
+	for _, st := range [][2]string{{"waiting_reconcile", "applied"}, {"failed", "sent_unknown"}} {
+		owner(t, `UPDATE restrictions.restriction_units SET release_state = $3, apply_state = $4 WHERE restriction_id = $1 AND unit_id = $2`, id, offline, st[0], st[1])
+		if code, m := retry(&restrMgr, "release", "rules-1", offline); code != 409 || m["messageKey"] != "errors.reconcile_required" {
+			t.Errorf("release retry with %v: %d %v", st, code, m)
+		}
+	}
+	owner(t, `UPDATE restrictions.restriction_units SET release_state = 'failed', apply_state = 'applied' WHERE restriction_id = $1 AND unit_id = $2`, id, offline)
 	owner(t, `UPDATE devices.devices SET connection = 'offline' WHERE unit_id = $1`, offline)
 	if code, m := retry(&restrMgr, "release", "rules-1", offline); code == 200 || m["code"] != "OFFLINE" {
 		t.Errorf("offline retry release: %d %v", code, m)

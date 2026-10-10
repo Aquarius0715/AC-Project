@@ -136,6 +136,14 @@ func TestWorkReports(t *testing.T) {
 	if code, m := getRep(&techInt, 5); code != 200 || data(m)["reviewAvailability"].(map[string]any)["reason"] != "permission_denied" {
 		t.Fatalf("technician report: %d %v", code, m)
 	}
+	// a reviewer never accepts a report they wrote (IR31): the same user through another membership is still its author
+	var author string
+	ownerScan(t, `SELECT author_id::text FROM maintenance.work_reports WHERE id = $1 AND version = 5`, []any{rep}, &author)
+	owner(t, `UPDATE maintenance.work_reports SET author_id = $2 WHERE id = $1 AND version = 5`, rep, seed.ID("user-hq-operator"))
+	if code, m := getRep(&hq, 5); code != 200 || data(m)["reviewAvailability"].(map[string]any)["allowed"] != false || data(m)["reviewAvailability"].(map[string]any)["reason"] != "self_authored" {
+		t.Errorf("self-authored report: %d %v", code, m)
+	}
+	owner(t, `UPDATE maintenance.work_reports SET author_id = $2 WHERE id = $1 AND version = 5`, rep, author)
 	if code, _ := getRep(&customerA, 5); code != 404 {
 		t.Error("client reads submitted (not accepted) report")
 	}

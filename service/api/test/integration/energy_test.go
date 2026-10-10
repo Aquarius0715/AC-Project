@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/energy"
 	"github.com/pradita/ac-project/service/api/internal/seed"
 )
 
@@ -166,6 +167,13 @@ func TestEnergySummary(t *testing.T) {
 	}
 	if w := data(m)["qualityWarnings"].([]any); len(w) != 1 || w[0] != "modeled_baseline" {
 		t.Errorf("warnings: %v", w)
+	}
+	// without a current default emission factor the emissions are unknown, never zero (SR09): factor_missing
+	owner(t, `UPDATE energy.emission_factors SET is_current = false WHERE id = $1 AND is_current`, energy.DefaultFactorID)
+	_, m = post(s, &hq, "energy.summary", body(end, ""))
+	owner(t, `UPDATE energy.emission_factors SET is_current = true WHERE id = $1 AND version = (SELECT max(version) FROM energy.emission_factors WHERE id = $1)`, energy.DefaultFactorID)
+	if tot := data(m)["totals"].(map[string]any); tot["emissionsKg"] != nil || tot["kWh"].(float64) != 5 || data(m)["factorRef"] != nil || !slices.Contains(data(m)["qualityWarnings"].([]any), any("factor_missing")) {
+		t.Errorf("factor missing: %v", m)
 	}
 	// an increase is signed negative (IR68)
 	_, m = post(s, &hq, "energy.summary", body(end, `,"baselineId":"`+fixed("4", 5)+`"`))

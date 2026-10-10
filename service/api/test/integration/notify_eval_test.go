@@ -89,6 +89,18 @@ func TestAutomationNotifications(t *testing.T) {
 	if _, m := post(s, &customerB, "automations.simulate", input(high)); outcome(m, u, withRecipient)["reason"] != "disabled" {
 		t.Errorf("disabled: %v", m)
 	}
+	// D02: a policy whose owner membership is gone notifies nobody, before any cooldown applies
+	owner(t, `UPDATE monitoring.alert_policies SET enabled = true, owner_membership_id = $2 WHERE id = $1`, withRecipient, uuid.New())
+	if _, m := post(s, &customerB, "automations.simulate", input(high)); outcome(m, u, withRecipient)["reason"] != "owner_forbidden" {
+		t.Errorf("owner gone: %v", outcome(m, u, withRecipient))
+	}
+	// IR115: the customer switched the default CO2 rule off, so the default policy no longer fires for its units
+	owner(t, `INSERT INTO monitoring.default_rule_settings (tenant_id, policy_id, rule_key, customer_id, enabled, changed_by_membership_id) VALUES ($1, $2, 'ventilation_co2', $3, false, $4)`,
+		seed.ID("tenant-a"), def, cust, seed.ID("customer-b"))
+	if _, m := post(s, &customerB, "automations.simulate", input(high)); outcome(m, u, def)["decision"] == "selected" {
+		t.Errorf("default rule switched off: %v", outcome(m, u, def))
+	}
+	owner(t, `DELETE FROM monitoring.default_rule_settings WHERE policy_id = $1 AND customer_id = $2 AND rule_key = 'ventilation_co2'`, def, cust)
 }
 
 // D08 / IR66: fired facts past the recovery threshold resolve the open policy alerts of the unit — the attached

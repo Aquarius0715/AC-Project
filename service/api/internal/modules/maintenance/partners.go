@@ -1051,31 +1051,38 @@ func (m Partners) scorecard(ctx context.Context, c *ops.Call, in *ScorecardInput
 	for _, cust := range order {
 		t := per[cust]
 		mm := t.metrics()
-		tgt := targetFor(targets, planOf[cust], c.Now)
-		status := "on_track"
-		check := func(v *float64, target float64) {
-			if v == nil || *v >= target {
-				return
-			}
-			if target-*v > 10 {
-				status = "breached"
-			} else if status != "breached" {
-				status = "at_risk"
-			}
-		}
-		check(mm.ResponseWithinTarget, 100)
-		check(mm.ArrivalInWindow, tgt.ArrivalInWindowPercent)
-		check(mm.FirstTimeFix, tgt.FirstTimeFixPercent)
-		if mm.OpenOverdue > 0 {
-			status = "breached"
-		}
-		out.Customers = append(out.Customers, CustomerMetrics{Metrics: mm, CustomerID: cust, PlanType: planOf[cust], JobCount: t.jobs, Status: status})
+		out.Customers = append(out.Customers, CustomerMetrics{Metrics: mm, CustomerID: cust, PlanType: planOf[cust], JobCount: t.jobs, Status: customerStatus(mm, targetFor(targets, planOf[cust], c.Now))})
 	}
 	sort.SliceStable(out.Breaches, func(i, k int) bool { return out.Breaches[i].at.After(out.Breaches[k].at) })
 	if len(out.Breaches) > 50 {
 		out.Breaches = out.Breaches[:50]
 	}
 	return out, nil
+}
+
+// customerStatus is a customer's SLA standing (DD-A22): every response is due within the plan's hours, so the response
+// share is held to 100 %, arrival in window and first-time fix to the plan's targets. A share at or above its target
+// is on track; up to 10 points below is at risk, more than 10 below — or any open overdue job — is breached. A share
+// without jobs to measure says nothing.
+func customerStatus(m Metrics, tgt SlaTargets) string {
+	status := "on_track"
+	check := func(v *float64, target float64) {
+		if v == nil || *v >= target {
+			return
+		}
+		if target-*v > 10 {
+			status = "breached"
+		} else if status != "breached" {
+			status = "at_risk"
+		}
+	}
+	check(m.ResponseWithinTarget, 100)
+	check(m.ArrivalInWindow, tgt.ArrivalInWindowPercent)
+	check(m.FirstTimeFix, tgt.FirstTimeFixPercent)
+	if m.OpenOverdue > 0 {
+		status = "breached"
+	}
+	return status
 }
 
 // RegisterPartners binds the IR131 operations.

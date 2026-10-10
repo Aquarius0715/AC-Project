@@ -139,6 +139,12 @@ func TestSLAScorecard(t *testing.T) {
 		job, created, clock.Add(-time.Hour), seed.ID("org-contractor-a"))
 	owner(t, `INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
 		VALUES ($1,$2,$3,'t',tstzrange($4,$5),$4,$5,$4,$5,'accept',$6)`, seed.ID("tenant-a"), job, seed.ID("org-contractor-a"), created, clock, created.Add(6*time.Hour+10*time.Minute))
+	// a job accepted 1 h after its creation answered within the default 4 h: counted within the target, no breach
+	_, m = write(s, &hq, "jobs.create", jobBody(unit, map[string]string{"alternativeSlots": "[]"}), 0)
+	onTime := data(m)["id"].(string)
+	owner(t, `UPDATE maintenance.jobs SET created_at = $2, contractor_org_id = $3 WHERE id = $1`, onTime, created, seed.ID("org-contractor-a"))
+	owner(t, `INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until, decision, decided_at)
+		VALUES ($1,$2,$3,'t',tstzrange($4,$5),$4,$5,$4,$5,'accept',$6)`, seed.ID("tenant-a"), onTime, seed.ID("org-contractor-a"), created, clock, created.Add(time.Hour))
 	// an open overdue job
 	_, m = write(s, &hq, "jobs.create", jobBody(unit, map[string]string{"alternativeSlots": "[]"}), 0)
 	overdue := data(m)["id"].(string)
@@ -175,6 +181,12 @@ func TestSLAScorecard(t *testing.T) {
 	}
 	if o := kinds[overdue+":overdue"]; o == nil || o["detail"] == "" || o["tookMinutes"] != nil || o["limitMinutes"] != nil {
 		t.Fatalf("overdue breach: %v", sc["breaches"])
+	}
+	if kinds[onTime+":response"] != nil {
+		t.Errorf("a response within the target is a breach: %v", kinds[onTime+":response"])
+	}
+	if share := sc["totals"].(map[string]any)["responseWithinTarget"]; share == nil || share.(float64) <= 0 || share.(float64) >= 100 {
+		t.Errorf("response share with one answer in time and misses: %v", share)
 	}
 	for id, after := range cancelled {
 		if miss := kinds[id+":response"] != nil; miss != (after > 4*time.Hour) {
