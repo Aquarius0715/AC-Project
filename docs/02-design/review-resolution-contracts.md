@@ -4703,3 +4703,31 @@ IR331 left ten tables, about 150 single checks and the tables with an expected-c
 3. **Result.** The integration suite now has no VALIDATION check that tests the status code alone. The suite has 69 `refusal` call sites and 149 single `fields(m)` checks. Every case kept the response it had, apart from the two above.
 
 Both Go suites pass (`make test-all`): 138 integration tests and 84 unit tests.
+
+## IR333 The BFF session cookie is sealed; the container design follows compose.yaml; every design document reads IR01–IR333 — 2026-10-11
+
+R324 checked compose.yaml and docker/ against the container design and the code.
+
+1. **The session cookie is sealed (backend architecture §6, DDC-02).**
+   - **Before.** The BFF kept the OIDC tokens in an httpOnly cookie that was HMAC-signed but not encrypted. Scripts could not read it, but the tokens sat readable in the browser's cookie store. The design says that tokens stay on the server, and the IR that wired sign-in said "browsers never receive tokens".
+   - **Now.** The session cookie and the sign-in state cookie (state, PKCE verifier, return path) are sealed with AES-256-GCM: `seal` / `unseal` in `lib/session.ts`.
+     - The key is derived from `SESSION_SECRET` with HKDF-SHA256.
+     - Every seal takes a fresh 12-byte IV.
+     - The 16-byte tag refuses any altered byte, a value sealed with another key, and a body that is not JSON.
+     - The browser keeps an opaque value.
+   - **Still open.** A server-side store with revocation on sign-out (ElastiCache, Valkey locally) is OPEN-CT-03. Until then `SESSION_STORE_URL` is reserved and not read.
+2. **Container design vs compose.yaml.**
+   - **ECS services.** §5 named the services `web` and `api`. It now lists the four web apps (IR178), the gateway and the five domain services (IR180), the webhook and the worker roles. Scaling and the deployment order (migrate, domain services and workers, gateway, web apps) follow.
+   - **Profiles.** The `backend` profile starts the `infra` stand-ins too, as compose.yaml does.
+   - **Environment variables.** The table gains the variables the code reads:
+     - `<DOMAIN>_API_URL`, `DEMO_OPS` / `DEMO_CLOCK_START` and `APP_LOGIN_PASSWORD` / `SEED_FIXTURE`;
+     - `SESSION_SECRET`, `APP_URL` / `OIDC_APP_CLIENT_SECRET` and the four `*_WEB_URL`.
+   - **Checked against compose.yaml.**
+     - Each domain service has its own database login, and the idle worker roles use `ac_app_login`.
+     - The internal token and the identity URL are set for the domain services.
+     - Only the scheduler role of `cmd/worker` has jobs; the other roles idle, as documented.
+3. **The design documents read every IR.** Ten documents still said "Read IR01–139", and their line also named an older version than the document's own. Among them are the contractor DD, the backend, database, container and network designs and the contract documents. Every document with the line now names its own version and IR01–IR333.
+4. **Checked.**
+   - The web typecheck, lint and Vitest pass; Vitest covers sealing, refusals, keys and the opaque value.
+   - The four builds pass.
+   - The E2E suite passes: 86 pass, 8 skip by design.

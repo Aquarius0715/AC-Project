@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTAINER
-version: 0.30.0
+version: 0.31.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -84,7 +84,7 @@ COPY --from=build-dev /out/ /app/
 | `demo` | `customer-web`, `partner-web`, `technician-web`, `admin-web` (mock mode, ports 3000–3003) | Phase 1A clickable demo |
 | `infra` | PostgreSQL 16, Valkey, LocalStack, Mosquitto, Keycloak, stripe-mock, weather mock | Stand-ins for AWS services |
 | `schema` | one-off `migrate` (cmd/migrate): schema, local `ac_app_login` and the domain logins `ac_<domain>_login`, demo fixture | Database only, without the Go services |
-| `backend` | `migrate`, `gateway` (8080), `identity-api`, `equipment-api`, `maintenance-api`, `billing-api`, `energy-api`, `worker-scheduler-equipment`, `worker-scheduler-maintenance` and the idle `worker-*` roles | Go backend against the stand-ins (IR180, IR194, IR195) |
+| `backend` | `migrate`, `gateway` (8080), `identity-api`, `equipment-api`, `maintenance-api`, `billing-api`, `energy-api`, `worker-scheduler-equipment`, `worker-scheduler-maintenance` and the idle `worker-*` roles, with the `infra` stand-ins | Go backend against the stand-ins (IR180, IR194, IR195) |
 | `full` | `customer-web-api`, `partner-web-api`, `technician-web-api`, `admin-web-api` (BFF mode, ports 3000–3003) + backend + infra | Production-like end-to-end runs and acceptance tests |
 | `planned` | `webhook` (8082), `iot-bridge`, `device-sim` | Services whose commands are not built yet; not started by the other profiles (IR197) |
 | `obs` | OpenTelemetry collector, Jaeger (16686) | Traces |
@@ -126,8 +126,14 @@ Configuration is twelve-factor: every service reads environment variables only. 
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | backend, web | `http://otel-collector:4318` | ADOT sidecar `http://localhost:4318` |
 | `DATA_SOURCE` | web | `mock` (demo) / `api` (full) | `api` |
 | `CORE_API_URL` | web (BFF / DAL) | `http://gateway:8080` | Core API entry (gateway, IR180) |
+| `IDENTITY_API_URL` / `EQUIPMENT_API_URL` / `MAINTENANCE_API_URL` / `BILLING_API_URL` / `ENERGY_API_URL` | gateway, domain services | `http://<domain>-api:8080` | internal service discovery names — The gateway routes each REST route to the service that owns its operation; the services call each other's internal queries (IR180, IR190) |
+| `DEMO_OPS` / `DEMO_CLOCK_START` | domain services, workers | `1` / not set (the fixture clock) | not set (demo operations off) — `demo.*` operations and the shared scenario clock (IR154, IR36, IR168) |
+| `APP_LOGIN_PASSWORD` / `SEED_FIXTURE` | migrate | a local password / the fixture path | not set (logins from infrastructure as code; no fixture) — Local logins `ac_app_login` and `ac_<domain>_login`, and the demo fixture (IR167, IR194) |
 | `INTERNAL_API_TOKEN` / `IDENTITY_INTERNAL_URL` | Core API services | secret / `http://identity-api:8080` | service-to-service calls; principals from identity-api (IR182) |
-| `SESSION_STORE_URL` | web (BFF) | `redis://valkey:6379` | ElastiCache endpoint (TLS) |
+| `SESSION_SECRET` | web (BFF) | a local value in `compose.yaml` | Secrets Manager — Key material of the sealed session cookie (AES-256-GCM, key derived with HKDF, IR333) |
+| `APP_URL` / `OIDC_APP_CLIENT_SECRET` | web (BFF) | `http://localhost:3000`–`3003` / the Keycloak client secret | the app's host name / Secrets Manager — The OIDC redirect URI and the confidential client |
+| `CUSTOMER_WEB_URL` / `PARTNER_WEB_URL` / `TECHNICIAN_WEB_URL` / `ADMIN_WEB_URL` | web | `http://localhost:3000`–`3003` | the four host names — Links between the four apps (IR178) |
+| `SESSION_STORE_URL` | web (BFF) | `redis://valkey:6379` | ElastiCache endpoint (TLS) — Reserved for the server-side session store: not read yet, sessions live in the sealed cookie (OPEN-CT-03) |
 
 Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`, LocalStack `SERVICES` / `AWS_DEFAULT_REGION`) exist only in compose. Local values come from compose and an optional git-ignored `.env.local` (`.env.local.example`).
 
@@ -137,12 +143,12 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 |---|---|
 | Registry | Amazon ECR per account (dev, staging, prod), immutable tags, scan on push, cross-region replication to ap-southeast-1 |
 | Tags | `git-<sha>` (immutable) plus release tags; deployments reference digests |
-| Services | `web`, `api`, `webhook`, `worker-outbox`, `worker-scheduler-equipment`, `worker-scheduler-maintenance`, `worker-iot`, `worker-telemetry`, `worker-rollup`, `worker-automation`, `worker-notification`, `worker-importexport`; task `migrate` |
+| Services | the four web apps `customer-web`, `partner-web`, `technician-web` and `admin-web` (IR178); `gateway` and the five domain services `identity-api`, `equipment-api`, `maintenance-api`, `billing-api` and `energy-api` (IR180); `webhook`, `worker-outbox`, `worker-scheduler-equipment`, `worker-scheduler-maintenance`, `worker-iot`, `worker-telemetry`, `worker-rollup`, `worker-automation`, `worker-notification` and `worker-importexport`; task `migrate` |
 | Task settings | `readonlyRootFilesystem: true`, non-root user, no privileged mode, `stopTimeout: 30`, awsvpc networking in the private subnets of network architecture §2a, one security group per service |
 | Configuration | Environment variables in the task definition; secrets from Secrets Manager via the `secrets` field; IAM task role per service (least privilege: e.g. only `worker-iot` may publish to IoT Core) |
-| Scaling | `web` and `api` on CPU and ALB request count; workers on SQS backlog per task and Kinesis iterator age; minimum two tasks across two AZs for `web`, `api`, `webhook`, `worker-outbox`, `worker-iot` |
+| Scaling | the web apps, the gateway and the domain services on CPU and ALB request count; workers on SQS backlog per task and Kinesis iterator age; minimum two tasks across two AZs for the web apps, the gateway, the domain services, `webhook`, `worker-outbox` and `worker-iot` |
 | Logs and traces | `awslogs` driver to CloudWatch (JSON), ADOT collector sidecar for OTLP traces and metrics |
-| Deployment | Rolling with deployment circuit breaker and automatic rollback; `migrate` runs first as a one-off task (expand step); `web` last |
+| Deployment | Rolling with deployment circuit breaker and automatic rollback; `migrate` runs first as a one-off task (expand step), then the domain services and the workers, then the gateway, and the web apps last |
 | Images allowed | Only images signed in CI (AWS Signer / cosign) and pushed by the pipeline role |
 
 ## 6. CI pipeline
@@ -158,5 +164,6 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 |---|---|
 | OPEN-CT-01 | Whether developers on x86 laptops need the `amd64` variant in the shared registry or build locally only |
 | OPEN-CT-02 | The S3 blob store (bucket `ac-files`, LocalStack locally) for staging and production; until then the maintenance service keeps uploaded files in the local directory store on the `blobs` volume (IR229) |
+| OPEN-CT-03 | The server-side session store (ElastiCache in production, Valkey locally) with revocation on sign-out (backend architecture §6). Until then the BFF keeps the tokens in its sealed session cookie (IR333) |
 
-Additional contracts for current version 0.30.0: Read IR01–139 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.31.0: Read IR01–IR333 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

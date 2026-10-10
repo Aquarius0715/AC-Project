@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND
-version: 0.30.0
+version: 0.31.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -138,7 +138,7 @@ Cross-module rules that the modules must keep:
 
 | Topic | Design |
 |---|---|
-| Sign-in | OIDC authorization code flow with PKCE against Amazon Cognito, performed by the BFF. Tokens stay on the server; the browser holds only an httpOnly, Secure, SameSite=Lax session cookie. CSRF protection on all BFF write routes. The Core API records the access token's `auth_time` as the user's last sign-in (IR268). |
+| Sign-in | OIDC authorization code flow with PKCE against Amazon Cognito, performed by the BFF. Tokens stay on the server; the browser holds only an httpOnly, Secure, SameSite=Lax session cookie. As built (IR333) the cookie itself carries the tokens, sealed with AES-256-GCM so that only the BFF can read them; the server-side store with revocation on sign-out is OPEN-CT-03 of the container design. CSRF protection on all BFF write routes. The Core API records the access token's `auth_time` as the user's last sign-in (IR268). |
 | Session lifetime | Idle lifetime 30 minutes with a warning 120 seconds before expiry and explicit extend (same behaviour as IR55); absolute lifetime 12 hours (PROPOSED). Sign-out revokes the server session and IdP refresh token. |
 | Two-step verification | TOTP in Amazon Cognito (FR-X08 becomes real). Required for every HQ user (PROPOSED). |
 | HQ network restriction | HQ users (role admin) sign in and work only through `admin.<domain>`, which AWS WAF allows only from the company network (office egress addresses and the company VPN). The BFF issues an admin session only on that host and marks it `channel=hq-network`; the Core API rejects admin-role operations without that mark (FORBIDDEN, shared Page unavailable). `/admin` routes on `app.<domain>` return the shared Page unavailable view. Contractors, technicians, and clients are not restricted. |
@@ -288,4 +288,4 @@ The scheduler claims due items with a database lease (`FOR UPDATE SKIP LOCKED`) 
 | OPEN-BE-06 | Decided 2026-10-07: capacity in §13 | — |
 | OPEN-BE-07 | Contractor payout rail (bank transfer file or Stripe Connect) | Payouts (FR-A23) |
 
-Additional contracts for current version 0.30.0: Read IR01–139 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.31.0: Read IR01–IR333 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

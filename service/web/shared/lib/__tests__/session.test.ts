@@ -1,7 +1,7 @@
-import { createHmac } from "node:crypto";
+import { createCipheriv, randomBytes } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SESSION_COOKIE, cookieOptions, jwtClaims, needsRefresh, oidcConfig, readSession, refresh, roleHome, safeReturnTo, sessionFromTokens, sign, verify, type Session } from "@ac/web/lib/session";
+import { SESSION_COOKIE, cookieKey, cookieOptions, jwtClaims, needsRefresh, oidcConfig, readSession, refresh, roleHome, safeReturnTo, seal, sessionFromTokens, unseal, type Session } from "@ac/web/lib/session";
 
 // the BFF session (backend architecture §5) is server code: next/headers is the request's cookie jar
 const jar = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }));
@@ -24,28 +24,41 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("the signed session cookie (HMAC-SHA256)", () => {
-  it("reads back what it signed and refuses anything altered", () => {
-    const t = sign({ a: 1, b: "x" });
-    expect(verify(t)).toEqual({ a: 1, b: "x" });
-    const [body, mac] = t.split(".");
-    expect([verify(`${b64({ a: 2, b: "x" })}.${mac}`), verify(`${body}.${mac.slice(0, -2)}AA`), verify(`${body}.`), verify(`.${mac}`), verify(body), verify(`${t}.x`), verify(undefined), verify("")])
-      .toEqual([null, null, null, null, null, null, null, null]);
+describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
+  it("opens what it sealed and refuses anything altered", () => {
+    const t = seal({ a: 1, b: "x" });
+    expect(unseal(t)).toEqual({ a: 1, b: "x" });
+    const [iv, body] = t.split(".");
+    const flip = (v: string, i: number) => { const b = Buffer.from(v, "base64url"); b[i] ^= 1; return b.toString("base64url"); };
+    expect([unseal(`${flip(iv, 0)}.${body}`), unseal(`${iv}.${flip(body, 0)}`), unseal(`${iv}.${flip(body, Buffer.from(body, "base64url").length - 1)}`),
+      unseal(`${iv}.`), unseal(`.${body}`), unseal(iv), unseal(`${t}.x`), unseal(`${iv.slice(2)}.${body}`), unseal(undefined), unseal("")])
+      .toEqual([null, null, null, null, null, null, null, null, null, null]);
+  });
+
+  it("keeps the tokens unreadable to the browser and never repeats a value", () => {
+    const s = session();
+    const t = seal(s);
+    const plain = Buffer.from(t.split(".")[1], "base64url").toString("latin1");
+    expect([plain.includes("accessToken"), plain.includes("r-1"), t.includes(Buffer.from(JSON.stringify(s)).toString("base64url").slice(0, 16))]).toEqual([false, false, false]);
+    expect(seal(s)).not.toBe(t); // a fresh IV each time
+    expect(unseal<Session>(t)).toEqual(s);
   });
 
   it("depends on the server's secret", () => {
     vi.stubEnv("SESSION_SECRET", "one");
-    const t = sign({ a: 1 });
+    const t = seal({ a: 1 });
     vi.stubEnv("SESSION_SECRET", "two");
-    expect(verify(t)).toBeNull();
+    expect(unseal(t)).toBeNull();
     vi.stubEnv("SESSION_SECRET", "one");
-    expect(verify(t)).toEqual({ a: 1 });
+    expect(unseal(t)).toEqual({ a: 1 });
   });
 
-  it("refuses a correctly signed body that is not JSON", () => {
+  it("refuses a correctly sealed body that is not JSON", () => {
     vi.stubEnv("SESSION_SECRET", "s");
-    const body = Buffer.from("not json").toString("base64url");
-    expect(verify(`${body}.${createHmac("sha256", "s").update(body).digest("base64url")}`)).toBeNull();
+    const iv = randomBytes(12);
+    const c = createCipheriv("aes-256-gcm", cookieKey(), iv);
+    const body = Buffer.concat([c.update("not json", "utf8"), c.final(), c.getAuthTag()]);
+    expect(unseal(`${iv.toString("base64url")}.${body.toString("base64url")}`)).toBeNull();
   });
 
   it("is httpOnly, lax, 30 minutes, and secure only on https", () => {
@@ -111,22 +124,22 @@ describe("refreshing the access token", () => {
 describe("reading the session in a route handler", () => {
   it("returns a valid session as it is", async () => {
     const s = session();
-    jar.get.mockImplementation((name: string) => (name === SESSION_COOKIE ? { value: sign(s) } : undefined));
+    jar.get.mockImplementation((name: string) => (name === SESSION_COOKIE ? { value: seal(s) } : undefined));
     expect(await readSession()).toEqual(s);
     expect([jar.set.mock.calls.length, jar.delete.mock.calls.length]).toEqual([0, 0]);
     expect(SESSION_COOKIE).toBe("ac_session_client"); // one cookie per app: local apps share the host
   });
 
   it("refreshes an expiring session and rewrites the cookie", async () => {
-    jar.get.mockReturnValue({ value: sign(session({ expiresAt: NOW / 1000 + 10 })) });
+    jar.get.mockReturnValue({ value: seal(session({ expiresAt: NOW / 1000 + 10 })) });
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ access_token: token(claims), refresh_token: "r-2", expires_in: 300 }))));
     expect(await readSession()).toMatchObject({ refreshToken: "r-2", expiresAt: NOW / 1000 + 300 });
     const [name, value, options] = jar.set.mock.calls[0];
-    expect([name, verify<Session>(value)?.refreshToken, options.maxAge]).toEqual([SESSION_COOKIE, "r-2", 1800]);
+    expect([name, unseal<Session>(value)?.refreshToken, options.maxAge]).toEqual([SESSION_COOKIE, "r-2", 1800]);
   });
 
   it("clears the cookie when the refresh fails, and ignores a missing or forged cookie", async () => {
-    jar.get.mockReturnValue({ value: sign(session({ expiresAt: NOW / 1000 + 10 })) });
+    jar.get.mockReturnValue({ value: seal(session({ expiresAt: NOW / 1000 + 10 })) });
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 401 })));
     expect(await readSession()).toBeNull();
     expect(jar.delete).toHaveBeenCalledWith(SESSION_COOKIE);

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { coreAll, coreDisplay, CoreError, coreNow, coreOp, corePermissions, corePrincipal, getSession } from "@ac/web/lib/dal";
-import { SESSION_COOKIE, sign, type Session } from "@ac/web/lib/session";
+import { SESSION_COOKIE, seal, type Session } from "@ac/web/lib/session";
 
 // the Data Access Layer (Next.js authentication guide) runs on the server: the cookie jar and redirect come from Next
 const jar = vi.hoisted(() => ({ get: vi.fn() }));
@@ -24,7 +24,7 @@ const reply = (...bodies: [number, unknown][]) => {
 
 beforeEach(() => {
   vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
-  jar.get.mockImplementation((name: string) => (name === SESSION_COOKIE ? { value: sign(session) } : undefined));
+  jar.get.mockImplementation((name: string) => (name === SESSION_COOKIE ? { value: seal(session) } : undefined));
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -72,7 +72,7 @@ describe("calling the Core API as the signed-in membership (IR222)", () => {
     const f = reply([200, { data: {} }]);
     jar.get.mockReturnValue(undefined);
     await expect(coreOp("units.get", { id: "u1" })).rejects.toThrow("NEXT_REDIRECT /login");
-    jar.get.mockReturnValue({ value: sign({ ...session, expiresAt: NOW / 1000 + 10 }) }); // expiring: the proxy's refresh failed
+    jar.get.mockReturnValue({ value: seal({ ...session, expiresAt: NOW / 1000 + 10 }) }); // expiring: the proxy's refresh failed
     expect(await getSession()).toBeNull();
     await expect(coreOp("units.get", { id: "u1" })).rejects.toThrow("NEXT_REDIRECT /login");
     expect(f.mock.calls.length).toBe(0);

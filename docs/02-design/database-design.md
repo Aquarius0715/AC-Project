@@ -1,6 +1,6 @@
 ---
 document_id: DD-DATABASE
-version: 0.30.0
+version: 0.31.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -69,7 +69,7 @@ Mapping of notable TypeScript types:
 | `Restriction.perUnit` | `restrictions.restriction_units` (apply / release state and command IDs per unit) |
 | `AuditView` | `audit.audit_log` |
 | `Measurement` | `monitoring.measurements` (hot, 35 days) + aggregates; raw history in S3 Parquet |
-| `TwoFactorStatus`, passwords, sessions | Not stored here: two-step verification and credentials live in Amazon Cognito; server sessions in ElastiCache (`twoFactor.*`, `auth.*`, `demoSession.*` call Cognito / the session store) |
+| `TwoFactorStatus`, passwords, sessions | Not stored here: two-step verification and credentials live in Amazon Cognito; server sessions in ElastiCache (as built, the BFF's sealed cookie, IR333) (`twoFactor.*`, `auth.*`, `demoSession.*` call Cognito / the session store) |
 
 Production-only enumeration values (not in the Phase 1A contract; add them to service-contracts.ts when the API adapter is built): `billing.payments.status` adds `expired` (Stripe Checkout Session expiry) and `method` / `channel` describe real methods instead of the demo `PaymentMethod`; `notify.notifications.template_key` adds `invite` (FR-C19 e-mail invites); `energy.baselines.method` adds `measured_period`; `energy.mrv_reports.status` adds `reviewed`; `energy.offset_records.state` adds `requested` / `purchased` / `retired` for a future real registry. All other CHECK lists equal the TypeScript unions, and every write operation that requires an expected version in the write version catalog has a `version` column on its target table (checked 2026-10-07).
 
@@ -184,4 +184,4 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 - `identity.users.last_sign_in_at` is the business time of the latest sign-in, and `sign_in_auth_time` is the identity provider's `auth_time` of that sign-in. Only a later `auth_time` replaces them (IR268).
 - Personal data anonymisation (backend architecture §7) updates `identity.users` (status `anonymised`, e-mail replaced) and `identity.client_users`; audit rows keep IDs but never contact data (masked at write time).
 
-Additional contracts for current version 0.30.0: Read IR01–139 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.31.0: Read IR01–IR333 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

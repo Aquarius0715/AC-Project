@@ -1,7 +1,8 @@
-// BFF session (backend architecture §5): the OIDC tokens and the selected tenant / membership live in an httpOnly,
-// HMAC-signed cookie that only the server reads. Browsers never see the access token.
+// BFF session (backend architecture §5, §6): the OIDC tokens and the selected tenant / membership live in an httpOnly
+// cookie sealed with AES-256-GCM, so the browser keeps an opaque value that only this server can open and that any
+// altered byte invalidates (IR333). The production step is a server-side store (ElastiCache) with revocation.
 import "server-only";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 
 export type Session = {
@@ -19,27 +20,32 @@ export const APP_ROLE = (process.env.AC_APP_ROLE ?? "client") as Session["role"]
 export const SESSION_COOKIE = `ac_session_${APP_ROLE}`;
 export const OIDC_COOKIE = `ac_oidc_${APP_ROLE}`;
 
-function secret(): string {
-  return process.env.SESSION_SECRET ?? "local-dev-session-secret-change-me";
+/** The cookie key: 32 bytes derived from SESSION_SECRET with HKDF-SHA256 (the secret itself is never the key). */
+export function cookieKey(): Buffer {
+  const secret = process.env.SESSION_SECRET ?? "local-dev-session-secret-change-me";
+  return Buffer.from(hkdfSync("sha256", secret, "", "ac bff session cookie", 32));
 }
 
-export function sign(value: object): string {
-  const body = Buffer.from(JSON.stringify(value)).toString("base64url");
-  const mac = createHmac("sha256", secret()).update(body).digest("base64url");
-  return `${body}.${mac}`;
+const IV_BYTES = 12, TAG_BYTES = 16;
+
+/** Seals a value for a cookie: "<iv>.<ciphertext and tag>", base64url; a fresh IV every time. */
+export function seal(value: object): string {
+  const iv = randomBytes(IV_BYTES);
+  const c = createCipheriv("aes-256-gcm", cookieKey(), iv);
+  const body = Buffer.concat([c.update(JSON.stringify(value), "utf8"), c.final(), c.getAuthTag()]);
+  return `${iv.toString("base64url")}.${body.toString("base64url")}`;
 }
 
-export function verify<T>(token: string | undefined): T | null {
-  if (!token) return null;
-  const parts = token.split(".");
-  if (parts.length !== 2) return null;
-  const [body, mac] = parts;
-  if (!body || !mac) return null;
-  const want = createHmac("sha256", secret()).update(body).digest();
-  const got = Buffer.from(mac, "base64url");
-  if (got.length !== want.length || !timingSafeEqual(got, want)) return null;
+/** Opens a sealed cookie value; null when it is missing, altered, sealed with another key, or not JSON. */
+export function unseal<T>(token: string | undefined): T | null {
+  const [iv64, body64, extra] = (token ?? "").split(".");
+  if (!iv64 || !body64 || extra !== undefined) return null;
+  const iv = Buffer.from(iv64, "base64url"), body = Buffer.from(body64, "base64url");
+  if (iv.length !== IV_BYTES || body.length <= TAG_BYTES) return null;
   try {
-    return JSON.parse(Buffer.from(body, "base64url").toString()) as T;
+    const d = createDecipheriv("aes-256-gcm", cookieKey(), iv);
+    d.setAuthTag(body.subarray(body.length - TAG_BYTES));
+    return JSON.parse(Buffer.concat([d.update(body.subarray(0, body.length - TAG_BYTES)), d.final()]).toString("utf8")) as T;
   } catch {
     return null;
   }
@@ -93,7 +99,7 @@ export function needsRefresh(s: Session): boolean {
 /** The signed-in session (route handlers only: refreshing rewrites or clears the cookie). */
 export async function readSession(): Promise<Session | null> {
   const jar = await cookies();
-  const s = verify<Session>(jar.get(SESSION_COOKIE)?.value);
+  const s = unseal<Session>(jar.get(SESSION_COOKIE)?.value);
   if (!s) return null;
   if (!needsRefresh(s)) return s;
   const next = await refresh(s);
@@ -101,7 +107,7 @@ export async function readSession(): Promise<Session | null> {
     jar.delete(SESSION_COOKIE);
     return null;
   }
-  jar.set(SESSION_COOKIE, sign(next), cookieOptions());
+  jar.set(SESSION_COOKIE, seal(next), cookieOptions());
   return next;
 }
 

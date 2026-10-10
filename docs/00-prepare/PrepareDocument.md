@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.216.0
+version: 0.217.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -269,6 +269,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.217.0: The BFF session cookie is sealed (AES-256-GCM); the container design follows compose.yaml; every design document reads IR01–IR333 (IR333). Phase 1A unchanged.
 0.216.0: Every VALIDATION check of the integration suite names its field; two more misses fixed (IR332). Phase 1A unchanged.
 0.215.0: VALIDATION checks name their field; audit.list names the missing end of its period (IR331). Phase 1A unchanged.
 0.214.0: Coverage round 5 — import revalidation, diagnostics and the inbox; two checks that passed for another reason (IR330). Phase 1A unchanged.

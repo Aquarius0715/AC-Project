@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { APP_ROLE, cookieOptions, OIDC_COOKIE, oidcConfig, roleHome, SESSION_COOKIE, sessionFromTokens, sign, verify } from "@ac/web/lib/session";
+import { APP_ROLE, cookieOptions, OIDC_COOKIE, oidcConfig, roleHome, SESSION_COOKIE, sessionFromTokens, seal, unseal } from "@ac/web/lib/session";
 
 type Pending = { state: string; verifier: string; returnTo: string | null };
 
 // GET /bff/auth/callback: exchanges the code, reads tenant / membership / role claims and stores the session cookie.
 export async function GET(req: NextRequest) {
   const cfg = oidcConfig();
-  const pending = verify<Pending>(req.cookies.get(OIDC_COOKIE)?.value);
+  const pending = unseal<Pending>(req.cookies.get(OIDC_COOKIE)?.value);
   const code = req.nextUrl.searchParams.get("code");
   if (!pending || !code || req.nextUrl.searchParams.get("state") !== pending.state) {
     return NextResponse.redirect(new URL("/login?error=state", cfg.appUrl));
@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.redirect(new URL("/login?error=membership", cfg.appUrl));
   if (session.role !== APP_ROLE) return NextResponse.redirect(new URL("/login?error=role", cfg.appUrl)); // another role's app
   const res = NextResponse.redirect(new URL(pending.returnTo ?? roleHome[session.role], cfg.appUrl));
-  res.cookies.set(SESSION_COOKIE, sign(session), cookieOptions());
+  res.cookies.set(SESSION_COOKIE, seal(session), cookieOptions());
   res.cookies.delete({ name: OIDC_COOKIE, path: "/bff/auth" });
   return res;
 }
