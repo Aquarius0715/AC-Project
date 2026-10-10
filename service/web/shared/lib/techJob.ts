@@ -1,7 +1,33 @@
 // Technician job workspace (FR-T04–T06, T08, T09, T13–T15, DATA_SOURCE=api): the component checklist of the unit's
 // service scope, the editable draft and its submit checks (IR100 / IR126), the work-window state (IR76 / IR89), time on
-// site and the version rows. Pure code shared by the Server Component and the client view.
-import { klTime, metricUnit, type Metric } from "@ac/web/lib/devices";
+// site and the version rows. Pure code shared by the Server Component and the client view. Texts in the display
+// language (`t`, IR282); instants through a formatter (`Fmt`) that reads the loader's server-formatted strings, so the
+// first render matches the server's, and formats in the browser only what appears after the page loaded.
+import { metricUnit, type Metric } from "@ac/web/lib/devices";
+import { EN, showClock, showDate, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { businessDay } from "@ac/web/lib/clientBilling";
+import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
+
+const en = translator("en");
+
+/** How the workspace writes an instant: a time of day, a date with its time and a span — the user's language and
+ * display time zone (IR44). */
+export type Fmt = { t: T; clock: (iso: string) => string; stamp: (iso: string) => string; span: (from: string, to: string) => string };
+/** The instants the loader formatted on the server, keyed by the ISO string (spans by “from|to”). */
+export type Known = { clock: Record<string, string>; stamp: Record<string, string>; span: Record<string, string> };
+export const fmtOf = (i: I18n, known?: Known): Fmt => ({
+  t: i.t,
+  clock: (iso) => known?.clock[iso] ?? showClock(iso, i.display),
+  stamp: (iso) => known?.stamp[iso] ?? showTime(iso, i.display),
+  span: (from, to) => known?.span[`${from}|${to}`] ?? showSpan(from, to, i.display),
+});
+/** The server's formatting of the instants a page shows: every time of day, stamp and span it will ask for. */
+export function knownOf(i: I18n, clocks: (string | null | undefined)[], stamps: (string | null | undefined)[], spans: [string, string][]): Known {
+  const f = fmtOf(i);
+  const keep = (xs: (string | null | undefined)[], fn: (iso: string) => string) => Object.fromEntries(xs.filter((x): x is string => !!x).map((x) => [x, fn(x)]));
+  return { clock: keep(clocks, f.clock), stamp: keep(stamps, f.stamp), span: Object.fromEntries(spans.map(([a, b]) => [`${a}|${b}`, f.span(a, b)])) };
+}
+const EN_FMT = fmtOf(EN);
 
 export type Group = "indoor" | "outdoor" | "electrical";
 /** The component keys of each group in canonical order (maintenance.ComponentGroups of the Core API). */
@@ -79,42 +105,45 @@ export function draftInput(jobId: string, reportId: string | null, d: Draft) {
 /** What blocks a submit (the IR100 / IR126 submit rules of the Core API, checked first in the browser so the
  * technician sees every issue at once; the API stays the authority). */
 export type Issue = { key: string | null; group: Group | null; text: string };
-export function submitIssues(d: Draft, attachments: { id: string; name: string; status: string }[], now: number): Issue[] {
+const PHOTO_STATE: Record<string, string> = { processing: "processing", failed: "failed", ready: "ready" };
+export function submitIssues(d: Draft, attachments: { id: string; name: string; status: string }[], now: number, t: T = en): Issue[] {
   const out: Issue[] = [];
+  const label = (key: string) => t(componentLabel[key] ?? key);
   for (const it of d.items) {
-    const where = `${groupLabel[it.componentGroup]} › ${componentLabel[it.componentKey] ?? it.componentKey}`;
-    if (it.result === null) out.push({ key: it.componentKey, group: it.componentGroup, text: `${where} has no result` });
-    else if (it.result !== "normal" && !it.reason.trim()) out.push({ key: it.componentKey, group: it.componentGroup, text: `${where} needs a reason` });
+    const where = `${t(groupLabel[it.componentGroup])} › ${label(it.componentKey)}`;
+    if (it.result === null) out.push({ key: it.componentKey, group: it.componentGroup, text: t("{where} has no result", { where }) });
+    else if (it.result !== "normal" && !it.reason.trim()) out.push({ key: it.componentKey, group: it.componentGroup, text: t("{where} needs a reason", { where }) });
   }
   for (const m of d.readings) {
-    if (m.value.trim() !== "" && !Number.isFinite(Number(m.value))) out.push({ key: m.componentKey, group: groupOf(m.componentKey), text: `${componentLabel[m.componentKey] ?? m.componentKey} reading is not a number` });
+    if (m.value.trim() !== "" && !Number.isFinite(Number(m.value))) out.push({ key: m.componentKey, group: groupOf(m.componentKey), text: t("{name} reading is not a number", { name: label(m.componentKey) }) });
   }
   const n = d.workText.trim().length;
-  if (n < 10 || n > 4000) out.push({ key: null, group: null, text: "Work performed must be 10–4000 characters" });
-  if (d.nextAction.kind === "follow_up" && (!d.nextAction.date || Date.parse(d.nextAction.date) <= now || !d.nextAction.note.trim())) out.push({ key: null, group: null, text: "A follow-up needs a future date and a note" });
-  d.parts.forEach((p, i) => { if (p.quantity < 1 || p.quantity > 999) out.push({ key: null, group: null, text: `Part ${i + 1} (${p.name || "unnamed"}) needs a quantity of 1–999` }); });
-  for (const a of attachments.filter((x) => d.attachmentIds.includes(x.id) && x.status !== "ready")) out.push({ key: null, group: null, text: `Photo ${a.name} is ${a.status} — remove or retry it` });
+  if (n < 10 || n > 4000) out.push({ key: null, group: null, text: t("Work performed must be 10–4000 characters") });
+  if (d.nextAction.kind === "follow_up" && (!d.nextAction.date || Date.parse(d.nextAction.date) <= now || !d.nextAction.note.trim())) out.push({ key: null, group: null, text: t("A follow-up needs a future date and a note") });
+  d.parts.forEach((p, k) => { if (p.quantity < 1 || p.quantity > 999) out.push({ key: null, group: null, text: t("Part {n} ({name}) needs a quantity of 1–999", { n: k + 1, name: p.name || t("unnamed") }) }); });
+  for (const a of attachments.filter((x) => d.attachmentIds.includes(x.id) && x.status !== "ready")) out.push({ key: null, group: null, text: t("Photo {name} is {state} — remove or retry it", { name: a.name, state: PHOTO_STATE[a.status] ? t(PHOTO_STATE[a.status]) : a.status }) });
   return out;
 }
 
 /** Checklist progress per group: results chosen out of the group's components, and the issues of each group. */
-export function progress(d: Draft, issues: Issue[]) {
+export function progress(d: Draft, issues: Issue[], t: T = en) {
   return componentGroups.map(({ group }) => {
     const items = d.items.filter((i) => i.componentGroup === group);
-    return { group, label: groupLabel[group], done: items.filter((i) => i.result !== null).length, total: items.length, issues: issues.filter((x) => x.group === group).length };
+    return { group, label: t(groupLabel[group]), done: items.filter((i) => i.result !== null).length, total: items.length, issues: issues.filter((x) => x.group === group).length };
   }).filter((g) => g.total > 0);
 }
 
 /** The work window (IR76 before the start, IR89 warning 15 minutes before the end and the end itself). */
 export type WindowState = { phase: "none" | "before" | "open" | "ending" | "ended"; text: string };
-export function windowState(a: { scheduledStart: string; scheduledEnd: string } | null, now: number): WindowState {
-  if (!a) return { phase: "none", text: "No work window" };
+export function windowState(a: { scheduledStart: string; scheduledEnd: string } | null, now: number, f: Fmt = EN_FMT): WindowState {
+  const { t } = f;
+  if (!a) return { phase: "none", text: t("No work window") };
   const start = Date.parse(a.scheduledStart), end = Date.parse(a.scheduledEnd);
-  const range = `${klTime(a.scheduledStart).slice(5)} – ${klTime(a.scheduledEnd).slice(5)}`;
-  if (now < start) return { phase: "before", text: `Starts ${klTime(a.scheduledStart).slice(5)} · ${range}` };
-  if (now >= end) return { phase: "ended", text: `Ended ${klTime(a.scheduledEnd).slice(5)} · ${range}` };
+  const range = f.span(a.scheduledStart, a.scheduledEnd);
+  if (now < start) return { phase: "before", text: t("Starts {time} · {range}", { time: f.stamp(a.scheduledStart), range }) };
+  if (now >= end) return { phase: "ended", text: t("Ended {time} · {range}", { time: f.stamp(a.scheduledEnd), range }) };
   const left = Math.ceil((end - now) / 60000);
-  return left <= 15 ? { phase: "ending", text: `Ends in ${left} min — unsaved input is discarded at ${klTime(a.scheduledEnd).slice(11)} (IR89)` } : { phase: "open", text: range };
+  return left <= 15 ? { phase: "ending", text: t("Ends in {n} min — unsaved input is discarded at {time} (IR89)", { n: left, time: f.clock(a.scheduledEnd) }) } : { phase: "open", text: range };
 }
 
 /** Time on site (FR-T13 / T14): arrival and check-in evidence, start, pauses, finish and the counted minutes. */
@@ -122,22 +151,24 @@ export type TimeOnSite = {
   arrivedAt?: string | null; checkInMethod?: "location_qr" | "manual" | null; checkInReason?: string | null; distanceMeters?: number | null; startedAt?: string | null;
   pauses?: { from: string; to: string | null }[]; finishedAt?: string | null; onSiteMinutes?: number | null;
 };
-const hhmm = (iso: string) => klTime(iso).slice(11);
-const duration = (mins: number) => (mins >= 60 ? `${Math.floor(mins / 60)} h ${mins % 60} min` : `${mins} min`);
-export function timeRows(t: TimeOnSite | null | undefined, now: number): [string, string][] {
-  if (!t?.arrivedAt && !t?.startedAt) return [["Arrived", "not checked in"]];
-  const pauses = t.pauses ?? [];
+const duration = (mins: number, t: T) => (mins >= 60 ? t("{h} h {m} min", { h: Math.floor(mins / 60), m: mins % 60 }) : t("{n} min", { n: mins }));
+/** The instants of a time on site, for the loader to format. */
+export const timeInstants = (ts: TimeOnSite | null | undefined) => [ts?.arrivedAt, ts?.startedAt, ts?.finishedAt, ...(ts?.pauses ?? []).flatMap((p) => [p.from, p.to])];
+export function timeRows(ts: TimeOnSite | null | undefined, now: number, f: Fmt = EN_FMT): [string, string][] {
+  const { t } = f;
+  if (!ts?.arrivedAt && !ts?.startedAt) return [[t("Arrived"), t("not checked in")]];
+  const pauses = ts.pauses ?? [];
   const open = pauses.find((p) => !p.to);
-  const paused = pauses.reduce((s, p) => s + ((p.to ? Date.parse(p.to) : now) - Date.parse(p.from)), 0);
-  const from = Date.parse(t.arrivedAt ?? t.startedAt!);
-  const minutes = t.onSiteMinutes ?? Math.max(0, Math.floor((((t.finishedAt ? Date.parse(t.finishedAt) : now) - from) - paused) / 60000));
+  const paused = pauses.reduce((sum, p) => sum + ((p.to ? Date.parse(p.to) : now) - Date.parse(p.from)), 0);
+  const from = Date.parse(ts.arrivedAt ?? ts.startedAt!);
+  const minutes = ts.onSiteMinutes ?? Math.max(0, Math.floor((((ts.finishedAt ? Date.parse(ts.finishedAt) : now) - from) - paused) / 60000));
   return [
-    ["Arrived", `${hhmm(t.arrivedAt ?? t.startedAt!)} · ${t.checkInMethod === "manual" ? "manual check-in" : "checked in"}`],
-    ["Location", t.checkInMethod === "manual" ? `manual — ${t.checkInReason ?? "no reason"}` : t.distanceMeters != null ? `${Math.round(t.distanceMeters)} m from site · QR matched` : "—"],
-    ["Started", t.startedAt ? hhmm(t.startedAt) : "—"],
-    ["Paused", open ? `since ${hhmm(open.from)}` : pauses.length ? `${pauses.length} pause${pauses.length === 1 ? "" : "s"} · ${duration(Math.round(paused / 60000))}` : "—"],
-    ["Finished", t.finishedAt ? hhmm(t.finishedAt) : "— (on submit)"],
-    ["On-site time", duration(minutes)],
+    [t("Arrived"), `${f.clock(ts.arrivedAt ?? ts.startedAt!)} · ${t(ts.checkInMethod === "manual" ? "manual check-in" : "checked in")}`],
+    [t("Location"), ts.checkInMethod === "manual" ? t("manual — {reason}", { reason: ts.checkInReason ?? t("no reason") }) : ts.distanceMeters != null ? t("{m} m from site · QR matched", { m: Math.round(ts.distanceMeters) }) : "—"],
+    [t("Started"), ts.startedAt ? f.clock(ts.startedAt) : "—"],
+    [t("Paused"), open ? t("since {time}", { time: f.clock(open.from) }) : pauses.length ? `${t(pauses.length === 1 ? "1 pause" : "{n} pauses", { n: pauses.length })} · ${duration(Math.round(paused / 60000), t)}` : "—"],
+    [t("Finished"), ts.finishedAt ? f.clock(ts.finishedAt) : t("— (on submit)")],
+    [t("On-site time"), duration(minutes, t)],
   ];
 }
 
@@ -145,17 +176,47 @@ export function timeRows(t: TimeOnSite | null | undefined, now: number): [string
  * and ready photos — the first save creates it without a reload) above the submitted versions with their review. */
 export type VersionRow = { title: string; sub: string; badge: { text: string; tone: "primary" | "ok" | "warn" | "muted" } };
 export type DraftVersion = { version: number; results: number; photos: number; savedAt: string | null };
-export function versionRows(draft: DraftVersion | null, reportRefs: { reportVersion: number }[], reviews: ApiTechReport["reviewHistory"]): VersionRow[] {
+export function versionRows(draft: DraftVersion | null, reportRefs: { reportVersion: number }[], reviews: ApiTechReport["reviewHistory"], f: Fmt = EN_FMT): VersionRow[] {
+  const { t } = f;
   const rows: VersionRow[] = [];
   if (draft) {
-    rows.push({ title: `Draft v${draft.version}${draft.savedAt ? ` · saved ${hhmm(draft.savedAt)}` : ""}`, sub: `${draft.results} result${draft.results === 1 ? "" : "s"} · ${draft.photos} photo${draft.photos === 1 ? "" : "s"}`, badge: { text: "Draft", tone: "warn" } });
+    rows.push({
+      title: draft.savedAt ? t("Draft v{version} · saved {time}", { version: draft.version, time: f.clock(draft.savedAt) }) : t("Draft v{version}", { version: draft.version }),
+      sub: `${t(draft.results === 1 ? "1 result" : "{n} results", { n: draft.results })} · ${t(draft.photos === 1 ? "1 photo" : "{n} photos", { n: draft.photos })}`, badge: { text: t("Draft"), tone: "warn" },
+    });
   }
   for (const ref of [...reportRefs].reverse()) {
     const rv = reviews.filter((h) => h.reportVersion === ref.reportVersion).pop();
     rows.push({
-      title: `v${ref.reportVersion} · ${rv ? (rv.decision === "accept" ? "accepted" : "returned") : "submitted"}`, sub: rv ? `${klTime(rv.occurredAt).slice(5)}${rv.reason ? ` — ${rv.reason}` : ""}` : "awaiting quality review",
-      badge: rv?.decision === "accept" ? { text: "Accepted", tone: "ok" } : rv?.decision === "return" ? { text: "Returned", tone: "warn" } : { text: "Submitted", tone: "primary" },
+      title: t("v{version} · {state}", { version: ref.reportVersion, state: t(rv ? (rv.decision === "accept" ? "accepted" : "returned") : "submitted") }),
+      sub: rv ? `${f.stamp(rv.occurredAt)}${rv.reason ? ` — ${rv.reason}` : ""}` : t("awaiting quality review"),
+      badge: rv?.decision === "accept" ? { text: t("Accepted"), tone: "ok" } : rv?.decision === "return" ? { text: t("Returned"), tone: "warn" } : { text: t("Submitted"), tone: "primary" },
     });
   }
   return rows;
+}
+
+/** The follow-up of a next action as text: the Kuala Lumpur calendar date the technician picked and the note. */
+export const followUpText = (n: NextAction, i: I18n = EN) => (n.kind === "none" ? i.t("None") : i.t("Follow-up {date} — {note}", { date: n.date ? businessDay(n.date, i.display.locale) : "—", note: n.note }));
+
+/** JobHistorySnapshot of service-contracts.ts as the technician reads it (IR124). */
+export type ApiTechHistory = {
+  projection: "history"; jobId: string; type: string; status: string; asOf: string; completedAt: string | null;
+  redactedReportSummary: { hasReport: boolean; acceptance: "accepted" | "not_accepted" };
+};
+/** A job whose viewing window ended (IR49): completed — the assignment ended with it (IR234) — or reassigned / cancelled,
+ * read as the snapshot frozen when it ended (IR124). */
+export function historyCard(h: ApiTechHistory, i: I18n = EN) {
+  const { t, display } = i;
+  const done = h.status === "completed";
+  const report = !h.redactedReportSummary.hasReport ? t("No report from your assignment") : t(h.redactedReportSummary.acceptance === "accepted" ? "Accepted in the quality review" : "Submitted — not accepted while you were assigned");
+  return {
+    title: `${h.jobId.slice(0, 8)} · ${typeLabel(h.type, t)}`, sub: t(done ? "Completed — your assignment ended with the job" : "Your assignment on this job has ended"),
+    rows: [
+      [t("Status"), done ? (h.completedAt ? t("Completed {time}", { time: showDate(h.completedAt, display) }) : t("Completed")) : t("{status} when your assignment ended", { status: statusWord(h.status, t) })],
+      [t("Your report"), report], [t("Assignment ended"), showTime(h.asOf, display)],
+    ] as [string, string][],
+    note: t(done ? "Your time is free for other jobs. The report, the unit and its devices stay with HQ and the customer." : "HQ or your coordinator changed the assignment, so the job details and the unit are no longer shown to you."),
+    back: t("← Overview"),
+  };
 }

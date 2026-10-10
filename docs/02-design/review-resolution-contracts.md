@@ -3164,3 +3164,29 @@ The Certifications tab of `/partner/team` (FR-P09, DD-P09, Figma Contractor 04-6
    - The HQ screens.
    - The browser demo.
    - The assistant panel and the voice demo's answers.
+
+## IR282 The technician job workspace in the display language — 2026-10-10
+
+`/technician/jobs/[id]` (SCR-T04, FR-T04–T06, T08, T09, T13–T15, Figma Technician 02) follows the display language and time zone.
+
+1. **Texts.** These are translated:
+   - the header, the assignment, window, hold, submitted, completed, rework and refusal banners;
+   - the checklist (groups, components, results, reasons and the submit checks), the checklist progress and the job & unit card;
+   - the readings, parts & refrigerant and time-on-site tabs, the work report with its photos, next action and sign-off, and the versions & autosave card;
+   - the check-in, can't-make, sign-off, part, refrigerant and submit dialogs, and the toasts;
+   - a refused write in words (FORBIDDEN: the window has not started or has ended, not assigned, a QR label of another unit; CONFLICT; UNAVAILABLE), the codes kept in front;
+   - the history card of a job whose viewing window ended (IR49 / IR124).
+   The dictionary gains 241 entries.
+2. **Times.**
+   - The work window is an instant span in the display time zone (`showSpan`); "starts" and "ended" use `showTime`, the IR89 warning, the times on site, a reading's time and the sign-off use `showClock`.
+   - A follow-up visit date stays the Kuala Lumpur calendar day the technician picked (`businessDay`); a new time typed in the can't-make dialog is read in the display time zone (`zonedInstant`).
+   - The loader formats every instant of the first render on the server (`knownOf`: clocks, stamps and spans keyed by the ISO string). The view's formatter (`fmtOf`) reads them, so the first render matches the server's ("Sept" in Node and the browser alike), and formats in the browser only what appears after the page loaded — a new reading, a save, a sign-off.
+3. **Shared helpers.** These take the translator or the formatter: `submitIssues`, `progress`, `windowState`, `timeRows` and `versionRows`; `followUpText` and `historyCard` are new. Their English moves to IR44.
+4. **Checked.**
+   - Vitest: 39 files, 226 tests. `techJob.test.ts` covers the new English times and adds a case for the server's formatting and Malay.
+   - E2E: `technician/language.e2e.ts` also opens an assigned job from the All assigned tab and checks the Malay headings, the back link and the window in GMT+9. The suite: 64 passed, 9 skipped, and the users are en / Asia/Kuala_Lumpur.
+5. **Still open.**
+   - The other technician screens: the unit with its alerts and control, the devices and the QR scan.
+   - The HQ screens.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.

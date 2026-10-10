@@ -2,12 +2,14 @@
 // projection with the assignment, time on site and report refs), the unit while the window allows it (units.get:
 // name, place, service scope → required components), the open draft or the latest submitted report (reports.get) and
 // the parts catalog for the add-part dialog (parts.list). Photos are streamed by the photos/[attachmentId] route.
+// Texts in the user's display language; the instants the page shows are formatted here, in their display time zone,
+// and handed to the view (IR282).
 import "server-only";
-import { coreAll, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { i18nOf } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
-import { componentsFor, type ApiTechReport, type TimeOnSite } from "@ac/web/lib/techJob";
+import { componentsFor, historyCard, knownOf, timeInstants, type ApiTechHistory, type ApiTechReport, type TimeOnSite } from "@ac/web/lib/techJob";
 import type { WorkspaceLive } from "../_components/workspace-view";
-import type { ApiTechHistory } from "../_components/job-history";
 
 type JobDetail = {
   projection: "detail" | "offer" | "history"; id: string; version: number; status: string; type: string; unitId: string; symptom: string; alertIds: string[];
@@ -23,12 +25,14 @@ const quiet = <T,>(p: Promise<T>): Promise<T | Refused> => p.catch((e) => {
 });
 const isRefused = (x: unknown): x is Refused => !!x && typeof x === "object" && "refused" in x;
 
-export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | { kind: "history"; history: ApiTechHistory } | "not_found"> {
+export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | { kind: "history"; card: ReturnType<typeof historyCard> } | "not_found"> {
   const job = await coreOp<JobDetail>("jobs.get", { jobId }).catch((e) => {
     if (e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || e.error.fieldErrors.jobId)) return null;
     throw e;
   });
-  if (job?.projection === "history") return { kind: "history", history: job as unknown as ApiTechHistory }; // window ended: completed (IR234) or reassigned
+  const display = await coreDisplay();
+  const i = i18nOf(display);
+  if (job?.projection === "history") return { kind: "history", card: historyCard(job as unknown as ApiTechHistory, i) }; // window ended: completed (IR234) or reassigned
   if (!job || job.projection !== "detail") return "not_found";
   const [now, unit] = await Promise.all([coreNow(), quiet(coreOp<ApiUnitDetail & { serviceScope?: string[] }>("units.get", { id: job.unitId }))]);
   const ref = job.draftReportRef ?? job.reportRefs[job.reportRefs.length - 1] ?? null;
@@ -39,8 +43,13 @@ export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | { ki
   ]);
   const u = isRefused(unit) ? null : unit;
   const r = report === null || isRefused(report) ? null : report;
+  const a = job.assignment;
+  const known = knownOf(i,
+    [...timeInstants(job.timeOnSite), a?.scheduledEnd, r?.signOff?.signedAt, ...(r?.measurements ?? []).map((m) => m.observedAt)],
+    [a?.scheduledStart, a?.scheduledEnd, ...(r?.reviewHistory ?? []).map((h) => h.occurredAt)],
+    a ? [[a.scheduledStart, a.scheduledEnd]] : []);
   return {
-    now: now.toISOString(),
+    now: now.toISOString(), known, zone: display.timeZone,
     job: {
       id: job.id, version: job.version, status: job.status, type: job.type, unitId: job.unitId, symptom: job.symptom, alertCount: job.alertIds.length, origin: job.origin,
       assignment: job.assignment, timeOnSite: job.timeOnSite, draftReportRef: job.draftReportRef, reportRefs: job.reportRefs,
