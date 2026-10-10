@@ -3,10 +3,11 @@
 // unit's units.get (setting, room temperature, power draw, capability and restriction for group control). KPI links
 // (powerState, connections) list the matching units. Renaming is locations.rename; group control sends commands.create
 // per AC and changed setting and follows each command with commands.get through the BFF. URL keys: propertyId,
-// spaceId, unassignedOnly, mode, unitIds, powerState, connections. The Phase 1A demo keeps the fixtures.
+// spaceId, unassignedOnly, mode, unitIds, powerState, connections. Texts and times in the user's display language and
+// time zone (IR263). The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreOp, corePrincipal } from "@ac/web/lib/dal";
-import { klStamp } from "@ac/web/lib/energy";
+import { apiMode, coreAll, coreDisplay, coreOp, corePrincipal } from "@ac/web/lib/dal";
+import { i18nOf, showDate } from "@ac/web/lib/i18n";
 import {
   connections, filterUnits, flatten, locationTree, powerStates, selection, spacePath, unitsAt,
   type ApiPropertyRow, type ApiSpaceRow, type ApiUnitRow, type Connection,
@@ -21,9 +22,10 @@ export default async function CustomerPropertiesPage({ searchParams }: PageProps
   if (!apiMode()) return <PropertiesDemo />;
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
-  const [me, properties, spaces, units] = await Promise.all([
-    corePrincipal(), coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"), coreAll<ApiUnitRow>("units.list"),
+  const [me, properties, spaces, units, display] = await Promise.all([
+    corePrincipal(), coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"), coreAll<ApiUnitRow>("units.list"), coreDisplay(),
   ]);
+  const i = i18nOf(display);
   const tree = locationTree(properties, spaces, units, properties[0]?.customerOrgId ?? "");
   const powerState = powerStates.find((p) => p === one("powerState"));
   const conns = (one("connections") ?? "").split(",").filter((c): c is Connection => (connections as string[]).includes(c));
@@ -39,10 +41,10 @@ export default async function CustomerPropertiesPage({ searchParams }: PageProps
   const p = sel?.property;
   const live: PropertiesLive = {
     tree, selection: sel, owner: me.clientRole === "owner", filter: filtered ? { powerState: powerState ?? null, connections: conns, total: units.length } : null,
-    units: roomUnits(details).map((r) => ({ ...r, place: place(units.find((u) => u.id === r.id)!) })), details,
+    units: roomUnits(details, i).map((r) => ({ ...r, place: place(units.find((u) => u.id === r.id)!) })), details,
     summary: p ? {
       kind: p.kind, floors: flatten(p.spaces).filter((s) => s.kind === "floor").map((s) => s.name), rooms: p.rooms, inRooms: p.units - p.unassigned, unassigned: p.unassigned,
-      edited: `${klStamp(p.updatedAt).slice(0, 10)} · version ${p.version}`,
+      edited: i.t("{date} · version {n}", { date: showDate(p.updatedAt, display), n: p.version }),
     } : null,
     mode: one("mode") === "group" ? "group" : "single", selectedUnits: (one("unitIds") ?? "").split(",").filter(Boolean),
   };

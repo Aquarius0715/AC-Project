@@ -2608,3 +2608,29 @@ After the unit screen (IR259), the customer's home screen `/customer` (FR-C01, D
      - `customerMaintenance.test.ts` and `customerFilterCare.test.ts`: the IR44 spans and dates, plus Malay / Asia/Tokyo cases.
    - E2E: `customer/unit-language.e2e.ts` also opens maintenance in Malay with Asia/Tokyo — the tabs and the New request dialog with "masa dalam Asia/Tokyo". The maintenance-request and filter-care specs pass in English. The whole suite: 54 passed, 9 skipped; the users are back to en / Asia/Kuala_Lumpur, and all 27 E2E jobs are cancelled.
 8. **Still open.** The other customer screens (units & locations, automations, energy, air quality, contracts & payments, users), the browser demo's screens, the other roles, and the voice demo's answers.
+
+## IR263 Units & locations in the display language and time zone; language specs restore in afterEach — 2026-10-10
+
+`/customer/properties` (FR-C02, FR-C14, DD-C02, DD-C14, Figma Client 02a–02d) follows the maintenance screen (IR262).
+
+1. **Texts.** These are translated:
+   - the location tree: kinds, unit counts, unassigned units, the read-only note;
+   - the property summary;
+   - the unit rows;
+   - the filtered list from the overview's counts (power and connection);
+   - the rename dialog and its refusals;
+   - group control: selection, change, review table, results, retry.
+   Location and unit names are the customer's data and stay as written. The plan result of a group change (Will send / Clamped / Skipped / No change) stays the plan's code; only its badge is translated.
+2. **Times.** These use the user's display time zone with the zone's abbreviation:
+   - a unit's last-seen time and an offline AC's note in the group plan (time of day);
+   - the property's last edit (`showDate`).
+3. **Shared helpers.** `roomUnits`, `groupPlan` and `changeText` (`lib/clientProperties`) take the translator and the display. `nameError` and `reasonError` (`lib/assets`) take the translator; HQ's unit register still calls them in English. `clientProperties.test.ts` is new: room rows in both languages, the group plan's commands, clamping, restriction and skips, and the Malay plan.
+4. **Language specs restore in afterEach.** The language E2E spec timed out on a wrong selector, and its `finally` block could not run: Playwright stops a timed-out test and closes the page. customer-a was left in Malay with Asia/Tokyo, which would have broken the English specs that ran after it. The data was reset by hand.
+   - The display language and time zone are now set through `e2e/fixtures/display.ts`.
+   - The two specs that change them (`customer/unit-language`, `shared/preferences`) put English and the earlier zone back at the end of the test, or in `test.afterEach` when the test fails. afterEach also runs after a timeout.
+   Checked by forcing a 1.8 s timeout: the spec failed after switching to Malay, and the user came back as en / Asia/Kuala_Lumpur.
+5. **Checked.**
+   - Vitest: 34 files, 175 tests.
+   - E2E: the language spec also opens units & locations in Malay. The whole suite: 54 passed, 9 skipped; the users are en / Asia/Kuala_Lumpur, and all 29 E2E jobs are cancelled.
+   - A screenshot of the tree and a property in Malay shows no overflow.
+6. **Still open.** Automations, energy, air quality, contracts & payments and users for the customer; the browser demo's screens; the other roles; the voice demo's answers.

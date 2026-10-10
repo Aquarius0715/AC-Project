@@ -1,6 +1,7 @@
 // HQ customers & units (FR-A02, DATA_SOURCE=api): customers with their contract standing, the property / space tree,
 // unit rows, the unit form and the customer's alert policies projected for /admin/units. Pure code shared by the
 // Server Component and the client view.
+import { translator, type T } from "@ac/web/lib/i18n";
 import { amount, klStamp, one } from "@ac/web/lib/energy";
 import { metricLabel, metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
 
@@ -206,8 +207,8 @@ export function propertyErrors(d: PropertyDraft): Record<string, string> {
 export const propertyInput = (d: PropertyDraft, orgId: string, id?: string) => ({
   ...(id ? { id } : {}), customerOrgId: orgId, kind: d.kind, name: d.name.trim(), address: d.address.trim() || null, accessInstructions: d.accessInstructions.trim() || null,
 });
-export const nameError = (name: string) => (between(name, 1, 120) ? undefined : "1–120 characters");
-export const reasonError = (reason: string) => (between(reason, 1, 1000) ? undefined : "A reason is required (1–1000 characters)");
+export const nameError = (name: string, t: T = translator("en")) => (between(name, 1, 120) ? undefined : t("1–120 characters"));
+export const reasonError = (reason: string, t: T = translator("en")) => (between(reason, 1, 1000) ? undefined : t("A reason is required (1–1000 characters)"));
 
 // ---- units ----
 

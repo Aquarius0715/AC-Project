@@ -2,49 +2,35 @@
 // (Malay puts the shell and the screen in Malay), a client's location consent and monthly report e-mail too, and
 // two-step verification turns on (setup QR, six code boxes, recovery codes once) and off. Every change is put back.
 import { test, expect } from "../../fixtures/test";
-import type { Page } from "@playwright/test";
+import { displayZone, ENGLISH, savePreferences as save, setDisplay } from "../../fixtures/display";
 
-// the page may be in either language while a change is put back
-const SAVE = /Save preferences|Simpan keutamaan/;
-const SAVED = /Preferences saved|Keutamaan disimpan/;
-const ENGLISH = /English|Inggeris/;
-
-/** Saves and waits for the Server Action's answer and its success toast (Save is also disabled while pending, so a
- * disabled button alone does not mean saved). */
-async function save(page: Page) {
-  const answered = page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === "/settings/preferences");
-  await page.getByRole("button", { name: SAVE }).click();
-  await answered;
-  await expect(page.getByText(SAVED).last()).toBeVisible();
-}
+// English and the earlier zone come back at the end of the language test, or here when it fails (also on a timeout)
+let zoneBefore: string | null = null;
+test.afterEach(async ({ page }) => {
+  if (zoneBefore) await setDisplay(page, ENGLISH, zoneBefore);
+  zoneBefore = null;
+});
 
 test("language and time zone are saved and read back", async ({ page }) => {
-  await page.goto("/settings/preferences");
-  const zone = page.locator("main select").first();
-  const before = await zone.inputValue();
+  const before = await displayZone(page);
   const target = before === "Asia/Tokyo" ? "Asia/Singapore" : "Asia/Tokyo";
-  try {
-    await zone.selectOption(target);
-    await page.getByRole("button", { name: "Bahasa Melayu" }).click();
-    await save(page);
-    await page.reload();
-    await expect(page.locator("main select").first()).toHaveValue(target);
-    await expect(page.getByRole("button", { name: "Bahasa Melayu" })).toHaveAttribute("aria-pressed", "true");
-    // the shell and the screen read the saved language (a text without a Malay entry stays English)
-    await expect(page.getByRole("button", { name: "Log keluar" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Keutamaan" })).toBeVisible();
-    await expect(page.getByText("Bahasa paparan", { exact: true })).toBeVisible();
-    await page.goto("/notifications"); // the inbox too (FR-X01: key screens and notifications)
-    await expect(page.getByRole("tab", { name: /^Semua/ })).toBeVisible();
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Pemberitahuan");
-  } finally {
-    // put it back, whichever language the page shows now
-    await page.goto("/settings/preferences");
-    await page.locator("main select").first().selectOption(before);
-    const english = page.getByRole("button", { name: ENGLISH });
-    if ((await english.getAttribute("aria-pressed")) !== "true") await english.click();
-    if (await page.getByRole("button", { name: SAVE }).isEnabled()) await save(page);
-  }
+  zoneBefore = before;
+  await page.locator("main select").first().selectOption(target);
+  await page.getByRole("button", { name: "Bahasa Melayu" }).click();
+  await save(page);
+  await page.reload();
+  await expect(page.locator("main select").first()).toHaveValue(target);
+  await expect(page.getByRole("button", { name: "Bahasa Melayu" })).toHaveAttribute("aria-pressed", "true");
+  // the shell and the screen read the saved language (a text without a Malay entry stays English)
+  await expect(page.getByRole("button", { name: "Log keluar" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Keutamaan" })).toBeVisible();
+  await expect(page.getByText("Bahasa paparan", { exact: true })).toBeVisible();
+  await page.goto("/notifications"); // the inbox too (FR-X01: key screens and notifications)
+  await expect(page.getByRole("tab", { name: /^Semua/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Pemberitahuan");
+  // put it back, whichever language the page shows now
+  await setDisplay(page, ENGLISH, before);
+  zoneBefore = null;
   await page.reload();
   await expect(page.locator("main select").first()).toHaveValue(before);
   await expect(page.getByRole("button", { name: ENGLISH })).toHaveAttribute("aria-pressed", "true");
