@@ -89,8 +89,9 @@ type TechAccess interface {
 
 // Alerts is the alert operation set.
 type Alerts struct {
-	Units  UnitLocator
-	Access TechAccess
+	Units   UnitLocator
+	Access  TechAccess
+	Devices DeviceRecoveries // the recovery events behind a resolution's evidence (IR327); nil offers none
 }
 
 // alertScope applies D01 to alert rows through the unit of the alert (unitscope, IR169). Lists use Equipment mode
@@ -384,6 +385,8 @@ func (in *ResolveInput) Validate() map[string]string {
 	}
 	if in.ResolutionEvidenceIDs == nil {
 		fe["resolutionEvidenceIds"] = "error.required"
+	} else if len(in.ResolutionEvidenceIDs) > 20 || !distinct(in.ResolutionEvidenceIDs) {
+		fe["resolutionEvidenceIds"] = "error.invalid" // at most 20, each once
 	}
 	return fe
 }
@@ -391,7 +394,7 @@ func (in *ResolveInput) Validate() map[string]string {
 // @Summary		alerts.resolve (write)
 // @ID				alerts.resolve
 // @Description	Authorization: technician:alert.resolve:assigned | admin:alert.resolve
-// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 resolutionReason 1-1000; IR94 technician write table (assignment and work window, jobId required when typed)
+// @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 resolutionReason 1-1000; IR94 technician write table (assignment and work window, jobId required when typed); IR327 a policy-free alert needs at least one evidence ID, every ID a candidate of alerts.evidence
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-T07, DD-A05
 // @Tags			alerts
@@ -419,6 +422,13 @@ func (m Alerts) resolve(ctx context.Context, c *ops.Call, in *ResolveInput) (Ale
 	}
 	if status == "resolved" {
 		return Alert{}, apperr.E(apperr.Conflict, "error.invalidState")
+	}
+	cur, err := scanAlert(c.Tx.QueryRow(ctx, "SELECT "+alertCols+" FROM monitoring.alerts a WHERE a.id = $1", in.AlertID))
+	if err != nil {
+		return Alert{}, err
+	}
+	if err := m.checkEvidence(ctx, c, cur, in.ResolutionEvidenceIDs); err != nil {
+		return Alert{}, err
 	}
 	a, err := scanAlert(c.Tx.QueryRow(ctx, `UPDATE monitoring.alerts a SET status = 'resolved', resolved_at = $2, resolved_by = $3, resolution_reason = $4,
 		resolution_evidence_ids = $5, version = version + 1, updated_at = platform.app_now() WHERE a.id = $1 RETURNING `+alertCols,
@@ -457,6 +467,7 @@ func RegisterAlerts(r *ops.Registry, m Alerts) {
 	ops.Register(r, "alerts.get", m.get)
 	ops.Register(r, "alerts.acknowledge", m.acknowledge)
 	ops.Register(r, "alerts.resolve", m.resolve)
+	ops.Register(r, "alerts.evidence", m.evidence)
 }
 
 // UnitSeverities implements maintenance.UnitSeverity (IR23): the highest open/acknowledged alert severity per unit.

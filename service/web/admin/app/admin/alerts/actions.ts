@@ -24,8 +24,9 @@ export async function acknowledgeAlert(alertId: string, version: number): Promis
   return run(() => coreOp("alerts.acknowledge", { alertId }, { write: true, expectedVersion: version }));
 }
 
-export async function resolveAlert(alertId: string, version: number, reason: string): Promise<ActionResult> {
-  return run(() => coreOp("alerts.resolve", { alertId, resolutionReason: reason, resolutionEvidenceIds: [] }, { write: true, expectedVersion: version }));
+/** Resolves with a reason and the picked evidence: candidates of alerts.evidence, at least one without a policy (IR327). */
+export async function resolveAlert(alertId: string, version: number, reason: string, evidenceIds: string[]): Promise<ActionResult> {
+  return run(() => coreOp("alerts.resolve", { alertId, resolutionReason: reason, resolutionEvidenceIds: evidenceIds }, { write: true, expectedVersion: version }));
 }
 
 export async function savePolicy(policy: AdminPolicy): Promise<ActionResult> {

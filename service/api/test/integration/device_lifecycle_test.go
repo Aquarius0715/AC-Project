@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -317,6 +318,13 @@ func TestDeviceEvents(t *testing.T) {
 	ownerScan(t, `SELECT status FROM monitoring.alerts WHERE id = $1`, []any{alert}, &status)
 	if status != "open" {
 		t.Errorf("tamper recovery does not resolve the alert: %s", status)
+	}
+	// the recovery is evidence a resolution of the tamper alert may cite (IR327)
+	clearID, _, _, _ := eventOf(clear)
+	if _, m := post(s, &hq, "alerts.evidence", `{"alertId":"`+alert+`","query":{"limit":100}}`); !slices.ContainsFunc(items(m), func(it map[string]any) bool {
+		return it["id"] == clearID && it["kind"] == "device_event" && it["eventType"] == "restored" && it["observedAt"] != nil
+	}) {
+		t.Errorf("tamper recovery as evidence: %v", m)
 	}
 	// a new tamper while the alert is open reuses it; after resolution a new alert links the previous one (IR66)
 	again := uuid.NewString()

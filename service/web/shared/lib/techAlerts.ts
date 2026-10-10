@@ -44,7 +44,7 @@ const STATE: Record<string, [string, Tone]> = { open: ["Open", "crit"], acknowle
 
 export type EvidenceCard = { kind: string; title: string; value: string; sub: string };
 export type AlertView = {
-  id: string; version: number; status: ApiTechAlert["status"]; severity: ApiTechAlert["severity"];
+  id: string; version: number; status: ApiTechAlert["status"]; severity: ApiTechAlert["severity"]; policyless: boolean;
   banner: { title: string; sub: string; tone: Tone; state: string | null };
   cards: EvidenceCard[];
   resolution: { info: string | null; done: string | null; note: string; forbidden: string };
@@ -75,7 +75,7 @@ export function alertView(a: ApiTechAlert, ctx: { alerts: ApiTechAlert[]; unit: 
   const unit = ctx.unit ? `${ctx.unit.displayName}${ctx.unit.location.pathLabels.length ? ` · ${ctx.unit.location.pathLabels.join(" › ")}` : ""}` : a.unitId.slice(0, 8);
   const resolver = a.status === "resolved" ? t("done {time}", { time: when(a.resolvedAt ?? a.detectedAt) }) : ctx.canResolve ? t(rule ? "with a reason, or by a remeasurement" : "with a reason") : rule ? t("with a remeasurement only") : t("no — ask a user with alert.resolve");
   return {
-    id: a.id, version: a.version, status: a.status, severity: a.severity,
+    id: a.id, version: a.version, status: a.status, severity: a.severity, policyless: !a.policyId,
     banner: {
       title: `${a.id.slice(0, 8)} · ${title}`, tone, state: a.status === "open" ? null : `${t(state)} · ${when((a.status === "resolved" ? a.resolvedAt : a.acknowledgedAt) ?? a.detectedAt)}`,
       sub: words ? words.policy : t("{kind} · no policy — it resolves only with a reason (IR66)", { kind: t(KIND[a.evidenceKind] ?? "Evidence") }),

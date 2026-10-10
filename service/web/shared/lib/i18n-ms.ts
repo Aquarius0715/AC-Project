@@ -3997,8 +3997,6 @@ export const ms: Record<string, string> = {
   "Escalate after (min)": "Eskalasi selepas (min)",
   "Escalate if still unacknowledged (1–1440)": "Eskalasi jika masih belum diakui (1–1440)",
   "Fix the validation errors first": "Betulkan ralat pengesahan dahulu",
-  "Resolve": "Selesaikan",
-  "Resolving requires a reason and evidence. Completing maintenance work does not resolve the alert by itself.": "Penyelesaian memerlukan sebab dan bukti. Menyelesaikan kerja penyelenggaraan tidak menyelesaikan amaran dengan sendirinya.",
   "At most 1000 characters": "Paling banyak 1000 aksara",
 
   // HQ customers & units (lib/assets, IR293)
@@ -5514,4 +5512,24 @@ export const ms: Record<string, string> = {
   "3000ms on commands.create": "3000ms pada commands.create",
   "Transport delay 3000 ms set": "Kelewatan penghantaran 3000 ms ditetapkan",
   "Session expired (demo)": "Sesi tamat (demo)",
+  // IR327: the evidence of an alert's resolution
+  "recorded on site": "direkodkan di tapak",
+  "The device's signal is back": "Isyarat peranti telah pulih",
+  "Remeasurement · {metric} {value} · {time}": "Pengukuran semula · {metric} {value} · {time}",
+  "{origin} · valid": "{origin} · sah",
+  "Device event · {time}": "Peristiwa peranti · {time}",
+  "Evidence attached to this alert": "Bukti yang dilampirkan pada amaran ini",
+  "Resolution evidence · required": "Bukti penyelesaian · wajib",
+  "At least one · measurements after detection": "Sekurang-kurangnya satu · ukuran selepas pengesanan",
+  "Resolution evidence · optional": "Bukti penyelesaian · pilihan",
+  "A policy alert may also be resolved by hand without evidence": "Amaran daripada dasar juga boleh diselesaikan secara manual tanpa bukti",
+  "Pick at least one evidence record — this alert has no policy": "Pilih sekurang-kurangnya satu rekod bukti — amaran ini tiada dasar",
+  "Pick at most {n} evidence records": "Pilih paling banyak {n} rekod bukti",
+  "An evidence record is no longer a candidate of this alert — pick again from the list": "Satu rekod bukti bukan lagi calon bagi amaran ini — pilih semula daripada senarai",
+  "Pick each evidence record once, at most {n}": "Pilih setiap rekod bukti sekali sahaja, paling banyak {n}",
+  "Loading the evidence…": "Memuatkan bukti…",
+  "No remeasurement since detection yet — remeasure the unit or record an inspection.": "Belum ada pengukuran semula sejak pengesanan — ukur semula unit atau rekodkan pemeriksaan.",
+  "The evidence could not be loaded — close the dialog and try again.": "Bukti tidak dapat dimuatkan — tutup dialog dan cuba lagi.",
+  "Resolution reason · required": "Sebab penyelesaian · wajib",
+  "Resolved alerts stay in history. If the condition returns, a new alert is created.": "Amaran yang diselesaikan kekal dalam sejarah. Jika keadaan itu berulang, amaran baharu dicipta.",
 };

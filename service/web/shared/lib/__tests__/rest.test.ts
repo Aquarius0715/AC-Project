@@ -12,9 +12,10 @@ const query = (path: string) => {
 
 describe("coreRequest", () => {
   it("covers every operation of the catalog", () => {
-    expect(Object.keys(coreRoutes)).toHaveLength(200); // IR238 filterCare.getSettings
-    expect(Object.values(coreRoutes).flat()).toHaveLength(220);
+    expect(Object.keys(coreRoutes)).toHaveLength(201); // IR238 filterCare.getSettings, IR327 alerts.evidence
+    expect(Object.values(coreRoutes).flat()).toHaveLength(221);
     expect(coreRequest("filterCare.getSettings", {})).toEqual({ method: "GET", path: "/v1/filter-care/settings" });
+    expect(coreRequest("alerts.evidence", { alertId: "a1", query: { limit: 100 } })).toEqual({ method: "GET", path: "/v1/alerts/a1/evidence?limit=100", body: undefined });
     for (const routes of Object.values(coreRoutes)) for (const r of routes) expect(r.path).toMatch(/^\/v1(\/([a-z0-9-]+|\{[A-Za-z]\w*(\.[A-Za-z]\w*)?\}))+$/);
   });
 

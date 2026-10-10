@@ -20,6 +20,16 @@ type AlertPage struct {
 
 var _ = paging.Page[Alert](AlertPage{})
 
+// EvidenceCandidatePage is paging.Page[EvidenceCandidate].
+type EvidenceCandidatePage struct {
+	Items           []EvidenceCandidate `json:"items"`
+	NextCursor      *string             `json:"nextCursor"`
+	Total           int                 `json:"total"`
+	SnapshotVersion int                 `json:"snapshotVersion"`
+}
+
+var _ = paging.Page[EvidenceCandidate](EvidenceCandidatePage{})
+
 // PolicyPage is paging.Page[Policy].
 type PolicyPage struct {
 	Items           []Policy `json:"items"`

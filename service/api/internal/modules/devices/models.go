@@ -180,3 +180,25 @@ func (Models) OperationBusy(ctx context.Context, c *ops.Call, unit uuid.UUID) (b
 	err := c.Tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM devices.device_operations WHERE unit_id = $1 AND status IN ('queued','running') AND expires_at > $2)`, unit, c.Now).Scan(&b)
 	return b, err
 }
+
+// AlertRecovery is a recovery event of a device linked to an alert.
+type AlertRecovery struct {
+	ID         uuid.UUID
+	EventType  string
+	OccurredAt time.Time
+}
+
+// AlertRecoveries lists the recovery events (restored) that carry an alert since a time, the newest first: the
+// evidence a tamper or connection alert's resolution may cite (IR327).
+func (Models) AlertRecoveries(ctx context.Context, c *ops.Call, alert uuid.UUID, since time.Time) ([]AlertRecovery, error) {
+	rows, err := c.Tx.Query(ctx, `SELECT id, event_type, occurred_at FROM devices.device_events WHERE $1 = ANY(alert_ids) AND event_type = 'restored' AND occurred_at >= $2
+		ORDER BY occurred_at DESC, id LIMIT 50`, alert, since)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (AlertRecovery, error) {
+		var x AlertRecovery
+		err := r.Scan(&x.ID, &x.EventType, &x.OccurredAt)
+		return x, err
+	})
+}

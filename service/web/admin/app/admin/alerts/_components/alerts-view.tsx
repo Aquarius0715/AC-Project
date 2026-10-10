@@ -4,10 +4,13 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Textarea, Timeline, LineChart, useToast, cx } from "@ac/web/components/ui";
-import { useT } from "@ac/web/components/I18n";
+import { useI18n, useT } from "@ac/web/components/I18n";
+import { EvidencePicker } from "@ac/web/components/EvidencePicker";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { actionMessage } from "@ac/web/lib/actionMessage";
+import { evidenceProblem, evidenceRefusal, evidenceRows, type ApiEvidenceCandidate } from "@ac/web/lib/alertEvidence";
+import { invalidate, useNow, useOp } from "@ac/web/lib/useOp";
 import { HQ_METRICS, metricLabel, opSymbol, policyErrors, type AdminAlert, type AdminPolicy, type AlertState, type Channel, type Severity } from "@ac/web/lib/adminAlerts";
 import { acknowledgeAlert, resolveAlert, savePolicy, type ActionResult } from "../actions";
 import { ScopeBar } from "../../jobs/_components/jobs-header";
@@ -35,6 +38,11 @@ const seedAlerts: AdminAlert[] = [
   demoAlert("alert-unknown-a", "Cooling load increase", "08:48", "warning", "customer-a · Bedroom AC"),
   demoAlert("alert-window-a", "Possible open window", "08:50", "warning", "customer-a · Bedroom AC"),
 ];
+// the demo's remeasurements of the Bedroom AC after its alerts (Figma Admin 259:2)
+const demoEvidence: ApiEvidenceCandidate[] = [
+  { id: "measurement-0920", kind: "remeasurement", observedAt: "2026-09-14T01:20:00Z", metric: "temperature", value: 26.4, unit: "°C", origin: "measured", quality: "valid", eventType: null },
+  { id: "measurement-0910", kind: "remeasurement", observedAt: "2026-09-14T01:10:00Z", metric: "temperature", value: 26.9, unit: "°C", origin: "measured", quality: "valid", eventType: null },
+];
 const demoRecipients = [{ id: "customer-a", label: "customer-a", role: "client" }, { id: "hq-operator", label: "hq-operator", role: "admin" }];
 const demoPolicy = (id: string, name: string, sub: string, metric: string, threshold: number, recovery: number, duration: number, on: boolean, units: string): AdminPolicy => ({
   id, version: 1, kind: "alert", name, group: "CUSTOMER-A", sub, on, units, customerId: "customer-a", customerName: "customer-a", priority: 50, timezone: "Asia/Kuala_Lumpur",
@@ -56,6 +64,8 @@ type Live = { tab: "alerts" | "policies"; q: Query; scope: Scope; scopeName: str
  * re-render the route); the demo keeps its fixture rows in local state. Texts in the display language (IR292). */
 export function AdminAlertsView({ live }: { live?: Live }) {
   const t = useT();
+  const i18n = useI18n();
+  const now = useNow();
   const toast = useToast();
   const router = useRouter();
   const pathname = usePathname();
@@ -78,7 +88,13 @@ export function AdminAlertsView({ live }: { live?: Live }) {
   const pickStatus = (s: AlertState) => (live ? patch({ status: s === "open" ? null : s, alertId: null }) : (setDemoStatus(s), setDemoAlertId(null)));
   const [resolve, setResolve] = useState(false);
   const [reason, setReason] = useState("");
+  const [picked, setPicked] = useState<string[]>([]);
   const [tried, setTried] = useState(false);
+  // the evidence candidates, read only while the Resolve dialog is open (IR327); the demo lists its fixture readings
+  const evidence = useOp<{ items: ApiEvidenceCandidate[] }, ApiEvidenceCandidate[]>("alerts.evidence", { alertId: a?.id ?? "", query: { limit: 100 } }, live ? [] : demoEvidence, (d) => d.items, resolve && !!a);
+  const evRows = evidenceRows(evidence.data, (now ?? new Date()).getTime(), i18n);
+  const sendable = picked.filter((id) => evRows.some((r) => r.id === id)); // a refreshed list drops what is no longer a candidate
+  const evProblem = a ? evidenceProblem(a.policyless, sendable, t) : null;
 
   // policies: the editor holds a draft of the selected policy, restarted when the selection or its version changes
   const pols = live ? live.policies : seedPolicies;
@@ -93,13 +109,16 @@ export function AdminAlertsView({ live }: { live?: Live }) {
   const set = <K extends keyof AdminPolicy>(k: K, v: AdminPolicy[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
   const errors = draft ? policyErrors(draft, t) : {};
 
-  const act = (fn: () => Promise<ActionResult>, ok: string, after?: () => void) =>
+  const act = (fn: () => Promise<ActionResult>, ok: string, after?: () => void, failed?: () => void) =>
     startTransition(async () => {
       const r = await fn();
       if (r.ok) {
         toast(ok);
         after?.();
-      } else toast(actionMessage(r, t), "crit");
+      } else {
+        toast(evidenceRefusal(r.fieldErrors, t) ?? actionMessage(r, t), "crit");
+        failed?.();
+      }
     });
   const demoState = (id: string, state: AlertState) => setDemoList((l) => l.map((x) => (x.id === id ? { ...x, state, st: t(ST[state]), timeline: demoTimeline(x.time, state) } : x)));
   const acknowledge = () => {
@@ -110,8 +129,9 @@ export function AdminAlertsView({ live }: { live?: Live }) {
   };
   const doResolve = () => {
     setTried(true);
-    if (!a || !reason.trim() || reason.length > 1000) return;
-    if (live) return act(() => resolveAlert(a.id, a.version, reason.trim()), t("Alert resolved"), () => { setResolve(false); setReason(""); setTried(false); });
+    if (!a || !reason.trim() || reason.length > 1000 || evProblem) return;
+    // a refused evidence ID re-reads the candidates (invalidate)
+    if (live) return act(() => resolveAlert(a.id, a.version, reason.trim(), sendable), t("Alert resolved"), () => { setResolve(false); setReason(""); setPicked([]); setTried(false); }, invalidate);
     demoState(a.id, "resolved");
     setResolve(false);
     toast(t("Alert resolved"));
@@ -161,7 +181,7 @@ export function AdminAlertsView({ live }: { live?: Live }) {
                 <Card title={a.title} sub={`${a.id} · ${t("detected {time}", { time: a.detected })}`} action={
                   <div className="flex flex-wrap justify-end gap-2">
                     <Btn size="sm" disabled={a.state !== "open" || pending} onClick={acknowledge}>{t("Acknowledge")}</Btn>
-                    <Btn size="sm" variant="primary" disabled={a.state === "resolved" || pending} onClick={() => setResolve(true)}>{t("Resolve…")}</Btn>
+                    <Btn size="sm" variant="primary" disabled={a.state === "resolved" || pending} onClick={() => { setPicked([]); setTried(false); setResolve(true); }}>{t("Resolve…")}</Btn>
                     {a.state !== "resolved" && <Link href={`/admin/jobs?new=${a.unitId}&alertId=${a.id}`} className="inline-flex items-center rounded-control border border-line bg-surface px-2.5 py-1 text-xs font-semibold hover:bg-surface2">{t("Request maintenance")}</Link>}
                     <Link href={a.customerId ? `/admin/units?customerId=${a.customerId}&unitId=${a.unitId}` : `/admin/units?unitId=${a.unitId}`} className="inline-flex items-center px-1 text-xs font-semibold text-primary">{t("Open unit →")}</Link>
                   </div>
@@ -208,7 +228,16 @@ export function AdminAlertsView({ live }: { live?: Live }) {
           </Card>
         </div>
       )}
-      <Modal open={resolve} onClose={() => setResolve(false)} title={t("Resolve alert")} footer={<><Btn onClick={() => setResolve(false)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={doResolve}>{t("Resolve")}</Btn></>}><p className="text-xs text-muted">{t("Resolving requires a reason and evidence. Completing maintenance work does not resolve the alert by itself.")}</p><Field label={t("Reason (required)")} error={tried && !reason.trim() ? t("A reason is required") : tried && reason.length > 1000 ? t("At most 1000 characters") : undefined}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field></Modal>
+      <Modal open={resolve} onClose={() => setResolve(false)} title={t("Resolve alert")} footer={<><Btn onClick={() => setResolve(false)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || evidence.loading} onClick={doResolve}>{t("Resolve alert")}</Btn></>}>
+        {a && (
+          <>
+            <p className="text-xs text-muted">{a.id} · {a.title}</p>
+            <EvidencePicker rows={evRows} policyless={a.policyless} picked={sendable} onChange={setPicked} loading={evidence.loading} error={evidence.error ? t("The evidence could not be loaded — close the dialog and try again.") : tried ? evProblem : null} />
+          </>
+        )}
+        <Field label={t("Resolution reason · required")} hint={`${reason.length} / 1000`} error={tried && !reason.trim() ? t("A reason is required") : tried && reason.length > 1000 ? t("At most 1000 characters") : undefined}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+        <p className="text-[11px] text-muted">{t("Resolved alerts stay in history. If the condition returns, a new alert is created.")}</p>
+      </Modal>
     </Page>
   );
 }

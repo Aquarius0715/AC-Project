@@ -86,14 +86,16 @@ func TestAlerts(t *testing.T) {
 	if code, _ := write(s, &hq, "alerts.resolve", `{"alertId":"`+crit+`","resolutionReason":"fixed"}`, 2); code != 422 {
 		t.Error("evidence ids required")
 	}
-	if code, m := write(s, &hq, "alerts.resolve", `{"alertId":"`+crit+`","resolutionReason":" window closed ","resolutionEvidenceIds":["`+uuid.NewString()+`"]}`, 2); code != 200 || data(m)["resolutionReason"] != "window closed" {
+	// an alert without a policy cites a candidate (IR66, IR327): here a remeasurement after detection
+	back := reading(t, u, "temperature", 25, "°C", clock.Add(-2*time.Minute), "valid")
+	if code, m := write(s, &hq, "alerts.resolve", `{"alertId":"`+crit+`","resolutionReason":" window closed ","resolutionEvidenceIds":["`+back+`"]}`, 2); code != 200 || data(m)["resolutionReason"] != "window closed" {
 		t.Fatalf("resolve: %d %v", code, m)
 	}
 	if code, _ := write(s, &hq, "alerts.resolve", `{"alertId":"`+crit+`","resolutionReason":"again","resolutionEvidenceIds":[]}`, 3); code != 409 {
 		t.Error("resolve twice")
 	}
-	if code, m := write(s, &hq, "alerts.resolve", `{"alertId":"`+warn+`","resolutionReason":"direct","resolutionEvidenceIds":[]}`, 1); code != 200 || data(m)["status"] != "resolved" {
-		t.Fatalf("resolve from open: %d", code)
+	if code, m := write(s, &hq, "alerts.resolve", `{"alertId":"`+warn+`","resolutionReason":"direct","resolutionEvidenceIds":["`+back+`"]}`, 1); code != 200 || data(m)["status"] != "resolved" {
+		t.Fatalf("resolve from open: %d %v", code, m)
 	}
 	if code, _ := write(s, &hq, "alerts.acknowledge", `{"alertId":"`+norm+`"}`, 5); code != 409 {
 		t.Error("stale version")

@@ -409,6 +409,122 @@
                 }
             }
         },
+        "/v1/alerts/{alertId}/evidence": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: technician:alert.resolve:assigned | admin:alert.resolve\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A05, DD-T07 · Query: filters none · sort id,observedAt (default observedAt desc;id asc)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "alerts"
+                ],
+                "summary": "alerts.evidence (read)",
+                "operationId": "alerts.evidence",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "input field alertId",
+                        "name": "alertId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "page cursor: nextCursor of the previous page (D12)",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "page size 1–100, default 25",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "field:direction — fields id,observedAt; default observedAt desc;id asc",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/monitoring.EvidenceCandidatePage"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/alerts/{alertId}/resolve": {
             "post": {
                 "security": [
@@ -416,7 +532,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: technician:alert.resolve:assigned | admin:alert.resolve\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 resolutionReason 1-1000; IR94 technician write table (assignment and work window, jobId required when typed)\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T07, DD-A05",
+                "description": "Authorization: technician:alert.resolve:assigned | admin:alert.resolve\nValidation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR87 resolutionReason 1-1000; IR94 technician write table (assignment and work window, jobId required when typed); IR327 a policy-free alert needs at least one evidence ID, every ID a candidate of alerts.evidence\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-T07, DD-A05",
                 "consumes": [
                     "application/json"
                 ],
@@ -32923,6 +33039,59 @@
                 },
                 "id": {
                     "type": "string"
+                }
+            }
+        },
+        "monitoring.EvidenceCandidate": {
+            "type": "object",
+            "properties": {
+                "eventType": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "description": "detection | remeasurement | device_event",
+                    "type": "string"
+                },
+                "metric": {
+                    "type": "string"
+                },
+                "observedAt": {
+                    "type": "string"
+                },
+                "origin": {
+                    "type": "string"
+                },
+                "quality": {
+                    "type": "string"
+                },
+                "unit": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
+        "monitoring.EvidenceCandidatePage": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/monitoring.EvidenceCandidate"
+                    }
+                },
+                "nextCursor": {
+                    "type": "string"
+                },
+                "snapshotVersion": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },

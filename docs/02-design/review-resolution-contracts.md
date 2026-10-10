@@ -4556,3 +4556,24 @@ The second coverage round (IR325) adds Core API tests where business rules had n
    - **Decision.** Computing the recurrence in the property's time zone is a production decision; nothing changes in 1A.
 
 Both Go suites pass (`make test-all`): 132 integration tests and 80 unit tests. Coverage is 87.7 %.
+
+## IR327 Resolution evidence: `alerts.evidence` and the evidence picker — 2026-10-11
+
+IR66 lets an alert without a policy resolve only by hand, with a reason and evidence (DD-A05 item 6). Until now no read listed the records that `resolutionEvidenceIds` may cite. The web sent an empty list, and the Core API accepted any list, an empty one too.
+
+1. **New read `alerts.evidence` (201 operations).** `GET /v1/alerts/{alertId}/evidence` returns `Page<EvidenceCandidate>` to a user who may resolve the alert: a technician with `alert.resolve` on an assigned unit, or an admin with `alert.resolve`. It takes no filters and sorts `observedAt desc; id asc`. The candidates are:
+   - `detection` — each of the Alert's own `evidenceIds`, at its `observedAt`;
+   - `remeasurement` — the unit's valid readings observed after `detectedAt`, measured or recorded on site and never estimated. They are of the rule's metric when the Alert has a rule, of any metric otherwise, at most 100, with metric, value, unit, origin and quality;
+   - `device_event` — the `restored` events of the unit's device that carry the Alert, since `detectedAt` (Devices answers them).
+2. **`alerts.resolve` checks the evidence.**
+   - An Alert without a policy needs at least one ID (`resolutionEvidenceIds: errors.evidence_required`).
+   - Every ID must be a candidate (`errors.evidence_unknown`). At most 20 IDs, each once (`error.invalid`).
+   - A policy Alert may still be resolved by hand without evidence. The automatic resolution (IR285) is unchanged.
+3. **HQ Resolve dialog (Figma Admin 259:2).** The dialog reads the candidates only while it is open (SCR-A05; this replaces the earlier `telemetry.series` read). It lists them as checkboxes under "Resolution evidence · required" ("· optional" for a policy Alert), with the evidence attached at detection last. The reason shows its count of 1000 characters. Resolve alert checks the reason and the evidence before anything is sent. A refused evidence ID is said in words and re-reads the list. The frame's rows and note now use the screen's words ("Remeasurement · Temperature 26.4 °C · today 9:20 am MYT", "measured · valid", "none attached").
+4. **Technician resolution (DD-T07).** For an unresolved alert, a user with `alert.resolve` reads the candidates with the page (SCR-T07). The resolution card lists them above the reason in the same way, and a refusal of the evidence is said in words instead of the reason message. The Technician frames 02-14…02-17 show tech-internal-a without `alert.resolve` (02-16 is its FORBIDDEN), so they rightly show no picker; for a holder the card follows Figma Admin 259:2.
+5. **Persistence.** `alerts.evidence` reads `monitoring.alerts`, `monitoring.measurements` and `devices.device_events`. `alerts.resolve` reads the same and writes `monitoring.alerts`.
+6. **Tests.**
+   - Go: `TestAlertEvidence` covers the candidates, their order and paging, the refused filter, the scope, each refusal of the resolution, a rule Alert's metric and a policy Alert resolved by hand. `TestDeviceLifecycle` checks a tamper recovery as a candidate, and `TestQueryCatalogFilters` checks the new row.
+   - Web: `alertEvidence.test.ts` (Vitest) covers the rows, the heading, the checks and the refusals. The E2E test "the Resolve dialog requires evidence for an alert without a policy" opens the dialog on the seed's alert, finds its five readings and cancels.
+
+Both Go suites pass (`make test-all`): 133 integration tests and 80 unit tests. Coverage is 87.7 %. Vitest passes 358 tests, and the E2E suite passes 86.

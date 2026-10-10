@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -27,8 +28,10 @@ func TestQueryCatalogFilters(t *testing.T) {
 		t.Fatal(err)
 	}
 	device, job, invoice := seed.ID("device-online-rto").String(), seed.ID("job-contractor-a").String(), seed.ID("invoice-overdue-a").String()
+	alert := newAlert(t, newUnit(t, s, "Query catalog AC"), seed.ID("org-customer-b").String(), "warning", clock.Add(-time.Hour)) // the seed has no alerts
 	// input wraps the Query of operations whose input is not a bare Query
 	input := map[string]func(q string) string{
+		"alerts.evidence":      func(q string) string { return `{"alertId":"` + alert + `","query":` + q + `}` },
 		"devices.events":       func(q string) string { return `{"id":"` + device + `","query":` + q + `}` },
 		"devices.calibrations": func(q string) string { return `{"deviceId":"` + device + `","query":` + q + `}` },
 		"devices.operations":   func(q string) string { return `{"deviceId":"` + device + `","query":` + q + `}` },

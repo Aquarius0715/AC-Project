@@ -1,6 +1,7 @@
 // The reads of the technician's alert evidence (FR-T07, DD-T07, SCR-T07) through the DAL: the unit's alerts with the
 // condition each was raised by (alerts.list, Alert.rule), the unit for its name and the latest reading of the rule's
-// metric (units.get), the URL's job (jobs.get) and whether the user holds alert.resolve. ?alertId= picks the alert.
+// metric (units.get), the URL's job (jobs.get) and whether the user holds alert.resolve; with it, the evidence an
+// unresolved alert's resolution may cite (alerts.evidence, IR327). ?alertId= picks the alert.
 // Before the work window the page says when it opens (IR76). Texts in the user's display language; every time is
 // formatted here (IR284).
 import "server-only";
@@ -8,6 +9,7 @@ import { coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/we
 import { i18nOf, showTime } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { alertChoices, alertView, selectAlert, type ApiTechAlert } from "@ac/web/lib/techAlerts";
+import { evidenceRows, type ApiEvidenceCandidate } from "@ac/web/lib/alertEvidence";
 import type { TechJobRead } from "@ac/web/lib/techJob";
 
 type Page<T> = { items: T[] };
@@ -48,10 +50,15 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
     corePermissions(),
   ]);
   const selected = selectAlert(alerts, sp.alertId);
+  const canResolve = permissions.has("alert.resolve");
+  const evidence = selected && selected.status !== "resolved" && canResolve
+    ? await optional(coreOp<Page<ApiEvidenceCandidate>>("alerts.evidence", { alertId: selected.id, query: { limit: 100 } }).then((r) => evidenceRows(r.items, nowMs, i)), null)
+    : null;
   return {
     kind: "live" as const, unitId, unitHref, unitName: unit?.displayName ?? unitId.slice(0, 8),
     choices: alertChoices(alerts, nowMs, i), count: alerts.length,
-    alert: selected ? alertView(selected, { alerts, unit, job: job?.projection === "detail" ? { id: job.id, type: job.type } : null, canResolve: permissions.has("alert.resolve") }, nowMs, i) : null,
+    alert: selected ? alertView(selected, { alerts, unit, job: job?.projection === "detail" ? { id: job.id, type: job.type } : null, canResolve }, nowMs, i) : null,
+    evidence, // null: nothing to cite (resolved, no alert.resolve) or not readable now
   };
 }
 

@@ -2,13 +2,14 @@ operation,mode,module,own_reads,own_writes,other_module_calls,write_side_effects
 admin.summary,read,Read models,,,Assets;Billing;Energy & carbon;Maintenance;Monitoring & alerts,,read model assembled from module query interfaces (no cross-schema joins)
 alerts.acknowledge,write,Monitoring & alerts,monitoring.alerts,monitoring.alerts,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 alerts.get,read,Monitoring & alerts,monitoring.alerts,,,,
+alerts.evidence,read,Monitoring & alerts,monitoring.alerts;monitoring.measurements,,Devices,,
 alerts.list,read,Monitoring & alerts,monitoring.alerts,,,,
-alerts.resolve,write,Monitoring & alerts,monitoring.alerts,monitoring.alerts,,audit.audit_log;platform.idempotency_keys;platform.outbox,
+alerts.resolve,write,Monitoring & alerts,monitoring.alerts;monitoring.measurements,monitoring.alerts,Devices,audit.audit_log;platform.idempotency_keys;platform.outbox,
 attachments.add,write,Maintenance,maintenance.attachments,maintenance.attachments,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 attachments.getContent,read,Maintenance,maintenance.attachments,,,,
 audit.list,read,Audit,audit.audit_log,,,,
 auth.previewPasswordReset,read,Identity & access,identity.users,,,,preview only; real reset is a Cognito flow
-automations.delete,write,Control,control.automations,control.automations;control.automation_units,,audit.audit_log;platform.idempotency_keys;platform.outbox,IR214: Commands and automation_runs stay as history
+automations.delete,write,Control,control.automations;control.automation_units;control.automation_runs,control.automations;control.automation_units,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 automations.fire,write,Control,control.automations;control.automation_units,control.automation_runs;control.commands,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 automations.list,read,Control,control.automations;control.automation_units;control.automation_runs,,,,
 automations.nextRuns,read,Control,control.automations,,Demo,,
@@ -28,7 +29,7 @@ clientUsers.resendInvite,read,Identity & access,identity.client_users;identity.m
 clientUsers.save,write,Identity & access,identity.client_users;identity.memberships,identity.client_users;identity.memberships,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 commands.create,write,Control,control.commands,control.commands,Assets;Devices;Restrictions,audit.audit_log;platform.idempotency_keys;platform.outbox,
 commands.get,read,Control,control.commands,,,,
-commands.list,read,Control,control.commands,,Assets,,IR216 unit history; technicians through assets.unit_assignment_access
+commands.list,read,Control,control.commands,,,,
 consents.get,read,Identity & access,identity.consents,,,,
 consents.update,write,Identity & access,identity.consents,identity.consents,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 contractors.list,read,Maintenance,maintenance.contractors,,,,

@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.210.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
+Version: 0.211.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.211.0 (2026-10-11): An alert's resolution cites its evidence. The new read `alerts.evidence` lists the candidates — the alert's own evidence, valid remeasurements after detection and device recoveries — and `alerts.resolve` accepts only them, at least one for an alert without a policy. The HQ Resolve dialog and the technician's resolution pick from them (IR327).
 0.210.0 (2026-10-11): Coverage round 2: the contractor inbox, schedule boundaries and offline diagnostic ends are tested; two open questions are recorded for the product owner — back-to-back schedules on one unit, and plan recurrence in UTC (IR326).
 0.209.0 (2026-10-11): Coverage round: the Core API tests now reach the SLA standing, slot-proposal holds, self-authored reviews, restriction retry rules, a missing emission factor and alert-policy owners and switched-off default rules; coverage 87.7 % (IR325).
 0.208.0 (2026-10-11): HQ offsets gain the customer, status and created filters and say when a record is outside them; with this the HQ frames 10–25 match their screens, apart from data the seed does not hold (IR324).

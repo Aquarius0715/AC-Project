@@ -61,6 +61,8 @@ P = {
 # per-operation overrides: (reads, writes)
 O = {
  'alerts.acknowledge': (None, 'monitoring.alerts'),
+ 'alerts.evidence': ('monitoring.alerts;monitoring.measurements;devices.device_events', ''),
+ 'alerts.resolve': ('monitoring.alerts;monitoring.measurements;devices.device_events', 'monitoring.alerts'),
  'attachments.getContent': ('maintenance.attachments', ''),
  'automations.fire': ('control.automations;control.automation_units', 'control.automation_runs;control.commands'),
  'automations.simulate': ('control.automations;control.automation_units', ''),

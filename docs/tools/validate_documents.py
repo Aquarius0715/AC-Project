@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.211.0 (2026-10-11): IR327 alerts.evidence and the resolution's evidence picker (DD-A 0.41.0, DD-T 0.40.0, DD-COMMON 0.100.0); 201 operations.
 # 0.210.0 (2026-10-11): IR326 coverage round 2, two open questions (DD-A 0.40.0, DD-COMMON 0.99.0); counts unchanged.
 # 0.209.0 (2026-10-11): IR325 coverage of untested business rules (DD-A 0.39.0, DD-COMMON 0.98.0); counts unchanged.
 # 0.208.0 (2026-10-11): IR324 HQ offsets filters; HQ frames 10–25 aligned (DD-A 0.38.0, DD-COMMON 0.97.0); counts unchanged.
@@ -301,8 +302,8 @@ opnames = unique(operations, 'operation', 'operation')
 opmap = {row['operation']: row for row in operations}
 types = (ROOT / '02-design/service-contracts.ts').read_text()
 typed = {name:(input_, result, mode) for name,input_,result,mode in re.findall(r"^  '([^']+)': \{input:(.*);result:(.*);mode:'(read|write)'\};$", types, re.M)}
-if set(typed) != opnames or len(operations) != 200:  # IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings
-    fail('200 operation/TypeScript contract keys differ')
+if set(typed) != opnames or len(operations) != 201:  # IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence
+    fail('201 operation/TypeScript contract keys differ')
 for row in operations:
     name = row['operation']
     if typed.get(name) != (row['input_contract'], row['result_contract'], row['mode']):

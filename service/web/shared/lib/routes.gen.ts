@@ -8,6 +8,7 @@ export type CoreRoute = { method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"; p
 export const coreRoutes: Readonly<Record<string, readonly CoreRoute[]>> = {
   "admin.summary": [{ method: "GET", path: "/v1/admin/summary" }],
   "alerts.acknowledge": [{ method: "POST", path: "/v1/alerts/{alertId}/acknowledge" }],
+  "alerts.evidence": [{ method: "GET", path: "/v1/alerts/{alertId}/evidence" }],
   "alerts.get": [{ method: "GET", path: "/v1/alerts/{id}" }],
   "alerts.list": [{ method: "GET", path: "/v1/alerts" }],
   "alerts.resolve": [{ method: "POST", path: "/v1/alerts/{alertId}/resolve" }],

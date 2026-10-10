@@ -120,7 +120,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	assets.Register(reg, am)
 	eq := equipmentView{am: am, alerts: monitoring.Alerts{}, tel: monitoring.Telemetry{Sensors: devices.Models{}}, models: devices.Models{}} // other domains' view (IR193)
 	devices.Register(reg, devices.Capabilities{Units: am})
-	monitoring.RegisterAlerts(reg, monitoring.Alerts{Units: am, Access: maintenance.Access{}})
+	monitoring.RegisterAlerts(reg, monitoring.Alerts{Units: am, Access: maintenance.Access{}, Devices: deviceRecoveries{}})
 	jobs := maintenance.Jobs{Units: eq, Severity: eq, HQOrg: func(c *ops.Call) uuid.UUID { return c.Principal.OrgID }, Sites: eq}
 	maintenance.RegisterJobs(reg, jobs)
 	maintenance.RegisterOnSite(reg, maintenance.OnSite{Jobs: jobs})
@@ -219,6 +219,18 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 }
 
 // monitorReads combines the Monitoring read interfaces Assets uses.
+// deviceRecoveries hands the devices' recovery events of an alert to the alert resolution (IR327).
+type deviceRecoveries struct{}
+
+func (deviceRecoveries) AlertRecoveries(ctx context.Context, c *ops.Call, alert uuid.UUID, since time.Time) ([]monitoring.DeviceRecovery, error) {
+	rs, err := devices.Models{}.AlertRecoveries(ctx, c, alert, since)
+	out := make([]monitoring.DeviceRecovery, len(rs))
+	for i, r := range rs {
+		out[i] = monitoring.DeviceRecovery{ID: r.ID, EventType: r.EventType, OccurredAt: r.OccurredAt}
+	}
+	return out, err
+}
+
 type monitorReads struct {
 	alerts    monitoring.Alerts
 	telemetry monitoring.Telemetry

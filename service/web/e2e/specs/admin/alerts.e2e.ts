@@ -41,3 +41,30 @@ test("the alerts tab filters in the URL and opens a job or the unit from an aler
   await expect(dialog).toHaveCount(0);
   await page.waitForURL((u) => !u.searchParams.has("new"));
 });
+
+// IR327: the Resolve dialog lists the evidence candidates of alerts.evidence — the seed's five valid readings of the
+// Bedroom AC after the policy-free "Possible open window" was detected, and no evidence attached at detection — and an
+// alert without a policy needs a reason and at least one of them. Nothing is resolved: the dialog is cancelled.
+test("the Resolve dialog requires evidence for an alert without a policy", async ({ page }) => {
+  await page.goto("/admin/alerts");
+  const main = page.getByRole("main");
+  await main.getByRole("button", { name: /Possible open window/ }).click();
+  await page.waitForURL(/alertId=/);
+  await main.getByRole("button", { name: "Resolve…" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Resolve alert" })).toBeVisible();
+  const evidence = dialog.getByRole("group", { name: "Resolution evidence · required" });
+  await expect(evidence.getByRole("checkbox", { name: /^Remeasurement · / })).toHaveCount(5);
+  await expect(evidence.getByRole("checkbox", { name: /Evidence attached to this alert/ })).toBeDisabled(); // none attached
+
+  await dialog.getByRole("button", { name: "Resolve alert" }).click(); // checked before anything is sent
+  await expect(dialog).toContainText("A reason is required");
+  await expect(dialog).toContainText("Pick at least one evidence record — this alert has no policy");
+  await evidence.getByRole("checkbox", { name: /^Remeasurement · Temperature 28\.0 °C/ }).check();
+  await expect(dialog).not.toContainText("Pick at least one evidence record");
+  await dialog.getByLabel("Resolution reason · required").fill("Window closed");
+  await expect(dialog).toContainText("13 / 1000");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(main.getByRole("button", { name: /^Open\s*\d+$/ })).toHaveAttribute("aria-pressed", "true"); // still open
+});

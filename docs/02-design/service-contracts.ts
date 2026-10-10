@@ -51,6 +51,8 @@ export type Severity = 'critical'|'warning'|'normal';
 export type Alert = Entity & {unitId:ID;policyId:ID|null;type:'sensor'|'quality'|'maintenance'|'tamper'|'reconciliation_required';severity:Severity;status:'open'|'acknowledged'|'resolved';causeCode:'window_open'|'insulation_loss'|'unknown';evidenceKind:'demo_observation'|'inferred'|'inspection';evidenceText:string;observedAt:Instant;evidenceIds:ID[];detectedAt:Instant;acknowledgedAt:Instant|null;resolvedAt:Instant|null;resolutionReason:string|null;previousAlertId:ID|null;deliveryFailures:DeliveryFailure[];rule:AlertRule|null};
 /** The condition that raised an Alert, read with it (IR284): its policy's own (kind alert) or the default rule of its rule key; null without a policy. */
 export type AlertRule = {name:string;metric:Metric;operator:Compare;threshold:number;recoveryThreshold:number;durationSeconds:number};
+// A record that may support an alert's resolution (IR327): its own evidence at detection, a valid remeasurement of the unit after detection (of the rule's metric when it has one), or a recovery event of the unit's device linked to the alert.
+export type EvidenceCandidate = {id:ID;kind:'detection'|'remeasurement'|'device_event';observedAt:Instant;metric:Metric|null;value:number|null;unit:UnitSymbol|null;origin:Measurement['origin']|null;quality:Quality|null;eventType:DeviceEvent['eventType']|null};
 export type Slot = {startAt:Instant;endAt:Instant};
 /** IR113: where a job came from. client_request = created by a client (or by HQ on a client's behalf) with preferred times; periodic_plan = generated from a MaintenancePlan. */
 export type JobOrigin = 'client_request'|'periodic_plan';
@@ -244,6 +246,7 @@ export type OperationContracts = {
   'admin.summary': {input:Range & {customerId?:ID;propertyId?:ID};result:AdminSummary;mode:'read'};
   'alerts.acknowledge': {input:{alertId:ID};result:Alert;mode:'write'};
   'alerts.get': {input:{id:ID};result:Alert;mode:'read'};
+  'alerts.evidence': {input:{alertId:ID;query:Query};result:Page<EvidenceCandidate>;mode:'read'};
   'alerts.list': {input:Query;result:Page<Alert>;mode:'read'};
   'alerts.resolve': {input:{alertId:ID;resolutionReason:string;resolutionEvidenceIds:ID[]};result:Alert;mode:'write'};
   'attachments.add': {input:{jobId:ID;reportId:ID;file:BlobInput};result:Attachment;mode:'write'};
