@@ -4,9 +4,10 @@
 // adds units.get of the customer's ACs for their actions. Save, switch on/off, delete and consent are Server Actions;
 // the editor previews an unsaved schedule through the BFF (automations.nextRuns draft) and tests a saved event rule
 // with automations.simulate at the current tick — nothing is sent (IR214). URL keys: automationId (an id, or new),
-// tab. The Phase 1A demo keeps the fixtures.
+// tab. Texts and times in the user's display language and time zone (IR264). The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
-import { apiMode, coreAll, coreOp, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreOp, CoreError } from "@ac/web/lib/dal";
+import { i18nOf } from "@ac/web/lib/i18n";
 import { spacePath, type ApiPropertyRow, type ApiSpaceRow, type ApiUnitRow } from "@ac/web/lib/assets";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { consentCard, ruleCard, triggerOf, type ApiAutomation, type ApiConsent, type ApiOccurrence, type Caps } from "@ac/web/lib/clientAutomations";
@@ -18,14 +19,15 @@ export default async function CustomerAutomationsPage({ searchParams }: PageProp
   if (!apiMode()) return <AutomationsDemo />;
   const sp = await searchParams;
   const editing = typeof sp.automationId === "string" && sp.automationId ? sp.automationId : null;
-  const [prefs, rules, units, properties, spaces, consent] = await Promise.all([
+  const [prefs, rules, units, properties, spaces, consent, display] = await Promise.all([
     coreOp<{ timezone: string }>("preferences.get", {}), coreAll<ApiAutomation>("automations.list"), coreAll<ApiUnitRow>("units.list"),
     coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"),
     coreOp<ApiConsent>("consents.get", { purpose: "location_automation" }).catch((e) => {
       if (e instanceof CoreError && e.error.code === "NOT_FOUND") return null; // no consent record: location rules unavailable
       throw e;
-    }),
+    }), coreDisplay(),
   ]);
+  const i = i18nOf(display);
   const propertyName = new Map(properties.map((p) => [p.id, p.name]));
   const acs = units.filter((u) => !u.archived).map((u) => {
     const property = propertyName.get(u.propertyId) ?? "";
@@ -44,8 +46,8 @@ export default async function CustomerAutomationsPage({ searchParams }: PageProp
   }
   const live: AutomationsLive = {
     rules, acs, caps, timezone: prefs.timezone || "Asia/Kuala_Lumpur", editing,
-    cards: rules.map((r) => ruleCard(r, ac.get(r.unitIds[0]) ?? null, nextRuns.get(r.id) ?? null, granted)),
-    consent: consent ? { version: consent.version, ...consentCard(consent, location.length, location.filter((r) => r.disabledReason === "consent_revoked").length) } : { version: null, ...consentCard(null, 0, 0) },
+    cards: rules.map((r) => ruleCard(r, ac.get(r.unitIds[0]) ?? null, nextRuns.get(r.id) ?? null, granted, i)),
+    consent: consent ? { version: consent.version, ...consentCard(consent, location.length, location.filter((r) => r.disabledReason === "consent_revoked").length, i) } : { version: null, ...consentCard(null, 0, 0, i) },
     nextRuns: Object.fromEntries(nextRuns),
   };
   return <AutomationsView live={live} />;

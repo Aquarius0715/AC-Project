@@ -1,8 +1,7 @@
 // Customer automations & schedules (FR-C04, FR-C05, DATA_SOURCE=api): the rule cards of the list (Figma Client 03a,
 // 03d, 03f, 03i), the editor draft with its automations.save input and checks (03b, 03e), the schedule preview and the
 // event test (03c), and the location consent card. Pure code shared by the Server Component and the client view.
-import { klStamp } from "@ac/web/lib/energy";
-import { EN, intlTag, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, intlTag, showDate, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import type { UnitAction } from "@ac/web/lib/units";
 
 const en = translator("en");
@@ -42,7 +41,7 @@ export const triggerInfo: Record<Trigger, { label: string; sub: string; icon: st
 const conditionTrigger = { occupancy: "presence", location: "location", pattern: "routine", weather: "weather" } as const;
 export const triggerOf = (a: ApiAutomation): Trigger => (a.kind === "schedule" ? "schedule" : conditionTrigger[a.condition.type]);
 
-const dayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+export const dayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export const dayLong = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 /** "Mon, Wed" (lists) or "Mon & Wed" / "Mon, Tue & Sun" (sentences); every day, weekdays and weekends by name. */
 export function weekdaysText(ds: number[], sentence = false, t: T = en): string {
@@ -108,8 +107,18 @@ export function runText(iso: string, tz = KL, i: I18n = EN): string {
     return runText(iso, KL, i);
   }
 }
+/** “22:00 MYT”: only the time of a rule's run, in the rule's own time zone (the end of a schedule run). */
+export function runClock(iso: string, tz = KL, i: I18n = EN): string {
+  const d = new Date(iso);
+  const tag = intlTag(i.display.locale);
+  try {
+    const zone = new Intl.DateTimeFormat(tag, { timeZone: tz, timeZoneName: "short" }).formatToParts(d).find((p) => p.type === "timeZoneName")?.value;
+    return `${d.toLocaleTimeString(tag, { timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}${zone ? ` ${zone}` : ""}`;
+  } catch {
+    return runClock(iso, KL, i);
+  }
+}
 const reasonText: Record<string, string> = { consent_revoked: "consent revoked", capability_changed: "capability changed", unit_archived: "unit archived" };
-const stamp = (iso: string | null) => (iso ? klStamp(iso) : "—");
 
 /** One rule card of the list. */
 export type RuleCard = {
@@ -125,7 +134,7 @@ export function ruleCard(a: ApiAutomation, unit: { name: string; path: string; p
   const more = extra > 0 ? t(extra === 1 ? " (+{n} more AC)" : " (+{n} more ACs)", { n: extra }) : "";
   const where = unit ? `${unit.name}${more} · ${unit.path}` : t("AC no longer available");
   const status = a.enabled ? { text: t("On"), tone: "ok" as const } : a.disabledReason ? { text: t("Disabled · {reason}", { reason: t(reasonText[a.disabledReason]) }), tone: "warn" as const } : { text: t("Off"), tone: "muted" as const };
-  const note = a.disabledReason === "consent_revoked" ? t("Will not run: location consent withdrawn {date}. Existing commands are not cancelled.", { date: stamp(a.updatedAt).slice(0, 10) })
+  const note = a.disabledReason === "consent_revoked" ? t("Will not run: location consent withdrawn {date}. Existing commands are not cancelled.", { date: showDate(a.updatedAt, i.display) })
     : a.disabledReason === "capability_changed" ? t("Will not run: the AC's capabilities changed — edit the actions, then switch it on again.")
     : a.disabledReason === "unit_archived" ? t("Will not run: the AC was archived.") : null;
   const skipped = !note && a.lastRun?.outcome === "skipped" ? t("Last evaluation skipped {when} — {reason}", { when: runText(a.lastRun.at, a.timezone, i), reason: decisionText[a.lastRun.reason ?? ""] ? t(decisionText[a.lastRun.reason ?? ""]) : a.lastRun.reason ?? t("no reason recorded") }) : null;
@@ -213,28 +222,28 @@ export const scheduleDraft = (d: Draft) => ({
 const hhmm = /^([01]\d|2[0-3]):[0-5]\d$/;
 const minutes = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
 /** The checks automations.save makes, shown before saving (the API checks again). */
-export function draftErrors(d: Draft): Record<string, string> {
+export function draftErrors(d: Draft, tr: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   const n = d.name.trim().length;
-  if (n < 1 || n > 120) e.name = "1–120 characters";
-  if (!d.unitId) e.unitId = "Choose the AC";
+  if (n < 1 || n > 120) e.name = tr("1–120 characters");
+  if (!d.unitId) e.unitId = tr("Choose the AC");
   if (d.trigger === "schedule") {
-    if (d.weekdays.length === 0) e.weekdays = "Choose at least one weekday";
+    if (d.weekdays.length === 0) e.weekdays = tr("Choose at least one weekday");
     if (!hhmm.test(d.startLocal)) e.startLocal = "HH:mm";
     if (!hhmm.test(d.endLocal)) e.endLocal = "HH:mm";
     if (!e.startLocal && !e.endLocal) {
       const s = minutes(d.startLocal);
       const t = minutes(d.endLocal);
-      if (s === t) e.endLocal = "Start and end cannot be equal — not 24-hour operation";
-      else if (t < s && !d.endsNextDay) e.endsNextDay = "The end is before the start — tick “Ends next day” for an overnight schedule";
-      else if (t > s && d.endsNextDay) e.endsNextDay = "With “Ends next day” the end must be at or before the start (at most 24 hours)";
+      if (s === t) e.endLocal = tr("Start and end cannot be equal — not 24-hour operation");
+      else if (t < s && !d.endsNextDay) e.endsNextDay = tr("The end is before the start — tick “Ends next day” for an overnight schedule");
+      else if (t > s && d.endsNextDay) e.endsNextDay = tr("With “Ends next day” the end must be at or before the start (at most 24 hours)");
     }
   }
   if (d.trigger === "routine" && !hhmm.test(d.localTime)) e.localTime = "HH:mm";
-  if (d.trigger === "weather" && !(d.value.trim() !== "" && Number(d.value) >= -50 && Number(d.value) <= 100)) e.value = "−50 to 100 °C";
+  if (d.trigger === "weather" && !(d.value.trim() !== "" && Number(d.value) >= -50 && Number(d.value) <= 100)) e.value = tr("−50 to 100 °C");
   fitExtras(d).forEach((x, i) => {
-    if (x.type === "weekday" && x.weekdays.length === 0) e[`extra${i}`] = "Choose at least one weekday";
-    if (x.type === "weather" && !(x.value.trim() !== "" && Number(x.value) >= -50 && Number(x.value) <= 100)) e[`extra${i}`] = "−50 to 100 °C";
+    if (x.type === "weekday" && x.weekdays.length === 0) e[`extra${i}`] = tr("Choose at least one weekday");
+    if (x.type === "weather" && !(x.value.trim() !== "" && Number(x.value) >= -50 && Number(x.value) <= 100)) e[`extra${i}`] = tr("−50 to 100 °C");
   });
   return e;
 }
@@ -249,41 +258,49 @@ const keyText: Record<string, string> = {
   "errors.duplicate_condition": "Each “Only if” type once, and not the trigger's own type", "errors.weekday_on_schedule": "A schedule has its own weekdays",
 };
 /** API field errors of automations.save / nextRuns draft mapped to the editor fields. */
-export function apiErrors(fe: Record<string, string>): Record<string, string> {
+export function apiErrors(fe: Record<string, string>, t: T = en): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(fe)) out[fieldName[k] ?? k] = keyText[v] ?? v.replace(/^errors?\./, "").replace(/_/g, " ");
+  for (const [k, v] of Object.entries(fe)) out[fieldName[k] ?? k] = keyText[v] ? t(keyText[v]) : v.replace(/^errors?\./, "").replace(/_/g, " ");
   return out;
 }
 
 /** Action options for an AC (Figma 03b one select): power, the capability temperatures, modes and fan levels. */
 export type Caps = { control: boolean; modeControl: boolean; fanControl: boolean; temperature: { min: number; max: number; step: number } | null; modes: ("cool" | "dry" | "fan")[]; fanLevels: ("low" | "mid" | "high")[] };
-export function actionOptions(c: Caps | null): { group: string; options: { key: string; label: string }[] }[] {
+export function actionOptions(c: Caps | null, t: T = en): { group: string; options: { key: string; label: string }[] }[] {
   if (!c || !c.control) return [];
   const temps: { key: string; label: string }[] = [];
-  if (c.temperature) for (let t = c.temperature.min; t <= c.temperature.max; t += c.temperature.step || 1) temps.push({ key: `temp:${t}`, label: `Set temperature ${t}°C` });
+  if (c.temperature) for (let x = c.temperature.min; x <= c.temperature.max; x += c.temperature.step || 1) temps.push({ key: `temp:${x}`, label: t("Set temperature {celsius}°C", { celsius: x }) });
   return [
-    { group: "Power", options: [{ key: "power:on", label: "Power ON" }, { key: "power:off", label: "Power OFF" }] },
-    ...(temps.length ? [{ group: "Temperature", options: temps }] : []),
-    ...(c.modeControl && c.modes.length ? [{ group: "Mode", options: c.modes.map((m) => ({ key: `mode:${m}`, label: `Mode ${cap(m)}` })) }] : []),
-    ...(c.fanControl && c.fanLevels.length ? [{ group: "Fan", options: c.fanLevels.map((f) => ({ key: `fan:${f}`, label: `Fan ${cap(f)}` })) }] : []),
+    { group: t("Power"), options: [{ key: "power:on", label: t("Power ON") }, { key: "power:off", label: t("Power OFF") }] },
+    ...(temps.length ? [{ group: t("Temperature"), options: temps }] : []),
+    ...(c.modeControl && c.modes.length ? [{ group: t("Mode"), options: c.modes.map((m) => ({ key: `mode:${m}`, label: actionLabel({ kind: "set_mode", mode: m }, t) })) }] : []),
+    ...(c.fanControl && c.fanLevels.length ? [{ group: t("Fan"), options: c.fanLevels.map((f) => ({ key: `fan:${f}`, label: actionLabel({ kind: "set_fan", fanLevel: f }, t) })) }] : []),
   ];
 }
 
 /** The editor summary (Figma 03b/03e right panel). */
-export function summaryText(d: Draft, unit: string, place: string): string {
-  const a = (k: string) => actionOf(k);
-  const set = (k: string) => (a(k).kind === "set_power" ? `${unit} power ${(a(k) as { power: boolean }).power ? "ON" : "OFF"}` : `set ${unit} to ${actionLabel(a(k)).replace(/^Set temperature /, "").replace(/^(Mode|Fan) /, (m) => m.toLowerCase())}`);
+export function summaryText(d: Draft, unit: string, place: string, t: T = en): string {
+  const set = (k: string) => {
+    const a = actionOf(k);
+    switch (a.kind) {
+      case "set_power": return t(a.power ? "{unit} power ON" : "{unit} power OFF", { unit });
+      case "set_temperature": return t("set {unit} to {value}", { unit, value: `${a.celsius}°C` });
+      case "set_mode": return t("set {unit} to {value}", { unit, value: t("mode {mode}", { mode: (modeWord[a.mode] ? t(modeWord[a.mode]) : a.mode).toLowerCase() }) });
+      default: return t("set {unit} to {value}", { unit, value: t("fan {level}", { level: (fanWord[a.fanLevel] ? t(fanWord[a.fanLevel]) : a.fanLevel).toLowerCase() }) });
+    }
+  };
   if (d.trigger === "schedule") {
-    const days = d.weekdays.length ? weekdaysText(d.weekdays, true) : "no weekday";
-    return `When ${days} at ${d.startLocal} → ${set(d.startAction)}. At ${d.endLocal}${d.endsNextDay ? " (next day)" : ""} → ${set(d.endAction)}.${onlyIfSummary(d)}`;
+    const days = d.weekdays.length ? weekdaysText(d.weekdays, true, t) : t("no weekday");
+    return t(d.endsNextDay ? "When {days} at {start} → {startAction}. At {end} (next day) → {endAction}.{onlyIf}" : "When {days} at {start} → {startAction}. At {end} → {endAction}.{onlyIf}",
+      { days, start: d.startLocal, startAction: set(d.startAction), end: d.endLocal, endAction: set(d.endAction), onlyIf: onlyIfSummary(d, t) });
   }
-  const when = d.trigger === "location" ? (d.event === "arrival" ? `you arrive at ${place}` : `everyone leaves ${place}`)
-    : d.trigger === "presence" ? (d.occupied ? "someone is in the room" : "no one is detected") : d.trigger === "routine" ? `it is your usual time ${d.localTime}` : `the outdoor temperature is ${cmp[d.operator]} ${d.value}°C`;
-  return `When ${when} → ${set(d.action)}.${onlyIfSummary(d)}`;
+  const when = d.trigger === "location" ? t(d.event === "arrival" ? "you arrive at {place}" : "everyone leaves {place}", { place })
+    : d.trigger === "presence" ? t(d.occupied ? "someone is in the room" : "no one is detected") : d.trigger === "routine" ? t("it is your usual time {time}", { time: d.localTime }) : t("the outdoor temperature is {op} {value}°C", { op: cmp[d.operator], value: d.value });
+  return t("When {when} → {action}.{onlyIf}", { when, action: set(d.action), onlyIf: onlyIfSummary(d, t) });
 }
-function onlyIfSummary(d: Draft): string {
-  const xs = fitExtras(d).filter((x) => x.type !== "weather" || x.value.trim() !== "").map((x) => extraText(extraOf(x)));
-  return xs.length ? ` Only if ${xs.join(" and ")}.` : "";
+function onlyIfSummary(d: Draft, t: T): string {
+  const xs = fitExtras(d).filter((x) => x.type !== "weather" || x.value.trim() !== "").map((x) => extraText(extraOf(x), t));
+  return xs.length ? t(" Only if {conditions}.", { conditions: xs.join(t(" and ")) }) : "";
 }
 export const summaryNote: Record<Trigger, string> = {
   schedule: "Weekdays are the start day. At run time the automation is re-checked (permissions, capabilities, restrictions).",
@@ -296,19 +313,21 @@ export const summaryNote: Record<Trigger, string> = {
 /** One row of the test result (Figma 03c). */
 export type TestRow = { at: string; title: string; detail: string; tone: "ok" | "muted" };
 /** The schedule test: the next start and end from the preview and the first following day that is not selected. */
-export function scheduleTest(runs: ApiOccurrence[], d: Draft, unit: string): TestRow[] {
+export function scheduleTest(runs: ApiOccurrence[], d: Draft, unit: string, i: I18n = EN): TestRow[] {
+  const { t } = i;
   const start = runs.find((r) => r.phase === "schedule_start");
   const end = start ? runs.find((r) => r.phase === "schedule_end" && r.at > start.at) : undefined;
   const rows: TestRow[] = [];
-  if (start) rows.push({ at: start.at, title: `${runText(start.at, d.timezone)} — matches`, detail: `Would send 1 command: ${unit} · ${actionLabel(start.action)}`, tone: "ok" });
-  if (end) rows.push({ at: end.at, title: `${runText(end.at, d.timezone)} — end action`, detail: `Would send 1 command: ${unit} · ${actionLabel(end.action)}`, tone: "ok" });
+  const would = (a: UnitAction) => t("Would send 1 command: {unit} · {action}", { unit, action: actionLabel(a, t) });
+  if (start) rows.push({ at: start.at, title: t("{when} — matches", { when: runText(start.at, d.timezone, i) }), detail: would(start.action), tone: "ok" });
+  if (end) rows.push({ at: end.at, title: t("{when} — end action", { when: runText(end.at, d.timezone, i) }), detail: would(end.action), tone: "ok" });
   if (start && d.weekdays.length < 7) {
-    for (let i = 1; i <= 7; i++) {
-      const t = new Date(Date.parse(start.at) + i * 86_400_000).toISOString();
-      const wd = ((new Date(t).toLocaleDateString("en-US", { timeZone: d.timezone, weekday: "short" }) as string));
+    for (let k = 1; k <= 7; k++) {
+      const at = new Date(Date.parse(start.at) + k * 86_400_000).toISOString();
+      const wd = new Date(at).toLocaleDateString("en-US", { timeZone: d.timezone, weekday: "short" }); // the index, not the label
       const iso = dayShort.indexOf(wd) + 1;
       if (iso > 0 && !d.weekdays.includes(iso)) {
-        rows.push({ at: t, title: `${runText(t, d.timezone)} — no match`, detail: `${dayLong[iso - 1]} is not selected — nothing would be sent`, tone: "muted" });
+        rows.push({ at, title: t("{when} — no match", { when: runText(at, d.timezone, i) }), detail: t("{day} is not selected — nothing would be sent", { day: t(dayLong[iso - 1]) }), tone: "muted" });
         break;
       }
     }
@@ -322,11 +341,13 @@ const decisionText: Record<string, string> = {
   no_control_action: "only a notification would be sent", reconciliation_required: "the AC must be reconciled first",
 };
 /** The event test: what automations.simulate decided for the AC at the current tick (all the AC's rules arbitrated). */
-export function eventTest(dec: ApiDecision | undefined, ruleId: string | null, names: Map<string, string>, unit: string, action: UnitAction, at: string): TestRow {
-  if (!dec) return { at, title: "No result", detail: "The simulation returned no decision for this AC", tone: "muted" };
-  if (dec.decision === "selected" && dec.ruleId === ruleId) return { at, title: `${runText(at)} — matches`, detail: `Would send 1 command: ${unit} · ${actionLabel(action)}`, tone: "ok" };
-  if (dec.decision === "selected") return { at, title: `${runText(at)} — another rule wins`, detail: `“${names.get(dec.ruleId ?? "") ?? "Another automation"}” has priority for ${unit} — this one would not send`, tone: "muted" };
-  return { at, title: `${runText(at)} — not sent`, detail: `Nothing would be sent: ${decisionText[dec.reason ?? ""] ?? dec.reason ?? "no reason"}`, tone: "muted" };
+export function eventTest(dec: ApiDecision | undefined, ruleId: string | null, names: Map<string, string>, unit: string, action: UnitAction, at: string, i: I18n = EN): TestRow {
+  const { t } = i;
+  const when = runText(at, KL, i);
+  if (!dec) return { at, title: t("No result"), detail: t("The simulation returned no decision for this AC"), tone: "muted" };
+  if (dec.decision === "selected" && dec.ruleId === ruleId) return { at, title: t("{when} — matches", { when }), detail: t("Would send 1 command: {unit} · {action}", { unit, action: actionLabel(action, t) }), tone: "ok" };
+  if (dec.decision === "selected") return { at, title: t("{when} — another rule wins", { when }), detail: t("“{rule}” has priority for {unit} — this one would not send", { rule: names.get(dec.ruleId ?? "") ?? t("Another automation"), unit }), tone: "muted" };
+  return { at, title: t("{when} — not sent", { when }), detail: t("Nothing would be sent: {reason}", { reason: decisionText[dec.reason ?? ""] ? t(decisionText[dec.reason ?? ""]) : dec.reason ?? t("no reason") }), tone: "muted" };
 }
 /** The synthetic fact a test sends for an event rule (Phase 1A demo events; the action adds the AC and the tick). */
 export function testFact(d: Draft): { metric: string; value: boolean | number | string; unit: string; quality: "valid" }[] {
@@ -338,14 +359,15 @@ export function testFact(d: Draft): { metric: string; value: boolean | number | 
   }
 }
 
-/** The location consent card (Figma 03a/03f). */
-export function consentCard(c: ApiConsent | null, locationRules: number, disabledByConsent: number): { granted: boolean; title: string; text: string; tone: "ok" | "warn" | "muted" } {
-  if (!c) return { granted: false, title: "Not recorded", text: "No location consent record exists for your account — location automations cannot be used.", tone: "muted" };
+/** The location consent card (Figma 03a/03f); its times in the user's display time zone (IR44). */
+export function consentCard(c: ApiConsent | null, locationRules: number, disabledByConsent: number, i: I18n = EN): { granted: boolean; title: string; text: string; tone: "ok" | "warn" | "muted" } {
+  const { t } = i;
+  if (!c) return { granted: false, title: t("Not recorded"), text: t("No location consent record exists for your account — location automations cannot be used."), tone: "muted" };
   if (c.granted) {
-    return { granted: true, title: "Granted", tone: "ok", text: `Granted ${stamp(c.grantedAt)} · used only by ${locationRules} location automation${locationRules === 1 ? "" : "s"} · demo location events (no real GPS history).` };
+    return { granted: true, title: t("Granted"), tone: "ok", text: t(locationRules === 1 ? "Granted {when} · used only by {n} location automation · demo location events (no real GPS history)." : "Granted {when} · used only by {n} location automations · demo location events (no real GPS history).", { when: showTime(c.grantedAt, i.display), n: locationRules }) };
   }
   if (c.revokedAt) {
-    return { granted: false, title: "Revoked", tone: "warn", text: `Withdrawn ${stamp(c.revokedAt)} · ${disabledByConsent} location automation${disabledByConsent === 1 ? " was" : "s were"} turned off and will not run. Granting consent again does NOT turn them back on automatically — you re-enable each one. Manual control is unaffected.` };
+    return { granted: false, title: t("Revoked"), tone: "warn", text: t(disabledByConsent === 1 ? "Withdrawn {when} · {n} location automation was turned off and will not run. Granting consent again does NOT turn them back on automatically — you re-enable each one. Manual control is unaffected." : "Withdrawn {when} · {n} location automations were turned off and will not run. Granting consent again does NOT turn them back on automatically — you re-enable each one. Manual control is unaffected.", { when: showTime(c.revokedAt, i.display), n: disabledByConsent }) };
   }
-  return { granted: false, title: "Not granted", tone: "muted", text: "Location automations need your consent. It is used only for arrival/departure automations — demo location events, no real GPS history." };
+  return { granted: false, title: t("Not granted"), tone: "muted", text: t("Location automations need your consent. It is used only for arrival/departure automations — demo location events, no real GPS history.") };
 }

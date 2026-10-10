@@ -1,5 +1,5 @@
-// AT-X01-N ③ (FR-X01, IR44, NFR-08, IR259–IR263): with Malay and another display time zone saved in Preferences, the
-// customer's overview, units & locations, alerts, maintenance and unit screen speak Malay and show their times in that
+// AT-X01-N ③ (FR-X01, IR44, NFR-08, IR259–IR264): with Malay and another display time zone saved in Preferences, the
+// customer's overview, units & locations, automations, alerts, maintenance and unit screen speak Malay and show their times in that
 // zone with the zone's abbreviation — the request form takes its times in that zone too — while the unit's ID and units
 // (°C) stay as stored. English and the earlier zone come back at the end, or in afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
@@ -27,6 +27,11 @@ test("the customer screens in Malay keep IDs and units and use the display time 
   await expect(main.getByRole("heading", { name: "Premis saya" })).toBeVisible();
   await main.locator("button[aria-pressed]").first().click(); // the first property of the tree: its summary
   await expect(main.getByText("Pilih bilik untuk melihat penyaman udaranya")).toBeVisible();
+  await page.goto("/customer/automations");
+  await expect(main.getByRole("heading", { name: "Automasi anda" })).toBeVisible();
+  await page.goto("/customer/automations?automationId=new");
+  // a new rule takes the Preferences zone (Asia/Tokyo here) and its runs read in that zone, with the weekday in Malay
+  await expect(main.getByText("Larian seterusnya", { exact: true }).locator("..")).toContainText(/(Isn|Sel|Rab|Kha|Jum), \d{1,2} \w+, 18:00 GMT\+9 · 22:00 GMT\+9/);
   await page.goto("/customer/alerts");
   for (const name of ["Perlu perhatian", "Peringatan & maklumat"]) await expect(main.getByRole("heading", { name })).toBeVisible();
   await expect(main).toContainText(/Dikemas kini \d{1,2}:\d{2} (PG|PTG) GMT\+9/);

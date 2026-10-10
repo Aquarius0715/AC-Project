@@ -2634,3 +2634,24 @@ After the unit screen (IR259), the customer's home screen `/customer` (FR-C01, D
    - E2E: the language spec also opens units & locations in Malay. The whole suite: 54 passed, 9 skipped; the users are en / Asia/Kuala_Lumpur, and all 29 E2E jobs are cancelled.
    - A screenshot of the tree and a property in Malay shows no overflow.
 6. **Still open.** Automations, energy, air quality, contracts & payments and users for the customer; the browser demo's screens; the other roles; the voice demo's answers.
+
+## IR264 The customer's automations in the display language; the schedule preview's end time fixed — 2026-10-10
+
+`/customer/automations` (FR-C04, FR-C05, DD-C04, DD-C05, Figma Client 03a–03i) follows units & locations (IR263).
+
+1. **Texts.** These are translated:
+   - the rule list: cards, status, the toggle and menu, the delete dialog;
+   - the location consent card, full and compact;
+   - the editor: the triggers, weekday buttons, times, presence / location / routine / weather fields, "Only if" rows, target AC and actions with their options;
+   - the summary sentence, the next runs, the checks and the API's field errors;
+   - the test dialog: the schedule test and the event test.
+   Rule names are the customer's data and stay as written.
+2. **Times.** A rule's runs stay in the rule's own time zone with its abbreviation: next run, last skip, schedule test and event test. A new rule takes its zone from Preferences, so with Asia/Tokyo saved its runs read "18:00 GMT+9". The consent card's grant and withdrawal show the IR44 date and time in the user's display time zone; the consent-withdrawn note on a rule shows the date.
+3. **Fixed: the schedule preview's end time.** "Next runs" cut the end time from `runText(…).slice(-5)`. IR260 added the zone abbreviation to `runText`, so the end read "· 0 MYT". The end now comes from `runClock` ("22:00 MYT").
+   `customer/automations.e2e.ts` is new and would have caught it. It creates a schedule, checks its preview "… 18:00 MYT · 22:00 MYT", saves it switched off (no command), checks the card and deletes it; a leftover is deleted in afterEach.
+4. **Shared helpers.** These take the translator or the display: `actionOptions`, `draftErrors`, `apiErrors`, `summaryText`, `scheduleTest`, `eventTest` and `consentCard`, plus `runClock` (new). `dayShort` is exported for the weekday buttons. `scheduleTest` still finds the weekday index from the en-US short name; the labels follow the language.
+5. **Checked.**
+   - Vitest: 34 files, 176 tests. `clientAutomations.test.ts` checks the editor in both languages: summary, checks, field errors, options, the schedule test (start, end and the first day not selected), the event test, the consent card and `runClock`.
+   - E2E: 55 passed, 9 skipped (+1 automations). The language spec also opens automations and the editor's next runs in Malay with Asia/Tokyo. The users are en / Asia/Kuala_Lumpur, all 31 E2E jobs are cancelled and no E2E automation is left.
+   - A screenshot of the editor in Malay shows no overflow.
+6. **Still open.** Energy, air quality, contracts & payments and users for the customer; the browser demo's screens; the other roles; the voice demo's answers.
