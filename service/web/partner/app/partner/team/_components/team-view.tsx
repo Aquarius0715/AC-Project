@@ -159,7 +159,7 @@ function UnavailableDays({ live, onClose }: { live: Live; onClose: () => void })
   const save = () => {
     setTried(true);
     if (Object.keys(unavailabilityErrors(form, t)).length) return;
-    run(() => setUnavailability({ membershipId: form.membershipId || null, from: form.from, to: form.to, type: form.type, note: form.note.trim() || undefined }),
+    run(() => setUnavailability({ membershipId: form.membershipId || null, from: form.from, to: form.to, type: form.type as "annual_leave" | "sick" | "training" | "public_holiday" | "other", note: form.note.trim() || undefined }),
       (v) => (v.conflicts === 0 ? t("Unavailable days saved — the available hours of those days are 0.")
         : t(v.conflicts === 1 ? "Unavailable days saved — 1 confirmed assignment overlaps them; reassign it in Schedule & assignments." : "Unavailable days saved — {n} confirmed assignments overlap them; reassign them in Schedule & assignments.", { n: v.conflicts })),
       () => onClose(),

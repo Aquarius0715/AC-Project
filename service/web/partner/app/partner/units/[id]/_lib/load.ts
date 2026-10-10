@@ -11,6 +11,7 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import type { ApiMember } from "@ac/web/lib/partnerOverview";
 import type { ApiPartnerJobDetail } from "@ac/web/lib/partnerJobDetail";
 import { chart, chartMetrics, contextJob, evidenceRows, jobContext, pastWork, readingRows, registerRows, snapshotRows, type ApiUnitJob } from "@ac/web/lib/partnerUnit";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 type Page<T> = { items: T[]; nextCursor?: string | null };
 type Point = { value: number | null; observedAt: string; quality?: string; unit?: string };
@@ -22,7 +23,7 @@ const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FO
 const minute = (ms: number) => new Date(ms).toISOString().slice(0, 16) + ":00Z";
 
 /** Up to 400 readings of a metric in the window, newest first (telemetry.series pages its query). */
-async function series(unitId: string, metric: string, from: number, to: number): Promise<Point[]> {
+async function series(unitId: string, metric: OpInput<"telemetry.series">["metric"], from: number, to: number): Promise<Point[]> {
   const out: Point[] = [];
   let cursor: string | null | undefined;
   for (let page = 0; page < 4; page++) {

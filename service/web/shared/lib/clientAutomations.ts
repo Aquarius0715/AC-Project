@@ -3,6 +3,7 @@
 // event test (03c), and the location consent card. Pure code shared by the Server Component and the client view.
 import { EN, intlTag, showDate, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import type { UnitAction } from "@ac/web/lib/units";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 const en = translator("en");
 
@@ -207,7 +208,7 @@ export function conditionOf(d: Draft): ClientCondition {
   }
 }
 /** automations.save input (one AC per rule on this screen, Figma 03b “Action for one AC”). */
-export function saveInput(d: Draft): Record<string, unknown> {
+export function saveInput(d: Draft): OpInput<"automations.save"> {
   const base = { ...(d.id ? { id: d.id } : {}), name: d.name.trim(), unitIds: [d.unitId, ...d.others.filter((u) => u !== d.unitId)], timezone: d.timezone, enabled: d.enabled, priority: d.priority,
     onlyIf: fitExtras(d).map(extraOf) };
   return d.trigger === "schedule"
@@ -350,9 +351,9 @@ export function eventTest(dec: ApiDecision | undefined, ruleId: string | null, n
   return { at, title: t("{when} — not sent", { when }), detail: t("Nothing would be sent: {reason}", { reason: decisionText[dec.reason ?? ""] ? t(decisionText[dec.reason ?? ""]) : dec.reason ?? t("no reason") }), tone: "muted" };
 }
 /** The synthetic fact a test sends for an event rule (Phase 1A demo events; the action adds the AC and the tick). */
-export function testFact(d: Draft): { metric: string; value: boolean | number | string; unit: string; quality: "valid" }[] {
+export function testFact(d: Draft): Omit<OpInput<"automations.simulate">["facts"][number], "unitId" | "observedAt">[] {
   switch (d.trigger) {
-    case "location": return [{ metric: "location", value: d.event, unit: "event", quality: "valid" }];
+    case "location": return [{ metric: "location", value: d.event as "arrival" | "departure", unit: "event", quality: "valid" }];
     case "presence": return [{ metric: "occupied", value: d.occupied, unit: "boolean", quality: "valid" }];
     case "weather": return [{ metric: "weather_temperature", value: Number(d.value), unit: "°C", quality: "valid" }];
     default: return []; // a routine matches only at its local time (IR52)

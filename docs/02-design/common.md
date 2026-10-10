@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.85.0
+version: 0.86.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -27,6 +27,7 @@ service/web/
   shared/ (@ac/web)
     components/   AppShell, ui primitives (Tailwind CSS 4, Figma UI Guideline tokens), shared parts (JobBits, QrScan …)
     lib/          dal.ts (server-only data access), session, rest + routes.gen (Core API REST routes from the catalog),
+                  contracts.gen + opTypes (the contract's types: every Core API call is typed by its input, IR313),
                   pure mappers and validators per screen (Vitest), URL state, the Phase 1A demo stores
     screens/      shared screens: sign-in, notifications, preferences, demo, page unavailable
     bff/          Route Handlers: OIDC sign-in, callback and sign-out; /bff/ops for interactive reads; session
@@ -34,7 +35,7 @@ service/web/
 ```
 
 **Data in API mode (`DATA_SOURCE=api`).**
-- Reads: a route's `page.tsx` is a Server Component. It reads through `lib/dal.ts`, which is `server-only`: the session comes from the app's signed cookie, and each operation goes to its Core API REST route. The page passes plain rows to Client Components. Mapping DTOs to view rows is done by pure functions in `shared/lib`.
+- Reads: a route's `page.tsx` is a Server Component. It reads through `lib/dal.ts`, which is `server-only`: the session comes from the app's signed cookie, and each operation goes to its Core API REST route; its input is typed by the contract (IR313). The page passes plain rows to Client Components. Mapping DTOs to view rows is done by pure functions in `shared/lib`.
 - Writes: Server Actions in `actions.ts` next to the route. Each one checks its input, calls the operation with the row version (`X-Expected-Version`) and an Idempotency-Key, and calls `refresh()` so the route renders again. Field errors return to the form.
 - Interactive reads: reads that follow a gesture, such as the technician's QR scan, go through the BFF Route Handler `/bff/ops/<operation>`.
 - The browser never calls the Core API.
@@ -258,4 +259,4 @@ API paths, HTTP methods, databases, server authentication and authorization, rea
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.85.0: Read IR01–IR312 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.86.0: Read IR01–IR313 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

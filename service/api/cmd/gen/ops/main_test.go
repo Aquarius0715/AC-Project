@@ -7,13 +7,13 @@ import (
 )
 
 // The generated files are current: regenerating from the design documents changes neither catalog_gen.go nor the
-// web apps' route table (run make gen after changing a catalog).
+// web apps' route table and contract types (run make gen after changing a catalog or service-contracts.ts).
 func TestGeneratedFilesAreCurrent(t *testing.T) {
-	src, ts, n := generate("../../../../../docs/02-design")
+	src, ts, ct, n := generate("../../../../../docs/02-design")
 	if n != 200 {
 		t.Fatalf("%d operations", n)
 	}
-	for path, want := range map[string][]byte{"../../../internal/ops/catalog_gen.go": src, "../../../../web/shared/lib/routes.gen.ts": ts} {
+	for path, want := range map[string][]byte{"../../../internal/ops/catalog_gen.go": src, "../../../../web/shared/lib/routes.gen.ts": ts, "../../../../web/shared/lib/contracts.gen.ts": ct} {
 		got, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatal(err)

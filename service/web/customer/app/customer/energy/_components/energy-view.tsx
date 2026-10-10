@@ -137,7 +137,7 @@ function ExportModal({ live, onClose }: { live: EnergyLive; onClose: () => void 
   const err = !props.length ? t("Choose at least one location") : !sections.length ? t("Choose at least one section") : undefined;
   const download = () => {
     const input: ReportInput = { month, propertyIds: props, sections, format };
-    const prefs = live.prefs && email !== live.prefs.monthlyReportEmail ? { locale: live.prefs.locale, timezone: live.prefs.timezone, value: email } : null;
+    const prefs = live.prefs && email !== live.prefs.monthlyReportEmail ? { locale: live.prefs.locale as "en" | "ms", timezone: live.prefs.timezone, value: email } : null;
     run(() => exportReport(input, prefs), t("Report ready"), setFile);
   };
   return (

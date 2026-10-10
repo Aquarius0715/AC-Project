@@ -10,6 +10,7 @@ import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { KL, statementWord, totals, type ApiRecipient, type ContractOption, type InquiryRow, type InvoiceDetail, type InvoiceRow, type InvoiceStatus, type StatementDetail, type StatementRow } from "@ac/web/lib/billing";
 import { previewText } from "@ac/web/lib/clientBilling";
+import type { Channel, Currency } from "@ac/web/lib/contracts.gen";
 import {
   answerInquiry, confirmCardPayment, createInvoice, generatePayouts, previewReminder, recordManualPayment, resolvePayoutQuery, sendReminder, transitionStatement, type ActionResult,
 } from "../actions";
@@ -111,7 +112,7 @@ export function BillingView({ live }: { live?: BillingLive }) {
   const record = () => {
     setTried(true);
     if (!sel || !m.ref.trim() || Math.round(+m.amount * 100) !== sel.amountMinor || (live && !m.reason.trim())) return;
-    if (live) return act(() => recordManualPayment(sel.id, sel.version, m.ref.trim(), sel.amountMinor, sel.currency, m.reason.trim()), t("Manual payment recorded"), close);
+    if (live) return act(() => recordManualPayment(sel.id, sel.version, m.ref.trim(), sel.amountMinor, sel.currency as Currency, m.reason.trim()), t("Manual payment recorded"), close);
     if (demoReminded) setConflict(true);
     setDemoList((l) => l.map((x) => (x.id === sel.id ? { ...x, st: "Paid", method: "Method not selected · confirmed", methodName: "Method not selected", paymentState: "confirmed" } : x)));
     toast(t("Manual payment recorded"));
@@ -122,7 +123,7 @@ export function BillingView({ live }: { live?: BillingLive }) {
     const id = detail?.processingPaymentId;
     const version = detail?.processingPaymentVersion;
     if (!sel || !m.ref.trim() || !m.reason.trim() || !id || version == null) return;
-    act(() => confirmCardPayment(id, version, m.ref.trim(), sel.amountMinor, sel.currency, m.reason.trim()), t("Card payment confirmed"), close);
+    act(() => confirmCardPayment(id, version, m.ref.trim(), sel.amountMinor, sel.currency as Currency, m.reason.trim()), t("Card payment confirmed"), close);
   };
   const create = () => {
     setTried(true);
@@ -131,14 +132,14 @@ export function BillingView({ live }: { live?: BillingLive }) {
       toast(t("Invoice created"));
       return close();
     }
-    act(() => createInvoice({ contractId: contract.id, contractVersion: contract.version, from: nw.from, to: nw.to, dueAt: nw.dueAt, amountMinor: contract.priceMinor, currency: contract.currency }), t("Invoice created"), close);
+    act(() => createInvoice({ contractId: contract.id, contractVersion: contract.version, from: nw.from, to: nw.to, dueAt: nw.dueAt, amountMinor: contract.priceMinor, currency: contract.currency as Currency }), t("Invoice created"), close);
   };
   // the reminder the customer gets, in this screen's language: the invoice name from notifications.preview with the
   // invoice's amount and due date (the preview carries neither); the demo shows it without asking
   const message = sel && (reminder.preview || !live) ? previewText(channel, { number: reminder.preview || sel.number, amount: sel.amt, dueDate: sel.due, status: "Overdue" }, t) : null;
   const preview = () => {
     if (!sel || !recipient || !reminder.reason.trim()) return;
-    act(() => previewReminder(sel.id, recipient.id, channel, reminder.reason.trim()), t("Preview ready — nothing is sent yet"), (name) => setReminder((r) => ({ ...r, preview: name })));
+    act(() => previewReminder(sel.id, recipient.id, channel as Channel, reminder.reason.trim()), t("Preview ready — nothing is sent yet"), (name) => setReminder((r) => ({ ...r, preview: name })));
   };
   const send = () => {
     if (!sel || !reminder.reason.trim()) return;
@@ -147,7 +148,7 @@ export function BillingView({ live }: { live?: BillingLive }) {
       return toast(t("Reminder queued (simulated)"));
     }
     if (!recipient) return;
-    act(() => sendReminder(sel.id, sel.version, recipient.id, channel, reminder.reason.trim()), t("Reminder recorded (delivery simulated)"), () => setReminder(noReminder));
+    act(() => sendReminder(sel.id, sel.version, recipient.id, channel as Channel, reminder.reason.trim()), t("Reminder recorded (delivery simulated)"), () => setReminder(noReminder));
   };
 
   // inquiries

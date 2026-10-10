@@ -5,6 +5,7 @@
 // the Core API authorizes them (automation.policy.write) and checks the policy version.
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string> };
 type Decision = { unitId: string; decision: string; ruleId: string | null; reason: string | null; commandId?: string | null };
@@ -20,14 +21,14 @@ async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResu
   }
 }
 
-export async function saveAutoPolicy(input: Record<string, unknown> & { id?: string }, version?: number) {
+export async function saveAutoPolicy(input: OpInput<"policies.save">, version?: number) {
   return run(() => coreOp<{ id: string; version: number }>("policies.save", input, { write: true, expectedVersion: input.id ? version : undefined }).then((p) => ({ id: p.id, version: p.version })));
 }
 /** automations.simulate: the selected rule or the suppression reason per unit; creates no Command. */
-export async function simulateAuto(input: Record<string, unknown>) {
+export async function simulateAuto(input: OpInput<"automations.simulate">) {
   return run(() => coreOp<{ results: Decision[] }>("automations.simulate", input).then((r) => r.results), false);
 }
 /** automations.fire (demo): the event ID is the one-time key, so a repeat returns the stored result. */
-export async function fireAuto(input: Record<string, unknown> & { eventId: string }) {
+export async function fireAuto(input: OpInput<"automations.fire">) {
   return run(() => coreOp<{ results: Decision[] }>("automations.fire", input, { write: true, idempotencyKey: input.eventId }).then((r) => r.results));
 }

@@ -4160,3 +4160,37 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
 5. **Checked.** Vitest: 60 files, 346 tests. Typecheck and lint pass. E2E: 70 passed, 9 skipped. The dev data is unchanged; the spec deletes its schedule.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR313 Every Core API call of the web is typed by the contract — 2026-10-10
+
+IR312 found a call the API refused (`count: 4`) with a check that sees only literal inputs. Now tsc checks every call.
+
+1. **The contract types in the web.** `make gen` (service/api `cmd/gen/ops`) copies service-contracts.ts into `shared/lib/contracts.gen.ts`, as it writes routes.gen.ts from the catalog. Its test fails when a generated file is stale.
+2. **Typed calls.**
+   - `coreOp`, `coreAll`, `callOp` and `useOp` take `[operation, input, …]` as one of the tuples of `OpArgs` (`shared/lib/opTypes.ts`), one tuple per operation.
+   - The literal operation name picks `OperationContracts[op].input`. Callers still name only the result type, as in `coreOp<ApiCommand>("commands.create", …)`.
+   - `coreAll` takes the operation's `filters` and `sort`. The job writes of `jobsApi` take the operation's input without its `jobId`.
+3. **Typed mappers and actions.**
+   - Twelve shared mappers return the contract's input type:
+     - alert policies of HQ and the customer;
+     - automation policies and their evaluation input;
+     - the audit query;
+     - the customer's automation save input and test facts;
+     - baselines;
+     - device models;
+     - memberships;
+     - the contractor's job list filters and sort;
+     - the technician's report draft.
+   - The Server Actions take the contract's input or field types. A form's or an API row's value is narrowed where it enters a call, because the API validates it.
+   - The device units are typed by `UnitSymbol`; the web's unit table already matches it.
+4. **What the typing found.**
+   - A unit test sorted units.list by `displayName`, which the catalog does not allow. It now sorts by `createdAt`.
+   - The contractor's accept and decline in `jobsApi` sent an undefined offer ID and terms version when the job had no open offer. They now stop with an explicit error first.
+   - The technician's acknowledgement and manual check-in sent `reason: null`. They now leave the reason out when there is none.
+   - A baseline is built as the contract's two cases: a fixed baseline with its kWh, or a period comparison without it.
+5. **Checked.**
+   - The typecheck of the four apps, the shared package and the E2E passes. Lint passes.
+   - Vitest: 60 files, 346 tests. The cmd/gen/ops test passes.
+   - All four apps build. E2E: 70 passed, 9 skipped. The dev data is unchanged.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

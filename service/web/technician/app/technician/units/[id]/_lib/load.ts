@@ -10,6 +10,8 @@ import { i18nOf, showTime } from "@ac/web/lib/i18n";
 import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiTechJobRow } from "@ac/web/lib/techOverview";
 import type { ApiDeviceEventFull } from "@ac/web/lib/techDevices";
+import type { OpInput } from "@ac/web/lib/opTypes";
+import type { Metric } from "@ac/web/lib/contracts.gen";
 import {
   componentCards, controlJob, jobRows, liveTiles, metricOf, openAlerts, otherMetrics, PERIODS, periodOf, periodRange, registerRows, seriesChart, stoppedBanner,
   windowEvents, type ApiTechUnit, type Point,
@@ -23,7 +25,7 @@ const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => 
 const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || !!e.error.fieldErrors.id);
 
 /** The readings of a metric in the period, newest first: up to `pages` pages of 100 (telemetry.series pages its query). */
-async function series(unitId: string, metric: string, from: number, to: number, pages: number): Promise<Point[]> {
+async function series(unitId: string, metric: OpInput<"telemetry.series">["metric"], from: number, to: number, pages: number): Promise<Point[]> {
   const out: Point[] = [];
   let cursor: string | null | undefined;
   for (let page = 0; page < pages; page++) {
@@ -61,7 +63,7 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const metric = metricOf(d, sp.metric), period = periodOf(sp.period);
   const { from, to } = periodRange(period, nowMs);
   const unitOf = (m: string) => d.latestMeasurements.find((x) => x.metric === m)?.unit ?? "";
-  const others = tab === "monitoring" ? d.latestMeasurements.filter((m) => m.metric !== metric).slice(0, 3).map((m) => m.metric) : [];
+  const others = tab === "monitoring" ? d.latestMeasurements.filter((m) => m.metric !== metric).slice(0, 3).map((m) => m.metric as Metric) : [];
   const [alerts, jobs, points, more, devices] = await Promise.all([
     optional(coreOp<Page<ApiAlert>>("alerts.list", { limit: 50, filters: { unitId: id } }).then((r) => r.items), [] as ApiAlert[]),
     optional(coreOp<Page<ApiTechJobRow>>("jobs.list", { limit: 20, filters: { unitId: id } }).then((r) => r.items), [] as ApiTechJobRow[]),

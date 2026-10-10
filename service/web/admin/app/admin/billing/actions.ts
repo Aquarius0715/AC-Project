@@ -4,6 +4,7 @@
 // and the Core API authorizes the call (billing.write, billing.payment) and checks the expected version.
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string> };
 
@@ -18,7 +19,7 @@ async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResu
   }
 }
 
-export type NewInvoice = { contractId: string; contractVersion: number; from: string; to: string; dueAt: string; amountMinor: number; currency: string };
+export type NewInvoice = { contractId: string; contractVersion: number; from: string; to: string; dueAt: string; amountMinor: number; currency: OpInput<"invoices.create">["currency"] };
 
 /** invoices.create for a contract version (dates are Kuala Lumpur days). */
 export async function createInvoice(n: NewInvoice) {
@@ -28,22 +29,22 @@ export async function createInvoice(n: NewInvoice) {
   }, { write: true }).then(() => null));
 }
 
-export async function recordManualPayment(invoiceId: string, version: number, paymentReference: string, amountMinor: number, currency: string, reason: string) {
+export async function recordManualPayment(invoiceId: string, version: number, paymentReference: string, amountMinor: number, currency: OpInput<"payments.recordManual">["currency"], reason: string) {
   return run(() => coreOp("payments.recordManual", { invoiceId, paymentReference, confirmedAmountMinor: amountMinor, currency, reason }, { write: true, expectedVersion: version }).then(() => null));
 }
 
-export async function confirmCardPayment(paymentId: string, version: number, paymentReference: string, amountMinor: number, currency: string, reason: string) {
+export async function confirmCardPayment(paymentId: string, version: number, paymentReference: string, amountMinor: number, currency: OpInput<"payments.confirm">["currency"], reason: string) {
   return run(() => coreOp("payments.confirm", { paymentId, paymentReference, confirmedAmountMinor: amountMinor, currency, reason }, { write: true, expectedVersion: version }).then(() => null));
 }
 
 /** notifications.preview of a payment reminder (a read: nothing is sent, the route is not re-rendered). */
-export async function previewReminder(invoiceId: string, recipientMembershipId: string, channel: string, reason: string) {
+export async function previewReminder(invoiceId: string, recipientMembershipId: string, channel: OpInput<"invoices.remind">["channel"], reason: string) {
   return run(() => coreOp<{ params: { targetName: string } }>("notifications.preview", {
     target: { kind: "invoice", id: invoiceId }, templateKey: "payment_reminder", channel, recipientMembershipId, reason,
   }).then((p) => p.params.targetName), false);
 }
 
-export async function sendReminder(invoiceId: string, version: number, recipientMembershipId: string, channel: string, reason: string) {
+export async function sendReminder(invoiceId: string, version: number, recipientMembershipId: string, channel: OpInput<"invoices.remind">["channel"], reason: string) {
   return run(() => coreOp("invoices.remind", { invoiceId, recipientMembershipId, channel, reason }, { write: true, expectedVersion: version }).then(() => null));
 }
 

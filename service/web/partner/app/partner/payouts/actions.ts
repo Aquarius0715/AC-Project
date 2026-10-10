@@ -5,6 +5,7 @@
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
 const failed = (e: unknown): Result<never> => {
@@ -12,7 +13,7 @@ const failed = (e: unknown): Result<never> => {
   throw e;
 };
 
-export async function askHq(statementId: string, version: number, lineId: string, topic: string, message: string): Promise<Result<null>> {
+export async function askHq(statementId: string, version: number, lineId: string, topic: OpInput<"payouts.query">["topic"], message: string): Promise<Result<null>> {
   try {
     await coreOp("payouts.query", { statementId, lineId, topic, message }, { write: true, expectedVersion: version });
     return { ok: true, value: null };

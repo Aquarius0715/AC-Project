@@ -10,6 +10,7 @@ import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { certDates } from "@ac/web/lib/partnerCertificates";
 import { uploadType } from "@ac/web/lib/files";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
 const failure = (e: unknown): { ok: false } & ActionFailure => {
@@ -17,7 +18,7 @@ const failure = (e: unknown): { ok: false } & ActionFailure => {
   throw e;
 };
 
-export async function setUnavailability(input: { membershipId: string | null; from: string; to: string; type: string; note?: string }): Promise<Result<{ conflicts: number }>> {
+export async function setUnavailability(input: OpInput<"members.setUnavailability">): Promise<Result<{ conflicts: number }>> {
   try {
     const u = await coreOp<{ conflictingAssignmentIds?: string[] }>("members.setUnavailability", input, { write: true });
     refresh();
@@ -36,8 +37,8 @@ export async function submitCertificate(form: FormData): Promise<Result<{ id: st
     const bytes = file instanceof File ? Buffer.from(await file.arrayBuffer()) : Buffer.alloc(0);
     const renewalOf = text("renewalOf");
     const c = await coreOp<{ id: string }>("certificates.submit", {
-      membershipId: text("membershipId"), code: text("code"), name: text("name"), number: text("number"), ...certDates({ issued: text("issued"), expires: text("expires") }),
-      file: { name: file instanceof File ? file.name : "", mime: file instanceof File ? uploadType(bytes, file.type) : "", size: bytes.length, bytes: bytes.toString("base64") },
+      membershipId: text("membershipId"), code: text("code") as OpInput<"certificates.submit">["code"], name: text("name"), number: text("number"), ...certDates({ issued: text("issued"), expires: text("expires") }),
+      file: { name: file instanceof File ? file.name : "", mime: (file instanceof File ? uploadType(bytes, file.type) : "") as OpInput<"certificates.submit">["file"]["mime"], size: bytes.length, bytes: bytes.toString("base64") },
       ...(renewalOf ? { renewalOf } : {}),
     }, { write: true });
     refresh();

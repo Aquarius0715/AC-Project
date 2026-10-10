@@ -10,6 +10,7 @@ import { i18nOf } from "@ac/web/lib/i18n";
 import { memberRows, type ApiMember, type ApiOrganization } from "@ac/web/lib/members";
 import { AccessDemo } from "./_components/access-demo";
 import { AccessView } from "./_components/access-view";
+import type { Role } from "@ac/web/lib/contracts.gen";
 
 type Page<T> = { items: T[] };
 
@@ -22,7 +23,7 @@ export default async function AdminAccessPage({ searchParams }: PageProps<"/admi
   const status = one("status") === "active" || one("status") === "inactive" ? one("status") : undefined;
   const [now, perms, me, display, members, orgs, properties, units] = await Promise.all([
     coreNow(), corePermissions(), corePrincipal(), coreDisplay(),
-    coreOp<Page<ApiMember>>("members.list", { limit: 100, filters: { ...(role && { role }), ...(status === "active" && { activeOnly: true }) } }),
+    coreOp<Page<ApiMember>>("members.list", { limit: 100, filters: { ...(role && { role: role as Role }), ...(status === "active" && { activeOnly: true }) } }),
     coreOp<Page<ApiOrganization>>("organizations.list", { limit: 100 }),
     coreOp<Page<{ id: string; name: string }>>("properties.list", { limit: 100 }),
     coreOp<Page<{ id: string; displayName: string }>>("units.list", { limit: 100 }),

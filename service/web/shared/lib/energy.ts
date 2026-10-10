@@ -2,6 +2,7 @@
 // IR68 savings wording and the IR44 number rules. Pure code shared by Server Components and client views; texts in the
 // display language (`t` / `i`, IR265). Numbers keep the en-MY format, which ms-MY shares.
 import { EN, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 const en = translator("en");
 
@@ -123,9 +124,8 @@ export function baselineErrors(d: BaselineDraft, t: T = en): Record<string, stri
   if (d.source.trim().length < 1 || d.source.length > 500) e.source = t("1–500 characters");
   return e;
 }
-export function baselineInput(d: BaselineDraft, id?: string) {
-  return {
-    ...(id ? { id } : {}), unitIds: d.unitIds, period: { from: klInstant(d.from), to: klInstant(d.to) }, method: d.method,
-    ...(d.method === "demo_fixed" ? { baselineKWh: Number(d.baselineKWh) } : {}), boundaryId: d.boundaryId, boundary: d.boundary.trim(), assumptions: d.assumptions.trim(), source: d.source.trim(),
-  };
+export function baselineInput(d: BaselineDraft, id?: string): OpInput<"baselines.save"> {
+  const base = { ...(id ? { id } : {}), unitIds: d.unitIds, period: { from: klInstant(d.from), to: klInstant(d.to) }, boundaryId: d.boundaryId, boundary: d.boundary.trim(), assumptions: d.assumptions.trim(), source: d.source.trim() };
+  // a fixed baseline carries its kWh; a period comparison computes it (the contract's two cases)
+  return d.method === "demo_fixed" ? { ...base, method: "demo_fixed", baselineKWh: Number(d.baselineKWh) } : { ...base, method: "demo_period_comparison" };
 }

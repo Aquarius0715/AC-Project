@@ -5,10 +5,11 @@
 // membership version. Revoking access is a save with validUntil at the business clock, never a delete.
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string> };
 
-export async function saveMember(input: Record<string, unknown> & { id?: string }, version?: number): Promise<ActionResult<{ id: string; version: number }>> {
+export async function saveMember(input: OpInput<"members.save">, version?: number): Promise<ActionResult<{ id: string; version: number }>> {
   try {
     const m = await coreOp<{ id: string; version: number }>("members.save", input, { write: true, expectedVersion: input.id ? version : undefined });
     return { ok: true, value: { id: m.id, version: m.version } };

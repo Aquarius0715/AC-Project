@@ -11,6 +11,7 @@ import type { ApiDeviceDetail, Metric } from "@ac/web/lib/devices";
 import { deviceFieldText, deviceRefusal, FILTERS, filterOf, openAlerts, type EventRow, type Filter, type OperationRow, type TechDeviceRow } from "@ac/web/lib/techDevices";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { acknowledgeAlert, addResponseNote, bindDevice, calibrateSensor, checkDevice, registerDevice, updateFirmware } from "../actions";
+import type { UnitSymbol } from "@ac/web/lib/contracts.gen";
 
 export type TechDevicesLive = {
   rows: TechDeviceRow[]; canMaintain: boolean; canAcknowledge: boolean; events: boolean;
@@ -94,7 +95,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
     if (cal.measured.trim() === "" || !Number.isFinite(+cal.measured)) e.measuredValue = t("A number");
     setErrors(e);
     if (Object.keys(e).length || !dv || !s || !dv.jobId) return;
-    run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit, +cal.reference, +cal.measured, dv.jobId!), t("Calibration recorded — earlier readings unchanged"), ok(), failed);
+    run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit as UnitSymbol, +cal.reference, +cal.measured, dv.jobId!), t("Calibration recorded — earlier readings unchanged"), ok(), failed);
   };
   const firmware = () => {
     if (!dv || !fw || !dv.jobId) return setErrors({ firmwareVersion: t("Choose a version") });

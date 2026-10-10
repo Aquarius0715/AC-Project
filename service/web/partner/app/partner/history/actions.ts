@@ -8,10 +8,11 @@ import { refresh } from "next/cache";
 import { coreDisplay, coreOp, CoreError } from "@ac/web/lib/dal";
 import { showTime } from "@ac/web/lib/i18n";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type Communication = {
   jobId: string; version: number | null; saveNote: boolean; message: string; visibility: "internal" | "customer";
-  templateKey: string; channel: string; recipientMembershipId: string;
+  templateKey: OpInput<"notifications.preview">["templateKey"]; channel: OpInput<"notifications.preview">["channel"]; recipientMembershipId: string;
 };
 type Preview = { id: string; templateKey: string; channel: string; recipientMembershipId: string; deliveryState: string; occurredAt: string; at: string };
 export type CommunicationFailure = { ok: false; stage: "note" | "preview"; noteSaved: boolean } & ActionFailure;

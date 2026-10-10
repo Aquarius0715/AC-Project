@@ -4,6 +4,7 @@
 // DATA_SOURCE=api the same screen reads the Core API through the BFF relay.
 import { useEffect, useState } from "react";
 import { callOp, OpError } from "@ac/web/lib/ops";
+import type { OpArgs, OpCall } from "@ac/web/lib/opTypes";
 
 export type BffSession = { dataSource: "mock" | "api"; signedIn: boolean; role: string | null; membershipId: string | null; clientRole: string | null; serverNow: string | null };
 
@@ -48,7 +49,7 @@ export function useBffSession(): BffSession | null {
 
 /** Reads an operation in api mode; returns the mock value in mock mode (and while the data source is unknown).
  * The fetch result is stored with the request it answers; `loading` is derived (no setState in the effect body). */
-export function useOp<T, R>(operation: string, input: unknown, mock: R, map: (data: T) => R, enabled = true): { data: R; loading: boolean; error: OpError | null; source: "mock" | "api" | null } {
+export function useOp<T, R>(...[operation, input, mock, map, enabled = true]: [...OpCall, mock: R, map: (data: T) => R, enabled?: boolean]): { data: R; loading: boolean; error: OpError | null; source: "mock" | "api" | null } {
   const session = useBffSession();
   const rev = useRevision();
   const key = JSON.stringify(input);
@@ -58,7 +59,7 @@ export function useOp<T, R>(operation: string, input: unknown, mock: R, map: (da
   useEffect(() => {
     if (!active) return;
     let live = true;
-    callOp<T>(operation, JSON.parse(key))
+    callOp<T>(...([operation, JSON.parse(key)] as OpArgs<never>))
       .then((d) => live && setState({ request, data: map(d), error: null }))
       .catch((e: unknown) => live && setState((s) => ({ request, data: s.data, error: e instanceof OpError ? e : null })));
     return () => {

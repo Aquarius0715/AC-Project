@@ -10,6 +10,7 @@ import { airNumber } from "@ac/web/lib/air";
 import { until, type Slot } from "@ac/web/lib/partnerOverview";
 import { statusWord, typeLabel, type ApiHistory } from "@ac/web/lib/partnerJobDetail";
 import { bucket, type ApiUnitDetail } from "@ac/web/lib/units";
+import type { Metric } from "@ac/web/lib/contracts.gen";
 
 /** jobs.list rows on the unit (the company's own: summaries inside the access window, history after it). */
 export type ApiUnitJob =
@@ -21,7 +22,7 @@ const SCOPE: Record<string, string> = { indoor: "Indoor unit", outdoor: "Outdoor
 const QUALITY: Record<string, { text: string; tone?: "warn" | "crit" }> = { valid: { text: "good" }, stale: { text: "stale", tone: "warn" }, suspect: { text: "suspect", tone: "crit" }, missing: { text: "missing", tone: "warn" } };
 const EVIDENCE: Record<string, string> = { inferred: "Suspected", inspection: "Inspection record", demo_observation: "Observed (demo)" };
 /** The diagnosis metrics a chart shows first, in order (Figma: vibration and refrigerant pressure). */
-export const CHART_METRICS = ["vibration", "refrigerant_pressure", "temperature", "humidity", "power"];
+export const CHART_METRICS: Metric[] = ["vibration", "refrigerant_pressure", "temperature", "humidity", "power"];
 const label = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]) : metric.replace(/_/g, " "));
 
 /** The unit register (Figma: location, model, maintenance scope; the connection — a badge — and the last seen time). */

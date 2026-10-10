@@ -6,6 +6,8 @@
 // (`t` / `i`, IR261).
 import { metricUnit, opSymbol, recoveryError, type Channel, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
 import { EN, showDate, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import type { OpInput } from "@ac/web/lib/opTypes";
+import type { Metric as ContractMetric } from "@ac/web/lib/contracts.gen";
 
 const en = translator("en");
 
@@ -144,12 +146,12 @@ export function summaryText(f: PolicyForm, t: T = en): string {
 }
 /** policies.save input (AlertPolicyInput): the form plus the hidden fields — new: the session membership as recipient,
  * escalation 60, cooldown 5, the Preferences time zone, priority 50; edit: the policy's own (IR120). */
-export function policyInput(f: PolicyForm, existing: ApiAlertPolicy | null, ctx: { customerId: string; membershipId: string; timezone: string }) {
+export function policyInput(f: PolicyForm, existing: ApiAlertPolicy | null, ctx: { customerId: string; membershipId: string; timezone: string }): OpInput<"policies.save"> {
   return {
     ...(existing ? { id: existing.id } : {}), kind: "alert" as const, name: f.name.trim(), customerId: ctx.customerId,
     timezone: existing?.timezone ?? ctx.timezone, enabled: existing?.enabled ?? true, priority: existing?.priority ?? 50,
     recipientMembershipIds: existing?.recipientMembershipIds ?? [ctx.membershipId], escalateAfterMinutes: existing?.escalateAfterMinutes ?? 60, cooldownMinutes: existing?.cooldownMinutes ?? 5,
-    channels: (f.email ? ["inApp", "email"] : ["inApp"]) as Channel[], metric: f.metric, operator: f.operator, threshold: Number(f.threshold), recoveryThreshold: Number(f.recovery),
+    channels: (f.email ? ["inApp", "email"] : ["inApp"]) as Channel[], metric: f.metric as ContractMetric, operator: f.operator, threshold: Number(f.threshold), recoveryThreshold: Number(f.recovery),
     durationSeconds: seconds(f) ?? 0, activeWindow: f.windowOn ? { weekdays: [...f.weekdays].sort(), startLocal: f.start, endLocal: f.end } : null, severity: f.severity,
   };
 }

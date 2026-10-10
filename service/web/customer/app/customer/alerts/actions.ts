@@ -7,6 +7,7 @@
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
 const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
@@ -36,7 +37,7 @@ export async function readAlert(notes: { id: string; version: number }[]): Promi
 }
 
 /** policies.save: a new policy, or an own policy at its version (the input of customerPolicies.policyInput). */
-export async function savePolicy(input: Record<string, unknown>, version: number | null) {
+export async function savePolicy(input: OpInput<"policies.save">, version: number | null) {
   return run(async () => (await coreOp<{ id: string }>("policies.save", input, version === null ? { write: true } : { write: true, expectedVersion: version })).id);
 }
 

@@ -7,6 +7,7 @@ import { refresh } from "next/cache";
 import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import type { CampaignDraft, Metric } from "@ac/web/lib/devices";
 import { parseWaves } from "@ac/web/lib/devices";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string> };
 
@@ -22,7 +23,7 @@ async function run<T>(fn: () => Promise<T>, rerender = true): Promise<ActionResu
 }
 
 /** capabilities.save: a new model (no id) or the next capability version (id + the version it was read at). */
-export async function saveCapability(input: Record<string, unknown> & { id?: string }, version?: number) {
+export async function saveCapability(input: OpInput<"capabilities.save">, version?: number) {
   return run(() => coreOp<{ id: string; version: number }>("capabilities.save", input, { write: true, expectedVersion: input.id ? version : undefined }).then((k) => ({ id: k.id, version: k.version })));
 }
 
@@ -55,7 +56,7 @@ export async function checkDevice(deviceId: string, version: number) {
   return run(() => coreOp("devices.check", { id: deviceId }, { write: true, expectedVersion: version }).then(() => null));
 }
 
-export async function calibrateSensor(deviceId: string, version: number, sensorId: string, metric: Metric, unit: string, referenceValue: number, measuredValue: number) {
+export async function calibrateSensor(deviceId: string, version: number, sensorId: string, metric: Metric, unit: OpInput<"devices.calibrate">["unit"], referenceValue: number, measuredValue: number) {
   return run(async () => {
     const calibratedAt = (await coreNow()).toISOString();
     await coreOp("devices.calibrate", { deviceId, sensorId, metric, unit, referenceValue, measuredValue, calibratedAt }, { write: true, expectedVersion: version });

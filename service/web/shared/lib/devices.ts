@@ -4,6 +4,8 @@
 // start is typed there (NFR-08), while its install window stays the device's local time. Metric and status codes
 // stay codes where the API shows them.
 import { EN, showTime, translator, zonedInstant, type I18n, type T } from "@ac/web/lib/i18n";
+import type { OpInput } from "@ac/web/lib/opTypes";
+import type { UnitSymbol } from "@ac/web/lib/contracts.gen";
 
 const en = translator("en");
 export type Mode = "cool" | "dry" | "fan";
@@ -12,7 +14,7 @@ export type Metric = "temperature" | "humidity" | "co2" | "pm25" | "power" | "vi
 export type Connection = "online" | "offline" | "unknown" | "connecting" | "error";
 
 /** The fixed unit of each metric (DD-A04 boundary cases). */
-export const metricUnit: Record<Metric, string> = {
+export const metricUnit: Record<Metric, UnitSymbol> = {
   temperature: "°C", humidity: "%", co2: "ppm", pm25: "µg/m³", power: "kW", vibration: "mm/s", refrigerant_pressure: "kPa", compressor_cycles: "cycles/h",
   airflow_drop: "%", heartbeat_gap: "min",
 };
@@ -106,7 +108,7 @@ export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en)
 }
 
 /** The capabilities.save input (Save<Capability> & {changeReason}); sensor units and boundaries are derived (IR11/12). */
-export function capabilityInput(d: CapabilityDraft, id?: string) {
+export function capabilityInput(d: CapabilityDraft, id?: string): OpInput<"capabilities.save"> {
   return {
     ...(id ? { id, changeReason: d.changeReason.trim() } : {}),
     manufacturer: d.manufacturer.trim(), model: d.model.trim(), control: d.control, modeControl: d.modeControl, fanControl: d.fanControl,

@@ -2,6 +2,8 @@
 // policies.save input and the evaluation facts of automations.simulate / automations.fire. Pure code shared by the
 // Server Component and the client view. Texts in the display language (`t`, IR303).
 import { translator, type T } from "@ac/web/lib/i18n";
+import type { OpInput } from "@ac/web/lib/opTypes";
+import type { Fact } from "@ac/web/lib/contracts.gen";
 
 const en = translator("en");
 
@@ -97,7 +99,7 @@ export function autoErrors(d: AutoDraft, tempRange: { min: number; max: number }
   }
   return e;
 }
-export function autoInput(d: AutoDraft, id?: string) {
+export function autoInput(d: AutoDraft, id?: string): Extract<OpInput<"policies.save">, { kind: "automation" }> {
   const condition: AutoCondition = d.type === "occupancy" ? { type: "occupancy", occupied: d.flag } : d.type === "peak" ? { type: "peak", active: d.flag }
     : d.type === "tariff" ? { type: "tariff", operator: d.operator, value: Number(d.value), unit: "MYR_per_kWh" } : { type: d.type, operator: d.operator, value: Number(d.value), unit: "kW" };
   const action: UnitAction = d.actionKind === "set_power" ? { kind: "set_power", power: d.power } : d.actionKind === "set_temperature" ? { kind: "set_temperature", celsius: Number(d.celsius) }
@@ -112,13 +114,13 @@ export const factOf: Record<AutoCondition["type"], { metric: string; unit: strin
 };
 export type FactRow = { unitId: string; value: string; quality: "valid" | "missing" | "stale" | "suspect" };
 /** EvaluationInput for the current business-clock minute (occurredAt must be in it); empty values are null facts. */
-export function evaluationInput(type: AutoCondition["type"], rows: FactRow[], now: Date, eventId: string) {
+export function evaluationInput(type: AutoCondition["type"], rows: FactRow[], now: Date, eventId: string): OpInput<"automations.simulate"> {
   const f = factOf[type];
   const at = new Date(Math.floor(now.getTime() / 60000) * 60000).toISOString();
   return {
     eventId, occurredAt: at, phase: "condition" as const, unitIds: rows.map((r) => r.unitId),
     facts: rows.map((r) => ({
-      unitId: r.unitId, metric: f.metric, unit: f.unit, observedAt: at, quality: r.quality,
+      unitId: r.unitId, metric: f.metric as Fact["metric"], unit: f.unit, observedAt: at, quality: r.quality,
       value: r.value.trim() === "" ? null : f.boolean ? r.value === "true" : Number(r.value),
     })),
   };

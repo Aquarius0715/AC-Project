@@ -9,8 +9,9 @@ import "server-only";
 import { connection } from "next/server";
 import { apiMode, coreDisplay, coreIdentity, coreOp } from "@ac/web/lib/dal";
 import type { Role, ShellLive } from "@ac/web/lib/nav";
+import type { OpCall } from "@ac/web/lib/opTypes";
 
-const total = (op: string, input: unknown) => coreOp<{ total: number }>(op, input).then((p) => p.total);
+const total = (...call: OpCall) => coreOp<{ total: number }>(...call).then((p) => p.total);
 const quiet = (p: Promise<number>) => p.catch(() => null);
 
 export async function loadShell(role: Role): Promise<ShellLive | undefined> {

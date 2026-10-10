@@ -5,6 +5,7 @@
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ApiMRVPreview, MRVConditions } from "@ac/web/lib/mrv";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string> };
 
@@ -36,6 +37,6 @@ export async function recordReview(reportId: string, version: number, reviewComm
 }
 
 /** factors.save: a new factor or the next version (id + the version it was read at). */
-export async function saveFactor(input: Record<string, unknown> & { id?: string }, version?: number) {
+export async function saveFactor(input: OpInput<"factors.save">, version?: number) {
   return run(() => coreOp<{ id: string; version: number }>("factors.save", input, { write: true, expectedVersion: input.id ? version : undefined }).then((f) => ({ id: f.id, version: f.version })));
 }

@@ -7,7 +7,7 @@ import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import {
   actionText, autoDraft, autoErrors, autoInput, conditionText, decisionWord, disabledReasonWord, evaluationInput, factOf, reasonWord, subjectText,
-  type ApiAutoPolicy, type AutoDraft, type Compare, type FactRow, type PolicyGroup,
+  type ApiAutoPolicy, type AutoCondition, type AutoDraft, type Compare, type FactRow, type PolicyGroup,
 } from "@ac/web/lib/automation";
 import { fireAuto, saveAutoPolicy, simulateAuto } from "../actions";
 
@@ -112,7 +112,7 @@ export function AutomationView({ live }: { live: Live }) {
                   {d.actionKind === "set_mode" && <Select className="w-auto" value={d.mode} onChange={(e) => set({ mode: e.target.value as AutoDraft["mode"] })}><option value="cool">{t("cool")}</option><option value="dry">{t("dry")}</option><option value="fan">{t("fan")}</option></Select>}
                   {(d.actionKind === "set_fan" || d.actionKind === "ventilate") && <Select className="w-auto" value={d.level} onChange={(e) => set({ level: e.target.value as AutoDraft["level"] })}><option value="low">{t("low")}</option><option value="mid">{t("mid")}</option><option value="high">{t("high")}</option></Select>}
                 </div>
-                <p className="mt-2 text-xs text-muted">{conditionText(preview.condition, t)} → {actionText(preview.action, t)}.</p>
+                <p className="mt-2 text-xs text-muted">{conditionText(preview.condition as AutoCondition, t)} → {actionText(preview.action, t)}.</p>
               </section>
               <section className="rounded-xl bg-surface2 p-3"><h3 className="mb-2 text-[13px] font-bold">{t("How conflicts are resolved")}</h3><p className="mb-2 text-xs text-muted">{t("Evaluated per unit — at most one action per unit per evaluation.")}</p><ol className="grid-fluid text-xs" style={{ ["--min" as string]: "180px" }}><li><b>{t("1 Capabilities & active restrictions")}</b><br />{t("always first")}</li><li><b>{t("2 HQ policies")}</b><br />{t("higher priority wins · ties: ascending ID")}</li><li><b>{t("3 Customer rules")}</b><br />{t("only when no HQ policy applies")}</li></ol></section>
               {live.canWrite && <div className="flex justify-end"><Btn variant="primary" disabled={pending} onClick={save}>{sel ? t("Save as v{n}", { n: sel.version + 1 }) : t("Create policy")}</Btn></div>}

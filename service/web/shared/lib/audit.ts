@@ -2,6 +2,8 @@
 // screen. Pure code shared by the Server Component and the client view. Texts in the display language and instants in
 // the display time zone; the period's days are the display time zone's days too (`i` / `zone`, IR304).
 import { EN, relativeTime, showTime, translator, zonedInstant, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
+import type { OpInput } from "@ac/web/lib/opTypes";
+import type { AuditView } from "@ac/web/lib/contracts.gen";
 
 const en = translator("en");
 export type AuditResult = "Success" | "Denied" | "Failed" | "Pending";
@@ -50,14 +52,14 @@ export function periodError(f: Pick<AuditFilters, "from" | "to">, t: T = en): st
 }
 
 /** audit.list input for the filters: the days start at midnight in the display time zone (NFR-08). */
-export function auditQuery(f: AuditFilters, zone = KL) {
+export function auditQuery(f: AuditFilters, zone = KL): OpInput<"audit.list"> {
   return {
     limit: f.limit,
     filters: {
       from: zonedInstant(f.from, "00:00", zone),
       to: zonedInstant(f.to, "00:00", zone),
       ...(f.correlationId ? { correlationId: f.correlationId } : {}),
-      ...(f.result !== "All" ? { result: f.result.toLowerCase() } : {}),
+      ...(f.result !== "All" ? { result: f.result.toLowerCase() as AuditView["result"] } : {}),
     },
   };
 }

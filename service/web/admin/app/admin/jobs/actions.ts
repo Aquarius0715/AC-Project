@@ -13,6 +13,7 @@ import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import type { CostLine } from "@ac/web/lib/adminJobs";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 type Slot = { startAt: string; endAt: string };
 type Result = { ok: true; value: null } | ({ ok: false } & ActionFailure);
@@ -84,7 +85,7 @@ export async function extendAccess(jobId: string, version: number, accessValidUn
 
 /** jobs.create on a customer's behalf (DD-A06 item 8): the 1st preferred time is the requested window, up to two
  * more, due at or after the requested end, an optional contact window. Returns the new job's id. */
-export async function createJob(input: { unitId: string; type: string; symptom: string; slots: Slot[]; dueAt: string | null; contactWindow: string }): Promise<{ ok: true; value: { id: string } } | ({ ok: false } & ActionFailure)> {
+export async function createJob(input: { unitId: string; type: OpInput<"jobs.create">["type"]; symptom: string; slots: Slot[]; dueAt: string | null; contactWindow: string }): Promise<{ ok: true; value: { id: string } } | ({ ok: false } & ActionFailure)> {
   const [first, ...alternatives] = input.slots;
   try {
     const job = await coreOp<{ id: string }>("jobs.create", {
@@ -157,7 +158,7 @@ export async function setOfferStatus(contractorOrgId: string, version: number, s
 }
 
 /** rateCards.save: a new rate card version effective from a future date. */
-export async function saveRateCard(input: { contractorOrgId: string; effectiveFrom: string; currency: "MYR" | "USD"; lines: { workType: string; amountMinor: number; note: string | null }[] }) {
+export async function saveRateCard(input: OpInput<"rateCards.save">) {
   return value(async () => { const r = await coreOp<{ id: string; version: number }>("rateCards.save", input, { write: true }); return { id: r.id, version: r.version }; });
 }
 
@@ -167,7 +168,7 @@ export async function verifyCertificate(certificateId: string, version: number, 
 }
 
 /** sla.saveTargets: a plan type's new targets from now or later (jobs created afterwards use them; IR131 item 4). */
-export async function saveSlaTargets(input: { planType: string; responseHours: number; arrivalInWindowPercent: number; firstTimeFixPercent: number; effectiveFrom: string }) {
+export async function saveSlaTargets(input: OpInput<"sla.saveTargets">) {
   return value(async () => { const t = await coreOp<{ version: number }>("sla.saveTargets", input, { write: true }); return { version: t.version }; });
 }
 

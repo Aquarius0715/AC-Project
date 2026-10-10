@@ -6,6 +6,7 @@
 import { refresh } from "next/cache";
 import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import type { Metric } from "@ac/web/lib/devices";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string> };
 
@@ -32,7 +33,7 @@ export async function checkDevice(deviceId: string, version: number, jobId: stri
   return run(() => coreOp("devices.check", { id: deviceId, jobId }, { write: true, expectedVersion: version }).then(() => null));
 }
 /** devices.calibrate at the current business time (a demo record; earlier readings stay unchanged). */
-export async function calibrateSensor(deviceId: string, version: number, sensorId: string, metric: Metric, unit: string, referenceValue: number, measuredValue: number, jobId: string) {
+export async function calibrateSensor(deviceId: string, version: number, sensorId: string, metric: Metric, unit: OpInput<"devices.calibrate">["unit"], referenceValue: number, measuredValue: number, jobId: string) {
   return run(async () => {
     const calibratedAt = (await coreNow()).toISOString();
     await coreOp("devices.calibrate", { deviceId, sensorId, metric, unit, referenceValue, measuredValue, calibratedAt, jobId }, { write: true, expectedVersion: version });

@@ -6,6 +6,7 @@
 import { refresh } from "next/cache";
 import { coreAll, coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ApiCustomerRow, ApiImportPreview, ApiOrgRow, ApiUnitImport, Profile, Scope } from "@ac/web/lib/assets";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string> };
 
@@ -119,7 +120,7 @@ export async function importUndo(importId: string, version: number, reason: stri
 }
 
 // ---- warranty (FR-A19) ----
-export async function recordWarrantyClaim(jobId: string, version: number, partLabel: string, amountMinor: number, currency: string, reason: string) {
+export async function recordWarrantyClaim(jobId: string, version: number, partLabel: string, amountMinor: number, currency: OpInput<"jobs.recordWarrantyClaim">["currency"], reason: string) {
   return run(() => coreOp("jobs.recordWarrantyClaim", { jobId, partLabel: partLabel.trim(), amountMinor, currency, reason: reason.trim() }, write(version)).then(() => null));
 }
 

@@ -16,11 +16,12 @@ import {
 } from "@ac/web/lib/air";
 import { AirQualityDemo } from "./_components/air-quality-demo";
 import { AirQualityView, type AirLive } from "./_components/air-quality-view";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 const MAX_READINGS = 1000; // D07: 10 pages of 100; a cut-off series is labelled, never shown as complete
 
 /** telemetry.series of one unit, newest first, following nextCursor up to MAX_READINGS. */
-async function readSeries(unitId: string, metric: string, from: string, to: string) {
+async function readSeries(unitId: string, metric: OpInput<"telemetry.series">["metric"], from: string, to: string) {
   const items: ApiMeasurement[] = [];
   let cursor: string | null = null;
   let total = 0;

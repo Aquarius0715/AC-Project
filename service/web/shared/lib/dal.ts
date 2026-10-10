@@ -8,6 +8,7 @@ import { needsRefresh, SESSION_COOKIE, verify, type Session } from "@ac/web/lib/
 import type { DomainError } from "@ac/web/lib/ops";
 import { coreRequest } from "@ac/web/lib/rest";
 import { DEFAULT_DISPLAY, isLocale, type Display } from "@ac/web/lib/i18n";
+import type { ListArgs, OpArgs } from "@ac/web/lib/opTypes";
 
 /** The session from the signed cookie, or null. proxy.ts refreshes tokens before pages render (Server Components
  * cannot write cookies), so an expired token here means the refresh failed. Memoized per render pass. */
@@ -32,17 +33,17 @@ export class CoreError extends Error {
 export type CoreOptions = { write?: boolean; expectedVersion?: number; idempotencyKey?: string };
 
 /** Calls one Core API operation as the signed-in membership at its REST route (IR222) and returns `data`
- * (DomainError → CoreError). */
-export async function coreOp<T>(operation: string, input: unknown, opts: CoreOptions = {}): Promise<T> {
+ * (DomainError → CoreError). The input is typed by the contract (IR313). */
+export async function coreOp<T>(...[operation, input, opts = {}]: OpArgs<CoreOptions>): Promise<T> {
   return (await coreCall<T>(operation, input, opts)).data;
 }
 
 /** Every item of a list operation: follows nextCursor with the same filters and sort (SR14), up to `max` items. */
-export async function coreAll<T>(operation: string, query: { filters?: Record<string, unknown>; sort?: { field: string; direction: "asc" | "desc" } } = {}, max = 1000): Promise<T[]> {
+export async function coreAll<T>(...[operation, query = {}, max = 1000]: ListArgs): Promise<T[]> {
   const out: T[] = [];
   let cursor: string | null = null;
   do {
-    const page: { items: T[]; nextCursor: string | null } = await coreOp(operation, { ...query, limit: 100, ...(cursor ? { cursor } : {}) });
+    const page: { items: T[]; nextCursor: string | null } = (await coreCall<{ items: T[]; nextCursor: string | null }>(operation, { ...query, limit: 100, ...(cursor ? { cursor } : {}) }, {})).data;
     out.push(...page.items);
     cursor = page.nextCursor;
   } while (cursor && out.length < max);

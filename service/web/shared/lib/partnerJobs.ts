@@ -7,6 +7,7 @@
 import { klTime } from "@ac/web/lib/devices";
 import { EN, showSpan, showTime, type I18n } from "@ac/web/lib/i18n";
 import { bucket, hhmm, partnerJob, until, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 export const TABS = [
   { id: "all", label: "All", statuses: null },
@@ -18,7 +19,7 @@ export const TABS = [
 export type TabId = (typeof TABS)[number]["id"];
 export const tabOf = (v?: string): TabId => (TABS.find((t) => t.id === v)?.id ?? "all");
 /** The jobs.list filters of a tab within the period. */
-export function tabFilters(tab: TabId, fromAt: string, toAt: string): Record<string, unknown> {
+export function tabFilters(tab: TabId, fromAt: string, toAt: string): NonNullable<OpInput<"jobs.list">["filters"]> {
   const statuses = TABS.find((t) => t.id === tab)!.statuses;
   return { from: fromAt, to: toAt, ...(statuses ? { statuses: [...statuses] } : {}) };
 }
@@ -30,7 +31,7 @@ export const SORTS = [
 ] as const;
 export type SortId = (typeof SORTS)[number]["id"];
 export const sortOf = (v?: string): SortId => (SORTS.find((s) => s.id === v)?.id ?? "status:asc");
-export const sortSpec = (id: SortId) => { const [field, direction] = id.split(":"); return { field, direction }; };
+export const sortSpec = (id: SortId): NonNullable<OpInput<"jobs.list">["sort"]> => { const [field, direction] = id.split(":"); return { field, direction } as NonNullable<OpInput<"jobs.list">["sort"]>; }; // SortId names only the catalog's sorts
 
 export const PAGE_SIZE = 25;
 

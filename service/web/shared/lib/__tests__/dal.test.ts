@@ -48,7 +48,7 @@ describe("calling the Core API as the signed-in membership (IR222)", () => {
     const [url, init] = f.mock.calls[0];
     expect([url, init.method, JSON.parse(String(init.body)).unitId]).toEqual(["http://localhost:8080/v1/commands", "POST", "u1"]);
     expect(init.headers).toMatchObject({ "Content-Type": "application/json", "Idempotency-Key": "key-1", "X-Expected-Version": "7" });
-    await coreOp("commands.create", { unitId: "u1" }, { write: true });
+    await coreOp("commands.create", { unitId: "u1", action: { kind: "set_power", power: true }, expectedUnitVersion: 3 }, { write: true });
     expect(f.mock.calls[1][1].headers["Idempotency-Key"]).toMatch(/^[0-9a-f-]{36}$/); // a fresh key per intent when none is given
   });
 
@@ -63,6 +63,7 @@ describe("calling the Core API as the signed-in membership (IR222)", () => {
 
   it("refuses an operation outside the catalog without calling anything", async () => {
     const f = reply([200, {}]);
+    // @ts-expect-error an operation outside the catalog does not type-check either
     const e = await refusal(coreOp("units.teleport", {}));
     expect([e.status, e.error.messageKey, f.mock.calls.length]).toEqual([404, "error.unknownOperation", 0]);
   });
@@ -81,9 +82,9 @@ describe("calling the Core API as the signed-in membership (IR222)", () => {
 describe("reading whole lists (SR14)", () => {
   it("follows nextCursor with the same filters and sort, 100 per page", async () => {
     const f = reply([200, { data: { items: [1, 2], nextCursor: "c2" } }], [200, { data: { items: [3], nextCursor: null } }]);
-    expect(await coreAll("units.list", { filters: { propertyId: "p1" }, sort: { field: "displayName", direction: "asc" } })).toEqual([1, 2, 3]);
+    expect(await coreAll("units.list", { filters: { propertyId: "p1" }, sort: { field: "createdAt", direction: "asc" } })).toEqual([1, 2, 3]);
     const pages = f.mock.calls.map(([url]) => new URL(url).searchParams);
-    expect(pages.map((q) => [q.get("propertyId"), q.get("sort"), q.get("limit"), q.get("cursor")])).toEqual([["p1", "displayName:asc", "100", null], ["p1", "displayName:asc", "100", "c2"]]);
+    expect(pages.map((q) => [q.get("propertyId"), q.get("sort"), q.get("limit"), q.get("cursor")])).toEqual([["p1", "createdAt:asc", "100", null], ["p1", "createdAt:asc", "100", "c2"]]);
   });
 
   it("stops at the maximum, never past it", async () => {

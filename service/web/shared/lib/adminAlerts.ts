@@ -4,6 +4,8 @@
 // "today / yesterday" for the days next to now. Cause codes and evidence texts stay as the Core API records them.
 import { EN, relativeTime, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { alertTitle } from "@ac/web/lib/alerts";
+import type { OpInput } from "@ac/web/lib/opTypes";
+import type { Metric as ContractMetric } from "@ac/web/lib/contracts.gen";
 
 const en = translator("en");
 
@@ -139,11 +141,12 @@ export function policyErrors(p: Pick<AdminPolicy, "name" | "duration" | "cooldow
 }
 
 /** policies.save input for an edited alert policy (AlertPolicyInput of service-contracts.ts). */
-export function alertPolicyInput(p: AdminPolicy) {
+export function alertPolicyInput(p: AdminPolicy): OpInput<"policies.save"> {
   return {
-    id: p.id, kind: "alert" as const, name: p.name, timezone: p.timezone, enabled: p.on, priority: p.priority, customerId: p.customerId,
-    metric: p.metric, operator: p.operator, threshold: p.threshold, recoveryThreshold: p.recovery, durationSeconds: p.duration,
-    activeWindow: p.activeWindow, severity: p.severity, recipientMembershipIds: p.recipientIds, channels: p.channels,
+    // an alert policy always belongs to a customer (the Default policy is saved as default_alert)
+    id: p.id, kind: "alert" as const, name: p.name, timezone: p.timezone, enabled: p.on, priority: p.priority, customerId: p.customerId!,
+    metric: p.metric as ContractMetric, operator: p.operator, threshold: p.threshold, recoveryThreshold: p.recovery, durationSeconds: p.duration,
+    activeWindow: p.activeWindow ?? null, severity: p.severity, recipientMembershipIds: p.recipientIds, channels: p.channels,
     escalateAfterMinutes: p.escalate, cooldownMinutes: p.cooldown,
   };
 }

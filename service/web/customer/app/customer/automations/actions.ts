@@ -5,6 +5,7 @@
 import { refresh } from "next/cache";
 import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ApiAutomation, ApiConsent, ApiDecision } from "@ac/web/lib/clientAutomations";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string> };
 
@@ -20,7 +21,7 @@ async function run<T>(fn: () => Promise<T>, write = true): Promise<ActionResult<
 }
 
 /** automations.save (create without a version, update with the rule's version); saving sends no Command (AT-C04-N ②). */
-export async function saveAutomation(input: Record<string, unknown>, version: number | null) {
+export async function saveAutomation(input: OpInput<"automations.save">, version: number | null) {
   return run(() => coreOp<ApiAutomation>("automations.save", input, { write: true, ...(version !== null ? { expectedVersion: version } : {}) }));
 }
 /** automations.delete: the rule stops; its Commands and run log stay (IR214). */
@@ -33,7 +34,7 @@ export async function updateConsent(granted: boolean, version: number) {
 }
 /** automations.simulate of the AC for a synthetic event at the current tick of the business clock (IR21): the saved
  * rules decide, nothing is stored or sent. */
-export async function testEvent(unitId: string, facts: { metric: string; value: boolean | number | string; unit: string; quality: "valid" }[]) {
+export async function testEvent(unitId: string, facts: Omit<OpInput<"automations.simulate">["facts"][number], "unitId" | "observedAt">[]) {
   return run(async () => {
     const at = new Date(Math.floor((await coreNow()).getTime() / 60_000) * 60_000).toISOString();
     const r = await coreOp<{ results: ApiDecision[] }>("automations.simulate", {

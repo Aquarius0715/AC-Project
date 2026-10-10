@@ -8,7 +8,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { CHANNELS, channelText, communicationRefusal, ROLES, TEMPLATES, type TimelineItem } from "@ac/web/lib/partnerHistory";
-import { communicate, type CommunicationFailure } from "../actions";
+import { communicate, type Communication, type CommunicationFailure } from "../actions";
 import type { HistoryLive } from "../_lib/load";
 
 const dot: Record<string, string> = { ok: "bg-ok/15 text-ok", warn: "bg-warn/15 text-warn", none: "bg-primary/10 text-primary" };
@@ -142,7 +142,7 @@ function Compose({ detail, onPreview }: { detail: Extract<Detail, { missing: fal
     setTried(true);
     if (!message.trim() || tooLong || !chosen) return;
     const ch = channels.some((c) => c.id === channel) ? channel : "inApp";
-    run(() => communicate({ jobId: r.id, version: r.version, saveNote: mode.kind === "note", message, visibility, templateKey: template, channel: ch, recipientMembershipId: chosen.id }),
+    run(() => communicate({ jobId: r.id, version: r.version, saveNote: mode.kind === "note", message, visibility, templateKey: template as Communication["templateKey"], channel: ch as Communication["channel"], recipientMembershipId: chosen.id }),
       t(mode.kind === "note" ? "Note saved + preview created" : "Preview created"),
       (v) => {
         const label = ROLES.find((x) => x.id === role)?.label ?? role;

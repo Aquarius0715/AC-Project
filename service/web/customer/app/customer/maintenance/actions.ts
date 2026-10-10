@@ -10,6 +10,7 @@ import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { uploadType } from "@ac/web/lib/files";
+import type { OpInput } from "@ac/web/lib/opTypes";
 
 type Slot = { startAt: string; endAt: string };
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
@@ -65,7 +66,7 @@ export async function addNote(jobId: string, version: number, message: string) {
 }
 
 /** jobs.rate: 1–5 stars, tags and an optional comment; editable for 7 days. */
-export async function rateJob(jobId: string, version: number, stars: number, tags: string[], comment: string) {
+export async function rateJob(jobId: string, version: number, stars: OpInput<"jobs.rate">["stars"], tags: string[], comment: string) {
   return run(async () => { await coreOp("jobs.rate", { jobId, stars, tags, ...(comment.trim() ? { comment: comment.trim() } : {}) }, write(version)); return null; });
 }
 
@@ -75,11 +76,11 @@ export async function reportProblem(form: FormData) {
   return run(async () => {
     const photos = await Promise.all(form.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0).map(async (f) => {
       const buf = Buffer.from(await f.arrayBuffer());
-      return { name: f.name, mime: uploadType(buf, f.type), size: f.size, bytes: buf.toString("base64") };
+      return { name: f.name, mime: uploadType(buf, f.type) as OpInput<"jobs.reportProblem">["photos"][number]["mime"], size: f.size, bytes: buf.toString("base64") }; // the API refuses any other type
     }));
     const start = String(form.get("visitStart") ?? ""), end = String(form.get("visitEnd") ?? "");
     const j = await coreOp<{ id: string }>("jobs.reportProblem", {
-      jobId: String(form.get("jobId")), reasonCode: String(form.get("reasonCode")), details: String(form.get("details") ?? "").trim(), photos,
+      jobId: String(form.get("jobId")), reasonCode: String(form.get("reasonCode")) as OpInput<"jobs.reportProblem">["reasonCode"], details: String(form.get("details") ?? "").trim(), photos,
       preferredSlot: start && end ? { startAt: start, endAt: end } : null,
     }, write(Number(form.get("version"))));
     return { id: j.id };

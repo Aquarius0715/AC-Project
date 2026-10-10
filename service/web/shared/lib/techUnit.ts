@@ -13,6 +13,7 @@ import { componentGroups, componentLabel, groupLabel, type Group } from "@ac/web
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { ApiTechJobRow } from "@ac/web/lib/techOverview";
 import type { ApiDeviceEventFull } from "@ac/web/lib/techDevices";
+import type { Metric } from "@ac/web/lib/contracts.gen";
 
 /** units.get as the technician reads it (ACUnit.type is part of the unit). */
 export type ApiTechUnit = ApiUnitDetail & { type?: string | null };
@@ -32,9 +33,9 @@ export function periodRange(p: Period, nowMs: number): { from: number; to: numbe
   return { from: today - 6 * DAY, to: nowMs };
 }
 /** The metric the series shows: the URL's when the unit measures it, else temperature, else its first measured one. */
-export function metricOf(d: ApiTechUnit, v?: string): string {
-  const measured = d.latestMeasurements.map((m) => m.metric);
-  if (v && measured.includes(v)) return v;
+export function metricOf(d: ApiTechUnit, v?: string): Metric {
+  const measured = d.latestMeasurements.map((m) => m.metric as Metric); // the API names only the contract's metrics
+  if (v && measured.includes(v as Metric)) return v as Metric;
   return measured.includes("temperature") || !measured.length ? "temperature" : measured[0];
 }
 const label = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]) : metric.replace(/_/g, " "));

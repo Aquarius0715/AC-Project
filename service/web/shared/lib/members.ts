@@ -3,6 +3,8 @@
 // item 1). Pure code shared by the Server Component and the client view. Texts in the display language; the valid period
 // is shown and typed in the display time zone (`t` / `i` / `zone`, IR302).
 import { EN, showTime, translator, zonedInstant, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
+import type { OpInput } from "@ac/web/lib/opTypes";
+import type { Permission } from "@ac/web/lib/contracts.gen";
 
 const en = translator("en");
 
@@ -115,10 +117,10 @@ export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?
 }
 
 /** members.save input; the valid period typed in `zone` becomes instants. */
-export function memberInput(d: MemberDraft, id?: string, zone = "Asia/Kuala_Lumpur") {
+export function memberInput(d: MemberDraft, id?: string, zone = "Asia/Kuala_Lumpur"): OpInput<"members.save"> {
   return {
     ...(id ? { id } : {}), userId: d.userId, organizationId: d.organizationId, role: d.role, employment: d.role === "technician" ? d.employment : null,
-    permissions: d.permissions, scopes: d.scopes, validFrom: zonedFrom(d.validFrom, zone), validUntil: d.validUntil ? zonedFrom(d.validUntil, zone) : null, reason: d.reason.trim(),
+    permissions: d.permissions as Permission[], scopes: d.scopes, validFrom: zonedFrom(d.validFrom, zone), validUntil: d.validUntil ? zonedFrom(d.validUntil, zone) : null, reason: d.reason.trim(),
   };
 }
 
