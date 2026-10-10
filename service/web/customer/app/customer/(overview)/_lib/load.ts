@@ -62,7 +62,7 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
   const shown = inScope.slice(0, 3);
   const [summary, sums, co2, nexts] = await Promise.all([
     coreOp<Summary>("summaries.get", { kind: "customer", filters }), energy, hasCo2 ? series() : Promise.resolve(null),
-    Promise.all(shown.map((a) => (a.kind === "schedule" && a.enabled ? coreOp<ApiOccurrence[]>("automations.nextRuns", { automationId: a.id, count: 4 }).then((o) => o.find((x) => x.phase === "schedule_start")?.at ?? null).catch(() => null) : Promise.resolve(null)))),
+    Promise.all(shown.map((a) => (a.kind === "schedule" && a.enabled ? coreOp<ApiOccurrence[]>("automations.nextRuns", { automationId: a.id, count: 8 }).then((o) => o.find((x) => x.phase === "schedule_start")?.at ?? null).catch(() => null) : Promise.resolve(null)))),
   ]);
   const unitName = new Map(units.map((u) => [u.id, u.displayName]));
   const n = sel.scope.length;

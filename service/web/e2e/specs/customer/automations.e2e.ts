@@ -1,6 +1,7 @@
 // Customer automations (FR-C04, FR-C05, IR214, IR264): a new schedule previews its next runs — start and end in the
-// rule's time zone (the end once read as "0 MYT", R257) — is saved switched off (saving sends no command) and deleted.
-// A schedule left behind by a failed run is deleted in afterEach.
+// rule's time zone (the end once read as "0 MYT", R257) — is saved switched off (saving sends no command). Switched on,
+// the overview names its next run (automations.nextRuns, IR312); then it is deleted. A schedule left behind by a failed
+// run is deleted in afterEach.
 import { test, expect } from "../../fixtures/test";
 import type { Page } from "@playwright/test";
 
@@ -38,6 +39,11 @@ test("a schedule previews its next runs, is saved off and deleted", async ({ pag
   const card = page.locator("section", { hasText: name });
   await expect(card).toContainText("Weekdays at 18:00 (Asia/Kuala_Lumpur)");
   await expect(card.getByRole("switch")).toHaveAttribute("aria-checked", "false");
+  // switched on (the next run is 18:00, so nothing is sent now), the overview shows when it runs next
+  await card.getByRole("switch").click();
+  await expect(card.getByRole("switch")).toHaveAttribute("aria-checked", "true");
+  await page.goto("/customer");
+  await expect(page.locator("section", { hasText: name })).toContainText(/Next run: .* · /);
   await remove(page, name);
   leftover = null;
   await expect(page.locator("section", { hasText: name })).toHaveCount(0);

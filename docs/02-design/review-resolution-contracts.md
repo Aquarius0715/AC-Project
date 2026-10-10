@@ -4137,3 +4137,26 @@ IR310's fault was a statement that no test had ever run. This round looked for m
    - No production code changed, so the web build and E2E are unchanged (70 passed, 9 skipped, IR310).
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR312 The customer overview shows the next run again; the web's calls are checked against the contract — 2026-10-10
+
+1. **The overview never showed a schedule's next run.**
+   - In API mode the Automations card of `/customer` (Figma Client 01a, "Next run: today 18:00 · Bedroom AC") asked automations.nextRuns with `count: 4`. The API fixes the count at 8 and answered VALIDATION.
+   - The loader swallowed the refusal, so the card never named the next run. The automations screen asked for 8 and worked.
+   - The overview now asks for 8.
+   - `customer/automations.e2e.ts` switches its new schedule on and checks the overview's "Next run: …" before deleting the schedule. With the old loader the spec fails.
+2. **The web's calls against the contract.** `contract.test.ts` (Vitest) checks every coreOp / callOp / coreAll call that has a literal operation and an object-literal input — 368 calls. It reads the contract with the TypeScript checker (`OperationContracts` of service-contracts.ts) and the filters from the API's generated catalog. A call may use only:
+   - operations of the contract;
+   - their input fields (the API refuses unknown fields);
+   - the filters of the operation's catalog row (the REST binding refuses others);
+   - the literal values the contract fixes, such as `count: 8`.
+   Before the fix the test fails on the overview's `count 4`.
+3. **Contract corrections.**
+   - The audit filter `targetKind` is a string, like `AuditView.targetRef.kind`. The audit log records more kinds than notifications target, such as property, space, automation and certificate.
+   - `BlobInput.bytes` and `DocumentInput.bytes` are base64 strings in JSON.
+4. **Findings for the next rounds.**
+   - 76 of the web's 111 write operations never reach the API in the E2E suite, which changes no data. Their API side is covered by the Go tests, and their mappers by the unit tests.
+   - Typing `coreOp`'s input by `OperationContracts` was tried as an experiment and reverted. About 50 call sites need tighter types, for example plain strings where the contract has a union of literals, or mappers that return `Record<string, unknown>`.
+5. **Checked.** Vitest: 60 files, 346 tests. Typecheck and lint pass. E2E: 70 passed, 9 skipped. The dev data is unchanged; the spec deletes its schedule.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

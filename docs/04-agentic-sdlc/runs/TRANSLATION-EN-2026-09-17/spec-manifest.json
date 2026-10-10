@@ -1,12 +1,12 @@
 {
-  "version": "0.195.0",
-  "spec_baseline_id": "3529d49f56994598ac73c0bce443c1632c0594e70da0c38495514110f944cac9",
+  "version": "0.196.0",
+  "spec_baseline_id": "75bf3ca2cfbb9b6cf23b9416cf98bf18859452ae0f0d68143cb59b67d03a8c0b",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "d6333d667eb66002a04125dbd6308018121a69113d1611b7510638cb5d551381"
+      "sha256": "653d91919c2e4dd407416022d745840097ef5fa6af73967002dc911320a161d5"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -114,7 +114,7 @@
     },
     {
       "path": "02-design/common.md",
-      "sha256": "3136037b4c4df16231e7f79cad39ec555d8ec0ce968fc7a178ba11b239a1e448"
+      "sha256": "e9bcf961e98311918f16fe51f798a450c6c4bc899f9e800a7e3e28f5c14ab294"
     },
     {
       "path": "02-design/container-design.md",
@@ -154,11 +154,11 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "171b7197f346d261fe7ca503e10e13eabc440674e5bb6bb10b550f5606549ca9"
+      "sha256": "9927ea042ab0bf9517466a73f1cae9227c22b754e7f6038907722322e16a1ac9"
     },
     {
       "path": "02-design/service-contracts.ts",
-      "sha256": "87d1624f063d3a2f0fe132758125078c4625d868738cc93fac0087c8f50f706d"
+      "sha256": "e23af068f16c242a327cd5375903754492b66832c1b353422aab4acf0ff8934c"
     },
     {
       "path": "02-design/strict-review-contracts.md",
@@ -282,7 +282,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "e39805f49046e2c7b5d6c4dd8ac3b454d6e9262c7eea28cdce911feac9b12b5a"
+      "sha256": "1fb5684403b91868de56eb986d5a107a842a6477e0f83dcfe4325637e82f91af"
     },
     {
       "path": "tools/check_review_regressions.py",
@@ -294,7 +294,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "02037e3bb7d8ebabe1ac1e26156b9ee74d311360998d5132eeba2b163ad1799a"
+      "sha256": "edd82eb434bbdb508bb842cdd72612a83f7b43efbfc1acf336ecc3f89265b38b"
     }
   ]
 }
