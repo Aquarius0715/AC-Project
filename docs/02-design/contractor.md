@@ -326,6 +326,8 @@ Scope: FR-P09 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 **Boundary cases and failures**: VALIDATION keeps the form; other-company IDs are NOT_FOUND.
 
+**As built (IR277)**: one row per technician and qualification — the certificate on file (its latest, with a pending renewal noted), else the HQ grant without a certificate on file (also while a first upload waits for HQ or after HQ rejected it), else “not held” when a booked job's unit scope needs it. A certificate is “Expiring” within the URL's window (`expiringWithinDays` 30 / 60 / 90, default 60); it blocks the technician's booked jobs that end after it. Upload renewal sends `renewalOf`; a grant or a missing qualification gets a new certificate; Request training needs a certificate on file. Dates are Kuala Lumpur days: Issued on and Expires on stand for the start of those days. Only active technicians can get a new certificate.
+
 **Verification**: Check the traceability entries under AT-P09 (N/E/B).
 
 ### DD-P10 Details

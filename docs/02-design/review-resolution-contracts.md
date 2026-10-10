@@ -3032,3 +3032,33 @@ DEC-03 was open since IR257. The SRC-02 phrase "shared libraries, reactForms" ha
    - Go: `make test-all` passes. The session tests check `organizationId`.
    - E2E: `partner/team.e2e.ts` is new and covers the technicians, week and grants, a Saturday, another company's roster and the form's day checks. Nothing is saved, because unavailable days have no undo. `partner/language.e2e.ts` also opens the team in Malay. The suite: 62 passed, 9 skipped. The users are en / Asia/Kuala_Lumpur, all 65 E2E jobs are cancelled and no unavailable days exist.
    - A visual check with an accepted and assigned job showed the booked block, the week and the overlap warning. Nothing was saved, and the job was cancelled.
+
+## IR277 The contractor's certifications as in Figma, in the display language — 2026-10-10
+
+The Certifications tab of `/partner/team` (FR-P09, DD-P09, Figma Contractor 04-6/04-7) listed the technicians' qualification grants (IR276). It now reads `certificates.list`.
+
+1. **Conditions in the URL.** `membershipId`, `status` (valid, expiring, expired, pending, rejected, not held) and `expiringWithinDays` (30 / 60 / 90, default 60) join the SCR-P06 URL keys (screen catalog).
+2. **Rows.** There is one row per technician and qualification:
+   - the certificate on file: its latest one, with a pending renewal noted;
+   - else the HQ grant without a certificate on file — also while a first upload waits for HQ, or after HQ rejected it, because the grant still decides eligibility (BR-P09);
+   - else "not held", when a booked job's unit scope needs the qualification (IR123 item 3).
+   Within the window a certificate is "Expiring · N d". It blocks the technician's booked jobs that end after it ("job-p07 (20 Oct)").
+   A certificate keeps the name it was uploaded with; grants and missing qualifications use the qualification's name.
+3. **KPIs and the assignment impact.**
+   - The KPIs count Valid (in date), Expiring ≤ N days with the soonest named, Expired, and Pending HQ verification.
+   - The impact card names the first job that an expiring, expired or missing qualification blocks, with "Open assignment →".
+4. **Forms.**
+   - **Upload renewal** sends `renewalOf`. A grant or a missing qualification gets **Add certificate** (technician, qualification, name).
+   - Both forms take Issued on and Expires on as Kuala Lumpur days (the start of those days), a number of 1–64 characters, and a PDF, JPG or PNG of at most 10 MB (`certificateErrors`).
+   - The file goes as form data to a Server Action, which sends it base64. The partner app's Server Action body limit is 11 MB.
+   - **Request training** (note 1–1000, the certificate's version as the expected version) needs a certificate on file.
+   - Only an active technician can get a new certificate. The Core API's refusals become readable text (`certificateRefusal`).
+5. **Fix: certificate files above 1 MiB.** `certificates.submit` had the ordinary 1 MiB body limit, so a file larger than about 750 KB was refused with `error.bodyTooLarge` before the IR133 10 MB check. It now has a 16 MiB limit, like `reports.signOff`. A file over 10 MB is a field error (`file: error.invalidFile`).
+6. **Language.** Every text is translated; certificate dates are Kuala Lumpur days in the user's language.
+7. **Shared helpers.** `shared/lib/partnerCertificates.ts` is new: `certQuery`, `certRows`, `certKpis`, `impact`, `certificateErrors`, `certDates`, `certificateRefusal` and `fileSize`. The shared `ApiCertificate` type gains `verifiedAt` and `trainingRequestedAt`.
+8. **Checked.**
+   - Vitest: 38 files, 217 tests. `partnerCertificates.test.ts` is new, with Malay cases.
+   - Go: `make test-all` passes. `TestBodyLimits` covers a 10 MB certificate in JSON. The integration test sends a 3 MiB scan and a file over 10 MB.
+   - E2E: `partner/team.e2e.ts` adds the Certifications tab (KPIs, the window in the URL, the form's checks); nothing is uploaded. `partner/language.e2e.ts` also opens the tab in Malay.
+   - The first E2E run failed both new checks: they matched a hidden status `<option>` with the same text. Each KPI tile is now a named region. The suite then passed 63 tests and skipped 9. The users are en / Asia/Kuala_Lumpur, all 69 E2E jobs are cancelled and no unavailable days exist.
+   - A visual flow uploaded a 1.5 MB PDF from the tab. The row turned "Pending HQ verification", and HQ rejected it in Verify uploads. The dev database keeps that one rejected certificate (EB-2026-0931).

@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@ac/web"],
   outputFileTracingRoot: path.join(__dirname, ".."),
   turbopack: { root: path.join(__dirname, "..") },
+  experimental: { serverActions: { bodySizeLimit: "11mb" } }, // a certificate file of up to 10 MB (DD-P09, IR277)
 };
 
 export default nextConfig;

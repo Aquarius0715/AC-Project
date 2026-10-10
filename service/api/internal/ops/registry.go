@@ -280,8 +280,9 @@ func expectedVersion(s Spec, body []byte, header string) (*int, error) {
 
 // fileBodies are the operations whose input carries BlobInput files (JPEG/PNG up to 5 MiB, sent base64 in JSON, so
 // about 6.7 MiB each): attachments.add and jobs.reportProblem one file, reports.signOff a signature and a site photo
-// (IR221). Every other operation keeps the 1 MiB body limit.
-var fileBodies = map[string]int64{"attachments.add": 8 << 20, "jobs.reportProblem": 8 << 20, "reports.signOff": 16 << 20}
+// (IR221), certificates.submit one PDF/JPEG/PNG of up to 10 MB, about 13.4 MB in JSON (IR133, IR277). Every other
+// operation keeps the 1 MiB body limit.
+var fileBodies = map[string]int64{"attachments.add": 8 << 20, "jobs.reportProblem": 8 << 20, "reports.signOff": 16 << 20, "certificates.submit": 16 << 20}
 
 func bodyLimit(operation string) int64 {
 	if n, ok := fileBodies[operation]; ok {

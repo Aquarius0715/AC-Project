@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, cx, DataTable, EmptyState, Field, Input, LinkBtn, Modal, Page, Select, Tabs, TextLink, UtilBar } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, cx, EmptyState, Field, Input, LinkBtn, Modal, Page, Select, Tabs, TextLink, UtilBar } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { unavailabilityConflicts, unavailabilityErrors, unavailabilityRefusal, type UnavailabilityForm, type WeekCell } from "@ac/web/lib/partnerTeam";
 import { setUnavailability } from "../actions";
+import { Certifications } from "./certifications";
 import type { TeamLive } from "../_lib/load";
 
 type Live = Extract<TeamLive, { notFound: false }>;
@@ -191,21 +192,5 @@ function UnavailableDays({ live, onClose }: { live: Live; onClose: () => void })
         {live.otherZone && ` ${t("The days are Kuala Lumpur days.")}`}
       </p>
     </Modal>
-  );
-}
-
-/** The Certifications tab until it reads the certificates (FR-P09): the qualification grants of the listed
- * technicians with their validity, as Kuala Lumpur dates. */
-function Certifications({ live }: { live: Live }) {
-  const t = useT();
-  const rows = live.grants.filter((g) => g.technician !== "—");
-  return (
-    <Card title={t("Certificates — {company}", { company: live.company })}>
-      <DataTable rowKey={(r) => r.key} rows={rows} cols={[
-        { key: "t", label: t("Technician"), render: (r) => <b>{r.technician}</b> }, { key: "c", label: t("Certificate"), render: (r) => r.name },
-        { key: "u", label: t("Valid until"), render: (r) => r.until }, { key: "s", label: t("Status"), render: (r) => <Badge tone={r.badge.tone}>{r.badge.text}</Badge> },
-      ]} />
-      <p className="mt-2 text-[11px] text-muted">{t("Only valid, HQ-verified certificates make a technician eligible for offers that require them. Renewals are requested from HQ.")}</p>
-    </Card>
   );
 }

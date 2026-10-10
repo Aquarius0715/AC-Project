@@ -53,6 +53,10 @@ test("the contractor screens in Malay keep Kuala Lumpur days and show instants i
   await expect(main.getByRole("heading", { name: /^Minggu \d{1,2} \S+ — jam ditugaskan \/ tersedia$/ })).toBeVisible();
   await expect(main.getByRole("heading", { name: "Kelayakan", exact: true })).toBeVisible();
   await expect(main).toContainText("Hari dan jam dalam waktu Kuala Lumpur (Asia/Kuala_Lumpur)."); // another display zone
+  await page.goto("/partner/team?tab=certifications");
+  await expect(main.getByRole("heading", { name: /^Sijil — / })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Kesan penugasan" })).toBeVisible();
+  await expect(main.getByRole("region", { name: "Menunggu pengesahan HQ" })).toBeVisible(); // a KPI
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/partner");

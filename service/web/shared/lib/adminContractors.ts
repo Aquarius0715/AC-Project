@@ -15,6 +15,7 @@ export type ApiRateCard = { id: string; version: number; contractorOrgId: string
 export type ApiCertificate = {
   id: string; version: number; membershipId: string; organizationId: string; code: string; name: string; number: string; issuedAt: string; expiresAt: string; fileName: string | null;
   status: "valid" | "expiring" | "expired" | "pending_verification" | "rejected"; renewalOf: string | null; createdAt: string;
+  verifiedAt?: string | null; trainingRequestedAt?: string | null;
 };
 export type ApiTechnician = { id: string; displayName: string; organizationId: string; role: string; validUntil: string | null; qualifications: { code: string; validFrom: string; validUntil: string; revokedAt: string | null }[] };
 type Tone = "ok" | "warn" | "crit" | "primary" | "muted";

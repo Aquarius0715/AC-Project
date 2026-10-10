@@ -342,6 +342,9 @@ func TestBodyLimits(t *testing.T) {
 	if bodyLimit("attachments.add") <= 1<<20 || bodyLimit("reports.signOff") < bodyLimit("attachments.add") || bodyLimit("units.save") != 1<<20 {
 		t.Fatal("limits by operation")
 	}
+	if cert := int64(len(base64.StdEncoding.EncodeToString(make([]byte, 10*1000*1000)))) + 4<<10; bodyLimit("certificates.submit") < cert { // IR277: a 10 MB certificate file
+		t.Fatalf("certificates.submit limit %d below a 10 MB file in JSON (%d)", bodyLimit("certificates.submit"), cert)
+	}
 	w := do(e, tech, "attachments.add", `{"jobId":"j1","reportId":"r1","file":{"bytes":"`+photo+`"}}`, "key-23456789")
 	if w.Code == http.StatusUnprocessableEntity && strings.Contains(w.Body.String(), "error.bodyTooLarge") {
 		t.Fatalf("a 4 MiB photo must pass the body limit: %d", w.Code)

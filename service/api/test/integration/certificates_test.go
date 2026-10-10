@@ -34,6 +34,14 @@ func TestCertificatesAndParts(t *testing.T) {
 	if code, _ := write(s, &contrA, "certificates.submit", body(`,"renewalOf":"`+uuid.NewString()+`"`), 0); code != 404 {
 		t.Error("unknown renewal")
 	}
+	big := append([]byte("%PDF-1.4 "), make([]byte, 3<<20)...) // IR277: a scan above the ordinary 1 MiB body limit
+	if code, m := write(s, &contrA, "certificates.submit", strings.Replace(body(""), pdf, blobJSON("scan.pdf", "application/pdf", big, len(big)), 1), 0); code != 200 || data(m)["fileName"] != "scan.pdf" {
+		t.Fatalf("a 3 MiB certificate: %d %v", code, m)
+	}
+	tooBig := make([]byte, 10*1000*1000+1)
+	if code, m := write(s, &contrA, "certificates.submit", strings.Replace(body(""), pdf, blobJSON("huge.pdf", "application/pdf", tooBig, len(tooBig)), 1), 0); code != 422 || m["fieldErrors"].(map[string]any)["file"] != "error.invalidFile" {
+		t.Fatalf("a file over 10 MB is a field error, not a body error: %d %v", code, m)
+	}
 	code, m := write(s, &contrA, "certificates.submit", body(""), 0)
 	if code != 200 || data(m)["status"] != "pending_verification" || data(m)["fileName"] != "cert.pdf" || data(m)["name"] != "Indoor AC" {
 		t.Fatalf("submit: %d %v", code, m)

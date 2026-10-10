@@ -113,9 +113,9 @@ Additional checks: reject candidates from another company, without required qual
 
 | Case | Additional checks |
 |---|---|
-| AT-X01 / AT-X02 | Generic password-reset wording; clear old displays on sign-out; English/Malay (AT-X01-N ③: `e2e/specs/customer/unit-language.e2e.ts`, the overview, units & locations, automations, alerts, maintenance, energy & cost, carbon offsets, air quality, contracts & payments with an invoice, users and the unit screen, IR259–IR267; the contractor overview, job list, a job's page, a quality review, the schedule and the team: `e2e/specs/partner/language.e2e.ts`, IR270–IR276; restored in afterEach); alternatives when voice is denied |
+| AT-X01 / AT-X02 | Generic password-reset wording; clear old displays on sign-out; English/Malay (AT-X01-N ③: `e2e/specs/customer/unit-language.e2e.ts`, the overview, units & locations, automations, alerts, maintenance, energy & cost, carbon offsets, air quality, contracts & payments with an invoice, users and the unit screen, IR259–IR267; the contractor overview, job list, a job's page, a quality review, the schedule, the team and its certifications: `e2e/specs/partner/language.e2e.ts`, IR270–IR277; restored in afterEach); alternatives when voice is denied |
 | AT-X03 / AT-X06 | Consistent quality/unit/capability displays across four roles; valid treatment of non-RTO (Rent to Own) units |
-| AT-X04 | Route/service/Query boundaries, customer boundaries within one tenant, outsourcing period/company boundaries (another company's `orgId` on Team & capacity reads as not found: `e2e/specs/partner/team.e2e.ts`, AT-P06-E①, IR276) |
+| AT-X04 | Route/service/Query boundaries, customer boundaries within one tenant, outsourcing period/company boundaries (another company's `orgId` on Team & capacity reads as not found: `e2e/specs/partner/team.e2e.ts`, AT-P06-E①, IR276; the Certifications tab's KPIs and upload checks there too, AT-P09, IR277) |
 | AT-X05 | Shared data across role switches in one tab, seeds on reload/reset, no external communication |
 | AT-X07 | Read status differs from business completion; correlation IDs; notification links; audit logs cannot be edited through UI |
 | AT-NFR01 / AT-NFR02 | Automated accessibility plus manual keyboard/screen-reader checks; widths 360/768/1024/1279/1280/1440 CSS pixels; 200% zoom; error/empty states |

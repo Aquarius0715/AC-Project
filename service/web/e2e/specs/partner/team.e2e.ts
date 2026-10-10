@@ -1,7 +1,8 @@
-// Team & capacity (FR-P06, DD-P06, Figma Contractor 04-1…04-5, 04-8, IR276): the company's technicians with the
-// chosen day, the team's week and the qualification grants; a Saturday has no available hours; another company's
-// orgId reads as not found (AT-P06-E①); the unavailable days form checks its days before saving. Nothing is saved:
-// members.setUnavailability has no undo.
+// Team & capacity (FR-P06, FR-P09, DD-P06, DD-P09, Figma Contractor 04-1…04-8, IR276, IR277): the company's
+// technicians with the chosen day, the team's week and the qualification grants; a Saturday has no available hours;
+// another company's orgId reads as not found (AT-P06-E①); the unavailable days form checks its days before saving;
+// the Certifications tab shows the KPIs, one row per technician and qualification and the certificate form's checks.
+// Nothing is saved: unavailable days and certificates have no undo.
 import { test, expect } from "../../fixtures/test";
 
 test("the team shows the technicians, the week and the qualifications", async ({ page }) => {
@@ -46,6 +47,28 @@ test("the unavailable days form checks its days before saving", async ({ page })
   await to.fill("2026-10-20");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toContainText("At most 31 days at a time");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+});
+
+test("the Certifications tab counts the certificates and checks an upload before sending it", async ({ page }) => {
+  await page.goto("/partner/team?tab=certifications");
+  const main = page.getByRole("main");
+  await expect(page.getByRole("tab", { name: "Certifications" })).toHaveAttribute("aria-selected", "true");
+  for (const name of ["Valid", /^Expiring ≤ 60 days$/, "Expired", "Pending HQ verification"]) await expect(main.getByRole("region", { name })).toBeVisible(); // the KPIs
+  await expect(main.getByRole("heading", { name: /^Certificates — / })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Assignment impact" })).toBeVisible();
+  await main.getByRole("combobox", { name: "Expiring within" }).selectOption("30");
+  await page.waitForURL(/expiringWithinDays=30/);
+  await expect(main.getByRole("region", { name: /^Expiring ≤ 30 days$/ })).toBeVisible();
+  await main.getByRole("button", { name: "+ Add certificate" }).click();
+  const dialog = page.getByRole("dialog", { name: "Add certificate" });
+  await dialog.getByRole("button", { name: "Submit for verification" }).click();
+  await expect(dialog).toContainText("Attach the certificate file");
+  await dialog.getByLabel(/^Issued on/).fill("2026-09-28");
+  await dialog.getByLabel(/^Expires on/).fill("2026-09-01");
+  await dialog.getByRole("button", { name: "Submit for verification" }).click();
+  await expect(dialog).toContainText("The expiry date must be after the issue date");
   await dialog.getByRole("button", { name: "Cancel" }).click();
   await expect(dialog).toBeHidden();
 });
