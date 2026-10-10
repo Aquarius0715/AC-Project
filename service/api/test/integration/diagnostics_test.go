@@ -64,6 +64,9 @@ func TestDiagnosticRuns(t *testing.T) {
 			t.Errorf("%s: %d want %d", name, code, tc.code)
 		}
 	}
+	if code, m := run(&techInt, on, `{"kind":"ventilate","level":"low"}`, 5, uv, jv); code != 422 || m["fieldErrors"].(map[string]any)["endAction"] != "error.unsupportedAction" {
+		t.Errorf("an end action the unit does not support: %d %v", code, m)
+	}
 	if code, _ := run(&hq, on, off, 5, uv, jv); code != 403 {
 		t.Error("HQ creates runs")
 	}

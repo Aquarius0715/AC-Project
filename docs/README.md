@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.213.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
+Version: 0.214.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.214.0 (2026-10-11): Coverage round 5: the CSV import validates again at commit (one new property for two rows, a serial bound since the preview), diagnostics, the inbox period and payment-reminder target; two checks that passed for another reason now name their field; coverage 88.3 % (IR330).
 0.213.0 (2026-10-11): The Figma System Architecture and Use Cases follow IR327 (201 operations, 221 routes, browser reads through the BFF, the resolution notes); coverage round 4 reaches the demo trigger rules, the REST binding, summary counts, the monthly report figures and plan re-anchoring; coverage 88.2 % (IR329).
 0.212.0 (2026-10-11): Coverage round 3: the Core API tests now reach work-report edges, retried offset retirements, payout reductions, the client's restriction history, offer expiry at the slot start and other paths; coverage 88.1 % (IR328).
 0.211.0 (2026-10-11): An alert's resolution cites its evidence. The new read `alerts.evidence` lists the candidates — the alert's own evidence, valid remeasurements after detection and device recoveries — and `alerts.resolve` accepts only them, at least one for an alert without a policy. The HQ Resolve dialog and the technician's resolution pick from them (IR327).

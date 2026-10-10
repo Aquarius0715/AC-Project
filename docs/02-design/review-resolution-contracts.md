@@ -4650,3 +4650,21 @@ R320 checked the System Architecture and Use Cases pages against the code after 
    - An automation on an archived unit is NOT_FOUND to its client once the scope leaves the unit out. The 409 `errors.unit_archived` shows only while a cached scope still holds the unit, so no test pins it.
 
 Both Go suites pass (`make test-all`): 137 integration tests and 84 unit tests. Coverage is 88.2 %.
+
+## IR330 Coverage round 5: import revalidation, diagnostics, the inbox; two checks that passed for another reason — 2026-10-11
+
+R321 checked the User Flows page after IR327. The HQ flow's 05-2 "Resolve alert" lists the dialog's exits (Cancel, ✕, Resolve) from its ClickMap; ticking evidence happens inside the dialog, so the flow stays as it is. The round also added tests for paths still not reached. No rule changes.
+
+1. **CSV import (DD-A18).** The new test `TestUnitsImportRevalidation` covers two cases:
+   - two rows of one new property create the property once;
+   - a serial bound to another unit after the preview makes the commit CONFLICT `error.previewExpired`, and nothing is imported.
+2. **Diagnostic runs (IR123).** An end action the unit does not support is VALIDATION `endAction: error.unsupportedAction`.
+3. **Notifications (FR-X07).**
+   - A reversed period is VALIDATION `filters.to: error.range`.
+   - A payment reminder is about an invoice only: any other target is VALIDATION `target: error.invalid`.
+4. **Two checks that passed for another reason.**
+   - A unit installed after its stored warranty end used an installation date in 2027. The future date was refused first, so the warranty rule was never reached. The stored end now moves back, and the check names `warrantyEndsAt: error.range`.
+   - The demo trigger's "unsupported type" was refused for an unknown field, not for its type (fixed in IR329).
+   The new checks of VALIDATION name the field they expect, so a body that fails on another rule does not pass them. Older checks that test the status code only are reviewed in later rounds.
+
+Both Go suites pass (`make test-all`): 138 integration tests and 84 unit tests. Coverage is 88.3 %.

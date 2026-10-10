@@ -47,6 +47,9 @@ func TestNotificationsInbox(t *testing.T) {
 			t.Errorf("%s: %d", b, code)
 		}
 	}
+	if code, m := post(s, &customerB, "notifications.list", `{"filters":{"from":"2026-09-14T00:00:00Z","to":"2026-09-01T00:00:00Z"}}`); code != 422 || m["fieldErrors"].(map[string]any)["filters.to"] != "error.range" {
+		t.Errorf("a reversed period: %d %v", code, m)
+	}
 	if _, m := post(s, &customerB, "notifications.list", `{"sort":{"field":"severity","direction":"desc"},"limit":5}`); len(items(m)) == 0 {
 		t.Error("severity sort")
 	}
@@ -124,6 +127,11 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	}
 	if code, _ := preview(seed.ID("customer-a").String()); code != 422 {
 		t.Error("ineligible preview recipient")
+	}
+	// a payment reminder is about an invoice only
+	if code, m := post(s, &hq, "notifications.preview", `{"target":{"kind":"job","id":"`+seed.ID("job-contractor-a").String()+`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`","message":"Please pay"}`); code != 422 ||
+		m["fieldErrors"].(map[string]any)["target"] != "error.invalid" {
+		t.Errorf("a payment reminder about a job: %d %v", code, m)
 	}
 	if code, _ := post(s, &hq, "notifications.preview", `{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`","message":" "}`); code != 422 {
 		t.Error("blank message")

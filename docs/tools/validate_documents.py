@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.214.0 (2026-10-11): IR330 coverage round 5 (DD-A 0.44.0, DD-COMMON 0.103.0); counts unchanged.
 # 0.213.0 (2026-10-11): IR329 Figma architecture and use cases after IR327, coverage round 4 (DD-A 0.43.0, DD-COMMON 0.102.0); counts unchanged.
 # 0.212.0 (2026-10-11): IR328 coverage round 3 (DD-A 0.42.0, DD-COMMON 0.101.0); counts unchanged.
 # 0.211.0 (2026-10-11): IR327 alerts.evidence and the resolution's evidence picker (DD-A 0.41.0, DD-T 0.40.0, DD-COMMON 0.100.0); 201 operations.

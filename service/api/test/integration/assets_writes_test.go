@@ -190,8 +190,11 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	if code, m := write(s, &hq, "units.save", early, 4); code != 422 || m["fieldErrors"].(map[string]any)["warrantyEndsAt"] != "error.range" {
 		t.Errorf("warranty before installation: %d %v", code, m)
 	}
-	if code, _ := write(s, &hq, "units.save", strings.Replace(unitBody(unit, floor, ""), `"installedAt":null`, `"installedAt":"2027-02-01T00:00:00+08:00"`, 1), 4); code != 422 {
-		t.Errorf("an installation after the stored warranty end: %d", code)
+	// the stored warranty end counts too (an installation in 2027 would be refused as future, so the end moves back)
+	owner(t, `UPDATE assets.units SET warranty_ends_at = '2026-08-01T00:00:00+08:00' WHERE id = $1`, unit)
+	if code, m := write(s, &hq, "units.save", strings.Replace(unitBody(unit, floor, ""), `"installedAt":null`, `"installedAt":"2026-09-01T00:00:00+08:00"`, 1), 4); code != 422 ||
+		m["fieldErrors"].(map[string]any)["warrantyEndsAt"] != "error.range" {
+		t.Errorf("an installation after the stored warranty end: %d %v", code, m)
 	}
 	if code, m := write(s, &hq, "units.save", unitBody(unit, floor, `,"warrantyEndsAt":null`), 4); code != 200 || data(m)["warrantyEndsAt"] != nil {
 		t.Fatalf("warranty cleared: %d %v", code, data(m)["warrantyEndsAt"])

@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "8af5ea7b7b480f2a7eb938ee53016915400821a91d719ce40c5ae480afd4f3a8",
+  "spec_baseline_id": "d152d4a00d79b97a22cf6b99ce35761ed50207591dc9bb7d71ff7f92f18a37c0",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "d085e91ff483dbf5bcbf6ab0ad8990894fb81e67619c51be987ff08ad920acbf"
+      "sha256": "7149e51cf606e1b0a8d3439bd2e129197f890350ed241ce303e02fd350757259"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -94,7 +94,7 @@
     },
     {
       "path": "02-design/admin.md",
-      "sha256": "88fac564278f43aa1562ae5f3bc75a08bd1c8080e13afbb4d04948a41a470ab1"
+      "sha256": "f6530fcd324a5158b2adfc8bde537c03d1381d90de93c8d1084d7218ef66b81d"
     },
     {
       "path": "02-design/api/swagger.json",
@@ -114,7 +114,7 @@
     },
     {
       "path": "02-design/common.md",
-      "sha256": "34ec228ebdd653caa0237a383f047e3104a05c5824e967095bed856c50c9f170"
+      "sha256": "f491d3d0c0d923f5f2521513fab62f687c14f9f1af4d08b93c0ce67fcd57b182"
     },
     {
       "path": "02-design/container-design.md",
@@ -154,7 +154,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "29a8c3daf8779ddd2f623bc5b62d39aa3d9e1b0d6c0776ce0457c9e306cdc215"
+      "sha256": "e5775dead2cfa530b0a003c0f804bc1f871811f6ff3b11aa29f4bf6062ff80c5"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -282,7 +282,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "4217896515aeb20e4463020ad7d4540ac2d6fbde3389381362a565ba2ccfb027"
+      "sha256": "369db0131cc4c685adb5844c0da236ad26ac8dc66feec6203be1fad9cb4bfbdb"
     },
     {
       "path": "tools/check_review_regressions.py",
@@ -294,7 +294,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "e1cb1589ec1bfad5e8f236b6704f2879b8519cb20e3fedda0050873c2bda62cf"
+      "sha256": "9479f318d2b04cfc9a62f5e3a8e56970ed30e202796c2907bfd4f88cc2127291"
     }
   ]
 }

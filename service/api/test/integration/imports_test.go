@@ -254,3 +254,42 @@ func TestUnitsImportRefusals(t *testing.T) {
 		t.Errorf("commit for an inactive customer: %d %v", code, m)
 	}
 }
+
+// DD-A18: a commit validates again what may have changed since the preview — two rows of one new property create it
+// once, and a serial that was bound in between turns the preview stale (error.previewExpired), so nothing is imported.
+func TestUnitsImportRevalidation(t *testing.T) {
+	s := server(t)
+	cust, org := seed.ID("cust-b").String(), seed.ID("org-customer-b").String()
+	commit := func(csv string) (int, map[string]any, map[string]any) {
+		_, pm := post(s, &hq, "units.importPreview", `{"customerId":"`+cust+`","fileName":"units.csv","csvText":`+jsonStr(csv)+`,"mapping":`+mapping+`}`)
+		code, m := write(s, &hq, "units.importCommit", `{"previewId":"`+data(pm)["previewId"].(string)+`","customerId":"`+cust+`"}`, 0)
+		return code, m, data(pm)
+	}
+	header := "Property,Floor,Room,Unit,Model,Serial,Installed,Warranty\n"
+	twin := "Twin site " + uuid.NewString()[:6]
+	code, m, p := commit(header + twin + ",,,Twin AC 1,SPL-100,,,\n" + twin + ",,,Twin AC 2,SPL-100,,,\n")
+	if code != 200 || len(data(m)["createdPropertyIds"].([]any)) != 1 || len(data(m)["createdUnitIds"].([]any)) != 2 {
+		t.Fatalf("one new property for two rows: %d %v (preview %v)", code, m, p["rows"])
+	}
+
+	// a free device, bound to another unit after the preview
+	serial := "LATE-" + uuid.NewString()[:8]
+	dev := uuid.NewString()
+	other := newUnit(t, s, "Took the device")
+	owner(t, `INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'v1')`,
+		dev, seed.ID("tenant-a"), serial, other, seed.ID("hq-operator"))
+	_, pm := post(s, &hq, "units.importPreview", `{"customerId":"`+cust+`","fileName":"units.csv","csvText":`+jsonStr(header+twin+",,,Late AC,SPL-100,"+serial+",,\n")+`,"mapping":`+mapping+`}`)
+	if data(pm)["readyCount"].(float64) != 1 {
+		t.Fatalf("preview with a free serial: %v", pm)
+	}
+	owner(t, `INSERT INTO devices.device_bindings (tenant_id, device_id, unit_id, customer_org_id, bound_at, actor_membership_id) VALUES ($1,$2,$3,$4,$5,$6)`,
+		seed.ID("tenant-a"), dev, other, org, clock, seed.ID("hq-operator"))
+	owner(t, `UPDATE devices.devices SET unit_id = $2 WHERE id = $1`, dev, other)
+	if code, m := write(s, &hq, "units.importCommit", `{"previewId":"`+data(pm)["previewId"].(string)+`","customerId":"`+cust+`"}`, 0); code != 409 || m["messageKey"] != "error.previewExpired" {
+		t.Errorf("serial bound since the preview: %d %v", code, m)
+	}
+	_, m = post(s, &hq, "units.list", `{"filters":{"customerId":"`+cust+`","search":"Late AC"},"limit":100}`)
+	if len(items(m)) != 0 {
+		t.Errorf("nothing imported: %v", items(m))
+	}
+}
