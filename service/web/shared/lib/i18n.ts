@@ -42,15 +42,15 @@ export const DEFAULT_DISPLAY: Display = { locale: "en", timeZone: "Asia/Kuala_Lu
  * time rendered on the server reads the same after hydration in any browser. */
 const plain = (s: string) => s.replace(/[\u00a0\u2009\u202f]/g, " ");
 
-/** `opts` in the user's language and display time zone with the zone's abbreviation; a zone this runtime does not
- * know falls back to the default one. */
-function zoned(iso: string | null, d: Display, opts: Intl.DateTimeFormatOptions): string {
+/** `opts` in the user's language and display time zone with the zone's abbreviation (unless `withZone` is false); a
+ * zone this runtime does not know falls back to the default one. */
+function zoned(iso: string | null, d: Display, opts: Intl.DateTimeFormatOptions, withZone = true): string {
   if (!iso) return "—";
   const at = new Date(iso);
   const tag = intlTag(d.locale);
   for (const timeZone of [d.timeZone, DEFAULT_DISPLAY.timeZone]) {
     try {
-      const zone = new Intl.DateTimeFormat(tag, { timeZone, timeZoneName: "short" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value;
+      const zone = withZone ? new Intl.DateTimeFormat(tag, { timeZone, timeZoneName: "short" }).formatToParts(at).find((p) => p.type === "timeZoneName")?.value : undefined;
       const text = plain(at.toLocaleString(tag, { ...opts, timeZone }));
       return zone ? `${text} ${zone}` : text;
     } catch {
@@ -64,8 +64,22 @@ function zoned(iso: string | null, d: Display, opts: Intl.DateTimeFormatOptions)
  * zone, with the zone's abbreviation — “14 Sept 2026, 9:00 am MYT”; “—” without a time. Stored times stay UTC. */
 export const showTime = (iso: string | null, d: Display = DEFAULT_DISPLAY) => zoned(iso, d, { dateStyle: "medium", timeStyle: "short" });
 
-/** The IR44 time without the date, where a screen shows only the time of a recent reading: “9:12 am MYT”. */
-export const showClock = (iso: string | null, d: Display = DEFAULT_DISPLAY) => zoned(iso, d, { timeStyle: "short" });
+/** The IR44 time without the date, where a screen shows only the time of a recent reading: “9:12 am MYT”; without the
+ * abbreviation (`zone` false) on a chart axis whose zone the chart names once. */
+export const showClock = (iso: string | null, d: Display = DEFAULT_DISPLAY, zone = true) => zoned(iso, d, { timeStyle: "short" }, zone);
+
+/** The short weekday and the day of the month, “Mon 14” (Figma Client 04a, 05a), in the user's language and a time zone. */
+export function showDay(iso: string, d: Display = DEFAULT_DISPLAY): string {
+  for (const timeZone of [d.timeZone, DEFAULT_DISPLAY.timeZone]) {
+    try {
+      const part = (o: Intl.DateTimeFormatOptions) => new Date(iso).toLocaleDateString(intlTag(d.locale), { timeZone, ...o });
+      return plain(`${part({ weekday: "short" })} ${part({ day: "numeric" })}`); // "Mon 14", not the en-US "14 Mon"
+    } catch {
+      // RangeError: unknown time zone
+    }
+  }
+  return iso.slice(0, 10);
+}
 
 /** The IR44 date without the time, for the day something was done: “28 Sept 2026” in the user's display time zone. */
 export function showDate(iso: string | null, d: Display = DEFAULT_DISPLAY): string {

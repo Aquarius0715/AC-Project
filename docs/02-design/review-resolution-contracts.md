@@ -2681,3 +2681,43 @@ After the unit screen (IR259), the customer's home screen `/customer` (FR-C01, D
    - E2E: 55 passed, 9 skipped. The language spec also opens Energy & cost and Offsets in Malay with Asia/Tokyo and checks that the period stays "(n hari) · Asia/Kuala_Lumpur". After the default-unit fix the customer and scenario projects passed again (23 passed, 2 skipped). The users are en / Asia/Kuala_Lumpur, and all 37 E2E jobs are cancelled.
    - Screenshots of the energy page, the export dialog and Offsets in Malay show no overflow.
 7. **Still open.** Air quality, contracts & payments and users for the customer; the browser demo's screens; the other roles; the voice demo's answers.
+
+## IR266 Air quality in the display language and time zone; a hint the customer could not follow — 2026-10-10
+
+`/customer/air-quality` (FR-C07, DD-C07, Figma Client 05a–05c) follows energy & cost (IR265).
+
+1. **Texts.** These are translated:
+   - the viewing bar: room and sensor choices, the update time, Refresh;
+   - the metric cards (`metricCard`, IR260) and the metric, period and view tabs;
+   - the allergen strip (IR98), the cleaning banner and the ventilation strip (IR99), also without CO2 and PM2.5 readings and without a fresh-air function;
+   - the chart: title, sub line, axis, legend, the no-sensor and no-valid-reading states and the cut-off note (D07), and the table view;
+   - the ventilation history and the Log ventilation dialog with its field errors and toasts.
+   Room, property and unit names and the allergen data (substance, source, evidence) stay as written.
+2. **Times.** Every instant is in the user's display time zone (NFR-08):
+   - the update time and the readings' times show the zone's abbreviation (IR44);
+   - the chart axis leaves it out, because the sub line names it;
+   - each table row shows its slot as a span (`showSpan`);
+   - the current CO2 and the history use `relativeTime` ("today …").
+   The 7-day window still starts at 00:00 Kuala Lumpur six days earlier (IR41, SR17), and the sub line says so: "calendar days in Asia/Kuala_Lumpur from 8 Sept 2026 to 9:12 am MYT now".
+3. **Fixed: a hint the customer could not follow.** For a unit outside any room, the screen said "assign this unit to a room in Units & locations". Client locations are read-only: HQ sets up properties, floors and rooms (2026-09-30). The hint now says "HQ sets up the rooms, so ask HQ to place this unit in one."
+4. **Shared helpers.**
+   - These take the translator or the display: `airRooms`, `ventStrip`, `cleanNote` (new, moved from the page), `allergenView`, `windowTitle`, `windowSub`, `axisLabels`, `airRows`, `co2Now` and `ventRow`. `showClock` replaces `updatedAt`.
+   - `i18n.ts` adds `showDay` ("Mon 14"), which the energy chart's days also use, and lets `showClock` leave out the abbreviation.
+   - `air.test.ts` adds five tests:
+     - rooms, guidance and the cleaning note in both languages;
+     - the allergen cases;
+     - the 1-hour, 24-hour and 7-day labels and sub lines in Kuala Lumpur and Tokyo;
+     - the table's spans and gaps;
+     - the ventilation rows and the current CO2.
+5. **Checked.**
+   - Vitest: 35 files, 190 tests.
+   - E2E: 55 passed, 9 skipped. The language spec also opens air quality in Malay with Asia/Tokyo:
+     - the 24-hour window ends in GMT+9;
+     - the 7-day window names Kuala Lumpur;
+     - the Log ventilation dialog opens and is cancelled, because a log cannot be removed.
+     The users are en / Asia/Kuala_Lumpur, and all 39 E2E jobs are cancelled.
+   - Screenshots in Malay (24 hours, 7 days, the dialog) and a scrolled view show no overflow.
+6. **Still open.**
+   - For the customer: contracts & payments and users.
+   - The browser demo's screens, the other roles and the voice demo's answers.
+   - Shared by all four apps and still English: the failure toast of a Server Action (`actionMessage`) and each route's loading and error states (`RouteLoading`, `RouteError`).

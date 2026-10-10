@@ -1,8 +1,8 @@
-// AT-X01-N ③ (FR-X01, IR44, NFR-08, IR259–IR265): with Malay and another display time zone saved in Preferences, the
-// customer's overview, units & locations, automations, alerts, maintenance, energy & cost, carbon offsets and unit screen
-// speak Malay and show their times in that zone with the zone's abbreviation — the request form takes its times in that
-// zone too, while the energy periods stay Kuala Lumpur days — and the unit's ID and units (°C) stay as stored. English and
-// the earlier zone come back at the end, or in afterEach when the test fails.
+// AT-X01-N ③ (FR-X01, IR44, NFR-08, IR259–IR266): with Malay and another display time zone saved in Preferences, the
+// customer's overview, units & locations, automations, alerts, maintenance, energy & cost, carbon offsets, air quality and
+// unit screen speak Malay and show their times in that zone with the zone's abbreviation — the request form takes its
+// times in that zone too, while the energy periods and the 7-day air window start on Kuala Lumpur days — and the unit's
+// ID and units (°C) stay as stored. English and the earlier zone come back at the end, or in afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
@@ -54,6 +54,16 @@ test("the customer screens in Malay keep IDs and units and use the display time 
   await expect(main.getByRole("button", { name: "↓ Eksport" })).toBeVisible();
   await page.goto("/customer/energy/offsets");
   for (const name of ["Berdasarkan Tenaga & kos", "Berapa banyak yang anda ingin ofset?", "Rekod ofset demo"]) await expect(main.getByRole("heading", { name })).toBeVisible();
+  await page.goto("/customer/air-quality");
+  await expect(main.getByRole("heading", { name: "Sejarah pengudaraan" })).toBeVisible();
+  await expect(main).toContainText(/tetingkap bergerak berakhir \d{1,2}:\d{2} (PG|PTG) GMT\+9/); // the 24-hour window ends now, in Asia/Tokyo
+  await page.getByRole("tab", { name: "7 hari" }).click();
+  await page.waitForURL(/period=7d/);
+  await expect(main).toContainText("hari kalendar dalam Asia/Kuala_Lumpur"); // the 7-day window starts on a Kuala Lumpur day
+  await main.getByRole("button", { name: "Rekod pengudaraan" }).click(); // opened and cancelled: a log cannot be removed
+  await expect(dialog).toContainText("CO2 semasa");
+  await dialog.getByRole("button", { name: "Batal" }).click();
+  await expect(dialog).toBeHidden();
   await page.goto(href!);
   for (const name of ["KAWALAN JAUH", "Sejarah arahan", "Telemetri langsung"]) await expect(main.getByRole("heading", { name })).toBeVisible();
   expect(new URL(page.url()).pathname).toBe(href); // the ID is the stored one

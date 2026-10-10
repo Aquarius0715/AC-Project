@@ -1,11 +1,14 @@
 // Customer air quality (FR-C07, DATA_SOURCE=api): the room choices, the metric cards from the unit's latest readings
 // (UnitSummary.latestMeasurements with read-time quality, IR213), the IR99 guidance, the IR98 allergen observation, the
 // IR41 series window with its 5-minute or hourly averages, and the manual ventilation log (IR110). Pure code shared by
-// the Server Component and the client view.
+// the Server Component and the client view. Texts in the display language (`t` / `i`); every instant in the user's
+// display time zone, the 7-day window's start a Kuala Lumpur calendar day that the chart names (IR266).
 import { periodRange } from "@ac/web/lib/clientEnergy";
-import { klStamp, roundAway } from "@ac/web/lib/energy";
+import { roundAway } from "@ac/web/lib/energy";
 import { spacePath, type ApiPropertyRow, type ApiSpaceRow, type ApiUnitRow } from "@ac/web/lib/assets";
-import { EN, showClock, type I18n } from "@ac/web/lib/i18n";
+import { DEFAULT_DISPLAY, EN, relativeTime, showClock, showDate, showDay, showSpan, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
+
+const en = translator("en");
 
 export type AirMetric = "co2" | "pm25" | "temperature" | "humidity";
 export const airMetrics: AirMetric[] = ["co2", "pm25", "temperature", "humidity"];
@@ -40,9 +43,7 @@ export const metricInfo: Record<AirMetric, { label: string; tab: string; unit: s
 };
 
 const KL = "Asia/Kuala_Lumpur";
-const hms = (iso: string) => new Date(iso).toLocaleTimeString("en-GB", { timeZone: KL, hour12: false });
-const hm = (iso: string) => hms(iso).slice(0, 5);
-const nf = (digits: number) => new Intl.NumberFormat("en-MY", { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false });
+const nf =(digits: number) => new Intl.NumberFormat("en-MY", { minimumFractionDigits: digits, maximumFractionDigits: digits, useGrouping: false });
 /** IR44: temperature and humidity with one decimal, ppm and µg/m³ as integers, rounded half away from zero; other
  * metrics as received. */
 export function airNumber(metric: string, v: number): string {
@@ -53,7 +54,7 @@ export function airNumber(metric: string, v: number): string {
 /** A choice of the viewing bar (Figma Client 05a “Room: Bedroom · Home A › 1F”): a space with units directly in it, or a
  * property's units outside any room (they have readings but no ventilation log — logs belong to a room). */
 export type AirRoom = { key: string; spaceId: string | null; label: string; path: string; units: { id: string; name: string }[] };
-export function airRooms(ps: ApiPropertyRow[], ss: ApiSpaceRow[], us: ApiUnitRow[]): AirRoom[] {
+export function airRooms(ps: ApiPropertyRow[], ss: ApiSpaceRow[], us: ApiUnitRow[], t: T = en): AirRoom[] {
   const props = new Map(ps.filter((p) => !p.archived).map((p) => [p.id, p.name]));
   const live = us.filter((u) => !u.archived && props.has(u.propertyId));
   const units = (keep: (u: ApiUnitRow) => boolean) => live.filter(keep).map((u) => ({ id: u.id, name: u.displayName })).sort((a, b) => a.name.localeCompare(b.name));
@@ -65,7 +66,7 @@ export function airRooms(ps: ApiPropertyRow[], ss: ApiSpaceRow[], us: ApiUnitRow
   }
   for (const [id, property] of props) {
     const loose = units((u) => u.propertyId === id && u.spaceId === null);
-    if (loose.length) out.push({ key: `unassigned:${id}`, spaceId: null, label: `Not in a room · ${property}`, path: property, units: loose, sort: `${property}\u0000￿` });
+    if (loose.length) out.push({ key: `unassigned:${id}`, spaceId: null, label: t("Not in a room · {property}", { property }), path: property, units: loose, sort: `${property}\u0000￿` });
   }
   return out.sort((a, b) => a.sort.localeCompare(b.sort)).map((r) => ({ key: r.key, spaceId: r.spaceId, label: r.label, path: r.path, units: r.units }));
 }
@@ -133,29 +134,39 @@ export function airGuidance(co2: ApiMeasurement | undefined, pm25: ApiMeasuremen
 }
 /** The ventilation strip above the chart (Figma 05a/05b): the CO2 guidance or how ventilation works for this unit. Log
  * ventilation is offered in every case; nothing is ever sent to the AC or to HQ (IR110). */
-export function ventStrip(g: Guidance[], co2: ApiMeasurement | undefined, room: string, unit: string, freshAir: boolean): { tone: "warn" | "primary"; title: string; text: string } {
+export function ventStrip(g: Guidance[], co2: ApiMeasurement | undefined, room: string, unit: string, freshAir: boolean, t: T = en): { tone: "warn" | "primary"; title: string; text: string } {
   const v = validValue(co2);
-  const reading = v === null ? "" : `CO2 ${airNumber("co2", v)} ppm in ${room} (≥ 1000 ppm guide). `;
-  if (g.includes("ventilate")) return { tone: "warn", title: guidanceText.ventilate, text: `${reading}Open a window or run your ventilation fan, then log it — the record is kept in this room’s ventilation history.` };
-  if (g.includes("ventilate_manual")) return { tone: "warn", title: guidanceText.ventilate_manual, text: `${reading}${unit} has no fresh-air function, so nothing is sent to the AC — open a window, then log what you did.` };
+  const reading = v === null ? "" : `${t("CO2 {value} ppm in {room} (≥ 1000 ppm guide).", { value: airNumber("co2", v), room })} `;
+  if (g.includes("ventilate")) return { tone: "warn", title: t(guidanceText.ventilate), text: reading + t("Open a window or run your ventilation fan, then log it — the record is kept in this room’s ventilation history.") };
+  if (g.includes("ventilate_manual")) return { tone: "warn", title: t(guidanceText.ventilate_manual), text: reading + t("{unit} has no fresh-air function, so nothing is sent to the AC — open a window, then log what you did.", { unit }) };
   if (g.includes("unavailable")) {
-    return { tone: "primary", title: guidanceText.unavailable, text: `Neither CO2 nor PM2.5 has a current reading — no advice is given from missing data. ${freshAir
-      ? "You can still log a manual ventilation." : `Manual ventilation: ${unit} has no fresh-air function, so open a window or use a fan and log what you did — nothing is sent to the AC.`}` };
+    return { tone: "primary", title: t(guidanceText.unavailable), text: `${t("Neither CO2 nor PM2.5 has a current reading — no advice is given from missing data.")} ${freshAir
+      ? t("You can still log a manual ventilation.") : t("Manual ventilation: {unit} has no fresh-air function, so open a window or use a fan and log what you did — nothing is sent to the AC.", { unit })}` };
   }
-  if (!freshAir) return { tone: "primary", title: "Manual ventilation", text: `Open a window or use a fan. ${unit} has no fresh-air function, so nothing is sent to the AC — just log what you did.` };
-  return { tone: "primary", title: guidanceText.none, text: "After opening a window or running your ventilation fan, log it — nothing is sent to the AC or to HQ." };
+  if (!freshAir) return { tone: "primary", title: t("Manual ventilation"), text: t("Open a window or use a fan. {unit} has no fresh-air function, so nothing is sent to the AC — just log what you did.", { unit }) };
+  return { tone: "primary", title: t(guidanceText.none), text: t("After opening a window or running your ventilation fan, log it — nothing is sent to the AC or to HQ.") };
+}
+/** The PM2.5 cleaning banner (IR99): the latest valid reading against the 35 µg/m³ guide, or null. */
+export function cleanNote(g: Guidance[], pm25: ApiMeasurement | undefined, room: string, t: T = en): string | null {
+  const v = validValue(pm25);
+  return g.includes("clean") && v !== null
+    ? t("{guidance} — PM2.5 {value} µg/m³ in {room} (≥ 35 µg/m³ guide). Request a filter clean from Maintenance.", { guidance: t(guidanceText.clean), value: airNumber("pm25", v), room }) : null;
 }
 
 /** The allergen strip (IR98): an observation needs substance, source, time and evidence, a number also its unit; missing
  * or unsupported data never reads as “no allergens”, and nothing is derived from PM2.5. */
-export function allergenView(a: ApiAllergen | null): { title: string; badge: { text: string; tone: Tone; icon: string }; text: string } {
-  const notNone = "this does not mean “no allergens”";
-  if (!a) return { title: "Allergen", badge: { text: "Unknown", tone: "unknown", icon: "?" }, text: `No observation for this selection — ${notNone}.` };
-  if (a.availability === "unsupported") return { title: "Allergen", badge: { text: "Unsupported", tone: "muted", icon: "⊘" }, text: `This unit cannot observe allergens — ${notNone}.` };
-  if (a.availability === "not_measured") return { title: "Allergen", badge: { text: "Not measured", tone: "muted", icon: "○" }, text: `No observation — ${notNone}.` };
-  if (!a.substance || !a.sourceLabel || !a.observedAt || !a.evidenceText) return { title: "Allergen", badge: { text: "Unknown", tone: "unknown", icon: "?" }, text: `Incomplete observation — shown as unknown, ${notNone}.` };
-  const value = a.value === null ? "" : a.unit ? `${a.value} ${a.unit} · ` : "Value unknown (no unit) · ";
-  return { title: `Allergen (${a.substance})`, badge: { text: "Detected", tone: "warn", icon: "⚠" }, text: `${value}Source: ${a.sourceLabel} · ${hm(a.observedAt)} · ${a.evidenceText}` };
+export function allergenView(a: ApiAllergen | null, i: I18n = EN): { title: string; badge: { text: string; tone: Tone; icon: string }; text: string } {
+  const { t, display } = i;
+  const title = t("Allergen");
+  if (!a) return { title, badge: { text: t("Unknown"), tone: "unknown", icon: "?" }, text: t("No observation for this selection — this does not mean “no allergens”.") };
+  if (a.availability === "unsupported") return { title, badge: { text: t("Unsupported"), tone: "muted", icon: "⊘" }, text: t("This unit cannot observe allergens — this does not mean “no allergens”.") };
+  if (a.availability === "not_measured") return { title, badge: { text: t("Not measured"), tone: "muted", icon: "○" }, text: t("No observation — this does not mean “no allergens”.") };
+  if (!a.substance || !a.sourceLabel || !a.observedAt || !a.evidenceText) return { title, badge: { text: t("Unknown"), tone: "unknown", icon: "?" }, text: t("Incomplete observation — shown as unknown, this does not mean “no allergens”.") };
+  const value = a.value === null ? [] : [a.unit ? `${a.value} ${a.unit}` : t("Value unknown (no unit)")];
+  return {
+    title: t("Allergen ({substance})", { substance: a.substance }), badge: { text: t("Detected"), tone: "warn", icon: "⚠" },
+    text: [...value, t("Source: {source}", { source: a.sourceLabel }), showClock(a.observedAt, display), a.evidenceText].join(" · "),
+  };
 }
 
 /** [from, to) of a preset (IR41): 1h/24h roll back from the business clock floored to the UTC minute; 7d is SR17 calendar
@@ -169,9 +180,15 @@ export function airWindow(period: AirPeriod, now: Date): AirWindow {
   const to = Math.floor(now.getTime() / 60_000) * 60_000;
   return { period, from: new Date(to - (period === "1h" ? 60 : 1440) * 60_000).toISOString(), to: new Date(to).toISOString(), slotMs: 300_000 };
 }
-export const windowTitle = (p: AirPeriod) => (p === "1h" ? "last hour" : p === "24h" ? "last 24 hours" : "last 7 days");
-export function windowSub(w: AirWindow, unit: string, room: string): string {
-  const span = w.period === "7d" ? `calendar days from ${klStamp(w.from).slice(0, 10)} to ${hm(w.to)} now · hourly averages` : `rolling window ending ${hm(w.to)} · 5-min averages`;
+export const windowTitle = (p: AirPeriod, t: T = en) => t(p === "1h" ? "last hour" : p === "24h" ? "last 24 hours" : "last 7 days");
+/** The chart's sub line: unit, room and the window — its end in the display time zone with the zone's abbreviation, and
+ * for 7 days the Kuala Lumpur calendar day it starts on. */
+export function windowSub(w: AirWindow, unit: string, room: string, i: I18n = EN): string {
+  const { t, display } = i;
+  const time = showClock(w.to, display);
+  const span = w.period === "7d"
+    ? t("calendar days in Asia/Kuala_Lumpur from {date} to {time} now · hourly averages", { date: showDate(w.from, { locale: display.locale, timeZone: KL }), time })
+    : t("rolling window ending {time} · 5-min averages", { time });
   return `${unit} · ${room} · ${span}`;
 }
 
@@ -192,15 +209,18 @@ export function airSlots(items: ApiMeasurement[], w: AirWindow): AirSlot[] {
   }
   return sum.map((s, i) => ({ start: new Date(from + i * w.slotMs).toISOString(), avg: cnt[i] ? s / cnt[i] : null, n: cnt[i] }));
 }
-/** Five x-axis labels from the window start to now (Figma 05a “09:12 yesterday … 09:12 now”). */
-export function axisLabels(w: AirWindow): string[] {
+/** Five x-axis labels from the window start to now (Figma 05a “09:12 yesterday … 09:12 now”) in the display time zone,
+ * which the sub line names. */
+export function axisLabels(w: AirWindow, i: I18n = EN): string[] {
+  const { t, display } = i;
   const from = Date.parse(w.from);
   const span = Date.parse(w.to) - from;
   return [0, 1, 2, 3, 4].map((k) => {
-    const t = new Date(from + (span * k) / 4).toISOString();
-    const day = (o: Intl.DateTimeFormatOptions) => new Date(t).toLocaleDateString("en-US", { timeZone: KL, ...o });
-    if (w.period === "7d") return k === 4 ? `${hm(t)} now` : `${day({ weekday: "short" })} ${day({ day: "numeric" })}`; // "Tue 8", not the en-US "8 Tue"
-    return k === 4 ? `${hm(t)} now` : k === 0 && w.period === "24h" ? `${hm(t)} yesterday` : hm(t);
+    const at = new Date(from + (span * k) / 4).toISOString();
+    const time = showClock(at, display, false);
+    if (k === 4) return t("{time} now", { time });
+    if (w.period === "7d") return showDay(at, display); // "Tue 8"
+    return k === 0 && w.period === "24h" ? t("{time} yesterday", { time }) : time;
   });
 }
 /** The y range of the chart: the values and the guide line with some room around them. */
@@ -221,14 +241,16 @@ export function axisTicks(min: number, max: number): number[] {
   for (let t = Math.ceil(min / stepSize) * stepSize; t <= max; t += stepSize) out.push(roundAway(t, 6));
   return out;
 }
-/** The table view: newest slot first, consecutive empty slots merged into one gap row. */
+/** The table view: newest slot first, consecutive empty slots merged into one gap row; each row's slot as a span in the
+ * display time zone. */
 export type AirRow = { key: string; time: string; value: string; note: string; gap: boolean };
-export function airRows(slots: AirSlot[], metric: AirMetric, slotMs: number): AirRow[] {
+export function airRows(slots: AirSlot[], metric: AirMetric, slotMs: number, i: I18n = EN): AirRow[] {
+  const { t, display } = i;
   const out: AirRow[] = [];
   const end = (s: AirSlot) => new Date(Date.parse(s.start) + slotMs).toISOString();
   let gap: { newest: AirSlot; oldest: AirSlot } | null = null;
   const flush = () => {
-    if (gap) out.push({ key: `gap-${gap.oldest.start}`, time: `${klStamp(gap.oldest.start)} – ${klStamp(end(gap.newest)).slice(11)}`, value: "No data", note: "Gap — not joined", gap: true });
+    if (gap) out.push({ key: `gap-${gap.oldest.start}`, time: showSpan(gap.oldest.start, end(gap.newest), display), value: t("No data"), note: t("Gap — not joined"), gap: true });
     gap = null;
   };
   for (const s of [...slots].reverse()) {
@@ -237,7 +259,7 @@ export function airRows(slots: AirSlot[], metric: AirMetric, slotMs: number): Ai
       continue;
     }
     flush();
-    out.push({ key: s.start, time: klStamp(s.start), value: `${airNumber(metric, s.avg)} ${metricInfo[metric].unit}`, note: `${s.n} reading${s.n === 1 ? "" : "s"}`, gap: false });
+    out.push({ key: s.start, time: showSpan(s.start, end(s), display), value: `${airNumber(metric, s.avg)} ${metricInfo[metric].unit}`, note: t(s.n === 1 ? "{n} reading" : "{n} readings", { n: s.n }), gap: false });
   }
   flush();
   return out;
@@ -249,14 +271,15 @@ export const ventMethods: { id: VentMethod; label: string }[] = [
 /** Durations offered by the Log ventilation modal (Figma 05c); ventilation.log accepts 1–240 minutes (IR110). */
 export const ventDurations = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240];
 /** The latest valid CO2 as the modal's “Current CO2” (what co2AtLog will record), or null. */
-export const co2Now = (co2?: ApiMeasurement) => (validValue(co2) === null ? null : `${airNumber("co2", co2!.value!)} ppm · ${hm(co2!.observedAt)}`);
-/** One ventilation history row: method and duration, the CO2 recorded at logging time, who and when. */
-export function ventRow(v: ApiVentilationLog, me: string, names: Map<string, string>) {
-  const method = ventMethods.find((m) => m.id === v.method)?.label ?? v.method;
+export const co2Now = (co2?: ApiMeasurement, d: Display = DEFAULT_DISPLAY) => (validValue(co2) === null ? null : `${airNumber("co2", co2!.value!)} ppm · ${showClock(co2!.observedAt, d)}`);
+/** One ventilation history row: method and duration, the CO2 recorded at logging time, who and when (“today …” on the
+ * days next to now). */
+export function ventRow(v: ApiVentilationLog, me: string, names: Map<string, string>, nowMs: number, i: I18n = EN) {
+  const { t, display } = i;
+  const method = ventMethods.find((m) => m.id === v.method);
   return {
-    id: v.id, text: `${method} · ${v.durationMinutes} min${v.unitId ? ` · ${names.get(v.unitId) ?? "another unit"}` : ""}`,
-    co2: v.co2AtLog ? `CO2 ${airNumber("co2", v.co2AtLog.value)} ppm at ${hm(v.co2AtLog.observedAt)}` : "CO2 not measured at logging",
-    by: v.loggedByMembershipId === me ? "you" : "another member", when: klStamp(v.loggedAt),
+    id: v.id, text: [method ? t(method.label) : v.method, t("{n} min", { n: v.durationMinutes }), ...(v.unitId ? [names.get(v.unitId) ?? t("another unit")] : [])].join(" · "),
+    co2: v.co2AtLog ? t("CO2 {value} ppm at {time}", { value: airNumber("co2", v.co2AtLog.value), time: showClock(v.co2AtLog.observedAt, display) }) : t("CO2 not measured at logging"),
+    by: t(v.loggedByMembershipId === me ? "by you" : "by another member"), when: relativeTime(v.loggedAt, nowMs, i),
   };
 }
-export const updatedAt = (now: Date) => hms(now.toISOString());

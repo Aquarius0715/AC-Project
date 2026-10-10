@@ -3,7 +3,7 @@
 // by the Server Components and the client views. The periods are Kuala Lumpur days (REV18-035); their labels follow the
 // display language (`i`, IR265).
 import { klInstant, klLocal, klStamp, one, saving, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
-import { EN, intlTag, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
+import { EN, intlTag, showDay, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
 
 export type PeriodKind = "today" | "7d" | "30d" | "custom";
 export const periodKinds: PeriodKind[] = ["today", "7d", "30d", "custom"];
@@ -40,8 +40,7 @@ export function dayRanges(from: string, to: string, locale: Locale = "en"): { la
   while (Date.parse(start) < Date.parse(to) && out.length < 31) {
     const next = klInstant(`${addDays(klLocal(start).slice(0, 10), 1)}T00:00`);
     const end = Date.parse(next) < Date.parse(to) ? next : to;
-    const day = (o: Intl.DateTimeFormatOptions) => new Date(start).toLocaleDateString(intlTag(locale), { timeZone: "Asia/Kuala_Lumpur", ...o });
-    out.push({ label: `${day({ weekday: "short" })} ${day({ day: "numeric" })}`, from: start, to: end }); // "Mon 14" (Figma Client 04a)
+    out.push({ label: showDay(start, { locale, timeZone: "Asia/Kuala_Lumpur" }), from: start, to: end }); // "Mon 14" (Figma Client 04a)
     start = next;
   }
   return out;
