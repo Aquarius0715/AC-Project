@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.31.0
+version: 0.32.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -260,13 +260,13 @@ Scope: FR-A05 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 2. Apply these business rules to reads and actions. Units are fixed by metric. Do not use missing or stale data to judge normal thresholds; treat them as connection/data-quality notices. Suppress repeats with cooldown. Record severity changes as new notification reasons.
 3. Save Policy version. On trigger, create an Alert and Notification preview. Keep notification read status separate from Alert acknowledgement.
 4. Queries to update: `policies / alerts / notifications / admin summary / audit`。
-5. Tabs: `tab=alerts` (default; alert list with status/severity/cause/unit filters and the `alertId` detail) and `tab=policies` (policy list and the `policyId` editor). The detail shows cause and evidence using the BIZ-17 wording above, the target unit, and notification activity; reading a notification never changes the Alert.
+5. Tabs: `tab=alerts` (default; alert list with status/severity/cause/unit filters and the `alertId` detail; the status tiles, the customer → property → unit scope, the severity and the selection are URL state, IR318) and `tab=policies` (policy list and the `policyId` editor). The detail shows cause and evidence using the BIZ-17 wording above, the target unit, and notification activity; reading a notification never changes the Alert.
 6. Resolve (IR66): policy-free Alerts resolve only manually by an alert.resolve holder with a 1–1000 character reason and at least one evidence ID. Evidence candidates are the Alert's own `evidenceIds` (from `alerts.get`) and remeasurements from `telemetry.series` for the same unit and metric observed after `detectedAt`, fetched only when the Resolve dialog opens.
 7. Policy editor order: basics (name, priority, timezone) → targets and metric → condition and recovery → severity → recipients/channels, cooldown, escalation → `notifications.preview` per recipient → demo test (synthetic reading and clock advance, simulator off) → save.
 8. Scope entry (IR108): the Policies tab filters by `customerId` → `propertyId` → `unitId` (URL keys, search-selects with the first 20 options and server search; `policies.list` filters, customer candidates from `customers.list`, unit candidates from `units.list`). The list is grouped “Default · on every unit” first, then one group per customer (owner). A unitId filter (from unit edit) lists only the policies attached to that unit. A new policy first asks for the owner customer; the owner is fixed after creation. The editor’s “Owner & units” section shows the attached units read-only with a link to each unit edit — units are never assigned from this screen.
 9. Default policy (`kind=default_alert`, policy-default): rule list (6 rules, IR120), the selected rule’s condition editor (HQ template; saving affects all units), and “On / off per customer — this rule” with a customer search-select; toggles call `policies.setDefaultRule` with a reason. “Copy as a <customer> policy →” opens an unsaved alert policy prefilled from the rule. The default policy cannot be deleted or detached.
 10. Air-quality limits (FR-A12/DD-A12) are alert policies with metric co2 (ppm) or pm25 (µg/m³). Metric choices: temperature, humidity, CO₂, PM2.5, refrigerant pressure, vibration, power. “Only if …” sets activeWindow (weekdays and local hours in the policy timezone). Delete policy (`policies.delete`) detaches from all units after confirmation.
-11. Alerts tab actions: Acknowledge, Resolve (step 6), Request maintenance (opens New job in SCR-A06 prefilled with unit and alert), Open unit → (SCR-A02 unit edit).
+11. Alerts tab actions: Acknowledge, Resolve (step 6), Request maintenance (opens New job in SCR-A06 prefilled with unit and alert: `/admin/jobs?new=<unitId>&alertId=<id>`, the symptom taken from the alert, IR318), Open unit → (SCR-A02 unit edit).
 
 **Boundary cases and failures**: Reject zero recipients, zero duration, and recovery thresholds inconsistent with comparison direction. Check just-before, exact-threshold, and duration boundaries.
 
@@ -863,7 +863,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.31.0: Read IR01–IR314 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.32.0: Read IR01–IR318 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

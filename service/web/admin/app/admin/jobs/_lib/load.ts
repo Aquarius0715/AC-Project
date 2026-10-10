@@ -9,6 +9,7 @@
 import "server-only";
 import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { i18nOf, showTime } from "@ac/web/lib/i18n";
+import { alertTitle } from "@ac/web/lib/alerts";
 import { jobEventTitle, type ApiJobEvent } from "@ac/web/lib/partnerOverview";
 import type { ApiWorkReport } from "@ac/web/lib/partnerReview";
 import { agreedSlots, classifyBy, controls, costTotals, delivery, facts, filtersOf, hqRow, LISTED, longSlot, periodChip, periodOfQuery, preferredRows, reportCard, slotText, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
@@ -79,8 +80,12 @@ export async function loadJobs(sp: SP) {
     optional(coreAll<{ organizationId: string; status: string }>("contractors.list"), []), // offers suspended per profile (DD-A21)
   ]);
   const rows = list.items.map((j) => hqRow(j, nowMs, names, unitOrg, i));
+  // ?new=<unitId>[&alertId=] opens New job for that unit, its symptom taken from the alert (DD-A05 item 11, IR318)
+  const newUnit = one(sp.new), fromAlert = one(sp.alertId);
+  const alert = newUnit && fromAlert ? await optional(coreOp<{ id: string; type: string; causeCode: string; evidenceText: string }>("alerts.get", { id: fromAlert }), null) : null;
+  const newJob = newUnit ? { unitId: newUnit, symptom: alert ? t("Alert {id}: {title} — {evidence}", { id: alert.id.slice(0, 8), title: alertTitle(alert, t), evidence: alert.evidenceText }).slice(0, 2000) : "" } : null;
   const base = {
-    ...head, q, period, periodChip: period ? periodChip(period, i) : null, sort, sorts: SORTS.map((x) => ({ id: x.id, text: t(x.text) })), total: list.total,
+    ...head, q, newJob, period, periodChip: period ? periodChip(period, i) : null, sort, sorts: SORTS.map((x) => ({ id: x.id, text: t(x.text) })), total: list.total,
     stages: STAGES.map((x, k) => ({ id: x.id, label: t(x.label), count: counts[k] })),
     deliveries: [{ id: "internal", name: t("Internal") }, ...contractors.map((c) => ({ id: c.id, name: c.name }))],
     assignees: members.filter((m) => m.role === "technician").map((m) => ({ id: m.id, name: m.displayName })),

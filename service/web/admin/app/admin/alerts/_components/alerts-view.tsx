@@ -1,15 +1,20 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Textarea, Timeline, LineChart, useToast, cx } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
+import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { HQ_METRICS, metricLabel, opSymbol, policyErrors, type AdminAlert, type AdminPolicy, type AlertState, type Channel, type Severity } from "@ac/web/lib/adminAlerts";
 import { acknowledgeAlert, resolveAlert, savePolicy, type ActionResult } from "../actions";
+import { ScopeBar } from "../../jobs/_components/jobs-header";
 
 const ST: Record<AlertState, string> = { open: "Open", acknowledged: "Acknowledged", resolved: "Resolved" };
+const LIST: Record<AlertState, string> = { open: "Open alerts", acknowledged: "Acknowledged alerts", resolved: "Resolved alerts" };
+const SEVERITY: [Severity, string][] = [["critical", "Severity: Critical"], ["warning", "Severity: Warning"], ["normal", "Severity: Info"]];
 // the Phase 1A demo's fixture rows (their data stays English, as the other demo screens)
 const demoTimeline = (time: string, st: AlertState): AdminAlert["timeline"] => [
   { time, title: "Alert detected", detail: "Load increase with stable outdoor temperature", tone: "warn" },
@@ -18,7 +23,8 @@ const demoTimeline = (time: string, st: AlertState): AdminAlert["timeline"] => [
   { time: "—", title: st === "resolved" ? "Resolved" : st === "acknowledged" ? "Acknowledged — waiting for resolution" : "Waiting for acknowledgement", detail: "", tone: st === "resolved" ? "ok" : undefined },
 ];
 const demoAlert = (id: string, title: string, time: string, sev: Severity, meta: string): AdminAlert => ({
-  id, version: 1, title, time, sev, meta, state: "open", st: ST.open, unit: "Bedroom AC · unit-online-rto", context: "customer-a · Home A › 1F › Bedroom · Running · Online",
+  id, version: 1, title, time, sev, meta, state: "open", st: ST.open, unitId: "unit-online-rto", customerId: "customer-a", policyless: id !== "alert-temp-a", inferred: true,
+  unit: "Bedroom AC · unit-online-rto", context: "customer-a · Home A › 1F › Bedroom · Running · Online",
   evidence: "inferred — “Demo: cooling load rose while the outdoor temperature was stable.”", cause: "window_open (suspected)", observed: `${time} MYT`, detected: `${time} MYT`,
   evidenceRecords: "none attached", timeline: demoTimeline(time, "open"),
 });
@@ -42,7 +48,9 @@ const seedPolicies: AdminPolicy[] = [
   demoPolicy("policy-humidity-a", "Night humidity", "Humidity ≥ 70 % · 30 min · 22–06", "humidity", 70, 65, 1800, false, "0 units"),
 ];
 
-type Live = { tab: "alerts" | "policies"; alerts: AdminAlert[]; policies: AdminPolicy[] };
+type Scope = { customers: { id: string; name: string }[]; properties: { id: string; name: string }[]; units: { id: string; name: string }[] };
+type Query = { customerId?: string; propertyId?: string; unitId?: string; severity: Severity | null; status: AlertState; alertId: string | null };
+type Live = { tab: "alerts" | "policies"; q: Query; scope: Scope; scopeName: string | null; alerts: AdminAlert[]; policies: AdminPolicy[] };
 
 /** HQ alerts and alert policies. `live` comes from the Server Component in API mode (writes are Server Actions that
  * re-render the route); the demo keeps its fixture rows in local state. Texts in the display language (IR292). */
@@ -51,6 +59,7 @@ export function AdminAlertsView({ live }: { live?: Live }) {
   const toast = useToast();
   const router = useRouter();
   const pathname = usePathname();
+  const patch = useUrlPatch();
   const [pending, startTransition] = useTransition();
   const [urlTab, setUrlTab] = useUrlTab<"alerts" | "policies">({ alerts: "alerts", policies: "policies" }, "alerts");
   const tab = live ? live.tab : urlTab;
@@ -59,8 +68,14 @@ export function AdminAlertsView({ live }: { live?: Live }) {
   // alerts: the demo changes its local copy; API mode shows the server rows
   const [demoList, setDemoList] = useState(seedAlerts);
   const al = live ? live.alerts : demoList;
-  const [alertId, setAlertId] = useState<string | null>(null);
-  const a = al.find((x) => x.id === alertId) ?? al.find((x) => x.state !== "resolved") ?? al[0] ?? null;
+  // API mode keeps the status, scope, severity and selection in the URL (DD-A05 item 5); the demo in local state
+  const [demoStatus, setDemoStatus] = useState<AlertState>("open");
+  const [demoAlertId, setDemoAlertId] = useState<string | null>(null);
+  const status = live ? live.q.status : demoStatus;
+  const shown = al.filter((x) => x.state === status);
+  const a = al.find((x) => x.id === (live ? live.q.alertId : demoAlertId)) ?? shown[0] ?? null;
+  const pick = (id: string) => (live ? patch({ alertId: id }) : setDemoAlertId(id));
+  const pickStatus = (s: AlertState) => (live ? patch({ status: s === "open" ? null : s, alertId: null }) : (setDemoStatus(s), setDemoAlertId(null)));
   const [resolve, setResolve] = useState(false);
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
@@ -109,27 +124,62 @@ export function AdminAlertsView({ live }: { live?: Live }) {
   };
   const toggleChannel = (c: Channel, on: boolean) => draft && set("channels", on ? [...new Set([...draft.channels, c])] : draft.channels.filter((x) => x !== c));
   const groups = [...new Set(pols.map((x) => x.group))];
-  const counts: [AlertState, number][] = [["open", al.filter((x) => x.state === "open").length], ["acknowledged", al.filter((x) => x.state === "acknowledged").length], ["resolved", al.filter((x) => x.state === "resolved").length + (live ? 0 : 2)]];
+  const counts: [AlertState, number][] = [["open", al.filter((x) => x.state === "open").length], ["acknowledged", al.filter((x) => x.state === "acknowledged").length], ["resolved", al.filter((x) => x.state === "resolved").length]];
   const openish = al.filter((x) => x.state !== "resolved");
+  const scopeName = live?.scopeName ?? t("all customers");
 
   return (
     <Page>
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "alerts", label: t("Alerts"), count: openish.length }, { id: "policies", label: t("Policies"), count: pols.length }]} />
       {tab === "alerts" ? (
         <>
-          <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>{counts.map(([s, n]) => <div key={s} className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted">{t(ST[s])}</div><div className="text-2xl font-bold">{n}</div></div>)}</div>
-          {!a ? <Card title={t("Open alerts · all customers")}><EmptyState title={t("No alerts")}>{t("No unit has raised an alert.")}</EmptyState></Card> : (
-            <div className="split-rev">
-              <Card title={t("Open alerts · all customers")} sub={t("severity ↓")} className="self-start"><div className="flex flex-col gap-2">{openish.length === 0 ? <EmptyState title={t("No open alerts")}>{t("Every alert is resolved.")}</EmptyState> : openish.map((x) => <ListRow key={x.id} selected={a.id === x.id} onClick={() => setAlertId(x.id)}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.title}</b><span className="text-[11px] text-muted">{x.time}</span></div><div className="flex items-center gap-2 text-[11px] text-muted"><SeverityBadge s={x.sev} />{x.state !== "open" && <Badge tone="primary">{x.st}</Badge>}</div><div className="truncate text-[11px] text-muted">{x.meta} · {x.id}</div></div></ListRow>)}</div></Card>
-              <div className="flex min-w-0 flex-col gap-4">
-                <Card title={a.title} sub={`${a.id} · ${t("detected {time}", { time: a.detected })}`} action={<div className="flex gap-2"><Btn size="sm" disabled={a.state !== "open" || pending} onClick={acknowledge}>{t("Acknowledge")}</Btn><Btn size="sm" variant="primary" disabled={a.state === "resolved" || pending} onClick={() => setResolve(true)}>{t("Resolve…")}</Btn></div>}>
-                  <SummaryList items={[[t("Unit"), a.unit], [t("Context"), a.context], [t("Evidence"), a.evidence], [t("Cause"), a.cause], [t("Observed at"), a.observed], [t("Evidence records"), a.evidenceRecords]]} />
-                  <p className="mt-2 text-xs text-muted">{t("This is an inference, not a confirmed cause. Ask the customer to check windows, or request an inspection to record evidence.")}</p>
-                </Card>
-                <Card title={t("Timeline")}><Timeline items={a.timeline} /><p className="mt-2 text-[11px] text-muted">{t("Resolving requires a reason and evidence (remeasurement or a recorded confirmation). Completing maintenance work does not resolve the alert by itself.")}</p></Card>
+          {live && <ScopeBar scope={live.scope} q={live.q} text={t(al.length === 1 ? "1 alert in scope" : "{n} alerts in scope", { n: al.length })} clear="alertId" />}
+          <div className="flex flex-wrap items-stretch gap-3">
+            {counts.map(([s, n]) => (
+              <button key={s} type="button" aria-pressed={status === s} onClick={() => pickStatus(s)} className={cx("min-w-[140px] flex-1 rounded-2xl border bg-surface p-4 text-left", status === s ? "border-primary ring-1 ring-primary" : "border-line hover:bg-surface2")}>
+                <div className="text-xs text-muted">{t(ST[s])}</div><div className="text-2xl font-bold">{n}</div>
+              </button>
+            ))}
+            {live && (
+              <Select aria-label={t("Severity")} className="w-auto self-center" value={live.q.severity ?? ""} onChange={(e) => patch({ severity: e.target.value || null, alertId: null })}>
+                <option value="">{t("Severity: All")}</option>{SEVERITY.map(([v, l]) => <option key={v} value={v}>{t(l)}</option>)}
+              </Select>
+            )}
+          </div>
+          <div className="split-rev">
+            <Card title={`${t(LIST[status])} · ${scopeName}`} sub={t("severity ↓")} className="self-start">
+              <div className="flex flex-col gap-2">
+                {shown.length === 0 ? <EmptyState title={t("No alerts in this scope")}>{t("Change the scope, severity or status.")}</EmptyState> : shown.map((x) => (
+                  <ListRow key={x.id} selected={a?.id === x.id} onClick={() => pick(x.id)}>
+                    <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.title}</b><span className="text-[11px] text-muted">{x.time}</span></div><div className="mt-1 flex flex-wrap items-center gap-2"><SeverityBadge s={x.sev} /></div><div className="mt-1 truncate text-[11px] text-muted">{x.meta}</div></div>
+                  </ListRow>
+                ))}
               </div>
-            </div>
-          )}
+            </Card>
+            {!a ? <Card title={t("Alert")}><EmptyState title={t("No alert selected")}>{t("Pick an alert in the list.")}</EmptyState></Card> : (
+              <div className="flex min-w-0 flex-col gap-4">
+                <Card title={a.title} sub={`${a.id} · ${t("detected {time}", { time: a.detected })}`} action={
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Btn size="sm" disabled={a.state !== "open" || pending} onClick={acknowledge}>{t("Acknowledge")}</Btn>
+                    <Btn size="sm" variant="primary" disabled={a.state === "resolved" || pending} onClick={() => setResolve(true)}>{t("Resolve…")}</Btn>
+                    {a.state !== "resolved" && <Link href={`/admin/jobs?new=${a.unitId}&alertId=${a.id}`} className="inline-flex items-center rounded-control border border-line bg-surface px-2.5 py-1 text-xs font-semibold hover:bg-surface2">{t("Request maintenance")}</Link>}
+                    <Link href={a.customerId ? `/admin/units?customerId=${a.customerId}&unitId=${a.unitId}` : `/admin/units?unitId=${a.unitId}`} className="inline-flex items-center px-1 text-xs font-semibold text-primary">{t("Open unit →")}</Link>
+                  </div>
+                }>
+                  <SummaryList items={[[t("Unit"), a.unit], [t("Context"), a.context], [t("Severity"), <SeverityBadge key="s" s={a.sev} />], [t("Status"), a.st]]} />
+                </Card>
+                <Card title={t("Why we think this")}>
+                  <SummaryList items={[[t("Evidence"), a.evidence], [t("Cause"), a.cause], [t("Observed at"), a.observed], [t("Evidence records"), a.evidenceRecords]]} />
+                  {a.inferred && <p className="mt-2 text-xs text-muted">{t("This is an inference, not a confirmed cause. Ask the customer to check windows, or request an inspection to record evidence.")}</p>}
+                </Card>
+                <Card title={t("Activity")}>
+                  <Timeline items={a.timeline} />
+                  <p className="mt-2 text-[11px] text-muted">{t("Reading a notification does not acknowledge or resolve the alert")}{a.policyless ? ` · ${t("No policy escalation — this alert was not raised by a policy")}` : ""}</p>
+                  <p className="mt-1 text-[11px] text-muted">{t("Resolving requires a reason and evidence (remeasurement or a recorded confirmation). Completing maintenance work does not resolve the alert by itself.")}</p>
+                </Card>
+              </div>
+            )}
+          </div>
         </>
       ) : !p || !draft ? (
         <Card title={t("Alert policies")}><EmptyState title={t("No alert policies")}>{t("Customers have no alert policies yet.")}</EmptyState></Card>

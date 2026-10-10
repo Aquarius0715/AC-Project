@@ -29,14 +29,14 @@ const nextDay = (date: string) => new Date(Date.parse(`${date}T00:00:00Z`) + 86_
 export function JobsView({ live }: { live: JobsLive }) {
   const t = useT();
   const patch = useUrlPatch();
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(!!live.newJob); // opened by ?new=<unitId> (an alert's Request maintenance)
   // The job New job just created: its detail opens step 2 (book) or says it was saved as requested.
   const [fresh, setFresh] = useState<Fresh | null>(() => pendingFresh);
   useEffect(() => { pendingFresh = null; }, []);
   return (
     <Page className="max-w-[1440px]">
       <JobsTabs tab="jobs" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => setCreating(true)}>{t("+ New job")}</Btn>} />
-      {creating && <NewJobModal live={live} onClose={() => setCreating(false)} onCreated={(f) => { setCreating(false); setFresh(f); }} />}
+      {creating && <NewJobModal live={live} initial={live.newJob ?? undefined} onClose={() => { setCreating(false); if (live.newJob) patch({ new: null, alertId: null }); }} onCreated={(f) => { setCreating(false); setFresh(f); }} />}
       <JobsTab live={live} patch={patch} fresh={fresh} onFresh={() => setFresh(null)} />
     </Page>
   );
@@ -489,14 +489,14 @@ const JOB_TYPES = [{ id: "reactive" as const, label: "Repair" }, { id: "preventi
 
 /** New job (DD-A06 item 8, Figma 06-1 New job): step 1 creates the job (requested) with the customer's preferred times
  * asked by phone; “Save as requested” stops there, “Next: choose delivery” opens step 2 (the booking dialog) on it. */
-export function NewJobModal({ live, onClose, onCreated }: { live: { now: string; units: JobsLive["units"]; q: { unitId?: string } }; onClose: () => void; onCreated?: (f: Fresh) => void }) {
+export function NewJobModal({ live, initial, onClose, onCreated }: { live: { now: string; units: JobsLive["units"]; q: { unitId?: string } }; initial?: { unitId: string; symptom: string }; onClose: () => void; onCreated?: (f: Fresh) => void }) {
   const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const router = useRouter();
   const now = Date.parse(live.now);
   const [pending, run] = useAction();
-  const [unitId, setUnitId] = useState(live.q.unitId ?? live.units[0]?.id ?? "");
+  const [unitId, setUnitId] = useState(initial?.unitId ?? live.q.unitId ?? live.units[0]?.id ?? "");
   const [type, setType] = useState<"reactive" | "preventive" | "periodic">("reactive");
-  const [symptom, setSymptom] = useState("");
+  const [symptom, setSymptom] = useState(initial?.symptom ?? "");
   const tomorrow = tomorrowIn(now, zone);
   const [times, setTimes] = useState([{ date: tomorrow, from: "10:00", to: "12:00" }]);
   const [due, setDue] = useState("");

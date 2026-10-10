@@ -238,6 +238,15 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 		_, err := tx.Exec(ctx, sql, args...)
 		return err
 	}
+	// IR91 item 2: a row without createdAt / updatedAt gets fixture.seedCreatedAt. The columns default to
+	// platform.app_now(), so the transaction's app.now is that time while the fixture is applied; otherwise the
+	// seed would carry the wall clock, a date after the demo clock (IR318: "customer since Oct 2026").
+	if !f.SeedCreatedAt.IsZero() {
+		if err := ex(`SELECT set_config('app.now', $1, true)`, f.SeedCreatedAt.UTC().Format(time.RFC3339Nano)); err != nil {
+			return err
+		}
+		defer func() { _, _ = tx.Exec(ctx, `SELECT set_config('app.now', '', true)`) }()
+	}
 	orgTenant := tenantOfOrg(f)
 	for _, t := range f.DemoSeed.Tenants {
 		if err := ex(`INSERT INTO platform.tenants (id, name) VALUES ($1,$2) ON CONFLICT DO NOTHING`, ID(t), t); err != nil {

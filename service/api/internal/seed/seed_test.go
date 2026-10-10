@@ -115,4 +115,15 @@ func TestApplyFixture(t *testing.T) {
 	if err := tx.QueryRow(ctx, `SELECT display_name FROM assets.units WHERE id=$1`, ID("unit-online-rto")).Scan(&name); err != nil || name != "Bedroom AC" {
 		t.Fatalf("unit-online-rto: %v %q", err, name)
 	}
+	// IR91 item 2: rows without createdAt carry fixture.seedCreatedAt, not the wall clock (IR318); explicit ones keep theirs
+	for _, table := range []string{"identity.organizations", "identity.users", "identity.memberships", "devices.capabilities", "assets.customers", "assets.properties", "assets.spaces", "assets.units", "devices.devices", "monitoring.alert_policies", "billing.invoices"} {
+		var later int
+		if err := tx.QueryRow(ctx, "SELECT count(*) FROM "+table+" WHERE created_at <> $1", f.SeedCreatedAt).Scan(&later); err != nil || later != 0 {
+			t.Errorf("%s: %d rows not created at seedCreatedAt (%v)", table, later, err)
+		}
+	}
+	var now time.Time
+	if err := tx.QueryRow(ctx, `SELECT platform.app_now()`).Scan(&now); err != nil || now.Equal(f.SeedCreatedAt) {
+		t.Errorf("app.now stays the seed time after Apply: %v %v", now, err)
+	}
 }

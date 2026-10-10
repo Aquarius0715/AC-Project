@@ -34,6 +34,8 @@ export type ApiMemberName = { id: string; displayName: string; role: string };
 /** One alert of the screen: `state` is the alert's status for the logic, `st` its label in the display language. */
 export type AdminAlert = {
   id: string; version: number; title: string; time: string; sev: Severity; meta: string; state: AlertState; st: string;
+  /** the unit and its customer (customers.id) for Open unit → and Request maintenance (DD-A05 item 11) */
+  unitId: string; customerId: string | null; policyless: boolean; inferred: boolean;
   unit: string; context: string; evidence: string; cause: string; observed: string; detected: string; evidenceRecords: string;
   timeline: { time: string; title: string; detail: string; tone?: "warn" | "ok" }[];
 };
@@ -73,6 +75,7 @@ export function adminAlertRows(alerts: ApiAdminAlert[], units: ApiUnitName[], cu
   const when = (iso: string) => relativeTime(iso, now, i);
   const unit = new Map(units.map((u) => [u.id, u]));
   const custByOrg = new Map(customers.map((c) => [c.organizationId, c.name]));
+  const custIdByOrg = new Map(customers.map((c) => [c.organizationId, c.id]));
   const policy = new Map(policies.map((p) => [p.id, p.name]));
   return [...alerts]
     .sort((a, b) => stRank[a.status] - stRank[b.status] || sevRank[a.severity] - sevRank[b.severity] || b.detectedAt.localeCompare(a.detectedAt))
@@ -88,6 +91,7 @@ export function adminAlertRows(alerts: ApiAdminAlert[], units: ApiUnitName[], cu
       return {
         id: a.id, version: a.version, title: alertTitle(a, t), time: when(a.detectedAt), sev: a.severity,
         meta: `${customer} · ${u?.displayName ?? a.unitId} · ${pol}`, state: a.status, st: t(stLabel[a.status]),
+        unitId: a.unitId, customerId: (u && custIdByOrg.get(u.customerOrgId)) ?? null, policyless: !a.policyId, inferred: a.evidenceKind === "inferred",
         unit: `${u?.displayName ?? t("Unit")} · ${a.unitId}`, context: customer,
         evidence: `${evidenceKind[a.evidenceKind] ? t(evidenceKind[a.evidenceKind]) : a.evidenceKind} — “${a.evidenceText}”`,
         cause: a.causeCode === "unknown" ? t("not determined") : t("{cause} (suspected)", { cause: a.causeCode }),

@@ -29,6 +29,10 @@ describe("HQ alerts and alert policies", () => {
     expect([rows[0].cause, rows[2].timeline.at(-1)]).toEqual(["not determined", { time: "today 8:58 am MYT", title: "Resolved", detail: "window closed", tone: "ok" }]);
     const ack = adminAlertRows([alert({ status: "acknowledged", acknowledgedAt: "2026-09-14T00:57:00Z", evidenceIds: ["e1", "e2"], policyId: null })], [], [], [], NOW)[0];
     expect([ack.meta, ack.evidenceRecords, ack.timeline.map((x) => x.title)]).toEqual(["unknown customer · u1 · no policy", "2 attached", ["Alert detected", "Acknowledged", "Acknowledged — waiting for resolution"]]);
+    // the links of the detail: the unit and its customer (customers.id), and whether a policy or an inference raised it (IR318)
+    expect([r.unitId, r.customerId, r.policyless, r.inferred]).toEqual(["u1", "c-a", false, true]);
+    expect([ack.customerId, ack.policyless]).toEqual([null, true]);
+    expect(adminAlertRows([alert({ evidenceKind: "inspection" })], units, customers, [], NOW)[0].inferred).toBe(false);
   });
 
   it("lists the policies, the default first, with their condition in words", () => {

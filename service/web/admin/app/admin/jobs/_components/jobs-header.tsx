@@ -27,7 +27,7 @@ export function JobsTabs({ tab, counts, q, action }: { tab: string; counts: { jo
 }
 
 /** The scope selects; changing one clears the narrower ones and the selected job or plan (`clear`). */
-export function ScopeBar({ scope, q, text, clear }: { scope: { customers: { id: string; name: string }[]; properties: { id: string; name: string }[]; units: { id: string; name: string }[] }; q: Scope; text: string; clear: "jobId" | "planId" }) {
+export function ScopeBar({ scope, q, text, clear }: { scope: { customers: { id: string; name: string }[]; properties: { id: string; name: string }[]; units: { id: string; name: string }[] }; q: Scope; text: string; clear: "jobId" | "planId" | "alertId" }) {
   const t = useT();
   const patch = useUrlPatch();
   return (

@@ -4313,3 +4313,38 @@ Figma's demo shows ten contractor jobs; the seed has one (job-contractor-a). Mos
    - E2E: 73 passed, 8 skipped by design. The dev data holds the seed and the runs' cancelled scenario jobs.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR318 HQ alerts as DD-A05 asks; the seed's timestamps — 2026-10-11
+
+The method of IR315 was applied to the first nine HQ screens (Figma Admin): overview, customers, a customer's locations, unit edit, users, warranty & coverage, models, devices and alerts. hq-operator was the user. The overview, customers, locations, unit edit, users, warranty and models match Figma apart from data and the editor's layout.
+
+1. **The Alerts tab as DD-A05 items 5 and 11 and Figma 256:2 / 534:16158 describe it.** It had kept the selection and the status in local state, had no filters, and offered only Acknowledge and Resolve.
+   - The customer → property → unit scope, the severity, the status (the three tiles) and the selected alert are in the URL (`customerId`, `propertyId`, `unitId`, `severity`, `status`, `alertId`). The page passes the scope and the severity to `alerts.list`; the tiles count every status in the scope. A changed filter clears the selection. An empty list says so.
+   - The detail has three cards:
+     - the alert, with Acknowledge, Resolve…, **Request maintenance** and **Open unit →**;
+     - **Why we think this**: evidence, cause, observation time and evidence records, with the inference note only for inferred evidence;
+     - **Activity**: the timeline, that reading a notification does not acknowledge or resolve an alert and, for an alert without a policy, that no policy escalates it.
+   - **Request maintenance** opens `/admin/jobs?new=<unitId>&alertId=<id>`. The Jobs tab then opens New job for that unit, its symptom taken from the alert: “Alert {id}: {title} — {evidence}”. Closing the dialog drops the parameters.
+   - **Open unit →** opens the unit edit of the unit's customer.
+   - `adminAlertRows` adds the unit, the customer (`customers.id`), whether a policy raised the alert, and whether its evidence is inferred.
+   - The new `admin/alerts` E2E spec covers the filters, the empty status, the detail, both links and the prefilled New job; nothing is created.
+2. **The seed's timestamps (IR91 item 2).** Rows the fixture gives no createdAt or updatedAt must carry `fixture.seedCreatedAt`, 1 Sept 2026. The seed left them to the column default, `platform.app_now()`, which outside the API is the wall clock. So HQ read “customer since Oct 2026” and a capability “updated 11 Oct 2026” while the demo clock stood at 14 Sept. Eleven tables were affected:
+   - identity: organizations, users, memberships;
+   - assets: customers, properties, spaces, units;
+   - devices: capabilities, devices;
+   - monitoring.alert_policies and billing.invoices.
+   `seed.Apply` now sets the transaction's `app.now` to seedCreatedAt while it applies the fixture and clears it at the end. Rows with an explicit time keep theirs. The seed test checks those tables and that `app.now` is cleared; it fails without the change.
+3. **A test the earlier round broke.** IR317 renamed the workspace link to “Diagnostics →” and left its Malay entry “Diagnostic control →”. The i18n test, which refuses entries the code no longer shows, failed, and that round had not run Vitest. The rebuilt alerts tab retired five more entries. All six are gone. Every round now runs Vitest with the typecheck before committing.
+4. **Next.**
+   - **Devices tab.** It still has its older layout: no state chips, search or sort, and no tiles, bound-unit card, per-sensor Calibrate → or operation history table (Figma 246:2). The technician's devices screen already follows that layout.
+   - **Customer list.** For users without `restriction.read` it cannot show “Restriction applied”, although contracts list their `activeRestrictionIds`.
+   - **Resolving with evidence.** It still needs the evidence records behind `evidenceIds` (IR292, open).
+   - **The other HQ screens:** jobs and its tabs, contracts, billing, restrictions and their exceptions, automation policies, energy, MRV, offsets, audit, and access & roles.
+5. **Checked.**
+   - The typecheck and lint pass.
+   - Vitest: 61 files, 349 tests.
+   - All four apps build.
+   - E2E on a fresh seed: 74 passed, 8 skipped by design.
+   - make test-all passes, the seed test included. The migrate image is rebuilt.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
