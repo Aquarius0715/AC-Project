@@ -54,10 +54,16 @@ func TestAlerts(t *testing.T) {
 			t.Errorf("%s: %d want %d", body, len(items(m)), n)
 		}
 	}
+	want := map[string]string{ // the field each case is refused for
+		"{\"filters\":{\"from\":\"2026-09-14T01:00:00Z\",\"to\":\"2026-09-14T00:00:00Z\"}}": "filters.to=error.range",
+		"{\"filters\":{\"severity\":\"info\"}}":                                             "filters.severity=error.invalid",
+		"{\"filters\":{\"status\":\"x\"}}":                                                  "filters.status=error.invalid",
+		"{\"filters\":{\"z\":1}}":                                                           "z=error.notAllowed",
+		"{\"sort\":{\"field\":\"title\",\"direction\":\"asc\"}}":                            "sort.field=error.invalid",
+	}
 	for _, b := range []string{`{"filters":{"severity":"info"}}`, `{"filters":{"status":"x"}}`, `{"filters":{"from":"2026-09-14T01:00:00Z","to":"2026-09-14T00:00:00Z"}}`, `{"filters":{"z":1}}`, `{"sort":{"field":"title","direction":"asc"}}`} {
-		if code, _ := post(s, &hq, "alerts.list", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+		code, m := post(s, &hq, "alerts.list", b)
+		refusal(t, b, code, m, want[b])
 	}
 	// scope: customer-b sees, customer-a does not; units.list shows the active count
 	if code, _ := post(s, &customerB, "alerts.get", `{"id":"`+crit+`"}`); code != 200 {

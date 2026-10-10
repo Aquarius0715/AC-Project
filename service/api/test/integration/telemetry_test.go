@@ -168,10 +168,14 @@ func TestVentilation(t *testing.T) {
 	if len(items(m)) == 0 {
 		t.Fatal("hq list by unit")
 	}
+	want := map[string]string{ // the field each case is refused for
+		"{\"filters\":{\"from\":\"2026-09-14T01:00:00Z\",\"to\":\"2026-09-14T00:00:00Z\"}}": "filters.to=error.range",
+		"{\"filters\":{\"x\":1}}":                                 "x=error.notAllowed",
+		"{\"sort\":{\"field\":\"method\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+	}
 	for _, b := range []string{`{"filters":{"x":1}}`, `{"filters":{"from":"` + clock.Format(time.RFC3339) + `","to":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `"}}`, `{"sort":{"field":"method","direction":"asc"}}`} {
-		if code, _ := post(s, &hq, "ventilation.list", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+		code, m := post(s, &hq, "ventilation.list", b)
+		refusal(t, b, code, m, want[b])
 	}
 	if code, _ := post(s, &hq, "ventilation.list", `{"sort":{"field":"createdAt","direction":"asc"}}`); code != 200 {
 		t.Error("sort createdAt")

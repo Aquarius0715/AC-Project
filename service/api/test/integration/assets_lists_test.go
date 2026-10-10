@@ -29,10 +29,15 @@ func TestAssetLists(t *testing.T) {
 			t.Errorf("%s: %d", f, code)
 		}
 	}
+	want := map[string]string{ // the field each case is refused for
+		"{\"filters\":{\"kind\":\"x\"}}":                        "filters.kind=error.invalid",
+		"{\"filters\":{\"status\":\"x\"}}":                      "filters.status=error.invalid",
+		"{\"filters\":{\"x\":1}}":                               "x=error.notAllowed",
+		"{\"sort\":{\"field\":\"name\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+	}
 	for _, f := range []string{`{"filters":{"kind":"x"}}`, `{"filters":{"status":"x"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"name","direction":"asc"}}`} {
-		if code, _ := post(s, &hq, "customers.list", f); code != 422 {
-			t.Errorf("%s: %d", f, code)
-		}
+		code, m := post(s, &hq, "customers.list", f)
+		refusal(t, f, code, m, want[f])
 	}
 	// properties: client sees own only
 	_, m = post(s, &customerA, "properties.list", `{}`)

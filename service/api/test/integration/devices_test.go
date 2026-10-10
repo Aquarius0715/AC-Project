@@ -92,10 +92,13 @@ func TestDevicesRegisterListGet(t *testing.T) {
 	if len(items(m)) != 1 {
 		t.Fatalf("list by unit: %v", m)
 	}
+	want := map[string]string{ // the field each case is refused for
+		"{\"filters\":{\"status\":\"x\"}}": "filters.status=error.invalid",
+		"{\"filters\":{\"y\":1}}":          "y=error.notAllowed",
+	}
 	for _, b := range []string{`{"filters":{"status":"x"}}`, `{"filters":{"y":1}}`} {
-		if code, _ := post(s, &hq, "devices.list", b); code != 422 {
-			t.Errorf("%s", b)
-		}
+		code, m := post(s, &hq, "devices.list", b)
+		refusal(t, b, code, m, want[b])
 	}
 	_, m = post(s, &customerA, "devices.list", `{"limit":100}`)
 	for _, it := range items(m) {
@@ -181,15 +184,20 @@ func TestDeviceBindAndOperations(t *testing.T) {
 		t.Fatalf("calibrate: %d %v", code, m)
 	}
 	v++
+	want := map[string]string{ // the field each case is refused for
+		"future":         "calibratedAt=error.future",
+		"metric differs": "metric=error.sensorMismatch",
+		"other sensor":   "sensorId=error.notOnDevice",
+		"unit mismatch":  "unit=error.unitMismatch",
+	}
 	for name, b := range map[string]string{
 		"future":         `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"temperature","unit":"°C","referenceValue":1,"measuredValue":1,"calibratedAt":"2030-01-01T00:00:00Z"}`,
 		"unit mismatch":  `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"temperature","unit":"%","referenceValue":1,"measuredValue":1,"calibratedAt":"2026-09-14T00:30:00Z"}`,
 		"other sensor":   `{"deviceId":"` + dev + `","sensorId":"` + uuid.NewString() + `","metric":"temperature","unit":"°C","referenceValue":1,"measuredValue":1,"calibratedAt":"2026-09-14T00:30:00Z"}`,
 		"metric differs": `{"deviceId":"` + dev + `","sensorId":"` + sensor + `","metric":"humidity","unit":"%","referenceValue":1,"measuredValue":1,"calibratedAt":"2026-09-14T00:30:00Z"}`,
 	} {
-		if code, _ := write(s, &hq, "devices.calibrate", b, v); code != 422 {
-			t.Errorf("calibrate %s: %d", name, code)
-		}
+		code, m := write(s, &hq, "devices.calibrate", b, v)
+		refusal(t, name, code, m, want[name])
 	}
 	code, m = write(s, &hq, "devices.check", `{"id":"`+dev+`"}`, v)
 	if code != 200 || data(m)["status"] != "queued" || data(m)["kind"] != "check" {

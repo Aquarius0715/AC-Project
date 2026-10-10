@@ -55,10 +55,23 @@ func TestCapabilities(t *testing.T) {
 		"dup firmware":   strings.Replace(capBody("", "x9", ""), `["v1"]`, `["v1","v1"]`, 1),
 		"modes required": strings.Replace(capBody("", "x10", ""), `"modes":["cool","dry"]`, `"modes":[]`, 1),
 	}
+	// the field each case is refused for
+	want := map[string]string{
+		"bad mode":       "modes=error.invalid",
+		"boundary":       "sensors[0].boundaryId=error.invalid",
+		"dup fan":        "fanLevels=error.invalid",
+		"dup firmware":   "firmwareCandidates=error.invalid",
+		"empty name":     "model=error.length",
+		"modes required": "modes=error.invalid",
+		"no control":     "control=error.controlRequired",
+		"stale too low":  "sensors[0].staleAfterSeconds=error.range",
+		"temp range":     "temperature=error.range",
+		"unit mismatch":  "sensors[0].unit=error.unitMismatch",
+		"vent levels":    "ventilationLevels=error.invalid",
+	}
 	for name, b := range bad {
-		if code, _ := write(s, &hq, "capabilities.save", b, 0); code != 422 {
-			t.Errorf("%s: %d", name, code)
-		}
+		code, m := write(s, &hq, "capabilities.save", b, 0)
+		refusal(t, name, code, m, want[name])
 	}
 	// a unit on this model moves to the new capability version
 	_, um := write(s, &hq, "units.save", `{"customerOrgId":"`+seed.ID("org-customer-b").String()+`","propertyId":"`+seed.ID("property-home-b").String()+`","spaceId":null,"displayName":"Cap AC `+uuid.NewString()[:4]+`","modelId":"`+id+`","type":"split","installedAt":null,"serviceScope":["indoor"]}`, 0)

@@ -27,6 +27,18 @@ func TestContractsAndInvoices(t *testing.T) {
 		}
 		return "{" + strings.Join(parts, ",") + "}"
 	}
+	// the field each case is refused for
+	want := map[string]string{
+		"bad currency":        "currency=error.invalid",
+		"duplicate unit":      "unitIds=error.duplicate",
+		"general restricted":  "restrictionEligible=errors.rto_only",
+		"negative price":      "priceMinor=error.range",
+		"no units":            "unitIds=error.count",
+		"other customer unit": "unitIds=error.otherCustomerUnit",
+		"reversed term":       "endAt=error.range",
+		"rto without rules":   "rulesVersion=error.required",
+		"rules not eligible":  "rulesVersion=error.notAllowed",
+	}
 	for name, e := range map[string]map[string]string{
 		"general restricted":  {"planType": `"general"`},
 		"rto without rules":   {"rulesVersion": "null"},
@@ -38,9 +50,8 @@ func TestContractsAndInvoices(t *testing.T) {
 		"other customer unit": {"unitIds": `["` + seed.ID("unit-non-rto").String() + `"]`},
 		"duplicate unit":      {"unitIds": `["` + u + `","` + u + `"]`},
 	} {
-		if code, _ := write(s, &hq, "contracts.save", body(e), 0); code != 422 {
-			t.Errorf("contract %s: %d", name, code)
-		}
+		code, m := write(s, &hq, "contracts.save", body(e), 0)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := write(s, &hq, "contracts.save", body(map[string]string{"customerId": `"` + uuid.NewString() + `"`}), 0); code != 404 {
 		t.Error("unknown customer")

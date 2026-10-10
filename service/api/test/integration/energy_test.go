@@ -80,6 +80,17 @@ func TestBaselines(t *testing.T) {
 	body := func(method, extra string) string {
 		return `{"unitIds":["` + u + `"],"period":` + period + `,"boundaryId":"ac_input_electricity","boundary":"AC input","assumptions":"demo","source":"test","method":"` + method + `"` + extra + `}`
 	}
+	// the field each case is refused for
+	want := map[string]string{
+		"bad method":             "method=error.invalid",
+		"comparison on building": "boundaryId=errors.boundary_not_measurable",
+		"comparison with value":  "baselineKWh=error.notAllowed",
+		"fixed without value":    "baselineKWh=error.range",
+		"negative fixed":         "baselineKWh=error.range",
+		"no units":               "unitIds=error.invalid",
+		"unaligned period":       "period=errors.energy_range",
+		"unknown unit":           "unitIds=errors.unit_unknown",
+	}
 	for name, b := range map[string]string{
 		"fixed without value":    body("demo_fixed", ""),
 		"negative fixed":         body("demo_fixed", `,"baselineKWh":-1`),
@@ -90,9 +101,8 @@ func TestBaselines(t *testing.T) {
 		"unknown unit":           strings.Replace(body("demo_fixed", `,"baselineKWh":1`), u, uuid.NewString(), 1),
 		"bad method":             body("guess", ""),
 	} {
-		if code, m := write(s, &hq, "baselines.save", b, 0); code != 422 {
-			t.Errorf("%s: %d %v", name, code, m)
-		}
+		code, m := write(s, &hq, "baselines.save", b, 0)
+		refusal(t, name, code, m, want[name])
 	}
 	code, m := write(s, &hq, "baselines.save", body("demo_period_comparison", ""), 0)
 	q, _ := data(m)["quality"].(map[string]any)

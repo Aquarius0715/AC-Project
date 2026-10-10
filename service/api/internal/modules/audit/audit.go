@@ -89,15 +89,22 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 	var f Filter
 	bad := apperr.Fields(map[string]string{"filters": "error.invalid"})
 	if len(in.Filters) == 0 {
-		return paging.Page[View]{}, apperr.Fields(map[string]string{"filters.from": "error.required"})
+		return paging.Page[View]{}, apperr.Fields(map[string]string{"filters.from": "error.required", "filters.to": "error.required"})
 	}
 	dec := json.NewDecoder(strings.NewReader(string(in.Filters)))
 	dec.DisallowUnknownFields()
 	if dec.Decode(&f) != nil || (f.Result != nil && !slices.Contains([]string{"success", "denied", "failed", "pending"}, *f.Result)) {
 		return paging.Page[View]{}, bad
 	}
-	if f.From == nil || f.To == nil {
-		return paging.Page[View]{}, apperr.Fields(map[string]string{"filters.from": "error.required"})
+	if f.From == nil || f.To == nil { // the period is required: name the end that is missing
+		fe := map[string]string{}
+		if f.From == nil {
+			fe["filters.from"] = "error.required"
+		}
+		if f.To == nil {
+			fe["filters.to"] = "error.required"
+		}
+		return paging.Page[View]{}, apperr.Fields(fe)
 	}
 	if !f.From.Before(*f.To) || f.To.Sub(*f.From) > 366*24*time.Hour {
 		return paging.Page[View]{}, apperr.Fields(map[string]string{"filters.to": "errors.period_range"})

@@ -90,10 +90,14 @@ func TestUnitsCoverage(t *testing.T) {
 	for _, b := range []string{`{"sort":{"field":"name","direction":"desc"},"limit":100}`, `{"sort":{"field":"id","direction":"asc"},"limit":100}`, `{"sort":{"field":"dueAt","direction":"desc"},"limit":2}`} {
 		byUnit(b)
 	}
+	want := map[string]string{ // the field each case is refused for
+		"{\"filters\":{\"coverage\":\"x\"}}":                      "filters.coverage=error.invalid",
+		"{\"filters\":{\"expiringWithinDays\":0}}":                "filters.expiringWithinDays=error.range",
+		"{\"sort\":{\"field\":\"status\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+	}
 	for _, b := range []string{`{"filters":{"coverage":"x"}}`, `{"filters":{"expiringWithinDays":0}}`, `{"sort":{"field":"status","direction":"asc"}}`} {
-		if code, _ := post(s, &hq, "units.coverage", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+		code, m := post(s, &hq, "units.coverage", b)
+		refusal(t, b, code, m, want[b])
 	}
 	if code, _ := post(s, &customerA, "units.coverage", `{}`); code != 403 {
 		t.Error("client cannot read coverage")

@@ -34,14 +34,18 @@ func TestPaymentSimulation(t *testing.T) {
 	sim := func(body string, v int) (int, map[string]any) {
 		return write(s, &customerB, "payments.simulate", body, v)
 	}
+	want := map[string]string{ // the field each case is refused for
+		"bad event":     "event=error.invalid",
+		"bad method":    "method=error.invalid",
+		"not confirmed": "invoiceId=error.required",
+	}
 	for name, b := range map[string]string{
 		"bad method":    `{"event":"initiate","invoiceId":"` + inv + `","method":"cash","demoConfirmed":true}`,
 		"not confirmed": `{"event":"initiate","invoiceId":"` + inv + `","method":"demo_credit_card","demoConfirmed":false}`,
 		"bad event":     `{"event":"refund","invoiceId":"` + inv + `","demoConfirmed":true}`,
 	} {
-		if code, _ := sim(b, 1); code != 422 {
-			t.Errorf("simulate %s: %d", name, code)
-		}
+		code, m := sim(b, 1)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, m := sim(`{"event":"instructions","invoiceId":"`+inv+`","demoConfirmed":true}`, 1); code != 200 || data(m)["deliveryState"] != "preview" {
 		t.Fatalf("instructions: %d %v", code, m)

@@ -23,6 +23,14 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	add := func(file string, v int) (int, map[string]any) {
 		return write(s, &techInt, "attachments.add", `{"jobId":"`+job+`","reportId":"`+rep+`","file":`+file+`}`, v)
 	}
+	want := map[string]string{ // the field each case is refused for
+		"empty":         "file=error.invalidFile",
+		"gif":           "file=error.invalidFile",
+		"no name":       "file=error.invalidFile",
+		"not a png":     "file=error.invalidFile",
+		"png as jpeg":   "file=error.invalidFile",
+		"size mismatch": "file=error.invalidFile",
+	}
 	for name, f := range map[string]string{
 		"gif":           blobJSON("a.gif", "image/gif", img, len(img)),
 		"size mismatch": blobJSON("a.png", "image/png", img, 3),
@@ -31,9 +39,8 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		"not a png":     blobJSON("a.png", "image/png", []byte("<svg onload=alert(1)>"), 21), // stored and served only as what it is (IR308)
 		"png as jpeg":   blobJSON("a.jpg", "image/jpeg", img, len(img)),
 	} {
-		if code, _ := add(f, 1); code != 422 {
-			t.Errorf("add %s: %d", name, code)
-		}
+		code, m := add(f, 1)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := add(blobJSON("a.png", "image/png", img, len(img)), 2); code != 409 {
 		t.Error("stale report version")
@@ -57,6 +64,13 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		return write(s, &techInt, "reports.signOff", `{"jobId":"`+job+`","reportId":"`+rep+`","reportVersion":`+itoa(rv)+`,"signerName":" Aisha "`+extra+`}`, v)
 	}
 	sig := blobJSON("sig.png", "image/png", img, len(img))
+	want = map[string]string{ // the field each case is refused for
+		"absent without photo": "signature=errors.signature_or_absence",
+		"blank absent reason":  "absentReason=error.length",
+		"both":                 "signature=errors.signature_or_absence",
+		"jpeg signature":       "signature=error.invalidFile",
+		"neither":              "signature=errors.signature_or_absence",
+	}
 	for name, extra := range map[string]string{
 		"neither":              `,"signature":null`,
 		"both":                 `,"signature":` + sig + `,"absentReason":"out","sitePhoto":` + sig,
@@ -64,9 +78,8 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		"absent without photo": `,"signature":null,"absentReason":"out"`,
 		"blank absent reason":  `,"signature":null,"absentReason":" ","sitePhoto":` + sig,
 	} {
-		if code, _ := sign(extra, 3, 3); code != 422 {
-			t.Errorf("signOff %s: %d", name, code)
-		}
+		code, m := sign(extra, 3, 3)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := sign(`,"signature":`+sig, 3, 2); code != 409 {
 		t.Error("signOff of an old version")

@@ -4668,3 +4668,21 @@ R321 checked the User Flows page after IR327. The HQ flow's 05-2 "Resolve alert"
    The new checks of VALIDATION name the field they expect, so a body that fails on another rule does not pass them. Older checks that test the status code only are reviewed in later rounds.
 
 Both Go suites pass (`make test-all`): 138 integration tests and 84 unit tests. Coverage is 88.3 %.
+
+## IR331 VALIDATION checks name their field; audit.list names the missing end of its period — 2026-10-11
+
+IR330 found two checks that passed only because another rule refused their body first. R322 traced every VALIDATION response of the integration suite: 870 responses, recorded by an instrumented copy of the request helpers that is not committed. Each response was matched to the check that asked for it.
+
+1. **Checks that missed their rule.**
+   - `TestAgreedSlotsAndInputs`: the "input shape" cases of jobs.offer and jobs.assign carried no jobId, so the missing ID refused them. They never reached the reversed visit slot, access window or assignment times. They now carry the job and name `visitSlot`, `accessValidUntil` and `endAt`.
+   - The accept and decline cases are refused as malformed, because each carries a field of the other decision; they now name `_`.
+   - `TestAssetWritesLifecycle`: the long-address case of properties.save had no customerOrgId, so it failed on two fields at once. It now has the customer, names `address`, and a separate case names `customerOrgId`.
+2. **Table checks name their field.** The table-driven checks name the field and message key that each case is refused for. They use the new helper `refusal` (test/integration/refusal_test.go), and a case without an expected key fails. This covers 47 tables and about 280 cases (43 through `refusal`, four written by hand), among them policies.save (27), automation policies (20), the report draft (14), automation schedules (13), capabilities (11), jobs.list (10), contracts (9), the schedule preview (9) and baselines (8). Every case kept the response it had: the traced keys matched the case names.
+3. **Left as they were.**
+   - Ten tables are keyed by a body that holds IDs made during the run (a new unit, device or job), so a key written in the source would not match the next run. These still check the status only. The query catalog test checks every row's unknown sort field generically.
+   - About 150 single checks of one body still test the status code only.
+4. **audit.list (DD-A16).**
+   - A missing end of the period is named: `filters.to: error.required` when only from is given, and `filters.from` when only to is. Without filters, both ends are named.
+   - Before, every missing end read `filters.from`, which pointed at the wrong field when only `to` was missing. The HQ audit screen always sends both ends, so the screens do not change.
+
+Both Go suites pass (`make test-all`): 138 integration tests and 84 unit tests.

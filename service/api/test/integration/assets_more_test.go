@@ -156,10 +156,15 @@ func TestOrganizations(t *testing.T) {
 	if code != 200 || len(items(m)) < 2 {
 		t.Fatalf("list: %d %v", code, m)
 	}
+	want := map[string]string{ // the field each case is refused for
+		"{\"filters\":{\"kind\":\"x\"}}":                        "filters.kind=error.invalid",
+		"{\"filters\":{\"status\":\"x\"}}":                      "filters.status=error.invalid",
+		"{\"filters\":{\"y\":1}}":                               "y=error.notAllowed",
+		"{\"sort\":{\"field\":\"name\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+	}
 	for _, f := range []string{`{"filters":{"kind":"x"}}`, `{"filters":{"status":"x"}}`, `{"filters":{"y":1}}`, `{"sort":{"field":"name","direction":"asc"}}`} {
-		if code, _ := post(s, &hq, "organizations.list", f); code != 422 {
-			t.Errorf("%s: %d", f, code)
-		}
+		code, m := post(s, &hq, "organizations.list", f)
+		refusal(t, f, code, m, want[f])
 	}
 	if code, _ := post(s, &customerA, "organizations.list", `{}`); code != 403 {
 		t.Error("client cannot list organizations")

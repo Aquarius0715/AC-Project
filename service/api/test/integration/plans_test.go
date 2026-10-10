@@ -16,15 +16,20 @@ func TestPlans(t *testing.T) {
 	body := func(extra string) string {
 		return `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":3},"nextDueAt":"` + next.Format(time.RFC3339) + `"` + extra + `}`
 	}
+	want := map[string]string{ // the field each case is refused for
+		"interval 0":  "recurrence=error.invalid",
+		"interval 13": "recurrence=error.invalid",
+		"past":        "nextDueAt=error.past",
+		"weekly":      "recurrence=error.invalid",
+	}
 	for name, b := range map[string]string{
 		"interval 0":  `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":0},"nextDueAt":"` + next.Format(time.RFC3339) + `"}`,
 		"interval 13": `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":13},"nextDueAt":"` + next.Format(time.RFC3339) + `"}`,
 		"weekly":      `{"unitId":"` + unit + `","recurrence":{"kind":"weekly","intervalMonths":1},"nextDueAt":"` + next.Format(time.RFC3339) + `"}`,
 		"past":        `{"unitId":"` + unit + `","recurrence":{"kind":"monthly","intervalMonths":3},"nextDueAt":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `"}`,
 	} {
-		if code, _ := write(s, &hq, "plans.save", b, 0); code != 422 {
-			t.Errorf("save %s: %d", name, code)
-		}
+		code, m := write(s, &hq, "plans.save", b, 0)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := write(s, &hq, "plans.save", `{"unitId":"`+uuid.NewString()+`","recurrence":{"kind":"monthly","intervalMonths":3},"nextDueAt":"`+next.Format(time.RFC3339)+`"}`, 0); code != 404 {
 		t.Error("unknown unit")

@@ -233,19 +233,27 @@ func TestAgreedSlotsAndInputs(t *testing.T) {
 	if code, m := write(s, &hq, "jobs.assign", `{"jobId":"`+pj+`","technicianMembershipId":"`+seed.ID("tech-internal-a").String()+`","startAt":"`+ts(60)+`","endAt":"`+ts(62)+`"}`, 1); code != 200 {
 		t.Fatalf("plan occurrence slot: %d %v", code, m)
 	}
-	// input shape errors
-	for op, b := range map[string]string{
-		"jobs.offer":   `{"visitSlot":{"startAt":"` + ts(3) + `","endAt":"` + ts(2) + `"},"offerExpiresAt":"` + ts(5) + `","accessValidFrom":"` + ts(6) + `","accessValidUntil":"` + ts(4) + `","termsVersion":"t"}`,
-		"jobs.accept":  `{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","reason":"x"}`,
-		"jobs.decline": `{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t"}`,
-		"jobs.assign":  `{"startAt":"` + ts(3) + `","endAt":"` + ts(2) + `","reason":"` + string(make([]byte, 0)) + `"}`,
+	// input shape errors: reversed times, and a field of the other decision (not an input field: malformed)
+	for op, c := range map[string]struct {
+		body   string
+		fields []string
+	}{
+		"jobs.offer": {`{"jobId":"` + job + `","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `","visitSlot":{"startAt":"` + ts(3) + `","endAt":"` + ts(2) +
+			`"},"offerExpiresAt":"` + ts(5) + `","accessValidFrom":"` + ts(6) + `","accessValidUntil":"` + ts(4) + `","termsVersion":"t"}`, []string{"visitSlot", "accessValidUntil"}},
+		"jobs.accept":  {`{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","reason":"x"}`, []string{"_"}},
+		"jobs.decline": {`{"jobId":"` + job + `","offerId":"` + uuid.NewString() + `","termsVersion":"t"}`, []string{"_"}},
+		"jobs.assign":  {`{"jobId":"` + job + `","technicianMembershipId":"` + seed.ID("tech-internal-a").String() + `","startAt":"` + ts(3) + `","endAt":"` + ts(2) + `"}`, []string{"endAt"}},
 	} {
 		a := &hq
 		if op == "jobs.accept" || op == "jobs.decline" {
 			a = &contrA
 		}
-		if code, _ := write(s, a, op, b, 1); code != 422 {
-			t.Errorf("%s shape: %d", op, code)
+		code, m := write(s, a, op, c.body, 1)
+		fe, _ := m["fieldErrors"].(map[string]any)
+		for _, f := range c.fields {
+			if code != 422 || fe[f] == nil {
+				t.Errorf("%s shape: %d %v, want %s", op, code, fe, f)
+			}
 		}
 	}
 	if code, _ := write(s, &contrA, "jobs.accept", `{"offerId":"`+uuid.NewString()+`","termsVersion":"t","reason":"x"}`, 1); code != 422 {

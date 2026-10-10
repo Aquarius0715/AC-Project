@@ -16,10 +16,13 @@ func TestOffsets(t *testing.T) {
 	quote := func(a *actor, extra string) (int, map[string]any) {
 		return write(s, a, "offsets.preview", `{"purpose":"Offset September usage","amountKg":12.5,"period":{"from":"2026-09-01T00:00:00Z","to":"2026-09-14T00:00:00Z"},"unitIds":["`+u+`"]`+extra+`}`, 0)
 	}
+	want := map[string]string{ // the field each case is refused for
+		"4 decimals": "amountKg=error.range",
+		"zero kg":    "amountKg=error.range",
+	}
 	for name, b := range map[string]string{"zero kg": `,"amountKg":0`, "4 decimals": `,"amountKg":1.2345`} {
-		if code, _ := write(s, &customerB, "offsets.preview", `{"purpose":"x","period":{"from":"2026-09-01T00:00:00Z","to":"2026-09-14T00:00:00Z"},"unitIds":["`+u+`"]`+b+`}`, 0); code != 422 {
-			t.Errorf("%s accepted", name)
-		}
+		code, m := write(s, &customerB, "offsets.preview", `{"purpose":"x","period":{"from":"2026-09-01T00:00:00Z","to":"2026-09-14T00:00:00Z"},"unitIds":["`+u+`"]`+b+`}`, 0)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := quote(&customerA, ""); code != 404 {
 		t.Error("client quotes another customer's unit")

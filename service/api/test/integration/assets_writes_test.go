@@ -60,14 +60,15 @@ func TestAssetWritesLifecycle(t *testing.T) {
 	if code, m := write(s, &hq, "properties.save", `{"customerOrgId":"`+org+`","kind":"home","name":" `+strings.ToLower(propName)+`","address":null,"accessInstructions":null}`, 0); code != 409 || m["messageKey"] != "error.duplicateSiblingName" {
 		t.Errorf("duplicate property name: %d %v", code, m)
 	}
-	for _, bad := range []string{
-		`{"customerOrgId":"` + org + `","kind":"castle","name":"x","address":null,"accessInstructions":null}`,
-		`{"customerOrgId":"` + org + `","kind":"home","name":"","address":null,"accessInstructions":null}`,
-		`{"customerOrgId":"` + org + `","kind":"home","name":"` + strings.Repeat("x", 121) + `","address":null,"accessInstructions":null}`,
-		`{"kind":"home","name":"x","address":"` + strings.Repeat("a", 501) + `","accessInstructions":null}`,
+	for bad, field := range map[string]string{
+		`{"customerOrgId":"` + org + `","kind":"castle","name":"x","address":null,"accessInstructions":null}`:                              "kind",
+		`{"customerOrgId":"` + org + `","kind":"home","name":"","address":null,"accessInstructions":null}`:                                 "name",
+		`{"customerOrgId":"` + org + `","kind":"home","name":"` + strings.Repeat("x", 121) + `","address":null,"accessInstructions":null}`: "name",
+		`{"customerOrgId":"` + org + `","kind":"home","name":"x","address":"` + strings.Repeat("a", 501) + `","accessInstructions":null}`:  "address",
+		`{"kind":"home","name":"x","address":null,"accessInstructions":null}`:                                                              "customerOrgId",
 	} {
-		if code, _ := write(s, &hq, "properties.save", bad, 0); code != 422 {
-			t.Errorf("property validation %s: %d", bad[:40], code)
+		if code, m := write(s, &hq, "properties.save", bad, 0); code != 422 || len(m["fieldErrors"].(map[string]any)) != 1 || m["fieldErrors"].(map[string]any)[field] == nil {
+			t.Errorf("property validation %s: %d %v, want %s", bad[:40], code, m["fieldErrors"], field)
 		}
 	}
 	if code, _ := write(s, &hq, "properties.save", `{"customerOrgId":"`+uuid.NewString()+`","kind":"home","name":"x","address":null,"accessInstructions":null}`, 0); code != 404 {
@@ -156,10 +157,18 @@ func TestAssetWritesLifecycle(t *testing.T) {
 		"empty scope":     strings.Replace(unitBody("", "", ""), `["indoor","outdoor"]`, `[]`, 1),
 		"space elsewhere": unitBody("", seed.ID("room-1").String(), ""),
 	}
+	want := map[string]string{ // the field each case is refused for
+		"bad scope":       "serviceScope=error.invalid",
+		"dup scope":       "serviceScope=error.invalid",
+		"empty scope":     "serviceScope=error.required",
+		"future install":  "installedAt=error.future",
+		"other customer":  "propertyId=error.otherCustomer",
+		"space elsewhere": "spaceId=error.otherProperty",
+		"unknown model":   "modelId=error.unknownModel",
+	}
 	for name, b := range badUnits {
-		if code, _ := write(s, &hq, "units.save", b, 0); code != 422 {
-			t.Errorf("%s: %d", name, code)
-		}
+		code, m := write(s, &hq, "units.save", b, 0)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := write(s, &hq, "units.save", unitBody(unit, floor, ""), 1); code != 422 {
 		t.Error("relocation without reason")

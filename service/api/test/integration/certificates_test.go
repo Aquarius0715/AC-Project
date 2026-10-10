@@ -18,6 +18,13 @@ func TestCertificatesAndParts(t *testing.T) {
 	body := func(extra string) string {
 		return `{"membershipId":"` + tech + `","code":"demo_indoor","name":" Indoor AC ","number":"N-1","issuedAt":"` + issued + `","expiresAt":"` + expires + `","file":` + pdf + extra + `}`
 	}
+	want := map[string]string{ // the field each case is refused for
+		"bad code":       "code=error.invalid",
+		"blank name":     "name=error.length",
+		"gif file":       "file=error.invalidFile",
+		"not a pdf":      "file=error.invalidFile",
+		"reversed dates": "expiresAt=error.range",
+	}
 	for name, b := range map[string]string{
 		"bad code":       strings.Replace(body(""), `"demo_indoor"`, `"demo_roof"`, 1),
 		"blank name":     strings.Replace(body(""), `" Indoor AC "`, `" "`, 1),
@@ -25,9 +32,8 @@ func TestCertificatesAndParts(t *testing.T) {
 		"gif file":       `{"membershipId":"` + tech + `","code":"demo_indoor","name":"x","number":"N","issuedAt":"` + issued + `","expiresAt":"` + expires + `","file":` + blobJSON("a.gif", "image/gif", []byte("x"), 1) + `}`,
 		"not a pdf":      strings.Replace(body(""), pdf, blobJSON("cert.pdf", "application/pdf", []byte("<html>"), 6), 1),
 	} {
-		if code, _ := write(s, &contrA, "certificates.submit", b, 0); code != 422 {
-			t.Errorf("submit %s: %d", name, code)
-		}
+		code, m := write(s, &contrA, "certificates.submit", b, 0)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := write(s, &contrB, "certificates.submit", body(""), 0); code != 404 {
 		t.Error("other contractor's technician")

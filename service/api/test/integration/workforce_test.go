@@ -71,14 +71,18 @@ func TestEligibleCapacityUnavailability(t *testing.T) {
 		t.Error("contractor sees internal technicians")
 	}
 	// unavailability: reports conflicts, removes availability and eligibility
+	want := map[string]string{ // the field each case is refused for
+		"32 days":        "to=error.range",
+		"bad type":       "type=error.invalid",
+		"to before from": "to=error.range",
+	}
 	for name, b := range map[string]string{
 		"to before from": `{"membershipId":"` + tech.String() + `","from":"2026-09-15","to":"2026-09-14","type":"sick"}`,
 		"32 days":        `{"membershipId":"` + tech.String() + `","from":"2026-09-01","to":"2026-10-03","type":"sick"}`,
 		"bad type":       `{"membershipId":"` + tech.String() + `","from":"2026-09-14","to":"2026-09-14","type":"holiday"}`,
 	} {
-		if code, _ := write(s, &hq, "members.setUnavailability", b, 0); code != 422 {
-			t.Errorf("unavailability %s: %d", name, code)
-		}
+		code, m := write(s, &hq, "members.setUnavailability", b, 0)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := write(s, &contrA, "members.setUnavailability", `{"membershipId":"`+tech.String()+`","from":"2026-09-14","to":"2026-09-14","type":"sick"}`, 0); code != 404 {
 		t.Error("contractor sets another organization's technician")

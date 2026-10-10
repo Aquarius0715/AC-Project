@@ -92,9 +92,23 @@ func TestPolicies(t *testing.T) {
 		"technician recipient":     {"recipientMembershipIds": `["` + seed.ID("tech-internal-a").String() + `"]`},
 		"unknown field":            {"color": `"red"`},
 	}
+	// the field each case is refused for
+	want := map[string]string{
+		"recovery direction gte": "recoveryThreshold=error.recoveryDirection", "recovery direction lte": "recoveryThreshold=error.recoveryDirection",
+		"duration 0": "durationSeconds=error.range", "duration > 86400": "durationSeconds=error.range", "no recipients": "recipientMembershipIds=error.invalid",
+		"channels without inApp": "channels=error.invalid", "duplicate channel": "channels=error.invalid", "bad channel": "channels=error.invalid",
+		"blank name": "name=error.length", "name too long": "name=error.length", "priority 101": "priority=error.range", "bad timezone": "timezone=error.invalid",
+		"cooldown 0": "cooldownMinutes=error.range", "escalate 1441": "escalateAfterMinutes=error.range", "bad severity": "severity=error.invalid",
+		"unknown metric": "metric=error.invalid", "bad operator": "operator=error.invalid", "window weekday 0": "activeWindow.weekdays=error.invalid",
+		"window duplicate weekday": "activeWindow.weekdays=error.invalid", "window same times": "activeWindow=error.window", "window bad time": "activeWindow=error.window",
+		"unitIds are not input": "unitIds=error.unitsAttachOnUnit", "missing condition": "condition=error.required", "client metric": "metric=error.invalid",
+		"recipient of other org": "recipientMembershipIds=error.recipientCannotRead", "technician recipient": "recipientMembershipIds=error.recipientCannotRead",
+		"unknown field": "_=error.malformedInput",
+	}
 	for name, e := range bad {
-		if code, _ := write(s, &customerA, "policies.save", alertPolicyBody(e), 0); code != 422 {
-			t.Errorf("%s: %d", name, code)
+		field, key, _ := strings.Cut(want[name], "=")
+		if code, m := write(s, &customerA, "policies.save", alertPolicyBody(e), 0); code != 422 || m["fieldErrors"].(map[string]any)[field] != key {
+			t.Errorf("%s: %d %v, want %s", name, code, m["fieldErrors"], want[name])
 		}
 	}
 	// overnight window, HQ-only metric and HQ recipient are valid for HQ
@@ -197,10 +211,14 @@ func TestPolicies(t *testing.T) {
 			t.Fatalf("name desc: %v", names)
 		}
 	}
+	want = map[string]string{ // the field each case is refused for
+		"{\"filters\":{\"kind\":\"air_quality\"}}":                "filters.kind=error.invalid",
+		"{\"filters\":{\"x\":1}}":                                 "x=error.notAllowed",
+		"{\"sort\":{\"field\":\"metric\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+	}
 	for _, b := range []string{`{"filters":{"kind":"air_quality"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"metric","direction":"asc"}}`} {
-		if code, _ := post(s, &hq, "policies.list", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+		code, m := post(s, &hq, "policies.list", b)
+		refusal(t, b, code, m, want[b])
 	}
 	for _, sf := range []string{"priority", "updatedAt"} {
 		if code, _ := post(s, &hq, "policies.list", `{"sort":{"field":"`+sf+`","direction":"asc"}}`); code != 200 {
@@ -227,11 +245,15 @@ func TestPolicies(t *testing.T) {
 	swapped := strings.Replace(string(raw), `"ruleKey":"ventilation_co2"`, `"ruleKey":"dust_pm25"`, 1)
 	rules[1].(map[string]any)["metric"] = "temperature"
 	wrongMetric, _ := json.Marshal(rules)
+	want = map[string]string{ // the field each case is refused for
+		"five rules":     "rules=error.fixedRules",
+		"metric changed": "rules.1.metric=error.invalid",
+		"reordered keys": "rules=error.fixedRules",
+	}
 	for name, body := range map[string]string{"reordered keys": swapped, "five rules": "[" + strings.Join(strings.SplitN(string(raw)[1:], "},", 6)[:5], "},") + "}]",
 		"metric changed": string(wrongMetric)} {
-		if code, _ := write(s, &hq, "policies.save", `{"kind":"default_alert","id":"`+def+`","rules":`+body+`}`, dv); code != 422 {
-			t.Errorf("%s: %d", name, code)
-		}
+		code, m := write(s, &hq, "policies.save", `{"kind":"default_alert","id":"`+def+`","rules":`+body+`}`, dv)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := write(s, &hq, "policies.save", `{"kind":"default_alert","id":"`+pid+`","rules":`+string(raw)+`}`, 3); code != 422 {
 		t.Error("alert policy saved as default")

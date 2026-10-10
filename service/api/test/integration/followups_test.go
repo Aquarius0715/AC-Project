@@ -26,6 +26,14 @@ func TestRateAndReportProblem(t *testing.T) {
 	rate := func(a *actor, body string, v int) (int, map[string]any) {
 		return write(s, a, "jobs.rate", `{"jobId":"`+job+`",`+body+`}`, v)
 	}
+	want := map[string]string{ // the field each case is refused for
+		"duplicate tag": "tags=error.invalid",
+		"long comment":  "comment=error.length",
+		"no tags":       "tags=error.required",
+		"stars 0":       "stars=error.range",
+		"stars 6":       "stars=error.range",
+		"unknown tag":   "tags=error.invalid",
+	}
 	for name, b := range map[string]string{
 		"stars 0":       `"stars":0,"tags":[]`,
 		"stars 6":       `"stars":6,"tags":[]`,
@@ -34,9 +42,8 @@ func TestRateAndReportProblem(t *testing.T) {
 		"long comment":  `"stars":4,"tags":[],"comment":"` + strings.Repeat("c", 1001) + `"`,
 		"no tags":       `"stars":4`,
 	} {
-		if code, _ := rate(&customerA, b, 1); code != 422 {
-			t.Errorf("rate %s: %d", name, code)
-		}
+		code, m := rate(&customerA, b, 1)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := rate(&customerB, `"stars":5,"tags":[]`, 1); code != 404 {
 		t.Error("other customer rates")
@@ -68,6 +75,15 @@ func TestRateAndReportProblem(t *testing.T) {
 	prob := func(body string, v int) (int, map[string]any) {
 		return write(s, &customerA, "jobs.reportProblem", `{"jobId":"`+job+`",`+body+`}`, v)
 	}
+	want = map[string]string{ // the field each case is refused for
+		"bad code":      "reasonCode=error.invalid",
+		"bad mime":      "photos=error.invalidFile",
+		"png as jpeg":   "photos=error.invalidFile",
+		"short details": "details=error.length",
+		"six photos":    "photos=error.count",
+		"size mismatch": "photos=error.invalidFile",
+		"today slot":    "preferredSlot=error.slotRules",
+	}
 	for name, b := range map[string]string{
 		"short details": `"reasonCode":"same_problem","details":"short","photos":[],"preferredSlot":null`,
 		"bad code":      `"reasonCode":"angry","details":"still dripping water","photos":[],"preferredSlot":null`,
@@ -77,9 +93,8 @@ func TestRateAndReportProblem(t *testing.T) {
 		"six photos":    `"reasonCode":"same_problem","details":"still dripping water","photos":[` + strings.Repeat(photo+",", 5) + photo + `],"preferredSlot":null`,
 		"today slot":    `"reasonCode":"same_problem","details":"still dripping water","photos":[],"preferredSlot":` + slotJSON(2, 1),
 	} {
-		if code, _ := prob(b, 3); code != 422 {
-			t.Errorf("problem %s: %d", name, code)
-		}
+		code, m := prob(b, 3)
+		refusal(t, name, code, m, want[name])
 	}
 	code, m = prob(`"reasonCode":"same_problem","details":"Still dripping water after the visit","photos":[`+photo+`],"preferredSlot":`+slotJSON(49, 2), 3)
 	if code != 200 || data(m)["followUpOfJobId"] != job || data(m)["followUpClass"] != "pending" || data(m)["status"] != "requested" || len(data(m)["preferredSlots"].([]any)) != 1 {

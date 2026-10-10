@@ -17,6 +17,13 @@ func TestContractorRegister(t *testing.T) {
 	body := func(extra string) string {
 		return `{"organizationId":"` + org + `","registrationNo":" REG-1 ","serviceAreas":["Kuala Lumpur"," Selangor "],"contactEmail":"ops@partner.example","insuranceValidUntil":null` + extra + `}`
 	}
+	want := map[string]string{ // the field each case is refused for
+		"bad email":      "contactEmail=error.invalid",
+		"blank reg":      "registrationNo=error.length",
+		"customer org":   "organizationId=error.notContractor",
+		"duplicate area": "serviceAreas=error.invalid",
+		"no areas":       "serviceAreas=error.count",
+	}
 	for name, b := range map[string]string{
 		"no areas":       `{"organizationId":"` + org + `","registrationNo":"R","serviceAreas":[],"contactEmail":"a@b.example","insuranceValidUntil":null}`,
 		"duplicate area": `{"organizationId":"` + org + `","registrationNo":"R","serviceAreas":["KL","kl"],"contactEmail":"a@b.example","insuranceValidUntil":null}`,
@@ -24,9 +31,8 @@ func TestContractorRegister(t *testing.T) {
 		"blank reg":      `{"organizationId":"` + org + `","registrationNo":" ","serviceAreas":["KL"],"contactEmail":"a@b.example","insuranceValidUntil":null}`,
 		"customer org":   `{"organizationId":"` + seed.ID("org-customer-a").String() + `","registrationNo":"R","serviceAreas":["KL"],"contactEmail":"a@b.example","insuranceValidUntil":null}`,
 	} {
-		if code, _ := write(s, &hq, "contractors.save", b, 0); code != 422 {
-			t.Errorf("save %s: %d", name, code)
-		}
+		code, m := write(s, &hq, "contractors.save", b, 0)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := write(s, &hq, "contractors.save", `{"organizationId":"`+uuid.NewString()+`","registrationNo":"R","serviceAreas":["KL"],"contactEmail":"a@b.example","insuranceValidUntil":null}`, 0); code != 404 {
 		t.Error("unknown organization")
@@ -94,6 +100,13 @@ func TestContractorRegister(t *testing.T) {
 		return write(s, &hq, "rateCards.save", `{"contractorOrgId":"`+org+`","effectiveFrom":"`+from+`","currency":"MYR","lines":`+lines+`}`, 0)
 	}
 	line := `[{"workType":"repair_base","amountMinor":45000,"note":" base "}]`
+	want = map[string]string{ // the field each case is refused for
+		"bad worktype": "lines=error.invalid",
+		"dup worktype": "lines=error.invalid",
+		"negative":     "lines=error.invalid",
+		"no lines":     "lines=error.count",
+		"past":         "effectiveFrom=error.past",
+	}
 	for name, tc := range map[string][2]string{
 		"past":         {clock.Add(-time.Hour).Format(time.RFC3339), line},
 		"no lines":     {until, `[]`},
@@ -101,9 +114,8 @@ func TestContractorRegister(t *testing.T) {
 		"bad worktype": {until, `[{"workType":"travel","amountMinor":1,"note":null}]`},
 		"negative":     {until, `[{"workType":"emergency","amountMinor":-1,"note":null}]`},
 	} {
-		if code, _ := rc(tc[0], tc[1]); code != 422 {
-			t.Errorf("rate card %s: %d", name, code)
-		}
+		code, m := rc(tc[0], tc[1])
+		refusal(t, name, code, m, want[name])
 	}
 	code, m = rc(clock.Add(24*time.Hour).Format(time.RFC3339), line)
 	if code != 200 || data(m)["version"].(float64) != 1 || data(m)["lines"].([]any)[0].(map[string]any)["note"] != "base" {
@@ -132,6 +144,13 @@ func TestSLAScorecard(t *testing.T) {
 	owner(t, `DELETE FROM maintenance.sla_targets`) // test-only rows
 	// earlier runs leave jobs in the scorecard window (created_at set back by this test); move them out
 	owner(t, `UPDATE maintenance.jobs SET created_at = created_at - interval '1000 days' WHERE created_at >= $1 AND created_at < $2`, clock.Add(-48*time.Hour), clock)
+	want := map[string]string{ // the field each case is refused for
+		"arrival 120":  "arrivalInWindowPercent=error.range",
+		"bad plan":     "planType=error.invalid",
+		"past":         "effectiveFrom=error.past",
+		"response 0":   "responseHours=error.range",
+		"response 169": "responseHours=error.range",
+	}
 	for name, b := range map[string]string{
 		"arrival 120":  `{"planType":"general","responseHours":4,"arrivalInWindowPercent":120,"firstTimeFixPercent":80,"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
 		"response 0":   `{"planType":"general","responseHours":0,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
@@ -139,9 +158,8 @@ func TestSLAScorecard(t *testing.T) {
 		"bad plan":     `{"planType":"vip","responseHours":4,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,"effectiveFrom":"` + clock.Format(time.RFC3339) + `"}`,
 		"past":         `{"planType":"general","responseHours":4,"arrivalInWindowPercent":90,"firstTimeFixPercent":80,"effectiveFrom":"` + clock.Add(-time.Hour).Format(time.RFC3339) + `"}`,
 	} {
-		if code, _ := write(s, &hq, "sla.saveTargets", b, 0); code != 422 {
-			t.Errorf("targets %s: %d", name, code)
-		}
+		code, m := write(s, &hq, "sla.saveTargets", b, 0)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, m := write(s, &hq, "sla.saveTargets", `{"planType":"general","responseHours":2,"arrivalInWindowPercent":95,"firstTimeFixPercent":90,"effectiveFrom":"`+clock.Add(time.Hour).Format(time.RFC3339)+`"}`, 0); code != 200 || data(m)["version"].(float64) != 1 {
 		t.Fatalf("save targets: %d %v", code, m)

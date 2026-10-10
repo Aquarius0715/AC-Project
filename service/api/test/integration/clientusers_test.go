@@ -18,15 +18,20 @@ func TestClientUsers(t *testing.T) {
 		return write(s, a, "clientUsers.save", body, v)
 	}
 	invite := `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member"}`
+	want := map[string]string{ // the field each case is refused for
+		"bad email":    "email=error.invalid",
+		"bad role":     "clientRole=error.invalid",
+		"bad status":   "status=error.invalid",
+		"blank reason": "reason=error.length",
+	}
 	for name, b := range map[string]string{
 		"bad email":    `{"customerId":"` + cust + `","email":"not-an-email","clientRole":"member"}`,
 		"bad role":     `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"admin"}`,
 		"bad status":   `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","status":"invited"}`,
 		"blank reason": `{"customerId":"` + cust + `","email":"` + email + `","clientRole":"member","reason":" "}`,
 	} {
-		if code, _ := save(&hq, b, 0); code != 422 {
-			t.Errorf("%s: %d", name, code)
-		}
+		code, m := save(&hq, b, 0)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := save(&hq, `{"customerId":"`+cust+`","email":"`+email+`","clientRole":"member","status":"active"}`, 0); code != 422 {
 		t.Error("status on invite")
@@ -122,10 +127,14 @@ func TestTwoFactor(t *testing.T) {
 	if code != 200 || data(m)["enabled"] != false || data(m)["setupKey"] == nil || data(m)["recoveryCodesLeft"] != nil {
 		t.Fatalf("get: %d %v", code, m)
 	}
+	want := map[string]string{ // the field each case is refused for
+		"{\"code\":\"12345\"}":  "code=error.invalid",
+		"{\"code\":\"abcdef\"}": "code=error.invalid",
+		"{}":                    "code=error.invalid",
+	}
 	for _, b := range []string{`{"code":"12345"}`, `{"code":"abcdef"}`, `{}`} {
-		if code, _ := write(s, &techB, "twoFactor.enable", b, 0); code != 422 {
-			t.Errorf("%s accepted", b)
-		}
+		code, m := write(s, &techB, "twoFactor.enable", b, 0)
+		refusal(t, b, code, m, want[b])
 	}
 	if code, _ := write(s, &techB, "twoFactor.disable", `{"code":"123456"}`, 0); code != 409 {
 		t.Error("disable when off")

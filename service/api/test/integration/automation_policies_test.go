@@ -70,10 +70,32 @@ func TestAutomationPolicies(t *testing.T) {
 		"no action":               {"action": ""},
 		"temperature not finite?": {"action": `{"kind":"set_temperature"}`},
 	}
+	// the field each case is refused for
+	want := map[string]string{
+		"action two fields":       "action=error.invalid",
+		"alert fields":            "kind=error.fieldsOfOtherKind",
+		"bad action kind":         "action=error.invalid",
+		"bad mode":                "action=error.invalid",
+		"duplicate unit":          "unitIds=error.invalid",
+		"name blank":              "name=error.length",
+		"no action":               "action=error.invalid",
+		"no condition":            "condition=error.invalid",
+		"no units":                "unitIds=error.invalid",
+		"occupancy extra field":   "condition=error.invalid",
+		"peak missing active":     "condition=error.invalid",
+		"priority -1":             "priority=error.range",
+		"solar bad operator":      "condition=error.invalid",
+		"tariff negative":         "condition=error.invalid",
+		"tariff wrong unit":       "condition=error.invalid",
+		"temperature above max":   "action=error.unsupportedAction",
+		"temperature not finite?": "action=error.invalid",
+		"temperature off step":    "action=error.unsupportedAction",
+		"ventilate unsupported":   "action=error.unsupportedAction",
+		"weather not in DD-A11":   "condition=error.invalid",
+	}
 	for name, e := range bad {
-		if code, _ := write(s, &hq, "policies.save", autoPolicyBody(e), 0); code != 422 {
-			t.Errorf("%s: %d", name, code)
-		}
+		code, m := write(s, &hq, "policies.save", autoPolicyBody(e), 0)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := write(s, &hq, "policies.save", autoPolicyBody(map[string]string{"unitIds": `["` + uuid.NewString() + `"]`}), 0); code != 404 {
 		t.Error("unknown unit → NOT_FOUND")

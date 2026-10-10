@@ -45,10 +45,14 @@ func TestSummariesCustomer(t *testing.T) {
 	if _, m := post(s, &customerA, "summaries.get", `{"kind":"customer","filters":{"unitIds":[]}}`); count(m, "total") != 0 {
 		t.Error("empty unitIds")
 	}
+	want := map[string]string{ // the field each case is refused for
+		"{\"kind\":\"customer\",\"filters\":{\"overdueOnly\":true}}":    "filters=error.invalid",
+		"{\"kind\":\"customer\",\"filters\":{\"status\":\"assigned\"}}": "filters=error.invalid",
+		"{\"kind\":\"shop\",\"filters\":{}}":                            "kind=error.invalid",
+	}
 	for _, b := range []string{`{"kind":"customer","filters":{"status":"assigned"}}`, `{"kind":"customer","filters":{"overdueOnly":true}}`, `{"kind":"shop","filters":{}}`} {
-		if code, _ := post(s, &customerA, "summaries.get", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+		code, m := post(s, &customerA, "summaries.get", b)
+		refusal(t, b, code, m, want[b])
 	}
 	if code, _ := post(s, &customerA, "summaries.get", `{"kind":"partner","filters":{}}`); code != 403 {
 		t.Error("client asks for partner summary")

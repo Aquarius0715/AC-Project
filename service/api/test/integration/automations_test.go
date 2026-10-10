@@ -28,6 +28,22 @@ func scheduleRule(u string, extra map[string]string) string {
 func TestAutomationSchedules(t *testing.T) {
 	s := server(t)
 	u := newUnit(t, s, "Auto AC")
+	// the field each case is refused for
+	want := map[string]string{
+		"bad time":             "startLocal=error.invalid",
+		"bad zone":             "timezone=error.invalid",
+		"blank name":           "name=error.length",
+		"duplicate weekday":    "weekdays=error.invalid",
+		"event fields":         "kind=error.invalid",
+		"no end action":        "endAction=error.invalid",
+		"no weekdays":          "weekdays=error.required",
+		"over 24 hours":        "endsNextDay=errors.over_24_hours",
+		"overnight not marked": "endsNextDay=errors.overnight_required",
+		"priority 101":         "priority=error.range",
+		"same start and end":   "endLocal=errors.same_as_start",
+		"unsupported action":   "unitIds=error.unsupportedAction",
+		"weekday 8":            "weekdays=error.invalid",
+	}
 	for name, e := range map[string]map[string]string{
 		"no weekdays":          {"weekdays": "[]"},
 		"weekday 8":            {"weekdays": "[8]"},
@@ -43,18 +59,20 @@ func TestAutomationSchedules(t *testing.T) {
 		"event fields":         {"condition": `{"type":"occupancy","occupied":true}`},
 		"unsupported action":   {"startAction": `{"kind":"set_temperature","celsius":40}`},
 	} {
-		if code, m := write(s, &customerB, "automations.save", scheduleRule(u, e), 0); code != 422 {
-			t.Errorf("%s: %d %v", name, code, m)
-		}
+		code, m := write(s, &customerB, "automations.save", scheduleRule(u, e), 0)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := write(s, &customerA, "automations.save", scheduleRule(u, nil), 0); code != 404 {
 		t.Error("another customer's unit")
 	}
 	// nonexistent local time (America/New_York 2027-03-14 02:30) and ambiguous (2026-11-01 01:30)
+	want = map[string]string{ // the field each case is refused for
+		"\"01:30\"": "startLocal=errors.local_time_invalid",
+		"\"02:30\"": "startLocal=errors.local_time_invalid",
+	}
 	for _, hm := range []string{`"02:30"`, `"01:30"`} {
-		if code, _ := write(s, &customerB, "automations.save", scheduleRule(u, map[string]string{"timezone": `"America/New_York"`, "weekdays": "[7]", "startLocal": hm, "endLocal": `"05:00"`}), 0); code != 422 {
-			t.Errorf("DST %s accepted", hm)
-		}
+		code, m := write(s, &customerB, "automations.save", scheduleRule(u, map[string]string{"timezone": `"America/New_York"`, "weekdays": "[7]", "startLocal": hm, "endLocal": `"05:00"`}), 0)
+		refusal(t, hm, code, m, want[hm])
 	}
 	code, m := write(s, &customerB, "automations.save", scheduleRule(u, map[string]string{"startLocal": `"22:00"`, "endLocal": `"06:00"`, "endsNextDay": "true"}), 0)
 	if code != 200 || data(m)["enabled"] != false || data(m)["kind"] != "schedule" || data(m)["ownerMembershipId"] != seed.ID("customer-b").String() {
@@ -113,11 +131,17 @@ func TestAutomationEvents(t *testing.T) {
 	rule := func(cond string) string {
 		return `{"name":"When home","unitIds":["` + u + `"],"timezone":"Asia/Kuala_Lumpur","enabled":true,"priority":10,"kind":"event","condition":` + cond + `,"action":{"kind":"set_temperature","celsius":24}}`
 	}
+	want := map[string]string{ // the field each case is refused for
+		"{\"type\":\"location\",\"event\":\"leave\"}":                                        "condition=error.invalid",
+		"{\"type\":\"occupancy\"}":                                                           "condition=error.invalid",
+		"{\"type\":\"pattern\",\"localTime\":\"25:00\"}":                                     "condition=error.invalid",
+		"{\"type\":\"tariff\",\"operator\":\"gt\",\"value\":1,\"unit\":\"MYR_per_kWh\"}":     "condition=error.invalid",
+		"{\"type\":\"weather\",\"metric\":\"temperature\",\"operator\":\"eq\",\"value\":30}": "condition=error.invalid",
+	}
 	for _, c := range []string{`{"type":"occupancy"}`, `{"type":"pattern","localTime":"25:00"}`, `{"type":"weather","metric":"temperature","operator":"eq","value":30}`,
 		`{"type":"tariff","operator":"gt","value":1,"unit":"MYR_per_kWh"}`, `{"type":"location","event":"leave"}`} {
-		if code, _ := write(s, &customerB, "automations.save", rule(c), 0); code != 422 {
-			t.Errorf("%s accepted", c)
-		}
+		code, m := write(s, &customerB, "automations.save", rule(c), 0)
+		refusal(t, c, code, m, want[c])
 	}
 	if code, m := write(s, &customerB, "automations.save", rule(`{"type":"weather","metric":"temperature","operator":"gte","value":30}`), 0); code != 200 || data(m)["condition"] == nil {
 		t.Fatalf("weather rule: %d %v", code, m)

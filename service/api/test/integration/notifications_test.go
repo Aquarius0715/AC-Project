@@ -42,10 +42,14 @@ func TestNotificationsInbox(t *testing.T) {
 			t.Fatal("unreadable target listed")
 		}
 	}
+	want := map[string]string{ // the field each case is refused for
+		"{\"filters\":{\"kind\":\"x\"}}":        "kind=error.notAllowed",
+		"{\"filters\":{\"severity\":\"high\"}}": "filters=error.invalid",
+		"{\"filters\":{\"type\":\"spam\"}}":     "filters=error.invalid",
+	}
 	for _, b := range []string{`{"filters":{"severity":"high"}}`, `{"filters":{"kind":"x"}}`, `{"filters":{"type":"spam"}}`} {
-		if code, _ := post(s, &customerB, "notifications.list", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+		code, m := post(s, &customerB, "notifications.list", b)
+		refusal(t, b, code, m, want[b])
 	}
 	if code, m := post(s, &customerB, "notifications.list", `{"filters":{"from":"2026-09-14T00:00:00Z","to":"2026-09-01T00:00:00Z"}}`); code != 422 || m["fieldErrors"].(map[string]any)["filters.to"] != "error.range" {
 		t.Errorf("a reversed period: %d %v", code, m)
@@ -168,10 +172,14 @@ func TestPreferencesAndConsents(t *testing.T) {
 	if code, m := post(s, &techB, "preferences.get", `{}`); code != 200 || data(m)["currency"] != "MYR" || data(m)["timezone"] == "" {
 		t.Fatalf("preferences default: %d %v", code, m)
 	}
+	want := map[string]string{ // the field each case is refused for
+		"{\"locale\":\"en\",\"timezone\":\"Local\"}":             "timezone=error.invalid",
+		"{\"locale\":\"en\",\"timezone\":\"Mars/Base\"}":         "timezone=error.invalid",
+		"{\"locale\":\"fr\",\"timezone\":\"Asia/Kuala_Lumpur\"}": "locale=error.invalid",
+	}
 	for _, b := range []string{`{"locale":"fr","timezone":"Asia/Kuala_Lumpur"}`, `{"locale":"en","timezone":"Mars/Base"}`, `{"locale":"en","timezone":"Local"}`} {
-		if code, _ := write(s, &customerB, "preferences.update", b, 0); code != 422 {
-			t.Errorf("%s accepted", b)
-		}
+		code, m := write(s, &customerB, "preferences.update", b, 0)
+		refusal(t, b, code, m, want[b])
 	}
 	if code, _ := write(s, &hq, "preferences.update", `{"locale":"en","timezone":"UTC","monthlyReportEmail":true}`, 0); code != 422 {
 		t.Error("monthlyReportEmail for HQ")

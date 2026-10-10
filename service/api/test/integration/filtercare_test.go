@@ -36,6 +36,13 @@ func TestFilterCare(t *testing.T) {
 		t.Fatalf("due soon: %v", st)
 	}
 	// settings (owner only)
+	want := map[string]string{ // the field each case is refused for
+		"bad recipient": "recipients=error.invalid",
+		"fallback 181":  "fallbackDays=error.range",
+		"no inApp":      "channels=error.invalid",
+		"threshold 49":  "thresholdHours=error.range",
+		"whatsapp":      "channels=error.invalid",
+	}
 	for name, b := range map[string]string{
 		"threshold 49":  `{"thresholdHours":49,"fallbackDays":30,"recipients":"owners","channels":["inApp"]}`,
 		"fallback 181":  `{"thresholdHours":null,"fallbackDays":181,"recipients":"owners","channels":["inApp"]}`,
@@ -43,9 +50,8 @@ func TestFilterCare(t *testing.T) {
 		"whatsapp":      `{"thresholdHours":null,"fallbackDays":30,"recipients":"owners","channels":["inApp","whatsapp"]}`,
 		"bad recipient": `{"thresholdHours":null,"fallbackDays":30,"recipients":"everyone","channels":["inApp"]}`,
 	} {
-		if code, _ := write(s, &customerB, "filterCare.saveSettings", b, 0); code != 422 {
-			t.Errorf("settings %s: %d", name, code)
-		}
+		code, m := write(s, &customerB, "filterCare.saveSettings", b, 0)
+		refusal(t, name, code, m, want[name])
 	}
 	// IR238: the settings read back — the defaults (version 0) before the first save
 	if code, m := post(s, &customerB, "filterCare.getSettings", `{}`); code != 200 || data(m)["version"].(float64) != 0 || data(m)["thresholdHours"] != nil ||
@@ -114,10 +120,14 @@ func TestFilterCare(t *testing.T) {
 	if _, m := post(s, &customerB, "filterCare.list", `{"sort":{"field":"status","direction":"desc"},"limit":100}`); len(items(m)) < 2 {
 		t.Error("sorted list")
 	}
+	want = map[string]string{ // the field each case is refused for
+		"{\"filters\":{\"status\":\"dirty\"}}":                      "filters=error.invalid",
+		"{\"filters\":{\"x\":1}}":                                   "x=error.notAllowed",
+		"{\"sort\":{\"field\":\"runHours\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+	}
 	for _, b := range []string{`{"filters":{"status":"dirty"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"runHours","direction":"asc"}}`} {
-		if code, _ := post(s, &customerB, "filterCare.list", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+		code, m := post(s, &customerB, "filterCare.list", b)
+		refusal(t, b, code, m, want[b])
 	}
 	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, u2)
 	if code, _ := write(s, &customerB, "filterCare.markCleaned", `{"unitId":"`+u2+`"}`, 0); code != 422 {

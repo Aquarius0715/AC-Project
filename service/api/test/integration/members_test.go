@@ -165,10 +165,14 @@ func TestMembersList(t *testing.T) {
 			t.Fatalf("contractor projection: %v", it)
 		}
 	}
+	want := map[string]string{ // the field each case is refused for
+		"{\"filters\":{\"role\":\"guest\"}}":                    "filters=error.invalid",
+		"{\"filters\":{\"x\":1}}":                               "x=error.notAllowed",
+		"{\"sort\":{\"field\":\"name\",\"direction\":\"asc\"}}": "sort.field=error.invalid",
+	}
 	for _, b := range []string{`{"filters":{"role":"guest"}}`, `{"filters":{"x":1}}`, `{"sort":{"field":"name","direction":"asc"}}`} {
-		if code, _ := post(s, &hq, "members.list", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+		code, m := post(s, &hq, "members.list", b)
+		refusal(t, b, code, m, want[b])
 	}
 	if code, _ := post(s, &customerA, "members.list", `{}`); code != 403 {
 		t.Error("client lists members")

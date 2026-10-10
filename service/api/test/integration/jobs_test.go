@@ -122,12 +122,24 @@ func TestJobsReadAndTransitions(t *testing.T) {
 			t.Errorf("%s: %d want %d", body, len(items(m)), n)
 		}
 	}
+	// the field each case is refused for
+	want := map[string]string{
+		"{\"filters\":{\"from\":\"2026-09-15T00:00:00Z\",\"to\":\"2026-09-14T00:00:00Z\"}}": "filters.to=error.range",
+		"{\"filters\":{\"origin\":\"phone\"}}":                                              "filters.origin=error.invalid",
+		"{\"filters\":{\"severity\":\"info\"}}":                                             "filters.severity=error.invalid",
+		"{\"filters\":{\"status\":\"done\"}}":                                               "filters.status=error.invalid",
+		"{\"filters\":{\"status\":\"requested\",\"statuses\":[\"requested\"]}}":             "filters.statuses=error.invalid",
+		"{\"filters\":{\"statuses\":[\"done\"]}}":                                           "filters.statuses=error.invalid",
+		"{\"filters\":{\"statuses\":[]}}":                                                   "filters.statuses=error.invalid",
+		"{\"filters\":{\"type\":\"repair\"}}":                                               "filters.type=error.invalid",
+		"{\"filters\":{\"x\":1}}":                                                           "x=error.notAllowed",
+		"{\"sort\":{\"field\":\"unitId\",\"direction\":\"asc\"}}":                           "sort.field=error.invalid",
+	}
 	for _, b := range []string{`{"filters":{"status":"requested","statuses":["requested"]}}`, `{"filters":{"statuses":[]}}`, `{"filters":{"status":"done"}}`,
 		`{"filters":{"statuses":["done"]}}`, `{"filters":{"severity":"info"}}`, `{"filters":{"origin":"phone"}}`, `{"filters":{"type":"repair"}}`, `{"filters":{"x":1}}`,
 		`{"filters":{"from":"2026-09-15T00:00:00Z","to":"2026-09-14T00:00:00Z"}}`, `{"sort":{"field":"unitId","direction":"asc"}}`} {
-		if code, _ := post(s, &hq, "jobs.list", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
-		}
+		code, m := post(s, &hq, "jobs.list", b)
+		refusal(t, b, code, m, want[b])
 	}
 	for _, f := range []string{"id", "severity", "dueAt", "status"} {
 		for _, d := range []string{"asc", "desc"} {

@@ -82,6 +82,13 @@ func TestOnSiteOperations(t *testing.T) {
 	if code, _ := write(s, &techInt, "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 4); code != 409 {
 		t.Error("start twice")
 	}
+	want := map[string]string{ // the field each case is refused for
+		"bad method":    "method=error.invalid",
+		"manual reason": "reason=error.length",
+		"no qr":         "qrUnitId=error.required",
+		"qr mismatch":   "qrUnitId=errors.qr_unit_mismatch",
+		"too far":       "distanceMeters=errors.too_far",
+	}
 	for name, b := range map[string]string{
 		"too far":       `{"jobId":"` + job + `","method":"location_qr","distanceMeters":201,"qrUnitId":"` + unit + `"}`,
 		"no qr":         `{"jobId":"` + job + `","method":"location_qr","distanceMeters":10,"qrUnitId":null}`,
@@ -89,9 +96,8 @@ func TestOnSiteOperations(t *testing.T) {
 		"bad method":    `{"jobId":"` + job + `","method":"gps","distanceMeters":null,"qrUnitId":null}`,
 		"qr mismatch":   `{"jobId":"` + job + `","method":"location_qr","distanceMeters":10,"qrUnitId":"` + uuid.NewString() + `"}`,
 	} {
-		if code, _ := write(s, &techInt, "jobs.checkIn", b, 4); code != 422 {
-			t.Errorf("checkIn %s: %d", name, code)
-		}
+		code, m := write(s, &techInt, "jobs.checkIn", b, 4)
+		refusal(t, name, code, m, want[name])
 	}
 	code, m := write(s, &techInt, "jobs.checkIn", `{"jobId":"`+job+`","method":"location_qr","distanceMeters":200,"qrUnitId":"`+unit+`"}`, 4)
 	tos, _ := data(m)["timeOnSite"].(map[string]any)

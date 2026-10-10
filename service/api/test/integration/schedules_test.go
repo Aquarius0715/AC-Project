@@ -142,6 +142,18 @@ func TestScheduleDraftPreview(t *testing.T) {
 	if first["automationId"] != nil || first["phase"] != "schedule_start" || first["at"] != "2026-09-14T10:00:00Z" || list[1].(map[string]any)["at"] != "2026-09-14T14:00:00Z" {
 		t.Fatalf("Monday 18:00 → 22:00 Kuala Lumpur: %v", list[:2])
 	}
+	// the field each case is refused for
+	want := map[string]string{
+		"bad action":     "draft.endAction=error.invalid",
+		"bad count":      "count=error.invalid",
+		"bad zone":       "draft.timezone=error.invalid",
+		"both targets":   "automationId=error.exactlyOneTarget",
+		"no target":      "automationId=error.exactlyOneTarget",
+		"no weekdays":    "draft.weekdays=error.required",
+		"nonexistent":    "draft.startLocal=errors.local_time_invalid",
+		"overnight flag": "draft.endsNextDay=errors.overnight_required",
+		"same times":     "draft.endLocal=errors.same_as_start",
+	}
 	for name, body := range map[string]string{
 		"both targets":   `{"count":8,"automationId":"` + uuid.NewString() + `","draft":{}}`,
 		"no target":      `{"count":8}`,
@@ -153,9 +165,8 @@ func TestScheduleDraftPreview(t *testing.T) {
 		"bad zone":       strings2(draft(""), `"Asia/Kuala_Lumpur"`, `"Moon/Base"`),
 		"nonexistent":    `{"count":8,"draft":{"timezone":"America/New_York","weekdays":[7],"startLocal":"02:30","endLocal":"05:00","endsNextDay":false,"startAction":{"kind":"set_power","power":true},"endAction":{"kind":"set_power","power":false}}}`,
 	} {
-		if code, _ := post(s, &customerA, "automations.nextRuns", body); code != 422 {
-			t.Errorf("%s: %d", name, code)
-		}
+		code, m := post(s, &customerA, "automations.nextRuns", body)
+		refusal(t, name, code, m, want[name])
 	}
 }
 

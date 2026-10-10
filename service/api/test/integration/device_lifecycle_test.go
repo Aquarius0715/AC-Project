@@ -353,6 +353,13 @@ func TestDeviceEvents(t *testing.T) {
 		t.Fatalf("events: %d %v", code, m)
 	}
 	// validation and refusals
+	want := map[string]string{ // the field each case is refused for
+		"axis/value mismatch": "recovery=error.invalid",
+		"fault with recovery": "recovery=error.invalid",
+		"no sequence":         "sequence=error.required",
+		"restored no source":  "recovery=error.invalid",
+		"unknown kind":        "kind=error.invalid",
+	}
 	for name, b := range map[string]string{
 		"unknown kind":        `"kind":"smoke","sequence":9`,
 		"restored no source":  `"kind":"restored","sequence":9`,
@@ -361,9 +368,8 @@ func TestDeviceEvents(t *testing.T) {
 		"no sequence":         `"kind":"tamper"`,
 	} {
 		body := `{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + at(60) + `","eventType":"device","deviceId":"` + dev + `","bindingId":"` + binding + `",` + b + `}`
-		if code, _ := write(s, &customerB, "demo.trigger", body, 0); code != 422 {
-			t.Errorf("%s: %d", name, code)
-		}
+		code, m := write(s, &customerB, "demo.trigger", body, 0)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, m := write(s, &customerB, "demo.trigger", `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+at(60)+`","eventType":"device","deviceId":"`+dev+
 		`","bindingId":"`+uuid.NewString()+`","kind":"tamper","sequence":9}`, 0); code != 422 || m["fieldErrors"].(map[string]any)["bindingId"] == nil {

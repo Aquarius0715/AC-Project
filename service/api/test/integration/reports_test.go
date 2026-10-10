@@ -78,11 +78,27 @@ func TestWorkReports(t *testing.T) {
 		"missing parts":    {"parts": ""},
 		"unknown field":    {"author": `"me"`},
 	}
+	// the field each case is refused for
+	want := map[string]string{
+		"bad result":       "items=error.invalid",
+		"bad symbol":       "measurements=error.invalid",
+		"duplicate key":    "items=error.invalid",
+		"measurement key":  "measurements=error.invalid",
+		"missing parts":    "draft=error.required",
+		"next action":      "nextAction=error.invalid",
+		"none with note":   "nextAction=error.invalid",
+		"other attachment": "attachmentIds=error.otherReportAttachment",
+		"part quantity":    "parts=error.invalid",
+		"part source":      "parts=error.invalid",
+		"refrigerant":      "refrigerant=error.invalid",
+		"unknown field":    "_=error.malformedInput",
+		"work text":        "workText=error.length",
+		"wrong group":      "items=error.invalid",
+	}
 	for name, e := range bad {
 		e["reportId"] = `"` + rep + `"`
-		if code, _ := write(s, &techInt, "jobs.saveDraft", draftBody(job, "", e), 1); code != 422 {
-			t.Errorf("draft %s: %d", name, code)
-		}
+		code, m := write(s, &techInt, "jobs.saveDraft", draftBody(job, "", e), 1)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := write(s, &techInt, "jobs.saveDraft", draftBody(job, "", map[string]string{"reportId": `"` + rep + `"`, "measurements": `[{"id":"` + uuid.NewString() + `","componentKey":"filter","metric":"temperature","value":20,"unit":"°C","observedAt":"` + now + `"}]`}), 1); code != 404 {
 		t.Error("unknown measurement id")

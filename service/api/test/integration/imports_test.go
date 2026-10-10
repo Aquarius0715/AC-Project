@@ -83,6 +83,14 @@ func TestUnitsImport(t *testing.T) {
 	}
 
 	// preview validation
+	want := map[string]string{ // the field each case is refused for
+		"bad quoting":               "csvText=error.malformedCsv",
+		"column not in header":      "mapping.unit_name=error.columnNotFound",
+		"header only":               "csvText=error.noRows",
+		"missing unit_name mapping": "mapping.unit_name=error.required",
+		"too many rows":             "csvText=error.tooManyRows",
+		"unknown mapping key":       "mapping.color=error.unknownColumn",
+	}
 	for name, b := range map[string]string{
 		"missing unit_name mapping": `{"customerId":"` + cust + `","fileName":"a.csv","csvText":"a,b\n1,2","mapping":{"property":"a","model_code":"b"}}`,
 		"unknown mapping key":       `{"customerId":"` + cust + `","fileName":"a.csv","csvText":"a,b\n1,2","mapping":{"property":"a","unit_name":"a","model_code":"b","color":"a"}}`,
@@ -91,9 +99,8 @@ func TestUnitsImport(t *testing.T) {
 		"too many rows":             `{"customerId":"` + cust + `","fileName":"a.csv","csvText":` + jsonStr("p,u,m\n"+strings.Repeat("x,y,z\n", 1001)) + `,"mapping":{"property":"p","unit_name":"u","model_code":"m"}}`,
 		"bad quoting":               `{"customerId":"` + cust + `","fileName":"a.csv","csvText":` + jsonStr("p,u,m\n\"x,y\n") + `,"mapping":{"property":"p","unit_name":"u","model_code":"m"}}`,
 	} {
-		if code, _ := post(s, &hq, "units.importPreview", b); code != 422 {
-			t.Errorf("%s: %d", name, code)
-		}
+		code, m := post(s, &hq, "units.importPreview", b)
+		refusal(t, name, code, m, want[name])
 	}
 	if code, _ := post(s, &hq, "units.importPreview", strings.Replace(body, cust, uuid.NewString(), 1)); code != 404 {
 		t.Error("unknown customer")

@@ -120,10 +120,26 @@ func TestAuditList(t *testing.T) {
 	if _, m := post(s, &hq, "audit.list", `{"filters":{`+day+`,"result":"denied"},"sort":{"field":"occurredAt","direction":"asc"},"limit":2}`); m["data"] == nil {
 		t.Error("result filter")
 	}
-	for _, b := range []string{`{}`, `{"filters":{"from":"` + clock.Format(time.RFC3339) + `"}}`, `{"filters":{` + period(clock, clock.Add(-time.Hour)) + `}}`,
-		`{"filters":{` + period(clock.Add(-400*24*time.Hour), clock) + `}}`, `{"filters":{` + day + `,"result":"ok"}}`, `{"filters":{` + day + `,"x":1}}`} {
-		if code, _ := post(s, &hq, "audit.list", b); code != 422 {
-			t.Errorf("%s: %d", b, code)
+	// the period is required (both ends named when missing), from < to and at most 366 days
+	for b, want := range map[string]map[string]string{
+		`{}`: {"filters.from": "error.required", "filters.to": "error.required"},
+		`{"filters":{"from":"` + clock.Format(time.RFC3339) + `"}}`:         {"filters.to": "error.required"},
+		`{"filters":{"to":"` + clock.Format(time.RFC3339) + `"}}`:           {"filters.from": "error.required"},
+		`{"filters":{` + period(clock, clock.Add(-time.Hour)) + `}}`:        {"filters.to": "errors.period_range"},
+		`{"filters":{` + period(clock.Add(-400*24*time.Hour), clock) + `}}`: {"filters.to": "errors.period_range"},
+		`{"filters":{` + day + `,"result":"ok"}}`:                           {"filters": "error.invalid"},
+		`{"filters":{` + day + `,"x":1}}`:                                   {"x": "error.notAllowed"},
+	} {
+		code, m := post(s, &hq, "audit.list", b)
+		fe, _ := m["fieldErrors"].(map[string]any)
+		if code != 422 || len(fe) != len(want) {
+			t.Errorf("%s: %d %v, want %v", b, code, fe, want)
+			continue
+		}
+		for k, v := range want {
+			if fe[k] != v {
+				t.Errorf("%s: %v, want %v", b, fe, want)
+			}
 		}
 	}
 	if code, _ := post(s, &customerB, "audit.list", `{"filters":{`+day+`}}`); code != 403 {
