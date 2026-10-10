@@ -4476,3 +4476,25 @@ Two more of the HQ frames that R311 compared.
    - New E2E specs: `admin/billing` gains the payouts filters, the dialog's refusal of a running month and a statement outside the list; `admin/contracts` checks the counts, the eligibility marks, the restricted editor and an empty scope. The HQ language spec reads the plan tabs with their counts.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR323 HQ baselines and automation policies as Figma draws them — 2026-10-11
+
+Two more of the HQ frames that R311 compared.
+
+1. **Baselines (FR-A13, DD-A13 item 6, Figma Admin 316:2).**
+   - **Scope and list.** The scope names its baseline count. The list reads "Baselines · all customers", or the chosen customer.
+   - **Rows.** Each row shows its version with its quality: "v1 · modeled" for demo_fixed and "measured" for demo_period_comparison (SR29). Below come the units and period, then the method, value and boundary.
+   - **Editor.** The heading carries Version N and "Editing → vN+1", and says that the version number is assigned automatically. The units are "the same set required for comparison", and the period ends "Up to 366 days". Method and boundary are segmented choices; the boundary shows as "AC input electricity" or "Whole-building electricity". The baseline energy and the texts have the hints Figma shows.
+   - **Warning.** The note says that MRV reports keep the version they reference, and that nothing is labelled adjusted without an adjustment model.
+   - **Save.** Discard and "Save as version N" replace "Save as vN"; "+ New baseline" replaces "+ New".
+2. **Automation policies (FR-A11, DD-A11 items 5–6, Figma Admin 106:5 / 361:7456).**
+   - **Editor.** The editor groups its Basics. Its footer says "No unsaved changes · form loaded from policy vN", or that saving creates the next version, beside Discard and Save policy.
+   - **List.** Show disabled hides disabled policies; the open one stays listed.
+   - **Simulate.** Every fact row now chooses its unit and its kind. "+ Add fact" adds another fact, for example a missing solar reading beside the tariff (AT-A11-E/B), so other policies and customer rules can match. `evaluationInput` gives each fact its own metric and lists each unit once. "Run simulation" replaces "Simulate"; it still creates no command.
+3. **Checked.**
+   - The typecheck and lint pass.
+   - Vitest covers a unit with two facts of different kinds.
+   - New E2E spec `admin/automation`: it creates a disabled policy and checks the footer, Discard, Show disabled and a simulation with an added missing solar fact. Its afterEach deletes the policy again through the app's operation relay (`policies.delete` with the version).
+   - The HQ language spec reads the baselines' count and their new button.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

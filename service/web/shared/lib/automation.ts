@@ -112,17 +112,22 @@ export const factOf: Record<AutoCondition["type"], { metric: string; unit: strin
   occupancy: { metric: "occupied", unit: "boolean", boolean: true }, peak: { metric: "peak", unit: "boolean", boolean: true },
   tariff: { metric: "tariff", unit: "MYR_per_kWh", boolean: false }, solar: { metric: "solar", unit: "kW", boolean: false }, battery: { metric: "battery", unit: "kW", boolean: false },
 };
-export type FactRow = { unitId: string; value: string; quality: "valid" | "missing" | "stale" | "suspect" };
-/** EvaluationInput for the current business-clock minute (occurredAt must be in it); empty values are null facts. */
+/** One synthetic fact of a simulation: a unit, the kind of fact (the policy's own when omitted; “+ Add fact” adds other
+ * kinds, so other policies and customer rules can match too — Figma Admin 361:7456, IR323), its value and quality. */
+export type FactRow = { unitId: string; kind?: AutoCondition["type"]; value: string; quality: "valid" | "missing" | "stale" | "suspect" };
+/** EvaluationInput for the current business-clock minute (occurredAt must be in it); empty values are null facts and
+ * each unit is evaluated once, whatever number of facts it has. */
 export function evaluationInput(type: AutoCondition["type"], rows: FactRow[], now: Date, eventId: string): OpInput<"automations.simulate"> {
-  const f = factOf[type];
   const at = new Date(Math.floor(now.getTime() / 60000) * 60000).toISOString();
   return {
-    eventId, occurredAt: at, phase: "condition" as const, unitIds: rows.map((r) => r.unitId),
-    facts: rows.map((r) => ({
-      unitId: r.unitId, metric: f.metric as Fact["metric"], unit: f.unit, observedAt: at, quality: r.quality,
-      value: r.value.trim() === "" ? null : f.boolean ? r.value === "true" : Number(r.value),
-    })),
+    eventId, occurredAt: at, phase: "condition" as const, unitIds: [...new Set(rows.map((r) => r.unitId))],
+    facts: rows.map((r) => {
+      const f = factOf[r.kind ?? type];
+      return {
+        unitId: r.unitId, metric: f.metric as Fact["metric"], unit: f.unit, observedAt: at, quality: r.quality,
+        value: r.value.trim() === "" ? null : f.boolean ? r.value === "true" : Number(r.value),
+      };
+    }),
   };
 }
 /** Why a unit was not acted on (the suppression reasons of automations.simulate / fire), worded for HQ. */

@@ -54,6 +54,9 @@ describe("HQ automation policies (FR-A11, DD-A11)", () => {
       ],
     });
     expect(evaluationInput("tariff", [{ unitId: "u1", value: "0.7", quality: "valid" }], new Date("2026-09-15T01:00:00Z"), "e2").facts[0]).toMatchObject({ metric: "tariff", unit: "MYR_per_kWh", value: 0.7 });
+    // + Add fact: another kind for a unit already in the list — the unit is evaluated once, each fact keeps its kind (IR323)
+    const both = evaluationInput("tariff", [{ unitId: "u1", value: "0.7", quality: "valid" }, { unitId: "u1", kind: "solar", value: "", quality: "missing" }], new Date("2026-09-15T01:00:00Z"), "e3");
+    expect([both.unitIds, both.facts.map((f) => [f.metric, f.unit, f.value, f.quality])]).toEqual([["u1"], [["tariff", "MYR_per_kWh", 0.7, "valid"], ["solar", "kW", null, "missing"]]]);
     expect([reasonWord("missing_data"), reasonWord("a_new_reason"), decisionWord("suppressed"), decisionWord("other"), disabledReasonWord("other")]).toEqual(["missing data — skipped", "a_new_reason", "suppressed", "other", "other"]);
   });
 });

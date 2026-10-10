@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.36.0
+version: 0.37.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -481,7 +481,7 @@ Scope: FR-A11 / Main display pattern: **UI-FORM**. Service boundary: `policies.s
 3. Save policy version. `automations.simulate` returns only selected/suppressed rules and reasons; it creates no Command. Trigger through `automations.fire` with DemoWriteOptions for duplicate prevention. It passes through shared Command policy and returns commandIds (DDC-08§6).
 4. Queries to update: `policies / automations / simulation results / audit`。
 5. Screen: scope filter `customerId` → `propertyId` → `unitId` (URL keys; `policies.list` with kind=automation), list grouped by the customer of the target units (policies spanning customers under “Across customers”), and the `policyId` editor loaded from `policies.get` (AT-A11-R01). The editor has basics (name, priority, timezone, enabled), target units, a When sentence for the chosen condition type, a Then sentence for the UnitAction with the capability range of the targets, and an explanation of the tier order.
-6. Simulate: enter synthetic facts per unit (value, unit, observedAt, quality) and call `automations.simulate`; show one row per unit with the selected rule or the suppression reason (`DecisionReason`, e.g. missing_data). Fire (demo) calls `automations.fire` with a one-time key and reports the created command IDs.
+6. Simulate: enter synthetic facts per unit (value, unit, observedAt, quality) — the policy's own kind for each target unit, and “+ Add fact” adds a fact of another kind (occupancy, tariff, peak, solar, battery) for a target unit, so other policies and customer rules can match — and call `automations.simulate` (Run simulation); show one row per unit with the selected rule or the suppression reason (`DecisionReason`, e.g. missing_data). The editor groups Basics, shows whether the form has unsaved changes with Discard, and the list can hide disabled policies (Show disabled; the open one stays listed) (IR323). Fire (demo) calls `automations.fire` with a one-time key and reports the created command IDs.
 7. Language (IR303): texts, condition and action sentences, decisions and reasons follow the display language. Metric codes, units and IDs stay as they are.
 
 **Boundary cases and failures**: Check HQ priority over customer rules, deterministic results for ties, and no automatic execution when solar data is unavailable.
@@ -552,7 +552,7 @@ Scope: FR-A13 / Main display pattern: **UI-ANALYSIS / UI-FORM**. Service boundar
 3. Saving a baseline creates a new version. Do not later change baseline versions referenced by existing MRV reports.
 4. Queries to update: `baselines / energy / audit`。
 5. Tabs: `tab=analysis` (default) and `tab=baselines`. Analysis: choose customer (URL `customerId`), units from `units.list`, period, and baseline; show `energy.summary` actual, baseline, difference in kWh and %, cost, and emissions with the IR68 wording, the “not adjusted” label, calculation conditions (boundary, baseline snapshot, factor snapshot, tariff version, coverage) and quality warnings. When unit sets or boundaries differ, show the warning and no difference.
-6. Baselines: scope filter `customerId` → `propertyId` → `unitId` and period (URL keys; `baselines.list` filters; the period filter is `[from, to)` on a baseline's period start, labelled “Period starts from (Kuala Lumpur)” / “Period starts before”), the list, and the selected `baselineId`; editing saves a new version with `baselines.save`. baselineKWh is entered only for demo_fixed. Explain that existing MRV reports keep the version they reference.
+6. Baselines: scope filter `customerId` → `propertyId` → `unitId` and period (URL keys; `baselines.list` filters; the period filter is `[from, to)` on a baseline's period start, labelled “Period starts from (Kuala Lumpur)” / “Period starts before”), the list (“Baselines · all customers” or the customer, the scope's count, each row's version with its quality — v1 · modeled for demo_fixed, measured for demo_period_comparison, SR29), and the selected `baselineId`; editing saves a new version with `baselines.save` (Save as version N, Discard). baselineKWh is entered only for demo_fixed. Explain that existing MRV reports keep the version they reference and that nothing is labelled adjusted without an adjustment model (IR323).
 7. Language and time (IR296): texts follow the display language. The analysis and baseline periods are Kuala Lumpur business time in every display time zone; they are typed in it, and the labels and the conditions name it.
 
 **Boundary cases and failures**: Check zero baseline, missing actual data, different unit sets, and different boundaries. Example: baseline 100, actual 80 shows “Reduction 20.0 kWh / Reduction 20.0%.” Baseline 100, actual 120 has DTO values -20kWh/-20% and shows “Increase 20.0 kWh” / “Increase 20.0%” (IR68).
@@ -864,7 +864,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.36.0: Read IR01–IR322 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.37.0: Read IR01–IR323 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

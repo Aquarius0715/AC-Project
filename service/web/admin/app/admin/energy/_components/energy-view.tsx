@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, EmptyState, Field, Input, ListRow, Page, Select, SummaryList, Tabs, Textarea } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Page, Select, SummaryList, Tabs, Textarea } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -106,6 +106,7 @@ function Baselines({ live, l }: { live: EnergyLive; l: NonNullable<EnergyLive["l
   const scopeUnits = live.units.filter((u) => (!live.scope.customerId || u.customerId === live.scope.customerId) && (!live.scope.propertyId || u.propertyId === live.scope.propertyId));
   const [from, setFrom] = useState(l.from);
   const [to, setTo] = useState(l.to);
+  const customer = live.customers.find((c) => c.id === live.scope.customerId)?.name;
   const save = () => {
     setTried(true);
     if (Object.keys(errors).length > 0) return;
@@ -115,33 +116,36 @@ function Baselines({ live, l }: { live: EnergyLive; l: NonNullable<EnergyLive["l
   return (
     <>
       <div className="flex flex-wrap items-end gap-3">
+        <span className="pb-2 text-xs font-semibold text-muted">{t("Scope")}</span>
         <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => nav({ customerId: e.target.value || null, propertyId: null, unitId: null, baselineId: null })}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
         <Field label={t("Property")}><Select value={live.scope.propertyId ?? ""} onChange={(e) => nav({ propertyId: e.target.value || null, unitId: null, baselineId: null })}><option value="">{t("All properties")}</option>{props.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
         <Field label={t("Unit")}><Select value={live.scope.unitId ?? ""} onChange={(e) => nav({ unitId: e.target.value || null, baselineId: null })}><option value="">{t("All units")}</option>{scopeUnits.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
         <Field label={t("Period starts from (Kuala Lumpur)")}><Input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
         <Field label={t("Period starts before")}><Input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
         <Btn size="sm" disabled={from === l.from && to === l.to} onClick={() => nav({ from: from || null, to: to || null, baselineId: null })}>{t("Apply")}</Btn>
+        <span className="ml-auto pb-2 text-xs text-muted">{t(l.rows.length === 1 ? "1 baseline in scope" : "{n} baselines in scope", { n: l.rows.length })}</span>
       </div>
       <div className="split-rev">
-        <Card title={t("Baselines")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => setCreating(true)}>{t("+ New")}</Btn>} className="self-start">
-          {l.rows.length === 0 ? <EmptyState title={t("No baselines")}>{t("No baseline matches this scope.")}</EmptyState> : <div className="flex flex-col gap-2">{l.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setCreating(false); nav({ baselineId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)} · v{x.version}</b><Badge tone={x.method === "demo_fixed" ? "muted" : "primary"}>{x.method}</Badge></div><div className="text-[11px] text-muted">{x.units} · {x.value} · {x.boundaryId}</div><div className="text-[11px] text-muted">{x.period}</div></div></ListRow>)}</div>}
+        <Card title={customer ? t("Baselines · {customer}", { customer }) : t("Baselines · all customers")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => setCreating(true)}>{t("+ New baseline")}</Btn>} className="self-start">
+          {l.rows.length === 0 ? <EmptyState title={t("No baselines")}>{t("No baseline matches this scope.")}</EmptyState> : <div className="flex flex-col gap-2">{l.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setCreating(false); nav({ baselineId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={x.method === "demo_fixed" ? "muted" : "primary"}>{t(x.method === "demo_fixed" ? "v{v} · modeled" : "v{v} · measured", { v: x.version })}</Badge></div><div className="text-[11px] text-muted">{x.units} · {x.period}</div><div className="text-[11px] text-muted">{x.method} · {x.value} · {x.boundaryId}</div></div></ListRow>)}</div>}
         </Card>
         {creating || sel ? (
-          <Card title={sel ? t("Baseline {id}", { id: sel.id.slice(0, 8) }) : t("New baseline")} sub={sel ? t("Version {v} · saving creates version {next}", { v: sel.version, next: sel.version + 1 }) : t("Saving creates version 1")}>
+          <Card title={sel ? <span className="flex flex-wrap items-center gap-2">{t("Baseline {id}", { id: sel.id.slice(0, 8) })}<Badge>{t("Version {v}", { v: sel.version })}</Badge><Badge tone="warn">{t("Editing → v{n}", { n: sel.version + 1 })}</Badge></span> : t("New baseline")}
+            sub={sel ? t("Saving creates version {next} — the version number is assigned automatically", { next: sel.version + 1 }) : t("Saving creates version 1")} className="self-start">
             <div className="flex flex-col gap-4">
-              <section><h3 className="mb-1 text-[13px] font-bold">{t("Units")}</h3><div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{live.units.map((u) => <Check key={u.id} label={u.label} checked={d.unitIds.includes(u.id)} onChange={(on) => set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) })} />)}</div>{err("unitIds") && <p className="mt-1 text-xs text-crit">{err("unitIds")}</p>}</section>
+              <section><h3 className="mb-1 text-[13px] font-bold">{t("Units · the same set is required for comparison")}</h3><div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{live.units.map((u) => <Check key={u.id} label={u.label} checked={d.unitIds.includes(u.id)} onChange={(on) => set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) })} />)}</div>{err("unitIds") && <p className="mt-1 text-xs text-crit">{err("unitIds")}</p>}</section>
               <section className="grid-fluid" style={{ ["--min" as string]: "190px" }}>
-                <Field label={t("Period start (Kuala Lumpur)")} error={err("period")}><Input type="datetime-local" value={d.from} onChange={(e) => set({ from: e.target.value })} /></Field>
-                <Field label={t("Period end")}><Input type="datetime-local" value={d.to} onChange={(e) => set({ to: e.target.value })} /></Field>
-                <Field label={t("Method")}><Select value={d.method} onChange={(e) => set({ method: e.target.value as BaselineDraft["method"] })}><option value="demo_fixed">demo_fixed ({t("entered value")})</option><option value="demo_period_comparison">demo_period_comparison ({t("measured")})</option></Select></Field>
-                {d.method === "demo_fixed" ? <Field label={t("Baseline (kWh, fictional)")} error={err("baselineKWh")}><Input type="number" min="0" step="0.1" value={d.baselineKWh} onChange={(e) => set({ baselineKWh: e.target.value })} /></Field> : <p className="self-end text-xs text-muted">{t("Measured from the period’s readings when saved; no value is entered (SR29).")}</p>}
-                <Field label={t("Boundary")} error={err("boundaryId")}><Select value={d.boundaryId} onChange={(e) => set({ boundaryId: e.target.value as BaselineDraft["boundaryId"] })}><option value="ac_input_electricity">ac_input_electricity</option><option value="whole_building_electricity">whole_building_electricity</option></Select></Field>
+                <Field label={t("Period from (Kuala Lumpur)")} error={err("period")}><Input type="datetime-local" value={d.from} onChange={(e) => set({ from: e.target.value })} /></Field>
+                <Field label={t("Period to")} hint={t("Up to 366 days")}><Input type="datetime-local" value={d.to} onChange={(e) => set({ to: e.target.value })} /></Field>
               </section>
-              <Field label={t("Boundary description")} error={err("boundary")}><Input value={d.boundary} maxLength={500} onChange={(e) => set({ boundary: e.target.value })} placeholder={t("AC unit input electricity only")} /></Field>
-              <Field label={t("Assumptions")} error={err("assumptions")}><Textarea value={d.assumptions} maxLength={2000} onChange={(e) => set({ assumptions: e.target.value })} /></Field>
+              <Field label={t("Method")}><Choice value={d.method} onChange={(v) => set({ method: v })} options={[{ id: "demo_fixed" as const, label: `demo_fixed · ${t("entered value")}` }, { id: "demo_period_comparison" as const, label: `demo_period_comparison · ${t("measured")}` }]} /></Field>
+              {d.method === "demo_fixed" ? <div className="max-w-xs"><Field label={t("Baseline energy (kWh)")} error={err("baselineKWh")} hint={t("Fictional demo value · ≥ 0 · not used for demo_period_comparison")}><Input type="number" min="0" step="0.1" value={d.baselineKWh} onChange={(e) => set({ baselineKWh: e.target.value })} /></Field></div> : <p className="text-xs text-muted">{t("Measured from the period’s readings when saved; no value is entered (SR29).")}</p>}
+              <Field label={t("Boundary")} error={err("boundaryId")}><Choice value={d.boundaryId} onChange={(v) => set({ boundaryId: v })} options={[{ id: "ac_input_electricity" as const, label: t("AC input electricity") }, { id: "whole_building_electricity" as const, label: t("Whole-building electricity") }]} /></Field>
+              <Field label={t("Boundary description")} error={err("boundary")} hint={t("1–500 characters")}><Input value={d.boundary} maxLength={500} onChange={(e) => set({ boundary: e.target.value })} placeholder={t("AC unit input electricity only")} /></Field>
+              <Field label={t("Assumptions")} error={err("assumptions")} hint={t("1–2000 characters")}><Textarea value={d.assumptions} maxLength={2000} onChange={(e) => set({ assumptions: e.target.value })} /></Field>
               <Field label={t("Source")} error={err("source")}><Input value={d.source} maxLength={500} onChange={(e) => set({ source: e.target.value })} placeholder={t("Demo source (fictional)")} /></Field>
-              {sel && <p className="rounded-xl bg-surface2 p-3 text-xs">{t("Existing MRV reports keep the baseline version they reference; saved versions are never recalculated.")}</p>}
-              {live.canWrite && <div className="flex justify-end gap-2">{creating && <Btn onClick={() => setCreating(false)}>{t("Cancel")}</Btn>}<Btn variant="primary" disabled={pending} onClick={save}>{sel ? t("Save as v{n}", { n: sel.version + 1 }) : t("Create baseline")}</Btn></div>}
+              {sel && <Banner tone="warn">{t("MRV reports that already reference version {v} keep version {v}. Results are labelled “adjusted” only if an adjustment model exists — none does in this demo.", { v: sel.version })}</Banner>}
+              {live.canWrite && <div className="flex justify-end gap-2">{creating ? <Btn onClick={() => setCreating(false)}>{t("Cancel")}</Btn> : <Btn disabled={pending} onClick={() => { setD(baselineDraft(sel?.b)); setTried(false); }}>{t("Discard")}</Btn>}<Btn variant="primary" disabled={pending} onClick={save}>{sel ? t("Save as version {n}", { n: sel.version + 1 }) : t("Create baseline")}</Btn></div>}
             </div>
           </Card>
         ) : <Card title={t("Baseline")}><EmptyState title={t("Nothing selected")}>{t("Choose a baseline or create one.")}</EmptyState></Card>}

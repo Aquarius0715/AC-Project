@@ -132,7 +132,8 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await main.getByRole("tab", { name: /^Garis dasar/ }).click();
   await page.waitForURL(/tab=baselines/);
   await expect(main.getByLabel("Tempoh bermula dari (Kuala Lumpur)")).toBeVisible();
-  await main.getByRole("button", { name: "+ Baharu" }).click();
+  await expect(main).toContainText(/\d+ garis dasar dalam skop/); // the scope's count (IR323)
+  await main.getByRole("button", { name: "+ Garis dasar baharu" }).click();
   await expect(main.getByRole("heading", { name: "Garis dasar baharu", exact: true })).toBeVisible();
   await main.getByRole("button", { name: "Cipta garis dasar" }).click();
   for (const text of ["Pilih 1–100 unit", "Tamat mesti selepas mula", "Nilai ≥ 0 kWh"]) await expect(main).toContainText(text);
