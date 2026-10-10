@@ -126,3 +126,31 @@ func TestCertificatesAndParts(t *testing.T) {
 		t.Error("bad parts filter")
 	}
 }
+
+// TestCertificateCreatesMissingGrant: approving a certificate for a code the technician holds no grant for creates
+// the grant (QualificationGranted, IR133, IR192), not only extends an existing one. The seed grant is restored after.
+func TestCertificateCreatesMissingGrant(t *testing.T) {
+	s := server(t)
+	tech := seed.ID("tech-external-a")
+	var from, until time.Time
+	ownerScan(t, `SELECT valid_from, valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_outdoor'`, []any{tech}, &from, &until)
+	owner(t, `DELETE FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_outdoor'`, tech)
+	t.Cleanup(func() {
+		owner(t, `UPDATE identity.qualification_grants SET valid_from = $2, valid_until = $3 WHERE membership_id = $1 AND code = 'demo_outdoor'`, tech, from, until)
+	})
+	expires := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
+	pdf := blobJSON("outdoor.pdf", "application/pdf", []byte("%PDF-1.4 outdoor"), 16)
+	code, m := write(s, &contrA, "certificates.submit", `{"membershipId":"`+tech.String()+`","code":"demo_outdoor","name":"Outdoor AC","number":"N-2","issuedAt":"`+
+		clock.Add(-24*time.Hour).Format(time.RFC3339)+`","expiresAt":"`+expires.Format(time.RFC3339)+`","file":`+pdf+`}`, 0)
+	if code != 200 {
+		t.Fatalf("submit: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "certificates.verify", `{"certificateId":"`+data(m)["id"].(string)+`","decision":"approve"}`, 1); code != 200 {
+		t.Fatalf("approve: %d %v", code, m)
+	}
+	var got time.Time
+	ownerScan(t, `SELECT valid_until FROM identity.qualification_grants WHERE membership_id = $1 AND code = 'demo_outdoor' AND revoked_at IS NULL`, []any{tech}, &got)
+	if !got.Equal(expires) {
+		t.Errorf("the new grant: until %v", got)
+	}
+}

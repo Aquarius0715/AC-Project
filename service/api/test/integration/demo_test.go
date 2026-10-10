@@ -107,7 +107,16 @@ func TestDemoOperations(t *testing.T) {
 	}
 	cmd := data(m)["id"].(string)
 	keepObserved(t, cmd)
-	if code, _ := trig(s, `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Add(time.Second).Format(time.RFC3339)+`","eventType":"command_ack","commandId":"`+cmd+`","sequence":1}`); code != 200 {
+	// a requested command is marked sent by the device's sent event (commands.create sends at once, so set it back)
+	owner(t, `UPDATE control.commands SET status = 'requested', delivery = 'not_sent', sent_at = NULL WHERE id = $1`, cmd)
+	sentAt := clock.Add(500 * time.Millisecond)
+	if code, m := trig(s, `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+sentAt.Format(time.RFC3339Nano)+`","eventType":"command_sent","commandId":"`+cmd+`","sequence":1}`); code != 200 {
+		t.Fatalf("sent trigger: %d %v", code, m)
+	}
+	if _, m := post(s, &customerB, "commands.get", `{"id":"`+cmd+`"}`); data(m)["status"] != "sent" || data(m)["delivery"] != "sent" || data(m)["sentAt"] != sentAt.Format(time.RFC3339Nano) {
+		t.Errorf("sent: %v", data(m))
+	}
+	if code, _ := trig(s, `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Add(time.Second).Format(time.RFC3339)+`","eventType":"command_ack","commandId":"`+cmd+`","sequence":2}`); code != 200 {
 		t.Fatal("ack trigger")
 	}
 	if _, m := post(s, &customerB, "commands.get", `{"id":"`+cmd+`"}`); data(m)["status"] != "acknowledged" {

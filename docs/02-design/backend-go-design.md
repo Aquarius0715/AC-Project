@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND-GO
-version: 0.31.0
+version: 0.32.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -285,7 +285,7 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 |---|---|---|
 | Domain unit tests | `go test` | State machines, calculations (energy, coverage, emissions), validation, authorization predicates — table-driven, no I/O |
 | Store tests | `testcontainers-go` PostgreSQL 16 + migrations | sqlc queries, RLS isolation (a second tenant sees nothing), constraints (overlap, one pending command, append-only audit) |
-| API tests | `httptest` + Echo | Status mapping, idempotency replay, version conflicts, HQ-network rule, owner-only rules |
+| API tests | `httptest` + Echo | Status mapping, idempotency replay, version conflicts, HQ-network rule, owner-only rules; every SQL statement of a module runs in at least one test, checked on the coverage profile after `make cover` (IR311) |
 | Contract tests | generated from the catalog | Every operation registered once, mode and authorization match the catalog, inputs reject unknown fields; each operation's input rules answer VALIDATION before authorization (`TestRequiredInputs`, IR307) |
 | Acceptance tests | `test/acceptance` | AT-* cases from the requirement documents replayed against the API with fixture-contract.json seeds and a fixed clock (the same cases that drive the Phase 1A mock) |
 | Integration | LocalStack, Stripe CLI, IoT device simulator | Outbox → SNS → SQS flows, Stripe webhooks, MQTT command round trip in staging |

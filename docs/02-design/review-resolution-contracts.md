@@ -4116,3 +4116,24 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
 3. **No web change.** E2E: 70 passed, 9 skipped, against the rebuilt backend.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR311 Every SQL statement of the Core API runs in a test — 2026-10-10
+
+IR310's fault was a statement that no test had ever run. This round looked for more of that kind.
+
+1. **Parameters without a type.** Every parameter in a CASE arm, COALESCE, NULLIF, GREATEST / LEAST, `IS NULL` or a select list was checked. None other than IR310's was at risk:
+   - the NULLIFs feed text columns;
+   - each COALESCE takes its type from a column;
+   - the other CASE arms are cast.
+2. **Statements no test ran.** A scan of the coverage profile lists the SQL statements (UPDATE, INSERT, DELETE, SELECT, WITH) that sit in blocks no test executed. Four of them were in the modules, and they are tested now:
+   - the QualificationGranted consumer inserts a grant when the technician holds none for the code (`TestCertificateCreatesMissingGrant`; before, only the extension of an existing grant ran);
+   - demo.trigger `command_sent` marks a requested command sent with its time;
+   - members.save checks a property scope against identity's copy of the properties, both a known and an unknown property;
+   - jobs.requestReschedule for a periodic visit that is offered but not yet assigned reads the open offer's visit for the 48-hour rule (`TestRescheduleOfferedPeriodicVisit`).
+   Only process start-up, the seed and the migration runner remain outside the tests.
+3. **The standing rule.** Backend design §9 now requires every SQL statement of a module to run in at least one test. The coverage scan checks it after `make cover`.
+4. **Checked.**
+   - `make cover`: 87.4 % → 87.5 %. Integration tests: 130; unit tests: 78. `make test-all` passes.
+   - No production code changed, so the web build and E2E are unchanged (70 passed, 9 skipped, IR310).
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

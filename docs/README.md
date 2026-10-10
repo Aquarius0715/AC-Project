@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.194.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
+Version: 0.195.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.195.0 (2026-10-10): Every SQL statement of the Core API's modules now runs in at least one test, a rule in backend design §9. The four that never ran are tested: a new qualification grant, the demo command-sent event, a property scope and the 48-hour rule of an offered periodic visit. No other parameter-type fault like IR310's was found (IR311).
 0.194.0 (2026-10-10): Fixed: HQ could not change the role or status of a client user who had signed in. The membership update failed on a parameter PostgreSQL read as text. New tests cover the explicit restriction release, a forecast without readings, campaign refusals and the internal queries between domain services; Go coverage is 87.4 % (IR310).
 0.193.0 (2026-10-10): The demo job actions run in the tab again, so a refused note reaches its dialog. New tests cover contractor quality figures (arrival in window, first-time fix, rework rate), import refusals, payout conflicts and statements without a rate card, alert threshold operators and busy-time merging, and the demo job and client-user stores. Go coverage is 87.3 % (IR309).
 0.192.0 (2026-10-10): Uploads must be what their bytes are (PNG, JPEG or PDF signature). The upload Server Actions send the bytes' type, and a refusal names the file. New tests cover the remaining input rules, a reschedule after a contractor assignment, partner proposal refusals, the report submit checks and the reconcile paths; Go coverage is 87.0 % (IR308).

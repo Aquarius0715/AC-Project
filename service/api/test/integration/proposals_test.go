@@ -361,3 +361,30 @@ func TestPartnerProposalRefusals(t *testing.T) {
 	}
 	write(s, &hq, "jobs.cancel", `{"jobId":"`+job+`","reason":"test done"}`, version(job))
 }
+
+// TestRescheduleOfferedPeriodicVisit: a periodic visit that is offered but not yet assigned has no scheduled slot, so
+// the 48-hour rule of jobs.requestReschedule reads the open offer's visit (IR113): within 48 hours it is too late,
+// later the customer's three times go back to HQ.
+func TestRescheduleOfferedPeriodicVisit(t *testing.T) {
+	s := server(t)
+	unit := seed.ID("unit-non-rto")
+	plan, job := uuid.NewString(), uuid.NewString()
+	owner(t, `INSERT INTO maintenance.plans (id, tenant_id, unit_id, interval_months, anchor_day, next_due_at) VALUES ($1,$2,$3,3,8,$4)`, plan, seed.ID("tenant-a"), unit, clock.Add(24*90*time.Hour))
+	owner(t, `INSERT INTO maintenance.jobs (id, tenant_id, unit_id, customer_org_id, plan_id, occurrence_at, type, status, origin, requested_slot, due_at, contractor_org_id)
+		VALUES ($1,$2,$3,$4,$5,$6,'periodic','offered','periodic_plan',tstzrange($6,$7),$7,$8)`, job, seed.ID("tenant-a"), unit, seed.ID("org-customer-a"), plan,
+		clock.Add(30*time.Hour), clock.Add(32*time.Hour), seed.ID("org-contractor-a"))
+	owner(t, `INSERT INTO maintenance.offers (tenant_id, job_id, contractor_org_id, terms_version, visit_slot, offered_at, offer_expires_at, access_valid_from, access_valid_until)
+		VALUES ($1,$2,$3,'t',tstzrange($4,$5),$6,$7,$6,$8)`, seed.ID("tenant-a"), job, seed.ID("org-contractor-a"), clock.Add(30*time.Hour), clock.Add(32*time.Hour), clock, clock.Add(12*time.Hour), clock.Add(200*time.Hour))
+	three := `[` + slotJSON(170, 2) + `,` + slotJSON(194, 2) + `,` + slotJSON(218, 2) + `]`
+	reschedule := func() (int, map[string]any) {
+		_, m := post(s, &customerA, "jobs.get", `{"jobId":"`+job+`"}`)
+		return write(s, &customerA, "jobs.requestReschedule", `{"jobId":"`+job+`","preferredSlots":`+three+`}`, ver(m))
+	}
+	if code, m := reschedule(); code != 409 || m["messageKey"] != "errors.reschedule_too_late" {
+		t.Errorf("an offered visit in 30 hours: %d %v", code, m)
+	}
+	owner(t, `UPDATE maintenance.offers SET visit_slot = tstzrange($2, $3) WHERE job_id = $1`, job, clock.Add(100*time.Hour), clock.Add(102*time.Hour))
+	if code, m := reschedule(); code != 200 || data(m)["status"] != "requested" {
+		t.Errorf("an offered visit in 100 hours: %d %v", code, m)
+	}
+}

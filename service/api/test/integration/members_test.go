@@ -55,6 +55,7 @@ func TestMembersSave(t *testing.T) {
 		"blank reason":           {map[string]string{"reason": `" "`}, 422},
 		"internal at contractor": {map[string]string{"organizationId": `"` + contractor + `"`}, 422},
 		"unknown scope":          {map[string]string{"scopes": `[{"kind":"unit","id":"` + uuid.NewString() + `"}]`}, 422},
+		"unknown property":       {map[string]string{"scopes": `[{"kind":"property","id":"` + uuid.NewString() + `"}]`}, 422},
 		"unknown user":           {map[string]string{"userId": `"` + uuid.NewString() + `"`}, 404},
 		"unknown organization":   {map[string]string{"organizationId": `"` + uuid.NewString() + `"`}, 404},
 	} {
@@ -78,6 +79,11 @@ func TestMembersSave(t *testing.T) {
 	}
 	if code, _ := write(s, &hq, "members.save", body(map[string]string{"id": `"` + id + `"`, "role": `"admin"`, "employment": "null", "permissions": `[]`, "scopes": `[]`}), 3); code != 422 {
 		t.Error("role fixed")
+	}
+	// a technician may also be scoped to a whole property (the identity copy of the property, IR186)
+	if code, m := write(s, &hq, "members.save", body(map[string]string{"id": `"` + id + `"`, "permissions": `["alert.read","alert.resolve"]`, "scopes": `[{"kind":"property","id":"` + seed.ID("property-home-a").String() + `"}]`, "reason": `"whole home"`}), 3); code != 200 ||
+		data(m)["scopes"].([]any)[0].(map[string]any)["kind"] != "property" || data(m)["scopeVersion"].(float64) != 3 {
+		t.Fatalf("property scope: %d %v", code, m)
 	}
 	if code, _ := write(s, &hq, "members.save", body(map[string]string{"id": `"` + id + `"`}), 1); code != 409 {
 		t.Error("stale membership version")
