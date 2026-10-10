@@ -3305,3 +3305,30 @@ IR284 left one D08 rule unbuilt: the Core API opened policy alerts from the demo
    - The HQ screens.
    - The browser demo.
    - The assistant panel and the voice demo's answers.
+
+## IR286 The technician's diagnostic control in the display language — 2026-10-10
+
+`/technician/units/[id]/control` (SCR-T10, FR-T10, DD-T10, Figma Technician 02-18…02-28) already had Figma's layout: normal diagnostic action, current unit state, the job's command history, test run, authorization and the confirm dialog. It now follows the display language and time zone.
+
+1. **Texts.** These are translated:
+   - the cards and fields, the banners (restriction, blocked control, outside the work window), the empty states (no control.diagnose, no job) and the confirm dialog;
+   - the toasts and the inline validation;
+   - the test-run banner of every DiagnosticRun state (awaiting start, running, end requested, completed, start failed, end failed, end blocked);
+   - the command history (test-run start and end, the device outcome, the badges);
+   - the state tiles, and the capability, restriction and connection text;
+   - a refused write in words (restriction, busy, reconciliation, outside the window, OFFLINE, FORBIDDEN, CONFLICT, UNAVAILABLE). A VALIDATION only marks the fields, and the field errors are in words.
+   The dictionary gains 85 entries.
+2. **What stays a code.** A command as the device gets it ("set_mode = cool", "set_temperature = 24 °C"), as in Figma, and the DiagnosticRun state names in the banner text (end_requested, end_blocked …). The optgroup names of the action list and "Power ON / OFF" are words.
+3. **Times.**
+   - A command's request and acknowledgement times, the run's start and end, and the observation time are clock times in the display time zone (`showClock`, with the zone).
+   - The work window is a span (`showSpan`). Before, these were fixed Kuala Lumpur times, and the window was "09/14 08:00 – 09/20 08:00".
+4. **Before the work window (IR76).** units.get answers `errors.assignment_not_started`. The page then reads the URL's job (`jobs.get`) and says when diagnostic control opens, with a link back to the unit.
+5. **Code.** The loader moves to `_lib/load.ts` and formats everything; the view only renders. `shared/lib/techControl.ts` gains capabilityText, restrictionText, blockedText, connectionText, refusal and fieldText. A history row says whether it is a test-run command, so the card's last command no longer depends on the English title.
+6. **Checked.**
+   - Vitest: 41 files, 240 tests. `techControl.test.ts` moves to the display-zone times and adds the capability, restriction, blocked, connection, refusal and field words and a Malay case.
+   - E2E: `technician/language.e2e.ts` opens the job's diagnostic control in Malay from the unit screen, with its five cards and the send button; nothing is sent. The suite: 64 passed, 9 skipped; the users are en / Asia/Kuala_Lumpur, and no diagnostic command was created.
+7. **Still open.**
+   - The technician devices (list, detail, events) and the QR scan in Malay.
+   - The HQ screens.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.

@@ -1,8 +1,9 @@
-// AT-X01-N ③ for the technician (FR-X01, FR-T01–FR-T04, FR-T07, IR44, IR281–IR284): with Malay and Asia/Tokyo saved
-// in Preferences, the overview speaks Malay — tiles, tabs, sort and the side cards — while today's timeline stays in
-// Kuala Lumpur hours and says so; an assigned job's workspace speaks Malay with its window in GMT+9, and so do its unit,
-// on both tabs and with the 7-day period, and the unit's alert evidence. English and the earlier zone come back at the
-// end, or in afterEach when the test fails. Nothing is acknowledged or resolved (the dev data stays as it is).
+// AT-X01-N ③ for the technician (FR-X01, FR-T01–FR-T04, FR-T07, FR-T10, IR44, IR281–IR286): with Malay and Asia/Tokyo
+// saved in Preferences, the overview speaks Malay — tiles, tabs, sort and the side cards — while today's timeline stays
+// in Kuala Lumpur hours and says so; an assigned job's workspace speaks Malay with its window in GMT+9, and so do its
+// unit, on both tabs and with the 7-day period, the unit's alert evidence and the job's diagnostic control. English and
+// the earlier zone come back at the end, or in afterEach when the test fails. Nothing is acknowledged, resolved or sent
+// (the dev data stays as it is).
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
@@ -55,6 +56,17 @@ test("the technician overview in Malay keeps the timeline in Kuala Lumpur hours"
       await expect(main).toContainText(/Dasar: |tiada dasar/);
       await expect(main.getByRole("button", { name: "Selesaikan amaran" }).or(main.getByText(/^Diselesaikan .* — /))).toBeVisible(); // open: resolve with a reason; resolved: when and why
     } else await expect(main).toContainText("Tiada amaran pada unit ini");
+    // the job's diagnostic control (IR286): its cards in Malay, nothing sent
+    await main.getByRole("link", { name: "Kembali", exact: true }).click();
+    await page.waitForURL(/\/technician\/units\/[^/?]+\?jobId=/);
+    const control = main.getByRole("link", { name: "Diagnostik →", exact: true });
+    if (await control.count()) {
+      await control.click();
+      await page.waitForURL(/\/control\?jobId=/);
+      await expect(main.getByRole("heading", { name: "Kawalan diagnostik", exact: true })).toBeVisible();
+      for (const name of ["Tindakan diagnostik biasa", "Keadaan semasa unit", "Sejarah arahan — kerja ini", "Larian ujian", "Kebenaran"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();
+      await expect(main.getByRole("button", { name: "Semak & hantar" })).toBeVisible();
+    }
   }
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
