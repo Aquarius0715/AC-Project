@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.33.0
+version: 0.34.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -669,9 +669,10 @@ Scope: FR-A16 / Main display pattern: **UI-TIMELINE / UI-DETAIL**. Service bound
 2. Apply these business rules to reads and actions. Show success, denied, failed, and pending separately. Mask secrets and contacts in before/after. Only Repository business events append records. This screen cannot add, edit, or delete them. A browser-only demo does not guarantee tamper-proof records.
 3. This screen is read-only. Keep search conditions in the URL, without confidential text.
 4. Queries to update: `none (audit read-only)`.
-5. Tabs (IR115, Figma Admin 14-1…14-5): `tab=log` (default; audit search with `correlationId`, actor, target, result and period in the URL) and `tab=devices` (device event history for the `deviceId`; notes are added from Devices & models with device.write, not here).
+5. Tabs (IR115, Figma Admin 14-1…14-5, IR320): `tab=log` (default; the URL keeps `from`, `to`, `actorId`, `targetKind`, `targetId`, `correlationId`, `result`, `limit` and the open entry `entryId`) and `tab=devices` (`deviceId` and `eventId`; `devices.events` runs only for the picked device over the same period, with no fallback device; notes are added from Devices & models with device.write, not here).
 6. Language and time (IR304): texts, results and recorded roles follow the display language. Entry and device-event times are in the display time zone, and the period filter takes that zone's days and names it.
 7. Actors (IR305): entries show the actor's current display name (`AuditView.actorName`), and the detail also shows the actor ID. A system actor has no name and shows its ID. The role stays as recorded at the time.
+8. Related records and trace (IR320): the entries with the open entry's correlation ID (a day either side, oldest first) give its correlation trace and its related restriction, command, job and unit, the entry's own target first. The links open `/admin/restrictions?restrictionId=`, `/admin/jobs?jobId=` and `/admin/units?unitId=`, and each screen checks its own permission; `commands.get` runs only when Load command is clicked. A restriction the entry changed shows the state and exception end that the entry recorded. Filter by actor / ID / target keep the open entry open; an `entryId` outside the results says so.
 
 **Boundary cases and failures**: Search correlation IDs within the authorized set. Other-tenant and nonexistent correlation IDs return the same successful empty result. Reject delete-equivalent calls and reversed periods. Role switching must not change historical actors to different people.
 
@@ -863,7 +864,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.33.0: Read IR01–IR319 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.34.0: Read IR01–IR320 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

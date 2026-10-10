@@ -18,7 +18,7 @@ CASES = [
     ('four_permission_requirement_returns', [('01-requirements/admin.md', 'Authorize grace/exception/cancel with restriction.write and forced release with restriction.override: two permissions.', 'Record grace, exceptions, cancellation, and manual release with four separate permissions.')], 'Restriction requirement still demands four permissions'),
     ('job_list_unit_set_missing', [('02-design/query-catalog.csv', 'jobs.list,"unitId,unitIds,', 'jobs.list,"unitId,')], 'Job list/summary shared filters differ'),
     ('audit_device_candidates_missing', [('03-uiux/screen-catalog.csv', 'audit.list;devices.list;devices.events', 'audit.list;devices.events')], 'Audit device selection dependency absent'),
-    ('audit_primary_read_missing', [('03-uiux/screen-catalog.csv', ',audit.list,devices.list;devices.events;commands.get,', ',none,devices.list;devices.events;commands.get,')], 'Audit primary read absent'),
+    ('audit_primary_read_missing', [('03-uiux/screen-catalog.csv', ',audit.list,devices.list;devices.events;commands.get;members.list;units.list;alerts.get,', ',none,devices.list;devices.events;commands.get;members.list;units.list;alerts.get,')], 'Audit primary read absent'),
     ('review_ui_availability_missing', [(TYPE, 'reviewAvailability:ReviewAvailability;', '')], 'Report review availability absent'),
     ('stale_handoff_baseline', [('04-agentic-sdlc/README.md','runs/TRANSLATION-EN-2026-09-17/spec-manifest.json','runs/DOC-0.21.0/spec-manifest.json')], 'Current handoff baseline mismatch'),
     ('job_completed_time_missing', [(TYPE, 'startedAt:Instant|null;completedAt:Instant|null;contractorOrgId:', 'startedAt:Instant|null;contractorOrgId:')], 'Job completion timestamp source absent'),

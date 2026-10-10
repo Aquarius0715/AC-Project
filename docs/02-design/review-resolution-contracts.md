@@ -4374,3 +4374,48 @@ Two items IR318 left open.
    - E2E: 76 passed, 8 skipped by design.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR320 The HQ audit explorer as SCR-A16 and Figma describe it — 2026-10-11
+
+The audit screen (FR-A16, DD-A16, SCR-A16, Figma Admin 337:2, 338:2, 338:332, 338:602 and 340:2) had three gaps. It had no actor or target filter. It showed related records only in the demo. Its device tab fell back to the first device, which IR33 forbids.
+
+1. **URL keys.** The log tab keeps `from`, `to`, `actorId`, `targetKind`, `targetId`, `correlationId`, `result`, `limit` and the open entry `entryId` in the URL. `correlationId` replaces the former key `corr`. The device tab keeps `deviceId` and `eventId`, and uses the same period.
+   - **Actor filter.** It lists the users of the memberships the session may read (`members.list`, where readable), the actors of the shown entries and the URL's actor.
+   - **Target filter.** It offers the business kinds alert, automation, command, contract, device, device_event, invoice, job, membership, payment, policy, restriction, unit and user, with the kinds of the shown entries.
+   - **Filter by ….** In the open entry, **Filter by actor →**, **Filter by ID →** (the correlation) and **Filter by target →** keep that entry open, because it matches the new search. A target ID shows as a chip that clears it.
+   - **New searches.** Any other filter change starts from the newest entry.
+2. **The open entry.** It shows:
+   - the actor's name and ID;
+   - the recorded role, "kept as recorded, not rewritten by the current membership";
+   - the time, the correlation ID, the target with the versions it moved between ("version 3 → 4") and the reason;
+   - the masked before/after values.
+   The page then reads `audit.list` once more for the entry's correlation ID, a day either side, oldest first. That read gives two things:
+   - **Correlation trace.** When there are several entries, the trace lists them all. A pending entry and its final result are separate entries; earlier entries are never edited.
+   - **Related records.** These are the restriction, command, job and unit of the entry and its correlation, the entry's own target first. Restriction, job and unit open their own screens, and each screen checks its own permission. The command is read with `commands.get` only when the user clicks **Load command**. A restriction the entry changed shows the state and exception end that the entry recorded, so the screen reads no restriction.
+   `/admin/units?unitId=` without a customer now redirects to the unit under its customer.
+3. **Why nothing shows.**
+   - A reversed or too long period searches nothing and says so.
+   - A correlation ID that matches nothing says that an unknown ID and an out-of-scope ID look the same.
+   - Otherwise the list says that no entry matches the filters.
+   - An `entryId` outside the results says so, instead of opening another entry.
+   - A read-only banner states that entries are appended only by business events: `audit.audit_log` rejects updates and deletes. Before/after values are masked, and filters, but never reasons or values, go to the URL.
+4. **Device events (Figma 340:2).**
+   - **No fallback.** Without a `deviceId` the tab asks the user to pick a device. An unknown or out-of-scope `deviceId` says it is not in the list.
+   - **Device list.** It comes from `devices.list`, with the unit names of `units.list` where readable.
+   - **Events.** `devices.events` runs only for the picked device and the period.
+   - **Event list.** Each event shows its title, its type code, the evidence source, the sequence and the time, and its recovery.
+   - **Event detail.** It shows the type, the evidence, the sequence with any gap ("42 (previous 40 — 1 missing)"), the unit at the time, the times and the recovery. It also shows:
+     - the event's alerts, through `alerts.get` where readable, with **Open alert →**;
+     - **Filter log →**, for the response notes' audit entries (`targetKind=device_event`);
+     - the response notes, read-only here. The screen does not claim to mask the text of notes, which device.write users write; Figma 340:2's footnote no longer says so either.
+5. **Code.**
+   - `lib/audit` gains `correlationQuery`, `correlationTrace`, `relatedRecords`, `actorOptions`, `targetKinds`, `auditDeviceEvents` and `periodInstants`.
+   - `deviceEventItem` and its five Malay words go.
+   - `lib/techDevices` exports `eventCause`.
+   - SCR-A16 adds `members.list`, `units.list` and `alerts.get` and the new URL keys. The review regression check's audit mutation follows the new read list.
+6. **Checked.**
+   - The typecheck and lint pass.
+   - Vitest covers the filters, the query, the related records, the trace, the actor and kind options and the device event words, in both languages.
+   - The new `admin/audit` E2E spec checks the URL state, the Filter by links, the chip, the empty states and the device tab. The HQ language spec checks the banner and the device tab in Malay.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

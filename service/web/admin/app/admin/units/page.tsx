@@ -5,8 +5,9 @@
 // D05 archive blockers (contracts, jobs, device bindings, restrictions, pending commands), and the customer's client users
 // (clientUsers.list). tab=warranty (no customer) reads units.coverage with the claimable jobs (jobs.get, reports.get).
 // URL keys: customerId, tab, locationId (property, space or "unassigned:<propertyId>"), propertyId, unitId, powerState,
-// connections, search. Writes are Server Actions (actions.ts). The Phase 1A demo keeps the fixtures. Texts and times of
+// connections, search; a unitId without customerId redirects to the unit under its customer (IR320). Writes are Server Actions (actions.ts). The Phase 1A demo keeps the fixtures. Texts and times of
 // the first render are formatted here in the user's language and display time zone (IR293).
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
 import { klStamp } from "@ac/web/lib/energy";
@@ -65,6 +66,10 @@ export default async function AdminUnitsPage({ searchParams }: PageProps<"/admin
     rows, kpis: registerKpis(rows, units, t), search: one("search") ?? "", missing: !!one("customerId") && !rows.some((r) => r.id === one("customerId")),
     top: one("tab") === "warranty" ? "warranty" : "customers", activeCustomers: rows.filter((r) => r.status === "active").map((r) => ({ id: r.id, name: r.name })), coverageAttention: null,
   };
+  // a unit link without its customer (the audit's related records, IR320) goes to the unit under its customer
+  const unitOrg = !one("customerId") && one("unitId") ? units.find((u) => u.id === one("unitId"))?.customerOrgId : undefined;
+  const owner = unitOrg ? rows.find((r) => r.orgId === unitOrg) : undefined;
+  if (owner) redirect(`/admin/units?customerId=${owner.id}&unitId=${one("unitId")}`);
   const cust = rows.find((r) => r.id === one("customerId"));
   if (!cust) {
     const coverage = has("asset.read", "contract.read") ? await coreAll<ApiCoverage>("units.coverage") : null;

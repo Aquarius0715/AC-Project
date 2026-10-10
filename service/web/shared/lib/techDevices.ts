@@ -139,6 +139,8 @@ const eventDetail: Record<ApiDeviceEventFull["eventType"], string> = {
 const restoredDetail: Record<NonNullable<ApiDeviceEventFull["recovery"]>["axis"], string> = {
   connection: "Connection restored", power: "Power signal restored", tamper: "Tamper cleared — cover closed (the alert stays until handled)",
 };
+/** What a device event means in words: the fault, or for a recovery the axis that came back. */
+export const eventCause = (e: Pick<ApiDeviceEventFull, "eventType" | "recovery">, t: T = en) => t(e.recovery ? restoredDetail[e.recovery.axis] : eventDetail[e.eventType]);
 /** One device event row (Figma 03 “Device events”): detection, evidence, its alerts and the recovery or response. */
 export type EventRow = { id: string; version: number; time: string; type: ApiDeviceEventFull["eventType"]; tone: "warn" | "crit" | "ok" | "muted"; detail: string; recovery: string; notes: string[]; alerts: ApiAlertLite[] };
 export function eventRows(es: ApiDeviceEventFull[], alerts: Map<string, ApiAlertLite>, now: number, i: I18n = EN): EventRow[] {
@@ -154,7 +156,7 @@ export function eventRows(es: ApiDeviceEventFull[], alerts: Map<string, ApiAlert
       : as.length ? t(open ? "open · unacknowledged" : as.every((a) => a.status === "resolved") ? "open · resolved" : "open · acknowledged") : t("open");
     return {
       id: e.id, version: e.version, time: when(e.occurredAt), type: e.eventType, tone: e.eventType === "tamper" ? "warn" : e.eventType === "restored" ? "ok" : e.eventType === "operation_failed" ? "muted" : "crit",
-      detail: `${t(e.recovery ? restoredDetail[e.recovery.axis] : eventDetail[e.eventType])} · ${e.evidenceSource}${e.alertIds.length ? ` · ${t(e.alertIds.length === 1 ? "1 alert" : "{n} alerts", { n: e.alertIds.length })}` : ""}`,
+      detail: `${eventCause(e, t)} · ${e.evidenceSource}${e.alertIds.length ? ` · ${t(e.alertIds.length === 1 ? "1 alert" : "{n} alerts", { n: e.alertIds.length })}` : ""}`,
       recovery, notes: e.responseNotes.map((n) => `${when(n.at)} — ${n.message}`), alerts: as,
     };
   });

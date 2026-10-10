@@ -3,7 +3,6 @@ import {
   campaignErrors, campaignRows, campaignStart, capabilityDraft, capabilityErrors, deviceRows, modelRows, parseWaves,
   type ApiCampaign, type ApiCapability, type ApiDevice, type CampaignDraft,
 } from "@ac/web/lib/devices";
-import { deviceEventItem } from "@ac/web/lib/audit";
 import { i18nOf } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
@@ -21,12 +20,6 @@ describe("HQ device registry", () => {
     expect(modelRows([cap], units, [device({}), device({ id: "d2", unitId: null })])[0]).toMatchObject({ name: "DemoAir SPL-100", used: "1 unit · 1 device", updated: "10 Sept 2026, 10:00 am MYT" });
     expect(deviceRows([device({}), device({ id: "d2", unitId: null, tamper: "detected" })], units).map((r) => [r.unit, r.tamper])).toEqual([["Bedroom AC", false], ["Unbound", true]]);
     expect(capabilityErrors({ ...capabilityDraft(cap), control: false, changeReason: "" }, true)).toEqual({ control: "Mode, fan or temperature control needs power control", changeReason: "A reason is required (1–1000 characters)" });
-  });
-
-  it("words device events in the display time zone", () => {
-    const ev = { id: "e1", deviceId: "d1", eventType: "communication_lost", evidenceSource: "heartbeat", occurredAt: "2026-09-14T00:30:00Z", restoredAt: "2026-09-14T00:40:00Z" };
-    expect(deviceEventItem(ev)).toEqual({ time: "09-14 08:30", title: "communication lost", detail: "heartbeat · restored" }); // the audit screen's English and Kuala Lumpur
-    expect(deviceEventItem(ev, MS, NOW.getTime())).toEqual({ time: "hari ini 9:30 PG GMT+9", title: "komunikasi terputus", detail: "heartbeat · dipulihkan" });
   });
 
   it("checks a campaign: waves, the start in the display time zone and the device window", () => {

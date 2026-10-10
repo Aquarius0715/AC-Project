@@ -255,16 +255,17 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(main.getByRole("heading", { name: "Cara konflik diselesaikan", exact: true })).toBeVisible();
   await main.getByRole("button", { name: "Cipta polisi" }).click();
   for (const text of ["1–120 aksara", "Pilih sekurang-kurangnya satu unit"]) await expect(main).toContainText(text);
-  // the audit log (IR304): the period's days in the display zone, the result choices, an entry's times in GMT+9, and the
-  // device events tab
+  // the audit log (IR304, IR320): the read-only banner, the period's days in the display zone, the result choices, an
+  // entry's times in GMT+9, and the device events tab without a device
   await page.goto("/admin/audit");
   await expect(main.getByRole("tab", { name: /^Log audit/ })).toHaveAttribute("aria-selected", "true");
   await expect(main).toContainText("Hari dalam Asia/Tokyo");
   for (const name of ["Berjaya", "Ditolak", "Gagal", "Belum selesai"]) await expect(main.getByRole("button", { name, exact: true })).toBeVisible();
   if (await main.getByText("Peranan pada masa itu", { exact: true }).count()) await expect(main).toContainText(/Berlaku\s*\d{1,2} \S+ \d{4}, .+ GMT\+9/);
+  await expect(main).toContainText("Baca sahaja · entri ditambah hanya oleh peristiwa perniagaan");
   await main.getByRole("tab", { name: "Peristiwa peranti" }).click();
   await page.waitForURL(/tab=devices/);
-  await expect(main.getByRole("heading", { name: "Peristiwa peranti", exact: true })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "○ Pilih peranti", exact: true })).toBeVisible(); // no fallback device (IR320)
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/admin");
