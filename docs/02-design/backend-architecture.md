@@ -138,7 +138,7 @@ Cross-module rules that the modules must keep:
 
 | Topic | Design |
 |---|---|
-| Sign-in | OIDC authorization code flow with PKCE against Amazon Cognito, performed by the BFF. Tokens stay on the server; the browser holds only an httpOnly, Secure, SameSite=Lax session cookie. CSRF protection on all BFF write routes. |
+| Sign-in | OIDC authorization code flow with PKCE against Amazon Cognito, performed by the BFF. Tokens stay on the server; the browser holds only an httpOnly, Secure, SameSite=Lax session cookie. CSRF protection on all BFF write routes. The Core API records the access token's `auth_time` as the user's last sign-in (IR268). |
 | Session lifetime | Idle lifetime 30 minutes with a warning 120 seconds before expiry and explicit extend (same behaviour as IR55); absolute lifetime 12 hours (PROPOSED). Sign-out revokes the server session and IdP refresh token. |
 | Two-step verification | TOTP in Amazon Cognito (FR-X08 becomes real). Required for every HQ user (PROPOSED). |
 | HQ network restriction | HQ users (role admin) sign in and work only through `admin.<domain>`, which AWS WAF allows only from the company network (office egress addresses and the company VPN). The BFF issues an admin session only on that host and marks it `channel=hq-network`; the Core API rejects admin-role operations without that mark (FORBIDDEN, shared Page unavailable). `/admin` routes on `app.<domain>` return the shared Page unavailable view. Contractors, technicians, and clients are not restricted. |

@@ -82,8 +82,9 @@ type cached struct {
 // ErrNoMembership is identity-api's answer for an unknown, foreign or inactive membership.
 var ErrNoMembership = errors.New("auth: membership not valid")
 
-// Principal implements PrincipalSource.
-func (r *RemoteSource) Principal(ctx context.Context, subject string, tenant, membership uuid.UUID) (*ops.Principal, error) {
+// Principal implements PrincipalSource. A fetch passes the token's sign-in time on, so identity-api records it
+// (IR268); a cached principal does not, and the next fetch does.
+func (r *RemoteSource) Principal(ctx context.Context, subject string, tenant, membership uuid.UUID, signedIn time.Time) (*ops.Principal, error) {
 	now := time.Now
 	if r.Now != nil {
 		now = r.Now
@@ -95,7 +96,7 @@ func (r *RemoteSource) Principal(ctx context.Context, subject string, tenant, me
 		return c.p, c.err
 	}
 	r.mu.Unlock()
-	p, err := r.fetch(ctx, subject, tenant, membership)
+	p, err := r.fetch(ctx, subject, tenant, membership, signedIn)
 	if errors.Is(err, ErrUnavailable) {
 		return nil, err // never cache an outage
 	}
@@ -108,8 +109,11 @@ func (r *RemoteSource) Principal(ctx context.Context, subject string, tenant, me
 	return p, err
 }
 
-func (r *RemoteSource) fetch(ctx context.Context, subject string, tenant, membership uuid.UUID) (*ops.Principal, error) {
+func (r *RemoteSource) fetch(ctx context.Context, subject string, tenant, membership uuid.UUID, signedIn time.Time) (*ops.Principal, error) {
 	q := url.Values{"subject": {subject}, "tenant": {tenant.String()}, "membership": {membership.String()}}
+	if !signedIn.IsZero() {
+		q.Set("signedIn", signedIn.UTC().Format(time.RFC3339))
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.BaseURL+PrincipalPath+"?"+q.Encode(), nil)
 	if err != nil {
 		return nil, err

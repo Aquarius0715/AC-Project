@@ -640,7 +640,7 @@ Scope: FR-C19 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 | email | string/required | Valid address, unique per customer (case-insensitive) | Invitation |
 | clientRole | enum (fixed) | member; owners cannot choose owner | Role |
 | status | Read-only | invited / active / disabled | Account state |
-| lastSignInAt | Read-only | null = never signed in | Activity |
+| lastSignInAt | Read-only | null = never signed in; recorded from the sign-in token (IR268) | Activity |
 
 **Steps**
 

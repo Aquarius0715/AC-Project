@@ -1294,7 +1294,7 @@ Details fixed while implementing `inquiries.*` and `audit.list` (IR118); DD-C12,
 Details fixed while implementing `clientUsers.*` and `twoFactor.*` (IR118); IR111, IR112 and IR114 apply.
 
 1. **Client user records.** `identity.client_users` lists a customer's users. The seed creates one active owner row per seed client membership; `members.save` creating a client membership adds an active member row (unless the email is already listed). `Target.kind` gains `client_user` and `Notification.templateKey` gains `invite` for the invite preview.
-2. **clientUsers.list.** Client owners (members FORBIDDEN) see their own customer; HQ asset.read sees all. Filters customerId, status, clientRole; sort email (default), invitedAt or id. lastSignInAt comes from the linked user.
+2. **clientUsers.list.** Client owners (members FORBIDDEN) see their own customer; HQ asset.read sees all. Filters customerId, status, clientRole; sort email (default), invitedAt or id. lastSignInAt comes from the linked user and is recorded at sign-in (IR268).
 3. **clientUsers.save.** Email must be a plain valid address up to 254 characters and unique per customer, case-insensitive (VALIDATION). Without id it invites: status=invited, invitedAt=now, invitedBy=caller; status is not allowed; a client owner may invite only members without status or reason (FORBIDDEN otherwise) and only into their own customer (NOT_FOUND). With id it is HQ asset.write only, latest version, reason 1–1000 required, customerId immutable; an invite cannot be set active before first sign-in (CONFLICT); demoting or disabling the last active owner is CONFLICT. Changes are mirrored on the linked membership (clientRole; disabled ends validUntil=now, active clears it; scopeVersion+1).
 4. **clientUsers.remove.** HQ asset.write, latest version, reason 1–1000; the last active owner is CONFLICT. The row is deleted, the linked membership ends at now, and DeletedResource {id, deleted:true} is returned.
 5. **clientUsers.resendInvite.** Read: client owner of the customer or HQ asset.write; only status=invited (CONFLICT otherwise); returns an email NotificationPreview (templateKey/type invite, target client_user, deliveryState preview) and saves or sends nothing.
@@ -2773,3 +2773,36 @@ After the unit screen (IR259), the customer's home screen `/customer` (FR-C01, D
    - The partner, technician and HQ screens.
    - The voice demo's answers.
    - The shared failure toast and route states (IR266).
+
+## IR268 The last sign-in is recorded from the token's sign-in time — 2026-10-10
+
+IR267 found that `identity.users.last_sign_in_at` was read by `clientUsers.list` but never written. "Last sign-in" therefore showed "—" for everyone, on the customer's Users page (FR-C19) and in HQ's Users tab (FR-A17). The BFF signs users in (backend architecture §6) and never tells the Core API. The access token does say when its holder signed in: OIDC `auth_time`, sent by Cognito and checked on the local Keycloak.
+
+1. **Rule.** When an authenticated request carries an `auth_time` later than the sign-in recorded for the user, identity sets:
+   - `last_sign_in_at` to the business time now — in the demo that is the demo clock, so the time reads like the rest of the scenario;
+   - `sign_in_auth_time` (new column) to that `auth_time`.
+   These requests leave both columns alone:
+   - more requests of the same sign-in;
+   - the token of an older session on another device;
+   - a token without `auth_time` (the static test tokens).
+   A failure to record is logged and never fails the request. The time is informational and has no version or audit entry.
+2. **Where.** The verifier returns the subject with the sign-in time (`auth.Identity`).
+   - identity-api records it when it loads the principal.
+   - The other services pass it on in their principal call (`signedIn`, RFC 3339), so identity-api records it there.
+   - A principal served from another service's 30-second cache is not passed on; the next fetch passes it on.
+   - Each process remembers the latest sign-in time it has recorded per user, so further requests of that sign-in cost no query. The database condition (`sign_in_auth_time < auth_time`) keeps replicas and restarts correct.
+3. **Schema.** `identity.users.sign_in_auth_time timestamptz` (schema.sql = `000001_init.up.sql`, before the first release). The dev database `ac` got the column with `ALTER TABLE … ADD COLUMN IF NOT EXISTS` instead of a reset, so its data and demo clock stay. The test databases are rebuilt by `make test-all`.
+4. **Checked.**
+   - Go unit tests:
+     - TestOIDCVerifier reads `auth_time` and ignores a value that is not a number;
+     - TestRemoteSource passes the time on;
+     - TestRecordSignIn covers a missing time, the first sign-in on the business clock, the same and an older sign-in in a process with nothing cached, a later one, and the middleware path.
+   - Integration TestLastSignIn, in monolith and cluster mode:
+     - the first sign-in shows in the Users list;
+     - repeats, an older session and a token without a time do not move it;
+     - a later sign-in moves it, directly on identity and through equipment-api's principal call.
+   - `make test-all`: both suites pass (114 integration tests, 71 unit tests).
+   - E2E: `customer/users.e2e.ts` is new (2 tests):
+     - the owner's row shows the last sign-in in the IR44 format instead of "—";
+     - the invite dialog refuses a bad address and an existing user in another letter case, and Cancel invites nobody.
+     The suite: 57 passed, 9 skipped. After the run every user that signed in has a last sign-in in demo time; the preferences are en / Asia/Kuala_Lumpur, and all 47 E2E jobs are cancelled.

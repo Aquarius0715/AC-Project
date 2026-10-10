@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -71,11 +73,29 @@ func seedFixture(t *testing.T) *seed.Fixture {
 	return f
 }
 
+// testTokens maps the static test tokens to the fixture users. "tok-a@1789000000" is tok-a signed in at that Unix
+// time, as an OIDC token's auth_time (IR268).
+type testTokens auth.StaticVerifier
+
+func (v testTokens) Verify(ctx context.Context, token string) (auth.Identity, error) {
+	tok, at, signed := strings.Cut(token, "@")
+	id, err := auth.StaticVerifier(v).Verify(ctx, tok)
+	if err != nil || !signed {
+		return id, err
+	}
+	sec, err := strconv.ParseInt(at, 10, 64)
+	if err != nil {
+		return auth.Identity{}, err
+	}
+	id.SignedIn = time.Unix(sec, 0).UTC()
+	return id, nil
+}
+
 // testVerifier maps the static test tokens to the fixture users.
-func testVerifier(t *testing.T) auth.StaticVerifier {
+func testVerifier(t *testing.T) testTokens {
 	t.Helper()
 	f := seedFixture(t)
-	v := auth.StaticVerifier{}
+	v := testTokens{}
 	for _, a := range f.Actors {
 		v["tok-"+map[string]string{"hq-operator": "hq", "customer-a": "a", "customer-b": "b", "tech-external-b": "tb", "tech-internal-a": "ti", "tech-external-a": "ta", "contractor-a": "ca", "contractor-b": "cb", "hq-restriction-manager": "rm", "hq-override-only": "oo"}[a.MembershipID]] = seed.ID(a.UserID).String()
 	}

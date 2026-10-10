@@ -2,10 +2,12 @@ package auth
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
@@ -20,22 +22,38 @@ type OIDCVerifier struct {
 	Keyfunc   jwt.Keyfunc
 }
 
-// Verify implements Verifier and returns the `sub` claim.
-func (v *OIDCVerifier) Verify(_ context.Context, token string) (string, error) {
+// Verify implements Verifier and returns the `sub` claim with the `auth_time` claim, which Cognito and Keycloak put
+// in access tokens (IR268).
+func (v *OIDCVerifier) Verify(_ context.Context, token string) (Identity, error) {
 	t, err := jwt.Parse(token, v.Keyfunc,
 		jwt.WithIssuer(v.Issuer), jwt.WithExpirationRequired(), jwt.WithValidMethods([]string{"RS256"}))
 	if err != nil {
-		return "", err
+		return Identity{}, err
 	}
 	claims := t.Claims.(jwt.MapClaims)
 	if !audienceOK(claims, v.Audiences) {
-		return "", errors.New("audience")
+		return Identity{}, errors.New("audience")
 	}
 	sub, _ := claims["sub"].(string)
 	if sub == "" {
-		return "", errors.New("no subject")
+		return Identity{}, errors.New("no subject")
 	}
-	return sub, nil
+	return Identity{Subject: sub, SignedIn: authTime(claims)}, nil
+}
+
+// authTime reads the `auth_time` claim (seconds since the epoch); zero when it is missing or not a number.
+func authTime(c jwt.MapClaims) time.Time {
+	var sec float64
+	switch v := c["auth_time"].(type) {
+	case float64:
+		sec = v
+	case json.Number:
+		sec, _ = v.Float64()
+	}
+	if sec <= 0 {
+		return time.Time{}
+	}
+	return time.Unix(int64(sec), 0).UTC()
 }
 
 // audienceOK accepts `aud` or Keycloak/Cognito `azp` / `client_id` matching an allowed client.

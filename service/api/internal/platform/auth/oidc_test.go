@@ -22,10 +22,20 @@ func TestOIDCVerifier(t *testing.T) {
 	base := func() jwt.MapClaims {
 		return jwt.MapClaims{"iss": v.Issuer, "sub": "user-1", "azp": "ac-web", "exp": time.Now().Add(time.Hour).Unix()}
 	}
-	if sub, err := v.Verify(context.Background(), sign(key, base())); err != nil || sub != "user-1" {
-		t.Fatalf("valid token: %v", err)
+	if id, err := v.Verify(context.Background(), sign(key, base())); err != nil || id.Subject != "user-1" || !id.SignedIn.IsZero() {
+		t.Fatalf("valid token: %+v %v", id, err)
 	}
+	signedIn := time.Date(2026, 9, 14, 0, 55, 0, 0, time.UTC) // IR268: auth_time is the sign-in time
 	c := base()
+	c["auth_time"] = signedIn.Unix()
+	if id, err := v.Verify(context.Background(), sign(key, c)); err != nil || !id.SignedIn.Equal(signedIn) {
+		t.Fatalf("auth_time: %+v %v", id, err)
+	}
+	c["auth_time"] = "yesterday"
+	if id, err := v.Verify(context.Background(), sign(key, c)); err != nil || !id.SignedIn.IsZero() {
+		t.Fatalf("a non-numeric auth_time gives no sign-in time: %+v %v", id, err)
+	}
+	c = base()
 	delete(c, "azp")
 	c["aud"] = "ac-admin-web"
 	if _, err := v.Verify(context.Background(), sign(key, c)); err != nil {

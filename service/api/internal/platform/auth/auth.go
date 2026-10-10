@@ -2,12 +2,15 @@
 // Membership (X-Tenant-Id + X-Membership-Id from the BFF session context, backend architecture §5) inside the
 // tenant's RLS context, and stores the resulting ops.Principal in the request context. Requests without a token
 // stay anonymous so public demo operations can run; the dispatcher rejects anonymous calls to other operations.
+// The token's sign-in time becomes the user's last sign-in (IR268).
 package auth
 
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,26 +21,34 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 )
 
-// Verifier checks a bearer token and returns the subject (Cognito/Keycloak `sub`, or the user ID locally).
-type Verifier interface {
-	Verify(ctx context.Context, token string) (string, error)
+// Identity is what a verified token says about its holder: the subject (Cognito/Keycloak `sub`, or the user ID
+// locally) and, when the identity provider sends it, when the holder signed in (OIDC `auth_time`).
+type Identity struct {
+	Subject  string
+	SignedIn time.Time // zero when the token does not say
 }
 
-// StaticVerifier maps fixed tokens to subjects (tests and local tooling only).
+// Verifier checks a bearer token and returns who holds it.
+type Verifier interface {
+	Verify(ctx context.Context, token string) (Identity, error)
+}
+
+// StaticVerifier maps fixed tokens to subjects (tests and local tooling only); its tokens carry no sign-in time.
 type StaticVerifier map[string]string
 
 // Verify implements Verifier.
-func (s StaticVerifier) Verify(_ context.Context, token string) (string, error) {
+func (s StaticVerifier) Verify(_ context.Context, token string) (Identity, error) {
 	if sub, ok := s[token]; ok {
-		return sub, nil
+		return Identity{Subject: sub}, nil
 	}
-	return "", errors.New("unknown token")
+	return Identity{}, errors.New("unknown token")
 }
 
 // PrincipalSource resolves the selected Membership of a token subject into an ops.Principal (IR181 step 1):
-// identity-api reads its own tables (DB), every other service asks identity-api (RemoteSource).
+// identity-api reads its own tables (DB), every other service asks identity-api (RemoteSource). signedIn is the
+// token's sign-in time (zero: none), which identity records as the user's last sign-in (IR268).
 type PrincipalSource interface {
-	Principal(ctx context.Context, subject string, tenant, membership uuid.UUID) (*ops.Principal, error)
+	Principal(ctx context.Context, subject string, tenant, membership uuid.UUID, signedIn time.Time) (*ops.Principal, error)
 }
 
 // ErrUnavailable means the principal could not be resolved because identity-api did not answer.
@@ -49,6 +60,15 @@ type Authenticator struct {
 	DB       ops.Runner
 	Now      func() time.Time
 	Source   PrincipalSource
+
+	signIns sync.Map // user ID → the latest sign-in time this process has recorded
+}
+
+func (a *Authenticator) now() time.Time {
+	if a.Now != nil {
+		return a.Now()
+	}
+	return time.Now().UTC()
 }
 
 // unauth returns the 401 DomainError; Echo's HTTPErrorHandler writes it.
@@ -70,7 +90,7 @@ func (a *Authenticator) Middleware() echo.MiddlewareFunc {
 			if !ok || token == "" {
 				return unauth(c, "error.unauthenticated")
 			}
-			sub, err := a.Verifier.Verify(c.Request().Context(), token)
+			id, err := a.Verifier.Verify(c.Request().Context(), token)
 			if err != nil {
 				return unauth(c, "error.unauthenticated")
 			}
@@ -79,7 +99,7 @@ func (a *Authenticator) Middleware() echo.MiddlewareFunc {
 			if err1 != nil || err2 != nil {
 				return unauth(c, "error.membershipRequired")
 			}
-			p, err := a.principal(c.Request().Context(), sub, tenant, membership)
+			p, err := a.principal(c.Request().Context(), id.Subject, tenant, membership, id.SignedIn)
 			if errors.Is(err, ErrUnavailable) {
 				return apperr.E(apperr.Unavailable, "error.unavailable")
 			}
@@ -92,26 +112,51 @@ func (a *Authenticator) Middleware() echo.MiddlewareFunc {
 	}
 }
 
-func (a *Authenticator) principal(ctx context.Context, subject string, tenant, membership uuid.UUID) (*ops.Principal, error) {
+func (a *Authenticator) principal(ctx context.Context, subject string, tenant, membership uuid.UUID, signedIn time.Time) (*ops.Principal, error) {
 	if a.Source != nil {
-		return a.Source.Principal(ctx, subject, tenant, membership)
+		return a.Source.Principal(ctx, subject, tenant, membership, signedIn)
 	}
-	return a.Load(ctx, subject, tenant, membership)
+	return a.Principal(ctx, subject, tenant, membership, signedIn)
 }
 
-// Principal implements PrincipalSource with the identity tables (identity-api).
-func (a *Authenticator) Principal(ctx context.Context, subject string, tenant, membership uuid.UUID) (*ops.Principal, error) {
-	return a.Load(ctx, subject, tenant, membership)
+// Principal implements PrincipalSource with the identity tables (identity-api) and records a new sign-in.
+func (a *Authenticator) Principal(ctx context.Context, subject string, tenant, membership uuid.UUID, signedIn time.Time) (*ops.Principal, error) {
+	p, err := a.Load(ctx, subject, tenant, membership)
+	if err == nil {
+		a.RecordSignIn(ctx, p, signedIn)
+	}
+	return p, err
+}
+
+// RecordSignIn notes a sign-in of the principal's user (IR268). When signedIn (the token's auth_time) is later than
+// the sign-in recorded last, last_sign_in_at becomes the business time now. In the demo that is the demo clock, so
+// the time reads like the rest of the scenario. The token of an older session does not move it back. A sign-in this
+// process has already recorded costs no query, and a failure is logged without failing the request.
+func (a *Authenticator) RecordSignIn(ctx context.Context, p *ops.Principal, signedIn time.Time) {
+	if p == nil || signedIn.IsZero() {
+		return
+	}
+	signedIn = signedIn.UTC().Truncate(time.Second)
+	if last, ok := a.signIns.Load(p.UserID); ok && !signedIn.After(last.(time.Time)) {
+		return
+	}
+	err := a.DB.Run(ctx, false, p, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE identity.users SET last_sign_in_at = $3, sign_in_auth_time = $2
+			WHERE id = $1 AND (sign_in_auth_time IS NULL OR sign_in_auth_time < $2)`, p.UserID, signedIn, a.now())
+		return err
+	})
+	if err != nil {
+		slog.WarnContext(ctx, "auth: sign-in not recorded", "user", p.UserID, "err", err)
+		return
+	}
+	a.signIns.Store(p.UserID, signedIn)
 }
 
 // Load reads the Membership for subject in tenant; it fails when the membership does not belong to the subject,
 // is outside its validity window, or the user is not active.
 func (a *Authenticator) Load(ctx context.Context, subject string, tenant, membership uuid.UUID) (*ops.Principal, error) {
 	p := &ops.Principal{TenantID: tenant, MembershipID: membership}
-	now := time.Now().UTC()
-	if a.Now != nil {
-		now = a.Now()
-	}
+	now := a.now()
 	err := a.DB.Run(ctx, true, p, func(tx pgx.Tx) error {
 		var clientRole, employment, timezone *string
 		var validUntil *time.Time

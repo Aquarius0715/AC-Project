@@ -154,7 +154,8 @@ CREATE TABLE identity.users (
   display_name  text NOT NULL CHECK (length(display_name) BETWEEN 1 AND 120),
   phone         text,
   status        text NOT NULL DEFAULT 'active' CHECK (status IN ('invited','active','disabled','anonymised')),
-  last_sign_in_at timestamptz,
+  last_sign_in_at timestamptz,             -- business time of the latest sign-in (IR268)
+  sign_in_auth_time timestamptz,           -- the identity provider's auth_time of that sign-in (IR268)
   created_at    timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at    timestamptz NOT NULL DEFAULT platform.app_now(),
   version       int NOT NULL DEFAULT 1

@@ -69,7 +69,8 @@ func newEcho(reg *ops.Registry, m *db.TxManager, a *auth.Authenticator, logger *
 }
 
 // principalHandler is identity-api's internal principal endpoint: it resolves a token subject's membership from the
-// identity tables for the other services (RemoteSource). Callers authenticate with the shared INTERNAL_API_TOKEN.
+// identity tables for the other services (RemoteSource) and records the token's sign-in time when given (IR268).
+// Callers authenticate with the shared INTERNAL_API_TOKEN.
 func principalHandler(a *auth.Authenticator, token string) echo.HandlerFunc {
 	return func(c *echo.Context) error {
 		got, _ := strings.CutPrefix(c.Request().Header.Get(echo.HeaderAuthorization), "Bearer ")
@@ -79,10 +80,15 @@ func principalHandler(a *auth.Authenticator, token string) echo.HandlerFunc {
 		q := c.QueryParams()
 		tenant, err1 := uuid.Parse(q.Get("tenant"))
 		membership, err2 := uuid.Parse(q.Get("membership"))
-		if err1 != nil || err2 != nil || q.Get("subject") == "" {
+		var signedIn time.Time
+		var err3 error
+		if raw := q.Get("signedIn"); raw != "" {
+			signedIn, err3 = time.Parse(time.RFC3339, raw)
+		}
+		if err1 != nil || err2 != nil || err3 != nil || q.Get("subject") == "" {
 			return apperr.Fields(map[string]string{"_": "error.malformedInput"})
 		}
-		p, err := a.Load(c.Request().Context(), q.Get("subject"), tenant, membership)
+		p, err := a.Principal(c.Request().Context(), q.Get("subject"), tenant, membership, signedIn)
 		if err != nil {
 			if de := apperr.From(err); de.Code == apperr.NotFound {
 				return apperr.E(apperr.NotFound, "error.membershipInvalid")
