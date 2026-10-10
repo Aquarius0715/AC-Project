@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.35.0
+version: 0.36.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -335,7 +335,7 @@ Scope: FR-A07 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 2. Apply these business rules to reads and actions. General maintenance uses restrictionEligible=false. Even RTO is eligible only when explicitly specified. Contract revisions do not retroactively change issued invoices.
 3. Keep contract versions. New invoices reference the new version; past invoices keep the original. Contract expiry does not mean a real device has stopped.
 4. Queries to update: `contracts / customer payments / audit`。
-5. List: scope filter `customerId` → `unitId` and plan-type chips (`kind`), all as URL keys and `contracts.list` filters. Each row shows contract ID, plan type, customer, unit count, price, period, and restriction eligibility with rules version.
+5. List: scope filter `customerId` → `unitId` and plan-type chips (`kind`), all as URL keys and `contracts.list` filters. Each row shows contract ID, plan type, customer, unit count, price, period, and restriction eligibility with rules version (“Eligible · demo-v1”, “· restriction active” while one is, or “Not restriction eligible”). The scope names its contract count and each plan chip its count in the scope (IR322).
 6. Editor (`contractId`) and New contract (no `id`): customer, unit checklist limited to that customer's active units (a unit already on another contract is labelled, not hidden), plan type, period, price and currency, restriction eligibility and rules version (enabled only for `rto`; disabled with the reason for other plans), and a “what saving does” summary (new version, issued invoices keep their version). When `activeRestrictionIds` is non-empty or `hasUnresolvedRecovery` is true, disable save and show the SR19 reason.
 7. Language and dates (IR300): texts and plan types follow the display language. Contract periods are Kuala Lumpur business days. The list shows them in the user's language, the date inputs take Kuala Lumpur days, and a hint says so.
 
@@ -843,13 +843,13 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
-| period / contractorOrgId / status | filters | Current month | Scope |
+| period / contractorOrgId / status | filters | All periods (the current month has not ended, so it can neither be generated nor paid; IR322) | Scope (URL keys) |
 | reply / adjustmentMinor | required/optional | 1–2000; signed minor units | Answer a question |
 
 **Steps**
 
-1. Statements table (contractor, statement, queries, MYR, status); detail with gross, deductions, net, lines, and questions.
-2. Reply / Add adjustment → `payouts.resolveQuery`; Approve / Mark paid (unlocks on the pay date) → `payouts.transition`; Generate drafts → `payouts.generate`. All need billing.payment.
+1. Statements table (contractor, statement, queries, MYR, status with its date — “Approved · pays …”, “Paid …”); detail with gross, deductions, net, who approved, lines, and questions. A `statementId` the filtered list does not hold says so (IR322).
+2. Reply / Add adjustment → `payouts.resolveQuery`; Approve / Mark paid (unlocks on the pay date) → `payouts.transition`; Generate drafts → `payouts.generate` for a month that has ended in Kuala Lumpur (the dialog offers the last one and refuses a running month before any call; generating again rebuilds that month's drafts, approved and paid statements stay). All need billing.payment.
 3. Queries to update: `payouts / audit`.
 
 **Boundary cases and failures**: Mark paid before the pay date or on a draft → CONFLICT.
@@ -864,7 +864,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.35.0: Read IR01–IR321 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.36.0: Read IR01–IR322 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

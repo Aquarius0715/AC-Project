@@ -8,7 +8,7 @@ import { Badge, Banner, Btn, Card, DataTable, EmptyState, Field, Input, ListRow,
 import { useI18n } from "@ac/web/components/I18n";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { actionMessage } from "@ac/web/lib/actionMessage";
-import { KL, statementWord, totals, type ApiRecipient, type ContractOption, type InquiryRow, type InvoiceDetail, type InvoiceRow, type InvoiceStatus, type StatementDetail, type StatementRow } from "@ac/web/lib/billing";
+import { KL, monthsText, statementWord, totals, type ApiRecipient, type ContractOption, type InquiryRow, type InvoiceDetail, type InvoiceRow, type InvoiceStatus, type StatementDetail, type StatementRow } from "@ac/web/lib/billing";
 import { previewText } from "@ac/web/lib/clientBilling";
 import type { Channel } from "@ac/web/lib/contracts.gen";
 import {
@@ -23,6 +23,10 @@ export type BillingLive = {
   rows: InvoiceRow[]; contracts: ContractOption[]; inquiries: InquiryRow[];
   customers: { id: string; name: string }[]; properties: { id: string; name: string; customerId: string }[]; contractsOfCustomer: { id: string; customerId: string }[];
   selectedInvoice?: InvoiceDetail; recipients?: ApiRecipient[]; selectedInquiryId?: string; statements?: StatementRow[]; statement?: StatementDetail;
+  /** the payouts tab's filters (URL keys period, contractorOrgId, status) and the last month that has ended (IR322) */
+  payouts?: { period?: string; contractorOrgId?: string; status?: "draft" | "approved" | "paid"; contractors: { id: string; name: string }[]; lastClosed: string };
+  /** a statementId the filtered list does not hold */
+  statementMissing?: boolean;
 };
 
 const row = (r: Omit<InvoiceRow, "methodName" | "paymentState">): InvoiceRow => ({ ...r, methodName: r.method.split(" · ")[0], paymentState: r.method.split(" · ")[1] ?? null });
@@ -174,47 +178,13 @@ export function BillingView({ live }: { live?: BillingLive }) {
     setTab("invoices");
   };
 
-  // payouts
-  const [period, setPeriod] = useState("");
-  const [answers, setAnswers] = useState<Record<string, { reply: string; adjustment: string }>>({});
-  const answer = (id: string) => answers[id] ?? { reply: "", adjustment: "" };
-  const setAnswer = (id: string, patch: Partial<{ reply: string; adjustment: string }>) => setAnswers((a) => ({ ...a, [id]: { ...answer(id), ...patch } }));
-
   const scopeProps = live ? live.properties.filter((p) => !live.scope.customerId || p.customerId === live.scope.customerId) : [];
   const scopeContracts = live ? live.contractsOfCustomer.filter((k) => !live.scope.customerId || k.customerId === live.scope.customerId) : [];
   const otherZone = i.display.timeZone !== KL;
   return (
     <Page>
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "invoices", label: t("Invoices"), count: list.length }, { id: "inquiries", label: t("Inquiries"), count: inquiries.length }, { id: "payouts" as Tab, label: t("Contractor payouts"), count: live ? live.statements?.length : 1 }]} />
-      {tab === "payouts" ? (live ? (
-        <div className="split-rev">
-          <Card title={t("Statements")} className="self-start" action={<span className="flex items-center gap-2"><Input aria-label={t("Closed month")} value={period} onChange={(e) => setPeriod(e.target.value)} placeholder="2026-09" className="w-28" /><Btn size="sm" disabled={pending || !/^\d{4}-\d{2}$/.test(period)} onClick={() => act(() => generatePayouts(period), (n) => t(n === 1 ? "1 draft statement generated for {period}" : "{n} draft statements generated for {period}", { n, period }))}>{t("Generate")}</Btn></span>}>
-            {(live.statements ?? []).length === 0 ? <EmptyState title={t("No statements")}>{t("Generate the drafts of a closed month.")}</EmptyState> : <div className="flex flex-col gap-2">{live.statements!.map((s) => <ListRow key={s.id} selected={live.statement?.id === s.id} onClick={() => nav({ statementId: s.id })}><div className="min-w-0 flex-1"><b className="text-[13px]">{s.contractor}</b><div className="text-[11px] text-muted">{s.period} · {t(s.jobs === 1 ? "1 job" : "{n} jobs", { n: s.jobs })} · {s.net}</div></div><Badge tone={s.status === "Paid" ? "ok" : s.status === "Draft" ? "muted" : "primary"}>{statementWord(s.status, t)}</Badge></ListRow>)}</div>}
-          </Card>
-          {live.statement && (() => {
-            const st = live.statement;
-            return (
-              <Card title={`${st.contractor} · ${st.period}`} sub={t("Priced by the rate card effective at acceptance · pays {date}", { date: st.payDate })} action={<span className="flex gap-2">{st.status === "Draft" && <Btn size="sm" variant="primary" disabled={pending} onClick={() => act(() => transitionStatement(st.id, st.version, "approve"), t("Statement approved"))}>{t("Approve")}</Btn>}{st.status === "Approved" && <Btn size="sm" variant="primary" disabled={pending || !st.payable} title={st.payable ? undefined : t("Payable on or after {date}", { date: st.payDate })} onClick={() => act(() => transitionStatement(st.id, st.version, "mark_paid"), t("Marked paid"))}>{t("Mark paid")}</Btn>}</span>}>
-                <SummaryList items={[[t("Jobs"), String(st.jobs)], [t("Gross"), st.gross], [t("Deductions"), st.deductions], [t("Total"), st.net], [t("Status"), st.status === "Approved" && !st.payable ? t("Approved · payable on or after {date}", { date: st.payDate }) : statementWord(st.status, t)]]} />
-                {st.lines.length > 0 && <div className="mt-3"><DataTable rows={st.lines} rowKey={(r) => r.id} cols={[{ key: "j", label: t("Job"), render: (r) => <span className="font-mono text-xs">{r.job}</span> }, { key: "w", label: t("Work"), render: (r) => r.work }, { key: "k", label: t("Kind"), render: (r) => r.kind }, { key: "a", label: t("Amount"), render: (r) => r.amount }, { key: "n", label: t("Note"), render: (r) => r.note }]} /></div>}
-                {st.queries.map((q) => (
-                  <div key={q.id} className="mt-3 rounded-xl bg-surface2 p-3 text-[13px]">
-                    <b>{q.topic}</b> · {q.line} · <Badge tone={q.open ? "warn" : "ok"}>{q.state}</Badge>
-                    <p className="mt-1">“{q.message}”</p>
-                    {q.reply ? <p className="mt-1 text-xs text-muted">{q.adjustment ? t("Reply: {reply} · adjustment {amount}, added to the contractor's next draft", { reply: q.reply, amount: q.adjustment }) : t("Reply: {reply}", { reply: q.reply })}</p> : (
-                      <div className="mt-2 flex flex-col gap-2">
-                        <Textarea aria-label={t("Reply to the contractor")} value={answer(q.id).reply} onChange={(e) => setAnswer(q.id, { reply: e.target.value })} placeholder={t("Reply to the contractor")} />
-                        <div className="flex flex-wrap items-center gap-2"><Input aria-label={t("Adjustment")} type="number" value={answer(q.id).adjustment} onChange={(e) => setAnswer(q.id, { adjustment: e.target.value })} placeholder={t("Adjustment (optional)")} className="w-48" /><Btn size="sm" disabled={pending || !answer(q.id).reply.trim()} onClick={() => act(() => resolvePayoutQuery(st.id, st.version, q.id, answer(q.id).reply.trim(), answer(q.id).adjustment ? Math.round(+answer(q.id).adjustment * 100) : null), t("Answered"))}>{t("Answer")}</Btn></div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-                <p className="mt-2 text-[11px] text-muted">{t("Contractors see approved and paid statements only (Partner › Payouts).")}</p>
-              </Card>
-            );
-          })()}
-        </div>
-      ) : <ContractorPayouts />) : tab === "invoices" ? (
+      {tab === "payouts" ? (live ? <PayoutsTab live={live} nav={nav} act={act} pending={pending} /> : <ContractorPayouts />) : tab === "invoices" ? (
         <>
           {live && (
             <div className="flex flex-wrap items-end gap-3">
@@ -334,6 +304,79 @@ function BillingMonths({ from, to, onChange }: { from?: string; to?: string; onC
       <Field label={t("Billing months from")} error={reversed ? t("The first month must not be after the last") : undefined}><Input type="month" value={f.from} onChange={(e) => change({ ...f, from: e.target.value })} /></Field>
       <Field label={t("Billing months to")}><Input type="month" value={f.to} onChange={(e) => change({ ...f, to: e.target.value })} /></Field>
       {(from || to) && <Btn size="sm" onClick={() => change({ from: "", to: "" })}>{t("All months ✕")}</Btn>}
+    </>
+  );
+}
+
+type Act = <T>(fn: () => Promise<ActionResult<T>>, ok: string | ((v: T) => string), after?: (v: T) => void) => void;
+
+/** The contractor payouts tab (FR-A23, DD-A23, Figma Admin 699:22119): the statement period, contractor and status
+ * filters in the URL, the statements table, Generate drafts for a month that has ended, and the selected statement
+ * with its lines, questions and actions. Every write needs billing.payment and is audited (IR322). */
+function PayoutsTab({ live, nav, act, pending }: { live: BillingLive; nav: (patch: Record<string, string | null>) => void; act: Act; pending: boolean }) {
+  const i = useI18n(), { t } = i;
+  const p = live.payouts ?? { contractors: [], lastClosed: "" };
+  const rows = live.statements ?? [];
+  const st = live.statement;
+  const [generating, setGenerating] = useState(false);
+  const [month, setMonth] = useState(p.lastClosed);
+  const [answers, setAnswers] = useState<Record<string, { reply: string; adjustment: string }>>({});
+  const answer = (id: string) => answers[id] ?? { reply: "", adjustment: "" };
+  const setAnswer = (id: string, patch: Partial<{ reply: string; adjustment: string }>) => setAnswers((a) => ({ ...a, [id]: { ...answer(id), ...patch } }));
+  const filtered = !!(p.period || p.contractorOrgId || p.status);
+  const ended = /^\d{4}-\d{2}$/.test(month) && month <= p.lastClosed;
+  const generate = () => act(() => generatePayouts(month), (n) => t(n === 1 ? "1 draft statement generated for {period}" : "{n} draft statements generated for {period}", { n, period: month }), () => { setGenerating(false); nav({ period: month, status: null, statementId: null }); });
+  const tone = (s: StatementRow["status"]) => (s === "Paid" ? "ok" : s === "Draft" ? "muted" : "primary");
+  return (
+    <>
+      <div className="flex flex-wrap items-end gap-3">
+        <Field label={t("Period")}><Input type="month" value={p.period ?? ""} onChange={(e) => nav({ period: e.target.value || null, statementId: null })} /></Field>
+        <Field label={t("Contractor")}><Select value={p.contractorOrgId ?? ""} onChange={(e) => nav({ contractorOrgId: e.target.value || null, statementId: null })}><option value="">{t("All contractors")}</option>{p.contractors.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
+        <Field label={t("Status")}><Select value={p.status ?? ""} onChange={(e) => nav({ status: e.target.value || null, statementId: null })}><option value="">{t("All statuses")}</option>{(["draft", "approved", "paid"] as const).map((x) => <option key={x} value={x}>{statementWord(x === "draft" ? "Draft" : x === "approved" ? "Approved" : "Paid", t)}</option>)}</Select></Field>
+        {filtered && <Btn size="sm" onClick={() => nav({ period: null, contractorOrgId: null, status: null, statementId: null })}>{t("Clear the filters")}</Btn>}
+      </div>
+      <div className="split-rev">
+        <Card title={p.period ? t("Statements · {period}", { period: monthsText(p.period, p.period, i) ?? p.period }) : t("Statements")} className="self-start" action={<Btn size="sm" onClick={() => { setMonth(p.period && p.period <= p.lastClosed ? p.period : p.lastClosed); setGenerating(true); }}>{t("Generate drafts")}</Btn>}>
+          {rows.length === 0 ? <EmptyState title={t("No statements")}>{t(filtered ? "No statement matches these filters." : "Generate the drafts of a month that has ended.")}</EmptyState> : (
+            <DataTable rows={rows} rowKey={(r) => r.id} selectedKey={st?.id} onRowClick={(r) => nav({ statementId: r.id })} cols={[
+              { key: "c", label: t("Contractor / statement"), render: (r) => <span><b className="text-[13px]">{r.contractor}</b><span className="block text-[11px] text-muted">{r.period} · {t(r.jobs === 1 ? "1 job" : "{n} jobs", { n: r.jobs })}</span></span> },
+              { key: "q", label: t("Queries"), render: (r) => (r.queryCount === 0 ? "—" : <span>{t(r.queryCount === 1 ? "1 query" : "{n} queries", { n: r.queryCount })}{r.openQueries > 0 && <> <Badge tone="warn">{t("{n} open", { n: r.openQueries })}</Badge></>}</span>) },
+              { key: "n", label: t("Net"), render: (r) => <span className="font-semibold">{r.net}</span> },
+              { key: "s", label: t("Status"), render: (r) => <Badge tone={tone(r.status)}>{r.statusText}</Badge> },
+              { key: "a", label: "", render: (r) => <span className="text-xs font-semibold text-primary">{t(r.status === "Draft" ? "Review" : "Open")}</span> },
+            ]} />
+          )}
+          <p className="mt-2 text-[11px] text-muted">{t("Drafts are generated on the 1st from review-accepted jobs × the contractor's rate card. Approve → the contractor sees it; Mark paid after the bank transfer (manual in this demo).")}</p>
+        </Card>
+        {live.statementMissing ? <EmptyState title={t("That statement is not in this list")}>{t("It does not exist, or the period, contractor or status filter hides it.")}</EmptyState> : st && (
+          <Card title={`${st.contractor} · ${st.period}`} sub={t("Priced by the rate card effective at acceptance · pays {date}", { date: st.payDate })} className="self-start"
+            action={<span className="flex gap-2">{st.status === "Draft" && <Btn size="sm" variant="primary" disabled={pending} onClick={() => act(() => transitionStatement(st.id, st.version, "approve"), t("Statement approved"))}>{t("Approve")}</Btn>}{st.status === "Approved" && <Btn size="sm" variant="primary" disabled={pending || !st.payable} title={st.payable ? undefined : t("Payable on or after {date}", { date: st.payDate })} onClick={() => act(() => transitionStatement(st.id, st.version, "mark_paid"), t("Marked paid"))}>{t("Mark paid")}</Btn>}</span>}>
+            <SummaryList items={[
+              [t("Jobs"), String(st.jobs)], [t("Gross"), st.gross], [t("Deductions"), st.deductions], [t("Net"), st.net], [t("Status"), st.statusText],
+              ...(st.approvedBy ? [[t("Approved by"), st.approvedBy] as [string, string]] : []),
+            ]} />
+            {st.status === "Approved" && !st.payable && <p className="mt-2 text-[11px] text-muted">{t("Mark paid unlocks on the pay date ({date}). Payouts need billing.payment; every action is audited.", { date: st.payDate })}</p>}
+            {st.lines.length > 0 && <div className="mt-3"><DataTable rows={st.lines} rowKey={(r) => r.id} cols={[{ key: "j", label: t("Job"), render: (r) => <span className="font-mono text-xs">{r.job}</span> }, { key: "w", label: t("Work"), render: (r) => r.work }, { key: "k", label: t("Kind"), render: (r) => r.kind }, { key: "a", label: t("Amount"), render: (r) => r.amount }, { key: "n", label: t("Note"), render: (r) => r.note }]} /></div>}
+            {st.queries.map((q) => (
+              <div key={q.id} className="mt-3 rounded-xl bg-surface2 p-3 text-[13px]">
+                <b>{q.topic}</b> · {q.line} · <Badge tone={q.open ? "warn" : "ok"}>{q.state}</Badge>
+                <p className="mt-1">“{q.message}”</p>
+                {q.reply ? <p className="mt-1 text-xs text-muted">{q.adjustment ? t("Reply: {reply} · adjustment {amount}, added to the contractor's next draft", { reply: q.reply, amount: q.adjustment }) : t("Reply: {reply}", { reply: q.reply })}</p> : (
+                  <div className="mt-2 flex flex-col gap-2">
+                    <Textarea aria-label={t("Reply to the contractor")} value={answer(q.id).reply} onChange={(e) => setAnswer(q.id, { reply: e.target.value })} placeholder={t("Reply to the contractor")} />
+                    <div className="flex flex-wrap items-center gap-2"><Input aria-label={t("Adjustment")} type="number" value={answer(q.id).adjustment} onChange={(e) => setAnswer(q.id, { adjustment: e.target.value })} placeholder={t("Adjustment (optional)")} className="w-48" /><Btn size="sm" disabled={pending || !answer(q.id).reply.trim()} onClick={() => act(() => resolvePayoutQuery(st.id, st.version, q.id, answer(q.id).reply.trim(), answer(q.id).adjustment ? Math.round(+answer(q.id).adjustment * 100) : null), t("Answered"))}>{t("Answer")}</Btn></div>
+                  </div>
+                )}
+              </div>
+            ))}
+            <p className="mt-2 text-[11px] text-muted">{t("Contractors see approved and paid statements only (Partner › Payouts).")}</p>
+          </Card>
+        )}
+      </div>
+      <Modal open={generating} onClose={() => setGenerating(false)} title={t("Generate drafts")} footer={<><Btn onClick={() => setGenerating(false)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || !ended} onClick={generate}>{t("Generate drafts")}</Btn></>}>
+        <Field label={t("Month")} error={month && !ended ? t("Only a month that has ended (Kuala Lumpur) can be generated") : undefined} hint={t("Kuala Lumpur months; the last one that has ended is {month}", { month: monthsText(p.lastClosed, p.lastClosed, i) ?? p.lastClosed })}><Input type="month" value={month} max={p.lastClosed} onChange={(e) => setMonth(e.target.value)} /></Field>
+        <p className="text-xs text-muted">{t("Drafts come from the jobs whose report HQ accepted in that month, priced by each contractor's rate card. Generating again rebuilds the drafts; approved and paid statements stay as they are.")}</p>
+      </Modal>
     </>
   );
 }

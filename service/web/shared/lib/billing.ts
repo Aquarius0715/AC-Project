@@ -3,7 +3,7 @@
 // display language (`t` / `i`, IR299): billing periods, due dates, billing months and pay dates are Kuala Lumpur business
 // days written in the user's language; inquiries are instants in the display time zone.
 import type { Currency } from "@ac/web/lib/contracts.gen";
-import { EN, intlTag, showDate, showTime, translator, zonedInstant, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
+import { EN, intlTag, showDate, showTime, translator, zonedInstant, zonedParts, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
 
 const en = translator("en");
 export type Range = { from: string; to: string };
@@ -130,13 +130,18 @@ export type ApiStatement = {
   id: string; version: number; contractorOrgId: string; period: string; status: "draft" | "approved" | "paid"; currency: string; grossMinor: number; deductionsMinor: number; netMinor: number; payDate: string;
   lines: { id: string; jobId: string; workType: string; acceptedAt: string | null; amountMinor: number; kind: "charge" | "deduction" | "adjustment"; note: string | null }[];
   queries: { id: string; lineId: string; topic: string; message: string; state: "open" | "answered" | "adjusted"; reply: string | null; adjustmentMinor: number | null }[];
+  approvedByMembershipId: string | null; paidAt: string | null;
 };
 export type ApiOrganization = { id: string; name: string; kind: string };
-export type StatementRow = { id: string; version: number; contractor: string; period: string; status: "Draft" | "Approved" | "Paid"; jobs: number; net: string };
+export type StatementRow = {
+  id: string; version: number; contractor: string; period: string; status: "Draft" | "Approved" | "Paid"; jobs: number; net: string;
+  /** the status with its date: “Approved · pays 15 Oct 2026”, “Paid 15 Sept 2026” (Kuala Lumpur days, IR322) */
+  statusText: string; queryCount: number; openQueries: number;
+};
 /** A statement's status, a line's kind, a question's topic and state as the screen words them. */
 export const statementWord = (s: StatementRow["status"], t: T = en) => ({ Draft: t("Draft"), Approved: t("Approved"), Paid: t("Paid") })[s] ?? s;
 export type StatementDetail = StatementRow & {
-  gross: string; deductions: string; payDate: string; payable: boolean;
+  gross: string; deductions: string; payDate: string; payable: boolean; approvedBy: string | null; paidAt: string | null;
   lines: { id: string; job: string; work: string; kind: string; amount: string; note: string }[];
   queries: { id: string; line: string; topic: string; message: string; state: string; open: boolean; reply: string | null; adjustment: string | null }[];
 };
@@ -144,15 +149,23 @@ const statusLabel = { draft: "Draft", approved: "Approved", paid: "Paid" } as co
 
 export function statementRows(statements: ApiStatement[], orgs: ApiOrganization[], i: I18n = EN): StatementRow[] {
   const org = new Map(orgs.map((o) => [o.id, o.name]));
+  const day = (iso: string) => businessDay(iso, i.display.locale);
   return [...statements].sort((a, b) => b.period.localeCompare(a.period) || a.contractorOrgId.localeCompare(b.contractorOrgId)).map((s) => ({
     id: s.id, version: s.version, contractor: org.get(s.contractorOrgId) ?? i.t("contractor"), period: periodName(s.period, i.display.locale), status: statusLabel[s.status],
     jobs: new Set(s.lines.map((l) => l.jobId)).size, net: money(s.netMinor, s.currency),
+    statusText: s.status === "approved" ? i.t("Approved · pays {date}", { date: day(s.payDate) }) : s.status === "paid" ? (s.paidAt ? i.t("Paid {date}", { date: day(s.paidAt) }) : i.t("Paid")) : i.t("Draft"),
+    queryCount: s.queries.length, openQueries: s.queries.filter((q) => q.state === "open").length,
   }));
+}
+/** The last month that has ended in Kuala Lumpur (YYYY-MM): payout drafts are generated for ended months only. */
+export function lastClosedMonth(now: Date): string {
+  const [y, m] = zonedParts(now.toISOString(), KL).date.slice(0, 7).split("-").map(Number);
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
 }
 
 /** The statement detail; `payable` is whether its pay date has come (approved → paid only on or after it). The pay
- * date is a Kuala Lumpur business day. */
-export function statementDetail(s: ApiStatement, orgs: ApiOrganization[], now: Date, i: I18n = EN): StatementDetail {
+ * date is a Kuala Lumpur business day. `names` are the members' names, for who approved it. */
+export function statementDetail(s: ApiStatement, orgs: ApiOrganization[], now: Date, i: I18n = EN, names: Map<string, string> = new Map()): StatementDetail {
   const { t } = i;
   const [row] = statementRows([s], orgs, i);
   const line = new Map(s.lines.map((l) => [l.id, l]));
@@ -162,6 +175,7 @@ export function statementDetail(s: ApiStatement, orgs: ApiOrganization[], now: D
   const state: Record<string, string> = { open: t("open"), answered: t("answered"), adjusted: t("adjusted") };
   return {
     ...row, gross: money(s.grossMinor, s.currency), deductions: money(s.deductionsMinor, s.currency), payDate: businessDay(s.payDate, i.display.locale), payable: Date.parse(s.payDate) <= now.getTime(),
+    approvedBy: s.approvedByMembershipId ? names.get(s.approvedByMembershipId) ?? s.approvedByMembershipId.slice(0, 8) : null, paidAt: s.paidAt ? businessDay(s.paidAt, i.display.locale) : null,
     lines: s.lines.map((l) => ({ id: l.id, job: l.jobId, work: work[l.workType] ?? l.workType, kind: kind[l.kind] ?? l.kind, amount: l.kind === "deduction" ? `−${money(l.amountMinor, s.currency)}` : money(l.amountMinor, s.currency), note: l.note ?? "" })), // a minus sign, as on the adjustments
     queries: s.queries.map((q) => ({
       id: q.id, line: line.get(q.lineId)?.jobId ?? q.lineId, topic: topic[q.topic] ?? q.topic, message: q.message, state: state[q.state] ?? q.state, open: q.state === "open", reply: q.reply,

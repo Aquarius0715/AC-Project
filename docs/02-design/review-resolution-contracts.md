@@ -4449,3 +4449,30 @@ R311 compared the HQ frames 10–25 with the screens. Most differences came from
      - `admin/restrictions` runs as the restriction manager and checks the cause invoice filter, Details → and an uncited invoice.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR322 HQ contractor payouts and contracts as Figma draws them — 2026-10-11
+
+Two more of the HQ frames that R311 compared.
+
+1. **Contractor payouts (FR-A23, DD-A23, Figma Admin 699:22119).**
+   - **Filters.** The statement period, contractor and status are URL keys (`period`, `contractorOrgId`, `status`) and `payouts.list` filters. The default is every period: DD-A23 named the current month, but that month has not ended, so its statements can neither be generated nor paid. A `statementId` the filtered list does not hold says so.
+   - **Statements table.** The table has the columns Contractor / statement (with the period and job count), Queries (with the open ones), Net, Status and Review / Open. The status carries its date, such as "Approved · pays 15 Oct 2026" or "Paid 15 Sept 2026". The footnote explains how drafts are made and approved.
+   - **Generate drafts.** Generate drafts opens a dialog. It offers the last month that has ended in Kuala Lumpur, and refuses a running month before any call; the backend refuses it too (`errors.period_not_ended`). The dialog says that generating again rebuilds the drafts, while approved and paid statements stay. This replaces the free-text month field.
+   - **Detail.** The detail names who approved the statement (`approvedByMembershipId`, through `members.list` where readable). While Mark paid is locked, it notes that it unlocks on the pay date.
+2. **Contracts (FR-A07, DD-A07, Figma Admin 106:4).**
+   - **Scope and plans.** The scope names its contract count, and each plan tab shows its count in the scope.
+   - **Rows.** Each row marks its eligibility: "Eligible · demo-v1", plus "· restriction active" while one is, or "Not restriction eligible". The screen cannot tell an applied restriction from a scheduled one without restriction.read, so it says "active" (IR319).
+   - **Editor.** The editor has the sections Customer & units, Plan (RTO — Rent to Own, General — maintenance, Energy, Environment) and Restriction eligibility, with the hints Figma shows. The heading names the customer and the active restrictions.
+   - **Save.** Save reads "Save as version N". The SR19 banner opens the restriction on the Restrictions screen.
+3. **Code.** `lib/billing`:
+   - statement rows gain `statusText`, `queryCount` and `openQueries`;
+   - the detail gains `approvedBy` and `paidAt`;
+   - `lastClosedMonth` is new;
+   - `ApiStatement` follows PayoutStatement (`approvedByMembershipId`, `paidAt`).
+   SCR-A08 adds the URL keys `period`, `contractorOrgId` and `status`.
+4. **Checked.**
+   - The typecheck and lint pass.
+   - Vitest covers the statement texts, the approver and the last ended month.
+   - New E2E specs: `admin/billing` gains the payouts filters, the dialog's refusal of a running month and a statement outside the list; `admin/contracts` checks the counts, the eligibility marks, the restricted editor and an empty scope. The HQ language spec reads the plan tabs with their counts.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

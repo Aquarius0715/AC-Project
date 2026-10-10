@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.205.0
+version: 0.206.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -269,6 +269,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.206.0: HQ payouts gain filters, a statements table and a Generate drafts dialog; contracts show counts and eligibility (IR322). Phase 1A unchanged.
 0.205.0: HQ access gains the organization filter and search-selects; billing filters by billing months; restrictions filter by cause invoice (IR321). Phase 1A unchanged.
 0.204.0: The HQ audit explorer follows SCR-A16 and Figma (actor and target filters, the open entry in the URL, correlation trace, related records, device events only for a picked device) (IR320). Phase 1A unchanged.
 0.203.0: The HQ Devices tab follows Figma 246:2 (state chips, serial order, tiles, bound unit, sensors with Calibrate →, histories); an active restriction shows without restriction.read (IR319). Phase 1A unchanged.

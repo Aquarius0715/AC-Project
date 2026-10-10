@@ -218,7 +218,8 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(main.getByRole("heading", { name: "Penyata", exact: true })).toBeVisible();
   // contracts (IR300): the plan tabs, the Kuala Lumpur days, and the new-contract checks, which stop before any call
   await page.goto("/admin/billing/contracts");
-  for (const name of ["RTO", "Umum", "Tenaga", "Alam sekitar"]) await expect(main.getByRole("tab", { name, exact: true })).toBeVisible();
+  for (const name of ["RTO", "Umum", "Tenaga", "Alam sekitar"]) await expect(main.getByRole("tab", { name: new RegExp(`^${name}\\s*\\d+$`) })).toBeVisible(); // each with its count (IR322)
+  await expect(main).toContainText(/\d+ kontrak dalam skop/);
   await expect(main.getByRole("tab", { name: /^Semua/ })).toHaveAttribute("aria-selected", "true");
   await main.getByRole("button", { name: "+ Baharu" }).click();
   await expect(main.getByRole("heading", { name: "Kontrak baharu", exact: true })).toBeVisible();

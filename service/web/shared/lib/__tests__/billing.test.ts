@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  billingMonth, billingMonths, businessDay, contractOptions, monthsText, inquiryRows, invoiceDetail, invoiceRows, invoiceStatus, paymentWord, statementDetail, statementRows, statementWord, totals,
+  billingMonth, billingMonths, businessDay, contractOptions, lastClosedMonth, monthsText, inquiryRows, invoiceDetail, invoiceRows, invoiceStatus, paymentWord, statementDetail, statementRows, statementWord, totals,
   type ApiContract, type ApiCustomer, type ApiInquiry, type ApiInvoice, type ApiStatement,
 } from "@ac/web/lib/billing";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
@@ -17,6 +17,7 @@ const statement: ApiStatement = {
   id: "s1", version: 2, contractorOrgId: "org-p", period: "2026-08", status: "approved", currency: "MYR", grossMinor: 30000, deductionsMinor: 5000, netMinor: 25000, payDate: "2026-09-14T16:00:00Z",
   lines: [{ id: "l1", jobId: "job-1", workType: "repair_base", acceptedAt: null, amountMinor: 30000, kind: "charge", note: null }, { id: "l2", jobId: "job-2", workType: "rework_deduction", acceptedAt: null, amountMinor: 5000, kind: "deduction", note: "rework" }],
   queries: [{ id: "q1", lineId: "l2", topic: "deduction", message: "Why?", state: "open", reply: null, adjustmentMinor: null }, { id: "q2", lineId: "l1", topic: "amount", message: "Short", state: "adjusted", reply: "Fixed", adjustmentMinor: -500 }],
+  approvedByMembershipId: "m-hq", paidAt: null,
 };
 
 describe("HQ billing (FR-A08, FR-A23, DD-A08)", () => {
@@ -40,7 +41,13 @@ describe("HQ billing (FR-A08, FR-A23, DD-A08)", () => {
       ["q1", "Payment", "14 Sept 2026, 10:00 am MYT", "“Paid already”"], ["q0", "Cooling restriction", "15 Sept 2026, 8:00 am MYT", "“Paid already”"],
     ]); // received first
     expect(contractOptions(contracts, [])[0].label).toBe("customer · rto · 120.00 MYR");
-    expect(statementRows([statement], [{ id: "org-p", name: "CoolFix", kind: "contractor" }])).toEqual([{ id: "s1", version: 2, contractor: "CoolFix", period: "Aug 2026", status: "Approved", jobs: 2, net: "250.00 MYR" }]);
+    expect(statementRows([statement], [{ id: "org-p", name: "CoolFix", kind: "contractor" }])).toEqual([{
+      id: "s1", version: 2, contractor: "CoolFix", period: "Aug 2026", status: "Approved", jobs: 2, net: "250.00 MYR", statusText: "Approved · pays 15 Sept 2026", queryCount: 2, openQueries: 1,
+    }]);
+    // the status with its date (IR322): paid on its paid day, a draft as it is
+    expect(statementRows([{ ...statement, status: "paid", paidAt: "2026-09-15T04:00:00Z" }, { ...statement, id: "s2", status: "draft" }], []).map((r) => r.statusText)).toEqual(["Paid 15 Sept 2026", "Draft"]);
+    expect([statementDetail(statement, [], NOW, undefined, new Map([["m-hq", "hq-operator"]])).approvedBy, statementDetail({ ...statement, approvedByMembershipId: null }, [], NOW).approvedBy]).toEqual(["hq-operator", null]);
+    expect([lastClosedMonth(NOW), lastClosedMonth(new Date("2026-01-01T00:00:00+08:00")), lastClosedMonth(new Date("2026-09-30T16:30:00Z"))]).toEqual(["2026-08", "2025-12", "2026-09"]); // 1 Oct in Kuala Lumpur
     const s = statementDetail(statement, [], NOW);
     expect([s.contractor, s.payDate, s.payable, s.lines.map((l) => [l.work, l.kind, l.amount])]).toEqual(["contractor", "15 Sept 2026", true, [["Repair", "charge", "300.00 MYR"], ["Rework deduction", "deduction", "−50.00 MYR"]]]);
     expect(s.queries.map((q) => [q.topic, q.line, q.state, q.open, q.adjustment])).toEqual([["Deduction", "job-2", "open", true, null], ["Amount", "job-1", "adjusted", false, "−5.00 MYR"]]);
