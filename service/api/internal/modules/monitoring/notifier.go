@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -178,11 +180,70 @@ func recipientsOf(ctx context.Context, c *ops.Call, p notifPolicy, org uuid.UUID
 	return ids, p.channels, nil
 }
 
+// freshValue is a fact's value when it can decide at the tick: valid quality, a number, observed at most 120 s before
+// the tick and not after it (late or future observations decide nothing, D08).
+func freshValue(f fact, at time.Time) (float64, bool) {
+	var v float64
+	if f.Quality != "valid" || string(f.Value) == "null" || json.Unmarshal(f.Value, &v) != nil || f.ObservedAt.After(at) || at.Sub(f.ObservedAt) > 120*time.Second {
+		return 0, false
+	}
+	return v, true
+}
+
+// recovered reports whether v is past the recovery threshold: below it for a high limit, above it for a low one (D08).
+func recovered(c AlertCondition, v float64) bool {
+	if c.Operator == "gt" || c.Operator == "gte" {
+		return v < c.RecoveryThreshold
+	}
+	return v > c.RecoveryThreshold
+}
+
+// recoverAlert resolves the open source Alert of the policy / rule on the unit after a sustained recovery — in the demo
+// evaluation a fact is taken as sustained for durationSeconds — and keeps the recovering reading as its evidence: the
+// reason names it and resolutionEvidenceIds holds the evaluation event (D08; only Alerts with a policy, IR66). An Alert
+// detected after the tick is left alone.
+func recoverAlert(ctx context.Context, c *ops.Call, unit, policy uuid.UUID, ruleKey string, cnd AlertCondition, v float64, at time.Time, eventID uuid.UUID) error {
+	var key *string
+	if ruleKey != "" {
+		key = &ruleKey
+	}
+	dir := ">"
+	if cnd.Operator == "gt" || cnd.Operator == "gte" {
+		dir = "<"
+	}
+	reason := fmt.Sprintf("Recovered: %s %s %s %s for %d s (D08)", cnd.Metric, strconv.FormatFloat(v, 'f', -1, 64), dir, strconv.FormatFloat(cnd.RecoveryThreshold, 'f', -1, 64), cnd.DurationSeconds)
+	rows, err := c.Tx.Query(ctx, `UPDATE monitoring.alerts a SET status = 'resolved', resolved_at = $4, resolution_reason = $5, resolution_evidence_ids = ARRAY[$6::uuid],
+		version = version + 1, updated_at = $4
+		WHERE a.unit_id = $1 AND a.policy_id = $2 AND a.rule_key IS NOT DISTINCT FROM $3 AND a.type = 'sensor' AND a.status <> 'resolved' AND a.detected_at <= $4
+		RETURNING a.id`, unit, policy, key, at, reason, eventID)
+	if err != nil {
+		return err
+	}
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, id := range ids {
+		c.Emit(ops.Event{AggregateType: "alert", AggregateID: id, Type: "AlertResolved", Payload: map[string]any{"unitId": unit, "recovered": true}})
+	}
+	return nil
+}
+
 // Evaluate returns one outcome per notification policy of the unit, sorted by policyId. A policy matches when one of
 // its conditions holds for the facts at the tick (facts are taken as sustained for durationSeconds in the demo
 // evaluation); absent facts give not_due, invalid quality gives quality. With fire, a matching policy reuses or opens
 // its source Alert and creates one Notification per recipient and channel; zero recipients add one DeliveryFailure
-// (no_recipient, SR12) and do not advance the cooldown.
+// (no_recipient, SR12) and do not advance the cooldown. With fire, a condition whose fact is past its recovery
+// threshold resolves the policy's open Alert first, whether the policy is enabled or not (D08).
 func (n Notifier) Evaluate(ctx context.Context, c *ops.Call, unit uuid.UUID, factsJSON []byte, at time.Time, eventID uuid.UUID, fire bool) ([]json.RawMessage, error) {
 	var facts []fact
 	_ = json.Unmarshal(factsJSON, &facts)
@@ -202,6 +263,17 @@ func (n Notifier) Evaluate(ctx context.Context, c *ops.Call, unit uuid.UUID, fac
 	}
 	out := []json.RawMessage{}
 	for _, p := range pols {
+		if fire { // sustained recovery resolves the policy's open Alert (D08)
+			for i, cnd := range p.conds {
+				if f, ok := byMetric[cnd.Metric]; ok {
+					if v, ok := freshValue(f, at); ok && recovered(cnd, v) {
+						if err := recoverAlert(ctx, c, unit, p.id, p.ruleKeys[i], cnd, v, at, eventID); err != nil {
+							return nil, err
+						}
+					}
+				}
+			}
+		}
 		o := Outcome{UnitID: unit, PolicyID: p.id}
 		reason := ""
 		var hit *AlertCondition
@@ -215,8 +287,8 @@ func (n Notifier) Evaluate(ctx context.Context, c *ops.Call, unit uuid.UUID, fac
 				if !ok {
 					continue
 				}
-				var v float64
-				if f.Quality != "valid" || string(f.Value) == "null" || json.Unmarshal(f.Value, &v) != nil || f.ObservedAt.After(at) || at.Sub(f.ObservedAt) > 120*time.Second {
+				v, ok := freshValue(f, at)
+				if !ok {
 					if reason == "not_due" {
 						reason = "quality"
 					}
@@ -312,7 +384,8 @@ func (n Notifier) Evaluate(ctx context.Context, c *ops.Call, unit uuid.UUID, fac
 	return out, nil
 }
 
-// sourceAlert reuses the open Alert of the policy/rule on the unit or opens one (alerts_one_open_per_rule).
+// sourceAlert reuses the open Alert of the policy/rule on the unit or opens one (alerts_one_open_per_rule) linked to the
+// latest earlier Alert of the same policy / rule on the unit (a recurrence after it resolved, IR66).
 func sourceAlert(ctx context.Context, c *ops.Call, unit, org, policy uuid.UUID, ruleKey string, cnd *AlertCondition, at time.Time) (uuid.UUID, error) {
 	var key *string
 	if ruleKey != "" {
@@ -328,7 +401,8 @@ func sourceAlert(ctx context.Context, c *ops.Call, unit, org, policy uuid.UUID, 
 		return id, err
 	}
 	err = c.Tx.QueryRow(ctx, `INSERT INTO monitoring.alerts (tenant_id, unit_id, customer_org_id, policy_id, rule_key, type, severity, status, cause_code, evidence_kind, evidence_text,
-		observed_at, detected_at, created_at, updated_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'sensor', $5, 'open', 'unknown', 'demo_observation', $6, $7, $7, $7, $7)
+		observed_at, detected_at, created_at, updated_at, previous_alert_id) VALUES (current_setting('app.tenant_id')::uuid, $1, $2, $3, $4, 'sensor', $5, 'open', 'unknown', 'demo_observation', $6, $7, $7, $7, $7,
+		(SELECT p.id FROM monitoring.alerts p WHERE p.unit_id = $1 AND p.policy_id = $3 AND p.rule_key IS NOT DISTINCT FROM $4 AND p.type = 'sensor' ORDER BY p.detected_at DESC, p.id DESC LIMIT 1))
 		RETURNING id`, unit, org, policy, key, cnd.Severity, "Demo event: "+cnd.Metric+" "+cnd.Operator+" threshold", at).Scan(&id)
 	return id, err
 }

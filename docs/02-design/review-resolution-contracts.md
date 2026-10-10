@@ -3277,3 +3277,31 @@ The Certifications tab of `/partner/team` (FR-P09, DD-P09, Figma Contractor 04-6
    - The HQ screens.
    - The browser demo.
    - The assistant panel and the voice demo's answers.
+
+## IR285 Sustained recovery resolves policy alerts; recurrences link to the alert before — 2026-10-10
+
+IR284 left one D08 rule unbuilt: the Core API opened policy alerts from the demo evaluation, but nothing resolved them when the reading recovered. Figma 02-17, "resolved after remeasurement", needs it. IR66's recurrence link was missing too.
+
+1. **Recovery (D08).**
+   - In `automations.fire`, the notifier checks every condition of the unit's alert policies, the attached ones and the default rules enabled for the customer.
+   - When the condition's metric has a fresh, valid reading past the recovery threshold, the policy's open or acknowledged alert on the unit is resolved. Past means below it for a high limit and above it for a low one. Fresh means valid quality, observed within 120 s, and not after the tick.
+   - As with a breach, the demo evaluation takes the reading as sustained for `durationSeconds`.
+   - It applies whether the policy is enabled or not and outside its active window: recovery is a fact about the unit, not about notifying.
+   - An alert detected after the tick is left alone.
+2. **Evidence.**
+   - `resolutionReason` names the reading, for example "Recovered: co2 850 < 900 for 60 s (D08)".
+   - `resolutionEvidenceIds` holds the evaluation event id: the fired facts that recovered. A replay of that event returns the stored result (D02) and resolves nothing again.
+   - Each resolution emits `AlertResolved` with `recovered: true`.
+   - `automations.simulate` saves nothing.
+3. **Limits (IR66).** Only alerts with a policy resolve this way. Device, maintenance, reconciliation and other alerts without a policy still need a reason from an alert.resolve holder. A reading between the two thresholds, or of suspect, missing or stale quality, resolves nothing.
+4. **Recurrence (IR66).** A breach after the alert resolved opens a new source alert. Its `previousAlertId` is the latest earlier alert of the same policy and rule on the unit. The alert evidence shows it under Related as the previous alert.
+5. **Checked.**
+   - Go: `TestAlertRecoveryResolvesPolicyAlerts`. A breach opens the policy's and the default rule's alerts. These resolve nothing: a reading between the thresholds, a suspect one, and a simulation. A valid recovery resolves both alerts with the reason and the event. A policy-free tamper alert stays open. The next breach opens a new alert linked to the first, also seen in alerts.get. Both suites pass, and the dev containers run it.
+   - No web change. The technician's alert evidence shows the resolved alert, its reason and the link.
+6. **Still open.**
+   - The continuous D08 evaluation of stored telemetry at one-second ticks, where the counter resets on poor quality. The demo evaluation still decides on fired facts.
+   - The actor of an acknowledgement or resolution on Alert.
+   - The diagnostic control, devices and QR-scan screens in Malay.
+   - The HQ screens.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.

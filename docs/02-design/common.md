@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.58.0
+version: 0.59.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -257,4 +257,4 @@ API paths, HTTP methods, databases, server authentication and authorization, rea
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.58.0: Read IR01–IR284 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.59.0: Read IR01–IR285 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

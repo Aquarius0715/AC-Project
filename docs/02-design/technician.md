@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.32.0
+version: 0.33.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -253,6 +253,7 @@ Scope: FR-T07 / Main display pattern: **UI-DETAIL**. Service boundary: `alerts.l
 1. Open evidence from the alert list. Check measured values, estimates, on-site inspection results, and their history. Acknowledge the alert. If needed, proceed to remeasurement or resolution with a reason.
 2. Do not invent a numerical probability if an estimate has no confidence information. Acknowledgement sets `acknowledged`. Resolution requires a remeasurement that meets conditions, or a person with `alert.resolve` permission to resolve it with a reason.
    - As built (IR284): the alert shows `Alert.rule`, the condition of its policy or default rule read with the alert (technicians never read policies), with the recovery a remeasurement needs. The evidence at detection comes first, then the unit's latest reading of the rule's metric (`units.get`). Related lists the URL's job (`jobs.get`), the unit, the policy, the recovery rule, the previous alert and how the user can resolve it. A technician on the unit acknowledges with `alert.read` and resolves with `alert.resolve`, inside the work window (IR94).
+   - As built (IR285): in the demo evaluation (`automations.fire`), a valid reading past the recovery threshold resolves the policy's open alert. Like a breach, it is taken as sustained for durationSeconds. The reason names the reading ("Recovered: co2 850 < 900 for 60 s (D08)") and `resolutionEvidenceIds` holds the evaluation event. The next breach opens a new alert with `previousAlertId` (IR66).
 3. Record detection, acknowledgement, and resolution times and actors. For recurrence, create a new alertId linked to the previous event.
 4. Queries to update: `alerts / alert events / customer summary / admin summary / audit`.
 
@@ -479,6 +480,6 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 
 0.10.0: T12 fetches alerts.get using DeviceEvent.alertIds and acknowledges using Alert.version (SR23). Filter device history by scope at event time (SR24).
 
-Additional contracts for current version 0.32.0: Read IR01–IR284 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.33.0: Read IR01–IR285 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

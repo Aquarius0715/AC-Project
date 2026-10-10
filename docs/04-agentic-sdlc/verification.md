@@ -165,7 +165,7 @@ AT-*-SRC text in role requirements is authoritative for source-related acceptanc
 | FR-C08 | AT-C08-SRC | DD-C08 | not_run |
 | FR-C11 | AT-C11-SRC | DD-C11 | not_run |
 | FR-C13 | AT-C13-SRC | DD-C13 | not_run |
-| FR-T07 | AT-T07-SRC | DD-T07 | not_run (Core API: `TestAlertRuleAndTechnicianAcknowledge` — the rule of a policy alert, of a default rule and none; acknowledge with alert.read, resolve only with alert.resolve, IR284) |
+| FR-T07 | AT-T07-SRC | DD-T07 | not_run (Core API: `TestAlertRuleAndTechnicianAcknowledge` — the rule of a policy alert, of a default rule and none; acknowledge with alert.read, resolve only with alert.resolve, IR284; `TestAlertRecoveryResolvesPolicyAlerts` — sustained recovery resolves policy alerts with the evaluation event as evidence, a recurrence links to the earlier alert, IR285) |
 | FR-A05 | AT-A05-SRC | DD-A05 | not_run |
 | FR-A08 | AT-A08-SRC | DD-A08 | not_run |
 | FR-A12 | AT-A12-SRC | DD-A12 | not_run |
