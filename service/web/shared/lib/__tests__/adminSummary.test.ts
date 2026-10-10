@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { asOfText, axisRows, billingView, forecastView, jobRows, kpisFrom, overviewLinks, todayRange, type AdminSummary, type ApiForecast } from "@ac/web/lib/adminSummary";
+import { periodRange } from "@ac/web/lib/clientEnergy";
+import { i18nOf } from "@ac/web/lib/i18n";
+
+const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
 const summary = (over: Partial<AdminSummary> = {}): AdminSummary => ({
   customerCount: 2, total: 5, online: 5, offline: 0, unknown: 0, powerOn: 2, powerOff: 2, powerUnknown: 1, operatingRate: 50, alertCount: 1,
@@ -15,8 +19,10 @@ const forecast = (over: Partial<ApiForecast> = {}): ApiForecast => ({
 
 describe("HQ overview sections (DD-A01, IR244)", () => {
   it("states the time and period, and links lists with the scope but not the period", () => {
-    expect(asOfText("2026-09-14T01:00:00Z", todayRange(new Date("2026-09-14T01:00:00Z")))).toBe("As of 09:00 MYT · 2026-09-14 00:00–09:00 (Asia/Kuala_Lumpur)");
-    expect(asOfText("2026-09-14T01:00:00Z", { from: "2026-09-07T16:00:00Z", to: "2026-09-14T01:00:00Z" })).toBe("As of 09:00 MYT · 2026-09-08 00:00 – 2026-09-14 09:00 (Asia/Kuala_Lumpur)");
+    const today = periodRange("today", new Date("2026-09-14T01:00:00Z"));
+    expect(asOfText("2026-09-14T01:00:00Z", today.label)).toBe(`As of 9:00 am MYT · ${today.label}`);
+    expect(today.label).toMatch(/\(1 day\) · Asia\/Kuala_Lumpur$/); // the period stays Kuala Lumpur days, named so
+    expect(todayRange(new Date("2026-09-14T01:00:00Z"))).toEqual({ from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:00:00.000Z" });
     const l = overviewLinks({ customerId: "c1", propertyId: null });
     expect([l.units, l.power("off"), l.connection("connecting,error,unknown"), l.jobs("assigned"), l.billing, overviewLinks({ customerId: null, propertyId: null }).units])
       .toEqual(["/admin/units?customerId=c1", "/admin/units?customerId=c1&powerState=off", "/admin/units?customerId=c1&connections=connecting%2Cerror%2Cunknown", "/admin/jobs?customerId=c1&stage=assigned", "/admin/billing?overdueOnly=true", "/admin/units"]);
@@ -45,10 +51,23 @@ describe("HQ overview sections (DD-A01, IR244)", () => {
     expect(a.connection.map((r) => r.count)).toEqual([5, 0, 0]);
     expect(a.rateNote).toMatch(/= 2 ÷ 4 = 50\.0%/);
     const jobs = jobRows(s.jobCounts, overviewLinks({ customerId: null, propertyId: null }));
-    expect([jobs.length, jobs[0], jobs.at(-1)]).toEqual([10, { status: "requested", count: 1, href: "/admin/jobs?stage=requested" }, { status: "cancelled", count: 0, href: "/admin/jobs" }]);
+    expect([jobs.length, jobs[0], jobs.at(-1)]).toEqual([10, { status: "requested", label: "requested", count: 1, href: "/admin/jobs?stage=requested" }, { status: "cancelled", label: "cancelled", count: 0, href: "/admin/jobs" }]);
     expect(billingView(summary({ amountsByCurrency: [{ amountMinor: 12000, currency: "MYR" }, { amountMinor: 5000, currency: "USD" }] }))).toEqual({ forbidden: false, overdue: 1, rows: [{ currency: "MYR", text: "120.00 MYR" }, { currency: "USD", text: "50.00 USD" }] });
     expect(billingView(summary({ billingVisibility: "forbidden", amountsByCurrency: null, overdueInvoiceCount: null }))).toEqual({ forbidden: true });
-    expect(kpisFrom(s)).toMatchObject({ rate: "50.0%", kwh: "9.0 kWh", billing: "120.00 MYR", jobs: 2 });
+    expect(kpisFrom(s)).toMatchObject({ rate: "50.0%", kwh: "9.0 kWh", billing: "120.00 MYR", jobs: 2, kwhSub: "measured · coverage 40% · cost 3.29 MYR", billingSub: "1 overdue invoice · unpaid, per currency" });
+  });
+});
+
+describe("HQ overview in Malay with the display time zone (IR289)", () => {
+  it("words the KPIs, the forecast, the axes and the job statuses", () => {
+    const s = summary({ overdueInvoiceCount: 2 });
+    expect(asOfText("2026-09-14T01:00:00Z", "P", MS)).toBe("Setakat 10:00 PG GMT+9 · P");
+    expect(kpisFrom(s, MS.t)).toMatchObject({ kwhSub: "diukur · liputan 40% · kos 3.29 MYR", billingSub: "2 invois tertunggak · belum dibayar, mengikut mata wang" });
+    expect(forecastView(forecast(), MS.t)).toMatchObject({ saved: { text: "Jangkaan pengurangan 9.9 kWh" }, coverage: "1,080 / 2,700 unit-min" });
+    expect(forecastView(null, MS.t)).toMatchObject({ text: "Tidak dapat dikira" });
+    const a = axisRows(s, overviewLinks({ customerId: null, propertyId: null }), MS.t);
+    expect([a.power[0].label, a.connection[1].label]).toEqual(["Berjalan", "Luar talian"]);
+    expect(jobRows(s.jobCounts, overviewLinks({ customerId: null, propertyId: null }), MS.t).slice(0, 2).map((j) => j.label)).toEqual(["diminta", "ditawarkan"]);
   });
 });
 

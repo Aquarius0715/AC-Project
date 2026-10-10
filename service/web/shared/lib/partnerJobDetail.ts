@@ -36,7 +36,7 @@ const TYPES: Record<string, string> = { periodic: "Periodic inspection", reactiv
 export const typeLabel = (type: string, t: T = en) => (TYPES[type] ? t(TYPES[type]) : type);
 export const originLabel = (o: string, t: T = en) => t(o === "periodic_plan" ? "from the periodic plan" : "agreed with the client");
 const STATUS_WORDS: Record<string, string> = {
-  offered: "offered", accepted: "accepted", assigned: "assigned", in_progress: "in progress", on_hold: "on hold", submitted: "submitted",
+  requested: "requested", offered: "offered", accepted: "accepted", assigned: "assigned", in_progress: "in progress", on_hold: "on hold", submitted: "submitted",
   rework_requested: "rework requested", completed: "completed", cancelled: "cancelled",
 };
 /** A job status inside a sentence (“the job is on hold”), in the display language. */

@@ -3388,3 +3388,28 @@ The "Scan unit QR" dialog of the technician shell (FR-T13, DD-T13, Figma Technic
    - The HQ screens (15).
    - The browser demo.
    - The assistant panel and the voice demo's answers.
+
+## IR289 The HQ overview in the display language — 2026-10-10
+
+`/admin` (SCR-A01, FR-A01, DD-A01, Figma Admin 01) is the first HQ screen to follow the display language and time zone.
+
+1. **Texts.** These are translated:
+   - the customer, property and period filters and the refresh button;
+   - the eight KPI tiles with their sub lines and links;
+   - the energy-saving forecast in each direction, or why there is none (IR78);
+   - the power-state and connection axes with the operation-rate note;
+   - the job statuses (`statusWord`, which gains "requested") and the billing card, still per currency (IR50);
+   - the footnotes, and the empty and error banners.
+   The dictionary gains 63 entries. Field names that name the API (forecastSavedKWh, amountsByCurrency, powerState=on …) stay as they are.
+2. **Times.**
+   - The as-of time is a clock time in the display time zone, with its zone.
+   - The period stays Kuala Lumpur days. `periodRange` labels it in the user's language with "Asia/Kuala_Lumpur", as on the customer energy screens.
+   - The page formats both on the server and hands the line to the view ("As of 1:18 am GMT+9 · 15 Sept, 00:00 – 15 Sept, 00:18 (1 day) · Asia/Kuala_Lumpur"). Before, it was a fixed "As of 09:00 MYT · 2026-09-14 00:00–09:00 (Asia/Kuala_Lumpur)".
+3. **Shared helpers.** These take the translator: `kpisFrom`, `forecastView`, `axisRows` and `jobRows` (now with a label beside the status code). `asOfText` takes the period label and the display. The overdue sub line is singular or plural.
+4. **Checked.**
+   - Vitest: 41 files, 245 tests. `adminSummary.test.ts` moves to the new as-of line and adds a Malay case.
+   - E2E: `admin/language.e2e.ts` is new. It sets Malay and Asia/Tokyo and checks the filters, KPIs and cards, and the as-of line in GMT+9 with the Kuala Lumpur period. Then it restores English. The suite: 65 passed, 9 skipped; the users are en / Asia/Kuala_Lumpur.
+5. **Still open.**
+   - The other 14 HQ screens: jobs with SLA, alerts, units, devices, energy, MRV, offsets, billing, contracts, restrictions with exceptions, access, automation and audit.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.
