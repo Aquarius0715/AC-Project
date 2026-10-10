@@ -1,13 +1,14 @@
-// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A06, FR-A13, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
+// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A06, FR-A13, FR-A14, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
 // HQ overview speaks Malay — the scope and period filters, the KPI tiles, the forecast, the power and connection axes,
 // the job statuses and the billing card — and its as-of time is in GMT+9 while the period stays Kuala Lumpur days, named
 // so; the Jobs tab speaks Malay too — tabs, scope, filters, the list and one job's detail with its times in GMT+9 — and
 // New job types its times in Asia/Tokyo; so do the Plans tab (its next date typed in Asia/Tokyo), the Contractors tab
 // (its dates named Kuala Lumpur days) and the SLA tab with its targets dialog (IR291), the alerts with their policies
 // (IR292), customers & units — the register, one customer's locations, users and policies, and warranty & coverage
-// (IR293) — the device registry's three tabs with the new-campaign dialog (IR295), and the energy analysis with its
-// period named Kuala Lumpur time and the baselines with the form checks (IR296). Nothing is saved. English and the
-// earlier zone come back at the end, or in afterEach when the test fails.
+// (IR293) — the device registry's three tabs with the new-campaign dialog (IR295), the energy analysis with its
+// period named Kuala Lumpur time and the baselines with the form checks (IR296), and the MRV reports with a preview
+// (a read) and the emission factors with the form checks (IR297). Nothing is saved. English and the earlier zone come
+// back at the end, or in afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
@@ -130,6 +131,35 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   for (const text of ["Pilih 1–100 unit", "Tamat mesti selepas mula", "Nilai ≥ 0 kWh"]) await expect(main).toContainText(text);
   await main.getByRole("button", { name: "Batal", exact: true }).click();
   await expect(main.getByRole("heading", { name: "Garis dasar baharu", exact: true })).toBeHidden();
+  // the MRV workspace (IR297): the reports with the new-report checks and a preview — a read, so nothing is stored —
+  // and the emission factors with the new-factor checks, which stop before any call
+  await page.goto("/admin/mrv");
+  await expect(main.getByRole("tab", { name: /^Laporan/ })).toHaveAttribute("aria-selected", "true");
+  await expect(main.getByRole("heading", { name: "Laporan Skop 2", exact: true })).toBeVisible();
+  await expect(main.getByLabel("Tempoh bermula dari (Kuala Lumpur)")).toBeVisible();
+  await main.getByRole("button", { name: "+ Baharu" }).click();
+  const report = page.getByRole("dialog", { name: "Laporan Skop 2 baharu" });
+  await report.getByRole("button", { name: "Pratonton", exact: true }).click();
+  for (const text of ["Pilih organisasi pelanggan", "Pilih versi garis dasar", "Pilih versi faktor pelepasan"]) await expect(report).toContainText(text);
+  await report.getByLabel("Organisasi pelanggan").selectOption({ label: "Demo Customer A" });
+  await report.getByRole("checkbox").first().check();
+  await report.getByLabel("Mula (Kuala Lumpur)").fill("2026-09-01T00:00");
+  await report.getByLabel("Tamat", { exact: true }).fill("2026-09-08T00:00");
+  await report.getByLabel("Versi garis dasar").selectOption({ index: 1 });
+  await report.getByLabel("Versi faktor pelepasan").selectOption({ index: 1 });
+  await report.getByLabel("Penerangan sempadan").fill("AC input electricity (E2E preview)");
+  await report.getByRole("button", { name: "Pratonton", exact: true }).click();
+  await expect(report.getByText("Pratonton · tidak disimpan", { exact: true })).toBeVisible();
+  await expect(report).toContainText("Demo — belum disahkan");
+  await expect(report.getByText(/^(Elektrik digunakan|Pengiraan tidak lengkap — )/).first()).toBeVisible(); // the figures, or why they are not shown
+  await report.getByRole("button", { name: "Batal", exact: true }).click();
+  await expect(report).toBeHidden();
+  await main.getByRole("tab", { name: /^Faktor pelepasan/ }).click();
+  await page.waitForURL(/tab=factors/);
+  await main.getByRole("button", { name: "+ Baharu" }).click();
+  await expect(main.getByRole("heading", { name: "Faktor baharu", exact: true })).toBeVisible();
+  await main.getByRole("button", { name: "Cipta faktor" }).click();
+  for (const text of ["1–120 aksara", "Melebihi 0 dan paling banyak 10 kgCO₂e/kWh"]) await expect(main).toContainText(text);
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/admin");

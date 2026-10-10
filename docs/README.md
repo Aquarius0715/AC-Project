@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.180.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
+Version: 0.181.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.181.0 (2026-10-10): The HQ MRV workspace in Malay — Scope 2 reports with their versions, condition snapshots, evidence and demo reviews, the new-report preview, and the emission factors. Report periods stay Kuala Lumpur time, typed and named so; demo review times are in the user's time zone (IR297).
 0.180.0 (2026-10-10): The HQ energy analysis in Malay — the analysis scope, figures and calculation conditions, and the baselines with their editor — while its analysis and baseline periods stay Kuala Lumpur time, typed and named so (IR296).
 0.179.0 (2026-10-10): Table rows that open a record take the keyboard focus and open with Enter or Space (IR294). The HQ device registry in Malay — models, IoT devices and firmware campaigns — with its times in the user's time zone; a campaign's start is typed there while its install window stays the device's local time (IR295).
 0.178.0 (2026-10-10): HQ customers & units in Malay — the register, one customer's locations, units and unit edit, alert policies, users, warranty & coverage and the CSV import — with instants in the user's time zone and installation, warranty and contract dates kept as Kuala Lumpur days (IR293).

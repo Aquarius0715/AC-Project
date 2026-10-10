@@ -1,12 +1,12 @@
 {
-  "version": "0.180.0",
-  "spec_baseline_id": "06de333a83826d62c7945049c54e0eb43477237fe29dc386f62aac5e4c40deab",
+  "version": "0.181.0",
+  "spec_baseline_id": "0a7fe4c1d17f220972d5cc1df44d1409c5804908a2a2fd3e321538a2c963b37e",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "564c1018e6e89b91a8dcc029ed503cbb8b97529e30b7e6a4b35e6f62b288325e"
+      "sha256": "c01bad4960bcb40bdec82666a67f89b0e5020b27a8a6b2580c3149f19d86fa2f"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -94,7 +94,7 @@
     },
     {
       "path": "02-design/admin.md",
-      "sha256": "b85e4f4867868082d9a5a83ae3285aec1d8e14faaaffa2db7a97e40dfeab6a58"
+      "sha256": "769eb870f90812806492f608367305665b3e2694b4130c8623980d6100db78d0"
     },
     {
       "path": "02-design/api/swagger.json",
@@ -114,7 +114,7 @@
     },
     {
       "path": "02-design/common.md",
-      "sha256": "adbc7cec97d608ddaf8126678312f79f3abf08bdbec9aee2273f085d5b9cfa57"
+      "sha256": "d702c2c07cbab95dd8b675fbda994c3602ad9a50996f926787acf7a0558f7351"
     },
     {
       "path": "02-design/container-design.md",
@@ -154,7 +154,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "782b895ec5230630bd851e9b4997979e67442c4f0e4534988ad261e18c409b8e"
+      "sha256": "2a75ab8563bfc4d8007b3f1e6ce281539d5213ab103f7fc50646e74f2b46c606"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -278,11 +278,11 @@
     },
     {
       "path": "04-agentic-sdlc/verification.md",
-      "sha256": "f437d7ddf3258bd39b095b99335bacd833b2f0f4e300f393228ae73766f7190a"
+      "sha256": "278f06423dc5092b316b1a3390941b5a06edf0a061f0b43219e15079ad953527"
     },
     {
       "path": "README.md",
-      "sha256": "1f43ab372895c91c17dff623cacb747e1f171d3f7c0b352740bdd13095e71c64"
+      "sha256": "c64001eb0951bb986ead33af9d747082d0e9ac0013db54e64baa5f6fd4443222"
     },
     {
       "path": "tools/check_review_regressions.py",
@@ -294,7 +294,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "8c922280909f7795b5e09ca80f671fda7c91e3e687e58e05f835c8311aabd374"
+      "sha256": "203935f2beec09f98ce804cace64fabf79e25ff163a7fdd9cc74aa84f413a8ee"
     }
   ]
 }

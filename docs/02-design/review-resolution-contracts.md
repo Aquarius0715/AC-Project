@@ -3645,3 +3645,33 @@ IR293 found that `DataTable` rows with `onRowClick` opened a record only on a mo
    - The assistant panel and the voice demo's answers.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR297 The HQ MRV workspace in the display language; report periods stay Kuala Lumpur time — 2026-10-10
+
+`/admin/mrv` (SCR-A14, FR-A14, DD-A14, Figma Admin 14) follows the display language.
+
+1. **Texts.** These are translated:
+   - the Reports and Emission factors tabs;
+   - the report filters, the list, a report's figures, its version selector, the condition snapshot, the evidence and the demo review;
+   - the new-report dialog with its checks (`mrvDraftErrors`) and the "not saved" preview;
+   - the factors list, the factor form and its checks (`factorErrors`), and the toasts.
+   The dictionary gains 73 entries. "Demo — unverified" stays on screen as "Demo — belum disahkan".
+   These stay as they are: method and boundary codes, report and baseline IDs, and the stored boundary, region, source and review texts.
+2. **Times.**
+   - Report periods are Kuala Lumpur business time, as on the energy screens (IR296). They are typed in that time ("Start (Kuala Lumpur)"), and the list and the condition snapshot show them as Kuala Lumpur "YYYY-MM-DD HH:MM" with "(Asia/Kuala_Lumpur)".
+   - The list's period filter reads `[from, to)` on a report's period start (query catalog). It is labelled like the baselines filter: "Period starts from (Kuala Lumpur)" / "Period starts before".
+   - Demo review times are instants. The page formats them in the display time zone (`reviewItems`, `showTime`, IR282). Before, they were fixed Kuala Lumpur stamps.
+3. **New helpers.**
+   - `statusWord` words a version's status ("draft", "demo reviewed"). Before, the version selector showed the raw code.
+   - The evidence line words one attachment and several attachments separately.
+   - The new factor's default source is in the display language ("Demo (fictional)"). It is the user's to change, and it is stored as typed.
+4. **Checked.**
+   - Vitest: 45 files, 269 tests. `mrv.test.ts` is new. It covers the report rows, the figures and conditions with the IR68 wording, the incomplete case, the review history, the report and factor checks, the Kuala Lumpur conditions, and Malay / Tokyo.
+   - E2E: `admin/language.e2e.ts` also opens the MRV reports. It checks the new-report errors, then runs a preview, which is a read (`mrv.preview`): "Pratonton · tidak disimpan" with "Demo — belum disahkan", and the figures or why they are missing. It also checks the new-factor errors, which stop before any call. Nothing is saved.
+5. **Progress.** 36 of the 44 business screens follow the display language.
+6. **Still open.**
+   - The other 8 HQ screens: offsets, billing, contracts, restrictions with exceptions, access, automation and audit.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
