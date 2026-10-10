@@ -1,28 +1,75 @@
-// Contractor unit page in API mode (Server Component): diagnosis-scoped read-only view of a unit of the company's
-// accepted job (contractor:accepted-valid-offer, IR169). Rendered from data the page read through the DAL.
+"use client";
+
 import Link from "next/link";
-import { Badge, Card, ConnBadge, Page, SeverityBadge, SummaryList } from "@ac/web/components/ui";
-import { klTime, type ApiUnitDetail } from "@ac/web/lib/units";
+import { Badge, Banner, BarChart, Card, ConnBadge, LinkBtn, Page, SeverityBadge, SummaryList, UtilBar, cx } from "@ac/web/components/ui";
+import { useT } from "@ac/web/components/I18n";
+import type { UnitLive } from "../_lib/load";
 
-export type ApiAlert = { id: string; severity: "critical" | "warning" | "normal"; status: string; causeCode: string; type: string; evidenceKind: string; evidenceText: string; detectedAt: string };
-export type ApiJob = { projection: string; id?: string; jobId?: string; type: string; status: string; scheduledSlot?: { startAt: string; endAt: string } | null };
-const evidence: Record<string, string> = { inferred: "Suspected", inspection: "Inspection record", demo_observation: "Observed (demo)" };
-
-export function PartnerUnitDetail({ d, alerts, jobs }: { d: ApiUnitDetail; alerts: ApiAlert[]; jobs: ApiJob[] }) {
-  const current = jobs.filter((j) => j.projection === "summary");
-  const past = jobs.filter((j) => j.projection === "history");
+/** The contractor's unit view (FR-P04, FR-P08, Figma Contractor Unit View): diagnosis only — the register, the job
+ * context with its access window, past work, alert evidence, readings and the last 24 hours — or, after the
+ * delegation, the job's history snapshot. Texts in the user's display language; the times come formatted from the
+ * loader (IR280). */
+export function PartnerUnitDetail({ live }: { live: UnitLive }) {
+  const t = useT();
+  if (live.kind === "snapshot") {
+    return (
+      <Page>
+        <Banner tone="crit">{live.banner}</Banner>
+        <Card title={live.title} className="max-w-xl">
+          <SummaryList items={live.rows} />
+          <p className="mt-2 text-[11px] text-muted">{t("Only your own acceptance / decline and work records are kept. Past access never re-opens customer data.")}</p>
+          <div className="mt-3"><LinkBtn href="/partner/jobs" variant="primary" size="sm">{t("Back to Jobs")}</LinkBtn></div>
+        </Card>
+      </Page>
+    );
+  }
+  const conn = live.register.connection;
   return (
     <Page>
-      <div><h1 className="text-lg font-bold">{d.displayName}</h1><p className="text-xs text-muted">Diagnosis-scoped view for your accepted job — no billing, payments, or other contracts.</p></div>
-      <div className="split">
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href={live.context ? `/partner/jobs/${live.context.id}` : "/partner/jobs"} className="font-semibold text-primary">‹</Link><b className="text-ink">{live.name}</b><span>· {live.id.slice(0, 8)}</span></div>
+      <Banner>{live.banner}</Banner>
+      <div className="split-rev">
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Unit register"><SummaryList items={[["Location", d.location.pathLabels.join(" › ")], ["Model", `${d.capabilities.manufacturer} ${d.capabilities.model}`], ["Maintenance scope", d.serviceScope.join(" · ")], ["Connection", <ConnBadge key="c" s={d.connection === "online" ? "online" : "offline"} />], ["Last seen", klTime(d.lastSeenAt, true)]]} /><p className="mt-2 text-[11px] text-muted">Read-only — no remote-control actions available to contractors.</p></Card>
-          <Card title={`Alert evidence (${alerts.length})`}>{alerts.length === 0 ? <p className="text-[13px] text-muted">No alerts on this unit.</p> : alerts.map((a) => <div key={a.id} className="border-t border-line py-2 first:border-0"><b className="text-[13px]">{a.causeCode !== "unknown" ? a.causeCode.replace(/_/g, " ") : a.type}</b> <SeverityBadge s={a.severity} /> <Badge tone="muted">{a.status}</Badge><div className="text-xs text-muted">{evidence[a.evidenceKind] ?? a.evidenceKind} — {a.evidenceText} · {klTime(a.detectedAt, true)}</div></div>)}</Card>
-          <Card title="Readings (diagnosis only)" sub={`observed ${klTime(d.observedState.observedAt, true)}`}><SummaryList items={d.latestMeasurements.length ? d.latestMeasurements.map((m) => [m.metric.replace(/_/g, " "), `${m.value ?? "—"} ${m.unit}${m.quality === "valid" ? "" : ` (${m.quality})`} · ${klTime(m.observedAt)}`] as [string, string]) : [["Measurements", "No measurements yet"]]} /></Card>
+          <Card title={t("Unit register")}>
+            <SummaryList items={[...live.register.rows, [t("Connection"), <ConnBadge key="c" s={conn} />], [t("Last seen"), live.register.lastSeen]]} />
+            <p className="mt-2 rounded-xl bg-primary-soft/40 px-3 py-2 text-[11px] text-muted">{t("Read-only — no remote-control actions available to contractors.")}</p>
+          </Card>
+          <Card title={t("Job context")} action={live.context && <Link className="text-xs font-semibold text-primary" href={`/partner/jobs/${live.context.id}`}>{t("Job →")}</Link>}>
+            {!live.context ? <p className="text-[13px] text-muted">{t("No current job of your company on this unit.")}</p> : (
+              <>
+                <SummaryList items={live.context.rows.map(([k, v], n): [string, React.ReactNode] => [k, n === 1 && live.context!.techMissing ? <span key="t" className="font-semibold text-crit">{v}</span> : v])} />
+                {live.context.pct !== null && <div className="mt-2"><UtilBar pct={live.context.pct} tone={live.context.pct >= 80 ? "crit" : "primary"} /></div>}
+                <p className="mt-2 text-[11px] text-muted">{live.context.note}</p>
+              </>
+            )}
+          </Card>
+          <Card title={t("Our past work on this unit")}>
+            {live.past.length === 0 ? <p className="text-[13px] text-muted">{t("No past jobs.")}</p> : live.past.map((j) => (
+              <div key={j.id} className="flex items-center justify-between gap-2 border-t border-line py-2 text-[13px] first:border-0"><span><b className="block">{j.title}</b><span className="text-[11px] text-muted">{j.sub}</span></span><Badge tone={j.badge.tone}>{j.badge.text}</Badge></div>
+            ))}
+            <p className="mt-1 text-[11px] text-muted">{t("Only your company’s own jobs are listed — other contractors’ work and customer billing are hidden.")}</p>
+          </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Job context">{current.length === 0 ? <p className="text-[13px] text-muted">No current job.</p> : current.map((j) => <Link key={j.id} href={`/partner/jobs/${j.id}`} className="block border-t border-line py-2 text-[13px] first:border-0 hover:bg-surface2/50"><b>{j.type} · {j.status}</b><div className="text-xs text-muted">{j.scheduledSlot ? `${klTime(j.scheduledSlot.startAt, true)} – ${klTime(j.scheduledSlot.endAt)}` : "not scheduled"}</div></Link>)}<p className="mt-2 text-xs text-muted">Access ends with the accepted offer’s access window; after that only a history snapshot remains.</p></Card>
-          <Card title="Our past work on this unit">{past.length === 0 ? <p className="text-[13px] text-muted">No past jobs.</p> : past.map((j) => <div key={j.jobId} className="border-t border-line py-2 text-[13px] first:border-0"><b>{j.type} · {j.status}</b><div className="text-xs text-muted">{(j.jobId ?? "").slice(0, 8)}</div></div>)}<p className="mt-1 text-[11px] text-muted">Only your company’s own jobs are listed — other contractors’ work and customer billing are hidden.</p></Card>
+          <Card title={t("Alert evidence")}>
+            {live.alerts.length === 0 ? <p className="text-[13px] text-muted">{t("No alerts on this unit.")}</p> : live.alerts.map((a) => (
+              <div key={a.id} className={cx("border-t border-line py-2 first:border-0", a.resolved && "opacity-70")}><b className="text-[13px]">⚠ {a.title}</b> <SeverityBadge s={a.severity} /><div className="text-xs text-muted">{a.sub}</div></div>
+            ))}
+          </Card>
+          <Card title={t("Readings (diagnosis only)")} sub={t("observed {time}", { time: live.readings.observed })}>
+            <SummaryList items={live.readings.rows.length ? live.readings.rows.map((r): [string, React.ReactNode] => [r.label, <span key={r.label} className={cx("font-semibold", r.tone === "crit" && "text-crit", r.tone === "warn" && "text-warn")}>{r.value}</span>]) : [[t("Measurements"), t("No measurements yet")]]} />
+          </Card>
+          <Card title={t("Readings — last 24 h")} sub={live.window}>
+            {live.charts.length === 0 ? <p className="text-[13px] text-muted">{t("No diagnosis readings for this unit.")}</p> : (
+              <div className="flex flex-col gap-4">{live.charts.map((c) => (
+                <div key={c.metric}>
+                  <div className="mb-1 flex justify-between text-xs font-semibold"><span>{c.title}</span><span className="text-muted">{c.now}</span></div>
+                  <BarChart labels={c.labels} series={[c.values]} colors={["#9ec0f5"]} height={110} />
+                </div>
+              ))}</div>
+            )}
+            <p className="mt-2 text-[11px] text-muted">{t("Diagnosis only — read-only values, no control.")}</p>
+          </Card>
         </div>
       </div>
     </Page>

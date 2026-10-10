@@ -3113,3 +3113,29 @@ The Certifications tab of `/partner/team` (FR-P09, DD-P09, Figma Contractor 04-6
    - The technician and HQ screens.
    - The browser demo's screens.
    - The assistant panel and the voice demo's answers.
+
+## IR280 The contractor's unit view as in Figma, in the display language — 2026-10-10
+
+`/partner/units/[id]` (FR-P04, FR-P08, DD-P04, Figma Contractor Unit View and "delegation ended while open") showed a plain read of the unit in API mode. It now follows Figma.
+
+1. **The view.**
+   - A banner names the job the view is for.
+   - The left column has the unit register (location, model, maintenance scope, connection, last seen), the job context and the company's past work on the unit. The job context shows the job and type, the technician or "Not assigned yet", and the access window with its elapsed share and when access ends.
+   - The right column has the alert evidence, the latest readings with their quality in words ("good", "stale", "suspect") and the power state, and the last 24 hours of two diagnosis metrics in 12 two-hour buckets.
+   - Nothing on the page controls the unit.
+2. **After the delegation.**
+   - When `units.get` refuses the unit and the URL's `jobId` names one of the company's history snapshots, the page shows the snapshot: the company's decision, the work, the report, and "Live unit values: Not available after the period".
+   - Otherwise the unit is not found, as before (IR169).
+3. **Language and time.**
+   - Every text is translated (44 entries).
+   - Every time is formatted on the server in the display time zone, the chart labels included.
+4. **Shared helpers.** `shared/lib/partnerUnit.ts` is new: `registerRows`, `contextJob`, `jobContext`, `pastWork`, `evidenceRows`, `readingRows`, `chartMetrics`, `chart` and `snapshotRows`.
+5. **Checked.**
+   - Vitest: 39 files, 223 tests. `partnerUnit.test.ts` is new, with Malay cases.
+   - E2E: the cross-app scenario now opens the unit from the partner's job page and checks the diagnosis-only view with no control buttons. The suite: 63 passed, 9 skipped. The users are en / Asia/Kuala_Lumpur, and all 75 E2E jobs are cancelled.
+   - A visual check in English and Malay on a delegated unit showed the register, the job context, the alert evidence and the 24-hour temperature and power charts.
+6. **Contractor screens.** Every contractor screen now follows the display language: overview, jobs, offer / job, quality review, schedule, team & capacity with certifications, job history, payouts and the unit.
+7. **Still open.**
+   - The technician and HQ screens.
+   - The browser demo's screens.
+   - The assistant panel and the voice demo's answers.

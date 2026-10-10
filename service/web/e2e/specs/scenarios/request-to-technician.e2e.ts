@@ -1,8 +1,9 @@
-// Across the four apps (FR-C09 → FR-A06 → FR-P02 / FR-P03 → FR-T01; IR113, IR124, IR225–IR232): a customer's request is
-// offered by HQ to contractor-a at the customer's first preferred time; the partner accepts it and gives it to
-// tech-external-a, who accepts the assignment (受領), after which the partner sees it accepted and the customer the
-// technician's name. HQ cancels it with a reason at the end, so a run leaves one cancelled job. Starting the work needs
-// the visit window, which only a jump of the never-returning demo clock would reach, so the scenario stops here.
+// Across the four apps (FR-C09 → FR-A06 → FR-P02 / FR-P03 / FR-P04 → FR-T01; IR113, IR124, IR225–IR232, IR280): a
+// customer's request is offered by HQ to contractor-a at the customer's first preferred time; the partner accepts it,
+// gives it to tech-external-a and opens the unit's diagnosis view; the technician accepts the assignment (受領), after
+// which the partner sees it accepted and the customer the technician's name. HQ cancels it with a reason at the end,
+// so a run leaves one cancelled job. Starting the work needs the visit window, which only a jump of the
+// never-returning demo clock would reach, so the scenario stops here.
 import type { Browser, Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
@@ -54,6 +55,17 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       await partner.getByRole("radiogroup", { name: "Technician" }).getByRole("radio", { name: /tech-external-a/ }).click();
       await partner.getByRole("button", { name: "Confirm assignment" }).click();
       await expect(partner.getByText("Technician assigned — waiting for acceptance")).toBeVisible();
+    });
+
+    await test.step("the partner opens the unit — diagnosis only (FR-P04, IR280)", async () => {
+      await partner.goto(`/partner/jobs/${jobId}`);
+      await partner.getByRole("link", { name: "Open unit →" }).first().click();
+      await partner.waitForURL(/\/partner\/units\/[^/?]+\?jobId=/);
+      const main = partner.getByRole("main");
+      for (const name of ["Unit register", "Job context", "Alert evidence", "Readings (diagnosis only)"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();
+      await expect(main).toContainText(`Diagnosis-scoped view for ${jobId!.slice(0, 8)}`);
+      await expect(main).toContainText("Read-only — no remote-control actions available to contractors.");
+      await expect(main.getByRole("button", { name: /power|temperature/i })).toHaveCount(0); // no control
     });
 
     await test.step("tech-external-a accepts the assignment", async () => {

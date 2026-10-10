@@ -178,6 +178,8 @@ Scope: FR-P04 / Main display pattern: **UI-DETAIL**. Service boundary: `units.ge
 
 **Boundary cases and failures**: If the period expires while the screen remains open, reject the next request and discard the cache. Permission to view monitoring data does not grant control permission.
 
+**As built (IR280)**: the Server Component reads `units.get`, `alerts.list`, `jobs.list` and `members.list` on the unit, and `telemetry.series` for the last 24 hours of two of its latest metrics (diagnosis metrics first: vibration, refrigerant pressure, then temperature, humidity, power) in 12 two-hour buckets. The URL's `jobId` picks the job context; without it the first current job of the company on the unit is shown. When `units.get` refuses the unit and `jobId` names one of the company's history snapshots, the page shows that snapshot — the company's decision, the work, the report and that live values are gone; otherwise the unit is not found.
+
 **Verification**: Check the traceability entries under AT-P04 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
 ### DD-P05 Details
