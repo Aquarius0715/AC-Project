@@ -12,6 +12,11 @@ describe("Display language (FR-X01, AT-X01-N, IR258)", () => {
     expect(translate("ms", "A text nobody translated yet")).toBe("A text nobody translated yet");
   });
 
+  it("tells one English text apart by its context (IR287)", () => {
+    expect([translate("en", "tamper::Clear"), translate("ms", "tamper::Clear"), translate("ms", "Clear")]).toEqual(["Clear", "Tiada gangguan", "Kosongkan"]);
+    expect(translate("ms", "nobody::Untranslated")).toBe("Untranslated"); // English after the context when Malay has none
+  });
+
   it("fills {name} placeholders in both languages and leaves unknown ones as they are", () => {
     expect(translate("en", "Not saved: {reason}", { reason: "conflict" })).toBe("Not saved: conflict");
     expect(translate("ms", "Not saved: {reason}", { reason: "conflict" })).toBe("Tidak disimpan: conflict");

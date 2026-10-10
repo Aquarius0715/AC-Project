@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.60.0
+version: 0.61.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -50,9 +50,9 @@ service/web/
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
 
-**Language — partly built (IR258–IR286).** FR-X01 asks that a language change reach key screens, notifications and dates.
-- These show the saved language: the shell, a failed Server Action's toast, each route's loading and error states, Preferences, Demo controls, the notifications inbox and every customer screen (AT-X01-N) — overview, units & locations (with group control), automations, alerts (inbox and policies), maintenance (requests and Filter care), energy & cost with carbon offsets, air quality, contracts & payments with the invoice page, users and the unit screen — and the contractor overview, job list, offer / job page, quality review, schedule, team & capacity with its certifications, job history, payouts and the unit view — every contractor screen — and the technician overview, job workspace, unit screen, alert evidence and diagnostic control.
-- The English text is the key of the Malay dictionary (`shared/lib/i18n-ms.ts`, a draft not yet reviewed). A text without an entry stays English.
+**Language — partly built (IR258–IR287).** FR-X01 asks that a language change reach key screens, notifications and dates.
+- These show the saved language: the shell, a failed Server Action's toast, each route's loading and error states, Preferences, Demo controls, the notifications inbox and every customer screen (AT-X01-N) — overview, units & locations (with group control), automations, alerts (inbox and policies), maintenance (requests and Filter care), energy & cost with carbon offsets, air quality, contracts & payments with the invoice page, users and the unit screen — and the contractor overview, job list, offer / job page, quality review, schedule, team & capacity with its certifications, job history, payouts and the unit view — every contractor screen — and the technician overview, job workspace, unit screen, alert evidence, diagnostic control and devices with their events.
+- The English text is the key of the Malay dictionary (`shared/lib/i18n-ms.ts`, a draft not yet reviewed). A text without an entry stays English. When one English text means two things, its key names the context before `::` ("tamper::Clear" is a state, "Clear" a button); English shows the text after it (IR287).
 - Their times follow IR44: the user's language and display time zone, with the zone's abbreviation (`showTime` / `showClock`). Times on the days next to now show "today", "yesterday" or "tomorrow" instead of the date (`relativeTime`). Business days stay in Asia/Kuala_Lumpur, where they are cut, and the screens say so: the periods of the overview and the energy screens, the 7-day air-quality window, contract periods and invoice due dates, the contractor's timeline, team weeks, free hours and unavailable days, the technician's today and its timeline, a follow-up visit date and a unit's 7-day period (named when the display time zone is another one). Booked and preferred times show as one span (`showSpan`), and preferred times and an extended work end are typed in the display time zone (`zonedInstant`, NFR-08).
 - The other business screens and their dates are still English, in Asia/Kuala_Lumpur.
 
@@ -257,4 +257,4 @@ API paths, HTTP methods, databases, server authentication and authorization, rea
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.60.0: Read IR01–IR286 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.61.0: Read IR01–IR287 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

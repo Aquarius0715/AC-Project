@@ -3332,3 +3332,34 @@ IR284 left one D08 rule unbuilt: the Core API opened policy alerts from the demo
    - The HQ screens.
    - The browser demo.
    - The assistant panel and the voice demo's answers.
+
+## IR287 The technician's devices in the display language; dictionary keys with a context — 2026-10-10
+
+`/technician/devices` and `/technician/devices/[id]` (SCR-T11, SCR-T12, FR-T11, FR-T12, Figma Technician 03-x) already had Figma's layout: the list with filters, then the device with its tiles, binding, actions and history, or its events. They now follow the display language and time zone.
+
+1. **Texts.** These are translated:
+   - the filter chips, the search, the list and its empty states;
+   - the four tiles: connection, power signal, tamper and firmware, with their evidence lines;
+   - the binding card, the three actions, the sensor table, and the operation and calibration history;
+   - the firmware card in each state, and the events with their recovery, alert and note lines;
+   - the five dialogs (register, rebind, calibrate, firmware, response note), the toasts, the inline validation, and the refusals in words.
+   The dictionary gains 151 entries.
+2. **What stays a code** (as in Figma): the event types (tamper, power_lost, communication_lost …), the evidence sources (heartbeat, power_signal, tamper_signal), firmware versions, serials and sensor metrics.
+3. **Times.** These are in the display time zone:
+   - fault times on the tiles, and the firmware start and deadline (`showClock`);
+   - operation starts, calibrations and a finished update (`showTime`);
+   - event, recovery and note times, with "today / yesterday" (`relativeTime`).
+   "… ago" lines stay relative. Before, all of these were fixed Kuala Lumpur times. The loader formats everything, including the sensor table, which now comes from `sensorRows`.
+4. **Acknowledging a device's alert** needs `alert.read` on the unit's assignment, as IR284 made it. The page offered the link only to alert.resolve holders before.
+5. **Context keys.**
+   - "Clear" was already the Malay button "Kosongkan", but the tamper tile uses it as a state.
+   - A key can now name its context before `::`: `t("tamper::Clear")` shows "Clear" in English and "Tiada gangguan" in Malay, while "Clear" stays the button.
+   - `translate` shows the text after the context when the dictionary has no entry. `i18n.test.ts` covers it.
+6. **Checked.**
+   - Vitest: 41 files, 243 tests. `techDevices.test.ts` moves to the display-zone times and adds Malay tiles, history, events, failure text, the sensor rows and refusals. The i18n test adds the context keys.
+   - E2E: `technician/language.e2e.ts` opens the devices and one device's events in Malay. The suite: 64 passed, 9 skipped; the users are en / Asia/Kuala_Lumpur.
+7. **Still open.**
+   - The technician QR scan in Malay; the technician screens are complete after it.
+   - The HQ screens.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.

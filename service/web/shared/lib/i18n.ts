@@ -16,11 +16,14 @@ export type T = (text: string, params?: Params) => string;
 
 const warned = new Set<string>();
 
-/** The text in `locale`, with `{name}` placeholders filled from params; English when Malay has no entry. */
+/** The text in `locale`, with `{name}` placeholders filled from params; English when Malay has no entry. When one English
+ * text means two things, its key names the context before "::" ("tamper::Clear" is a state, "Clear" a button); English
+ * shows the text after it. */
 export function translate(locale: Locale, text: string, params?: Params): string {
-  let base = text;
+  const english = text.includes("::") ? text.slice(text.indexOf("::") + 2) : text;
+  let base = english;
   if (locale === "ms") {
-    base = ms[text] ?? text;
+    base = ms[text] ?? english;
     if (!(text in ms) && process.env.NODE_ENV === "development" && !warned.has(text)) {
       warned.add(text);
       console.warn(`[i18n] no Malay text for "${text}"`);

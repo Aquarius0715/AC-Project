@@ -1,9 +1,9 @@
-// AT-X01-N ③ for the technician (FR-X01, FR-T01–FR-T04, FR-T07, FR-T10, IR44, IR281–IR286): with Malay and Asia/Tokyo
-// saved in Preferences, the overview speaks Malay — tiles, tabs, sort and the side cards — while today's timeline stays
-// in Kuala Lumpur hours and says so; an assigned job's workspace speaks Malay with its window in GMT+9, and so do its
-// unit, on both tabs and with the 7-day period, the unit's alert evidence and the job's diagnostic control. English and
-// the earlier zone come back at the end, or in afterEach when the test fails. Nothing is acknowledged, resolved or sent
-// (the dev data stays as it is).
+// AT-X01-N ③ for the technician (FR-X01, FR-T01–FR-T04, FR-T07, FR-T10–FR-T12, IR44, IR281–IR287): with Malay and
+// Asia/Tokyo saved in Preferences, the overview speaks Malay — tiles, tabs, sort and the side cards — while today's
+// timeline stays in Kuala Lumpur hours and says so; an assigned job's workspace speaks Malay with its window in GMT+9,
+// and so do its unit, on both tabs and with the 7-day period, the unit's alert evidence, the job's diagnostic control
+// and the devices with one device's events. English and the earlier zone come back at the end, or in afterEach when
+// the test fails. Nothing is acknowledged, resolved or sent (the dev data stays as it is).
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
@@ -67,6 +67,17 @@ test("the technician overview in Malay keeps the timeline in Kuala Lumpur hours"
       for (const name of ["Tindakan diagnostik biasa", "Keadaan semasa unit", "Sejarah arahan — kerja ini", "Larian ujian", "Kebenaran"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();
       await expect(main.getByRole("button", { name: "Semak & hantar" })).toBeVisible();
     }
+  }
+  // the devices of the assigned units (IR287): the list, then one device's events
+  await page.goto("/technician/devices");
+  await expect(main.getByRole("heading", { name: "Peranti — unit yang ditugaskan", exact: true })).toBeVisible();
+  await expect(main.getByRole("button", { name: /^Semua \d+$/ })).toBeVisible();
+  const events = main.getByRole("link", { name: "Peristiwa peranti →", exact: true });
+  if (await events.count()) {
+    await events.click();
+    await page.waitForURL(/\/technician\/devices\/[^/?]+$/);
+    await expect(main).toContainText(/Peristiwa peranti|Peristiwa peranti dibuka semasa/);
+    await expect(main.getByRole("link", { name: "← Butiran peranti", exact: true })).toBeVisible();
   }
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;

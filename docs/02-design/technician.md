@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.34.0
+version: 0.35.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -480,6 +480,6 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 
 0.10.0: T12 fetches alerts.get using DeviceEvent.alertIds and acknowledges using Alert.version (SR23). Filter device history by scope at event time (SR24).
 
-Additional contracts for current version 0.34.0: Read IR01–IR286 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.35.0: Read IR01–IR287 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.
