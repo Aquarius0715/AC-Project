@@ -3,7 +3,8 @@
 // gives it to tech-external-a and opens the unit's diagnosis view; the technician accepts the assignment (受領), after
 // which the partner sees it accepted and the customer the technician's name. HQ cancels it with a reason at the end,
 // so a run leaves one cancelled job. Starting the work needs the visit window, which only a jump of the
-// never-returning demo clock would reach, so the scenario stops here.
+// never-returning demo clock would reach, so the scenario stops here. The seed keeps tech-external-a on its own job
+// until 20 Sept (KL), so a visit before that would find them busy: the preferred times move after it (IR316).
 import type { Browser, Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
@@ -25,6 +26,9 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       const dialog = customer.getByRole("dialog");
       await dialog.getByLabel(/Symptoms/).fill("E2E scenario: water drips from the indoor unit.");
       await dialog.getByLabel(/Contact window/).fill("Weekdays 09:00-18:00");
+      if ((await dialog.getByLabel("Date 1", { exact: true }).inputValue()) <= "2026-09-20") {
+        for (const [n, date] of [[1, "2026-09-21"], [2, "2026-09-22"], [3, "2026-09-23"]] as const) await dialog.getByLabel(`Date ${n}`, { exact: true }).fill(date);
+      }
       await dialog.getByRole("button", { name: "Submit request" }).click();
       await customer.waitForURL(/jobId=/);
       jobId = new URL(customer.url()).searchParams.get("jobId");

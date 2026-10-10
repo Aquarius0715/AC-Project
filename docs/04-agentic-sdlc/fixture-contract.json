@@ -1828,7 +1828,16 @@
       "baseline-demo-tenant-a matches all five non-archived tenant-a units; /admin without filters shows an energy-saving forecast (IR78)",
       "Emission factor factor-demo-2026 (0.5 kgCO₂e/kWh) is the record referenced by defaultEmissionFactorId (IR92)",
       "allergenObservations has one available row for unit-online-rto and one unsupported row for unit-non-rto. Other Units have no row and are not_measured (IR98)",
-      "capabilities have tenantId; unit-tenant-b references tenant-b cap-split-std-tb (IR101)"
+      "capabilities have tenantId; unit-tenant-b references tenant-b cap-split-std-tb (IR101)",
+      "unit-offline-rto (offline, so its run time is unknown) was last cleaned 2026-07-21 by customer-a: Filter care shows it overdue by the 30-day fallback and the reminder follows (Figma Client 07j, 06a; IR316)"
+    ],
+    "filterCleanings": [
+      {
+        "id": "cleaning-meeting-a",
+        "unitId": "unit-offline-rto",
+        "cleanedAt": "2026-07-21T02:00:00.000Z",
+        "markedByMembershipId": "customer-a"
+      }
     ]
   },
   "acceptancePatches": {

@@ -87,7 +87,9 @@ type Fixture struct {
 		Offers        []map[string]any `json:"offers"`
 		Assignments   []map[string]any `json:"assignments"`
 		RateCards     []map[string]any `json:"rateCards"`
-		Consents      []struct {
+		// FilterCleanings are customers' own cleanings (FR-C18): Filter care counts from the latest one (IR316)
+		FilterCleanings []map[string]any `json:"filterCleanings"`
+		Consents        []struct {
 			ID           string     `json:"id"`
 			TenantID     string     `json:"tenantId"`
 			MembershipID string     `json:"membershipId"`
@@ -755,6 +757,12 @@ func applyBusiness(ex func(string, ...any) error, f *Fixture) error {
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING`,
 			ID(str(r, "id")), ID(str(r, "tenantId")), ID(str(r, "contractorOrgId")), str(r, "effectiveFrom"), str(r, "currency"), lines, r["version"], str(r, "createdAt")); err != nil {
 			return fmt.Errorf("rate card %s: %w", str(r, "id"), err)
+		}
+	}
+	for _, c := range f.DemoSeed.FilterCleanings {
+		if err := ex(`INSERT INTO maintenance.filter_cleanings (id, tenant_id, unit_id, cleaned_at, marked_by_membership_id) VALUES ($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
+			ID(str(c, "id")), ID(unitTenant[str(c, "unitId")]), ID(str(c, "unitId")), str(c, "cleanedAt"), ID(str(c, "markedByMembershipId"))); err != nil {
+			return fmt.Errorf("filter cleaning %s: %w", str(c, "id"), err)
 		}
 	}
 	return seedJobEvents(ex, f, jobTenant)

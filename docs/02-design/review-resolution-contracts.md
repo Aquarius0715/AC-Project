@@ -4259,3 +4259,30 @@ The visible text of sixteen customer screens in API mode was compared with their
    - E2E: 72 passed, 9 skipped. The dev data is unchanged apart from the scenario's two cancelled jobs.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR316 The E2E suite passes on a fresh seed; the seed has an overdue filter — 2026-10-11
+
+IR315 found the dev data full of E2E leftovers. The dev DB was reset to the seed (`scripts/resetdb.sh`) and the whole suite was run on it. Four specs had passed only on the drifted data, and two of them had never tested anything.
+
+1. **Filter care settings.** The spec compared the card's text before and after a save and its put-back. On a fresh seed the first save turns “Default settings” into “Set by the account owner” for good, because a settings row cannot be removed. The spec now compares only the reminder values, from “Remind at” to “Edit reminders”. Its old 200-character window had also cut the card's note at different points.
+2. **Request cleaning had never run.** It skipped when no AC was overdue, for two reasons:
+   - it counted the buttons before the rows had streamed in;
+   - the seed had no overdue AC.
+   It now waits for the rows and finds the overdue row relative to its button; the old inner locator started at `main tr` again and matched nothing. It passes.
+3. **The seed's overdue filter (Figma Client 07j, 06a).** `demoSeed.filterCleanings` in the fixture contract holds one cleaning by customer-a of Meeting room AC (unit-offline-rto) on 21 July. The AC is offline, so its run time is unknown, and the 30-day fallback makes it overdue. The reminder follows, as Figma shows. The seed applies the section (`internal/seed`), its test counts the row, and a consistency line records it. The fixture contract remains the only source of initial business data (IR69).
+4. **The cross-app scenario.** The seed books tech-external-a for job-contractor-a from 14 to 20 Sept, so the customer's first preferred time (the next day) found them busy and the scenario timed out. Its job was left accepted and is now cancelled. The customer's preferred times now move to 21–23 Sept while the default date falls in that week. Before, a completion done by hand in R233 had freed the technician.
+5. **The QR scan.** The one-tap labels need an open job, and on the seed only tech-external-a has one. The spec signs in as that technician and no longer skips.
+6. **Seed lifetime.** The demo clock moves with real time: the clock table stores an offset, and the clock only moves further forward. Two seed dates bound it:
+   - After 20 Sept (demo), the seed booking ends and the QR label part skips.
+   - From 1 Oct, the technicians' fixture qualifications end and assignments fail.
+   A reset to the seed brings the clock back to 14 Sept 09:00 (Kuala Lumpur). Each run leaves two cancelled jobs and their notifications.
+7. **compose.yaml.** The gateway's comment still said it routes `POST /v1/ops/<operation>`, which IR223 retired. It now says the gateway forwards each operation's REST route (IR222). The migrate image is rebuilt with the new seed section.
+8. **Checked.**
+   - On a fresh seed, E2E: 73 passed, 8 skipped by design:
+     - four clock moves, which are opt-in;
+     - three client-only consent tests, in the other apps;
+     - the technician's device fault, because tech-internal-a manages no device.
+   - Go: make test-all passes on fresh test databases, the seed test included.
+   - The dev DB holds the seed plus one run.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

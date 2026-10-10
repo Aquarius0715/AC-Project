@@ -89,12 +89,13 @@ func TestApplyFixture(t *testing.T) {
 		return out
 	}
 	counts := map[string][]any{
-		"identity.memberships": ids(len(f.Actors), func(i int) string { return f.Actors[i].MembershipID }),
-		"assets.customers":     ids(len(f.DemoSeed.Customers), func(i int) string { return f.DemoSeed.Customers[i].ID }),
-		"assets.properties":    ids(len(f.DemoSeed.Properties), func(i int) string { return f.DemoSeed.Properties[i].ID }),
-		"assets.spaces":        ids(len(f.DemoSeed.Spaces), func(i int) string { return f.DemoSeed.Spaces[i].ID }),
-		"assets.units":         ids(len(f.DemoSeed.Units), func(i int) string { return f.DemoSeed.Units[i].ID }),
-		"devices.capabilities": ids(len(f.DemoSeed.Capabilities), func(i int) string { return f.DemoSeed.Capabilities[i].ID }),
+		"identity.memberships":         ids(len(f.Actors), func(i int) string { return f.Actors[i].MembershipID }),
+		"assets.customers":             ids(len(f.DemoSeed.Customers), func(i int) string { return f.DemoSeed.Customers[i].ID }),
+		"assets.properties":            ids(len(f.DemoSeed.Properties), func(i int) string { return f.DemoSeed.Properties[i].ID }),
+		"assets.spaces":                ids(len(f.DemoSeed.Spaces), func(i int) string { return f.DemoSeed.Spaces[i].ID }),
+		"assets.units":                 ids(len(f.DemoSeed.Units), func(i int) string { return f.DemoSeed.Units[i].ID }),
+		"devices.capabilities":         ids(len(f.DemoSeed.Capabilities), func(i int) string { return f.DemoSeed.Capabilities[i].ID }),
+		"maintenance.filter_cleanings": ids(len(f.DemoSeed.FilterCleanings), func(i int) string { return str(f.DemoSeed.FilterCleanings[i], "id") }),
 	}
 	for table, want := range counts {
 		var got int

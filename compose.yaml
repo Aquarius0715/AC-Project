@@ -207,7 +207,7 @@ services:
     networks: [data]
     profiles: [schema, backend, full]
 
-  gateway:             # Core API entry for the web apps: routes /v1/ops/<operation> to the owning service (IR180)
+  gateway:             # Core API entry for the web apps: forwards each operation's REST route (/v1/…) to the owning service (IR180, IR222)
     image: ac-gateway:dev
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: runtime, args: { SERVICE: gateway } }
     environment:

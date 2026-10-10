@@ -1,6 +1,8 @@
 // Customer filter care (FR-C18, DD-C18, IR238): the tab is in the URL, every AC has a row, the reminder settings refuse
 // a run time below the minimum and are saved and put back, and Request cleaning opens New request prefilled (cancelled,
-// so no job is created). Mark cleaned is left out: it moves the cleaning date for good.
+// so no job is created). Mark cleaned is left out: it moves the cleaning date for good. The first save on a fresh seed
+// turns "Default settings" into "Set by the account owner" for good (a settings row cannot be removed), so only the
+// values are compared (IR316).
 import { test, expect } from "../../fixtures/test";
 
 test("the Filter care tab lists every AC and goes back to My requests", async ({ page }) => {
@@ -17,10 +19,10 @@ test("the Filter care tab lists every AC and goes back to My requests", async ({
 test("reminder settings refuse too few hours, then are saved and put back", async ({ page }) => {
   await page.goto("/customer/maintenance?tab=filter-care");
   const dialog = page.getByRole("dialog");
-  // the reminder lines once the settings card has rendered (a read right after navigation can come before it)
+  // the reminder values once the settings card has rendered (a read right after navigation can come before it)
   const reminders = async () => {
     await expect(page.getByRole("button", { name: "Edit reminders" })).toBeVisible();
-    return (await page.getByRole("main").innerText()).match(/Reminders[\s\S]{0,200}/)?.[0] ?? "";
+    return (await page.getByRole("main").innerText()).match(/Remind at[\s\S]*?Edit reminders/)?.[0] ?? "";
   };
   // a save is finished when its Server Action has answered: a toast of the previous save may still be on screen
   const save = async () => {
@@ -54,9 +56,10 @@ test("reminder settings refuse too few hours, then are saved and put back", asyn
 
 test("Request cleaning opens New request for that AC, prefilled", async ({ page }) => {
   await page.goto("/customer/maintenance?tab=filter-care");
+  await page.locator("main tr", { hasText: " AC" }).first().waitFor(); // count once the rows are there (IR316: it never ran)
   const request = page.locator("main tr").getByRole("button", { name: "Request cleaning" });
-  test.skip((await request.count()) === 0, "no AC is overdue for cleaning");
-  const row = page.locator("main tr", { has: request.first() });
+  test.skip((await request.count()) === 0, "no AC is overdue for cleaning (the seed's Meeting room AC is, until someone marks it cleaned)");
+  const row = page.locator("main tr", { has: page.getByRole("button", { name: "Request cleaning" }) }).first(); // the inner locator is relative to the row
   const unit = ((await row.locator("td").first().innerText()).split("\n")[0] ?? "").trim();
   await request.first().click();
   const dialog = page.getByRole("dialog");
