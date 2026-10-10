@@ -171,7 +171,7 @@ func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
 		t.Errorf("resolve needs alert.resolve: %d", code)
 	}
 	owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1, $2, 'alert.resolve') ON CONFLICT DO NOTHING`,
-			seed.ID("tenant-a"), seed.ID("tech-internal-a"))
+		seed.ID("tenant-a"), seed.ID("tech-internal-a"))
 	if code, m := write(s, &techInt, "alerts.resolve", `{"alertId":"`+own+`","resolutionReason":"filter replaced","resolutionEvidenceIds":[]}`, 2); code != 200 || data(m)["status"] != "resolved" {
 		t.Fatalf("resolve with alert.resolve: %d %v", code, m)
 	}

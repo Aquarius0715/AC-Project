@@ -7,14 +7,14 @@
 // photos through attachments.getContent). The Plans tab (loadPlans) reads plans.list in the same scope, plans.get for
 // the selected plan and jobs.list (the unit's periodic jobs) for the status of each generated occurrence.
 import "server-only";
-import { coreAll, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
+import { i18nOf, showDate, showTime } from "@ac/web/lib/i18n";
 import { jobEventTitle, type ApiJobEvent } from "@ac/web/lib/partnerOverview";
 import type { ApiWorkReport } from "@ac/web/lib/partnerReview";
-import { agreedSlots, controls, costTotals, delivery, facts, filtersOf, hqRow, periodOfQuery, preferredRows, reportCard, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
+import { agreedSlots, classifyBy, controls, costTotals, delivery, facts, filtersOf, hqRow, LISTED, longSlot, periodChip, periodOfQuery, preferredRows, reportCard, slotText, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
 import { planRows, type ApiPlan } from "@ac/web/lib/adminPlans";
 import { breachRows, PERIODS, periodOf, slaRows, slaTiles, targetsByPlan, type ApiScorecard } from "@ac/web/lib/adminSla";
 import { contractorRows, kpiTiles, pendingCertificates, profileFacts, rateCardView, technicianRows, type ApiCertificate, type ApiProfile, type ApiRateCard, type ApiTechnician } from "@ac/web/lib/adminContractors";
-import { klTime } from "@ac/web/lib/devices";
 
 type Page<T> = { items: T[]; total: number };
 type Org = { id: string; name: string; kind: string; status: string };
@@ -26,12 +26,12 @@ const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => 
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 type SP = Record<string, string | string[] | undefined>;
-const OPEN = ["requested", "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "on_hold"];
 
 /** The reads both tabs share: the clock, organizations, customers, properties, units and members with their names, the
  * customer → property → unit scope from the URL, and the tab counts (jobs that are not cancelled, plans, contractors). */
 async function shared(sp: SP) {
-  const now = await coreNow();
+  const [now, display] = await Promise.all([coreNow(), coreDisplay()]);
+  const i = i18nOf(display);
   const [orgs, customers, properties, units, members] = await Promise.all([
     optional(coreAll<Org>("organizations.list"), []), optional(coreAll<{ id: string; name: string; organizationId: string }>("customers.list"), []),
     optional(coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"), []), optional(coreAll<{ id: string; displayName: string; customerOrgId: string; propertyId: string }>("units.list"), []),
@@ -48,11 +48,11 @@ async function shared(sp: SP) {
   const scope = filtersOf(sq, hq?.id ?? null, false);
   const custOrg = customers.find((c) => c.id === sq.customerId)?.organizationId;
   const [jobsInScope, plansInScope] = await Promise.all([
-    coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, statuses: OPEN }, limit: 1 }).then((r) => r.total),
+    coreOp<Page<unknown>>("jobs.list", { filters: { ...scope, statuses: LISTED }, limit: 1 }).then((r) => r.total),
     optional(coreOp<Page<unknown>>("plans.list", { filters: scope, limit: 1 }).then((r) => r.total), 0),
   ]);
   return {
-    now, orgs, customers, properties, units, members, hq, contractors, names, unitOrg, scope,
+    now, i, orgs, customers, properties, units, members, hq, contractors, names, unitOrg, scope,
     head: {
       now: now.toISOString(), counts: { jobs: jobsInScope, plans: plansInScope, contractors: contractors.length },
       scope: {
@@ -60,13 +60,14 @@ async function shared(sp: SP) {
         properties: properties.filter((p) => !custOrg || p.customerOrgId === custOrg).map((p) => ({ id: p.id, name: p.name })),
         units: units.filter((u) => (!custOrg || u.customerOrgId === custOrg) && (!sq.propertyId || u.propertyId === sq.propertyId)).map((u) => ({ id: u.id, name: u.displayName })),
       },
-      units: units.map((u) => ({ id: u.id, name: u.displayName, customer: names.customers.get(u.customerOrgId) ?? "customer" })).sort((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
+      units: units.map((u) => ({ id: u.id, name: u.displayName, customer: names.customers.get(u.customerOrgId) ?? i.t("customer") })).sort((a, b) => a.customer.localeCompare(b.customer) || a.name.localeCompare(b.name)),
     },
   };
 }
 
 export async function loadJobs(sp: SP) {
-  const { now, members, hq, contractors, names, unitOrg, scope, head } = await shared(sp);
+  const { now, i, members, hq, contractors, names, unitOrg, scope, head } = await shared(sp);
+  const { t } = i;
   const nowMs = now.getTime();
   const q: Query = { customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId), origin: one(sp.origin), delivery: one(sp.delivery), assignee: one(sp.assignee), overdue: one(sp.overdue), type: one(sp.type), stage: stageOf(one(sp.stage)) ?? undefined, from: one(sp.from), to: one(sp.to) };
   const period = periodOfQuery(q);
@@ -77,11 +78,11 @@ export async function loadJobs(sp: SP) {
     coreOp<Page<ApiHqRow>>("jobs.list", { filters: filtersOf(q, hq?.id ?? null), sort: { field: spec.field, direction: spec.direction }, limit: 100 }),
     optional(coreAll<{ organizationId: string; status: string }>("contractors.list"), []), // offers suspended per profile (DD-A21)
   ]);
-  const rows = list.items.filter((j) => j.status !== "cancelled" && (!q.type || j.type === q.type)).map((j) => hqRow(j, nowMs, names, unitOrg));
+  const rows = list.items.map((j) => hqRow(j, nowMs, names, unitOrg, i));
   const base = {
-    ...head, q, period, sort, sorts: SORTS, total: list.total,
-    stages: STAGES.map((s, i) => ({ id: s.id, label: s.label, count: counts[i] })),
-    deliveries: [{ id: "internal", name: "Internal" }, ...contractors.map((c) => ({ id: c.id, name: c.name }))],
+    ...head, q, period, periodChip: period ? periodChip(period, i) : null, sort, sorts: SORTS.map((x) => ({ id: x.id, text: t(x.text) })), total: list.total,
+    stages: STAGES.map((x, k) => ({ id: x.id, label: t(x.label), count: counts[k] })),
+    deliveries: [{ id: "internal", name: t("Internal") }, ...contractors.map((c) => ({ id: c.id, name: c.name }))],
     assignees: members.filter((m) => m.role === "technician").map((m) => ({ id: m.id, name: m.displayName })),
     contractors: contractors.map((c) => ({ id: c.id, name: c.name, status: profiles.find((p) => p.organizationId === c.id)?.status === "suspended" ? "suspended" : c.status })),
     internalTechs: members.filter((m) => m.role === "technician" && m.employment === "internal").map((m) => ({ id: m.id, name: m.displayName })),
@@ -105,6 +106,7 @@ export async function loadJobs(sp: SP) {
     ref ? optional(coreOp<ApiWorkReport>("reports.get", { jobId: job.id, reportId: ref.reportId, reportVersion: ref.reportVersion }), null) : Promise.resolve(null),
   ]);
   const byUser = new Map(members.map((m) => [m.userId, m.displayName]));
+  const sp2 = job.slotProposal, pp = job.partnerSlotProposal;
   const photos = report ? (await Promise.all(report.attachmentRefs.filter((a) => a.status === "ready" && a.size <= 2_000_000).slice(0, 4).map(async (a) => {
     const b = await optional(coreOp<{ mime: string; bytes: string }>("attachments.getContent", { jobId: job.id, reportId: report.id, reportVersion: report.version, attachmentId: a.id }), null);
     return b ? { id: a.id, name: a.name, url: `data:${b.mime};base64,${b.bytes}` } : null;
@@ -113,13 +115,22 @@ export async function loadJobs(sp: SP) {
   return {
     ...base,
     detail: {
-      job, title: names.units.get(job.unitId) ?? unit?.displayName ?? "Unit", customer: names.customers.get(unitOrg.get(job.unitId) ?? "") ?? "customer", location: unit?.location.pathLabels.join(" › ") ?? "",
-      steps: stepper(job.status, !job.contractorOrgId), facts: facts(job, names), delivery: delivery(job, names, nowMs), controls: controls(job.status),
-      preferred: preferredRows(job, eligible, nowMs),
-      history: [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 12).map((e) => ({ id: e.id, at: klTime(e.occurredAt).slice(5), text: `${jobEventTitle[e.action] ?? e.action.replace(/[._]/g, " ")}${e.actorUserId ? ` · ${byUser.get(e.actorUserId) ?? "client"}` : ""}` })),
-      partnerTech: job.partnerSlotProposal ? names.people.get(job.partnerSlotProposal.technicianMembershipId) ?? "technician" : null,
-      holdWho: job.slotProposal ? (job.slotProposal.hold.kind === "internal" ? names.people.get(job.slotProposal.hold.membershipId) ?? "HQ technician" : names.orgs.get(job.slotProposal.hold.contractorOrgId) ?? "contractor") : null,
-      report: report ? { ...reportCard(job, report, byUser), photos } : null, draft: !!job.draftReportRef,
+      job, title: names.units.get(job.unitId) ?? unit?.displayName ?? t("Unit"), customer: names.customers.get(unitOrg.get(job.unitId) ?? "") ?? t("customer"), location: unit?.location.pathLabels.join(" › ") ?? "",
+      steps: stepper(job.status, !job.contractorOrgId, t), facts: facts(job, names, i), delivery: delivery(job, names, nowMs, i), controls: controls(job.status, t),
+      preferred: preferredRows(job, eligible, nowMs, i),
+      history: [...events].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)).slice(0, 12).map((e) => ({
+        id: e.id, at: showTime(e.occurredAt, i.display), text: `${jobEventTitle[e.action] ? t(jobEventTitle[e.action]) : e.action.replace(/[._]/g, " ")}${e.actorUserId ? ` · ${byUser.get(e.actorUserId) ?? t("client")}` : ""}`,
+      })),
+      partnerTech: pp ? names.people.get(pp.technicianMembershipId) ?? t("technician") : null,
+      holdWho: sp2 ? (sp2.hold.kind === "internal" ? names.people.get(sp2.hold.membershipId) ?? t("HQ technician") : names.orgs.get(sp2.hold.contractorOrgId) ?? t("contractor")) : null,
+      // the times the detail shows on its first render, formatted here in the display time zone (IR290)
+      texts: {
+        occurrence: job.occurrenceAt ? showDate(job.occurrenceAt, { ...i.display, timeZone: "Asia/Kuala_Lumpur" }) : null, classifyBy: classifyBy(job.createdAt, i),
+        declinedAt: sp2?.decidedAt ? showTime(sp2.decidedAt, i.display) : null, replyBy: sp2 ? showTime(sp2.replyBy, i.display) : null, proposed: sp2 ? longSlot(sp2.slot, i) : null,
+        agreed: job.offer ? slotText(job.offer.visitSlot, i) : null, partnerSlot: pp ? longSlot(pp.slot, i) : null, partnerSent: pp ? showTime(pp.sentAt, i.display) : null,
+        accessUntil: job.offer ? showTime(job.offer.accessValidUntil, i.display) : null,
+      },
+      report: report ? { ...reportCard(job, report, byUser, i), photos } : null, draft: !!job.draftReportRef,
       costs, totals: costTotals(costs),
       extend: job.offer?.decision === "accept" && !["completed", "cancelled"].includes(job.status) ? { until: job.offer.accessValidUntil } : null,
     },

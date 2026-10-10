@@ -108,6 +108,8 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		`{"filters":{"unitId":"` + unit + `","origin":"client_request","proposalPending":false}}`:                                                                         1,
 		`{"filters":{"unitId":"` + unit + `","proposalPending":true}}`:                                                                                                    0,
 		`{"filters":{"unitId":"` + unit + `","overdueOnly":true}}`:                                                                                                        0,
+		`{"filters":{"unitId":"` + unit + `","type":"reactive"}}`:                                                                                                         1, // IR290
+		`{"filters":{"unitId":"` + unit + `","type":"periodic"}}`:                                                                                                         0,
 		`{"filters":{"unitId":"` + unit + `","customerId":"` + seed.ID("cust-b").String() + `"}}`:                                                                         1,
 		`{"filters":{"unitId":"` + unit + `","propertyId":"` + seed.ID("property-home-b").String() + `"}}`:                                                                1,
 		`{"filters":{"unitId":"` + unit + `","organizationId":"` + seed.ID("org-operator-a").String() + `"}}`:                                                             1,
@@ -121,7 +123,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		}
 	}
 	for _, b := range []string{`{"filters":{"status":"requested","statuses":["requested"]}}`, `{"filters":{"statuses":[]}}`, `{"filters":{"status":"done"}}`,
-		`{"filters":{"statuses":["done"]}}`, `{"filters":{"severity":"info"}}`, `{"filters":{"origin":"phone"}}`, `{"filters":{"x":1}}`,
+		`{"filters":{"statuses":["done"]}}`, `{"filters":{"severity":"info"}}`, `{"filters":{"origin":"phone"}}`, `{"filters":{"type":"repair"}}`, `{"filters":{"x":1}}`,
 		`{"filters":{"from":"2026-09-15T00:00:00Z","to":"2026-09-14T00:00:00Z"}}`, `{"sort":{"field":"unitId","direction":"asc"}}`} {
 		if code, _ := post(s, &hq, "jobs.list", b); code != 422 {
 			t.Errorf("%s: %d", b, code)

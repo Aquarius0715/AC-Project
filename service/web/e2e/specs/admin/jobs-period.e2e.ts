@@ -14,7 +14,7 @@ test("a job-status row opens the Jobs tab for that period", async ({ page }) => 
   await rows.nth(i).click();
   await page.waitForURL(/\/admin\/jobs\?.*from=/);
   const chip = page.getByRole("button", { name: "Clear the requested-time period" });
-  await expect(chip).toContainText(/Requested time \d\d-\d\d \d\d:\d\d – \d\d-\d\d \d\d:\d\d/);
+  await expect(chip).toContainText(/^Requested time \d{1,2} \S+.* – .+ MYT/); // one span in the display time zone (IR290)
   await expect(page.getByRole("main")).toContainText(/jobs? in scope · in the period/);
   await expect(page.locator("main button[aria-pressed='true']").first()).toContainText(String(count)); // the stage total follows the period
   await chip.click();

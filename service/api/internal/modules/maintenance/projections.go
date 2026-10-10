@@ -277,7 +277,7 @@ func (m Jobs) extraProjections(ctx context.Context, c *ops.Call, f *listFilters)
 		}
 		for _, o := range offers {
 			start := o.RequestedSlot.StartAt
-			if !f.statusOK(o.Status) || !inPeriod(f, &start) || (f.Origin != nil && *f.Origin != o.Origin) ||
+			if !f.statusOK(o.Status) || !inPeriod(f, &start) || (f.Origin != nil && *f.Origin != o.Origin) || (f.Type != nil && *f.Type != o.Type) ||
 				(f.OrganizationID != nil && *f.OrganizationID != c.Principal.OrgID) || (f.OverdueOnly != nil && *f.OverdueOnly && !c.Now.After(o.DueAt)) {
 				continue
 			}
@@ -290,7 +290,7 @@ func (m Jobs) extraProjections(ctx context.Context, c *ops.Call, f *listFilters)
 		return nil, err
 	}
 	for _, h := range hs {
-		if !f.statusOK(h.Status) || !inPeriod(f, h.CompletedAt) || f.Origin != nil || (f.OverdueOnly != nil && *f.OverdueOnly) ||
+		if !f.statusOK(h.Status) || !inPeriod(f, h.CompletedAt) || f.Origin != nil || (f.Type != nil && *f.Type != h.Type) || (f.OverdueOnly != nil && *f.OverdueOnly) ||
 			(f.OrganizationID != nil && (h.ContractorOrgID == nil || *h.ContractorOrgID != *f.OrganizationID)) {
 			continue
 		}

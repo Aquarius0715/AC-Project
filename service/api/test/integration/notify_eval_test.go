@@ -161,7 +161,7 @@ func TestAlertRecoveryResolvesPolicyAlerts(t *testing.T) {
 	if len(first) != 1 || first[0].status != "open" || len(of(def)) != 1 {
 		t.Fatalf("the breach opens the policy's and the default rule's alerts: %v / %v", first, of(def))
 	}
-	fire("950", "valid", false)  // between the thresholds
+	fire("950", "valid", false)   // between the thresholds
 	fire("850", "suspect", false) // not a valid reading
 	fire("850", "valid", true)    // a simulation saves nothing
 	if r := of(pol); r[0].status != "open" {

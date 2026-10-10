@@ -10303,7 +10303,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR23: project before filters/sort/total\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A06, DD-C09, DD-P01, DD-P03, DD-P06, DD-T01, DD-T11, DD-T12, DD-P10, DD-P07, DD-T13, DD-T02 · Query: filters unitId,unitIds,status,severity,from,to,organizationId,membershipId,customerId,propertyId,statuses,overdueOnly,origin,proposalPending · sort id,severity,dueAt,status (default status asc;id asc)",
+                "description": "Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read\nValidation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR23: project before filters/sort/total\nRecovery: D04: retry only UNAVAILABLE, at most twice\nDesign: DD-A06, DD-C09, DD-P01, DD-P03, DD-P06, DD-T01, DD-T11, DD-T12, DD-P10, DD-P07, DD-T13, DD-T02 · Query: filters unitId,unitIds,status,severity,from,to,organizationId,membershipId,customerId,propertyId,statuses,overdueOnly,origin,proposalPending,type · sort id,severity,dueAt,status (default status asc;id asc)",
                 "consumes": [
                     "application/json"
                 ],
@@ -10424,6 +10424,12 @@
                         "type": "boolean",
                         "description": "filter",
                         "name": "proposalPending",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "filter",
+                        "name": "type",
                         "in": "query"
                     }
                 ],

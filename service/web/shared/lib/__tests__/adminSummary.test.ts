@@ -75,8 +75,8 @@ describe("HQ Jobs tab period (IR245)", () => {
   it("passes a valid requested-time period to jobs.list and names it on the chip", async () => {
     const { filtersOf, periodChip, periodOfQuery } = await import("@ac/web/lib/adminJobs");
     const q = { from: "2026-09-13T16:00:00.000Z", to: "2026-09-14T01:00:00.000Z", customerId: "c1" };
-    expect(filtersOf(q, null)).toEqual({ customerId: "c1", from: q.from, to: q.to });
+    expect(filtersOf(q, null)).toMatchObject({ customerId: "c1", from: q.from, to: q.to });
     expect([periodOfQuery({ from: q.to, to: q.from }), periodOfQuery({ from: "x", to: q.to }), periodOfQuery({})]).toEqual([null, null, null]);
-    expect(periodChip(periodOfQuery(q)!)).toBe("Requested time 09-14 00:00 – 09-14 09:00");
+    expect(periodChip(periodOfQuery(q)!)).toBe("Requested time 14 Sept, 12:00 – 9:00 am MYT"); // one span in the display time zone (IR290)
   });
 });

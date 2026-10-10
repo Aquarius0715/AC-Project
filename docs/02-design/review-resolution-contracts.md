@@ -3413,3 +3413,51 @@ The "Scan unit QR" dialog of the technician shell (FR-T13, DD-T13, Figma Technic
    - The other 14 HQ screens: jobs with SLA, alerts, units, devices, energy, MRV, offsets, billing, contracts, restrictions with exceptions, access, automation and audit.
    - The browser demo.
    - The assistant panel and the voice demo's answers.
+
+## IR290 The HQ Jobs tab in the display language; jobs.list filters by type — 2026-10-10
+
+The Jobs tab of `/admin/jobs` (SCR-A06, FR-A06, DD-A06, Figma Admin 06-1, 06-11…06-18) follows the display language and time zone. The Plans, Contractors and SLA tabs come next.
+
+1. **Texts.** These are translated:
+   - the tabs and the customer → property → unit scope, which the other tabs share;
+   - the ten stage tiles, the filters (type, origin, delivery, assignee, overdue only, sort) and the period chip;
+   - the list rows: type and what is next;
+   - the detail: the stepper, the four facts, the follow-up card, the preferred times with the HQ technicians free for each, the proposal, delivery and partner-time cards, the submitted report with its review, the cost lines with their totals, and the history;
+   - the eight dialogs (book, propose another time, hold / resume / cancel / reassign, classify, report, review, cost line, extend access) and New job, with their validation, toasts and refusals.
+   The dictionary gains 290 entries. These stay as they are: status codes in technical lines (submitted → rework_requested), operation names (members.eligible, jobs.saveCost) and 受領.
+2. **Times.**
+   - Instants are in the display time zone:
+     - the requested window, the preferred times and proposals, as one span (`showSpan`, with the weekday in the table and the dialogs);
+     - the due, classify-by, reply-by, offer and access times;
+     - the report's submitted, signed and reviewed times, and the history (`showTime`).
+   - The loader formats every time the detail shows on its first render (`texts`). The dialogs format after the user acts.
+   - Business days stay Kuala Lumpur days:
+     - the follow-up's classify-by business day (its time shows in the display zone);
+     - the plan occurrence's date;
+     - "from tomorrow" for new preferred times. Its message now says "(Kuala Lumpur)", as on the customer's form.
+   - The times HQ types are read in the display time zone and sent as instants (NFR-08). Before, they were fixed +08:00. They are:
+     - the proposed time;
+     - New job's preferred times and due time;
+     - an offer's expiry and access window;
+     - the new end of an access extension.
+     The dialogs name the zone ("times in Asia/Tokyo") and start on tomorrow in that zone.
+3. **jobs.list filters by type** (query catalog, DD-A06 item 6).
+   - DD-A06 has a type filter, but jobs.list had none. The tab filtered the first 100 rows in the browser, and dropped cancelled jobs there too.
+   - As a result, "Showing 4 of 100" counted 96 cancelled jobs. With the deadline sort, cancelled jobs could also push open ones off the first page.
+   - jobs.list now takes `type` (MaintenanceJob.type). Offer and history rows match on their public type (IR23). An unknown type is VALIDATION.
+   - Without a stage tile, the tab asks for every status except cancelled (`statuses`). No tile shows cancelled jobs, and the "in scope" count already left them out. The total now counts what the list shows.
+   - Swagger is regenerated. `jobs_test.go`, `projections_test.go` and the query-catalog test cover the filter.
+4. **Code.**
+   - These adminJobs helpers take the display or the translator: `hqRow`, `stepper`, `facts`, `delivery`, `preferredRows`, `controls`, `classifyBy`, `hqRefusal`, `costLineOf`, `newJobErrors`, `reportCard`, `returnReason`, `slotText`, `longSlot` and `periodChip`.
+   - New: `zonedInput` / `fromZonedInput` (a datetime-local value in the display zone), `tomorrowIn` and `LISTED`.
+   - The fixed Kuala Lumpur formatters (`klTime`, `md`, `hm`) are gone from adminJobs.
+5. **Checked.**
+   - Go: both suites pass.
+   - Vitest: 41 files, 247 tests. `adminJobs.test.ts` moves to the display-zone spans, and adds a Malay / Tokyo case, the typed-time helpers and the filters.
+   - E2E: `admin/language.e2e.ts` opens the Jobs tab and New job in Malay ("masa dalam Asia/Tokyo") and closes it without saving. `jobs-period.e2e.ts` reads the new chip.
+   - The suite: 65 passed, 9 skipped; the users are en / Asia/Kuala_Lumpur.
+6. **Still open.**
+   - The Plans, Contractors and SLA tabs of `/admin/jobs`.
+   - The other 13 HQ screens: alerts, units, devices, energy, MRV, offsets, billing, contracts, restrictions with exceptions, access, automation and audit.
+   - The browser demo (its New job keeps its own English form).
+   - The assistant panel and the voice demo's answers.

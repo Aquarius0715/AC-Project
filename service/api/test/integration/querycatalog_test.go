@@ -83,7 +83,7 @@ func TestQueryCatalogFilters(t *testing.T) {
 		"devices.list":            {"status": `"online"`},
 		"inquiries.list":          {"status": `"received"`},
 		"invoices.list":           {"status": `"unpaid"`},
-		"jobs.list":               {"status": `"requested"`},
+		"jobs.list":               {"status": `"requested"`, "type": `"reactive"`},
 		"mrv.list":                {"status": `"draft"`},
 		"offsets.list":            {"status": `"demo_requested"`},
 		"policies.list":           {"kind": `"alert"`},

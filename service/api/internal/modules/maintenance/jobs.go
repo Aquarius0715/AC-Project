@@ -614,6 +614,7 @@ type listFilters struct {
 	OverdueOnly     *bool        `json:"overdueOnly,omitempty"`
 	Origin          *string      `json:"origin,omitempty"`
 	ProposalPending *bool        `json:"proposalPending,omitempty"`
+	Type            *string      `json:"type,omitempty"` // MaintenanceJob.type; offer and history rows match their public type (IR290)
 }
 
 // Summary is JobSummary of service-contracts.ts.
@@ -650,7 +651,7 @@ var severityRank = map[string]int{"normal": 0, "warning": 1, "critical": 2}
 // @Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR23: project before filters/sort/total
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A06, DD-C09, DD-P01, DD-P03, DD-P06, DD-T01, DD-T11, DD-T12, DD-P10, DD-P07, DD-T13, DD-T02 · Query: filters unitId,unitIds,status,severity,from,to,organizationId,membershipId,customerId,propertyId,statuses,overdueOnly,origin,proposalPending · sort id,severity,dueAt,status (default status asc;id asc)
+// @Description	Design: DD-A06, DD-C09, DD-P01, DD-P03, DD-P06, DD-T01, DD-T11, DD-T12, DD-P10, DD-P07, DD-T13, DD-T02 · Query: filters unitId,unitIds,status,severity,from,to,organizationId,membershipId,customerId,propertyId,statuses,overdueOnly,origin,proposalPending,type · sort id,severity,dueAt,status (default status asc;id asc)
 // @Tags			jobs
 // @Accept			json
 // @Produce		json
@@ -671,6 +672,7 @@ var severityRank = map[string]int{"normal": 0, "warning": 1, "critical": 2}
 // @Param			overdueOnly		query		boolean		false	"filter"
 // @Param			origin			query		string		false	"filter"
 // @Param			proposalPending	query		boolean		false	"filter"
+// @Param			type			query		string		false	"filter"
 // @Success		200				{object}	ops.Envelope{data=anyPage}
 // @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
@@ -734,6 +736,8 @@ func (f *listFilters) check() error {
 		return bad("severity")
 	case f.Origin != nil && *f.Origin != "client_request" && *f.Origin != "periodic_plan":
 		return bad("origin")
+	case f.Type != nil && !jobTypes[*f.Type]:
+		return bad("type")
 	case f.From != nil && f.To != nil && !f.From.Before(*f.To):
 		return apperr.Fields(map[string]string{"filters.to": "error.range"})
 	}
@@ -804,6 +808,9 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 	}
 	if f.Origin != nil {
 		conds = append(conds, "j.origin = "+add(*f.Origin))
+	}
+	if f.Type != nil {
+		conds = append(conds, "j.type = "+add(*f.Type))
 	}
 	if f.ProposalPending != nil {
 		q := "EXISTS (SELECT 1 FROM maintenance.slot_proposals p WHERE p.job_id = j.id AND p.status = 'pending')"

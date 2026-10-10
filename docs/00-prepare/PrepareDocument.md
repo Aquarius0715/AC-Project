@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.174.0
+version: 0.175.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -269,6 +269,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.175.0: The HQ Jobs tab in Malay; jobs.list filters by type (IR290). Phase 1A unchanged.
 0.174.0: The HQ overview in Malay (IR289). Phase 1A unchanged.
 0.173.0: The technician's QR scan in Malay — every technician screen now follows the display language (IR288). Phase 1A unchanged.
 0.172.0: The technician's devices and device events in Malay (IR287). Phase 1A unchanged.

@@ -35,7 +35,9 @@ func TestLastSignIn(t *testing.T) {
 		}
 		return last, auth
 	}
-	reset := func() { exec(`UPDATE identity.users SET last_sign_in_at = NULL, sign_in_auth_time = NULL WHERE id = $1`, user) }
+	reset := func() {
+		exec(`UPDATE identity.users SET last_sign_in_at = NULL, sign_in_auth_time = NULL WHERE id = $1`, user)
+	}
 	reset()
 	t.Cleanup(reset)
 	earlier := clock.Add(-30 * 24 * time.Hour)

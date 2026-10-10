@@ -87,6 +87,8 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		`{"filters":{"status":"accepted"},"limit":100}`:                                                     false,
 		`{"filters":{"origin":"client_request","from":"` + ts(24) + `","to":"` + ts(26) + `"},"limit":100}`: true,
 		`{"filters":{"overdueOnly":true},"limit":100}`:                                                      false,
+		`{"filters":{"type":"reactive"},"limit":100}`:                                                       true, // the offer's public type (IR290)
+		`{"filters":{"type":"periodic"},"limit":100}`:                                                       false,
 		`{"sort":{"field":"severity","direction":"desc"},"limit":100}`:                                      true,
 		`{"sort":{"field":"dueAt","direction":"asc"},"limit":100}`:                                          true,
 		`{"sort":{"field":"id","direction":"desc"},"limit":100}`:                                            true,
@@ -143,6 +145,11 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 	}
 	if _, m := post(s, &contrA, "jobs.list", `{"filters":{"status":"accepted","organizationId":"`+seed.ID("org-contractor-a").String()+`"},"limit":100}`); byJob(m, job) == nil {
 		t.Error("history with own organization")
+	}
+	for typ, want := range map[string]bool{"reactive": true, "preventive": false} { // the history's public type (IR290)
+		if _, m := post(s, &contrA, "jobs.list", `{"filters":{"type":"`+typ+`"},"limit":100}`); (byJob(m, job) != nil) != want {
+			t.Errorf("history type filter %s: want %v", typ, want)
+		}
 	}
 	if _, m := post(s, &contrA, "jobs.events", `{"jobId":"`+job+`","query":{}}`); len(items(m)) != 1 {
 		t.Error("history events are own decisions only")
