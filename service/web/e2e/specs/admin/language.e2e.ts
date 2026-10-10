@@ -4,8 +4,9 @@
 // so; the Jobs tab speaks Malay too — tabs, scope, filters, the list and one job's detail with its times in GMT+9 — and
 // New job types its times in Asia/Tokyo; so do the Plans tab (its next date typed in Asia/Tokyo), the Contractors tab
 // (its dates named Kuala Lumpur days) and the SLA tab with its targets dialog (IR291), the alerts with their policies
-// (IR292), and customers & units — the register, one customer's locations, users and policies, and warranty & coverage
-// (IR293). Nothing is saved. English and the earlier zone come back at the end, or in afterEach when the test fails.
+// (IR292), customers & units — the register, one customer's locations, users and policies, and warranty & coverage
+// (IR293) — and the device registry's three tabs with the new-campaign dialog (IR295). Nothing is saved. English and the
+// earlier zone come back at the end, or in afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
@@ -95,6 +96,22 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await page.goto("/admin/units?tab=warranty");
   await expect(main.getByRole("combobox", { name: "Liputan" })).toContainText("Liputan: Semua");
   await expect(main.getByRole("heading", { name: "Unit mengikut tamat liputan", exact: true })).toBeVisible();
+  // the device registry (IR295): models, IoT devices, firmware campaigns and the new-campaign dialog, closed unsaved
+  await page.goto("/admin/devices");
+  await expect(main.getByRole("tab", { name: /^Model/ })).toHaveAttribute("aria-selected", "true");
+  for (const name of ["Identiti", "Kawalan", "Penderia"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();
+  await main.getByRole("tab", { name: /^Peranti IoT/ }).click();
+  await page.waitForURL(/tab=devices/);
+  await expect(main.getByRole("heading", { name: "Peristiwa peranti", exact: true })).toBeVisible();
+  await expect(main).toContainText("Kali terakhir dilihat");
+  await main.getByRole("tab", { name: /^Kempen perisian tegar/ }).click();
+  await page.waitForURL(/tab=firmware/);
+  await main.getByRole("button", { name: "+ Kempen baharu" }).click();
+  const campaign = page.getByRole("dialog", { name: "Kempen perisian tegar baharu" });
+  await expect(campaign).toContainText("masa dalam Asia/Tokyo"); // the start is typed in the display zone
+  await expect(campaign).toContainText("Waktu tempatan peranti"); // the install window is the device's local time
+  await campaign.getByRole("button", { name: "Batal", exact: true }).click();
+  await expect(campaign).toBeHidden();
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/admin");

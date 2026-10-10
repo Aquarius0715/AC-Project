@@ -67,11 +67,11 @@ export async function updateFirmware(deviceId: string, version: number, firmware
   return run(() => coreOp("devices.updateFirmware", { deviceId, firmwareVersion }, { write: true, expectedVersion: version }).then(() => null));
 }
 
-/** firmwareCampaigns.schedule; the start is a Kuala Lumpur local time (datetime-local). */
-export async function scheduleCampaign(d: CampaignDraft) {
+/** firmwareCampaigns.schedule; `startAt` is the instant the form read in the user's display time zone (NFR-08). */
+export async function scheduleCampaign(d: CampaignDraft, startAt: string) {
   return run(() => coreOp<{ id: string }>("firmwareCampaigns.schedule", {
     modelId: d.modelId, targetVersion: d.targetVersion, deviceIds: d.deviceIds, waves: parseWaves(d.waves) ?? [], window: { startLocal: d.startLocal, endLocal: d.endLocal },
-    autoPauseFailurePercent: Number(d.autoPause), startAt: new Date(`${d.startAt}:00+08:00`).toISOString(),
+    autoPauseFailurePercent: Number(d.autoPause), startAt,
   }, { write: true }).then((c) => c.id));
 }
 

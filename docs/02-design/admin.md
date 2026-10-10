@@ -763,7 +763,7 @@ Scope: FR-A20 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 | deviceIds | ID[]/required | Devices of the model (excluding open tamper) | Scope |
 | waves | array/required | Ascending percents ending at 100 (default 5 devices → 20 % → 100 %) | Rollout |
 | window | local times/required | e.g. 01:00–05:00 device local time | Install window |
-| autoPauseFailurePercent / startAt | required | 1–50 % / ≥ 24 h ahead | Safety |
+| autoPauseFailurePercent / startAt | required | 1–50 % / ≥ 24 h ahead; startAt is typed in the user’s display time zone and sent as an instant (NFR-08, IR295) | Safety |
 
 **Steps**
 

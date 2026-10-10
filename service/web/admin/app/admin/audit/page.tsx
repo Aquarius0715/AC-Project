@@ -20,7 +20,7 @@ export default async function AdminAuditPage({ searchParams }: PageProps<"/admin
     const devices = await coreOp<{ items: Device[] }>("devices.list", { limit: 100 });
     const d = devices.items.find((x) => x.id === sp.deviceId) ?? devices.items[0];
     const events = d ? await coreOp<{ items: ApiDeviceEvent[] }>("devices.events", { id: d.id, query: { limit: 50 } }) : { items: [] };
-    device = { label: d ? `${d.serial} · connection, power and tamper are separate` : "No devices", items: events.items.map(deviceEventItem) };
+    device = { label: d ? `${d.serial} · connection, power and tamper are separate` : "No devices", items: events.items.map((e) => deviceEventItem(e)) };
   }
   const tab = sp.tab === "devices" ? "devices" : "log";
   return <AuditView live={{ rows: page.items.map(auditRow), total: page.total, filters, tab, device }} />;

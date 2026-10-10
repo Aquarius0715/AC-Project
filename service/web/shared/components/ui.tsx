@@ -360,7 +360,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
 /* ───────────── Data display ───────────── */
 export type Col<T> = { key: string; label: string; render: (r: T) => React.ReactNode; className?: string; hideBelow?: "sm" | "md" };
-/** Responsive table: scrolls horizontally if needed; optional columns hide on narrow containers. */
+/** Responsive table: scrolls horizontally if needed; optional columns hide on narrow containers. A row that opens a
+ * record (`onRowClick`) is focusable and opens with Enter or Space as well as a click (keyboard access, IR294). */
 export function DataTable<T>({ cols, rows, rowKey, onRowClick, selectedKey }: { cols: Col<T>[]; rows: T[]; rowKey: (r: T) => string; onRowClick?: (r: T) => void; selectedKey?: string }) {
   const t = useT();
   return (
@@ -377,7 +378,9 @@ export function DataTable<T>({ cols, rows, rowKey, onRowClick, selectedKey }: { 
           {rows.map((r) => {
             const k = rowKey(r);
             return (
-              <tr key={k} onClick={() => onRowClick?.(r)} className={cx("border-t border-line", onRowClick && "cursor-pointer hover:bg-surface2/60", selectedKey === k && "bg-primary-soft/60")}>
+              <tr key={k} onClick={onRowClick && (() => onRowClick(r))} tabIndex={onRowClick ? 0 : undefined} aria-current={selectedKey === k ? "true" : undefined}
+                onKeyDown={onRowClick && ((e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onRowClick(r); } })}
+                className={cx("border-t border-line", onRowClick && "cursor-pointer outline-none hover:bg-surface2/60 focus-visible:bg-surface2/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary", selectedKey === k && "bg-primary-soft/60")}>
                 {cols.map((c) => (
                   <td key={c.key} className={cx("px-3 py-2.5 align-middle", c.hideBelow === "sm" && "max-sm:hidden", c.hideBelow === "md" && "max-md:hidden", c.className)}>{c.render(r)}</td>
                 ))}

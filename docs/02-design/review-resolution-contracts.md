@@ -3575,3 +3575,47 @@ The other three tabs of `/admin/jobs` (FR-A06, FR-A21, FR-A22, DD-A06 item 9, DD
    - The other 11 HQ screens: devices, energy, MRV, offsets, billing, contracts, restrictions with exceptions, access, automation and audit.
    - The browser demo.
    - The assistant panel and the voice demo's answers.
+
+## IR294 Table rows that open a record work by keyboard — 2026-10-10
+
+IR293 found that `DataTable` rows with `onRowClick` opened a record only on a mouse click. Those rows are the HQ register's customers, a customer's units and its alert policies.
+
+1. **Rows.**
+   - Such a row now takes the keyboard focus (`tabIndex` 0) and opens with Enter or Space. Both keys act only when the row itself has the focus, so a control inside the row keeps its own keys.
+   - A focused row shows an outline. The selected row carries `aria-current`.
+   - Rows without `onRowClick` are unchanged.
+2. **Checked.** E2E: `admin/table-keyboard.e2e.ts` is new. It focuses the register's customer row and presses Enter, then a unit row and presses Space; each opens its record. This closes the IR293 open item.
+
+## IR295 The HQ device registry in the display language; a campaign's start in the display time zone — 2026-10-10
+
+`/admin/devices` (SCR-A04, FR-A04, FR-A20, DD-A04, DD-A20, Figma Admin 04) follows the display language and time zone.
+
+1. **Texts.** These are translated:
+   - the tabs;
+   - the models list and the capability editor: identity, controls, temperature, modes and fan, ventilation, sensors, firmware candidates, the impact of a change and the change reason;
+   - the version history;
+   - the IoT devices list and a device's tiles, summary, sensors, operations, calibrations and device events;
+   - the register, rebind, calibrate and firmware dialogs;
+   - firmware campaigns with their waves and devices, and the new-campaign and abort dialogs;
+   - the toasts and the validation.
+   The dictionary gains 159 entries. These stay as they are: metric codes, evidence sources, firmware versions, serials and result reason keys.
+   - "Schedule" was already the noun "Jadual". The campaign button uses the context key `campaign::Schedule` ("Jadualkan", IR287).
+2. **Times.**
+   - These are in the display time zone (`showTime`): a capability's update, an operation and its finish, a calibration, a sensor's calibration, a campaign's start, and the version history entries.
+   - A device's last seen time and its events show "today / yesterday" (`relativeTime`).
+   - The page formats the times of the first render (IR282). Before, they were fixed Kuala Lumpur "YYYY-MM-DD HH:MM".
+3. **A campaign's start.**
+   - It is now typed in the display time zone (`campaignStart`), and the Server Action takes the instant. Before, the form added +08:00. The 24-hour check reads the same instant.
+   - The install window stays the device's local time, as the Core API defines it, and the dialog says so.
+   - Wave labels are stored with the campaign, so they stay English data. The screen words each wave from its number and percentage.
+4. **Device events on the audit screen** keep English and Kuala Lumpur until that screen is translated.
+   - Its call is now `map((e) => deviceEventItem(e))`. A direct `map(deviceEventItem)` would have passed the array index as the display.
+5. **Checked.**
+   - Vitest: 44 files, 263 tests. `devices.test.ts` is new. It covers models and devices, operations, calibrations and device events, waves, the campaign start and its checks, and Malay / Tokyo.
+   - E2E: `admin/language.e2e.ts` also opens the three device tabs and the new-campaign dialog ("masa dalam Asia/Tokyo", "Waktu tempatan peranti"); nothing is saved.
+   - The suite: 66 passed, 9 skipped; the users are en / Asia/Kuala_Lumpur.
+6. **Progress.** 34 of the 44 business screens follow the display language.
+7. **Still open.**
+   - The other 10 HQ screens: energy, MRV, offsets, billing, contracts, restrictions with exceptions, access, automation and audit.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.

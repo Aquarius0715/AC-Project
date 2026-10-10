@@ -1,5 +1,6 @@
 // Audit log rows (FR-A16, DATA_SOURCE=api): audit.list items for the admin audit screen, and the URL filters of the
 // screen. Pure code shared by the Server Component and the client view.
+import { EN, relativeTime, type I18n } from "@ac/web/lib/i18n";
 export type AuditResult = "Success" | "Denied" | "Failed" | "Pending";
 export type AuditChange = { field: string; before: string; after: string; changed: boolean };
 export type AuditRow = { id: string; op: string; target: string; actor: string; role: string; at: string; occurred: string; corr: string; res: AuditResult; reason: string | null; changes: AuditChange[] };
@@ -75,8 +76,12 @@ export function auditRow(a: ApiAudit): AuditRow {
 
 const eventTitle: Record<string, string> = { communication_lost: "communication lost", power_lost: "power_signal lost", tamper: "tamper_signal — cover opened", restored: "restored", operation_failed: "operation failed" };
 
-/** Device events tab rows. */
-export function deviceEventItem(e: ApiDeviceEvent) {
-  const t = new Date(e.occurredAt).toLocaleString("en-CA", { timeZone: KL, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
-  return { time: t, title: eventTitle[e.eventType] ?? e.eventType, detail: `${e.evidenceSource}${e.restoredAt ? " · restored" : ""}` };
+/** Device events tab rows: the event in words, its evidence source (a code) and whether it was restored. The HQ
+ * devices screen passes its display (IR295): the time in the user's time zone with "today / yesterday"; the audit
+ * screen keeps English and Kuala Lumpur until it is translated. */
+export function deviceEventItem(e: ApiDeviceEvent, i?: I18n, nowMs?: number) {
+  const tr = (i ?? EN).t;
+  const time = i && nowMs !== undefined ? relativeTime(e.occurredAt, nowMs, i)
+    : new Date(e.occurredAt).toLocaleString("en-CA", { timeZone: KL, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).replace(",", "");
+  return { time, title: eventTitle[e.eventType] ? tr(eventTitle[e.eventType]) : e.eventType, detail: `${e.evidenceSource}${e.restoredAt ? ` · ${tr("restored")}` : ""}` };
 }

@@ -1,5 +1,11 @@
 // HQ device registry (FR-A04, FR-A20, DATA_SOURCE=api): capabilities, devices with their histories and firmware
-// campaigns projected for /admin/devices. Pure code shared by the Server Component and the client view.
+// campaigns projected for /admin/devices. Pure code shared by the Server Component and the client view; Vitest covers
+// it. Texts in the display language (`i` / `t`, IR295); instants in the user's display time zone, and a campaign's
+// start is typed there (NFR-08), while its install window stays the device's local time. Metric and status codes
+// stay codes where the API shows them.
+import { EN, showTime, translator, zonedInstant, type I18n, type T } from "@ac/web/lib/i18n";
+
+const en = translator("en");
 export type Mode = "cool" | "dry" | "fan";
 export type Fan = "low" | "mid" | "high";
 export type Metric = "temperature" | "humidity" | "co2" | "pm25" | "power" | "vibration" | "refrigerant_pressure" | "compressor_cycles" | "airflow_drop" | "heartbeat_gap";
@@ -43,14 +49,15 @@ export const klTime = (iso: string) =>
 
 export type ModelRow = { id: string; version: number; name: string; used: string; ventilation: boolean; updated: string; cap: ApiCapability };
 
-export function modelRows(caps: ApiCapability[], units: ApiUnitLite[], devices: ApiDevice[]): ModelRow[] {
+export function modelRows(caps: ApiCapability[], units: ApiUnitLite[], devices: ApiDevice[], i: I18n = EN): ModelRow[] {
+  const { t } = i;
   return caps.map((k) => {
     const mine = units.filter((u) => u.modelId === k.id && !u.archived);
     const ids = new Set(mine.map((u) => u.id));
     const devs = devices.filter((d) => d.unitId && ids.has(d.unitId)).length;
     return {
-      id: k.id, version: k.version, name: `${k.manufacturer} ${k.model}`, ventilation: k.ventilation, updated: klTime(k.updatedAt), cap: k,
-      used: `${mine.length} unit${mine.length === 1 ? "" : "s"} · ${devs} device${devs === 1 ? "" : "s"}`,
+      id: k.id, version: k.version, name: `${k.manufacturer} ${k.model}`, ventilation: k.ventilation, updated: showTime(k.updatedAt, i.display), cap: k,
+      used: `${t(mine.length === 1 ? "1 unit" : "{n} units", { n: mine.length })} · ${t(devs === 1 ? "1 device" : "{n} devices", { n: devs })}`,
     };
   });
 }
@@ -73,28 +80,28 @@ export function capabilityDraft(k?: ApiCapability): CapabilityDraft {
 const num = (s: string) => (s.trim() === "" ? NaN : Number(s));
 
 /** The capability rules of DD-A04 (boundary cases) checked before capabilities.save; the API checks them again. */
-export function capabilityErrors(d: CapabilityDraft, update: boolean): Record<string, string> {
+export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (d.manufacturer.trim().length < 1 || d.manufacturer.trim().length > 120) e.manufacturer = "1–120 characters";
-  if (d.model.trim().length < 1 || d.model.trim().length > 120) e.model = "1–120 characters";
-  if ((d.modeControl || d.fanControl || d.temperatureOn) && !d.control) e.control = "Mode, fan or temperature control needs power control";
-  if (d.modeControl && d.modes.length === 0) e.modes = "Choose at least one mode";
-  if (d.fanControl && d.fanLevels.length === 0) e.fanLevels = "Choose at least one fan level";
+  if (d.manufacturer.trim().length < 1 || d.manufacturer.trim().length > 120) e.manufacturer = t("1–120 characters");
+  if (d.model.trim().length < 1 || d.model.trim().length > 120) e.model = t("1–120 characters");
+  if ((d.modeControl || d.fanControl || d.temperatureOn) && !d.control) e.control = t("Mode, fan or temperature control needs power control");
+  if (d.modeControl && d.modes.length === 0) e.modes = t("Choose at least one mode");
+  if (d.fanControl && d.fanLevels.length === 0) e.fanLevels = t("Choose at least one fan level");
   if (d.temperatureOn) {
     const [min, max, step] = [num(d.min), num(d.max), num(d.step)];
-    if (!(min < max)) e.temperature = "min must be below max";
-    else if (!(step > 0 && step <= max - min)) e.temperature = "0 < step ≤ max − min";
+    if (!(min < max)) e.temperature = t("min must be below max");
+    else if (!(step > 0 && step <= max - min)) e.temperature = t("0 < step ≤ max − min");
   }
-  if (d.ventilation && (d.ventilationLevels.length === 0 || !d.ventilationLevels.includes("low"))) e.ventilationLevels = "Ventilation levels must include Low";
+  if (d.ventilation && (d.ventilationLevels.length === 0 || !d.ventilationLevels.includes("low"))) e.ventilationLevels = t("Ventilation levels must include Low");
   const seen = new Set<string>();
   for (const s of d.sensors) {
-    if (seen.has(s.metric)) e.sensors = `One sensor per metric (${s.metric} twice)`;
+    if (seen.has(s.metric)) e.sensors = t("One sensor per metric ({metric} twice)", { metric: s.metric });
     seen.add(s.metric);
     const v = num(s.staleAfterSeconds);
-    if (!(Number.isInteger(v) && v >= 10 && v <= 86400)) e.sensors = "Stale after must be 10–86400 seconds";
+    if (!(Number.isInteger(v) && v >= 10 && v <= 86400)) e.sensors = t("Stale after must be 10–86400 seconds");
   }
-  if (d.firmware.split(",").map((x) => x.trim()).some((x) => x.length > 32)) e.firmware = "Firmware versions are at most 32 characters";
-  if (update && (d.changeReason.trim().length < 1 || d.changeReason.trim().length > 1000)) e.changeReason = "A reason is required (1–1000 characters)";
+  if (d.firmware.split(",").map((x) => x.trim()).some((x) => x.length > 32)) e.firmware = t("Firmware versions are at most 32 characters");
+  if (update && (d.changeReason.trim().length < 1 || d.changeReason.trim().length > 1000)) e.changeReason = t("A reason is required (1–1000 characters)");
   return e;
 }
 
@@ -112,35 +119,47 @@ export function capabilityInput(d: CapabilityDraft, id?: string) {
 
 export type DeviceRow = { id: string; version: number; serial: string; unitId: string | null; unit: string; conn: Connection; fw: string; tamper: boolean; power: string };
 
-export function deviceRows(devices: ApiDevice[], units: ApiUnitLite[]): DeviceRow[] {
+export function deviceRows(devices: ApiDevice[], units: ApiUnitLite[], t: T = en): DeviceRow[] {
   const name = new Map(units.map((u) => [u.id, u.displayName]));
   return devices.map((d) => ({
-    id: d.id, version: d.version, serial: d.serial, unitId: d.unitId, unit: d.unitId ? name.get(d.unitId) ?? "unit" : "Unbound", conn: d.connection, fw: d.firmwareVersion,
+    id: d.id, version: d.version, serial: d.serial, unitId: d.unitId, unit: d.unitId ? name.get(d.unitId) ?? t("unit") : t("Unbound"), conn: d.connection, fw: d.firmwareVersion,
     tamper: d.tamper === "detected", power: d.powerSignal,
   }));
 }
 
 const opLabel = { check: "Connection check", calibrate: "Calibration", firmware: "Firmware update" } as const;
-export function operationItem(o: ApiDeviceOperation) {
+const opStatus: Record<ApiDeviceOperation["status"], string> = { queued: "queued", running: "running", succeeded: "succeeded", failed: "failed" };
+/** One device operation for the timeline: what, its status, and how it ended (failure code, finish time). */
+export function operationItem(o: ApiDeviceOperation, i: I18n = EN) {
+  const { t, display } = i;
   return {
-    time: klTime(o.createdAt), title: `${opLabel[o.kind]}${o.targetVersion ? ` → ${o.targetVersion}` : ""} · ${o.status}`,
-    detail: o.failureCode ? `failure ${o.failureCode}` : o.finishedAt ? `finished ${klTime(o.finishedAt)}` : "in progress", tone: o.status === "failed" ? ("crit" as const) : o.status === "succeeded" ? ("ok" as const) : undefined,
+    time: showTime(o.createdAt, display), title: `${t(opLabel[o.kind])}${o.targetVersion ? ` → ${o.targetVersion}` : ""} · ${t(opStatus[o.status])}`,
+    detail: o.failureCode ? t("failure {code}", { code: o.failureCode }) : o.finishedAt ? t("finished {time}", { time: showTime(o.finishedAt, display) }) : t("in progress"),
+    tone: o.status === "failed" ? ("crit" as const) : o.status === "succeeded" ? ("ok" as const) : undefined,
   };
 }
-export function calibrationItem(c: ApiCalibration) {
-  return { time: klTime(c.calibratedAt), title: `${c.metric}: reference ${c.referenceValue} ${c.unit} · measured ${c.measuredValue} ${c.unit}`, detail: `offset ${(c.measuredValue - c.referenceValue).toFixed(2)} ${c.unit} · demo` };
+/** One calibration for the timeline: the metric code, reference and measured values and their offset. */
+export function calibrationItem(c: ApiCalibration, i: I18n = EN) {
+  const { t } = i;
+  return {
+    time: showTime(c.calibratedAt, i.display), title: t("{metric}: reference {reference} {unit} · measured {measured} {unit}", { metric: c.metric, reference: c.referenceValue, measured: c.measuredValue, unit: c.unit }),
+    detail: t("offset {offset} {unit} · demo", { offset: (c.measuredValue - c.referenceValue).toFixed(2), unit: c.unit }),
+  };
 }
 
 export type CampaignRow = { id: string; version: number; model: string; versions: string; state: ApiCampaign["state"]; devices: number; start: string; c: ApiCampaign };
-export function campaignRows(cs: ApiCampaign[], caps: ApiCapability[]): CampaignRow[] {
+export function campaignRows(cs: ApiCampaign[], caps: ApiCapability[], i: I18n = EN): CampaignRow[] {
+  const { t } = i;
   const model = new Map(caps.map((k) => [k.id, `${k.manufacturer} ${k.model}`]));
   return cs.map((c) => ({
-    id: c.id, version: c.version, model: model.get(c.modelId) ?? "model", versions: `${c.fromVersions.join(", ") || "any"} → ${c.targetVersion}`, state: c.state,
-    devices: c.deviceIds.length, start: klTime(c.startAt), c,
+    id: c.id, version: c.version, model: model.get(c.modelId) ?? t("model"), versions: `${c.fromVersions.join(", ") || t("any")} → ${c.targetVersion}`, state: c.state,
+    devices: c.deviceIds.length, start: showTime(c.startAt, i.display), c,
   }));
 }
 
-/** The firmware campaign form (DD-A20): waves ascend and end at 100 %, auto-pause 1–50 %, start ≥ 24 h ahead. */
+/** The firmware campaign form (DD-A20): waves ascend and end at 100 %, auto-pause 1–50 %, start ≥ 24 h ahead. The start
+ * is a datetime-local value in the user's display time zone (NFR-08); the window is the device's local time. The wave
+ * labels are stored with the campaign, so they stay English data; the screen words each wave itself. */
 export type CampaignDraft = { modelId: string; targetVersion: string; deviceIds: string[]; waves: string; startLocal: string; endLocal: string; autoPause: string; startAt: string };
 export function parseWaves(s: string): { label: string; percent: number }[] | null {
   const ps = s.split(",").map((x) => Number(x.replace("%", "").trim()));
@@ -149,16 +168,18 @@ export function parseWaves(s: string): { label: string; percent: number }[] | nu
   if (ps[ps.length - 1] !== 100) return null;
   return ps.map((p, i) => ({ label: i === ps.length - 1 ? `Wave ${i + 1} · 100 %` : `Wave ${i + 1} · ${p} %`, percent: p }));
 }
-export function campaignErrors(d: CampaignDraft, now: Date): Record<string, string> {
+/** The campaign's start as an instant: the datetime-local value read in the display time zone ("" while empty). */
+export const campaignStart = (d: Pick<CampaignDraft, "startAt">, zone: string) => (d.startAt ? zonedInstant(d.startAt.slice(0, 10), d.startAt.slice(11, 16), zone) : "");
+export function campaignErrors(d: CampaignDraft, now: Date, zone = "Asia/Kuala_Lumpur", t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (!d.modelId) e.modelId = "Choose a model";
-  if (!d.targetVersion) e.targetVersion = "Choose a target version";
-  if (d.deviceIds.length === 0) e.deviceIds = "Choose at least one device";
-  if (!parseWaves(d.waves)) e.waves = "Ascending percentages ending at 100, e.g. 10, 50, 100";
+  if (!d.modelId) e.modelId = t("Choose a model");
+  if (!d.targetVersion) e.targetVersion = t("Choose a target version");
+  if (d.deviceIds.length === 0) e.deviceIds = t("Choose at least one device");
+  if (!parseWaves(d.waves)) e.waves = t("Ascending percentages ending at 100, e.g. 10, 50, 100");
   const ap = Number(d.autoPause);
-  if (!(Number.isInteger(ap) && ap >= 1 && ap <= 50)) e.autoPause = "1–50 %";
-  if (!/^\d{2}:\d{2}$/.test(d.startLocal) || !/^\d{2}:\d{2}$/.test(d.endLocal)) e.window = "HH:MM – HH:MM";
-  const at = Date.parse(`${d.startAt}:00+08:00`);
-  if (!d.startAt || !(at >= now.getTime() + 24 * 3600 * 1000)) e.startAt = "At least 24 hours ahead";
+  if (!(Number.isInteger(ap) && ap >= 1 && ap <= 50)) e.autoPause = t("1–50 %");
+  if (!/^\d{2}:\d{2}$/.test(d.startLocal) || !/^\d{2}:\d{2}$/.test(d.endLocal)) e.window = t("HH:MM – HH:MM");
+  const at = Date.parse(campaignStart(d, zone));
+  if (!d.startAt || !(at >= now.getTime() + 24 * 3600 * 1000)) e.startAt = t("At least 24 hours ahead");
   return e;
 }
