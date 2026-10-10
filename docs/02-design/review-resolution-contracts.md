@@ -3086,3 +3086,30 @@ The Certifications tab of `/partner/team` (FR-P09, DD-P09, Figma Contractor 04-6
    - The technician and HQ screens.
    - The browser demo's screens.
    - The assistant panel and the voice demo's answers.
+
+## IR279 The contractor's payouts in the display language — 2026-10-10
+
+`/partner/payouts` (FR-P10, DD-P10, Figma Contractor 06-1/06-2) already matched Figma. It now follows the display language and time zone.
+
+1. **Texts.** These are translated:
+   - the filters, the KPIs and the statements list with its empty states;
+   - the lines table: work, status, actions and "Not included · next statement";
+   - the totals, notes and questions to HQ;
+   - the Ask HQ dialog with its refusals and toasts;
+   - the one-page statement PDF.
+   Line statuses are codes (`accepted`, `deduction`, `adjustment`, `not_included`) with a translated `statusText`, so the view never compares translated text.
+2. **Dates.**
+   - A period reads as a month in the user's language ("Sept 2026", "Sep 2026").
+   - The pay date is a Kuala Lumpur business day: HQ pays on the 15th (`businessDay`).
+   - When a report was accepted and when a statement was paid are moments, shown as dates in the user's display time zone (`showDayMonth`, a new helper — "15 Sept" — and `showDate`).
+   - The loader formats the totals, the statement title and its subtitle; the view formats nothing.
+3. **Shared helpers.** These take the translator or the display: `periodLabel`, `statementRows`, `kpis`, `lineRows`, `questionRows` and `payoutPdf`. Amounts keep the Malaysian number format with the currency code.
+4. **Checked.**
+   - Vitest: 38 files, 219 tests. `partnerPayouts.test.ts` covers the new English dates and adds a Malay case, the PDF included.
+   - E2E: `partner/language.e2e.ts` also opens the payouts in Malay. The dev database has no approved statement for Contractor A, so the E2E sees the empty state; the unit tests cover the statement view.
+   - The suite: 63 passed, 9 skipped. The users are en / Asia/Kuala_Lumpur, and the E2E jobs are cancelled.
+5. **Still open.**
+   - The partner unit screen.
+   - The technician and HQ screens.
+   - The browser demo's screens.
+   - The assistant panel and the voice demo's answers.

@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.163.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
+Version: 0.164.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.164.0 (2026-10-10): The contractor's payouts in Malay, the statement PDF too; pay dates read as Kuala Lumpur days, acceptance and payment dates in the user's time zone (IR279).
 0.163.0 (2026-10-10): The contractor's job history in Malay; the latest event reads relative to now ("today 9:05 am MYT") and every time is in the user's time zone (IR278).
 0.162.0 (2026-10-10): The contractor's Certifications tab is built as in Figma: KPIs, one row per technician and qualification with the jobs an ending certificate blocks, the assignment impact, renewal and new-certificate uploads, and training requests, in Malay too. Certificate files above 1 MiB were refused by the Core API's body limit; they now pass up to 10 MB (IR277).
 0.161.0 (2026-10-10): The contractor's Team & capacity is built as in Figma: date, qualification and active-only filters, each technician's day, the team's week, the qualification grants, unavailable days that list the assignments they overlap, and another company's roster as not found. It is in Malay too; `session.get` now returns the organization (IR276).

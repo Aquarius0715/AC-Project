@@ -94,6 +94,20 @@ export function showDate(iso: string | null, d: Display = DEFAULT_DISPLAY): stri
   return iso.slice(0, 10);
 }
 
+/** The day and month without the year (“15 Sept”), where a table of one statement or period shows its dates, in the
+ * user's language and display time zone. */
+export function showDayMonth(iso: string | null, d: Display = DEFAULT_DISPLAY): string {
+  if (!iso) return "—";
+  for (const timeZone of [d.timeZone, DEFAULT_DISPLAY.timeZone]) {
+    try {
+      return plain(new Date(iso).toLocaleDateString(intlTag(d.locale), { day: "numeric", month: "short", timeZone }));
+    } catch {
+      // RangeError: unknown time zone
+    }
+  }
+  return iso.slice(5, 10);
+}
+
 /** A time span — a booked visit or a preferred time: “Tue, 22 Sept, 10:00 am – 12:00 pm MYT” in the user's language
  * and display time zone, the weekday only when asked for. The span is the stored instants, so it keeps its meaning when
  * the user changes the time zone (NFR-08). */

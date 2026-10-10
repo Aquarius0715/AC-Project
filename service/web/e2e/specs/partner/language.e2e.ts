@@ -1,6 +1,6 @@
-// AT-X01-N ③ for the contractor (FR-X01, FR-P01…FR-P07, FR-P09, IR44, IR270–IR278): with Malay and Asia/Tokyo saved in
-// Preferences, the overview, the job list, a job's page, a completed job's quality review, the schedule, the team with
-// its certifications and the job history speak Malay; the update time, the delegation windows and the history's events
+// AT-X01-N ③ for the contractor (FR-X01, FR-P01…FR-P07, FR-P09, FR-P10, IR44, IR270–IR279): with Malay and Asia/Tokyo
+// saved in Preferences, the overview, the job list, a job's page, a completed job's quality review, the schedule, the
+// team with its certifications, the job history and the payouts speak Malay; the update time, the delegation windows and the history's events
 // are in GMT+9, while the period, today's timeline and the team's weeks stay Kuala Lumpur days and hours — the screens
 // say so.
 // English and the earlier zone come back at the end, or in afterEach when the test fails.
@@ -69,6 +69,10 @@ test("the contractor screens in Malay keep Kuala Lumpur days and show instants i
     await expect(main.getByRole("heading", { name: "Pratonton komunikasi baharu" })).toBeVisible();
     await expect(main).toContainText(/GMT\+9/); // the events in the display zone
   }
+  await page.goto("/partner/payouts");
+  await expect(main.getByRole("combobox", { name: "Tempoh" })).toContainText("Tempoh: Semua");
+  await expect(main.getByRole("combobox", { name: "Status" })).toContainText("Status: Diluluskan");
+  await expect(main.getByRole("heading", { name: "Penyata", exact: true }).first()).toBeVisible();
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/partner");
