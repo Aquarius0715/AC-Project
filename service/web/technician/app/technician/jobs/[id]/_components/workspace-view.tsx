@@ -22,7 +22,7 @@ export type WorkspaceLive = {
     assignment: { scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: "pending" | "accepted" | "cant_make"; cantMakeReason: string | null } | null;
     timeOnSite: TimeOnSite | null; draftReportRef: { reportId: string; reportVersion: number } | null; reportRefs: { reportId: string; reportVersion: number }[];
   };
-  unit: { name: string; place: string; model: string; scope: string[] } | null; unitRefused: string | null;
+  unit: { name: string; place: string; access: string | null; model: string; scope: string[] } | null; unitRefused: string | null;
   components: { group: Group; key: string }[];
   report: ApiTechReport | null; reportRefused: string | null;
   parts: { code: string; name: string; vanStockQuantity: number | null }[];
@@ -79,6 +79,9 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   const inWork = job.status === "in_progress";
   const paused = !!job.timeOnSite?.pauses?.some((p) => !p.to);
   const editable = inWork && win.phase !== "ended" && win.phase !== "before";
+  // the unit's alert evidence and diagnostics open for an active job inside its window: in progress, assigned or
+  // returned for rework (IR94, IR283; Figma Technician 423:604)
+  const unitOpen = ["assigned", "in_progress", "rework_requested"].includes(job.status) && win.phase !== "ended" && win.phase !== "before";
   const failed = (x: ActionFailure) => setRefused(refusal(x, t));
   const edit = (fn: (d: Draft) => Draft) => { setDraft(fn); setDirty(true); };
   const photos = (rep ?? live.report)?.attachmentRefs.filter((a) => a.id !== (rep ?? live.report)?.signOff?.signatureAttachmentId) ?? [];
@@ -190,11 +193,16 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
               <Card title={t("Job & unit")} action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${job.unitId}?jobId=${job.id}`}>{t("Unit →")}</Link>}>
                 <SummaryList items={[
                   [t("Window"), <span key="w" className={win.phase === "ending" || win.phase === "ended" ? "font-semibold text-crit" : undefined}>{job.assignment ? f.span(job.assignment.scheduledStart, job.assignment.scheduledEnd) : "—"}</span>],
-                  [t("Site"), live.unit?.place ?? (live.unitRefused ? t("opens at the start of your window") : "—")], [t("Unit"), live.unit ? `${live.unit.name} · ${live.unit.model}` : job.unitId.slice(0, 8)],
+                  [t("Site"), live.unit?.place ?? (live.unitRefused ? t("opens at the start of your window") : "—")], [t("Access"), live.unit?.access ?? "—"], [t("Unit"), live.unit ? `${live.unit.name} · ${live.unit.model}` : job.unitId.slice(0, 8)],
                   [t("Job"), `${typeLabel(job.type, t)} · ${t(job.origin === "periodic_plan" ? "periodic plan" : "client request")}`], [t("Request"), job.symptom ? `“${job.symptom}”` : "—"],
                   [t("Linked alerts"), job.alertCount ? <Link key="a" className="font-semibold text-crit" href={`/technician/units/${job.unitId}/alerts?jobId=${job.id}`}>{t(job.alertCount === 1 ? "1 alert →" : "{n} alerts →", { n: job.alertCount })}</Link> : t("none")],
                 ]} />
-                {inWork && <div className="mt-3"><Link className="text-xs font-semibold text-primary" href={`/technician/units/${job.unitId}/control?jobId=${job.id}`}>{t("Diagnostic control →")}</Link></div>}
+                {unitOpen && (
+                  <div className="mt-3 flex flex-wrap gap-3 text-xs font-semibold">
+                    <Link className="text-primary" href={`/technician/units/${job.unitId}/alerts?jobId=${job.id}`}>{t("Alert evidence →")}</Link>
+                    <Link className="text-primary" href={`/technician/units/${job.unitId}/control?jobId=${job.id}`}>{t("Diagnostics →")}</Link>
+                  </div>
+                )}
               </Card>
             </div>
           </div>

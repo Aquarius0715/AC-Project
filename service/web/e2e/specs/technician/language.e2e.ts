@@ -3,17 +3,25 @@
 // timeline stays in Kuala Lumpur hours and says so; an assigned job's workspace speaks Malay with its window in GMT+9,
 // and so do its unit, on both tabs and with the 7-day period, the unit's alert evidence, the job's diagnostic control
 // and the devices with one device's events. English and the earlier zone come back at the end, or in afterEach when
-// the test fails. Nothing is acknowledged, resolved or sent (the dev data stays as it is).
+// the test fails. Nothing is acknowledged, resolved or sent (the dev data stays as it is). The walk through a job needs
+// an assigned job: on the seed only tech-external-a has one (job-contractor-a), so the spec signs in as that technician;
+// as tech-internal-a it had skipped the job part on a fresh seed (IR317).
+import type { BrowserContext, Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
+import { signIn } from "../../fixtures/auth";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
-let zoneBefore: string | null = null;
-test.afterEach(async ({ page }) => {
-  if (zoneBefore) await setDisplay(page, ENGLISH, zoneBefore);
-  zoneBefore = null;
+let context: BrowserContext | null = null, tech: Page | null = null, zoneBefore: string | null = null;
+test.afterEach(async () => {
+  if (tech && zoneBefore) await setDisplay(tech, ENGLISH, zoneBefore);
+  await context?.close();
+  context = tech = zoneBefore = null;
 });
 
-test("the technician overview in Malay keeps the timeline in Kuala Lumpur hours", async ({ page }) => {
+test("the technician overview in Malay keeps the timeline in Kuala Lumpur hours", async ({ browser, app }) => {
+  context = await browser.newContext({ baseURL: app.url, storageState: { cookies: [], origins: [] } }); // not the project's tech-internal-a session
+  const page = (tech = await context.newPage());
+  await signIn(page, app, "tech-external-a");
   const zone = await displayZone(page);
   zoneBefore = zone;
   await setDisplay(page, MALAY, "Asia/Tokyo");
@@ -42,6 +50,13 @@ test("the technician overview in Malay keeps the timeline in Kuala Lumpur hours"
     for (const name of ["Kemajuan senarai semak", "Kerja & unit", "Versi & simpan automatik"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();
     await expect(main.getByRole("link", { name: "← Gambaran keseluruhan" })).toBeVisible();
     await expect(main).toContainText(/GMT\+9/); // the work window in the display zone
+    // the site's access instructions, as written, and inside the window the unit's alert evidence and diagnostics for
+    // an assigned job too (Figma 423:604, IR94, IR283, IR317)
+    await expect(main.getByRole("term").filter({ hasText: /^Akses$/ })).toBeVisible();
+    await expect(main).toContainText("Ring the demo bell (fictional)"); // the seed property's entry instructions stay as written
+    if (await main.getByRole("button", { name: /Mulakan kerja/ }).isEnabled()) {
+      for (const name of ["Bukti amaran →", "Diagnostik →"]) await expect(main.getByRole("link", { name, exact: true }).first()).toBeVisible();
+    }
     // the job's unit (IR283): the register, the history and alerts, then Monitoring with another period in the URL
     await main.getByRole("link", { name: "Unit →", exact: true }).click();
     await page.waitForURL(/\/technician\/units\/[^/?]+\?jobId=/);

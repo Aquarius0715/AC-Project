@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.38.0
+version: 0.39.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -279,7 +279,7 @@ Scope: FR-T08 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get
 **Steps**
 
 1. A new assignment (acknowledgement pending) shows **New assignment — please accept** with the Origin badge, the agreed visit time and who assigned it: **Accept assignment** (受領) or **Can't make this time…** (reason + optional alternative time, sent to the coordinator) via `jobs.acknowledgeAssignment` (IR113). The Overview shows a banner for each assignment waiting for acceptance. Check assignment and schedule. Start work, edit the report, submit, and wait for quality review. If returned, perform rework and resubmit.
-2. Work can start from `assigned`; rework can resume from `rework_requested`. After `submitted`, the submitted version is read-only. Technicians cannot approve on behalf of customers.
+2. Work can start from `assigned`; rework can resume from `rework_requested`. After `submitted`, the submitted version is read-only. Technicians cannot approve on behalf of customers. The Job & unit card shows the site's access instructions, and inside the window it links to the unit's alert evidence and diagnostics for an assigned, in-progress or returned job (IR94, IR283, IR317).
 3. Save start time, submission time, and `reportVersion`. The quality review determines completion.
 4. Queries to update: `jobs / reports / job events / notifications / audit`.
 
@@ -480,6 +480,6 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 
 0.10.0: T12 fetches alerts.get using DeviceEvent.alertIds and acknowledges using Alert.version (SR23). Filter device history by scope at event time (SR24).
 
-Additional contracts for current version 0.38.0: Read IR01–IR314 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.39.0: Read IR01–IR317 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

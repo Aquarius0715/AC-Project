@@ -56,7 +56,7 @@ export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | { ki
       id: job.id, version: job.version, status: job.status, type: job.type, unitId: job.unitId, symptom: job.symptom, alertCount: job.alertIds.length, origin: job.origin,
       assignment: job.assignment, timeOnSite: job.timeOnSite, draftReportRef: job.draftReportRef, reportRefs: job.reportRefs,
     },
-    unit: u ? { name: u.displayName, place: u.location.pathLabels.join(" › "), model: `${u.capabilities.manufacturer} ${u.capabilities.model}`, scope: u.serviceScope ?? ["indoor", "outdoor", "electrical"] } : null,
+    unit: u ? { name: u.displayName, place: u.location.pathLabels.join(" › "), access: u.location.accessInstructions, model: `${u.capabilities.manufacturer} ${u.capabilities.model}`, scope: u.serviceScope ?? ["indoor", "outdoor", "electrical"] } : null,
     unitRefused: isRefused(unit) ? unit.refused : null,
     components: componentsFor(u?.serviceScope ?? ["indoor", "outdoor", "electrical"]),
     report: r, reportRefused: isRefused(report) ? report.refused : null,

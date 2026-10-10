@@ -4286,3 +4286,30 @@ IR315 found the dev data full of E2E leftovers. The dev DB was reset to the seed
    - The dev DB holds the seed plus one run.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR317 The contractor and technician screens checked against Figma — 2026-10-11
+
+The method of IR315 was applied to the default states of eleven contractor screens and nine technician screens. The technician screens were read as tech-external-a, the seed's technician with a job.
+- **Contractor:** overview, jobs, job detail, schedule, unit, quality review, team, certifications, job history and one job's history, payouts.
+- **Technician:** today, all assigned, unit register and monitoring, job workspace, alert evidence, diagnostic control, devices and device events.
+
+Figma's demo shows ten contractor jobs; the seed has one (job-contractor-a). Most differences come from that.
+
+1. **Contractor screens: no fix needed.** The cards, KPI tiles, columns, timelines, banners and dialogs match Figma. Two kinds of text differ:
+   - wording that later IRs set: the history footnote (IR42) and Review & send before a diagnostic command (Figma 594:23802);
+   - small labels such as “in date” for “certificates in date”.
+2. **The technician's job workspace shows the site's access (Figma 73:5 / 423:604).**
+   - The Job & unit card now has an **Access** row with the unit's `location.accessInstructions`, as written. Before, the card showed no way into the site, while the partner's job page and the unit register did.
+   - The card also offers **Alert evidence →** and **Diagnostics →** for an active job inside its window: in progress, assigned or returned for rework. That is the rule of IR94 and IR283; before, the links appeared only once work had started.
+   - The demo's link label follows Figma (“Diagnostics →”).
+3. **The technician language spec walks a job.** It ran as tech-internal-a, who has no job on a fresh seed, so the walk through the workspace, unit, alert evidence and diagnostic control was skipped without a sign. It now signs in as tech-external-a, puts that user's language and zone back in afterEach, and checks the Access row and the unit links.
+4. **Not changed, by design or by data.**
+   - Readings the seed lacks: supply air, refrigerant pressure, vibration.
+   - The evidence kind chips of alerts the seed lacks: measured, estimated, inspection.
+   - The devices list's search field: its placeholder is not part of the visible text.
+5. **Checked.**
+   - The typecheck and lint pass.
+   - The technician app builds.
+   - E2E: 73 passed, 8 skipped by design. The dev data holds the seed and the runs' cancelled scenario jobs.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
