@@ -3675,3 +3675,36 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
    - The assistant panel and the voice demo's answers.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR298 The HQ offset demo in the display language; attempt and event times in the display time zone — 2026-10-10
+
+`/admin/offsets` (SCR-A15, FR-A15, DD-A15, Figma Admin 13-1…13-5) follows the display language and time zone.
+
+1. **Texts.** These are translated:
+   - the demo banner and the Demo records and Market concept tabs;
+   - the records list with each record's state and next step;
+   - a record's steps, failure banner, summary, next-step cards and event history;
+   - the market concept card;
+   - the new-quote dialog with its checks (`quoteErrors`), the quote, and the toasts.
+   The dictionary gains 69 entries. They use the customer offsets page's words: "sebut harga" (quote), "pembatalan" (retirement), "penyedia" (provider), "pengesahan" (verification), "lejar" (ledger).
+   These stay as they are: IDs, purchase and DEMO- certificate references, the scheme code, and stored purposes and reasons.
+2. **States and events.**
+   - A record's state shows as a word (`stateWord`, the same words as the customer page). Before, the badge showed the raw state code.
+   - A failed record names the failed stage and the previous state in words.
+   - The event history comes from the audit log. Its actions (`offsets.request`, `purchase_confirm`, `retire`, `fail`, `retry`) and results (`success`, `denied`, `failed`, `pending`) are worded. An unknown action or result stays as its code.
+   - The market concept's codes (`future_concept`, `unverified`, `not_connected`) are worded (`conceptText`).
+3. **Times.**
+   - The current attempt's start and the event times are instants. The page formats them in the display time zone (`attemptText`, `eventItem`, IR282). Before, they were fixed Kuala Lumpur stamps.
+   - A quote's expiry is shown in the display time zone. The quote comes from a Server Action, so the browser formats it.
+   - A quote's period is Kuala Lumpur business time, like the energy and MRV periods (IR296, IR297). It is typed in that time ("Period start (Kuala Lumpur)").
+4. **The note about energy savings and MRV estimates** is one translated sentence, followed by the two links. Before, the links sat inside the English sentence.
+5. **Checked.**
+   - Vitest: 46 files, 272 tests. `offsets.test.ts` is new. It covers the states and next steps, attempts and events in the display zone, unknown event codes, the quote checks with the Kuala Lumpur period sent as instants, the market concept, and Malay / Tokyo.
+   - E2E: `admin/language.e2e.ts` also opens the offset demo. It checks the banner, the records, the new-quote checks (which stop before any call, since a quote is a write) and the market concept. Nothing is saved.
+6. **Progress.** 37 of the 44 business screens follow the display language.
+7. **Still open.**
+   - The other 7 HQ screens: billing, contracts, restrictions with exceptions, access, automation and audit.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

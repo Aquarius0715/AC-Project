@@ -1,4 +1,4 @@
-// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A06, FR-A13, FR-A14, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
+// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A06, FR-A13, FR-A14, FR-A15, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
 // HQ overview speaks Malay — the scope and period filters, the KPI tiles, the forecast, the power and connection axes,
 // the job statuses and the billing card — and its as-of time is in GMT+9 while the period stays Kuala Lumpur days, named
 // so; the Jobs tab speaks Malay too — tabs, scope, filters, the list and one job's detail with its times in GMT+9 — and
@@ -7,8 +7,9 @@
 // (IR292), customers & units — the register, one customer's locations, users and policies, and warranty & coverage
 // (IR293) — the device registry's three tabs with the new-campaign dialog (IR295), the energy analysis with its
 // period named Kuala Lumpur time and the baselines with the form checks (IR296), and the MRV reports with a preview
-// (a read) and the emission factors with the form checks (IR297). Nothing is saved. English and the earlier zone come
-// back at the end, or in afterEach when the test fails.
+// (a read) and the emission factors with the form checks (IR297), and the offset demo's records, market concept and
+// new-quote checks (IR298). Nothing is saved. English and the earlier zone come back at the end, or in afterEach when
+// the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
@@ -160,6 +161,22 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(main.getByRole("heading", { name: "Faktor baharu", exact: true })).toBeVisible();
   await main.getByRole("button", { name: "Cipta faktor" }).click();
   for (const text of ["1–120 aksara", "Melebihi 0 dan paling banyak 10 kgCO₂e/kWh"]) await expect(main).toContainText(text);
+  // the offset demo (IR298): the records and the market concept, and the new-quote checks, which stop before any call
+  // (a quote is a write)
+  await page.goto("/admin/offsets");
+  await expect(main).toContainText("Demo sahaja — sebut harga, pembelian dan pembatalan disimulasikan.");
+  await expect(main.getByRole("tab", { name: /^Rekod demo/ })).toHaveAttribute("aria-selected", "true");
+  await expect(main.getByRole("heading", { name: "Rekod ofset demo", exact: true })).toBeVisible();
+  await main.getByRole("button", { name: "+ Sebut harga demo baharu" }).click();
+  const quote = page.getByRole("dialog", { name: "Sebut harga demo baharu" });
+  await expect(quote.getByLabel("Mula tempoh (Kuala Lumpur)")).toBeVisible(); // the quote's period is Kuala Lumpur time
+  await quote.getByRole("button", { name: "Dapatkan sebut harga demo" }).click();
+  for (const text of ["Pilih pelanggan", "Pilih 1–100 unit", "Tamat mesti selepas mula", "1–1000 aksara", "Melebihi 0, paling banyak 100000, sehingga 3 perpuluhan"]) await expect(quote).toContainText(text);
+  await quote.getByRole("button", { name: "Batal", exact: true }).click();
+  await expect(quote).toBeHidden();
+  await main.getByRole("tab", { name: "Konsep pasaran" }).click();
+  await page.waitForURL(/tab=market/);
+  await expect(main.getByRole("heading", { name: "Pasaran karbon — konsep masa depan", exact: true })).toBeVisible();
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/admin");

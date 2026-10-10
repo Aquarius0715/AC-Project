@@ -635,6 +635,7 @@ Scope: FR-A15 / Main display pattern: **UI-LIST / UI-FORM / UI-DETAIL**. Service
 3. Keep quoted → demo_requested → demo_purchased → demo_retired in history. Prefix proof references with DEMO- and do not output them as real certificates.
 4. Queries to update: `offsets / offset events / audit`。
 5. Tabs (IR115, Figma Admin 13-1…13-5): `tab=records` (default; offset records with the `recordId` detail, quote → request, proof, failed → retry) and `tab=market` (read-only carbon-market concept; no orders, no prices).
+6. Language and time (IR298): texts follow the display language. States, audit events and the market concept are worded, and unknown codes stay as codes. Attempt, event and quote expiry times are in the display time zone. A quote's period is Kuala Lumpur business time, and HQ types it in that time.
 
 **Boundary cases and failures**: Reject retirement before purchase, duplicate retirement, quantity 0, expired quotes, and other-tenant record actions. On failure, keep failed and the previous stage.
 
