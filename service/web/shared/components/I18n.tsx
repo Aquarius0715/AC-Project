@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext } from "react";
-import { DEFAULT_DISPLAY, translate, type Display, type T } from "@ac/web/lib/i18n";
+import { DEFAULT_DISPLAY, i18nOf, translate, type Display, type I18n, type T } from "@ac/web/lib/i18n";
 
 const DisplayContext = createContext<Display>(DEFAULT_DISPLAY);
 
@@ -11,6 +11,8 @@ export function I18nProvider({ display, children }: { display: Display; children
 }
 
 export const useDisplay = () => useContext(DisplayContext);
+/** The translator and the display together, for the pure helpers (lib/*) a client view calls. */
+export const useI18n = (): I18n => i18nOf(useContext(DisplayContext));
 export const useLocale = () => useContext(DisplayContext).locale;
 
 /** t(text, params): the English text in the current display language. */

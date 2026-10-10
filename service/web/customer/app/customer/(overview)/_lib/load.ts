@@ -3,9 +3,11 @@
 // alerts (alerts.list), the automations with the next run of the schedules shown (automations.list,
 // automations.nextRuns, consents.get), energy.summary for the period, the previous period and each of the last 14 days
 // (with a comparable baseline for the emissions saving, baselines.list), and the CO2 series of the last 24 h of the
-// air-quality unit (telemetry.series). URL keys: propertyId, unitId, period (today, 7d, 30d).
+// air-quality unit (telemetry.series). URL keys: propertyId, unitId, period (today, 7d, 30d). Texts and times in the
+// user's display language and time zone (coreDisplay, IR260).
 import "server-only";
-import { coreAll, coreNow, coreOp } from "@ac/web/lib/dal";
+import { coreAll, coreDisplay, coreNow, coreOp } from "@ac/web/lib/dal";
+import { i18nOf } from "@ac/web/lib/i18n";
 import { unitPlaces } from "@ac/web/lib/clientBilling";
 import { baselinesFor, dayRanges, periodRange } from "@ac/web/lib/clientEnergy";
 import { ruleCard, triggerOf, type ApiAutomation, type ApiConsent, type ApiOccurrence } from "@ac/web/lib/clientAutomations";
@@ -14,7 +16,7 @@ import type { ApiAlert } from "@ac/web/lib/alerts";
 import type { ApiPropertyRow, ApiSpaceRow } from "@ac/web/lib/assets";
 import type { ApiBaseline, ApiEnergySummary } from "@ac/web/lib/energy";
 import {
-  attentionCard, emissionsCard, energyCard, hourlyPoints, nextRunText, overviewRows, overviewScope, periodNote, periodOf, previousRange, type OverviewUnit,
+  attentionCard, emissionsCard, energyCard, hourlyPoints, nextRunText, overviewRows, overviewScope, periodLabel, periodNote, periodOf, previousRange, type OverviewUnit,
 } from "@ac/web/lib/customerOverview";
 
 type Summary = { counts: { total: number; powerOn: number; powerOff: number; powerUnknown: number; alertCount: number }; asOf: string };
@@ -22,18 +24,20 @@ const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 export async function loadOverview(sp: Record<string, string | string[] | undefined>) {
   const kind = periodOf(one(sp.period));
-  const [now, units, properties, spaces, alerts, automations, baselines, consent] = await Promise.all([
+  const [now, units, properties, spaces, alerts, automations, baselines, consent, display] = await Promise.all([
     coreNow(), coreAll<OverviewUnit>("units.list"), coreAll<ApiPropertyRow>("properties.list"), coreAll<ApiSpaceRow>("spaces.list"),
     coreAll<ApiAlert>("alerts.list"), coreAll<ApiAutomation>("automations.list"), coreAll<ApiBaseline>("baselines.list"),
-    coreOp<ApiConsent>("consents.get", { purpose: "location_automation" }).catch(() => null),
+    coreOp<ApiConsent>("consents.get", { purpose: "location_automation" }).catch(() => null), coreDisplay(),
   ]);
+  const i = i18nOf(display);
+  const { t } = i;
   const nowMs = now.getTime();
   const sel = overviewScope(units, properties, { propertyId: one(sp.propertyId), unitId: one(sp.unitId) });
   const ids = sel.scope.map((u) => u.id);
   const place = unitPlaces(units, properties, spaces);
   const period = periodRange(kind, now);
   const prev = previousRange(period);
-  const week = dayRanges(periodRange("7d", now).from, period.to).slice(-7);
+  const week = dayRanges(periodRange("7d", now).from, period.to, display.locale).slice(-7);
   const filters = sel.unitId ? { unitId: sel.unitId } : sel.propertyId ? { propertyId: sel.propertyId } : {};
   const baseline = baselinesFor(baselines, ids)[0];
   const sum = (from: string, to: string, b?: string) => coreOp<ApiEnergySummary>("energy.summary", { from, to, unitIds: ids, ...(b ? { baselineId: b } : {}) });
@@ -61,27 +65,31 @@ export async function loadOverview(sp: Record<string, string | string[] | undefi
     Promise.all(shown.map((a) => (a.kind === "schedule" && a.enabled ? coreOp<ApiOccurrence[]>("automations.nextRuns", { automationId: a.id, count: 4 }).then((o) => o.find((x) => x.phase === "schedule_start")?.at ?? null).catch(() => null) : Promise.resolve(null)))),
   ]);
   const unitName = new Map(units.map((u) => [u.id, u.displayName]));
-  const scopeText = sel.unitId ? unitName.get(sel.unitId)! : `${sel.scope.length === sel.inProperty.length && !sel.propertyId ? "all" : ""} ${sel.scope.length} unit${sel.scope.length === 1 ? "" : "s"}${sel.propertyName ? ` in ${sel.propertyName}` : ""}`.trim();
-  const roomOf = (u: OverviewUnit) => (u.spaceId ? spaces.find((s) => s.id === u.spaceId)?.name : null) ?? properties.find((p) => p.id === u.propertyId)?.name ?? "Room";
+  const n = sel.scope.length;
+  const scopeText = sel.unitId ? unitName.get(sel.unitId)!
+    : sel.propertyName ? t(n === 1 ? "{n} unit in {property}" : "{n} units in {property}", { n, property: sel.propertyName })
+    : t(n === 1 ? "all {n} unit" : "all {n} units", { n });
+  const roomOf = (u: OverviewUnit) => (u.spaceId ? spaces.find((s) => s.id === u.spaceId)?.name : null) ?? properties.find((p) => p.id === u.propertyId)?.name ?? t("Room");
   return {
-    now: now.toISOString(), period: kind, periodLabel: kind === "today" ? "Today" : kind === "7d" ? "Last 7 days" : "Last 30 days", note: periodNote(kind, period), asOf: summary.asOf,
+    now: now.toISOString(), period: kind, periodLabel: t(periodLabel[kind]), note: periodNote(kind, period, i), asOf: summary.asOf, display,
     properties: properties.filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name })), propertyId: sel.propertyId, propertyName: sel.propertyName,
     units: sel.inProperty.map((u) => ({ id: u.id, name: u.displayName })), unitId: sel.unitId,
     counts: summary.counts,
-    rows: overviewRows(sel.scope, (u) => place.get(u.id)?.place ?? ""),
-    energy: sums ? energyCard(kind, sums[0], sums[1], week.map((d, i) => ({ label: d.label.split(" ")[0], kWh: sums[2][i].totals.kWh })), sums[3].map((s) => s.totals.kWh), scopeText) : null,
-    emissions: sums ? { ...emissionsCard(sums[0], baseline ? baseline.method : null), scope: scopeText } : null,
+    rows: overviewRows(sel.scope, (u) => place.get(u.id)?.place ?? "", i),
+    energy: sums ? energyCard(kind, sums[0], sums[1], week.map((d, k) => ({ label: d.label.split(" ")[0], kWh: sums[2][k].totals.kWh })), sums[3].map((s) => s.totals.kWh), scopeText, i) : null,
+    emissions: sums ? { ...emissionsCard(sums[0], baseline ? baseline.method : null, i), scope: scopeText } : null,
     air: air ? {
-      id: air.id, room: roomOf(air), unit: air.displayName, co2: metricCard("co2", air.latestMeasurements.find((m) => m.metric === "co2"), true),
-      pm25: metricCard("pm25", air.latestMeasurements.find((m) => m.metric === "pm25"), true), points: co2 ? hourlyPoints(co2.items, nowMs) : [], cut: co2?.cut ?? false,
+      id: air.id, room: roomOf(air), unit: air.displayName, co2: metricCard("co2", air.latestMeasurements.find((m) => m.metric === "co2"), true, i),
+      pm25: metricCard("pm25", air.latestMeasurements.find((m) => m.metric === "pm25"), true, i), points: co2 ? hourlyPoints(co2.items, nowMs) : [], cut: co2?.cut ?? false,
     } : null,
-    attention: attentionCard(alerts, sel.scope, nowMs),
+    attention: attentionCard(alerts, sel.scope, nowMs, 3, i),
     automations: {
       on: inScope.filter((a) => a.enabled).length, off: inScope.filter((a) => !a.enabled).length,
-      items: shown.map((a, i) => {
+      items: shown.map((a, k) => {
         const u = units.find((x) => x.id === a.unitIds[0]);
-        const card = ruleCard(a, u ? { name: u.displayName, path: place.get(u.id)?.place ?? "", property: properties.find((p) => p.id === u.propertyId)?.name ?? "" } : null, nexts[i], !!consent?.granted);
-        const line = nexts[i] ? `Next run: ${nextRunText(nexts[i]!, nowMs)} · ${u?.displayName ?? "AC"}` : triggerOf(a) === "location" ? `${card.when} · location consent: ${consent?.granted ? "granted" : "not granted"}` : card.when;
+        const card = ruleCard(a, u ? { name: u.displayName, path: place.get(u.id)?.place ?? "", property: properties.find((p) => p.id === u.propertyId)?.name ?? "" } : null, nexts[k], !!consent?.granted, i);
+        const line = nexts[k] ? t("Next run: {when} · {unit}", { when: nextRunText(nexts[k]!, nowMs, i), unit: u?.displayName ?? "AC" })
+          : triggerOf(a) === "location" ? t("{when} · location consent: {state}", { when: card.when, state: t(consent?.granted ? "granted" : "not granted") }) : card.when;
         return { id: a.id, name: a.name, line, status: card.status };
       }),
     },

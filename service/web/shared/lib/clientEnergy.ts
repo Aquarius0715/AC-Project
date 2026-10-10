@@ -2,6 +2,7 @@
 // buckets of energy.summary, the unit comparison rows and the selection carried to the offsets page. Pure code shared
 // by the Server Components and the client views.
 import { klInstant, klLocal, klStamp, one, saving, type ApiBaseline, type ApiEnergySummary } from "@ac/web/lib/energy";
+import { intlTag, type Locale } from "@ac/web/lib/i18n";
 
 export type PeriodKind = "today" | "7d" | "30d" | "custom";
 export const periodKinds: PeriodKind[] = ["today", "7d", "30d", "custom"];
@@ -29,14 +30,15 @@ export function periodRange(kind: PeriodKind, now: Date, custom: { from?: string
   const error = !(span > 0) ? "The end must be after the start" : span > 366 * dayMs ? "At most 366 days" : undefined;
   return { kind, from, to, days, error, label: `${fmt(from)} – ${fmt(to)} (${days} day${days === 1 ? "" : "s"}) · Asia/Kuala_Lumpur` };
 }
-/** The Kuala Lumpur days of [from, to) (the last one ends at `to`), at most 31 for the daily chart. */
-export function dayRanges(from: string, to: string): { label: string; from: string; to: string }[] {
+/** The Kuala Lumpur days of [from, to) (the last one ends at `to`), at most 31 for the daily chart, labelled “Mon 14”
+ * in the display language (Figma Client 04a). */
+export function dayRanges(from: string, to: string, locale: Locale = "en"): { label: string; from: string; to: string }[] {
   const out: { label: string; from: string; to: string }[] = [];
   let start = from;
   while (Date.parse(start) < Date.parse(to) && out.length < 31) {
     const next = klInstant(`${addDays(klLocal(start).slice(0, 10), 1)}T00:00`);
     const end = Date.parse(next) < Date.parse(to) ? next : to;
-    const day = (o: Intl.DateTimeFormatOptions) => new Date(start).toLocaleDateString("en-US", { timeZone: "Asia/Kuala_Lumpur", ...o });
+    const day = (o: Intl.DateTimeFormatOptions) => new Date(start).toLocaleDateString(intlTag(locale), { timeZone: "Asia/Kuala_Lumpur", ...o });
     out.push({ label: `${day({ weekday: "short" })} ${day({ day: "numeric" })}`, from: start, to: end }); // "Mon 14" (Figma Client 04a)
     start = next;
   }

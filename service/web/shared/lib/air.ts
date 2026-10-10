@@ -5,6 +5,7 @@
 import { periodRange } from "@ac/web/lib/clientEnergy";
 import { klStamp, roundAway } from "@ac/web/lib/energy";
 import { spacePath, type ApiPropertyRow, type ApiSpaceRow, type ApiUnitRow } from "@ac/web/lib/assets";
+import { EN, showClock, type I18n } from "@ac/web/lib/i18n";
 
 export type AirMetric = "co2" | "pm25" | "temperature" | "humidity";
 export const airMetrics: AirMetric[] = ["co2", "pm25", "temperature", "humidity"];
@@ -83,29 +84,34 @@ export type MetricCard = {
   feed: { text: string; tone: Tone; icon: string }; status: { text: string; tone: Tone; icon: string }; sub: string; advice: string; warn: boolean;
 };
 const reasonText: Record<string, string> = { unit_mismatch: "unit mismatch", non_finite: "not a number", out_of_range: "out of range", invalid_time: "invalid time" };
-export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, hasSensor: boolean): MetricCard {
-  const { label, unit, guide } = metricInfo[metric];
-  const noAdvice = metric === "temperature" ? "Setpoint is on Unit Control" : metric === "humidity" ? "Not enough data for advice" : `Not enough data for ${label} advice`;
-  const unavailable = (sub: string, feed = { text: "Unavailable", tone: "unknown" as Tone, icon: "⊘" }): MetricCard =>
-    ({ metric, label, unit, value: null, feed, status: { text: "Not measured", tone: "muted", icon: "○" }, sub, advice: noAdvice, warn: false });
-  if (!hasSensor) return unavailable(`No ${label} sensor on this model`, { text: "Unsupported", tone: "muted", icon: "⊘" });
-  if (!m) return unavailable("No reading yet");
-  if (m.quality === "stale") return unavailable(`No reading since ${hm(m.observedAt)}${m.value !== null ? ` (last ${airNumber(metric, m.value)} ${unit})` : ""}`);
+const originText: Record<string, string> = { estimated: "estimated", inspection: "inspection" };
+/** The card in the display language; reading times are the IR44 time of day in the user's display time zone (IR260). */
+export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, hasSensor: boolean, i: I18n = EN): MetricCard {
+  const { t, display } = i;
+  const { unit, guide } = metricInfo[metric];
+  const label = t(metricInfo[metric].label);
+  const noAdvice = t(metric === "temperature" ? "Setpoint is on Unit Control" : metric === "humidity" ? "Not enough data for advice" : "Not enough data for {metric} advice", { metric: label });
+  const unavailable = (sub: string, feed = { text: t("Unavailable"), tone: "unknown" as Tone, icon: "⊘" }): MetricCard =>
+    ({ metric, label, unit, value: null, feed, status: { text: t("Not measured"), tone: "muted", icon: "○" }, sub, advice: noAdvice, warn: false });
+  if (!hasSensor) return unavailable(t("No {metric} sensor on this model", { metric: label }), { text: t("Unsupported"), tone: "muted", icon: "⊘" });
+  if (!m) return unavailable(t("No reading yet"));
+  const at = showClock(m.observedAt, display);
+  if (m.quality === "stale") return unavailable(m.value !== null ? t("No reading since {time} (last {value} {unit})", { time: at, value: airNumber(metric, m.value), unit }) : t("No reading since {time}", { time: at }));
   if (m.quality === "suspect") {
     return {
-      metric, label, unit, value: m.value === null ? null : airNumber(metric, m.value), feed: { text: "Suspect", tone: "warn", icon: "!" },
-      status: { text: "Suspect", tone: "warn", icon: "!" }, sub: `Observed ${hm(m.observedAt)} · ${reasonText[m.qualityReason ?? ""] ?? "unreliable reading"}`, advice: "Not used for advice", warn: false,
+      metric, label, unit, value: m.value === null ? null : airNumber(metric, m.value), feed: { text: t("Suspect"), tone: "warn", icon: "!" },
+      status: { text: t("Suspect"), tone: "warn", icon: "!" }, sub: t("Observed {time} · {reason}", { time: at, reason: t(reasonText[m.qualityReason ?? ""] ?? "unreliable reading") }), advice: t("Not used for advice"), warn: false,
     };
   }
-  if (m.value === null) return unavailable(`No reading (null)${metric === "humidity" ? " — not 0%" : ""} · ${hm(m.observedAt)}`, { text: "Unknown", tone: "unknown", icon: "?" });
+  if (m.value === null) return unavailable(t(metric === "humidity" ? "No reading (null) — not 0% · {time}" : "No reading (null) · {time}", { time: at }), { text: t("Unknown"), tone: "unknown", icon: "?" });
   const high = guide !== null && m.value >= guide;
-  const status = guide === null ? { text: "Measured", tone: "muted" as Tone, icon: "●" } : high ? { text: "High", tone: "warn" as Tone, icon: "⚠" } : { text: "Within guide", tone: "ok" as Tone, icon: "✓" };
-  const advice = metric === "co2" ? (high ? "Ventilation recommended (≥ 1000 ppm)" : "No current advice")
+  const status = guide === null ? { text: t("Measured"), tone: "muted" as Tone, icon: "●" } : high ? { text: t("High"), tone: "warn" as Tone, icon: "⚠" } : { text: t("Within guide"), tone: "ok" as Tone, icon: "✓" };
+  const advice = t(metric === "co2" ? (high ? "Ventilation recommended (≥ 1000 ppm)" : "No current advice")
     : metric === "pm25" ? (high ? "Filter cleaning recommended (≥ 35 µg/m³)" : "No current advice")
-    : metric === "temperature" ? "Setpoint is on Unit Control" : "No current advice";
+    : metric === "temperature" ? "Setpoint is on Unit Control" : "No current advice");
   return {
-    metric, label, unit, value: airNumber(metric, m.value), feed: { text: "Live", tone: "ok", icon: "●" }, status,
-    sub: `Observed ${hms(m.observedAt)}${m.origin === "measured" ? "" : ` · ${m.origin}`}`, advice, warn: high,
+    metric, label, unit, value: airNumber(metric, m.value), feed: { text: t("Live"), tone: "ok", icon: "●" }, status,
+    sub: `${t("Observed {time}", { time: at })}${m.origin === "measured" ? "" : ` · ${t(originText[m.origin] ?? m.origin)}`}`, advice, warn: high,
   };
 }
 

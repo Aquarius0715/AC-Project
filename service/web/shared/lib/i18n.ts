@@ -62,3 +62,29 @@ export const showTime = (iso: string | null, d: Display = DEFAULT_DISPLAY) => zo
 
 /** The IR44 time without the date, where a screen shows only the time of a recent reading: “9:12 am MYT”. */
 export const showClock = (iso: string | null, d: Display = DEFAULT_DISPLAY) => zoned(iso, d, { timeStyle: "short" });
+
+/** The translator with the display, for the pure helpers that word and time a screen's text (IR259, IR260). */
+export type I18n = { t: T; display: Display };
+export const i18nOf = (display: Display): I18n => ({ t: translator(display.locale), display });
+export const EN: I18n = i18nOf(DEFAULT_DISPLAY);
+
+/** The calendar day (YYYY-MM-DD) of an instant in a time zone (the default zone for one the runtime does not know). */
+function dayKey(ms: number, timeZone: string): string {
+  try {
+    return new Date(ms).toLocaleDateString("en-CA", { timeZone });
+  } catch {
+    return new Date(ms).toLocaleDateString("en-CA", { timeZone: DEFAULT_DISPLAY.timeZone });
+  }
+}
+
+/** “today 9:12 am MYT”, “yesterday …”, “tomorrow …” on the days next to now in the user's display time zone, else the
+ * IR44 date and time: the relative day stands in for the date (IR260). */
+export function relativeTime(iso: string, nowMs: number, i: I18n = EN): string {
+  const tz = i.display.timeZone;
+  const day = dayKey(Date.parse(iso), tz);
+  const time = showClock(iso, i.display);
+  if (day === dayKey(nowMs, tz)) return i.t("today {time}", { time });
+  if (day === dayKey(nowMs - 86_400_000, tz)) return i.t("yesterday {time}", { time });
+  if (day === dayKey(nowMs + 86_400_000, tz)) return i.t("tomorrow {time}", { time });
+  return showTime(iso, i.display);
+}

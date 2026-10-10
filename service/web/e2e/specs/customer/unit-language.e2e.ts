@@ -1,6 +1,6 @@
-// AT-X01-N ③ (FR-X01, IR44, IR259): with Malay and another display time zone saved in Preferences, the customer's unit
-// screen speaks Malay and shows its times in that zone with the zone's abbreviation, while the unit's ID and units (°C)
-// stay as stored. English and the time zone are put back in finally.
+// AT-X01-N ③ (FR-X01, IR44, IR259, IR260): with Malay and another display time zone saved in Preferences, the customer's
+// overview and unit screen speak Malay and show their times in that zone with the zone's abbreviation, while the unit's
+// ID and units (°C) stay as stored. English and the time zone are put back in finally.
 import { test, expect } from "../../fixtures/test";
 import type { Page } from "@playwright/test";
 
@@ -21,7 +21,7 @@ async function setDisplay(page: Page, language: RegExp, zone: string) {
   await expect(page.getByText(SAVED).last()).toBeVisible();
 }
 
-test("the unit screen in Malay keeps the ID and units and shows times in the display time zone", async ({ page }) => {
+test("the overview and unit screen in Malay keep IDs and units and show times in the display time zone", async ({ page }) => {
   await page.goto("/settings/preferences");
   const zone = await page.locator("main select").first().inputValue();
   await page.goto("/customer"); // the overview lists every AC with a link to its screen
@@ -29,8 +29,12 @@ test("the unit screen in Malay keeps the ID and units and shows times in the dis
   expect(href).toBeTruthy();
   try {
     await setDisplay(page, /^Bahasa Melayu$/, "Asia/Tokyo");
-    await page.goto(href!);
+    await page.goto("/customer");
     const main = page.getByRole("main");
+    for (const name of ["Tenaga digunakan", "Anggaran pelepasan", "Perlu perhatian", "Automasi"]) await expect(main.getByRole("heading", { name })).toBeVisible();
+    await expect(main).toContainText(/Dikemas kini \d{1,2}:\d{2} (PG|PTG) GMT\+9/); // the overview's read time in Asia/Tokyo
+    await expect(main).toContainText("Asia/Kuala_Lumpur"); // the period note: the periods are Kuala Lumpur days
+    await page.goto(href!);
     for (const name of ["KAWALAN JAUH", "Sejarah arahan", "Telemetri langsung"]) await expect(main.getByRole("heading", { name })).toBeVisible();
     expect(new URL(page.url()).pathname).toBe(href); // the ID is the stored one
     await expect(main).toContainText("°C");

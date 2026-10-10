@@ -2520,3 +2520,28 @@ AT-X01-N ③ opens `/customer/units/unit-online-rto` and expects the Malay displ
    - The whole suite: 54 passed, 9 skipped. All four users are back to en / Asia/Kuala_Lumpur afterwards.
    - A screenshot of the unit screen in Malay with Asia/Tokyo shows no overflow.
 7. **Still open.** The other business screens and their dates (klTime in Asia/Kuala_Lumpur), and the voice demo's answers.
+
+## IR260 The customer overview in the display language and time zone — 2026-10-10
+
+After the unit screen (IR259), the customer's home screen `/customer` (FR-C01, DD-C01, Figma Client 01a) is the next key screen of FR-X01.
+
+1. **Texts.** The overview is translated: the scope bar, the four counts, the energy, emissions, air-quality, units, Needs attention and automation cards. So are the texts its server reads build: the scope ("all 4 units", "2 units in Home A"), the energy change against the previous period, the emission factor, the automation lines and the day labels of the energy chart.
+2. **Times (IR44).**
+   - A unit's latest reading and the read time ("Updated …") show the time of day in the user's display time zone with the zone's abbreviation. Last seen shows the date as well.
+   - Times on the days next to now, such as Needs attention and next runs, show "today", "yesterday" or "tomorrow" instead of the date ("today 9:12 am MYT"). Other days show the IR44 date and time. The day is the calendar day in the user's display time zone (`relativeTime` in `lib/i18n`).
+3. **The period note stays in Kuala Lumpur time.** The overview's periods (today, the last 7 and 30 days) are Kuala Lumpur days (REV18-035). The note names the zone ("Today = 00:00–16:10 · Asia/Kuala_Lumpur"); only its words and month names follow the language.
+4. **Shared helpers.** These take the translator and the display (`I18n`, `i18nOf`, `useI18n`):
+   - `lib/customerOverview` — every function;
+   - `alertTitle`;
+   - `metricCard`;
+   - the automation sentences and the rule card: `ruleCard`, `whenText`, `weekdaysText`, `extraText`, `onlyIfText`, `thenText`, `actionLabel`;
+   - `dayRanges`.
+   A rule's runs keep the rule's own time zone, now with its abbreviation ("Mon, 14 Sept, 18:00 MYT"), because a schedule is set in local time. Screens that do not pass a display yet get English, with IR44 times in Asia/Kuala_Lumpur: air quality, automations and energy for the customer, and the alert titles of the other roles.
+5. **Checked.**
+   - Vitest: 33 files, 168 tests.
+     - New: `air.test.ts` (IR44 rounding, live, stale, suspect, null and unsupported readings, Malay with Asia/Tokyo) and `clientAutomations.test.ts` (days, actions, only-if sentences, run times in the rule's zone, card states in both languages).
+     - `customerOverview.test.ts` now expects the IR44 times and adds Malay / Asia/Tokyo cases.
+   - The typecheck caught a duplicate dictionary key (TS1117), so the key check relies on it as well.
+   - E2E: `customer/unit-language.e2e.ts` also opens the overview in Malay with Asia/Tokyo. It checks the card headings, the read time in GMT+9 and the period note in Asia/Kuala_Lumpur. The whole suite: 54 passed, 9 skipped; the users are back to en / Asia/Kuala_Lumpur.
+   - A screenshot of the overview in Malay with Asia/Tokyo shows no overflow.
+6. **Still open.** The customer's alerts (inbox and policies), maintenance and the other screens, and the voice demo's answers.

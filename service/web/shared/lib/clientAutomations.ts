@@ -2,7 +2,10 @@
 // 03d, 03f, 03i), the editor draft with its automations.save input and checks (03b, 03e), the schedule preview and the
 // event test (03c), and the location consent card. Pure code shared by the Server Component and the client view.
 import { klStamp } from "@ac/web/lib/energy";
+import { EN, intlTag, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import type { UnitAction } from "@ac/web/lib/units";
+
+const en = translator("en");
 
 export type Compare = "gt" | "gte" | "lt" | "lte";
 export type ClientCondition =
@@ -42,58 +45,68 @@ export const triggerOf = (a: ApiAutomation): Trigger => (a.kind === "schedule" ?
 const dayShort = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export const dayLong = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 /** "Mon, Wed" (lists) or "Mon & Wed" / "Mon, Tue & Sun" (sentences); every day, weekdays and weekends by name. */
-export function weekdaysText(ds: number[], sentence = false): string {
+export function weekdaysText(ds: number[], sentence = false, t: T = en): string {
   const s = [...ds].sort((a, b) => a - b);
-  if (s.length === 7) return "Every day";
-  if (s.join() === "1,2,3,4,5") return "Weekdays";
-  if (s.join() === "6,7") return "Weekends";
-  const names = s.map((d) => dayShort[d - 1]);
-  return sentence && names.length > 1 ? `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}` : names.join(", ");
+  if (s.length === 7) return t("Every day");
+  if (s.join() === "1,2,3,4,5") return t("Weekdays");
+  if (s.join() === "6,7") return t("Weekends");
+  const names = s.map((d) => t(dayShort[d - 1]));
+  return sentence && names.length > 1 ? t("{list} & {last}", { list: names.slice(0, -1).join(", "), last: names[names.length - 1] }) : names.join(", ");
 }
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-export function actionLabel(a: UnitAction | { kind: "ventilate"; level: string }): string {
+const modeWord: Record<string, string> = { cool: "Cool", dry: "Dry", fan: "Fan" };
+const fanWord: Record<string, string> = { low: "Low", mid: "Mid", high: "High" };
+export function actionLabel(a: UnitAction | { kind: "ventilate"; level: string }, t: T = en): string {
   switch (a.kind) {
-    case "set_power": return a.power ? "Power ON" : "Power OFF";
-    case "set_temperature": return `Set temperature ${a.celsius}°C`;
-    case "set_mode": return `Mode ${cap(a.mode)}`;
-    case "set_fan": return `Fan ${cap(a.fanLevel)}`;
-    default: return `Ventilate ${a.level}`;
+    case "set_power": return t(a.power ? "Power ON" : "Power OFF");
+    case "set_temperature": return t("Set temperature {celsius}°C", { celsius: a.celsius });
+    case "set_mode": return t("Mode {mode}", { mode: modeWord[a.mode] ? t(modeWord[a.mode]) : cap(a.mode) });
+    case "set_fan": return t("Fan {level}", { level: fanWord[a.fanLevel] ? t(fanWord[a.fanLevel]) : cap(a.fanLevel) });
+    default: return t("Ventilate {level}", { level: fanWord[a.level] ? t(fanWord[a.level]).toLowerCase() : a.level });
   }
 }
 const cmp: Record<Compare, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
 export const compares: Compare[] = ["gte", "gt", "lte", "lt"];
 export const compareText = (c: Compare) => cmp[c];
 /** The “When …” sentence of a rule; a location event happens where the target AC is (its property). */
-export function whenText(a: ApiAutomation, place: string): string {
+export function whenText(a: ApiAutomation, place: string, t: T = en): string {
   if (a.kind === "schedule") {
-    return (a.endsNextDay ? `${weekdaysText(a.weekdays)} ${a.startLocal} → ${a.endLocal} next day (overnight)` : `${weekdaysText(a.weekdays)} at ${a.startLocal} (${a.timezone})`) + onlyIfText(a.onlyIf);
+    return (a.endsNextDay ? t("{days} {start} → {end} next day (overnight)", { days: weekdaysText(a.weekdays, false, t), start: a.startLocal, end: a.endLocal })
+      : t("{days} at {start} ({zone})", { days: weekdaysText(a.weekdays, false, t), start: a.startLocal, zone: a.timezone })) + onlyIfText(a.onlyIf, t);
   }
   const c = a.condition;
-  const when = c.type === "location" ? (c.event === "arrival" ? `Arrival at ${place}` : `Everyone leaves ${place} (departure event)`)
-    : c.type === "occupancy" ? (c.occupied ? "Someone is in the room (demo occupancy)" : "No one detected (demo occupancy)")
-    : c.type === "pattern" ? `Your usual time ${c.localTime} (demo routine)` : `Outdoor temperature ${cmp[c.operator]} ${c.value}°C (demo weather)`;
-  return when + onlyIfText(a.onlyIf);
+  const when = c.type === "location" ? (c.event === "arrival" ? t("Arrival at {place}", { place }) : t("Everyone leaves {place} (departure event)", { place }))
+    : c.type === "occupancy" ? t(c.occupied ? "Someone is in the room (demo occupancy)" : "No one detected (demo occupancy)")
+    : c.type === "pattern" ? t("Your usual time {time} (demo routine)", { time: c.localTime }) : t("Outdoor temperature {op} {value}°C (demo weather)", { op: cmp[c.operator], value: c.value });
+  return when + onlyIfText(a.onlyIf, t);
 }
 /** “someone is home”, “outdoor ≥ 30°C”, “weekdays” — the “Only if” clause of a sentence. */
-export function extraText(x: ExtraCondition): string {
+export function extraText(x: ExtraCondition, t: T = en): string {
   if (x.type === "weekday") {
-    const t = weekdaysText(x.weekdays);
-    return ["Weekdays", "Weekends", "Every day"].includes(t) ? t.toLowerCase() : t;
+    const s = [...x.weekdays].sort((a, b) => a - b).join();
+    const days = weekdaysText(x.weekdays, false, t);
+    return s === "1,2,3,4,5" || s === "6,7" || x.weekdays.length === 7 ? days.toLowerCase() : days;
   }
-  if (x.type === "occupancy") return x.occupied ? "someone is home" : "no one is home";
-  return `outdoor ${cmp[x.operator]} ${x.value}°C`;
+  if (x.type === "occupancy") return t(x.occupied ? "someone is home" : "no one is home");
+  return t("outdoor {op} {value}°C", { op: cmp[x.operator], value: x.value });
 }
-export const onlyIfText = (xs: ExtraCondition[]) => (xs.length ? ` · Only if: ${xs.map(extraText).join(" and ")}` : "");
-export function thenText(a: ApiAutomation): string {
-  return a.kind === "schedule" ? `${actionLabel(a.startAction)} · at ${a.endLocal} → ${actionLabel(a.endAction)} (end action)` : actionLabel(a.action);
+export const onlyIfText = (xs: ExtraCondition[], t: T = en) => (xs.length ? t(" · Only if: {conditions}", { conditions: xs.map((x) => extraText(x, t)).join(t(" and ")) }) : "");
+export function thenText(a: ApiAutomation, t: T = en): string {
+  return a.kind === "schedule" ? t("{start} · at {end} → {endAction} (end action)", { start: actionLabel(a.startAction, t), end: a.endLocal, endAction: actionLabel(a.endAction, t) }) : actionLabel(a.action, t);
 }
 
 const KL = "Asia/Kuala_Lumpur";
-/** "Mon Sep 28 18:00" in the rule's timezone. */
-export function runText(iso: string, tz = KL): string {
+/** "Mon, 28 Sept, 18:00 MYT": a rule's time in the rule's own time zone (a schedule keeps its local time, IR44 adds the
+ * zone's abbreviation), in the display language. */
+export function runText(iso: string, tz = KL, i: I18n = EN): string {
   const d = new Date(iso);
-  const part = (o: Intl.DateTimeFormatOptions) => d.toLocaleString("en-US", { timeZone: tz, ...o });
-  return `${part({ weekday: "short" })} ${part({ month: "short" })} ${part({ day: "numeric" })} ${part({ hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}`;
+  const tag = intlTag(i.display.locale);
+  try {
+    const zone = new Intl.DateTimeFormat(tag, { timeZone: tz, timeZoneName: "short" }).formatToParts(d).find((p) => p.type === "timeZoneName")?.value;
+    return `${d.toLocaleString(tag, { timeZone: tz, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}${zone ? ` ${zone}` : ""}`;
+  } catch {
+    return runText(iso, KL, i);
+  }
 }
 const reasonText: Record<string, string> = { consent_revoked: "consent revoked", capability_changed: "capability changed", unit_archived: "unit archived" };
 const stamp = (iso: string | null) => (iso ? klStamp(iso) : "—");
@@ -103,21 +116,24 @@ export type RuleCard = {
   id: string; version: number; name: string; trigger: Trigger; when: string; then: string; place: string; enabled: boolean;
   status: { text: string; tone: "ok" | "warn" | "muted" }; note: string | null; skipped: string | null; toggle: { allowed: boolean; hint: string | null };
 };
-export function ruleCard(a: ApiAutomation, unit: { name: string; path: string; property: string } | null, nextStart: string | null, consentGranted: boolean): RuleCard {
+/** One rule card in the display language (IR260); a rule's own times stay in its time zone. */
+export function ruleCard(a: ApiAutomation, unit: { name: string; path: string; property: string } | null, nextStart: string | null, consentGranted: boolean, i: I18n = EN): RuleCard {
+  const { t } = i;
   const trigger = triggerOf(a);
-  const place = unit?.property ?? "the AC's property";
-  const more = a.unitIds.length > 1 ? ` (+${a.unitIds.length - 1} more AC${a.unitIds.length === 2 ? "" : "s"})` : "";
-  const where = unit ? `${unit.name}${more} · ${unit.path}` : "AC no longer available";
-  const status = a.enabled ? { text: "On", tone: "ok" as const } : a.disabledReason ? { text: `Disabled · ${reasonText[a.disabledReason]}`, tone: "warn" as const } : { text: "Off", tone: "muted" as const };
-  const note = a.disabledReason === "consent_revoked" ? `Will not run: location consent withdrawn ${stamp(a.updatedAt).slice(0, 10)}. Existing commands are not cancelled.`
-    : a.disabledReason === "capability_changed" ? "Will not run: the AC's capabilities changed — edit the actions, then switch it on again."
-    : a.disabledReason === "unit_archived" ? "Will not run: the AC was archived." : null;
-  const skipped = !note && a.lastRun?.outcome === "skipped" ? `Last evaluation skipped ${runText(a.lastRun.at, a.timezone)} — ${decisionText[a.lastRun.reason ?? ""] ?? a.lastRun.reason ?? "no reason recorded"}` : null;
+  const place = unit?.property ?? t("the AC's property");
+  const extra = a.unitIds.length - 1;
+  const more = extra > 0 ? t(extra === 1 ? " (+{n} more AC)" : " (+{n} more ACs)", { n: extra }) : "";
+  const where = unit ? `${unit.name}${more} · ${unit.path}` : t("AC no longer available");
+  const status = a.enabled ? { text: t("On"), tone: "ok" as const } : a.disabledReason ? { text: t("Disabled · {reason}", { reason: t(reasonText[a.disabledReason]) }), tone: "warn" as const } : { text: t("Off"), tone: "muted" as const };
+  const note = a.disabledReason === "consent_revoked" ? t("Will not run: location consent withdrawn {date}. Existing commands are not cancelled.", { date: stamp(a.updatedAt).slice(0, 10) })
+    : a.disabledReason === "capability_changed" ? t("Will not run: the AC's capabilities changed — edit the actions, then switch it on again.")
+    : a.disabledReason === "unit_archived" ? t("Will not run: the AC was archived.") : null;
+  const skipped = !note && a.lastRun?.outcome === "skipped" ? t("Last evaluation skipped {when} — {reason}", { when: runText(a.lastRun.at, a.timezone, i), reason: decisionText[a.lastRun.reason ?? ""] ? t(decisionText[a.lastRun.reason ?? ""]) : a.lastRun.reason ?? t("no reason recorded") }) : null;
   const needsConsent = trigger === "location" && !consentGranted;
   return {
-    id: a.id, version: a.version, name: a.name, trigger, when: whenText(a, place), then: thenText(a), enabled: a.enabled, status, note, skipped,
-    place: `${where}${a.enabled && nextStart ? ` · next run ${runText(nextStart, a.timezone)}` : ""}`,
-    toggle: { allowed: !(needsConsent && !a.enabled) && !!unit, hint: needsConsent && !a.enabled ? "Grant location consent first" : unit ? null : "The AC is no longer available" },
+    id: a.id, version: a.version, name: a.name, trigger, when: whenText(a, place, t), then: thenText(a, t), enabled: a.enabled, status, note, skipped,
+    place: `${where}${a.enabled && nextStart ? t(" · next run {when}", { when: runText(nextStart, a.timezone, i) }) : ""}`,
+    toggle: { allowed: !(needsConsent && !a.enabled) && !!unit, hint: needsConsent && !a.enabled ? t("Grant location consent first") : unit ? null : t("The AC is no longer available") },
   };
 }
 

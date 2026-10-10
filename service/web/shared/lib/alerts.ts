@@ -1,6 +1,7 @@
 // Customer alerts (DATA_SOURCE=api): the alert titles every role shows and the customer's alert inbox rows (IR51:
 // unresolved critical / warning alerts need attention, the rest are information; DD-C08 read state on the
 // notifications). Pure code shared by server and client.
+import { translator, type T } from "@ac/web/lib/i18n";
 export type Alert = { id: string; title: string; sev: "warning" | "normal"; kind: string; icon: string; where: string; ev: string; group: "attn" | "info"; read: boolean };
 
 /** Alert of service-contracts.ts (fields shown on this screen). */
@@ -13,9 +14,9 @@ const causeTitle: Record<string, string> = { window_open: "Possible open window"
 const typeTitle: Record<string, string> = { maintenance: "Filter cleaning reminder", quality: "Air quality alert", tamper: "Device tamper", reconciliation_required: "Restriction check needed", sensor: "Sensor alert" };
 const evidenceLabel: Record<string, string> = { inferred: "Evidence (inferred)", inspection: "Inspection record", demo_observation: "Evidence (demo observation)" };
 
-/** The display title of an alert: its suspected cause, else its type. */
-export function alertTitle(a: Pick<ApiAlert, "causeCode" | "type">): string {
-  return causeTitle[a.causeCode] ?? typeTitle[a.type] ?? "Alert";
+/** The display title of an alert: its suspected cause, else its type — in the display language (IR260). */
+export function alertTitle(a: Pick<ApiAlert, "causeCode" | "type">, t: T = translator("en")): string {
+  return t(causeTitle[a.causeCode] ?? typeTitle[a.type] ?? "Alert");
 }
 
 // ---- the customer alert inbox (DD-C08, IR242) ----
