@@ -4498,3 +4498,16 @@ Two more of the HQ frames that R311 compared.
    - The HQ language spec reads the baselines' count and their new button.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR324 HQ offset record filters; the HQ frames 10–25 are aligned — 2026-10-11
+
+1. **Offsets (FR-A15, DD-A15 item 5, SCR-A15, Figma Admin 106:9).**
+   - **Filters.** The records tab gains the Figma filter bar: customer, status and created — the last 7, 30 or 90 days of the business clock, or all, with 30 days by default. They are URL keys (`customerId`, `status`, `created`) and `offsets.list` filters; created becomes `from` on createdAt.
+   - **A record outside the list.** A `recordId` the list does not hold now says so. Before, the screen opened the first record instead.
+   - **Retire.** The button reads "Retire whole amount (demo)", because 1A retires a record only as a whole (DD-A15 step 2).
+2. **The HQ comparison of R311 is done.** IR311–IR324 compared HQ frames 10–25 with the screens and closed the gaps in their code. The differences that remain come from data the fixture does not seed (IR69): plans, contractor profiles, payout statements, automation policies, MRV reports and offset records. Each of those screens draws the Figma states once such data exists. MRV keeps its period inputs; Figma's "Period: All" select is the same filter.
+3. **Checked.**
+   - The typecheck and lint pass.
+   - New E2E spec `admin/offsets`: the filters in the URL, the default that leaves the URL, and a record outside the list.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

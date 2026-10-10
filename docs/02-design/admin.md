@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.37.0
+version: 0.38.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -640,7 +640,7 @@ Scope: FR-A15 / Main display pattern: **UI-LIST / UI-FORM / UI-DETAIL**. Service
 2. Apply these business rules to reads and actions. Purchase request, purchase confirmation, and retirement are separate events. Phase 1A supports only retiring a record's full quantity at once. Do not add calculated company emission reductions to purchased balances.
 3. Keep quoted → demo_requested → demo_purchased → demo_retired in history. Prefix proof references with DEMO- and do not output them as real certificates.
 4. Queries to update: `offsets / offset events / audit`。
-5. Tabs (IR115, Figma Admin 13-1…13-5): `tab=records` (default; offset records with the `recordId` detail, quote → request, proof, failed → retry) and `tab=market` (read-only carbon-market concept; no orders, no prices).
+5. Tabs (IR115, Figma Admin 13-1…13-5): `tab=records` (default; offset records with the `recordId` detail, quote → request, proof, failed → retry) and `tab=market` (read-only carbon-market concept; no orders, no prices). The records are filtered by `customerId`, `status` and `created` (the last 7, 30 or 90 days, or all; 30 by default) — URL keys and `offsets.list` filters (`from` on createdAt) — and a `recordId` the list does not hold says so; the retirement button reads “Retire whole amount (demo)”, as 1A retires a record only as a whole (IR324).
 6. Language and time (IR298): texts follow the display language. States, audit events and the market concept are worded, and unknown codes stay as codes. Attempt, event and quote expiry times are in the display time zone. A quote's period is Kuala Lumpur business time, and HQ types it in that time.
 
 **Boundary cases and failures**: Reject retirement before purchase, duplicate retirement, quantity 0, expired quotes, and other-tenant record actions. On failure, keep failed and the previous stage.
@@ -864,7 +864,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.37.0: Read IR01–IR323 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.38.0: Read IR01–IR324 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

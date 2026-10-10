@@ -4712,7 +4712,6 @@ export const ms: Record<string, string> = {
   "Next step · demo retirement": "Langkah seterusnya · pembatalan demo",
   "I understand this is a demo retirement. It does not retire a real credit.": "Saya faham ini pembatalan demo. Ia tidak membatalkan kredit sebenar.",
   "Disabled until confirmed. Retiring before the purchase is not possible.": "Dilumpuhkan sehingga disahkan. Pembatalan sebelum pembelian tidak boleh dilakukan.",
-  "Retire (demo)": "Batalkan kredit (demo)",
   "Event history": "Sejarah peristiwa",
   "Open in audit →": "Buka dalam audit →",
   "No events yet.": "Belum ada peristiwa.",
@@ -5366,6 +5365,15 @@ export const ms: Record<string, string> = {
   "Remove the fact": "Buang fakta",
   "No unsaved changes · form loaded from policy v{v}": "Tiada perubahan belum disimpan · borang dimuatkan daripada polisi v{v}",
   "Unsaved changes — saving creates version {n}": "Perubahan belum disimpan — menyimpan mencipta versi {n}",
+
+  // HQ offsets filters (IR324)
+  "All time": "Sepanjang masa",
+  "Created": "Dicipta",
+  "Last 90 days": "90 hari lepas",
+  "It does not exist, or the customer, status or created filter hides it.": "Ia tidak wujud, atau penapis pelanggan, status atau tarikh dicipta menyembunyikannya.",
+  "No record matches these filters — widen them, or get a demo quote and request it to create a record.": "Tiada rekod sepadan dengan penapis ini — luaskan penapis, atau dapatkan sebut harga demo dan mintanya untuk mencipta rekod.",
+  "Retire whole amount (demo)": "Batalkan keseluruhan jumlah (demo)",
+  "That record is not in this list": "Rekod itu tiada dalam senarai ini",
 
   // customer assistant (lib/assistant, IR306)
   "Language": "Bahasa",
