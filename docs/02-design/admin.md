@@ -670,6 +670,7 @@ Scope: FR-A16 / Main display pattern: **UI-TIMELINE / UI-DETAIL**. Service bound
 3. This screen is read-only. Keep search conditions in the URL, without confidential text.
 4. Queries to update: `none (audit read-only)`.
 5. Tabs (IR115, Figma Admin 14-1…14-5): `tab=log` (default; audit search with `correlationId`, actor, target, result and period in the URL) and `tab=devices` (device event history for the `deviceId`; notes are added from Devices & models with device.write, not here).
+6. Language and time (IR304): texts, results and recorded roles follow the display language. Entry and device-event times are in the display time zone, and the period filter takes that zone's days and names it.
 
 **Boundary cases and failures**: Search correlation IDs within the authorized set. Other-tenant and nonexistent correlation IDs return the same successful empty result. Reject delete-equivalent calls and reversed periods. Role switching must not change historical actors to different people.
 

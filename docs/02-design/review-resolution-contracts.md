@@ -3868,3 +3868,28 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
    - The assistant panel and the voice demo's answers.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR304 The HQ audit log in the display language; every business screen now follows the display language — 2026-10-10
+
+`/admin/audit` (SCR-A16, FR-A16, DD-A16, Figma Admin 14-1…14-5) follows the display language and time zone. It is the last of the 44 business screens.
+
+1. **Texts.** These are translated:
+   - the Audit log and Device events tabs, the filter card and the result choices;
+   - the list and an entry's detail: actor, role at the time, occurred, correlation ID, reason, and the masked before / after table;
+   - the device events tab, the empty states and "Load more".
+   The dictionary gains 27 entries. These stay as they are: actions, target kinds and IDs, correlation IDs, field names and the masked values.
+2. **Words for codes.** Results (`resultWord`) and the role recorded at the time (`roleAtTimeWord`) are worded. Before, the badge showed the English code, and the role was printed raw. An unknown role stays as recorded.
+3. **Times.**
+   - An entry's time is an instant. The list shows it relative to now ("today 9:30"), and the detail shows the full time, both in the display time zone and formatted by the page (IR282). Before, they were Kuala Lumpur stamps.
+   - Device events use `relativeTime` too (IR295).
+   - The period filter's days are now the display time zone's days. `auditFilters` and `auditQuery` take the zone, and the form names it ("Days in Asia/Tokyo"). An entry shown at a time on a day is then inside a filter that starts on that day. Before, the days were Kuala Lumpur days while the times showed another zone.
+4. **One timeline helper.** The restriction exception screen's audit card now uses `auditItem` from `lib/audit` (IR301).
+5. **Checked.**
+   - Vitest: 52 files, 296 tests. `audit.test.ts` is new. It covers the URL filters and their default period in the display zone, the period check, the audit.list input in two zones, the rows with relative and full times, the masked changes, the recorded role and unknown codes, and Malay / Tokyo.
+   - E2E: `admin/language.e2e.ts` also opens the audit log. It checks "Hari dalam Asia/Tokyo", the result choices, an entry's time in GMT+9, and the device events tab.
+6. **Progress.** All 44 business screens follow the display language (IR258–IR304).
+7. **Still open.**
+   - The Phase 1A browser demo's fixture screens, and the assistant panel and voice demo's answers.
+   - Audit actors show as user IDs. `audit.list` should return the actor's display name (identity holds both), so this is next.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

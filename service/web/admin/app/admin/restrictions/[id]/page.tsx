@@ -8,8 +8,8 @@ import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { EmptyState, Page as Screen } from "@ac/web/components/ui";
 import { apiMode, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
-import type { ApiAudit } from "@ac/web/lib/audit";
-import { i18nOf, showTime } from "@ac/web/lib/i18n";
+import { auditItem, type ApiAudit } from "@ac/web/lib/audit";
+import { i18nOf } from "@ac/web/lib/i18n";
 import { activePeriod, intentText, unitRows, type ApiRestriction } from "@ac/web/lib/restrictions";
 import { ExceptionDemo } from "./_components/exception-demo";
 import { ExceptionView } from "./_components/exception-view";
@@ -37,13 +37,12 @@ export default async function AdminRestrictionPage({ params }: PageProps<"/admin
   const from = new Date(now.getTime() - 365 * 24 * 3600 * 1000).toISOString();
   const to = new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
   const audit = canAudit ? await coreOp<Page<ApiAudit>>("audit.list", { limit: 100, filters: { targetKind: "restriction", targetId: id, from, to }, sort: { field: "occurredAt", direction: "asc" } }) : null;
-  const result: Record<string, string> = { success: t("Success"), denied: t("Denied"), failed: t("Failed"), pending: t("Pending") };
   return (
     <ExceptionView live={{
       now: now.toISOString(), r, units: unitRows(r, new Map(units.items.map((u) => [u.id, u.displayName])), new Map(), i),
       canWrite: perms.has("restriction.write"), canOverride: perms.has("restriction.override"), canAudit,
       period: activePeriod(r, now, i), intent: intentText(r, i),
-      audit: audit?.items.map((a) => ({ time: showTime(a.occurredAt, display), title: `${a.action} · ${result[a.result] ?? a.result}`, detail: `${a.actorId} (${a.actorRoleAtTime})${a.reason ? ` · ${a.reason}` : ""}` })) ?? [],
+      audit: audit?.items.map((a) => auditItem(a, i)) ?? [],
     }} />
   );
 }

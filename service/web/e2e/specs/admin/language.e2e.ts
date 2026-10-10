@@ -1,4 +1,4 @@
-// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A03, FR-A06, FR-A07, FR-A08, FR-A11, FR-A13, FR-A14, FR-A15, FR-A23, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
+// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A03, FR-A06, FR-A07, FR-A08, FR-A11, FR-A13, FR-A14, FR-A15, FR-A16, FR-A23, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
 // HQ overview speaks Malay — the scope and period filters, the KPI tiles, the forecast, the power and connection axes,
 // the job statuses and the billing card — and its as-of time is in GMT+9 while the period stays Kuala Lumpur days, named
 // so; the Jobs tab speaks Malay too — tabs, scope, filters, the list and one job's detail with its times in GMT+9 — and
@@ -12,7 +12,8 @@
 // preview (a read), the payment and invoice checks, inquiries and payouts (IR299), and contracts with their Kuala Lumpur
 // days and the new-contract checks (IR300), the restrictions' no-access state (IR301), and access & roles with the
 // valid period in the display zone and the new-membership checks (IR302), and the automation policies' editor and
-// new-policy checks (IR303). Nothing is saved. English and the earlier zone come back at the end, or in
+// new-policy checks (IR303), and the audit log with its period in the display zone and the device events (IR304).
+// Nothing is saved. English and the earlier zone come back at the end, or in
 // afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
@@ -253,6 +254,16 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(main.getByRole("heading", { name: "Cara konflik diselesaikan", exact: true })).toBeVisible();
   await main.getByRole("button", { name: "Cipta polisi" }).click();
   for (const text of ["1–120 aksara", "Pilih sekurang-kurangnya satu unit"]) await expect(main).toContainText(text);
+  // the audit log (IR304): the period's days in the display zone, the result choices, an entry's times in GMT+9, and the
+  // device events tab
+  await page.goto("/admin/audit");
+  await expect(main.getByRole("tab", { name: /^Log audit/ })).toHaveAttribute("aria-selected", "true");
+  await expect(main).toContainText("Hari dalam Asia/Tokyo");
+  for (const name of ["Berjaya", "Ditolak", "Gagal", "Belum selesai"]) await expect(main.getByRole("button", { name, exact: true })).toBeVisible();
+  if (await main.getByText("Peranan pada masa itu", { exact: true }).count()) await expect(main).toContainText(/Berlaku\s*\d{1,2} \S+ \d{4}, .+ GMT\+9/);
+  await main.getByRole("tab", { name: "Peristiwa peranti" }).click();
+  await page.waitForURL(/tab=devices/);
+  await expect(main.getByRole("heading", { name: "Peristiwa peranti", exact: true })).toBeVisible();
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/admin");

@@ -3,8 +3,9 @@
 import { useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Badge, Btn, Card, Choice, DataTable, EmptyState, Field, Input, ListRow, Page, SummaryList, Tabs, Timeline } from "@ac/web/components/ui";
+import { useI18n } from "@ac/web/components/I18n";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
-import { periodError, type AuditFilters, type AuditResult, type AuditRow } from "@ac/web/lib/audit";
+import { periodError, resultWord, type AuditFilters, type AuditResult, type AuditRow } from "@ac/web/lib/audit";
 
 const seed: AuditRow[] = [
   { id: "1", op: "restriction.override", target: "restriction · restriction-a41", actor: "hq-operator", role: "admin", at: "09-22 09:14", occurred: "2026-09-22 09:14 (Asia/Kuala_Lumpur)", corr: "corr-7f21a9", res: "Success", reason: "Customer requested a short exception while the invoice is under review.",
@@ -21,8 +22,10 @@ const tone = (r: AuditResult) => (r === "Success" ? "ok" : r === "Denied" ? "war
 type Live = { rows: AuditRow[]; total: number; filters: AuditFilters; tab: "log" | "devices"; device?: { label: string; items: { time: string; title: string; detail: string }[] } };
 
 /** The audit log. `live` comes from the Server Component in API mode, where every filter change replaces the URL and
- * the server reads audit.list again; the demo filters its seed rows locally. */
+ * the server reads audit.list again; the demo filters its seed rows locally. Texts in the display language; the
+ * period's days are the display time zone's (IR304). */
 export function AuditView({ live }: { live?: Live }) {
+  const i = useI18n(), { t } = i, zone = i.display.timeZone;
   const router = useRouter();
   const pathname = usePathname();
   const nav = (patch: Record<string, string | null>) => {
@@ -35,7 +38,7 @@ export function AuditView({ live }: { live?: Live }) {
   };
   const [urlTab, setUrlTab] = useUrlTab<"log" | "devices">({ log: "log", devices: "devices" }, "log");
   const tab = live ? live.tab : urlTab; // API mode: the server read the tab from the URL (and loaded its data)
-  const setTab = (t: "log" | "devices") => (live ? nav({ tab: t === "devices" ? "devices" : null }) : setUrlTab(t));
+  const setTab = (id: "log" | "devices") => (live ? nav({ tab: id === "devices" ? "devices" : null }) : setUrlTab(id));
   const initial = live?.filters ?? demoFilters;
   const [res, setRes] = useState<"All" | AuditResult>(initial.result);
   const [corr, setCorr] = useState(initial.correlationId);
@@ -52,7 +55,7 @@ export function AuditView({ live }: { live?: Live }) {
     setTo(live.filters.to);
   }
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const periodErr = periodError({ from, to });
+  const periodErr = periodError({ from, to }, t);
   const all = live ? live.rows : seed;
   const rows = live ? all : all.filter((l) => (res === "All" || l.res === res) && (!corr || l.corr.includes(corr))).slice(0, shown);
   const [selId, setSelId] = useState<string | null>(null);
@@ -86,34 +89,34 @@ export function AuditView({ live }: { live?: Live }) {
 
   return (
     <Page>
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "log", label: "Audit log", count: total }, { id: "devices", label: "Device events" }]} />
+      <Tabs value={tab} onChange={setTab} tabs={[{ id: "log", label: t("Audit log"), count: total }, { id: "devices", label: t("Device events") }]} />
       {tab === "log" ? (
         <>
-          <Card title="Filter">
-            <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}><Field label="Correlation ID"><Input value={corr} onChange={(e) => changeCorr(e.target.value)} placeholder="corr-…" /></Field><Field label="From" error={periodErr}><Input type="date" value={from} onChange={(e) => changeDate("from", e.target.value)} /></Field><Field label="To"><Input type="date" value={to} onChange={(e) => changeDate("to", e.target.value)} /></Field></div>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><Choice value={res} onChange={changeRes} options={(["All", "Success", "Denied", "Failed", "Pending"] as const).map((k) => ({ id: k, label: k }))} /><Btn size="sm" onClick={reset}>Reset</Btn></div>
+          <Card title={t("Filter")}>
+            <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}><Field label={t("Correlation ID")}><Input value={corr} onChange={(e) => changeCorr(e.target.value)} placeholder="corr-…" /></Field><Field label={t("From")} error={periodErr} hint={periodErr ? undefined : t("Days in {zone}", { zone })}><Input type="date" value={from} onChange={(e) => changeDate("from", e.target.value)} /></Field><Field label={t("To")}><Input type="date" value={to} onChange={(e) => changeDate("to", e.target.value)} /></Field></div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><Choice value={res} onChange={changeRes} options={(["All", "Success", "Denied", "Failed", "Pending"] as const).map((k) => ({ id: k, label: k === "All" ? t("All") : resultWord(k, t) }))} /><Btn size="sm" onClick={reset}>{t("Reset")}</Btn></div>
           </Card>
           <div className="split-rev">
-            <Card title="Audit log · newest first" className="self-start">
-              {rows.length === 0 ? <EmptyState title="No audit entries match these filters">{periodErr ?? "No audit entries match this period, correlation ID or result."}</EmptyState> : <div className="flex flex-col gap-2">{rows.map((l) => <ListRow key={l.id} selected={sel?.id === l.id} onClick={() => setSelId(l.id)}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{l.op}</b><Badge tone={tone(l.res)}>{l.res}</Badge></div><div className="truncate text-[11px] text-muted">{l.target}</div><div className="truncate text-[11px] text-muted">{l.actor} ({l.role}) · {l.at} · {l.corr}</div></div></ListRow>)}</div>}
-              <p className="mt-3 text-[11px] text-muted">{rows.length} of {total} · 25 per page</p>
+            <Card title={t("Audit log · newest first")} className="self-start">
+              {rows.length === 0 ? <EmptyState title={t("No audit entries match these filters")}>{periodErr ?? t("No audit entries match this period, correlation ID or result.")}</EmptyState> : <div className="flex flex-col gap-2">{rows.map((l) => <ListRow key={l.id} selected={sel?.id === l.id} onClick={() => setSelId(l.id)}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{l.op}</b><Badge tone={tone(l.res)}>{resultWord(l.res, t)}</Badge></div><div className="truncate text-[11px] text-muted">{l.target}</div><div className="truncate text-[11px] text-muted">{l.actor} ({l.role}) · {l.at} · {l.corr}</div></div></ListRow>)}</div>}
+              <p className="mt-3 text-[11px] text-muted">{t("{n} of {total} · 25 per page", { n: rows.length, total })}</p>
             </Card>
             {sel && (
               <div className="flex min-w-0 flex-col gap-4">
                 <Card title={sel.op} sub={sel.target}>
-                  <SummaryList items={[["Actor", sel.actor], ["Role at the time", `${sel.role} — kept as recorded, not rewritten`], ["Occurred", sel.occurred], ["Correlation ID", <button key="c" className="font-mono text-primary underline" onClick={() => changeCorr(sel.corr)}>{sel.corr} · Filter by ID →</button>], ["Reason", sel.reason ?? "—"]]} />
-                  <h3 className="mt-4 mb-2 text-[13px] font-bold">Before / after (masked)</h3>
-                  {sel.changes.length === 0 ? <p className="text-xs text-muted">No field values were recorded for this entry.</p> : <DataTable rows={sel.changes} rowKey={(r) => r.field} cols={[{ key: "f", label: "Field", render: (r) => <span className="font-mono text-xs">{r.field}</span> }, { key: "a", label: "Before", render: (r) => r.before }, { key: "b", label: "After", render: (r) => <span className={r.changed ? "font-bold text-warn" : ""}>{r.after}</span> }]} />}
-                  <p className="mt-2 text-[11px] text-muted">Changed fields are highlighted. Secrets are masked.</p>
+                  <SummaryList items={[[t("Actor"), sel.actor], [t("Role at the time"), t("{role} — kept as recorded, not rewritten", { role: sel.role })], [t("Occurred"), sel.occurred], [t("Correlation ID"), <button key="c" className="font-mono text-primary underline" onClick={() => changeCorr(sel.corr)}>{t("{corr} · Filter by ID →", { corr: sel.corr })}</button>], [t("Reason"), sel.reason ?? "—"]]} />
+                  <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Before / after (masked)")}</h3>
+                  {sel.changes.length === 0 ? <p className="text-xs text-muted">{t("No field values were recorded for this entry.")}</p> : <DataTable rows={sel.changes} rowKey={(r) => r.field} cols={[{ key: "f", label: t("Field"), render: (r) => <span className="font-mono text-xs">{r.field}</span> }, { key: "a", label: t("Before"), render: (r) => r.before }, { key: "b", label: t("After"), render: (r) => <span className={r.changed ? "font-bold text-warn" : ""}>{r.after}</span> }]} />}
+                  <p className="mt-2 text-[11px] text-muted">{t("Changed fields are highlighted. Secrets are masked.")}</p>
                 </Card>
-                {!live && <Card title="Related records"><SummaryList items={[["Restriction", "restriction-a41 · applied · exception until 09-29"], ["Command", "cmd-3302 · same correlation ID"], ["Job", "No related job"]]} /><p className="mt-2 text-[11px] text-muted">Links open existing detail screens and export no new data.</p></Card>}
+                {!live && <Card title={t("Related records")}><SummaryList items={[[t("Restriction"), "restriction-a41 · applied · exception until 09-29"], [t("Command"), "cmd-3302 · same correlation ID"], [t("Job"), t("No related job")]]} /><p className="mt-2 text-[11px] text-muted">{t("Links open existing detail screens and export no new data.")}</p></Card>}
               </div>
             )}
           </div>
-          {more && <div className="text-center"><Btn onClick={() => (live ? nav({ limit: String(Math.min(100, live.filters.limit + 25)) }) : setShown((s) => s + 25))}>Load more</Btn></div>}
+          {more && <div className="text-center"><Btn onClick={() => (live ? nav({ limit: String(Math.min(100, live.filters.limit + 25)) }) : setShown((s) => s + 25))}>{t("Load more")}</Btn></div>}
         </>
       ) : (
-        <Card title="Device events" sub={live?.device?.label ?? "device-online-rto · connection, power and tamper are separate"}>{(live?.device?.items ?? seedEvents).length === 0 ? <EmptyState title="No device events">This device has no recorded events.</EmptyState> : <Timeline items={live?.device?.items ?? seedEvents} />}</Card>
+        <Card title={t("Device events")} sub={live?.device?.label ?? "device-online-rto · connection, power and tamper are separate"}>{(live?.device?.items ?? seedEvents).length === 0 ? <EmptyState title={t("No device events")}>{t("This device has no recorded events.")}</EmptyState> : <Timeline items={live?.device?.items ?? seedEvents} />}</Card>
       )}
     </Page>
   );
