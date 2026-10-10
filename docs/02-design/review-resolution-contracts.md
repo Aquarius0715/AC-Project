@@ -4751,3 +4751,28 @@ R325 compared the files under docker/ and the variables of compose.yaml with the
    - **Prepared resources.** `docker/localstack/init-aws.sh` already creates the production resource names: the domain-events FIFO topic, five FIFO queues with dead-letter queues, the telemetry stream, four buckets, the SES identity and the Stripe test secret.
    - **Where it is written.** The container design says so under its variable table, and the LocalStack row reads "the AWS clients will use `AWS_ENDPOINT_URL`" instead of "services use". OPEN-CT-04 records the missing OpenTelemetry instrumentation. Figma board 07 adds the same note.
 3. **No code change.**
+
+## IR335 Screens, flows and use cases are complete; the scheduler and the unused tables as built — 2026-10-11
+
+R326 checked the wireframes, the User Flows, the Use Cases and the screen catalog against each other, and then the scheduler and the schema against the code.
+
+1. **Screens and flows match.**
+   - **Admin, contractor, technician.** Every screen frame carries its ScreenTag: 123, 61 and 58. Each User Flows board lists the same tags. The only untagged frames are the legends and the cross-role scheduling flow.
+   - **Client.** The 82 client frames are named by their tags, and the User Flows board lists the same 82. The frame "02k-states" is the state sheet of 02k, not a screen.
+   - **Use Cases.** The page cites all 75 FR IDs of the requirements. Its catalogue counts 10 + 36 + 48 + 16 + 16 = 126 use cases.
+   - **Screen catalog.** It has 50 screens (C 12, A 15, P 9, T 7, X 7), as board 01 says. Every catalogued route is a page of its app. The only pages outside the catalog are the root redirects and `/technician/jobs` (a redirect to the overview).
+2. **The scheduler as built (backend architecture §10).**
+   - **How it runs.** One scheduler per business domain. Each transition is a set-based update guarded by the state it leaves; no lease is used yet.
+   - **Built transitions:**
+     - equipment: command expiry, diagnostic run ends, automation schedules, device operation start and time-out;
+     - maintenance: offer expiry, the slot proposal reply deadline, auto-confirm, the work window end and filter reminders.
+   - **The other items of the table:**
+     - done by explicit operations: `restrictions.execute`, `plans.generateNext`, `invoices.remind`;
+     - computed when read: grace, exception and certificate expiry;
+     - not built: the work window warning, the follow-up reminder, the monthly report, campaign wave starts.
+   - **Open.** OPEN-BE-08 records the open items and the lease for several instances.
+3. **Unused tables (database design §2).** Six tables are created but nothing uses them yet: `billing.stripe_events`, the two measurement rollups, `notify.deliveries`, `notify.templates`, `platform.scheduled_items` and `platform.stream_checkpoints`.
+   - The 24-hour chart reads the raw measurements.
+   - The energy figures integrate `energy.ref_power_samples`.
+   - `identity.permissions` holds the 38 codes inserted by schema.sql and is used through its foreign key.
+4. **No code change.**

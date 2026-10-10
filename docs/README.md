@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.218.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
+Version: 0.219.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.219.0 (2026-10-11): The wireframes, User Flows, Use Cases and screen catalog match screen for screen; the backend architecture lists the scheduled transitions that are built and those that wait (OPEN-BE-08); the database design names the six tables nothing uses yet (IR335).
 0.218.0 (2026-10-11): docker/ matches the container design (Keycloak realm, Mosquitto, WireMock, OpenTelemetry collector); the container design names the AWS, MQTT, Stripe, weather and OpenTelemetry variables that nothing reads yet and the LocalStack resources prepared for them (IR334).
 0.217.0 (2026-10-11): The BFF session cookie is sealed with AES-256-GCM, so the browser keeps an opaque value instead of readable tokens (the server-side store stays OPEN-CT-03); the container design lists the ECS services and the variables compose.yaml and the code use; ten design documents that still read IR01–139 now read IR01–IR333 (IR333).
 0.216.0 (2026-10-11): Every VALIDATION check of the integration suite now names its field, including the single checks, the tables with run-made IDs and the tables with an expected-code column; a default-policy check that passed on a 409 and an accept check without its job are fixed (IR332).

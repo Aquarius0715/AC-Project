@@ -1,6 +1,6 @@
 ---
 document_id: DD-DATABASE
-version: 0.31.0
+version: 0.32.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -31,6 +31,16 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 | energy | Energy & carbon | baselines (versioned), emission_factors (versioned), mrv_reports (versioned), mrv_reviews, offset_quotes, offset_records, offset_attempts, ref_* reference copies including minute-slot power samples (IR189) |
 | notify | Notifications | notifications, deliveries, templates, ref_* reference copies of other domains' rows kept from RowChanged events (IR188) |
 | audit | Audit | audit_log (append-only, partitioned) |
+
+As built (IR335), six tables are created but not used yet:
+
+- `billing.stripe_events`: the webhook service is planned (IR197);
+- `monitoring.measurements_15m` and `monitoring.measurements_1h`: the rollup worker is not built. `telemetry.series` reads the raw measurements, and the energy figures integrate the minute power samples copied to `energy.ref_power_samples`;
+- `notify.deliveries` and `notify.templates`: the notification worker is not built. Notifications are saved in-app with a simulated delivery, and their texts come from the code;
+- `platform.scheduled_items`: the schedulers update the domain tables directly (backend architecture §10);
+- `platform.stream_checkpoints`: no stream consumer yet.
+
+`identity.permissions` is used through its foreign key: schema.sql inserts the 38 codes.
 
 Rules:
 
@@ -168,8 +178,8 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 | Admin overview (`admin.summary`) | counts by status per tenant / customer | `units_customer`, `units_connection`, `alerts_open`, `jobs_status`, `invoices_overdue` |
 | Units & locations tree (`units.list`, `spaces.list`) | by customer / property / space | `properties_customer`, `spaces_property`, `units_property` |
 | Unit control (`commands.create`, `commands.get`) | pending command per unit, latest commands | `commands_one_pending_per_unit`, `commands_unit` |
-| 24-hour chart (`telemetry.series`) | unit + metric + time range | `measurements_unit_metric` (hot) or `measurements_15m` |
-| Energy analysis / MRV | unit set + period | `measurements_1h` primary key |
+| 24-hour chart (`telemetry.series`) | unit + metric + time range | `measurements_unit_metric` (hot) or `measurements_15m` (as built: the hot index only, IR335) |
+| Energy analysis / MRV | unit set + period | `measurements_1h` primary key (as built: `energy.ref_power_samples` by unit and time, IR335) |
 | Alerts inbox (`alerts.list`) | open alerts by customer and severity | `alerts_open` |
 | Jobs lists (HQ / partner / technician) | by status, contractor, assigned technician | `jobs_status`, `jobs_contractor`, `assignments_technician` |
 | Follow-ups to classify (IR114) | `follow_up_class = 'pending'` | `jobs_follow_up_pending` |
@@ -184,4 +194,4 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 - `identity.users.last_sign_in_at` is the business time of the latest sign-in, and `sign_in_auth_time` is the identity provider's `auth_time` of that sign-in. Only a later `auth_time` replaces them (IR268).
 - Personal data anonymisation (backend architecture §7) updates `identity.users` (status `anonymised`, e-mail replaced) and `identity.client_users`; audit rows keep IDs but never contact data (masked at write time).
 
-Additional contracts for current version 0.31.0: Read IR01–IR333 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.32.0: Read IR01–IR335 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

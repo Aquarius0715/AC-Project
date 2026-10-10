@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND
-version: 0.31.0
+version: 0.32.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -224,6 +224,22 @@ Modelling rules:
 
 The scheduler claims due items with a database lease (`FOR UPDATE SKIP LOCKED`) so that each item runs once even with several instances; handlers are idempotent and audited with actorRoleAtTime=system.
 
+As built (IR335), the worker runs one scheduler per business domain (IR195). Each scheduler ticks every second of business time, with one transaction per tenant. Each transition is a set-based update guarded by the state it leaves, for example `status = 'offered' AND offer_expires_at <= now`, so a second run finds nothing to change. No lease table is used yet: `platform.scheduled_items` stays empty, and compose runs one scheduler per domain. Several instances would need the lease above (OPEN-BE-08).
+
+| Scheduler | Built transitions |
+|---|---|
+| Equipment | Command expiry at `expiresAt`, diagnostic run ends (IR123), automation schedules (FR-C04, IR54), device operation start and time-out (IR67) |
+| Maintenance | Offer expiry, the slot proposal reply deadline (IR113), auto-confirm of completed jobs (FR-C17), the work window end (the assignment history is frozen, IR89), filter cleaning reminders (IR239) |
+
+Items of the table above that are not scheduled yet:
+
+- **Done by an explicit operation:**
+  - restriction execution: `restrictions.execute` is refused before `executeAfter` and the 24-hour notice, and while an exception or grace period holds;
+  - periodic plan job generation: `plans.generateNext`;
+  - invoice reminders: HQ previews one with `notifications.preview` and sends it with `invoices.remind`, which saves the customer's notification; external delivery is simulated (DD-A08).
+- **Computed when read:** grace and exception expiry (compared at execution) and certificate expiry (the status, IR133).
+- **Not built:** the 15-minute work window warning, the follow-up classification reminder, the monthly energy report (exported on demand with `energy.exportReport`) and the start of firmware campaign waves.
+
 ## 11. External integrations
 
 | Integration | Direction | Pattern | Security |
@@ -287,5 +303,6 @@ The scheduler claims due items with a database lease (`FOR UPDATE SKIP LOCKED`) 
 | OPEN-BE-05 | Decided 2026-10-07: retention in §7 (confirm with legal counsel before go-live) | — |
 | OPEN-BE-06 | Decided 2026-10-07: capacity in §13 | — |
 | OPEN-BE-07 | Contractor payout rail (bank transfer file or Stripe Connect) | Payouts (FR-A23) |
+| OPEN-BE-08 | The scheduled items that are not built yet (§10 as built) and the lease (`platform.scheduled_items`, `FOR UPDATE SKIP LOCKED`) for running several scheduler instances per domain | Scheduler, worker |
 
-Additional contracts for current version 0.31.0: Read IR01–IR333 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.32.0: Read IR01–IR335 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
