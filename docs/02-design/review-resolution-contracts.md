@@ -2943,3 +2943,29 @@ DEC-03 was open since IR257. The SRC-02 phrase "shared libraries, reactForms" ha
    - the production-instructions row and the reference analysis' icon row.
    Earlier IRs and review records keep their history.
 3. **Code.** Nothing changes; the build already works this way. Vitest (200), E2E (58 passed, 9 skipped) and `make test-all` stay as they were in IR272.
+
+## IR274 The contractor's quality review in the display language — 2026-10-10
+
+`/partner/jobs/[id]/review` (FR-P05, DD-P05, Figma Contractor 03) follows the offer and job page (IR272).
+
+1. **Texts.** These are translated:
+   - the report: the inspection rows with their result badges and reasons, photos, work performed and the next action, parts and refrigerant, readings, time on site and the customer sign-off;
+   - the quality review card with the IR31 note and the decision buttons;
+   - the evidence check (rows, missing items, verdict);
+   - the versions and linked alerts;
+   - the return dialog, the banners, the refusals (CONFLICT, FORBIDDEN, NOT_FOUND) and the toasts.
+   Part sources (van stock, HQ warehouse, bought locally) and leak checks (passed, failed, not done) get words instead of codes (`partLines`). Reasons, work text, notes and names stay as written.
+2. **Times.** The loader formats every time on the server in the display time zone (IR44):
+   - the submission and the sign-off;
+   - the time on site as a span with its duration;
+   - each version's review, an alert's time, the work window and the due time.
+   A follow-up date stays the calendar date the technician picked.
+3. **Shared helpers.** These take the translator or the display: `timeOnSiteText`, `evidenceCheck`, `availabilityText`, `versionRows`, `alertRows` and `dueRow`; `partLines` is new. Only the review uses them, so their English output moves to IR44 too ("v1 · returned 14 Sept 2026, 8:30 am MYT").
+4. **Checked.**
+   - Vitest: 36 files, 201 tests. `partnerReview.test.ts` covers the new English times and the Malay evidence check, availability, versions, alerts, time on site and parts.
+   - E2E: `partner/language.e2e.ts` also opens a completed job's review in Malay. The suite: 58 passed, 9 skipped. The users are en / Asia/Kuala_Lumpur, and all 57 E2E jobs are cancelled.
+5. **Still open.**
+   - The other partner screens: schedule, team, history, payouts and unit.
+   - The technician and HQ screens.
+   - The browser demo's screens.
+   - The assistant panel and the voice demo's answers.

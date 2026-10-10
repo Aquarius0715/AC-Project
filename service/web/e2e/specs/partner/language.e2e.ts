@@ -1,7 +1,7 @@
-// AT-X01-N ③ for the contractor (FR-X01, FR-P01, FR-P02, IR44, IR270–IR272): with Malay and Asia/Tokyo saved in
-// Preferences, the overview, the job list and a job's page speak Malay; the update time is in GMT+9, while the period
-// and today's timeline stay Kuala Lumpur days and hours — the timeline says so. English and the earlier zone come back
-// at the end, or in afterEach when the test fails.
+// AT-X01-N ③ for the contractor (FR-X01, FR-P01, FR-P02, FR-P05, IR44, IR270–IR274): with Malay and Asia/Tokyo saved
+// in Preferences, the overview, the job list, a job's page and a completed job's quality review speak Malay; the update
+// time is in GMT+9, while the period and today's timeline stay Kuala Lumpur days and hours — the timeline says so.
+// English and the earlier zone come back at the end, or in afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
@@ -31,6 +31,12 @@ test("the contractor screens in Malay keep Kuala Lumpur days and show instants i
     await job.click();
     await page.waitForURL(/\/partner\/(jobs\/[^/?]+|history|schedule)/);
     if (/\/partner\/jobs\/[^/?]+$/.test(new URL(page.url()).pathname)) await expect(main.getByRole("link", { name: "← Kerja" })).toBeVisible(); // the offer, detail or history page
+  }
+  await page.goto("/partner/jobs?tab=completed");
+  const done = main.locator("a[href^='/partner/jobs/']").first(); // a completed job inside its delegation: its quality review
+  if (await done.count()) {
+    await page.goto(`${(await done.getAttribute("href"))!.split("?")[0]}/review`);
+    await expect(main.getByRole("heading", { name: /^(Semakan bukti|Tiada laporan untuk disemak)$/ })).toBeVisible();
   }
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
