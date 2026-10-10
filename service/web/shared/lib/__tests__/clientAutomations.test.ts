@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  actionLabel, actionOptions, apiErrors, consentCard, draftErrors, draftOf, eventTest, ruleCard, runClock, runText, scheduleTest, summaryText, weekdaysText, whenText, type ApiAutomation,
+  actionLabel, actionOptions, apiErrors, consentCard, draftErrors, draftOf, eventTest, ruleCard, runClock, runText, saveInput, scheduleTest, summaryText, weekdaysText, whenText, type ApiAutomation,
 } from "@ac/web/lib/clientAutomations";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
@@ -54,5 +54,23 @@ describe("customer automation sentences (FR-C04, FR-C05, IR260)", () => {
       .toMatchObject({ title: "Isn, 14 Sep, 09:00 MYT — tidak dihantar", detail: "Tiada apa-apa akan dihantar: AC di luar talian" });
     expect(consentCard({ id: "c", version: 2, granted: true, grantedAt: "2026-09-10T02:00:00Z", revokedAt: null }, 1, 0, MS)).toMatchObject({ title: "Diberikan", text: "Diberikan 10 Sep 2026, 11:00 PG GMT+9 · digunakan hanya oleh 1 automasi lokasi · peristiwa lokasi demo (tiada sejarah GPS sebenar)." });
     expect([runClock("2026-09-14T14:00:00Z"), runClock("2026-09-14T14:00:00Z", "Asia/Tokyo")]).toEqual(["22:00 MYT", "23:00 GMT+9"]);
+  });
+});
+
+describe("ventilation in a customer rule (DD-C05 “within unit capabilities”, IR314)", () => {
+  const fresh = { control: true, modeControl: false, fanControl: false, temperature: null, modes: [], fanLevels: [], ventilation: true, ventilationLevels: ["low", "high"] } as const;
+  it("offers ventilation on a model with a fresh-air function, and the AC settings only with control", () => {
+    expect(actionOptions(fresh).map((g) => g.group)).toEqual(["Power", "Ventilation"]);
+    expect(actionOptions(fresh)[1].options).toEqual([{ key: "vent:low", label: "Ventilate low" }, { key: "vent:high", label: "Ventilate high" }]);
+    expect(actionOptions({ ...fresh, control: false }).map((g) => g.group)).toEqual(["Ventilation"]);
+    expect(actionOptions({ ...fresh, ventilation: false }).map((g) => g.group)).toEqual(["Power"]);
+  });
+  it("edits a ventilating rule back unchanged and says what it does", () => {
+    const rule = { ...base, kind: "event", condition: { type: "occupancy", occupied: true }, action: { kind: "ventilate", level: "high" } } as ApiAutomation;
+    const d = draftOf(rule);
+    expect(d.action).toBe("vent:high"); // was "fan:undefined", which the API refused on save
+    expect(saveInput(d)).toMatchObject({ kind: "event", action: { kind: "ventilate", level: "high" } });
+    expect(summaryText(d, "Bedroom AC", "Home A")).toBe("When someone is in the room → set Bedroom AC to ventilation high.");
+    expect(summaryText(d, "Bedroom AC", "Home A", ms)).toContain("pengudaraan tinggi");
   });
 });

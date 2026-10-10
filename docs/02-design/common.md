@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.86.0
+version: 0.87.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -27,7 +27,8 @@ service/web/
   shared/ (@ac/web)
     components/   AppShell, ui primitives (Tailwind CSS 4, Figma UI Guideline tokens), shared parts (JobBits, QrScan …)
     lib/          dal.ts (server-only data access), session, rest + routes.gen (Core API REST routes from the catalog),
-                  contracts.gen + opTypes (the contract's types: every Core API call is typed by its input, IR313),
+                  contracts.gen + opTypes (the contract's types: every Core API call is typed by its input, IR313,
+                  and the result types are checked against it, IR314),
                   pure mappers and validators per screen (Vitest), URL state, the Phase 1A demo stores
     screens/      shared screens: sign-in, notifications, preferences, demo, page unavailable
     bff/          Route Handlers: OIDC sign-in, callback and sign-out; /bff/ops for interactive reads; session
@@ -58,7 +59,7 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
 - The customer assistant speaks its own chosen language (IR306). It starts in the display language, and its header switches between English and Bahasa Melayu. A switch discards an unconfirmed change and keeps the typed text (D09). Its suggestions are sentences of the fixed grammar.
 - Still English: the Phase 1A browser demo's fixture screens, including its simulated assistant.
 
-**Tests.** Vitest covers the shared mappers and validators, the BFF session and the DAL (IR307), and checks the web's calls against the Core API contract (IR312). Playwright end-to-end tests run against the local stack. The Core API has its Go integration and unit tests.
+**Tests.** Vitest covers the shared mappers and validators, the BFF session and the DAL (IR307), and checks the web's calls against the Core API contract: inputs (IR312) and result types (IR314). Playwright end-to-end tests run against the local stack. The Core API has its Go integration and unit tests.
 
 The stack is TypeScript (strict mode), React 19 and Next.js 16 App Router (DEC-67, DEC-71) with Tailwind CSS 4. Each app is its own container (container design) with its own session cookie (IR175).
 
@@ -259,4 +260,4 @@ API paths, HTTP methods, databases, server authentication and authorization, rea
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.86.0: Read IR01–IR313 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.87.0: Read IR01–IR314 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

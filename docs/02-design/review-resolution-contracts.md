@@ -4194,3 +4194,46 @@ IR312 found a call the API refused (`count: 4`) with a check that sees only lite
    - All four apps build. E2E: 70 passed, 9 skipped. The dev data is unchanged.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR314 The web's result types are checked against the contract — 2026-10-10
+
+IR313 typed every call's input. The results were still typed by hand in the web, and nothing compared them with the contract. A new check does, and it found faults in the contract and in the web.
+
+1. **The check.** `shared/lib/__tests__/results.test.ts` (Vitest) runs on every coreOp / coreAll / callOp / useOp call with a literal operation. The result type the caller names, or TypeScript infers, must accept `OperationContracts[op].result`; for coreAll, an item of its page. The rules:
+   - Every field the web reads is in the contract, with a type the web accepts. A field the contract allows to be null must allow null in the web too.
+   - Below the top of a result, every variant the contract allows must fit, for example the kinds of a command's action.
+   - At the top, and for the items of a page, the request or the role picks the variant. The screen names the projection or kind it reads, and each variant it names must fit. This applies to a union with a field that tells every variant apart. A union without such a field needs one variant that fits (payments.simulate, where the event decides).
+   - The check covers 384 typed calls. It fails if the earlier contract or the earlier web types are put back.
+2. **Contract fixes (service-contracts.ts).**
+   - `attachments.getContent` answered `Blob`, which the contract never declared, so it meant the browser's Blob. It now answers `BlobContent` `{name, mime, size, bytes}`, with the bytes in base64, as IR129 item 1 says.
+   - The document validator now compiles the contract without the DOM library. Only the repository call's `AbortSignal` may be missing.
+   - Narrowed to what the API accepts:
+     - customer automations take `ClientCondition` (occupancy, location, pattern, weather; DD-C05);
+     - HQ automation policies take `PolicyCondition` (occupancy, tariff, peak, solar, battery; DD-A11);
+     - filter-care reminders take `FilterCareChannel` (in-app and e-mail; IR134 item 4).
+     The API already refused the other values.
+3. **Web faults found.**
+   - **Restriction commands had no words.** The unit's command history showed a restriction's own commands as “undefined”. The seed's Lobby AC shows one: the restriction command that limits cooling to 24 °C. Now every command kind of the contract has words:
+     - “Set ventilation {level}”;
+     - “Apply restriction: {policy}”;
+     - “Remove restriction”.
+     The technician's command codes add `apply_restriction = min 24 °C` and `remove_restriction`.
+   - **Ventilating rules could not be edited.** The customer automation editor turned a ventilate action into `fan:undefined`, so such a rule could not be saved again. The editor now keeps it. It offers ventilation on a model with a fresh-air function, as DD-C05 and DD-T10 allow (UnitAction within the unit's capabilities), and the technician's diagnostic control offers it too.
+   - **Ended jobs could crash two technician screens.** Diagnostic control and alert evidence read the URL's job with `jobs.get`. After the job's window ends, that read answers the history snapshot, which has no ID, and both screens then failed on `job.id`. Now only the detail counts as the technician's job:
+     - diagnostic control shows a job that is no longer the technician's as not found;
+     - alert evidence shows no job;
+     - the start time before the window is read only from the detail.
+     The job page and the QR scan name the projections they read, and the scan's list of the user's open jobs skips history rows, which name no unit.
+   - Smaller fixes:
+     - HQ's job reads name the summary and detail projections they get;
+     - the partner's preview no longer claims a field the API does not send;
+     - the HQ invite resend no longer names an unused result.
+4. **Fewer casts.** The web's sensor and reading metrics and units, and the currencies of invoices, payments, contracts and warranty claims, are typed by the contract's `Metric`, `UnitSymbol` and `Currency`. That removes the casts IR313 left at the screens. 318 other fields are still typed wider than the contract, such as `string` where it has a literal union. They are safe, because the check only requires that the web accepts every value the contract allows.
+5. **Checked.**
+   - The typecheck of the four apps, the shared package and the E2E passes. Lint passes.
+   - Vitest: 61 files, 347 tests, with new tests for the words of every command kind, the ventilation option and its round trip, and the snapshot in the QR card.
+   - All four apps build.
+   - E2E: 71 passed, 9 skipped. The new `customer/command-history` spec reads the Lobby AC history. The dev data is unchanged.
+   - The cmd/gen/ops test passes.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

@@ -4,14 +4,15 @@
 // Pure code shared by the Server Component and the client view; Vitest covers it. Texts in the display language (`i`
 // / `t`, IR286); instants in the user's display time zone (IR44). Command codes (“set_mode = cool”) stay codes.
 import { EN, showClock, showSpan, translator, type I18n, type T } from "@ac/web/lib/i18n";
-import { FAN_LABEL, MODE_LABEL, type ApiUnitDetail, type UnitAction } from "@ac/web/lib/units";
+import type { UnitAction } from "@ac/web/lib/contracts.gen";
+import { FAN_LABEL, MODE_LABEL, type ApiUnitDetail, type CommandAction } from "@ac/web/lib/units";
 import { airNumber } from "@ac/web/lib/air";
 
 const en = translator("en");
 
 /** Command of service-contracts.ts (fields shown here). */
 export type ApiCommandRow = {
-  id: string; action: UnitAction | { kind: "ventilate"; level: string } | { kind: string }; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled";
+  id: string; action: CommandAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled";
   requestedAt: string; acknowledgedAt: string | null; failureCode: string | null; reason: string | null; diagnosticRunId: string | null; source: string;
 };
 /** DiagnosticRun of service-contracts.ts. */
@@ -24,15 +25,15 @@ export type ApiRun = {
 const clock = (iso: string | null, i: I18n) => (iso ? showClock(iso, i.display) : "—");
 
 /** "set_mode = cool", "set_temperature = 24 °C" (Figma Technician 02 control) — the command as the device gets it. */
-export function actionCode(a: ApiCommandRow["action"]): string {
-  const x = a as Record<string, unknown>;
-  switch (x.kind) {
-    case "set_power": return `set_power = ${x.power ? "ON" : "OFF"}`;
-    case "set_temperature": return `set_temperature = ${x.celsius} °C`;
-    case "set_mode": return `set_mode = ${x.mode}`;
-    case "set_fan": return `set_fan = ${x.fanLevel}`;
-    case "ventilate": return `ventilate = ${x.level}`;
-    default: return String(x.kind ?? "command");
+export function actionCode(a: CommandAction): string {
+  switch (a.kind) {
+    case "set_power": return `set_power = ${a.power ? "ON" : "OFF"}`;
+    case "set_temperature": return `set_temperature = ${a.celsius} °C`;
+    case "set_mode": return `set_mode = ${a.mode}`;
+    case "set_fan": return `set_fan = ${a.fanLevel}`;
+    case "ventilate": return `ventilate = ${a.level}`;
+    case "apply_restriction": return `apply_restriction = ${a.policy.kind === "power_off" ? "power_off" : `min ${a.policy.minimumCoolingSetpoint} °C`}`;
+    case "remove_restriction": return "remove_restriction";
   }
 }
 /** A test run's start or end action: “Power ON” in words, the other settings as their code. */

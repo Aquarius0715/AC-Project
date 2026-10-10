@@ -2,7 +2,7 @@
 // 03d, 03f, 03i), the editor draft with its automations.save input and checks (03b, 03e), the schedule preview and the
 // event test (03c), and the location consent card. Pure code shared by the Server Component and the client view.
 import { EN, intlTag, showDate, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
-import type { UnitAction } from "@ac/web/lib/units";
+import type { UnitAction } from "@ac/web/lib/contracts.gen";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 const en = translator("en");
@@ -56,13 +56,13 @@ export function weekdaysText(ds: number[], sentence = false, t: T = en): string 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const modeWord: Record<string, string> = { cool: "Cool", dry: "Dry", fan: "Fan" };
 const fanWord: Record<string, string> = { low: "Low", mid: "Mid", high: "High" };
-export function actionLabel(a: UnitAction | { kind: "ventilate"; level: string }, t: T = en): string {
+export function actionLabel(a: UnitAction, t: T = en): string {
   switch (a.kind) {
     case "set_power": return t(a.power ? "Power ON" : "Power OFF");
     case "set_temperature": return t("Set temperature {celsius}°C", { celsius: a.celsius });
     case "set_mode": return t("Mode {mode}", { mode: modeWord[a.mode] ? t(modeWord[a.mode]) : cap(a.mode) });
     case "set_fan": return t("Fan {level}", { level: fanWord[a.fanLevel] ? t(fanWord[a.fanLevel]) : cap(a.fanLevel) });
-    default: return t("Ventilate {level}", { level: fanWord[a.level] ? t(fanWord[a.level]).toLowerCase() : a.level });
+    case "ventilate": return t("Ventilate {level}", { level: fanWord[a.level] ? t(fanWord[a.level]).toLowerCase() : a.level });
   }
 }
 const cmp: Record<Compare, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤" };
@@ -170,13 +170,16 @@ export function fitExtras(d: Draft): ExtraDraft[] {
 }
 const extraOf = (x: ExtraDraft): ExtraCondition => (x.type === "weather" ? { type: "weather", metric: "temperature", operator: x.operator, value: Number(x.value) } : x);
 const extraDraftOf = (x: ExtraCondition): ExtraDraft => (x.type === "weather" ? { type: "weather", operator: x.operator, value: String(x.value) } : x);
+/** The option key of an action; every UnitAction of the contract has one, so a saved rule edits back unchanged (IR314). */
 export const actionKey = (a: UnitAction): string =>
-  a.kind === "set_power" ? `power:${a.power ? "on" : "off"}` : a.kind === "set_temperature" ? `temp:${a.celsius}` : a.kind === "set_mode" ? `mode:${a.mode}` : `fan:${a.fanLevel}`;
+  a.kind === "set_power" ? `power:${a.power ? "on" : "off"}` : a.kind === "set_temperature" ? `temp:${a.celsius}` : a.kind === "set_mode" ? `mode:${a.mode}`
+    : a.kind === "set_fan" ? `fan:${a.fanLevel}` : `vent:${a.level}`;
 export function actionOf(key: string): UnitAction {
   const [k, v] = key.split(":");
   if (k === "power") return { kind: "set_power", power: v === "on" };
   if (k === "temp") return { kind: "set_temperature", celsius: Number(v) };
   if (k === "mode") return { kind: "set_mode", mode: v as "cool" | "dry" | "fan" };
+  if (k === "vent") return { kind: "ventilate", level: v as "low" | "mid" | "high" };
   return { kind: "set_fan", fanLevel: v as "low" | "mid" | "high" };
 }
 export function newDraft(unitId: string, timezone: string): Draft {
@@ -266,16 +269,22 @@ export function apiErrors(fe: Record<string, string>, t: T = en): Record<string,
 }
 
 /** Action options for an AC (Figma 03b one select): power, the capability temperatures, modes and fan levels. */
-export type Caps = { control: boolean; modeControl: boolean; fanControl: boolean; temperature: { min: number; max: number; step: number } | null; modes: ("cool" | "dry" | "fan")[]; fanLevels: ("low" | "mid" | "high")[] };
+export type Caps = {
+  control: boolean; modeControl: boolean; fanControl: boolean; temperature: { min: number; max: number; step: number } | null; modes: ("cool" | "dry" | "fan")[]; fanLevels: ("low" | "mid" | "high")[];
+  ventilation?: boolean; ventilationLevels?: ("low" | "mid" | "high")[];
+};
+/** The actions a unit takes (DD-C05 “within unit capabilities”, the API's rule): the AC settings with control, and
+ * ventilation on a model with a fresh-air function (IR314). */
 export function actionOptions(c: Caps | null, t: T = en): { group: string; options: { key: string; label: string }[] }[] {
-  if (!c || !c.control) return [];
+  if (!c) return [];
   const temps: { key: string; label: string }[] = [];
-  if (c.temperature) for (let x = c.temperature.min; x <= c.temperature.max; x += c.temperature.step || 1) temps.push({ key: `temp:${x}`, label: t("Set temperature {celsius}°C", { celsius: x }) });
+  if (c.control && c.temperature) for (let x = c.temperature.min; x <= c.temperature.max; x += c.temperature.step || 1) temps.push({ key: `temp:${x}`, label: t("Set temperature {celsius}°C", { celsius: x }) });
   return [
-    { group: t("Power"), options: [{ key: "power:on", label: t("Power ON") }, { key: "power:off", label: t("Power OFF") }] },
+    ...(c.control ? [{ group: t("Power"), options: [{ key: "power:on", label: t("Power ON") }, { key: "power:off", label: t("Power OFF") }] }] : []),
     ...(temps.length ? [{ group: t("Temperature"), options: temps }] : []),
-    ...(c.modeControl && c.modes.length ? [{ group: t("Mode"), options: c.modes.map((m) => ({ key: `mode:${m}`, label: actionLabel({ kind: "set_mode", mode: m }, t) })) }] : []),
-    ...(c.fanControl && c.fanLevels.length ? [{ group: t("Fan"), options: c.fanLevels.map((f) => ({ key: `fan:${f}`, label: actionLabel({ kind: "set_fan", fanLevel: f }, t) })) }] : []),
+    ...(c.control && c.modeControl && c.modes.length ? [{ group: t("Mode"), options: c.modes.map((m) => ({ key: `mode:${m}`, label: actionLabel({ kind: "set_mode", mode: m }, t) })) }] : []),
+    ...(c.control && c.fanControl && c.fanLevels.length ? [{ group: t("Fan"), options: c.fanLevels.map((f) => ({ key: `fan:${f}`, label: actionLabel({ kind: "set_fan", fanLevel: f }, t) })) }] : []),
+    ...(c.ventilation && c.ventilationLevels?.length ? [{ group: t("Ventilation"), options: c.ventilationLevels.map((l) => ({ key: `vent:${l}`, label: actionLabel({ kind: "ventilate", level: l }, t) })) }] : []),
   ];
 }
 
@@ -287,7 +296,8 @@ export function summaryText(d: Draft, unit: string, place: string, t: T = en): s
       case "set_power": return t(a.power ? "{unit} power ON" : "{unit} power OFF", { unit });
       case "set_temperature": return t("set {unit} to {value}", { unit, value: `${a.celsius}°C` });
       case "set_mode": return t("set {unit} to {value}", { unit, value: t("mode {mode}", { mode: (modeWord[a.mode] ? t(modeWord[a.mode]) : a.mode).toLowerCase() }) });
-      default: return t("set {unit} to {value}", { unit, value: t("fan {level}", { level: (fanWord[a.fanLevel] ? t(fanWord[a.fanLevel]) : a.fanLevel).toLowerCase() }) });
+      case "set_fan": return t("set {unit} to {value}", { unit, value: t("fan {level}", { level: (fanWord[a.fanLevel] ? t(fanWord[a.fanLevel]) : a.fanLevel).toLowerCase() }) });
+      case "ventilate": return t("set {unit} to {value}", { unit, value: t("ventilation {level}", { level: (fanWord[a.level] ? t(fanWord[a.level]) : a.level).toLowerCase() }) });
     }
   };
   if (d.trigger === "schedule") {

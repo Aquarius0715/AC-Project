@@ -202,6 +202,9 @@ export function versionRows(draft: DraftVersion | null, reportRefs: { reportVers
 export const followUpText = (n: NextAction, i: I18n = EN) => (n.kind === "none" ? i.t("None") : i.t("Follow-up {date} — {note}", { date: n.date ? businessDay(n.date, i.display.locale) : "—", note: n.note }));
 
 /** JobHistorySnapshot of service-contracts.ts as the technician reads it (IR124). */
+/** jobs.get as the technician reads it (IR124): the detail while the job is theirs; after the window a snapshot (an offer
+ * is a contractor's) that names no unit, window or version — read as no job. */
+export type TechJobRead<D> = ({ projection: "detail" } & D) | { projection: "offer" | "history" };
 export type ApiTechHistory = {
   projection: "history"; jobId: string; type: string; status: string; asOf: string; completedAt: string | null;
   redactedReportSummary: { hasReport: boolean; acceptance: "accepted" | "not_accepted" };

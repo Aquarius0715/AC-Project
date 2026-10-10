@@ -33,7 +33,7 @@ export async function communicate(c: Communication): Promise<{ ok: true; value: 
     }
   }
   try {
-    const p = await coreOp<Preview>("notifications.preview", { target: { kind: "job", id: c.jobId }, templateKey: c.templateKey, channel: c.channel, recipientMembershipId: c.recipientMembershipId, message });
+    const p = await coreOp<Omit<Preview, "at">>("notifications.preview", { target: { kind: "job", id: c.jobId }, templateKey: c.templateKey, channel: c.channel, recipientMembershipId: c.recipientMembershipId, message });
     if (noteSaved) refresh();
     const at = showTime(p.occurredAt, await coreDisplay()); // in the user's display time zone (IR278)
     return { ok: true, value: { noteSaved, preview: { id: p.id, templateKey: p.templateKey, channel: p.channel, recipientMembershipId: p.recipientMembershipId, deliveryState: p.deliveryState, occurredAt: p.occurredAt, at } } };

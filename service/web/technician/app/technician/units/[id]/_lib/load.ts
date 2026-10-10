@@ -8,10 +8,10 @@ import "server-only";
 import { coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { i18nOf, showTime } from "@ac/web/lib/i18n";
 import type { ApiAlert } from "@ac/web/lib/alerts";
+import type { TechJobRead } from "@ac/web/lib/techJob";
 import type { ApiTechJobRow } from "@ac/web/lib/techOverview";
 import type { ApiDeviceEventFull } from "@ac/web/lib/techDevices";
 import type { OpInput } from "@ac/web/lib/opTypes";
-import type { Metric } from "@ac/web/lib/contracts.gen";
 import {
   componentCards, controlJob, jobRows, liveTiles, metricOf, openAlerts, otherMetrics, PERIODS, periodOf, periodRange, registerRows, seriesChart, stoppedBanner,
   windowEvents, type ApiTechUnit, type Point,
@@ -51,8 +51,8 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   });
   if (d === null) return null; // not in the technician's assignments: not found (IR169)
   if (d === "not_started") { // IR76: the start time comes from the URL's job; without it only the general sentence
-    const job = sp.jobId ? await optional(coreOp<{ assignment: { scheduledStart: string } | null }>("jobs.get", { jobId: sp.jobId }), null) : null;
-    const start = job?.assignment?.scheduledStart ?? null;
+    const job = sp.jobId ? await optional(coreOp<TechJobRead<{ assignment: { scheduledStart: string } | null }>>("jobs.get", { jobId: sp.jobId }), null) : null;
+    const start = job?.projection === "detail" ? job.assignment?.scheduledStart ?? null : null;
     return {
       kind: "not_started" as const, title: t("Not started yet"),
       text: start ? t("You can see this AC from {time}, when your work window starts.", { time: showTime(start, display) }) : t("Available from the work start time of your assigned job."),
@@ -63,7 +63,7 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const metric = metricOf(d, sp.metric), period = periodOf(sp.period);
   const { from, to } = periodRange(period, nowMs);
   const unitOf = (m: string) => d.latestMeasurements.find((x) => x.metric === m)?.unit ?? "";
-  const others = tab === "monitoring" ? d.latestMeasurements.filter((m) => m.metric !== metric).slice(0, 3).map((m) => m.metric as Metric) : [];
+  const others = tab === "monitoring" ? d.latestMeasurements.filter((m) => m.metric !== metric).slice(0, 3).map((m) => m.metric) : [];
   const [alerts, jobs, points, more, devices] = await Promise.all([
     optional(coreOp<Page<ApiAlert>>("alerts.list", { limit: 50, filters: { unitId: id } }).then((r) => r.items), [] as ApiAlert[]),
     optional(coreOp<Page<ApiTechJobRow>>("jobs.list", { limit: 20, filters: { unitId: id } }).then((r) => r.items), [] as ApiTechJobRow[]),

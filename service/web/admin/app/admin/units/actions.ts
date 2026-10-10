@@ -101,7 +101,7 @@ export async function removeClientUser(id: string, version: number, reason: stri
 }
 /** clientUsers.resendInvite only builds the invite preview again (nothing is sent, IR144). */
 export async function resendInvite(id: string) {
-  return run(() => coreOp<{ title?: string }>("clientUsers.resendInvite", { id }).then(() => null));
+  return run(() => coreOp("clientUsers.resendInvite", { id }).then(() => null));
 }
 /** auth.previewPasswordReset answers the same generic preview for every address (IR145). */
 export async function previewPasswordReset(email: string) {

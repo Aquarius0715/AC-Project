@@ -9,14 +9,16 @@ const unit = { id: "u1", displayName: "Bedroom AC", location: { pathLabels: ["Ho
 
 describe("technician QR scan", () => {
   it("describes the matched unit and the user's job on it", () => {
-    const today = qrMatch({ unitId: "u1", jobId: "job-c-aaaa" }, unit, { id: "job-c-aaaa", type: "reactive", status: "in_progress", scheduledSlot: { startAt: "2026-09-21T02:00:00Z", endAt: "2026-09-21T04:00:00Z" }, alertIds: ["a1"] }, NOW);
+    const today = qrMatch({ unitId: "u1", jobId: "job-c-aaaa" }, unit, { projection: "detail", id: "job-c-aaaa", type: "reactive", status: "in_progress", scheduledSlot: { startAt: "2026-09-21T02:00:00Z", endAt: "2026-09-21T04:00:00Z" }, alertIds: ["a1"] }, NOW);
     expect(today).toEqual({
       title: "Bedroom AC", sub: "Home A › 1F › Bedroom · DemoAir SPL-200V",
       job: { label: "Your job today: job-c-aa", text: "21 Sept, 10:00 am – 12:00 pm MYT · Repair · in progress · 1 linked alert", tone: "ok" },
       unitHref: "/technician/units/u1?jobId=job-c-aaaa", jobHref: "/technician/jobs/job-c-aaaa",
     });
-    const later = qrMatch({ unitId: "u1", jobId: "job-d" }, unit, { id: "job-d", type: "periodic", status: "assigned", scheduledSlot: { startAt: "2026-09-23T02:00:00Z", endAt: "2026-09-23T04:00:00Z" } }, NOW);
+    const later = qrMatch({ unitId: "u1", jobId: "job-d" }, unit, { projection: "detail", id: "job-d", type: "periodic", status: "assigned", scheduledSlot: { startAt: "2026-09-23T02:00:00Z", endAt: "2026-09-23T04:00:00Z" }, alertIds: [] }, NOW);
     expect(later.job).toEqual({ label: "Your next job: job-d", text: "23 Sept, 10:00 am – 12:00 pm MYT · Periodic inspection · assigned", tone: "primary" });
+    // a job whose window ended reads as its snapshot (IR124): the card names the job only
+    expect(qrMatch({ unitId: "u1", jobId: "job-d" }, unit, { projection: "history" }, NOW).job).toEqual({ label: "Your next job: job-d", text: "", tone: "primary" });
     expect(qrMatch({ unitId: "u1", jobId: null }, unit, null, NOW)).toMatchObject({ job: null, unitHref: "/technician/units/u1", jobHref: null });
     expect(qrMatch({ unitId: "u1", jobId: null }, null, null, NOW).title).toBe("Assigned unit");
     expect(qrMatch({ unitId: "u1", jobId: "job-d" }, null, null, NOW, { name: "Meeting room AC", locked: true })).toMatchObject({ title: "Meeting room AC", sub: "Unit details open when your work window starts (IR94)." });
@@ -32,7 +34,7 @@ describe("technician QR scan", () => {
 
 describe("the QR scan in Malay with the display time zone (IR288)", () => {
   it("words the match and the refusals", () => {
-    const m = qrMatch({ unitId: "u1", jobId: "job-c-aaaa" }, unit, { id: "job-c-aaaa", type: "reactive", status: "in_progress", scheduledSlot: { startAt: "2026-09-21T02:00:00Z", endAt: "2026-09-21T04:00:00Z" }, alertIds: ["a1", "a2"] }, NOW, {}, MS);
+    const m = qrMatch({ unitId: "u1", jobId: "job-c-aaaa" }, unit, { projection: "detail", id: "job-c-aaaa", type: "reactive", status: "in_progress", scheduledSlot: { startAt: "2026-09-21T02:00:00Z", endAt: "2026-09-21T04:00:00Z" }, alertIds: ["a1", "a2"] }, NOW, {}, MS);
     expect(m.job).toEqual({ label: "Kerja anda hari ini: job-c-aa", text: "21 Sep, 11:00 PG – 1:00 PTG GMT+9 · Pembaikan · sedang berjalan · 2 amaran berpaut", tone: "ok" });
     expect(qrMatch({ unitId: "u1", jobId: null }, null, null, NOW, { locked: true }, MS)).toMatchObject({ title: "Unit yang ditugaskan", sub: "Butiran unit dibuka apabila tetingkap kerja anda bermula (IR94)." });
     expect(qrRefusal({ code: "NOT_FOUND", messageKey: "error.notFound" }, MS.t).title).toBe("Halaman tidak tersedia");

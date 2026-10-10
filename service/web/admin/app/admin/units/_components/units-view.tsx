@@ -20,7 +20,6 @@ import {
 } from "@ac/web/lib/assets";
 import { amount } from "@ac/web/lib/energy";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
-import type { Currency } from "@ac/web/lib/contracts.gen";
 import {
   archiveLocation, archiveUnit, createCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim,
   removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer,
@@ -810,7 +809,7 @@ function WarrantyTab({ live }: { live: UnitsLive }) {
         )}
       </Card>
       {claim && <ClaimModal x={claim} pending={pending} onClose={() => setClaim(null)}
-        onSave={(label, minor, reason) => run(() => recordWarrantyClaim(claim.jobId, claim.version, label, minor, claim.currency as Currency, reason), t("Warranty claim filed for {unit}", { unit: claim.unit }), () => setClaim(null))} />}
+        onSave={(label, minor, reason) => run(() => recordWarrantyClaim(claim.jobId, claim.version, label, minor, claim.currency, reason), t("Warranty claim filed for {unit}", { unit: claim.unit }), () => setClaim(null))} />}
     </>
   );
 }

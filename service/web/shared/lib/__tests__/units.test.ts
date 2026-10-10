@@ -10,6 +10,15 @@ describe("unit commands and readings in the display language and time zone (FR-X
   it("words every command in English and Malay, the stored values unchanged", () => {
     expect([actionText({ kind: "set_power", power: true }), actionText({ kind: "set_mode", mode: "cool" }), actionText({ kind: "set_fan", fanLevel: "mid" })]).toEqual(["Set power ON", "Set mode COOL", "Set fan MID"]);
     expect([actionText({ kind: "set_power", power: false }, ms), actionText({ kind: "set_temperature", celsius: 24 }, ms), actionText({ kind: "set_mode", mode: "dry" }, ms)]).toEqual(["Tetapkan kuasa MATI", "Tetapkan suhu 24°C", "Tetapkan mod KERING"]);
+
+    // every kind of the contract has words: ventilation (an automation) and a restriction's apply / remove (IR314)
+    const limit = { kind: "apply_restriction", restrictionId: "r1", rulesVersion: "v1", policy: { kind: "temperature_limit", minimumCoolingSetpoint: 26 } } as const;
+    const remove = { kind: "remove_restriction", restrictionId: "r1", rulesVersion: "v1" } as const;
+    expect([actionText({ kind: "ventilate", level: "high" }), actionText(limit), actionText({ ...limit, policy: { kind: "power_off" } }), actionText(remove)])
+      .toEqual(["Set ventilation HIGH", "Apply restriction: Temperature limit — cooling setpoint ≥ 26 °C", "Apply restriction: Power off", "Remove restriction"]);
+    expect([actionText({ kind: "ventilate", level: "low" }, ms), actionText(limit, ms), actionText(remove, ms)])
+      .toEqual(["Tetapkan pengudaraan RENDAH", "Kenakan sekatan: Had suhu — suhu tetapan penyejukan ≥ 26 °C", "Tarik balik sekatan"]);
+    expect(historyRow(cmd({ action: limit, source: "restriction" })).text).toBe("Apply restriction: Temperature limit — cooling setpoint ≥ 26 °C — acknowledged by device · by a restriction");
   });
 
   it("states a command's outcome and source, with the IR44 time of the request", () => {

@@ -111,19 +111,21 @@ export type DeviceDetail = Device & {calibrationRefs:ID[];activeOperation:Device
 export type DeviceEvent = Entity & DeviceHistoryScope & {alertIds:ID[];deviceId:ID;eventType:'communication_lost'|'power_lost'|'tamper'|'restored'|'operation_failed';recovery:DeviceRecovery|null;evidenceSource:'heartbeat'|'power_signal'|'tamper_signal';sequence:number;occurredAt:Instant;restoredAt:Instant|null;responseNotes:{actorId:ID;message:string;at:Instant}[]};
 export type CalibrationRecord = Entity & DeviceHistoryScope & {deviceId:ID;sensorId:ID;metric:Metric;unit:UnitSymbol;referenceValue:number;measuredValue:number;calibratedAt:Instant;actorId:ID;isDemo:true};
 export type Condition = {type:'occupancy';occupied:boolean}|{type:'location';event:'arrival'|'departure'}|{type:'pattern';localTime:string}|{type:'weather';metric:'temperature';operator:Compare;value:number}|{type:'tariff';operator:Compare;value:number;unit:'MYR_per_kWh'}|{type:'peak';active:boolean}|{type:'solar'|'battery';operator:Compare;value:number;unit:'kW'};
+export type ClientCondition = Extract<Condition,{type:'occupancy'|'location'|'pattern'|'weather'}>; // the customer automation conditions (DD-C05; automations.save refuses the others)
+export type PolicyCondition = Extract<Condition,{type:'occupancy'|'tariff'|'peak'|'solar'|'battery'}>; // the HQ automation policy conditions (DD-A11; policies.save refuses the others)
 export type Compare = 'gt'|'gte'|'lt'|'lte';
 export type RuleBase = Entity & {name:string;unitIds:ID[];ownerMembershipId:ID;createdByUserId:ID;timezone:string;enabled:boolean;priority:number;disabledReason:'capability_changed'|'unit_archived'|'consent_revoked'|null};
 /** IR215: “Only if …” conditions — every one must hold when the rule runs (missing data never matches). */
 export type ExtraCondition = {type:'weekday';weekdays:number[]}|{type:'occupancy';occupied:boolean}|{type:'weather';metric:'temperature';operator:Compare;value:number};
 /** IR215: the latest run-log outcome of a rule — a Command, or a skip with its reason. */
 export type AutomationRun = {at:Instant;outcome:'command_created'|'skipped';reason:DecisionReason|null;commandId:ID|null};
-export type Automation = RuleBase & {onlyIf:ExtraCondition[];lastRun:AutomationRun|null} & ({kind:'schedule';weekdays:number[];startLocal:string;endLocal:string;endsNextDay:boolean;startAction:UnitAction;endAction:UnitAction}|{kind:'event';condition:Condition;action:UnitAction});
+export type Automation = RuleBase & {onlyIf:ExtraCondition[];lastRun:AutomationRun|null} & ({kind:'schedule';weekdays:number[];startLocal:string;endLocal:string;endsNextDay:boolean;startAction:UnitAction;endAction:UnitAction}|{kind:'event';condition:ClientCondition;action:UnitAction});
 /** IR108: alert policies belong to one customer; units carry them (ACUnit.alertPolicyIds) and alert Policy.unitIds is the derived attachment list. Air-quality limits are alert policies (FR-A12 merged into FR-A05). */
 export type ActiveWindow = {weekdays:number[];startLocal:string;endLocal:string};
 export type AlertCondition = {metric:Metric;operator:Compare;threshold:number;recoveryThreshold:number;durationSeconds:number;activeWindow:ActiveWindow|null;severity:Severity};
 export type DefaultAlertRule = AlertCondition & {ruleKey:ID;name:string;category:'air_quality'|'fault'|'maintenance'|'connection'};
 export type DefaultRuleSetting = Entity & {policyId:ID;ruleKey:ID;customerId:ID;enabled:boolean;changedByMembershipId:ID;reason:string|null};
-export type Policy = RuleBase & ({kind:'automation';condition:Condition;action:UnitAction}|({kind:'alert';customerId:ID;recipientMembershipIds:ID[];channels:Channel[];escalateAfterMinutes:number;cooldownMinutes:number} & AlertCondition)|{kind:'default_alert';customerId:null;rules:DefaultAlertRule[];ruleSettings:DefaultRuleSetting[]});
+export type Policy = RuleBase & ({kind:'automation';condition:PolicyCondition;action:UnitAction}|({kind:'alert';customerId:ID;recipientMembershipIds:ID[];channels:Channel[];escalateAfterMinutes:number;cooldownMinutes:number} & AlertCondition)|{kind:'default_alert';customerId:null;rules:DefaultAlertRule[];ruleSettings:DefaultRuleSetting[]});
 export type Consent = Entity & {membershipId:ID;purpose:'location_automation';granted:boolean;grantedAt:Instant|null;revokedAt:Instant|null};
 export type Fact = {unitId:ID;metric:Metric|'weather_temperature'|'tariff'|'solar'|'battery'|'occupied'|'location'|'peak';value:number|boolean|'arrival'|'departure'|null;unit:string;observedAt:Instant;quality:Quality};
 export type EvaluationInput = {eventId:ID;occurredAt:Instant;unitIds:ID[];facts:Fact[];phase:'schedule_start'|'schedule_end'|'condition'};
@@ -132,6 +134,7 @@ export type Decision = {unitId:ID;decision:'selected'|'suppressed';ruleId:ID|nul
 export type SimulationResult = {eventId:ID;results:Decision[];notifications:NotificationDecision[]};
 export type FireResult = {eventId:ID;results:(Omit<Decision,'decision'> & {decision:'requested'|'suppressed'|'failed';commandId:ID|null})[];notifications:NotificationOutcome[]};
 export type Channel = 'inApp'|'email'|'whatsapp';
+export type FilterCareChannel = Exclude<Channel,'whatsapp'>; // filter-care reminders go in-app and by e-mail (IR134 item 4)
 export type Target = {kind:'unit'|'job'|'invoice'|'restriction'|'device'|'inquiry'|'client_user';id:ID};
 export type Notification = Entity & {sourceAlertId:ID|null;type:NotificationType;recipientMembershipId:ID;scopeVersionAtCreation:number;target:Target;templateKey:'alert'|'quality'|'schedule_change'|'report_return'|'completion'|'payment'|'payment_reminder'|'restriction'|'inquiry'|'job_update'|'device_operation'|'invite';params:{targetName:string;at:Instant;status:string;reason:string|null;amountMinor:number|null;currency:Currency|null;method:PaymentMethod|null;message:string|null};channel:Channel;deliveryState:'preview'|'simulated'|'failed';severity:Severity;occurredAt:Instant;readAt:Instant|null};
 export type NotificationPreview = Notification;
@@ -159,6 +162,7 @@ export type DemoEvent = {eventId:ID;generation:number;occurredAt:Instant;type:st
 export type Query = {cursor?:string;limit?:number;sort?:{field:'id'|'version'|'name'|'status'|'createdAt'|'updatedAt'|'severity'|'dueAt'|'observedAt'|'occurredAt'|'periodFrom'|'startAt'|'validFrom'|'priority'|'email'|'invitedAt'|'year'|'region'|'executeAfter'|'noticeAt'|'effectiveFrom'|'expiresAt'|'period';direction:'asc'|'desc'};filters?:{search?:string;period?:string;origin?:JobOrigin;proposalPending?:boolean;contractorOrgId?:ID;statementId?:ID;campaignId?:ID;modelId?:ID;expiringWithinDays?:number;coverage?:UnitCoverage['status'];customerId?:ID;propertyId?:ID;spaceId?:ID;unitId?:ID;unitIds?:ID[];jobId?:ID;contractId?:ID;invoiceId?:ID;restrictionId?:ID;organizationId?:ID;membershipId?:ID;kind?:string;status?:string;statuses?:string[];overdueOnly?:boolean;includeDescendants?:boolean;connections?:Connection[];powerState?:'on'|'off'|'unknown';unassignedOnly?:boolean;severity?:Severity;enabled?:boolean;unreadOnly?:boolean;from?:Instant;to?:Instant;date?:string;qualification?:QualificationCode;activeOnly?:boolean;actorId?:ID;targetKind?:string;targetId?:ID;action?:string;correlationId?:ID;result?:AuditView['result'];method?:'demo_fixed'|'demo_period_comparison';boundaryId?:string;region?:string;year?:number;subjectType?:Inquiry['subjectType'];role?:Role;type?:NotificationType|MaintenanceJob['type'];clientRole?:ClientRole;code?:QualificationCode|'other'}};
 export type Save<T> = Omit<T,keyof Entity|'ownerMembershipId'|'createdByUserId'> & {id?:ID};
 export type BlobInput = {name:string;mime:'image/jpeg'|'image/png';size:number;bytes:string}; // bytes: base64 in JSON; the leading bytes must be of mime (IR308)
+export type BlobContent = {name:string;mime:Attachment['mime'];size:number;bytes:string}; // attachments.getContent: bytes base64 in JSON (IR129 item 1), not a browser Blob
 export type DocumentInput = {name:string;mime:'application/pdf'|'image/jpeg'|'image/png';size:number;bytes:string}; // bytes: base64 in JSON (IR308)
 
 
@@ -229,7 +233,7 @@ export type TwoFactorStatus = {enabled:boolean;enabledAt:Instant|null;recoveryCo
 export type JobRating = {stars:1|2|3|4|5;tags:string[];comment:string|null;ratedAt:Instant;editableUntil:Instant};
 export type TimeOnSite = {arrivedAt:Instant|null;checkInMethod:'location_qr'|'manual'|null;checkInReason:string|null;distanceMeters:number|null;startedAt:Instant|null;pauses:{from:Instant;to:Instant|null}[];finishedAt:Instant|null;onSiteMinutes:number|null};
 export type FilterCareStatus = {unitId:ID;runHoursSinceCleaning:number|null;thresholdHours:number;fallbackDays:number;lastCleanedAt:Instant|null;lastCleanedBy:'customer'|'technician'|null;lastCleaningJobId:ID|null;status:'ok'|'due_soon'|'overdue'|'unknown'};
-export type FilterCareSettings = Entity & {customerId:ID;thresholdHours:number|null;fallbackDays:number;recipients:'owners'|'all_users';channels:Channel[]};
+export type FilterCareSettings = Entity & {customerId:ID;thresholdHours:number|null;fallbackDays:number;recipients:'owners'|'all_users';channels:FilterCareChannel[]};
 export type ReportFile = {fileName:string;mime:'application/pdf'|'text/csv';size:number;generatedAt:Instant;isDemo:true};
 export type QrResolution = {unitId:ID;jobId:ID|null};
 export type PartCatalogItem = {code:string;name:string;vanStockQuantity:number|null};
@@ -246,14 +250,14 @@ export type OperationContracts = {
   'alerts.list': {input:Query;result:Page<Alert>;mode:'read'};
   'alerts.resolve': {input:{alertId:ID;resolutionReason:string;resolutionEvidenceIds:ID[]};result:Alert;mode:'write'};
   'attachments.add': {input:{jobId:ID;reportId:ID;file:BlobInput};result:Attachment;mode:'write'};
-  'attachments.getContent': {input:{jobId:ID;reportId:ID;reportVersion:number;attachmentId:ID};result:Blob;mode:'read'};
+  'attachments.getContent': {input:{jobId:ID;reportId:ID;reportVersion:number;attachmentId:ID};result:BlobContent;mode:'read'};
   'audit.list': {input:Query;result:Page<AuditView>;mode:'read'};
   'auth.previewPasswordReset': {input:{demoEmail:string};result:ResetPreview;mode:'read'};
   'automations.delete': {input:{id:ID};result:DeletedResource;mode:'write'};
   'automations.fire': {input:EvaluationInput;result:FireResult;mode:'write'};
   'automations.list': {input:Query;result:Page<Automation>;mode:'read'};
   'automations.nextRuns': {input:{automationId:ID;count:8}|{draft:ScheduleDraft;count:8};result:ScheduledOccurrence[];mode:'read'};
-  'automations.save': {input:RuleInput & {onlyIf?:ExtraCondition[]} & ({kind:'schedule';weekdays:number[];startLocal:string;endLocal:string;endsNextDay:boolean;startAction:UnitAction;endAction:UnitAction}|{kind:'event';condition:Condition;action:UnitAction});result:Automation;mode:'write'};
+  'automations.save': {input:RuleInput & {onlyIf?:ExtraCondition[]} & ({kind:'schedule';weekdays:number[];startLocal:string;endLocal:string;endsNextDay:boolean;startAction:UnitAction;endAction:UnitAction}|{kind:'event';condition:ClientCondition;action:UnitAction});result:Automation;mode:'write'};
   'automations.simulate': {input:EvaluationInput;result:SimulationResult;mode:'read'};
   'baselines.list': {input:Query;result:Page<EnergyBaseline>;mode:'read'};
   'baselines.save': {input:BaselineInput;result:EnergyBaseline;mode:'write'};
@@ -427,7 +431,7 @@ export type OperationContracts = {
   'filterCare.list': {input:Query;result:Page<FilterCareStatus>;mode:'read'};
   'filterCare.getSettings': {input:Record<string,never>;result:FilterCareSettings;mode:'read'};
   'filterCare.markCleaned': {input:{unitId:ID};result:FilterCareStatus;mode:'write'};
-  'filterCare.saveSettings': {input:{thresholdHours:number|null;fallbackDays:number;recipients:FilterCareSettings['recipients'];channels:Channel[]};result:FilterCareSettings;mode:'write'};
+  'filterCare.saveSettings': {input:{thresholdHours:number|null;fallbackDays:number;recipients:FilterCareSettings['recipients'];channels:FilterCareChannel[]};result:FilterCareSettings;mode:'write'};
   'energy.exportReport': {input:{month:string;propertyIds:ID[];sections:('energy_cost'|'month_comparison'|'co2_offsets'|'alerts_maintenance')[];format:'pdf'|'csv'};result:ReportFile;mode:'read'};
   'units.resolveQr': {input:{code:string};result:QrResolution;mode:'read'};
   'jobs.checkIn': {input:{jobId:ID;method:'location_qr'|'manual';distanceMeters:number|null;qrUnitId:ID|null;reason?:string};result:MaintenanceJob;mode:'write'};

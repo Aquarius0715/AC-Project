@@ -2,14 +2,15 @@
 // projected for the admin billing screen. Pure code shared by the Server Component and the client view. Texts in the
 // display language (`t` / `i`, IR299): billing periods, due dates, billing months and pay dates are Kuala Lumpur business
 // days written in the user's language; inquiries are instants in the display time zone.
+import type { Currency } from "@ac/web/lib/contracts.gen";
 import { EN, intlTag, showDate, showTime, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
 
 const en = translator("en");
 export type Range = { from: string; to: string };
-export type ApiInvoice = { id: string; version: number; number: string; amountMinor: number; currency: string; contractId: string; contractVersion: number; period: Range; dueAt: string; status: "unpaid" | "processing" | "paid"; paymentMethod: string | null; paymentStatus: string | null; paidAt: string | null };
-export type ApiPayment = { id: string; version: number; amountMinor: number; currency: string; invoiceId: string; method: string | null; status: "initiated" | "processing" | "confirmed" | "failed"; paymentReference: string | null; confirmedAt: string | null; confirmationReason: string | null };
+export type ApiInvoice = { id: string; version: number; number: string; amountMinor: number; currency: Currency; contractId: string; contractVersion: number; period: Range; dueAt: string; status: "unpaid" | "processing" | "paid"; paymentMethod: string | null; paymentStatus: string | null; paidAt: string | null };
+export type ApiPayment = { id: string; version: number; amountMinor: number; currency: Currency; invoiceId: string; method: string | null; status: "initiated" | "processing" | "confirmed" | "failed"; paymentReference: string | null; confirmedAt: string | null; confirmationReason: string | null };
 export type ApiInvoiceDetail = ApiInvoice & { paymentRefs: ApiPayment[]; restrictionIds: string[] };
-export type ApiContract = { id: string; version: number; customerId: string; customerOrgId: string; unitIds: string[]; planType: string; startAt: string; endAt: string; priceMinor: number; currency: string; restrictionEligible: boolean };
+export type ApiContract = { id: string; version: number; customerId: string; customerOrgId: string; unitIds: string[]; planType: string; startAt: string; endAt: string; priceMinor: number; currency: Currency; restrictionEligible: boolean };
 export type ApiCustomer = { id: string; name: string; organizationId: string; status: string };
 export type ApiProperty = { id: string; customerOrgId: string; name: string; archived: boolean };
 export type ApiInquiry = { id: string; version: number; customerId: string; invoiceId: string | null; restrictionId: string | null; subjectType: "payment" | "restriction"; message: string; state: "received" | "answered"; reply: string | null; createdAt: string };
@@ -17,12 +18,12 @@ export type ApiRecipient = { id: string; role: string; displayLabel: string; all
 
 export type InvoiceStatus = "Unpaid" | "Overdue" | "Processing" | "Paid";
 export type InvoiceRow = {
-  id: string; version: number; number: string; amt: string; amountMinor: number; currency: string; meta: string; method: string; methodName: string; paymentState: string | null;
+  id: string; version: number; number: string; amt: string; amountMinor: number; currency: Currency; meta: string; method: string; methodName: string; paymentState: string | null;
   st: InvoiceStatus; customerId: string; contractId: string; period: string; due: string;
 };
 export type InvoiceDetail = { id: string; version: number; processingPaymentId: string | null; processingPaymentVersion: number | null; payments: string[]; restrictionIds: string[] };
 export type InquiryRow = { id: string; version: number; cust: string; kind: string; at: string; text: string; state: "received" | "answered"; reply: string | null; invoiceId: string | null; restrictionId: string | null };
-export type ContractOption = { id: string; version: number; label: string; priceMinor: number; currency: string };
+export type ContractOption = { id: string; version: number; label: string; priceMinor: number; currency: Currency };
 
 export const KL = "Asia/Kuala_Lumpur";
 /** A contract or invoice date — a Kuala Lumpur business day — in the user's language: “10 Sept 2026”. */

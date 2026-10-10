@@ -7,7 +7,7 @@ import "server-only";
 import { coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import { statusWord } from "@ac/web/lib/partnerJobDetail";
-import type { ApiCalibration, ApiDevice, ApiDeviceDetail, ApiDeviceOperation, Metric } from "@ac/web/lib/devices";
+import type { ApiCalibration, ApiDevice, ApiDeviceDetail, ApiDeviceOperation } from "@ac/web/lib/devices";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import {
   calibrationText, deviceTiles, eventRows, firmwareCard, jobFor, newerFirmware, newerVersions, openFaults, operationRows, sensorRows, techDeviceRows,
@@ -40,7 +40,7 @@ export async function loadDevices(opts: { selected?: string; unitId?: string; jo
     register: free.flatMap((u, i) => {
       const d = freeDetails[i];
       return d ? [{ unitId: u.id, label: `${d.displayName} · ${d.location.pathLabels.join(" › ")}`, model: `${d.capabilities.manufacturer} ${d.capabilities.model}`,
-        sensors: d.capabilities.sensors.map((s) => s.metric as Metric), jobs: myJobs.filter((j) => j.unitId === u.id).map((j) => ({ id: j.id, label: `${j.id.slice(0, 8)} · ${statusWord(j.status, t)}` })) }] : [];
+        sensors: d.capabilities.sensors.map((s) => s.metric), jobs: myJobs.filter((j) => j.unitId === u.id).map((j) => ({ id: j.id, label: `${j.id.slice(0, 8)} · ${statusWord(j.status, t)}` })) }] : [];
     }),
     rebind: units.filter((u) => !u.archived && jobFor(u.id, myJobs)).map((u) => ({ unitId: u.id, label: u.displayName, jobId: jobFor(u.id, myJobs)! })),
   };

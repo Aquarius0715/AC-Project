@@ -8,7 +8,6 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { metrics, metricUnit, type Metric } from "@ac/web/lib/devices";
 import { bindDevice, calibrateSensor, checkDevice, registerDevice, updateFirmware } from "../actions";
 import type { DevicesLive } from "./devices-view";
-import type { UnitSymbol } from "@ac/web/lib/contracts.gen";
 
 const powerWord: Record<string, string> = { on: "on", off: "off", unknown: "unknown" };
 const opWord: Record<string, string> = { check: "Connection check", calibrate: "Calibration", firmware: "Firmware update" };
@@ -47,7 +46,7 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
     setTried(true);
     const s = dv?.detail.sensors.find((x) => x.id === cal.sensorId);
     if (!dv || !s || cal.reference.trim() === "" || cal.measured.trim() === "" || !Number.isFinite(+cal.reference) || !Number.isFinite(+cal.measured)) return;
-    run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit as UnitSymbol, +cal.reference, +cal.measured), t("Calibration recorded (demo)"), close);
+    run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit, +cal.reference, +cal.measured), t("Calibration recorded (demo)"), close);
   };
   const firmware = () => {
     setTried(true);

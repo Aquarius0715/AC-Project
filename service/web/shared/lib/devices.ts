@@ -26,18 +26,18 @@ export const fans: Fan[] = ["low", "mid", "high"];
 export type ApiCapability = {
   id: string; version: number; updatedAt: string; manufacturer: string; model: string; control: boolean; modeControl: boolean; fanControl: boolean;
   temperature: { min: number; max: number; step: number } | null; modes: Mode[]; fanLevels: Fan[]; ventilation: boolean; ventilationLevels: Fan[];
-  sensors: { metric: Metric; unit: string; staleAfterSeconds: number; boundaryId: string | null }[]; firmwareCandidates: string[];
+  sensors: { metric: Metric; unit: UnitSymbol; staleAfterSeconds: number; boundaryId: string | null }[]; firmwareCandidates: string[];
 };
 /** The unit fields this screen needs (UnitSummary). */
 export type ApiUnitLite = { id: string; displayName: string; modelId: string; customerOrgId: string; archived: boolean };
 /** Device / DeviceDetail of service-contracts.ts. */
 export type ApiDevice = {
   id: string; version: number; unitId: string | null; serial: string; connection: Connection; lastSeenAt: string | null; firmwareVersion: string;
-  powerSignal: "unknown" | "on" | "off"; tamper: "clear" | "detected"; sensors: { id: string; metric: Metric; unit: string; staleAfterSeconds: number; calibratedAt: string | null }[];
+  powerSignal: "unknown" | "on" | "off"; tamper: "clear" | "detected"; sensors: { id: string; metric: Metric; unit: UnitSymbol; staleAfterSeconds: number; calibratedAt: string | null }[];
 };
 export type ApiDeviceOperation = { id: string; kind: "check" | "calibrate" | "firmware"; status: "queued" | "running" | "succeeded" | "failed"; targetVersion: string | null; failureCode: string | null; createdAt: string; finishedAt: string | null };
 export type ApiDeviceDetail = ApiDevice & { calibrationRefs: string[]; activeOperation: ApiDeviceOperation | null };
-export type ApiCalibration = { id: string; sensorId: string; metric: Metric; unit: string; referenceValue: number; measuredValue: number; calibratedAt: string; actorId: string };
+export type ApiCalibration = { id: string; sensorId: string; metric: Metric; unit: UnitSymbol; referenceValue: number; measuredValue: number; calibratedAt: string; actorId: string };
 export type ApiCampaign = {
   id: string; version: number; modelId: string; fromVersions: string[]; targetVersion: string; deviceIds: string[]; waves: { label: string; percent: number }[];
   window: { startLocal: string; endLocal: string }; autoPauseFailurePercent: number; startAt: string; state: "scheduled" | "running" | "paused" | "aborted" | "completed";

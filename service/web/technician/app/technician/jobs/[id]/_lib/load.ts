@@ -11,12 +11,14 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { componentsFor, historyCard, knownOf, timeInstants, type ApiTechHistory, type ApiTechReport, type TimeOnSite } from "@ac/web/lib/techJob";
 import type { WorkspaceLive } from "../_components/workspace-view";
 
-type JobDetail = {
-  projection: "detail" | "offer" | "history"; id: string; version: number; status: string; type: string; unitId: string; symptom: string; alertIds: string[];
+/** jobs.get for the technician: the detail while the job is theirs, the snapshot after the window (IR124); an offer
+ * projection is a contractor's and reads as not found here. */
+type JobRead = {
+  projection: "detail"; id: string; version: number; status: string; type: string; unitId: string; symptom: string; alertIds: string[];
   origin: string; dueAt: string | null; timeOnSite: TimeOnSite | null; draftReportRef: { reportId: string; reportVersion: number } | null;
   reportRefs: { reportId: string; reportVersion: number }[];
   assignment: { scheduledStart: string; scheduledEnd: string; status: string; acknowledgement: "pending" | "accepted" | "cant_make"; cantMakeReason: string | null } | null;
-};
+} | ApiTechHistory | { projection: "offer" };
 type Part = { code: string; name: string; vanStockQuantity: number | null };
 type Refused = { refused: string }; // FORBIDDEN / NOT_FOUND with the reason (e.g. errors.assignment_not_started)
 const quiet = <T,>(p: Promise<T>): Promise<T | Refused> => p.catch((e) => {
@@ -26,13 +28,13 @@ const quiet = <T,>(p: Promise<T>): Promise<T | Refused> => p.catch((e) => {
 const isRefused = (x: unknown): x is Refused => !!x && typeof x === "object" && "refused" in x;
 
 export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | { kind: "history"; card: ReturnType<typeof historyCard> } | "not_found"> {
-  const job = await coreOp<JobDetail>("jobs.get", { jobId }).catch((e) => {
+  const job = await coreOp<JobRead>("jobs.get", { jobId }).catch((e) => {
     if (e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || e.error.fieldErrors.jobId)) return null;
     throw e;
   });
   const display = await coreDisplay();
   const i = i18nOf(display);
-  if (job?.projection === "history") return { kind: "history", card: historyCard(job as unknown as ApiTechHistory, i) }; // window ended: completed (IR234) or reassigned
+  if (job?.projection === "history") return { kind: "history", card: historyCard(job, i) }; // window ended: completed (IR234) or reassigned
   if (!job || job.projection !== "detail") return "not_found";
   const [now, unit] = await Promise.all([coreNow(), quiet(coreOp<ApiUnitDetail & { serviceScope?: string[] }>("units.get", { id: job.unitId }))]);
   const ref = job.draftReportRef ?? job.reportRefs[job.reportRefs.length - 1] ?? null;

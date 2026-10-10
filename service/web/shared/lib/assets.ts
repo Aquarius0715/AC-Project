@@ -3,6 +3,7 @@
 // Server Component and the client view; Vitest covers it. Texts in the display language (`i` / `t`, IR293); instants
 // in the user's display time zone, while dates that are Kuala Lumpur days (installation, warranty end, contract end)
 // stay so (IR44).
+import type { Currency } from "@ac/web/lib/contracts.gen";
 import { EN, intlTag, showDate, showTime, translator, type I18n, type Locale, type T } from "@ac/web/lib/i18n";
 import { businessDay } from "@ac/web/lib/clientBilling";
 import { amount, klStamp, one } from "@ac/web/lib/energy";
@@ -28,7 +29,7 @@ export type ApiUnitRow = {
 /** UnitDetail of service-contracts.ts (fields shown on this screen). */
 export type ApiUnitDetail = ApiUnitRow & { location: { pathLabels: string[]; address: string | null; accessInstructions: string | null }; pendingCommandIds: string[] };
 export type ApiContractLite = { id: string; customerId: string; unitIds: string[]; planType: Profile; startAt: string; endAt: string };
-export type ApiInvoiceLite = { id: string; contractId: string; amountMinor: number; currency: string };
+export type ApiInvoiceLite = { id: string; contractId: string; amountMinor: number; currency: Currency };
 export type ApiRestrictionLite = { id: string; contractId?: string; state: string; unitIds: string[] };
 
 const byName = <T extends { name: string }>(a: T, b: T) => a.name.localeCompare(b.name);
@@ -404,9 +405,9 @@ export const coverageCsv = (rows: CoverageRow[]) => toCsv(["unit", "unit_id", "c
   rows.map((r) => [r.unit, r.unitId, r.customer, r.model, r.endsDate, r.contracts === "—" ? "" : r.contracts, r.statusText]));
 
 /** A job completed under warranty whose accepted report lists replaced parts and has no filed claim (IR209). */
-export type ClaimCandidate = { jobId: string; version: number; unit: string; type: string; completed: string; parts: string; partLabel: string; amountMinor: number | null; currency: string };
+export type ClaimCandidate = { jobId: string; version: number; unit: string; type: string; completed: string; parts: string; partLabel: string; amountMinor: number | null; currency: Currency };
 type Part = { name: string; quantity: number; catalogCode: string | null };
-type Cost = { kind: "estimate" | "actual"; amountMinor: number; currency: string };
+type Cost = { kind: "estimate" | "actual"; amountMinor: number; currency: Currency };
 export function claimCandidate(j: { id: string; version: number; type: string; completedAt: string | null; costs: Cost[] }, parts: Part[], unit: string, i: I18n = EN): ClaimCandidate {
   const label = parts.map((p) => `${p.name}${p.catalogCode ? ` ${p.catalogCode}` : ""} ×${p.quantity}`).join(", ");
   const actual = j.costs.filter((c) => c.kind === "actual");

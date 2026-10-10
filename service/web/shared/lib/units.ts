@@ -2,11 +2,16 @@
 // commands.create per changed setting, commands.get polling until the device answers or the command expires (D04),
 // and units.setAlertPolicies with the unit version (FR-C03, FR-C15).
 import { airNumber } from "@ac/web/lib/air";
+import type { Metric, RestrictionAction, UnitAction as AnyUnitAction, UnitSymbol } from "@ac/web/lib/contracts.gen";
+import { policyText } from "@ac/web/lib/restrictions";
 import { DEFAULT_DISPLAY, showClock, showTime, translator, type Display, type T } from "@ac/web/lib/i18n";
 
 type Mode = "cool" | "dry" | "fan";
 type Fan = "low" | "mid" | "high";
 export type UnitAction = { kind: "set_power"; power: boolean } | { kind: "set_temperature"; celsius: number } | { kind: "set_mode"; mode: Mode } | { kind: "set_fan"; fanLevel: Fan };
+/** What a stored command did (Command.action): a setting of the remote control, ventilation (an automation) or a
+ * restriction's apply / remove (IR314). */
+export type CommandAction = AnyUnitAction | RestrictionAction;
 
 /** UnitDetail of service-contracts.ts (fields shown on the control screen). */
 export type ApiUnitDetail = {
@@ -20,10 +25,10 @@ export type ApiUnitDetail = {
   observedState: { power: boolean | null; celsius: number | null; mode: Mode | null; fanLevel: Fan | null; observedAt: string | null };
   lastSeenAt: string | null;
   /** The latest reading of each metric with read-time quality (IR213: a valid reading past its sensor's stale limit is stale). */
-  latestMeasurements: { id: string; unitId: string; sensorId: string; metric: string; value: number | null; unit: string; observedAt: string; origin: "measured" | "estimated" | "inspection"; quality: "valid" | "missing" | "stale" | "suspect"; qualityReason: string | null }[];
+  latestMeasurements: { id: string; unitId: string; sensorId: string; metric: Metric; value: number | null; unit: UnitSymbol; observedAt: string; origin: "measured" | "estimated" | "inspection"; quality: "valid" | "missing" | "stale" | "suspect"; qualityReason: string | null }[];
   capabilities: {
     manufacturer: string; model: string; control: boolean; modeControl: boolean; fanControl: boolean; temperature: { min: number; max: number; step: number } | null; modes: Mode[]; fanLevels: Fan[];
-    ventilation: boolean; ventilationLevels: Fan[]; sensors: { metric: string; unit: string; staleAfterSeconds: number }[];
+    ventilation: boolean; ventilationLevels: Fan[]; sensors: { metric: Metric; unit: UnitSymbol; staleAfterSeconds: number }[];
   };
   effectiveControlPolicy: { state: "unrestricted" } | { state: "restricted"; phase: string; policy: { kind: "temperature_limit"; minimumCoolingSetpoint: number } | { kind: "power_off" } };
   controlAvailability: { state: "available" } | { state: "blocked"; reasonKey: string };
@@ -35,7 +40,7 @@ export type ApiUnitDetail = {
   components: string[];
 };
 
-export type ApiCommand = { id: string; action: UnitAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; acknowledgedAt?: string | null; expiresAt?: string; failureCode: string | null; source?: string };
+export type ApiCommand = { id: string; action: CommandAction; status: "requested" | "sent" | "acknowledged" | "failed" | "expired" | "cancelled"; requestedAt: string; acknowledgedAt?: string | null; expiresAt?: string; failureCode: string | null; source?: string };
 
 /** The fixed Asia/Kuala_Lumpur time of the screens not yet on the user's display time zone; screens moved to it use
  * showTime / showClock of lib/i18n (IR44, IR259). */
@@ -49,8 +54,8 @@ const en = translator("en");
 export const MODE_LABEL: Record<Mode, string> = { cool: "Cool", dry: "Dry", fan: "Fan" };
 export const FAN_LABEL: Record<Fan, string> = { low: "Low", mid: "Mid", high: "High" };
 
-/** A command as a sentence in the display language (IR258). */
-export function actionText(a: UnitAction, t: T = en): string {
+/** A command as a sentence in the display language (IR258); every kind of the contract has its words (IR314). */
+export function actionText(a: CommandAction, t: T = en): string {
   switch (a.kind) {
     case "set_power":
       return t(a.power ? "Set power ON" : "Set power OFF");
@@ -60,6 +65,12 @@ export function actionText(a: UnitAction, t: T = en): string {
       return t("Set mode {mode}", { mode: t(MODE_LABEL[a.mode]).toUpperCase() });
     case "set_fan":
       return t("Set fan {level}", { level: t(FAN_LABEL[a.fanLevel]).toUpperCase() });
+    case "ventilate":
+      return t("Set ventilation {level}", { level: t(FAN_LABEL[a.level]).toUpperCase() });
+    case "apply_restriction":
+      return t("Apply restriction: {policy}", { policy: policyText(a.policy, t) });
+    case "remove_restriction":
+      return t("Remove restriction");
   }
 }
 

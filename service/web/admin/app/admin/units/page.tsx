@@ -14,6 +14,7 @@ import { i18nOf, relativeTime, showDate, type I18n } from "@ac/web/lib/i18n";
 import { businessDay } from "@ac/web/lib/clientBilling";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { metricLabel } from "@ac/web/lib/adminAlerts";
+import type { Currency } from "@ac/web/lib/contracts.gen";
 import type { ApiCapability } from "@ac/web/lib/devices";
 import {
   claimCandidate, clientUserRows, coverageKpis, coverageRows, connections, customerRows, defaultRules, filterUnits, locationTree, modelLabel, placeOptions, policyLines, powerStates, registerKpis, selection, standing, unitRows, unitsAt,
@@ -24,11 +25,11 @@ import { UnitsDemo } from "./_components/units-demo";
 import { UnitsView, type CustomerLive, type UnitLive, type UnitsLive } from "./_components/units-view";
 
 type Member = { id: string; displayName: string };
-type Job = { id: string; type: string; status: string };
+type Job = { projection: "summary"; id: string; type: string; status: string };
 type Device = { id: string; serial: string; unitId: string | null; connection: Connection };
 type Alert = { severity: "critical" | "warning" | "normal" };
 type Audit = { occurredAt: string; actorId: string; reason: string | null };
-type JobForClaim = { id: string; version: number; type: string; unitId: string; completedAt: string | null; costs: { kind: "estimate" | "actual"; amountMinor: number; currency: string }[]; reportRefs: { reportId: string; reportVersion: number }[] };
+type JobForClaim = { projection: "detail"; id: string; version: number; type: string; unitId: string; completedAt: string | null; costs: { kind: "estimate" | "actual"; amountMinor: number; currency: Currency }[]; reportRefs: { reportId: string; reportVersion: number }[] };
 type Report = { parts: { name: string; quantity: number; catalogCode: string | null }[]; acceptedAt: string | null };
 const done = ["completed", "cancelled"];
 const restrictionState: Record<string, string> = { requested: "requested", applied: "applied", release_requested: "release requested" };

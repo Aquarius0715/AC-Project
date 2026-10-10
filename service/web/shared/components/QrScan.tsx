@@ -27,7 +27,9 @@ export function QrScan({ open, onClose }: { open: boolean; onClose: () => void }
   const input = useRef<HTMLInputElement>(null);
   const now = useNow();
   const units = useOp<{ items: { id: string; displayName: string }[] }, { id: string; displayName: string }[]>("units.list", { limit: 100 }, [], (p) => p.items, open);
-  const jobUnits = useOp<{ items: { unitId: string }[] }, string[]>("jobs.list", { filters: { statuses: OPEN }, limit: 100 }, [], (p) => p.items.map((j) => j.unitId), open);
+  // the open jobs' summary rows name their units; a snapshot of a past job (history) names none
+  const jobUnits = useOp<{ items: ({ projection: "summary"; unitId: string } | { projection: "offer" | "history" })[] }, string[]>("jobs.list", { filters: { statuses: OPEN }, limit: 100 }, [],
+    (p) => p.items.flatMap((j) => (j.projection === "summary" ? [j.unitId] : [])), open);
   const assigned = units.data.filter((u) => jobUnits.data.includes(u.id));
   const close = () => { setState({ kind: "idle" }); setCode(""); onClose(); };
   const scan = async (raw: string) => {

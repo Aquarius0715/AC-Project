@@ -8,6 +8,7 @@ import { coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/we
 import { i18nOf, showTime } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { alertChoices, alertView, selectAlert, type ApiTechAlert } from "@ac/web/lib/techAlerts";
+import type { TechJobRead } from "@ac/web/lib/techJob";
 
 type Page<T> = { items: T[] };
 const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => {
@@ -32,8 +33,8 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
   });
   if (!Array.isArray(alerts)) {
     if (alerts.messageKey === "errors.assignment_not_started") { // IR76: the start time from the URL's job
-      const job = sp.jobId ? await optional(coreOp<{ assignment: { scheduledStart: string } | null }>("jobs.get", { jobId: sp.jobId }), null) : null;
-      const start = job?.assignment?.scheduledStart ?? null;
+      const job = sp.jobId ? await optional(coreOp<TechJobRead<{ assignment: { scheduledStart: string } | null }>>("jobs.get", { jobId: sp.jobId }), null) : null;
+      const start = job?.projection === "detail" ? job.assignment?.scheduledStart ?? null : null;
       return {
         kind: "unavailable" as const, title: t("Not started yet"), unitHref, back: t("← Unit"),
         text: start ? t("You can see this AC from {time}, when your work window starts.", { time: showTime(start, display) }) : t("Available from the work start time of your assigned job."),
@@ -43,14 +44,14 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
   }
   const [unit, job, permissions] = await Promise.all([
     optional(coreOp<ApiUnitDetail>("units.get", { id: unitId }), null),
-    sp.jobId ? optional(coreOp<{ id: string; type: string }>("jobs.get", { jobId: sp.jobId }), null) : Promise.resolve(null),
+    sp.jobId ? optional(coreOp<TechJobRead<{ id: string; type: string }>>("jobs.get", { jobId: sp.jobId }), null) : Promise.resolve(null),
     corePermissions(),
   ]);
   const selected = selectAlert(alerts, sp.alertId);
   return {
     kind: "live" as const, unitId, unitHref, unitName: unit?.displayName ?? unitId.slice(0, 8),
     choices: alertChoices(alerts, nowMs, i), count: alerts.length,
-    alert: selected ? alertView(selected, { alerts, unit, job: job ? { id: job.id, type: job.type } : null, canResolve: permissions.has("alert.resolve") }, nowMs, i) : null,
+    alert: selected ? alertView(selected, { alerts, unit, job: job?.projection === "detail" ? { id: job.id, type: job.type } : null, canResolve: permissions.has("alert.resolve") }, nowMs, i) : null,
   };
 }
 

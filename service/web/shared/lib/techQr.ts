@@ -6,12 +6,14 @@
 import { EN, showSpan, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
+import type { TechJobRead } from "@ac/web/lib/techJob";
 
 const en = translator("en");
 
 export type ApiQrResolution = { unitId: string; jobId: string | null };
 export type ApiQrUnit = { id: string; displayName: string; location: { pathLabels: string[] }; capabilities: { manufacturer: string; model: string } };
-export type ApiQrJob = { id: string; type: string; status: string; scheduledSlot: Slot | null; alertIds?: string[] };
+/** jobs.get of the resolved job (TechJobRead): the open job's detail; a snapshot after its window reads as no job. */
+export type ApiQrJob = TechJobRead<{ id: string; type: string; status: string; scheduledSlot: Slot | null; alertIds: string[] }>;
 
 const KL = 8 * 3600_000;
 const klDate = (ms: number) => new Date(ms + KL).toISOString().slice(0, 10);
@@ -29,12 +31,13 @@ export function qrMatch(r: ApiQrResolution, unit: ApiQrUnit | null, job: ApiQrJo
     : opts.locked ? t("Unit details open when your work window starts (IR94).") : "";
   let card: QrMatch["job"] = null;
   if (r.jobId) {
-    const s = job?.scheduledSlot ?? null;
+    const j = job?.projection === "detail" ? job : null;
+    const s = j?.scheduledSlot ?? null;
     const today = !!s && klDate(Date.parse(s.startAt)) <= klDate(now) && klDate(now) <= klDate(Date.parse(s.endAt));
-    const alerts = job?.alertIds?.length ? t(job.alertIds.length === 1 ? "1 linked alert" : "{n} linked alerts", { n: job.alertIds.length }) : "";
+    const alerts = j?.alertIds.length ? t(j.alertIds.length === 1 ? "1 linked alert" : "{n} linked alerts", { n: j.alertIds.length }) : "";
     card = {
       label: t(today ? "Your job today: {id}" : "Your next job: {id}", { id: r.jobId.slice(0, 8) }),
-      text: [s ? showSpan(s.startAt, s.endAt, display) : "", job ? typeLabel(job.type, t) : "", job ? statusWord(job.status, t) : "", alerts].filter(Boolean).join(" · "), tone: today ? "ok" : "primary",
+      text: [s ? showSpan(s.startAt, s.endAt, display) : "", j ? typeLabel(j.type, t) : "", j ? statusWord(j.status, t) : "", alerts].filter(Boolean).join(" · "), tone: today ? "ok" : "primary",
     };
   }
   return { title, sub, job: card, unitHref: `/technician/units/${r.unitId}${r.jobId ? `?jobId=${r.jobId}` : ""}`, jobHref: r.jobId ? `/technician/jobs/${r.jobId}` : null };

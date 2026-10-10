@@ -7,12 +7,13 @@ import "server-only";
 import { coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
 import { i18nOf, showTime } from "@ac/web/lib/i18n";
 import { actionOptions } from "@ac/web/lib/clientAutomations";
+import type { TechJobRead } from "@ac/web/lib/techJob";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import {
   blockedText, capabilityText, connectionText, historyRows, observedText, restrictionText, runActive, runBanner, stateTiles, windowText, type ApiCommandRow, type ApiRun,
 } from "@ac/web/lib/techControl";
 
-type JobDetail = { id: string; version: number; status: string; assignment: { scheduledStart: string; scheduledEnd: string; status: string } | null };
+type JobRead = TechJobRead<{ id: string; version: number; status: string; assignment: { scheduledStart: string; scheduledEnd: string; status: string } | null }>;
 const gone = (e: unknown) => e instanceof CoreError && (e.error.code === "NOT_FOUND" || e.error.code === "FORBIDDEN" || !!e.error.fieldErrors.id || !!e.error.fieldErrors.jobId);
 
 export async function loadControl(unitId: string, jobId: string | null) {
@@ -27,8 +28,8 @@ export async function loadControl(unitId: string, jobId: string | null) {
   const unitHref = `/technician/units/${unitId}${jobId ? `?jobId=${jobId}` : ""}`;
   if (d === null) return null; // not in the technician's assignments: not found (IR169)
   if (d === "not_started") { // IR76: the start time from the URL's job
-    const job = jobId ? await coreOp<JobDetail>("jobs.get", { jobId }).catch(() => null) : null;
-    const start = job?.assignment?.scheduledStart ?? null;
+    const job = jobId ? await coreOp<JobRead>("jobs.get", { jobId }).catch(() => null) : null;
+    const start = job?.projection === "detail" ? job.assignment?.scheduledStart ?? null : null;
     return {
       kind: "not_started" as const, title: t("Not started yet"), back: t("← Unit"), unitHref,
       text: start ? t("Diagnostic control opens at {time}, when your work window starts.", { time: showTime(start, display) }) : t("Available from the work start time of your assigned job."),
@@ -40,8 +41,9 @@ export async function loadControl(unitId: string, jobId: string | null) {
   };
   const base = { kind: "live" as const, unitHref, unit, canDiagnose: perms.has("control.diagnose") };
   if (!jobId) return { ...base, job: null, run: null, banner: null, active: false, history: [] };
-  const job = await coreOp<JobDetail>("jobs.get", { jobId }).catch((e) => { if (gone(e)) return null; throw e; });
-  if (!job) return null;
+  const read = await coreOp<JobRead>("jobs.get", { jobId }).catch((e) => { if (gone(e)) return null; throw e; });
+  const job = read?.projection === "detail" ? read : null;
+  if (!job) return null; // a refused job, or one whose window ended (a history snapshot): not the technician's to control
   const [runs, cmds] = await Promise.all([
     coreOp<{ items: ApiRun[] }>("diagnosticRuns.list", { unitId, jobId, query: { limit: 10 } }),
     coreOp<{ items: ApiCommandRow[] }>("commands.list", { unitId, jobId, query: { limit: 20 } }),

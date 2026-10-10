@@ -20,8 +20,11 @@ describe("action text", () => {
     expect(actionCode({ kind: "set_temperature", celsius: 24 })).toBe("set_temperature = 24 °C");
     expect(actionCode({ kind: "set_mode", mode: "cool" })).toBe("set_mode = cool");
     expect(actionCode({ kind: "set_fan", fanLevel: "high" })).toBe("set_fan = high");
-    expect(actionCode({ kind: "ventilate", level: "boost" })).toBe("ventilate = boost");
-    expect(actionCode({ kind: "unknown_kind" })).toBe("unknown_kind");
+    expect(actionCode({ kind: "ventilate", level: "low" })).toBe("ventilate = low");
+    // a restriction's own commands are in the unit's history too (IR314)
+    expect(actionCode({ kind: "apply_restriction", restrictionId: "r1", rulesVersion: "v1", policy: { kind: "temperature_limit", minimumCoolingSetpoint: 26 } })).toBe("apply_restriction = min 26 °C");
+    expect(actionCode({ kind: "apply_restriction", restrictionId: "r1", rulesVersion: "v1", policy: { kind: "power_off" } })).toBe("apply_restriction = power_off");
+    expect(actionCode({ kind: "remove_restriction", restrictionId: "r1", rulesVersion: "v1" })).toBe("remove_restriction");
     expect(actionWord({ kind: "set_power", power: false })).toBe("Power OFF");
     expect(actionWord({ kind: "set_temperature", celsius: 22 })).toBe("set_temperature = 22 °C");
   });

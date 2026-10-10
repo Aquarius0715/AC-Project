@@ -160,7 +160,7 @@ export async function loadPlans(sp: SP) {
   if (!plan) return { ...base, detail: null, missing: pick };
   const [unit, jobs] = await Promise.all([
     optional(coreOp<{ displayName: string; location: { pathLabels: string[] } }>("units.get", { id: plan.unitId }), null),
-    optional(coreAll<{ id: string; status: string; displayStatus: string }>("jobs.list", { filters: { unitId: plan.unitId, origin: "periodic_plan" } }), []),
+    optional(coreAll<{ projection: "summary"; id: string; status: string; displayStatus: string }>("jobs.list", { filters: { unitId: plan.unitId, origin: "periodic_plan" } }), []),
   ]);
   const status = new Map(jobs.map((j) => [j.id, j.displayStatus === "time_proposed" ? "time_proposed" : j.status]));
   return {

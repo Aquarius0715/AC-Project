@@ -20,7 +20,7 @@ export type TechDevicesLive = {
   device: null | {
     detail: ApiDeviceDetail; row: TechDeviceRow; jobId: string | null;
     tiles: { label: string; value: string; dot: string | null; sub: string; warn?: boolean }[];
-    sensors: { id: string; metric: string; unit: string; stale: string; calibrated: string }[];
+    sensors: { id: string; metric: Metric; unit: UnitSymbol; stale: string; calibrated: string }[];
     unit: { name: string; place: string; model: string } | null; firmware: string[];
     firmwareCard: { tone: "primary" | "crit" | "ok"; title: string; status: string; text: string } | null;
     operations: OperationRow[]; calibrations: string[];
@@ -95,7 +95,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
     if (cal.measured.trim() === "" || !Number.isFinite(+cal.measured)) e.measuredValue = t("A number");
     setErrors(e);
     if (Object.keys(e).length || !dv || !s || !dv.jobId) return;
-    run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit as UnitSymbol, +cal.reference, +cal.measured, dv.jobId!), t("Calibration recorded — earlier readings unchanged"), ok(), failed);
+    run(() => calibrateSensor(dv.detail.id, dv.detail.version, s.id, s.metric, s.unit, +cal.reference, +cal.measured, dv.jobId!), t("Calibration recorded — earlier readings unchanged"), ok(), failed);
   };
   const firmware = () => {
     if (!dv || !fw || !dv.jobId) return setErrors({ firmwareVersion: t("Choose a version") });

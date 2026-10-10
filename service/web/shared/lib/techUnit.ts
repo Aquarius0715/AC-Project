@@ -34,8 +34,9 @@ export function periodRange(p: Period, nowMs: number): { from: number; to: numbe
 }
 /** The metric the series shows: the URL's when the unit measures it, else temperature, else its first measured one. */
 export function metricOf(d: ApiTechUnit, v?: string): Metric {
-  const measured = d.latestMeasurements.map((m) => m.metric as Metric); // the API names only the contract's metrics
-  if (v && measured.includes(v as Metric)) return v as Metric;
+  const measured = d.latestMeasurements.map((m) => m.metric);
+  const asked = measured.find((m) => m === v);
+  if (asked) return asked;
   return measured.includes("temperature") || !measured.length ? "temperature" : measured[0];
 }
 const label = (metric: string, t: T) => (metricLabel[metric] ? t(metricLabel[metric]) : metric.replace(/_/g, " "));

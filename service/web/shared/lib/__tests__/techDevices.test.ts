@@ -121,7 +121,7 @@ describe("operation history", () => {
     expect(rows[0]).toMatchObject({ id: "1", kind: "Connection check", status: "succeeded", statusText: "Succeeded" });
   });
   it("prints a calibration with the signed offset reference − measured", () => {
-    const base = { id: "c", sensorId: "s", metric: "temperature" as const, unit: "°C", calibratedAt: "2026-09-14T01:04:00Z", actorId: "u" };
+    const base = { id: "c", sensorId: "s", metric: "temperature" as const, unit: "°C" as const, calibratedAt: "2026-09-14T01:04:00Z", actorId: "u" };
     expect(calibrationText({ ...base, referenceValue: 25, measuredValue: 25.4 })).toBe("temperature · ref 25.0 °C / measured 25.4 °C · offset −0.4 °C · 14 Sept 2026, 9:04 am MYT — appended; earlier readings unchanged.");
     expect(calibrationText({ ...base, referenceValue: 25.5, measuredValue: 25 })).toContain("offset 0.5 °C");
   });
