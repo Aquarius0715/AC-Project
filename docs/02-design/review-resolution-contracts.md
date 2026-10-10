@@ -3619,3 +3619,29 @@ IR293 found that `DataTable` rows with `onRowClick` opened a record only on a mo
    - The other 10 HQ screens: energy, MRV, offsets, billing, contracts, restrictions with exceptions, access, automation and audit.
    - The browser demo.
    - The assistant panel and the voice demo's answers.
+
+## IR296 The HQ energy analysis in the display language; its periods stay Kuala Lumpur time — 2026-10-10
+
+`/admin/energy` (SCR-A13, FR-A13, DD-A13, Figma Admin 13) follows the display language.
+
+1. **Texts.** These are translated:
+   - the Analysis and Baselines tabs;
+   - the scope card: customer, baseline, period, units and the comparison notes;
+   - the figure tiles, the cost card with the IR68 note, and the calculation conditions with their quality warnings;
+   - the baselines filters, the list, the editor and its checks (`baselineErrors`), the toasts, and a failed summary's message.
+   The dictionary gains 49 entries. These stay as they are: method and boundary codes, baseline IDs, and the stored boundary, assumption, factor and source texts.
+2. **Periods.**
+   - The analysis and baseline periods are Kuala Lumpur business time, like the customer energy periods (REV18-035). They are typed in Kuala Lumpur time, and the labels say so: "From (Kuala Lumpur)", "Period start (Kuala Lumpur)".
+   - They are shown as Kuala Lumpur "YYYY-MM-DD HH:MM" with "(Asia/Kuala_Lumpur)", as in the conditions of the customer screens (IR265).
+   - The baselines filter reads `[from, to)` on a baseline's period start (query catalog). Its labels are now "Period starts from (Kuala Lumpur)" and "Period starts before"; before, they were "Period start from" and "to".
+3. **The baseline list** words its value and unit count in the display language (`baselineRows(bs, t)`). The MRV screen still calls it without `t`, so it stays English until that screen is translated.
+4. **Checked.**
+   - Vitest: 44 files, 264 tests. `energy.test.ts` gains the baseline rows and the form checks in Malay.
+   - E2E: `admin/language.e2e.ts` also opens both energy tabs. It checks that the period is named Kuala Lumpur time in another zone. It also checks the new-baseline form errors, which stop before any call. Nothing is saved.
+5. **Progress.** 35 of the 44 business screens follow the display language.
+6. **Still open.**
+   - The other 9 HQ screens: MRV, offsets, billing, contracts, restrictions with exceptions, access, automation and audit.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

@@ -1,11 +1,12 @@
-// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A06, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
+// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A06, FR-A13, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
 // HQ overview speaks Malay — the scope and period filters, the KPI tiles, the forecast, the power and connection axes,
 // the job statuses and the billing card — and its as-of time is in GMT+9 while the period stays Kuala Lumpur days, named
 // so; the Jobs tab speaks Malay too — tabs, scope, filters, the list and one job's detail with its times in GMT+9 — and
 // New job types its times in Asia/Tokyo; so do the Plans tab (its next date typed in Asia/Tokyo), the Contractors tab
 // (its dates named Kuala Lumpur days) and the SLA tab with its targets dialog (IR291), the alerts with their policies
 // (IR292), customers & units — the register, one customer's locations, users and policies, and warranty & coverage
-// (IR293) — and the device registry's three tabs with the new-campaign dialog (IR295). Nothing is saved. English and the
+// (IR293) — the device registry's three tabs with the new-campaign dialog (IR295), and the energy analysis with its
+// period named Kuala Lumpur time and the baselines with the form checks (IR296). Nothing is saved. English and the
 // earlier zone come back at the end, or in afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
@@ -112,6 +113,23 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(campaign).toContainText("Waktu tempatan peranti"); // the install window is the device's local time
   await campaign.getByRole("button", { name: "Batal", exact: true }).click();
   await expect(campaign).toBeHidden();
+  // the energy analysis (IR296): the scope with the period in Kuala Lumpur time, the figures and conditions, and the
+  // baselines with the new-baseline checks, which stop before any call
+  await page.goto("/admin/energy");
+  await expect(main.getByRole("tab", { name: /^Analisis/ })).toHaveAttribute("aria-selected", "true");
+  await expect(main.getByRole("heading", { name: "Skop", exact: true })).toBeVisible();
+  await expect(main.getByLabel("Dari (Kuala Lumpur)")).toBeVisible();
+  for (const name of ["Kos", "Syarat pengiraan"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();
+  await expect(main).toContainText(/Tempoh\s*\d{4}-\d{2}-\d{2} \d{2}:\d{2} → .*\(Asia\/Kuala_Lumpur\)/); // named Kuala Lumpur time in another zone
+  await main.getByRole("tab", { name: /^Garis dasar/ }).click();
+  await page.waitForURL(/tab=baselines/);
+  await expect(main.getByLabel("Tempoh bermula dari (Kuala Lumpur)")).toBeVisible();
+  await main.getByRole("button", { name: "+ Baharu" }).click();
+  await expect(main.getByRole("heading", { name: "Garis dasar baharu", exact: true })).toBeVisible();
+  await main.getByRole("button", { name: "Cipta garis dasar" }).click();
+  for (const text of ["Pilih 1–100 unit", "Tamat mesti selepas mula", "Nilai ≥ 0 kWh"]) await expect(main).toContainText(text);
+  await main.getByRole("button", { name: "Batal", exact: true }).click();
+  await expect(main.getByRole("heading", { name: "Garis dasar baharu", exact: true })).toBeHidden();
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/admin");

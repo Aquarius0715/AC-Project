@@ -92,10 +92,11 @@ export function summaryView(s: ApiEnergySummary, i: I18n = EN): SummaryView {
 }
 
 export type BaselineRow = { id: string; version: number; method: ApiBaseline["method"]; value: string; units: string; period: string; boundaryId: BoundaryId; b: ApiBaseline };
-export function baselineRows(bs: ApiBaseline[]): BaselineRow[] {
+/** The baseline list (DD-A13): value and unit count in the display language; the period stays Kuala Lumpur time. */
+export function baselineRows(bs: ApiBaseline[], t: T = en): BaselineRow[] {
   return bs.map((b) => ({
-    id: b.id, version: b.version, method: b.method, value: b.baselineKWh === null ? "no value" : `${one(b.baselineKWh)} kWh`,
-    units: `${b.unitIds.length} unit${b.unitIds.length === 1 ? "" : "s"}`, period: `${klStamp(b.period.from)} → ${klStamp(b.period.to)}`, boundaryId: b.boundaryId, b,
+    id: b.id, version: b.version, method: b.method, value: b.baselineKWh === null ? t("no value") : `${one(b.baselineKWh)} kWh`,
+    units: t(b.unitIds.length === 1 ? "1 unit" : "{n} units", { n: b.unitIds.length }), period: `${klStamp(b.period.from)} → ${klStamp(b.period.to)}`, boundaryId: b.boundaryId, b,
   }));
 }
 
@@ -108,17 +109,18 @@ export function baselineDraft(b?: ApiBaseline): BaselineDraft {
     boundary: b?.boundary ?? "", assumptions: b?.assumptions ?? "", source: b?.source ?? "",
   };
 }
-/** baselines.save rules (IR baselines.save item 3) checked before the call; the API checks them again. */
-export function baselineErrors(d: BaselineDraft): Record<string, string> {
+/** baselines.save rules (IR baselines.save item 3) checked before the call, worded in the display language; the API
+ * checks them again. */
+export function baselineErrors(d: BaselineDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (d.unitIds.length < 1 || d.unitIds.length > 100) e.unitIds = "Choose 1–100 units";
-  if (!d.from || !d.to || d.from >= d.to) e.period = "The end must be after the start";
-  else if (Date.parse(klInstant(d.to)) - Date.parse(klInstant(d.from)) > 366 * 24 * 3600 * 1000) e.period = "At most 366 days";
-  if (d.method === "demo_fixed" && !(d.baselineKWh.trim() !== "" && Number.isFinite(+d.baselineKWh) && +d.baselineKWh >= 0)) e.baselineKWh = "A value ≥ 0 kWh";
-  if (d.method === "demo_period_comparison" && d.boundaryId === "whole_building_electricity") e.boundaryId = "Period comparison measures AC input electricity only";
-  if (d.boundary.trim().length < 1 || d.boundary.length > 500) e.boundary = "1–500 characters";
-  if (d.assumptions.trim().length < 1 || d.assumptions.length > 2000) e.assumptions = "1–2000 characters";
-  if (d.source.trim().length < 1 || d.source.length > 500) e.source = "1–500 characters";
+  if (d.unitIds.length < 1 || d.unitIds.length > 100) e.unitIds = t("Choose 1–100 units");
+  if (!d.from || !d.to || d.from >= d.to) e.period = t("The end must be after the start");
+  else if (Date.parse(klInstant(d.to)) - Date.parse(klInstant(d.from)) > 366 * 24 * 3600 * 1000) e.period = t("At most 366 days");
+  if (d.method === "demo_fixed" && !(d.baselineKWh.trim() !== "" && Number.isFinite(+d.baselineKWh) && +d.baselineKWh >= 0)) e.baselineKWh = t("A value ≥ 0 kWh");
+  if (d.method === "demo_period_comparison" && d.boundaryId === "whole_building_electricity") e.boundaryId = t("Period comparison measures AC input electricity only");
+  if (d.boundary.trim().length < 1 || d.boundary.length > 500) e.boundary = t("1–500 characters");
+  if (d.assumptions.trim().length < 1 || d.assumptions.length > 2000) e.assumptions = t("1–2000 characters");
+  if (d.source.trim().length < 1 || d.source.length > 500) e.source = t("1–500 characters");
   return e;
 }
 export function baselineInput(d: BaselineDraft, id?: string) {

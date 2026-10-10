@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compareRow, dayRanges, periodRange, pickUnits, selectionQuery } from "@ac/web/lib/clientEnergy";
-import { amount, one, roundAway, saving, summaryView, warning, type ApiEnergySummary } from "@ac/web/lib/energy";
+import { amount, baselineErrors, baselineRows, one, roundAway, saving, summaryView, warning, type ApiEnergySummary, type BaselineDraft } from "@ac/web/lib/energy";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
 const NOW = new Date("2026-09-14T01:30:20Z"); // Mon 09:30 KL
@@ -102,5 +102,22 @@ describe("customer energy & cost (FR-C06, FR-C13)", () => {
   it("carries the selection to the offsets page as URL parameters (FR-C13)", () => {
     expect(selectionQuery({ unitIds: ["u1", "u2"], period: "7d", baselineId: "b1" })).toBe("unitIds=u1%2Cu2&period=7d&baselineId=b1");
     expect(selectionQuery({ unitIds: ["u1"], period: "custom", from: "2026-09-01T00:00", to: "2026-09-08T00:00" })).toBe("unitIds=u1&period=custom&from=2026-09-01T00%3A00&to=2026-09-08T00%3A00");
+  });
+});
+
+describe("HQ energy baselines in the display language (IR296)", () => {
+  it("words the baseline list and the form checks; the period stays Kuala Lumpur time", () => {
+    const b = summary.baselineSnapshot!;
+    const ms = translator("ms");
+    expect(baselineRows([b, { ...b, id: "b2", unitIds: ["u1"], baselineKWh: null }]).map((r) => [r.value, r.units, r.period])).toEqual([
+      ["135.0 kWh", "2 units", "2026-09-01 00:00 → 2026-09-08 00:00"], ["no value", "1 unit", "2026-09-01 00:00 → 2026-09-08 00:00"],
+    ]);
+    expect(baselineRows([{ ...b, baselineKWh: null }], ms).map((r) => [r.value, r.units, r.period])).toEqual([["tiada nilai", "2 unit", "2026-09-01 00:00 → 2026-09-08 00:00"]]);
+    const draft: BaselineDraft = { unitIds: [], from: "2026-09-08T00:00", to: "2026-09-01T00:00", method: "demo_period_comparison", baselineKWh: "", boundaryId: "whole_building_electricity", boundary: "", assumptions: "x", source: "" };
+    expect(baselineErrors(draft, ms)).toEqual({
+      unitIds: "Pilih 1–100 unit", period: "Tamat mesti selepas mula", boundaryId: "Perbandingan tempoh mengukur elektrik input AC sahaja", boundary: "1–500 aksara", source: "1–500 aksara",
+    });
+    expect(baselineErrors({ ...draft, unitIds: ["u1"], from: "2025-01-01T00:00", to: "2026-09-01T00:00", method: "demo_fixed", baselineKWh: "-1", boundaryId: "ac_input_electricity", boundary: "AC", source: "demo" }))
+      .toEqual({ period: "At most 366 days", baselineKWh: "A value ≥ 0 kWh" });
   });
 });
