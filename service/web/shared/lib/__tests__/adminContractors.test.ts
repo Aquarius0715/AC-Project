@@ -3,6 +3,9 @@ import {
   contractorRefusal, contractorRows, kpiTiles, nextMonthStart, pendingCertificates, profileErrors, profileFacts, rateAmount, rateCardErrors, rateCardView, technicianRows,
   type ApiCertificate, type ApiProfile, type ApiRateCard, type ApiTechnician,
 } from "@ac/web/lib/adminContractors";
+import { i18nOf } from "@ac/web/lib/i18n";
+
+const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
 const NOW = Date.parse("2026-09-14T01:00:00Z"); // Mon 09:00 KL
 const kpis = { period: { from: "2026-06-16T01:00:00Z", to: "2026-09-14T01:00:00Z" }, offerAcceptance: 92, arrivalInWindow: 96.2, firstTimeAccepted: 84, averageRating: 4.6, ratingCount: 12, reworkRate: 8 };
@@ -30,8 +33,8 @@ describe("HQ contractor register", () => {
     expect(kpiTiles(kpis).map((t) => [t.label, t.value])).toEqual([["Offer acceptance", "92 %"], ["Arrival in window", "96 %"], ["Report accepted first time", "84 %"], ["Customer rating", "4.6 ★"], ["Rework rate", "8 %"]]);
     const empty = kpiTiles({ ...kpis, offerAcceptance: null, averageRating: null, ratingCount: 0, reworkRate: 12.5 });
     expect([empty[0].value, empty[0].sub, empty[3].value, empty[3].sub, empty[4].tone]).toEqual(["—", "no answered offers · 90 d", "—", "0 ratings (Client)", "warn"]);
-    expect(profileFacts(profile({}), NOW)).toEqual([["Registration", "SSM 202301012345"], ["Service areas", "Kuala Lumpur, Selangor"], ["Delegation period", "2026-04-01 – 2027-01-31"], ["Contact", "ops@contractor-a.example"], ["Insurance", "valid to 2027-01-31"]]);
-    expect(profileFacts(profile({ insuranceValidUntil: "2026-08-01T00:00:00Z" }), NOW)[4][1]).toBe("expired 2026-08-01");
+    expect(profileFacts(profile({}), NOW)).toEqual([["Registration", "SSM 202301012345"], ["Service areas", "Kuala Lumpur, Selangor"], ["Delegation period", "1 Apr 2026 – 31 Jan 2027"], ["Contact", "ops@contractor-a.example"], ["Insurance", "valid to 31 Jan 2027"]]); // Kuala Lumpur days
+    expect(profileFacts(profile({ insuranceValidUntil: "2026-08-01T00:00:00Z" }), NOW)[4][1]).toBe("expired 1 Aug 2026");
     expect(profileFacts(profile({ insuranceValidUntil: null }), NOW)[4][1]).toBe("not recorded — the delegation runs a year");
   });
 
@@ -41,8 +44,8 @@ describe("HQ contractor register", () => {
       { id: "rc-3", version: 3, contractorOrgId: "org-a", effectiveFrom: "2026-06-01T00:00:00Z", currency: "MYR", lines: [{ workType: "rework_deduction", amountMinor: 12000, note: "2nd return" }, { workType: "periodic_inspection", amountMinor: 38000, note: "per unit visit" }] },
     ];
     const v = rateCardView(cards, "rc-3", NOW);
-    expect(v.current).toEqual({ title: "Rate card v3 (from 2026-06-01)", currency: "MYR", lines: [{ label: "Periodic inspection (per unit)", amount: "380.00", note: "per unit visit" }, { label: "Rework deduction (2nd return)", amount: "− 120.00", note: "2nd return" }] });
-    expect(v.scheduled.map((s) => s.title)).toEqual(["v4 from 2026-10-01 · scheduled"]);
+    expect(v.current).toEqual({ title: "Rate card v3 (from 1 Jun 2026)", since: "v3 (from 1 Jun 2026)", currency: "MYR", lines: [{ workType: "periodic_inspection", label: "Periodic inspection (per unit)", amount: "380.00", note: "per unit visit" }, { workType: "rework_deduction", label: "Rework deduction (2nd return)", amount: "− 120.00", note: "2nd return" }] });
+    expect(v.scheduled.map((s) => s.title)).toEqual(["v4 from 1 Oct 2026 · scheduled"]);
     expect(v.nextVersion).toBe(5);
     expect(rateCardView([], null, NOW)).toEqual({ current: null, scheduled: [], nextVersion: 1 });
     expect(rateAmount({ workType: "emergency", amountMinor: 65000 })).toBe("650.00");
@@ -55,8 +58,8 @@ describe("HQ contractor register", () => {
       tech({ id: "m-d", displayName: "tech-d" }),
     ], [cert({}), cert({ id: "c2", membershipId: "m-d", status: "pending_verification" })], NOW);
     expect(rows.map((r) => [r.name, r.sub, r.badge.label])).toEqual([
-      ["tech-external-a", "Indoor", "1 expiring · 10-15"], ["tech-external-a2", "Indoor", "Valid"], ["tech-external-b", "membership ended 09-01", "Expired"],
-      ["tech-c", "Indoor", "expiring · 10-01"], ["tech-d", "Indoor", "1 awaiting verification"],
+      ["tech-external-a", "Indoor", "1 expiring · 15 Oct"], ["tech-external-a2", "Indoor", "Valid"], ["tech-external-b", "membership ended 1 Sept", "Expired"],
+      ["tech-c", "Indoor", "expiring · 1 Oct"], ["tech-d", "Indoor", "1 awaiting verification"],
     ]);
     expect(pendingCertificates([cert({}), cert({ id: "c2", status: "pending_verification" })]).map((c) => c.id)).toEqual(["c2"]);
   });
@@ -70,5 +73,17 @@ describe("HQ contractor register", () => {
     expect(rateCardErrors({ effectiveFrom: "2026-10-01T00:00:00Z", lines: [{ workType: "emergency", amount: "-1", note: "" }] }, NOW).lines).toMatch(/non-negative/);
     expect(nextMonthStart(NOW)).toBe("2026-09-30T16:00:00.000Z"); // 2026-10-01 00:00 KL
     expect(contractorRefusal({ code: "CONFLICT", messageKey: "errors.profile_exists", fieldErrors: {} })).toBe("Not saved (CONFLICT): this organization already has a contractor profile.");
+  });
+});
+
+describe("HQ contractor register in Malay (IR291)", () => {
+  it("words the rows, tiles, facts, rate card and technicians; the dates stay Kuala Lumpur days", () => {
+    expect(contractorRows([{ id: "org-b", name: "B" }], [], [], MS.t)[0]).toMatchObject({ sub: "belum ada profil kontraktor · 0 juruteknik", badge: { label: "Tiada profil" } });
+    expect(kpiTiles(kpis, MS.t).map((k) => k.label)).toEqual(["Penerimaan tawaran", "Ketibaan dalam tetingkap", "Laporan diterima kali pertama", "Penilaian pelanggan", "Kadar kerja semula"]);
+    expect(profileFacts(profile({ insuranceValidUntil: "2027-01-30T16:00:00Z" }), NOW, MS)[4]).toEqual(["Insurans", "sah hingga 31 Jan 2027"]); // 00:00 on the 31st in Kuala Lumpur, whatever the display zone
+    const v = rateCardView([{ id: "rc-3", version: 3, contractorOrgId: "org-a", effectiveFrom: "2026-05-31T16:00:00Z", currency: "MYR", lines: [{ workType: "repair_base", amountMinor: 47000, note: null }] }], "rc-3", NOW, MS);
+    expect([v.current?.title, v.current?.lines[0].label]).toEqual(["Kad kadar v3 (dari 1 Jun 2026)", "Pembaikan — lawatan asas"]);
+    expect(technicianRows([tech({})], [cert({})], NOW, MS)[0].badge.label).toBe("1 hampir tamat · 15 Okt");
+    expect(contractorRefusal({ code: "NOT_FOUND", messageKey: "error.notFound", fieldErrors: {} }, MS.t)).toBe("Kontraktor atau sijil tidak lagi wujud.");
   });
 });

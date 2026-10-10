@@ -3461,3 +3461,42 @@ The Jobs tab of `/admin/jobs` (SCR-A06, FR-A06, DD-A06, Figma Admin 06-1, 06-11�
    - The other 13 HQ screens: alerts, units, devices, energy, MRV, offsets, billing, contracts, restrictions with exceptions, access, automation and audit.
    - The browser demo (its New job keeps its own English form).
    - The assistant panel and the voice demo's answers.
+
+## IR291 The HQ Plans, Contractors and SLA tabs in the display language; a breach carries its minutes — 2026-10-10
+
+The other three tabs of `/admin/jobs` (FR-A06, FR-A21, FR-A22, DD-A06 item 9, DD-A21, DD-A22, Figma Admin 06 283:2, 06-9, 06-10) follow the display language and time zone. With IR290, the whole maintenance jobs screen does.
+
+1. **Texts.** These are translated:
+   - Plans: the list, the plan card with its form and the next-occurrence box, the generated occurrences, the CONFLICT banners, New plan and the refusals;
+   - Contractors: the list and its badges, the 90-day KPI tiles, the profile facts, the rate card in effect and the scheduled ones, technicians and certificates, and the four dialogs (profile, offer suspension, rate card, certificate verification);
+   - SLA: the period and contractor filters, the KPI tiles with their targets, the customers table, the recent breaches, the targets dialog, the toasts and refusals;
+   - the CSV export, whose header and plan and status words follow the language.
+   The dictionary gains 264 entries.
+2. **Dates.**
+   - A plan's dates are its instants in the display time zone, the zone its next date is typed in (D16). Before, they were fixed Kuala Lumpur dates. The loader formats the dates of the first render: the list, the next occurrence, the date after it and the generated occurrences.
+   - The Jobs tab's "plan occurrence" date follows the same rule. IR290 named it a Kuala Lumpur day; this replaces that.
+   - The contractor register's dates are Kuala Lumpur days, as on the contractor's own certifications (IR277). These are the delegation period, the insurance end, the rate card starts, membership ends and certificate dates. The insurance end and a rate card's start are typed as Kuala Lumpur days and say so. In another display time zone the tab says "The days are Kuala Lumpur days."
+   - An SLA target's start is typed and shown in the display time zone (NFR-08). The CSV's period ends are dates in that zone.
+3. **A breach carries its minutes** (`SlaScorecard.breaches`, service contracts, Swagger).
+   - `detail` was the only text, and it was English ("response 6 h 10 min vs 4 h").
+   - Now each breach also has `tookMinutes` (request → response; null while unanswered) and `limitMinutes` (the target in effect when the job was created). Both are null for kinds other than response.
+   - The tab words a breach from its kind and minutes. `detail` stays English for logs.
+4. **A job cancelled before its response was due is no response miss** (IR131 item 5 said nothing about cancellation).
+   - Every cancelled job without a response counted as a miss once its target time had passed. On the dev data, the E2E suite's jobs, which are cancelled within seconds, made 40 "no response within 4 h" breaches and a 56 % response rate.
+   - Now a job cancelled (the `job.cancelled` event) within its response target counts neither as within the target nor as a miss. A job cancelled later without a response is still a miss. On the same data: 4 breaches, 94 %.
+   - `partners_test.go` covers both cases and the breach minutes.
+5. **Code.**
+   - The adminPlans, adminContractors and adminSla helpers take the display or the translator.
+   - `nextBox` takes the server's next date, so the first render matches it (IR282). `breachText` is new.
+   - Rate card lines keep their work type, so the form finds them in any language.
+   - The fixed Kuala Lumpur input helpers `klInput` / `fromKlInput` and `klDate` are gone. Plans and SLA use the display-zone `zonedInput` / `fromZonedInput`; Contractors uses the Kuala Lumpur day helpers of the contractor team (`klDate`, `klStart`).
+6. **Checked.**
+   - Go: both suites pass.
+   - Vitest: 41 files, 250 tests. The three tab test files move to the new dates and add Malay / Tokyo cases.
+   - E2E: `admin/language.e2e.ts` also opens the Plans, Contractors and SLA tabs in Malay, and the targets dialog ("masa dalam Asia/Tokyo"); nothing is saved.
+   - The suite: 65 passed, 9 skipped; the users are en / Asia/Kuala_Lumpur.
+7. **Progress.** 31 of the 44 business screens follow the display language: every customer, contractor and technician screen, and the HQ overview and maintenance jobs.
+8. **Still open.**
+   - The other 13 HQ screens: alerts, units, devices, energy, MRV, offsets, billing, contracts, restrictions with exceptions, access, automation and audit.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.

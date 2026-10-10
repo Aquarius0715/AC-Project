@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { breachRows, periodOf, slaCsv, slaRefusal, slaRows, slaTiles, targetErrors, targetsByPlan, type ApiScorecard, type ApiTargetView } from "@ac/web/lib/adminSla";
+import { breachRows, breachText, periodOf, slaCsv, slaRefusal, slaRows, slaTiles, targetErrors, targetsByPlan, type ApiScorecard, type ApiTargetView } from "@ac/web/lib/adminSla";
+import { i18nOf } from "@ac/web/lib/i18n";
+
+const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 
 const NOW = Date.parse("2026-09-14T01:00:00Z");
 const target = (planType: ApiTargetView["planType"], over: Partial<ApiTargetView> = {}): ApiTargetView =>
@@ -42,11 +45,24 @@ describe("HQ SLA by customer", () => {
   it("shows the targets per plan and checks the edit form", () => {
     const by = targetsByPlan(sc().targets);
     expect(by.map((p) => [p.label, p.line, p.scheduled])).toEqual([
-      ["RTO", "v2 since 2026-08-01: ≤ 4 h · arrival 95 % · first-time fix 85 %", []], ["General", "default: ≤ 4 h · arrival 90 % · first-time fix 85 %", ["v1 from 2026-10-01 08:00: ≤ 2 h · 90 % · 85 %"]],
+      ["RTO", "v2 since 1 Aug 2026: ≤ 4 h · arrival 95 % · first-time fix 85 %", []], ["General", "default: ≤ 4 h · arrival 90 % · first-time fix 85 %", ["v1 from 1 Oct 2026, 8:00 am MYT: ≤ 2 h · 90 % · 85 %"]],
       ["Energy", "default: ≤ 4 h · arrival 90 % · first-time fix 85 %", []], ["Environment", "default: ≤ 4 h · arrival 90 % · first-time fix 85 %", []],
     ]);
     expect(targetErrors({ responseHours: "4", arrival: "95", ftf: "85.5", effectiveFrom: new Date(NOW).toISOString() }, NOW)).toEqual({});
     expect(targetErrors({ responseHours: "0", arrival: "120", ftf: "x", effectiveFrom: "2026-09-01T00:00:00Z" }, NOW)).toEqual({ responseHours: "1–168 whole hours.", arrival: "0–100 %.", ftf: "0–100 %.", effectiveFrom: "Now or later." });
     expect(slaRefusal({ code: "CONFLICT", messageKey: "errors.targets_exist", fieldErrors: {} })).toBe("Not saved (CONFLICT): targets for this plan already start at that time.");
+  });
+});
+
+describe("HQ SLA by customer in Malay with the display time zone (IR291)", () => {
+  it("phrases a breach from its kind and minutes, and words the tiles, rows, targets and CSV", () => {
+    const took = { jobId: "j", customerId: "c-b", kind: "response" as const, detail: "response 6 h 10 min vs 4 h", tookMinutes: 370, limitMinutes: 240 };
+    expect([breachText(took), breachText(took, MS.t), breachText({ ...took, tookMinutes: null, detail: "no response within 4 h" }, MS.t)]).toEqual(["response 6 h 10 min vs 4 h", "respons 6 j 10 min berbanding 4 j", "tiada respons dalam 4 j"]);
+    expect(breachText({ ...took, kind: "overdue", tookMinutes: null, limitMinutes: null }, MS.t)).toBe("terbuka melepasi masa akhirnya");
+    expect(slaTiles(sc(), MS.t).map((x) => x.label)).toEqual(["Respons ≤ 4 j", "Ketibaan dalam tetingkap", "Pembaikan kali pertama", "Purata penilaian pelanggan", "Terbuka & tertunggak"]);
+    const rows = slaRows(sc(), [{ id: "c-a", name: "A", organizationId: "o-a" }], [], [], MS.t);
+    expect([rows[0].sub, rows[0].status.label, rows[1].name]).toEqual(["tiada premis · 0 unit", "Mengikut sasaran", "pelanggan"]);
+    expect(targetsByPlan(sc().targets, MS)[1].scheduled[0]).toMatch(/^v1 dari 1 Okt 2026, 9:00 PG GMT\+9: ≤ 2 j/); // the start in the display zone
+    expect(slaCsv(rows.slice(0, 1), sc().period, MS).split("\n")[0]).toBe('"Pelanggan","Pelan","Kerja","Respons","Ketibaan","Pembaikan kali pertama","Penilaian","Tertunggak","Status","Tempoh dari","Tempoh hingga"');
   });
 });

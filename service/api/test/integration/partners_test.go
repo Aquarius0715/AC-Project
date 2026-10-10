@@ -144,21 +144,42 @@ func TestSLAScorecard(t *testing.T) {
 	overdue := data(m)["id"].(string)
 	owner(t, `UPDATE maintenance.jobs SET created_at = $2, due_at = $3 WHERE id = $1`, overdue, clock.Add(-5*time.Hour), clock.Add(-time.Hour))
 
+	// IR291: a job cancelled before its response was due is neither within the target nor a miss; one cancelled later
+	// without a response is a miss
+	cancelled := map[string]time.Duration{}
+	for _, after := range []time.Duration{time.Hour, 6 * time.Hour} {
+		_, m = write(s, &hq, "jobs.create", jobBody(unit, map[string]string{"alternativeSlots": "[]"}), 0)
+		id := data(m)["id"].(string)
+		cancelled[id] = after
+		owner(t, `UPDATE maintenance.jobs SET created_at = $2, status = 'cancelled' WHERE id = $1`, id, clock.Add(-10*time.Hour))
+		owner(t, `INSERT INTO maintenance.job_events (id, tenant_id, job_id, action, occurred_at) VALUES (gen_random_uuid(), $1, $2, 'job.cancelled', $3)`,
+			seed.ID("tenant-a"), id, clock.Add(-10*time.Hour+after))
+	}
 	period := `{"period":{"from":"` + clock.Add(-48*time.Hour).Format(time.RFC3339) + `","to":"` + clock.Format(time.RFC3339) + `"}`
 	code, m := post(s, &hq, "sla.scorecard", period+`}`)
 	if code != 200 {
 		t.Fatalf("scorecard: %d %v", code, m)
 	}
 	sc := data(m)
-	kinds := map[string]string{}
+	kinds := map[string]map[string]any{}
 	for _, b := range sc["breaches"].([]any) {
 		bm := b.(map[string]any)
-		if bm["jobId"] == job || bm["jobId"] == overdue {
-			kinds[bm["kind"].(string)] = bm["detail"].(string)
-		}
+		kinds[bm["jobId"].(string)+":"+bm["kind"].(string)] = bm
 	}
-	if kinds["response"] != "response 6 h 10 min vs 4 h" || kinds["overdue"] == "" {
-		t.Fatalf("breaches: %v", sc["breaches"])
+	// the screens phrase a breach from its kind and minutes (IR291); detail stays English
+	if r := kinds[job+":response"]; r == nil || r["detail"] != "response 6 h 10 min vs 4 h" || r["tookMinutes"] != float64(370) || r["limitMinutes"] != float64(240) {
+		t.Fatalf("response breach: %v", sc["breaches"])
+	}
+	if r := kinds[overdue+":response"]; r == nil || r["detail"] != "no response within 4 h" || r["tookMinutes"] != nil || r["limitMinutes"] != float64(240) {
+		t.Fatalf("unanswered breach: %v", sc["breaches"])
+	}
+	if o := kinds[overdue+":overdue"]; o == nil || o["detail"] == "" || o["tookMinutes"] != nil || o["limitMinutes"] != nil {
+		t.Fatalf("overdue breach: %v", sc["breaches"])
+	}
+	for id, after := range cancelled {
+		if miss := kinds[id+":response"] != nil; miss != (after > 4*time.Hour) {
+			t.Errorf("cancelled %v after creation: response miss %v", after, miss)
+		}
 	}
 	if sc["totals"].(map[string]any)["ratingCount"].(float64) < 1 || len(sc["customers"].([]any)) == 0 {
 		t.Fatalf("totals: %v", sc)

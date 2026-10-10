@@ -30583,6 +30583,14 @@
                 },
                 "kind": {
                     "type": "string"
+                },
+                "limitMinutes": {
+                    "description": "response: the target in effect when the job was created; null for other kinds",
+                    "type": "integer"
+                },
+                "tookMinutes": {
+                    "description": "response: request → response; null while unanswered and for other kinds",
+                    "type": "integer"
                 }
             }
         },

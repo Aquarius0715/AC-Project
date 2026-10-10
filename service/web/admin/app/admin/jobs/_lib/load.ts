@@ -8,11 +8,11 @@
 // the selected plan and jobs.list (the unit's periodic jobs) for the status of each generated occurrence.
 import "server-only";
 import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
-import { i18nOf, showDate, showTime } from "@ac/web/lib/i18n";
+import { i18nOf, showTime } from "@ac/web/lib/i18n";
 import { jobEventTitle, type ApiJobEvent } from "@ac/web/lib/partnerOverview";
 import type { ApiWorkReport } from "@ac/web/lib/partnerReview";
 import { agreedSlots, classifyBy, controls, costTotals, delivery, facts, filtersOf, hqRow, LISTED, longSlot, periodChip, periodOfQuery, preferredRows, reportCard, slotText, SORTS, sortOf, STAGES, stageOf, stepper, type ApiHqJob, type ApiHqRow, type Names, type Query } from "@ac/web/lib/adminJobs";
-import { planRows, type ApiPlan } from "@ac/web/lib/adminPlans";
+import { nextOccurrence, planDate, planRows, type ApiPlan } from "@ac/web/lib/adminPlans";
 import { breachRows, PERIODS, periodOf, slaRows, slaTiles, targetsByPlan, type ApiScorecard } from "@ac/web/lib/adminSla";
 import { contractorRows, kpiTiles, pendingCertificates, profileFacts, rateCardView, technicianRows, type ApiCertificate, type ApiProfile, type ApiRateCard, type ApiTechnician } from "@ac/web/lib/adminContractors";
 
@@ -125,7 +125,8 @@ export async function loadJobs(sp: SP) {
       holdWho: sp2 ? (sp2.hold.kind === "internal" ? names.people.get(sp2.hold.membershipId) ?? t("HQ technician") : names.orgs.get(sp2.hold.contractorOrgId) ?? t("contractor")) : null,
       // the times the detail shows on its first render, formatted here in the display time zone (IR290)
       texts: {
-        occurrence: job.occurrenceAt ? showDate(job.occurrenceAt, { ...i.display, timeZone: "Asia/Kuala_Lumpur" }) : null, classifyBy: classifyBy(job.createdAt, i),
+        // the plan occurrence is an instant: its date in the display zone, as on the Plans tab (IR291)
+        occurrence: job.occurrenceAt ? planDate(job.occurrenceAt, i.display) : null, classifyBy: classifyBy(job.createdAt, i),
         declinedAt: sp2?.decidedAt ? showTime(sp2.decidedAt, i.display) : null, replyBy: sp2 ? showTime(sp2.replyBy, i.display) : null, proposed: sp2 ? longSlot(sp2.slot, i) : null,
         agreed: job.offer ? slotText(job.offer.visitSlot, i) : null, partnerSlot: pp ? longSlot(pp.slot, i) : null, partnerSent: pp ? showTime(pp.sentAt, i.display) : null,
         accessUntil: job.offer ? showTime(job.offer.accessValidUntil, i.display) : null,
@@ -140,12 +141,14 @@ export async function loadJobs(sp: SP) {
 export type JobsLive = Awaited<ReturnType<typeof loadJobs>>;
 
 /** The Plans tab: plans.list in the scope (next due first), plans.get for planId (default the first), the unit's place
- * (units.get) and the status of each generated occurrence (the unit's periodic jobs, jobs.list). */
+ * (units.get) and the status of each generated occurrence (the unit's periodic jobs, jobs.list). The dates of the first
+ * render are formatted here in the display time zone (IR291). */
 export async function loadPlans(sp: SP) {
-  const { names, unitOrg, scope, head } = await shared(sp);
+  const { i, names, unitOrg, scope, head } = await shared(sp);
+  const { t } = i;
   const plans = await optional(coreAll<ApiPlan>("plans.list", { filters: scope }), [] as ApiPlan[]);
-  const customerOfUnit = new Map([...unitOrg].map(([u, org]) => [u, names.customers.get(org) ?? "customer"]));
-  const rows = planRows(plans, names.units, customerOfUnit);
+  const customerOfUnit = new Map([...unitOrg].map(([u, org]) => [u, names.customers.get(org) ?? t("customer")]));
+  const rows = planRows(plans, names.units, customerOfUnit, i);
   const q = { customerId: one(sp.customerId), propertyId: one(sp.propertyId), unitId: one(sp.unitId) };
   const base = { ...head, q, rows, plansTotal: plans.length };
   const pick = one(sp.planId) ?? rows[0]?.id;
@@ -163,8 +166,9 @@ export async function loadPlans(sp: SP) {
   return {
     ...base,
     detail: {
-      plan, unit: names.units.get(plan.unitId) ?? unit?.displayName ?? "Unit", customer: customerOfUnit.get(plan.unitId) ?? "customer", location: unit?.location.pathLabels.join(" › ") ?? "",
-      occurrences: [...plan.generatedOccurrences].sort((a, b) => Date.parse(b.occurrenceAt) - Date.parse(a.occurrenceAt)).map((o) => ({ ...o, status: status.get(o.jobId) ?? null })),
+      plan, unit: names.units.get(plan.unitId) ?? unit?.displayName ?? t("Unit"), customer: customerOfUnit.get(plan.unitId) ?? t("customer"), location: unit?.location.pathLabels.join(" › ") ?? "",
+      occurrences: [...plan.generatedOccurrences].sort((a, b) => Date.parse(b.occurrenceAt) - Date.parse(a.occurrenceAt)).map((o) => ({ ...o, date: planDate(o.occurrenceAt, i.display), status: status.get(o.jobId) ?? null })),
+      texts: { next: planDate(plan.nextDueAt, i.display), then: planDate(nextOccurrence(plan.nextDueAt, plan.recurrence.intervalMonths, plan.anchorDay), i.display) },
     },
   };
 }
@@ -175,12 +179,13 @@ export type PlansLive = Awaited<ReturnType<typeof loadPlans>>;
  * 90-day KPIs, the delegation and the rate card in effect) and for contractorId its rate cards (rateCards.list, newest
  * first), technicians (members.list) and uploaded certificates (certificates.list). */
 export async function loadContractors(sp: SP) {
-  const { now, members, contractors: orgs, names, head } = await shared(sp);
+  const { now, i, members, contractors: orgs, names, head } = await shared(sp);
+  const { t } = i;
   const nowMs = now.getTime();
   const profiles = await optional(coreAll<ApiProfile>("contractors.list"), [] as ApiProfile[]);
   const technicians: ApiTechnician[] = members.filter((m) => m.role === "technician" && orgs.some((o) => o.id === m.organizationId))
     .map((m) => ({ id: m.id, displayName: m.displayName, organizationId: m.organizationId, role: m.role, validUntil: m.validUntil ?? null, qualifications: m.qualifications ?? [] }));
-  const rows = contractorRows(orgs.map((o) => ({ id: o.id, name: o.name })), profiles, technicians);
+  const rows = contractorRows(orgs.map((o) => ({ id: o.id, name: o.name })), profiles, technicians, t);
   const base = { ...head, q: {}, rows, withoutProfile: orgs.filter((o) => !profiles.some((p) => p.organizationId === o.id)).map((o) => ({ id: o.id, name: o.name })) };
   const pick = one(sp.contractorId) ?? rows[0]?.id;
   if (!pick) return { ...base, detail: null };
@@ -197,9 +202,9 @@ export async function loadContractors(sp: SP) {
   return {
     ...base,
     detail: {
-      org: { id: org.id, name: org.name }, profile, kpis: profile ? kpiTiles(profile.kpis) : null, facts: profile ? profileFacts(profile, nowMs) : null,
-      rates: rateCardView(cards, inEffect, nowMs), techs: technicianRows(mine, certs, nowMs),
-      pending: pendingCertificates(certs).map((c) => ({ id: c.id, version: c.version, technician: names.people.get(c.membershipId) ?? "technician", name: c.name, code: c.code, number: c.number, issuedAt: c.issuedAt, expiresAt: c.expiresAt, fileName: c.fileName, renewal: !!c.renewalOf })),
+      org: { id: org.id, name: org.name }, profile, kpis: profile ? kpiTiles(profile.kpis, t) : null, facts: profile ? profileFacts(profile, nowMs, i) : null,
+      rates: rateCardView(cards, inEffect, nowMs, i), techs: technicianRows(mine, certs, nowMs, i),
+      pending: pendingCertificates(certs).map((c) => ({ id: c.id, version: c.version, technician: names.people.get(c.membershipId) ?? t("technician"), name: c.name, code: c.code, number: c.number, issuedAt: c.issuedAt, expiresAt: c.expiresAt, fileName: c.fileName, renewal: !!c.renewalOf })),
     },
   };
 }
@@ -210,14 +215,15 @@ export type ContractorsLive = Awaited<ReturnType<typeof loadContractors>>;
  * (contractorId) — totals with the targets of the customers' plans, one row per customer, the recent breaches and the
  * targets per plan type for the edit dialog. */
 export async function loadSla(sp: SP) {
-  const { now, customers, properties, units, contractors: orgs, head } = await shared(sp);
+  const { now, i, customers, properties, units, contractors: orgs, head } = await shared(sp);
+  const { t } = i;
   const period = periodOf(one(sp.period), now.getTime());
   const contractorId = orgs.find((o) => o.id === one(sp.contractorId))?.id ?? "";
   const sc = await coreOp<ApiScorecard>("sla.scorecard", { period: { from: period.from, to: period.to }, ...(contractorId ? { contractorOrgId: contractorId } : {}) });
   return {
-    ...head, q: {}, period, periods: PERIODS.map((p) => ({ id: p.id, label: p.label })), contractorId, contractors: orgs.map((o) => ({ id: o.id, name: o.name })),
-    tiles: slaTiles(sc), rows: slaRows(sc, customers, properties, units), breaches: breachRows(sc, new Map(customers.map((c) => [c.id, c.name]))),
-    targets: targetsByPlan(sc.targets), scorecardPeriod: sc.period,
+    ...head, q: {}, period, periods: PERIODS.map((p) => ({ id: p.id, label: t(p.label) })), contractorId, contractors: orgs.map((o) => ({ id: o.id, name: o.name })),
+    tiles: slaTiles(sc, t), rows: slaRows(sc, customers, properties, units, t), breaches: breachRows(sc, new Map(customers.map((c) => [c.id, c.name])), t),
+    targets: targetsByPlan(sc.targets, i), scorecardPeriod: sc.period,
   };
 }
 

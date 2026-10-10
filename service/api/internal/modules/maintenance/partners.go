@@ -152,6 +152,7 @@ type jobMetric struct {
 	followUpWithin30      bool
 	reworkFollowUp        bool
 	stars                 int
+	cancelledAt           *time.Time // the job.cancelled event
 }
 
 // jobMetrics loads the per-job facts for SLA / KPI metrics of jobs created in [$1, $2) matching extra.
@@ -168,7 +169,8 @@ func jobMetrics(ctx context.Context, c *ops.Call, extra string, args []any) ([]j
 		EXISTS (SELECT 1 FROM maintenance.jobs f WHERE f.unit_id = j.unit_id AND f.id <> j.id AND j.completed_at IS NOT NULL
 			AND f.created_at > j.completed_at AND f.created_at <= j.completed_at + interval '30 days'),
 		EXISTS (SELECT 1 FROM maintenance.jobs f WHERE f.follow_up_of_job_id = j.id AND f.follow_up_class = 'rework'),
-		COALESCE((j.rating->>'stars')::int, 0)
+		COALESCE((j.rating->>'stars')::int, 0),
+		(SELECT min(e.occurred_at) FROM maintenance.job_events e WHERE e.job_id = j.id AND e.action = 'job.cancelled')
 		FROM maintenance.jobs j WHERE j.created_at >= $1 AND j.created_at < $2 AND `+extra+` ORDER BY j.created_at, j.id`, args...)
 	if err != nil {
 		return nil, err
@@ -178,7 +180,7 @@ func jobMetrics(ctx context.Context, c *ops.Call, extra string, args []any) ([]j
 	for rows.Next() {
 		var j jobMetric
 		if err := rows.Scan(&j.id, &j.customerOrg, &j.unit, &j.createdAt, &j.dueAt, &j.status, &j.responseAt, &j.arrivedAt, &j.inWindow, &j.firstReview,
-			&j.everReturned, &j.followUpWithin30, &j.reworkFollowUp, &j.stars); err != nil {
+			&j.everReturned, &j.followUpWithin30, &j.reworkFollowUp, &j.stars, &j.cancelledAt); err != nil {
 			return nil, err
 		}
 		out = append(out, j)
@@ -853,13 +855,16 @@ type TargetView struct {
 	State                  string     `json:"state"` // in_effect | default | scheduled
 }
 
-// Breach is one scorecard breach.
+// Breach is one scorecard breach. Detail is English for logs; screens phrase the kind with the response minutes in
+// the user's language (IR291).
 type Breach struct {
-	JobID      uuid.UUID `json:"jobId"`
-	CustomerID uuid.UUID `json:"customerId"`
-	Kind       string    `json:"kind"`
-	Detail     string    `json:"detail"`
-	at         time.Time
+	JobID        uuid.UUID `json:"jobId"`
+	CustomerID   uuid.UUID `json:"customerId"`
+	Kind         string    `json:"kind"`
+	Detail       string    `json:"detail"`
+	TookMinutes  *int      `json:"tookMinutes"`  // response: request → response; null while unanswered and for other kinds
+	LimitMinutes *int      `json:"limitMinutes"` // response: the target in effect when the job was created; null for other kinds
+	at           time.Time
 }
 
 // Scorecard is SlaScorecard.
@@ -977,11 +982,13 @@ func (m Partners) scorecard(ctx context.Context, c *ops.Call, in *ScorecardInput
 		}
 		tgt := targetFor(targets, prof[1], j.createdAt)
 		limit := time.Duration(tgt.ResponseHours) * time.Hour
+		limitMin := int(limit.Minutes())
 		for _, t := range []*tally{total, per[cust]} {
 			t.jobs++
 		}
-		breach := func(kind, detail string) {
-			out.Breaches = append(out.Breaches, Breach{JobID: j.id, CustomerID: cust, Kind: kind, Detail: detail, at: j.createdAt})
+		breach := func(b Breach) {
+			b.JobID, b.CustomerID, b.at = j.id, cust, j.createdAt
+			out.Breaches = append(out.Breaches, b)
 		}
 		switch {
 		case j.responseAt != nil:
@@ -993,13 +1000,16 @@ func (m Partners) scorecard(ctx context.Context, c *ops.Call, in *ScorecardInput
 				}
 			}
 			if !ok {
-				breach("response", "response "+durationText(j.responseAt.Sub(j.createdAt))+" vs "+durationText(limit))
+				took := int(j.responseAt.Sub(j.createdAt).Minutes())
+				breach(Breach{Kind: "response", Detail: "response " + durationText(j.responseAt.Sub(j.createdAt)) + " vs " + durationText(limit), TookMinutes: &took, LimitMinutes: &limitMin})
 			}
+		case j.cancelledAt != nil && j.cancelledAt.Sub(j.createdAt) <= limit:
+			// cancelled before its response was due: neither within the target nor a miss (IR291)
 		case c.Now.Sub(j.createdAt) > limit:
 			for _, t := range []*tally{total, per[cust]} {
 				t.respN++
 			}
-			breach("response", "no response within "+durationText(limit))
+			breach(Breach{Kind: "response", Detail: "no response within " + durationText(limit), LimitMinutes: &limitMin})
 		}
 		if j.arrivedAt != nil {
 			for _, t := range []*tally{total, per[cust]} {
@@ -1009,7 +1019,7 @@ func (m Partners) scorecard(ctx context.Context, c *ops.Call, in *ScorecardInput
 				}
 			}
 			if !j.inWindow {
-				breach("arrival", "arrival outside the scheduled window")
+				breach(Breach{Kind: "arrival", Detail: "arrival outside the scheduled window"})
 			}
 		}
 		if j.status == "completed" {
@@ -1021,7 +1031,7 @@ func (m Partners) scorecard(ctx context.Context, c *ops.Call, in *ScorecardInput
 				}
 			}
 			if !ok {
-				breach("first_time_fix", "not fixed the first time")
+				breach(Breach{Kind: "first_time_fix", Detail: "not fixed the first time"})
 			}
 		}
 		if j.stars > 0 {
@@ -1034,7 +1044,7 @@ func (m Partners) scorecard(ctx context.Context, c *ops.Call, in *ScorecardInput
 			for _, t := range []*tally{total, per[cust]} {
 				t.overdue++
 			}
-			breach("overdue", "open past its due time")
+			breach(Breach{Kind: "overdue", Detail: "open past its due time"})
 		}
 	}
 	out.Totals = total.metrics()
