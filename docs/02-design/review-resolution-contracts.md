@@ -3744,3 +3744,29 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
    - The assistant panel and the voice demo's answers.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR300 HQ contracts in the display language; contract periods stay Kuala Lumpur days — 2026-10-10
+
+`/admin/billing/contracts` (SCR-A07, FR-A07, DD-A07, Figma Admin 07) follows the display language.
+
+1. **Texts.** These are translated:
+   - the scope filters and the plan-type tabs;
+   - the list with each contract's plan, unit count, period and restriction eligibility;
+   - the editor: customer, plan type, units, period, price and currency, restriction eligibility and rules version;
+   - the SR19 block, the "what saving does" summary, the toasts and the checks (`draftErrors`).
+   The dictionary gains 39 entries. These stay as they are: contract IDs, the rules version, unit and property names, and the "id ↑" sort marker.
+2. **Plan types** are worded (`planWord`: RTO, General, Energy, Environment). Before, the view showed the English labels.
+3. **Dates.**
+   - Contract periods are Kuala Lumpur business days. The list shows them in the user's language ("1 Jan 2026 → 1 Jan 2027", `businessDay`).
+   - The date inputs keep their `yyyy-mm-dd` Kuala Lumpur values. Under Start, a hint says that the dates are Kuala Lumpur days.
+   - An unchanged day still keeps the stored instant (`dayInstant`).
+4. **Checked.**
+   - Vitest: 48 files, 278 tests. `contracts.test.ts` is new. It covers the rows with the input days and the shown period, and the unit options (archived units and other customers' units are left out). It also covers the draft checks, `dayInstant`, `priceMinor`, and Malay / Tokyo (the days stay Kuala Lumpur's).
+   - E2E: `admin/language.e2e.ts` also opens contracts. It checks the plan tabs, the Kuala Lumpur day hint, and the new-contract errors, which stop before any call. Nothing is saved.
+5. **Progress.** 39 of the 44 business screens follow the display language.
+6. **Still open.**
+   - The other 5 HQ screens: restrictions with exceptions, access, automation and audit.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

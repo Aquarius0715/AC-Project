@@ -336,6 +336,7 @@ Scope: FR-A07 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 4. Queries to update: `contracts / customer payments / audit`。
 5. List: scope filter `customerId` → `unitId` and plan-type chips (`kind`), all as URL keys and `contracts.list` filters. Each row shows contract ID, plan type, customer, unit count, price, period, and restriction eligibility with rules version.
 6. Editor (`contractId`) and New contract (no `id`): customer, unit checklist limited to that customer's active units (a unit already on another contract is labelled, not hidden), plan type, period, price and currency, restriction eligibility and rules version (enabled only for `rto`; disabled with the reason for other plans), and a “what saving does” summary (new version, issued invoices keep their version). When `activeRestrictionIds` is non-empty or `hasUnresolvedRecovery` is true, disable save and show the SR19 reason.
+7. Language and dates (IR300): texts and plan types follow the display language. Contract periods are Kuala Lumpur business days. The list shows them in the user's language, the date inputs take Kuala Lumpur days, and a hint says so.
 
 **Boundary cases and failures**: Reject other customers' units, reversed periods, negative prices, and restrictions for general maintenance. Do not block monitoring or maintenance for units without contracts.
 

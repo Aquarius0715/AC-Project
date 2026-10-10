@@ -1,4 +1,4 @@
-// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A06, FR-A08, FR-A13, FR-A14, FR-A15, FR-A23, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
+// AT-X01-N ③ for HQ (FR-X01, FR-A01, FR-A06, FR-A07, FR-A08, FR-A13, FR-A14, FR-A15, FR-A23, IR44, IR289, IR290): with Malay and Asia/Tokyo saved in Preferences, the
 // HQ overview speaks Malay — the scope and period filters, the KPI tiles, the forecast, the power and connection axes,
 // the job statuses and the billing card — and its as-of time is in GMT+9 while the period stays Kuala Lumpur days, named
 // so; the Jobs tab speaks Malay too — tabs, scope, filters, the list and one job's detail with its times in GMT+9 — and
@@ -9,8 +9,9 @@
 // period named Kuala Lumpur time and the baselines with the form checks (IR296), and the MRV reports with a preview
 // (a read) and the emission factors with the form checks (IR297), the offset demo's records, market concept and
 // new-quote checks (IR298), and billing — invoices with their Kuala Lumpur dates named in another zone, a reminder
-// preview (a read), the payment and invoice checks, inquiries and payouts (IR299). Nothing is saved. English and the
-// earlier zone come back at the end, or in afterEach when the test fails.
+// preview (a read), the payment and invoice checks, inquiries and payouts (IR299), and contracts with their Kuala Lumpur
+// days and the new-contract checks (IR300). Nothing is saved. English and the earlier zone come back at the end, or in
+// afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
@@ -211,6 +212,17 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await main.getByRole("tab", { name: /^Pembayaran kontraktor/ }).click();
   await page.waitForURL(/tab=payouts/);
   await expect(main.getByRole("heading", { name: "Penyata", exact: true })).toBeVisible();
+  // contracts (IR300): the plan tabs, the Kuala Lumpur days, and the new-contract checks, which stop before any call
+  await page.goto("/admin/billing/contracts");
+  for (const name of ["RTO", "Umum", "Tenaga", "Alam sekitar"]) await expect(main.getByRole("tab", { name, exact: true })).toBeVisible();
+  await expect(main.getByRole("tab", { name: /^Semua/ })).toHaveAttribute("aria-selected", "true");
+  await main.getByRole("button", { name: "+ Baharu" }).click();
+  await expect(main.getByRole("heading", { name: "Kontrak baharu", exact: true })).toBeVisible();
+  await expect(main).toContainText("Tarikh ialah hari Kuala Lumpur (Asia/Kuala_Lumpur).");
+  await main.getByRole("button", { name: "Cipta kontrak" }).click();
+  for (const text of ["Pilih pelanggan", "Masukkan sekurang-kurangnya satu unit", "Tamat mesti selepas mula", "Harga ≥ 0 dengan paling banyak 2 perpuluhan"]) await expect(main).toContainText(text);
+  await main.getByRole("button", { name: "Batal", exact: true }).click();
+  await expect(main.getByRole("heading", { name: "Kontrak baharu", exact: true })).toBeHidden();
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/admin");

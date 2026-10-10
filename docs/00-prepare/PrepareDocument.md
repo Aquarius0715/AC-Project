@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.183.0
+version: 0.184.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -269,6 +269,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.184.0: HQ contracts in Malay; contract periods stay Kuala Lumpur days (IR300). Phase 1A unchanged.
 0.183.0: HQ billing in Malay; billing dates stay Kuala Lumpur days, inquiry times in the display time zone (IR299). Phase 1A unchanged.
 0.182.0: The HQ offset demo in Malay; attempt and event times in the display time zone (IR298). Phase 1A unchanged.
 0.181.0: The HQ MRV workspace in Malay; report periods stay Kuala Lumpur time, review times in the display time zone (IR297). Phase 1A unchanged.
