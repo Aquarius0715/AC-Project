@@ -3770,3 +3770,39 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
    - The assistant panel and the voice demo's answers.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR301 HQ restrictions and the exception screen in the display language; HQ types their times in the display time zone — 2026-10-10
+
+`/admin/restrictions` and `/admin/restrictions/[id]` (SCR-A09, SCR-A10, FR-A09, FR-A10, DD-A09, DD-A10, Figma Admin 09–10) follow the display language and time zone.
+
+1. **Texts.** These are translated:
+   - the state chips and the contract filter;
+   - the list with each restriction's progress;
+   - the detail: lifecycle, summary, execute and release with their reasons, cause invoices, units with their apply, release, observed and command states, and recovery cases;
+   - the retry dialog, and the schedule dialog with its checks;
+   - the exception screen: the four action cards with the transition for the current state, the form, "what happens", the units needing follow-up, the summary and the audit timeline;
+   - the no-access state.
+   The dictionary gains 142 entries. They use the customer notice's state words (IR267: "Dikenakan", "Pelepasan diminta").
+   - The units table's "Apply" column means applying the restriction, so it uses the context key `restriction::Apply` ("Pengenaan").
+   - The schedule button uses the context key `restriction::Schedule` ("Jadualkan").
+   These stay as they are: IDs, rules versions, operation and permission codes, failure codes, and stored reasons.
+2. **Words for codes.** These are worded: states (`stateWord`), release-intent sources (`sourceWord`), per-unit apply and release states, command statuses, pending reasons and recovery states. Before, the screens showed the raw codes.
+3. **Times.**
+   - Notice, execute-after, grace and exception ends, release intent, observed and audit times are instants, shown in the display time zone. Before, they were Kuala Lumpur stamps.
+   - The page formats the first render's times, and the execute and release blockers that contain them (IR282).
+   - HQ types the schedule's "execute after" and the exception's "until" in the display time zone (`zonedInstant`, NFR-08), as with a firmware campaign's start (IR295). They are deadlines, not business days. Before, they were typed in Kuala Lumpur time. The 24-hour and 90-day checks read the same instant.
+4. **Button wording.**
+   - The exception buttons name their action: "Apply grace period", "Apply exception", "Cancel restriction", "Override release". Before, they were built as "Apply cancel" and "Apply override release".
+   - The toasts name what was recorded.
+5. **Checked.**
+   - Vitest: 49 files, 282 tests. `restrictions.test.ts` is new. It covers states and progress, unit rows with their actions (SR26), the execute and release blockers, active periods and release intents, the outcome matrix (IR35, IR96), and Malay / Tokyo.
+   - E2E: the new `admin/restrictions-language.e2e.ts` signs in as `hq-restriction-manager` in its own browser context. It sets Malay and Asia/Tokyo and opens the list and the selected restriction (execute-after in GMT+9, the release blocker). It runs the schedule dialog's checks, which stop before any call, and opens the exception screen (the end typed in Asia/Tokyo, the reason check). It restores the manager's English and zone in afterEach, and nothing is saved.
+   - `admin/language.e2e.ts` checks hq-operator's no-access state in Malay.
+   - The suite: 67 passed, 9 skipped. The manager now has a saved preference row, so five users are en / Asia/Kuala_Lumpur.
+6. **Progress.** 41 of the 44 business screens follow the display language; this round covers two of them.
+7. **Still open.**
+   - The other 3 HQ screens: access, automation and audit.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

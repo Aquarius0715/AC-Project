@@ -10,7 +10,7 @@
 // (a read) and the emission factors with the form checks (IR297), the offset demo's records, market concept and
 // new-quote checks (IR298), and billing — invoices with their Kuala Lumpur dates named in another zone, a reminder
 // preview (a read), the payment and invoice checks, inquiries and payouts (IR299), and contracts with their Kuala Lumpur
-// days and the new-contract checks (IR300). Nothing is saved. English and the earlier zone come back at the end, or in
+// days and the new-contract checks (IR300), and the restrictions' no-access state (IR301). Nothing is saved. English and the earlier zone come back at the end, or in
 // afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
@@ -223,6 +223,10 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   for (const text of ["Pilih pelanggan", "Masukkan sekurang-kurangnya satu unit", "Tamat mesti selepas mula", "Harga ≥ 0 dengan paling banyak 2 perpuluhan"]) await expect(main).toContainText(text);
   await main.getByRole("button", { name: "Batal", exact: true }).click();
   await expect(main.getByRole("heading", { name: "Kontrak baharu", exact: true })).toBeHidden();
+  // restrictions (IR301): this account holds no restriction permission, so the screen says so in Malay
+  // (restrictions-language.e2e.ts opens them as the restriction manager)
+  await page.goto("/admin/restrictions");
+  await expect(main).toContainText("Sekatan memerlukan restriction.read, restriction.write atau restriction.override.");
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/admin");

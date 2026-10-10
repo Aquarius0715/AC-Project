@@ -1,13 +1,16 @@
 // /admin/restrictions/[id] (FR-A10, SCR-A10): in API mode a Server Component reads restrictions.get (the release
 // projection for override-only callers, IR03), the unit names and, only for audit.read holders, the restriction's audit
 // timeline (audit.list over the last 12 months). Grace, exception, cancellation and override, plus reconcile / release
-// retry where IR96 allows them, are Server Actions (../actions.ts). The Phase 1A demo keeps the fixture restriction.
+// retry where IR96 allows them, are Server Actions (../actions.ts). Texts in the display language; the times of the
+// first render are formatted here, in the display time zone (IR282, IR301). The Phase 1A demo keeps the fixture
+// restriction.
 import { connection } from "next/server";
 import { notFound } from "next/navigation";
 import { EmptyState, Page as Screen } from "@ac/web/components/ui";
-import { apiMode, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
-import { auditRow, type ApiAudit } from "@ac/web/lib/audit";
-import { unitRows, type ApiRestriction } from "@ac/web/lib/restrictions";
+import { apiMode, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
+import type { ApiAudit } from "@ac/web/lib/audit";
+import { i18nOf, showTime } from "@ac/web/lib/i18n";
+import { activePeriod, intentText, unitRows, type ApiRestriction } from "@ac/web/lib/restrictions";
 import { ExceptionDemo } from "./_components/exception-demo";
 import { ExceptionView } from "./_components/exception-view";
 
@@ -17,10 +20,11 @@ export default async function AdminRestrictionPage({ params }: PageProps<"/admin
   await connection();
   const { id } = await params;
   if (!apiMode()) return <ExceptionDemo id={id} />;
-  const [now, perms] = await Promise.all([coreNow(), corePermissions()]);
+  const [now, perms, display] = await Promise.all([coreNow(), corePermissions(), coreDisplay()]);
+  const i = i18nOf(display), { t } = i;
   // the same permission state as the list (D01): without restriction.read / .write / .override nothing is read
   if (!perms.has("restriction.read") && !perms.has("restriction.write") && !perms.has("restriction.override")) {
-    return <Screen><EmptyState title="No access">Restrictions need restriction.read, restriction.write or restriction.override.</EmptyState></Screen>;
+    return <Screen><EmptyState title={t("No access")}>{t("Restrictions need restriction.read, restriction.write or restriction.override.")}</EmptyState></Screen>;
   }
   const [r, units] = await Promise.all([
     coreOp<ApiRestriction>("restrictions.get", { id }).catch((e) => {
@@ -33,11 +37,13 @@ export default async function AdminRestrictionPage({ params }: PageProps<"/admin
   const from = new Date(now.getTime() - 365 * 24 * 3600 * 1000).toISOString();
   const to = new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
   const audit = canAudit ? await coreOp<Page<ApiAudit>>("audit.list", { limit: 100, filters: { targetKind: "restriction", targetId: id, from, to }, sort: { field: "occurredAt", direction: "asc" } }) : null;
+  const result: Record<string, string> = { success: t("Success"), denied: t("Denied"), failed: t("Failed"), pending: t("Pending") };
   return (
     <ExceptionView live={{
-      now: now.toISOString(), r, units: unitRows(r, new Map(units.items.map((u) => [u.id, u.displayName])), new Map()),
+      now: now.toISOString(), r, units: unitRows(r, new Map(units.items.map((u) => [u.id, u.displayName])), new Map(), i),
       canWrite: perms.has("restriction.write"), canOverride: perms.has("restriction.override"), canAudit,
-      audit: audit?.items.map(auditRow) ?? [],
+      period: activePeriod(r, now, i), intent: intentText(r, i),
+      audit: audit?.items.map((a) => ({ time: showTime(a.occurredAt, display), title: `${a.action} · ${result[a.result] ?? a.result}`, detail: `${a.actorId} (${a.actorRoleAtTime})${a.reason ? ` · ${a.reason}` : ""}` })) ?? [],
     }} />
   );
 }

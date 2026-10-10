@@ -3,12 +3,16 @@
 // (invoices.list), the latest command per unit (commands.get) and unit names. restriction.write holders also get the
 // schedule form data: eligible RTO contracts, their overdue unpaid invoices, unit capabilities, units already under an
 // active restriction and the active clients per customer (IR05). Override-only callers (IR03) see the release
-// projection without billing fields. Writes are Server Actions (actions.ts). The Phase 1A demo keeps the fixtures.
+// projection without billing fields. Writes are Server Actions (actions.ts). Texts in the display language; the times
+// of the first render are formatted here, in the display time zone (IR282, IR301). The Phase 1A demo keeps the fixtures.
 import { connection } from "next/server";
-import { apiMode, coreNow, coreOp, corePermissions } from "@ac/web/lib/dal";
+import { apiMode, coreDisplay, coreNow, coreOp, corePermissions } from "@ac/web/lib/dal";
 import type { ApiContract, ApiCustomer, ApiInvoice } from "@ac/web/lib/billing";
 import type { ApiCapability } from "@ac/web/lib/devices";
-import { restrictionRows, states, unitRows, type ApiCommand, type ApiRestriction, type RestrictionState } from "@ac/web/lib/restrictions";
+import { i18nOf, showTime } from "@ac/web/lib/i18n";
+import {
+  activePeriod, executeBlocker, intentText, releaseBlocker, restrictionRows, states, stateWord, unitRows, type ApiCommand, type ApiRestriction, type RestrictionState,
+} from "@ac/web/lib/restrictions";
 import { RestrictionsDemo } from "./_components/restrictions-demo";
 import { RestrictionsView, type RestrictionsLive } from "./_components/restrictions-view";
 
@@ -21,7 +25,8 @@ export default async function AdminRestrictionsPage({ searchParams }: PageProps<
   if (!apiMode()) return <RestrictionsDemo />;
   const sp = await searchParams;
   const one = (k: string) => (typeof sp[k] === "string" && sp[k] ? (sp[k] as string) : undefined);
-  const [now, perms] = await Promise.all([coreNow(), corePermissions()]);
+  const [now, perms, display] = await Promise.all([coreNow(), corePermissions(), coreDisplay()]);
+  const i = i18nOf(display), { t } = i;
   const full = perms.has("restriction.read") || perms.has("restriction.write");
   const canWrite = perms.has("restriction.write");
   if (!full && !perms.has("restriction.override")) return <RestrictionsView live={null} />;
@@ -39,9 +44,9 @@ export default async function AdminRestrictionsPage({ searchParams }: PageProps<
   const customerName = new Map(customers.items.map((c) => [c.id, c.name]));
   const contractLabel = (id?: string) => {
     const k = contracts.items.find((c) => c.id === id);
-    return k ? `${customerName.get(k.customerId) ?? "customer"} · ${k.planType} contract v${k.version}` : full ? "contract" : "release view";
+    return k ? `${customerName.get(k.customerId) ?? t("customer")} · ${t("{plan} contract v{version}", { plan: k.planType, version: k.version })}` : full ? t("contract") : t("release view");
   };
-  const rows = restrictionRows(scoped.items, contractLabel);
+  const rows = restrictionRows(scoped.items, contractLabel, i);
   const counts = Object.fromEntries(states.map((s) => [s, rows.filter((r) => r.state === s).length])) as Record<RestrictionState, number>;
   const live: RestrictionsLive = { now: now.toISOString(), full, canWrite, scope, rows, counts, contracts: contracts.items.map((k) => ({ id: k.id, label: contractLabel(k.id) })) };
 
@@ -55,9 +60,16 @@ export default async function AdminRestrictionsPage({ searchParams }: PageProps<
     ]);
     const invoice = new Map(invoices.items.map((i) => [i.id, i]));
     const causes = (r.causeInvoiceIds ?? []).map((i) => ({ id: i, number: invoice.get(i)?.number ?? i.slice(0, 8), paid: invoice.get(i)?.status === "paid", amountMinor: invoice.get(i)?.amountMinor ?? null, currency: invoice.get(i)?.currency ?? "" }));
+    const allPaid = causes.length > 0 && causes.every((c) => c.paid);
+    const notices = r.noticeNotificationIds?.length ?? 0;
     live.selected = {
-      r, contract: contractLabel(r.contractId), causes, allPaid: causes.length > 0 && causes.every((c) => c.paid),
-      units: unitRows(r, names, new Map(commands.filter((c): c is ApiCommand => !!c).map((c) => [c.id, c]))),
+      r, contract: contractLabel(r.contractId), causes, allPaid,
+      units: unitRows(r, names, new Map(commands.filter((c): c is ApiCommand => !!c).map((c) => [c.id, c])), i),
+      texts: {
+        notice: t(notices === 1 ? "{time} · 1 client notice" : "{time} · {n} client notices", { time: showTime(r.noticeAt, display), n: notices }),
+        executeAfter: showTime(r.executeAfter, display), period: activePeriod(r, now, i), intent: intentText(r, i),
+        execute: executeBlocker(r, now, i), release: releaseBlocker(r, allPaid, now, i),
+      },
     };
   }
 
@@ -69,8 +81,8 @@ export default async function AdminRestrictionsPage({ searchParams }: PageProps<
       coreOp<Page<{ customerId: string; status: string }>>("clientUsers.list", { limit: 100, filters: { status: "active" } }),
     ]);
     const busy = new Map<string, string>();
-    for (const x of all.items) if (active.includes(x.state)) for (const u of x.unitIds) busy.set(u, `under restriction ${x.id.slice(0, 8)} (${x.state})`);
-    for (const x of all.items) for (const c of x.recoveryCases) if (c.state !== "resolved") busy.set(c.unitId, "unresolved recovery case");
+    for (const x of all.items) if (active.includes(x.state)) for (const u of x.unitIds) busy.set(u, t("under restriction {id} ({state})", { id: x.id.slice(0, 8), state: stateWord(x.state, t) }));
+    for (const x of all.items) for (const c of x.recoveryCases) if (c.state !== "resolved") busy.set(c.unitId, t("unresolved recovery case"));
     const cap = new Map(caps.items.map((k) => [k.id, k]));
     const term = (k: ApiContract) => Date.parse(k.startAt) <= now.getTime() && now.getTime() < Date.parse(k.endAt);
     live.schedule = contracts.items.filter((k) => k.planType === "rto" && k.restrictionEligible && k.rulesVersion && term(k)).map((k) => ({
@@ -79,7 +91,7 @@ export default async function AdminRestrictionsPage({ searchParams }: PageProps<
       units: k.unitIds.map((u) => {
         const unit = units.items.find((x) => x.id === u);
         const c = unit ? cap.get(unit.modelId) : undefined;
-        return { id: u, name: names.get(u) ?? u.slice(0, 8), blocked: !unit || unit.archived ? "archived" : busy.get(u) ?? (!c?.control ? "no power control" : null), temperature: c?.temperature ?? null };
+        return { id: u, name: names.get(u) ?? u.slice(0, 8), blocked: !unit || unit.archived ? t("archived") : busy.get(u) ?? (!c?.control ? t("no power control") : null), temperature: c?.temperature ?? null };
       }),
     }));
   }
