@@ -16,6 +16,10 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/paging"
 )
 
+// actorJoin finds the actor's user: actor_id is a user ID or a system actor such as "system-demo", which matches no
+// user, so the name stays null (identity owns both tables, IR196 / IR305).
+const actorJoin = `LEFT JOIN identity.users u ON u.id::text = a.actor_id`
+
 // View is AuditView of service-contracts.ts.
 type View struct {
 	ID              uuid.UUID          `json:"id"`
@@ -24,6 +28,7 @@ type View struct {
 	CreatedAt       time.Time          `json:"createdAt"`
 	UpdatedAt       time.Time          `json:"updatedAt"`
 	ActorID         string             `json:"actorId"`
+	ActorName       *string            `json:"actorName"` // the actor user's current display name; null for system actors and in client projections (IR305)
 	ActorRoleAtTime string             `json:"actorRoleAtTime"`
 	Action          string             `json:"action"`
 	TargetRef       map[string]string  `json:"targetRef"`
@@ -119,8 +124,8 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 	if err := c.Tx.QueryRow(ctx, "SELECT count(*) FROM audit.audit_log a WHERE "+where, args...).Scan(&total); err != nil {
 		return paging.Page[View]{}, err
 	}
-	rows, err := c.Tx.Query(ctx, fmt.Sprintf(`SELECT a.id, a.tenant_id, a.actor_id, a.actor_role_at_time, a.action, a.target_kind, a.target_id, a.previous_version, a.next_version,
-		a.occurred_at, a.correlation_id, a.result, a.masked_before, a.masked_after, a.reason FROM audit.audit_log a WHERE %s ORDER BY %s LIMIT %d OFFSET %d`, where, order, w.Limit, w.Offset), args...)
+	rows, err := c.Tx.Query(ctx, fmt.Sprintf(`SELECT a.id, a.tenant_id, a.actor_id, u.display_name, a.actor_role_at_time, a.action, a.target_kind, a.target_id, a.previous_version, a.next_version,
+		a.occurred_at, a.correlation_id, a.result, a.masked_before, a.masked_after, a.reason FROM audit.audit_log a `+actorJoin+` WHERE %s ORDER BY %s LIMIT %d OFFSET %d`, where, order, w.Limit, w.Offset), args...)
 	if err != nil {
 		return paging.Page[View]{}, err
 	}
@@ -129,7 +134,7 @@ func list(ctx context.Context, c *ops.Call, in *paging.Query) (paging.Page[View]
 	for rows.Next() {
 		var x View
 		var kind, id string
-		if err := rows.Scan(&x.ID, &x.TenantID, &x.ActorID, &x.ActorRoleAtTime, &x.Action, &kind, &id, &x.PreviousVersion, &x.NextVersion, &x.OccurredAt, &x.CorrelationID,
+		if err := rows.Scan(&x.ID, &x.TenantID, &x.ActorID, &x.ActorName, &x.ActorRoleAtTime, &x.Action, &kind, &id, &x.PreviousVersion, &x.NextVersion, &x.OccurredAt, &x.CorrelationID,
 			&x.Result, &x.MaskedBefore, &x.MaskedAfter, &x.Reason); err != nil {
 			return paging.Page[View]{}, err
 		}

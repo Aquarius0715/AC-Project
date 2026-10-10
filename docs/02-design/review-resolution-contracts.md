@@ -3893,3 +3893,30 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
    - Audit actors show as user IDs. `audit.list` should return the actor's display name (identity holds both), so this is next.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR305 Audit entries carry the actor's name; customers never see it — 2026-10-10
+
+The audit log showed actors as user IDs (IR304 left this open). `AuditView` gains `actorName: string | null` (service-contracts.ts).
+
+1. **The contract.**
+   - `actorName` is the actor user's current display name (`identity.users.display_name`).
+   - It is null for a system actor (`system-demo`, `system-restriction`, `system-scheduler`), which matches no user.
+   - It is not recorded with the entry. The role stays as recorded at the time (AT-A16-B ④), while the name follows the user's current name.
+   - The same field reaches every `AuditView` list: audit.list, `Restriction.events` and `OffsetRecord.eventHistory`.
+2. **Customers never see a name.**
+   - The client projection of restriction events (IR42) already masked the actor as "masked". It now also sets `actorName` to null.
+   - Offset records read by a client return `actorName` null in their event history. The actor ID there is unchanged.
+3. **The backend.**
+   - The audit log and the users both belong to the identity domain (IR196), so audit.list and the history query (`audit.History`, used by restrictions and offsets) add `LEFT JOIN identity.users u ON u.id::text = a.actor_id`.
+   - The two `Event` copies in restrictions and offsets gain the field.
+   - Swagger is regenerated from the annotations.
+4. **The web.**
+   - The audit list, the entry detail and the restriction exception screen's audit card show the name, and the ID when no name exists.
+   - The entry detail adds an "Actor ID" row when a name is shown.
+   - HQ offset events show who acted.
+5. **Checked.**
+   - Go: `TestAuditList` checks the name of an HQ entry and a system actor's null name. The restrictions test checks that the client events carry no name. `TestOffsets` checks that a customer's event history carries no names while HQ's does. `make test-all` passes.
+   - Vitest: 52 files, 296 tests (audit rows with name and ID, a system actor, offset events with a name).
+   - E2E: 67 passed, 9 skipped.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

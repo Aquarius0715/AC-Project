@@ -24,6 +24,7 @@ describe("HQ offset demo (FR-A15, DD-A15)", () => {
     ]);
     expect([rows[0].currentText, rows[2].currentText]).toEqual(["purchase · pending · started 14 Sept 2026, 9:30 am MYT", null]);
     expect(rows[0].events).toEqual([{ time: "14 Sept 2026, 9:00 am MYT", title: "Demo request · done", detail: "user-hq-" }]);
+    expect(eventItem({ action: "offsets.retire", occurredAt: "2026-09-14T01:00:00Z", actorId: "user-hq-0001", actorName: "hq-operator", result: "success", reason: null }).detail).toBe("hq-operator"); // who acted (IR305)
     expect(eventItem({ action: "offsets.something_new", occurredAt: "2026-09-14T01:00:00Z", actorId: "system", result: "denied", reason: "not allowed" }).title).toBe("offsets.something_new · denied");
     expect([kg3(0.1), kg3(1234.5)]).toEqual(["0.100", "1,234.500"]);
   });

@@ -26721,6 +26721,10 @@
                 "actorId": {
                     "type": "string"
                 },
+                "actorName": {
+                    "description": "the actor user's current display name; null for system actors and in client projections (IR305)",
+                    "type": "string"
+                },
                 "actorRoleAtTime": {
                     "type": "string"
                 },
@@ -29127,6 +29131,9 @@
                     "type": "string"
                 },
                 "actorId": {
+                    "type": "string"
+                },
+                "actorName": {
                     "type": "string"
                 },
                 "actorRoleAtTime": {
@@ -33580,6 +33587,9 @@
                     "type": "string"
                 },
                 "actorId": {
+                    "type": "string"
+                },
+                "actorName": {
                     "type": "string"
                 },
                 "actorRoleAtTime": {

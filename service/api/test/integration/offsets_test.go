@@ -107,8 +107,16 @@ func TestOffsets(t *testing.T) {
 		t.Error("retry a retired record")
 	}
 	// lists
-	if _, m := post(s, &customerB, "offsets.list", `{"filters":{"status":"demo_retired"},"limit":100}`); len(items(m)) == 0 {
+	_, m = post(s, &customerB, "offsets.list", `{"filters":{"status":"demo_retired"},"limit":100}`)
+	if len(items(m)) == 0 {
 		t.Error("client list")
+	}
+	for _, it := range items(m) { // a customer never sees an actor's name (IR305)
+		for _, e := range it["eventHistory"].([]any) {
+			if e.(map[string]any)["actorName"] != nil {
+				t.Errorf("client event history shows a name: %v", e)
+			}
+		}
 	}
 	if _, m := post(s, &customerA, "offsets.list", `{"limit":100}`); func() bool {
 		for _, it := range items(m) {
@@ -120,8 +128,18 @@ func TestOffsets(t *testing.T) {
 	}() {
 		t.Error("other customer sees the record")
 	}
-	if _, m := post(s, &hq, "offsets.list", `{"filters":{"customerId":"`+seed.ID("cust-b").String()+`"},"limit":100}`); len(items(m)) == 0 {
+	_, m = post(s, &hq, "offsets.list", `{"filters":{"customerId":"`+seed.ID("cust-b").String()+`"},"limit":100}`)
+	if len(items(m)) == 0 {
 		t.Error("HQ list")
+	}
+	named := false // HQ sees who acted
+	for _, it := range items(m) {
+		for _, e := range it["eventHistory"].([]any) {
+			named = named || e.(map[string]any)["actorName"] != nil
+		}
+	}
+	if !named {
+		t.Error("HQ event history has no actor names")
 	}
 	if code, _ := post(s, &hq, "offsets.list", `{"filters":{"status":"sold"}}`); code != 422 {
 		t.Error("bad state filter")

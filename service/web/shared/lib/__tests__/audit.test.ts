@@ -5,7 +5,7 @@ import { EN, i18nOf, translator } from "@ac/web/lib/i18n";
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
 const NOW = new Date("2026-09-15T01:00:00Z"); // 09:00 in Kuala Lumpur, 10:00 in Tokyo
 const entry = (over: Partial<ApiAudit>): ApiAudit => ({
-  id: "a1", actorId: "hq-operator", actorRoleAtTime: "admin", action: "restrictions.defer", targetRef: { kind: "restriction", id: "r1" }, occurredAt: "2026-09-15T00:30:00Z",
+  id: "a1", actorId: "user-0001", actorName: "hq-operator", actorRoleAtTime: "admin", action: "restrictions.defer", targetRef: { kind: "restriction", id: "r1" }, occurredAt: "2026-09-15T00:30:00Z",
   correlationId: "corr-1", result: "success", maskedBefore: { state: "applied", contactPhone: "***" }, maskedAfter: { state: "applied", "exception.until": "2026-09-20T00:00:00Z", contactPhone: "***" },
   reason: "Invoice under review", ...over,
 });
@@ -28,7 +28,8 @@ describe("HQ audit log (FR-A16, DD-A16)", () => {
 
   it("rows an entry with its times, the recorded role and the masked changes", () => {
     const r = auditRow(entry({}), EN, NOW.getTime());
-    expect(r).toMatchObject({ op: "restrictions.defer", target: "restriction · r1", role: "Admin", at: "today 8:30 am MYT", occurred: "15 Sept 2026, 8:30 am MYT", res: "Success" });
+    expect(r).toMatchObject({ op: "restrictions.defer", target: "restriction · r1", actor: "hq-operator", actorId: "user-0001", role: "Admin", at: "today 8:30 am MYT", occurred: "15 Sept 2026, 8:30 am MYT", res: "Success" });
+    expect([auditRow(entry({ actorId: "system-demo", actorName: null, actorRoleAtTime: "system" })).actor]).toEqual(["system-demo"]); // a system actor has no name (IR305)
     expect(r.changes).toEqual([
       { field: "contactPhone", before: "***", after: "***", changed: false }, { field: "exception.until", before: "null", after: "2026-09-20T00:00:00Z", changed: true }, { field: "state", before: "applied", after: "applied", changed: false },
     ]);

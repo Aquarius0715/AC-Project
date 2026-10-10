@@ -17,7 +17,7 @@ type Attempt = { id: string; stage: "purchase" | "retirement"; status: "pending"
 export type ApiOffsetRecord = {
   id: string; version: number; createdAt: string; quoteId: string; customerId: string; amountKg: number; attempts: Attempt[]; currentAttemptId: string | null;
   state: "demo_requested" | "demo_purchased" | "demo_retired" | "failed"; previousState: ApiOffsetRecord["state"] | null; purchaseRef: string | null; retirementRef: string | null;
-  demoCertificateRef: string | null; eventHistory: { action: string; occurredAt: string; actorId: string; result: string; reason: string | null }[];
+  demoCertificateRef: string | null; eventHistory: { action: string; occurredAt: string; actorId: string; actorName?: string | null; result: string; reason: string | null }[];
 };
 
 const stageOf: Record<string, number> = { demo_requested: 1, demo_purchased: 2, demo_retired: 3 };
@@ -50,7 +50,7 @@ export function eventItem(e: ApiOffsetRecord["eventHistory"][number], i: I18n = 
     "offsets.request": t("Demo request"), "offsets.purchase_confirm": t("Demo purchase confirmed"), "offsets.retire": t("Demo retirement"), "offsets.fail": t("Simulated failure"), "offsets.retry": t("Retry started"),
   };
   const result: Record<string, string> = { success: t("done"), denied: t("denied"), failed: t("failed"), pending: t("pending") };
-  return { time: showTime(e.occurredAt, i.display), title: `${action[e.action] ?? e.action} · ${result[e.result] ?? e.result}`, detail: `${e.actorId.slice(0, 8)}${e.reason ? ` · ${e.reason}` : ""}` };
+  return { time: showTime(e.occurredAt, i.display), title: `${action[e.action] ?? e.action} · ${result[e.result] ?? e.result}`, detail: `${e.actorName ?? e.actorId.slice(0, 8)}${e.reason ? ` · ${e.reason}` : ""}` }; // who acted (IR305)
 }
 
 export function recordRows(rs: ApiOffsetRecord[], customers: { id: string; name: string }[], i: I18n = EN): RecordRow[] {

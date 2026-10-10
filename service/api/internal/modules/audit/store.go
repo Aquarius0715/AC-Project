@@ -28,8 +28,8 @@ func History(ctx context.Context, c *ops.Call, kind, id string) ([]View, error) 
 }
 
 func history(ctx context.Context, c *ops.Call, in *HistoryInput) ([]View, error) {
-	rows, err := c.Tx.Query(ctx, `SELECT id, tenant_id, actor_id, actor_role_at_time, action, previous_version, next_version, occurred_at, correlation_id, result,
-		masked_before, masked_after, reason FROM audit.audit_log WHERE target_kind = $1 AND target_id = $2 ORDER BY occurred_at, correlation_id, id`, in.TargetKind, in.TargetID)
+	rows, err := c.Tx.Query(ctx, `SELECT a.id, a.tenant_id, a.actor_id, u.display_name, a.actor_role_at_time, a.action, a.previous_version, a.next_version, a.occurred_at, a.correlation_id, a.result,
+		a.masked_before, a.masked_after, a.reason FROM audit.audit_log a `+actorJoin+` WHERE a.target_kind = $1 AND a.target_id = $2 ORDER BY a.occurred_at, a.correlation_id, a.id`, in.TargetKind, in.TargetID)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func history(ctx context.Context, c *ops.Call, in *HistoryInput) ([]View, error)
 	out := []View{}
 	for rows.Next() {
 		var x View
-		if err := rows.Scan(&x.ID, &x.TenantID, &x.ActorID, &x.ActorRoleAtTime, &x.Action, &x.PreviousVersion, &x.NextVersion, &x.OccurredAt, &x.CorrelationID, &x.Result,
+		if err := rows.Scan(&x.ID, &x.TenantID, &x.ActorID, &x.ActorName, &x.ActorRoleAtTime, &x.Action, &x.PreviousVersion, &x.NextVersion, &x.OccurredAt, &x.CorrelationID, &x.Result,
 			&x.MaskedBefore, &x.MaskedAfter, &x.Reason); err != nil {
 			return nil, err
 		}

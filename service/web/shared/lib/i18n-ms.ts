@@ -5217,6 +5217,7 @@ export const ms: Record<string, string> = {
   "{serial} · connection, power and tamper are separate": "{serial} · sambungan, kuasa dan gangguan adalah berasingan",
   "System": "Sistem",
   "Period must be start < end, at most 366 days": "Tempoh mesti mula < tamat, paling lama 366 hari",
+  "Actor ID": "ID pelaku",
 
   // notifications
   "All": "Semua",

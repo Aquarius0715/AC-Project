@@ -82,6 +82,7 @@ type Event struct {
 	CreatedAt       time.Time          `json:"createdAt"`
 	UpdatedAt       time.Time          `json:"updatedAt"`
 	ActorID         string             `json:"actorId"`
+	ActorName       *string            `json:"actorName"`
 	ActorRoleAtTime string             `json:"actorRoleAtTime"`
 	Action          string             `json:"action"`
 	TargetRef       map[string]string  `json:"targetRef"`
@@ -212,7 +213,7 @@ func maskForClient(x *Restriction) {
 		if _, ok := stateEvents[e.Action]; !ok || e.Result != "success" {
 			continue
 		}
-		e.ActorID, e.ActorRoleAtTime, e.Reason = "masked", "admin", nil
+		e.ActorID, e.ActorName, e.ActorRoleAtTime, e.Reason = "masked", nil, "admin", nil
 		e.MaskedBefore, e.MaskedAfter = map[string]*string{}, map[string]*string{}
 		events = append(events, e)
 	}

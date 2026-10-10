@@ -6,11 +6,11 @@ import { EN, relativeTime, showTime, translator, zonedInstant, zonedParts, type 
 const en = translator("en");
 export type AuditResult = "Success" | "Denied" | "Failed" | "Pending";
 export type AuditChange = { field: string; before: string; after: string; changed: boolean };
-export type AuditRow = { id: string; op: string; target: string; actor: string; role: string; at: string; occurred: string; corr: string; res: AuditResult; reason: string | null; changes: AuditChange[] };
+export type AuditRow = { id: string; op: string; target: string; actor: string; actorId: string; role: string; at: string; occurred: string; corr: string; res: AuditResult; reason: string | null; changes: AuditChange[] };
 
 /** AuditView of service-contracts.ts. */
 export type ApiAudit = {
-  id: string; actorId: string; actorRoleAtTime: string; action: string; targetRef: { kind: string; id: string }; occurredAt: string; correlationId: string;
+  id: string; actorId: string; actorName: string | null; actorRoleAtTime: string; action: string; targetRef: { kind: string; id: string }; occurredAt: string; correlationId: string;
   result: "success" | "denied" | "failed" | "pending"; maskedBefore: Record<string, string | null>; maskedAfter: Record<string, string | null>; reason: string | null;
 };
 
@@ -62,14 +62,16 @@ export function auditQuery(f: AuditFilters, zone = KL) {
   };
 }
 
-/** One entry of the log: the list time relative to now, the full time and the role in the display language. */
+/** One entry of the log: who acted (the user's name, else the actor ID — a system actor has no name, IR305), the list
+ * time relative to now, the full time and the role in the display language. */
 export function auditRow(a: ApiAudit, i: I18n = EN, nowMs?: number): AuditRow {
   const fields = [...new Set([...Object.keys(a.maskedBefore ?? {}), ...Object.keys(a.maskedAfter ?? {})])].sort();
   return {
     id: a.id,
     op: a.action,
     target: `${a.targetRef.kind} · ${a.targetRef.id}`,
-    actor: a.actorId,
+    actor: a.actorName ?? a.actorId,
+    actorId: a.actorId,
     role: roleAtTimeWord(a.actorRoleAtTime, i.t),
     at: nowMs === undefined ? showTime(a.occurredAt, i.display) : relativeTime(a.occurredAt, nowMs, i),
     occurred: showTime(a.occurredAt, i.display),
@@ -86,7 +88,7 @@ export function auditRow(a: ApiAudit, i: I18n = EN, nowMs?: number): AuditRow {
 /** An entry as a timeline item (the restriction exception screen's audit card, IR301). */
 export const auditItem = (a: ApiAudit, i: I18n = EN) => ({
   time: showTime(a.occurredAt, i.display), title: `${a.action} · ${resultWord(a.result.charAt(0).toUpperCase() + a.result.slice(1), i.t)}`,
-  detail: `${a.actorId} (${roleAtTimeWord(a.actorRoleAtTime, i.t)})${a.reason ? ` · ${a.reason}` : ""}`,
+  detail: `${a.actorName ?? a.actorId} (${roleAtTimeWord(a.actorRoleAtTime, i.t)})${a.reason ? ` · ${a.reason}` : ""}`,
 });
 
 const eventTitle: Record<string, string> = { communication_lost: "communication lost", power_lost: "power_signal lost", tamper: "tamper_signal — cover opened", restored: "restored", operation_failed: "operation failed" };

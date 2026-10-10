@@ -101,6 +101,15 @@ func TestAuditList(t *testing.T) {
 	if len(items(m)) != 1 || items(m)[0]["action"] != "invoices.create" || items(m)[0]["result"] != "success" {
 		t.Fatalf("invoice audit: %v", m)
 	}
+	if items(m)[0]["actorName"] != "hq-operator" { // the actor user's display name (IR305)
+		t.Errorf("actor name: %v", items(m)[0]["actorName"])
+	}
+	sys := uuid.NewString() // a system actor matches no user, so it has no name
+	owner(t, `INSERT INTO audit.audit_log (tenant_id, actor_id, actor_role_at_time, action, target_kind, target_id, occurred_at, correlation_id, result)
+		VALUES ($1, 'system-demo', 'system', 'demo.tick', 'test', $2, $3, $4, 'success')`, seed.ID("tenant-a"), sys, clock, uuid.NewString())
+	if _, m := post(s, &hq, "audit.list", `{"filters":{`+day+`,"targetKind":"test","targetId":"`+sys+`"}}`); len(items(m)) != 1 || items(m)[0]["actorName"] != nil || items(m)[0]["actorId"] != "system-demo" {
+		t.Errorf("system actor: %v", m)
+	}
 	corr := items(m)[0]["correlationId"].(string)
 	if _, m := post(s, &hq, "audit.list", `{"filters":{`+day+`,"correlationId":"`+corr+`"},"limit":100}`); len(items(m)) < 1 {
 		t.Error("by correlation")

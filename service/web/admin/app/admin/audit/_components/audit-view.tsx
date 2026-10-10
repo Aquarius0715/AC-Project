@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Badge, Btn, Card, Choice, DataTable, EmptyState, Field, Input, ListRow, Page, SummaryList, Tabs, Timeline } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
@@ -8,12 +8,12 @@ import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { periodError, resultWord, type AuditFilters, type AuditResult, type AuditRow } from "@ac/web/lib/audit";
 
 const seed: AuditRow[] = [
-  { id: "1", op: "restriction.override", target: "restriction · restriction-a41", actor: "hq-operator", role: "admin", at: "09-22 09:14", occurred: "2026-09-22 09:14 (Asia/Kuala_Lumpur)", corr: "corr-7f21a9", res: "Success", reason: "Customer requested a short exception while the invoice is under review.",
+  { id: "1", op: "restriction.override", target: "restriction · restriction-a41", actor: "hq-operator", actorId: "hq-operator", role: "admin", at: "09-22 09:14", occurred: "2026-09-22 09:14 (Asia/Kuala_Lumpur)", corr: "corr-7f21a9", res: "Success", reason: "Customer requested a short exception while the invoice is under review.",
     changes: [{ field: "exception.until", before: "null", after: "2026-09-29 00:00", changed: true }, { field: "exception.reason", before: "null", after: "Invoice under review", changed: true }, { field: "contactPhone", before: "***masked***", after: "***masked***", changed: false }, { field: "state", before: "applied", after: "applied", changed: false }] },
-  { id: "2", op: "access.grant", target: "membership · membership-b09", actor: "contractor-lead-b", role: "contractor", at: "09-22 08:51", occurred: "2026-09-22 08:51 (Asia/Kuala_Lumpur)", corr: "corr-2c88e0", res: "Denied", reason: null, changes: [] },
-  { id: "3", op: "devices.calibrate", target: "device · device-online-rto", actor: "tech-ali", role: "technician", at: "09-21 16:30", occurred: "2026-09-21 16:30 (Asia/Kuala_Lumpur)", corr: "corr-51d0aa", res: "Failed", reason: null, changes: [] },
-  { id: "4", op: "commands.create", target: "command · cmd-3310", actor: "hq-operator", role: "admin", at: "09-20 10:14", occurred: "2026-09-20 10:14 (Asia/Kuala_Lumpur)", corr: "corr-115e6b", res: "Pending", reason: null, changes: [] },
-  { id: "5", op: "offsets.simulate · retire", target: "offset · offset-0231", actor: "hq-operator", role: "admin", at: "09-12 14:20", occurred: "2026-09-12 14:20 (Asia/Kuala_Lumpur)", corr: "corr-9a10f4", res: "Success", reason: null, changes: [] },
+  { id: "2", op: "access.grant", target: "membership · membership-b09", actor: "contractor-lead-b", actorId: "contractor-lead-b", role: "contractor", at: "09-22 08:51", occurred: "2026-09-22 08:51 (Asia/Kuala_Lumpur)", corr: "corr-2c88e0", res: "Denied", reason: null, changes: [] },
+  { id: "3", op: "devices.calibrate", target: "device · device-online-rto", actor: "tech-ali", actorId: "tech-ali", role: "technician", at: "09-21 16:30", occurred: "2026-09-21 16:30 (Asia/Kuala_Lumpur)", corr: "corr-51d0aa", res: "Failed", reason: null, changes: [] },
+  { id: "4", op: "commands.create", target: "command · cmd-3310", actor: "hq-operator", actorId: "hq-operator", role: "admin", at: "09-20 10:14", occurred: "2026-09-20 10:14 (Asia/Kuala_Lumpur)", corr: "corr-115e6b", res: "Pending", reason: null, changes: [] },
+  { id: "5", op: "offsets.simulate · retire", target: "offset · offset-0231", actor: "hq-operator", actorId: "hq-operator", role: "admin", at: "09-12 14:20", occurred: "2026-09-12 14:20 (Asia/Kuala_Lumpur)", corr: "corr-9a10f4", res: "Success", reason: null, changes: [] },
 ];
 const seedEvents = [{ time: "09-22 08:41", title: "tamper_signal — cover opened while powered", detail: "device-online-rto" }, { time: "09-22 08:33", title: "power_signal lost", detail: "device-online-rto" }, { time: "09-21 16:30", title: "calibration recorded", detail: "device-online-rto" }];
 const demoFilters: AuditFilters = { from: "2026-09-01", to: "2026-09-30", correlationId: "", result: "All", limit: 25 };
@@ -104,7 +104,7 @@ export function AuditView({ live }: { live?: Live }) {
             {sel && (
               <div className="flex min-w-0 flex-col gap-4">
                 <Card title={sel.op} sub={sel.target}>
-                  <SummaryList items={[[t("Actor"), sel.actor], [t("Role at the time"), t("{role} — kept as recorded, not rewritten", { role: sel.role })], [t("Occurred"), sel.occurred], [t("Correlation ID"), <button key="c" className="font-mono text-primary underline" onClick={() => changeCorr(sel.corr)}>{t("{corr} · Filter by ID →", { corr: sel.corr })}</button>], [t("Reason"), sel.reason ?? "—"]]} />
+                  <SummaryList items={[[t("Actor"), sel.actor], ...(sel.actorId !== sel.actor ? [[t("Actor ID"), <span key="i" className="font-mono text-xs">{sel.actorId}</span>] as [string, ReactNode]] : []), [t("Role at the time"), t("{role} — kept as recorded, not rewritten", { role: sel.role })], [t("Occurred"), sel.occurred], [t("Correlation ID"), <button key="c" className="font-mono text-primary underline" onClick={() => changeCorr(sel.corr)}>{t("{corr} · Filter by ID →", { corr: sel.corr })}</button>], [t("Reason"), sel.reason ?? "—"]]} />
                   <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Before / after (masked)")}</h3>
                   {sel.changes.length === 0 ? <p className="text-xs text-muted">{t("No field values were recorded for this entry.")}</p> : <DataTable rows={sel.changes} rowKey={(r) => r.field} cols={[{ key: "f", label: t("Field"), render: (r) => <span className="font-mono text-xs">{r.field}</span> }, { key: "a", label: t("Before"), render: (r) => r.before }, { key: "b", label: t("After"), render: (r) => <span className={r.changed ? "font-bold text-warn" : ""}>{r.after}</span> }]} />}
                   <p className="mt-2 text-[11px] text-muted">{t("Changed fields are highlighted. Secrets are masked.")}</p>

@@ -194,7 +194,7 @@ func TestRestrictionLifecycle(t *testing.T) {
 		t.Fatalf("client forInvoice: %v", m)
 	}
 	for _, e := range items(m)[0]["events"].([]any) {
-		if ev := e.(map[string]any); ev["actorId"] != "masked" || ev["reason"] != nil {
+		if ev := e.(map[string]any); ev["actorId"] != "masked" || ev["actorName"] != nil || ev["reason"] != nil {
 			t.Errorf("unmasked event %v", ev)
 		}
 	}

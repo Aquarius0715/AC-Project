@@ -205,6 +205,7 @@ type Event struct {
 	CreatedAt       time.Time          `json:"createdAt"`
 	UpdatedAt       time.Time          `json:"updatedAt"`
 	ActorID         string             `json:"actorId"`
+	ActorName       *string            `json:"actorName"`
 	ActorRoleAtTime string             `json:"actorRoleAtTime"`
 	Action          string             `json:"action"`
 	TargetRef       map[string]string  `json:"targetRef"`
@@ -259,7 +260,11 @@ func decorateRecord(ctx context.Context, c *ops.Call, x *Record) error {
 	}
 	x.EventHistory = []Event{}
 	for _, v := range hist {
-		x.EventHistory = append(x.EventHistory, Event(v))
+		e := Event(v)
+		if c.Principal.Role == "client" { // a customer never sees an actor's name (IR305)
+			e.ActorName = nil
+		}
+		x.EventHistory = append(x.EventHistory, e)
 	}
 	return nil
 }
