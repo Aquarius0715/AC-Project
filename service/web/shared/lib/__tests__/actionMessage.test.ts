@@ -10,6 +10,7 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
     expect(actionMessage(failure({ fieldErrors: { "query.filters.to": "error.range" } }))).toBe("To is out of range");
     expect(actionMessage(failure({ fieldErrors: { calibratedAt: "error.future" } }))).toBe("Calibrated at must not be in the future");
     expect(actionMessage(failure({ fieldErrors: { unit: "errors.unit_mismatch" } }))).toBe("Unit — unit mismatch");
+    expect(actionMessage(failure({ fieldErrors: { sitePhoto: "error.invalidFile" } }))).toBe("Site photo is not an accepted file — check its type and size"); // IR308
   });
   it("explains version conflicts, domain errors and bare codes", () => {
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "error.versionConflict" }))).toMatch(/changed this in the meantime/);

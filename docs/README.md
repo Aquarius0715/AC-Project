@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.191.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
+Version: 0.192.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.192.0 (2026-10-10): Uploads must be what their bytes are (PNG, JPEG or PDF signature). The upload Server Actions send the bytes' type, and a refusal names the file. New tests cover the remaining input rules, a reschedule after a contractor assignment, partner proposal refusals, the report submit checks and the reconcile paths; Go coverage is 87.0 % (IR308).
 0.191.0 (2026-10-10): Coverage round. New tests cover the BFF session (signed cookie, refresh, return paths), the DAL, command polling, the input rules of 79 operations, and payment, restriction, policy and plan refusals; Go coverage is 86.4 %. Two web fixes: inherited names are no longer accepted as a role, and coreAll stops at its maximum (IR307).
 0.190.0 (2026-10-10): The customer assistant uses the Core API in API mode: `voice.resolveIntent` in the language chosen in its header, a change confirmed before one `commands.create` labelled `source: voice` (client only), an ambiguous room asked by room then AC, and the device's microphone consent (off = text only). Its suggestions are sentences of the fixed grammar, and Figma 09a–09g now match (IR306).
 0.189.0 (2026-10-10): Audit entries carry the actor's current display name (`AuditView.actorName`, null for system actors). HQ sees who acted on the audit log, the restriction exception screen and offset events; customer projections never include a name (IR305).

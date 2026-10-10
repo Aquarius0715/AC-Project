@@ -4026,3 +4026,31 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
 5. **No UI change.** E2E: 70 passed, 9 skipped.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR308 Uploads are checked by their bytes; the remaining input rules, reschedule, partner proposal, report and reconcile paths tested — 2026-10-10
+
+1. **Uploads are what their bytes are.**
+   - The Core API checked an upload's declared type, name and size, but not its bytes. A file declared `image/png` could hold anything and would be stored and served as a PNG.
+   - Now the leading bytes must match the declared type: the PNG signature, the JPEG start-of-image marker or the PDF header (`ContentMatches`). This applies to report photos (attachments.add), the sign-off's signature and site photo, the photos of jobs.reportProblem, and certificate files. A mismatch is VALIDATION `error.invalidFile`, as before.
+   - The browser's `File.type` follows the file name, so the four Server Actions that upload now send the type of the bytes (`uploadType`, `lib/files.ts`). A JPEG photo renamed to `.png` is therefore still accepted, as a JPEG. A file that is none of these keeps the browser's type, and the API refuses it.
+   - The refusal reads "Site photo is not an accepted file — check its type and size" (`error.invalidFile` in `actionMessage`, with Malay). Before, it showed the raw key.
+   - The frontend contract already asked attachments.add to validate the content (DDC attachments.add row). The API now does, for every upload.
+2. **Backend tests.**
+   - `TestRequiredInputs` gains 29 cases: wrong shapes, references inside lists and kind-specific fields. They include locations.rename, properties.save, units.save, automations.save, capabilities.save, baselines, factors, offsets.preview and offsets.simulate, mrv.saveDraft, energy.summary, clientUsers.save, members.save, the acknowledgement's other time, a manual check-in, a follow-up without a date, an invalid site photo, the three policy kinds, and telemetry.series (the REST binding refuses an unknown query parameter first).
+   - `TestRescheduleAfterContractorAssignment`:
+     - HQ may propose another time for an assigned job only after the technician answered "can't make it";
+     - when the customer accepts it, the contractor's accepted offer moves to the new visit, the assignment is revoked as rescheduled, and the job goes back to accepted.
+   - `TestPartnerProposalRefusals`: a time that breaks the slot rules, an expired offer, a reply-by after 7 days, and sending the contractor's time while HQ's own proposal is pending.
+   - `TestSubmitErrors` (unit): every IR100 submit check of a draft.
+   - `TestRestrictionReconcilePaths`:
+     - a scheduled restriction has nothing to reconcile;
+     - a unit whose device carries no restriction becomes not applied, and is not reconciled twice;
+     - a releasing unit whose device still carries the restriction gets its remove command at once.
+   - Uploads: a non-PNG declared as PNG, a PNG declared as JPEG, and a non-PDF certificate are refused.
+3. **Web unit tests.** `files.test.ts`: the type of PNG, JPEG and PDF bytes whatever the name says; anything else keeps the browser's type.
+4. **Cannot be reached through the API.** These branches stay untested: `retry_device` without a device (the device ID is in the route), the query filters of telemetry.series (an unknown parameter is refused first), the NaN threshold, and the fixed actions of payouts.transition and firmwareCampaigns.control (IR307).
+5. **Checked.**
+   - `make cover`: 86.4 % → 87.0 %. `make test-all` passes. Vitest: 57 files, 332 tests.
+   - E2E: 70 passed, 9 skipped. The suite uploads no files; the upload rule is covered by the Go tests and `files.test.ts`.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

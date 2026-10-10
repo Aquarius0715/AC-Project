@@ -1,6 +1,6 @@
 ---
 document_id: DD-C
-version: 0.30.0
+version: 0.31.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -590,7 +590,7 @@ Scope: FR-C17 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, 
 | tags | string[]/optional | On time, Clean work, Explained clearly, Polite, Fixed the problem | What went well |
 | comment | string/optional | 0–1000 characters | Comment |
 | reasonCode / details | required (problem) | same_problem/new_damage/not_completed/other; 10–2000 characters | Problem |
-| photos / preferredSlot | optional | Up to 5 JPEG/PNG ≤ 5 MiB; future slot | Evidence and visit |
+| photos / preferredSlot | optional | Up to 5 JPEG/PNG ≤ 5 MiB, bytes of that type (IR308); future slot | Evidence and visit |
 
 **Steps**
 

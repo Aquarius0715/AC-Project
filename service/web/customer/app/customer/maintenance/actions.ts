@@ -9,6 +9,7 @@
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
+import { uploadType } from "@ac/web/lib/files";
 
 type Slot = { startAt: string; endAt: string };
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
@@ -72,9 +73,10 @@ export async function rateJob(jobId: string, version: number, stars: number, tag
  * follow-up request's id. The photos arrive as files in the form data. */
 export async function reportProblem(form: FormData) {
   return run(async () => {
-    const photos = await Promise.all(form.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0).map(async (f) => ({
-      name: f.name, mime: f.type, size: f.size, bytes: Buffer.from(await f.arrayBuffer()).toString("base64"),
-    })));
+    const photos = await Promise.all(form.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0).map(async (f) => {
+      const buf = Buffer.from(await f.arrayBuffer());
+      return { name: f.name, mime: uploadType(buf, f.type), size: f.size, bytes: buf.toString("base64") };
+    }));
     const start = String(form.get("visitStart") ?? ""), end = String(form.get("visitEnd") ?? "");
     const j = await coreOp<{ id: string }>("jobs.reportProblem", {
       jobId: String(form.get("jobId")), reasonCode: String(form.get("reasonCode")), details: String(form.get("details") ?? "").trim(), photos,

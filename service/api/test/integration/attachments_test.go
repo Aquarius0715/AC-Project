@@ -18,7 +18,8 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	write(s, &techInt, "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 2)
 	_, m := write(s, &techInt, "jobs.saveDraft", draftBody(job, "normal", nil), 0)
 	rep := data(m)["id"].(string)
-	img := []byte("\x89PNG photo bytes")
+	img := []byte("\x89PNG\r\n\x1a\nphoto bytes") // the PNG signature, then the demo bytes
+	jpg := []byte("\xff\xd8\xffdoor photo bytes") // the JPEG start of image marker
 	add := func(file string, v int) (int, map[string]any) {
 		return write(s, &techInt, "attachments.add", `{"jobId":"`+job+`","reportId":"`+rep+`","file":`+file+`}`, v)
 	}
@@ -27,6 +28,8 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		"size mismatch": blobJSON("a.png", "image/png", img, 3),
 		"empty":         blobJSON("a.png", "image/png", nil, 0),
 		"no name":       blobJSON(" ", "image/png", img, len(img)),
+		"not a png":     blobJSON("a.png", "image/png", []byte("<svg onload=alert(1)>"), 21), // stored and served only as what it is (IR308)
+		"png as jpeg":   blobJSON("a.jpg", "image/jpeg", img, len(img)),
 	} {
 		if code, _ := add(f, 1); code != 422 {
 			t.Errorf("add %s: %d", name, code)
@@ -73,7 +76,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	if code != 200 || so["signerName"] != "Aisha" || so["signatureAttachmentId"] == nil || so["reportVersion"].(float64) != 3 || data(m)["version"].(float64) != 3 {
 		t.Fatalf("signOff: %d %v", code, m)
 	}
-	if code, m := sign(`,"signature":null,"absentReason":"Customer out","sitePhoto":`+blobJSON("door.jpg", "image/jpeg", img, len(img)), 3, 3); code != 200 ||
+	if code, m := sign(`,"signature":null,"absentReason":"Customer out","sitePhoto":`+blobJSON("door.jpg", "image/jpeg", jpg, len(jpg)), 3, 3); code != 200 ||
 		data(m)["signOff"].(map[string]any)["sitePhotoAttachmentId"] == nil {
 		t.Fatalf("absent sign-off: %d %v", code, m)
 	}

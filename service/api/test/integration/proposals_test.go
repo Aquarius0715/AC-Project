@@ -251,3 +251,113 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 		t.Error("reschedule within 48 hours")
 	}
 }
+
+// TestRescheduleAfterContractorAssignment: HQ may propose another time for an assigned job only after the technician
+// answered that they can't make it. When the customer accepts it, the contractor's accepted offer moves to the new
+// visit, the assignment is revoked as rescheduled, and the job goes back to accepted, so the contractor assigns again.
+func TestRescheduleAfterContractorAssignment(t *testing.T) {
+	s := server(t)
+	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active'`, seed.ID("tech-external-a"))
+	t.Cleanup(func() { // the seed assignment comes back unless a test assignment now holds its window
+		owner(t, `UPDATE maintenance.assignments a SET status = 'active' WHERE a.id = $1 AND NOT EXISTS (SELECT 1 FROM maintenance.assignments b
+			WHERE b.id <> a.id AND b.status = 'active' AND b.technician_membership_id = a.technician_membership_id AND b.scheduled && a.scheduled)`, seed.ID("assignment-contractor-a"))
+	})
+	owner(t, `DELETE FROM maintenance.contractors WHERE organization_id = $1`, seed.ID("org-contractor-a"))
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	version := func(job string) int {
+		_, m := post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
+		return ver(m)
+	}
+	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	job := data(m)["id"].(string)
+	if code, m := write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
+		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(200)+`","termsVersion":"t"}`, version(job)); code != 200 {
+		t.Fatalf("offer: %d %v", code, m)
+	}
+	var offer string
+	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
+	if code, m := write(s, &contrA, "jobs.accept", `{"jobId":"`+job+`","offerId":"`+offer+`","termsVersion":"t"}`, version(job)); code != 200 {
+		t.Fatalf("accept: %d %v", code, m)
+	}
+	if code, m := write(s, &contrA, "jobs.assign", `{"jobId":"`+job+`","technicianMembershipId":"`+seed.ID("tech-external-a").String()+`","startAt":"`+ts(49)+`","endAt":"`+ts(51)+`"}`, version(job)); code != 200 {
+		t.Fatalf("assign: %d %v", code, m)
+	}
+	contractorHold := `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `","technicianMembershipId":null}`
+	propose := func() (int, map[string]any) {
+		return write(s, &hq, "jobs.proposeSlot", `{"jobId":"`+job+`","slot":`+slotJSON(97, 2)+`,"hold":`+contractorHold+`,"message":"Can we come then?","replyBy":"`+ts(48)+`"}`, version(job))
+	}
+	if code, m := propose(); code != 409 || m["messageKey"] != "error.invalidState" {
+		t.Errorf("propose while the technician has not answered: %d %v", code, m)
+	}
+	if code, m := write(s, &techA, "jobs.acknowledgeAssignment", `{"jobId":"`+job+`","decision":"cant_make","reason":"another call"}`, version(job)); code != 200 || data(m)["acknowledgement"] != "cant_make" {
+		t.Fatalf("can't make it: %d %v", code, m)
+	}
+	if code, m := propose(); code != 200 {
+		t.Fatalf("propose after can't make: %d %v", code, m)
+	}
+	var proposal string
+	ownerScan(t, `SELECT id::text FROM maintenance.slot_proposals WHERE job_id = $1 AND status = 'pending'`, []any{job}, &proposal)
+	code, m := write(s, &customerA, "jobs.respondProposal", `{"jobId":"`+job+`","proposalId":"`+proposal+`","decision":"accept"}`, version(job))
+	if code != 200 || data(m)["status"] != "accepted" || data(m)["assignmentId"] != nil || data(m)["scheduledSlot"] != nil {
+		t.Fatalf("accept the new time: %d %v", code, m)
+	}
+	var status, reason string
+	ownerScan(t, `SELECT status, reason FROM maintenance.assignments WHERE job_id = $1 ORDER BY created_at DESC LIMIT 1`, []any{job}, &status, &reason)
+	if status != "revoked" || reason != "rescheduled" {
+		t.Errorf("assignment after the new time: %s %s", status, reason)
+	}
+	if _, m := post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`); data(m)["offer"].(map[string]any)["visitSlot"].(map[string]any)["startAt"] != ts(97) {
+		t.Errorf("the accepted offer's visit: %v", data(m)["offer"])
+	}
+	write(s, &hq, "jobs.cancel", `{"jobId":"`+job+`","reason":"test done"}`, version(job))
+}
+
+// TestPartnerProposalRefusals covers the refusals around a contractor's time proposal: a time that breaks the slot
+// rules, an offer that has expired, sending it to the customer while HQ's own proposal is pending, and a reply-by
+// outside the allowed range.
+func TestPartnerProposalRefusals(t *testing.T) {
+	s := server(t)
+	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active' AND lower(scheduled) > $2`, seed.ID("tech-external-a"), clock.Add(2*time.Hour))
+	ts := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
+	version := func(job string) int {
+		_, m := post(s, &hq, "jobs.get", `{"jobId":"`+job+`"}`)
+		return ver(m)
+	}
+	_, m := write(s, &customerA, "jobs.create", jobBody(seed.ID("unit-non-rto").String(), nil), 0)
+	job := data(m)["id"].(string)
+	write(s, &hq, "jobs.offer", `{"jobId":"`+job+`","contractorOrgId":"`+seed.ID("org-contractor-a").String()+`","visitSlot":`+slotJSON(49, 2)+
+		`,"offerExpiresAt":"`+ts(12)+`","accessValidFrom":"`+ts(0)+`","accessValidUntil":"`+ts(200)+`","termsVersion":"t"}`, version(job))
+	var offer string
+	ownerScan(t, `SELECT id::text FROM maintenance.offers WHERE job_id = $1 AND decision IS NULL`, []any{job}, &offer)
+	pp := func(slot string) (int, map[string]any) {
+		return write(s, &contrA, "jobs.proposePartnerSlot", `{"jobId":"`+job+`","offerId":"`+offer+`","slot":`+slot+`,"technicianMembershipId":"`+seed.ID("tech-external-a").String()+`","reason":"van in repair"}`, version(job))
+	}
+	if code, m := pp(slotJSON(3, 1)); code != 422 || m["fieldErrors"].(map[string]any)["slot"] != "error.slotRules" {
+		t.Errorf("a time today: %d %v", code, m)
+	}
+	owner(t, `UPDATE maintenance.offers SET offer_expires_at = $2 WHERE id = $1`, offer, clock.Add(-time.Minute))
+	if code, m := pp(slotJSON(101, 2)); code != 409 || m["messageKey"] != "errors.offer_expired" {
+		t.Errorf("an expired offer: %d %v", code, m)
+	}
+	owner(t, `UPDATE maintenance.offers SET offer_expires_at = $2 WHERE id = $1`, offer, clock.Add(12*time.Hour))
+	if code, m := pp(slotJSON(101, 2)); code != 200 {
+		t.Fatalf("partner proposal: %d %v", code, m)
+	}
+	var partner string
+	ownerScan(t, `SELECT id::text FROM maintenance.partner_slot_proposals WHERE offer_id = $1 AND status = 'pending'`, []any{offer}, &partner)
+	resolve := func(replyBy string) (int, map[string]any) {
+		return write(s, &hq, "jobs.resolvePartnerSlot", `{"jobId":"`+job+`","proposalId":"`+partner+`","decision":"send_to_client","replyBy":"`+replyBy+`"}`, version(job))
+	}
+	if code, m := resolve(ts(24 * 8)); code != 422 || m["fieldErrors"].(map[string]any)["replyBy"] != "error.range" {
+		t.Errorf("reply by in 8 days: %d %v", code, m)
+	}
+	// HQ's own proposal is pending: the contractor's time waits
+	hold := `{"kind":"contractor","contractorOrgId":"` + seed.ID("org-contractor-a").String() + `","technicianMembershipId":null}`
+	if code, m := write(s, &hq, "jobs.proposeSlot", `{"jobId":"`+job+`","slot":`+slotJSON(121, 2)+`,"hold":`+hold+`,"message":"Or then?","replyBy":"`+ts(48)+`"}`, version(job)); code != 200 {
+		t.Fatalf("HQ proposal: %d %v", code, m)
+	}
+	if code, m := resolve(ts(24)); code != 409 || m["messageKey"] != "errors.proposal_pending" {
+		t.Errorf("send while HQ's proposal is pending: %d %v", code, m)
+	}
+	write(s, &hq, "jobs.cancel", `{"jobId":"`+job+`","reason":"test done"}`, version(job))
+}

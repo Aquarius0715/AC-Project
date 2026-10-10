@@ -555,3 +555,56 @@ func TestRestrictionScheduleRefusals(t *testing.T) {
 		t.Fatalf("schedule once the causes are gone: %d %v", code, m)
 	}
 }
+
+// TestRestrictionReconcilePaths covers the other outcomes of restrictions.reconcile (SR26): a scheduled restriction has
+// nothing to reconcile, a unit the device says carries no restriction becomes not applied (and is not reconciled
+// twice), and a releasing unit that still carries the restriction gets its remove command at once.
+func TestRestrictionReconcilePaths(t *testing.T) {
+	s := server(t)
+	reconcile := func(id, u string, v int) (int, map[string]any) {
+		return write(s, &restrMgr, "restrictions.reconcile", `{"restrictionId":"`+id+`","unitIds":["`+u+`"]}`, v)
+	}
+	getter := func(id string) func() map[string]any {
+		return func() map[string]any { _, m := post(s, &restrMgr, "restrictions.get", `{"id":"`+id+`"}`); return m }
+	}
+	// scheduled: nothing has been sent yet
+	u1 := boundUnit(t, s, "online")
+	k1, inv1 := overdueContract(t, s, u1)
+	_, m := write(s, &restrMgr, "restrictions.schedule", scheduleBody(k1, inv1, []string{u1}, nil), 0)
+	scheduled := data(m)["id"].(string)
+	if code, m := reconcile(scheduled, u1, ver(getter(scheduled)())); code != 409 || m["messageKey"] != "errors.restriction_state" {
+		t.Errorf("reconcile a scheduled restriction: %d %v", code, m)
+	}
+	// the apply's answer was lost and the device carries no restriction: not applied, and once only
+	u2 := boundUnit(t, s, "online")
+	k2, inv2 := overdueContract(t, s, u2)
+	id2, _ := executed(t, s, k2, inv2, []string{u2})
+	get2 := getter(id2)
+	expireAt(t, clock.Add(time.Minute))
+	owner(t, `UPDATE assets.units SET last_seen_at = $2, observed_restriction = NULL WHERE id = $1`, u2, clock)
+	if code, m := reconcile(id2, u2, ver(get2())); code != 200 || unitState(m, u2)["applyState"] != "not_applied" || unitState(m, u2)["observedRestriction"] != nil {
+		t.Fatalf("reconcile, nothing observed: %d %v", code, m)
+	}
+	if code, m := reconcile(id2, u2, ver(get2())); code != 422 || m["fieldErrors"].(map[string]any)["unitIds"] != "errors.reconcile_not_needed" {
+		t.Errorf("reconcile twice: %d %v", code, m)
+	}
+	// releasing while the apply's answer is unknown, and the device still carries it: the remove goes out now
+	u3 := boundUnit(t, s, "online")
+	k3, inv3 := overdueContract(t, s, u3)
+	id3, _ := executed(t, s, k3, inv3, []string{u3})
+	get3 := getter(id3)
+	expireAt(t, clock.Add(time.Minute))
+	if code, m := write(s, &restrMgr, "restrictions.exempt", `{"restrictionId":"`+id3+`","until":"`+clock.Add(time.Hour).Format(time.RFC3339)+`","reason":"hospital"}`, ver(get3())); code != 200 ||
+		unitState(m, u3)["releaseState"] != "waiting_reconcile" {
+		t.Fatalf("exempt: %d %v", code, m)
+	}
+	owner(t, `UPDATE assets.units SET last_seen_at = $2, observed_restriction = $3 WHERE id = $1`, u3, clock, `{"restrictionId":"`+id3+`","rulesVersion":"rules-1"}`)
+	code, m := reconcile(id3, u3, ver(get3()))
+	if code != 200 || unitState(m, u3)["applyState"] != "applied" || unitState(m, u3)["releaseState"] != "requested" || len(unitState(m, u3)["releaseCommandIds"].([]any)) != 1 {
+		t.Fatalf("reconcile while releasing: %d %v", code, m)
+	}
+	ackCommand(t, cmdOf(m, u3, "releaseCommandIds"), clock.Add(2*time.Second))
+	if data(get3())["state"] != "released" {
+		t.Errorf("released after the remove: %v", data(get3())["state"])
+	}
+}

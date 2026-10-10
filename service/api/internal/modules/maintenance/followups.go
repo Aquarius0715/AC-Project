@@ -1,6 +1,7 @@
 package maintenance
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -195,10 +196,26 @@ type ProblemInput struct {
 
 var problemCodes = map[string]bool{"same_problem": true, "new_damage": true, "not_completed": true, "other": true}
 
-// ValidBlob checks one image upload (JPEG/PNG, 1 byte – max bytes, size equal to the payload).
+// ValidBlob checks one image upload (JPEG/PNG whose bytes are that type, 1 byte – max bytes, size equal to the
+// payload).
 func ValidBlob(b BlobInput, max int) bool {
 	n := utf8.RuneCountInString(strings.TrimSpace(b.Name))
-	return n >= 1 && n <= 200 && (b.Mime == "image/jpeg" || b.Mime == "image/png") && b.Size == len(b.Bytes) && b.Size >= 1 && b.Size <= max
+	return n >= 1 && n <= 200 && (b.Mime == "image/jpeg" || b.Mime == "image/png") && b.Size == len(b.Bytes) && b.Size >= 1 && b.Size <= max &&
+		ContentMatches(b.Mime, b.Bytes)
+}
+
+// ContentMatches reports whether a file's leading bytes are of its declared type — the PNG signature, the JPEG start
+// of image marker or the PDF header — so a file is stored and served only as what it is (IR308).
+func ContentMatches(mime string, b []byte) bool {
+	switch mime {
+	case "image/png":
+		return bytes.HasPrefix(b, []byte("\x89PNG\r\n\x1a\n"))
+	case "image/jpeg":
+		return bytes.HasPrefix(b, []byte{0xFF, 0xD8, 0xFF})
+	case "application/pdf":
+		return bytes.HasPrefix(b, []byte("%PDF-"))
+	}
+	return false
 }
 
 // Validate implements ops.Validator.

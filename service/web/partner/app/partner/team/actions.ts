@@ -9,6 +9,7 @@ import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { certDates } from "@ac/web/lib/partnerCertificates";
+import { uploadType } from "@ac/web/lib/files";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
 const failure = (e: unknown): { ok: false } & ActionFailure => {
@@ -36,7 +37,7 @@ export async function submitCertificate(form: FormData): Promise<Result<{ id: st
     const renewalOf = text("renewalOf");
     const c = await coreOp<{ id: string }>("certificates.submit", {
       membershipId: text("membershipId"), code: text("code"), name: text("name"), number: text("number"), ...certDates({ issued: text("issued"), expires: text("expires") }),
-      file: { name: file instanceof File ? file.name : "", mime: file instanceof File ? file.type : "", size: bytes.length, bytes: bytes.toString("base64") },
+      file: { name: file instanceof File ? file.name : "", mime: file instanceof File ? uploadType(bytes, file.type) : "", size: bytes.length, bytes: bytes.toString("base64") },
       ...(renewalOf ? { renewalOf } : {}),
     }, { write: true });
     refresh();

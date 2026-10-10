@@ -15,6 +15,7 @@ const fieldText: Record<string, string> = {
   "error.future": "{field} must not be in the future",
   "error.duplicate": "{field} is already used",
   "error.count": "{field} has the wrong number of entries",
+  "error.invalidFile": "{field} is not an accepted file — check its type and size", // the bytes, the type or the size (IR308)
 };
 const codeText: Record<string, string> = {
   FORBIDDEN: "You don't have permission for this action",

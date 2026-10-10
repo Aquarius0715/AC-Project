@@ -23,6 +23,7 @@ func TestCertificatesAndParts(t *testing.T) {
 		"blank name":     strings.Replace(body(""), `" Indoor AC "`, `" "`, 1),
 		"reversed dates": `{"membershipId":"` + tech + `","code":"demo_indoor","name":"x","number":"N","issuedAt":"` + expires + `","expiresAt":"` + issued + `","file":` + pdf + `}`,
 		"gif file":       `{"membershipId":"` + tech + `","code":"demo_indoor","name":"x","number":"N","issuedAt":"` + issued + `","expiresAt":"` + expires + `","file":` + blobJSON("a.gif", "image/gif", []byte("x"), 1) + `}`,
+		"not a pdf":      strings.Replace(body(""), pdf, blobJSON("cert.pdf", "application/pdf", []byte("<html>"), 6), 1),
 	} {
 		if code, _ := write(s, &contrA, "certificates.submit", b, 0); code != 422 {
 			t.Errorf("submit %s: %d", name, code)

@@ -1,6 +1,6 @@
 ---
 document_id: DD-P
-version: 0.30.0
+version: 0.31.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -317,7 +317,7 @@ Scope: FR-P09 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 | membershipId / status / expiringWithinDays | filters | Own technicians; default 60 days | List scope |
 | issuedAt / expiresAt | date/required | issuedAt < expiresAt | Renewal |
 | number | string/required | 1–64 characters | Certificate number |
-| file | DocumentInput/required | PDF/JPEG/PNG ≤ 10 MB | Evidence |
+| file | DocumentInput/required | PDF/JPEG/PNG ≤ 10 MB, bytes of that type (IR308) | Evidence |
 
 **Steps**
 

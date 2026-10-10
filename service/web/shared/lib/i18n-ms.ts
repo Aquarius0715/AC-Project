@@ -1761,6 +1761,7 @@ export const ms: Record<string, string> = {
   "{field} must not be in the future": "{field} tidak boleh pada masa hadapan",
   "{field} is already used": "{field} sudah digunakan",
   "{field} has the wrong number of entries": "{field} mempunyai bilangan entri yang salah",
+  "{field} is not an accepted file — check its type and size": "{field} bukan fail yang diterima — semak jenis dan saiznya",
   "{field} — {problem}": "{field} — {problem}",
   "Someone changed this in the meantime — the screen now shows the latest version": "Seseorang telah mengubahnya sebentar tadi — skrin kini menunjukkan versi terkini",
   "You don't have permission for this action": "Anda tiada kebenaran untuk tindakan ini",
