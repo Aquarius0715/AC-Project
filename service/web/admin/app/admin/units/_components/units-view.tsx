@@ -193,8 +193,9 @@ function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
         <Kpi label={t("Operation")} value={r.operation} sub={t("Running {on} / known {known}", { on: r.running, known: r.known })} />
         <Kpi label={t("Open alerts")} value={r.alerts} tone={r.alerts ? "warn" : undefined} sub={c.alertsSub ?? t("severity needs alert.read")} href="/admin/alerts" link={t("Alerts ›")} />
         {s ? <Kpi label={t("Overdue billing")} value={s.overdueAmount ?? t("None")} tone={s.overdue ? "crit" : undefined}
-          sub={s.restriction ? t("Restriction {state}", { state: t(s.restriction.state.replace("_", " ")) }) : s.overdue ? count(t, s.overdue, "1 invoice overdue", "{n} invoices overdue") : t("no overdue invoice")}
-          href={s.restriction ? `/admin/restrictions?restrictionId=${s.restriction.id}` : s.overdue ? `/admin/billing?customerId=${r.id}&overdueOnly=true` : undefined} link={s.restriction ? t("View restriction →") : s.overdue ? t("View invoices →") : undefined} />
+          sub={s.restriction ? (s.restriction.state === "active" ? t("Restriction active") : t("Restriction {state}", { state: t(s.restriction.state.replace("_", " ")) })) : s.overdue ? count(t, s.overdue, "1 invoice overdue", "{n} invoices overdue") : t("no overdue invoice")}
+          href={s.restriction && s.restriction.state !== "active" ? `/admin/restrictions?restrictionId=${s.restriction.id}` : s.overdue ? `/admin/billing?customerId=${r.id}&overdueOnly=true` : undefined}
+          link={s.restriction && s.restriction.state !== "active" ? t("View restriction →") : s.overdue ? t("View invoices →") : undefined} />
           : <Kpi label={t("Overdue billing")} value="—" sub={t("needs billing.read")} />}
       </div>
       <Tabs value={c.tab} onChange={(v) => nav({ tab: v === "overview" ? null : v, unitId: null })} tabs={[

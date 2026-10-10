@@ -111,7 +111,8 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await main.getByRole("tab", { name: /^Peranti IoT/ }).click();
   await page.waitForURL(/tab=devices/);
   await expect(main.getByRole("heading", { name: "Peristiwa peranti", exact: true })).toBeVisible();
-  await expect(main).toContainText("Kali terakhir dilihat");
+  for (const name of ["Sejarah operasi", "Sejarah penentukuran"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible(); // Figma 246:2 (IR319)
+  await expect(main).toContainText(/kali terakhir dilihat/i); // the connection tile's evidence line
   await main.getByRole("tab", { name: /^Kempen perisian tegar/ }).click();
   await page.waitForURL(/tab=firmware/);
   await main.getByRole("button", { name: "+ Kempen baharu" }).click();

@@ -4,15 +4,22 @@ import { Page, Tabs } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { ApiDeviceDetail, CampaignRow, DeviceRow, ModelRow } from "@ac/web/lib/devices";
+import type { deviceTiles, EventRow, firmwareCard, OperationRow, sensorRows, TechDeviceRow } from "@ac/web/lib/techDevices";
 import { DeviceTab } from "./device-tab";
 import { FirmwareTab } from "./firmware-tab";
 import { ModelsTab } from "./models-tab";
 
-type Item = { time: string; title: string; detail?: string; tone?: "ok" | "crit" | "warn" };
 export type DevicesLive = {
   tab: "models" | "devices" | "firmware"; now: string; canAudit: boolean; canWrite: boolean;
   models: ModelRow[]; devices: DeviceRow[]; units: { id: string; label: string; modelId: string }[];
-  device?: { detail: ApiDeviceDetail; row: DeviceRow; firmware: string[]; operations: Item[]; calibrations: Item[]; events: Item[]; texts: { lastSeen: string | null; calibrated: Record<string, string | null> } };
+  /** the devices tab's list (Figma Admin 246:2): sorted by serial, with the state of each */
+  rows?: TechDeviceRow[];
+  device?: {
+    detail: ApiDeviceDetail; row: TechDeviceRow;
+    tiles: ReturnType<typeof deviceTiles>; sensors: ReturnType<typeof sensorRows>;
+    unit: { name: string; place: string; model: string } | null; firmware: string[]; firmwareCard: ReturnType<typeof firmwareCard>;
+    operations: OperationRow[]; calibrations: string[]; events: EventRow[];
+  };
   campaigns?: CampaignRow[]; campaign?: CampaignRow;
 };
 

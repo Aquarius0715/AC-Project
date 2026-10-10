@@ -129,26 +129,6 @@ export function deviceRows(devices: ApiDevice[], units: ApiUnitLite[], t: T = en
   }));
 }
 
-const opLabel = { check: "Connection check", calibrate: "Calibration", firmware: "Firmware update" } as const;
-const opStatus: Record<ApiDeviceOperation["status"], string> = { queued: "queued", running: "running", succeeded: "succeeded", failed: "failed" };
-/** One device operation for the timeline: what, its status, and how it ended (failure code, finish time). */
-export function operationItem(o: ApiDeviceOperation, i: I18n = EN) {
-  const { t, display } = i;
-  return {
-    time: showTime(o.createdAt, display), title: `${t(opLabel[o.kind])}${o.targetVersion ? ` → ${o.targetVersion}` : ""} · ${t(opStatus[o.status])}`,
-    detail: o.failureCode ? t("failure {code}", { code: o.failureCode }) : o.finishedAt ? t("finished {time}", { time: showTime(o.finishedAt, display) }) : t("in progress"),
-    tone: o.status === "failed" ? ("crit" as const) : o.status === "succeeded" ? ("ok" as const) : undefined,
-  };
-}
-/** One calibration for the timeline: the metric code, reference and measured values and their offset. */
-export function calibrationItem(c: ApiCalibration, i: I18n = EN) {
-  const { t } = i;
-  return {
-    time: showTime(c.calibratedAt, i.display), title: t("{metric}: reference {reference} {unit} · measured {measured} {unit}", { metric: c.metric, reference: c.referenceValue, measured: c.measuredValue, unit: c.unit }),
-    detail: t("offset {offset} {unit} · demo", { offset: (c.measuredValue - c.referenceValue).toFixed(2), unit: c.unit }),
-  };
-}
-
 export type CampaignRow = { id: string; version: number; model: string; versions: string; state: ApiCampaign["state"]; devices: number; start: string; c: ApiCampaign };
 export function campaignRows(cs: ApiCampaign[], caps: ApiCapability[], i: I18n = EN): CampaignRow[] {
   const { t } = i;

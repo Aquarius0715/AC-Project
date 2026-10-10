@@ -28,7 +28,7 @@ export type ApiUnitRow = {
 };
 /** UnitDetail of service-contracts.ts (fields shown on this screen). */
 export type ApiUnitDetail = ApiUnitRow & { location: { pathLabels: string[]; address: string | null; accessInstructions: string | null }; pendingCommandIds: string[] };
-export type ApiContractLite = { id: string; customerId: string; unitIds: string[]; planType: Profile; startAt: string; endAt: string };
+export type ApiContractLite = { id: string; customerId: string; unitIds: string[]; planType: Profile; startAt: string; endAt: string; activeRestrictionIds: string[] };
 export type ApiInvoiceLite = { id: string; contractId: string; amountMinor: number; currency: Currency };
 export type ApiRestrictionLite = { id: string; contractId?: string; state: string; unitIds: string[] };
 
@@ -39,7 +39,9 @@ const monthYear = (iso: string, locale: Locale) => new Date(iso).toLocaleDateStr
 
 // ---- customers ----
 
-/** The contract side of a customer: current contracts, overdue invoices and the most pressing active restriction. */
+/** The contract side of a customer: current contracts, overdue invoices and the most pressing active restriction. Without
+ * restriction.read (`restrictions` null) the contracts' activeRestrictionIds still tell that one is active, its state
+ * unknown ("active", IR319). */
 export type Standing = { plans: Profile[]; contracts: number; contractUnits: number; overdue: number; overdueAmount: string | null; restriction: { id: string; state: string; contractId: string } | null };
 const restrictionRank: Record<string, number> = { applied: 0, requested: 1, release_requested: 2, scheduled: 3 };
 export function standing(customerId: string, contracts: ApiContractLite[], overdue: ApiInvoiceLite[], restrictions: ApiRestrictionLite[] | null, now: Date): Standing {
@@ -52,11 +54,12 @@ export function standing(customerId: string, contracts: ApiContractLite[], overd
   return {
     plans: [...new Set(current.map((k) => k.planType))], contracts: current.length, contractUnits: new Set(current.flatMap((k) => k.unitIds)).size, overdue: due.length,
     overdueAmount: due.length ? amount(due.reduce((n, i) => n + i.amountMinor, 0), due[0].currency) : null,
-    restriction: r ? { id: r.id, state: r.state, contractId: r.contractId! } : null,
+    restriction: r ? { id: r.id, state: r.state, contractId: r.contractId! }
+      : restrictions === null ? mine.filter((k) => k.activeRestrictionIds.length).map((k) => ({ id: k.activeRestrictionIds[0], state: "active", contractId: k.id }))[0] ?? null : null,
   };
 }
 export type Mark = { label: string; tone: "crit" | "warn" | "ok" | "muted" };
-const restrictionLabel: Record<string, string> = { applied: "Restriction applied", requested: "Restriction requested", release_requested: "Release requested", scheduled: "Restriction scheduled" };
+const restrictionLabel: Record<string, string> = { applied: "Restriction applied", requested: "Restriction requested", release_requested: "Release requested", scheduled: "Restriction scheduled", active: "Restriction active" };
 /** Contract column badges (Figma 02-1): Overdue / restriction state / Good standing / No contract / Inactive. */
 export function standingMarks(status: "active" | "inactive", s: Standing | null, t: T = en): Mark[] {
   if (status === "inactive") return [{ label: t("Inactive"), tone: "muted" }];

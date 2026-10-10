@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.32.0
+version: 0.33.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -213,7 +213,7 @@ Scope: FR-A04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 2. Apply these business rules to reads and actions. Use false or unknown for unconfirmed capabilities. Do not infer modes from product category alone. Disable existing automation rules that conflict with new capabilities and show the reason.
 3. Update Capability version and available unit actions. Keep unfinished Command contents in history; do not rewrite them to match new capabilities.
 4. Queries to update: `capabilities / units / devices / automations / audit`。
-5. Tabs: `tab=models` (capability list and editor), `tab=firmware` (firmware campaigns, DD-A20) and `tab=devices` (device list; `deviceId` opens the detail with binding, sensors, operations, and calibrations).
+5. Tabs: `tab=models` (capability list and editor), `tab=firmware` (firmware campaigns, DD-A20) and `tab=devices` (device list; `deviceId` opens the detail with binding, sensors, operations, and calibrations). The list is sorted by serial with the state chips All / Online / Offline / Tamper / No sensors and a search; the detail draws the tiles, the bound unit, the actions, sensors with Calibrate →, the operation and calibration history and the events as Figma 246:2 (IR319).
 6. Version history (capability): shown only to holders of audit.read. On explicit open, call `audit.list` with `targetId=<capabilityId>` and list each saved version as previousVersion→nextVersion, actor, time, reason, and maskedBefore/maskedAfter. No separate capability-version read operation exists; the current version comes from `capabilities.list`.
 7. Device events: for the selected `deviceId`, call `devices.events` (communication_lost / power_lost / tamper / restored / operation_failed with recovery) as a secondary Query after `devices.get` succeeds.
 
@@ -863,7 +863,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.32.0: Read IR01–IR318 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.33.0: Read IR01–IR319 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

@@ -31,17 +31,20 @@ const ago = (iso: string | null, now: number, t: T) => {
   const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
   return s < 120 ? t("{n} s ago", { n: s }) : s < 7200 ? t("{n} min ago", { n: Math.round(s / 60) }) : t("{n} h ago", { n: Math.round(s / 3600) });
 };
-/** One device of the list (Figma Technician 03): serial, connection, unit and firmware. */
-export type TechDeviceRow = { id: string; serial: string; unitId: string | null; unit: string; conn: Connection; connText: string | null; fw: string; tamper: boolean };
+/** One device of the list (Figma Technician 03, Admin 246:2): serial, connection, unit, firmware and its sensor count. */
+export type TechDeviceRow = { id: string; serial: string; unitId: string | null; unit: string; conn: Connection; connText: string | null; fw: string; tamper: boolean; sensors: number };
 export function techDeviceRows(ds: ApiDevice[], unitName: Map<string, string>, now: number, t: T = en): TechDeviceRow[] {
   return [...ds].sort((a, b) => a.serial.localeCompare(b.serial)).map((d) => ({
     id: d.id, serial: d.serial, unitId: d.unitId, unit: d.unitId ? unitName.get(d.unitId) ?? t("unit") : t("Unbound"), conn: d.connection,
-    connText: d.connection === "online" ? null : d.lastSeenAt ? ago(d.lastSeenAt, now, t) : null, fw: d.firmwareVersion, tamper: d.tamper === "detected",
+    connText: d.connection === "online" ? null : d.lastSeenAt ? ago(d.lastSeenAt, now, t) : null, fw: d.firmwareVersion, tamper: d.tamper === "detected", sensors: d.sensors.length,
   }));
 }
-export type Filter = "all" | "online" | "offline" | "tamper";
+export type Filter = "all" | "online" | "offline" | "tamper" | "nosensors";
 export const FILTERS: { id: Filter; label: string }[] = [{ id: "all", label: "All" }, { id: "online", label: "Online" }, { id: "offline", label: "Offline" }, { id: "tamper", label: "Tamper" }];
-export const filterOf = (f: Filter) => (r: TechDeviceRow) => f === "all" || (f === "tamper" ? r.tamper : f === "online" ? r.conn === "online" : r.conn !== "online");
+/** HQ also lists the devices without sensors (Figma Admin 246:2). */
+export const HQ_FILTERS: { id: Filter; label: string }[] = [...FILTERS, { id: "nosensors", label: "No sensors" }];
+export const filterOf = (f: Filter) => (r: TechDeviceRow) =>
+  f === "all" || (f === "tamper" ? r.tamper : f === "nosensors" ? r.sensors === 0 : f === "online" ? r.conn === "online" : r.conn !== "online");
 
 /** When the open fault of each axis was detected (the newest fault of the axis while it has no restoredAt, T12 events). */
 export type OpenFaults = Partial<Record<"connection" | "power" | "tamper", string>>;

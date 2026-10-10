@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   changedFields, claimCandidate, conditionText, coverageCsv, coverageKpis, coverageRows, customerRows, defaultRules, errorReportCsv, importMessage, placeOptions, policyLines,
-  registerKpis, standingMarks, unitDraft, unitErrors, unitRows, type ApiCoverage, type ApiCustomerPolicy, type ApiImportRow, type ApiUnitRow, type Standing,
+  registerKpis, standing as standingOf, standingMarks, unitDraft, unitErrors, unitRows, type ApiCoverage, type ApiCustomerPolicy, type ApiImportRow, type ApiUnitRow, type Standing,
 } from "@ac/web/lib/assets";
 import { i18nOf } from "@ac/web/lib/i18n";
 
@@ -21,6 +21,12 @@ describe("HQ customers & units", () => {
   it("marks each customer's standing and counts the register", () => {
     expect([standingMarks("inactive", null), standingMarks("active", standing({ overdue: 1, restriction: { id: "r", state: "applied", contractId: "k" } })), standingMarks("active", standing({})), standingMarks("active", standing({ contracts: 0 }))].map((m) => m.map((x) => x.label)))
       .toEqual([["Inactive"], ["‼ Overdue", "Restriction applied"], ["Good standing"], ["No contract"]]);
+    // without restriction.read the contracts' activeRestrictionIds still tell that a restriction is active (IR319)
+    const k = { id: "k1", customerId: "c-a", unitIds: ["u1"], planType: "rto" as const, startAt: "2026-01-01T00:00:00Z", endAt: "2027-01-01T00:00:00Z", activeRestrictionIds: ["r1"] };
+    expect(standingOf("c-a", [k], [], null, NOW).restriction).toEqual({ id: "r1", state: "active", contractId: "k1" });
+    expect(standingMarks("active", standingOf("c-a", [k], [], null, NOW)).map((m) => m.label)).toEqual(["Restriction active"]);
+    expect(standingOf("c-a", [k], [], [], NOW).restriction).toBeNull(); // with restriction.read the restrictions list decides
+    expect(standingOf("c-a", [{ ...k, activeRestrictionIds: [] }], [], null, NOW).restriction).toBeNull();
     const rows = customerRows([{ id: "c1", version: 1, name: "Demo Customer A", status: "active", organizationId: "org-a", serviceProfile: "rto", createdAt: "2026-04-01T00:00:00Z" }],
       [{ id: "org-a", version: 2, name: "Customer A Sdn Bhd", kind: "customer", status: "active" }], [], [unit({}), unit({ id: "u2", effectivePowerState: "off" })], () => null);
     expect([rows[0].since, rows[0].operation, rows[0].billingName]).toEqual(["Apr 2026", "50.0%", "Customer A Sdn Bhd"]);

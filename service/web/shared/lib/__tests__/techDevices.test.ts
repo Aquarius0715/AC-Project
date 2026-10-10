@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ApiDevice, ApiDeviceDetail, ApiDeviceOperation } from "@ac/web/lib/devices";
 import {
-  calibrationText, deviceFieldText, deviceRefusal, deviceTiles, eventRows, failureText, filterOf, firmwareCard, jobFor, newerFirmware, newerVersions, openAlerts, openFaults,
+  calibrationText, deviceFieldText, deviceRefusal, deviceTiles, eventRows, failureText, filterOf, firmwareCard, HQ_FILTERS, jobFor, newerFirmware, newerVersions, openAlerts, openFaults,
   operationRows, sensorRows, techDeviceRows, type ApiAlertLite, type ApiDeviceEventFull, type TechJob,
 } from "@ac/web/lib/techDevices";
 import { i18nOf } from "@ac/web/lib/i18n";
@@ -38,6 +38,9 @@ describe("techDeviceRows / filterOf", () => {
   const rows = techDeviceRows([device({ id: "b", serial: "AC-B", unitId: null, connection: "offline", lastSeenAt: "2026-09-14T01:04:30Z", tamper: "detected" }), device({ id: "a", serial: "AC-A" }), device({ id: "c", serial: "AC-C", connection: "unknown", lastSeenAt: null })], names, NOW);
   it("sorts by serial and names the unit (Unbound without one)", () => {
     expect(rows.map((r) => r.serial)).toEqual(["AC-A", "AC-B", "AC-C"]);
+    // HQ's No sensors chip (Figma Admin 246:2, IR319): a device without sensors
+    const bare = techDeviceRows([device({ id: "n", serial: "AC-N", sensors: [] }), device({ id: "s", serial: "AC-S", sensors: [{ id: "s1", metric: "temperature", unit: "°C", staleAfterSeconds: 120, calibratedAt: null }] })], new Map(), NOW);
+    expect([bare.map((r) => r.sensors > 0), bare.filter(filterOf("nosensors")).map((r) => r.id), HQ_FILTERS.map((f) => f.id)]).toEqual([[false, true], ["n"], ["all", "online", "offline", "tamper", "nosensors"]]);
     expect(rows[0].unit).toBe("Bedroom AC");
     expect(rows[1].unit).toBe("Unbound");
   });

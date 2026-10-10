@@ -4348,3 +4348,29 @@ The method of IR315 was applied to the first nine HQ screens (Figma Admin): over
    - make test-all passes, the seed test included. The migrate image is rebuilt.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR319 HQ devices as Figma draws them; a restriction without restriction.read — 2026-10-11
+
+Two items IR318 left open.
+
+1. **The Devices tab (Figma Admin 246:2, DD-A04 item 5).** It now draws what the technician's device screen draws, from the same mappers (`techDevices`):
+   - **The list.** It is sorted by serial, with the state chips All, Online, Offline, Tamper and No sensors (HQ only), counts and the search “Search serial, device or unit…”. Each row shows the serial, the connection, how long the device has been silent, tamper, the unit, the firmware, and “no sensors” where there are none.
+   - **The detail.** It shows:
+     - the four tiles with their evidence lines: connection with last seen, the power signal, tamper and firmware with a newer version;
+     - the **Bound to unit** card with the place and the model's capability version, and Rebind…;
+     - the three actions with their notes and the firmware card while an update runs;
+     - **Sensors**, each with **Calibrate →**;
+     - the **Operation history** and the **Calibration history**;
+     - the **Device events** with their recovery and response.
+     The section titles are headings.
+   - **What stays.** The register, rebind, calibration and firmware dialogs and their Server Actions are unchanged.
+   - **What is removed.** `operationItem` and `calibrationItem` of `lib/devices` have no other user and go, with 15 Malay entries of the old layout.
+   - **Tests.** `TechDeviceRow` gains its sensor count, and `filterOf` the `nosensors` state. The new `admin/devices` E2E spec checks the order, the Offline and No sensors chips, the search and the detail. The HQ language spec checks the new headings.
+2. **An active restriction without restriction.read (Figma Admin 223:2).** The customer list and the customer header read restrictions only with restriction.read. hq-operator holds none, so Demo Customer A showed “‼ Overdue” without its applied restriction. Contracts list their `activeRestrictionIds`, which this user may read. With them, the standing now marks **Restriction active**, its state unknown. The header's billing tile says so too, with no link to the restrictions screen that the user cannot open. The new `admin/customers` E2E spec checks the row and the header.
+3. **Checked.**
+   - The typecheck and lint pass.
+   - Vitest: 61 files, 349 tests, with the No sensors filter and the restriction fallback.
+   - All four apps build.
+   - E2E: 76 passed, 8 skipped by design.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
