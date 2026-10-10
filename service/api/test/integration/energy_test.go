@@ -274,3 +274,30 @@ func TestForecastWithoutReadings(t *testing.T) {
 		t.Errorf("forecast without readings: %v", fc)
 	}
 }
+
+// IR110 / IR153: the monthly report states the month's figures — 5 kWh at the demo tariff is "5.0" and "2.50 MYR" —
+// and "n/a" for a month without readings; only the file's metadata is returned, so its size tells the two apart.
+func TestEnergyReportFigures(t *testing.T) {
+	s := server(t)
+	_, m := write(s, &hq, "properties.save", `{"customerOrgId":"`+seed.ID("org-customer-b").String()+`","kind":"home","name":"Report home `+uuid.NewString()[:6]+`","address":null,"accessInstructions":null}`, 0)
+	prop := data(m)["id"].(string)
+	code, m := write(s, &hq, "units.save", `{"customerOrgId":"`+seed.ID("org-customer-b").String()+`","propertyId":"`+prop+`","spaceId":null,"displayName":"Report AC","modelId":"`+seed.ID("ventilation-demo").String()+`","type":"split","installedAt":null,"serviceScope":["indoor"]}`, 0)
+	if code != 200 {
+		t.Fatalf("unit: %d %v", code, m)
+	}
+	powerSeries(t, data(m)["id"].(string), time.Date(2026, 8, 10, 2, 0, 0, 0, time.UTC), "measured", kw(60), kw(60), kw(60), kw(60), kw(60))
+	size := func(month string) int {
+		code, m := post(s, &customerB, "energy.exportReport", `{"month":"`+month+`","propertyIds":["`+prop+`"],"sections":["energy_cost"],"format":"csv"}`)
+		if code != 200 {
+			t.Fatalf("export %s: %d %v", month, code, m)
+		}
+		return int(data(m)["size"].(float64))
+	}
+	header := len("section,metric,value\n")
+	if got, want := size("2026-08"), header+len("energy_cost,kWh,5.0\n")+len("energy_cost,cost,2.50 MYR\n"); got != want {
+		t.Errorf("August with readings: %d bytes, want %d", got, want)
+	}
+	if got, want := size("2026-07"), header+len("energy_cost,kWh,n/a\n")+len("energy_cost,cost,n/a\n"); got != want {
+		t.Errorf("July without readings: %d bytes, want %d", got, want)
+	}
+}

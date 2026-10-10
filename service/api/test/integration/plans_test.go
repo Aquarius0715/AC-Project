@@ -48,6 +48,29 @@ func TestPlans(t *testing.T) {
 	if code, _ := write(s, &hq, "plans.save", body(`,"id":"`+plan+`"`), 1); code != 409 {
 		t.Error("stale plan version")
 	}
+	// another next date re-anchors the recurrence on its day; an unchanged one keeps the anchor
+	{
+		other := newUnit(t, s, "Plan AC 2")
+		later := next.Add(5 * 24 * time.Hour) // the 29th
+		save := func(id string, months int, at time.Time, v int) map[string]any {
+			idField := ""
+			if id != "" {
+				idField = `"id":"` + id + `",`
+			}
+			code, m := write(s, &hq, "plans.save", `{`+idField+`"unitId":"`+other+`","recurrence":{"kind":"monthly","intervalMonths":`+itoa(months)+`},"nextDueAt":"`+at.Format(time.RFC3339)+`"}`, v)
+			if code != 200 {
+				t.Fatalf("save: %d %v", code, m)
+			}
+			return data(m)
+		}
+		p := save("", 3, next, 0)
+		if p = save(p["id"].(string), 3, later, 1); p["anchorDay"].(float64) != 29 {
+			t.Errorf("re-anchored: %v", p)
+		}
+		if p = save(p["id"].(string), 6, later, 2); p["anchorDay"].(float64) != 29 {
+			t.Errorf("anchor kept: %v", p)
+		}
+	}
 	// generateNext
 	gen := func(at time.Time, v int) (int, map[string]any) {
 		return write(s, &hq, "plans.generateNext", `{"id":"`+plan+`","occurrenceDate":"`+at.Format(time.RFC3339)+`"}`, v)

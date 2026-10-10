@@ -119,9 +119,13 @@ func TestPayouts(t *testing.T) {
 		t.Fatalf("second query: %d %v", code, m)
 	}
 	_, m = post(s, &hq, "payouts.get", `{"id":"`+jid+`"}`)
-	q2 := data(m)["queries"].([]any)[1].(map[string]any)["id"].(string)
-	if code, m := write(s, &hq, "payouts.resolveQuery", `{"statementId":"`+jid+`","queryId":"`+q2+`","reply":"Refund the double charge","adjustmentMinor":-3000}`, 5); code != 200 ||
-		data(m)["queries"].([]any)[1].(map[string]any)["state"] != "adjusted" {
+	var q2 string
+	for _, x := range data(m)["queries"].([]any) { // both were asked at the test clock: pick the open one
+		if x := x.(map[string]any); x["state"] == "open" {
+			q2 = x["id"].(string)
+		}
+	}
+	if code, m := write(s, &hq, "payouts.resolveQuery", `{"statementId":"`+jid+`","queryId":"`+q2+`","reply":"Refund the double charge","adjustmentMinor":-3000}`, 5); code != 200 {
 		t.Fatalf("resolve with a reduction: %d %v", code, m)
 	}
 	// August draft: periodic + rework deduction + repair + the July adjustments (+12000, −3000)

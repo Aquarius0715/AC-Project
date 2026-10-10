@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
+	"strings"
 	"testing"
 	"time"
 
@@ -98,6 +99,33 @@ func TestDemoOperations(t *testing.T) {
 	}
 	if code, _ := trig(s, `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(time.RFC3339)+`","eventType":"network","connected":false}`); code != 422 {
 		t.Error("unsupported trigger type")
+	}
+	// the trigger's own rules (IR36): a known event type, its IDs, and a measurement of the sensor's metric and unit
+	now := clock.Format(time.RFC3339)
+	for name, c := range map[string]struct{ body, field, key string }{
+		"another type":          {`{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"network"}`, "eventType", "errors.trigger_unsupported"},
+		"no event ID":           {`{"scenarioId":"t","occurredAt":"` + now + `","eventType":"network"}`, "eventId", "error.required"},
+		"no time":               {`{"scenarioId":"t","eventId":"` + uuid.NewString() + `","eventType":"network"}`, "occurredAt", "error.required"},
+		"command without ID":    {`{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"command_ack"}`, "commandId", "error.required"},
+		"telemetry without one": {`{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"telemetry"}`, "measurement", "error.required"},
+		"observation, no unit":  {`{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"restriction_observation"}`, "unitId", "error.required"},
+		"device without one":    {`{"scenarioId":"t","eventId":"` + uuid.NewString() + `","occurredAt":"` + now + `","eventType":"device","kind":"tamper","sequence":1}`, "deviceId", "error.required"},
+	} {
+		if code, m := trig(s, c.body); code != 422 || m["fieldErrors"].(map[string]any)[c.field] != c.key {
+			t.Errorf("%s: %d %v", name, code, m)
+		}
+	}
+	if code, m := trig(s, strings.Replace(tele("55", "%", sensor), `"metric":"temperature"`, `"metric":"humidity"`, 1)); code != 422 || m["fieldErrors"].(map[string]any)["measurement"] != "errors.sensor_mismatch" {
+		t.Errorf("another metric than the sensor's: %d %v", code, m)
+	}
+	// IR77: a measurement's own sequence is kept; without one it is the sensor's latest + 1
+	if code, m := trig(s, strings.Replace(tele("26", "°C", sensor), `"quality":"valid"`, `"quality":"valid","sequence":100`, 1)); code != 200 {
+		t.Fatalf("own sequence: %d %v", code, m)
+	}
+	var top int64
+	ownerScan(t, `SELECT max(sequence) FROM monitoring.measurements WHERE sensor_id = $1`, []any{sensor}, &top)
+	if top != 100 {
+		t.Errorf("own sequence kept: %d", top)
 	}
 	// command acknowledgement through the demo trigger
 	_, g := post(s, &customerB, "units.get", `{"id":"`+u+`"}`)

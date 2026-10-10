@@ -97,3 +97,32 @@ func TestSummariesTechnicianPartner(t *testing.T) {
 		t.Error("contractor asks for technician summary")
 	}
 }
+
+// D07 / IR26: the job counts of a summary — scheduled (accepted or assigned), in progress, review (submitted), active
+// (scheduled or in progress), overdue (due before now while open) and assigned (with an active Assignment) — leave
+// completed and cancelled jobs out, and the technician's equipment counts its units once.
+func TestSummaryJobCounts(t *testing.T) {
+	s := server(t)
+	owner(t, `UPDATE maintenance.assignments SET status = 'revoked' WHERE technician_membership_id = $1 AND status = 'active'`, seedID("tech-internal-a"))
+	u := boundUnit(t, s, "online")
+	job := func(h int, status string, due time.Time) {
+		j := assign(t, u, "tech-internal-a", clock.Add(time.Duration(h)*time.Hour), clock.Add(time.Duration(h+1)*time.Hour), "active") // windows do not overlap
+		owner(t, `UPDATE maintenance.assignments SET created_at = $2 WHERE job_id = $1`, j, clock.Add(-2*time.Hour))
+		owner(t, `UPDATE maintenance.jobs j SET status = $2, due_at = $3, assignment_id = a.id, scheduled_slot = a.scheduled FROM maintenance.assignments a
+			WHERE a.job_id = j.id AND j.id = $1`, j, status, due)
+	}
+	job(0, "assigned", clock.Add(-time.Minute)) // overdue
+	job(1, "in_progress", clock.Add(24*time.Hour))
+	job(2, "submitted", clock.Add(24*time.Hour))
+	job(3, "completed", clock.Add(-time.Minute)) // done: neither counted nor overdue
+	job(4, "cancelled", clock.Add(-time.Minute))
+	code, m := post(s, &techInt, "summaries.get", `{"kind":"technician","filters":{"unitIds":["`+u+`"]}}`)
+	if code != 200 {
+		t.Fatalf("summary: %d %v", code, m)
+	}
+	for k, want := range map[string]int{"scheduledCount": 1, "inProgressCount": 1, "reviewCount": 1, "activeCount": 2, "overdueCount": 1, "assignedCount": 3, "total": 1, "online": 1} {
+		if got := count(m, k); got != want {
+			t.Errorf("%s: %d, want %d", k, got, want)
+		}
+	}
+}

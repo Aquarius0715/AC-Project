@@ -39,6 +39,23 @@ type restOpaque struct {
 	} `json:"lines"`
 }
 
+// restTwice names one parameter twice: its own field and the embedded struct's.
+type restTwice struct {
+	Name string `json:"name"`
+	RestInner
+}
+
+// RestInner is exported, so the binding walks it as an embedded struct.
+type RestInner struct {
+	Other string `json:"name"`
+}
+
+// restEmbedded embeds the paging query and has a field without a JSON name.
+type restEmbedded struct {
+	paging.Query
+	Note string
+}
+
 func restOp(mode Mode, in func() any) *Operation {
 	return &Operation{Spec: Spec{Name: "test.op", Mode: mode, Filters: []string{"status", "unitIds", "overdueOnly", "jobId"}}, NewInput: in}
 }
@@ -52,7 +69,9 @@ func bind(t *testing.T, b *Binding, method, target, body string, path map[string
 	for _, name := range b.Path {
 		pv = append(pv, echo.PathValue{Name: name, Value: path[name]})
 	}
-	c.SetPathValues(pv)
+	if len(pv) > 0 {
+		c.SetPathValues(pv)
+	}
 	raw, err := b.Input(c, []byte(body))
 	if err != nil {
 		return nil, apperr.From(err).FieldErrors
@@ -130,6 +149,10 @@ func TestRESTQueryInput(t *testing.T) {
 	got, _ = bind(t, b, "GET", "/v1/jobs/"+job+"/things?sort=name&count=", "", map[string]string{"jobId": job})
 	if s := got["query"].(map[string]any)["sort"]; !reflect.DeepEqual(s, map[string]any{"field": "name", "direction": "asc"}) || got["count"] != nil {
 		t.Fatalf("defaults: %v", got)
+	}
+	// an empty sort is no sort
+	if got, fe := bind(t, b, "GET", "/v1/jobs/"+job+"/things?sort=", "", map[string]string{"jobId": job}); fe != nil || got["query"] != nil {
+		t.Fatalf("empty sort: %v %v", got, fe)
 	}
 	// an empty list parameter is the empty list, not an absent field
 	got, _ = bind(t, b, "GET", "/v1/jobs/"+job+"/things?ids=&unitIds=,", "", map[string]string{"jobId": job})
@@ -213,6 +236,7 @@ func TestRESTBindingRules(t *testing.T) {
 		"filter path parameter":  {restOp(Read, in), Route{Method: "GET", Path: "/v1/x/{status}"}},
 		"unknown fixed field":    {restOp(Write, in), Route{Method: "POST", Path: "/v1/x", FixedField: "nope", FixedValue: "a"}},
 		"objects in a query":     {restOp(Read, func() any { return new(restOpaque) }), Route{Method: "GET", Path: "/v1/x"}},
+		"a parameter twice":      {restOp(Read, func() any { return new(restTwice) }), Route{Method: "GET", Path: "/v1/x"}},
 	} {
 		if _, err := NewBinding(c.op, c.rt); err == nil {
 			t.Errorf("%s: accepted", name)
@@ -223,6 +247,23 @@ func TestRESTBindingRules(t *testing.T) {
 	}
 	if EchoPath("/v1/jobs/{jobId}/offers/{offerId}") != "/v1/jobs/:jobId/offers/:offerId" || !reflect.DeepEqual(PathParams("/v1/l/{target.kind}/{target.id}"), []string{"target.kind", "target.id"}) {
 		t.Error("path helpers")
+	}
+}
+
+// TestRESTEmbeddedQuery: an embedded paging query binds its cursor, limit, sort and filters at the top of the input,
+// and a field without a JSON name is named as Go names it.
+func TestRESTEmbeddedQuery(t *testing.T) {
+	b, err := NewBinding(restOp(Read, func() any { return new(restEmbedded) }), Route{Method: "GET", Path: "/v1/x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, fe := bind(t, b, "GET", "/v1/x?limit=5&sort=name:desc&Note=hi&status=open", "", nil)
+	if fe != nil {
+		t.Fatal(fe)
+	}
+	want := map[string]any{"limit": 5.0, "sort": map[string]any{"field": "name", "direction": "desc"}, "Note": "hi", "filters": map[string]any{"status": "open"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("input\n got %v\nwant %v", got, want)
 	}
 }
 

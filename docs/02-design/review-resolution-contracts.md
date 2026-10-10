@@ -4625,3 +4625,28 @@ The third coverage round (after IR325 and IR326) adds Core API tests for paths t
 The REST routes already refuse two paths, so they stay untested: a filter that does not decode, and the deviceId check of a device retry (the route carries the ID).
 
 Both Go suites pass (`make test-all`): 135 integration tests and 83 unit tests. Coverage is 88.1 %.
+
+## IR329 Figma architecture and use cases follow IR327; coverage round 4 — 2026-10-11
+
+R320 checked the System Architecture and Use Cases pages against the code after IR327, and added tests for paths still not reached. No rule changes.
+
+1. **System Architecture (Figma 910:9031).**
+   - The operation and route counts read 201 operations and 221 routes on boards 01, 02, 03 and 06. Before, they read 197, 199 or 200 operations and 219 routes.
+   - Board 08 gives equipment-api 69 operations, after `alerts.evidence`.
+   - Board 02's HQ route list names the HQ changes of IR305–IR327.
+   - Board 02's "Browser through /bff/ops" column lists the dialogs and previews that read through the BFF in the browser:
+     - customer: the assistant, a command's progress and the schedule preview;
+     - HQ: the audit log's command detail and the Resolve dialog's evidence.
+     Before, it read "—" for both.
+2. **Use Cases (Figma 838:8066).** The notes of UC-A16 and UC-T13 follow IR327: an alert is resolved by hand with alert.resolve and a reason, and an alert without a policy also cites evidence.
+3. **Tests.**
+   - **Demo trigger (IR36, IR77).** The trigger's own rules: a known event type, the IDs of each type, a measurement of the sensor's metric (`errors.sensor_mismatch`), and a measurement's own sequence kept. The earlier "unsupported type" case was refused for its unknown field, not for its type.
+   - **REST binding (IR222).** An empty sort is no sort; a parameter named twice is refused; an embedded paging query binds at the top; a field without a JSON name keeps its Go name.
+   - **Summary counts (D07, IR26).** The new test `TestSummaryJobCounts`: scheduled, in progress, review, active, overdue and assigned, without completed and cancelled jobs.
+   - **Monthly report (IR110, IR153).** The new test `TestEnergyReportFigures`: a month with 5 kWh states "5.0" and "2.50 MYR", and a month without readings states "n/a".
+   - **Plans.** Another next date re-anchors the recurrence on its day; an unchanged one keeps the anchor.
+4. **Two checks of IR328 fixed.**
+   - The payout test picked the second question by position, but both questions are asked at the test clock. It now picks the open one.
+   - An automation on an archived unit is NOT_FOUND to its client once the scope leaves the unit out. The 409 `errors.unit_archived` shows only while a cached scope still holds the unit, so no test pins it.
+
+Both Go suites pass (`make test-all`): 137 integration tests and 84 unit tests. Coverage is 88.2 %.
