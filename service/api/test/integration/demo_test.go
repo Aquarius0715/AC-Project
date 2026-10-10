@@ -20,8 +20,11 @@ func TestDemoOperations(t *testing.T) {
 	if code, m := write(plain, &customerB, "demo.advanceClock", `{"to":"`+clock.Add(time.Hour).Format(time.RFC3339)+`"}`, 0); code != 503 || m["messageKey"] != "errors.demo_only" {
 		t.Fatalf("production demo ops: %d %v", code, m)
 	}
-	if code, m := write(plain, &customerB, "demoSession.signIn", `{"demoActorId":"customer-a"}`, 0); code != 503 || m["messageKey"] != "errors.session_via_bff" {
-		t.Errorf("demo sign-in: %d %v", code, m)
+	// sessions belong to the BFF and the identity provider in API mode: every demoSession operation says so
+	for op, body := range map[string]string{"demoSession.signIn": `{"demoActorId":"customer-a"}`, "demoSession.switchMembership": `{"demoMembershipId":"m-1"}`, "demoSession.signOut": `{}`, "demoSession.extend": `{}`} {
+		if code, m := write(plain, &customerB, op, body, 0); code != 503 || m["messageKey"] != "errors.session_via_bff" {
+			t.Errorf("%s: %d %v", op, code, m)
+		}
 	}
 	s := serverWith(t, true)
 	u := boundUnit(t, s, "online")

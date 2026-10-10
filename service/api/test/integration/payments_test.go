@@ -49,6 +49,9 @@ func TestPaymentSimulation(t *testing.T) {
 	if code, _ := write(s, &customerA, "payments.simulate", `{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`, 1); code != 404 {
 		t.Error("other customer pays")
 	}
+	if code, m := sim(`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`, 9); code != 409 || m["messageKey"] != "error.versionConflict" {
+		t.Errorf("initiate on a stale invoice version: %d %v", code, m)
+	}
 	code, m := sim(`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_debit_card","demoConfirmed":true}`, 1)
 	if code != 200 || data(m)["status"] != "initiated" || data(m)["method"] != "demo_debit_card" {
 		t.Fatalf("initiate: %d %v", code, m)
@@ -67,6 +70,12 @@ func TestPaymentSimulation(t *testing.T) {
 	}
 	if code, m := sim(`{"event":"processing","paymentId":"`+pay+`","eventId":"`+e1+`","paymentReference":"REF-`+pay[:8]+`"}`, 2); code != 200 || data(m)["version"].(float64) != 2 {
 		t.Fatalf("same event replay: %d %v", code, m)
+	}
+	if code, m := sim(`{"event":"processing","paymentId":"`+pay+`"`+ev("processing")+`}`, 2); code != 409 || m["messageKey"] != "error.invalidState" {
+		t.Errorf("a second processing event: %d %v", code, m)
+	}
+	if code, m := sim(`{"event":"fail","paymentId":"`+pay+`"`+ev("fail")+`}`, 1); code != 409 || m["messageKey"] != "error.versionConflict" {
+		t.Errorf("an event on a stale payment version: %d %v", code, m)
 	}
 	if _, m := post(s, &hq, "invoices.get", `{"id":"`+inv+`"}`); data(m)["status"] != "processing" || data(m)["paymentMethod"] != "demo_debit_card" {
 		t.Fatalf("invoice processing: %v", m)
@@ -101,6 +110,17 @@ func TestPaymentSimulation(t *testing.T) {
 	if code, _ := sim(`{"event":"initiate","invoiceId":"`+inv+`","method":"demo_credit_card","demoConfirmed":true}`, ver(m)); code != 409 {
 		t.Error("pay a paid invoice")
 	}
+	// the confirmed payment's reference cannot confirm another invoice's payment
+	_, inv2 := newInvoice(t, s)
+	code, m = sim(`{"event":"initiate","invoiceId":"`+inv2+`","method":"demo_credit_card","demoConfirmed":true}`, 1)
+	if code != 200 {
+		t.Fatalf("initiate another invoice: %d %v", code, m)
+	}
+	pay2 := data(m)["id"].(string)
+	sim(`{"event":"processing","paymentId":"`+pay2+`","eventId":"`+uuid.NewString()+`","paymentReference":"P-`+pay2[:8]+`"}`, 1)
+	if code, m := sim(`{"event":"confirm","paymentId":"`+pay2+`","eventId":"`+uuid.NewString()+`","paymentReference":"REF-`+pay[:8]+`"}`, 2); code != 409 || m["messageKey"] != "errors.reference_used" {
+		t.Errorf("confirm with a used reference: %d %v", code, m)
+	}
 }
 
 func TestHQPaymentsAndRelease(t *testing.T) {
@@ -126,6 +146,9 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	}
 	if code, _ := write(s, &customerB, "payments.recordManual", `{"invoiceId":"`+inv+`","paymentReference":"X","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`, 1); code != 403 {
 		t.Error("client records payment")
+	}
+	if code, m := manual("5000", 9); code != 409 || m["messageKey"] != "error.versionConflict" {
+		t.Errorf("manual on a stale invoice version: %d %v", code, m)
 	}
 	code, m := manual("5000", 1)
 	if code != 200 || data(m)["status"] != "confirmed" || data(m)["method"] != nil {
@@ -168,6 +191,12 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	write(s, &customerB, "payments.simulate", `{"event":"processing","paymentId":"`+pay+`","eventId":"`+uuid.NewString()+`","paymentReference":"P-`+pay[:8]+`"}`, 1)
 	if code, _ := write(s, &hq, "payments.recordManual", `{"invoiceId":"`+inv2+`","paymentReference":"M-`+pay[:8]+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`, 3); code != 409 {
 		t.Error("manual on an invoice with a payment")
+	}
+	if code, m := confirm(9); code != 409 || m["messageKey"] != "error.versionConflict" {
+		t.Errorf("hq confirm on a stale version: %d %v", code, m)
+	}
+	if code, m := write(s, &hq, "payments.confirm", `{"paymentId":"`+pay+`","paymentReference":"`+ref+`","confirmedAmountMinor":5000,"currency":"MYR","reason":"checked"}`, 2); code != 409 || m["messageKey"] != "errors.reference_used" {
+		t.Errorf("hq confirm with the manual payment's reference: %d %v", code, m)
 	}
 	if code, m := confirm(2); code != 200 || data(m)["status"] != "confirmed" || data(m)["method"] != "demo_credit_card" {
 		t.Fatalf("hq confirm: %d %v", code, m)

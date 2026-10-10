@@ -3975,3 +3975,54 @@ In API mode the header assistant (FR-X02, D09, IR65, Figma Client 09a–09g) was
 9. **Progress.** Every business screen and the assistant follow the display language (IR258–IR306). Still English: the Phase 1A browser demo's fixture screens, including its simulated assistant.
 
 No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).
+
+## IR307 Test coverage: the BFF session and the DAL, every operation's input rules, and payment, restriction, policy and plan refusals — 2026-10-10
+
+1. **Two fixes found by the new tests.**
+   - `sessionFromTokens` accepted inherited names as a role, because `role in roleHome` follows the prototype ("constructor", "toString", "__proto__"). It now accepts only the object's own keys (`Object.hasOwn`). Tokens come from the identity provider's token endpoint, so this is defense in depth.
+   - `coreAll` reads 100 items per page and could return up to 99 more than `max`. It now stops at `max`.
+2. **Web unit tests.** Vitest: 56 files, 330 tests. These are new:
+   - `session.test.ts` (15 tests):
+     - the HMAC-signed cookie: every altered form, the server's secret, and a signed body that is not JSON;
+     - the cookie options;
+     - the session from the token's claims: missing claims, unknown and inherited roles, and a broken token;
+     - the refresh grant: the request, the kept tenant and membership, a refused grant, a network failure, and no refresh token;
+     - reading the cookie in a route handler: valid, refreshed and rewritten, cleared after a failed refresh, and missing or forged;
+     - where sign-in returns to: absolute, protocol-relative, backslash and control-character forms are refused;
+     - the identity provider settings.
+   - `dal.test.ts` (9 tests):
+     - the REST route with the token, tenant and membership headers;
+     - the write headers, with a fresh Idempotency-Key when none is given;
+     - a DomainError as CoreError, and an unreadable answer as UNAVAILABLE;
+     - an operation outside the catalog, which calls nothing;
+     - sign-in for a missing or expiring session;
+     - whole lists: the cursor, filters and sort, 100 per page, never past `max`;
+     - the principal, permissions, business clock and display settings, with their defaults.
+   - `unitCommands.test.ts` (4 tests): `waitForCommand` polls every 2 s, stops at the first final state, gives up after 40 s, and passes a failed read on.
+3. **Backend tests.**
+   - `TestRequiredInputs` checks the input rules of 79 operations in 85 cases. The rules run before authorization: a missing ID, an unknown choice, a reversed period or an over-long text is VALIDATION with the field named. Path parameters are sent as the nil UUID, so the route matches.
+   - Payments:
+     - payments.simulate refuses a stale invoice or payment version and a second processing event;
+     - a confirmed payment's reference cannot confirm another invoice's payment (`errors.reference_used`);
+     - payments.recordManual and payments.confirm refuse a stale version, and payments.confirm refuses the manual payment's reference.
+   - restrictions.schedule refuses an ineligible contract, a contract with no overdue invoice and an archived unit. The same request schedules once the causes are gone.
+   - policies.save refuses an inactive customer, and the kind of a saved automation policy is fixed.
+   - plans.generateNext:
+     - asking for the old occurrence again is now asserted as `errors.occurrence_mismatch`;
+     - an occurrence is generated once (`errors.occurrence_generated`), even when the next date is moved back to it;
+     - an archived unit gets no new job.
+   - Every demoSession operation answers UNAVAILABLE `errors.session_via_bff` in API mode, and `DomainError.StatusCode` (read by Echo's error handler) matches the status table.
+   - `make cover`: 85.2 % → 86.4 % of 14,835 statements. `make test-all` passes.
+4. **Remaining gaps.**
+   - About 500 logic blocks are uncovered. They are mostly:
+     - database error returns;
+     - maintenance proposal and report rules (an assignment revoked on reschedule, an expired offer, report checks);
+     - restriction reconcile paths;
+     - the cluster's internal query errors;
+     - process start-up.
+   - Two kinds of branch cannot be reached through the API:
+     - the NaN / Infinity threshold check, because JSON has no NaN;
+     - the action check of payouts.transition and firmwareCampaigns.control, because their routes fix the action.
+5. **No UI change.** E2E: 70 passed, 9 skipped.
+
+No UI kit, icon set, or form, schema, query or translation library is added. Reads are Server Components, by the user's instruction to follow the Next.js documentation (2026-10-08).

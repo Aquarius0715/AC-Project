@@ -46,7 +46,7 @@ export async function coreAll<T>(operation: string, query: { filters?: Record<st
     out.push(...page.items);
     cursor = page.nextCursor;
   } while (cursor && out.length < max);
-  return out;
+  return out.slice(0, max);
 }
 
 /** session.get once per render pass: the principal and the response meta. */

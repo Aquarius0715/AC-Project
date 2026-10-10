@@ -317,3 +317,24 @@ func TestPolicies(t *testing.T) {
 		t.Error("delete unattached policy")
 	}
 }
+
+// TestPolicySaveRefusals covers two refusals of policies.save: a customer that is no longer active cannot get an alert
+// policy, and the kind of a saved policy is fixed (an automation policy cannot be saved as an alert policy).
+func TestPolicySaveRefusals(t *testing.T) {
+	s := server(t)
+	owner(t, `UPDATE assets.customers SET status = 'inactive' WHERE id = $1`, seed.ID("cust-a"))
+	code, m := write(s, &hq, "policies.save", alertPolicyBody(nil), 0)
+	owner(t, `UPDATE assets.customers SET status = 'active' WHERE id = $1`, seed.ID("cust-a"))
+	if code != 422 || m["fieldErrors"].(map[string]any)["customerId"] != "error.inactiveCustomer" {
+		t.Errorf("inactive customer: %d %v", code, m)
+	}
+	code, m = write(s, &hq, "policies.save", autoPolicyBody(nil), 0)
+	if code != 200 {
+		t.Fatalf("automation policy: %d %v", code, m)
+	}
+	id, v := data(m)["id"].(string), ver(m)
+	if code, m := write(s, &hq, "policies.save", alertPolicyBody(map[string]string{"id": `"` + id + `"`}), v); code != 422 || m["fieldErrors"].(map[string]any)["kind"] != "error.kindFixed" {
+		t.Errorf("alert save over an automation policy: %d %v", code, m)
+	}
+	owner(t, `DELETE FROM control.automation_policies WHERE id = $1`, id)
+}

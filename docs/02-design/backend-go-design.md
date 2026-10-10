@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND-GO
-version: 0.30.0
+version: 0.31.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -286,11 +286,11 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | Domain unit tests | `go test` | State machines, calculations (energy, coverage, emissions), validation, authorization predicates — table-driven, no I/O |
 | Store tests | `testcontainers-go` PostgreSQL 16 + migrations | sqlc queries, RLS isolation (a second tenant sees nothing), constraints (overlap, one pending command, append-only audit) |
 | API tests | `httptest` + Echo | Status mapping, idempotency replay, version conflicts, HQ-network rule, owner-only rules |
-| Contract tests | generated from the catalog | Every operation registered once, mode and authorization match the catalog, inputs reject unknown fields |
+| Contract tests | generated from the catalog | Every operation registered once, mode and authorization match the catalog, inputs reject unknown fields; each operation's input rules answer VALIDATION before authorization (`TestRequiredInputs`, IR307) |
 | Acceptance tests | `test/acceptance` | AT-* cases from the requirement documents replayed against the API with fixture-contract.json seeds and a fixed clock (the same cases that drive the Phase 1A mock) |
 | Integration | LocalStack, Stripe CLI, IoT device simulator | Outbox → SNS → SQS flows, Stripe webhooks, MQTT command round trip in staging |
 | Load | k6 | Design capacity in backend architecture §13 |
-| Web unit tests | Vitest (`service/web/shared`, `npm run test`; config as in the Next.js docs with the React plugin and jsdom) | The pure mappers of `@ac/web/lib` that the Server Components and client views share (device tiles and events, quality review evidence check, payout lines and PDF, command history, action messages); `npm run typecheck` includes the shared package and its tests (IR219) |
+| Web unit tests | Vitest (`service/web/shared`, `npm run test`; config as in the Next.js docs with the React plugin and jsdom) | The pure mappers of `@ac/web/lib` that the Server Components and client views share (device tiles and events, quality review evidence check, payout lines and PDF, command history, action messages), the BFF session (signed cookie, refresh, return paths) and the DAL (headers, errors, paging) (IR307); `npm run typecheck` includes the shared package and its tests (IR219) |
 
 ## 10. Build, run, and deploy
 

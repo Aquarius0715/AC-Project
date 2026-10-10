@@ -65,8 +65,21 @@ func TestPlans(t *testing.T) {
 	if data(m)["nextDueAt"] != next.AddDate(0, 1, 0).Format(time.RFC3339) || data(m)["generatedOccurrences"].([]any)[0].(map[string]any)["jobId"] != job || ver(m) != 3 {
 		t.Fatalf("plan after generate: %v", m)
 	}
-	if code, _ := gen(next, 3); code != 409 {
-		t.Error("old occurrence again")
+	if code, m := gen(next, 3); code != 409 || m["messageKey"] != "errors.occurrence_mismatch" {
+		t.Errorf("old occurrence again: %d %v", code, m)
+	}
+	// an occurrence is generated once, even when the next date is moved back to it
+	owner(t, `UPDATE maintenance.plans SET next_due_at = $2 WHERE id = $1`, plan, next)
+	if code, m := gen(next, 3); code != 409 || m["messageKey"] != "errors.occurrence_generated" {
+		t.Errorf("generated occurrence again: %d %v", code, m)
+	}
+	// an archived unit gets no new job
+	owner(t, `UPDATE maintenance.plans SET next_due_at = $2 WHERE id = $1`, plan, next.AddDate(0, 1, 0))
+	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, unit)
+	code, m = gen(next.AddDate(0, 1, 0), 3)
+	owner(t, `UPDATE assets.units SET archived = false WHERE id = $1`, unit)
+	if code != 409 || m["messageKey"] != "error.unitArchived" {
+		t.Errorf("archived unit: %d %v", code, m)
 	}
 	// a past next date must be corrected first
 	owner(t, `UPDATE maintenance.plans SET next_due_at = $2 WHERE id = $1`, plan, clock.Add(-time.Hour))

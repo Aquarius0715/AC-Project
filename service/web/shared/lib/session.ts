@@ -58,7 +58,8 @@ export function cookieOptions() {
 export function sessionFromTokens(t: { access_token: string; refresh_token?: string; expires_in: number }, previousRefresh: string | null = null): Session | null {
   const claims = jwtClaims(t.access_token);
   const role = claims.role as Session["role"] | undefined;
-  if (!claims.tenant_id || !claims.membership_id || !role || !(role in roleHome)) return null;
+  // own keys only: `in` would also accept inherited names such as "constructor"
+  if (!claims.tenant_id || !claims.membership_id || typeof role !== "string" || !Object.hasOwn(roleHome, role)) return null;
   return {
     accessToken: t.access_token, refreshToken: t.refresh_token ?? previousRefresh, tenantId: String(claims.tenant_id), membershipId: String(claims.membership_id),
     role, expiresAt: Math.floor(Date.now() / 1000) + t.expires_in,

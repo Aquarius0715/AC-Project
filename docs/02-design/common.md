@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.79.0
+version: 0.80.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -57,7 +57,7 @@ No UI kit, icon set, or form, schema, query or translation library is added. Rea
 - The customer assistant speaks its own chosen language (IR306). It starts in the display language, and its header switches between English and Bahasa Melayu. A switch discards an unconfirmed change and keeps the typed text (D09). Its suggestions are sentences of the fixed grammar.
 - Still English: the Phase 1A browser demo's fixture screens, including its simulated assistant.
 
-**Tests.** Vitest covers the shared mappers and validators. Playwright end-to-end tests run against the local stack. The Core API has its Go integration and unit tests.
+**Tests.** Vitest covers the shared mappers and validators, the BFF session and the DAL (IR307). Playwright end-to-end tests run against the local stack. The Core API has its Go integration and unit tests.
 
 The stack is TypeScript (strict mode), React 19 and Next.js 16 App Router (DEC-67, DEC-71) with Tailwind CSS 4. Each app is its own container (container design) with its own session cookie (IR175).
 
@@ -258,4 +258,4 @@ API paths, HTTP methods, databases, server authentication and authorization, rea
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.79.0: Read IR01–IR306 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.80.0: Read IR01–IR307 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

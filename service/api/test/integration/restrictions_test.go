@@ -525,3 +525,33 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 		t.Fatalf("reconcile not applied: %d %v", code, m)
 	}
 }
+
+// TestRestrictionScheduleRefusals covers the contract and unit refusals of restrictions.schedule: a contract that is
+// not restriction eligible, a contract without an overdue invoice, and an archived unit. The same request schedules
+// once each cause is gone.
+func TestRestrictionScheduleRefusals(t *testing.T) {
+	s := server(t)
+	u := boundUnit(t, s, "online")
+	k, inv := overdueContract(t, s, u)
+	schedule := func() (int, map[string]any) {
+		return write(s, &restrMgr, "restrictions.schedule", scheduleBody(k, inv, []string{u}, nil), 0)
+	}
+	owner(t, `UPDATE billing.contracts SET restriction_eligible = false WHERE id = $1`, k)
+	if code, m := schedule(); code != 422 || m["fieldErrors"].(map[string]any)["contractId"] != "errors.restriction_ineligible" {
+		t.Errorf("ineligible contract: %d %v", code, m)
+	}
+	owner(t, `UPDATE billing.contracts SET restriction_eligible = true WHERE id = $1`, k)
+	owner(t, `UPDATE billing.invoices SET due_at = $2 WHERE id = $1`, inv, clock.Add(48*time.Hour))
+	if code, m := schedule(); code != 409 || m["messageKey"] != "errors.no_overdue_invoice" {
+		t.Errorf("nothing overdue: %d %v", code, m)
+	}
+	owner(t, `UPDATE billing.invoices SET due_at = $2 WHERE id = $1`, inv, clock.Add(-time.Hour))
+	owner(t, `UPDATE assets.units SET archived = true WHERE id = $1`, u)
+	if code, m := schedule(); code != 409 || m["messageKey"] != "errors.unit_archived" {
+		t.Errorf("archived unit: %d %v", code, m)
+	}
+	owner(t, `UPDATE assets.units SET archived = false WHERE id = $1`, u)
+	if code, m := schedule(); code != 200 || data(m)["state"] != "scheduled" {
+		t.Fatalf("schedule once the causes are gone: %d %v", code, m)
+	}
+}

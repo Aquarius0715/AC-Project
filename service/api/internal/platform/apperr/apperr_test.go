@@ -23,6 +23,9 @@ func TestStatusMapping(t *testing.T) {
 		if got := E(c, "k").HTTPStatus(); got != want[c] {
 			t.Errorf("%s: got %d want %d", c, got, want[c])
 		}
+		if got := E(c, "k").StatusCode(); got != want[c] { // what Echo's error handler and the request log read
+			t.Errorf("%s: StatusCode %d want %d", c, got, want[c])
+		}
 	}
 }
 
