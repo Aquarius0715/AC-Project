@@ -41,17 +41,38 @@ type Alert struct {
 	ResolutionReason *string         `json:"resolutionReason"`
 	PreviousAlertID  *uuid.UUID      `json:"previousAlertId"`
 	DeliveryFailures json.RawMessage `json:"deliveryFailures" swaggertype:"object"`
+	Rule             *AlertRule      `json:"rule"`
 }
+
+// AlertRule is AlertRule of service-contracts.ts: the condition that raised the alert, read with it (IR284).
+type AlertRule struct {
+	Name              string  `json:"name"`
+	Metric            string  `json:"metric"`
+	Operator          string  `json:"operator"`
+	Threshold         float64 `json:"threshold"`
+	RecoveryThreshold float64 `json:"recoveryThreshold"`
+	DurationSeconds   int     `json:"durationSeconds"`
+}
+
+// alertRule reads the condition of the alert's policy — the policy's own for kind alert, the rule of rule_key for the
+// default policy — so everyone who reads the alert sees what raised it and when it recovers, without reading the policy
+// itself (policy reads stay with policy permission holders, IR284); NULL for an alert without a policy.
+const alertRule = `(SELECT jsonb_build_object('name', x.name, 'metric', x.c->>'metric', 'operator', x.c->>'operator', 'threshold', x.c->'threshold',
+		'recoveryThreshold', x.c->'recoveryThreshold', 'durationSeconds', x.c->'durationSeconds')
+	FROM (SELECT p.name, p.condition AS c FROM monitoring.alert_policies p WHERE p.id = a.policy_id AND p.kind = 'alert'
+		UNION ALL
+		SELECT r->>'name', r FROM monitoring.alert_policies p CROSS JOIN LATERAL jsonb_array_elements(p.rules) r
+		WHERE p.id = a.policy_id AND p.kind = 'default_alert' AND r->>'ruleKey' = a.rule_key) x LIMIT 1)`
 
 const alertCols = `a.id, a.tenant_id, a.version, a.created_at, a.updated_at, a.unit_id, a.policy_id, a.type, a.severity, a.status, a.cause_code,
 	a.evidence_kind, a.evidence_text, a.observed_at, a.evidence_ids, a.detected_at, a.acknowledged_at, a.resolved_at, a.resolution_reason,
-	a.previous_alert_id, a.delivery_failures`
+	a.previous_alert_id, a.delivery_failures, ` + alertRule
 
 func scanAlert(r pgx.Row) (Alert, error) {
 	var a Alert
 	err := r.Scan(&a.ID, &a.TenantID, &a.Version, &a.CreatedAt, &a.UpdatedAt, &a.UnitID, &a.PolicyID, &a.Type, &a.Severity, &a.Status, &a.CauseCode,
 		&a.EvidenceKind, &a.EvidenceText, &a.ObservedAt, &a.EvidenceIDs, &a.DetectedAt, &a.AcknowledgedAt, &a.ResolvedAt, &a.ResolutionReason,
-		&a.PreviousAlertID, &a.DeliveryFailures)
+		&a.PreviousAlertID, &a.DeliveryFailures, &a.Rule)
 	return a, err
 }
 
@@ -304,7 +325,7 @@ func (in *AckInput) Validate() map[string]string {
 
 // @Summary		alerts.acknowledge (write)
 // @ID				alerts.acknowledge
-// @Description	Authorization: technician:alert.resolve:assigned | admin:alert.resolve
+// @Description	Authorization: technician:alert.read:assigned | admin:alert.resolve
 // @Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; IR94 technician write table (assignment and work window, jobId required when typed)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-T07, DD-T12, DD-A05

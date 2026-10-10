@@ -57,10 +57,10 @@ export function TechUnitView({ live }: { live: UnitLive }) {
             </Card>
             <Card title={t("Open alerts ({n})", { n: live.alerts.length })} action={<TextLink href={live.alertsHref}>{t("Evidence →")}</TextLink>}>
               {live.alerts.length === 0 ? <p className="text-[13px] text-muted">{t("No open alerts.")}</p> : live.alerts.map((a) => (
-                <div key={a.id} className="border-t border-line py-2 first:border-0">
+                <Link key={a.id} href={a.href} className="block border-t border-line py-2 first:border-0 hover:bg-surface2/60">
                   <div className="flex items-start justify-between gap-2"><span className="min-w-0"><b className="block text-[13px]">{a.title}</b><span className="text-xs text-muted">{a.sub}</span></span><SeverityBadge s={a.severity} /></div>
                   <p className="mt-1 text-[11px] text-muted">{a.ack}</p>
-                </div>
+                </Link>
               ))}
             </Card>
           </div>

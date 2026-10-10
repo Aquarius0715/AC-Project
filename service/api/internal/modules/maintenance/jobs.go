@@ -572,7 +572,7 @@ func (m Jobs) assignmentWhere(ctx context.Context, c *ops.Call, job uuid.UUID, c
 // @Description	Authorization: client:self | contractor:offer-projection-or-delegated-history | technician:assigned-history | admin:job.read
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot; IR86 expired unanswered offer: NOT_FOUND for contractor
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02
+// @Description	Design: DD-A06, DD-C09, DD-P01, DD-P02, DD-P05, DD-P08, DD-T04, DD-T05, DD-T06, DD-T08, DD-T09, DD-T10, DD-C17, DD-T13, DD-P10, DD-P03, DD-T02, DD-T07
 // @Tags			jobs
 // @Accept			json
 // @Produce		json

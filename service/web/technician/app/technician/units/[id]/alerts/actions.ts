@@ -1,7 +1,8 @@
 "use server";
 
 // Server Actions of the technician alert evidence screen (FR-T07): alerts.acknowledge / alerts.resolve with the
-// alert version. The DAL verifies the session; the Core API applies technician:alert.resolve:assigned (IR94).
+// alert version. The DAL verifies the session; the Core API lets a technician on the unit acknowledge with alert.read and
+// resolve with alert.resolve, inside the work window (IR94, IR284).
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 

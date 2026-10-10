@@ -1,8 +1,8 @@
-// AT-X01-N ③ for the technician (FR-X01, FR-T01, FR-T02, FR-T03, FR-T04, IR44, IR281–IR283): with Malay and
-// Asia/Tokyo saved in Preferences, the overview speaks Malay — tiles, tabs, sort and the side cards — while today's
-// timeline stays in Kuala Lumpur hours and says so; an assigned job's workspace speaks Malay with its window in GMT+9,
-// and so does its unit, on both tabs and with the 7-day period. English and the earlier zone come back at the end, or
-// in afterEach when the test fails.
+// AT-X01-N ③ for the technician (FR-X01, FR-T01–FR-T04, FR-T07, IR44, IR281–IR284): with Malay and Asia/Tokyo saved
+// in Preferences, the overview speaks Malay — tiles, tabs, sort and the side cards — while today's timeline stays in
+// Kuala Lumpur hours and says so; an assigned job's workspace speaks Malay with its window in GMT+9, and so do its unit,
+// on both tabs and with the 7-day period, and the unit's alert evidence. English and the earlier zone come back at the
+// end, or in afterEach when the test fails. Nothing is acknowledged or resolved (the dev data stays as it is).
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
@@ -45,6 +45,16 @@ test("the technician overview in Malay keeps the timeline in Kuala Lumpur hours"
     await main.getByRole("tab", { name: "7 hari", exact: true }).click();
     await page.waitForURL(/period=7d/);
     await expect(main.getByRole("heading", { name: /· 7 hari terakhir \(hari kalendar Kuala Lumpur\)$/ })).toBeVisible();
+    // the unit's alert evidence (IR284): the policy's condition or that there is none, resolution, history, related
+    await main.getByRole("tab", { name: "Daftar", exact: true }).click();
+    await main.getByRole("link", { name: "Bukti amaran →", exact: true }).click();
+    await page.waitForURL(/\/technician\/units\/[^/?]+\/alerts/);
+    await expect(main.getByRole("heading", { name: "Bukti amaran", exact: true })).toBeVisible();
+    if (await main.getByRole("heading", { name: "Penyelesaian", exact: true }).count()) {
+      for (const name of ["Sejarah amaran", "Berkaitan"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();
+      await expect(main).toContainText(/Dasar: |tiada dasar/);
+      await expect(main.getByRole("button", { name: "Selesaikan amaran" }).or(main.getByText(/^Diselesaikan .* — /))).toBeVisible(); // open: resolve with a reason; resolved: when and why
+    } else await expect(main).toContainText("Tiada amaran pada unit ini");
   }
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;

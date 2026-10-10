@@ -47,8 +47,8 @@ describe("technician overview", () => {
       { id: "a3", unitId: "u1", type: "sensor", severity: "warning", status: "resolved", causeCode: "unknown", evidenceKind: "inferred", evidenceText: "", detectedAt: "2026-09-20T01:00:00Z" },
     ] as ApiAlert[];
     expect(alertRows(alerts, units, new Map([["u1", "job-a"]]))).toEqual([
-      { id: "a2", title: "Filter cleaning reminder", sub: "Bedroom AC · acknowledged · 20 Sept 2026, 9:00 am MYT", severity: "critical", href: "/technician/units/u1/alerts?jobId=job-a" },
-      { id: "a1", title: "Possible open window", sub: "Server room AC · open · 21 Sept 2026, 9:12 am MYT", severity: "warning", href: "/technician/units/u2/alerts" },
+      { id: "a2", title: "Filter cleaning reminder", sub: "Bedroom AC · acknowledged · 20 Sept 2026, 9:00 am MYT", severity: "critical", href: "/technician/units/u1/alerts?jobId=job-a&alertId=a2" },
+      { id: "a1", title: "Possible open window", sub: "Server room AC · open · 21 Sept 2026, 9:12 am MYT", severity: "warning", href: "/technician/units/u2/alerts?alertId=a1" },
     ]);
     expect(reportRows(rows).map((r) => [r.title, r.badge.text])).toEqual([["job-a · Bedroom AC", "Draft"], ["job-c · Bedroom AC", "Submitted"]]);
   });

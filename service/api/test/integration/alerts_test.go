@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -107,5 +108,71 @@ func TestAlerts(t *testing.T) {
 	_, g = post(s, &hq, "units.get", `{"id":"`+u+`"}`)
 	if data(g)["activeAlertCount"].(float64) != 0 { // only the normal alert is left open (IR51)
 		t.Fatal("resolved alerts are not active")
+	}
+}
+
+// IR284: every reader of an alert sees the condition that raised it — its policy's own, or the default rule of its rule
+// key — and none for an alert without a policy; a technician on the unit acknowledges with alert.read, and only
+// alert.resolve resolves.
+func TestAlertRuleAndTechnicianAcknowledge(t *testing.T) {
+	s := server(t)
+	u := newUnit(t, s, "Rule AC")
+	org := seed.ID("org-customer-b").String()
+	policy := uuid.NewString()
+	owner(t, `INSERT INTO monitoring.alert_policies (id, tenant_id, kind, customer_id, name, owner_membership_id, created_by_user_id, timezone, condition)
+		VALUES ($1, $2, 'alert', $3, 'Bedroom too hot', $4, $4, 'Asia/Kuala_Lumpur',
+		'{"metric":"temperature","operator":"gte","threshold":30,"recoveryThreshold":28,"durationSeconds":60,"activeWindow":null,"severity":"warning"}')`,
+		policy, seed.ID("tenant-a"), seed.ID("cust-b"), uuid.New())
+	var def string
+	ownerScan(t, `SELECT id FROM monitoring.alert_policies WHERE tenant_id = $1 AND kind = 'default_alert'`, []any{seed.ID("tenant-a")}, &def)
+	insert := func(policy, ruleKey any, typ string) string {
+		id := uuid.NewString()
+		owner(t, `INSERT INTO monitoring.alerts (id, tenant_id, unit_id, customer_org_id, policy_id, rule_key, type, severity, status, cause_code, evidence_kind, evidence_text, observed_at, detected_at)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,'warning','open','unknown','demo_observation','demo',$8,$8)`, id, seed.ID("tenant-a"), u, org, policy, ruleKey, typ, clock.Add(-10*time.Minute))
+		return id
+	}
+	own, viaDefault, none := insert(policy, nil, "sensor"), insert(def, "ventilation_co2", "sensor"), insert(nil, nil, "tamper")
+	rule := func(a *actor, id string) any {
+		code, m := post(s, a, "alerts.get", `{"id":"`+id+`"}`)
+		if code != 200 {
+			t.Fatalf("alerts.get %s: %d %v", id, code, m)
+		}
+		return data(m)["rule"]
+	}
+	want := map[string]any{"name": "Bedroom too hot", "metric": "temperature", "operator": "gte", "threshold": 30.0, "recoveryThreshold": 28.0, "durationSeconds": 60.0}
+	for _, a := range []*actor{&hq, &customerB} {
+		if got, _ := rule(a, own).(map[string]any); fmt.Sprint(got) != fmt.Sprint(want) {
+			t.Errorf("the policy's condition: %v", got)
+		}
+	}
+	if got, _ := rule(&hq, viaDefault).(map[string]any); got["name"] != "Ventilation" || got["metric"] != "co2" || got["threshold"] != 1000.0 || got["recoveryThreshold"] != 900.0 || got["durationSeconds"] != 600.0 {
+		t.Errorf("the default rule of the rule key: %v", got)
+	}
+	if got := rule(&hq, none); got != nil {
+		t.Errorf("no policy, no rule: %v", got)
+	}
+	if _, m := post(s, &hq, "alerts.list", `{"filters":{"unitId":"`+u+`"}}`); len(items(m)) != 3 || items(m)[0]["rule"] == nil && items(m)[1]["rule"] == nil {
+		t.Errorf("alerts.list carries the rule: %v", m)
+	}
+	// a technician on the unit without alert.resolve acknowledges (alert.read) but does not resolve (DD-T07)
+	owner(t, `DELETE FROM maintenance.assignments WHERE technician_membership_id = $1 AND job_id IN (SELECT id FROM maintenance.jobs WHERE customer_org_id = $2)`,
+		seed.ID("tech-internal-a"), seed.ID("org-customer-b"))
+	owner(t, `INSERT INTO identity.membership_scopes (tenant_id, membership_id, kind, ref_id) VALUES ($1,$2,'unit',$3) ON CONFLICT DO NOTHING`, seed.ID("tenant-a"), seed.ID("tech-internal-a"), u)
+	assign(t, u, "tech-internal-a", clock.Add(-time.Hour), clock.Add(time.Hour), "active")
+	owner(t, `DELETE FROM identity.membership_permissions WHERE membership_id = $1 AND permission = 'alert.resolve'`, seed.ID("tech-internal-a"))
+	t.Cleanup(func() {
+		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1, $2, 'alert.resolve') ON CONFLICT DO NOTHING`,
+			seed.ID("tenant-a"), seed.ID("tech-internal-a"))
+	})
+	if code, m := write(s, &techInt, "alerts.acknowledge", `{"alertId":"`+own+`"}`, 1); code != 200 || data(m)["status"] != "acknowledged" || data(m)["rule"] == nil {
+		t.Fatalf("technician acknowledges with alert.read: %d %v", code, m)
+	}
+	if code, _ := write(s, &techInt, "alerts.resolve", `{"alertId":"`+own+`","resolutionReason":"filter replaced","resolutionEvidenceIds":[]}`, 2); code != 403 {
+		t.Errorf("resolve needs alert.resolve: %d", code)
+	}
+	owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1, $2, 'alert.resolve') ON CONFLICT DO NOTHING`,
+			seed.ID("tenant-a"), seed.ID("tech-internal-a"))
+	if code, m := write(s, &techInt, "alerts.resolve", `{"alertId":"`+own+`","resolutionReason":"filter replaced","resolutionEvidenceIds":[]}`, 2); code != 200 || data(m)["status"] != "resolved" {
+		t.Fatalf("resolve with alert.resolve: %d %v", code, m)
 	}
 }

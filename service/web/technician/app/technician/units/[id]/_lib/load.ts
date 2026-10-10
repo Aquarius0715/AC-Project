@@ -75,6 +75,7 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
   const control = controlJob(jobs, sp.jobId);
   const job = control ?? sp.jobId ?? null; // the job the alert evidence opens with
   const back = sp.jobId ? `/technician/jobs/${sp.jobId}` : "/technician";
+  const alertsHref = `/technician/units/${id}/alerts${job ? `?jobId=${job}` : ""}`;
   return {
     kind: "live" as const, id, short: id.slice(0, 8), name: d.displayName, back, tab, metric, period, connection: d.connection,
     tabs: [{ id: "register" as const, label: t("Register") }, { id: "monitoring" as const, label: t("Monitoring") }],
@@ -84,8 +85,7 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
     tiles: liveTiles(d, nowMs, i), chart: seriesChart(metric, unitOf(metric), points, period, nowMs, i),
     others: otherMetrics(d, metric, Object.fromEntries(others.map((m, k) => [m, more[k]])), period, nowMs, i),
     events: windowEvents(alerts, events, period, nowMs, i),
-    history: jobRows(jobs, i), alerts: openAlerts(alerts, nowMs, i),
-    alertsHref: `/technician/units/${id}/alerts${job ? `?jobId=${job}` : ""}`,
+    history: jobRows(jobs, i), alerts: openAlerts(alerts, nowMs, i).map((a) => ({ ...a, href: `${alertsHref}${job ? "&" : "?"}alertId=${a.id}` })), alertsHref,
     controlHref: control ? `/technician/units/${id}/control?jobId=${control}` : null,
   };
 }

@@ -3231,3 +3231,49 @@ The Certifications tab of `/partner/team` (FR-P09, DD-P09, Figma Contractor 04-6
    - The HQ screens.
    - The browser demo.
    - The assistant panel and the voice demo's answers.
+
+## IR284 The technician's alert evidence as in Figma; the condition on every alert; acknowledging with alert.read — 2026-10-10
+
+`/technician/units/[id]/alerts` (SCR-T07, FR-T07, DD-T07, Figma Technician 02-14…02-17) is rebuilt as in Figma and follows the display language and time zone. Two Core API gaps behind Figma close with it.
+
+1. **`Alert.rule` (API).**
+   - Every Alert now carries `rule: AlertRule | null`: name, metric, operator, threshold, recovery threshold and duration of the condition that raised it.
+   - It is read with the alert: the policy's own condition for kind alert, or the rule of `ruleKey` in the default policy. It is null for an alert without a policy (device, maintenance, reconciliation).
+   - Why: Figma shows the policy line and the recovery rule to technicians. Policy reads stay with policy permission holders (SCR-T02 query rule), so the alert itself carries what raised it.
+   - Every reader of alerts gets it: clients, contractors inside the access window, technicians and HQ. There is no schema change; it is a read-time join inside the monitoring domain.
+2. **Acknowledge with `alert.read` (API).**
+   - `alerts.acknowledge` for technicians is now `technician:alert.read:assigned` (it was `technician:alert.resolve:assigned`). `alerts.resolve` still needs `alert.resolve`.
+   - Both still follow the IR94 write table: an active assignment on the unit, inside the work window.
+   - Why: DD-T07 says acknowledgement only marks the alert as seen, and resolution needs alert.resolve. Figma 02-15 / 02-16 shows a technician without alert.resolve acknowledging and then refused when resolving. Figma is the final spec (2026-10-01) and later than the catalog row.
+3. **The screen.**
+   - The banner: the alert and its rule's name, or its title. Below it the policy line ("Policy: Temperature ≥ 30.0 °C, recovery < 28.0 °C, duration 60 s"), or that it has no policy and resolves only with a reason (IR66). On the right, Acknowledge while open, else the state and its time.
+   - The evidence: the evidence at detection (kind, text, observed), then the unit's latest reading of the rule's metric. That reading gives its origin and quality, and "confidence unknown" for an estimate (BR-T07).
+   - Resolution:
+     - What resolves the alert: a sustained remeasurement for a policy alert (D08), else only a reason (IR66). Then the reason field and Resolve alert.
+     - A resolved alert says when and why, and when it was acknowledged.
+     - A refused write is shown in words. Without alert.resolve it says how the alert can still resolve.
+   - Alert history: resolved, acknowledged and raised, newest first.
+   - Related: the URL's job, the unit with its place, the policy, the recovery rule, the previous alert, and "You can resolve" (with a reason; with a remeasurement only; or not without alert.resolve).
+   - The unit's other alerts to switch to. `alertId` in the URL; by default the worst unresolved one.
+   - Links now name the alert: the overview's alert rows and each open alert on the unit screen. The back link keeps the job.
+   - Before the work window the page says when it opens (IR76, `jobs.get`).
+4. **Texts and times.**
+   - Every text is translated; the dictionary gains 53 entries.
+   - Times use the display time zone with "today / yesterday".
+   - The loader formats everything. New pure code is `shared/lib/techAlerts.ts`.
+5. **Catalog.**
+   - SCR-T07 adds units.get and jobs.get and the URL key alertId.
+   - DD-T07 adds units.get and jobs.get, and an as-built note.
+   - The operation catalog (design ids, the acknowledge authorization), `service-contracts.ts` (AlertRule), the Go catalog and the API description are regenerated.
+6. **Checked.**
+   - Go: `TestAlertRuleAndTechnicianAcknowledge`. It covers the rule of a policy alert (HQ and the client), of a default rule, and none without a policy, in alerts.get and alerts.list. A technician on the unit without alert.resolve acknowledges, is refused when resolving (403), and resolves once the permission is back. Both suites pass.
+   - Vitest: 41 files, 237 tests. `techAlerts.test.ts` is new: rule words and durations, an open policy alert without alert.resolve, a resolved alert without a policy, the selection, refusals and Malay. The overview's alert links are updated.
+   - E2E: `technician/language.e2e.ts` opens the unit's alert evidence in Malay without acknowledging or resolving. The suite: 64 passed, 9 skipped; the users are en / Asia/Kuala_Lumpur, and the dev alerts are unchanged.
+7. **Still open.**
+   - D08 threshold evaluation on telemetry. The Core API opens policy alerts from demo events, but it does not yet resolve them after a sustained recovery, so Figma's "resolved after remeasurement" (02-17) needs it. That is next.
+   - Who acknowledged or resolved an alert. The columns are kept, but Alert does not carry the actor.
+   - Figma's measured / estimated / inspection evidence trio. It needs the evidence records behind `evidenceIds`; the screen shows the alert's evidence and the latest reading.
+   - The other technician screens: diagnostic control, the devices and the QR scan.
+   - The HQ screens.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.

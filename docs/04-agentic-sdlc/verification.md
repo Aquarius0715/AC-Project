@@ -113,7 +113,7 @@ Additional checks: reject candidates from another company, without required qual
 
 | Case | Additional checks |
 |---|---|
-| AT-X01 / AT-X02 | Generic password-reset wording; clear old displays on sign-out; English/Malay (AT-X01-N ③: `e2e/specs/customer/unit-language.e2e.ts`, the overview, units & locations, automations, alerts, maintenance, energy & cost, carbon offsets, air quality, contracts & payments with an invoice, users and the unit screen, IR259–IR267; the contractor overview, job list, a job's page, a quality review, the schedule, the team and its certifications, the job history and the payouts: `e2e/specs/partner/language.e2e.ts`, IR270–IR279; the unit's diagnosis view in the cross-app scenario `e2e/specs/scenarios/request-to-technician.e2e.ts`, IR280; the technician overview, an assigned job's workspace and its unit: `e2e/specs/technician/language.e2e.ts`, IR281–IR283; restored in afterEach); alternatives when voice is denied |
+| AT-X01 / AT-X02 | Generic password-reset wording; clear old displays on sign-out; English/Malay (AT-X01-N ③: `e2e/specs/customer/unit-language.e2e.ts`, the overview, units & locations, automations, alerts, maintenance, energy & cost, carbon offsets, air quality, contracts & payments with an invoice, users and the unit screen, IR259–IR267; the contractor overview, job list, a job's page, a quality review, the schedule, the team and its certifications, the job history and the payouts: `e2e/specs/partner/language.e2e.ts`, IR270–IR279; the unit's diagnosis view in the cross-app scenario `e2e/specs/scenarios/request-to-technician.e2e.ts`, IR280; the technician overview, an assigned job's workspace, its unit and the unit's alert evidence: `e2e/specs/technician/language.e2e.ts`, IR281–IR284; restored in afterEach); alternatives when voice is denied |
 | AT-X03 / AT-X06 | Consistent quality/unit/capability displays across four roles; valid treatment of non-RTO (Rent to Own) units |
 | AT-X04 | Route/service/Query boundaries, customer boundaries within one tenant, outsourcing period/company boundaries (another company's `orgId` on Team & capacity reads as not found: `e2e/specs/partner/team.e2e.ts`, AT-P06-E①, IR276; the Certifications tab's KPIs and upload checks there too, AT-P09, IR277) |
 | AT-X05 | Shared data across role switches in one tab, seeds on reload/reset, no external communication |
@@ -165,7 +165,7 @@ AT-*-SRC text in role requirements is authoritative for source-related acceptanc
 | FR-C08 | AT-C08-SRC | DD-C08 | not_run |
 | FR-C11 | AT-C11-SRC | DD-C11 | not_run |
 | FR-C13 | AT-C13-SRC | DD-C13 | not_run |
-| FR-T07 | AT-T07-SRC | DD-T07 | not_run |
+| FR-T07 | AT-T07-SRC | DD-T07 | not_run (Core API: `TestAlertRuleAndTechnicianAcknowledge` — the rule of a policy alert, of a default rule and none; acknowledge with alert.read, resolve only with alert.resolve, IR284) |
 | FR-A05 | AT-A05-SRC | DD-A05 | not_run |
 | FR-A08 | AT-A08-SRC | DD-A08 | not_run |
 | FR-A12 | AT-A12-SRC | DD-A12 | not_run |

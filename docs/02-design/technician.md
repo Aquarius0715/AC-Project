@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.31.0
+version: 0.32.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -29,7 +29,7 @@ Treat route parameters as untrusted input and always validate them. Service name
 | DD-T04 / FR-T04 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Select normal/needs attention/not inspected/not applicable for each component. Record findings and measurement evidence. Do not default to normal | Require reasons for not applicable or not inspected. Do not replace actual measurements with demo diagnosis results |
 | DD-T05 / FR-T05 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Outdoor units use the shared schema with a separate component group | Do not claim detection of tiny leaks without a selected sensor |
 | DD-T06 / FR-T06 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Record each measurement's value, unit, observation time, and inspector. Operating procedures and installation instructions are outside this design | Do not save an unmeasured value as 0 or normal |
-| DD-T07 / FR-T07 | `/technician/units/:id/alerts` / `DiagnosticEvidence` | `alerts.list`, `alerts.get`, `alerts.acknowledge`, `alerts.resolve` | Acknowledgement only marks the alert as acknowledged. Resolution requires remeasurement or a reason recorded by an authorized person | Do not infer theft from connection loss alone. Treat removal detection as a separate event |
+| DD-T07 / FR-T07 | `/technician/units/:id/alerts` / `DiagnosticEvidence` | `alerts.list`, `alerts.get`, `alerts.acknowledge`, `alerts.resolve`, `units.get`, `jobs.get` | Acknowledgement only marks the alert as acknowledged. Resolution requires remeasurement or a reason recorded by an authorized person | Do not infer theft from connection loss alone. Treat removal detection as a separate event |
 | DD-T08 / FR-T08 | `/technician/jobs/:id` / `JobWorkspace` | `jobs.get`, `jobs.submit`, `reports.get`, `jobs.start`, `jobs.resumeRework`, `units.get`, `jobs.acknowledgeAssignment` | Check active assignment and start conditions. Submission enters quality-review waiting state | Reject submission after assignment expiry or cancellation. Keep the draft if sending fails |
 | DD-T09 / FR-T09 | `/technician/jobs/:id` / `ReportEditor` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `attachments.add`, `attachments.getContent`, `units.get` | Report body: 10–4000 characters. Photos: JPEG/PNG, at most 5MiB each, at most 10 (provisional). Part quantities must be greater than 0 | Drafts may be incomplete. Validate the schema on submission. Reselect images after processing failure, while keeping text |
 | DD-T10 / FR-T10 | `/technician/units/:id/control` / `DiagnosticControl` | `commands.create`, `commands.get`, `diagnosticRuns.create`, `diagnosticRuns.get`, `units.get`, `jobs.get`, `diagnosticRuns.list`, `commands.list` | Check `control.diagnose` permission, unit capabilities, reason, and test-run duration (1–15 minutes, provisional) | Do not use test runs to bypass contract restrictions. Do not automatically resend after expiry |
@@ -236,7 +236,7 @@ Verification: AT-T07-SRC uses three fixtures: suspected open window, inspection 
 
 **Source mapping**: SRC-06 BIZ-08, BIZ-11, BIZ-17 → FR-T07 → DD-T07. Source category: original company requirements SRC-06 + design additions. Design addition: possible causes, evidence, and resolution steps. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-T07 / Main display pattern: **UI-DETAIL**. Service boundary: `alerts.list, alerts.get, alerts.acknowledge, alerts.resolve`.
+Scope: FR-T07 / Main display pattern: **UI-DETAIL**. Service boundary: `alerts.list, alerts.get, alerts.acknowledge, alerts.resolve, units.get, jobs.get`.
 
 **Initial view and prerequisites**: An assigned unit has an alert or a suspected issue to diagnose. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -252,6 +252,7 @@ Scope: FR-T07 / Main display pattern: **UI-DETAIL**. Service boundary: `alerts.l
 
 1. Open evidence from the alert list. Check measured values, estimates, on-site inspection results, and their history. Acknowledge the alert. If needed, proceed to remeasurement or resolution with a reason.
 2. Do not invent a numerical probability if an estimate has no confidence information. Acknowledgement sets `acknowledged`. Resolution requires a remeasurement that meets conditions, or a person with `alert.resolve` permission to resolve it with a reason.
+   - As built (IR284): the alert shows `Alert.rule`, the condition of its policy or default rule read with the alert (technicians never read policies), with the recovery a remeasurement needs. The evidence at detection comes first, then the unit's latest reading of the rule's metric (`units.get`). Related lists the URL's job (`jobs.get`), the unit, the policy, the recovery rule, the previous alert and how the user can resolve it. A technician on the unit acknowledges with `alert.read` and resolves with `alert.resolve`, inside the work window (IR94).
 3. Record detection, acknowledgement, and resolution times and actors. For recurrence, create a new alertId linked to the previous event.
 4. Queries to update: `alerts / alert events / customer summary / admin summary / audit`.
 
@@ -478,6 +479,6 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 
 0.10.0: T12 fetches alerts.get using DeviceEvent.alertIds and acknowledges using Alert.version (SR23). Filter device history by scope at event time (SR24).
 
-Additional contracts for current version 0.31.0: Read IR01–IR283 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.32.0: Read IR01–IR284 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

@@ -113,7 +113,7 @@ export function alertRows(alerts: ApiAlert[], units: Map<string, string>, jobOfU
   return alerts.filter((a) => a.status !== "resolved").sort((a, b) => rank[a.severity] - rank[b.severity] || Date.parse(b.detectedAt) - Date.parse(a.detectedAt)).map((a) => {
     const job = jobOfUnit.get(a.unitId);
     return {
-      id: a.id, title: alertTitle(a, t), severity: a.severity, href: `/technician/units/${a.unitId}/alerts${job ? `?jobId=${job}` : ""}`,
+      id: a.id, title: alertTitle(a, t), severity: a.severity, href: `/technician/units/${a.unitId}/alerts?${job ? `jobId=${job}&` : ""}alertId=${a.id}`,
       sub: `${units.get(a.unitId) ?? t("unit")} · ${ALERT_STATE[a.status] ? t(ALERT_STATE[a.status]) : a.status} · ${showTime(a.detectedAt, display)}`,
     };
   });

@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.168.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
+Version: 0.169.0 / Created: 2026-09-14 / Updated: 2026-10-10 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.169.0 (2026-10-10): The technician's alert evidence is built as in Figma — the alert with its policy's condition, the evidence and the latest reading, resolution, history and related records — in Malay. Every Alert now carries `rule`, the condition of its policy or default rule read with it, so technicians and contractors see it without reading policies; a technician on the unit acknowledges with alert.read, and resolving still needs alert.resolve (IR284).
 0.168.0 (2026-10-10): The technician's unit screen is built as in Figma — the register with “Not registered” for what is missing, the components, the technician's jobs on the unit, the open alerts, the latest values (last known while offline) and one metric over 1 h / 24 h / 7 days with the other metrics and the period's events — in Malay; SCR-T02, DD-T02 and DD-T03 list the reads it makes (IR283).
 0.167.0 (2026-10-10): The technician job workspace in Malay — checklist, readings, parts, time on site, report, versions and the check-in, can't-make and sign-off dialogs; the work window and the times of the page in the user's time zone, formatted by the server first (IR282).
 0.166.0 (2026-10-10): The technician overview in Malay; job windows and alert times in the user's time zone, today's timeline in Kuala Lumpur hours (IR281).
