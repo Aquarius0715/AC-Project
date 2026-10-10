@@ -2721,3 +2721,55 @@ After the unit screen (IR259), the customer's home screen `/customer` (FR-C01, D
    - For the customer: contracts & payments and users.
    - The browser demo's screens, the other roles and the voice demo's answers.
    - Shared by all four apps and still English: the failure toast of a Server Action (`actionMessage`) and each route's loading and error states (`RouteLoading`, `RouteError`).
+
+## IR267 Contracts & payments and users in the display language; due dates stay Kuala Lumpur days — 2026-10-10
+
+`/customer/payments`, `/customer/payments/[id]` (FR-C10–C12, DD-C10–C12) and `/customer/users` (FR-C19, DD-C19) follow air quality (IR266). With them, every customer screen shows the display language.
+
+1. **Texts.** These are translated:
+   - contracts: the list, plan names, period, scope and status badges;
+   - invoices: the status filter, the rows, the empty states and the notes;
+   - the invoice page:
+     - the demo payment: methods; the processing, confirmed and failed states; the demo provider's events;
+     - the payment history and the reminders;
+     - the instructions and the message previews (email, WhatsApp);
+   - the cooling-restriction notice and tab: reason, notice, start, units, per-unit apply and release states, timeline (IR42);
+   - inquiries: the list, the form and the toasts;
+   - users:
+     - the table: role, status, last sign-in, channels;
+     - the invite dialog with its checks and toasts;
+     - the page shown to members.
+   Unit and location names, contract IDs, invoice numbers and inquiry messages stay as written. The payment message preview is written in the recipient's language.
+2. **Dates and times.**
+   - Contract periods, invoice due dates and billing months are Kuala Lumpur business days (REV18-035), written in the user's language.
+     - A due date at 23:59 Kuala Lumpur stays that day for a user in Tokyo, where the instant is already the next day.
+     - When the display time zone is not Kuala Lumpur, the pages say so. The list shows "Due dates and contract periods are Kuala Lumpur dates (Asia/Kuala_Lumpur)."; the invoice shows "Kuala Lumpur date (Asia/Kuala_Lumpur)".
+   - These are instants in the user's display time zone (IR44):
+     - payments, inquiries, reminders and the restriction's notice day;
+     - the restriction's events, its start and its release request;
+     - invitations and last sign-ins.
+3. **Status codes stay codes.** The per-unit release badge took its tone from its English text ("Released", "Release failed"); `noticeUnits` now returns `releaseTone`. Contract and invoice statuses stay the codes that the badges key on, and the view translates them.
+4. **Shared helpers.** These take the translator or the display:
+   - in `lib/clientBilling`: `contractCards`, `clientInvoiceRows`, `paymentLines`, `restrictionNotice`, `noticeUnits`, `noticeTimeline`, `inquiryLines` and `previewText`. `businessDay` and `billingMonth` are new; `longDay` is removed;
+   - `policyText` (`lib/restrictions`), `clientUserRows` and `inviteError` (`lib/assets`).
+   HQ's billing, restriction and users screens still call them in English with Kuala Lumpur times.
+   `clientBilling.test.ts` is new (6 tests):
+   - contract cards and invoice rows in both languages, with the Kuala Lumpur due day;
+   - payment and event times in Tokyo;
+   - the restriction notice per unit;
+   - the message previews;
+   - the users table for HQ and for the owner, and the invite checks.
+5. **Fixed in the E2E suite.** `customer/filter-care.e2e.ts` read the reminder lines right after navigating, before the settings card had rendered. One run compared an empty snapshot and failed, although the settings were put back. The spec now waits for the card and fails on an empty snapshot.
+6. **Checked.**
+   - Vitest: 36 files, 196 tests.
+   - E2E: 55 passed, 9 skipped. The language spec also opens contracts & payments, the newest invoice and users in Malay with Asia/Tokyo:
+     - it checks the Kuala Lumpur date notes;
+     - it opens the invite dialog and cancels it.
+     The users are en / Asia/Kuala_Lumpur, all 44 E2E jobs are cancelled, and no invitation was left.
+   - Screenshots of the list, the invoice and the restriction tab in Malay show no overflow.
+7. **Found: the last sign-in is never recorded.** `clientUsers.list` reads `identity.users.last_sign_in_at`, but nothing writes it. "Last sign-in" therefore shows "—" for everyone, both on the customer's Users page and in HQ's Users tab. The access token carries `auth_time` (checked on the local Keycloak; Cognito sends it too). Recording it is planned for the next round.
+8. **Still open.**
+   - The browser demo's screens.
+   - The partner, technician and HQ screens.
+   - The voice demo's answers.
+   - The shared failure toast and route states (IR266).

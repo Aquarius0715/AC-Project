@@ -1,8 +1,9 @@
-// AT-X01-N ③ (FR-X01, IR44, NFR-08, IR259–IR266): with Malay and another display time zone saved in Preferences, the
-// customer's overview, units & locations, automations, alerts, maintenance, energy & cost, carbon offsets, air quality and
-// unit screen speak Malay and show their times in that zone with the zone's abbreviation — the request form takes its
-// times in that zone too, while the energy periods and the 7-day air window start on Kuala Lumpur days — and the unit's
-// ID and units (°C) stay as stored. English and the earlier zone come back at the end, or in afterEach when the test fails.
+// AT-X01-N ③ (FR-X01, IR44, NFR-08, IR259–IR267): with Malay and another display time zone saved in Preferences, every
+// customer screen — overview, units & locations, automations, alerts, maintenance, energy & cost, carbon offsets, air
+// quality, contracts & payments with an invoice, users and the unit screen — speaks Malay and shows its times in that
+// zone with the zone's abbreviation. The request form takes its times in that zone too, while the energy periods, the
+// 7-day air window and the due dates stay Kuala Lumpur days; the unit's ID and units (°C) stay as stored. English and the
+// earlier zone come back at the end, or in afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
 
@@ -62,6 +63,21 @@ test("the customer screens in Malay keep IDs and units and use the display time 
   await expect(main).toContainText("hari kalendar dalam Asia/Kuala_Lumpur"); // the 7-day window starts on a Kuala Lumpur day
   await main.getByRole("button", { name: "Rekod pengudaraan" }).click(); // opened and cancelled: a log cannot be removed
   await expect(dialog).toContainText("CO2 semasa");
+  await dialog.getByRole("button", { name: "Batal" }).click();
+  await expect(dialog).toBeHidden();
+  await page.goto("/customer/payments");
+  for (const name of [/^KONTRAK \(\d+\)$/, "Invois untuk kontrak ini"]) await expect(main.getByRole("heading", { name })).toBeVisible();
+  await expect(main).toContainText("Tarikh akhir dan tempoh kontrak ialah tarikh Kuala Lumpur (Asia/Kuala_Lumpur)."); // another display zone: the due dates stay KL days
+  await main.locator('a[href^="/customer/payments/"]').first().click(); // the newest invoice of the contract
+  await page.waitForURL(/\/customer\/payments\/[^/?]+/);
+  await expect(page.getByRole("tab", { name: "Pembayaran" })).toHaveAttribute("aria-selected", "true");
+  await expect(main.getByRole("heading", { name: "Sejarah pembayaran" })).toBeVisible();
+  await expect(main).toContainText("tarikh Kuala Lumpur (Asia/Kuala_Lumpur)");
+  await page.goto("/customer/users");
+  await expect(main.getByRole("heading", { name: "Pengguna", level: 1 })).toBeVisible();
+  await expect(main.getByRole("columnheader", { name: "Peranan" })).toBeVisible();
+  await page.getByRole("button", { name: "+ Jemput ahli" }).click(); // opened and cancelled: nothing is invited
+  await expect(dialog.getByRole("heading", { name: "Jemput ahli" })).toBeVisible();
   await dialog.getByRole("button", { name: "Batal" }).click();
   await expect(dialog).toBeHidden();
   await page.goto(href!);

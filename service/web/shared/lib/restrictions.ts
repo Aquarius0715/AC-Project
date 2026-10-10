@@ -2,6 +2,9 @@
 // projected for /admin/restrictions and /admin/restrictions/[id], with the transition rules of IR35 / IR96 / IR141 for
 // the action availability. Pure code shared by the Server Components and the client views.
 import { klStamp } from "@ac/web/lib/energy";
+import { translator, type T } from "@ac/web/lib/i18n";
+
+const en = translator("en");
 
 export type RestrictionState = "scheduled" | "requested" | "applied" | "release_requested" | "released" | "cancelled";
 export type Policy = { kind: "temperature_limit"; minimumCoolingSetpoint: number } | { kind: "power_off" };
@@ -24,7 +27,8 @@ export const states: RestrictionState[] = ["scheduled", "requested", "applied", 
 export const lifecycle = ["Scheduled", "Requested", "Applied", "Release requested", "Released"];
 export const stateLabel: Record<RestrictionState, string> = { scheduled: "Scheduled", requested: "Requested", applied: "Applied", release_requested: "Release requested", released: "Released", cancelled: "Cancelled" };
 export const stateTone = (s: RestrictionState) => (s === "applied" ? "warn" : s === "released" ? "ok" : s === "cancelled" ? "muted" : s === "release_requested" ? "unknown" : "primary") as "warn" | "ok" | "muted" | "unknown" | "primary";
-export const policyText = (p: Policy) => (p.kind === "power_off" ? "Power off" : `Temperature limit — cooling setpoint ≥ ${p.minimumCoolingSetpoint} °C`);
+/** The policy in the display language (the customer's notice, IR267); HQ's screens keep English. */
+export const policyText = (p: Policy, t: T = en) => (p.kind === "power_off" ? t("Power off") : t("Temperature limit — cooling setpoint ≥ {value} °C", { value: p.minimumCoolingSetpoint }));
 
 /** An active grace period or exception at now (execute and apply retries wait; release may proceed). */
 export function activePeriod(r: ApiRestriction, now: Date): string | null {

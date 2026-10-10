@@ -1,7 +1,7 @@
 // HQ customers & units (FR-A02, DATA_SOURCE=api): customers with their contract standing, the property / space tree,
 // unit rows, the unit form and the customer's alert policies projected for /admin/units. Pure code shared by the
 // Server Component and the client view.
-import { translator, type T } from "@ac/web/lib/i18n";
+import { EN, showDate, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { amount, klStamp, one } from "@ac/web/lib/energy";
 import { metricLabel, metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
 
@@ -324,21 +324,25 @@ export type ClientUserRow = {
   lastOwner: boolean; you: boolean;
 };
 const channelLabel: Record<Channel, string> = { inApp: "In-app", email: "Email", whatsapp: "WhatsApp" };
-/** Rows by name; the last active owner is marked because it cannot be demoted, disabled or removed (CONFLICT). */
-export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) => string, self?: string): ClientUserRow[] {
+/** Rows by name; the last active owner is marked because it cannot be demoted, disabled or removed (CONFLICT). The
+ * customer's Users page passes its display (IR267): the invite day and the last sign-in in the user's time zone; HQ's
+ * register keeps English and Kuala Lumpur. */
+export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) => string, self?: string, i?: I18n): ClientUserRow[] {
   const owners = us.filter((u) => u.clientRole === "owner" && u.status === "active").length;
+  const t = (i ?? EN).t;
   return [...us].sort((a, b) => (a.displayName ?? a.email).localeCompare(b.displayName ?? b.email)).map((u) => ({
     id: u.id, version: u.version, email: u.email, name: u.displayName, role: u.clientRole, status: u.status,
-    sub: u.displayName ? u.email : `invited ${klDate(u.invitedAt)} by ${who(u.invitedByMembershipId)}`, lastSignIn: u.lastSignInAt ? klStamp(u.lastSignInAt) : "—",
-    channels: u.status === "active" && u.allowedChannels.length ? u.allowedChannels.map((c) => channelLabel[c]).join(" · ") : "—",
+    sub: u.displayName ? u.email : t("invited {date} by {who}", { date: i ? showDate(u.invitedAt, i.display) : klDate(u.invitedAt), who: who(u.invitedByMembershipId) }),
+    lastSignIn: u.lastSignInAt ? (i ? showTime(u.lastSignInAt, i.display) : klStamp(u.lastSignInAt)) : "—",
+    channels: u.status === "active" && u.allowedChannels.length ? u.allowedChannels.map((c) => t(channelLabel[c])).join(" · ") : "—",
     lastOwner: u.clientRole === "owner" && u.status === "active" && owners === 1, you: !!self && u.membershipId === self,
   }));
 }
 /** A plain address up to 254 characters, not yet a user of this customer (case-insensitive). */
-export function inviteError(email: string, us: { email: string }[]): string | undefined {
+export function inviteError(email: string, us: { email: string }[], t: T = translator("en")): string | undefined {
   const e = email.trim();
-  if (e.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return "A valid email address (up to 254 characters)";
-  if (us.some((u) => u.email.toLowerCase() === e.toLowerCase())) return "Already a user of this customer";
+  if (e.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return t("A valid email address (up to 254 characters)");
+  if (us.some((u) => u.email.toLowerCase() === e.toLowerCase())) return t("Already a user of this customer");
   return undefined;
 }
 

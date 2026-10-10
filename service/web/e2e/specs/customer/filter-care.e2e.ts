@@ -17,7 +17,13 @@ test("the Filter care tab lists every AC and goes back to My requests", async ({
 test("reminder settings refuse too few hours, then are saved and put back", async ({ page }) => {
   await page.goto("/customer/maintenance?tab=filter-care");
   const dialog = page.getByRole("dialog");
-  const before = (await page.getByRole("main").innerText()).match(/Reminders[\s\S]{0,200}/)?.[0] ?? "";
+  // the reminder lines once the settings card has rendered (a read right after navigation can come before it)
+  const reminders = async () => {
+    await expect(page.getByRole("button", { name: "Edit reminders" })).toBeVisible();
+    return (await page.getByRole("main").innerText()).match(/Reminders[\s\S]{0,200}/)?.[0] ?? "";
+  };
+  const before = await reminders();
+  expect(before).not.toBe("");
   await page.getByRole("button", { name: "Edit reminders" }).click();
   await dialog.getByRole("button", { name: "Custom" }).click();
   await dialog.getByLabel("Hours of running").fill("20");
@@ -37,7 +43,7 @@ test("reminder settings refuse too few hours, then are saved and put back", asyn
   await dialog.getByRole("button", { name: "Save reminders" }).click();
   await expect(page.getByText("Reminder settings saved.").last()).toBeVisible();
   await page.reload();
-  expect((await page.getByRole("main").innerText()).match(/Reminders[\s\S]{0,200}/)?.[0] ?? "").toBe(before);
+  expect(await reminders()).toBe(before);
 });
 
 test("Request cleaning opens New request for that AC, prefilled", async ({ page }) => {
