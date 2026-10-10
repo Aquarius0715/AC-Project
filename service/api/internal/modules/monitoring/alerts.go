@@ -89,7 +89,7 @@ const severityRank = `CASE a.severity WHEN 'normal' THEN 0 WHEN 'warning' THEN 1
 // @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:alert.read | admin:alert.policy.read
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A05, DD-C01, DD-C08, DD-P04, DD-T01, DD-T07 · Query: filters unitId,unitIds,severity,status,from,to,customerId,propertyId · sort id,createdAt,updatedAt,severity (default severity desc;id asc)
+// @Description	Design: DD-A05, DD-C01, DD-C08, DD-P04, DD-T01, DD-T07, DD-T02 · Query: filters unitId,unitIds,severity,status,from,to,customerId,propertyId · sort id,createdAt,updatedAt,severity (default severity desc;id asc)
 // @Tags			alerts
 // @Accept			json
 // @Produce		json

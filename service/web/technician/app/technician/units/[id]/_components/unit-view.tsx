@@ -1,104 +1,116 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Banner, Card, ConnBadge, LineChart, Page, SeverityBadge, SummaryList, Tabs } from "@ac/web/components/ui";
-import { bucket, componentGroups, klTime, latest, windowMs, type ApiUnitDetail } from "@ac/web/lib/units";
-import { useDisplay } from "@ac/web/components/I18n";
+import { Badge, Banner, Card, ConnBadge, LineChart, LinkBtn, Page, SeverityBadge, SummaryList, Tabs, TextLink, cx } from "@ac/web/components/ui";
+import { useT } from "@ac/web/components/I18n";
+import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
+import type { Period, SeriesChart, Tile } from "@ac/web/lib/techUnit";
+import type { UnitLive } from "../_lib/load";
 
-export type ApiAlert = { id: string; severity: "critical" | "warning" | "normal"; status: string; causeCode: string; type: string; evidenceText: string; detectedAt: string; acknowledgedAt: string | null };
-export type ApiJob = { projection: string; id?: string; type?: string; status?: string; scheduledSlot?: { startAt: string; endAt: string } | null; requestedSlot?: { startAt: string; endAt: string } | null };
-export type ApiMeasurement = { value: number | null; unit: string; observedAt: string; quality: string };
-const jobType: Record<string, string> = { reactive: "Reactive", preventive: "Preventive", installation: "Installation", inspection: "Inspection" };
-
-const comps = { Indoor: ["Filter: attention (2026-06-12)"], Outdoor: ["All normal (2026-06-12)"], Electrical: ["Capacitor not inspected — reason given"] };
-const counts = { Indoor: 8, Outdoor: 5, Electrical: 5 };
-
-export type TechUnitData = { d: ApiUnitDetail; alerts: ApiAlert[]; jobs: ApiJob[]; series: ApiMeasurement[]; now: string };
-
-/** Technician unit page. `data` comes from the Server Component in API mode (series = latest 7 days, up to 100
- * temperature measurements); the window tabs filter it on the client. The demo uses fixture values. */
-export function TechUnitView({ id, data }: { id: string; data?: TechUnitData }) {
-  const display = useDisplay(); // reading times in the user's display time zone (IR44)
-  const [tab, setTab] = useState<"register" | "monitoring">("register");
-  const [win, setWin] = useState<"1h" | "24h" | "7d">("24h");
-  const [lost, setLost] = useState(false);
-  const d = data?.d ?? null;
-  const alerts = { data: data?.alerts ?? [] };
-  const jobs = { data: data?.jobs ?? [] };
-  // the job diagnostic control works for (DD-T10): in progress first, else assigned
-  const controlJob = jobs.data.find((j) => j.status === "in_progress")?.id ?? jobs.data.find((j) => j.status === "assigned" || j.status === "rework_requested")?.id ?? null;
-  const to = new Date(data?.now ?? 0);
-  const from = new Date(to.getTime() - windowMs[win]);
-  const series = { data: (data?.series ?? []).filter((m) => new Date(m.observedAt) >= from), loading: false };
-  if (d) {
-    const groups = componentGroups(d.components);
-    const temp = latest(d, "temperature", undefined, display);
-    const pow = latest(d, "power", undefined, display);
-    const hum = latest(d, "humidity", undefined, display);
-    const offline = d.connection !== "online";
-    const points = bucket(series.data, from, to);
-    const sched = (j: ApiJob) => j.scheduledSlot ?? j.requestedSlot;
-    return (
-      <Page>
-        <div className="flex flex-wrap items-center justify-between gap-2"><div><h1 className="text-lg font-bold">{d.displayName}</h1><div className="mt-1 flex gap-2"><ConnBadge s={offline ? "offline" : "online"} /></div></div><Tabs value={tab} onChange={setTab} tabs={[{ id: "register", label: "Register" }, { id: "monitoring", label: "Monitoring" }]} /></div>
-        {offline && <Banner tone="warn">Communication lost — updates stopped. Showing last known values (last seen {klTime(d.lastSeenAt, true)}).</Banner>}
-        {tab === "register" ? (
-          <div className="split">
-            <div className="flex min-w-0 flex-col gap-4">
-              <Card title="Unit register"><SummaryList cols={2} items={[["Location", d.location.pathLabels.join(" › ")], ["Manufacturer / model", `${d.capabilities.manufacturer} / ${d.capabilities.model}`], ["Installed", d.installedAt ? klTime(d.installedAt, true).split(",")[0] : "Not registered"], ["Capability version", String(d.capabilityVersion)], ["Maintenance scope", d.serviceScope.map((x) => x[0].toUpperCase() + x.slice(1)).join(" · ")], ["Access", d.location.accessInstructions ?? "—"]]} /><p className="mt-2 text-xs text-muted">{d.components.length} components across 3 groups ({groups.Indoor.length} indoor, {groups.Outdoor.length} outdoor, {groups.Electrical.length} electrical) — inspect them in the Job Workspace.</p></Card>
-              <Card title={`Components (${d.components.length})`}><div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>{(Object.keys(groups) as (keyof typeof groups)[]).map((g) => <div key={g} className="rounded-xl bg-surface2 p-3"><b className="text-[13px]">{g} · {groups[g].length} components</b><div className="text-xs text-muted">{groups[g].join(", ") || "—"}</div></div>)}</div></Card>
-              <Card title="Maintenance history">{jobs.data.length === 0 ? <p className="text-[13px] text-muted">No jobs you can see on this unit.</p> : jobs.data.map((j) => <Link key={j.id} href={`/technician/jobs/${j.id}`} className="block border-t border-line py-2 text-[13px] first:border-0 hover:bg-surface2/50"><b>{jobType[j.type ?? ""] ?? j.type} · {j.status}</b><div className="text-xs text-muted">{sched(j) ? klTime(sched(j)!.startAt, true) : "not scheduled"}</div></Link>)}</Card>
-            </div>
-            <div className="flex min-w-0 flex-col gap-4">
-              <Card title={`Open alerts (${alerts.data.length})`} action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${id}/alerts`}>Evidence →</Link>}>{alerts.data.length === 0 ? <p className="text-[13px] text-muted">No open alerts.</p> : alerts.data.map((a) => <div key={a.id} className="border-t border-line py-2 first:border-0"><b className="text-[13px]">{a.causeCode !== "unknown" ? a.causeCode.replace(/_/g, " ") : a.type}</b> <SeverityBadge s={a.severity} /><p className="text-xs text-muted">{a.evidenceText} · {klTime(a.detectedAt, true)}</p><p className="mt-1 text-xs text-muted">{a.acknowledgedAt ? "Acknowledged" : "Acknowledged by nobody yet"}. Completing the job does not resolve it.</p></div>)}</Card>
-              <Card title="Live"><SummaryList items={[["Temperature", temp ? `${temp.text} · ${temp.at}` : "—"], ["Power", pow ? `${pow.text} · ${pow.at}` : "—"], ["Humidity", hum ? `${hum.text} · ${hum.at}` : "—"], ["Connection", `${d.connection} · last seen ${klTime(d.lastSeenAt)}`]]} /></Card>
-              <Card title="Diagnostics">{controlJob ? <Link href={`/technician/units/${id}/control?jobId=${controlJob}`} className="text-xs font-semibold text-primary">Open diagnostic control →</Link>
-                : <p className="text-xs text-muted">Diagnostic control opens for a job you are assigned to on this AC (assigned or in progress).</p>}</Card>
-            </div>
-          </div>
-        ) : (
-          <Card title={`Temperature · last ${win} (rolling)`} action={<Tabs value={win} onChange={setWin} tabs={[{ id: "1h", label: "1h" }, { id: "24h", label: "24h" }, { id: "7d", label: "7d" }]} />}>
-            {points.every((p) => p === null) ? <p className="text-[13px] text-muted">{series.loading ? "Loading…" : "No valid measurements in this window."}</p> : <LineChart points={points} height={170} labels={[`${win} ago`, "", "", "", "now"]} />}
-            <p className="mt-1 text-[11px] text-muted">latest {series.data.length} measurements · gaps stay unconnected; suspect or missing readings are not plotted.</p>
-          </Card>
-        )}
-      </Page>
-    );
-  }
-  if (id === "unit-other-customer") return <Page className="max-w-xl"><Card title="This page isn’t available" sub="Not in your assignments (NOT_FOUND)." /></Page>;
-  const missing = id === "unit-non-rto";
-  const temp = [26, 26, 25, 25, null, null, 26, 27, 28, 29, 30, 30.4];
+/** The technician's unit (FR-T02, FR-T03, Figma Technician 02-10…02-13): the register with its components, the
+ * maintenance history and open alerts, the latest values and one metric over a period — the metric and the period in
+ * the URL (`metric` opens Monitoring, `period`). Texts in the user's display language; the times come formatted from
+ * the loader (IR283). */
+export function TechUnitView({ live }: { live: UnitLive }) {
+  const t = useT();
+  const patch = useUrlPatch();
+  const setPeriod = (p: Period) => patch({ period: p === "24h" ? null : p });
+  const periods = <Tabs value={live.period} onChange={setPeriod} tabs={live.periods} />;
   return (
     <Page>
-      <div className="flex flex-wrap items-center justify-between gap-2"><div><h1 className="text-lg font-bold">Bedroom AC · {id}</h1><div className="mt-1 flex gap-2"><ConnBadge s={lost ? "offline" : "online"} /></div></div><Tabs value={tab} onChange={setTab} tabs={[{ id: "register", label: "Register" }, { id: "monitoring", label: "Monitoring" }]} /></div>
-      {lost && <Banner tone="warn">Communication lost — updates stopped. Showing last known values.</Banner>}
-      {tab === "register" ? (
-        <div className="split">
+      <div className="flex flex-wrap items-center gap-2 text-[13px]">
+        <Link href={live.back} className="font-semibold text-primary" aria-label={t("Back")}>‹</Link><h1 className="text-base font-bold">{live.name}</h1><span className="text-muted">· {live.short}</span><ConnBadge s={live.connection} />
+      </div>
+      <div><Tabs value={live.tab} onChange={(v) => patch({ metric: v === "monitoring" ? live.metric : null })} tabs={live.tabs} /></div>
+      {live.tab === "register" ? (
+        <div className="split-rev">
           <div className="flex min-w-0 flex-col gap-4">
-            <Card title="Unit register"><SummaryList cols={2} items={[["Location", "customer-a · Home A › 1F › Bedroom"], ["Manufacturer / model", missing ? "Not registered" : "AC-Co / ventilation-demo v3"], ["Configuration", missing ? "Not registered" : "Split · 2.5 kW · R32"], ["Installed", missing ? "Not registered" : "2025-03-01"], ["Capability version", "3"], ["Maintenance scope", "Indoor · Outdoor · Electrical"]]} /><p className="mt-2 text-xs text-muted">18 components across 3 groups (8 indoor, 5 outdoor, 5 electrical) — see Job Workspace for inspection.</p></Card>
-            <Card title="Components (18) · last inspection"><div className="grid-fluid" style={{ ["--min"as string]: "200px" }}>{(Object.keys(comps) as (keyof typeof comps)[]).map((g) => <div key={g} className="rounded-xl bg-surface2 p-3"><b className="text-[13px]">{g} · {counts[g]} components</b>{comps[g].map((c) => <div key={c} className="text-xs text-muted">{c}</div>)}</div>)}</div></Card>
-            <Card title="Maintenance history">{[["job-contractor-a · Reactive", "today 10:00–12:00 · you"], ["job-c01 · Preventive", "2026-06-12 · filter replaced"], ["job-a17 · Installation check", "2025-03-01 · commissioning"]].map(([a, b]) => <div key={a} className="border-t border-line py-2 text-[13px] first:border-0"><b>{a}</b><div className="text-xs text-muted">{b}</div></div>)}</Card>
+            <Card title={t("Unit register")}>
+              <SummaryList items={live.register.rows} />
+              <p className="mt-2 rounded-xl bg-primary-soft/40 px-3 py-2 text-[11px] text-muted">ⓘ {live.register.note}</p>
+              <div className="mt-3 flex flex-col gap-2">
+                <LinkBtn href={live.alertsHref} size="sm">{t("Alert evidence →")}</LinkBtn>
+                {live.controlHref ? <LinkBtn href={live.controlHref} size="sm">{t("Diagnostics →")}</LinkBtn> : <p className="text-[11px] text-muted">{t("Diagnostic control opens for a job you are assigned to on this AC (assigned or in progress).")}</p>}
+              </div>
+              {live.register.missing && <p className="mt-2 text-[11px] text-muted">{t("Missing values are never filled from similar models or today’s date (BR-T02).")}</p>}
+            </Card>
+            <Card title={t("Components ({n})", { n: live.componentCount })}>
+              {live.components.length === 0 ? <p className="text-[13px] text-muted">{t("No components in this unit’s service scope.")}</p> : live.components.map((c) => (
+                <div key={c.group} className="border-t border-line py-2 first:border-0"><b className="text-[13px]">{c.title}</b><div className="text-xs text-muted">{c.names}</div></div>
+              ))}
+              <p className="mt-1 text-[11px] text-muted">{t("Each component gets its result in the job workspace — normal is never preselected.")}</p>
+            </Card>
           </div>
           <div className="flex min-w-0 flex-col gap-4">
-            <Card title="Open alerts (1)" action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${id}/alerts`}>Evidence →</Link>}><b className="text-[13px]">Bedroom too hot</b> <SeverityBadge s="warning" /><p className="text-xs text-muted">30.4 °C since 09:12 · policy ≥ 30 °C</p><p className="mt-1 text-xs text-muted">Acknowledged by nobody yet. Completing the job does not resolve it.</p></Card>
-            <Card title="Live"><SummaryList items={[["Temperature", "24.5°C · updated 2s ago"], ["Power", "1200 W · updated 2s ago"], ["Connection", lost ? "Offline" : "Online · last seen 09:41"]]} /><button className="mt-2 text-[11px] text-muted underline" onClick={() => setLost((l) => !l)}>preview: communication lost</button></Card>
-            <Card title="Diagnostics"><Link href={`/technician/units/${id}/control`} className="text-xs font-semibold text-primary">Open diagnostic control →</Link></Card>
+            <Card title={t("Time-series monitoring")} action={periods}>
+              {live.stopped && <div className="mb-3"><Banner tone="warn">{live.stopped}</Banner></div>}
+              <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>{[live.tiles.temperature, live.tiles.power, live.tiles.connection].map((x) => <TileBox key={x.label} tile={x} />)}</div>
+              <Series chart={live.chart} width={700} />
+            </Card>
+            <Card title={t("Maintenance history")}>
+              {live.history.length === 0 ? <p className="text-[13px] text-muted">{t("No jobs of yours on this unit.")}</p> : live.history.map((j) => (
+                <Link key={j.id} href={`/technician/jobs/${j.id}`} className="flex items-center justify-between gap-2 border-t border-line py-2 first:border-0 hover:bg-surface2/60">
+                  <span className="min-w-0"><b className="block text-[13px]">{j.title}</b><span className="text-xs text-muted">{j.sub}</span></span><Badge tone={j.badge.tone}>{j.badge.text}</Badge>
+                </Link>
+              ))}
+              <p className="mt-1 text-[11px] text-muted">{t("Only your own assignments on this unit are listed.")}</p>
+            </Card>
+            <Card title={t("Open alerts ({n})", { n: live.alerts.length })} action={<TextLink href={live.alertsHref}>{t("Evidence →")}</TextLink>}>
+              {live.alerts.length === 0 ? <p className="text-[13px] text-muted">{t("No open alerts.")}</p> : live.alerts.map((a) => (
+                <div key={a.id} className="border-t border-line py-2 first:border-0">
+                  <div className="flex items-start justify-between gap-2"><span className="min-w-0"><b className="block text-[13px]">{a.title}</b><span className="text-xs text-muted">{a.sub}</span></span><SeverityBadge s={a.severity} /></div>
+                  <p className="mt-1 text-[11px] text-muted">{a.ack}</p>
+                </div>
+              ))}
+            </Card>
           </div>
         </div>
       ) : (
-        <div className="split">
-          <Card title="Temperature · last 24 h (rolling)" action={<Tabs value={win} onChange={setWin} tabs={[{ id: "1h", label: "1h" }, { id: "24h", label: "24h" }, { id: "7d", label: "7d" }]} />}>
-            <div className="mb-3 grid-fluid" style={{ ["--min"as string]: "130px" }}>{[["Temperature", "24.5°C", "observed 09:41:02"], ["Power", "1200 W", "updated 2s ago"], ["Operation", "Cooling", "observed 09:41:02"], ["Connection", lost ? "Offline" : "Online", "last seen 09:41"]].map(([a, b, c]) => <div key={a} className="rounded-xl bg-surface2 p-2.5"><div className="text-[11px] text-muted">{a}</div><b>{b}</b><div className="text-[10px] text-muted">{c}</div></div>)}</div>
-            <LineChart points={temp} min={22} max={32} threshold={30} height={170} labels={["24 h ago", "", "", "", "now"]} />
-            <p className="mt-1 text-[11px] text-muted">no data 03:00–05:10 (gap not connected) · alert ≥ 30 °C. Reordered/duplicate demo events never roll values backward.</p>
+        <>
+          <Card title={live.chart.title} action={periods}>
+            {live.stopped && <div className="mb-3"><Banner tone="warn">{live.stopped}</Banner></div>}
+            <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>{[live.tiles.temperature, live.tiles.power, live.tiles.operation, live.tiles.connection].map((x) => <TileBox key={x.label} tile={x} />)}</div>
+            <Series chart={live.chart} width={1000} />
           </Card>
-          <div className="flex min-w-0 flex-col gap-4">
-            <Card title="Other metrics">{[["Humidity", "60 %RH"], ["Power", "1.20 kW"], ["Supply air", "14.2 °C"]].map(([a, b]) => <div key={a} className="flex justify-between border-t border-line py-2 text-[13px] first:border-0"><span>{a}</span><span><b>{b}</b><span className="block text-[10px] text-muted">observed 09:41:02 · gap 03:00–05:10</span></span></div>)}</Card>
-            <Card title="Events in this window"><div className="text-[13px]"><b>09:12 · Alert raised — Bedroom too hot</b><div className="text-xs text-muted">temperature ≥ 30 °C for 60 s · alert-temp-a</div></div><div className="mt-2 text-[13px]"><b>05:10 · Data resumed</b><div className="text-xs text-muted">gateway reconnected · 2 h 10 m gap left unconnected</div></div></Card>
-          </div>
-        </div>
+          {live.others.length > 0 && (
+            <div className="grid-fluid" style={{ ["--min" as string]: "260px" }}>
+              {live.others.map((m) => (
+                <Card key={m.metric} title={m.label} action={<b className={cx("text-[13px]", m.tone === "warn" && "text-warn")}>{m.value}</b>}>
+                  {m.points.every((v) => v === null) ? <p className="text-xs text-muted">{t("No valid readings in this period.")}</p> : <LineChart points={m.points} height={56} width={500} />}
+                  <div className="mt-1 flex justify-between gap-2 text-[11px] text-muted"><span>{m.sub}</span><button type="button" className="font-semibold text-primary" onClick={() => patch({ metric: m.metric })}>{t("Chart →")}</button></div>
+                </Card>
+              ))}
+            </div>
+          )}
+          <Card title={t("Events in this period")}>
+            {live.events.length === 0 ? <p className="text-[13px] text-muted">{t("No alert or device events in this period.")}</p> : live.events.map((e) => (
+              <div key={e.id} className="flex items-start justify-between gap-2 border-t border-line py-2 first:border-0">
+                <span className="min-w-0"><b className="block text-[13px]">{e.time} · {e.title}</b>{e.sub && <span className="text-xs text-muted">{e.sub}</span>}</span><Badge tone={e.badge.tone}>{e.badge.text}</Badge>
+              </div>
+            ))}
+          </Card>
+        </>
       )}
     </Page>
+  );
+}
+
+function TileBox({ tile }: { tile: Tile }) {
+  return (
+    <div className="rounded-xl bg-surface2 p-3">
+      <div className="text-[11px] text-muted">{tile.label}</div>
+      <b className={cx("text-lg", tile.tone === "crit" && "text-crit", tile.tone === "warn" && "text-warn")}>{tile.value}</b>
+      <div className="text-[11px] text-muted">{tile.sub}</div>
+    </div>
+  );
+}
+
+function Series({ chart, width }: { chart: SeriesChart; width: number }) {
+  const t = useT();
+  return (
+    <div className="mt-3">
+      {chart.empty ? <div className="rounded-xl border border-dashed border-line p-6 text-center text-[13px] text-muted">{t("No valid readings in this period.")}</div> : <LineChart points={chart.points} height={200} width={width} labels={chart.labels} />}
+      <p className="mt-1 text-[11px] text-muted">{[chart.count, chart.gap, t("Gaps in missing data are not connected by lines. Reordered or duplicate demo events never roll values backward.")].filter(Boolean).join(" · ")}</p>
+    </div>
   );
 }

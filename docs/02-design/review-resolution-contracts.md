@@ -3190,3 +3190,44 @@ The Certifications tab of `/partner/team` (FR-P09, DD-P09, Figma Contractor 04-6
    - The HQ screens.
    - The browser demo.
    - The assistant panel and the voice demo's answers.
+
+## IR283 The technician's unit screen as in Figma, in the display language — 2026-10-10
+
+`/technician/units/[id]` (SCR-T02, FR-T02, FR-T03, DD-T02, DD-T03, Figma Technician 02-10…02-13) is rebuilt as in Figma and follows the display language and time zone.
+
+1. **Register tab.**
+   - The unit register: location, manufacturer / model, configuration (the unit type), installed, capability version and maintenance scope, with the access instructions when the unit has them. A missing value says "Not registered" and the card says it is never filled from a similar model or today's date (DD-T02).
+   - The note "18 components across 3 groups (8 indoor, 5 outdoor, 5 electrical)", and the buttons to the alert evidence and to diagnostic control. Control opens only for an active job of the technician on the unit: in progress first, then assigned or returned for rework (IR94).
+   - The components of each group in the service scope (IR100). Each gets its result in the job workspace.
+   - Time-series monitoring: temperature, power and connection with their times, and the chart of the period.
+   - Maintenance history: the technician's own jobs on the unit. Current visits come first with their window, then ended jobs with their completion day.
+   - Open alerts: worst and newest first, with the evidence, the detection time and who acknowledged them. Finishing the job does not resolve an alert.
+2. **Monitoring tab.**
+   - The metric's chart with four tiles: temperature, power, operation and connection.
+   - Up to three other metrics, each with its latest value and the period's slots. One click charts that metric.
+   - The events of the period: the unit's alert raises, acknowledgements and resolutions, and its device's connection, power and tamper events (`devices.list` → `devices.events` with from / to).
+3. **URL and periods (DD-T03).**
+   - `metric` opens Monitoring, `period` is 1h / 24h / 7d (24h by default), and `jobId` names the job the page was opened for: the back link, and the job the alert evidence opens with. The job workspace's "Unit →" now passes it.
+   - 1 h and 24 h roll back from now. 7 days are the Kuala Lumpur calendar days up to today, and the title says so.
+   - The chart has 12 slots, each with the latest valid reading. Stale, suspect and missing readings are not plotted, and the empty slots between readings are named as a gap that stays unconnected.
+4. **Offline.** While the unit is not online, the values say "last known · observed …". The banner says when updates stopped and that nothing on the page is real-time (DD-T03).
+5. **Before the work window (IR76).** `units.get` answers `errors.assignment_not_started`. The page then reads the URL's job (`jobs.get`) and says when the AC can be seen, with a link to the job. Without the job it gives only the general sentence.
+6. **Texts and times.**
+   - Every text is translated; the dictionary gains 78 entries.
+   - Instants use the display time zone with "today / yesterday" (`relativeTime`). Visit windows are spans (`showSpan`); the start of the 7-day period is a Kuala Lumpur day.
+   - The loader formats everything, so the view only renders.
+   - New pure code is `shared/lib/techUnit.ts`. The fixture view moves to `unit-demo.tsx` and stays English (Phase 1A).
+7. **Catalog.**
+   - SCR-T02 now lists the reads the screen makes: units.get, alerts.list, jobs.list, jobs.get, devices.list, devices.events, telemetry.series and telemetry.summary. Its URL keys are jobId, metric and period.
+   - `jobs.list` is a lookup there (no sort; the validator's job lookups gain SCR-T02).
+   - DD-T02 gains alerts.list, jobs.list and jobs.get; DD-T03 gains devices.events. The operation catalog, the Go catalog and the API description carry the new design ids.
+8. **Checked.**
+   - Vitest: 40 files, 232 tests. `techUnit.test.ts` is new: the register with missing values, the tiles online and offline, the 1 h / 24 h / 7 d periods with a gap and a suspect reading, the events, the jobs, the control job, the open alerts, and Malay with Asia/Tokyo.
+   - E2E: `technician/language.e2e.ts` opens the job's unit in Malay. It checks the register cards, Monitoring with the 24-hour title and the events, and the 7-day period in the URL. The suite: 64 passed, 9 skipped, and the users are en / Asia/Kuala_Lumpur.
+9. **Still open.**
+   - Figma's "last inspection" per component group (the results of the latest accepted report). No read gives it to the technician yet.
+   - Figma's alert threshold line on the chart. The technician cannot read alert policies; the alert evidence screen raises the same gap (next).
+   - The other technician screens: the alert evidence, diagnostic control, the devices and the QR scan.
+   - The HQ screens.
+   - The browser demo.
+   - The assistant panel and the voice demo's answers.

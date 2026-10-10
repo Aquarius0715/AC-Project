@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.30.0
+version: 0.31.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -24,8 +24,8 @@ Treat route parameters as untrusted input and always validate them. Service name
 | Design ID / requirement | Route / main component | Read and action contracts | Input, processing, validation | Errors and prohibited actions |
 |---|---|---|---|---|
 | DD-T01 / FR-T01 | `/technician` / `TechnicianOverview` | `jobs.list`, `alerts.list`, `summaries.get`, `units.list` | Filter by period and severity. Check assignments and deadlines in the service | Exclude jobs assigned to others from results and summaries |
-| DD-T02 / FR-T02 | `/technician/units/:id` / `DiagnosticUnit` | `units.get`, `devices.list` | View unit ID and supported features. Clearly identify items outside maintenance scope | Distinguish unregistered units from disconnected units |
-| DD-T03 / FR-T03 | `/technician/units/:id` / `TelemetryPanel` | `telemetry.series`, `telemetry.summary` | Select metric and period. Subscribe through the Repository. Phase 1A uses only predefined events | Do not show old values as live. Refetch when the stream disconnects |
+| DD-T02 / FR-T02 | `/technician/units/:id` / `DiagnosticUnit` | `units.get`, `devices.list`, `alerts.list`, `jobs.list`, `jobs.get` | View unit ID and supported features. Clearly identify items outside maintenance scope | Distinguish unregistered units from disconnected units |
+| DD-T03 / FR-T03 | `/technician/units/:id` / `TelemetryPanel` | `telemetry.series`, `telemetry.summary`, `devices.events` | Select metric and period. Subscribe through the Repository. Phase 1A uses only predefined events | Do not show old values as live. Refetch when the stream disconnects |
 | DD-T04 / FR-T04 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Select normal/needs attention/not inspected/not applicable for each component. Record findings and measurement evidence. Do not default to normal | Require reasons for not applicable or not inspected. Do not replace actual measurements with demo diagnosis results |
 | DD-T05 / FR-T05 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Outdoor units use the shared schema with a separate component group | Do not claim detection of tiny leaks without a selected sensor |
 | DD-T06 / FR-T06 | `/technician/jobs/:id` / `InspectionForm` | `jobs.get`, `jobs.saveDraft`, `jobs.submit`, `reports.get`, `units.get` | Record each measurement's value, unit, observation time, and inspector. Operating procedures and installation instructions are outside this design | Do not save an unmeasured value as 0 or normal |
@@ -89,7 +89,7 @@ Scope: FR-T01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.l
 
 **Source mapping**: SRC-06 BIZ-06, BIZ-07, BIZ-10 → FR-T02 → DD-T02. Source category: original company requirements SRC-06 + design additions. Design addition: unit register fields and viewing steps. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-T02 / Main display pattern: **UI-DETAIL**. Service boundary: `units.get, devices.list`.
+Scope: FR-T02 / Main display pattern: **UI-DETAIL**. Service boundary: `units.get, devices.list, alerts.list, jobs.list, jobs.get`.
 
 **Initial view and prerequisites**: An assignment relationship grants read access to the unit. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -103,6 +103,8 @@ Scope: FR-T02 / Main display pattern: **UI-DETAIL**. Service boundary: `units.ge
 **Steps**
 
 1. Open the unit register from the job. Check installation location, model, configuration, installation date, and maintenance scope. Continue to diagnosis or work.
+   - Beside the register (IR283): the components of each group in the service scope; the technician's own jobs on the unit (`jobs.list`, a lookup: current visits, then ended ones with their completion day) and the job diagnostic control opens for; the open alerts with their evidence and acknowledgement (`alerts.list`); the latest temperature, power and connection with their times.
+   - Before an external technician's work window, `units.get` answers `errors.assignment_not_started`; the screen reads the URL job (`jobs.get`) for its start time (IR76).
 2. Show model capabilities with their capability version. Show unregistered or unknown fields as “Not registered”; do not fill them with common model values.
 3. This screen is read-only. Technicians do not change manufacturer register data, customer memberships, or billing data.
 4. No Queries are updated (read-only).
@@ -115,7 +117,7 @@ Scope: FR-T02 / Main display pattern: **UI-DETAIL**. Service boundary: `units.ge
 
 **Source mapping**: SRC-06 BIZ-08, BIZ-11 → FR-T03 → DD-T03. Source category: original company requirements SRC-06 + design additions. Design addition: choosing data series and displaying data quality. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-T03 / Main display pattern: **UI-DETAIL** and **UI-ANALYSIS**. Service boundary: `telemetry.series, telemetry.summary`.
+Scope: FR-T03 / Main display pattern: **UI-DETAIL** and **UI-ANALYSIS**. Service boundary: `telemetry.series, telemetry.summary, devices.events`.
 
 **Initial view and prerequisites**: The user may view the target unit's telemetry. Connection information can be shown even without sensors. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -130,6 +132,7 @@ Scope: FR-T03 / Main display pattern: **UI-DETAIL** and **UI-ANALYSIS**. Service
 **Steps**
 
 1. Select metric and period. Check sensor, power, operation, and connection values and their times. Demo update events change values. Make stopped updates clear when communication is lost.
+   - As built (IR283): the metric and the period are URL keys (`metric` opens Monitoring, `period` 1h / 24h / 7d). Up to three other metrics show their latest value and the period's slots. The events of the period are the unit's alert raises, acknowledgements and resolutions and its device's connection, power and tamper events (`devices.list` → `devices.events` with from / to).
 2. Keep observation time (measured on site) separate from receipt time (received by the server). Mark data stale after staleAfterSeconds. Do not overwrite current values with older events. Keep series units fixed and leave gaps where data is missing.
 3. Keep latest values and time-series charts consistent using the same eventId and version. Unsubscribe when leaving the screen or changing scope.
 4. Queries to update: `telemetry / unit summary`.
@@ -475,6 +478,6 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 
 0.10.0: T12 fetches alerts.get using DeviceEvent.alertIds and acknowledges using Alert.version (SR23). Filter device history by scope at event time (SR24).
 
-Additional contracts for current version 0.30.0: Read IR01–139 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.31.0: Read IR01–IR283 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

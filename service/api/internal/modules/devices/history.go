@@ -284,7 +284,7 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 // @Description	Authorization: client:self | contractor:accepted-valid-offer | technician:assigned | admin:device.read | admin:audit.read; SR24 current-device AND occurrence-scope
 // @Description	Validation: D01; input constraints in the corresponding DD; scope-bound snapshot
 // @Description	Recovery: D04: retry only UNAVAILABLE, at most twice
-// @Description	Design: DD-A04, DD-A16, DD-T12 · Query: filters from,to · sort id,createdAt,updatedAt (default occurredAt desc;sequence desc;id asc)
+// @Description	Design: DD-A04, DD-A16, DD-T12, DD-T03 · Query: filters from,to · sort id,createdAt,updatedAt (default occurredAt desc;sequence desc;id asc)
 // @Tags			devices
 // @Accept			json
 // @Produce		json
