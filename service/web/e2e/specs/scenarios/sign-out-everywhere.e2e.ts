@@ -28,7 +28,8 @@ test("HQ signs a client user out everywhere, and the password signs them in agai
       await admin.waitForURL(/customerId=/);
       await admin.getByRole("tab", { name: /^Users/ }).click();
       await admin.waitForURL(/tab=users/);
-      await admin.getByLabel("Actions for customer-b@ac.local").selectOption({ label: "Sign out everywhere…" });
+      await admin.getByRole("button", { name: "Actions for customer-b@ac.local" }).click();
+      await admin.getByRole("menuitem", { name: "Sign out everywhere…" }).click();
       const dialog = admin.getByRole("dialog");
       await expect(dialog).toContainText("Sign out customer-b@ac.local everywhere?");
       await dialog.getByRole("button", { name: "Sign out everywhere" }).click();

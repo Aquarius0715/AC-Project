@@ -48,7 +48,7 @@ test("reminder settings refuse too few hours, then are saved and put back", asyn
   await dialog.getByRole("button", { name: /Model default/ }).click();
   await dialog.getByRole("textbox").first().fill("30");
   await dialog.getByRole("button", { name: "Owners of the location" }).click();
-  if (await dialog.getByLabel("E-mail").isChecked()) await dialog.getByLabel("E-mail").uncheck();
+  if (await dialog.getByRole("checkbox", { name: "E-mail" }).isChecked()) await dialog.getByRole("checkbox", { name: "E-mail" }).uncheck();
   await save(); // R293: waiting only for a "saved" toast let the reload read before this save had committed
   await page.reload();
   expect(await reminders()).toBe(before);

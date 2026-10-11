@@ -1,17 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, isValidElement, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
+import { Children, createContext, isValidElement, useCallback, useContext, useId, useRef, useState } from "react";
 import { useT } from "@ac/web/components/I18n";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { Alert } from "@ac/web/components/ui/alert";
 import { Badge as UIBadge } from "@ac/web/components/ui/badge";
 import { Button, buttonVariants } from "@ac/web/components/ui/button";
 import { Card as UICard, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@ac/web/components/ui/card";
+import { Checkbox } from "@ac/web/components/ui/checkbox";
+import { Dialog, DialogClose, DialogContent, DialogTitle } from "@ac/web/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ac/web/components/ui/dropdown-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@ac/web/components/ui/empty";
 import { Input as UIInput } from "@ac/web/components/ui/input";
 import { NativeSelect } from "@ac/web/components/ui/native-select";
+import { Switch } from "@ac/web/components/ui/switch";
+import { Tabs as UITabs, TabsList, TabsTrigger } from "@ac/web/components/ui/tabs";
 import { Textarea as UITextarea } from "@ac/web/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@ac/web/components/ui/toggle-group";
 import { cn } from "@ac/web/lib/utils";
 
 // The product's components (DEC-75): the screens' names (Btn, Card, Badge, …) built on the shadcn/ui components of
@@ -235,16 +241,19 @@ export function Timeline({ items }: { items: { time: string; title: React.ReactN
 }
 
 /* ───────────── Tabs / segmented ───────────── */
+/** A tab bar: the shadcn/ui Tabs (tablist and tabs; the screens draw the panels). `count` is a badge after the label. */
 export function Tabs<T extends string>({ tabs, value, onChange, className }: { tabs: { id: T; label: string; count?: number | string }[]; value: T; onChange: (v: T) => void; className?: string }) {
   return (
-    <div role="tablist" className={cx("inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-surface2 p-1", className)}>
-      {tabs.map((t) => (
-        <button key={t.id} role="tab" aria-selected={value === t.id} onClick={() => onChange(t.id)} className={cx("rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors", value === t.id ? "bg-surface text-ink shadow-sm" : "text-muted-foreground hover:text-ink")}>
-          {t.label}
-          {t.count !== undefined && <span className="ml-1.5 rounded-full bg-primary-soft px-1.5 text-[11px] text-primary">{t.count}</span>}
-        </button>
-      ))}
-    </div>
+    <UITabs value={value} onValueChange={(v) => onChange(v as T)} className={cn("max-w-full", className)}>
+      <TabsList className="max-w-full flex-wrap justify-start group-data-horizontal/tabs:h-auto">
+        {tabs.map((t) => (
+          <TabsTrigger key={t.id} value={t.id} className="flex-none px-3 py-1.5 text-[13px] font-semibold text-muted-foreground">
+            {t.label}
+            {t.count !== undefined && <span className="rounded-full bg-primary-soft px-1.5 text-[11px] text-primary">{t.count}</span>}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+    </UITabs>
   );
 }
 
@@ -269,19 +278,19 @@ export const Input = ({ className, ...p }: React.ComponentProps<"input">) => <UI
 export const Select = ({ className, children, ...p }: Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "size">) => (
   <NativeSelect {...p} className={cn("w-full", className)}>{children}</NativeSelect>
 );
-/** A row's actions behind the "more" icon (DEC-74): a transparent native select lies over the icon, so the keyboard,
- * the screen reader (by `label`) and the platform's own menu work as with a plain select. The first option keeps the
- * menu unchosen; `onChoose` gets the chosen option's value. */
+/** A row's actions behind the "more" icon: the shadcn/ui DropdownMenu. The actions are written as <option value>
+ * children (shown only when they apply); `onChoose` gets the chosen value. */
 export function ActionMenu({ label, disabled, onChoose, children }: { label: string; disabled?: boolean; onChoose: (value: string) => void; children: React.ReactNode }) {
+  const items = Children.toArray(children).filter((c): c is React.ReactElement<{ value: string; children: React.ReactNode }> => isValidElement(c) && c.type === "option");
   return (
-    <span className="relative inline-grid h-7 w-8 shrink-0 place-items-center rounded-md text-[15px] text-muted-foreground hover:bg-surface2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-primary">
-      <Icon name="more" />
-      <select aria-label={label} disabled={disabled} value="" onChange={(e) => e.target.value && onChoose(e.target.value)}
-        className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed">
-        <option value="">{label}</option>
-        {children}
-      </select>
-    </span>
+    <DropdownMenu>
+      <DropdownMenuTrigger disabled={disabled} render={<Button variant="ghost" size="icon-sm" aria-label={label} className="text-muted-foreground" />}>
+        <Icon name="more" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-44">
+        {items.map((o) => <DropdownMenuItem key={o.props.value} onClick={() => onChoose(o.props.value)}>{o.props.children}</DropdownMenuItem>)}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 export const Textarea = ({ className, ...p }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <UITextarea {...p} className={cn("min-h-[84px] resize-y", className)} />;
@@ -309,30 +318,25 @@ export function QrCode({ qr, label, className }: { qr: { size: number; path: str
     </svg>
   );
 }
+/** A checkbox with its label: the shadcn/ui Checkbox, 20 px so the lists' targets keep 24 px apart (WCAG 2.5.8, IR360). */
 export function Check({ label, checked, onChange, disabled }: { label: React.ReactNode; checked?: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {
   return (
     <label className="inline-flex items-center gap-2 text-[13px]">
-      <input type="checkbox" className="h-5 w-5 shrink-0 accent-[#005bea]" checked={checked} disabled={disabled} onChange={(e) => onChange?.(e.target.checked)} /> {/* 20 px: with the lists' gaps, targets keep 24 px apart (WCAG 2.5.8, IR360) */}
+      <Checkbox checked={checked} disabled={disabled} onCheckedChange={(v) => onChange?.(v === true)} className="size-5" />
       {label}
     </label>
   );
 }
+/** An on/off switch: the shadcn/ui Switch, named by `label`. */
 export function Toggle({ on, onChange, label, disabled }: { on: boolean; onChange: (v: boolean) => void; label?: string; disabled?: boolean }) {
-  return (
-    <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)} className={cx("relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50", on ? "bg-primary" : "bg-line")}>
-      <span className={cx("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all", on ? "left-[22px]" : "left-0.5")} />
-    </button>
-  );
+  return <Switch checked={on} onCheckedChange={(v) => onChange(v)} aria-label={label} disabled={disabled} />;
 }
+/** One choice of a few, shown as pressed buttons: the shadcn/ui ToggleGroup. The chosen one stays chosen when pressed again. */
 export function Choice<T extends string>({ options, value, onChange }: { options: { id: T; label: string }[]; value: T; onChange: (v: T) => void }) {
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {options.map((o) => (
-        <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onChange(o.id)} className={cx("rounded-control border px-3 py-1.5 text-[13px] font-semibold", value === o.id ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface text-ink hover:bg-surface2")}>
-          {o.label}
-        </button>
-      ))}
-    </div>
+    <ToggleGroup value={[value]} onValueChange={(v) => { const next = v[v.length - 1] as T | undefined; if (next !== undefined && next !== value) onChange(next); }} variant="outline" className="flex-wrap">
+      {options.map((o) => <ToggleGroupItem key={o.id} value={o.id} className="px-3 text-[13px] font-semibold data-pressed:border-primary data-pressed:bg-primary-soft data-pressed:text-primary">{o.label}</ToggleGroupItem>)}
+    </ToggleGroup>
   );
 }
 export function Search({ placeholder, value, onChange }: { placeholder: string; value: string; onChange: (v: string) => void }) {
@@ -392,59 +396,30 @@ export function SearchSelect({ value, onChange, options, label, placeholder, lim
 }
 
 /* ───────────── Modal ───────────── */
-// the open dialogs, innermost last: only it answers Escape and Tab
-const openModals: symbol[] = [];
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-/** A modal dialog as the WAI-ARIA dialog pattern and UX-06 ask (IR361). On open, focus moves into it: the first field
- * or control of the body, else the first footer button (Cancel), else the close button. Tab and Shift+Tab cycle inside it. Escape
- * closes it, and on close focus returns to what had it before (the trigger). */
+/** A modal dialog: the shadcn/ui Dialog, as the WAI-ARIA dialog pattern and UX-06 ask (IR361). On open, focus moves into
+ * it: the first field or control of the body, else the first footer button (Cancel), else the close button. Tab stays
+ * inside, Escape or a press outside closes it, and focus returns to what had it before (the trigger). */
 export function Modal({ open, title, onClose, children, footer, wide }: { open: boolean; title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean }) {
-  const id = useId();
   const t = useT();
-  const box = useRef<HTMLDivElement>(null);
-  const close = useRef(onClose);
-  useEffect(() => { close.current = onClose; });
-  useEffect(() => {
-    if (!open) return;
-    const me = Symbol("modal");
-    openModals.push(me);
-    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const inside = (part?: string) => [...(box.current?.querySelectorAll<HTMLElement>(part ? `[data-part="${part}"] :is(${FOCUSABLE})` : FOCUSABLE) ?? [])]
-      // a disabled control or one out of the tab order is not a stop (the shadcn/ui Button keeps tabindex="0" when disabled)
-      .filter((el) => !el.closest("[hidden], [inert]") && !(el as HTMLButtonElement).disabled && el.tabIndex >= 0);
-    (inside("body")[0] ?? inside("footer")[0] ?? inside("header")[0])?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (openModals[openModals.length - 1] !== me) return;
-      if (e.key === "Escape") return close.current();
-      if (e.key !== "Tab") return;
-      const all = inside();
-      if (!all.length) return;
-      const [a, z] = [all[0], all[all.length - 1]];
-      const at = document.activeElement;
-      if (!box.current?.contains(at)) { e.preventDefault(); (e.shiftKey ? z : a).focus(); }
-      else if (e.shiftKey && at === a) { e.preventDefault(); z.focus(); }
-      else if (!e.shiftKey && at === z) { e.preventDefault(); a.focus(); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      openModals.splice(openModals.indexOf(me), 1);
-      if (trigger?.isConnected) trigger.focus();
-    };
-  }, [open]);
-  if (!open) return null;
+  const popup = useRef<HTMLDivElement>(null);
+  const firstStop = () => {
+    const stop = (part: string) => [...(popup.current?.querySelectorAll<HTMLElement>(`[data-part="${part}"] :is(${FOCUSABLE})`) ?? [])]
+      .find((el) => !(el as HTMLButtonElement).disabled && el.tabIndex >= 0);
+    return stop("body") ?? stop("footer") ?? stop("header") ?? true;
+  };
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={box} role="dialog" aria-modal="true" aria-labelledby={id} className={cx("flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl", wide ? "sm:max-w-3xl" : "sm:max-w-[560px]")}>
-        <div data-part="header" className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
-          <h2 id={id} className="text-base font-bold">{title}</h2>
-          <button aria-label={t("Close")} onClick={onClose} className="rounded-lg px-2 py-1 text-muted-foreground hover:bg-surface2"><Icon name="close" /></button>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+      <DialogContent ref={popup} showCloseButton={false} initialFocus={firstStop} className={cn("flex max-h-[92dvh] flex-col gap-0 p-0", wide ? "sm:max-w-3xl" : "sm:max-w-[560px]")}>
+        <div data-part="header" className="flex items-center justify-between gap-3 border-b px-5 py-4">
+          <DialogTitle className="text-base font-semibold">{title}</DialogTitle>
+          <DialogClose render={<Button variant="ghost" size="icon-sm" aria-label={t("Close")} />}><Icon name="close" /></DialogClose>
         </div>
         <div data-part="body" className="flex flex-col gap-3 overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <div data-part="footer" className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}
-      </div>
-    </div>
+        {footer && <div data-part="footer" className="flex flex-wrap justify-end gap-2 rounded-b-xl border-t bg-muted/50 px-5 py-3">{footer}</div>}
+      </DialogContent>
+    </Dialog>
   );
 }
 

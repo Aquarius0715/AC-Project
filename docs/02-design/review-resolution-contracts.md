@@ -6344,3 +6344,31 @@ The product owner decided to build the UI from shadcn/ui components, and to use 
    6. Figma restyled to match;
    7. a translation library.
 8. **Checks.** Typecheck, lint, the web unit tests (460), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped. Screenshots of the four apps show the new components.
+
+## IR401 shadcn/ui, phase 3a: dialogs, menus, tabs and the choice controls — 2026-10-12
+
+The interactive parts of the product components are now shadcn/ui components on Base UI (DEC-75). Base UI's ARIA patterns and focus management replace the hand-written ones.
+
+1. **Added:** Dialog, Tabs, Switch, Checkbox, ToggleGroup and Toggle, DropdownMenu, Combobox, Popover, Tooltip, RadioGroup and InputGroup. Combobox, Popover and Tooltip are used in phase 3b.
+2. **On them** (`shared/components/ui.tsx`):
+   - `Modal` is the shadcn Dialog (portal, backdrop, Escape, a press outside, nested dialogs).
+     - On open, focus goes to the first field of the body, else the first footer button, else the close button.
+     - On close it returns to the trigger.
+     - The close button keeps its translated name.
+   - `Tabs` is the shadcn Tabs: a tablist, the screens draw the panels. Inactive tabs use `muted-foreground`; shadcn's `foreground/60` was below 4.5:1 on the muted surface (axe in the smoke crawl).
+   - `Toggle` is the Switch, `Check` the Checkbox (20 px), and `Choice` a single-choice ToggleGroup whose chosen item stays chosen.
+   - `ActionMenu` is the DropdownMenu: the `more` icon button opens a menu of the actions, still written as `<option>` children.
+   - The old focus trap and dialog stack are gone.
+3. **CSP.**
+   - Every app layout wraps the page in `UIProviders` (Base UI's CSPProvider) with the request's nonce, so a `<style>` that a Base UI part adds carries it.
+   - With a menu and a dialog open, the page had no `<style>` element and no CSP violation.
+   - The keyboard E2E now also fails on any CSP violation while its dialog is open.
+4. **Tests.**
+   - The keyboard E2E waits a frame for the dialog's focus guard. Past the last control, Base UI's guard hands focus to the first one on the next animation frame.
+   - Checkboxes are found by role: the Base UI Checkbox is a `role="checkbox"` element beside a hidden native input, so `getByLabel` found two.
+   - The menu scenario clicks the actions button and the menu item, instead of a select option.
+   - The modal unit tests check what jsdom can check: first focus, Escape, focus back to the trigger, and only the inner dialog answering Escape (the outer one is hidden from assistive technology meanwhile). Tab cycling is left to the E2E.
+5. **Also fixed.**
+   - The customer "Create policy" link is a `LinkBtn`; the hand-styled link had no gap for its icon. The empty-list hint names it without "+".
+   - The alert-policy spec's cleanup counted the E2E policies before the list had rendered, so a policy left by a failed run was never removed. It now waits for the list, and the left-over policy is gone.
+6. **Checks.** Typecheck, lint, the web unit tests (460), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped. One test failed once on data left by an earlier failed run, and passes on the restored data. Screenshots show the dialog, the menu, the tabs and the switches.

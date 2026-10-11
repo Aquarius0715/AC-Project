@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, Modal, Select, SeverityBadge, Toggle, cx } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, LinkBtn, Modal, Select, SeverityBadge, Toggle, cx } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
@@ -37,7 +37,7 @@ function PolicyList({ p, onDone, onFail }: Props) {
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h2 className="text-[15px] font-bold">{t("Alert policies")}</h2><p className="max-w-xl text-xs text-muted-foreground">{t("A policy is a set of limits. It only runs on the ACs you attach it to (open an AC › Alert policies). Every AC also has the default policy.")}</p></div>
-        <Link href={`${base}&policyId=new`} className="inline-flex items-center rounded-control border border-primary bg-primary px-3.5 py-2 text-[13px] font-semibold text-white"><Icon name="add" /> {t("Create policy")}</Link>
+        <LinkBtn href={`${base}&policyId=new`} variant="primary"><Icon name="add" /> {t("Create policy")}</LinkBtn>
       </div>
       {d && (
         <Card title={<span className="flex flex-wrap items-center gap-2">{t("Default policy")} <Badge tone="primary">{t("Default · set by HQ")}</Badge><Badge tone="primary">{t("{on} of {n} rules on", { on: d.on, n: d.rows.length })}</Badge></span>} action={<span className="text-[11px] text-muted-foreground">{t("Limits set by HQ · on / off is set by the account owner")}</span>}>
@@ -73,7 +73,7 @@ function PolicyList({ p, onDone, onFail }: Props) {
           </div>
         </Card>
       ))}
-      {p.cards.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-center text-xs text-muted-foreground">{t("No policies of your own yet — “+ Create policy” adds one; attach it on an AC’s page.")}</p>}
+      {p.cards.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-center text-xs text-muted-foreground">{t("No policies of your own yet — “Create policy” adds one; attach it on an AC’s page.")}</p>}
       <p className="text-xs text-muted-foreground">{t("A unit can carry several policies; each rule is checked separately. Missing or stale readings never raise an alert — they show “not measured”. Air-quality limits (CO₂ ppm, PM2.5 µg/m³) are regular alert policies.")}</p>
       {remove && <DeleteModal c={remove} version={p.list.find((x) => x.id === remove.id)?.version ?? 0} onClose={(text) => { setRemove(null); if (text) onDone(text); }} onFail={(f) => { setRemove(null); onFail(f); }} />}
     </>

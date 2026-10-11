@@ -8,6 +8,8 @@ const NAME = `E2E too hot ${Date.now() % 100_000}`;
 
 async function deleteE2EPolicies(page: Page) {
   await page.goto("/customer/alerts?tab=policies");
+  // count once the list is there: counted before it rendered, a left-over policy was never removed (R394)
+  await expect(page.getByText(/Your policies/).first()).toBeVisible();
   for (let i = 0; i < 5; i++) {
     const card = page.locator('main section, main [data-slot="card"]', { has: page.getByRole("switch", { name: /^E2E / }) }).first();
     if ((await page.getByRole("switch", { name: /^E2E / }).count()) === 0) return;
@@ -15,6 +17,7 @@ async function deleteE2EPolicies(page: Page) {
     await page.getByRole("dialog").getByRole("button", { name: "Delete policy" }).click();
     await expect(page.getByText(/deleted/).last()).toBeVisible();
     await page.reload();
+    await expect(page.getByText(/Your policies/).first()).toBeVisible();
   }
 }
 
@@ -42,7 +45,7 @@ test("a policy is created, edited, switched off and deleted", async ({ page }) =
   await page.getByRole("button", { name: "Save policy" }).click();
   await expect(page.getByRole("main")).toContainText("Recovery 31 must be below the 30 threshold");
   await page.getByLabel("Recovery").fill("28");
-  await page.getByLabel("Email").check();
+  await page.getByRole("checkbox", { name: "Email" }).check();
   await page.getByRole("button", { name: "Save policy" }).click();
   await expect(page.getByText(`“${NAME}” saved`)).toBeVisible();
   await expect(page.getByRole("switch", { name: NAME })).toHaveAttribute("aria-checked", "true");
@@ -51,7 +54,7 @@ test("a policy is created, edited, switched off and deleted", async ({ page }) =
   await card.getByRole("link", { name: "Edit" }).click();
   await page.waitForURL(/policyId=[0-9a-f-]{36}/);
   await page.getByLabel("Threshold").fill("29");
-  await page.getByLabel("Only on some days and times").check();
+  await page.getByRole("checkbox", { name: "Only on some days and times" }).check();
   await page.getByRole("button", { name: "Mon–Fri" }).click();
   await expect(page.getByRole("main")).toContainText(/29/);
   await page.getByRole("button", { name: "Save policy" }).click();

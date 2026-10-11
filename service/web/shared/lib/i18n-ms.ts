@@ -558,7 +558,7 @@ export const ms: Record<string, string> = {
   "Then": "Kemudian",
   "Edit": "Sunting",
   "Delete": "Padam",
-  "No policies of your own yet — “+ Create policy” adds one; attach it on an AC’s page.": "Belum ada polisi anda sendiri — “+ Cipta polisi” menambahnya; lampirkan pada halaman AC.",
+  "No policies of your own yet — “Create policy” adds one; attach it on an AC’s page.": "Belum ada polisi anda sendiri — “Cipta polisi” menambahnya; lampirkan pada halaman AC.",
   "A unit can carry several policies; each rule is checked separately. Missing or stale readings never raise an alert — they show “not measured”. Air-quality limits (CO₂ ppm, PM2.5 µg/m³) are regular alert policies.":
     "Satu unit boleh membawa beberapa polisi; setiap peraturan disemak secara berasingan. Bacaan yang tiada atau lapuk tidak mencetuskan amaran — ia menunjukkan “tidak diukur”. Had kualiti udara (CO₂ ppm, PM2.5 µg/m³) ialah polisi amaran biasa.",
   "Delete “{name}”?": "Padam “{name}”?",
