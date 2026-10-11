@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  campaignErrors, campaignRows, campaignStart, capabilityDraft, capabilityErrors, deviceRows, modelRows, parseWaves, resultReason, waveStates,
+  campaignErrors, campaignFacts, campaignRows, campaignStart, capabilityDraft, capabilityErrors, deviceRows, modelRows, parseWaves, resultReason, shortChecksum, waveStates,
   type ApiCampaign, type ApiCapability, type ApiDevice, type CampaignDraft,
 } from "@ac/web/lib/devices";
 import { i18nOf } from "@ac/web/lib/i18n";
@@ -31,8 +31,16 @@ describe("HQ device registry", () => {
       startAt: "At least 24 hours ahead", waves: "Ascending percentages ending at 100, e.g. 10, 50, 100", autoPause: "1–50 %", deviceIds: "Choose at least one device",
     }); // 09:30 tomorrow in Tokyo is 23.5 h ahead
     const c: ApiCampaign = { id: "k1", version: 1, modelId: "m1", fromVersions: [], targetVersion: "v2", deviceIds: ["d1"], waves: [{ label: "Wave 1 · 100 %", percent: 100 }], window: { startLocal: "02:00", endLocal: "05:00" },
-      autoPauseFailurePercent: 5, startAt: "2026-09-16T02:00:00Z", state: "scheduled", progress: { succeeded: 0, installing: 0, pending: 1, failed: 0, skipped: 0 }, results: [], reason: null };
+      autoPauseFailurePercent: 5, startAt: "2026-09-16T02:00:00Z", state: "scheduled", progress: { succeeded: 0, installing: 0, pending: 1, failed: 0, skipped: 0 }, results: [], reason: null,
+      checksum: "sha256:9f3c0e5d7a1b2c3da1", createdAt: "2026-09-14T01:00:00Z" };
     expect(campaignRows([c], [cap])[0]).toMatchObject({ model: "DemoAir SPL-100", versions: "any → v2", start: "16 Sept 2026, 10:00 am MYT" });
+    // the facts above the waves (Figma Admin 04-9)
+    expect(campaignFacts(campaignRows([c], [cap])[0])).toEqual([
+      ["Model / version", "DemoAir SPL-100 · any → v2 (signed, sha256 9f3c…a1)"], ["Window", "02:00–05:00 device local time"], ["Auto-pause", "failure rate > 5 % in a wave"],
+      ["Starts", "16 Sept 2026, 10:00 am MYT"], ["Created", "14 Sept 2026, 9:00 am MYT"],
+    ]);
+    expect([shortChecksum("sha256:abcd"), shortChecksum("plain0123456789")]).toEqual(["sha256 abcd", "plai…89"]);
+    expect(campaignFacts(campaignRows([c], [cap], MS)[0], MS).map(([k]) => k)).toEqual(["Model / versi", "Tetingkap", "Jeda automatik", "Bermula", "Dicipta"]);
   });
 
   it("words the runner's results and each wave's state (BR-A20, IR339)", () => {

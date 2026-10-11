@@ -6,7 +6,7 @@ import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { showTime } from "@ac/web/lib/i18n";
-import { campaignErrors, campaignStart, resultReason, waveStates, type CampaignDraft, type CampaignRow, type WaveState } from "@ac/web/lib/devices";
+import { campaignErrors, campaignFacts, campaignStart, resultReason, waveStates, type CampaignDraft, type CampaignRow, type WaveState } from "@ac/web/lib/devices";
 import { controlCampaign, scheduleCampaign } from "../actions";
 import type { DevicesLive } from "./devices-view";
 
@@ -43,7 +43,7 @@ export function FirmwareTab({ live }: { live: DevicesLive }) {
   const done = { pause: "Campaign paused", resume: "Campaign resumed", abort: "Campaign aborted", retry_device: "Device queued again" } as const;
   const control = (action: "pause" | "resume" | "abort" | "retry_device", deviceId?: string) =>
     sel && run(() => controlCampaign(sel.id, sel.version, action, deviceId, action === "abort" ? reason.trim() : undefined), t(done[action]), close);
-  const serial = new Map(live.devices.map((x) => [x.id, x.serial]));
+  const serial = new Map(live.devices.map((x) => [x.id, x.unitId ? `${x.serial} · ${x.unit}` : x.serial])); // Figma 04-9: the device and its unit
 
   return (
     <div className="split-rev">
@@ -51,7 +51,8 @@ export function FirmwareTab({ live }: { live: DevicesLive }) {
         {(live.campaigns ?? []).length === 0 ? <EmptyState title={t("No campaigns")}>{t("Schedule a firmware campaign for a model.")}</EmptyState> : <div className="flex flex-col gap-2">{live.campaigns!.map((c) => <ListRow key={c.id} selected={sel?.id === c.id} onClick={() => nav({ campaignId: c.id })}><div className="min-w-0 flex-1"><b className="text-[13px]">{c.model}</b><div className="text-[11px] text-muted">{c.versions} · {t(c.devices === 1 ? "1 device" : "{n} devices", { n: c.devices })} · {t("starts {time}", { time: c.start })}</div></div><Badge tone={tone(c.state)}>{t(stateWord[c.state])}</Badge></ListRow>)}</div>}
       </Card>
       {!sel ? <Card title={t("Campaign")}><EmptyState title={t("Nothing selected")}>{t("Choose or schedule a campaign.")}</EmptyState></Card> : (
-        <Card title={`${sel.model} · ${sel.versions}`} sub={t("Auto-pause if failures exceed {n} % within a wave · window {from}–{to} device local time · starts {time}", { n: sel.c.autoPauseFailurePercent, from: sel.c.window.startLocal, to: sel.c.window.endLocal, time: sel.start })} action={live.canWrite && <span className="flex gap-2">{(sel.state === "running" || sel.state === "scheduled") && <Btn size="sm" disabled={pending} onClick={() => control("pause")}>{t("Pause")}</Btn>}{sel.state === "paused" && <Btn size="sm" disabled={pending} onClick={() => control("resume")}>{t("Resume")}</Btn>}{["scheduled", "running", "paused"].includes(sel.state) && <Btn size="sm" variant="danger" disabled={pending} onClick={() => { setReason(""); setModal("abort"); }}>{t("Abort")}</Btn>}</span>}>
+        <Card title={`${sel.model} · ${sel.versions}`} action={live.canWrite && <span className="flex gap-2">{(sel.state === "running" || sel.state === "scheduled") && <Btn size="sm" disabled={pending} onClick={() => control("pause")}>{t("Pause")}</Btn>}{sel.state === "paused" && <Btn size="sm" disabled={pending} onClick={() => control("resume")}>{t("Resume")}</Btn>}{["scheduled", "running", "paused"].includes(sel.state) && <Btn size="sm" variant="danger" disabled={pending} onClick={() => { setReason(""); setModal("abort"); }}>{t("Abort")}</Btn>}</span>}>
+          <div className="mb-3"><SummaryList cols={2} items={campaignFacts(sel, i)} /></div>
           <div className="flex flex-col gap-3">{sel.c.waves.map((w, n) => {
             const inWave = sel.c.results.filter((r) => r.waveIndex === n);
             const [word, chip] = waveWord[waveStates(sel.c)[n]];

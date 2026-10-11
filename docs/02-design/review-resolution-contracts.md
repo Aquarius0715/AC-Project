@@ -4919,3 +4919,14 @@ IR336, IR340 and IR341 added clock-driven work that the Figma Use Cases page (83
    - Admin 15-3 item 4: “Warranty reminder row → 02-19”.
    The User Flows boards (805:8066) carry the same transitions as lane chips: “→ 04-6 Certificate reminder row” on 07-3 with “← 07-3” on 04-6, and “→ 02-19 Warranty reminder row” on 15-3 with “← 15-3” on 02-19. No card overlaps another.
 6. **No code or contract change.** The use case count stays 126.
+
+## IR343 The firmware campaign detail as Figma Admin 04-9 shows it — 2026-10-11
+
+A real-stack check of the HQ firmware tab (R336) showed the runner's results as IR339 meant them. It also showed two differences from Figma Admin 04-9.
+
+1. **Facts.** Figma lists Model / version (with the signed digest), Window, Auto-pause and Created above the waves; the web had folded window, auto-pause and start into one subtitle line.
+   - The detail now shows the facts grid: model · versions (signed, “sha256 9f3c…a1”: the first four and last two hex digits), “01:00–05:00 device local time”, “failure rate > n % in a wave”, the start and the time it was scheduled.
+   - The campaign contract already carries `checksum` and `createdAt`.
+2. **Device rows.** Figma names each device with its place ("AC-DEMO-0003 · customer-a · Office A"). The rows now name the device and its unit, the way the device list does.
+3. **Not shown: who scheduled it.** Figma's “Created hq-operator · …” needs the scheduling member. FirmwareCampaign keeps none, and the audit log records it as `firmwareCampaigns.schedule`. Created shows the time only.
+4. **Tests.** Web: the facts in English and Malay and `shortChecksum`. The Malay dictionary drops the old subtitle line.

@@ -41,6 +41,7 @@ export type ApiCalibration = { id: string; sensorId: string; metric: Metric; uni
 export type ApiCampaign = {
   id: string; version: number; modelId: string; fromVersions: string[]; targetVersion: string; deviceIds: string[]; waves: { label: string; percent: number }[];
   window: { startLocal: string; endLocal: string }; autoPauseFailurePercent: number; startAt: string; state: "scheduled" | "running" | "paused" | "aborted" | "completed";
+  checksum: string; createdAt: string;
   progress: { succeeded: number; installing: number; pending: number; failed: number; skipped: number };
   results: { deviceId: string; waveIndex: number; status: "pending" | "installing" | "succeeded" | "failed" | "skipped"; reasonKey: string | null; at: string | null }[]; reason: string | null;
 };
@@ -137,6 +138,25 @@ export function campaignRows(cs: ApiCampaign[], caps: ApiCapability[], i: I18n =
     id: c.id, version: c.version, model: model.get(c.modelId) ?? t("model"), versions: `${c.fromVersions.join(", ") || t("any")} → ${c.targetVersion}`, state: c.state,
     devices: c.deviceIds.length, start: showTime(c.startAt, i.display), c,
   }));
+}
+
+/** The signed artifact digest as Figma Admin 04-9 shows it: "sha256 9f3c…a1". */
+export function shortChecksum(sum: string): string {
+  const [algo, hex] = sum.includes(":") ? sum.split(":", 2) : ["", sum];
+  return `${algo ? `${algo} ` : ""}${hex.length > 8 ? `${hex.slice(0, 4)}…${hex.slice(-2)}` : hex}`;
+}
+
+/** The campaign's facts above its waves (Figma Admin 04-9): model and versions with the signed digest, the install
+ * window in device local time, the auto-pause share, the start and when it was scheduled. */
+export function campaignFacts(r: CampaignRow, i: I18n = EN): [string, string][] {
+  const { t } = i;
+  return [
+    [t("Model / version"), `${r.model} · ${r.versions} (${t("signed")}, ${shortChecksum(r.c.checksum)})`],
+    [t("Window"), t("{from}–{to} device local time", { from: r.c.window.startLocal, to: r.c.window.endLocal })],
+    [t("Auto-pause"), t("failure rate > {n} % in a wave", { n: r.c.autoPauseFailurePercent })],
+    [t("Starts"), r.start],
+    [t("Created"), showTime(r.c.createdAt, i.display)],
+  ];
 }
 
 /** Why the runner skipped or failed a device (FirmwareCampaignResult.reasonKey, IR339), worded as Figma Admin 04-9. */
