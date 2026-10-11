@@ -23,14 +23,17 @@ func TestCertificatesAndParts(t *testing.T) {
 		"blank name":     "name=error.length",
 		"gif file":       "file=error.invalidFile",
 		"not a pdf":      "file=error.invalidFile",
+		"pixel flood":    "file=error.invalidFile",
 		"reversed dates": "expiresAt=error.range",
 	}
+	flood := pngHeader(50000, 50000) // a scan as an image is held to the photo pixel limits (IR389)
 	for name, b := range map[string]string{
 		"bad code":       strings.Replace(body(""), `"demo_indoor"`, `"demo_roof"`, 1),
 		"blank name":     strings.Replace(body(""), `" Indoor AC "`, `" "`, 1),
 		"reversed dates": `{"membershipId":"` + tech + `","code":"demo_indoor","name":"x","number":"N","issuedAt":"` + expires + `","expiresAt":"` + issued + `","file":` + pdf + `}`,
 		"gif file":       `{"membershipId":"` + tech + `","code":"demo_indoor","name":"x","number":"N","issuedAt":"` + issued + `","expiresAt":"` + expires + `","file":` + blobJSON("a.gif", "image/gif", []byte("x"), 1) + `}`,
 		"not a pdf":      strings.Replace(body(""), pdf, blobJSON("cert.pdf", "application/pdf", []byte("<html>"), 6), 1),
+		"pixel flood":    strings.Replace(body(""), pdf, blobJSON("scan.png", "image/png", flood, len(flood)), 1),
 	} {
 		code, m := write(s, &contrA, "certificates.submit", b, 0)
 		refusal(t, name, code, m, want[name])

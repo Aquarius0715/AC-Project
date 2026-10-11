@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	apiserver "github.com/pradita/ac-project/service/api/internal/server"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -70,8 +71,9 @@ func TestRateAndReportProblem(t *testing.T) {
 		t.Error("rating locked after 7 days")
 	}
 	// report a problem → follow-up job
-	png := base64.StdEncoding.EncodeToString([]byte("\x89PNG\r\n\x1a\ndemo")) // the PNG signature, then the demo bytes
-	photo := `{"name":"leak.png","mime":"image/png","size":12,"bytes":"` + png + `"}`
+	img, flood := tinyPNG(t), pngHeader(50000, 50000)
+	png, size := base64.StdEncoding.EncodeToString(img), strconv.Itoa(len(img))
+	photo := `{"name":"leak.png","mime":"image/png","size":` + size + `,"bytes":"` + png + `"}`
 	prob := func(body string, v int) (int, map[string]any) {
 		return write(s, &customerA, "jobs.reportProblem", `{"jobId":"`+job+`",`+body+`}`, v)
 	}
@@ -82,14 +84,16 @@ func TestRateAndReportProblem(t *testing.T) {
 		"short details": "details=error.length",
 		"six photos":    "photos=error.count",
 		"size mismatch": "photos=error.invalidFile",
+		"pixel flood":   "photos=error.invalidFile",
 		"today slot":    "preferredSlot=error.slotRules",
 	}
 	for name, b := range map[string]string{
 		"short details": `"reasonCode":"same_problem","details":"short","photos":[],"preferredSlot":null`,
 		"bad code":      `"reasonCode":"angry","details":"still dripping water","photos":[],"preferredSlot":null`,
-		"bad mime":      `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.gif","mime":"image/gif","size":12,"bytes":"` + png + `"}],"preferredSlot":null`,
-		"png as jpeg":   `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.jpg","mime":"image/jpeg","size":12,"bytes":"` + png + `"}],"preferredSlot":null`,
+		"bad mime":      `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.gif","mime":"image/gif","size":` + size + `,"bytes":"` + png + `"}],"preferredSlot":null`,
+		"png as jpeg":   `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.jpg","mime":"image/jpeg","size":` + size + `,"bytes":"` + png + `"}],"preferredSlot":null`,
 		"size mismatch": `"reasonCode":"same_problem","details":"still dripping water","photos":[{"name":"a.png","mime":"image/png","size":3,"bytes":"` + png + `"}],"preferredSlot":null`,
+		"pixel flood":   `"reasonCode":"same_problem","details":"still dripping water","photos":[` + blobJSON("flood.png", "image/png", flood, len(flood)) + `],"preferredSlot":null`,
 		"six photos":    `"reasonCode":"same_problem","details":"still dripping water","photos":[` + strings.Repeat(photo+",", 5) + photo + `],"preferredSlot":null`,
 		"today slot":    `"reasonCode":"same_problem","details":"still dripping water","photos":[],"preferredSlot":` + slotJSON(2, 1),
 	} {

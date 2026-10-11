@@ -1,6 +1,6 @@
 ---
 document_id: DD-P
-version: 0.35.0
+version: 0.36.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -318,7 +318,7 @@ Scope: FR-P09 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 | membershipId / status / expiringWithinDays | filters | Own technicians; default 60 days | List scope |
 | issuedAt / expiresAt | date/required | issuedAt < expiresAt | Renewal |
 | number | string/required | 1–64 characters | Certificate number |
-| file | DocumentInput/required | PDF/JPEG/PNG ≤ 10 MB, bytes of that type (IR308) | Evidence |
+| file | DocumentInput/required | PDF/JPEG/PNG ≤ 10 MB, bytes of that type (IR308); an image within the pixel limits (IR389) | Evidence |
 
 **Steps**
 
@@ -363,7 +363,7 @@ Scope: FR-P10 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.35.0: Read IR01–IR352 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.36.0: Read IR01–IR389 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 0.14.0: Under IR25, get the pre-acceptance address from the unit's installation property. After expiry, freeze only report presence and acceptance state for report display.
 

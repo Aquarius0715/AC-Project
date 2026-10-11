@@ -1,6 +1,6 @@
 ---
 document_id: DD-C
-version: 0.36.0
+version: 0.37.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -593,7 +593,7 @@ Scope: FR-C17 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, 
 | tags | string[]/optional | On time, Clean work, Explained clearly, Polite, Fixed the problem | What went well |
 | comment | string/optional | 0–1000 characters | Comment |
 | reasonCode / details | required (problem) | same_problem/new_damage/not_completed/other; 10–2000 characters | Problem |
-| photos / preferredSlot | optional | Up to 5 JPEG/PNG ≤ 5 MiB, bytes of that type (IR308); future slot | Evidence and visit |
+| photos / preferredSlot | optional | Up to 5 JPEG/PNG ≤ 5 MiB, bytes of that type (IR308), at most 16,384 px a side and 50 megapixels by the header (IR389); future slot | Evidence and visit |
 
 **Steps**
 
@@ -661,6 +661,6 @@ Convert condition forms to the Condition type's discriminated union. occupancy i
 
 2026-09-16 approved updates: C01/C06 period boundaries follow SR17. C13 retry follows SR18 like A15; get the current version and attemptId through offsets.list.
 
-Additional contracts for current version 0.36.0: Read IR01–IR380 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.37.0: Read IR01–IR389 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

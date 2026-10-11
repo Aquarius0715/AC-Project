@@ -28,7 +28,8 @@ func TestForeignTargets(t *testing.T) {
 	s := server(t)
 	id := func(k string) string { return seed.ID(k).String() }
 	at := func(h int) string { return clock.Add(time.Duration(h) * time.Hour).Format(time.RFC3339) }
-	png := blobJSON("photo.png", "image/png", []byte("\x89PNG\r\n\x1a\ndemo"), 12)
+	img := tinyPNG(t)
+	png := blobJSON("photo.png", "image/png", img, len(img))
 	pdf := blobJSON("cert.pdf", "application/pdf", []byte("%PDF-1.4 demo"), 13)
 	period := `"from":"2026-09-01T00:00:00Z","to":"2026-09-14T00:00:00Z"`
 

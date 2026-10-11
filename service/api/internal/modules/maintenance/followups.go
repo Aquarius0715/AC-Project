@@ -5,6 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"image"
+	_ "image/jpeg" // ImageSizeOK reads JPEG headers
+	_ "image/png"  // and PNG headers
 	"slices"
 	"strings"
 	"time"
@@ -198,10 +201,28 @@ type ProblemInput struct {
 var problemCodes = map[string]bool{"same_problem": true, "new_damage": true, "not_completed": true, "other": true}
 
 // ValidBlob checks one image upload (a valid name, JPEG/PNG whose bytes are that type, 1 byte – max bytes, size equal
-// to the payload).
+// to the payload, and a header within the pixel limits).
 func ValidBlob(b BlobInput, max int) bool {
 	return ValidFileName(b.Name) && (b.Mime == "image/jpeg" || b.Mime == "image/png") && b.Size == len(b.Bytes) && b.Size >= 1 && b.Size <= max &&
-		ContentMatches(b.Mime, b.Bytes)
+		ContentMatches(b.Mime, b.Bytes) && ImageSizeOK(b.Mime, b.Bytes)
+}
+
+// The pixel limits of an uploaded image (IR389): at most 16,384 pixels a side and 50 megapixels, more than a phone
+// camera's full resolution in 5 MiB. A few megabytes of PNG or JPEG can declare billions of pixels, and decoding them
+// would stall the browser of whoever opens the photo.
+const (
+	maxImageSide   = 16384
+	maxImagePixels = 50_000_000
+)
+
+// ImageSizeOK reads an image's header, without decoding the image, and checks that it is the declared type and within
+// the pixel limits.
+func ImageSizeOK(mime string, b []byte) bool {
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(b))
+	if err != nil || "image/"+format != mime {
+		return false
+	}
+	return cfg.Width >= 1 && cfg.Height >= 1 && cfg.Width <= maxImageSide && cfg.Height <= maxImageSide && cfg.Width*cfg.Height <= maxImagePixels
 }
 
 // ValidFileName checks the name of an upload. The apps show it, and offer it as the file name when a photo is opened.

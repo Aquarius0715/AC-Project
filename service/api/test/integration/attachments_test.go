@@ -18,8 +18,8 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	write(s, &techInt, "jobs.start", `{"jobId":"`+job+`","startConfirmed":true}`, 2)
 	_, m := write(s, &techInt, "jobs.saveDraft", draftBody(job, "normal", nil), 0)
 	rep := data(m)["id"].(string)
-	img := []byte("\x89PNG\r\n\x1a\nphoto bytes") // the PNG signature, then the demo bytes
-	jpg := []byte("\xff\xd8\xffdoor photo bytes") // the JPEG start of image marker
+	img, jpg := tinyPNG(t), tinyJPEG(t)
+	flood := pngHeader(50000, 50000) // 2.5 gigapixels declared in a few dozen bytes (IR389)
 	add := func(file string, v int) (int, map[string]any) {
 		return write(s, &techInt, "attachments.add", `{"jobId":"`+job+`","reportId":"`+rep+`","file":`+file+`}`, v)
 	}
@@ -30,6 +30,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		"not a png":     "file=error.invalidFile",
 		"png as jpeg":   "file=error.invalidFile",
 		"size mismatch": "file=error.invalidFile",
+		"pixel flood":   "file=error.invalidFile",
 		// IR368: the name is a label without control characters, paths or bidirectional overrides
 		"line break in the name": "file=error.invalidFile",
 		"path in the name":       "file=error.invalidFile",
@@ -38,6 +39,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	for name, f := range map[string]string{
 		"gif":                    blobJSON("a.gif", "image/gif", img, len(img)),
 		"size mismatch":          blobJSON("a.png", "image/png", img, 3),
+		"pixel flood":            blobJSON("flood.png", "image/png", flood, len(flood)),
 		"empty":                  blobJSON("a.png", "image/png", nil, 0),
 		"no name":                blobJSON(" ", "image/png", img, len(img)),
 		"not a png":              blobJSON("a.png", "image/png", []byte("<svg onload=alert(1)>"), 21), // stored and served only as what it is (IR308)

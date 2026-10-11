@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.271.0 / Created: 2026-09-14 / Updated: 2026-10-12 / Status: Draft for review / Language: English
+Version: 0.272.0 / Created: 2026-09-14 / Updated: 2026-10-12 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.272.0 (2026-10-12): Uploaded images are held to pixel limits read from their header (16,384 px a side, 50 megapixels), so a tiny file declaring billions of pixels cannot stall the browsers that open it (IR389).
 0.271.0 (2026-10-12): A search term is matched as written: `%`, `_` and `\` are no longer wildcards in the four lists with a search filter; SQL built from input checked again; a unit import test that passed without checking now checks (IR388).
 0.270.0 (2026-10-12): Checks round: no open redirect on the sign-in again path, and a test now pins the whole chain; the IdP sign-out's remaining paths are under test; the architecture boards' counts are in step (IR387).
 0.269.0 (2026-10-12): Signing a user out everywhere also ends their sessions at the identity provider (Keycloak's admin logout locally, Cognito's AdminUserGlobalSignOut planned for production), so the next sign-in asks for the password at once; identity-api alone holds the service-account client (IR386).

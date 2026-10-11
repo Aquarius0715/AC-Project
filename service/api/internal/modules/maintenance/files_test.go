@@ -19,7 +19,7 @@ func TestValidFileName(t *testing.T) {
 			t.Errorf("%q accepted", n)
 		}
 	}
-	png := []byte("\x89PNG\r\n\x1a\nx")
+	png := tinyPNG(t)
 	if !ValidBlob(BlobInput{Name: "p.png", Mime: "image/png", Size: len(png), Bytes: png}, 100) {
 		t.Error("a valid photo is refused")
 	}

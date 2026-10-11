@@ -5986,3 +5986,30 @@ IR384 and IR385 left one step open: ending the identity provider's sessions from
    - For a part and a contractor with `%` and `_` in their names, each wildcard character is matched as written ("50% grade", "l_5", "50%_c" find them; "SEAL%", "seal_kit", "s_arch" do not).
    - With the escaping removed, the test fails.
 5. **Checks.** `make test-all` (both modes) and the validators pass. With the identity, maintenance and equipment images rebuilt, the E2E suite passes: 117 tests, 8 skipped.
+
+## IR389 Uploads, second pass: an image is held to pixel limits read from its header — 2026-10-12
+
+1. **What was already right (IR308, IR368).**
+   - Every upload is checked for its type by the leading bytes, its size against the payload, and its name.
+   - Only report photos and signatures are ever served back. They go out with their own type (JPEG or PNG), `nosniff` and an RFC 5987 file name.
+   - A PDF or a polyglot file is never served as a page.
+2. **Finding (security): a pixel flood.**
+   - No app shrinks a photo before the upload, and the server never decodes one. A PNG or JPEG of a few kilobytes can still declare billions of pixels.
+   - Example: a 50,000 × 50,000 header is 2.5 gigapixels in 45 bytes.
+   - A technician's report photo or a customer's problem photo is opened in other people's browsers: the customer, HQ, the contractor. Decoding such an image would stall or crash their tab.
+   - Within 5 MiB, a real photo stays far below the limit, but a crafted file does not.
+3. **Fixed.**
+   - `ValidBlob` (report photos, signatures, site photos, problem photos) and `certificates.submit` (a scan as an image) now read the image header with `image.DecodeConfig`, without decoding the image.
+   - The file must be the declared type and at most 16,384 pixels a side and 50 megapixels. A phone camera's full resolution (12–48 MP) passes.
+   - Otherwise the answer is VALIDATION `error.invalidFile`, the same as a wrong type. The apps' messages ("JPEG or PNG up to 5 MiB", "check its type and size") stay, because a genuine photo of 5 MiB never reaches the limit.
+   - The DD field tables now name the limits: DD-T09 report photos, the DD-T15 signature and site photo, DD-C17 problem photos, DD-P09 certificate files.
+4. **Tests.**
+   - Unit `TestImageSizeOK`:
+     - a one-pixel PNG and JPEG and a 4032 × 3024 JPEG pass;
+     - 16,384 × 3,000 passes;
+     - 16,385 wide, 64 megapixels and a JPEG frame of 60,000 × 60,000 are refused;
+     - so are a PNG named JPEG and a bare signature.
+   - The upload tests used made-up bytes after a signature. They now upload real one-pixel images.
+   - Each upload path gained a pixel-flood case: `attachments.add`, `jobs.reportProblem` and `certificates.submit`.
+   - With the check removed, the attachment and problem cases are accepted (200), and the tests fail.
+5. **Checks.** `make test-all` (both modes) and the validators pass. With the maintenance image rebuilt, the E2E suite passes: 117 tests, 8 skipped.

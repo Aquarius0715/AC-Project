@@ -134,7 +134,7 @@ func (in *SubmitCertInput) Validate() map[string]string {
 	}
 	f := in.File
 	if !ValidFileName(f.Name) || (f.Mime != "application/pdf" && f.Mime != "image/jpeg" && f.Mime != "image/png") || f.Size != len(f.Bytes) || f.Size < 1 || f.Size > 10*1000*1000 ||
-		!ContentMatches(f.Mime, f.Bytes) {
+		!ContentMatches(f.Mime, f.Bytes) || (f.Mime != "application/pdf" && !ImageSizeOK(f.Mime, f.Bytes)) {
 		fe["file"] = "error.invalidFile"
 	}
 	return fe

@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.45.0
+version: 0.46.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -306,7 +306,7 @@ Scope: FR-T09 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, 
 |---|---|---|---|
 | workText | string/required on submission | 10–4000 characters | Work performed |
 | inspectionItems | array/required on submission | Same component set as Unit.components at submission, result for every item, reasons for attention and similar results (IR100) | Checklist |
-| photos | Attachment array/optional | JPEG/PNG whose bytes are that type (IR308), <=5MiB×10; submit only ready items | Photos |
+| photos | Attachment array/optional | JPEG/PNG whose bytes are that type (IR308), <=5MiB×10, at most 16,384 px a side and 50 megapixels by the header (IR389); submit only ready items | Photos |
 | parts | array/optional | name: 1–120 characters; quantity: positive integer <=999 | Replacement parts |
 | nextAction.kind | enum/required | none/follow_up | Next action |
 | nextAction.date / note | datetime and string/conditionally required | Future date/time and 1–1000 characters for follow_up | Follow-up plan |
@@ -471,8 +471,8 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 | Field | Type / required | Default / constraints | Purpose |
 |---|---|---|---|
 | signerName | string/required | 1–120 characters | Signer |
-| signature | BlobInput/conditional | PNG of the pad; required unless absent | Signature |
-| absentReason / sitePhoto | conditional | Reason 1–1000 and a JPEG/PNG photo (bytes checked, IR308) when the customer is absent | Absence |
+| signature | BlobInput/conditional | PNG of the pad, within the pixel limits (IR389); required unless absent | Signature |
+| absentReason / sitePhoto | conditional | Reason 1–1000 and a JPEG/PNG photo (bytes checked, IR308; pixel limits, IR389) when the customer is absent | Absence |
 
 **Steps**
 
@@ -488,6 +488,6 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 
 0.10.0: T12 fetches alerts.get using DeviceEvent.alertIds and acknowledges using Alert.version (SR23). Filter device history by scope at event time (SR24).
 
-Additional contracts for current version 0.45.0: Read IR01–IR366 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.46.0: Read IR01–IR389 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.
