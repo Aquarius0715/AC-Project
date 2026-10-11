@@ -3396,6 +3396,7 @@ export const ms: Record<string, string> = {
   "Cancel: {why}": "Batal: {why}",
   "↩ Follow-up request — classify within 1 business day": "↩ Permintaan susulan — kelaskan dalam 1 hari bekerja",
   "↩ Follow-up of {id}": "↩ Susulan kepada {id}",
+  "↩ Follow-up of {id} · classify by {time}": "↩ Susulan kepada {id} · kelaskan sebelum {time}",
   "Classify by {time}": "Kelaskan sebelum {time}",
   "Client’s report": "Laporan pelanggan",
   "Original job": "Kerja asal",

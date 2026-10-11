@@ -4817,3 +4817,18 @@ Backend architecture §10 listed the 15-minute work window warning (IR89) as not
 5. **Tests.**
    - `windowState`: open, the 15-minute boundary, one minute left, Malay with Asia/Tokyo.
    - Overview rows: in progress and assigned in the last 15 minutes; a submitted job without the warning.
+
+## IR338 The follow-up row in HQ Jobs; the scheduled items that are app displays — 2026-10-11
+
+Backend architecture §10 listed a "follow-up classification reminder" as not built. IR114 item 3 makes it a display: HQ Jobs shows a pending follow-up with "↩ Follow-up of <job>" and its classify-by time (createdAt + 1 business day). The detail showed it, but the list row could not: JobSummary had neither the follow-up fields nor createdAt. DD-A06 and Figma Admin 06-17 show the row: "↩ Follow-up of job-c02 · classify by 09-23 11:05".
+
+1. **Contract.** JobSummary gains `createdAt`, `followUpOfJobId` and `followUpClass` from MaintenanceJob. Every reader of a summary already reads them in the job detail, so nothing new is exposed.
+2. **HQ Jobs.** A pending follow-up's row reads "↩ Follow-up of <job> · classify by <time>" (warning tone), with the time computed as in the detail (Kuala Lumpur business days, the user's display time zone). Once classified, the row shows its status line again.
+3. **Backend architecture §10.** The classify-by time moves to "shown by the app", next to the work window warning (IR337).
+4. **Open — the monthly report e-mail (FR-C16, user decision).** BR-C16 sends the report on the 1st of each month while `Preferences.monthlyReportEmail` is on. Two points are open:
+   - **What the e-mail holds.** The flag keeps no month, locations, sections or format, so the export dialog's choices cannot be repeated.
+   - **How it is delivered.** No e-mail delivery is built yet (Amazon SES is the production choice, DEC-68); in-app and preview notifications are the only channels.
+   Until the user decides, the report stays an on-demand export.
+5. **Tests.**
+   - Integration (`TestRateAndReportProblem`): the HQ and client list rows carry the follow-up, its class and createdAt, and the class after classification.
+   - Web: the pending row in English and Malay; a classified row; the result types against the contract (IR314).

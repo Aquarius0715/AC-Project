@@ -113,12 +113,45 @@ func TestRateAndReportProblem(t *testing.T) {
 	if code, _ := prob(`"reasonCode":"other","details":"Too late to report this","photos":[],"preferredSlot":null`, 5); code != 409 {
 		t.Error("problem after 7 days")
 	}
+	// the list rows name the follow-up, its class and when it was created: HQ's classify-by time (IR114, IR338), and
+	// the client's own row
+	summary := func(a *actor) map[string]any { // a follow-up stays requested (IR114); later tests' jobs may fill pages
+		t.Helper()
+		cursor := ""
+		for range 50 {
+			_, m := post(s, a, "jobs.list", `{"filters":{"unitId":"`+seed.ID("unit-non-rto").String()+`","status":"requested"},"limit":100`+cursor+`}`)
+			for _, it := range items(m) {
+				if it["id"] == follow {
+					return it
+				}
+			}
+			next, _ := data(m)["nextCursor"].(string)
+			if next == "" {
+				break
+			}
+			cursor = `,"cursor":"` + next + `"`
+		}
+		t.Fatal("follow-up not listed")
+		return nil
+	}
+	var created time.Time
+	ownerScan(t, `SELECT created_at FROM maintenance.jobs WHERE id = $1`, []any{follow}, &created)
+	for name, a := range map[string]*actor{"hq": &hq, "client": &customerA} {
+		row := summary(a)
+		at, _ := time.Parse(time.RFC3339, row["createdAt"].(string))
+		if row["projection"] != "summary" || row["followUpOfJobId"] != job || row["followUpClass"] != "pending" || !at.Equal(created) {
+			t.Errorf("%s row: %v", name, row)
+		}
+	}
 	// HQ classifies once
 	if code, m := write(s, &hq, "jobs.classifyFollowUp", `{"jobId":"`+follow+`","classification":"redo","reason":"x"}`, 1); code != 422 || fields(m) != "classification=error.invalid" {
 		t.Errorf("bad classification: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &hq, "jobs.classifyFollowUp", `{"jobId":"`+follow+`","classification":"rework","reason":"same fault"}`, 1); code != 200 || data(m)["followUpClass"] != "rework" {
 		t.Fatalf("classify: %d %v", code, m)
+	}
+	if row := summary(&hq); row["followUpClass"] != "rework" || row["followUpOfJobId"] != job {
+		t.Errorf("classified row: %v", row)
 	}
 	if code, _ := write(s, &hq, "jobs.classifyFollowUp", `{"jobId":"`+follow+`","classification":"new_request","reason":"again"}`, 2); code != 409 {
 		t.Error("classify twice")

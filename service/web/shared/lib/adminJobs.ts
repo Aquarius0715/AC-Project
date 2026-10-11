@@ -16,6 +16,7 @@ export type ApiHqRow = {
   projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; dueAt: string; requestedSlot: Slot; scheduledSlot: Slot | null;
   assignmentId: string | null; origin: string; preferredSlots: Slot[]; severity: string; displayStatus: string; assignmentAcknowledgement: "pending" | "accepted" | "cant_make" | null;
   technicianMembershipId: string | null; accessValidFrom: string | null; accessValidUntil: string | null;
+  createdAt: string; followUpOfJobId: string | null; followUpClass: "pending" | "rework" | "new_request" | null;
 };
 export type ApiSlotProposal = { id: string; source: "hq" | "contractor"; slot: Slot; hold: { kind: "internal"; membershipId: string } | { kind: "contractor"; contractorOrgId: string; technicianMembershipId: string | null }; message: string; replyBy: string; status: string; decidedAt: string | null; declineReason: string | null; declineComment: string | null };
 export type ApiPartnerProposal = { id: string; offerId: string; slot: Slot; technicianMembershipId: string; reason: string; sentAt: string; status: string };
@@ -113,6 +114,8 @@ export function hqRow(j: ApiHqRow, now: number, n: Names, unitOrg: Map<string, s
     case "completed": line = statusWord("completed", t); break;
     case "cancelled": line = statusWord("cancelled", t); break;
   }
+  // a client's follow-up waits for HQ's classification within one business day (IR114, Figma Admin 06-17)
+  if (j.followUpClass === "pending" && j.followUpOfJobId) [line, lineTone] = [t("↩ Follow-up of {id} · classify by {time}", { id: j.followUpOfJobId.slice(0, 8), time: classifyBy(j.createdAt, i) }), "warn"];
   return {
     id: j.id, short: j.id.slice(0, 8), title: n.units.get(j.unitId) ?? t("Unit"), customer: n.customers.get(unitOrg.get(j.unitId) ?? "") ?? t("customer"),
     type: typeLabel(j.type, t), origin: j.origin, status: j.displayStatus === "time_proposed" ? "time_proposed" : j.status, badge: { status: j.displayStatus === "time_proposed" ? "time_proposed" : j.status, overdue }, line, lineTone,

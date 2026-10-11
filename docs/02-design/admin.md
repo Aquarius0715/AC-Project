@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.47.0
+version: 0.48.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -309,7 +309,7 @@ Scope: FR-A06 / Main display pattern: **UI-LIST / UI-DETAIL / UI-FORM**. Service
 
 **Boundary cases and failures**: Check re-offering after decline, overlapping confirmed schedules, overdue jobs, and returns after failed quality review. Summarize estimate and actual costs separately by currency, without conversion.
 
-**Follow-up requests (FR-C17)**: A client “Report a problem” creates a requested job with followUpOfJobId and followUpClass=pending, highlighted in the Jobs tab; HQ classifies it within one business day as rework (free, linked to the original job) or a new request (`jobs.classifyFollowUp`, reason required). The list row shows “↩ Follow-up of <jobId>” with the classify-by time; the detail (06-17) shows the client's report, the original job and its rating; Classify… opens a centered dialog (06-18) with Rework (free) / New request and a reason (1–1000). Classification is set once (second call CONFLICT, IR114); the job stays requested and is booked under IR113 (06-11). Tabs: Jobs, Plans, Contractors (DD-A21), SLA by customer (DD-A22).
+**Follow-up requests (FR-C17)**: A client “Report a problem” creates a requested job with followUpOfJobId and followUpClass=pending, highlighted in the Jobs tab; HQ classifies it within one business day as rework (free, linked to the original job) or a new request (`jobs.classifyFollowUp`, reason required). The list row shows “↩ Follow-up of <jobId>” with the classify-by time (from `followUpOfJobId`, `followUpClass` and `createdAt` of JobSummary, IR338); the detail (06-17) shows the client's report, the original job and its rating; Classify… opens a centered dialog (06-18) with Rework (free) / New request and a reason (1–1000). Classification is set once (second call CONFLICT, IR114); the job stays requested and is booked under IR113 (06-11). Tabs: Jobs, Plans, Contractors (DD-A21), SLA by customer (DD-A22).
 
 **Verification**: Check the traceability entries under AT-A06 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -865,7 +865,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.47.0: Read IR01–IR333 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.48.0: Read IR01–IR338 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

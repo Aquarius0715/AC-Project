@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND
-version: 0.34.0
+version: 0.35.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -214,7 +214,7 @@ Modelling rules:
 | Offer expiry and re-offer | Offer deadline | FR-A06, FR-P02 |
 | Work window end warning and discard | scheduledEnd − 15 minutes (shown by the technician app) / scheduledEnd | IR89, IR337 |
 | Auto-confirm completed jobs | 7 days after completion without rating | FR-C17 (BR-C17) |
-| Follow-up classification reminder | createdAt + 1 business day | IR114 |
+| Follow-up classify-by time | createdAt + 1 business day, display only in HQ Jobs (IR114 item 3) | IR114, IR338 |
 | Invoice reminders | Due and overdue dates | FR-A08 |
 | Certificate expiry reminders | 60, 30 and 7 days before expiry: one reminder each to the contractor admins (BR-P09). The status reads `expiring` within 30 days of expiry and `expired` from it on (IR133 item 2) | FR-P09, FR-A21, IR336 |
 | Filter cleaning reminders | Every 15 minutes of business time: an overdue unit once per cleaning cycle (customer settings) | FR-C18, IR239 |
@@ -238,8 +238,12 @@ Items of the table above that are not scheduled yet:
   - periodic plan job generation: `plans.generateNext`;
   - invoice reminders: HQ previews one with `notifications.preview` and sends it with `invoices.remind`, which saves the customer's notification; external delivery is simulated (DD-A08).
 - **Computed when read:** grace and exception expiry (compared at execution) and the certificate status (IR133); the certificate reminders are scheduled (IR336).
-- **Shown by the app:** the 15-minute work window warning (IR89). The technician's job workspace and overview compute it from the business clock (IR337).
-- **Not built:** the follow-up classification reminder, the monthly energy report (exported on demand with `energy.exportReport`) and the start of firmware campaign waves.
+- **Shown by the app:**
+  - the 15-minute work window warning (IR89): the technician's job workspace and overview compute it from the business clock (IR337);
+  - the follow-up classify-by time (IR114): the HQ Jobs row and detail compute it from the job's createdAt (IR338).
+- **Not built:**
+  - the monthly energy report e-mail: the report is exported on demand with `energy.exportReport`; the e-mail on the 1st waits for a decision (IR338);
+  - the start of firmware campaign waves.
 
 ## 11. External integrations
 
@@ -306,4 +310,4 @@ Items of the table above that are not scheduled yet:
 | OPEN-BE-07 | Contractor payout rail (bank transfer file or Stripe Connect) | Payouts (FR-A23) |
 | OPEN-BE-08 | The scheduled items that are not built yet (§10 as built) and the lease (`platform.scheduled_items`, `FOR UPDATE SKIP LOCKED`) for running several scheduler instances per domain | Scheduler, worker |
 
-Additional contracts for current version 0.34.0: Read IR01–IR337 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.35.0: Read IR01–IR338 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

@@ -14,7 +14,8 @@ const unitOrg = new Map([["u1", "org-a"]]);
 const row = (over: Record<string, unknown>) => ({
   projection: "summary", id: "job-1-aaaa", version: 3, unitId: "u1", type: "reactive", status: "requested", dueAt: "2026-09-22T04:00:00Z", requestedSlot: slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"),
   scheduledSlot: null, assignmentId: null, origin: "client_request", preferredSlots: [slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z")],
-  severity: "normal", displayStatus: "requested", assignmentAcknowledgement: null, technicianMembershipId: null, accessValidFrom: null, accessValidUntil: null, ...over,
+  severity: "normal", displayStatus: "requested", assignmentAcknowledgement: null, technicianMembershipId: null, accessValidFrom: null, accessValidUntil: null,
+  createdAt: "2026-09-18T01:00:00Z", followUpOfJobId: null, followUpClass: null, ...over,
 }) as unknown as ApiHqRow;
 const job = (over: Record<string, unknown>) => ({
   projection: "detail", id: "job-1-aaaa", version: 4, unitId: "u1", type: "reactive", status: "requested", symptom: "Water dripping", contactWindow: "9:00–18:00", origin: "client_request", planId: null, occurrenceAt: null,
@@ -39,6 +40,12 @@ describe("HQ maintenance jobs", () => {
     expect(hqRow(row({ displayStatus: "time_proposed" }), NOW, names, unitOrg)).toMatchObject({ status: "time_proposed", line: "Time proposed · waiting for the client" });
     const late = hqRow(row({ status: "assigned", displayStatus: "assigned", scheduledSlot: slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z"), technicianMembershipId: "m-int", assignmentAcknowledgement: "cant_make" }), NOW, names, unitOrg);
     expect([late.badge, late.line, late.lineTone]).toEqual([{ status: "assigned", overdue: true }, "tech-internal-a · can’t make it ⚠ · window ended", "warn"]);
+    // a pending follow-up names the original job and the classify-by time (IR114, Figma Admin 06-17); classified, the status line returns
+    const follow = hqRow(row({ followUpOfJobId: "job-c02-orig", followUpClass: "pending", createdAt: "2026-09-22T03:05:00Z" }), NOW, names, unitOrg);
+    expect([follow.line, follow.lineTone]).toEqual(["↩ Follow-up of job-c02- · classify by 23 Sept 2026, 11:05 am MYT", "warn"]);
+    expect(hqRow(row({ followUpOfJobId: "job-c02-orig", followUpClass: "rework" }), NOW, names, unitOrg).line).toBe("2 preferred times · book one or propose");
+    expect(hqRow(row({ followUpOfJobId: "job-c02-orig", followUpClass: "pending", createdAt: "2026-09-22T03:05:00Z" }), NOW, names, unitOrg, MS).line)
+      .toBe("↩ Susulan kepada job-c02- · kelaskan sebelum 23 Sep 2026, 12:05 PTG GMT+9");
   });
 
   it("shows the stepper, the facts and the delivery", () => {

@@ -622,6 +622,7 @@ type Summary struct {
 	Projection                string     `json:"projection"`
 	ID                        uuid.UUID  `json:"id"`
 	Version                   int        `json:"version"`
+	CreatedAt                 time.Time  `json:"createdAt"`
 	UnitID                    uuid.UUID  `json:"unitId"`
 	Type                      string     `json:"type"`
 	Status                    string     `json:"status"`
@@ -638,6 +639,8 @@ type Summary struct {
 	TechnicianMembershipID    *uuid.UUID `json:"technicianMembershipId"` // the active Assignment's technician (IR225)
 	AccessValidFrom           *time.Time `json:"accessValidFrom"`        // the accepted Offer's access window (IR227)
 	AccessValidUntil          *time.Time `json:"accessValidUntil"`
+	FollowUpOfJobID           *uuid.UUID `json:"followUpOfJobId"` // a client's follow-up and its classification (IR114, IR338)
+	FollowUpClass             *string    `json:"followUpClass"`
 }
 
 var jobStatuses = []string{"requested", "offered", "accepted", "assigned", "in_progress", "on_hold", "submitted", "rework_requested", "completed", "cancelled"}
@@ -824,7 +827,7 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 		EXISTS (SELECT 1 FROM maintenance.slot_proposals p WHERE p.job_id = j.id AND p.status = 'pending'),
 		(SELECT a.acknowledgement FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status IN ('active', 'completed') ORDER BY a.status = 'active' DESC, a.updated_at DESC LIMIT 1),
 		(SELECT a.technician_membership_id FROM maintenance.assignments a WHERE a.job_id = j.id AND a.status IN ('active', 'completed') ORDER BY a.status = 'active' DESC, a.updated_at DESC LIMIT 1),
-		ao.access_valid_from, ao.access_valid_until
+		ao.access_valid_from, ao.access_valid_until, j.created_at, j.follow_up_of_job_id, j.follow_up_class
 		FROM maintenance.jobs j LEFT JOIN LATERAL (SELECT o.access_valid_from, o.access_valid_until FROM maintenance.offers o
 			WHERE o.job_id = j.id AND o.decision = 'accept' ORDER BY o.decided_at DESC LIMIT 1) ao ON true
 		WHERE `+strings.Join(conds, " AND "), args...)
@@ -844,7 +847,7 @@ func (m Jobs) collect(ctx context.Context, c *ops.Call, fp *listFilters) ([]list
 		var pending bool
 		if err := rows.Scan(&r.s.ID, &r.s.Version, &r.s.UnitID, &r.s.Type, &r.s.Status, &r.s.DueAt, &r.s.RequestedSlot.StartAt, &r.s.RequestedSlot.EndAt,
 			&ss, &se, &r.s.AssignmentID, &r.s.Origin, &pref, &r.rank, &pending, &r.s.AssignmentAcknowledgement, &r.s.TechnicianMembershipID,
-			&r.s.AccessValidFrom, &r.s.AccessValidUntil); err != nil {
+			&r.s.AccessValidFrom, &r.s.AccessValidUntil, &r.s.CreatedAt, &r.s.FollowUpOfJobID, &r.s.FollowUpClass); err != nil {
 			rows.Close()
 			return nil, err
 		}
