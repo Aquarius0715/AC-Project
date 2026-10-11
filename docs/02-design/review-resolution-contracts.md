@@ -4860,6 +4860,7 @@ BR-A20 and DD-A20 define how a firmware campaign rolls out, but only its operati
 8. **Tests.**
    - Unit: the window (bounds, over midnight), the outcome mapping, the 95 % rule; web: reasons, wave states, Malay.
    - Integration, in both suites (`TestFirmwareCampaignRunner`): the notice once, the start, the pilot, the four skip reasons, a reported failure and the auto-pause, nothing while paused, Retry and Resume, an install that times out, the wait below 95 %, the window, a device already on target, and the completion with every result's time.
+   - Integration (`TestFirmwareCampaignSkipsAndCompletion`, added in R334): the unbound, other-model and command-busy skips; a wave of 20 passes at 19 succeeded, and the campaign completes only after the twentieth install.
 
 ## IR340 Warranty end reminders to HQ from the equipment scheduler — 2026-10-11
 

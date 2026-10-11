@@ -208,3 +208,88 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		t.Errorf("progress: %v", p)
 	}
 }
+
+// IR339: the dispatch skips a device that left its unit, one now on a unit of another model, and one whose unit has a
+// command in flight (D05, control.Busy). A wave passes at exactly 95 % success, but the campaign completes only once
+// its last installing device finished.
+func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
+	s := serverWith(t, true)
+	ctx := context.Background()
+	tenant := seed.ID("tenant-a")
+	var units, devs []string
+	for range 4 {
+		u := boundUnit(t, s, "online")
+		var d string
+		ownerScan(t, `SELECT id::text FROM devices.devices WHERE unit_id = $1`, []any{u}, &d)
+		units, devs = append(units, u), append(devs, d)
+	}
+	code, m := write(s, &hq, "firmwareCampaigns.schedule", `{"modelId":"`+seed.ID("ventilation-demo").String()+`","targetVersion":"v2","deviceIds":["`+strings.Join(devs, `","`)+
+		`"],"waves":[{"label":"All","percent":100}],"window":{"startLocal":"00:00","endLocal":"23:59"},"autoPauseFailurePercent":50,"startAt":"`+
+		clock.Add(30*24*time.Hour).Format(time.RFC3339)+`"}`, 0)
+	if code != 200 {
+		t.Fatalf("schedule: %d %v", code, m)
+	}
+	camp := data(m)["id"].(string)
+	t.Cleanup(func() { owner(t, `UPDATE devices.firmware_campaigns SET state = 'aborted' WHERE id = ANY($1::uuid[]) AND state <> 'completed'`, []string{camp}) })
+	base, _ := time.Parse(time.RFC3339Nano, data(m)["createdAt"].(string))
+	owner(t, `UPDATE devices.firmware_campaigns SET start_at = $2, notice_sent_at = $2 WHERE id = $1`, camp, base)
+	// after scheduling: one device unbound, one moved to a split unit (another model), one unit with a command in flight
+	owner(t, `UPDATE devices.devices SET unit_id = NULL WHERE id = $1`, devs[0])
+	_, om := write(s, &hq, "units.save", `{"customerOrgId":"`+seed.ID("org-customer-b").String()+`","propertyId":"`+seed.ID("property-home-b").String()+`","spaceId":null,"displayName":"Split `+
+		uuid.NewString()[:8]+`","modelId":"`+seed.ID("cap-split-std").String()+`","type":"split","installedAt":null,"serviceScope":["indoor"]}`, 0)
+	owner(t, `UPDATE devices.devices SET unit_id = $2 WHERE id = $1`, devs[1], data(om)["id"].(string))
+	cmd := uuid.NewString()
+	owner(t, `INSERT INTO control.commands (id, tenant_id, unit_id, device_id, actor_membership_id, source, action, status, delivery, requested_at, expires_at, correlation_id)
+		VALUES ($1,$2,$3,$4,$5,'ui','{"kind":"set_power","power":false}','requested','sent',$6,$7,'t')`, cmd, tenant, units[2], devs[2], seed.ID("hq-operator"), base, base.Add(time.Hour))
+	t.Cleanup(func() { owner(t, `UPDATE control.commands SET status = 'cancelled' WHERE id = $1`, cmd) })
+	if _, err := schedTick(ctx, s, base.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	got := []string{}
+	for _, d := range devs {
+		var result, key string
+		ownerScan(t, `SELECT result, COALESCE(detail, '') FROM devices.firmware_campaign_devices WHERE campaign_id = $1 AND device_id = $2`, []any{camp, d}, &result, &key)
+		got = append(got, strings.TrimSuffix(result+":"+key, ":"))
+	}
+	if strings.Join(got, " ") != "skipped:errors.device_unbound skipped:errors.other_model skipped:errors.device_busy installing" {
+		t.Fatalf("skips: %v", got)
+	}
+
+	// a wave of 20 with 19 succeeded passes 95 %; the campaign waits for the twentieth install, then completes
+	unit, model := newUnit(t, s, "Wave AC"), seed.ID("ventilation-demo")
+	big := uuid.NewString()
+	owner(t, `INSERT INTO devices.firmware_campaigns (id, tenant_id, model_id, from_versions, target_version, checksum, waves, window_start_local, window_end_local,
+		auto_pause_failure_percent, start_at, state) VALUES ($1,$2,$3,'{1.0}','v2','sha256:x','[{"label":"All","percent":100}]','00:00','23:59',5,$4,'running')`, big, tenant, model, base.Add(-time.Hour))
+	t.Cleanup(func() { owner(t, `UPDATE devices.firmware_campaigns SET state = 'aborted' WHERE id = $1 AND state <> 'completed'`, big) })
+	op := uuid.NewString()
+	for i := range 20 {
+		dev := uuid.NewString()
+		owner(t, `INSERT INTO devices.devices (id, tenant_id, serial, target_unit_id, created_by_membership_id, firmware_version) VALUES ($1,$2,$3,$4,$5,'1.0')`,
+			dev, tenant, "W-"+dev[:8], unit, seed.ID("hq-operator"))
+		if i < 19 {
+			owner(t, `INSERT INTO devices.firmware_campaign_devices (campaign_id, device_id, tenant_id, wave, result, result_at) VALUES ($1,$2,$3,0,'succeeded',$4)`, big, dev, tenant, base)
+			continue
+		}
+		owner(t, `INSERT INTO devices.device_operations (id, tenant_id, device_id, kind, status, target_version, campaign_id, expires_at, started_at) VALUES ($1,$2,$3,'firmware','running','v2',$4,$5,$6)`,
+			op, tenant, dev, big, base.Add(24*time.Hour), base)
+		owner(t, `INSERT INTO devices.firmware_campaign_devices (campaign_id, device_id, tenant_id, wave, result, operation_id, result_at) VALUES ($1,$2,$3,0,'installing',$4,$5)`, big, dev, tenant, op, base)
+	}
+	state := func() string {
+		var st string
+		ownerScan(t, `SELECT state FROM devices.firmware_campaigns WHERE id = $1`, []any{big}, &st)
+		return st
+	}
+	if _, err := schedTick(ctx, s, base.Add(2*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if st := state(); st != "running" {
+		t.Fatalf("a device still installing: %s", st)
+	}
+	owner(t, `UPDATE devices.device_operations SET status = 'succeeded', finished_at = $2 WHERE id = $1`, op, base.Add(2*time.Minute))
+	if _, err := schedTick(ctx, s, base.Add(3*time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if st := state(); st != "completed" {
+		t.Fatalf("completed after the last install: %s", st)
+	}
+}
