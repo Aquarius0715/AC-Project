@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.252.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
+Version: 0.253.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.253.0 (2026-10-11): Rate limits. The BFF relay reads at most 1 MiB, where it used to read a body of any size into memory, and the local identity provider locks an account after 10 failed sign-ins, as Cognito does. The per-session write limit waits for the shared counter store (IR370).
 0.252.0 (2026-10-11): Secrets. The repository, its history and the client bundles hold none. Env files stay out of git and images (Next.js would copy them into the standalone output), and the Go logs mask secret-named values and personal data (IR369).
 0.251.0 (2026-10-11): Uploads. File names are labels without control, path or bidirectional formatting characters (the web cleans them, the API refuses them). A photo opens under a name in any script (RFC 5987 header), and CSV exports keep formula-like cells as text (IR368).
 0.250.0 (2026-10-11): Authentication. The Core API accepts access tokens only (an ID or refresh token of the same client is refused), and on https the BFF refuses to run its session cookie without a real `SESSION_SECRET` instead of using the local key (IR367).

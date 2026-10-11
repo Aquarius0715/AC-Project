@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTAINER
-version: 0.36.0
+version: 0.37.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -98,7 +98,7 @@ Local stand-ins for the AWS managed services:
 | ElastiCache (Valkey) | `valkey/valkey:8` | Sessions, idempotency fast path |
 | SQS / SNS FIFO, Kinesis, Firehose, S3, SES, Secrets Manager, KMS, EventBridge Scheduler | `localstack/localstack:4` | Resources created by `docker/localstack/init-aws.sh`; the AWS clients will use `AWS_ENDPOINT_URL` (none is built yet, IR334) |
 | AWS IoT Core (MQTT, rules) | `eclipse-mosquitto:2` + `iot-bridge` | Same topic layout; the bridge forwards topics to Kinesis / SQS like the IoT rules. Mutual TLS and IoT policies are verified in staging against IoT Core |
-| Amazon Cognito | `keycloak:26` realm `ac` (`docker/keycloak/realm-ac.json`) | Two OIDC clients `ac-web` and `ac-admin-web` (HQ network rule), TOTP (required for HQ users; the local realm pre-provisions a test TOTP credential per HQ user for end-to-end runs, IR177); one local user per fixture actor (username = `membershipId` in `docs/04-agentic-sdlc/fixture-contract.json`, password `local-pass`); the Go verifier is configured by issuer and JWKS URL only |
+| Amazon Cognito | `keycloak:26` realm `ac` (`docker/keycloak/realm-ac.json`) | Two OIDC clients `ac-web` and `ac-admin-web` (HQ network rule), TOTP (required for HQ users; the local realm pre-provisions a test TOTP credential per HQ user for end-to-end runs, IR177); one local user per fixture actor (username = `membershipId` in `docs/04-agentic-sdlc/fixture-contract.json`, password `local-pass`); the Go verifier is configured by issuer and JWKS URL only; brute-force protection like Cognito's lockout (10 failures lock an account for 60 s, growing to 15 min, IR370) |
 | Stripe API / webhooks | `stripe/stripe-mock` (offline) and Stripe CLI (test mode) | Live mode never outside production |
 | Weather source | `wiremock` (`docker/wiremock`) | Fixed demo responses |
 | CloudWatch / X-Ray | OpenTelemetry collector + Jaeger | Same OTLP exporter configuration |
@@ -176,4 +176,4 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 | OPEN-CT-03 | The server-side session store (ElastiCache in production, Valkey locally) with revocation on sign-out (backend architecture §6). Until then the BFF keeps the tokens in its sealed session cookie (IR333). Sign-out already ends the identity provider's session (IR357), so a copied cookie cannot be refreshed after it |
 | OPEN-CT-04 | OpenTelemetry instrumentation of the Go services and the web apps. The collector, Jaeger and `OTEL_EXPORTER_OTLP_ENDPOINT` are ready, but nothing exports traces or metrics yet (IR334) |
 
-Additional contracts for current version 0.36.0: Read IR01–IR369 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.37.0: Read IR01–IR370 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

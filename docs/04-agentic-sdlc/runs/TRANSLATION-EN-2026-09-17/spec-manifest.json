@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "397365ae4b8a6faf6b5cb40ac6ff90b23fb0f6d6b47d8f574598070ba48cc8d6",
+  "spec_baseline_id": "b192c5afd0299ca711c9f9da450b4ac6fcd667b01a2351d0f151b5b1f218c47e",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "a52c696f290abb15ae841eb18c3f3fed657fd87790f89362892e8f66e2966546"
+      "sha256": "8cf41ea7d5480519380f5a007e5b9b0ce4e504b2ff96b7922917849e65edb240"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -118,7 +118,7 @@
     },
     {
       "path": "02-design/container-design.md",
-      "sha256": "70982696a320924876479d271397986e0e36ca557671222cfc299131ce39873e"
+      "sha256": "3439d7ebda74e0e82059ace42a780e01d94e5d7b7b80c017874d1c2599116538"
     },
     {
       "path": "02-design/contractor.md",
@@ -138,7 +138,7 @@
     },
     {
       "path": "02-design/network-architecture.md",
-      "sha256": "b22428b502fdfa3efcf0f88e8aef54e35e9771ac4d9a6b9b409bce9fbba4ded5"
+      "sha256": "b3dd8673faa0b572e7ebc7bbd425347e870b0c94ce0463b77d6ff6d44775c20a"
     },
     {
       "path": "02-design/operation-catalog.csv",
@@ -154,7 +154,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "c35c304b50e386ab268ea1473716ecadf74b232ed2e121bd5301bb91c809b96a"
+      "sha256": "4c538867c2700d761319e31ed12a7b95ecadbeec0e869b39e83e9ed373c2c0ba"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -282,7 +282,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "e985ae46ec8099522624f7eccc0abfd816fd5d3812fff56ff42611dcb9d393d1"
+      "sha256": "5d15a7e1faf6cb60d893518c94d6fd69cecbc6cbd7eb5bc775d81cfaaa614bc7"
     },
     {
       "path": "tools/check_review_regressions.py",
@@ -294,7 +294,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "030c72648e887b96cdaebb43240c6fff943d722dc66116b3460eab0df8c4c8dc"
+      "sha256": "52753b674189345b49f8956cd8c66e98a3cc7ba939493cc376ae6d18f7afe6c1"
     }
   ]
 }

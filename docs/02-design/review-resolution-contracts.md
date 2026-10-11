@@ -5508,3 +5508,25 @@ The sixth security check looked for secrets wherever they could end up. No value
      IDs, dates and paths stay readable. A search by e-mail in a list URI is logged as `search=[masked]`.
 3. **Tests.** `TestMasking` logs a token, an `Authorization` header, a client secret, a cookie, an e-mail, a phone number and a database URL with its password. None reaches the line, while a UUID, a date range and a latency stay. The image check is the marker build above. Locally, the gateway's services log `search=[masked]` for a search by e-mail.
 4. **Checks.** `make test-all` (24 packages) and the E2E suite pass.
+
+## IR370 Rate limits: the BFF relay's input, sign-in attempts, and what is left to the edge — 2026-10-11
+
+The seventh security check reviewed limits on how much and how often a client may ask. Network architecture §6 proposes these limits: sign-in and password reset 10 per minute per IP and per account; writes 60 per minute per session.
+
+1. **Findings and fixes.**
+   - **The BFF relay read a body of any size.** `/bff/ops/<operation>` called `req.text()` before anything else. The proxy, which in Next.js 16 buffers at most `proxyClientMaxBodySize` of a body, does not run on `/bff` (its matcher excludes it). The same-origin check stops browsers of other sites, but not a client that sends neither `Origin` nor `Sec-Fetch-Site`. So one request without a session could make the BFF hold any amount of data in memory. The relay now reads at most 1 MiB, the Core API's limit for every operation without files. A larger declared `Content-Length` is refused without reading, and a body without a length is read only until it passes the limit. The answer is VALIDATION `error.bodyTooLarge`, as the Core API gives it. Files keep going through Server Actions, which have their own `bodySizeLimit` (8, 11 and 12 MB, and the 1 MB default for the HQ app).
+   - **The local identity provider let anyone keep guessing.** The local Keycloak realm had no brute-force protection, which is Keycloak's default. Production's Cognito locks an account out after repeated failures, and the local stand-in now does the same:
+     - after 10 consecutive failures, the account waits 60 s, growing up to 15 minutes, never permanently;
+     - a second failure within 1 second also waits 60 s;
+     - counts reset after 12 hours.
+
+     The live realm reads these settings back after it is imported again.
+2. **Checked and in order.**
+   - The Core API caps every operation's body (IR368).
+   - The in-app two-factor screens are demo screens with no real secret (IR112). The real password and TOTP checks happen at the identity provider, now limited.
+   - `clientUsers.resendInvite` shows a preview and sends nothing (IR111), so it cannot be used to flood a mailbox.
+3. **Not built, and why.**
+   - **Per IP.** The limits per IP belong to the edge WAF in production.
+   - **Per session.** The write limit of 60 per minute needs counters shared by every instance of a service. They would live in the cache (ElastiCache; Valkey runs locally), and the Core API has no client for it yet (OPEN-CT-03). Until then, `RATE_LIMITED` is defined in the error contract but no operation returns it.
+4. **Tests.** The relay test passes an input of exactly 1 MiB on, refuses 1 MiB + 1 byte without calling the Core API, and stops reading an endless body after the limit. Without the fix, the oversized input is relayed and the endless body is read until the test times out. For the realm, the live settings are read back with `kcadm.sh`.
+5. **Checks.** The web checks (404 unit tests, the build) and the E2E suite pass. The E2E suite runs against the imported realm with its new signing keys.
