@@ -28318,6 +28318,10 @@
                 "createdAt": {
                     "type": "string"
                 },
+                "createdByMembershipId": {
+                    "description": "who scheduled it (IR344)",
+                    "type": "string"
+                },
                 "deviceIds": {
                     "type": "array",
                     "items": {

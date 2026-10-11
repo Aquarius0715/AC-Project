@@ -63,16 +63,17 @@ type Campaign struct {
 	Progress                map[string]int   `json:"progress"`
 	Results                 []CampaignResult `json:"results"`
 	Reason                  *string          `json:"reason"`
+	CreatedByMembershipID   *uuid.UUID       `json:"createdByMembershipId"` // who scheduled it (IR344)
 }
 
 const campCols = `id, tenant_id, version, created_at, updated_at, model_id, from_versions, target_version, checksum, waves,
-	to_char(window_start_local, 'HH24:MI'), to_char(window_end_local, 'HH24:MI'), auto_pause_failure_percent, start_at, state, reason`
+	to_char(window_start_local, 'HH24:MI'), to_char(window_end_local, 'HH24:MI'), auto_pause_failure_percent, start_at, state, reason, created_by_membership_id`
 
 func scanCampaign(r pgx.Row) (Campaign, error) {
 	var x Campaign
 	var waves []byte
 	err := r.Scan(&x.ID, &x.TenantID, &x.Version, &x.CreatedAt, &x.UpdatedAt, &x.ModelID, &x.FromVersions, &x.TargetVersion, &x.Checksum, &waves,
-		&x.Window.StartLocal, &x.Window.EndLocal, &x.AutoPauseFailurePercent, &x.StartAt, &x.State, &x.Reason)
+		&x.Window.StartLocal, &x.Window.EndLocal, &x.AutoPauseFailurePercent, &x.StartAt, &x.State, &x.Reason, &x.CreatedByMembershipID)
 	if err == nil {
 		err = json.Unmarshal(waves, &x.Waves)
 	}
@@ -364,8 +365,8 @@ func (m *Module) campaignsSchedule(ctx context.Context, c *ops.Call, in *Schedul
 	id := uuid.Must(uuid.NewV7())
 	waves, _ := json.Marshal(in.Waves)
 	if _, err := c.Tx.Exec(ctx, `INSERT INTO devices.firmware_campaigns (id, tenant_id, model_id, from_versions, target_version, checksum, waves, window_start_local,
-		window_end_local, auto_pause_failure_percent, start_at, state) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7::time, $8::time, $9, $10, 'scheduled')`,
-		id, in.ModelID, from, in.TargetVersion, "sha256:"+hex.EncodeToString(sum[:]), waves, in.Window.StartLocal, in.Window.EndLocal, in.AutoPauseFailurePercent, in.StartAt); err != nil {
+		window_end_local, auto_pause_failure_percent, start_at, state, created_by_membership_id) VALUES ($1, current_setting('app.tenant_id')::uuid, $2, $3, $4, $5, $6, $7::time, $8::time, $9, $10, 'scheduled', $11)`,
+		id, in.ModelID, from, in.TargetVersion, "sha256:"+hex.EncodeToString(sum[:]), waves, in.Window.StartLocal, in.Window.EndLocal, in.AutoPauseFailurePercent, in.StartAt, c.Principal.MembershipID); err != nil {
 		return Campaign{}, err
 	}
 	for i, d := range in.DeviceIDs {

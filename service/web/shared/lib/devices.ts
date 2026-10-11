@@ -41,7 +41,7 @@ export type ApiCalibration = { id: string; sensorId: string; metric: Metric; uni
 export type ApiCampaign = {
   id: string; version: number; modelId: string; fromVersions: string[]; targetVersion: string; deviceIds: string[]; waves: { label: string; percent: number }[];
   window: { startLocal: string; endLocal: string }; autoPauseFailurePercent: number; startAt: string; state: "scheduled" | "running" | "paused" | "aborted" | "completed";
-  checksum: string; createdAt: string;
+  checksum: string; createdAt: string; createdByMembershipId: string | null;
   progress: { succeeded: number; installing: number; pending: number; failed: number; skipped: number };
   results: { deviceId: string; waveIndex: number; status: "pending" | "installing" | "succeeded" | "failed" | "skipped"; reasonKey: string | null; at: string | null }[]; reason: string | null;
 };
@@ -130,13 +130,15 @@ export function deviceRows(devices: ApiDevice[], units: ApiUnitLite[], t: T = en
   }));
 }
 
-export type CampaignRow = { id: string; version: number; model: string; versions: string; state: ApiCampaign["state"]; devices: number; start: string; c: ApiCampaign };
-export function campaignRows(cs: ApiCampaign[], caps: ApiCapability[], i: I18n = EN): CampaignRow[] {
+export type CampaignRow = { id: string; version: number; model: string; versions: string; state: ApiCampaign["state"]; devices: number; start: string; createdBy: string | null; c: ApiCampaign };
+/** The campaigns with their model and start; createdBy is the scheduling member's name where the session may read the
+ * members (IR344). */
+export function campaignRows(cs: ApiCampaign[], caps: ApiCapability[], i: I18n = EN, people: Map<string, string> = new Map()): CampaignRow[] {
   const { t } = i;
   const model = new Map(caps.map((k) => [k.id, `${k.manufacturer} ${k.model}`]));
   return cs.map((c) => ({
     id: c.id, version: c.version, model: model.get(c.modelId) ?? t("model"), versions: `${c.fromVersions.join(", ") || t("any")} → ${c.targetVersion}`, state: c.state,
-    devices: c.deviceIds.length, start: showTime(c.startAt, i.display), c,
+    devices: c.deviceIds.length, start: showTime(c.startAt, i.display), createdBy: c.createdByMembershipId ? people.get(c.createdByMembershipId) ?? null : null, c,
   }));
 }
 
@@ -155,7 +157,7 @@ export function campaignFacts(r: CampaignRow, i: I18n = EN): [string, string][] 
     [t("Window"), t("{from}–{to} device local time", { from: r.c.window.startLocal, to: r.c.window.endLocal })],
     [t("Auto-pause"), t("failure rate > {n} % in a wave", { n: r.c.autoPauseFailurePercent })],
     [t("Starts"), r.start],
-    [t("Created"), showTime(r.c.createdAt, i.display)],
+    [t("Created"), [r.createdBy, showTime(r.c.createdAt, i.display)].filter(Boolean).join(" · ")],
   ];
 }
 

@@ -4930,3 +4930,14 @@ A real-stack check of the HQ firmware tab (R336) showed the runner's results as 
 2. **Device rows.** Figma names each device with its place ("AC-DEMO-0003 · customer-a · Office A"). The rows now name the device and its unit, the way the device list does.
 3. **Not shown: who scheduled it.** Figma's “Created hq-operator · …” needs the scheduling member. FirmwareCampaign keeps none, and the audit log records it as `firmwareCampaigns.schedule`. Created shows the time only.
 4. **Tests.** Web: the facts in English and Malay and `shortChecksum`. The Malay dictionary drops the old subtitle line.
+
+## IR344 Who scheduled a firmware campaign — 2026-10-11
+
+IR343 item 3 left out the creator of Figma Admin 04-9 ("Created hq-operator · …"), because FirmwareCampaign kept none.
+
+1. **Contract.** FirmwareCampaign gains `createdByMembershipId` (ID or null). `firmwareCampaigns.schedule` stores the caller's membership (`firmware_campaigns.created_by_membership_id`); campaigns made before the change read null.
+2. **HQ screen.** The firmware tab reads `members.list` where the session may (the HQ billing pattern for approvers). The Created fact then reads "<member> · <time>"; without that permission it shows the time alone.
+3. **Tests.**
+   - Integration: TestFirmwareCampaigns checks the creator of a scheduled campaign.
+   - Web: the Created fact with and without the name.
+   - Real stack: the tab shows "hq-operator · 14 Sept 2026, 10:02 am MYT".

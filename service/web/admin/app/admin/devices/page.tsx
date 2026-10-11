@@ -4,7 +4,7 @@
 // deviceId, campaignId). Writes are Server Actions (actions.ts). The Phase 1A demo keeps the fixture register. Texts and
 // times of the first render are formatted here in the user's language and display time zone (IR295).
 import { connection } from "next/server";
-import { apiMode, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
+import { apiMode, coreAll, coreDisplay, coreNow, coreOp, corePermissions, CoreError } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import {
   campaignRows, deviceRows, modelRows,
@@ -20,6 +20,10 @@ import { DevicesView, type DevicesLive } from "./_components/devices-view";
 
 type Page<T> = { items: T[] };
 type Operation = ApiDeviceOperation & { startedAt?: string | null; expiresAt?: string };
+const optional = <T,>(p: Promise<T>, fallback: T): Promise<T> => p.catch((e) => { // members the session may not read (no identity.read)
+  if (e instanceof CoreError && e.error.code === "FORBIDDEN") return fallback;
+  throw e;
+});
 const absent = <T,>(p: Promise<T>) => p.catch((e) => { // an alert or unit HQ cannot read (archived, another tenant) reads as absent
   if (e instanceof CoreError && (e.error.code === "FORBIDDEN" || e.error.code === "NOT_FOUND")) return null;
   throw e;
@@ -76,10 +80,14 @@ export default async function AdminDevicesPage({ searchParams }: PageProps<"/adm
     }
   }
   if (tab === "firmware") {
-    const campaigns = await coreOp<Page<ApiCampaign>>("firmwareCampaigns.list", { limit: 100, sort: { field: "createdAt", direction: "desc" } });
-    live.campaigns = campaignRows(campaigns.items, caps.items, i);
+    const [campaigns, members] = await Promise.all([
+      coreOp<Page<ApiCampaign>>("firmwareCampaigns.list", { limit: 100, sort: { field: "createdAt", direction: "desc" } }),
+      optional(coreAll<{ id: string; displayName: string }>("members.list"), []), // who scheduled it, where the session may read members (IR344)
+    ]);
+    const people = new Map(members.map((m) => [m.id, m.displayName]));
+    live.campaigns = campaignRows(campaigns.items, caps.items, i, people);
     const id = live.campaigns.find((c) => c.id === one("campaignId"))?.id ?? live.campaigns[0]?.id;
-    if (id) live.campaign = campaignRows([await coreOp<ApiCampaign>("firmwareCampaigns.get", { id })], caps.items, i)[0];
+    if (id) live.campaign = campaignRows([await coreOp<ApiCampaign>("firmwareCampaigns.get", { id })], caps.items, i, people)[0];
   }
   return <DevicesView live={live} />;
 }

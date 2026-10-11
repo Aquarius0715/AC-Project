@@ -32,13 +32,15 @@ describe("HQ device registry", () => {
     }); // 09:30 tomorrow in Tokyo is 23.5 h ahead
     const c: ApiCampaign = { id: "k1", version: 1, modelId: "m1", fromVersions: [], targetVersion: "v2", deviceIds: ["d1"], waves: [{ label: "Wave 1 · 100 %", percent: 100 }], window: { startLocal: "02:00", endLocal: "05:00" },
       autoPauseFailurePercent: 5, startAt: "2026-09-16T02:00:00Z", state: "scheduled", progress: { succeeded: 0, installing: 0, pending: 1, failed: 0, skipped: 0 }, results: [], reason: null,
-      checksum: "sha256:9f3c0e5d7a1b2c3da1", createdAt: "2026-09-14T01:00:00Z" };
+      checksum: "sha256:9f3c0e5d7a1b2c3da1", createdAt: "2026-09-14T01:00:00Z", createdByMembershipId: "m-hq" };
     expect(campaignRows([c], [cap])[0]).toMatchObject({ model: "DemoAir SPL-100", versions: "any → v2", start: "16 Sept 2026, 10:00 am MYT" });
     // the facts above the waves (Figma Admin 04-9)
     expect(campaignFacts(campaignRows([c], [cap])[0])).toEqual([
       ["Model / version", "DemoAir SPL-100 · any → v2 (signed, sha256 9f3c…a1)"], ["Window", "02:00–05:00 device local time"], ["Auto-pause", "failure rate > 5 % in a wave"],
       ["Starts", "16 Sept 2026, 10:00 am MYT"], ["Created", "14 Sept 2026, 9:00 am MYT"],
     ]);
+    // the scheduling member's name where the session may read members (IR344)
+    expect(campaignFacts(campaignRows([c], [cap], undefined, new Map([["m-hq", "hq-operator"]]))[0]).at(-1)).toEqual(["Created", "hq-operator · 14 Sept 2026, 9:00 am MYT"]);
     expect([shortChecksum("sha256:abcd"), shortChecksum("plain0123456789")]).toEqual(["sha256 abcd", "plai…89"]);
     expect(campaignFacts(campaignRows([c], [cap], MS)[0], MS).map(([k]) => k)).toEqual(["Model / versi", "Tetingkap", "Jeda automatik", "Bermula", "Dicipta"]);
   });

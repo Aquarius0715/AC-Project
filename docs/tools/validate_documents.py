@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.228.0 (2026-10-11): IR344 FirmwareCampaign.createdByMembershipId (DD-A 0.53.0); counts unchanged.
 # 0.227.0 (2026-10-11): IR343 firmware campaign detail facts (DD-A 0.52.0); counts unchanged.
 # 0.226.0 (2026-10-11): IR342 Use Cases page clock associations (Figma only); counts unchanged.
 # 0.225.0 (2026-10-11): IR341 billing scheduler, monthly payout drafts (backend architecture 0.38.0, DD-A 0.51.0, DD-P 0.34.0, database design 0.36.0, container design 0.33.0); counts unchanged.

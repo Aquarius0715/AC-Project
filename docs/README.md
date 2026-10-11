@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.227.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
+Version: 0.228.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.228.0 (2026-10-11): A firmware campaign records who scheduled it (FirmwareCampaign.createdByMembershipId), and the HQ detail names that member (IR344).
 0.227.0 (2026-10-11): The HQ firmware campaign detail shows Figma 04-9's facts (model / version with the signed digest, window, auto-pause, start, created) and names each device with its unit (IR343).
 0.226.0 (2026-10-11): The Figma Use Cases page shows the demo clock starting the warranty and certificate reminders and the monthly payout drafts (UC-A08, UC-P12, UC-A34; IR342).
 0.225.0 (2026-10-11): A billing scheduler (`worker-scheduler-billing`) generates the contractor payout drafts of the month that ended on the 1st, once per month (BR-A23, BR-P10, IR341).

@@ -34,7 +34,8 @@ func TestFirmwareCampaigns(t *testing.T) {
 		return "{" + strings.Join(parts, ",") + "}"
 	}
 	code, m := write(s, &hq, "firmwareCampaigns.schedule", body(nil), 0)
-	if code != 200 || data(m)["state"] != "scheduled" || len(data(m)["results"].([]any)) != 3 || !strings.HasPrefix(data(m)["checksum"].(string), "sha256:") {
+	if code != 200 || data(m)["state"] != "scheduled" || len(data(m)["results"].([]any)) != 3 || !strings.HasPrefix(data(m)["checksum"].(string), "sha256:") ||
+		data(m)["createdByMembershipId"] != seed.ID("hq-operator").String() { // who scheduled it (Figma 04-9 "Created", IR344)
 		t.Fatalf("schedule: %d %v", code, m)
 	}
 	camp := data(m)["id"].(string)

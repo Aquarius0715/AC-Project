@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.52.0
+version: 0.53.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -793,7 +793,7 @@ Scope: FR-A20 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
    - **Results.** The operation's result becomes the device's: a reported failure or no answer within 60 s fails it, and it keeps its old version.
    - **Auto-pause.** A new failure that takes its wave above autoPauseFailurePercent pauses the campaign with the reason.
    - **Resume and completion.** Resume clears that reason, and the campaign pauses again only on a further failure. Once every wave passed and nothing is pending or installing, the campaign is completed.
-   - **Screen.** Above the waves are the facts of Figma 04-9: model / version with the signed digest (“sha256 9f3c…a1”), the window in device local time, the auto-pause share, the start and when the campaign was scheduled (IR343). Each wave shows Done / Running / Paused / Aborted / Waiting. Each device row names the device with its unit and shows its reason in words and the time of its result.
+   - **Screen.** Above the waves are the facts of Figma 04-9: model / version with the signed digest (“sha256 9f3c…a1”), the window in device local time, the auto-pause share, the start, and when and by whom the campaign was scheduled (IR343, IR344). Each wave shows Done / Running / Paused / Aborted / Waiting. Each device row names the device with its unit and shows its reason in words and the time of its result.
 
 **Boundary cases and failures**: Devices busy with a test run, firmware job, or tamper are skipped with the reason; failed devices keep the old version. Control transitions: pause from scheduled or running; resume from paused back to running (or to scheduled while now < startAt); abort (reason 1–1000) from scheduled, running or paused; aborted and completed are terminal; retry_device only for a failed or skipped device while the campaign is running or paused; any other combination is CONFLICT. Schedule rejects unknown devices, devices of another model, devices with open tamper and devices already on the target version (VALIDATION); devices are assigned to waves by cumulative percent in input order; the checksum is the signed artifact digest (`sha256:…`).
 
@@ -878,7 +878,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.52.0: Read IR01–IR343 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.53.0: Read IR01–IR344 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

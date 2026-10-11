@@ -602,6 +602,7 @@ CREATE TABLE devices.firmware_campaigns (        -- FR-A20
   state                      text NOT NULL CHECK (state IN ('scheduled','running','paused','aborted','completed')),
   reason                     text,                     -- abort reason, or why the runner paused it (IR339)
   notice_sent_at             timestamptz,              -- the customers' notice 24 h before the start (BR-A20, IR339)
+  created_by_membership_id   uuid,                     -- who scheduled it (Figma Admin 04-9 "Created", IR344)
   version                    int NOT NULL DEFAULT 1,
   created_at                 timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at                 timestamptz NOT NULL DEFAULT platform.app_now()
