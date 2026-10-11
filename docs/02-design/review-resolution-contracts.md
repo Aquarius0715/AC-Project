@@ -5530,3 +5530,20 @@ The seventh security check reviewed limits on how much and how often a client ma
    - **Per session.** The write limit of 60 per minute needs counters shared by every instance of a service. They would live in the cache (ElastiCache; Valkey runs locally), and the Core API has no client for it yet (OPEN-CT-03). Until then, `RATE_LIMITED` is defined in the error contract but no operation returns it.
 4. **Tests.** The relay test passes an input of exactly 1 MiB on, refuses 1 MiB + 1 byte without calling the Core API, and stops reading an endless body after the limit. Without the fix, the oversized input is relayed and the endless body is read until the test times out. For the realm, the live settings are read back with `kcadm.sh`.
 5. **Checks.** The web checks (404 unit tests, the build) and the E2E suite pass. The E2E suite runs against the imported realm with its new signing keys.
+
+## IR371 Cross-site scripting: the web apps, the documents they build, and the gateway's API page — 2026-10-11
+
+The eighth security check reviewed cross-site scripting: where content from users or from outside reaches a page as code or markup.
+
+1. **Checked and in order.**
+   - **No raw markup.** The four web apps and the shared package use no `dangerouslySetInnerHTML`, `innerHTML`, `insertAdjacentHTML`, `document.write`, `eval`, `new Function` or `srcdoc`. React escapes text, and React 19 blocks `javascript:` URLs.
+   - **No user URL in a link.** No contract field carries a URL. Every `href` the apps render is an app path built in the loaders from IDs and query values, and every `src` is an app route or a `data:` URL of a photo whose type the Core API checked at upload (IR308). The one link that opens a new tab has `rel="noreferrer"`.
+   - **Generated documents.** The payout statement PDF escapes `\`, `(` and `)` and drops non-ASCII text, so a name cannot leave its string. CSV exports keep formula-like cells as text (IR368). Notifications are template keys with parameters, which the apps show as text; there is no HTML e-mail.
+   - **The apps' Content-Security-Policy (IR354).** Scripts need a per-request nonce with `'strict-dynamic'`, and there is no `'unsafe-inline'` or `'unsafe-eval'` outside development. Also `object-src 'none'`, `base-uri 'self'` and `frame-ancestors 'none'`. Only inline style attributes are allowed, for React's `style` property.
+2. **Finding and fix: the gateway's API page.** The gateway (the development and demo entry) serves Swagger UI at `/docs`.
+   - **The problem.** The page loaded `swagger-ui-dist@5`, a floating major version, from unpkg without Subresource Integrity, and sent no Content-Security-Policy. Swagger UI keeps an entered bearer token in `localStorage` (`persistAuthorization`). So a changed file at the CDN, or a compromised release, would run on the gateway's origin and could read it.
+   - **Pinned with integrity.** The page now loads one release (5.33.1) with `integrity` hashes (SHA-384) and `crossorigin="anonymous"`. The hashes are of the files in the npm tarball of that release, which matches the registry's own integrity, and they equal the files unpkg serves.
+   - **No inline script.** The start script moved to `/docs/init.js`.
+   - **A strict policy.** `/docs` sends a policy that runs only that pinned file and its own script, connects only to its origin, and lets no one frame it. It also sends `nosniff` and `no-referrer`.
+3. **Tests.** `TestServesTheAPIDescription` requires the pinned files with their hashes, no floating version, no inline script, and the policy, and it reads `/docs/init.js`. In a headless browser, Swagger UI renders the API description under the policy with no console error, the same with the policy bypassed.
+4. **Checks.** `make test-all` and the E2E suite pass.

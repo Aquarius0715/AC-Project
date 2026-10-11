@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.253.0
+version: 0.254.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -269,6 +269,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.254.0: Cross-site scripting reviewed; the gateway's API page pinned with integrity hashes and a policy (IR371). Phase 1A unchanged.
 0.253.0: Rate limits reviewed; BFF input capped, sign-in lockout in the local realm (IR370). Phase 1A unchanged.
 0.252.0: Secrets reviewed; env files out of images and git, masked logs (IR369). Phase 1A unchanged.
 0.251.0: Uploads reviewed; file names, the photo header and CSV exports fixed (IR368). Phase 1A unchanged.

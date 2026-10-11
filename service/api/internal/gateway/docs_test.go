@@ -15,8 +15,26 @@ func TestServesTheAPIDescription(t *testing.T) {
 	e := New(Targets{}, nil)
 	w := httptest.NewRecorder()
 	e.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/docs", nil))
-	if w.Code != http.StatusOK || !strings.Contains(w.Header().Get("Content-Type"), "text/html") || !strings.Contains(w.Body.String(), `url: "/swagger.json"`) {
+	if w.Code != http.StatusOK || !strings.Contains(w.Header().Get("Content-Type"), "text/html") || !strings.Contains(w.Body.String(), `<script src="/docs/init.js">`) {
 		t.Fatalf("/docs: %d %s", w.Code, w.Header().Get("Content-Type"))
+	}
+	// IR371: the Swagger UI files are one pinned release, checked by their hashes, and the page runs no inline script
+	page, csp := w.Body.String(), w.Header().Get("Content-Security-Policy")
+	for _, want := range []string{`swagger-ui-dist@` + swaggerUIVersion + `/swagger-ui-bundle.js" integrity="sha384-`, `swagger-ui-dist@` + swaggerUIVersion + `/swagger-ui.css" integrity="sha384-`} {
+		if !strings.Contains(page, want) {
+			t.Errorf("/docs lacks %s", want)
+		}
+	}
+	if strings.Contains(page, "swagger-ui-dist@5/") || strings.Contains(page, "<script>") {
+		t.Error("/docs loads a floating version or runs an inline script")
+	}
+	if !strings.Contains(csp, "script-src 'self' "+swaggerUIBundle+";") || strings.Contains(csp, "unsafe-eval") || !strings.Contains(csp, "frame-ancestors 'none'") {
+		t.Errorf("/docs CSP: %q", csp)
+	}
+	w = httptest.NewRecorder()
+	e.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/docs/init.js", nil))
+	if w.Code != http.StatusOK || !strings.HasPrefix(w.Header().Get("Content-Type"), "text/javascript") || !strings.Contains(w.Body.String(), `url: "/swagger.json"`) {
+		t.Fatalf("/docs/init.js: %d %s", w.Code, w.Header().Get("Content-Type"))
 	}
 	w = httptest.NewRecorder()
 	e.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/swagger.json", nil))

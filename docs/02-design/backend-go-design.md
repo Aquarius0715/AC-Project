@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND-GO
-version: 0.40.0
+version: 0.41.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -283,7 +283,7 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 
 ## 10. Build, run, and deploy
 
-- `make gen` (the operation and contract generators; it also writes the web's routes.gen.ts and contracts.gen.ts, IR313), `make swagger` (Swagger 2.0 from the swag annotations of the handlers, served by the gateway at `/docs` and `/swagger.json`, IR220), `make test`, `make cover` (merged coverage of all packages), `make resetdb` (rebuild the local database from schema.sql and reseed), `make test` / `make test-cluster` (each on a freshly rebuilt test database, `ac_test` / `ac_test_cluster`), `make test-all` (both suites at once, about a minute and a quarter, IR225), `make up` (`docker compose --profile full up`), `make down`.
+- `make gen` (the operation and contract generators; it also writes the web's routes.gen.ts and contracts.gen.ts, IR313), `make swagger` (Swagger 2.0 from the swag annotations of the handlers, served by the gateway at `/docs` and `/swagger.json`, IR220; as built, IR371: Swagger UI is one pinned release with integrity hashes, under its own Content-Security-Policy), `make test`, `make cover` (merged coverage of all packages), `make resetdb` (rebuild the local database from schema.sql and reseed), `make test` / `make test-cluster` (each on a freshly rebuilt test database, `ac_test` / `ac_test_cluster`), `make test-all` (both suites at once, about a minute and a quarter, IR225), `make up` (`docker compose --profile full up`), `make down`.
 - Dockerfile: multi-stage `golang:1.25` builder → `gcr.io/distroless/static-debian12:nonroot` runtime, read-only root filesystem, `healthcheck` subcommand, graceful SIGTERM drain ([container design §3](container-design.md#3-dockerfile-standards)).
 - One image, several ECS services: `api`, `webhook`, and one service per worker role (independent autoscaling: API on CPU and request count, workers on SQS backlog and Kinesis iterator age).
 - Deploy order: migrations (expand) → workers → API → BFF; contract steps of migrations ship one release later (database design §9).
@@ -296,4 +296,4 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | OPEN-GO-01 | Final choice of the TypeScript → Go contract generator (output reviewed for union types such as `UnitAction` and `Policy`) |
 | OPEN-GO-02 | WhatsApp provider SDK (depends on OPEN-BE-04) |
 
-Additional contracts for current version 0.40.0: Read IR01–IR369 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.41.0: Read IR01–IR371 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
