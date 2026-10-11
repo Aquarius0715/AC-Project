@@ -9,6 +9,7 @@ import type { CompareRow, Period, PeriodKind } from "@ac/web/lib/clientEnergy";
 import { intlTag } from "@ac/web/lib/i18n";
 import { useLocale, useT } from "@ac/web/components/I18n";
 import { exportReport, type ReportFile, type ReportInput } from "../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 export type EnergyLive = {
   units: { id: string; name: string }[]; unitIds: string[]; period: Period; baselines: { id: string; label: string }[]; baselineId: string | null;
@@ -39,7 +40,7 @@ export function EnergyView({ live }: { live: EnergyLive }) {
     <Page>
       <Card>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <Btn size="sm" className="order-last ml-auto" onClick={() => setExporting(true)}>{t("↓ Export")}</Btn>
+          <Btn size="sm" className="order-last ml-auto" onClick={() => setExporting(true)}><Icon name="download" />{t("Export")}</Btn>
           <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted">{t("Period")}</span>
             <Tabs value={live.period.kind} onChange={(k: PeriodKind) => nav({ period: k === "7d" ? null : k, from: null, to: null })} tabs={[{ id: "today", label: t("Today") }, { id: "7d", label: t("7d") }, { id: "30d", label: t("30d") }, { id: "custom", label: t("Custom") }]} />
           </div>
@@ -63,7 +64,7 @@ export function EnergyView({ live }: { live: EnergyLive }) {
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
           <span className="text-xs text-muted">{t("Units")}</span>
-          {live.unitIds.map((u) => <Badge key={u} tone="primary">{names.get(u)}{live.unitIds.length > 1 && <button type="button" aria-label={t("Remove {name}", { name: names.get(u) ?? "" })} className="ml-1" onClick={() => setUnits(live.unitIds.filter((x) => x !== u))}>✕</button>}</Badge>)}
+          {live.unitIds.map((u) => <Badge key={u} tone="primary">{names.get(u)}{live.unitIds.length > 1 && <button type="button" aria-label={t("Remove {name}", { name: names.get(u) ?? "" })} className="ml-1" onClick={() => setUnits(live.unitIds.filter((x) => x !== u))}><Icon name="close" /></button>}</Badge>)}
           {live.unitIds.length < 4 && (
             <Select aria-label={t("Compare unit")} className="w-auto" value="" onChange={(e) => e.target.value && setUnits([...live.unitIds, e.target.value])}>
               <option value="">{t("+ Compare unit")}</option>{live.units.filter((u) => !live.unitIds.includes(u.id)).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -105,7 +106,7 @@ export function EnergyView({ live }: { live: EnergyLive }) {
           {s.warnings.length > 0 && <div className="mt-3"><Banner tone="warn">{s.warnings.join(" · ")}</Banner></div>}
           <details className="mt-3 text-[12px]"><summary className="cursor-pointer font-semibold text-muted">{t("Calculation conditions")}</summary><div className="mt-2"><SummaryList items={s.conditions} /></div></details>
         </Card>
-        <Card title={t("Carbon impact")} sub={t("Same period & units as above · {factor}", { factor: r.factor ?? t("emission factor missing") })} action={<LinkBtn size="sm" href={`/customer/energy/offsets?${live.query}`}>{t("ⓘ Learn about offsets")}</LinkBtn>}>
+        <Card title={t("Carbon impact")} sub={t("Same period & units as above · {factor}", { factor: r.factor ?? t("emission factor missing") })} action={<LinkBtn size="sm" href={`/customer/energy/offsets?${live.query}`}><Icon name="info" />{t("Learn about offsets")}</LinkBtn>}>
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
             <div><div className="text-xs text-muted">{t("Estimated emissions")}</div><div className="text-2xl font-bold">{s.emissions}</div><div className="text-[11px] text-muted">{r.kWh === null ? t("no valid readings") : t("{kWh} kWh actual × factor", { kWh: one(r.kWh) })}</div></div>
             <div><div className="text-xs text-muted">{t("Estimated savings vs baseline")}</div><div className={`text-2xl font-bold ${s.comparable ? (s.increase ? "text-warn" : "text-ok") : "text-muted"}`}>{s.savedEmissions}</div><div className="text-[11px] text-muted">{s.comparable ? `${s.baseline} → ${s.actual}` : t("needs a comparable baseline")}</div></div>

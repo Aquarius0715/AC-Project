@@ -3,7 +3,7 @@
 // notifications). Pure code shared by server and client.
 import { EN, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import type { IconName } from "@ac/web/components/Icon";
-export type Alert = { id: string; title: string; sev: "warning" | "normal"; kind: string; icon: string; where: string; ev: string; group: "attn" | "info"; read: boolean };
+export type Alert = { id: string; title: string; sev: "warning" | "normal"; kind: string; kindIcon: IconName; icon: IconName; where: string; ev: string; group: "attn" | "info"; read: boolean };
 
 /** Alert of service-contracts.ts (fields shown on this screen). */
 export type ApiAlert = {

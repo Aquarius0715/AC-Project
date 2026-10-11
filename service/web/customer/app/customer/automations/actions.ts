@@ -20,7 +20,7 @@ async function run<T>(fn: () => Promise<T>, write = true): Promise<ActionResult<
   }
 }
 
-/** automations.save (create without a version, update with the rule's version); saving sends no Command (AT-C04-N ②). */
+/** automations.save (create without a version, update with the rule's version); saving sends no Command (AT-C04-N item 2). */
 export async function saveAutomation(input: OpInput<"automations.save">, version: number | null) {
   return run(() => coreOp<ApiAutomation>("automations.save", input, { write: true, ...(version !== null ? { expectedVersion: version } : {}) }));
 }

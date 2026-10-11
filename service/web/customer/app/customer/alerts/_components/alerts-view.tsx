@@ -5,13 +5,14 @@ import { CURRENT_CLIENT } from "@ac/web/lib/clientUsers";
 import { Badge, Btn, Card, Check, Choice, ErrorState, Field, Input, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Toggle, cx, useToast } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { type Alert } from "@ac/web/lib/alerts";
+import { Icon } from "@ac/web/components/Icon";
 
 const seed: Alert[] = [
-  { id: "alert-window-a", title: "Possible open window", sev: "warning", kind: "⌂ Load cause (possible)", icon: "⚠", where: "Bedroom AC · Home A › 1F › Bedroom · detected 09:12 today", ev: "Evidence (inferred): room 3.2°C above setting for 20 min while compressor at full load. Possible cause — not confirmed.", group: "attn", read: false },
-  { id: "alert-short", title: "Compressor short-cycling", sev: "warning", kind: "✕ Fault", icon: "⚠", where: "Kitchen AC · Home A › 1F › Kitchen · yesterday 22:40", ev: "Evidence (detected): 4 compressor cycles/hour vs ≤ 1 expected, over 3 hours.", group: "attn", read: true },
-  { id: "alert-filter", title: "Filter cleaning reminder", sev: "normal", kind: "◷ Maintenance reminder", icon: "○", where: "Study AC · Home A › 2F · 5 days ago", ev: "Cleaning due (250 h of run time since the last cleaning). Not a fault.", group: "info", read: true },
-  { id: "alert-insulation-a", title: "Poor insulation suspected", sev: "warning", kind: "✎ Inspection record", icon: "⚠", where: "Bedroom AC · logged Sep 10 by technician", ev: "Possible cause of higher load, from inspection notes. Not confirmed.", group: "info", read: true },
-  { id: "alert-fw", title: "Firmware update available", sev: "normal", kind: "↻ System information", icon: "ⓘ", where: "Living room AC · v2.4.1 ready · 3 days ago", ev: "Installed by HQ/technician. No action needed.", group: "info", read: true },
+  { id: "alert-window-a", title: "Possible open window", sev: "warning", kind: "Load cause (possible)", kindIcon: "home", icon: "warning", where: "Bedroom AC · Home A › 1F › Bedroom · detected 09:12 today", ev: "Evidence (inferred): room 3.2°C above setting for 20 min while compressor at full load. Possible cause — not confirmed.", group: "attn", read: false },
+  { id: "alert-short", title: "Compressor short-cycling", sev: "warning", kind: "Fault", kindIcon: "error", icon: "warning", where: "Kitchen AC · Home A › 1F › Kitchen · yesterday 22:40", ev: "Evidence (detected): 4 compressor cycles/hour vs ≤ 1 expected, over 3 hours.", group: "attn", read: true },
+  { id: "alert-filter", title: "Filter cleaning reminder", sev: "normal", kind: "Maintenance reminder", kindIcon: "time", icon: "dot", where: "Study AC · Home A › 2F · 5 days ago", ev: "Cleaning due (250 h of run time since the last cleaning). Not a fault.", group: "info", read: true },
+  { id: "alert-insulation-a", title: "Poor insulation suspected", sev: "warning", kind: "Inspection record", kindIcon: "edit", icon: "warning", where: "Bedroom AC · logged Sep 10 by technician", ev: "Possible cause of higher load, from inspection notes. Not confirmed.", group: "info", read: true },
+  { id: "alert-fw", title: "Firmware update available", sev: "normal", kind: "System information", kindIcon: "refresh", icon: "info", where: "Living room AC · v2.4.1 ready · 3 days ago", ev: "Installed by HQ/technician. No action needed.", group: "info", read: true },
 ];
 
 const defaultRules = [["Ventilation", "CO₂ ≥ 1000 ppm for 10 min", "Warning", true], ["Dust / filter", "PM2.5 ≥ 35 µg/m³ for 30 min", "Warning", true], ["Refrigerant low pressure", "Refrigerant pressure ≤ 350 kPa for 120 s", "Critical", true], ["Compressor short-cycling", "≥ 4 cycles / h for 3 h", "Warning", true], ["Clogged filter", "Airflow drop ≥ 30 % vs. baseline for 1 h", "Info", true], ["AC offline", "No heartbeat for 15 min", "Warning", false]] as const;
@@ -41,8 +42,8 @@ export function AlertsView({ rows = seed }: { rows?: Alert[] }) {
 
   const Item = ({ a }: { a: Alert }) => (
     <button onClick={() => openAlert(a)} className="flex w-full items-start gap-3 border-t border-line px-1 py-3 text-left first:border-0 hover:bg-surface2/50">
-      <span className="mt-0.5">{a.icon}</span>
-      <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><b className={cx(!a.read && "text-primary")}>{a.title}</b><Badge tone="muted">{a.kind}</Badge>{a.read && <Badge tone="ok" icon="check">Read</Badge>}</span><span className="block text-xs text-muted">{a.where}</span><span className="mt-1 block text-xs">{a.ev}</span></span>
+      <Icon name={a.icon} className="mt-0.5" />
+      <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><b className={cx(!a.read && "text-primary")}>{a.title}</b><Badge tone="muted" icon={a.kindIcon}>{a.kind}</Badge>{a.read && <Badge tone="ok" icon="check">Read</Badge>}</span><span className="block text-xs text-muted">{a.where}</span><span className="mt-1 block text-xs">{a.ev}</span></span>
       <span className="text-muted">›</span>
     </button>
   );
@@ -106,7 +107,7 @@ export function PoliciesPanel() {
           <Field label="For (min)"><Input type="number" value={f.dur} onChange={(e) => setF({ ...f, dur: e.target.value })} /></Field>
           <Field label="Recover below"><Input type="number" value={f.rec} onChange={(e) => setF({ ...f, rec: e.target.value })} /></Field>
         </div>
-        <p className={cx("text-xs", recOk ? "text-ok" : "text-crit")}>{recOk ? `✓ Recovery ${f.rec} is below the ${f.val} limit` : `✕ Recovery must be below the ${f.val} limit`}</p>
+        <p className={cx("flex items-center gap-1 text-xs", recOk ? "text-ok" : "text-crit")}><Icon name={recOk ? "check" : "error"} />{recOk ? `Recovery ${f.rec} is below the ${f.val} limit` : `Recovery must be below the ${f.val} limit`}</p>
         <Field label="Severity"><Choice value={f.sev as "warning"} onChange={(v) => setF({ ...f, sev: v })} options={[{ id: "normal" as "warning", label: "Info" }, { id: "warning", label: "Warning" }, { id: "critical" as "warning", label: "Critical" }]} /></Field>
         <p className="text-[11px] text-muted">WhatsApp is only available after you allow it in Preferences. Missing or stale readings never trigger — they show “not measured”.</p>
       </Modal>

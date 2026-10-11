@@ -5,6 +5,7 @@ import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, ListRow, Mod
 import { JobStatusBadge, OriginBadge, PreferredSlotsInput, SlotLine, preferredError } from "@ac/web/components/JobBits";
 import { Job, JobStatus, Slot, fitFor, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { units } from "@ac/web/lib/client";
+import { Icon, type IconName } from "@ac/web/components/Icon";
 
 type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
 const tabOf = (s: JobStatus): StatusTab =>
@@ -13,11 +14,11 @@ const ORDER: JobStatus[] = ["time_proposed", "requested", "in_progress", "rework
 const blank = (): Slot[] => [{ date: "2026-09-28", win: "14:00–16:00" }, { date: "2026-09-29", win: "10:00–12:00" }, { date: "2026-09-30", win: "09:00–11:00" }];
 
 function scheduleLine(j: Job) {
-  if (j.status === "time_proposed" && j.proposal) return { icon: "⇄", text: `${j.proposal.by === "contractor" ? "Service partner asks for" : "HQ proposed"} ${fmt(j.proposal.slot)} — reply by ${j.proposal.replyBy}`, warn: true };
-  if (j.status === "requested") return { icon: "◷", text: `Preferred ${fmt(j.preferred[0])} · +${Math.max(0, j.preferred.length - 1)} more (not confirmed yet)` };
-  if (j.status === "completed") return { icon: "◷", text: `Completed ${fmt(j.scheduled)} · report available` };
-  if (j.status === "cancelled") return { icon: "◷", text: "Cancelled" };
-  return { icon: "◷", text: `${j.origin === "plan" ? "Scheduled" : "Confirmed"} ${fmt(j.scheduled)}${j.technician && j.techAck?.status === "accepted" ? ` · ${j.technician}` : j.status === "offered" ? " · booking the technician" : ""}` };
+  if (j.status === "time_proposed" && j.proposal) return { icon: "swap" as IconName, text: `${j.proposal.by === "contractor" ? "Service partner asks for" : "HQ proposed"} ${fmt(j.proposal.slot)} — reply by ${j.proposal.replyBy}`, warn: true };
+  if (j.status === "requested") return { icon: "time" as IconName, text: `Preferred ${fmt(j.preferred[0])} · +${Math.max(0, j.preferred.length - 1)} more (not confirmed yet)` };
+  if (j.status === "completed") return { icon: "success" as IconName, text: `Completed ${fmt(j.scheduled)} · report available` };
+  if (j.status === "cancelled") return { icon: "cancelled" as IconName, text: "Cancelled" };
+  return { icon: "time" as IconName, text: `${j.origin === "plan" ? "Scheduled" : "Confirmed"} ${fmt(j.scheduled)}${j.technician && j.techAck?.status === "accepted" ? ` · ${j.technician}` : j.status === "offered" ? " · booking the technician" : ""}` };
 }
 
 /** The Phase 1A demo of /customer/maintenance (fixture store); API mode renders MaintenanceView. */
@@ -57,7 +58,7 @@ export function MaintenanceDemo({ jobId, initialTab }: { jobId?: string; initial
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-muted">{j.id}</span><b>{j.unit}</b><OriginBadge origin={j.origin} />{j.followUpOf && <FollowUpBadge j={j} />}</div>
                       <div className="text-xs text-muted">{j.loc} · {j.origin === "plan" ? "Periodic inspection" : j.type}</div>
-                      <div className={cx("text-xs", l.warn && "font-semibold text-warn")}>{l.icon} {l.text}</div>
+                      <div className={cx("flex items-center gap-1.5 text-xs", l.warn && "font-semibold text-warn")}><Icon name={l.icon} className="shrink-0" />{l.text}</div>
                     </div>
                     <JobStatusBadge s={j.status} /><span className="text-muted">›</span>
                   </ListRow>
@@ -86,7 +87,7 @@ function Detail({ j, onClose, open }: { j: Job; onClose: () => void; open: (m: "
   const toast = useToast();
   const p = j.proposal;
   return (
-    <Card title={j.id} sub={`${j.unit} — ${j.origin === "plan" ? "periodic inspection" : j.symptom.slice(0, 40)}`} action={<div className="flex items-center gap-2"><JobStatusBadge s={j.status} /><Btn size="sm" variant="ghost" onClick={onClose}>✕</Btn></div>} className="self-start">
+    <Card title={j.id} sub={`${j.unit} — ${j.origin === "plan" ? "periodic inspection" : j.symptom.slice(0, 40)}`} action={<div className="flex items-center gap-2"><JobStatusBadge s={j.status} /><Btn size="sm" variant="ghost" aria-label="Close" onClick={onClose}><Icon name="close" /></Btn></div>} className="self-start">
       <SummaryList items={[
         ["Unit", `${j.unit} · ${j.loc}`],
         ["Origin · type", j.origin === "plan" ? `Periodic plan · ${j.planId} · visit ${j.planVisit}` : `Client request · ${j.type}`],
@@ -101,7 +102,7 @@ function Detail({ j, onClose, open }: { j: Job; onClose: () => void; open: (m: "
           {j.preferred.map((s, i) => {
             const chosen = j.scheduled && s.date === j.scheduled.date && s.win === j.scheduled.win;
             const none = j.status === "time_proposed" && fitFor(s).fits === "none";
-            return <SlotLine key={i} i={i} slot={s} struck={none} note={chosen ? "✓ booked" : none ? "Not available — no qualified technician free" : undefined} />;
+            return <SlotLine key={i} i={i} slot={s} struck={none} note={chosen ? "booked" : none ? "Not available — no qualified technician free" : undefined} />;
           })}
         </div>
       )}
@@ -111,12 +112,12 @@ function Detail({ j, onClose, open }: { j: Job; onClose: () => void; open: (m: "
           <div className="flex flex-wrap items-center justify-between gap-2"><b className="text-[14px]">{p.by === "contractor" ? "Your service partner asks for another time (via HQ)" : "HQ proposes a new time"}</b><Badge tone="warn">Reply by {p.replyBy}</Badge></div>
           <div className="my-2 text-xl font-bold">{longDate(p.slot)}</div>
           <SummaryList items={[["Who comes", p.by === "contractor" || p.who.startsWith("contractor") ? `Partner technician from ${p.who.split(" ")[0]} (name shown once assigned)` : "HQ technician (name shown once confirmed)"], ["Message", `“${p.message}”`]]} />
-          <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[11px] text-warn">Accepting books this time. Declining keeps your request open.</span><Btn variant="danger" onClick={() => open("decline")}>Decline…</Btn><Btn variant="primary" onClick={() => { jobActions.accept(j.id); toast("Time accepted — booking the technician"); }}>✓ Accept this time</Btn></div>
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[11px] text-warn">Accepting books this time. Declining keeps your request open.</span><Btn variant="danger" onClick={() => open("decline")}>Decline…</Btn><Btn variant="primary" onClick={() => { jobActions.accept(j.id); toast("Time accepted — booking the technician"); }}><Icon name="check" />Accept this time</Btn></div>
         </div>
       )}
       {j.origin === "plan" && (j.status === "assigned" || j.status === "offered") && (
         <div className="mt-3 rounded-xl border border-[#cdb8fa] bg-[#f7f2ff] p-4 text-[13px]">
-          <b className="text-[#6d28d9]">↻ Booked from your maintenance plan</b>
+          <b className="inline-flex items-center gap-1.5 text-[#6d28d9]"><Icon name="routine" />Booked from your maintenance plan</b>
           <p className="mt-1">You don’t need to request periodic visits — HQ schedules each one and tells you 1 month ahead. If you can’t be home, ask for another time (3 options) up to 48 h before the visit.</p>
           <div className="mt-2 flex justify-end"><Btn onClick={() => open("other")}>Request another time…</Btn></div>
         </div>
@@ -125,7 +126,7 @@ function Detail({ j, onClose, open }: { j: Job; onClose: () => void; open: (m: "
         <>
           <p className="mt-3 text-[13px] font-bold">Completed report <span className="text-xs font-normal text-muted">Accepted by HQ (visible after review)</span></p>
           <SummaryList items={[["Filter", "Cleaned — normal"], ["Evaporator coil", "Normal"], ["Drain pipe", "Attention — partly blocked, cleared"], ["Parts", "None"], ["Supply air", "12.5 °C"], ["Return air", "25.0 °C"]]} />
-          <p className="mt-2 text-xs text-muted">Photos (2) · ⎙ service-report.pdf</p>
+          <p className="mt-2 text-xs text-muted">Photos (2) · <Icon name="document" /> service-report.pdf</p>
           {!rated.has(j.id) && <div className="mt-3 flex justify-end gap-2"><Btn onClick={() => open("problem")}>Report a problem</Btn><Btn variant="primary" onClick={() => open("rate")}>Confirm & rate</Btn></div>}
         </>
       )}
@@ -212,7 +213,7 @@ function RateModal({ open, onClose, onDone }: { open: boolean; onClose: () => vo
   const TAGS = ["On time", "Clean work", "Explained clearly", "Polite"];
   return (
     <Modal open={open} onClose={onClose} title="Confirm & rate job-c02" footer={<><Btn onClick={onClose}>Not now</Btn><Btn variant="primary" onClick={onDone}>Confirm & submit</Btn></>}>
-      <Field label="How was the service? (required)"><div className="flex gap-1 text-2xl">{[1, 2, 3, 4, 5].map((n) => <button key={n} aria-label={`${n} stars`} onClick={() => setStars(n)} className={n <= stars ? "text-[#f59e0b]" : "text-line"}>★</button>)}</div></Field>
+      <Field label="How was the service? (required)"><div className="flex gap-1 text-2xl">{[1, 2, 3, 4, 5].map((n) => <button key={n} aria-label={`${n} stars`} onClick={() => setStars(n)} className={n <= stars ? "text-[#f59e0b]" : "text-line"}><Icon name="star" filled /></button>)}</div></Field>
       <Field label="What went well? (optional)"><div className="flex flex-wrap gap-1.5">{TAGS.map((t) => <button key={t} aria-pressed={tags.includes(t)} onClick={() => setTags((s) => (s.includes(t) ? s.filter((x) => x !== t) : [...s, t]))} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", tags.includes(t) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t}</button>)}</div></Field>
       {stars <= 2 && <Banner tone="warn">What went wrong? You can also “Report a problem” instead.</Banner>}
       <Field label="Comment (optional)"><Textarea placeholder="Technician was quick and tidy." /></Field>

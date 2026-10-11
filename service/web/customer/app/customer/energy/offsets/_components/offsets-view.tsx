@@ -9,6 +9,7 @@ import { kg3, type ApiOffsetRecord, type ApiQuote } from "@ac/web/lib/offsets";
 import { showDate, showTime } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
 import { getQuote, requestOffset } from "../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 type Live = {
   unitIds: string[]; subject: string; period: { from: string; to: string; label: string }; estimate: { emissions: string; savedEmissions: string; factor: string; comparable: boolean } | null; back: string;
@@ -48,7 +49,7 @@ export function OffsetsView({ live }: { live: Live }) {
       <Card title={t("Based on Energy & cost")} sub={`${live.subject} · ${live.period.label}${live.estimate ? ` · ${live.estimate.factor}` : ""}`}>
         {live.estimate ? <div className="flex flex-wrap gap-x-8 gap-y-1 text-[13px]"><span>{t("Estimated emissions")} <b>{live.estimate.emissions}</b></span><span>{t("Estimated savings")} <b className={live.estimate.comparable ? "text-ok" : "text-muted"}>{live.estimate.savedEmissions}</b></span></div>
           : <p className="text-[13px] text-muted">{t("No estimate for this selection — the emission factor or valid readings are missing.")}</p>}
-        <button type="button" className="mt-2 text-xs font-semibold text-primary" onClick={() => setExplain((e) => !e)}>{t("ⓘ What is a carbon offset?")} {explain ? "▾" : "▸"}</button>
+        <button type="button" className="mt-2 text-xs font-semibold text-primary" aria-expanded={explain} onClick={() => setExplain((e) => !e)}><Icon name="info" /> {t("What is a carbon offset?")} <Icon name={explain ? "chevronDown" : "chevronRight"} /></button>
         {explain && <p className="mt-1 text-xs text-muted">{t("An offset retires a carbon credit to compensate emissions. Here it is simulated — nothing real is purchased, and no market, price or balance exists.")}</p>}
       </Card>
       {done ? (
@@ -65,7 +66,7 @@ export function OffsetsView({ live }: { live: Live }) {
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted">{t("Getting a quote creates no record.")}</span><Btn variant="primary" disabled={pending || !!amountError || !!purposeError} onClick={ask}>{t("Get demo quote")}</Btn></div>
         </Card>
       ) : step === 1 && quote ? (
-        <Card title={<span className="flex items-center gap-2">{t("Demo quote")} <Badge tone="primary">{t("◷ Quoted")}</Badge></span>}>
+        <Card title={<span className="flex items-center gap-2">{t("Demo quote")} <Badge tone="primary" icon="time">{t("Quoted")}</Badge></span>}>
           <SummaryList items={[
             [t("Amount"), `${kg3(quote.amountKg)} kgCO₂e`], [t("Period / units"), `${span(quote)} · ${live.subject}`],
             [t("Quote ID"), t("{id} (demo)", { id: quote.id.slice(0, 8) })], [t("Estimated amount"), quote.estimatedAmountMinor !== null && quote.currency ? t("{amount} (demo)", { amount: amount(quote.estimatedAmountMinor, quote.currency) }) : "—"],

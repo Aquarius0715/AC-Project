@@ -54,7 +54,7 @@ test("the customer screens in Malay keep IDs and units and use the display time 
   await page.goto("/customer/energy");
   for (const name of [/^Tenaga (harian|sebenar harian)/, "Kesan karbon"]) await expect(main.getByRole("heading", { name })).toBeVisible();
   await expect(main).toContainText(/\(\d+ hari\) · Asia\/Kuala_Lumpur/); // the business period stays Kuala Lumpur days, labelled in Malay
-  await expect(main.getByRole("button", { name: "↓ Eksport" })).toBeVisible();
+  await expect(main.getByRole("button", { name: "Eksport" })).toBeVisible();
   await page.goto("/customer/energy/offsets");
   for (const name of ["Berdasarkan Tenaga & kos", "Berapa banyak yang anda ingin ofset?", "Rekod ofset demo"]) await expect(main.getByRole("heading", { name })).toBeVisible();
   await page.goto("/customer/air-quality");

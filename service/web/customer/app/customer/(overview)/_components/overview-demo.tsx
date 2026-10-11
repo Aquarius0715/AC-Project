@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Badge, Btn, Card, ConnBadge, Kpi, LineChart, BarChart, Page, PowerBadge, SeverityBadge, Tabs, TextLink, OnOffBadge, Banner } from "@ac/web/components/ui";
 import { units as mockUnits, week, mockCounts, type CustomerCounts, type UnitRow } from "@ac/web/lib/client";
+import { Icon } from "@ac/web/components/Icon";
 
 /** Customer overview of the Phase 1A demo (fixture rows); API mode renders OverviewView from the Core API. */
 export function OverviewDemo() {
@@ -26,7 +27,7 @@ export function OverviewDemo() {
         </div>
       </div>
 
-      {stale && <Banner tone="warn" action={<Btn size="sm" onClick={() => setStale(false)}>↻ Retry</Btn>}>Offline — showing values last loaded at 09:12. Remote actions are disabled until the connection returns.</Banner>}
+      {stale && <Banner tone="warn" action={<Btn size="sm" onClick={() => setStale(false)}><Icon name="refresh" />Retry</Btn>}>Offline — showing values last loaded at 09:12. Remote actions are disabled until the connection returns.</Banner>}
 
       <div className="grid-fluid" style={{ ["--min" as string]: "210px" }}>
         <Kpi label="Running" badge={<PowerBadge s="running" />} value={counts.powerOn} sub={`of ${counts.total} units · latest observation per unit`} href="/customer/properties?powerState=on" link="View running units →" />
@@ -43,7 +44,7 @@ export function OverviewDemo() {
             </div>
             {units.map((u) => (
               <Link key={u.id} href={`/customer/units/${u.id}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-2 py-3 hover:bg-surface2/50 @lg:grid-cols-[minmax(0,1fr)_64px_64px_72px_120px_14px]">
-                <div className="flex min-w-0 items-center gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary">❄</span><div className="min-w-0"><div className="truncate font-bold">{u.name}</div><div className="truncate text-[11px] text-muted">{u.loc} · {u.obs}</div></div></div>
+                <div className="flex min-w-0 items-center gap-2.5"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary"><Icon name="units" /></span><div className="min-w-0"><div className="truncate font-bold">{u.name}</div><div className="truncate text-[11px] text-muted">{u.loc} · {u.obs}</div></div></div>
                 <div className="col-span-2 row-start-2 flex gap-4 text-xs @lg:contents">
                   {([[u.temp, "°C"], [u.hum, "%"], [u.power, "W"]] as const).map(([v, unit], i) => (
                     <div key={i}><span className="text-[13px] font-bold">{v ?? "—"}</span> <span className="text-[11px] text-muted">{v === null ? "no data" : unit}</span></div>
@@ -78,7 +79,7 @@ export function OverviewDemo() {
       <div className="grid-fluid" style={{ ["--min" as string]: "290px" }}>
         <Card title="Energy used" sub="This week · Sep 14–20 · all 5 units" action={<span className="text-xs text-muted">kWh</span>}>
           <div className="text-[28px] font-bold">18.6 <span className="text-sm font-medium text-muted">kWh</span></div>
-          <div className="mb-2 text-xs font-semibold text-ok">↓ 8% vs last week (20.2 kWh)</div>
+          <div className="mb-2 text-xs font-semibold text-ok"><Icon name="arrowDown" /> 8% vs last week (20.2 kWh)</div>
           <BarChart labels={week} series={[[3.1, 2.9, 2.4, 3.3, 2.9, 2.2, 1.8].map((v) => v + 0.4), [3.1, 2.9, 2.4, 3.3, 2.9, 2.2, 1.8]]} />
           <div className="mt-1 flex gap-4 text-[11px] text-muted"><span><i className="mr-1 inline-block h-2 w-2 bg-primary" />This week</span><span><i className="mr-1 inline-block h-2 w-2 bg-[#c9d8ee]" />Last week</span></div>
           <TextLink href="/customer/energy" className="mt-2 inline-block">Energy details & table view →</TextLink>

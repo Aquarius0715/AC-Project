@@ -6163,3 +6163,26 @@ IR393 converted the shell and the shared parts. This part converts the glyphs th
    - Seven E2E specs expect the new texts: "Overdue", "Matched", the Malay sort labels of four screens, and the accepted assignment.
 5. **Next.** The glyphs in the four apps' own screens, the arrows in link texts, then Figma and the guard test.
 6. **Checks.** Typecheck, lint, the web unit tests (458), the four builds and the validators pass. The E2E suite passes (117 tests, 8 skipped); the two Malay sort labels found in the full run were rerun after the fix.
+
+## IR395 One icon library, part 3: the customer app's screens — 2026-10-12
+
+The customer app's screens kept 104 glyphs, in both the API views and the browser demo's views. All of them now draw Lucide icons through `Icon`.
+
+1. **Buttons and links.** Refresh, Retry, Export (download), Rename (edit), Resend invite (send), Accept this time (check), Delete, Test / Simulate, Learn about offsets (info), and the toggles for "What is a carbon offset?" and the payment reminders (chevrons).
+2. **Trees and rows.**
+   - The properties tree draws home, chevrons and "unassigned".
+   - Units show the units icon.
+   - The selected control mode shows a check, and the group selection shows checkboxes.
+   - Each maintenance row shows its state's icon, and the booked time a check.
+3. **States and messages.** The alert rows' severity, the kind badges (load cause, fault, reminder, inspection, system information), the recovery checks of a policy, every field error, the location consent, skipped automations and the simulation results.
+4. **Ratings.** The stars of the rating form are Lucide stars, filled up to the chosen rating. The thank-you toast says "(4 of 5 stars)".
+5. **Accessibility.** Every icon-only button has a name. Two demo buttons had none and showed only a glyph: the job card's close button, and the reminders toggle (which also says whether it is open). The carbon-offset explainer says whether it is open too.
+6. **Texts.**
+   - The chart's "no data" legend is a dashed swatch, not a glyph.
+   - The properties help says "its edit button" instead of showing ✎ in the sentence.
+   - Code comments that named spec items with circled digits use words.
+   - The Malay dictionary follows every changed key.
+   - HQ's overview refresh button shared a key with the customer's, so it changed too.
+7. **Tests.** Three E2E specs name the buttons without glyphs: Eksport, Delete, Rename. The web unit tests and the i18n check pass.
+8. **Left for the next parts.** The partner, technician and HQ screens: 90 glyphs. Then the arrows in link texts (about 660, with their Malay keys), Figma, and the guard test.
+9. **Checks.** Typecheck, lint, the web unit tests (458), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped.

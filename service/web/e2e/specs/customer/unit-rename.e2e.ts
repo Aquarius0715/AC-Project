@@ -1,4 +1,4 @@
-// FR-C03, DD-C03, IR315: ✎ Rename on the unit screen renames the AC (locations.rename, kind=unit) — Figma Client 02e.
+// FR-C03, DD-C03, IR315: Rename on the unit screen renames the AC (locations.rename, kind=unit) — Figma Client 02e.
 // The new name shows on the screen at once; the spec then gives the AC its seed name back, also in afterEach when the
 // test fails half-way.
 import type { Page } from "@playwright/test";
@@ -10,7 +10,7 @@ let href: string | null = null;
 
 async function rename(page: Page, from: string, to: string) {
   const main = page.getByRole("main");
-  await main.getByRole("button", { name: "✎ Rename" }).click();
+  await main.getByRole("button", { name: "Rename" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: `Rename ${from}` })).toBeVisible();
   await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)

@@ -10,7 +10,7 @@ import {
   airMetrics, airNumber, airPeriods, metricInfo, ventDurations, ventMethods, type AirMetric, type AirPeriod, type AirRow, type MetricCard, type VentMethod,
 } from "@ac/web/lib/air";
 import { logVentilation } from "../actions";
-import type { IconName } from "@ac/web/components/Icon";
+import { Icon, type IconName } from "@ac/web/components/Icon";
 
 type Tone = MetricCard["feed"]["tone"];
 export type AirLive = {
@@ -62,7 +62,7 @@ export function AirQualityView({ live }: { live: AirLive | null }) {
             {room.units.map((u) => <option key={u.id} value={u.id}>{t("Sensor: {name}", { name: u.name })}</option>)}
           </Select>
         </div>
-        <span className="flex items-center gap-2"><b>{t("Updated {time}", { time: live.updated })}</b><ConnBadge s={live.connection} /><Btn size="sm" variant="ghost" onClick={() => router.refresh()}>{t("↻ Refresh")}</Btn></span>
+        <span className="flex items-center gap-2"><b>{t("Updated {time}", { time: live.updated })}</b><ConnBadge s={live.connection} /><Btn size="sm" variant="ghost" onClick={() => router.refresh()}><Icon name="refresh" />{t("Refresh")}</Btn></span>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "210px" }}>
         {live.cards.map((m) => (
@@ -94,7 +94,7 @@ export function AirQualityView({ live }: { live: AirLive | null }) {
               <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
                 <span className="text-primary">— {label} ({info.unit})</span>
                 {c.guide !== null && <span className="text-crit">- - {c.guide} {info.unit} {t(live.metric === "co2" ? "ventilation guide" : "cleaning guide")}</span>}
-                {c.gaps && <span>{t("▧ No data (gap, not joined)")}</span>}
+                {c.gaps && <span className="inline-flex items-center gap-1"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm border border-dashed border-muted" />{t("No data (gap, not joined)")}</span>}
               </div>
             </>
           ) : (

@@ -55,7 +55,7 @@ export function PropertiesView({ live }: { live: PropertiesLive }) {
               </div>
             ))}
           </div>
-          <p className="mt-3 text-[11px] text-muted">{t("Read-only — HQ sets up properties, floors, rooms and units. You can rename any location with ✎ or Rename; nothing else here changes the structure.")}</p>
+          <p className="mt-3 text-[11px] text-muted">{t("Read-only — HQ sets up properties, floors, rooms and units. You can rename any location with its edit button or Rename; nothing else here changes the structure.")}</p>
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           {live.filter ? <FilteredUnits live={live} clear={() => go({})} /> : sel && <Panel live={live} sel={sel} rename={setRenaming} go={go} />}
@@ -75,7 +75,7 @@ function Row({ depth, selected, onClick, icon, name, tag, meta, onRename }: { de
         {tag && <span className="rounded bg-surface2 px-1.5 text-[10px] text-muted">{tag}</span>}
         {meta && <span className="truncate text-[11px] text-muted">{meta}</span>}
       </button>
-      {onRename && <button type="button" aria-label={t("Rename {name}", { name })} onClick={onRename} className="text-muted hover:text-primary">✎</button>}
+      {onRename && <button type="button" aria-label={t("Rename {name}", { name })} onClick={onRename} className="text-muted hover:text-primary"><Icon name="edit" /></button>}
     </div>
   );
 }
@@ -96,7 +96,7 @@ function UnitRows({ units }: { units: (RoomUnit & { place: string })[] }) {
     <div className="flex flex-col gap-2">
       {units.map((u) => (
         <Link key={u.id} href={`/customer/units/${u.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3 hover:bg-surface2/60">
-          <span className="min-w-0"><span className="flex items-center gap-2 font-bold"><span aria-hidden className="text-primary">❄</span>{u.name}</span><span className="block text-[11px] text-muted">{u.set} · {u.place}</span></span>
+          <span className="min-w-0"><span className="flex items-center gap-2 font-bold"><Icon name="units" className="text-primary" />{u.name}</span><span className="block text-[11px] text-muted">{u.set} · {u.place}</span></span>
           <span className="flex flex-wrap items-center gap-3 text-xs"><span>{u.temp}</span><span>{u.watts}</span><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{!u.online && u.seen && <span className="text-muted">{t("seen {time}", { time: u.seen })}</span>}<span className="font-semibold text-primary">{t("Open control →")}</span></span>
         </Link>
       ))}
@@ -124,8 +124,8 @@ function Panel({ live, sel, rename, go }: { live: PropertiesLive; sel: Selection
     return (
       <>
         <div className="text-[13px] text-muted">{t("My properties")} › <b className="text-ink">{p.name}</b></div>
-        <Card title={<span className="flex items-center gap-2">{p.name}<Badge tone="muted">⌂ {kind(t, p.kind)}</Badge></span>}
-          action={<Btn size="sm" onClick={() => rename({ kind: "property", id: p.id, version: p.version, name: p.name, where: t("{name} · {kind} (property)", { name: p.name, kind: kind(t, p.kind) }) })}>{t("✎ Rename")}</Btn>}>
+        <Card title={<span className="flex items-center gap-2">{p.name}<Badge tone="muted" icon="home">{kind(t, p.kind)}</Badge></span>}
+          action={<Btn size="sm" onClick={() => rename({ kind: "property", id: p.id, version: p.version, name: p.name, where: t("{name} · {kind} (property)", { name: p.name, kind: kind(t, p.kind) }) })}><Icon name="edit" />{t("Rename")}</Btn>}>
           <SummaryList cols={2} items={[[t("Type"), kind(t, s.kind)], [t("Floors"), s.floors.length ? `${s.floors.length} (${s.floors.join(", ")})` : t("none")], [t("Rooms"), s.rooms], [t("Air conditioners"), t("{inRooms} in rooms · {unassigned} unassigned", { inRooms: s.inRooms, unassigned: s.unassigned })], [t("Last edited"), s.edited]]} />
           <div className="my-4 rounded-xl bg-surface2 p-4 text-center"><div className="font-bold">{t("Select a room to see its air conditioners")}</div><div className="text-xs text-muted">{t("Floor → Room → Air conditioner. Each room lists every AC inside it; open one to control it.")}</div></div>
           {live.units.length > 0 && <>
@@ -154,12 +154,12 @@ function Panel({ live, sel, rename, go }: { live: PropertiesLive; sel: Selection
     <>
       <div className="text-[13px] text-muted">{t("My properties")} › {sel.path.split(" › ").map((x, i, a) => <span key={i}>{i === a.length - 1 ? <b className="text-ink">{x}</b> : `${x} › `}</span>)}</div>
       <Card title={<span className="flex items-center gap-2">{s.name}<Badge tone="muted">{kind(t, s.kind)}</Badge></span>}
-        action={<Btn size="sm" onClick={() => rename({ kind: "space", id: s.id, version: s.version, name: s.name, where: t("{name} · {kind} in {property}", { name: s.name, kind: kind(t, s.kind), property: p.name }) })}>{t("✎ Rename")}</Btn>}>
+        action={<Btn size="sm" onClick={() => rename({ kind: "space", id: s.id, version: s.version, name: s.name, where: t("{name} · {kind} in {property}", { name: s.name, kind: kind(t, s.kind), property: p.name }) })}><Icon name="edit" />{t("Rename")}</Btn>}>
         {canGroup && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted">{t("{acs} in {space} ·", { acs: acs_(t, direct.length), space: s.name })}</span>
             {(["single", "group"] as const).map((m) => <button key={m} type="button" aria-pressed={mode === m} onClick={() => go({ spaceId: s.id, mode: m === "group" ? "group" : null })}
-              className={cx("rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m ? "✓ " : ""}{t(m === "single" ? "Single AC" : "Group control")}</button>)}
+              className={cx("rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{t(m === "single" ? "Single AC" : "Group control")}</button>)}
           </div>
         )}
         {mode === "group" ? <GroupPanel key={s.id} live={{ ...live, units: direct, details: live.details.filter((d) => d.spaceId === s.id) }} space={s.name} /> : live.units.length === 0 ? <p className="text-[13px] text-muted">{t("No air conditioner in this {kind}.", { kind: kind(t, s.kind).toLowerCase() })}</p> : <>
@@ -222,7 +222,7 @@ function GroupPanel({ live, space }: { live: PropertiesLive; space: string }) {
           return (
             <button key={u.id} type="button" disabled={sending} onClick={() => toggle(u.id)} aria-pressed={sel.includes(u.id)}
               className={cx("rounded-xl border p-3 text-left disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
-              <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><span aria-hidden className="text-xs">{sel.includes(u.id) ? "☑" : "☐"}</span></div>
+              <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><Icon name={sel.includes(u.id) ? "checked" : "unchecked"} className="text-sm" /></div>
               <div className="text-[11px] text-muted">{!u.online ? (u.seen ? t("last seen {when}", { when: u.seen }) : t("no connection yet")) : u.temp === "—" && u.watts === "—" ? t("no recent reading") : `${u.temp} · ${u.watts}`}</div>
               <div className="mt-1 flex flex-wrap gap-1"><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{tr && <Badge tone={tr.status === "Confirmed" ? "ok" : tr.status === "Failed" ? "crit" : tr.status === "Waiting" ? "warn" : "primary"}>{t(tr.status)}</Badge>}</div>
               {(tr?.status === "Failed" || tr?.status === "Waiting") && <div className={cx("mt-1 text-[11px]", tr.status === "Failed" ? "text-crit" : "text-warn")}>{tr.note}</div>}

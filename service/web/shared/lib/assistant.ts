@@ -15,7 +15,7 @@ export type ResolvedIntent =
   | { kind: "change"; unitId: string; celsius: number; before: { power: boolean | null; celsius: number | null; observedAt: string | null }; expectedVersion: number };
 
 /** The microphone consent of this device (Preferences), kept in this browser and not on the account. "off" leaves the
- * assistant text only, and turning it off while listening discards the voice request (FR-X02, AT-X02-E ③, D09). */
+ * assistant text only, and turning it off while listening discards the voice request (FR-X02, AT-X02-E item 3, D09). */
 export const MICROPHONE = "ac-voice-microphone";
 
 /** Sentences the fixed grammar accepts (D09): the suggestions and the simulated voice transcript (no real microphone). */

@@ -113,7 +113,7 @@ export function releaseBlocker(r: ApiRestriction, allPaid: boolean, now: Date, i
   return null;
 }
 
-/** The outcome of each exception action for the current state (IR96, IR35 ②③, IR141 items 1 and 3). */
+/** The outcome of each exception action for the current state (IR96, IR35 items 2 and 3, IR141 items 1 and 3). */
 export type ActionKind = "defer" | "exempt" | "cancel" | "override";
 export function actionOutcome(kind: ActionKind, s: RestrictionState, t: T = en): { allowed: boolean; result: string } {
   const terminal = s === "released" || s === "cancelled";

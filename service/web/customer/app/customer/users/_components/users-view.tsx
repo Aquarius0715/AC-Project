@@ -6,6 +6,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { inviteError, type ClientUserRow } from "@ac/web/lib/assets";
 import { inviteMember, resendInvite } from "../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 /** Users (FR-C19) in API mode: the owner lists the customer's users, invites members and resends pending invites. Texts
  * in the user's display language (IR267). */
@@ -37,7 +38,7 @@ export function UsersView({ live }: { live: { customerId: string; customer: stri
           { key: "s", label: t("Status"), render: (u) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{t(u.status === "active" ? "Active" : u.status === "invited" ? "Invite pending" : "Disabled")}</Badge> },
           { key: "l", label: t("Last sign-in"), render: (u) => u.lastSignIn, hideBelow: "sm" },
           { key: "a", label: t("Actions"), render: (u) => (u.status === "invited"
-            ? <Btn size="sm" variant="ghost" disabled={pending} onClick={() => run(() => resendInvite(u.id), t("Invitation preview re-created for {email} — nothing is sent in the demo", { email: u.email }))}>{t("↻ Resend invite")}</Btn>
+            ? <Btn size="sm" variant="ghost" disabled={pending} onClick={() => run(() => resendInvite(u.id), t("Invitation preview re-created for {email} — nothing is sent in the demo", { email: u.email }))}><Icon name="send" />{t("Resend invite")}</Btn>
             : <span className="text-muted">—</span>) },
         ]} />
       </Card>
@@ -45,7 +46,7 @@ export function UsersView({ live }: { live: { customerId: string; customer: stri
       <p className="text-[11px] text-muted">{t("Invites are previews only in the demo — no e-mail is sent (FR-C19, IR114).")}</p>
       <Modal open={open} onClose={close} title={live.customer ? t("Invite a member to {customer}", { customer: live.customer }) : t("Invite a member")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!err) run(() => inviteMember(live.customerId, email), t("Invitation preview created for {email} — nothing is sent in the demo", { email: email.trim() }), close); }}>{t("Send invite")}</Btn></>}>
         <Field label={t("Email")} error={tried ? err : undefined}><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="lim.ka@example.com" /></Field>
-        <Field label={t("Role")} hint={t("Owners can invite members only. Ask HQ to make someone an owner.")}><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold">🔒 {t("Member")}</div></Field>
+        <Field label={t("Role")} hint={t("Owners can invite members only. Ask HQ to make someone an owner.")}><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {t("Member")}</div></Field>
         <Banner>{t("They get an invitation to sign in to the customer app and see only your properties and units. Demo: an invitation preview is shown — nothing is sent. The invite stays “pending” until they sign in.")}</Banner>
       </Modal>
     </Page>

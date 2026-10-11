@@ -12,7 +12,7 @@ async function remove(page: Page, name: string) {
   const card = page.locator("section", { hasText: name });
   if (!(await card.count())) return;
   await card.getByRole("button", { name: `More for ${name}` }).click();
-  await card.getByRole("button", { name: "🗑 Delete" }).click();
+  await card.getByRole("button", { name: "Delete" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Delete automation" }).click();
   await expect(page.getByText("Automation deleted").first()).toBeVisible();
 }

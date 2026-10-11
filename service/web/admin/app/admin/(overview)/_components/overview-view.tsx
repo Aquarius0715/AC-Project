@@ -6,6 +6,7 @@ import { Badge, Banner, Btn, Card, Input, Kpi, Page, Select, TextLink, cx } from
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { axisRows, billingView, forecastView, jobRows, kpisFrom, overviewLinks, type AdminSummary, type AxisRow } from "@ac/web/lib/adminSummary";
+import { Icon } from "@ac/web/components/Icon";
 
 type Live = {
   period: { kind: string; from: string; to: string; error: string | null; label: string }; custom: { from: string; to: string };
@@ -47,7 +48,7 @@ export function AdminOverviewView({ live }: { live: Live }) {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted">{live.asOf && <span>{live.asOf}</span>}<Btn size="sm" onClick={() => router.refresh()}>{t("↻ Refresh")}</Btn></div>
+        <div className="flex items-center gap-2 text-xs text-muted">{live.asOf && <span>{live.asOf}</span>}<Btn size="sm" onClick={() => router.refresh()}><Icon name="refresh" />{t("Refresh")}</Btn></div>
       </div>
       {live.period.error && <Banner tone="warn">{t("{error} — choose another period.", { error: live.period.error })}</Banner>}
       {s && <Sections s={s} links={links} />}

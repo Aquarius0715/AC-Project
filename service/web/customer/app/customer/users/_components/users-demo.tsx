@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, DataTable, Field, Input, LinkBtn, Modal, Page, PageHead, useToast } from "@ac/web/components/ui";
 import { CURRENT_CLIENT, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
+import { Icon } from "@ac/web/components/Icon";
 
 /** FR-C19 / IR114 — the customer owner lists users, invites members and resends invites (Figma Client 11a–11c). */
 export function UsersDemo() {
@@ -46,7 +47,7 @@ export function UsersDemo() {
           { key: "r", label: "Role", render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{u.role === "owner" ? "Owner" : "Member"}</Badge> },
           { key: "s", label: "Status", render: (u) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{u.status === "active" ? "Active" : u.status === "invited" ? "Invite pending" : "Disabled"}</Badge> },
           { key: "l", label: "Last sign-in", render: (u) => u.lastSignIn ?? "—", hideBelow: "sm" },
-          { key: "a", label: "Actions", render: (u) => (u.status === "invited" ? <Btn size="sm" variant="ghost" onClick={() => resend(u)}>↻ Resend invite</Btn> : <span className="text-muted">—</span>) },
+          { key: "a", label: "Actions", render: (u) => (u.status === "invited" ? <Btn size="sm" variant="ghost" onClick={() => resend(u)}><Icon name="send" />Resend invite</Btn> : <span className="text-muted">—</span>) },
         ]} />
       </Card>
       <Banner>To change a role, disable sign-in, reset a password or remove someone, contact HQ — they manage it in Customers &amp; units › Users. Only owners see this page.</Banner>
@@ -54,7 +55,7 @@ export function UsersDemo() {
 
       <Modal open={open} onClose={close} title="Invite a member to customer-a" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={send}>Send invite</Btn></>}>
         <Field label="Email" error={err}><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="lim.ka@example.com" /></Field>
-        <Field label="Role" hint="Owners can invite members only. Ask HQ to make someone an owner."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold">🔒 Member</div></Field>
+        <Field label="Role" hint="Owners can invite members only. Ask HQ to make someone an owner."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> Member</div></Field>
         <Banner>They get an invitation to sign in to the customer app and see only customer-a’s properties and units. Demo: an invitation preview is shown — nothing is sent. The invite stays “pending” until they sign in.</Banner>
       </Modal>
     </Page>

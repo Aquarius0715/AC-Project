@@ -12,6 +12,7 @@ import { useT } from "@ac/web/components/I18n";
 import { readAlert } from "../actions";
 import type { AlertsLive } from "../_lib/load";
 import { PoliciesLive } from "./policies-live";
+import { Icon } from "@ac/web/components/Icon";
 
 /** The customer alert inbox (FR-C08, DD-C08, Figma Client 06a/06b/06g) and the Alert policies tab (FR-C15, 06e/06f) from
  * the Core API: filters in the URL, read state from the membership's notifications (opening an alert marks them read; the
@@ -39,7 +40,7 @@ export function AlertsLiveView({ live }: { live: AlertsLive }) {
   };
   const Item = ({ a }: { a: InboxAlert }) => (
     <div className="flex w-full items-start gap-3 border-t border-line px-1 py-3 first:border-0">
-      <span className="mt-0.5">{a.group === "attn" ? "⚠" : "ⓘ"}</span>
+      <Icon name={a.group === "attn" ? "warning" : "info"} className="mt-0.5" />
       <div className="min-w-0 flex-1">
         <button type="button" onClick={() => show(a)} className="block w-full text-left hover:opacity-80">
           <span className="flex flex-wrap items-center gap-2">

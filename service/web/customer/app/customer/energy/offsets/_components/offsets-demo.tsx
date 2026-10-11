@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Banner, Btn, Card, Check, DemoBadge, Field, Input, Page, Steps, SummaryList, useToast } from "@ac/web/components/ui";
+import { Icon } from "@ac/web/components/Icon";
 
 /** The Phase 1A demo of /customer/energy/offsets (fixtures; DATA_SOURCE≠api). */
 export function OffsetsDemo() {
@@ -20,7 +21,7 @@ export function OffsetsDemo() {
       <Steps steps={["Amount", "Quote", "Confirm"]} current={done ? 3 : step} />
       <Card title="Based on Energy & cost" sub="Bedroom AC · Sep 14–20 · factor-demo-2026">
         <div className="flex flex-wrap gap-x-8 gap-y-1 text-[13px]"><span>Estimated emissions <b>40.0</b> kgCO2e</span><span>Estimated savings <b className="text-ok">10.0</b> kgCO2e</span></div>
-        <button className="mt-2 text-xs font-semibold text-primary" onClick={() => setExplain((e) => !e)}>ⓘ What is a carbon offset? {explain ? "▾" : "▸"}</button>
+        <button className="mt-2 text-xs font-semibold text-primary" aria-expanded={explain} onClick={() => setExplain((e) => !e)}><Icon name="info" /> What is a carbon offset? <Icon name={explain ? "chevronDown" : "chevronRight"} /></button>
         {explain && <p className="mt-1 text-xs text-muted">An offset retires a carbon credit to compensate emissions. Here it is simulated — nothing real is purchased.</p>}
       </Card>
       {done ? (

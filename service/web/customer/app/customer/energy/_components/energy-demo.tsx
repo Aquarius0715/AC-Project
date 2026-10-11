@@ -4,6 +4,7 @@ import { useState } from "react";
 import { BarChart, Btn, Card, Check, DataTable, Kpi, LinkBtn, Page, Tabs, Badge } from "@ac/web/components/ui";
 import { ExportReportModal } from "@ac/web/components/Features";
 import { week } from "@ac/web/lib/client";
+import { Icon } from "@ac/web/components/Icon";
 
 const days = ["Mon 14", "Tue 15", "Wed 16", "Thu 17", "Fri 18", "Sat 19", "Sun 20"];
 const perUnit: Record<string, { actual: number[]; base: number[] }> = {
@@ -29,7 +30,7 @@ export function EnergyDemo() {
     <Page>
       <Card>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-          <Btn size="sm" className="order-last ml-auto" onClick={() => setExp(true)}>↓ Export</Btn>
+          <Btn size="sm" className="order-last ml-auto" onClick={() => setExp(true)}><Icon name="download" />Export</Btn>
           <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted">Period</span><Tabs value={range} onChange={setRange} tabs={[{ id: "today", label: "Today" }, { id: "7d", label: "7d" }, { id: "30d", label: "30d" }, { id: "custom", label: "Custom" }]} /></div>
           <span className="text-xs text-muted">Sep 14 00:00 – Sep 21 00:00 (7 days) · Asia/Kuala_Lumpur</span>
         </div>
@@ -48,9 +49,9 @@ export function EnergyDemo() {
             <div className="mt-1 flex flex-wrap gap-4 text-[11px] text-muted"><span><i className="mr-1 inline-block h-2 w-2 bg-primary" />Actual (measured)</span><span><i className="mr-1 inline-block h-2 w-2 bg-[#c9d8ee]" />Baseline (normal operation)</span></div>
           </>
         ) : <DataTable rows={days.map((d, i) => ({ d, a: actual[i], b: base[i] }))} rowKey={(r) => r.d} cols={[{ key: "d", label: "Day", render: (r) => r.d }, { key: "a", label: "Actual (kWh)", render: (r) => r.a }, { key: "b", label: "Baseline (kWh)", render: (r) => r.b }, { key: "s", label: "Difference", render: (r) => (r.b - r.a).toFixed(1) }]} />}
-        <p className="mt-3 text-xs text-muted">◷ <b>Peak window 17:00–21:00</b> — 34% of energy used in peak · highest draw 1.2 kW (Thu 18:40) · pre-cooling before 17:00 lowers peak cost</p>
+        <p className="mt-3 text-xs text-muted"><Icon name="time" /> <b>Peak window 17:00–21:00</b> — 34% of energy used in peak · highest draw 1.2 kW (Thu 18:40) · pre-cooling before 17:00 lowers peak cost</p>
       </Card>
-      <Card title="Carbon impact" sub="Same period & units as above · factor-demo-2026 (0.5 kgCO2e/kWh, demo factor)" action={<LinkBtn size="sm" href="/customer/energy/offsets">ⓘ Learn about offsets</LinkBtn>}>
+      <Card title="Carbon impact" sub="Same period & units as above · factor-demo-2026 (0.5 kgCO2e/kWh, demo factor)" action={<LinkBtn size="sm" href="/customer/energy/offsets"><Icon name="info" />Learn about offsets</LinkBtn>}>
         <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
           <div><div className="text-xs text-muted">Estimated emissions</div><div className="text-2xl font-bold">{(sumA * 0.5).toFixed(1)} <span className="text-sm text-muted">kgCO2e</span></div><div className="text-[11px] text-muted">{sumA} kWh actual × factor</div></div>
           <div><div className="text-xs text-muted">Estimated savings vs baseline</div><div className="text-2xl font-bold text-ok">{(saved * 0.5).toFixed(1)} <span className="text-sm text-muted">kgCO2e</span></div><div className="text-[11px] text-muted">{sumB} → {sumA} kWh</div></div>

@@ -13,6 +13,7 @@ import {
 import { useT } from "@ac/web/components/I18n";
 import { deletePolicy, savePolicy, setDefaultRule } from "../actions";
 import type { AlertsLive } from "../_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 type Live = AlertsLive["policies"];
 type Props = { p: Live; onDone: (text: string) => void; onFail: (f: ActionFailure) => void };
@@ -134,8 +135,8 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
             <Select aria-label={t("Duration unit")} className="w-24" value={f.unit} onChange={(e) => set({ unit: e.target.value as "s" | "min" })}><option value="min">min</option><option value="s">s</option></Select>
           </div>
           <div className="flex flex-wrap items-center gap-2">{t(up ? "Recover when it drops below" : "Recover when it rises above")} <Input aria-label={t("Recovery")} inputMode="decimal" className="w-24" value={f.recovery} onChange={(e) => set({ recovery: e.target.value })} />{unit}</div>
-          {err.recovery || err.threshold || err.duration ? (tried || f.recovery !== editor.form.recovery || f.threshold !== editor.form.threshold) && <p className="text-xs text-crit">✕ {err.threshold ?? err.recovery ?? err.duration}</p>
-            : <p className="text-xs text-ok">{t(up ? "✓ Recovery {recovery} {unit} is below the {threshold} {unit} limit · unit fixed to {unit} for this metric" : "✓ Recovery {recovery} {unit} is above the {threshold} {unit} limit · unit fixed to {unit} for this metric", { recovery: f.recovery, threshold: f.threshold, unit })}</p>}
+          {err.recovery || err.threshold || err.duration ? (tried || f.recovery !== editor.form.recovery || f.threshold !== editor.form.threshold) && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{err.threshold ?? err.recovery ?? err.duration}</p>
+            : <p className="flex items-center gap-1 text-xs text-ok"><Icon name="check" />{t(up ? "Recovery {recovery} {unit} is below the {threshold} {unit} limit · unit fixed to {unit} for this metric" : "Recovery {recovery} {unit} is above the {threshold} {unit} limit · unit fixed to {unit} for this metric", { recovery: f.recovery, threshold: f.threshold, unit })}</p>}
         </div>
         <h3 className="mt-4 text-[13px] font-bold">{t("2 · Only if …")} <span className="font-normal text-muted">{t("(optional) Limit when the policy is checked")}</span></h3>
         <div className="mt-2 flex flex-col gap-2">
@@ -148,7 +149,7 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
               <span className="text-xs text-muted">{editor.policy?.timezone ?? p.timezone}</span>
             </div>
           )}
-          {tried && err.window && <p className="text-xs text-crit">✕ {err.window}</p>}
+          {tried && err.window && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{err.window}</p>}
         </div>
         <h3 className="mt-4 text-[13px] font-bold">{t("3 · Then …")} <span className="font-normal text-muted">{t("How loud the alert is and who hears about it")}</span></h3>
         <div className="mt-2 flex flex-col gap-2 text-[13px]">

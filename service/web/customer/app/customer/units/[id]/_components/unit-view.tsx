@@ -12,6 +12,7 @@ import { showClock, showTime } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
 import { createCommand, setUnitAlertPolicies } from "../actions";
 import { RenameModal } from "../../../_components/rename-modal";
+import { Icon } from "@ac/web/components/Icon";
 
 export type PolicyOption = { id: string; name: string; rule: string };
 
@@ -42,7 +43,7 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
   const [mode, setMode] = useState<"cool" | "dry" | "fan">("cool");
   const [fan, setFan] = useState<"low" | "mid" | "high">("mid");
   const [confirm, setConfirm] = useState(false);
-  const [renaming, setRenaming] = useState(false); // ✎ Rename of the AC (Figma 02e, DD-C03, IR315)
+  const [renaming, setRenaming] = useState(false); // Rename of the AC (Figma 02e, DD-C03, IR315)
   // api mode: start the controls from the device-reported setting when another unit or a newer report arrives
   // (adjust state during render, React "You might not need an effect")
   const reported = d ? `${d.id}|${d.observedState.observedAt}` : null;
@@ -148,7 +149,7 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
         </Card>
 
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={unit.name} sub={api ? unit.loc : `${unit.loc} · ${unit.id}`} action={<span className="flex items-center gap-2"><Btn size="sm" variant="ghost" onClick={() => setRenaming(true)}>{t("✎ Rename")}</Btn><PowerBadge s={unit.state} /><ConnBadge s={unit.conn} /></span>}>
+          <Card title={unit.name} sub={api ? unit.loc : `${unit.loc} · ${unit.id}`} action={<span className="flex items-center gap-2"><Btn size="sm" variant="ghost" onClick={() => setRenaming(true)}><Icon name="edit" />{t("Rename")}</Btn><PowerBadge s={unit.state} /><ConnBadge s={unit.conn} /></span>}>
             {offline ? <Banner tone="warn">{t("This AC is offline. Remote actions are disabled until the connection returns. Last seen {when}.", { when: unit.obs })}</Banner> : (
               <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
                 <Stat label={t("Room temperature (measured)")} value={room?.text ?? "—"} sub={room ? t("observed {at}", { at: room.at }) : t("no recent measurement")} />

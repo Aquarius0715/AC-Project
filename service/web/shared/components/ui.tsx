@@ -363,7 +363,7 @@ const openModals: symbol[] = [];
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** A modal dialog as the WAI-ARIA dialog pattern and UX-06 ask (IR361). On open, focus moves into it: the first field
- * or control of the body, else the first footer button (Cancel), else ✕. Tab and Shift+Tab cycle inside it. Escape
+ * or control of the body, else the first footer button (Cancel), else the close button. Tab and Shift+Tab cycle inside it. Escape
  * closes it, and on close focus returns to what had it before (the trigger). */
 export function Modal({ open, title, onClose, children, footer, wide }: { open: boolean; title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean }) {
   const id = useId();

@@ -110,7 +110,7 @@ function JobDetail({ d, open, onDone, onFail }: { d: Detail; open: (m: ModalKind
   const closed = j.status === "completed" || j.status === "cancelled";
   return (
     <Card title={j.id.slice(0, 8)} sub={`${d.unit.name} — ${j.origin === "periodic_plan" ? t("periodic inspection") : j.symptom.slice(0, 48)}`} className="self-start"
-      action={<div className="flex items-center gap-2"><JobStatusBadge s={status} /><Link href="/customer/maintenance" aria-label={t("Close")} className="rounded px-2 text-muted hover:bg-surface2">✕</Link></div>}>
+      action={<div className="flex items-center gap-2"><JobStatusBadge s={status} /><Link href="/customer/maintenance" aria-label={t("Close")} className="rounded px-2 text-muted hover:bg-surface2"><Icon name="close" /></Link></div>}>
       <SummaryList items={d.facts} />
       {d.preferred.length > 0 && (
         <div className="mt-3 flex flex-col gap-1">
@@ -127,13 +127,13 @@ function JobDetail({ d, open, onDone, onFail }: { d: Detail; open: (m: ModalKind
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
             <span className="mr-auto text-[11px] text-warn">{t("Accepting books this time. Declining keeps your request open.")}</span>
             <Btn variant="danger" disabled={pending} onClick={() => open("decline")}>{t("Decline…")}</Btn>
-            <Btn variant="primary" disabled={pending} onClick={() => run(() => respondProposal(j.id, j.version, d.proposal!.id, { decision: "accept" }), t("Time accepted"), () => onDone(t("Time accepted — {when} is booked; the technician confirms it next.", { when: d.proposal!.when })), onFail)}>{t("✓ Accept this time")}</Btn>
+            <Btn variant="primary" disabled={pending} onClick={() => run(() => respondProposal(j.id, j.version, d.proposal!.id, { decision: "accept" }), t("Time accepted"), () => onDone(t("Time accepted — {when} is booked; the technician confirms it next.", { when: d.proposal!.when })), onFail)}><Icon name="check" />{t("Accept this time")}</Btn>
           </div>
         </div>
       )}
       {d.plan && (
         <div className="mt-3 rounded-xl border border-[#cdb8fa] bg-[#f7f2ff] p-4 text-[13px]">
-          <b className="text-[#6d28d9]">{t("↻ Booked from your maintenance plan")}</b>
+          <b className="inline-flex items-center gap-1.5 text-[#6d28d9]"><Icon name="routine" />{t("Booked from your maintenance plan")}</b>
           <p className="mt-1">{t("You don’t need to request periodic visits — HQ schedules each one. If you can’t be home, ask for another time (3 options) up to 48 h before the visit.")}</p>
           <div className="mt-2 flex items-center justify-end gap-2">{d.plan.why && <span className="mr-auto text-[11px] text-muted">{d.plan.why}</span>}<Btn disabled={!d.plan.can || pending} onClick={() => open("other")}>{t("Request another time…")}</Btn></div>
         </div>
@@ -189,7 +189,7 @@ function TimesInput({ rows, onChange, error, label }: { rows: Row[]; onChange: (
           <Field label={t("To {n}", { n: i + 1 })}><Input type="time" value={r.to} onChange={(e) => set(i, "to", e.target.value)} /></Field>
         </div>
       ))}
-      {error && <p className="text-xs text-crit">✕ {error}</p>}
+      {error && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{error}</p>}
     </div>
   );
 }
@@ -285,8 +285,8 @@ function RateModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
   const [comment, setComment] = useState(j.rating?.comment ?? "");
   const [tried, setTried] = useState(false);
   return (
-    <Modal open onClose={() => onClose()} title={t(j.rating ? "Edit rating {job}" : "Confirm & rate {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => onClose()}>{t("Not now")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!stars) return; run(() => rateJob(j.id, j.version, stars as 1 | 2 | 3 | 4 | 5, tags, comment), t("Thanks — rating saved"), () => onClose(t(j.rating ? "Thanks — rating updated ({stars}★)." : "Thanks — job confirmed and rated ({stars}★).", { stars })), onFail); }}>{t(j.rating ? "Save rating" : "Confirm & submit")}</Btn></>}>
-      <Field label={t("How was the service? (required)")} error={tried && !stars ? t("Choose 1–5 stars") : undefined}><div className="flex gap-1 text-2xl">{[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" aria-label={t("{n} stars", { n })} aria-pressed={n === stars} onClick={() => setStars(n)} className={n <= stars ? "text-[#f59e0b]" : "text-line"}>★</button>)}</div></Field>
+    <Modal open onClose={() => onClose()} title={t(j.rating ? "Edit rating {job}" : "Confirm & rate {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => onClose()}>{t("Not now")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!stars) return; run(() => rateJob(j.id, j.version, stars as 1 | 2 | 3 | 4 | 5, tags, comment), t("Thanks — rating saved"), () => onClose(t(j.rating ? "Thanks — rating updated ({stars} of 5 stars)." : "Thanks — job confirmed and rated ({stars} of 5 stars).", { stars })), onFail); }}>{t(j.rating ? "Save rating" : "Confirm & submit")}</Btn></>}>
+      <Field label={t("How was the service? (required)")} error={tried && !stars ? t("Choose 1–5 stars") : undefined}><div className="flex gap-1 text-2xl">{[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" aria-label={t("{n} stars", { n })} aria-pressed={n === stars} onClick={() => setStars(n)} className={n <= stars ? "text-[#f59e0b]" : "text-line"}><Icon name="star" filled /></button>)}</div></Field>
       {/* the tags are stored in English (the API's values); only their labels follow the language */}
       <Field label={t("What went well? (optional)")}><div className="flex flex-wrap gap-1.5">{RATING_TAGS.map((tag) => <button key={tag} type="button" aria-pressed={tags.includes(tag)} onClick={() => setTags((s) => (s.includes(tag) ? s.filter((x) => x !== tag) : [...s, tag]))} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", tags.includes(tag) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(tag)}</button>)}</div></Field>
       {stars > 0 && stars <= 2 && <Banner tone="warn">{t("What went wrong? You can also “Report a problem” — HQ then looks at it as a follow-up.")}</Banner>}
