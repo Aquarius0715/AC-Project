@@ -47,17 +47,36 @@ type jobRow struct {
 	preferred  []Slot
 	scheduled  *Slot
 	assignment *uuid.UUID
+	version    int
 }
 
 // lock loads a job for update without the role scope (callers apply their own rules) and checks the version.
 func (m Delivery) lock(ctx context.Context, c *ops.Call, id uuid.UUID) (jobRow, error) {
+	r, err := m.load(ctx, c, id)
+	if err != nil {
+		return r, err
+	}
+	return r, r.current(c)
+}
+
+// current checks the expected version of a loaded job (CONFLICT).
+func (r jobRow) current(c *ops.Call) error {
+	if r.version != *c.ExpectedVersion {
+		return apperr.E(apperr.Conflict, "error.versionConflict")
+	}
+	return nil
+}
+
+// load locks a job for update like lock, without the version. A handler whose scope check needs the row checks the
+// scope first and the version after it (current), so a caller outside the scope gets NOT_FOUND / FORBIDDEN for any
+// version and learns nothing of the job (IR366).
+func (m Delivery) load(ctx context.Context, c *ops.Call, id uuid.UUID) (jobRow, error) {
 	var r jobRow
-	var v int
 	var pref []byte
 	var ss, se *time.Time
 	err := c.Tx.QueryRow(ctx, `SELECT status, unit_id, contractor_org_id, plan_id, occurrence_at, lower(requested_slot), upper(requested_slot), preferred_slots,
 		lower(scheduled_slot), upper(scheduled_slot), assignment_id, version FROM maintenance.jobs WHERE id = $1 FOR UPDATE`, id).
-		Scan(&r.status, &r.unit, &r.contractor, &r.planID, &r.occurrence, &r.requested.StartAt, &r.requested.EndAt, &pref, &ss, &se, &r.assignment, &v)
+		Scan(&r.status, &r.unit, &r.contractor, &r.planID, &r.occurrence, &r.requested.StartAt, &r.requested.EndAt, &pref, &ss, &se, &r.assignment, &r.version)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return r, apperr.E(apperr.NotFound, "error.notFound")
 	}
@@ -69,9 +88,6 @@ func (m Delivery) lock(ctx context.Context, c *ops.Call, id uuid.UUID) (jobRow, 
 	}
 	if err := unmarshalSlots(pref, &r.preferred); err != nil {
 		return r, err
-	}
-	if v != *c.ExpectedVersion {
-		return r, apperr.E(apperr.Conflict, "error.versionConflict")
 	}
 	return r, nil
 }
@@ -439,7 +455,7 @@ func (in *AssignInput) Validate() map[string]string {
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/assign [post]
 func (m Delivery) assign(ctx context.Context, c *ops.Call, in *AssignInput) (Job, error) {
-	r, err := m.lock(ctx, c, in.JobID)
+	r, err := m.load(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
 	}
@@ -463,6 +479,9 @@ func (m Delivery) assign(ctx context.Context, c *ops.Call, in *AssignInput) (Job
 		}
 	} else if r.contractor != nil {
 		return Job{}, apperr.E(apperr.Forbidden, "errors.internal_job_only")
+	}
+	if err := r.current(c); err != nil {
+		return Job{}, err
 	}
 	if err := m.checkTechnician(ctx, c, r.unit, in.TechnicianMembershipID, contractor, nil); err != nil {
 		return Job{}, err

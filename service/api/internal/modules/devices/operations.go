@@ -33,7 +33,9 @@ type devState struct {
 	firmware   string
 }
 
-// lockDevice loads the device for update and checks the expected version (NOT_FOUND / CONFLICT).
+// lockDevice loads the device for update (NOT_FOUND). The handler checks the caller's scope on the device's unit first
+// and the expected version after it (current), so a caller outside the scope gets NOT_FOUND / FORBIDDEN for any
+// version and learns nothing of the device (IR366).
 func lockDevice(ctx context.Context, c *ops.Call, id uuid.UUID) (devState, error) {
 	var s devState
 	err := c.Tx.QueryRow(ctx, `SELECT unit_id, target_unit_id, created_by_membership_id, version, connection, tamper, firmware_version
@@ -44,10 +46,15 @@ func lockDevice(ctx context.Context, c *ops.Call, id uuid.UUID) (devState, error
 	if err != nil {
 		return s, err
 	}
-	if c.ExpectedVersion != nil && s.version != *c.ExpectedVersion {
-		return s, apperr.E(apperr.Conflict, "error.versionConflict")
-	}
 	return s, nil
+}
+
+// current checks the expected version of a locked device (CONFLICT).
+func (s devState) current(c *ops.Call) error {
+	if c.ExpectedVersion != nil && s.version != *c.ExpectedVersion {
+		return apperr.E(apperr.Conflict, "error.versionConflict")
+	}
+	return nil
 }
 
 // exclusive applies D05 on a unit: no queued/running DeviceOperation for its device and no in-flight control work.
@@ -137,6 +144,16 @@ func (m *Module) bind(ctx context.Context, c *ops.Call, in *BindInput) (DeviceDe
 	}
 	s, err := lockDevice(ctx, c, in.DeviceID)
 	if err != nil {
+		return DeviceDetail{}, err
+	}
+	// a technician moves a bound device only from a unit of an assignment of theirs as well: the unit it leaves is in
+	// scope too, and DD-T11 rejects an unauthorized rebinding (IR366)
+	if s.unit != nil && *s.unit != in.UnitID && c.Principal.Role == "technician" {
+		if err := m.UnitAccess.TechnicianUnit(ctx, c, *s.unit, false, false); err != nil {
+			return DeviceDetail{}, err
+		}
+	}
+	if err := s.current(c); err != nil {
 		return DeviceDetail{}, err
 	}
 	if s.unit != nil && *s.unit == in.UnitID {
@@ -234,6 +251,9 @@ func (m *Module) startOperation(ctx context.Context, c *ops.Call, device uuid.UU
 		return DeviceOperation{}, apperr.E(apperr.Conflict, "error.deviceNotBound")
 	}
 	if err := m.technicianGate(ctx, c, jobID, *s.unit); err != nil {
+		return DeviceOperation{}, err
+	}
+	if err := s.current(c); err != nil {
 		return DeviceOperation{}, err
 	}
 	if kind == "firmware" {
@@ -453,6 +473,9 @@ func (m *Module) calibrate(ctx context.Context, c *ops.Call, in *CalibrateInput)
 		return CalibrationRecord{}, apperr.E(apperr.Conflict, "error.deviceNotBound")
 	}
 	if err := m.technicianGate(ctx, c, in.JobID, *s.unit); err != nil {
+		return CalibrationRecord{}, err
+	}
+	if err := s.current(c); err != nil {
 		return CalibrationRecord{}, err
 	}
 	var metric, unit string

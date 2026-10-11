@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.249.0 (2026-10-11): IR366 authorization by target (backend Go design 0.38.0, DD-T 0.45.0); counts unchanged.
 # 0.248.0 (2026-10-11): IR365 sort direction checked where it is used (backend Go design 0.37.0); counts unchanged.
 # 0.247.0 (2026-10-11): IR364 dependency advisories (backend architecture 0.43.0); counts unchanged.
 # 0.246.0 (2026-10-11): IR363 backend Go design as built (0.36.0); counts unchanged.

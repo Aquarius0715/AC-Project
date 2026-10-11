@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND-GO
-version: 0.37.0
+version: 0.38.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -220,7 +220,7 @@ func RegisterAssets(r *ops.Registry) {
 
 Rules every handler follows:
 
-1. **Visibility first.** A target that does not exist or is outside the caller's scope is NOT_FOUND, never FORBIDDEN (D01). Zero affected rows on a scoped insert or update means NOT_FOUND unless a version mismatch is confirmed, which is CONFLICT.
+1. **Visibility first.** A target that does not exist or is outside the caller's scope is NOT_FOUND, never FORBIDDEN (D01). Zero affected rows on a scoped insert or update means NOT_FOUND unless a version mismatch is confirmed, which is CONFLICT. As built (IR366): the scope comes before the expected version and before any stored result. A lock that a scope check needs only loads the row (`Delivery.load`, `lockDevice`); the handler checks the scope, then the version. A caller outside the scope gets the same refusal for any version and input.
 2. **Versions.** Updates use `WHERE id = $1 AND version = $2` and `version = version + 1`; aggregates with child rows lock the parent with `SELECT … FOR UPDATE` first.
 3. **State machines.** A status change is an update guarded by the states it may leave (`WHERE status IN (…)`). An illegal or concurrent transition changes no row and answers CONFLICT with a message key from the DD tables (for example Command, MaintenanceJob, Restriction in [common design §5](common.md#5-state-transitions-and-consistency)).
 4. **Time.** `c.Now` (UTC) is the only clock: the business clock, which `platform/democlock` shifts in demo runs; tests inject a fixed clock. Pools scan `timestamptz` in UTC so every Instant is serialized with `Z`, independent of the host time zone.
@@ -273,7 +273,7 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | Level | Tool | Scope |
 |---|---|---|
 | Unit tests | `go test` | Pure helpers (campaign waves, payout months, reminder stages, thresholds), validation rules that REST cannot reach, authorization predicates, the REST binding — table-driven, no I/O |
-| Integration tests | a local PostgreSQL 16 test database, reset per run (`make testdb`) | The operations with their SQL, RLS isolation (a second tenant sees nothing), constraints (overlap, one pending command, append-only audit), in one process and with the split services |
+| Integration tests | a local PostgreSQL 16 test database, reset per run (`make testdb`) | The operations with their SQL, RLS isolation (a second tenant sees nothing), constraints (overlap, one pending command, append-only audit), in one process and with the split services. Authorization by target: every operation a client, contractor or technician may call, tried with another party's records and a stale version (`TestForeignTargets`, IR366) |
 | API tests | `httptest` + Echo | Status mapping, idempotency replay, version conflicts, HQ-network rule, owner-only rules; every SQL statement of a module runs in at least one test, checked on the coverage profile after `make cover` (IR311) |
 | Contract tests | generated from the catalog | Every operation registered once, mode and authorization match the catalog, inputs reject unknown fields; each operation's input rules answer VALIDATION before authorization (`TestRequiredInputs`, IR307) |
 | Acceptance tests | `test/acceptance` | AT-* cases from the requirement documents replayed against the API with fixture-contract.json seeds and a fixed clock (the same cases that drive the Phase 1A mock) |
@@ -296,4 +296,4 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | OPEN-GO-01 | Final choice of the TypeScript → Go contract generator (output reviewed for union types such as `UnitAction` and `Policy`) |
 | OPEN-GO-02 | WhatsApp provider SDK (depends on OPEN-BE-04) |
 
-Additional contracts for current version 0.37.0: Read IR01–IR365 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.38.0: Read IR01–IR366 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

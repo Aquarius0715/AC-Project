@@ -334,7 +334,7 @@ func (in *RespondInput) Validate() map[string]string {
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/slot-proposals/{proposalId}/respond [post]
 func (m Proposals) respond(ctx context.Context, c *ops.Call, in *RespondInput) (Job, error) {
-	r, err := m.Delivery.lock(ctx, c, in.JobID)
+	r, err := m.Delivery.load(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
 	}
@@ -344,6 +344,9 @@ func (m Proposals) respond(ctx context.Context, c *ops.Call, in *RespondInput) (
 	}
 	if org != c.Principal.OrgID {
 		return Job{}, apperr.E(apperr.NotFound, "error.notFound")
+	}
+	if err := r.current(c); err != nil {
+		return Job{}, err
 	}
 	var status, source string
 	var slot Slot
@@ -489,7 +492,7 @@ func (in *RescheduleInput) Validate() map[string]string {
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/request-reschedule [post]
 func (m Proposals) requestReschedule(ctx context.Context, c *ops.Call, in *RescheduleInput) (Job, error) {
-	r, err := m.Delivery.lock(ctx, c, in.JobID)
+	r, err := m.Delivery.load(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
 	}
@@ -500,6 +503,9 @@ func (m Proposals) requestReschedule(ctx context.Context, c *ops.Call, in *Resch
 	}
 	if org != c.Principal.OrgID {
 		return Job{}, apperr.E(apperr.NotFound, "error.notFound")
+	}
+	if err := r.current(c); err != nil {
+		return Job{}, err
 	}
 	if origin != "periodic_plan" || (r.status != "offered" && r.status != "accepted" && r.status != "assigned") {
 		return Job{}, apperr.E(apperr.Conflict, "error.invalidState")

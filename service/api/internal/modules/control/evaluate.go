@@ -472,20 +472,29 @@ func (m Automations) decide(ctx context.Context, c *ops.Call, unit uuid.UUID, in
 
 // prepare authorizes the caller for every target unit (D02: out of scope NOT_FOUND) and merges the facts.
 func (m Automations) prepare(ctx context.Context, c *ops.Call, in *EvaluationInput) (map[string]Fact, error) {
-	for _, u := range in.UnitIDs {
-		t, found, err := m.Units.Target(ctx, c, u)
-		if err != nil {
-			return nil, err
-		}
-		if !found || (c.Principal.Role == "client" && t.OrgID != c.Principal.OrgID) {
-			return nil, apperr.E(apperr.NotFound, "error.notFound")
-		}
+	if err := m.targets(ctx, c, in); err != nil {
+		return nil, err
 	}
 	facts := map[string]Fact{}
 	for _, f := range in.Facts {
 		facts[f.UnitID.String()+"/"+f.Metric] = f
 	}
 	return facts, nil
+}
+
+// targets checks that the caller may evaluate every target unit: one outside the tenant, or a client's unit of another
+// customer, is NOT_FOUND (D02).
+func (m Automations) targets(ctx context.Context, c *ops.Call, in *EvaluationInput) error {
+	for _, u := range in.UnitIDs {
+		t, found, err := m.Units.Target(ctx, c, u)
+		if err != nil {
+			return err
+		}
+		if !found || (c.Principal.Role == "client" && t.OrgID != c.Principal.OrgID) {
+			return apperr.E(apperr.NotFound, "error.notFound")
+		}
+	}
+	return nil
 }
 
 // evaluate decides every unit; fire creates the winners' Commands (one per rule, unit and trigger: a schedule
@@ -643,6 +652,11 @@ func (m Automations) simulate(ctx context.Context, c *ops.Call, in *EvaluationIn
 //	@Security		BearerAuth
 //	@Router			/v1/automations/fire [post]
 func (m Automations) fire(ctx context.Context, c *ops.Call, in *EvaluationInput) (Result, error) {
+	// the target units first: a stored result is returned only after authorization (IR21), and a caller outside the
+	// units' scope gets NOT_FOUND, not the result of another caller's identical input or a tick CONFLICT (IR366)
+	if err := m.targets(ctx, c, in); err != nil {
+		return Result{}, err
+	}
 	norm, _ := json.Marshal(struct {
 		O time.Time
 		U []uuid.UUID

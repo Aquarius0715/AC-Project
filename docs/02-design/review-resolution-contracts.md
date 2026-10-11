@@ -5412,3 +5412,33 @@ The second security check reviewed the SQL the Core API puts together in code (`
    - `TestOrderByDirection` checks asc and desc. It refuses `DESC`, an empty direction, `sideways` and two injection strings (`desc, (SELECT pg_sleep(5))` and `asc; DROP TABLE x --`). Without the fix it fails, and the injected text appears in the ORDER BY.
    - The query catalog test sends `desc, (SELECT 1)` with every allowed sort field of every list operation (48 operations), and expects 422 on `sort.direction` (or `query.sort.direction`).
 4. **Checks.** `make test-all` and the E2E suite pass.
+
+## IR366 Authorization by target (IDOR): every scoped operation tried with another party's records — 2026-10-11
+
+The third security check reviewed authorization by target: can a client, a contractor or a technician reach another customer's, contractor's or assignment's record by naming its ID?
+
+1. **The check.** The integration test `TestForeignTargets` calls each operation that a role other than admin may call. The caller is someone the target does not belong to:
+   - customer B on customer A's units, devices, alerts, commands, invoices, jobs, reports, policies, automations, client users, quotes and notifications;
+   - contractor B on contractor A's job, offer, technician, certificate and payout statement;
+   - technician B on a job assigned to the internal technician;
+   - HQ and customer A on a unit of another tenant.
+
+   Each request is valid in every other way, so only the scope check can refuse it, with FORBIDDEN or NOT_FOUND (114 calls). Every write is sent again with a stale version and must get the same refusal.
+   - Lists are asked with filters that name the foreign records, and they return none of them (39 lists). A summary filtered to a foreign unit counts nothing.
+   - A catalog check keeps the table complete. Each of the 127 operations with a role other than admin is called (107), or named with the reason it takes no foreign target (20: own session, own membership, demo panel, the recipient's own inbox).
+2. **Findings and fixes.**
+   - **A technician could move another unit's device.** `devices.bind` checked the technician's assignment only for the unit the device moves to, not for the unit it leaves. A technician with any active job could bind a device of another customer's unit to their own job's unit, and that customer's unit lost its device. DD-T11 rejects an unauthorized rebinding. The unit a bound device leaves now also needs an assignment of the technician whose work window contains now; otherwise NOT_FOUND. A technician can still move a device between two units of their own assignments, and bind an unbound device.
+   - **`automations.fire` returned stored results before authorization.** It answered two cases before checking the target units: a replay of an event, and the same input reused in the same tick (D02). Customer B, sending customer A's unit with the same input in the same minute, got A's evaluation result, with A's decisions and policy IDs. Other facts got the tick CONFLICT. IR21 returns a stored result only after authorization. The target units are now checked first, and a caller outside their scope gets NOT_FOUND.
+   - **The version came before the scope.** Six writes compared `X-Expected-Version` before the scope check: `jobs.respondProposal`, `jobs.requestReschedule`, `jobs.assign`, `devices.check`, `devices.calibrate` and `devices.updateFirmware`.
+     - A caller outside the scope got CONFLICT for a stale version and NOT_FOUND for a record that does not exist. So the answer told them the record existed, and trial and error told them its version. No data and no change were reachable.
+     - The job lock (`Delivery.load`) and the device lock now only load the row. The handler checks its scope, then the version (`current`).
+   - **Checked and in order:**
+     - the Idempotency-Key replay is keyed by tenant, membership and key;
+     - `writes.getResult` answers NOT_FOUND for another member's key;
+     - `voice.resolveIntent` refuses a selected unit outside the caller's candidates;
+     - `diagnosticRuns.list` shows another technician's runs to no one.
+3. **Tests.**
+   - `TestTechnicianRebind`: a device on a unit outside the technician's assignments stays where it is, for any version. A device moves between two units of the technician's own assignments, and an unbound device binds.
+   - `TestFireAuthorizesFirst`: customer B gets NOT_FOUND for A's event, for A's input under another event, and for other facts in the same minute. A's own retry still gets its result.
+   - Without the fixes the tests fail: the device moves, B gets A's evaluation result, and the six writes answer CONFLICT.
+4. **Checks.** `make test-all` and the E2E suite pass.
