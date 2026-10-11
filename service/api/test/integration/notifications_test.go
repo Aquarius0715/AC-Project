@@ -166,6 +166,36 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	if code, _ := post(s, &customerB, "notifications.recipients", `{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","query":{}}`); code != 404 {
 		t.Error("unit of another customer")
 	}
+	// IR345: an HQ member who reads units without alert.read is a recipient of other unit notices, never of an alert —
+	// policies.save would refuse them (IR120 item 3)
+	assetOnly := uuid.NewString()
+	owner(t, `INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, valid_from) VALUES ($1,$2,$3,$4,'admin',$5)`,
+		assetOnly, seed.ID("tenant-a"), newUser(t), seed.ID("org-operator-a"), clock.Add(-time.Hour))
+	owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1,$2,'asset.read')`, seed.ID("tenant-a"), assetOnly)
+	t.Cleanup(func() {
+		owner(t, `UPDATE identity.memberships SET valid_until = valid_from + interval '1 second' WHERE id = $1`, assetOnly)
+	})
+	listed := func(template string) (hqOperator, asset bool) {
+		t.Helper()
+		code, m := post(s, &hq, "notifications.recipients", `{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"`+template+`","channel":"inApp","role":"admin","query":{"limit":100}}`)
+		if code != 200 {
+			t.Fatalf("%s recipients: %d %v", template, code, m)
+		}
+		for _, r := range items(m) {
+			hqOperator = hqOperator || r["id"] == seed.ID("hq-operator").String()
+			asset = asset || r["id"] == assetOnly
+		}
+		return
+	}
+	if op, asset := listed("alert"); !op || asset {
+		t.Errorf("alert recipients: hq-operator %v, asset.read only %v", op, asset)
+	}
+	if _, asset := listed("quality"); !asset {
+		t.Error("a unit notice other than an alert reaches asset.read")
+	}
+	if code, m := post(s, &hq, "notifications.preview", `{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","recipientMembershipId":"`+assetOnly+`"}`); code != 422 || fields(m) != "recipientMembershipId=errors.recipient_ineligible" {
+		t.Errorf("alert preview for asset.read only: %d %s", code, fields(m))
+	}
 }
 
 func TestPreferencesAndConsents(t *testing.T) {

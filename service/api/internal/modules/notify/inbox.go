@@ -411,13 +411,22 @@ const recipientsSQL = `SELECT m.id, m.role, u.display_name,
 	    OR (NOT $5 AND $3 = 'job' AND m.role = 'contractor' AND m.organization_id IN (SELECT o.contractor_org_id FROM notify.ref_offers o WHERE o.job_id = $4))
 	    OR (NOT $5 AND $3 = 'job' AND m.role = 'technician' AND m.id IN (SELECT a.technician_membership_id FROM notify.ref_assignments a WHERE a.job_id = $4 AND a.status = 'active')))`
 
+// adminPerms are the permissions that make an HQ member a recipient: one that reads the target kind (IR142); for an
+// alert about a unit only alert.read, as for the recipients an alert policy may notify (IR120 item 3, IR345).
+func adminPerms(in *TargetInput) []string {
+	if in.TemplateKey == "alert" && in.Target.Kind == "unit" {
+		return []string{"alert.read"}
+	}
+	return adminKinds[in.Target.Kind]
+}
+
 func recipients(ctx context.Context, c *ops.Call, in *TargetInput, t target, role *string) ([]Recipient, error) {
 	var org uuid.UUID
 	if t.org != nil {
 		org = *t.org
 	}
 	q := "SELECT * FROM (" + recipientsSQL + ") r(id, role, label, channels) WHERE $7 = ANY(r.channels)"
-	args := []any{c.Now, org, in.Target.Kind, in.Target.ID, in.TemplateKey == "payment_reminder", adminKinds[in.Target.Kind], in.Channel}
+	args := []any{c.Now, org, in.Target.Kind, in.Target.ID, in.TemplateKey == "payment_reminder", adminPerms(in), in.Channel}
 	if role != nil {
 		q += " AND r.role = $8"
 		args = append(args, *role)

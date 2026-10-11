@@ -99,7 +99,7 @@ function Reports({ live, r }: { live: MRVLive; r: NonNullable<MRVLive["reports"]
         <Btn size="sm" disabled={from === r.scope.from && to === r.scope.to} onClick={() => nav({ from: from || null, to: to || null, reportId: null, reportVersion: null })}>{t("Apply")}</Btn>
       </div>
       <div className="split-rev">
-        <Card title={t("Scope 2 reports")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => openDraft()}>{t("+ New")}</Btn>} className="self-start">
+        <Card title={t("Scope 2 reports")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => openDraft()}>{t("+ New report")}</Btn>} className="self-start">
           {r.rows.length === 0 ? <EmptyState title={t("No reports")}>{t("No report matches these filters.")}</EmptyState> : <div className="flex flex-col gap-2">{r.rows.map((x) => <ListRow key={x.id} selected={sel?.report.id === x.id} onClick={() => nav({ reportId: x.id, reportVersion: null })}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)} · v{x.version}</b><Badge tone={x.status === "demo_reviewed" ? "ok" : "muted"}>{x.status === "demo_reviewed" ? t("Demo reviewed") : t("Draft")}</Badge></div><div className="text-[11px] text-muted">{x.org} · {x.units} · {x.period}</div><div className={`text-[11px] ${x.incomplete ? "text-warn" : "text-muted"}`}>{x.result}</div></div></ListRow>)}</div>}
           <p className="mt-3 text-[11px] text-muted">{t("Every report is a demo — “Demo — unverified”. A demo review is not external certification.")}</p>
         </Card>
@@ -166,7 +166,7 @@ function Factors({ live }: { live: MRVLive }) {
   const err = (k: string) => (tried ? errors[k] : undefined);
   return (
     <div className="split-rev">
-      <Card title={t("Emission factors")} action={live.canFactors && <Btn size="sm" onClick={() => setSelId("new")}>{t("+ New")}</Btn>} className="self-start">
+      <Card title={t("Emission factors")} action={live.canFactors && <Btn size="sm" onClick={() => setSelId("new")}>{t("+ New factor")}</Btn>} className="self-start">
         {live.factors.length === 0 ? <EmptyState title={t("No factors")}>{t("Add a demo factor.")}</EmptyState> : <div className="flex flex-col gap-2">{live.factors.map((f) => <ListRow key={f.id} selected={sel?.id === f.id} onClick={() => setSelId(f.id)}><div className="min-w-0"><b className="text-[13px]">{f.region} · {f.year}</b><div className="text-[11px] text-muted">v{f.version} · {f.kgCO2ePerKWh} kgCO₂e/kWh</div></div></ListRow>)}</div>}
         <p className="mt-3 text-[11px] text-muted">{t("Demo factors only — not real regional factors. One current factor per region and year.")}</p>
       </Card>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adminAlertRows, alertPolicyInput, HQ_METRICS, policyErrors, policyRows, recoveryError, type ApiAdminAlert, type ApiPolicy } from "@ac/web/lib/adminAlerts";
+import { adminAlertRows, alertPolicyInput, HQ_METRICS, newPolicyDraft, policyChanges, policyErrors, policyRows, recoveryError, type ApiAdminAlert, type ApiPolicy } from "@ac/web/lib/adminAlerts";
 import { i18nOf } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
@@ -53,6 +53,36 @@ describe("HQ alerts and alert policies", () => {
     });
     expect([recoveryError("lte", 350, 380), recoveryError("lt", 350, 300)]).toEqual([undefined, "Recovery 300 must be above the 350 threshold (direction for <)"]);
     expect(HQ_METRICS).toEqual(["temperature", "humidity", "co2", "pm25", "refrigerant_pressure", "vibration", "power"]); // IR66 item 3
+    // IR120 item 3: a whole priority 0–100 and 1–20 recipients
+    expect(policyErrors({ ...p, priority: 50.5, recipients: [] })).toEqual({ priority: "A whole number 0–100", recipients: "Add at least one recipient" });
+    expect(policyErrors({ ...p, priority: 101, recipients: Array.from({ length: 21 }, (_, n) => ({ id: `m-${n}`, label: "", role: "" })) })).toEqual({ priority: "A whole number 0–100", recipients: "At most 20 recipients" });
+  });
+
+  it("names who made a policy and the units it is attached to (Figma 38:5, IR345)", () => {
+    const [r] = policyRows([policy({ ownerMembershipId: "m-hq" })], customers, [{ id: "m-hq", displayName: "hq-operator", role: "admin" }], undefined, [{ id: "u1", displayName: "Bedroom AC" }]);
+    expect([r.madeBy, r.unitIds, r.unitNames]).toEqual(["hq-operator", ["u1", "u2"], ["Bedroom AC", "u2"]]); // a unit the list does not hold keeps its ID
+    expect(policyRows([policy({ ownerMembershipId: "m-gone" })], customers, [])[0].madeBy).toBe(""); // members unreadable
+  });
+
+  it("starts a new policy as DD-A05 says and creates it without an id (IR345)", () => {
+    const d = newPolicyDraft({ id: "c-a", name: "Demo Customer A" }, "Asia/Tokyo");
+    expect([d.id, d.version, d.kind, d.customerId, d.group, d.timezone, d.on, d.priority, d.channels, d.recipients, d.unitIds]).toEqual(["", 0, "alert", "c-a", "DEMO CUSTOMER A", "Asia/Tokyo", false, 50, ["inApp"], [], []]);
+    expect(policyErrors(d)).toEqual({ name: "1–120 characters", recipients: "Add at least one recipient" });
+    const input = alertPolicyInput({ ...d, name: "Too hot", recipients: [{ id: "m-1", label: "customer-a", role: "client" }] });
+    expect(input).not.toHaveProperty("id");
+    expect(input).toEqual({
+      kind: "alert", name: "Too hot", timezone: "Asia/Tokyo", enabled: false, priority: 50, customerId: "c-a", metric: "temperature", operator: "gte", threshold: 30, recoveryThreshold: 28,
+      durationSeconds: 60, activeWindow: null, severity: "warning", recipientMembershipIds: ["m-1"], channels: ["inApp"], escalateAfterMinutes: 60, cooldownMinutes: 5,
+    });
+  });
+
+  it("names what a draft changes against the saved policy", () => {
+    const p = policyRows([policy({})], customers, [{ id: "m-1", displayName: "customer-a", role: "client" }])[0];
+    expect(policyChanges(p, p)).toEqual([]);
+    expect(policyChanges({ ...p, channels: ["inApp"] }, { ...p, channels: ["inApp"] })).toEqual([]);
+    expect(policyChanges({ ...p, on: false, threshold: 31, recipients: [], channels: ["email", "inApp"], escalate: 30 }, p)).toEqual(["Enabled", "Condition", "Recipients", "Channels", "Escalation"]);
+    expect(policyChanges({ ...p, channels: ["email", "inApp"] }, { ...p, channels: ["inApp", "email"] })).toEqual([]); // the order of the channels does not matter
+    expect(policyChanges({ ...p, name: "x", cooldown: 9 }, p, MS.t)).toEqual(["Nama", "Tempoh bertenang"]);
   });
 });
 

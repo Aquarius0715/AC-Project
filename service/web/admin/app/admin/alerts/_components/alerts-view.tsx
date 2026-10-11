@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Textarea, Timeline, LineChart, useToast, cx } from "@ac/web/components/ui";
+import { Btn, Card, EmptyState, Field, ListRow, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Textarea, Timeline, useToast, cx } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { EvidencePicker } from "@ac/web/components/EvidencePicker";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
@@ -11,8 +11,9 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { evidenceProblem, evidenceRefusal, evidenceRows, type ApiEvidenceCandidate } from "@ac/web/lib/alertEvidence";
 import { invalidate, useNow, useOp } from "@ac/web/lib/useOp";
-import { HQ_METRICS, metricLabel, opSymbol, policyErrors, type AdminAlert, type AdminPolicy, type AlertState, type Channel, type Severity } from "@ac/web/lib/adminAlerts";
-import { acknowledgeAlert, resolveAlert, savePolicy, type ActionResult } from "../actions";
+import type { AdminAlert, AdminPolicy, AlertState, Severity } from "@ac/web/lib/adminAlerts";
+import { acknowledgeAlert, resolveAlert, type ActionResult } from "../actions";
+import { demoCustomers, NewPolicyModal, PoliciesTab, seedPolicies, type PoliciesLive, type PolicySel } from "./policies-tab";
 import { ScopeBar } from "../../jobs/_components/jobs-header";
 
 const ST: Record<AlertState, string> = { open: "Open", acknowledged: "Acknowledged", resolved: "Resolved" };
@@ -43,22 +44,9 @@ const demoEvidence: ApiEvidenceCandidate[] = [
   { id: "measurement-0920", kind: "remeasurement", observedAt: "2026-09-14T01:20:00Z", metric: "temperature", value: 26.4, unit: "°C", origin: "measured", quality: "valid", eventType: null },
   { id: "measurement-0910", kind: "remeasurement", observedAt: "2026-09-14T01:10:00Z", metric: "temperature", value: 26.9, unit: "°C", origin: "measured", quality: "valid", eventType: null },
 ];
-const demoRecipients = [{ id: "customer-a", label: "customer-a", role: "client" }, { id: "hq-operator", label: "hq-operator", role: "admin" }];
-const demoPolicy = (id: string, name: string, sub: string, metric: string, threshold: number, recovery: number, duration: number, on: boolean, units: string): AdminPolicy => ({
-  id, version: 1, kind: "alert", name, group: "CUSTOMER-A", sub, on, units, customerId: "customer-a", customerName: "customer-a", priority: 50, timezone: "Asia/Kuala_Lumpur",
-  metric, operator: "gte", threshold, recovery, duration, severity: "warning", cooldown: 5, escalate: 60, channels: ["inApp", "email"], recipients: demoRecipients,
-  recipientIds: [], activeWindow: null,
-});
-const seedPolicies: AdminPolicy[] = [
-  { ...demoPolicy("policy-default", "Default policy", "6 rules · ventilation (CO₂, PM2.5) + fault causes", "co2", 1000, 900, 600, true, "every unit"), kind: "default_alert", group: "DEFAULT · ON EVERY UNIT", customerId: null },
-  demoPolicy("policy-temp-a", "Bedroom too hot", "Temperature ≥ 30 °C for 60 s", "temperature", 30, 28, 60, true, "2 units"),
-  demoPolicy("policy-co2-a", "Stuffy office", "CO₂ ≥ 1200 ppm · 15 min · weekdays", "co2", 1200, 1000, 900, true, "2 units"),
-  demoPolicy("policy-humidity-a", "Night humidity", "Humidity ≥ 70 % · 30 min · 22–06", "humidity", 70, 65, 1800, false, "0 units"),
-];
-
 type Scope = { customers: { id: string; name: string }[]; properties: { id: string; name: string }[]; units: { id: string; name: string }[] };
 type Query = { customerId?: string; propertyId?: string; unitId?: string; severity: Severity | null; status: AlertState; alertId: string | null };
-type Live = { tab: "alerts" | "policies"; q: Query; scope: Scope; scopeName: string | null; alerts: AdminAlert[]; policies: AdminPolicy[] };
+type Live = { tab: "alerts" | "policies"; q: Query; scope: Scope; scopeName: string | null; alerts: AdminAlert[]; policies: AdminPolicy[]; pol: PoliciesLive };
 
 /** HQ alerts and alert policies. `live` comes from the Server Component in API mode (writes are Server Actions that
  * re-render the route); the demo keeps its fixture rows in local state. Texts in the display language (IR292). */
@@ -86,6 +74,17 @@ export function AdminAlertsView({ live }: { live?: Live }) {
   const a = al.find((x) => x.id === (live ? live.q.alertId : demoAlertId)) ?? shown[0] ?? null;
   const pick = (id: string) => (live ? patch({ alertId: id }) : setDemoAlertId(id));
   const pickStatus = (s: AlertState) => (live ? patch({ status: s === "open" ? null : s, alertId: null }) : (setDemoStatus(s), setDemoAlertId(null)));
+  // policies: the selected one and a new one's owner customer, in the URL in API mode (DD-A05 items 5 and 8, IR345)
+  const [demoSel, setDemoSel] = useState<PolicySel>({ policyId: null, newFor: null });
+  const polSel: PolicySel = live ? { policyId: live.pol.policyId, newFor: live.pol.newFor } : demoSel;
+  const selectPolicy = (policyId: string | null, newFor: string | null = null) => (live ? patch({ policyId, new: newFor }) : setDemoSel({ policyId, newFor }));
+  const [asking, setAsking] = useState(false);
+  const startPolicy = (customerId: string) => {
+    setAsking(false);
+    if (live) return router.replace(`${pathname}?tab=policies&new=${customerId}`, { scroll: false });
+    setUrlTab("policies");
+    setDemoSel({ policyId: null, newFor: customerId });
+  };
   const [resolve, setResolve] = useState(false);
   const [reason, setReason] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
@@ -95,19 +94,6 @@ export function AdminAlertsView({ live }: { live?: Live }) {
   const evRows = evidenceRows(evidence.data, (now ?? new Date()).getTime(), i18n);
   const sendable = picked.filter((id) => evRows.some((r) => r.id === id)); // a refreshed list drops what is no longer a candidate
   const evProblem = a ? evidenceProblem(a.policyless, sendable, t) : null;
-
-  // policies: the editor holds a draft of the selected policy, restarted when the selection or its version changes
-  const pols = live ? live.policies : seedPolicies;
-  const [polId, setPolId] = useState<string | null>(null);
-  const p = pols.find((x) => x.id === polId) ?? pols.find((x) => x.kind === "alert") ?? pols[0] ?? null;
-  const [draft, setDraft] = useState<AdminPolicy | null>(p);
-  const [draftOf, setDraftOf] = useState(p ? `${p.id}@${p.version}` : "");
-  if (p && draftOf !== `${p.id}@${p.version}`) {
-    setDraftOf(`${p.id}@${p.version}`);
-    setDraft(p);
-  }
-  const set = <K extends keyof AdminPolicy>(k: K, v: AdminPolicy[K]) => setDraft((d) => (d ? { ...d, [k]: v } : d));
-  const errors = draft ? policyErrors(draft, t) : {};
 
   const act = (fn: () => Promise<ActionResult>, ok: string, after?: () => void, failed?: () => void) =>
     startTransition(async () => {
@@ -136,21 +122,16 @@ export function AdminAlertsView({ live }: { live?: Live }) {
     setResolve(false);
     toast(t("Alert resolved"));
   };
-  const save = () => {
-    setTried(true);
-    if (!draft || Object.keys(errors).length) return toast(t("Fix the validation errors first"), "crit");
-    if (live) return act(() => savePolicy(draft), t("Policy saved"), () => setTried(false));
-    toast(t("Policy saved"));
-  };
-  const toggleChannel = (c: Channel, on: boolean) => draft && set("channels", on ? [...new Set([...draft.channels, c])] : draft.channels.filter((x) => x !== c));
-  const groups = [...new Set(pols.map((x) => x.group))];
   const counts: [AlertState, number][] = [["open", al.filter((x) => x.state === "open").length], ["acknowledged", al.filter((x) => x.state === "acknowledged").length], ["resolved", al.filter((x) => x.state === "resolved").length]];
   const openish = al.filter((x) => x.state !== "resolved");
   const scopeName = live?.scopeName ?? t("all customers");
 
   return (
     <Page>
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "alerts", label: t("Alerts"), count: openish.length }, { id: "policies", label: t("Policies"), count: pols.length }]} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Tabs value={tab} onChange={setTab} tabs={[{ id: "alerts", label: t("Alerts"), count: openish.length }, { id: "policies", label: t("Policies"), count: (live ? live.policies : seedPolicies).length }]} />
+        {(live ? live.pol.canWrite : true) && <Btn size="sm" variant="primary" onClick={() => setAsking(true)}>{t("+ New policy")}</Btn>}
+      </div>
       {tab === "alerts" ? (
         <>
           {live && <ScopeBar scope={live.scope} q={live.q} text={t(al.length === 1 ? "1 alert in scope" : "{n} alerts in scope", { n: al.length })} clear="alertId" />}
@@ -201,33 +182,10 @@ export function AdminAlertsView({ live }: { live?: Live }) {
             )}
           </div>
         </>
-      ) : !p || !draft ? (
-        <Card title={t("Alert policies")}><EmptyState title={t("No alert policies")}>{t("Customers have no alert policies yet.")}</EmptyState></Card>
       ) : (
-        <div className="split-rev">
-          <Card title={t("Alert policies")} sub={t("by customer")} action={!live && <Btn size="sm" variant="primary" onClick={() => toast(t("New policy draft created"))}>{t("+ New")}</Btn>} className="self-start">
-            {groups.map((g) => <div key={g} className="mb-3"><div className="mb-1 text-[10px] font-bold tracking-wide text-muted">{g}</div><div className="flex flex-col gap-2">{pols.filter((x) => x.group === g).map((x) => <ListRow key={x.id} selected={p.id === x.id} onClick={() => { setPolId(x.id); setTried(false); }}><div className="min-w-0 flex-1"><b className="text-[13px]">{x.name}</b><div className="text-[11px] text-muted">{x.sub}</div><div className="text-[11px] text-muted">{x.units}{!x.on && ` · ${t("Off")}`}</div></div></ListRow>)}</div></div>)}
-          </Card>
-          <Card title={p.name} sub={`${p.id}${p.customerName ? ` · ${p.customerName}` : ""}`} action={<Badge tone={p.on ? "ok" : "muted"}>{t(p.on ? "Enabled" : "Disabled")}</Badge>}>
-            {p.kind === "default_alert" ? <Banner>{t("Default policy rules are set by HQ for every unit. Per-customer on/off is controlled by the customer.")}</Banner> : (
-              <div className="flex flex-col gap-5">
-                <section><h3 className="mb-2 text-[13px] font-bold">{t("Basics")}</h3><div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Name")} error={tried ? errors.name : undefined}><Input value={draft.name} onChange={(e) => set("name", e.target.value)} /></Field><Field label={t("Priority")} hint="0–100"><Input type="number" value={draft.priority} onChange={(e) => set("priority", +e.target.value)} /></Field><Field label={t("Timezone")} hint={t("The zone the policy’s active window is evaluated in")}><Select value={draft.timezone} onChange={(e) => set("timezone", e.target.value)}><option>Asia/Kuala_Lumpur</option></Select></Field></div></section>
-                <section><h3 className="mb-1 text-[13px] font-bold">{t("Owner & units")}</h3><p className="text-xs text-muted">{t("A policy belongs to one customer. Units pick it up on their own page (Customers & units › unit › Alert policies). Attached to {units} of {customer} · read-only here.", { units: p.units, customer: p.customerName })}</p></section>
-                <section><h3 className="mb-2 text-[13px] font-bold">{t("Condition")}</h3><p className="mb-2 text-xs text-muted">{t("Missing or stale readings never count toward the condition — they raise a data-quality notice instead.")}</p><div className="grid-fluid" style={{ ["--min" as string]: "130px" }}><Field label={t("Metric")}><Select value={draft.metric} onChange={(e) => set("metric", e.target.value)}>{HQ_METRICS.map((k) => <option key={k} value={k}>{t(metricLabel[k])}</option>)}</Select></Field><Field label={t("Alert when {op}", { op: opSymbol[draft.operator] })}><Input type="number" value={draft.threshold} onChange={(e) => set("threshold", +e.target.value)} /></Field><Field label={t("For (s)")} error={errors.duration}><Input type="number" value={draft.duration} onChange={(e) => set("duration", +e.target.value)} /></Field><Field label={t("Recover")} error={errors.recovery}><Input type="number" value={draft.recovery} onChange={(e) => set("recovery", +e.target.value)} /></Field></div>
-                  <div className="mt-2"><LineChart points={[20, 24, 28, 31, 32, 31, 29, 27, 25]} min={18} max={34} threshold={draft.threshold} height={90} /></div>
-                  <p className={cx("text-xs", errors.recovery ? "text-crit" : "text-ok")}>{errors.recovery ? `✕ ${errors.recovery}` : t("✓ Recovery {recovery} is on the safe side of the {threshold} threshold ({op})", { recovery: draft.recovery, threshold: draft.threshold, op: opSymbol[draft.operator] })}</p></section>
-                <section><h3 className="mb-1 text-[13px] font-bold">{t("Severity")}</h3><Choice value={draft.severity} onChange={(v) => set("severity", v)} options={[{ id: "normal", label: t("Info") }, { id: "warning", label: t("Warning") }, { id: "critical", label: t("Critical") }]} /><p className="mt-1 text-[11px] text-muted">{t("A severity change on an open alert counts as a new notification reason.")}</p></section>
-                <section><h3 className="mb-2 text-[13px] font-bold">{t("Notify")}</h3><p className="mb-2 text-xs text-muted">{t("Recipients come from notifications.recipients — only people allowed to see these units.")}</p>
-                  {draft.recipients.length === 0 ? <p className="text-xs text-muted">{t("No recipients.")}</p> : draft.recipients.map((r) => <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px]"><span><b>{r.label}</b><span className="block text-xs text-muted">{r.role}</span></span></div>)}
-                  <div className="flex flex-wrap gap-3 border-t border-line pt-2"><span className="text-xs text-muted">{t("Channels for every recipient:")}</span><Check label={t("In-app")} checked={draft.channels.includes("inApp")} onChange={(v) => toggleChannel("inApp", v)} /><Check label={t("Email")} checked={draft.channels.includes("email")} onChange={(v) => toggleChannel("email", v)} /><Check label="WhatsApp" checked={draft.channels.includes("whatsapp")} onChange={(v) => toggleChannel("whatsapp", v)} /></div>
-                  <p className="text-[11px] text-muted">{t("WhatsApp reaches only recipients who allowed that channel.")}</p></section>
-                <section className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Cooldown (min)")} hint={t("Same severity is not re-sent within this window (1–1440)")} error={errors.cooldown}><Input type="number" value={draft.cooldown} onChange={(e) => set("cooldown", +e.target.value)} /></Field><Field label={t("Escalate after (min)")} hint={t("Escalate if still unacknowledged (1–1440)")} error={errors.escalate}><Input type="number" value={draft.escalate} onChange={(e) => set("escalate", +e.target.value)} /></Field></section>
-                <div className="flex justify-end"><Btn variant="primary" disabled={pending} onClick={save}>{t("Save policy")}</Btn></div>
-              </div>
-            )}
-          </Card>
-        </div>
+        <PoliciesTab pols={live ? live.policies : seedPolicies} live={live?.pol} sel={polSel} select={selectPolicy} />
       )}
+      {asking && <NewPolicyModal customers={live ? live.pol.customers : demoCustomers} initial={live?.q.customerId} onClose={() => setAsking(false)} onStart={startPolicy} />}
       <Modal open={resolve} onClose={() => setResolve(false)} title={t("Resolve alert")} footer={<><Btn onClick={() => setResolve(false)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || evidence.loading} onClick={doResolve}>{t("Resolve alert")}</Btn></>}>
         {a && (
           <>

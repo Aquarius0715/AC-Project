@@ -447,7 +447,7 @@ function PoliciesTab({ c, run, pending }: { c: CustomerLive; run: Run; pending: 
   return (
     <>
       <Card title={t("Alert policies of {name}", { name: c.row.name })} sub={t("Policies belong to the customer. Each unit picks which of them it carries (unit edit › Alert policies). Air-quality limits are alert policies too.")}
-        action={<LinkBtn size="sm" variant="primary" href="/admin/alerts?tab=policies">{t("+ New policy for {name}", { name: c.row.name })}</LinkBtn>}>
+        action={<LinkBtn size="sm" variant="primary" href={`/admin/alerts?tab=policies&new=${c.row.id}`}>{t("+ New policy for {name}", { name: c.row.name })}</LinkBtn>}>
         <DataTable rows={c.policies} rowKey={(p) => p.id} onRowClick={(p) => router.push(`/admin/alerts?tab=policies&policyId=${p.id}`)} cols={[
           { key: "n", label: t("Policy"), render: (p) => <><b>{p.name}</b>{!p.enabled && <Badge className="ml-2">{t("Off")}</Badge>}</> },
           { key: "t", label: t("Type"), render: (p) => <Badge tone={p.kind === "default_alert" ? "primary" : "muted"}>{p.type}</Badge> },
@@ -651,7 +651,7 @@ function AttachModal({ c, unit, attached, pending, onClose, onSave }: { c: Custo
             </div>
           );
         })}
-        <p className="text-[11px] text-muted">{t("Disabled policies can be attached; they start alerting once enabled.")} <TextLink href="/admin/alerts?tab=policies">{t("+ New policy for {name}", { name: c.row.name })}</TextLink></p>
+        <p className="text-[11px] text-muted">{t("Disabled policies can be attached; they start alerting once enabled.")} <TextLink href={`/admin/alerts?tab=policies&new=${c.row.id}`}>{t("+ New policy for {name}", { name: c.row.name })}</TextLink></p>
       </div>
     </Modal>
   );

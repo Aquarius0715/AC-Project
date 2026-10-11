@@ -34,7 +34,9 @@ func TestFirmwareCampaignRunner(t *testing.T) {
 		t.Fatalf("schedule: %d %v", code, m)
 	}
 	camp := data(m)["id"].(string)
-	t.Cleanup(func() { owner(t, `UPDATE devices.firmware_campaigns SET state = 'aborted' WHERE id = $1 AND state <> 'completed'`, camp) })
+	t.Cleanup(func() {
+		owner(t, `UPDATE devices.firmware_campaigns SET state = 'aborted' WHERE id = $1 AND state <> 'completed'`, camp)
+	})
 	base, _ := time.Parse(time.RFC3339Nano, data(m)["createdAt"].(string)) // the server's business time
 	kl := time.FixedZone("MYT", 8*3600)
 	window := func(from, to int) { // the install window in whole Kuala Lumpur hours around base
@@ -230,7 +232,9 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 		t.Fatalf("schedule: %d %v", code, m)
 	}
 	camp := data(m)["id"].(string)
-	t.Cleanup(func() { owner(t, `UPDATE devices.firmware_campaigns SET state = 'aborted' WHERE id = ANY($1::uuid[]) AND state <> 'completed'`, []string{camp}) })
+	t.Cleanup(func() {
+		owner(t, `UPDATE devices.firmware_campaigns SET state = 'aborted' WHERE id = ANY($1::uuid[]) AND state <> 'completed'`, []string{camp})
+	})
 	base, _ := time.Parse(time.RFC3339Nano, data(m)["createdAt"].(string))
 	owner(t, `UPDATE devices.firmware_campaigns SET start_at = $2, notice_sent_at = $2 WHERE id = $1`, camp, base)
 	// after scheduling: one device unbound, one moved to a split unit (another model), one unit with a command in flight
@@ -260,7 +264,9 @@ func TestFirmwareCampaignSkipsAndCompletion(t *testing.T) {
 	big := uuid.NewString()
 	owner(t, `INSERT INTO devices.firmware_campaigns (id, tenant_id, model_id, from_versions, target_version, checksum, waves, window_start_local, window_end_local,
 		auto_pause_failure_percent, start_at, state) VALUES ($1,$2,$3,'{1.0}','v2','sha256:x','[{"label":"All","percent":100}]','00:00','23:59',5,$4,'running')`, big, tenant, model, base.Add(-time.Hour))
-	t.Cleanup(func() { owner(t, `UPDATE devices.firmware_campaigns SET state = 'aborted' WHERE id = $1 AND state <> 'completed'`, big) })
+	t.Cleanup(func() {
+		owner(t, `UPDATE devices.firmware_campaigns SET state = 'aborted' WHERE id = $1 AND state <> 'completed'`, big)
+	})
 	op := uuid.NewString()
 	for i := range 20 {
 		dev := uuid.NewString()

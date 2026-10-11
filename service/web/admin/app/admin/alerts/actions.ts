@@ -29,6 +29,17 @@ export async function resolveAlert(alertId: string, version: number, reason: str
   return run(() => coreOp("alerts.resolve", { alertId, resolutionReason: reason, resolutionEvidenceIds: evidenceIds }, { write: true, expectedVersion: version }));
 }
 
-export async function savePolicy(policy: AdminPolicy): Promise<ActionResult> {
-  return run(() => coreOp("policies.save", alertPolicyInput(policy), { write: true, expectedVersion: policy.version }));
+/** Creates a new policy for its customer (no id, no expected version) or updates a saved one at its version; the
+ * result names the saved policy so the editor can select a new one (IR345). */
+export async function savePolicy(policy: AdminPolicy): Promise<ActionResult & { id?: string }> {
+  let id: string | undefined;
+  const r = await run(async () => {
+    id = (await coreOp<{ id: string }>("policies.save", alertPolicyInput(policy), { write: true, ...(policy.id ? { expectedVersion: policy.version } : {}) })).id;
+  });
+  return r.ok ? { ...r, id } : r;
+}
+
+/** Deletes an alert policy: it is detached from every unit in the same change (IR108, IR120 item 6). */
+export async function deletePolicy(policyId: string, version: number): Promise<ActionResult> {
+  return run(() => coreOp("policies.delete", { policyId }, { write: true, expectedVersion: version }));
 }

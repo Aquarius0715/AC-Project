@@ -4941,3 +4941,54 @@ IR343 item 3 left out the creator of Figma Admin 04-9 ("Created hq-operator · �
    - Integration: TestFirmwareCampaigns checks the creator of a scheduled campaign.
    - Web: the Created fact with and without the name.
    - Real stack: the tab shows "hq-operator · 14 Sept 2026, 10:02 am MYT".
+
+## IR345 HQ creates and edits alert policies as DD-A05 and Figma Admin 38:5 show — 2026-10-11
+
+A check of the create buttons on the HQ screens (R338) found that HQ could not create an alert policy in API mode. The Policies tab offered "+ New" only in the Phase 1A demo. The seed holds only the default policy, so the editor never opened. The unit page's "+ New policy for …" and its Edit links opened the tab without selecting anything.
+
+1. **New policy (DD-A05 item 8).**
+   - "+ New policy" sits next to the tabs on both tabs, as in the Figma 38:5 header, for alert.policy.write.
+   - It first asks for the owner customer: a search-select of the active customers. Nobody is chosen unless the alerts are scoped to one customer. The owner cannot change once the policy is saved.
+   - The draft opens at `/admin/alerts?tab=policies&new=<customerId>`. It starts as DD-A05 says: the display time zone (Preferences), off, priority 50. The condition is the Figma example (temperature ≥ 30 °C for 60 s, recovery 28, warning), in-app only, with no recipients.
+   - Save policy calls `policies.save` without an id or an expected version. The new policy then opens by its `policyId`.
+   - The unit page's "+ New policy for <customer>" (on the customer's Alert policies tab and in the attach dialog) opens the same draft for that customer.
+2. **The selected policy in the URL.** `policyId` selects a policy (DD-A05 item 5), so the unit page's Edit and View links now open it. A `policyId` the list does not hold says so instead of opening another policy (as IR321). A `new` customer that is not active says so too.
+3. **The editor (Figma 38:5, 356:3714).**
+   - Header: the name with "Policy v<n>" (or "Not saved"); "<id> · <customer> · made by <member>" (ownerMembershipId, where the session may read `members.list`); an Enabled switch.
+   - Owner & units: the owner, fixed after creation, and the attached units by name. They are read-only, with a link to the customer's Alert policies tab.
+   - Condition: a Comparison select (≥ > ≤ <) joins the metric, threshold, duration and recovery.
+   - Notify: "+ Add recipient" opens a dialog of candidates (item 4). Each recipient row can be removed. In-app is always on (IR120 item 3).
+   - Footer:
+     - Delete policy, with a confirmation that names the units it is detached from.
+     - The change state: "No unsaved changes", "n unsaved changes · Name, Enabled …", "New policy · not saved yet" or "VALIDATION · n problems · nothing saved".
+     - Discard, and Save policy.
+   - Save is checked before anything is sent: name 1–120, a whole priority 0–100, 1–20 recipients, the duration, cooldown and escalation, and the recovery direction.
+   - Without alert.policy.write the editor is read-only (DD-A05: no save form for read-only staff).
+4. **Recipients.**
+   - The candidates come from `notifications.recipients` for one of the policy's units, or else one of the customer's units, with templateKey alert and channel inApp.
+   - They are read only while the dialog is open. Each candidate shows its role and allowed channels.
+   - Core API: for an alert about a unit, the HQ candidates are the members with alert.read. Before, any unit permission (asset.read, device.read, control.execute) listed them. But `policies.save` refuses such a recipient, and the notifier never sends to one (IR120 item 3).
+   - `notifications.preview` uses the same set. Other templates keep IR142 item 4.
+   - A customer without units has no candidates, and the dialog says so.
+5. **The default policy.** Its card no longer says that the customer controls the per-customer on/off. HQ switches the rules per customer on each customer's Alert policies tab (IR115 item 2), and the card links to Customers & units.
+6. **Create-button labels.** The generic "+ New" buttons now carry their Figma labels: "+ New policy" (automation), "+ New report" and "+ New factor" (MRV), "+ New contract" and "+ New model".
+7. **Not on the screen yet.**
+   - DD-A05 items 7–9 also ask for:
+     - the notification preview per recipient;
+     - the demo test;
+     - the "Only if …" active window;
+     - the Policies tab's customer → property → unit scope with Show disabled;
+     - the default policy's rule editor with "Copy as a <customer> policy →".
+   - Figma 38:5 drew channels per recipient. IR120 item 3 keeps one channel list per policy, so the editor says "Channels for every recipient", and Figma now does too.
+8. **Tests.**
+   - Integration (`TestNotificationRecipientsPreview`): an HQ member with asset.read only is a recipient of a unit's quality notice but not of its alert, and the alert preview refuses them.
+   - Web unit tests cover:
+     - the new draft, and its input without an id;
+     - the priority and recipient checks;
+     - who made a policy, and its unit names;
+     - the list of changes, in English and Malay.
+   - E2E `admin/alert-policies`:
+     - Creates a policy for Demo Customer A: the checks first, then a recipient.
+     - Checks the version and the footer, Discard, and an edit to version 2.
+     - Deletes the policy.
+     - Follows the unit page's link to a new draft.

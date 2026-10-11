@@ -30,7 +30,8 @@ func TestCertificateReminders(t *testing.T) {
 	tech := member("technician", clock.Add(-30*day), clock.Add(365*day))
 	gone := member("technician", clock.Add(-30*day), clock.Add(-time.Hour)) // left the company
 	viewer := member("contractor", clock.Add(-30*day), clock.Add(365*day))  // a contractor member without partner.assign
-	t.Cleanup(func() { // later tests see neither the memberships nor their reminders
+	// later tests see neither the memberships nor their reminders
+	t.Cleanup(func() {
 		owner(t, `UPDATE identity.memberships SET valid_until = valid_from + interval '1 minute' WHERE id = ANY($1::uuid[])`, []string{tech, viewer})
 	})
 	var certs []string
@@ -42,7 +43,9 @@ func TestCertificateReminders(t *testing.T) {
 		certs = append(certs, id)
 		return id
 	}
-	t.Cleanup(func() { owner(t, `UPDATE maintenance.certificates SET status = 'rejected' WHERE id = ANY($1::uuid[])`, certs) })
+	t.Cleanup(func() {
+		owner(t, `UPDATE maintenance.certificates SET status = 'rejected' WHERE id = ANY($1::uuid[])`, certs)
+	})
 	tick := 0
 	evaluate := func() { // a scheduler tick a minute later each time
 		t.Helper()
@@ -115,7 +118,7 @@ func TestCertificateReminders(t *testing.T) {
 	expired := cert(tech, "other", "valid", clock, nil)
 	left := cert(gone, "demo_indoor", "valid", clock.Add(20*day), nil)
 	renewed := cert(tech, "other", "valid", clock.Add(10*day), nil)
-	cert(tech, "other", "valid", clock.Add(400*day), renewed) // its approved renewal
+	cert(tech, "other", "valid", clock.Add(400*day), renewed)          // its approved renewal
 	older := cert(tech, "demo_indoor", "valid", clock.Add(3*day), nil) // main expires later
 	// a pending renewal does not stop the reminders; another "other" certificate is not a renewal
 	waiting := cert(tech, "other", "valid", clock.Add(25*day), nil)
