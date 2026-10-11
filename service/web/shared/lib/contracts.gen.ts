@@ -142,6 +142,7 @@ export type FilterCareChannel = Exclude<Channel,'whatsapp'>; // filter-care remi
 export type Target = {kind:'unit'|'job'|'invoice'|'restriction'|'device'|'inquiry'|'client_user'|'certificate';id:ID};
 export type Notification = Entity & {sourceAlertId:ID|null;type:NotificationType;recipientMembershipId:ID;scopeVersionAtCreation:number;target:Target;templateKey:'alert'|'quality'|'schedule_change'|'report_return'|'completion'|'payment'|'payment_reminder'|'restriction'|'inquiry'|'job_update'|'device_operation'|'invite'|'certificate_expiry'|'warranty_expiring';params:{targetName:string;at:Instant;status:string;reason:string|null;amountMinor:number|null;currency:Currency|null;method:PaymentMethod|null;message:string|null};channel:Channel;deliveryState:'preview'|'simulated'|'failed';severity:Severity;occurredAt:Instant;readAt:Instant|null};
 export type NotificationPreview = Notification;
+export type NotificationsMarked = {markedIds:ID[];skippedIds:ID[]};
 export type AuditView = Entity & {actorId:ID;actorName:string|null;actorRoleAtTime:Role|'system';action:string;targetRef:{kind:string;id:ID};previousVersion:number|null;nextVersion:number|null;occurredAt:Instant;correlationId:ID;result:'success'|'denied'|'failed'|'pending';maskedBefore:Record<string,string|null>;maskedAfter:Record<string,string|null>;reason:string|null};
 export type EnergyBaseline = Entity & {unitIds:ID[];period:Range;method:'demo_fixed'|'demo_period_comparison';baselineKWh:number|null;quality:BaselineQuality;boundaryId:EnergyBoundaryId;boundary:string;assumptions:string;source:string};
 export type EmissionFactor = Entity & {region:string;year:number;kgCO2ePerKWh:number;source:string;isDemo:true};
@@ -342,6 +343,7 @@ export type OperationContracts = {
   'mrv.recordReview': {input:{reportId:ID;reportVersion:number;reviewComment:string};result:MRVReport;mode:'write'};
   'mrv.saveDraft': {input:{id?:ID;conditions:MRVConditions;evidenceIds:ID[]};result:MRVReport;mode:'write'};
   'notifications.list': {input:Query;result:Page<Notification>;mode:'read'};
+  'notifications.markAllRead': {input:{ids:ID[]};result:NotificationsMarked;mode:'write'};
   'notifications.markRead': {input:{id:ID};result:Notification;mode:'write'};
   'notifications.recipients': {input:{target:Target;templateKey:Notification['templateKey'];channel:Channel;role?:Role;query:Query};result:Page<NotificationRecipient>;mode:'read'};
   'notifications.preview': {input:{target:Target;templateKey:Notification['templateKey'];channel:Channel;recipientMembershipId:ID;sourceAlertId?:ID;message?:string;reason?:string;severity?:Severity};result:NotificationPreview;mode:'read'};

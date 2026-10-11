@@ -1,7 +1,7 @@
 "use server";
 
 // Server Actions of /customer/alerts (FR-C08, FR-C15): opening an alert marks the signed-in membership's notifications
-// about it read (notifications.markRead with each row version; the alert itself is never changed, DD-C08); the Alert
+// about it read (one notifications.markAllRead write, IR379; the alert itself is never changed, DD-C08); the Alert
 // policies tab saves and deletes the customer's policies (policies.save / policies.delete with the policy version) and
 // switches default rules for the customer (policies.setDefaultRule with the setting version, owner only, IR115).
 import { refresh } from "next/cache";
@@ -24,10 +24,11 @@ const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
   }
 };
 
-/** Marks the alert's unread notifications read; returns an error message or null. */
-export async function readAlert(notes: { id: string; version: number }[]): Promise<string | null> {
+/** Marks the alert's unread notifications read in one write (one already read meanwhile is skipped); returns an error
+ * message or null. */
+export async function readAlert(ids: string[]): Promise<string | null> {
   try {
-    for (const n of notes) await coreOp("notifications.markRead", { id: n.id }, { write: true, expectedVersion: n.version });
+    await coreOp("notifications.markAllRead", { ids }, { write: true });
     return null;
   } catch (e) {
     return e instanceof CoreError ? `Not marked as read (${e.error.code}).` : "Not marked as read.";

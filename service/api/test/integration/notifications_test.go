@@ -80,6 +80,79 @@ func TestNotificationsInbox(t *testing.T) {
 	}
 }
 
+// TestMarkAllRead: "Mark all as read" is one write for the whole list (IR379), so it spends one of the member's
+// writes a minute (IR375). The caller's unread notifications with a readable target are marked; every other ID
+// (already read, another member's, an unreadable target, unknown) is skipped alike and stays as it is. The list holds
+// 1–100 distinct IDs and takes no expected version.
+func TestMarkAllRead(t *testing.T) {
+	s := server(t)
+	note := func(member, unit string) string {
+		id := uuid.NewString()
+		owner(t, `INSERT INTO notify.notifications (id, tenant_id, recipient_membership_id, scope_version_at_creation, type, template_key, target, params, severity, occurred_at)
+			VALUES ($1,$2,$3,1,'fault','alert',$4,'{}','warning',$5)`, id, seed.ID("tenant-a"), seed.ID(member), `{"kind":"unit","id":"`+seed.ID(unit).String()+`"}`, clock)
+		return id
+	}
+	mine, mine2, read := note("customer-b", "unit-other-customer"), note("customer-b", "unit-other-customer"), note("customer-b", "unit-other-customer")
+	owner(t, `UPDATE notify.notifications SET read_at = $2, version = 2 WHERE id = $1`, read, clock)
+	hidden := note("customer-b", "unit-online-rto") // customer A's unit: customer-b cannot read the target (IR58)
+	theirs := note("customer-a", "unit-online-rto")
+	unknown := uuid.NewString()
+	list := func(ids ...string) string { return `{"ids":["` + strings.Join(ids, `","`) + `"]}` }
+	many := make([]string, 101)
+	for i := range many {
+		many[i] = uuid.NewString()
+	}
+	for name, c := range map[string]struct{ body, want string }{
+		"no list":     {`{}`, "ids=error.required"},
+		"empty list":  {`{"ids":[]}`, "ids=error.required"},
+		"101 IDs":     {list(many...), "ids=error.count"},
+		"a duplicate": {list(mine, mine), "ids=error.invalid"},
+		"the nil ID":  {list(uuid.Nil.String()), "ids=error.invalid"},
+	} {
+		code, m := write(s, &customerB, "notifications.markAllRead", c.body, 0)
+		refusal(t, name, code, m, c.want)
+	}
+	code, m := write(s, &customerB, "notifications.markAllRead", list(mine), 1)
+	refusal(t, "an expected version", code, m, "expectedVersion=error.notAllowed")
+
+	code, m = write(s, &customerB, "notifications.markAllRead", list(mine, read, theirs, hidden, unknown, mine2), 0)
+	if code != 200 {
+		t.Fatalf("markAllRead: %d %v", code, m)
+	}
+	got := func(k string) string {
+		var out []string
+		for _, v := range data(m)[k].([]any) {
+			out = append(out, v.(string))
+		}
+		return strings.Join(out, ",")
+	}
+	if got("markedIds") != mine+","+mine2 || got("skippedIds") != strings.Join([]string{read, theirs, hidden, unknown}, ",") {
+		t.Fatalf("marked %s, skipped %s", got("markedIds"), got("skippedIds"))
+	}
+	state := func(id string) (bool, int) {
+		var readAt *time.Time
+		var v int
+		ownerScan(t, `SELECT read_at, version FROM notify.notifications WHERE id = $1`, []any{id}, &readAt, &v)
+		return readAt != nil, v
+	}
+	for id, want := range map[string]struct {
+		read    bool
+		version int
+	}{mine: {true, 2}, mine2: {true, 2}, read: {true, 2}, theirs: {false, 1}, hidden: {false, 1}} {
+		if r, v := state(id); r != want.read || v != want.version {
+			t.Errorf("%s: read %v version %d, want %v %d", id, r, v, want.read, want.version)
+		}
+	}
+	// a second click finds nothing unread: everything is skipped and nothing changes
+	code, m = write(s, &customerB, "notifications.markAllRead", list(mine, mine2), 0)
+	if code != 200 || got("markedIds") != "" || got("skippedIds") != mine+","+mine2 {
+		t.Fatalf("again: %d %v", code, m)
+	}
+	if _, v := state(mine); v != 2 {
+		t.Errorf("marked again: version %d", v)
+	}
+}
+
 func TestNotificationRecipientsPreview(t *testing.T) {
 	s := server(t)
 	_, inv := newInvoice(t, s)

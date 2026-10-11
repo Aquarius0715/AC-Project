@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.262.0 (2026-10-11): IR379 notifications.markAllRead (DD-C 0.35.0, DD-COMMON 0.110.0, implementation contracts 0.34.0, backend architecture 0.45.0, backend Go design 0.43.0); 203 operations.
 # 0.261.0 (2026-10-11): IR378 coverage: member refusals, ConfigFromEnv; counts unchanged.
 # 0.260.0 (2026-10-11): IR377 RLS on platform.idempotency_keys (database design 0.38.0, schema.sql); counts unchanged.
 # 0.259.0 (2026-10-11): IR376 RLS on partitions (database design 0.37.0, schema.sql); counts unchanged.
@@ -352,8 +353,8 @@ opnames = unique(operations, 'operation', 'operation')
 opmap = {row['operation']: row for row in operations}
 types = (ROOT / '02-design/service-contracts.ts').read_text()
 typed = {name:(input_, result, mode) for name,input_,result,mode in re.findall(r"^  '([^']+)': \{input:(.*);result:(.*);mode:'(read|write)'\};$", types, re.M)}
-if set(typed) != opnames or len(operations) != 202:  # IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list
-    fail('202 operation/TypeScript contract keys differ')
+if set(typed) != opnames or len(operations) != 203:  # IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead
+    fail('203 operation/TypeScript contract keys differ')
 for row in operations:
     name = row['operation']
     if typed.get(name) != (row['input_contract'], row['result_contract'], row['mode']):

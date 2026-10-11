@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND-GO
-version: 0.42.0
+version: 0.43.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -85,7 +85,7 @@ SQL stays inline with pgx. sqlc remains an option if the SQL should be type-chec
 
 | Source (docs) | Generator | Output | Check in CI |
 |---|---|---|---|
-| [operation-catalog.csv](operation-catalog.csv) | `cmd/gen/ops` | `internal/ops/catalog_gen.go`: 202 entries with name, mode, module, design IDs, authorization expression | Every catalog operation has exactly one registered handler; no extra handlers |
+| [operation-catalog.csv](operation-catalog.csv) | `cmd/gen/ops` | `internal/ops/catalog_gen.go`: 203 entries with name, mode, module, design IDs, authorization expression | Every catalog operation has exactly one registered handler; no extra handlers |
 | [service-contracts.ts](service-contracts.ts) | `cmd/gen/ops` | The web's `contracts.gen.ts` (IR313). The Go inputs and results are hand-written structs with JSON tags; the planned `types_gen.go` is not built (IR363) | The web's contract tests (IR312, IR314) and the integration tests read the API's JSON against the contract |
 | [write-version-catalog.csv](write-version-catalog.csv) | `cmd/gen/ops` | expected-version requirement per write operation | Writes listed as `required` reject a missing version with VALIDATION |
 | [fixture-contract.json](../04-agentic-sdlc/fixture-contract.json) | `internal/seed` (`cmd/seed`, `make seed`) | The demo fixture of the integration tests and the local stack | The integration and E2E suites pass on it |
@@ -297,4 +297,4 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | OPEN-GO-01 | Final choice of the TypeScript → Go contract generator (output reviewed for union types such as `UnitAction` and `Policy`) |
 | OPEN-GO-02 | WhatsApp provider SDK (depends on OPEN-BE-04) |
 
-Additional contracts for current version 0.42.0: Read IR01–IR375 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.43.0: Read IR01–IR379 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

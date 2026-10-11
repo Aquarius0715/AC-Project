@@ -5652,3 +5652,47 @@ A coverage scan (`make cover`: 88.4% of 15,439 statements) looked for security-r
    - `ADDR` and the `<DOMAIN>_API_URL` addresses are read.
 3. **Not pursued.** What the scan otherwise left are the Swagger route stubs (documentation only), the process entry points, and database-error returns, which would need fault injection. The client branch of the restriction projection is defensive: clients read restrictions only through `restrictions.forInvoice`, which masks them itself, and that masking is tested.
 4. **Checks.** `make test-all` passes. Only tests changed.
+
+## IR379 "Mark all as read" in one write (`notifications.markAllRead`), and the catalog's authorization reviewed — 2026-10-11
+
+This round's security check compared each operation's authorization in the catalog with its mode. It also compared the write limit (IR375) with the screens that send many writes at once.
+
+1. **Finding: "Mark all as read" used up the write limit.**
+   - IR351 marked each listed unread notification with its own `notifications.markRead`, one after another. The inbox lists the 100 newest, so one click could send up to 100 writes.
+   - Since IR375 a membership has 60 writes a minute. The 61st write was RATE_LIMITED, and the toast counted the rest as "changed meanwhile or no longer available".
+   - For the rest of that minute the member's other writes were refused too, for example a command to an AC.
+   - Opening a customer alert marked its notifications the same way, one write each.
+2. **Fix: one write for the whole list.**
+   - The new write `notifications.markAllRead` takes `{ids}` and returns `NotificationsMarked {markedIds, skippedIds}`.
+     - Route `POST /v1/notifications/mark-all-read`, authorization `authenticated:recipient-only`.
+     - The catalog now has 203 operations and 223 routes; the identity service has 28.
+   - It takes 1–100 distinct IDs. Otherwise `ids` is refused with `error.required`, `error.count` or `error.invalid`.
+   - It marks the caller's unread notifications whose target the caller can read now (IR58), as `notifications.markRead` does: `readAt` is now and the version goes up by one.
+   - Every other ID is skipped: one already read, another member's, a target out of scope, an unknown ID. These are not told apart, so the answer reveals nothing about other members' notifications.
+   - No expected version is sent; the write version catalog says `omit`. Marking read only moves forward, so a version check could only refuse a notification that was read meanwhile on another device.
+   - The inbox's "Mark all as read" sends one `notifications.markAllRead`, and so does opening a customer alert (DD-C08).
+   - The toast reads "n notifications marked as read", or "n marked as read · m skipped — read meanwhile or no longer available". A refusal shows the usual message; for RATE_LIMITED that includes how long to wait.
+   - `notifications.markRead` stays, for one notification at its version.
+3. **Checked and in order: the catalog's authorization.**
+   - No write is granted by a read permission except the technician's `alerts.acknowledge` (`alert.read:assigned`). That was decided in IR284, and the technician write table applies to it.
+   - The only non-admin write alternative without a named predicate is the client's `commands.create` (`client:control.execute`). DEC-54 defines `client:control.execute[:self]`, so the scope is the same as `:self`:
+     - the handler answers NOT_FOUND for another organization's unit;
+     - a client membership can only hold its own organization's scope (`members.save`);
+     - `TestForeignTargets` tries a foreign unit.
+   - The public writes are the demo operations, which run only with `DEMO_OPS` (IR367), and the demo session.
+   - The writes open to any signed-in user act only on the caller's own session, preferences, two-step verification or notifications.
+   - `clientUsers.resendInvite` is a read because it returns a preview and sends nothing (IR111).
+4. **Also in this round (Figma).** The User Flows boards were compared with every ClickMap item that leaves its screen: 262 on the Admin wireframes, 131 on the Contractor wireframes and 103 on the Technician wireframes. The Client board was compared with the Client flow labels. Three differences were fixed:
+   - Contractor 05-1 "Job row" pointed back at 05-1. It opens 05-2, as 05-2's "Shown when" and the app (`/partner/history?jobId=`) say. The wireframe's ClickMap and the board now show 05-1 → 05-2.
+   - The Contractor board's label "Slot outside delegation period" now reads "Outside the delegation period", as the ClickMap does.
+   - The back link on Client 02n now names its button, "Send to 3 ACs".
+   - The Use Case catalogue names all 324 screens of the four wireframes.
+5. **Tests.**
+   - Integration `TestMarkAllRead` covers:
+     - the five refusals of `ids`, and a sent expected version (`expectedVersion=error.notAllowed`);
+     - a list of six that marks the caller's two unread notifications and skips the other four, in input order;
+     - another member's notification and one with an unreadable target staying unread;
+     - a second click that marks nothing.
+   - `TestForeignTargets`: customer B sends customer A's notification; nothing is marked, and A's notification stays as it was.
+   - Web: `markAllRead.test.ts` requires one call for the whole list and passes refusals on with the wait. Against the old action all three cases fail.
+6. **Checks.** `make test-all`, the web checks and the E2E suite pass.

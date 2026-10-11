@@ -308,6 +308,18 @@ func TestForeignTargets(t *testing.T) {
 		t.Errorf("summaries.get as customer-b: %d %v", code, m)
 	}
 
+	// marking all read skips another member's notification, the same as an unknown ID, and leaves it as it is (IR379)
+	called["notifications.markAllRead"] = true
+	var before, after *time.Time
+	ownerScan(t, `SELECT read_at FROM notify.notifications WHERE id = $1`, []any{notifA}, &before)
+	if code, m := write(s, &customerB, "notifications.markAllRead", `{"ids":["`+notifA+`"]}`, 0); code != 200 || len(data(m)["markedIds"].([]any)) != 0 || len(data(m)["skippedIds"].([]any)) != 1 {
+		t.Errorf("notifications.markAllRead as customer-b: %d %v", code, m)
+	}
+	ownerScan(t, `SELECT read_at FROM notify.notifications WHERE id = $1`, []any{notifA}, &after)
+	if (before == nil) != (after == nil) {
+		t.Error("customer-b changed customer A's notification")
+	}
+
 	// every operation a role other than admin may call is above, or takes no foreign target
 	exempt := map[string]string{
 		"auth.previewPasswordReset":    "public demo read of the demo e-mail's reset preview",

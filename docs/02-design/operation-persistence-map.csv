@@ -126,6 +126,7 @@ mrv.recordReview,write,Energy & carbon,energy.mrv_reports,energy.mrv_reports;ene
 mrv.saveDraft,write,Energy & carbon,energy.mrv_reports,energy.mrv_reports,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 mrv.versions,read,Energy & carbon,energy.mrv_reports,,,,
 notifications.list,read,Notifications,notify.notifications,,,,
+notifications.markAllRead,write,Notifications,notify.notifications,notify.notifications,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 notifications.markRead,write,Notifications,notify.notifications,notify.notifications,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 notifications.preview,read,Notifications,notify.templates,,,,
 notifications.recipients,read,Notifications,,,Identity & access,,

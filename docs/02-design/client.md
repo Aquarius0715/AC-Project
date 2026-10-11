@@ -1,6 +1,6 @@
 ---
 document_id: DD-C
-version: 0.34.0
+version: 0.35.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -32,7 +32,7 @@ Always validate route parameters (values in URLs) as untrusted input. “Service
 | DD-C05 / FR-C05 | `/customer/automations` / `AutomationEditor` | `automations.save`, `automations.simulate`, `automations.fire`, `consents.get`, `consents.update`, `units.list`, `units.get` | Change fields by condition type (discriminated union). Explain the purpose of location consent. The demo does not collect real location; users enter arrival/departure events | If consent is denied or location unavailable, use manual or scheduled control. Clearly label lifestyle-pattern inference as a demo |
 | DD-C06 / FR-C06 | `/customer/energy` / `EnergyExplorer` | `energy.summary`, `baselines.list`, `units.list` | Require start<end and at most 366 days (provisional). Show currency, tariff version, comparison period, and data reliability | Show usable data coverage when data is missing. Do not treat estimated replacements as measurements |
 | DD-C07 / FR-C07 | `/customer/air-quality` / `AirQuality` | `telemetry.series`, `units.get`, `units.list`, `ventilation.log`, `ventilation.list`, `properties.list`, `spaces.list` | Select metric and period. Log a manual ventilation (method, 1–240 minutes); no device command | Show “Unsupported” when no sensor exists. A log does not imply CO₂ fell |
-| DD-C08 / FR-C08 | `/customer/alerts` / `AlertInbox` | `alerts.list`, `notifications.markRead`, `notifications.list`, `summaries.get`, `units.list`, `properties.list`, `spaces.list` | Filter by severity or unread status. Keep notificationId separate from alertId | Do not show a healthy “No alerts” summary when fetching fails |
+| DD-C08 / FR-C08 | `/customer/alerts` / `AlertInbox` | `alerts.list`, `notifications.markAllRead`, `notifications.list`, `summaries.get`, `units.list`, `properties.list`, `spaces.list` | Filter by severity or unread status. Keep notificationId separate from alertId | Do not show a healthy “No alerts” summary when fetching fails |
 | DD-C09 / FR-C09 | `/customer/maintenance` / `MaintenanceRequest` | `jobs.list`, `jobs.create`, `jobs.get`, `jobs.cancel`, `jobs.addNote`, `reports.get`, `attachments.getContent`, `units.list`, `jobs.respondProposal`, `jobs.requestReschedule`, `jobs.events`, `properties.list`, `spaces.list` | Require unitId, type, symptom description (10–2000 characters), and 3 preferred times (IR113). Preferred times are not confirmed bookings; a time outside them is booked only after the client accepts it | Prevent duplicate requests. Ask users to reselect unavailable times. Customers may cancel only requests with no assignee yet |
 | DD-C10 / FR-C10 | `/customer/payments` / `BillingOverview` | `contracts.list`, `invoices.list` | Filter by contract ID and invoice state. Store amounts in minor currency units (such as yen or cents) | Deny data outside permitted scope. Do not present “No invoices yet” as overdue payment |
 | DD-C11 / FR-C11 | `/customer/payments/:id` / `PaymentDemo` | `invoices.get`, `payments.simulate`, `notifications.preview`, `notifications.recipients` | Enter invoice ID, demo payment method, and confirmation. Provide no real card-number fields | Do not transfer real money. Do not show completion before processing ends. Reuse the same idempotency key on retry |
@@ -299,7 +299,7 @@ Verification: AT-C08-SRC. Prepare three fixtures: suspected open window, inspect
 
 **Source mapping**: SRC-06 BIZ-08, BIZ-09, BIZ-17 → FR-C08 → DD-C08. Source category: original company requirements SRC-06 + design additions. Design addition: keeping read status separate from alert resolution. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-C08 / Main display pattern: **UI-LIST**. Service boundary: `alerts.list, notifications.markRead, notifications.list, summaries.get, units.list, properties.list, spaces.list`.
+Scope: FR-C08 / Main display pattern: **UI-LIST**. Service boundary: `alerts.list, notifications.markAllRead, notifications.list, summaries.get, units.list, properties.list, spaces.list`.
 
 **Initial view and prerequisites**: Notifications and alerts within the customer's permitted scope can be fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -314,6 +314,7 @@ Scope: FR-C08 / Main display pattern: **UI-LIST**. Service boundary: `alerts.lis
 **Steps**
 
 1. Filter by severity or unread status. Open notification text, then unit evidence or maintenance requests. Finally, mark only the notification as read.
+   - As built (IR379): opening an alert marks the membership's unread notifications about it read in one `notifications.markAllRead` write. One already read meanwhile is skipped.
 2. Apply the following business rules to both reads and actions.
    - critical and warning indicate response priority.
    - normal is a health notice, not an unresolved problem.
@@ -659,6 +660,6 @@ Convert condition forms to the Condition type's discriminated union. occupancy i
 
 2026-09-16 approved updates: C01/C06 period boundaries follow SR17. C13 retry follows SR18 like A15; get the current version and attemptId through offsets.list.
 
-Additional contracts for current version 0.34.0: Read IR01–IR333 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.35.0: Read IR01–IR379 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

@@ -34,7 +34,7 @@ export function AlertsLiveView({ live }: { live: AlertsLive }) {
   const info = live.rows.filter((a) => a.group === "info");
   const show = (a: InboxAlert) => {
     setOpen(a);
-    if (a.unread.length) start(async () => setFailed(await readAlert(a.unread)));
+    if (a.unread.length) start(async () => setFailed(await readAlert(a.unread.map((n) => n.id))));
   };
   const Item = ({ a }: { a: InboxAlert }) => (
     <div className="flex w-full items-start gap-3 border-t border-line px-1 py-3 first:border-0">

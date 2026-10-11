@@ -87,6 +87,7 @@ members.setUnavailability,all,none,members.capacity,omit,none,D01; version misma
 mrv.recordReview,all,mrv,mrv.get,required,reportVersion=MRVReport.version,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 mrv.saveDraft,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 mrv.saveDraft,id present,mrv,mrv.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+notifications.markAllRead,all,none,notifications.list,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 notifications.markRead,all,notifications,notifications.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 offsets.preview,all,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 offsets.simulate,event=purchase_confirm|retire|fail,offset record,offsets.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects

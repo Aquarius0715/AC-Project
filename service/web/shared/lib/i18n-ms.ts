@@ -4012,7 +4012,7 @@ export const ms: Record<string, string> = {
   "Add a photo under Photos first, then link it to this finding.": "Tambah foto di bawah Foto dahulu, kemudian pautkannya pada penemuan ini.",
   "Report photos to link to {item}": "Foto laporan untuk dipautkan pada {item}",
   // Mark all as read; the diagnostic end retry (IR351)
-  "{n} marked as read · {failed} not marked — they changed meanwhile or are no longer available": "{n} ditanda sebagai dibaca · {failed} tidak ditanda — ia berubah sementara itu atau tidak lagi tersedia",
+  "{n} marked as read · {skipped} skipped — read meanwhile or no longer available": "{n} ditanda sebagai dibaca · {skipped} dilangkau — sudah dibaca sementara itu atau tidak lagi tersedia",
   "Mark all as read": "Tanda semua sebagai dibaca",
   "1 notification marked as read": "1 pemberitahuan ditanda sebagai dibaca",
   "{n} notifications marked as read": "{n} pemberitahuan ditanda sebagai dibaca",

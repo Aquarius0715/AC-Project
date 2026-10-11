@@ -7,6 +7,7 @@ import { useStoredRole } from "@ac/web/components/AppShell";
 import { useT } from "@ac/web/components/I18n";
 import { jobActions, useNotes } from "@ac/web/lib/jobs";
 import type { InboxRow } from "@ac/web/lib/notifications";
+import { actionMessage } from "@ac/web/lib/actionMessage";
 import { markAllRead, markRead } from "../actions";
 
 const initial = [
@@ -39,7 +40,7 @@ export function NotificationsView({ rows }: { rows?: InboxRow[] }) {
     return n.live ? jobActions.markRead(n.id) : setItems((s) => s.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
   };
   const unread = all.filter((i) => !i.read);
-  // “Mark all as read” (Figma Client 10c): every unread notification of the list, each at its version
+  // “Mark all as read” (Figma Client 10c): every unread notification of the list in one write (IR379)
   const readAll = () => {
     if (!api) {
       unread.forEach((n) => (n.live ? jobActions.markRead(n.id) : null));
@@ -47,9 +48,10 @@ export function NotificationsView({ rows }: { rows?: InboxRow[] }) {
       return toast(t(unread.length === 1 ? "1 notification marked as read" : "{n} notifications marked as read", { n: unread.length }));
     }
     start(async () => {
-      const r = await markAllRead(unread.map((n) => ({ id: n.id, version: n.version })));
+      const r = await markAllRead(unread.map((n) => n.id));
       setFailed(null);
-      toast(r.failed ? t("{n} marked as read · {failed} not marked — they changed meanwhile or are no longer available", { n: r.marked, failed: r.failed }) : t(r.marked === 1 ? "1 notification marked as read" : "{n} notifications marked as read", { n: r.marked }), r.failed ? "crit" : undefined);
+      if (r.failure) return toast(actionMessage(r.failure, t), "crit");
+      toast(r.skipped ? t("{n} marked as read · {skipped} skipped — read meanwhile or no longer available", { n: r.marked, skipped: r.skipped }) : t(r.marked === 1 ? "1 notification marked as read" : "{n} notifications marked as read", { n: r.marked }));
     });
   };
   return (

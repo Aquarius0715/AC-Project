@@ -327,6 +327,86 @@ func (Inbox) markRead(ctx context.Context, c *ops.Call, in *MarkReadInput) (Noti
 	return x, nil
 }
 
+// MarkAllReadInput is notifications.markAllRead input: the listed unread notifications (IR379).
+type MarkAllReadInput struct {
+	IDs []uuid.UUID `json:"ids"`
+}
+
+// Validate implements ops.Validator: 1–100 distinct IDs, the size of one inbox page.
+func (in *MarkAllReadInput) Validate() map[string]string {
+	if len(in.IDs) == 0 {
+		return map[string]string{"ids": "error.required"}
+	}
+	if len(in.IDs) > 100 {
+		return map[string]string{"ids": "error.count"}
+	}
+	seen := map[uuid.UUID]bool{}
+	for _, id := range in.IDs {
+		if id == uuid.Nil || seen[id] {
+			return map[string]string{"ids": "error.invalid"}
+		}
+		seen[id] = true
+	}
+	return nil
+}
+
+// Marked is NotificationsMarked: the IDs marked read now and the others, in input order.
+type Marked struct {
+	MarkedIDs  []uuid.UUID `json:"markedIds"`
+	SkippedIDs []uuid.UUID `json:"skippedIds"`
+}
+
+// markAllRead marks the listed notifications read in one write, so "Mark all as read" spends one write of the
+// membership's limit (IR375) instead of one per notification (IR379). Only the caller's unread notifications with a
+// readable target (IR58) change; any other ID (already read, another member's, out of scope, unknown) is skipped
+// alike, so the answer never tells which of them exist. Marking read only moves forward, so no version is expected.
+//
+//	@Summary		notifications.markAllRead (write)
+//	@ID				notifications.markAllRead
+//	@Description	Authorization: authenticated:recipient-only
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR379 1–100 distinct IDs; the caller's unread notifications with a readable target are marked read, every other ID is skipped (never told apart); one write for the whole list
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DDC-07, DD-C08
+//	@Tags			notifications
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			request			body		MarkAllReadInput	true	"input"
+//	@Success		200				{object}	ops.Envelope{data=Marked}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/notifications/mark-all-read [post]
+func (Inbox) markAllRead(ctx context.Context, c *ops.Call, in *MarkAllReadInput) (Marked, error) {
+	args := []any{in.IDs, c.Principal.MembershipID, c.Now}
+	q := "UPDATE notify.notifications x SET read_at = $3, version = x.version + 1 FROM (SELECT n.id FROM " + inboxFrom() +
+		" WHERE n.id = ANY($1) AND n.recipient_membership_id = $2 AND n.read_at IS NULL AND " +
+		readableSQL(c.Principal, c.Now, "(n.target->>'kind')", "(n.target->>'id')::uuid", &args) + ") r WHERE x.id = r.id RETURNING x.id"
+	rows, err := c.Tx.Query(ctx, q, args...)
+	if err != nil {
+		return Marked{}, err
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return Marked{}, err
+	}
+	out := Marked{MarkedIDs: []uuid.UUID{}, SkippedIDs: []uuid.UUID{}}
+	for _, id := range in.IDs {
+		if slices.Contains(ids, id) {
+			out.MarkedIDs = append(out.MarkedIDs, id)
+		} else {
+			out.SkippedIDs = append(out.SkippedIDs, id)
+		}
+	}
+	return out, nil
+}
+
 // TargetInput is the shared {target, templateKey, channel} input of preview / recipients.
 type TargetInput struct {
 	Target struct {
@@ -620,6 +700,7 @@ func Register(r *ops.Registry) {
 	var m Inbox
 	ops.Register(r, "notifications.list", m.list)
 	ops.Register(r, "notifications.markRead", m.markRead)
+	ops.Register(r, "notifications.markAllRead", m.markAllRead)
 	ops.Register(r, "notifications.recipients", m.recipients)
 	ops.Register(r, "notifications.preview", m.preview)
 }
