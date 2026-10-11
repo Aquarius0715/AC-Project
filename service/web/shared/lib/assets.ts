@@ -8,6 +8,7 @@ import { EN, intlTag, showDate, showTime, translator, type I18n, type Locale, ty
 import { businessDay } from "@ac/web/lib/clientBilling";
 import { amount, klStamp, one } from "@ac/web/lib/energy";
 import { metricLabel, metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
+import { csvCell } from "@ac/web/lib/csv";
 
 export type Profile = "rto" | "general" | "energy" | "environment";
 export type Connection = "online" | "offline" | "unknown" | "connecting" | "error";
@@ -402,7 +403,6 @@ export function coverageKpis(rows: CoverageRow[], t: T = en) {
 export type CoverageFilter = { customerId: string; coverage: "" | CoverageStatus; within: "" | "30" | "90" | "180" | "365" };
 export const coverageMatch = (r: CoverageRow, f: CoverageFilter) => (!f.customerId || r.customerId === f.customerId) && (!f.coverage || r.status === f.coverage)
   && (!f.within || (r.days !== null && r.days > 0 && r.days <= Number(f.within)));
-const csvCell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 export const toCsv = (header: string[], rows: string[][]) => [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\n") + "\n";
 export const coverageCsv = (rows: CoverageRow[]) => toCsv(["unit", "unit_id", "customer", "model", "warranty_end", "maintenance_contract", "status"],
   rows.map((r) => [r.unit, r.unitId, r.customer, r.model, r.endsDate, r.contracts === "—" ? "" : r.contracts, r.statusText]));

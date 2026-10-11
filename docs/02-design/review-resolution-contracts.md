@@ -5461,3 +5461,27 @@ The fourth security check reviewed authentication: token verification in the Cor
 3. **Follow-up.** On https the cookie names should carry the `__Host-` (session) and `__Secure-` (sign-in state) prefixes. The browser then keeps the cookies to this host, so a sibling subdomain cannot set or shadow them. Every deletion must then be sent with `Secure` and the same path. That https path is not reached by the local plain-http E2E suite, so it is a change of its own.
 4. **Tests.** The OIDC verifier test refuses a Keycloak ID token, a Cognito ID token, `token_use=id` with `typ=Bearer`, a refresh token and a token without a type, and accepts a Cognito access token. The session test refuses no, empty and 31-character secrets on https, and a cookie sealed before the secret went missing is not opened. Without the fixes both tests fail.
 5. **Checks.** `make test-all`, the web checks (396 unit tests) and the E2E suite pass. The E2E sign-ins use real Keycloak access tokens, and they carry `typ=Bearer`.
+
+## IR368 Uploads: file names, the header that names a photo, and CSV exports — 2026-10-11
+
+The fifth security check reviewed uploads: their type, their size, their names and paths, and the files made from what users upload.
+
+1. **Checked and in order.**
+   - **Type.** Since IR308, a file's leading bytes must be the declared type: the PNG signature, the JPEG start-of-image marker or the PDF header. The allowed types are images and PDF only, so no SVG or HTML.
+   - **Size.** The declared size must equal the payload. Each file has its own limit (5 MiB for photos, 10 MB for certificates), and each operation's body has its own (8 or 16 MiB for the four file operations, 1 MiB for all others).
+   - **Storage keys.** They are made on the server from UUIDs (`jobs/<job>/reports/<report>/<id>`, `certificates/<membership>/<id>`), never from the file name. The local store also refuses a key with `..` or a leading `/`.
+   - **Serving.** A file is served only as its checked type, behind the `nosniff` header, and photos are shown through `img`.
+2. **Findings and fixes.**
+   - **A photo with a name outside Latin-1 did not open.** The technician photo route wrote the stored name into `Content-Disposition` as it was, removing only quotes. A header value takes no character above U+00FF. So a photo named "写真.jpg", or a name with an emoji, made the route throw (500), and the technician could not view it. The name now goes into the header as RFC 6266 / 5987 ask: a plain-ASCII fallback in `filename` and the UTF-8 name in `filename*`. The response is built once, in `attachmentResponse` (shared).
+   - **Names took any character.** A name could hold control characters (a line break), path separators, and bidirectional formatting characters (`photo<U+202E>gpj.exe` reads as `photoexe.jpg`).
+     - The Core API now refuses such a name as VALIDATION `file=error.invalidFile` (`ValidFileName`, for photos, signatures, problem photos and certificates).
+     - The web apps clean the browser's file name before they send it (`uploadName`). The unsafe characters are dropped, `/` and `\` become `_`, and the name keeps its extension within 200 characters. So an upload with an odd but harmless name is not refused.
+   - **CSV exports could run as formulas.** The admin exports (units by coverage end, the import error report and the SLA customers table) wrote names from users, and from uploaded import files, as they were. A cell like `=HYPERLINK(...)` or `=cmd|...` becomes a formula when a spreadsheet opens the file (CSV injection). A cell that begins with `=`, `+`, `-`, `@`, a tab or a carriage return is now kept as text with a leading apostrophe (`csvText`), unless it is a plain number such as `-12.5`. The energy report CSV holds only numbers computed by the Core API.
+3. **Not changed.** A file written to the store before its transaction rolls back stays there unreferenced. Removing such files is a storage-lifecycle task, together with the production store (S3).
+4. **Tests.**
+   - `TestValidFileName` and the attachment integration test refuse a line break, a path and an override in the name.
+   - `attachmentResponse` serves "写真 1.jpg" with both name forms, and passes NOT_FOUND / FORBIDDEN on.
+   - The file tests check `uploadName` and `contentDisposition`. A header with the raw name throws, and one with the encoded name does not.
+   - The CSV tests guard formula-like cells and keep numbers.
+   - Without the fixes the tests fail: the route throws "Cannot convert argument to a ByteString", a name with a line break is stored, and the exports keep `=…` as it is.
+5. **Checks.** `make test-all`, the web checks (402 unit tests) and the E2E suite pass.

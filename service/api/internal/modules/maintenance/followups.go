@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -196,12 +197,33 @@ type ProblemInput struct {
 
 var problemCodes = map[string]bool{"same_problem": true, "new_damage": true, "not_completed": true, "other": true}
 
-// ValidBlob checks one image upload (JPEG/PNG whose bytes are that type, 1 byte – max bytes, size equal to the
-// payload).
+// ValidBlob checks one image upload (a valid name, JPEG/PNG whose bytes are that type, 1 byte – max bytes, size equal
+// to the payload).
 func ValidBlob(b BlobInput, max int) bool {
-	n := utf8.RuneCountInString(strings.TrimSpace(b.Name))
-	return n >= 1 && n <= 200 && (b.Mime == "image/jpeg" || b.Mime == "image/png") && b.Size == len(b.Bytes) && b.Size >= 1 && b.Size <= max &&
+	return ValidFileName(b.Name) && (b.Mime == "image/jpeg" || b.Mime == "image/png") && b.Size == len(b.Bytes) && b.Size >= 1 && b.Size <= max &&
 		ContentMatches(b.Mime, b.Bytes)
+}
+
+// ValidFileName checks the name of an upload. The apps show it, and offer it as the file name when a photo is opened.
+// It has 1–200 characters after trimming, and no control characters, path separators or bidirectional formatting
+// characters. Those could break the header that names the file, or make "photo<U+202E>gpj.exe" read as
+// "photoexe.jpg" (IR368).
+func ValidFileName(name string) bool {
+	name = strings.TrimSpace(name)
+	if n := utf8.RuneCountInString(name); n < 1 || n > 200 {
+		return false
+	}
+	for _, r := range name {
+		if unicode.IsControl(r) || r == '/' || r == '\\' || bidiFormat(r) {
+			return false
+		}
+	}
+	return true
+}
+
+// bidiFormat reports the Unicode bidirectional formatting characters: marks, embeddings, overrides and isolates.
+func bidiFormat(r rune) bool {
+	return r == '\u200e' || r == '\u200f' || r == '\u061c' || (r >= '\u202a' && r <= '\u202e') || (r >= '\u2066' && r <= '\u2069')
 }
 
 // ContentMatches reports whether a file's leading bytes are of its declared type — the PNG signature, the JPEG start

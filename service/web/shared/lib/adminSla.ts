@@ -6,6 +6,7 @@
 // zone, as typed (NFR-08).
 import { EN, showDate, showTime, translator, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
 import { planLabel } from "@ac/web/lib/contracts";
+import { csvQuoted } from "@ac/web/lib/csv";
 
 const en = translator("en");
 
@@ -121,10 +122,9 @@ export function targetErrors(f: { responseHours: string; arrival: string; ftf: s
  * period's ends are dates in the display time zone. */
 export function slaCsv(rows: SlaRow[], period: { from: string; to: string }, i: I18n = EN): string {
   const { t, display } = i;
-  const q = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
   const day = (iso: string) => zonedParts(iso, display.timeZone).date;
   const head = ["Customer", "Plan", "Jobs", "Response", "Arrival", "First-time fix", "Rating", "Overdue", "Status", "Period from", "Period to"].map((h) => t(h));
-  return [head, ...rows.map((r) => [r.name, r.plan, r.jobs, r.response, r.arrival, r.ftf, r.rating, r.overdue, r.status.label, day(period.from), day(period.to)])].map((l) => l.map(q).join(",")).join("\n") + "\n";
+  return [head, ...rows.map((r) => [r.name, r.plan, r.jobs, r.response, r.arrival, r.ftf, r.rating, r.overdue, r.status.label, day(period.from), day(period.to)])].map((l) => l.map(csvQuoted).join(",")).join("\n") + "\n";
 }
 
 /** Readable refusals of sla.saveTargets. */

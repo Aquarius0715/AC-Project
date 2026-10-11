@@ -30,14 +30,21 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		"not a png":     "file=error.invalidFile",
 		"png as jpeg":   "file=error.invalidFile",
 		"size mismatch": "file=error.invalidFile",
+		// IR368: the name is a label without control characters, paths or bidirectional overrides
+		"line break in the name": "file=error.invalidFile",
+		"path in the name":       "file=error.invalidFile",
+		"override in the name":   "file=error.invalidFile",
 	}
 	for name, f := range map[string]string{
-		"gif":           blobJSON("a.gif", "image/gif", img, len(img)),
-		"size mismatch": blobJSON("a.png", "image/png", img, 3),
-		"empty":         blobJSON("a.png", "image/png", nil, 0),
-		"no name":       blobJSON(" ", "image/png", img, len(img)),
-		"not a png":     blobJSON("a.png", "image/png", []byte("<svg onload=alert(1)>"), 21), // stored and served only as what it is (IR308)
-		"png as jpeg":   blobJSON("a.jpg", "image/jpeg", img, len(img)),
+		"gif":                    blobJSON("a.gif", "image/gif", img, len(img)),
+		"size mismatch":          blobJSON("a.png", "image/png", img, 3),
+		"empty":                  blobJSON("a.png", "image/png", nil, 0),
+		"no name":                blobJSON(" ", "image/png", img, len(img)),
+		"not a png":              blobJSON("a.png", "image/png", []byte("<svg onload=alert(1)>"), 21), // stored and served only as what it is (IR308)
+		"png as jpeg":            blobJSON("a.jpg", "image/jpeg", img, len(img)),
+		"line break in the name": blobJSON(`a\r\nSet-Cookie: x.png`, "image/png", img, len(img)),
+		"path in the name":       blobJSON("../../a.png", "image/png", img, len(img)),
+		"override in the name":   blobJSON("photo\u202egnp.exe", "image/png", img, len(img)),
 	} {
 		code, m := add(f, 1)
 		refusal(t, name, code, m, want[name])

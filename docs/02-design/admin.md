@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.60.0
+version: 0.61.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -761,7 +761,7 @@ Scope: FR-A19 / Main display pattern: **UI-LIST**. Service boundary: `units.cove
 **Steps**
 
 1. KPI tiles (under warranty, ends ≤ 90 days, out of warranty with no contract, maintenance contract) and the unit table sorted by coverage end.
-2. Actions: Renewal offer → SCR-A07 New contract prefilled with customer and unit; Open contract → SCR-A07; Export CSV (client-side, demo).
+2. Actions: Renewal offer → SCR-A07 New contract prefilled with customer and unit; Open contract → SCR-A07; Export CSV (client-side, demo). As built (IR368), the exports (this one, the import error report and the SLA customers table) keep a cell that a spreadsheet would run as a formula (starting with =, +, -, @, a tab or a carriage return, other than a plain number) as text, with a leading apostrophe.
 3. “Warranty on jobs” lists claimable jobs — completed while the unit's warranty ran (warrantyEndsAt not before completedAt), with replaced parts in the accepted work report and no filed claim yet (IR209); the claim form is prefilled with those parts and the job's actual cost lines; Mark claim filed → `jobs.recordWarrantyClaim`.
 
 **Boundary cases and failures**: Claim outside warranty → VALIDATION.
@@ -884,7 +884,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.60.0: Read IR01–IR352 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.61.0: Read IR01–IR368 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

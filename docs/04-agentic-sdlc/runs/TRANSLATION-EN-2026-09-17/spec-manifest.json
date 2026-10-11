@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "41fd8b7c9c8909398919ae411f0ae2fd77a2debd4c7f2bc570169fdbcef4ffa1",
+  "spec_baseline_id": "97d6dd726bf273d1d210c0fc167f8c8527716d8b33d2b2a38bf044f8c913d749",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "5854bd407f82b4159e74bca01b2d10a0520ce1d5fb1acb8088b9e051bdb185a3"
+      "sha256": "b0460c5190ae872290baeb998f4397103975c470af5a000ba60ba3d4d82251f7"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -94,7 +94,7 @@
     },
     {
       "path": "02-design/admin.md",
-      "sha256": "d4db4acf0240a4ab134429f25313c0d4ef5c2934c7160d1af43a973423e271c1"
+      "sha256": "3e33b8b9d08a89d2953d47bf07bffc411f7a1637b6cf2a502b5d8b99d22c298f"
     },
     {
       "path": "02-design/api/swagger.json",
@@ -154,11 +154,11 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "bbf64af069e16dd3cc852f41f5417dea623ce8e6cabcd66b678f3ff8b6534477"
+      "sha256": "362ce2290af075ef90df22b7f9542e59926800f2a188da1a1fe89a67ce29b625"
     },
     {
       "path": "02-design/service-contracts.ts",
-      "sha256": "ea574391ccc1de81aedaf00a33ab60e3e464f21978dc5a91859cb5a04f7f7927"
+      "sha256": "e655a9e8fb7066b462de44c3738f3cf145ca4da3042e8cbd2ff3b1fc494127cb"
     },
     {
       "path": "02-design/strict-review-contracts.md",
@@ -282,7 +282,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "473650649648d8291210a3c31e00f340c774e31e02a877597a3f790adc28a2e2"
+      "sha256": "9888fe938725820e55606f271e317835f9ade490ed56c7851f6642287fe916b1"
     },
     {
       "path": "tools/check_review_regressions.py",
@@ -294,7 +294,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "6e2961d2c86156fa6e4e1cd7d215674f0f3a609133616250fa61f5c4f457a51c"
+      "sha256": "1ce874078e5adf26c9110353f53f90fe12c8392fe6b9c469b2ceffd4d5caecfa"
     }
   ]
 }

@@ -9,7 +9,7 @@
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
-import { uploadType } from "@ac/web/lib/files";
+import { uploadName, uploadType } from "@ac/web/lib/files";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
 type Slot = { startAt: string; endAt: string };
@@ -76,7 +76,7 @@ export async function reportProblem(form: FormData) {
   return run(async () => {
     const photos = await Promise.all(form.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0).map(async (f) => {
       const buf = Buffer.from(await f.arrayBuffer());
-      return { name: f.name, mime: uploadType(buf, f.type) as OpInput<"jobs.reportProblem">["photos"][number]["mime"], size: f.size, bytes: buf.toString("base64") }; // the API refuses any other type
+      return { name: uploadName(f.name), mime: uploadType(buf, f.type) as OpInput<"jobs.reportProblem">["photos"][number]["mime"], size: f.size, bytes: buf.toString("base64") }; // the API refuses any other type
     }));
     const start = String(form.get("visitStart") ?? ""), end = String(form.get("visitEnd") ?? "");
     const j = await coreOp<{ id: string }>("jobs.reportProblem", {

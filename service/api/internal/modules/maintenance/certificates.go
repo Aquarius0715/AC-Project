@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -134,8 +133,7 @@ func (in *SubmitCertInput) Validate() map[string]string {
 		fe["expiresAt"] = "error.range"
 	}
 	f := in.File
-	n := utf8.RuneCountInString(strings.TrimSpace(f.Name))
-	if n < 1 || n > 200 || (f.Mime != "application/pdf" && f.Mime != "image/jpeg" && f.Mime != "image/png") || f.Size != len(f.Bytes) || f.Size < 1 || f.Size > 10*1000*1000 ||
+	if !ValidFileName(f.Name) || (f.Mime != "application/pdf" && f.Mime != "image/jpeg" && f.Mime != "image/png") || f.Size != len(f.Bytes) || f.Size < 1 || f.Size > 10*1000*1000 ||
 		!ContentMatches(f.Mime, f.Bytes) {
 		fe["file"] = "error.invalidFile"
 	}
