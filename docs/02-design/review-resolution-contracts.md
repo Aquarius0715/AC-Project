@@ -4900,3 +4900,7 @@ BR-A23 generates the drafts on the 1st, and BR-P10 says the statements are gener
 4. **Tests.**
    - Unit: `endedPeriod`, with Kuala Lumpur month and year boundaries.
    - Integration (`TestMonthlyPayoutDrafts`, both suites): the August draft from the September clock; no regeneration on a later tick; a later run leaves an approved statement.
+5. **Figma System Architecture.**
+   - Boards 06, 07 and 08 now show the three schedulers with the jobs of IR336, IR339, IR340 and IR341: `--domain=equipment|maintenance|billing`, "worker-scheduler × 3", the service cards and the workers card.
+   - Board 06's schema cards list the tables added since IR335: certificate_reminders, warranty_reminders, payout_runs, notify's ref_certificates, and filter_reminders / filter_reminder_watermarks, which were missing.
+   - The right column is restacked, because the longer maintenance list had overlapped restrictions.
