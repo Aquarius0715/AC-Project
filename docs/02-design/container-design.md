@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTAINER
-version: 0.39.0
+version: 0.40.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -147,6 +147,18 @@ As built (IR334), the code reads the database, OIDC, demo, blob, internal-call a
 
 `docker/localstack/init-aws.sh` already creates the production resource names for those integrations: the domain-events FIFO topic, five FIFO queues with their dead-letter queues, the telemetry stream, four buckets, the SES identity and the Stripe secret.
 
+The resource names, created locally by that script, are the ones the production infrastructure code creates (IR381):
+
+| Resource | Name | Used for |
+|---|---|---|
+| SNS FIFO topic | `ac-domain-events.fifo` | Domain events from the outbox relay (backend architecture §8) |
+| SQS FIFO queues | `command-requested`, `device-ack`, `device-event`, `notification-requested`, `importexport-jobs` (each `<name>.fifo`) | The work queues of the iot, notification and importexport workers (backend Go design §7) |
+| Dead-letter queues | `<name>-dlq.fifo` for each queue, after 5 receives | Replays reuse the event ID (backend architecture §8) |
+| Kinesis stream | `ac-telemetry` | Device telemetry from the IoT rules (2 shards locally) |
+| S3 buckets | `ac-files`, `ac-reports`, `ac-telemetry-archive`, `ac-audit-export` | Uploads (OPEN-CT-02), generated reports and exports, raw measurement history in Parquet, the monthly audit export with Object Lock (backend architecture §3a, §7) |
+| SES identity | `no-reply@ac.local` | The sender of e-mail previews; production verifies the real domain |
+| Secret | `ac/local/stripe` | The Stripe test key; production keeps one secret per environment in Secrets Manager |
+
 Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`, LocalStack `SERVICES` / `AWS_DEFAULT_REGION`) exist only in compose. Local values come from compose and an optional git-ignored `.env.local` (`.env.local.example`).
 
 ## 5. Production on ECS Fargate
@@ -179,4 +191,4 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 | OPEN-CT-03 | The server-side session store (ElastiCache in production, Valkey locally) with revocation on sign-out (backend architecture §6). Until then the BFF keeps the tokens in its sealed session cookie (IR333). Sign-out already ends the identity provider's session (IR357), so a copied cookie cannot be refreshed after it |
 | OPEN-CT-04 | OpenTelemetry instrumentation of the Go services and the web apps. The collector, Jaeger and `OTEL_EXPORTER_OTLP_ENDPOINT` are ready, but nothing exports traces or metrics yet (IR334) |
 
-Additional contracts for current version 0.39.0: Read IR01–IR375 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.40.0: Read IR01–IR381 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

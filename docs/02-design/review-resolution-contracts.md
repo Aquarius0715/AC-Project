@@ -5730,3 +5730,29 @@ After IR379, the web code was searched for writes sent one after another and for
    - Against the old mappers, and without pacing, 23 of the 24 cases fail.
    - Three tests that expected the raw text now expect the wording.
 5. **Checks.** The web checks and the E2E suite pass. The backend did not change.
+
+## IR381 Checks round: dependency advisories again, the local stand-ins against the container design, two scope rules under test — 2026-10-11
+
+1. **Dependency advisories (security).**
+   - govulncheck v1.9.0 finds no vulnerability in the Go module.
+   - `npm audit --omit=dev`, which covers what ships, finds none.
+   - The full audit lists only the braces chain under the lint configuration, accepted in IR364: it has no fixed release, and lint does not ship.
+2. **The local stand-ins against the container design.**
+   - LocalStack: the init script creates what container design §4 says. Its resource names were not in the documents, except the queues in backend Go design §7. §4 now lists them all: the topic, the five FIFO queues with their dead-letter queues, the stream, the four buckets, the SES identity and the Stripe secret.
+   - Keycloak: the realm `ac` has:
+     - the two confidential clients, with the code flow, PKCE S256 and no password grant;
+     - one user per fixture actor (10);
+     - a TOTP credential for each of the three HQ users;
+     - brute-force protection after 10 failures, 60 s growing to 15 min (IR370).
+   - Mosquitto: the anonymous local broker uses the topic layout of backend architecture §9, and its port is bound to 127.0.0.1 (IR373). The IoT bridge and the device simulator stay in the `planned` profile.
+   - WireMock: the weather stand-in answers `GET /v1/current`. No code reads `WEATHER_API_BASE` yet, because the weather provider is an open decision (DEC-68), as §4 says.
+3. **Coverage round (88.6% of 15,464 statements).** The scanners found no untested Validate rule, but two rules had no test.
+   - **Technician scopes by property and organization.** The seed technicians hold unit scopes only. So the property and organization branches of the unit scope (D01), and a membership with no scope, never ran.
+     - `TestInternalTechnicianScopeKinds` gives the internal technician's user three memberships:
+       - with a property scope, `units.list` returns that property's units;
+       - with an organization scope, it returns the customer's four units;
+       - with no scope, it returns none.
+     - A unit outside the scope is NOT_FOUND.
+     - With the property scope widened on purpose, the test fails.
+   - **An automation on an archived unit.** `TestAutomationOnArchivedUnit` archives one of customer B's units and saves an automation on it. The answer is NOT_FOUND and nothing is linked, as IR329 noted.
+4. **Checks.** `make test-all` and the validators pass. Only tests and the container design changed.

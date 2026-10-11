@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.263.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
+Version: 0.264.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.264.0 (2026-10-11): A checks round: no dependency advisory; the container design names the local AWS resources; the technician scopes by property and organization are under test (IR381).
 0.263.0 (2026-10-11): A refusal over the write limit says how long to wait on every screen, in the display language, and Group control waits and sends the command again (IR380).
 0.262.0 (2026-10-11): "Mark all as read" is one write, `notifications.markAllRead` (203 operations), so it no longer uses up the write limit of 60 a minute; opening a customer alert uses it too. The catalog's authorization was reviewed with no other finding (IR379).
 0.261.0 (2026-10-11): A coverage round tests what no test reached: the owner-only refusals of a client member, and the service configuration with the write limit (IR378).

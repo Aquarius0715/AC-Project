@@ -160,3 +160,25 @@ func TestAutomationEvents(t *testing.T) {
 		t.Fatalf("location rule: %d %v", code, m)
 	}
 }
+
+// TestAutomationOnArchivedUnit: an automation may not name an archived unit. Archiving takes the unit out of its
+// client's scope, so the save is NOT_FOUND and stores nothing; the 409 errors.unit_archived answers only while a cached
+// scope still holds the unit (IR329). IR381 pins this answer, which had no test.
+func TestAutomationOnArchivedUnit(t *testing.T) {
+	s := server(t)
+	u := newUnit(t, s, "Archived AC") // customer B's
+	if code, m := write(s, &hq, "units.archive", `{"id":"`+u+`","reason":"decommission"}`, 1); code != 200 {
+		t.Fatalf("archive: %d %v", code, m)
+	}
+	var before int
+	ownerScan(t, `SELECT count(*) FROM control.automation_units WHERE unit_id = $1`, []any{u}, &before)
+	code, m := write(s, &customerB, "automations.save", scheduleRule(u, nil), 0)
+	if code != 404 || m["messageKey"] != "error.notFound" {
+		t.Fatalf("an archived unit: %d %v", code, m)
+	}
+	var after int
+	ownerScan(t, `SELECT count(*) FROM control.automation_units WHERE unit_id = $1`, []any{u}, &after)
+	if after != before {
+		t.Errorf("the refused save linked the unit: %d → %d", before, after)
+	}
+}

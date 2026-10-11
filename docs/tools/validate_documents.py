@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.264.0 (2026-10-11): IR381 checks round, local AWS resource names (container design 0.40.0); counts unchanged.
 # 0.263.0 (2026-10-11): IR380 write-limit refusals worded, Group control pacing (DD-C 0.36.0, implementation contracts 0.35.0); counts unchanged.
 # 0.262.0 (2026-10-11): IR379 notifications.markAllRead (DD-C 0.35.0, DD-COMMON 0.110.0, implementation contracts 0.34.0, backend architecture 0.45.0, backend Go design 0.43.0); 203 operations.
 # 0.261.0 (2026-10-11): IR378 coverage: member refusals, ConfigFromEnv; counts unchanged.
