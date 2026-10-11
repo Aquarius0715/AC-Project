@@ -5640,3 +5640,15 @@ Following IR376, the `platform` schema was checked table by table. RLS leaves it
 2. **Fix.** `platform.idempotency_keys` now has row-level security enabled, forced and `tenant_isolation`. Before, tenant A's service role could read tenant B's stored response; the code never did, because it reads by tenant, membership and key, so this is the safety net. The local database got the same statements, and the migration image was rebuilt.
 3. **A test that changed.** The test that expires a key edited the table straight through the pool, outside a tenant transaction. Under RLS the empty `app.tenant_id` of a reused connection then fails the UUID cast. That is the same loud failure as for every business table read without a tenant, and better than a silent empty result. The test now edits the key inside the tenant's transaction.
 4. **Tests.** `TestIdempotencyKeysIsolated` requires the policy and reads a key row of tenant B as tenant A's service role. Without the fix it reports the missing policy and the row. `make test-all`, with its replay, conflict and `writes.getResult` tests, and the E2E suite pass.
+
+## IR378 Coverage round: the owner-only refusals of a client member, and the service configuration — 2026-10-11
+
+A coverage scan (`make cover`: 88.4% of 15,439 statements) looked for security-relevant branches that no test reaches.
+
+1. **The owner-only refusals were never run.** Every seed client is an owner, so nothing tested what a member of the same customer may not do: manage client users, switch the default rules, change the filter-care settings. `TestClientMembersAreNotOwners` signs customer A's user in with a second, member membership and calls `clientUsers.list`, `clientUsers.resendInvite`, `clientUsers.save`, `policies.setDefaultRule` (with a stale version: the refusal comes first) and `filterCare.saveSettings`. All five are FORBIDDEN, while the owner's list works. With the client-user check switched off, the member could list and invite; the test then fails, as it should. No defect was found.
+2. **The service configuration had no test.** `TestConfigFromEnv` covers `ConfigFromEnv`:
+   - without `RATE_LIMIT_URL` there is no write limit; with it, the limit is 60 and `WRITE_LIMIT_PER_MINUTE` sets another;
+   - a limit of 0, below 0 or not a number, a URL that is not `redis://`, or a bad `DEMO_CLOCK_START` stops the start rather than running without the limit;
+   - `ADDR` and the `<DOMAIN>_API_URL` addresses are read.
+3. **Not pursued.** What the scan otherwise left are the Swagger route stubs (documentation only), the process entry points, and database-error returns, which would need fault injection. The client branch of the restriction projection is defensive: clients read restrictions only through `restrictions.forInvoice`, which masks them itself, and that masking is tested.
+4. **Checks.** `make test-all` passes. Only tests changed.
