@@ -23,26 +23,37 @@ type TechUnitAccess interface {
 	TechnicianUnit(ctx context.Context, c *ops.Call, unit uuid.UUID, inScope bool, internal bool) error
 }
 
-// HistoryInput is {deviceId, query} / {id, query}.
+// HistoryInput is the input of devices.operations and devices.calibrations: {deviceId, query}.
 type HistoryInput struct {
 	DeviceID uuid.UUID    `json:"deviceId"`
-	ID       uuid.UUID    `json:"id"`
 	Query    paging.Query `json:"query"`
 }
 
-func (in *HistoryInput) device() uuid.UUID {
-	if in.DeviceID != uuid.Nil {
-		return in.DeviceID
-	}
-	return in.ID
-}
+func (in *HistoryInput) device() uuid.UUID { return in.DeviceID }
 
 // Validate implements ops.Validator.
 func (in *HistoryInput) Validate() map[string]string {
-	if in.device() == uuid.Nil {
+	if in.DeviceID == uuid.Nil {
 		return map[string]string{"deviceId": "error.required"}
 	}
 	return nil // the filters are checked per operation (decodeHistory)
+}
+
+// EventsInput is the input of devices.events: {id, query}. Each history read takes only its own contract's ID field,
+// so the other one is an unknown field (IR391).
+type EventsInput struct {
+	ID    uuid.UUID    `json:"id"`
+	Query paging.Query `json:"query"`
+}
+
+func (in *EventsInput) device() uuid.UUID { return in.ID }
+
+// Validate implements ops.Validator.
+func (in *EventsInput) Validate() map[string]string {
+	if in.ID == uuid.Nil {
+		return map[string]string{"id": "error.required"}
+	}
+	return nil
 }
 
 // historyAccess checks the current-device part of SR24 (device visible to the caller) and, for technicians, an
@@ -143,7 +154,6 @@ func orderFor(q paging.Query, prefix string) (string, error) {
 // @Accept			json
 // @Produce		json
 // @Param			deviceId	path		string	true	"input field deviceId"
-// @Param			id			query		string	false	"input field id"
 // @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
 // @Param			limit		query		integer	false	"page size 1–100, default 25"
 // @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default createdAt desc;id asc"
@@ -182,7 +192,6 @@ func (m *Module) operations(ctx context.Context, c *ops.Call, in *HistoryInput) 
 // @Accept			json
 // @Produce		json
 // @Param			deviceId	path		string	true	"input field deviceId"
-// @Param			id			query		string	false	"input field id"
 // @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
 // @Param			limit		query		integer	false	"page size 1–100, default 25"
 // @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default createdAt desc;id asc"
@@ -288,25 +297,24 @@ func (m *Module) withNotes(ctx context.Context, c *ops.Call, evs []DeviceEvent) 
 // @Tags			devices
 // @Accept			json
 // @Produce		json
-// @Param			id			path		string	true	"input field id"
-// @Param			deviceId	query		string	false	"input field deviceId"
-// @Param			cursor		query		string	false	"page cursor: nextCursor of the previous page (D12)"
-// @Param			limit		query		integer	false	"page size 1–100, default 25"
-// @Param			sort		query		string	false	"field:direction — fields id,createdAt,updatedAt; default occurredAt desc;sequence desc;id asc"
-// @Param			from		query		string	false	"filter → [from,to) on occurredAt"
-// @Param			to			query		string	false	"filter → [from,to) on occurredAt"
-// @Success		200			{object}	ops.Envelope{data=DeviceEventPage}
-// @Failure		401			{object}	apperr.DomainError	"UNAUTHENTICATED"
-// @Failure		403			{object}	apperr.DomainError	"FORBIDDEN"
-// @Failure		404			{object}	apperr.DomainError	"NOT_FOUND"
-// @Failure		409			{object}	apperr.DomainError	"CONFLICT / OFFLINE"
-// @Failure		422			{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
-// @Failure		429			{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
-// @Failure		503			{object}	apperr.DomainError	"UNAVAILABLE"
-// @Failure		504			{object}	apperr.DomainError	"TIMEOUT"
+// @Param			id		path		string	true	"input field id"
+// @Param			cursor	query		string	false	"page cursor: nextCursor of the previous page (D12)"
+// @Param			limit	query		integer	false	"page size 1–100, default 25"
+// @Param			sort	query		string	false	"field:direction — fields id,createdAt,updatedAt; default occurredAt desc;sequence desc;id asc"
+// @Param			from	query		string	false	"filter → [from,to) on occurredAt"
+// @Param			to		query		string	false	"filter → [from,to) on occurredAt"
+// @Success		200		{object}	ops.Envelope{data=DeviceEventPage}
+// @Failure		401		{object}	apperr.DomainError	"UNAUTHENTICATED"
+// @Failure		403		{object}	apperr.DomainError	"FORBIDDEN"
+// @Failure		404		{object}	apperr.DomainError	"NOT_FOUND"
+// @Failure		409		{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+// @Failure		422		{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+// @Failure		429		{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+// @Failure		503		{object}	apperr.DomainError	"UNAVAILABLE"
+// @Failure		504		{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/devices/{id}/events [get]
-func (m *Module) events(ctx context.Context, c *ops.Call, in *HistoryInput) (paging.Page[DeviceEvent], error) {
+func (m *Module) events(ctx context.Context, c *ops.Call, in *EventsInput) (paging.Page[DeviceEvent], error) {
 	scope, sargs, err := m.historyAccess(ctx, c, in.device())
 	if err != nil {
 		return paging.Page[DeviceEvent]{}, err

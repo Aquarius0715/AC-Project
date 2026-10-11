@@ -6458,12 +6458,6 @@
                     },
                     {
                         "type": "string",
-                        "description": "input field id",
-                        "name": "id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
                         "description": "page cursor: nextCursor of the previous page (D12)",
                         "name": "cursor",
                         "in": "query"
@@ -6824,12 +6818,6 @@
                         "name": "deviceId",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "input field id",
-                        "name": "id",
-                        "in": "query"
                     },
                     {
                         "type": "string",
@@ -7286,12 +7274,6 @@
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "input field deviceId",
-                        "name": "deviceId",
-                        "in": "query"
                     },
                     {
                         "type": "string",
@@ -30590,10 +30572,6 @@
         "identity.MemberInput": {
             "type": "object",
             "properties": {
-                "displayName": {
-                    "description": "the user's display name (IR172)",
-                    "type": "string"
-                },
                 "employment": {
                     "type": "string"
                 },
@@ -34764,17 +34742,36 @@
                 "bindingId": {
                     "type": "string"
                 },
+                "causeCode": {
+                    "type": "string"
+                },
                 "commandId": {
                     "type": "string"
+                },
+                "connected": {
+                    "type": "boolean"
+                },
+                "delayMs": {
+                    "type": "integer"
                 },
                 "deviceId": {
                     "description": "device (SR20): kind communication_lost / power_lost / tamper / restored with recovery",
                     "type": "string"
                 },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "event": {},
                 "eventId": {
                     "type": "string"
                 },
                 "eventType": {
+                    "type": "string"
+                },
+                "evidenceKind": {
+                    "type": "string"
+                },
+                "evidenceText": {
                     "type": "string"
                 },
                 "kind": {
@@ -34783,18 +34780,35 @@
                 "measurement": {
                     "$ref": "#/definitions/server.RawMeasurement"
                 },
+                "membershipId": {
+                    "description": "The other event types of DemoTrigger (qualification_revoked, automation, network, simulator, allergen, load_alert,\nsession_expired, microphone_denied, transport) are the browser demo's. Their fields are read here only so that a\ntrigger shaped by the contract is refused as errors.trigger_unsupported, not as malformed input (IR391).",
+                    "type": "string"
+                },
+                "observation": {},
                 "observed": {
                     "$ref": "#/definitions/restrictions.Observation"
                 },
                 "occurredAt": {
                     "type": "string"
                 },
+                "operation": {
+                    "type": "string"
+                },
                 "operationId": {
                     "description": "operation (IR67): the device's result for a running check / firmware operation",
                     "type": "string"
                 },
+                "outcome": {
+                    "type": "string"
+                },
+                "qualification": {
+                    "type": "string"
+                },
                 "recovery": {
                     "$ref": "#/definitions/devices.Recovery"
+                },
+                "remainingCalls": {
+                    "type": "integer"
                 },
                 "restrictionId": {
                     "description": "restriction_observation (SR26)",
@@ -34803,11 +34817,17 @@
                 "result": {
                     "type": "string"
                 },
+                "retryAfterSeconds": {
+                    "type": "integer"
+                },
                 "scenarioId": {
                     "type": "string"
                 },
                 "sequence": {
                     "type": "integer"
+                },
+                "severity": {
+                    "type": "string"
                 },
                 "unitId": {
                     "type": "string"

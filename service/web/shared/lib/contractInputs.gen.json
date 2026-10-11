@@ -1,0 +1,1180 @@
+{
+ "admin.summary": [
+  "customerId",
+  "from",
+  "propertyId",
+  "to"
+ ],
+ "alerts.acknowledge": [
+  "alertId"
+ ],
+ "alerts.evidence": [
+  "alertId",
+  "query"
+ ],
+ "alerts.get": [
+  "id"
+ ],
+ "alerts.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "alerts.resolve": [
+  "alertId",
+  "resolutionEvidenceIds",
+  "resolutionReason"
+ ],
+ "attachments.add": [
+  "file",
+  "jobId",
+  "reportId"
+ ],
+ "attachments.getContent": [
+  "attachmentId",
+  "jobId",
+  "reportId",
+  "reportVersion"
+ ],
+ "attachments.list": [
+  "from",
+  "query",
+  "to",
+  "unitIds"
+ ],
+ "audit.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "auth.previewPasswordReset": [
+  "demoEmail"
+ ],
+ "automations.delete": [
+  "id"
+ ],
+ "automations.fire": [
+  "eventId",
+  "facts",
+  "occurredAt",
+  "phase",
+  "unitIds"
+ ],
+ "automations.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "automations.nextRuns": [
+  "automationId",
+  "count",
+  "draft"
+ ],
+ "automations.save": [
+  "action",
+  "condition",
+  "enabled",
+  "endAction",
+  "endLocal",
+  "endsNextDay",
+  "id",
+  "kind",
+  "name",
+  "onlyIf",
+  "priority",
+  "startAction",
+  "startLocal",
+  "timezone",
+  "unitIds",
+  "weekdays"
+ ],
+ "automations.simulate": [
+  "eventId",
+  "facts",
+  "occurredAt",
+  "phase",
+  "unitIds"
+ ],
+ "baselines.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "baselines.save": [
+  "assumptions",
+  "baselineKWh",
+  "boundary",
+  "boundaryId",
+  "id",
+  "method",
+  "period",
+  "source",
+  "unitIds"
+ ],
+ "capabilities.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "capabilities.save": [
+  "changeReason",
+  "control",
+  "fanControl",
+  "fanLevels",
+  "firmwareCandidates",
+  "id",
+  "manufacturer",
+  "modeControl",
+  "model",
+  "modes",
+  "sensors",
+  "temperature",
+  "ventilation",
+  "ventilationLevels"
+ ],
+ "certificates.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "certificates.requestTraining": [
+  "certificateId",
+  "note"
+ ],
+ "certificates.submit": [
+  "code",
+  "expiresAt",
+  "file",
+  "issuedAt",
+  "membershipId",
+  "name",
+  "number",
+  "renewalOf"
+ ],
+ "certificates.verify": [
+  "certificateId",
+  "decision",
+  "reason"
+ ],
+ "clientUsers.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "clientUsers.remove": [
+  "id",
+  "reason"
+ ],
+ "clientUsers.resendInvite": [
+  "id"
+ ],
+ "clientUsers.save": [
+  "clientRole",
+  "customerId",
+  "email",
+  "id",
+  "reason",
+  "status"
+ ],
+ "commands.create": [
+  "action",
+  "expectedUnitVersion",
+  "jobId",
+  "reason",
+  "source",
+  "unitId"
+ ],
+ "commands.get": [
+  "id"
+ ],
+ "commands.list": [
+  "jobId",
+  "query",
+  "unitId"
+ ],
+ "consents.get": [
+  "purpose"
+ ],
+ "consents.update": [
+  "granted",
+  "purpose"
+ ],
+ "contractors.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "contractors.save": [
+  "contactEmail",
+  "id",
+  "insuranceValidUntil",
+  "organizationId",
+  "registrationNo",
+  "serviceAreas"
+ ],
+ "contractors.setOfferStatus": [
+  "contractorOrgId",
+  "reason",
+  "status"
+ ],
+ "contracts.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "contracts.save": [
+  "currency",
+  "customerId",
+  "endAt",
+  "id",
+  "planType",
+  "priceMinor",
+  "restrictionEligible",
+  "rulesVersion",
+  "startAt",
+  "unitIds"
+ ],
+ "customers.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "customers.save": [
+  "id",
+  "name",
+  "organizationId",
+  "serviceProfile",
+  "status"
+ ],
+ "demo.advanceClock": [
+  "to"
+ ],
+ "demo.reset": [
+  "confirmation"
+ ],
+ "demo.trigger": [
+  "bindingId",
+  "causeCode",
+  "commandId",
+  "connected",
+  "delayMs",
+  "deviceId",
+  "enabled",
+  "event",
+  "eventId",
+  "eventType",
+  "evidenceKind",
+  "evidenceText",
+  "kind",
+  "measurement",
+  "membershipId",
+  "observation",
+  "observed",
+  "occurredAt",
+  "operation",
+  "operationId",
+  "outcome",
+  "qualification",
+  "recovery",
+  "remainingCalls",
+  "restrictionId",
+  "result",
+  "retryAfterSeconds",
+  "scenarioId",
+  "sequence",
+  "severity",
+  "unitId"
+ ],
+ "demoSession.extend": [],
+ "demoSession.signIn": [
+  "demoActorId",
+  "returnTo"
+ ],
+ "demoSession.signOut": [],
+ "demoSession.switchMembership": [
+  "demoMembershipId"
+ ],
+ "devices.addResponseNote": [
+  "deviceId",
+  "eventId",
+  "responseNote"
+ ],
+ "devices.bind": [
+  "deviceId",
+  "jobId",
+  "reason",
+  "unitId"
+ ],
+ "devices.calibrate": [
+  "calibratedAt",
+  "deviceId",
+  "jobId",
+  "measuredValue",
+  "metric",
+  "referenceValue",
+  "sensorId",
+  "unit"
+ ],
+ "devices.calibrations": [
+  "deviceId",
+  "query"
+ ],
+ "devices.check": [
+  "id",
+  "jobId"
+ ],
+ "devices.events": [
+  "id",
+  "query"
+ ],
+ "devices.get": [
+  "id"
+ ],
+ "devices.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "devices.operations": [
+  "deviceId",
+  "query"
+ ],
+ "devices.register": [
+  "jobId",
+  "sensorTypes",
+  "serial",
+  "unitId"
+ ],
+ "devices.updateFirmware": [
+  "deviceId",
+  "firmwareVersion",
+  "jobId"
+ ],
+ "diagnosticRuns.create": [
+  "durationMinutes",
+  "endAction",
+  "expectedJobVersion",
+  "expectedUnitVersion",
+  "jobId",
+  "reason",
+  "startAction",
+  "unitId"
+ ],
+ "diagnosticRuns.get": [
+  "diagnosticRunId"
+ ],
+ "diagnosticRuns.list": [
+  "jobId",
+  "query",
+  "unitId"
+ ],
+ "energy.exportReport": [
+  "format",
+  "month",
+  "propertyIds",
+  "sections"
+ ],
+ "energy.summary": [
+  "baselineId",
+  "from",
+  "tariffVersion",
+  "to",
+  "unitIds"
+ ],
+ "factors.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "factors.save": [
+  "id",
+  "isDemo",
+  "kgCO2ePerKWh",
+  "region",
+  "source",
+  "year"
+ ],
+ "filterCare.getSettings": [],
+ "filterCare.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "filterCare.markCleaned": [
+  "unitId"
+ ],
+ "filterCare.saveSettings": [
+  "channels",
+  "fallbackDays",
+  "recipients",
+  "thresholdHours"
+ ],
+ "firmwareCampaigns.control": [
+  "action",
+  "campaignId",
+  "deviceId",
+  "reason"
+ ],
+ "firmwareCampaigns.get": [
+  "id"
+ ],
+ "firmwareCampaigns.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "firmwareCampaigns.schedule": [
+  "autoPauseFailurePercent",
+  "deviceIds",
+  "modelId",
+  "startAt",
+  "targetVersion",
+  "waves",
+  "window"
+ ],
+ "inquiries.answer": [
+  "inquiryId",
+  "reply"
+ ],
+ "inquiries.create": [
+  "invoiceId",
+  "message",
+  "restrictionId",
+  "subjectType"
+ ],
+ "inquiries.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "invoices.create": [
+  "amountMinor",
+  "contractId",
+  "contractVersion",
+  "currency",
+  "dueAt",
+  "period"
+ ],
+ "invoices.get": [
+  "id"
+ ],
+ "invoices.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "invoices.remind": [
+  "channel",
+  "invoiceId",
+  "reason",
+  "recipientMembershipId"
+ ],
+ "jobs.accept": [
+  "jobId",
+  "offerId",
+  "termsVersion"
+ ],
+ "jobs.acknowledgeAssignment": [
+  "alternativeSlot",
+  "decision",
+  "jobId",
+  "reason"
+ ],
+ "jobs.addNote": [
+  "jobId",
+  "message",
+  "visibility"
+ ],
+ "jobs.assign": [
+  "endAt",
+  "jobId",
+  "reason",
+  "startAt",
+  "technicianMembershipId"
+ ],
+ "jobs.cancel": [
+  "cancelReason",
+  "jobId"
+ ],
+ "jobs.checkIn": [
+  "distanceMeters",
+  "jobId",
+  "method",
+  "qrUnitId",
+  "reason"
+ ],
+ "jobs.classifyFollowUp": [
+  "classification",
+  "jobId",
+  "reason"
+ ],
+ "jobs.create": [
+  "alternativeSlots",
+  "contactWindow",
+  "dueAt",
+  "requestedEnd",
+  "requestedStart",
+  "symptom",
+  "type",
+  "unitId"
+ ],
+ "jobs.decline": [
+  "jobId",
+  "offerId",
+  "reason"
+ ],
+ "jobs.events": [
+  "jobId",
+  "query"
+ ],
+ "jobs.extendAccess": [
+  "accessValidUntil",
+  "jobId",
+  "reason"
+ ],
+ "jobs.get": [
+  "jobId"
+ ],
+ "jobs.hold": [
+  "jobId",
+  "reason"
+ ],
+ "jobs.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "jobs.offer": [
+  "accessValidFrom",
+  "accessValidUntil",
+  "contractorOrgId",
+  "jobId",
+  "offerExpiresAt",
+  "termsVersion",
+  "visitSlot"
+ ],
+ "jobs.pauseWork": [
+  "jobId",
+  "paused"
+ ],
+ "jobs.proposePartnerSlot": [
+  "jobId",
+  "offerId",
+  "reason",
+  "slot",
+  "technicianMembershipId"
+ ],
+ "jobs.proposeSlot": [
+  "hold",
+  "jobId",
+  "message",
+  "replyBy",
+  "slot"
+ ],
+ "jobs.rate": [
+  "comment",
+  "jobId",
+  "stars",
+  "tags"
+ ],
+ "jobs.recordWarrantyClaim": [
+  "amountMinor",
+  "currency",
+  "jobId",
+  "partLabel",
+  "reason"
+ ],
+ "jobs.reportProblem": [
+  "details",
+  "jobId",
+  "photos",
+  "preferredSlot",
+  "reasonCode"
+ ],
+ "jobs.requestReschedule": [
+  "comment",
+  "jobId",
+  "preferredSlots"
+ ],
+ "jobs.resolvePartnerSlot": [
+  "decision",
+  "jobId",
+  "proposalId",
+  "replyBy"
+ ],
+ "jobs.respondProposal": [
+  "comment",
+  "decision",
+  "declineReason",
+  "jobId",
+  "preferredSlots",
+  "proposalId"
+ ],
+ "jobs.resumeHold": [
+  "jobId",
+  "reason"
+ ],
+ "jobs.resumeRework": [
+  "jobId"
+ ],
+ "jobs.review": [
+  "decision",
+  "jobId",
+  "reason",
+  "reportVersion",
+  "reviewMode"
+ ],
+ "jobs.saveCost": [
+  "costLines",
+  "jobId"
+ ],
+ "jobs.saveDraft": [
+  "attachmentIds",
+  "items",
+  "jobId",
+  "measurements",
+  "nextAction",
+  "parts",
+  "refrigerant",
+  "reportId",
+  "workText"
+ ],
+ "jobs.start": [
+  "jobId",
+  "startConfirmed"
+ ],
+ "jobs.submit": [
+  "jobId",
+  "reportVersion"
+ ],
+ "jobs.withdrawPartnerSlot": [
+  "jobId",
+  "proposalId"
+ ],
+ "jobs.withdrawProposal": [
+  "jobId",
+  "proposalId"
+ ],
+ "locations.rename": [
+  "name",
+  "target"
+ ],
+ "members.capacity": [
+  "date",
+  "query"
+ ],
+ "members.eligible": [
+  "endAt",
+  "jobId",
+  "query",
+  "startAt"
+ ],
+ "members.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "members.revokeSessions": [
+  "membershipId",
+  "reason"
+ ],
+ "members.save": [
+  "employment",
+  "id",
+  "organizationId",
+  "permissions",
+  "reason",
+  "role",
+  "scopes",
+  "userId",
+  "validFrom",
+  "validUntil"
+ ],
+ "members.setUnavailability": [
+  "from",
+  "membershipId",
+  "note",
+  "to",
+  "type"
+ ],
+ "mrv.get": [
+  "id",
+  "reportVersion"
+ ],
+ "mrv.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "mrv.preview": [
+  "baselineId",
+  "baselineVersion",
+  "boundary",
+  "boundaryId",
+  "factorId",
+  "factorVersion",
+  "from",
+  "organizationId",
+  "to",
+  "unitIds"
+ ],
+ "mrv.recordReview": [
+  "reportId",
+  "reportVersion",
+  "reviewComment"
+ ],
+ "mrv.saveDraft": [
+  "conditions",
+  "evidenceIds",
+  "id"
+ ],
+ "mrv.versions": [
+  "id",
+  "query"
+ ],
+ "notifications.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "notifications.markAllRead": [
+  "ids"
+ ],
+ "notifications.markRead": [
+  "id"
+ ],
+ "notifications.preview": [
+  "channel",
+  "message",
+  "reason",
+  "recipientMembershipId",
+  "severity",
+  "sourceAlertId",
+  "target",
+  "templateKey"
+ ],
+ "notifications.recipients": [
+  "channel",
+  "query",
+  "role",
+  "target",
+  "templateKey"
+ ],
+ "offsets.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "offsets.preview": [
+  "amountKg",
+  "customerId",
+  "period",
+  "purpose",
+  "unitIds"
+ ],
+ "offsets.simulate": [
+  "attemptId",
+  "demoConfirmed",
+  "event",
+  "eventId",
+  "quoteId",
+  "quoteVersion",
+  "recordId"
+ ],
+ "organizations.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "organizations.save": [
+  "id",
+  "kind",
+  "name",
+  "status"
+ ],
+ "parts.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "payments.confirm": [
+  "confirmedAmountMinor",
+  "currency",
+  "paymentId",
+  "paymentReference",
+  "reason"
+ ],
+ "payments.recordManual": [
+  "confirmedAmountMinor",
+  "currency",
+  "invoiceId",
+  "paymentReference",
+  "reason"
+ ],
+ "payments.simulate": [
+  "demoConfirmed",
+  "event",
+  "eventId",
+  "invoiceId",
+  "method",
+  "paymentId",
+  "paymentReference"
+ ],
+ "payouts.generate": [
+  "period"
+ ],
+ "payouts.get": [
+  "id"
+ ],
+ "payouts.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "payouts.query": [
+  "lineId",
+  "message",
+  "statementId",
+  "topic"
+ ],
+ "payouts.resolveQuery": [
+  "adjustmentMinor",
+  "queryId",
+  "reply",
+  "statementId"
+ ],
+ "payouts.transition": [
+  "action",
+  "reason",
+  "statementId"
+ ],
+ "plans.generateNext": [
+  "id",
+  "occurrenceDate"
+ ],
+ "plans.get": [
+  "id"
+ ],
+ "plans.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "plans.save": [
+  "id",
+  "nextDueAt",
+  "recurrence",
+  "unitId"
+ ],
+ "policies.delete": [
+  "policyId"
+ ],
+ "policies.get": [
+  "policyId"
+ ],
+ "policies.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "policies.save": [
+  "action",
+  "activeWindow",
+  "channels",
+  "condition",
+  "cooldownMinutes",
+  "customerId",
+  "durationSeconds",
+  "enabled",
+  "escalateAfterMinutes",
+  "id",
+  "kind",
+  "metric",
+  "name",
+  "operator",
+  "priority",
+  "recipientMembershipIds",
+  "recoveryThreshold",
+  "rules",
+  "severity",
+  "threshold",
+  "timezone",
+  "unitIds"
+ ],
+ "policies.setDefaultRule": [
+  "customerId",
+  "enabled",
+  "policyId",
+  "reason",
+  "ruleKey"
+ ],
+ "preferences.get": [],
+ "preferences.update": [
+  "locale",
+  "monthlyReportEmail",
+  "timezone"
+ ],
+ "properties.archive": [
+  "id",
+  "reason"
+ ],
+ "properties.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "properties.save": [
+  "accessInstructions",
+  "address",
+  "customerOrgId",
+  "id",
+  "kind",
+  "name"
+ ],
+ "rateCards.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "rateCards.save": [
+  "contractorOrgId",
+  "currency",
+  "effectiveFrom",
+  "lines"
+ ],
+ "reports.get": [
+  "jobId",
+  "reportId",
+  "reportVersion"
+ ],
+ "reports.signOff": [
+  "absentReason",
+  "jobId",
+  "reportId",
+  "reportVersion",
+  "signature",
+  "signerName",
+  "sitePhoto"
+ ],
+ "restrictions.cancel": [
+  "reason",
+  "restrictionId"
+ ],
+ "restrictions.defer": [
+  "reason",
+  "restrictionId",
+  "until"
+ ],
+ "restrictions.execute": [
+  "confirmedRulesVersion",
+  "restrictionId"
+ ],
+ "restrictions.exempt": [
+  "reason",
+  "restrictionId",
+  "until"
+ ],
+ "restrictions.forInvoice": [
+  "invoiceId",
+  "query"
+ ],
+ "restrictions.get": [
+  "id"
+ ],
+ "restrictions.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "restrictions.override": [
+  "reason",
+  "restrictionId"
+ ],
+ "restrictions.reconcile": [
+  "restrictionId",
+  "unitIds"
+ ],
+ "restrictions.release": [
+  "restrictionId"
+ ],
+ "restrictions.retry": [
+  "confirmedRulesVersion",
+  "phase",
+  "reason",
+  "restrictionId",
+  "unitIds"
+ ],
+ "restrictions.schedule": [
+  "causeInvoiceIds",
+  "contractId",
+  "executeAfter",
+  "expectedContractVersion",
+  "policy",
+  "reason",
+  "rulesVersion",
+  "unitIds"
+ ],
+ "session.get": [],
+ "sla.saveTargets": [
+  "arrivalInWindowPercent",
+  "effectiveFrom",
+  "firstTimeFixPercent",
+  "planType",
+  "responseHours"
+ ],
+ "sla.scorecard": [
+  "contractorOrgId",
+  "period"
+ ],
+ "spaces.archive": [
+  "id",
+  "reason"
+ ],
+ "spaces.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "spaces.save": [
+  "id",
+  "kind",
+  "name",
+  "parentSpaceId",
+  "propertyId"
+ ],
+ "summaries.get": [
+  "filters",
+  "kind"
+ ],
+ "telemetry.series": [
+  "from",
+  "metric",
+  "query",
+  "sensorId",
+  "spaceId",
+  "to",
+  "unitIds"
+ ],
+ "telemetry.summary": [
+  "from",
+  "metric",
+  "to",
+  "unitIds"
+ ],
+ "twoFactor.disable": [
+  "code"
+ ],
+ "twoFactor.enable": [
+  "code"
+ ],
+ "twoFactor.get": [],
+ "units.archive": [
+  "id",
+  "reason"
+ ],
+ "units.coverage": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "units.delete": [
+  "id",
+  "reason"
+ ],
+ "units.get": [
+  "id",
+  "jobId"
+ ],
+ "units.importCommit": [
+  "customerId",
+  "previewId"
+ ],
+ "units.importPreview": [
+  "csvText",
+  "customerId",
+  "fileName",
+  "mapping"
+ ],
+ "units.importUndo": [
+  "importId",
+  "reason"
+ ],
+ "units.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "units.resolveQr": [
+  "code"
+ ],
+ "units.save": [
+  "changeReason",
+  "customerOrgId",
+  "displayName",
+  "id",
+  "installedAt",
+  "modelId",
+  "propertyId",
+  "serviceScope",
+  "spaceId",
+  "type",
+  "warrantyEndsAt"
+ ],
+ "units.setAlertPolicies": [
+  "alertPolicyIds",
+  "unitId"
+ ],
+ "ventilation.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "ventilation.log": [
+  "durationMinutes",
+  "method",
+  "spaceId",
+  "unitId"
+ ],
+ "voice.resolveIntent": [
+  "locale",
+  "selectedUnitId",
+  "text"
+ ],
+ "writes.getResult": [
+  "idempotencyKey",
+  "operation"
+ ]
+}

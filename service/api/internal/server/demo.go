@@ -190,6 +190,24 @@ type TriggerInput struct {
 	// operation (IR67): the device's result for a running check / firmware operation
 	OperationID *uuid.UUID `json:"operationId,omitempty"`
 	Result      string     `json:"result,omitempty"`
+	// The other event types of DemoTrigger (qualification_revoked, automation, network, simulator, allergen, load_alert,
+	// session_expired, microphone_denied, transport) are the browser demo's. Their fields are read here only so that a
+	// trigger shaped by the contract is refused as errors.trigger_unsupported, not as malformed input (IR391).
+	MembershipID      *uuid.UUID `json:"membershipId,omitempty"`
+	Qualification     *string    `json:"qualification,omitempty"`
+	Event             any        `json:"event,omitempty"`
+	Connected         *bool      `json:"connected,omitempty"`
+	Enabled           *bool      `json:"enabled,omitempty"`
+	Observation       any        `json:"observation,omitempty"`
+	CauseCode         *string    `json:"causeCode,omitempty"`
+	EvidenceKind      *string    `json:"evidenceKind,omitempty"`
+	EvidenceText      *string    `json:"evidenceText,omitempty"`
+	Severity          *string    `json:"severity,omitempty"`
+	Operation         *string    `json:"operation,omitempty"`
+	Outcome           *string    `json:"outcome,omitempty"`
+	RetryAfterSeconds *int       `json:"retryAfterSeconds,omitempty"`
+	DelayMs           *int       `json:"delayMs,omitempty"`
+	RemainingCalls    *int       `json:"remainingCalls,omitempty"`
 }
 
 // RawMeasurement is RawMeasurement of service-contracts.ts.

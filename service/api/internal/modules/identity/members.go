@@ -263,11 +263,11 @@ var RolePermissions = map[string][]string{
 	"client":     {},
 }
 
-// MemberInput is members.save input.
+// MemberInput is members.save input. The display name is the user's own (IR172): a Membership result carries it, the
+// input does not (IR391).
 type MemberInput struct {
 	ID             *uuid.UUID `json:"id,omitempty"`
 	UserID         uuid.UUID  `json:"userId"`
-	DisplayName    string     `json:"displayName"` // the user's display name (IR172)
 	OrganizationID uuid.UUID  `json:"organizationId"`
 	Role           string     `json:"role"`
 	Employment     *string    `json:"employment"`

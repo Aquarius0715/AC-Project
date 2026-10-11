@@ -116,6 +116,9 @@ func TestRequiredInputs(t *testing.T) {
 		{"energy.exportReport", `{"propertyIds":[],"sections":[]}`, map[string]string{"propertyIds": inv, "sections": req, "month": inv, "format": inv}},
 		{"energy.exportReport", `{"propertyIds":["00000000-0000-0000-0000-000000000001","00000000-0000-0000-0000-000000000001"],"sections":["weather"]}`, map[string]string{"propertyIds": inv, "sections": inv}},
 		{"members.save", `{}`, map[string]string{"userId": req, "organizationId": req, "role": inv, "validFrom": req}},
+		{"devices.events", `{}`, map[string]string{"id": req}}, // its own ID field (IR391)
+		{"devices.operations", `{}`, map[string]string{"deviceId": req}},
+		{"devices.calibrations", `{}`, map[string]string{"deviceId": req}},
 		{"clientUsers.remove", `{"reason":` + long(1001) + `}`, map[string]string{"id": req, "reason": length}},
 		{"notifications.preview", `{}`, map[string]string{"recipientMembershipId": req}},
 		{"writes.getResult", `{}`, map[string]string{"operation": req}},

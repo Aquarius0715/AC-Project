@@ -97,8 +97,14 @@ func TestDemoOperations(t *testing.T) {
 	if code, _ := trig(s, tele("25", "°C", uuid.NewString())); code != 404 {
 		t.Error("unknown sensor")
 	}
-	if code, m := trig(s, `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(time.RFC3339)+`","eventType":"network","connected":false}`); code != 422 || fields(m) != "_=error.malformedInput" {
+	if code, m := trig(s, `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(time.RFC3339)+`","eventType":"network","bogus":false}`); code != 422 || fields(m) != "_=error.malformedInput" {
 		t.Errorf("a trigger with a field no type has: %d %s", code, fields(m))
+	}
+	// a trigger of the browser demo's types, shaped by the contract, is refused as unsupported (IR391)
+	for _, extra := range []string{`"connected":false`, `"enabled":true`, `"membershipId":"` + uuid.NewString() + `","qualification":"demo_indoor"`,
+		`"operation":"units.list","outcome":"TIMEOUT","retryAfterSeconds":null,"delayMs":null,"remainingCalls":1`} {
+		code, m := trig(s, `{"scenarioId":"t","eventId":"`+uuid.NewString()+`","occurredAt":"`+clock.Format(time.RFC3339)+`","eventType":"network",`+extra+`}`)
+		refusal(t, "contract-shaped "+extra, code, m, "eventType=errors.trigger_unsupported")
 	}
 	// the trigger's own rules (IR36): a known event type, its IDs, and a measurement of the sensor's metric and unit
 	now := clock.Format(time.RFC3339)

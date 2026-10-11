@@ -6041,3 +6041,32 @@ IR384 and IR385 left one step open: ending the identity provider's sessions from
    - `required_inputs_test.go` gained `payments.recordManual`.
 5. **Coverage.** Go coverage is 88.6%, and no untested Validate rule remains. The web has 76 test files and 456 tests.
 6. **Checks.** `make test-all` (both modes), the web checks and the validators pass. With the billing and gateway images rebuilt, the E2E suite passes: 117 tests, 8 skipped.
+
+## IR391 Every operation's input type holds exactly its contract input — 2026-10-12
+
+IR390 found two writes sharing one input type. This round checked the same thing for all 204 operations.
+
+It is also this round's security check: an input type that takes fields outside its contract is where mass assignment starts (OWASP API3, object property level authorization). None of the extra fields below was written anywhere, and the permanent check now keeps any such field out.
+
+1. **How it was checked.**
+   - The contract side: every `OperationContracts[op].input` of the service contracts, with named types, intersections and unions resolved by the TypeScript checker. A union lists the fields of all its variants.
+   - The Core API side: the JSON fields that every registered operation's input type decodes, read by reflection.
+2. **Findings.**
+   - **The device history reads.** `devices.operations` and `devices.calibrations` take `deviceId`, and `devices.events` takes `id`. All three used one type that held both IDs, so each accepted the other's ID, a field outside its contract. `devices.events` without an ID named `deviceId` as the missing field.
+     - Fixed: `HistoryInput {deviceId, query}` and `EventsInput {id, query}`. The other ID is now an unknown field, and each refusal names its own field.
+   - **`members.save`** took a `displayName` that it never read; the contract has none. The display name is the user's own, and a Membership result carries it (IR172). The field is gone, so it is now an unknown field.
+   - **`demo.trigger`.** The contract's `DemoTrigger` also lists the browser demo's event types: `qualification_revoked`, `automation`, `network`, `simulator`, `allergen`, `load_alert`, `session_expired`, `microphone_denied` and `transport`.
+     - The Core API refuses them as VALIDATION `eventType=errors.trigger_unsupported`, as documented. But a trigger shaped by the contract, for example `network` with `connected`, carried fields the input type did not have, so it was refused as malformed input instead.
+     - The input now reads those fields, ignored, so such a trigger gets `errors.trigger_unsupported`. The demo test had pinned the old answer, and it now pins the documented one. A field that no variant has stays malformed input.
+   - Every other operation matched its contract input. Input types shared by several operations (archive, job ID, reason, list queries) serve contract inputs that are the same.
+3. **The check is now permanent.**
+   - The web's `contractInputs.test.ts` derives the list from `contracts.gen.ts` with the TypeScript checker and compares it with `service/web/shared/lib/contractInputs.gen.json`. A stale list fails the test. `UPDATE_CONTRACT_INPUTS=1` rewrites it after a contract change.
+   - The Core API's `TestInputsMatchContract` holds every registered operation's input type to that list: no field outside it, none of it missing, and no operation missing on either side.
+   - On the code before this round, the test reports the five mismatches above. It would also have caught IR390's payment inputs.
+   - Backend Go design §9 names the check.
+4. **Tests.** `TestRequiredInputs` gained the three device history reads, each with its own ID field. The demo test covers four triggers of the browser demo's types shaped by the contract.
+5. **The API description.**
+   - The device history routes no longer list the other ID as a query parameter.
+   - `MemberInput` has no `displayName`.
+   - The trigger's added fields have concrete types (bool, string, number, object). The first attempt read them as raw JSON, and the generator then dropped every property of the trigger's definition, so they were typed instead. The definition now lists all 31 fields of the contract's variants.
+6. **Checks.** `make test-all` (both modes), the web checks (457 unit tests) and the validators pass. With the equipment, identity and gateway images rebuilt, the E2E suite passes: 117 tests, 8 skipped.
