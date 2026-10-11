@@ -4992,3 +4992,32 @@ A check of the create buttons on the HQ screens (R338) found that HQ could not c
      - Checks the version and the footer, Discard, and an edit to version 2.
      - Deletes the policy.
      - Follows the unit page's link to a new draft.
+
+## IR346 The Policies tab's scope, Show disabled and active hours — 2026-10-11
+
+IR345 item 7 left parts of DD-A05 items 7–10 off the HQ Policies tab. This round adds the scope (item 8), Show disabled and the "Only if …" window (item 10), as Figma Admin 268:2 and 38:5 show them.
+
+1. **Scope (DD-A05 item 8).**
+   - The Policies tab has the Alerts tab's customer → property → unit selects and URL keys (`customerId`, `propertyId`, `unitId`). `policies.list` reads with the same filters.
+   - A property or unit scope lists the policies attached to those units (IR120 item 5), which leaves out the default policy. The screen reads the default policy on its own (`kind=default_alert`) and lists it first: it runs on every unit (Figma 268:2).
+   - A unit scope says "Showing the policies attached to <unit>: <names>."
+   - Switching between the tabs keeps the scope. Changing the scope clears the selected policy and a new policy's draft.
+   - The unit page's links carry the scope: Edit / View from the unit edit add the customer and the unit; the customer's Alert policies rows and "+ New policy for <customer>" add the customer.
+2. **New policy for the scoped customer.** Scoped to one active customer, the button reads "+ New policy for <customer>" and opens that customer's draft at once (Figma 268:2). Without a customer scope it asks for the owner (IR345 item 1).
+3. **Show disabled.** On by default, as on the automation policies (IR323). Off hides the disabled policies, except the one that is open.
+4. **Only if … (DD-A05 item 10).**
+   - "Only on some days and times" sets `activeWindow`: the days (Mon–Fri and Every day as shortcuts), From and To in the policy's time zone. The policy's own time zone is named next to them.
+   - Off reads "Any day · any time". On, the window is summed up as in the client app ("only 08:00–19:00 on Tue, Wed, Thu, Fri").
+   - The form checks at least one day and two different HH:mm times (IR120 item 3); a window past midnight is allowed. The footer names a change as "Active hours".
+   - The time inputs of this editor and of the client's (DD-C15) are wider, so a 12-hour time is not cut off.
+5. **Not on the screen yet.**
+   - The notification preview per recipient (DD-A05 item 7). `notifications.preview` renders an alert as a warning with the status "fault". The notifier sends the policy's severity with the status "open". A faithful preview needs the policy's severity in the preview input.
+   - The demo test, and the default policy's rule editor with "Copy as a <customer> policy →" (item 9).
+6. **Tests.**
+   - Web unit: the window check (a window past midnight, no days, equal or malformed times) and the "Active hours" change.
+   - E2E `admin/alert-policies`:
+     - Scoped to Demo Customer A, the new policy opens at once and is saved with Tue–Fri 08:00–19:00.
+     - Show disabled off keeps the open policy and hides it once another one is open.
+     - A unit scope lists only the default policy.
+     - The Alerts tab keeps the scope.
+   - The Malay language spec (`admin/language`) now clicks the create buttons IR345 item 6 renamed ("+ Laporan baharu", "+ Faktor baharu", "+ Kontrak baharu", "+ Polisi baharu"). IR345's suite run had used a build from before the rename.

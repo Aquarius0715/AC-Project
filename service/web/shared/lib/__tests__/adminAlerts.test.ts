@@ -56,6 +56,10 @@ describe("HQ alerts and alert policies", () => {
     // IR120 item 3: a whole priority 0–100 and 1–20 recipients
     expect(policyErrors({ ...p, priority: 50.5, recipients: [] })).toEqual({ priority: "A whole number 0–100", recipients: "Add at least one recipient" });
     expect(policyErrors({ ...p, priority: 101, recipients: Array.from({ length: 21 }, (_, n) => ({ id: `m-${n}`, label: "", role: "" })) })).toEqual({ priority: "A whole number 0–100", recipients: "At most 20 recipients" });
+    // “Only if …”: at least one day and two different HH:mm times (IR120 item 3)
+    const win = (weekdays: number[], startLocal: string, endLocal: string) => policyErrors({ ...p, activeWindow: { weekdays, startLocal, endLocal } }).activeWindow;
+    expect([win([1, 2, 3, 4, 5], "08:00", "19:00"), win([6, 7], "22:00", "06:00")]).toEqual([undefined, undefined]); // past midnight is allowed
+    for (const bad of [win([], "08:00", "19:00"), win([1], "08:00", "08:00"), win([1], "8:00", "19:00"), win([1], "08:00", "24:00")]) expect(bad).toBe("Pick at least one day and two different times.");
   });
 
   it("names who made a policy and the units it is attached to (Figma 38:5, IR345)", () => {
@@ -83,6 +87,8 @@ describe("HQ alerts and alert policies", () => {
     expect(policyChanges({ ...p, on: false, threshold: 31, recipients: [], channels: ["email", "inApp"], escalate: 30 }, p)).toEqual(["Enabled", "Condition", "Recipients", "Channels", "Escalation"]);
     expect(policyChanges({ ...p, channels: ["email", "inApp"] }, { ...p, channels: ["inApp", "email"] })).toEqual([]); // the order of the channels does not matter
     expect(policyChanges({ ...p, name: "x", cooldown: 9 }, p, MS.t)).toEqual(["Nama", "Tempoh bertenang"]);
+    const office = { ...p, activeWindow: { weekdays: [1, 2, 3, 4, 5], startLocal: "08:00", endLocal: "19:00" } };
+    expect([policyChanges(office, p), policyChanges({ ...office, activeWindow: { ...office.activeWindow, weekdays: [5, 4, 3, 2, 1] } }, office)]).toEqual([["Active hours"], []]);
   });
 });
 

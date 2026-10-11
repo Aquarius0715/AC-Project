@@ -4000,6 +4000,13 @@ export const ms: Record<string, string> = {
   "Escalate if still unacknowledged (1–1440)": "Eskalasi jika masih belum diakui (1–1440)",
   "Fix the validation errors first": "Betulkan ralat pengesahan dahulu",
   // HQ alert policy creation (IR345)
+  "Showing the policies attached to {unit}: {names}.": "Menunjukkan polisi yang dilampirkan pada {unit}: {names}.",
+  "Only if … (optional) · active hours": "Hanya jika … (pilihan) · waktu aktif",
+  "Evaluated in the policy timezone. Outside these hours the condition is not checked — the same field as “Only if” in the client app.": "Dinilai dalam zon waktu polisi. Di luar waktu ini syarat tidak disemak — medan yang sama dengan “Hanya jika” dalam aplikasi pelanggan.",
+  "Any day · any time": "Mana-mana hari · bila-bila masa",
+  "1 policy in scope": "1 polisi dalam skop",
+  "{n} policies in scope": "{n} polisi dalam skop",
+  "Active hours": "Waktu aktif",
   "+ New policy": "+ Polisi baharu",
   "New alert policy": "Polisi amaran baharu",
   "Alert policy": "Polisi amaran",

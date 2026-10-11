@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Btn, Card, EmptyState, Field, ListRow, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Textarea, Timeline, useToast, cx } from "@ac/web/components/ui";
+import { Btn, Card, Check, EmptyState, Field, ListRow, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Textarea, Timeline, useToast, cx } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { EvidencePicker } from "@ac/web/components/EvidencePicker";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
@@ -61,7 +61,12 @@ export function AdminAlertsView({ live }: { live?: Live }) {
   const [pending, startTransition] = useTransition();
   const [urlTab, setUrlTab] = useUrlTab<"alerts" | "policies">({ alerts: "alerts", policies: "policies" }, "alerts");
   const tab = live ? live.tab : urlTab;
-  const setTab = (v: "alerts" | "policies") => (live ? router.replace(v === "policies" ? `${pathname}?tab=policies` : pathname, { scroll: false }) : setUrlTab(v));
+  // the customer → property → unit scope is shared by both tabs, so switching keeps it (DD-A05 items 5 and 8)
+  const scoped = (extra: Record<string, string>) => {
+    const sp = new URLSearchParams({ ...Object.fromEntries((["customerId", "propertyId", "unitId"] as const).flatMap((k) => (live?.q[k] ? [[k, live.q[k]!]] : []))), ...extra });
+    return sp.size ? `${pathname}?${sp}` : pathname;
+  };
+  const setTab = (v: "alerts" | "policies") => (live ? router.replace(scoped(v === "policies" ? { tab: "policies" } : {}), { scroll: false }) : setUrlTab(v));
 
   // alerts: the demo changes its local copy; API mode shows the server rows
   const [demoList, setDemoList] = useState(seedAlerts);
@@ -79,12 +84,17 @@ export function AdminAlertsView({ live }: { live?: Live }) {
   const polSel: PolicySel = live ? { policyId: live.pol.policyId, newFor: live.pol.newFor } : demoSel;
   const selectPolicy = (policyId: string | null, newFor: string | null = null) => (live ? patch({ policyId, new: newFor }) : setDemoSel({ policyId, newFor }));
   const [asking, setAsking] = useState(false);
+  const [showOff, setShowOff] = useState(true);
   const startPolicy = (customerId: string) => {
     setAsking(false);
-    if (live) return router.replace(`${pathname}?tab=policies&new=${customerId}`, { scroll: false });
+    if (live) return router.replace(scoped({ tab: "policies", new: customerId }), { scroll: false });
     setUrlTab("policies");
     setDemoSel({ policyId: null, newFor: customerId });
   };
+  // scoped to one active customer, “+ New policy for <customer>” opens its draft at once (Figma 268:2)
+  const scopeOwner = live?.q.customerId ? live.pol.customers.find((c) => c.id === live.q.customerId) ?? null : null;
+  const pols = live ? live.policies : seedPolicies;
+  const scopeUnit = live?.q.unitId ? live.scope.units.find((u) => u.id === live.q.unitId)?.name ?? live.q.unitId : null;
   const [resolve, setResolve] = useState(false);
   const [reason, setReason] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
@@ -129,8 +139,10 @@ export function AdminAlertsView({ live }: { live?: Live }) {
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Tabs value={tab} onChange={setTab} tabs={[{ id: "alerts", label: t("Alerts"), count: openish.length }, { id: "policies", label: t("Policies"), count: (live ? live.policies : seedPolicies).length }]} />
-        {(live ? live.pol.canWrite : true) && <Btn size="sm" variant="primary" onClick={() => setAsking(true)}>{t("+ New policy")}</Btn>}
+        <Tabs value={tab} onChange={setTab} tabs={[{ id: "alerts", label: t("Alerts"), count: openish.length }, { id: "policies", label: t("Policies"), count: pols.length }]} />
+        {(live ? live.pol.canWrite : true) && (scopeOwner
+          ? <Btn size="sm" variant="primary" onClick={() => startPolicy(scopeOwner.id)}>{t("+ New policy for {name}", { name: scopeOwner.name })}</Btn>
+          : <Btn size="sm" variant="primary" onClick={() => setAsking(true)}>{t("+ New policy")}</Btn>)}
       </div>
       {tab === "alerts" ? (
         <>
@@ -183,7 +195,15 @@ export function AdminAlertsView({ live }: { live?: Live }) {
           </div>
         </>
       ) : (
-        <PoliciesTab pols={live ? live.policies : seedPolicies} live={live?.pol} sel={polSel} select={selectPolicy} />
+        <>
+          {live ? (
+            <ScopeBar scope={live.scope} q={live.q} text={t(pols.length === 1 ? "1 policy in scope" : "{n} policies in scope", { n: pols.length })} clear={["policyId", "new"]}>
+              <Check label={t("Show disabled")} checked={showOff} onChange={setShowOff} />
+            </ScopeBar>
+          ) : <div className="flex justify-end"><Check label={t("Show disabled")} checked={showOff} onChange={setShowOff} /></div>}
+          {scopeUnit && <p className="text-xs text-muted">{t("Showing the policies attached to {unit}: {names}.", { unit: scopeUnit, names: pols.map((x) => x.name).join(", ") })}</p>}
+          <PoliciesTab pols={pols} live={live?.pol} sel={polSel} select={selectPolicy} showOff={showOff} />
+        </>
       )}
       {asking && <NewPolicyModal customers={live ? live.pol.customers : demoCustomers} initial={live?.q.customerId} onClose={() => setAsking(false)} onStart={startPolicy} />}
       <Modal open={resolve} onClose={() => setResolve(false)} title={t("Resolve alert")} footer={<><Btn onClick={() => setResolve(false)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || evidence.loading} onClick={doResolve}>{t("Resolve alert")}</Btn></>}>

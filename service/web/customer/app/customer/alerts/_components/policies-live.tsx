@@ -144,7 +144,7 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
             <div className="flex flex-wrap items-center gap-2">
               <Btn size="sm" onClick={() => set({ weekdays: [1, 2, 3, 4, 5] })}>{t("Mon–Fri")}</Btn><Btn size="sm" onClick={() => set({ weekdays: [1, 2, 3, 4, 5, 6, 7] })}>{t("Every day")}</Btn>
               {days.map((d, i) => <button key={d} type="button" aria-pressed={f.weekdays.includes(i + 1)} onClick={() => set({ weekdays: f.weekdays.includes(i + 1) ? f.weekdays.filter((x) => x !== i + 1) : [...f.weekdays, i + 1] })} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", f.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</button>)}
-              <Input aria-label={t("From")} type="time" className="w-28" value={f.start} onChange={(e) => set({ start: e.target.value })} /> – <Input aria-label={t("To")} type="time" className="w-28" value={f.end} onChange={(e) => set({ end: e.target.value })} />
+              <Input aria-label={t("From")} type="time" className="w-32" value={f.start} onChange={(e) => set({ start: e.target.value })} /> – <Input aria-label={t("To")} type="time" className="w-32" value={f.end} onChange={(e) => set({ end: e.target.value })} />
               <span className="text-xs text-muted">{editor.policy?.timezone ?? p.timezone}</span>
             </div>
           )}

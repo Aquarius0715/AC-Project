@@ -87,9 +87,58 @@ test("the unit page's new-policy link opens a draft for that customer", async ({
   await main.getByRole("tab", { name: /^Alert policies/ }).click();
   await page.waitForURL(/tab=policies/);
   await main.getByRole("link", { name: "+ New policy for Demo Customer A" }).click();
-  await page.waitForURL(/\/admin\/alerts\?tab=policies&new=[0-9a-f-]{36}$/);
+  await page.waitForURL(/\/admin\/alerts\?tab=policies&customerId=([0-9a-f-]{36})&new=\1$/); // scoped to that customer
   await expect(main.getByRole("heading", { name: /New alert policy/ })).toBeVisible();
   await expect(main).toContainText("Demo Customer A");
   await main.getByRole("button", { name: "Discard" }).click(); // nothing is created
   await page.waitForURL((u) => !u.searchParams.has("new"));
+});
+
+// DD-A05 item 8 (Figma 268:2, IR346): the Policies tab shares the alerts' customer → property → unit scope; scoped to a
+// customer, “+ New policy for <customer>” opens its draft at once; “Only if …” limits the days and hours; Show disabled
+// off hides a disabled policy unless it is open; a unit scope lists the policies attached to that unit (the seed has
+// only the default policy); switching tabs keeps the scope.
+test("the Policies tab's scope, Show disabled and a scoped new policy with active hours", async ({ page }) => {
+  const name = `E2E office hours ${Date.now()}`;
+  await page.goto("/admin/alerts?tab=policies");
+  const main = page.getByRole("main");
+  await main.getByRole("combobox", { name: "Customer" }).selectOption({ label: "Demo Customer A" });
+  await page.waitForURL(/customerId=/);
+  await main.getByRole("button", { name: "+ New policy for Demo Customer A" }).click();
+  await page.waitForURL((u) => u.searchParams.get("tab") === "policies" && !!u.searchParams.get("new") && u.searchParams.get("new") === u.searchParams.get("customerId"));
+
+  await expect(main).toContainText("Any day · any time");
+  await main.getByRole("checkbox", { name: "Only on some days and times" }).check();
+  await expect(main).toContainText("only 08:00–19:00 on weekdays");
+  await main.getByRole("button", { name: "Mon", exact: true }).click();
+  await expect(main).toContainText("only 08:00–19:00 on Tue, Wed, Thu, Fri");
+  await main.getByRole("textbox", { name: /^Name/ }).fill(name);
+  await main.getByRole("button", { name: "+ Add recipient" }).click();
+  const picker = page.getByRole("dialog");
+  await picker.getByRole("checkbox", { name: /^hq-operator/ }).check();
+  await picker.getByRole("button", { name: "Add 1 recipient" }).click();
+  await main.getByRole("button", { name: "Save policy" }).click();
+  await page.waitForURL(/policyId=[0-9a-f-]{36}/);
+  created = new URL(page.url()).searchParams.get("policyId");
+  await expect(main).toContainText("only 08:00–19:00 on Tue, Wed, Thu, Fri"); // as saved
+  expect(new URL(page.url()).searchParams.get("customerId")).toBeTruthy(); // still scoped
+
+  // Show disabled off: the new policy is off, yet it stays listed while it is open
+  const list = main.locator("section").filter({ has: page.getByRole("heading", { name: "Alert policies", exact: true }) });
+  await main.getByRole("checkbox", { name: "Show disabled" }).uncheck();
+  await expect(list.getByRole("button", { name: new RegExp(name) })).toBeVisible();
+  await list.getByRole("button", { name: /Default policy/ }).click();
+  await expect(list.getByRole("button", { name: new RegExp(name) })).toHaveCount(0);
+  await main.getByRole("checkbox", { name: "Show disabled" }).check();
+  await expect(list.getByRole("button", { name: new RegExp(name) })).toBeVisible();
+
+  // a unit scope: the policies attached to it — the new policy is not attached, the default policy is on every unit
+  await main.getByRole("combobox", { name: "Unit" }).selectOption({ label: "Bedroom AC" });
+  await page.waitForURL(/unitId=/);
+  await expect(main).toContainText("Showing the policies attached to Bedroom AC: Default policy.");
+  await expect(list.getByRole("button", { name: new RegExp(name) })).toHaveCount(0);
+  // switching tabs keeps the scope
+  await main.getByRole("tab", { name: /^Alerts/ }).click();
+  await page.waitForURL((u) => !u.searchParams.has("tab") && u.searchParams.has("unitId") && u.searchParams.has("customerId"));
+  await expect(main.getByRole("heading", { name: "Open alerts · Demo Customer A", exact: true })).toBeVisible();
 });

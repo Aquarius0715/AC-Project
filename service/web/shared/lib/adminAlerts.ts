@@ -153,9 +153,12 @@ export function newPolicyDraft(customer: { id: string; name: string }, timezone:
   };
 }
 
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 /** The policy form checks (IR66, IR120 item 3): name 1–120, priority 0–100, duration 1–86400 s, 1–20 recipients,
- * cooldown and escalation 1–1440 min, and the recovery on the safe side of the threshold. */
-export function policyErrors(p: Pick<AdminPolicy, "name" | "priority" | "duration" | "cooldown" | "escalate" | "operator" | "threshold" | "recovery" | "recipients">, t: T = en): Record<string, string> {
+ * cooldown and escalation 1–1440 min, the recovery on the safe side of the threshold, and an “Only if …” window with
+ * at least one day and two different HH:mm times. */
+export function policyErrors(p: Pick<AdminPolicy, "name" | "priority" | "duration" | "cooldown" | "escalate" | "operator" | "threshold" | "recovery" | "recipients" | "activeWindow">, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!p.name.trim() || p.name.length > 120) e.name = t("1–120 characters");
   if (!(Number.isInteger(p.priority) && p.priority >= 0 && p.priority <= 100)) e.priority = t("A whole number 0–100");
@@ -166,12 +169,14 @@ export function policyErrors(p: Pick<AdminPolicy, "name" | "priority" | "duratio
   if (rec) e.recovery = rec;
   if (!p.recipients.length) e.recipients = t("Add at least one recipient");
   else if (p.recipients.length > 20) e.recipients = t("At most 20 recipients");
+  const w = p.activeWindow;
+  if (w && (!w.weekdays.length || !HHMM.test(w.startLocal) || !HHMM.test(w.endLocal) || w.startLocal === w.endLocal)) e.activeWindow = t("Pick at least one day and two different times.");
   return e;
 }
 
 const CHANGES: [string, (p: AdminPolicy) => unknown][] = [
   ["Name", (p) => p.name], ["Enabled", (p) => p.on], ["Priority", (p) => p.priority], ["Timezone", (p) => p.timezone],
-  ["Condition", (p) => [p.metric, p.operator, p.threshold, p.recovery, p.duration]], ["Severity", (p) => p.severity],
+  ["Condition", (p) => [p.metric, p.operator, p.threshold, p.recovery, p.duration]], ["Active hours", (p) => p.activeWindow && [[...p.activeWindow.weekdays].sort(), p.activeWindow.startLocal, p.activeWindow.endLocal]], ["Severity", (p) => p.severity],
   ["Recipients", (p) => p.recipients.map((r) => r.id)], ["Channels", (p) => [...p.channels].sort()], ["Cooldown", (p) => p.cooldown], ["Escalation", (p) => p.escalate],
 ];
 /** What the draft changes against the saved policy, as the editor's footer names it. */

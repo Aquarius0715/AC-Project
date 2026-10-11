@@ -6,6 +6,7 @@ import { useT } from "@ac/web/components/I18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { useOp } from "@ac/web/lib/useOp";
 import { ZONES } from "@ac/web/lib/preferences";
+import { windowText } from "@ac/web/lib/customerPolicies";
 import {
   HQ_METRICS, metricLabel, newPolicyDraft, opSymbol, policyChanges, policyErrors, recipientRole,
   type AdminPolicy, type ApiRecipient, type Channel, type Operator, type PolicyRecipient,
@@ -21,6 +22,7 @@ export type PoliciesLive = {
 };
 
 const OPERATORS: Operator[] = ["gte", "gt", "lte", "lt"];
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const CHANNEL: Record<Channel, string> = { inApp: "In-app", email: "Email", whatsapp: "WhatsApp" };
 // the Phase 1A demo's policies, customer and recipients (their data stays English, as the other demo screens)
 const demoRecipients: PolicyRecipient[] = [{ id: "customer-a", label: "customer-a", role: "client" }, { id: "hq-operator", label: "hq-operator", role: "HQ" }];
@@ -49,7 +51,7 @@ export type PolicySel = { policyId: string | null; newFor: string | null };
  * the selected one. A new policy (`sel.newFor`, started by “+ New policy”) starts as DD-A05 says (display time zone,
  * off, priority 50) and is created by Save policy. Recipients are added from notifications.recipients; Delete policy
  * detaches it from every unit. The demo keeps its fixture policies and saves nothing. */
-export function PoliciesTab({ pols, live, sel, select }: { pols: AdminPolicy[]; live?: PoliciesLive; sel: PolicySel; select: (policyId: string | null, newFor?: string | null) => void }) {
+export function PoliciesTab({ pols, live, sel, select, showOff = true }: { pols: AdminPolicy[]; live?: PoliciesLive; sel: PolicySel; select: (policyId: string | null, newFor?: string | null) => void; showOff?: boolean }) {
   const t = useT();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
@@ -111,7 +113,11 @@ export function PoliciesTab({ pols, live, sel, select }: { pols: AdminPolicy[]; 
   };
   const discard = () => (isNew ? select(null) : (setDraft(p), setTried(false)));
   const toggleChannel = (c: Channel, on: boolean) => draft && set("channels", on ? [...new Set([...draft.channels, c])] : draft.channels.filter((x) => x !== c));
-  const groups = [...new Set([...pols.map((x) => x.group), ...(isNew && draft ? [draft.group] : [])])];
+  // Show disabled off hides the disabled policies, but never the one that is open
+  const listed = pols.filter((x) => showOff || x.on || (!isNew && x.id === draft?.id));
+  const groups = [...new Set([...listed.map((x) => x.group), ...(isNew && draft ? [draft.group] : [])])];
+  const win = draft?.activeWindow ?? null;
+  const setWin = (w: Partial<NonNullable<AdminPolicy["activeWindow"]>>) => win && set("activeWindow", { ...win, ...w });
 
   return (
     <>
@@ -124,7 +130,7 @@ export function PoliciesTab({ pols, live, sel, select }: { pols: AdminPolicy[]; 
                 {isNew && draft?.group === g && (
                   <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">{draft.name.trim() || t("New alert policy")}</b><div className="text-[11px] text-muted">{t("not saved yet")}</div></div></ListRow>
                 )}
-                {pols.filter((x) => x.group === g).map((x) => (
+                {listed.filter((x) => x.group === g).map((x) => (
                   <ListRow key={x.id} selected={!isNew && draft?.id === x.id} onClick={() => select(x.id)}>
                     <div className="min-w-0 flex-1">
                       <b className="text-[13px]">{x.name}</b><div className="text-[11px] text-muted">{x.sub}</div>
@@ -180,6 +186,22 @@ export function PoliciesTab({ pols, live, sel, select }: { pols: AdminPolicy[]; 
                 </div>
                 <div className="mt-2"><LineChart points={[20, 24, 28, 31, 32, 31, 29, 27, 25]} min={18} max={34} threshold={draft.threshold} height={90} /></div>
                 <p className={cx("text-xs", errors.recovery ? "text-crit" : "text-ok")}>{errors.recovery ? `✕ ${errors.recovery}` : t("✓ Recovery {recovery} is on the safe side of the {threshold} threshold ({op})", { recovery: draft.recovery, threshold: draft.threshold, op: opSymbol[draft.operator] })}</p>
+              </section>
+              <section><h3 className="mb-1 text-[13px] font-bold">{t("Only if … (optional) · active hours")}</h3>
+                <p className="mb-2 text-xs text-muted">{t("Evaluated in the policy timezone. Outside these hours the condition is not checked — the same field as “Only if” in the client app.")}</p>
+                <div className="flex flex-col gap-2">
+                  <Check label={t("Only on some days and times")} checked={!!win} onChange={(v) => set("activeWindow", v ? { weekdays: [1, 2, 3, 4, 5], startLocal: "08:00", endLocal: "19:00" } : null)} />
+                  {win ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Btn size="sm" onClick={() => setWin({ weekdays: [1, 2, 3, 4, 5] })}>{t("Mon–Fri")}</Btn><Btn size="sm" onClick={() => setWin({ weekdays: [1, 2, 3, 4, 5, 6, 7] })}>{t("Every day")}</Btn>
+                      {DAYS.map((d, i) => <button key={d} type="button" aria-pressed={win.weekdays.includes(i + 1)} onClick={() => setWin({ weekdays: win.weekdays.includes(i + 1) ? win.weekdays.filter((x) => x !== i + 1) : [...win.weekdays, i + 1].sort() })} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", win.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</button>)}
+                      <Input aria-label={t("From")} type="time" className="w-32" value={win.startLocal} onChange={(e) => setWin({ startLocal: e.target.value })} /> – <Input aria-label={t("To")} type="time" className="w-32" value={win.endLocal} onChange={(e) => setWin({ endLocal: e.target.value })} />
+                      <span className="text-xs text-muted">{draft.timezone}</span>
+                    </div>
+                  ) : <p className="text-[13px]">{t("Any day · any time")}</p>}
+                  {win && !errors.activeWindow && <p className="text-xs text-muted">{windowText(win, t)}</p>}
+                  {errors.activeWindow && <p className="text-xs text-crit">✕ {errors.activeWindow}</p>}
+                </div>
               </section>
               <section><h3 className="mb-1 text-[13px] font-bold">{t("Severity")}</h3><Choice value={draft.severity} onChange={(v) => set("severity", v)} options={[{ id: "normal", label: t("Info") }, { id: "warning", label: t("Warning") }, { id: "critical", label: t("Critical") }]} /><p className="mt-1 text-[11px] text-muted">{t("A severity change on an open alert counts as a new notification reason.")}</p></section>
               <section>

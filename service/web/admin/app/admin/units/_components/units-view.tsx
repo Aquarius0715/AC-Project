@@ -416,7 +416,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: { live: UnitsLive; c: Custo
             {x.attached.map((p) => (
               <div key={p.id} className="flex flex-wrap items-center gap-2 border-t border-line py-2.5 text-[13px] first:border-0">
                 <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><b>{p.name}</b><Badge tone={p.kind === "default_alert" ? "primary" : "muted"}>{p.type}</Badge>{p.madeBy && <span className="text-[11px] text-muted">{p.madeBy}</span>}</div><div className="text-xs text-muted">{p.condition}{p.on ? ` · ${p.on}` : ""}</div></div>
-                <TextLink href={`/admin/alerts?tab=policies&policyId=${p.id}`}>{t(p.kind === "default_alert" ? "View" : "Edit")}</TextLink>
+                <TextLink href={`/admin/alerts?tab=policies&customerId=${c.row.id}&unitId=${u.id}&policyId=${p.id}`}>{t(p.kind === "default_alert" ? "View" : "Edit")}</TextLink>
                 {p.kind === "alert" && c.canAttach && !u.archived && <Btn size="sm" variant="ghost" disabled={pending} onClick={() => run(() => setUnitPolicies(u.id, u.version, attachedIds.filter((id) => id !== p.id)), t("“{name}” detached", { name: p.name }))}>{t("Detach")}</Btn>}
               </div>
             ))}
@@ -447,8 +447,8 @@ function PoliciesTab({ c, run, pending }: { c: CustomerLive; run: Run; pending: 
   return (
     <>
       <Card title={t("Alert policies of {name}", { name: c.row.name })} sub={t("Policies belong to the customer. Each unit picks which of them it carries (unit edit › Alert policies). Air-quality limits are alert policies too.")}
-        action={<LinkBtn size="sm" variant="primary" href={`/admin/alerts?tab=policies&new=${c.row.id}`}>{t("+ New policy for {name}", { name: c.row.name })}</LinkBtn>}>
-        <DataTable rows={c.policies} rowKey={(p) => p.id} onRowClick={(p) => router.push(`/admin/alerts?tab=policies&policyId=${p.id}`)} cols={[
+        action={<LinkBtn size="sm" variant="primary" href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}>{t("+ New policy for {name}", { name: c.row.name })}</LinkBtn>}>
+        <DataTable rows={c.policies} rowKey={(p) => p.id} onRowClick={(p) => router.push(`/admin/alerts?tab=policies&customerId=${c.row.id}&policyId=${p.id}`)} cols={[
           { key: "n", label: t("Policy"), render: (p) => <><b>{p.name}</b>{!p.enabled && <Badge className="ml-2">{t("Off")}</Badge>}</> },
           { key: "t", label: t("Type"), render: (p) => <Badge tone={p.kind === "default_alert" ? "primary" : "muted"}>{p.type}</Badge> },
           { key: "c", label: t("Condition"), render: (p) => p.condition, hideBelow: "sm" },
@@ -651,7 +651,7 @@ function AttachModal({ c, unit, attached, pending, onClose, onSave }: { c: Custo
             </div>
           );
         })}
-        <p className="text-[11px] text-muted">{t("Disabled policies can be attached; they start alerting once enabled.")} <TextLink href={`/admin/alerts?tab=policies&new=${c.row.id}`}>{t("+ New policy for {name}", { name: c.row.name })}</TextLink></p>
+        <p className="text-[11px] text-muted">{t("Disabled policies can be attached; they start alerting once enabled.")} <TextLink href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}>{t("+ New policy for {name}", { name: c.row.name })}</TextLink></p>
       </div>
     </Modal>
   );
