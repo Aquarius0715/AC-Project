@@ -22,3 +22,22 @@ test("a new report's evidence comes from the photos of accepted work reports", a
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(dialog).toBeHidden();
 });
+
+// The factor editor (Figma Admin 324:321, IR350): an edit marks the factor "Editing → v<next>" and enables Save as
+// v<next>; Discard puts the saved values back. Nothing is saved.
+test("the factor editor marks an edit and discards it", async ({ page }) => {
+  await page.goto("/admin/mrv?tab=factors");
+  const main = page.getByRole("main");
+  const save = main.getByRole("button", { name: /^Save as v\d+$/ });
+  await expect(save).toBeDisabled();
+  await expect(main).toContainText("No unsaved changes");
+  const value = main.getByRole("spinbutton", { name: /^kgCO₂e\/kWh/ });
+  const before = await value.inputValue();
+  await value.fill("0.999");
+  await expect(main.getByRole("heading", { name: /Editing → v\d+/ })).toBeVisible();
+  await expect(main).toContainText("Unsaved changes");
+  await expect(save).toBeEnabled();
+  await main.getByRole("button", { name: "Discard" }).click();
+  await expect(value).toHaveValue(before);
+  await expect(save).toBeDisabled();
+});

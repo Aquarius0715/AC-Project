@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.58.0
+version: 0.59.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -214,6 +214,7 @@ Scope: FR-A04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 3. Update Capability version and available unit actions. Keep unfinished Command contents in history; do not rewrite them to match new capabilities.
 4. Queries to update: `capabilities / units / devices / automations / audit`。
 5. Tabs: `tab=models` (capability list and editor), `tab=firmware` (firmware campaigns, DD-A20) and `tab=devices` (device list; `deviceId` opens the detail with binding, sensors, operations, and calibrations). The list is sorted by serial with the state chips All / Online / Offline / Tamper / No sensors and a search; the detail draws the tiles, the bound unit, the actions, sensors with Calibrate →, the operation and calibration history and the events as Figma 246:2 (IR319).
+   - As built (IR350, Figma 106:3): the editor shows “Capability v<n>” and, while the draft differs, “Editing → v<n+1>”; the footer names the changed parts, with Discard and “Save as capability v<n+1>” (disabled while nothing changed). Firmware candidates are chips (“current on n devices”, “latest”) with “+ Add version”.
 6. Version history (capability): shown only to holders of audit.read. On explicit open, call `audit.list` with `targetId=<capabilityId>` and list each saved version as previousVersion→nextVersion, actor, time, reason, and maskedBefore/maskedAfter. No separate capability-version read operation exists; the current version comes from `capabilities.list`.
 7. Device events: for the selected `deviceId`, call `devices.events` (communication_lost / power_lost / tamper / restored / operation_failed with recovery) as a secondary Query after `devices.get` succeeds.
 
@@ -601,6 +602,7 @@ Scope: FR-A14 / Main display pattern: **UI-ANALYSIS / UI-FORM / UI-DETAIL**. Ser
 6. New report: conditions from `organizations.list` → `units.list`, `baselines.list`, `factors.list`, boundary; `mrv.preview` shows a “Not saved” preview with “Demo — unverified”; missing factor/region/boundary or zero coverage shows “Calculation incomplete” without zero-filling; “Save draft” calls `mrv.saveDraft` with the selected evidence.
    - As built (IR349, Figma 324:2): “Evidence to attach” lists the chosen attachments as chips; “+ Add evidence” offers `attachments.list` for the draft's units and period (ready attachments of accepted work reports uploaded in it, at most 20 chosen). The report detail names its evidence the same way.
 7. Factors: `factors.list` and a form (region, year, kgCO₂e/kWh with the fixed unit, source stating demo) saved with `factors.save` as a new version; existing reports keep the factor version they reference.
+   - As built (IR350, Figma 324:321): a changed factor shows “Editing → v<n+1>” and “Unsaved changes”; Discard restores it, and “Save as v<n+1>” is disabled while nothing changed.
 8. Language and time (IR297): texts follow the display language. Report periods are Kuala Lumpur business time in every display time zone. They are typed in it, and the labels and the condition snapshot name it. The list's period filter is `[from, to)` on a report's period start, labelled “Period starts from (Kuala Lumpur)” / “Period starts before”. Demo review times are in the display time zone.
 
 **Boundary cases and failures**: Check missing factors, coverage 0, and duplicate review of one report version. Unverified values must not appear certified.
@@ -880,7 +882,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.58.0: Read IR01–IR349 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.59.0: Read IR01–IR350 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

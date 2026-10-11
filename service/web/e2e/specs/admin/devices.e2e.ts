@@ -28,3 +28,33 @@ test("the device list filters by state and the detail shows the device as Figma 
   await expect(main.getByRole("button", { name: "Calibrate →" }).first()).toBeVisible();
   for (const name of [/^Check connection/, /^Calibrate sensor/, /^Update firmware/]) await expect(main.getByRole("button", { name })).toBeVisible();
 });
+
+// The model editor (DD-A04, Figma Admin 106:3, IR350): a saved model shows its capability version; an edit marks the
+// draft "Editing → v<next>" and names what changed; the firmware candidates are chips with "+ Add version" (a listed
+// version is refused); Discard puts the saved capability back. Nothing is saved.
+test("the model editor marks a draft, adds a firmware version and discards it", async ({ page }) => {
+  await page.goto("/admin/devices?tab=models");
+  const main = page.getByRole("main");
+  await expect(main.getByRole("heading", { name: /Capability v\d+/ })).toBeVisible();
+  await expect(main).toContainText("No unsaved changes");
+  await expect(main.getByRole("button", { name: /^Save as capability v\d+$/ })).toBeDisabled();
+  const firmware = main.getByRole("region", { name: "Firmware candidates" });
+  await expect(firmware.getByRole("button", { name: "Remove v1" })).toBeVisible();
+
+  await firmware.getByRole("button", { name: "+ Add version" }).click();
+  const version = firmware.getByRole("textbox", { name: "Firmware version" });
+  await version.fill("v1");
+  await expect(firmware).toContainText("v1 is already a candidate");
+  await expect(firmware.getByRole("button", { name: "Add", exact: true })).toBeDisabled();
+  await version.fill("v9-e2e");
+  await firmware.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(firmware.getByRole("button", { name: "Remove v9-e2e" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: /Editing → v\d+/ })).toBeVisible();
+  await expect(main).toContainText("1 change · firmware candidates");
+  await expect(main.getByRole("button", { name: /^Save as capability v\d+$/ })).toBeEnabled();
+
+  await main.getByRole("button", { name: "Discard" }).click();
+  await expect(main).toContainText("No unsaved changes");
+  await expect(firmware.getByRole("button", { name: "Remove v9-e2e" })).toHaveCount(0);
+  await expect(main.getByRole("heading", { name: /Editing → v\d+/ })).toHaveCount(0);
+});

@@ -5,7 +5,7 @@ import { Badge, Btn, Card, Check, EmptyState, Field, Input, ListRow, Modal, Sele
 import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { showTime } from "@ac/web/lib/i18n";
-import { capabilityDraft, capabilityErrors, capabilityInput, fans, metrics, metricUnit, modes, type CapabilityDraft, type Fan, type Metric, type Mode } from "@ac/web/lib/devices";
+import { capabilityChanges, capabilityDraft, capabilityErrors, capabilityInput, fans, firmwareProblem, metrics, metricUnit, modes, type CapabilityDraft, type Fan, type Metric, type Mode } from "@ac/web/lib/devices";
 import { capabilityHistory, saveCapability, type HistoryEntry } from "../actions";
 import type { DevicesLive } from "./devices-view";
 
@@ -34,7 +34,19 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
   const set = (patch: Partial<CapabilityDraft>) => setD((x) => ({ ...x, ...patch }));
   const [history, setHistory] = useState<HistoryEntry[] | null>(null);
   const [newSensor, setNewSensor] = useState<Metric>("temperature");
+  const [adding, setAdding] = useState<string | null>(null); // the firmware version being typed after “+ Add version”
   const units = sel ? live.units.filter((u) => u.modelId === sel.id) : [];
+  // what the draft changes against the saved capability (Figma Admin 106:3: “Editing → v4”, “1 change · …”)
+  const changes = sel ? capabilityChanges(d, capabilityDraft(sel.cap), t) : [];
+  const dirty = changes.length > 0;
+  const onModel = new Set(units.map((u) => u.id));
+  const runningOn = (v: string) => live.devices.filter((x) => x.unitId && onModel.has(x.unitId) && x.fw === v).length;
+  const addProblem = adding === null ? null : firmwareProblem(adding, d.firmware, t);
+  const addVersion = () => {
+    if (adding === null || addProblem) return;
+    set({ firmware: [...d.firmware, adding.trim()] });
+    setAdding(null);
+  };
   const available = metrics.filter((m) => !d.sensors.some((s) => s.metric === m));
   const pick = available.includes(newSensor) ? newSensor : available[0];
   const save = () => {
@@ -51,7 +63,8 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
         {live.models.length === 0 ? <EmptyState title={t("No models")}>{t("Register the first model.")}</EmptyState> : <div className="flex flex-col gap-2">{live.models.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => setSelId(x.id)}><div className="min-w-0"><b className="text-[13px]">{x.name}</b> {x.ventilation && <Badge tone="primary">{t("Ventilation")}</Badge>}<div className="text-[11px] text-muted">{t("capability v{v} · updated {time}", { v: x.version, time: x.updated })}</div><div className="text-[11px] text-muted">{x.used}</div></div></ListRow>)}</div>}
         <p className="mt-3 text-[11px] text-muted">{t("Saving a change creates a new capability version. Unverified capabilities stay false/unknown (BR-A04).")}</p>
       </Card>
-      <Card title={sel ? sel.name : t("New model")} sub={sel ? t("capability v{v} · {used}", { v: sel.version, used: sel.used }) : t("Saving creates capability version 1")} action={sel && live.canAudit && <Btn size="sm" disabled={pending} onClick={openHistory}>{t("Version history")}</Btn>}>
+      <Card title={sel ? <span className="inline-flex flex-wrap items-center gap-2">{sel.name}<Badge>{t("Capability v{v}", { v: sel.version })}</Badge>{dirty && <Badge tone="warn">{t("Editing → v{v}", { v: sel.version + 1 })}</Badge>}</span> : t("New model")}
+        sub={sel ? `${t("updated {time}", { time: sel.updated })} · ${sel.used}` : t("Saving creates capability version 1")} action={sel && live.canAudit && <Btn size="sm" disabled={pending} onClick={openHistory}>{t("Version history")}</Btn>}>
         <div className="flex flex-col gap-5">
           <section><h3 className="mb-2 text-[13px] font-bold">{t("Identity")}</h3><div className="grid-fluid" style={{ ["--min" as string]: "200px" }}><Field label={t("Manufacturer")} error={err("manufacturer")}><Input value={d.manufacturer} maxLength={120} onChange={(e) => set({ manufacturer: e.target.value })} /></Field><Field label={t("Model")} hint={t("Manufacturer + model must be unique")} error={err("model")}><Input value={d.model} maxLength={120} onChange={(e) => set({ model: e.target.value })} /></Field></div></section>
           <section>
@@ -79,10 +92,39 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
             {available.length > 0 && <div className="mt-2 flex items-end gap-2"><Field label={t("Add sensor")}><Select value={pick} onChange={(e) => setNewSensor(e.target.value as Metric)}>{available.map((m) => <option key={m} value={m}>{m} ({metricUnit[m]})</option>)}</Select></Field><Btn size="sm" onClick={() => set({ sensors: [...d.sensors, { metric: pick, staleAfterSeconds: "120" }] })}>{t("Add")}</Btn></div>}
             {err("sensors") && <p className="mt-1 text-xs text-crit">{err("sensors")}</p>}
           </section>
-          <section><Field label={t("Firmware candidates (comma separated)")} hint={t("Supported demo versions only")} error={err("firmware")}><Input value={d.firmware} onChange={(e) => set({ firmware: e.target.value })} placeholder="v1, v2" /></Field></section>
+          <section aria-label={t("Firmware candidates")}>
+            <h3 className="mb-1 text-[13px] font-bold">{t("Firmware candidates")}</h3>
+            <p className="mb-2 text-xs text-muted">{t("Only supported demo versions can be offered for updates.")}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {d.firmware.map((v, n) => {
+                const on = runningOn(v);
+                return (
+                  <span key={v} className="inline-flex items-center gap-1.5 rounded-control border border-primary/40 bg-primary-soft px-2.5 py-1 text-xs">
+                    <b>{v}</b><span className="text-muted">{on ? t(on === 1 ? "current on 1 device" : "current on {n} devices", { n: on }) : n === d.firmware.length - 1 ? t("latest") : ""}</span>
+                    <button type="button" aria-label={t("Remove {name}", { name: v })} className="text-muted hover:text-ink" onClick={() => set({ firmware: d.firmware.filter((x) => x !== v) })}>✕</button>
+                  </span>
+                );
+              })}
+              {adding === null ? <Btn size="sm" variant="ghost" onClick={() => setAdding("")}>{t("+ Add version")}</Btn> : (
+                <span className="inline-flex items-center gap-1.5">
+                  <Input aria-label={t("Firmware version")} className="w-28" autoFocus value={adding} maxLength={32} placeholder="v3" onChange={(e) => setAdding(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addVersion(); if (e.key === "Escape") setAdding(null); }} />
+                  <Btn size="sm" disabled={!!addProblem} onClick={addVersion}>{t("Add")}</Btn><Btn size="sm" variant="ghost" onClick={() => setAdding(null)}>{t("Cancel")}</Btn>
+                </span>
+              )}
+            </div>
+            {adding !== null && adding.trim() !== "" && addProblem && <p className="mt-1 text-xs text-crit">✕ {addProblem}</p>}
+            {err("firmware") && <p className="mt-1 text-xs text-crit">✕ {err("firmware")}</p>}
+          </section>
           {sel && <section className="rounded-xl bg-surface2 p-3"><h3 className="mb-1 text-[13px] font-bold">{t("Impact of this change")}</h3><ul className="list-disc pl-5 text-xs"><li>{t(units.length === 1 ? "1 unit{list} moves to capability version {v}" : "{n} units{list} move to capability version {v}", { n: units.length, list: units.length ? ` — ${units.map((u) => u.label).join(", ")}` : "", v: sel.version + 1 })}</li><li>{t("Automation rules that no longer fit are disabled with reason capability_changed")}</li><li>{t("Unfinished commands keep their original content")}</li></ul></section>}
           {sel && <Field label={t("Change reason · required for updates")} error={err("changeReason")} hint={`${d.changeReason.length} / 1000`}><Textarea value={d.changeReason} maxLength={1000} onChange={(e) => set({ changeReason: e.target.value })} placeholder={t("Vendor bulletin: ventilation High not verified on the current batch.")} /></Field>}
-          {live.canWrite && <div className="flex justify-end gap-2">{!sel && live.models[0] && <Btn onClick={() => setSelId(live.models[0].id)}>{t("Cancel")}</Btn>}<Btn variant="primary" disabled={pending} onClick={save}>{t(sel ? "Save new version" : "Create model")}</Btn></div>}
+          {live.canWrite && (
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
+              {sel && <span className="mr-auto text-[12px] text-muted">{dirty ? `${t(changes.length === 1 ? "1 change" : "{n} changes", { n: changes.length })} · ${changes.join(", ")}` : t("No unsaved changes")}</span>}
+              {!sel && live.models[0] && <Btn onClick={() => setSelId(live.models[0].id)}>{t("Cancel")}</Btn>}
+              {sel && <Btn disabled={pending || !dirty} onClick={() => { setD(capabilityDraft(sel.cap)); setTried(false); setAdding(null); }}>{t("Discard")}</Btn>}
+              <Btn variant="primary" disabled={pending || (!!sel && !dirty)} onClick={save}>{sel ? t("Save as capability v{v}", { v: sel.version + 1 }) : t("Create model")}</Btn>
+            </div>
+          )}
         </div>
       </Card>
       <Modal open={history !== null} onClose={() => setHistory(null)} title={t("Version history · {name}", { name: sel?.name ?? "" })} footer={<Btn onClick={() => setHistory(null)}>{t("Close")}</Btn>}>

@@ -159,6 +159,9 @@ function Factors({ live }: { live: MRVLive }) {
     setTried(false);
   }
   const errors = factorErrors(d, t);
+  // a saved factor's form changed (Figma Admin 324:321: “Editing → v2”, Discard)
+  const saved: FactorDraft | null = sel ? { region: sel.region, year: String(sel.year), kgCO2ePerKWh: String(sel.kgCO2ePerKWh), source: sel.source } : null;
+  const dirty = !!saved && JSON.stringify([d.region.trim(), Number(d.year), Number(d.kgCO2ePerKWh), d.source.trim()]) !== JSON.stringify([saved.region, Number(saved.year), Number(saved.kgCO2ePerKWh), saved.source]);
   const save = () => {
     setTried(true);
     if (Object.keys(errors).length > 0) return;
@@ -171,7 +174,7 @@ function Factors({ live }: { live: MRVLive }) {
         {live.factors.length === 0 ? <EmptyState title={t("No factors")}>{t("Add a demo factor.")}</EmptyState> : <div className="flex flex-col gap-2">{live.factors.map((f) => <ListRow key={f.id} selected={sel?.id === f.id} onClick={() => setSelId(f.id)}><div className="min-w-0"><b className="text-[13px]">{f.region} · {f.year}</b><div className="text-[11px] text-muted">v{f.version} · {f.kgCO2ePerKWh} kgCO₂e/kWh</div></div></ListRow>)}</div>}
         <p className="mt-3 text-[11px] text-muted">{t("Demo factors only — not real regional factors. One current factor per region and year.")}</p>
       </Card>
-      <Card title={sel ? `${sel.region} · ${sel.year}` : t("New factor")} sub={sel ? t("Version {v} · saving creates version {next}", { v: sel.version, next: sel.version + 1 }) : t("Saving creates version 1")}>
+      <Card title={sel ? <span className="inline-flex flex-wrap items-center gap-2">{sel.region} · {sel.year}{dirty && <Badge tone="warn">{t("Editing → v{v}", { v: sel.version + 1 })}</Badge>}</span> : t("New factor")} sub={sel ? t("Version {v} · saving creates version {next}", { v: sel.version, next: sel.version + 1 }) : t("Saving creates version 1")}>
         <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
           <Field label={t("Region")} error={err("region")}><Input value={d.region} maxLength={120} onChange={(e) => setD({ ...d, region: e.target.value })} /></Field>
           <Field label={t("Year")} error={err("year")}><Input type="number" value={d.year} onChange={(e) => setD({ ...d, year: e.target.value })} /></Field>
@@ -179,7 +182,14 @@ function Factors({ live }: { live: MRVLive }) {
         </div>
         <div className="mt-3"><Field label={t("Source (state that it is a demo)")} error={err("source")}><Input value={d.source} maxLength={500} onChange={(e) => setD({ ...d, source: e.target.value })} /></Field></div>
         {sel && <p className="mt-3 rounded-xl bg-surface2 p-3 text-xs">{t("Existing reports keep the factor version they reference.")}</p>}
-        {live.canFactors && <div className="mt-3 flex justify-end gap-2">{!sel && live.factors[0] && <Btn onClick={() => setSelId(live.factors[0].id)}>{t("Cancel")}</Btn>}<Btn variant="primary" disabled={pending} onClick={save}>{sel ? t("Save as v{n}", { n: sel.version + 1 }) : t("Create factor")}</Btn></div>}
+        {live.canFactors && (
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+            {sel && <span className="mr-auto text-[12px] text-muted">{t(dirty ? "Unsaved changes" : "No unsaved changes")}</span>}
+            {!sel && live.factors[0] && <Btn onClick={() => setSelId(live.factors[0].id)}>{t("Cancel")}</Btn>}
+            {sel && saved && <Btn disabled={pending || !dirty} onClick={() => { setD(saved); setTried(false); }}>{t("Discard")}</Btn>}
+            <Btn variant="primary" disabled={pending || (!!sel && !dirty)} onClick={save}>{sel ? t("Save as v{n}", { n: sel.version + 1 }) : t("Create factor")}</Btn>
+          </div>
+        )}
       </Card>
     </div>
   );

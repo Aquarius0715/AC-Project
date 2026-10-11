@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  campaignErrors, campaignFacts, campaignRows, campaignStart, capabilityDraft, capabilityErrors, deviceRows, modelRows, parseWaves, resultReason, shortChecksum, waveStates,
+  campaignErrors, campaignFacts, campaignRows, campaignStart, capabilityChanges, capabilityDraft, capabilityErrors, capabilityInput, deviceRows, firmwareProblem, modelRows, parseWaves,
+  resultReason, shortChecksum, waveStates,
   type ApiCampaign, type ApiCapability, type ApiDevice, type CampaignDraft,
 } from "@ac/web/lib/devices";
 import { i18nOf } from "@ac/web/lib/i18n";
@@ -66,5 +67,22 @@ describe("HQ device registry in Malay with the display time zone (IR295)", () =>
     expect(campaignRows([{ ...({} as ApiCampaign), id: "k", version: 1, modelId: "x", fromVersions: [], targetVersion: "v2", deviceIds: [], startAt: "2026-09-16T02:00:00Z", state: "paused" } as ApiCampaign], [], MS)[0])
       .toMatchObject({ model: "model", versions: "mana-mana → v2", start: "16 Sep 2026, 11:00 PG GMT+9" });
     expect(resultReason("errors.device_busy", MS.t)).toBe("Dilangkau — unit sedang sibuk (operasi, arahan, ujian diagnostik atau sekatan)");
+  });
+});
+
+describe("the model editor's changes and firmware candidates (Figma Admin 106:3, IR350)", () => {
+  it("names what a draft changes, not the reason", () => {
+    const saved = capabilityDraft(cap);
+    expect(capabilityChanges(saved, saved)).toEqual([]);
+    expect(capabilityChanges({ ...saved, changeReason: "bulletin" }, saved)).toEqual([]);
+    expect(capabilityChanges({ ...saved, ventilation: true, ventilationLevels: ["low"], firmware: ["v1"], max: "28" }, saved)).toEqual(["temperature", "ventilation levels", "firmware candidates"]);
+    expect(capabilityChanges({ ...saved, modes: ["cool"], min: "16.0" }, saved)).toEqual([]); // the same values written differently
+    expect(capabilityChanges({ ...saved, model: "SPL-101" }, saved, MS.t)).toEqual(["identiti"]);
+  });
+  it("adds a firmware version once, trimmed, and saves the list without duplicates", () => {
+    expect([firmwareProblem("", ["v1"]), firmwareProblem(" v1 ", ["v1"]), firmwareProblem("x".repeat(33), []), firmwareProblem(" v3 ", ["v1"])])
+      .toEqual(["Enter a version", "v1 is already a candidate", "Firmware versions are at most 32 characters", null]);
+    expect(capabilityInput({ ...capabilityDraft(cap), firmware: ["v1", " v2", "v1"] }).firmwareCandidates).toEqual(["v1", "v2"]);
+    expect(capabilityDraft(cap).firmware).toEqual(["v1", "v2"]);
   });
 });

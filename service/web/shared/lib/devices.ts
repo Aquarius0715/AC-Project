@@ -68,7 +68,7 @@ export function modelRows(caps: ApiCapability[], units: ApiUnitLite[], devices: 
 /** The editable capability form (DD-A04 fields). Numbers stay strings until saved. */
 export type CapabilityDraft = {
   manufacturer: string; model: string; control: boolean; modeControl: boolean; fanControl: boolean; temperatureOn: boolean; min: string; max: string; step: string;
-  modes: Mode[]; fanLevels: Fan[]; ventilation: boolean; ventilationLevels: Fan[]; sensors: { metric: Metric; staleAfterSeconds: string }[]; firmware: string; changeReason: string;
+  modes: Mode[]; fanLevels: Fan[]; ventilation: boolean; ventilationLevels: Fan[]; sensors: { metric: Metric; staleAfterSeconds: string }[]; firmware: string[]; changeReason: string;
 };
 
 export function capabilityDraft(k?: ApiCapability): CapabilityDraft {
@@ -76,7 +76,7 @@ export function capabilityDraft(k?: ApiCapability): CapabilityDraft {
     manufacturer: k?.manufacturer ?? "", model: k?.model ?? "", control: k?.control ?? false, modeControl: k?.modeControl ?? false, fanControl: k?.fanControl ?? false,
     temperatureOn: !!k?.temperature, min: String(k?.temperature?.min ?? 16), max: String(k?.temperature?.max ?? 30), step: String(k?.temperature?.step ?? 1),
     modes: k?.modes ?? [], fanLevels: k?.fanLevels ?? [], ventilation: k?.ventilation ?? false, ventilationLevels: k?.ventilationLevels ?? [],
-    sensors: (k?.sensors ?? []).map((s) => ({ metric: s.metric, staleAfterSeconds: String(s.staleAfterSeconds) })), firmware: (k?.firmwareCandidates ?? []).join(", "), changeReason: "",
+    sensors: (k?.sensors ?? []).map((s) => ({ metric: s.metric, staleAfterSeconds: String(s.staleAfterSeconds) })), firmware: [...(k?.firmwareCandidates ?? [])], changeReason: "",
   };
 }
 
@@ -103,7 +103,7 @@ export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en)
     const v = num(s.staleAfterSeconds);
     if (!(Number.isInteger(v) && v >= 10 && v <= 86400)) e.sensors = t("Stale after must be 10–86400 seconds");
   }
-  if (d.firmware.split(",").map((x) => x.trim()).some((x) => x.length > 32)) e.firmware = t("Firmware versions are at most 32 characters");
+  if (d.firmware.some((x) => x.length > 32)) e.firmware = t("Firmware versions are at most 32 characters");
   if (update && (d.changeReason.trim().length < 1 || d.changeReason.trim().length > 1000)) e.changeReason = t("A reason is required (1–1000 characters)");
   return e;
 }
@@ -116,8 +116,28 @@ export function capabilityInput(d: CapabilityDraft, id?: string): OpInput<"capab
     temperature: d.temperatureOn ? { min: num(d.min), max: num(d.max), step: num(d.step) } : null,
     modes: d.modeControl ? d.modes : [], fanLevels: d.fanControl ? d.fanLevels : [], ventilation: d.ventilation, ventilationLevels: d.ventilation ? d.ventilationLevels : [],
     sensors: d.sensors.map((s) => ({ metric: s.metric, unit: metricUnit[s.metric], staleAfterSeconds: num(s.staleAfterSeconds), boundaryId: s.metric === "power" ? "ac_input_electricity" : null })),
-    firmwareCandidates: [...new Set(d.firmware.split(",").map((x) => x.trim()).filter(Boolean))],
+    firmwareCandidates: [...new Set(d.firmware.map((x) => x.trim()).filter(Boolean))],
   };
+}
+
+const CAPABILITY_PARTS: [string, (d: CapabilityDraft) => unknown][] = [
+  ["identity", (d) => [d.manufacturer.trim(), d.model.trim()]], ["controls", (d) => [d.control, d.modeControl, d.fanControl, d.temperatureOn]],
+  ["temperature", (d) => (d.temperatureOn ? [num(d.min), num(d.max), num(d.step)] : null)], ["modes", (d) => [...d.modes].sort()], ["fan levels", (d) => [...d.fanLevels].sort()],
+  ["ventilation levels", (d) => [d.ventilation, [...d.ventilationLevels].sort()]], ["sensors", (d) => d.sensors.map((x) => [x.metric, num(x.staleAfterSeconds)])],
+  ["firmware candidates", (d) => d.firmware],
+];
+/** What a model's draft changes against its saved capability (Figma Admin 106:3 “1 change · ventilation levels”); the
+ * change reason is not a change. */
+export function capabilityChanges(d: CapabilityDraft, saved: CapabilityDraft, t: T = en): string[] {
+  return CAPABILITY_PARTS.filter(([, f]) => JSON.stringify(f(d)) !== JSON.stringify(f(saved))).map(([k]) => t(k));
+}
+
+/** A firmware candidate to add: trimmed, 1–32 characters and not listed yet; otherwise the reason. */
+export function firmwareProblem(v: string, listed: string[], t: T = en): string | null {
+  const x = v.trim();
+  if (!x) return t("Enter a version");
+  if (x.length > 32) return t("Firmware versions are at most 32 characters");
+  return listed.includes(x) ? t("{v} is already a candidate", { v: x }) : null;
 }
 
 export type DeviceRow = { id: string; version: number; serial: string; unitId: string | null; unit: string; conn: Connection; fw: string; tamper: boolean; power: string };

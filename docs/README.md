@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.233.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
+Version: 0.234.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.234.0 (2026-10-11): The HQ model and factor editors mark a draft (“Editing → v<n>”), name its changes, offer Discard and save only a change; firmware candidates are chips with “+ Add version” (IR350).
 0.233.0 (2026-10-11): MRV reports attach evidence from the photos of accepted work reports: the new read `attachments.list` (202 operations) closes IR203's open point, and the report dialog gains “+ Add evidence” (IR349).
 0.232.0 (2026-10-11): The HQ policy editors show the notification a recipient gets (notifications.preview takes the alert's severity) and test a saved policy or rule with a synthetic reading through automations.simulate (IR348).
 0.231.0 (2026-10-11): HQ edits the default policy: the six rules' limits as the template for every unit, each customer's switch of a rule with a reason, and a copy of a rule as a customer's policy (IR347).

@@ -5108,3 +5108,23 @@ DD-A14 item 6 saves a new report or version "with the selected evidence", and Fi
    - Web unit: the candidate rows in English and Malay.
    - E2E `admin/mrv`: the dialog's evidence waits for the units and the period, then says the seed has no photos.
    - A real-stack check with a temporary photo of an accepted report on Bedroom AC listed it ("Bedroom AC · uploaded 5 Sept 2026, 10:30 am MYT"), attached it as a chip and removed it again. The temporary rows were deleted.
+
+## IR350 The model and factor editors mark a draft as Figma Admin 106:3 and 324:321 do — 2026-10-11
+
+A recheck of the HQ create and edit actions against Figma (R343) found the editors of a device model and of an emission factor saving without showing what a draft changes. The model editor offered "Save new version" even with nothing changed, and took the firmware candidates as one comma-separated field. Figma 106:3 draws "Capability v3 · Editing → v4", "1 change · ventilation levels", Discard, "Save as capability v4" and the candidates as chips with "+ Add version". Figma 324:321 draws "Editing → v2", Discard and "Save as version 2" for a factor.
+
+1. **Model editor (DD-A04).**
+   - The title carries "Capability v<n>", and "Editing → v<n+1>" while the draft differs from the saved capability.
+   - The footer names the changed parts: identity, controls, temperature, modes, fan levels, ventilation levels, sensors, firmware candidates. The change reason is not a change.
+   - Discard puts the saved capability back. "Save as capability v<n+1>" is disabled while nothing changed. A new model still reads "Create model".
+   - The subtitle reads "updated <time> · <units> · <devices>".
+2. **Firmware candidates.**
+   - Each candidate is a chip with its remove button: "current on n devices" for the versions the model's devices run, "latest" for the last one.
+   - "+ Add version" takes a version: trimmed, 1–32 characters, not listed yet ("v1 is already a candidate"). Enter adds it, Escape closes.
+   - `capabilities.save` still receives a list without duplicates. The server rule is unchanged: unique values.
+3. **Factor editor (DD-A14 item 7).** A saved factor shows "Editing → v<n+1>" and "Unsaved changes" while its form differs. Discard puts the saved values back, and "Save as v<n+1>" is disabled while nothing changed.
+4. **Not changed.** The impact panel keeps its three lines (the units that move, automation rules disabled with capability_changed, unfinished commands kept). Figma counts the automation rules a change disables, but no read computes that impact before saving.
+5. **Tests.**
+   - Web unit: the changed parts (the reason and equal values written differently are no change; Malay names), the firmware check, and the save input without duplicates.
+   - E2E `admin/devices`: "+ Add version" refuses a listed version and adds another; "Editing → v<n>" and "1 change · firmware candidates" appear; Discard clears them. Nothing is saved.
+   - E2E `admin/mrv`: a factor edit marks the draft and Discard restores the value.
