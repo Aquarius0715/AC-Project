@@ -10,6 +10,7 @@ import {
   type ApiAutoPolicy, type AutoCondition, type AutoDraft, type Compare, type FactRow, type PolicyGroup,
 } from "@ac/web/lib/automation";
 import { fireAuto, saveAutoPolicy, simulateAuto } from "../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 type UnitOption = { id: string; name: string; customerId: string; propertyId: string; temperature: { min: number; max: number; step: number } | null; ventilation: boolean };
 type Live = {
@@ -140,7 +141,7 @@ export function AutomationView({ live }: { live: Live }) {
                     <td className="pr-2"><Select aria-label={t("Fact")} value={f.kind ?? d.type} onChange={(e) => editFact(i, { kind: e.target.value as AutoCondition["type"], value: "" })}>{kinds.map((k) => <option key={k.id} value={k.id}>{k.label} · {factOf[k.id].metric}</option>)}</Select></td>
                     <td className="pr-2">{fact.boolean ? <Select aria-label={t("Value")} value={f.value} onChange={(e) => editFact(i, { value: e.target.value })}><option value="">{t("— no reading")}</option><option value="true">{t("true")}</option><option value="false">{t("false")}</option></Select> : <Input aria-label={t("Value")} type="number" step="0.1" value={f.value} placeholder={t("— no reading")} onChange={(e) => editFact(i, { value: e.target.value })} />}</td>
                     <td className="pr-2"><Select aria-label={t("Quality")} value={f.quality} onChange={(e) => editFact(i, { quality: e.target.value as FactRow["quality"] })}><option value="valid">{t("valid")}</option><option value="stale">{t("stale")}</option><option value="suspect">{t("suspect")}</option><option value="missing">{t("missing")}</option></Select></td>
-                    <td><button aria-label={t("Remove the fact")} className="text-muted hover:text-crit" onClick={() => removeFact(i)}>✕</button></td>
+                    <td><button aria-label={t("Remove the fact")} className="text-muted hover:text-crit" onClick={() => removeFact(i)}><Icon name="close" /></button></td>
                   </tr>
                 );
               })}</tbody></table></div>

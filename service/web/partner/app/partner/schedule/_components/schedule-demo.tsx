@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Badge, Banner, Btn, Card, EmptyState, Field, Input, ListRow, Page, Select, Textarea, cx, useToast } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
+import { Icon } from "@ac/web/components/Icon";
 
 const staticJobs = [
   { id: "job-p02", unit: "Rooftop unit", st: "Accepted · awaiting assignment", win: "09-14 01:00 → 09-22 00:00", left: "14 h left" },
@@ -20,7 +21,7 @@ export function ScheduleDemo({ jobId }: { jobId?: string }) {
   const toast = useToast();
   const store = useJobs();
   const live = store.filter((j) => j.contractor === "contractor-a" && (j.status === "accepted" || j.status === "assigned") && !staticJobs.some((s) => s.id === j.id));
-  const jobs = [...live.map((j) => ({ id: j.id, unit: j.unit, st: j.status === "accepted" ? "Accepted · awaiting assignment" : `Assigned · ${j.technician} · ${j.techAck?.status === "accepted" ? "accepted ✓" : j.techAck?.status === "cant_make" ? "can’t make it ⚠" : "awaiting acceptance"}`, win: `${j.scheduled?.date.slice(5)} 00:00 → ${j.scheduled?.date.slice(5)} 23:59`, left: "fixed time", live: true })), ...staticJobs.map((j) => ({ ...j, live: false }))];
+  const jobs = [...live.map((j) => ({ id: j.id, unit: j.unit, st: j.status === "accepted" ? "Accepted · awaiting assignment" : `Assigned · ${j.technician} · ${j.techAck?.status === "accepted" ? "accepted" : j.techAck?.status === "cant_make" ? "can’t make it" : "awaiting acceptance"}`, win: `${j.scheduled?.date.slice(5)} 00:00 → ${j.scheduled?.date.slice(5)} 23:59`, left: "fixed time", live: true })), ...staticJobs.map((j) => ({ ...j, live: false }))];
   const [selId, setSelId] = useState(jobId ?? jobs[0].id);
   const sel = jobs.find((j) => j.id === selId) ?? jobs[0];
   const setSel = (j: (typeof jobs)[number]) => setSelId(j.id);
@@ -57,13 +58,13 @@ export function ScheduleDemo({ jobId }: { jobId?: string }) {
           <Card title={`Assign — ${sel.id} · ${sel.unit}`} sub={`Delegation period: ${sel.win.replace("→", "–")} — work must fit within this window.`}>
             <div className="grid-fluid" style={{ ["--min"as string]: "200px" }}>
               <Field label="Technician (own company, active, qualified)"><Select value={tech} onChange={(e) => setTech(e.target.value)}><option value="tech-external-a">tech-external-a — refrigerant handling, active</option><option value="tech-external-a2">tech-external-a2 — general maintenance, active</option></Select></Field>
-              {lj ? <Field label="Visit time (agreed with the client)" hint="Fixed. A different time needs the client’s approval via HQ."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold">🔒 {lj.scheduled ? longDate(lj.scheduled) : "—"}</div></Field> : <>
+              {lj ? <Field label="Visit time (agreed with the client)" hint="Fixed. A different time needs the client’s approval via HQ."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {lj.scheduled ? longDate(lj.scheduled) : "—"}</div></Field> : <>
               <Field label="Work start"><Input type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
               <Field label="Work end"><Input type="datetime-local" value={end} onChange={(e) => setEnd(e.target.value)} /></Field></>}
             </div>
             {inProg && <div className="mt-3"><Field label="Reassign reason (required)" hint="Reassigning a job already in progress requires a reason and immediately revokes the previous technician's access."><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field></div>}
-            <p className="mt-2 text-xs text-ok">✓ No overlapping confirmed schedule for {tech} in this window.</p>
-            {lj?.techAck && <div className="mt-3"><Banner tone={lj.techAck.status === "accepted" ? "ok" : lj.techAck.status === "cant_make" ? "warn" : "primary"}>{lj.techAck.status === "accepted" ? `${lj.technician} accepted the assignment ✓ (${lj.techAck.at})` : lj.techAck.status === "cant_make" ? `${lj.technician} can’t make this time: “${lj.techAck.reason}”${lj.techAck.alt ? ` · could do ${lj.techAck.alt}` : ""}. Reassign another technician below, or ask HQ to propose a new time to the client.` : `Waiting for ${lj.technician} to accept (受領).`}</Banner></div>}
+            <p className="mt-2 flex items-center gap-1 text-xs text-ok"><Icon name="check" />No overlapping confirmed schedule for {tech} in this window.</p>
+            {lj?.techAck && <div className="mt-3"><Banner tone={lj.techAck.status === "accepted" ? "ok" : lj.techAck.status === "cant_make" ? "warn" : "primary"}>{lj.techAck.status === "accepted" ? `${lj.technician} accepted the assignment (${lj.techAck.at})` : lj.techAck.status === "cant_make" ? `${lj.technician} can’t make this time: “${lj.techAck.reason}”${lj.techAck.alt ? ` · could do ${lj.techAck.alt}` : ""}. Reassign another technician below, or ask HQ to propose a new time to the client.` : `Waiting for ${lj.technician} to accept (受領).`}</Banner></div>}
             {msg && <div className="mt-3"><Banner tone={msg.tone}>{msg.t}</Banner></div>}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="text-[11px] text-muted">Hint: start 09:00 shows the overlap conflict · end after window shows validation.</span><Btn variant="primary" onClick={save}>{inProg || lj?.status === "assigned" ? "Reassign" : "Assign technician"}</Btn></div>
           </Card>

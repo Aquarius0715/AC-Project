@@ -10,6 +10,7 @@ import { statusWord } from "@ac/web/lib/partnerJobDetail";
 import { resultText, type EvidenceRow, type InspectionRow, type VersionRow } from "@ac/web/lib/partnerReview";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { reviewReport } from "../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 export type ReviewLive = {
   job: { id: string; version: number; status: string; type: string; unit: string | null };
@@ -65,7 +66,7 @@ export function ReviewView({ live }: { live: ReviewLive }) {
           <Card title={t("Submitted report — version {version}", { version: r.version })} sub={r.submitted ? t("{name} · submitted {time}", { name: r.author, time: r.submitted }) : r.author}>
             <ul className="divide-y divide-line">{r.items.map((it) => {
               const res = it.result ? resultText[it.result] : { label: "No result", tone: "crit" as const };
-              return <li key={it.id} className="py-2 text-[13px]"><div className="flex flex-wrap items-center justify-between gap-2"><span>{it.label}</span><Badge tone={res.tone}>{t(res.label)}</Badge></div>{it.reason && <div className="text-xs text-muted">{t("Reason: {reason}", { reason: it.reason })}</div>}{it.photos.length > 0 && <div className="text-xs text-muted">📷 {t("Linked photos: {names}", { names: it.photos.join(", ") })}</div>}</li>;
+              return <li key={it.id} className="py-2 text-[13px]"><div className="flex flex-wrap items-center justify-between gap-2"><span>{it.label}</span><Badge tone={res.tone}>{t(res.label)}</Badge></div>{it.reason && <div className="text-xs text-muted">{t("Reason: {reason}", { reason: it.reason })}</div>}{it.photos.length > 0 && <div className="flex items-center gap-1 text-xs text-muted"><Icon name="camera" />{t("Linked photos: {names}", { names: it.photos.join(", ") })}</div>}</li>;
             })}</ul>
             <h3 className="mt-4 mb-1 text-[13px] font-bold">{t("Photos")}</h3>
             {r.photos.length === 0 ? <p className="text-xs text-muted">{t("No photos attached.")}</p> : (
@@ -84,7 +85,7 @@ export function ReviewView({ live }: { live: ReviewLive }) {
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={t("Quality review")} sub={t("Author: {name} · Reviewer: you (must differ)", { name: r.author })}>
-            <p className="mb-2 rounded-xl bg-primary-soft/40 px-3 py-2 text-xs text-muted">{t("ⓘ A contributor to this report version cannot approve it (IR31). The reviewer never edits the technician’s original records.")}</p>
+            <p className="mb-2 flex items-start gap-1.5 rounded-xl bg-primary-soft/40 px-3 py-2 text-xs text-muted"><Icon name="info" className="mt-px" />{t("A contributor to this report version cannot approve it (IR31). The reviewer never edits the technician’s original records.")}</p>
             {open ? (
               <div className="flex flex-col gap-2">
                 <Btn disabled={pending} onClick={() => { setError(null); setRet(true); }}>{t("Return for rework…")}</Btn>

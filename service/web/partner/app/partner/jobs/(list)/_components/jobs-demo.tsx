@@ -22,7 +22,7 @@ export function JobsDemo({ status }: { status?: string }) {
     return {
       id: j.id, unit: j.unit, cust: j.customer, origin: j.origin,
       line: offered ? (pend ? `Time change proposed · waiting for the client` : `Offered by HQ · visit ${fmt(j.scheduled)} (fixed)`) : j.status === "accepted" ? "Accepted · assign a technician for the agreed time" : `Assigned ${j.technician} · ${fmt(j.scheduled)}`,
-      tech: j.technician, techSub: j.technician ? (j.techAck?.status === "accepted" ? "accepted ✓" : j.techAck?.status === "cant_make" ? "can’t make it ⚠" : "awaiting acceptance") : "not assignable before acceptance",
+      tech: j.technician, techSub: j.technician ? (j.techAck?.status === "accepted" ? "accepted" : j.techAck?.status === "cant_make" ? "can’t make it" : "awaiting acceptance") : "not assignable before acceptance",
       slot: fmt(j.scheduled), deadline: offered ? "Answer by 09-25 12:00" : "", status: offered ? "Offered" : "Active",
       label: offered ? (pend ? "Time proposed" : "Offered") : j.status === "accepted" ? "Unassigned" : "Assigned", tone: pend ? "warn" : "primary",
     };

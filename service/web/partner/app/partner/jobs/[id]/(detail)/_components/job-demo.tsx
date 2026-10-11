@@ -25,7 +25,7 @@ function LiveOffer({ j }: { j: Job }) {
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/partner/jobs" className="font-semibold text-primary">← Jobs</Link> › {j.id} · {j.unit} · <JobStatusBadge s={j.status} /></div>
       {j.status === "accepted" && <Banner tone="ok" action={<LinkBtn size="sm" variant="primary" href={`/partner/schedule?jobId=${j.id}`}>Assign technician →</LinkBtn>}>Accepted — assign your technician for exactly {fmt(j.scheduled)}.</Banner>}
-      {(j.status === "assigned" || j.status === "in_progress") && <Banner tone="ok">Assigned to {j.technician} · {j.techAck?.status === "accepted" ? "accepted by the technician ✓" : j.techAck?.status === "cant_make" ? "technician can’t make it — reassign in Schedule" : "waiting for the technician to accept"}.</Banner>}
+      {(j.status === "assigned" || j.status === "in_progress") && <Banner tone="ok">Assigned to {j.technician} · {j.techAck?.status === "accepted" ? "accepted by the technician" : j.techAck?.status === "cant_make" ? "technician can’t make it — reassign in Schedule" : "waiting for the technician to accept"}.</Banner>}
       {j.status === "time_proposed" && <Banner tone="warn">HQ has asked the client about your proposed time. You will be notified of the answer.</Banner>}
       {j.partnerProposal?.status === "approved" && j.status === "offered" && <Banner tone="ok">The client approved your time ({fmt(j.scheduled)}). Accept the offer to continue.</Banner>}
       {j.partnerProposal?.status === "rejected" && j.status === "offered" && <Banner tone="warn">Your time change was not approved — the agreed time stays {fmt(j.scheduled)}. Accept or decline.</Banner>}
@@ -50,7 +50,7 @@ function LiveOffer({ j }: { j: Job }) {
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={`Can your team take it? — ${fmt(j.scheduled)}`} action={<Link className="text-xs font-semibold text-primary" href="/partner/team">Team & capacity →</Link>}>
-            <SummaryList items={[["tech-external-a", <Badge key="a" tone="ok">Fits · refrigerant ✓</Badge>], ["tech-external-a2", <Badge key="b" tone="muted">Not qualified</Badge>]]} />
+            <SummaryList items={[["tech-external-a", <Badge key="a" tone="ok" icon="check">Fits · refrigerant qualified</Badge>], ["tech-external-a2", <Badge key="b" tone="muted">Not qualified</Badge>]]} />
             <p className="mt-2 text-[11px] text-muted">Own-company technicians only. No customer data before acceptance.</p>
           </Card>
           <Card title="Job history"><ul className="flex flex-col gap-1.5 text-xs">{j.history.slice(-5).map((h, i) => <li key={i}><span className="text-muted">{h.at}</span> · {h.text}</li>)}</ul></Card>
@@ -72,7 +72,7 @@ function ProposeTimeModal({ j, onClose, onDone }: { j: Pick<Job, "id" | "schedul
     <Modal open onClose={onClose} title="Propose another time" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!reason.trim()) return; onDone({ date, win }, tech, reason.trim()); }}>Send to HQ</Btn></>}>
       <p className="text-xs text-muted">{j.id} · agreed with the client: {fmt(j.scheduled)}</p>
       <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}><Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field><Field label="Window"><Select value={win} onChange={(e) => setWin(e.target.value)}>{WINDOWS.map((w) => <option key={w}>{w}</option>)}</Select></Field></div>
-      <Field label="Technician"><Select value={tech} onChange={(e) => setTech(e.target.value)}><option value="tech-external-a">tech-external-a · free 14:00–18:00 ✓ refrigerant ✓</option><option value="tech-external-a2">tech-external-a2 · not qualified</option></Select></Field>
+      <Field label="Technician"><Select value={tech} onChange={(e) => setTech(e.target.value)}><option value="tech-external-a">tech-external-a · free 14:00–18:00 · refrigerant qualified</option><option value="tech-external-a2">tech-external-a2 · not qualified</option></Select></Field>
       <Field label="Reason (sent to HQ and the client) · required" error={tried && !reason.trim() ? "A reason is required" : undefined}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="tech-external-a has a certificate renewal course on 10-01 morning." /></Field>
       <Banner>HQ forwards this to the client for approval. The offer stays reserved for you until the client answers. If the client declines, HQ may keep the original time with another partner.</Banner>
     </Modal>

@@ -13,6 +13,7 @@ import { saveContractor, saveRateCard, setOfferStatus, verifyCertificate } from 
 import type { ContractorsLive } from "../_lib/load";
 import { JobsTabs } from "./jobs-header";
 import { NewJobModal } from "./jobs-view";
+import { Icon } from "@ac/web/components/Icon";
 
 type Detail = NonNullable<ContractorsLive["detail"]>;
 type ModalState = null | { kind: "profile"; organizationId: string | null } | { kind: "status" } | { kind: "rates" } | { kind: "verify" } | { kind: "job" };
@@ -178,7 +179,7 @@ function RatesModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now: 
             <Field label={t("Note {n}", { n: n + 1 })}><Input disabled={!l.on} value={l.note} maxLength={200} onChange={(e) => setLines(lines.map((x, k) => (k === n ? { ...x, note: e.target.value } : x)))} /></Field>
           </div>
         ))}
-        {tried && errors.lines && <p className="text-xs text-crit">✕ {errors.lines}</p>}
+        {tried && errors.lines && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{errors.lines}</p>}
       </div>
       <Banner>{t("The rework deduction is entered as a positive amount and shown as “−”. Jobs keep the card in effect when they were offered; payouts are not made from here.")}</Banner>
     </Modal>

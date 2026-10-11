@@ -14,6 +14,7 @@ import type { Channel } from "@ac/web/lib/contracts.gen";
 import {
   answerInquiry, confirmCardPayment, createInvoice, generatePayouts, previewReminder, recordManualPayment, resolvePayoutQuery, sendReminder, transitionStatement, type ActionResult,
 } from "../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 type Tab = "invoices" | "inquiries" | "payouts";
 export type BillingLive = {
@@ -192,7 +193,7 @@ export function BillingView({ live }: { live?: BillingLive }) {
               <Field label={t("Property")}><Select value={live.scope.propertyId ?? ""} onChange={(e) => nav({ propertyId: e.target.value || null, invoiceId: null })}><option value="">{t("All properties")}</option>{scopeProps.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
               <Field label={t("Contract")}><Select value={live.scope.contractId ?? ""} onChange={(e) => nav({ contractId: e.target.value || null, invoiceId: null })}><option value="">{t("All contracts")}</option>{scopeContracts.map((k) => <option key={k.id} value={k.id}>{contracts.find((c) => c.id === k.id)?.label ?? k.id}</option>)}</Select></Field>
               <BillingMonths from={live.scope.from} to={live.scope.to} onChange={(from, to) => nav({ from, to, invoiceId: null })} />
-              {live.scope.overdueOnly && <Btn size="sm" onClick={() => nav({ overdueOnly: null, invoiceId: null })} aria-label={t("Overdue only — show all invoices")}>{t("Overdue only")} <span aria-hidden>✕</span></Btn>}
+              {live.scope.overdueOnly && <Btn size="sm" onClick={() => nav({ overdueOnly: null, invoiceId: null })} aria-label={t("Overdue only — show all invoices")}>{t("Overdue only")} <Icon name="close" /></Btn>}
             </div>
           )}
           <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>{[[t("Outstanding"), totals(list, ["Unpaid", "Overdue", "Processing"]), t("unpaid · processing")], [t("Overdue"), totals(list, ["Overdue"]), t("reminders allowed")], [t("Processing"), totals(list, ["Processing"]), t("awaiting HQ confirmation")], live?.months ? [t("Paid in period"), totals(list, ["Paid"]), live.months] : [t("Paid"), totals(list, ["Paid"]), t("in this scope")]].map(([a, b, c]) => <div key={a} className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted">{a}</div><div className="text-xl font-bold">{b}</div><div className="text-[11px] text-muted">{c}</div></div>)}</div>
@@ -303,7 +304,7 @@ function BillingMonths({ from, to, onChange }: { from?: string; to?: string; onC
     <>
       <Field label={t("Billing months from")} error={reversed ? t("The first month must not be after the last") : undefined}><Input type="month" value={f.from} onChange={(e) => change({ ...f, from: e.target.value })} /></Field>
       <Field label={t("Billing months to")}><Input type="month" value={f.to} onChange={(e) => change({ ...f, to: e.target.value })} /></Field>
-      {(from || to) && <Btn size="sm" onClick={() => change({ from: "", to: "" })}>{t("All months ✕")}</Btn>}
+      {(from || to) && <Btn size="sm" onClick={() => change({ from: "", to: "" })}>{t("All months")} <Icon name="close" /></Btn>}
     </>
   );
 }

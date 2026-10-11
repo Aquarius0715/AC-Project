@@ -14,6 +14,7 @@ import { deletePolicy, savePolicy } from "../actions";
 import { DefaultPolicyEditor } from "./default-policy";
 import { ConditionFields, WindowEditor } from "./policy-parts";
 import { DemoTest, NotificationPreview } from "./policy-checks";
+import { Icon } from "@ac/web/components/Icon";
 
 /** API mode: the selected policy (`policyId`) or the owner customer of a new one (`new`, copied from the default rule
  * `from`) from the URL (DD-A05 items 5, 8 and 9), whether the session may write policies, the display time zone a new
@@ -207,10 +208,10 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
                 {draft.recipients.map((r) => (
                   <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px]">
                     <span><b>{r.label}</b><span className="block text-xs text-muted">{r.role}</span></span>
-                    {canWrite && <Btn size="sm" variant="ghost" aria-label={t("Remove {name}", { name: r.label })} onClick={() => set("recipients", draft.recipients.filter((x) => x.id !== r.id))}>✕</Btn>}
+                    {canWrite && <Btn size="sm" variant="ghost" aria-label={t("Remove {name}", { name: r.label })} onClick={() => set("recipients", draft.recipients.filter((x) => x.id !== r.id))}><Icon name="close" /></Btn>}
                   </div>
                 ))}
-                {(draft.recipients.length === 0 || (tried && errors.recipients)) && <p className={cx("py-1 text-xs", tried && errors.recipients ? "text-crit" : "text-muted")}>{tried && errors.recipients ? `✕ ${errors.recipients}` : t("No recipients yet — add at least one.")}</p>}
+                {(draft.recipients.length === 0 || (tried && errors.recipients)) && <p className={cx("py-1 text-xs", tried && errors.recipients ? "text-crit" : "text-muted")}>{tried && errors.recipients ? <span className="inline-flex items-center gap-1"><Icon name="error" />{errors.recipients}</span> : t("No recipients yet — add at least one.")}</p>}
                 <div className="flex flex-wrap gap-3 border-t border-line pt-2"><span className="text-xs text-muted">{t("Channels for every recipient:")}</span><Check label={t("In-app")} checked disabled /><Check label={t("Email")} checked={draft.channels.includes("email")} onChange={(v) => toggleChannel("email", v)} /><Check label="WhatsApp" checked={draft.channels.includes("whatsapp")} onChange={(v) => toggleChannel("whatsapp", v)} /></div>
                 <p className="text-[11px] text-muted">{t("In-app is always on. WhatsApp reaches only recipients who allowed that channel.")}</p>
               </section>

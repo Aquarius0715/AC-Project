@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Badge, Banner, Btn, Card, Check, DataTable, EmptyState, Field, Input, Modal, Page, Search, Select, Stat, Tabs, UtilBar, useToast } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
+import { Icon } from "@ac/web/components/Icon";
 
 // DATA_SOURCE=api: technicians of the company (members.list, IR172 displayName), a week of members.capacity and
 // members.setUnavailability. Qualification grants come from the memberships (contractors get no permissions/scopes, IR42).
@@ -60,7 +61,7 @@ export function MockTeam() {
       <Modal open={modal === "upload"} onClose={() => setModal(null)} title="Upload renewal — Electrical basics" footer={<><Btn onClick={() => setModal(null)}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(null); toast("Renewal uploaded — pending HQ verification"); }}>Upload</Btn></>}>
         <Field label="Technician"><Input disabled value="tech-external-a" /></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}><Field label="Certificate no."><Input defaultValue="EB-2026-0442" /></Field><Field label="Valid until"><Input type="date" defaultValue="2028-10-15" /></Field></div>
-        <div className="rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted">📄 Drop a PDF / image (≤ 5 MiB)</div>
+        <div className="rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted"><Icon name="upload" /> Drop a PDF / image (≤ 5 MiB)</div>
         <p className="text-[11px] text-muted">A pending renewal does not extend eligibility until HQ verifies it.</p>
       </Modal>
     </Page>

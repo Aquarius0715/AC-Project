@@ -13,8 +13,8 @@ test("the team shows the technicians, the week and the qualifications", async ({
   await expect(main.getByRole("heading", { name: /^Week of \d{1,2} \S+ — assigned \/ available hours$/ })).toBeVisible();
   await expect(main.getByRole("heading", { name: "Qualifications", exact: true })).toBeVisible();
   await expect(main.getByRole("combobox", { name: "Qualification" })).toContainText("All qualifications");
-  await expect(main.getByRole("button", { name: "✓ Active only" })).toHaveAttribute("aria-pressed", "true");
-  await main.getByRole("button", { name: "✓ Active only" }).click();
+  await expect(main.getByRole("button", { name: "Active only" })).toHaveAttribute("aria-pressed", "true");
+  await main.getByRole("button", { name: "Active only" }).click();
   await page.waitForURL(/activeOnly=false/);
   await expect(main.getByRole("button", { name: "Include expired" })).toHaveAttribute("aria-pressed", "false");
 });

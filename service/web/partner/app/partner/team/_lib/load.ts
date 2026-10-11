@@ -1,5 +1,5 @@
 // The reads of the contractor's team & capacity (FR-P06, DD-P06, SCR-P06) through the DAL: session.get (the own
-// company, so another orgId in the URL reads as NOT_FOUND, AT-P06-E①), members.list (the company's technicians with
+// company, so another orgId in the URL reads as NOT_FOUND, AT-P06-E item 1), members.list (the company's technicians with
 // their qualification grants and membership periods), members.capacity for each Kuala Lumpur day of the chosen date's
 // week, and jobs.list per technician (the job of a booked block and the confirmed assignments unavailable days would
 // overlap). The Certifications tab adds certificates.list and units.list (the qualifications a booked job's unit

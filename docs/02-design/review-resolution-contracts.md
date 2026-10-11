@@ -6186,3 +6186,25 @@ The customer app's screens kept 104 glyphs, in both the API views and the browse
 7. **Tests.** Three E2E specs name the buttons without glyphs: Eksport, Delete, Rename. The web unit tests and the i18n check pass.
 8. **Left for the next parts.** The partner, technician and HQ screens: 90 glyphs. Then the arrows in link texts (about 660, with their Malay keys), Figma, and the guard test.
 9. **Checks.** Typecheck, lint, the web unit tests (458), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped.
+
+## IR396 One icon library, part 4: the partner, technician and HQ screens — 2026-10-12
+
+The last 90 symbol glyphs, in the screens of the other three apps, are Lucide icons through `Icon`. The web code now uses no symbol or emoji character as an icon; only the arrows in link texts are left, and they are the next part.
+
+1. **Partner.**
+   - Locked schedule fields (lock), the unit's alerts (warning), certificate files (document, upload) and their errors.
+   - "Active only" (check), team members (account), the history timeline (alert, check, dot), and the job steps (check).
+   - The review's evidence check, linked photos (camera) and the contributor note (info).
+   - Acceptance texts lose their decorative ✓ and ⚠.
+2. **Technician.**
+   - The register note (info), Accept assignment (check), the signature pad (signature), the check-in badges (check), photos (camera, close) and the device notes (edit).
+3. **HQ.**
+   - Remove buttons for scopes, facts, evidence, recipients and firmware versions (close).
+   - The energy comparison (check, error), the import file (document), the recovery check and the field errors.
+   - Follow-up and proposal cards (undo, swap), locked times (lock), job steps (check), linked photos (camera), the Overdue and All months chips (close).
+   - The demo KPIs show the rating with a star icon.
+   - The MRV comparison title says "and" instead of ↔. A native `<option>` lists qualifications in words.
+4. **Accessibility.** The demo unit editor's close button had no name and has one now. Every other icon-only button already had one.
+5. **The Malay dictionary** follows every changed key. The i18n check passes in both directions.
+6. **Tests.** Three E2E specs name buttons without glyphs: Active only, Accept assignment, All months.
+7. **Checks.** Typecheck, lint, the web unit tests (458), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped.

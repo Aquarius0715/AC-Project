@@ -21,7 +21,7 @@ test("billing months filter the invoices and the related restriction opens on th
   // a month without invoices, then all months again
   await page.goto("/admin/billing?from=2026-09&to=2026-09");
   await expect(main.getByRole("heading", { name: "No invoices" })).toBeVisible();
-  await main.getByRole("button", { name: "All months ✕" }).click();
+  await main.getByRole("button", { name: "All months" }).click();
   await page.waitForURL((u) => !u.searchParams.has("from") && !u.searchParams.has("to"));
   await expect(main).toContainText("in this scope");
   await expect(main.getByRole("button", { name: /INV-202608-0001/ })).toBeVisible();

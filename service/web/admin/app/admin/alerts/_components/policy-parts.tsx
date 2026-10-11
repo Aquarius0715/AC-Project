@@ -4,6 +4,7 @@ import { Btn, Check, Field, Input, LineChart, Select, cx } from "@ac/web/compone
 import { useT } from "@ac/web/components/I18n";
 import { windowText } from "@ac/web/lib/customerPolicies";
 import { HQ_METRICS, metricLabel, metricUnit, opSymbol, type ApiPolicy, type Operator } from "@ac/web/lib/adminAlerts";
+import { Icon } from "@ac/web/components/Icon";
 
 type Window = NonNullable<ApiPolicy["activeWindow"]>;
 /** A condition as both editors hold it: an alert policy's and a default rule's (IR120 item 3). */
@@ -32,7 +33,7 @@ export function ConditionFields({ c, onChange, errors, tried, fixedMetric }: { c
       </div>
       {/* an illustrative curve that crosses the threshold and comes back (not real readings) */}
       <div className="mt-2"><LineChart points={(c.operator === "lt" || c.operator === "lte" ? FALL : RISE).map((k) => Math.round(k * c.threshold * 10) / 10)} threshold={c.threshold} height={90} /></div>
-      <p className={cx("text-xs", errors.recovery ? "text-crit" : "text-ok")}>{errors.recovery ? `✕ ${errors.recovery}` : t("✓ Recovery {recovery} is on the safe side of the {threshold} threshold ({op})", { recovery: c.recovery, threshold: c.threshold, op: opSymbol[c.operator] })}</p>
+      <p className={cx("text-xs", errors.recovery ? "text-crit" : "text-ok")}><span className="inline-flex items-center gap-1"><Icon name={errors.recovery ? "error" : "check"} />{errors.recovery ? errors.recovery : t("Recovery {recovery} is on the safe side of the {threshold} threshold ({op})", { recovery: c.recovery, threshold: c.threshold, op: opSymbol[c.operator] })}</span></p>
     </>
   );
 }
@@ -53,7 +54,7 @@ export function WindowEditor({ value, onChange, timezone, error }: { value: Wind
         </div>
       ) : <p className="text-[13px]">{t("Any day · any time")}</p>}
       {value && !error && <p className="text-xs text-muted">{windowText(value, t)}</p>}
-      {error && <p className="text-xs text-crit">✕ {error}</p>}
+      {error && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{error}</p>}
     </div>
   );
 }

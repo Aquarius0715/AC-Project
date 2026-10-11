@@ -8,6 +8,7 @@ import { useUrlTab } from "@ac/web/lib/useUrlTab";
 import { callOp, OpError } from "@ac/web/lib/ops";
 import { historyRow, type ApiCommand } from "@ac/web/lib/units";
 import { periodError, resultTone, resultWord, type AuditDeviceEvent, type AuditFilters, type AuditRow, type Related, type RelatedRef } from "@ac/web/lib/audit";
+import { Icon } from "@ac/web/components/Icon";
 
 const seed: AuditRow[] = [
   { id: "1", op: "restriction.override", target: "restriction · restriction-a41", targetKind: "restriction", targetId: "restriction-a41", versions: "version 3 → 4", actor: "hq-operator", actorId: "hq-operator", role: "admin", at: "09-22 09:14", occurred: "2026-09-22 09:14 (Asia/Kuala_Lumpur)", corr: "corr-7f21a9", res: "Success", reason: "Customer requested a short exception while the invoice is under review.",
@@ -117,7 +118,7 @@ export function AuditView({ live }: { live?: AuditLive }) {
               <Field label={t("Target")}><Select value={f.targetKind} onChange={(e) => search({ targetKind: e.target.value, targetId: "" })}><option value="">{t("Target: All")}</option>{kinds.map((k) => <option key={k} value={k}>{k}</option>)}</Select></Field>
               <Field label={t("Correlation ID")}><Input value={f.correlationId} onChange={(e) => typeCorr(e.target.value)} placeholder="corr-…" /></Field>
             </div>
-            {f.targetId && <div className="mt-2"><span className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-xs">{t("Target ID")} · <span className="font-mono">{f.targetKind ? `${f.targetKind} · ` : ""}{f.targetId}</span><button aria-label={t("Clear the target ID")} onClick={() => search({ targetId: "" })}>✕</button></span></div>}
+            {f.targetId && <div className="mt-2"><span className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-xs">{t("Target ID")} · <span className="font-mono">{f.targetKind ? `${f.targetKind} · ` : ""}{f.targetId}</span><button aria-label={t("Clear the target ID")} onClick={() => search({ targetId: "" })}><Icon name="close" /></button></span></div>}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <Choice value={f.result} onChange={(v) => search({ result: v })} options={(["All", "Success", "Denied", "Failed", "Pending"] as const).map((k) => ({ id: k, label: k === "All" ? t("All") : resultWord(k, t) }))} />
               <span className="flex flex-wrap items-center gap-3">

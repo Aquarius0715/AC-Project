@@ -12,6 +12,7 @@ import { decisionRefusal, originLabel, qualificationLabel, typeLabel, type ApiDe
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { acceptOffer, declineOffer, proposeSlot, withdrawProposal } from "../actions";
 import type { JobDetailLive } from "../_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 const scopeLabel: Record<string, string> = { indoor: "Indoor unit", outdoor: "Outdoor unit", electrical: "Electrical / control" };
 const statusTone: Record<string, "primary" | "ok" | "warn" | "crit" | "muted"> = { accepted: "primary", assigned: "primary", in_progress: "primary", submitted: "primary", completed: "ok", rework_requested: "warn", on_hold: "warn", cancelled: "muted" };
@@ -221,7 +222,7 @@ function DetailView({ live }: { live: Extract<JobDetailLive, { kind: "detail" }>
             <ol className="flex flex-col gap-2">
               {x.steps.map((s, i) => (
                 <li key={s.label} className="flex items-start gap-2 text-xs">
-                  <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${s.state === "done" ? "bg-primary text-white" : s.state === "current" ? "border-2 border-primary text-primary" : "border border-line text-muted"}`}>{s.state === "done" ? "✓" : i + 1}</span>
+                  <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${s.state === "done" ? "bg-primary text-white" : s.state === "current" ? "border-2 border-primary text-primary" : "border border-line text-muted"}`}>{s.state === "done" ? <Icon name="check" /> : i + 1}</span>
                   <span><b className={s.state === "todo" ? "text-muted" : s.state === "current" ? "text-primary" : ""}>{s.label}</b><span className="block text-[11px] text-muted">{s.atText ?? (s.state === "todo" ? t("next") : "")} · {s.sub}</span></span>
                 </li>
               ))}

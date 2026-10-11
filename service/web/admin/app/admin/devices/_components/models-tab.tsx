@@ -8,6 +8,7 @@ import { showTime } from "@ac/web/lib/i18n";
 import { capabilityChanges, capabilityDraft, capabilityErrors, capabilityInput, fans, firmwareProblem, metrics, metricUnit, modes, type CapabilityDraft, type Fan, type Metric, type Mode } from "@ac/web/lib/devices";
 import { capabilityHistory, saveCapability, type HistoryEntry } from "../actions";
 import type { DevicesLive } from "./devices-view";
+import { Icon } from "@ac/web/components/Icon";
 
 const modeLabel: Record<Mode, string> = { cool: "Cool", dry: "Dry", fan: "Fan" };
 const levelLabel: Record<Fan, string> = { low: "Low", mid: "Mid", high: "High" };
@@ -84,7 +85,7 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
             <Check label={t("Ventilation supported")} checked={d.ventilation} onChange={(v) => set({ ventilation: v, ventilationLevels: v ? d.ventilationLevels : [] })} />
             <p className="mb-1 mt-2 text-xs text-muted">{t("When enabled, levels must be non-empty and include Low.")}</p>
             <div className="flex flex-wrap gap-x-6 gap-y-2">{fans.map((k) => <Check key={k} label={t(levelLabel[k])} checked={d.ventilationLevels.includes(k)} disabled={!d.ventilation} onChange={(v) => set({ ventilationLevels: toggle(d.ventilationLevels, k, v) })} />)}</div>
-            {err("ventilationLevels") && <p className="mt-1 text-xs text-crit">✕ {err("ventilationLevels")}</p>}
+            {err("ventilationLevels") && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{err("ventilationLevels")}</p>}
           </section>
           <section>
             <h3 className="mb-2 text-[13px] font-bold">{t("Sensors")}</h3>
@@ -101,7 +102,7 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
                 return (
                   <span key={v} className="inline-flex items-center gap-1.5 rounded-control border border-primary/40 bg-primary-soft px-2.5 py-1 text-xs">
                     <b>{v}</b><span className="text-muted">{on ? t(on === 1 ? "current on 1 device" : "current on {n} devices", { n: on }) : n === d.firmware.length - 1 ? t("latest") : ""}</span>
-                    <button type="button" aria-label={t("Remove {name}", { name: v })} className="text-muted hover:text-ink" onClick={() => set({ firmware: d.firmware.filter((x) => x !== v) })}>✕</button>
+                    <button type="button" aria-label={t("Remove {name}", { name: v })} className="text-muted hover:text-ink" onClick={() => set({ firmware: d.firmware.filter((x) => x !== v) })}><Icon name="close" /></button>
                   </span>
                 );
               })}
@@ -112,8 +113,8 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
                 </span>
               )}
             </div>
-            {adding !== null && adding.trim() !== "" && addProblem && <p className="mt-1 text-xs text-crit">✕ {addProblem}</p>}
-            {err("firmware") && <p className="mt-1 text-xs text-crit">✕ {err("firmware")}</p>}
+            {adding !== null && adding.trim() !== "" && addProblem && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{addProblem}</p>}
+            {err("firmware") && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{err("firmware")}</p>}
           </section>
           {sel && <section className="rounded-xl bg-surface2 p-3"><h3 className="mb-1 text-[13px] font-bold">{t("Impact of this change")}</h3><ul className="list-disc pl-5 text-xs"><li>{t(units.length === 1 ? "1 unit{list} moves to capability version {v}" : "{n} units{list} move to capability version {v}", { n: units.length, list: units.length ? ` — ${units.map((u) => u.label).join(", ")}` : "", v: sel.version + 1 })}</li><li>{t("Automation rules that no longer fit are disabled with reason capability_changed")}</li><li>{t("Unfinished commands keep their original content")}</li></ul></section>}
           {sel && <Field label={t("Change reason · required for updates")} error={err("changeReason")} hint={`${d.changeReason.length} / 1000`}><Textarea value={d.changeReason} maxLength={1000} onChange={(e) => set({ changeReason: e.target.value })} placeholder={t("Vendor bulletin: ventilation High not verified on the current batch.")} /></Field>}

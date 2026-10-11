@@ -8,6 +8,7 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { certificateErrors, certificateRefusal, fileSize, FILE_TYPES, type CertForm, type CertRow } from "@ac/web/lib/partnerCertificates";
 import { requestTraining, submitCertificate } from "../actions";
 import type { TeamLive } from "../_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 type Live = Extract<TeamLive, { notFound: false }>;
 type Open = { kind: "renew" | "add"; row: CertRow | null } | { kind: "training" | "view"; row: CertRow } | null;
@@ -149,10 +150,10 @@ function CertificateModal({ live, kind, row, onClose }: { live: Live; kind: "ren
         <span>{t("Certificate file")}</span>
         <label className={cx("block cursor-pointer rounded-xl border border-dashed px-4 py-4 text-center hover:bg-surface2", err("file") ? "border-crit" : "border-line")}>
           <input type="file" accept={FILE_TYPES.join(",")} className="sr-only" onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); set({ file: f ? { name: f.name, type: f.type, size: f.size } : null }); }} />
-          <b className="block text-[13px]">{file ? `📄 ${file.name} · ${fileSize(file.size)}` : t("Choose a file")}</b>
+          <b className="flex items-center gap-1 text-[13px]">{file ? <><Icon name="document" />{`${file.name} · ${fileSize(file.size)}`}</> : t("Choose a file")}</b>
           <span className="block text-[11px] font-normal text-muted">{t("PDF / JPG / PNG, up to 10 MB")}{file ? ` · ${t("Replace")}` : ""}</span>
         </label>
-        {err("file") && <span className="font-medium text-crit">✕ {err("file")}</span>}
+        {err("file") && <span className="flex items-center gap-1 font-medium text-crit"><Icon name="error" />{err("file")}</span>}
       </div>
       <Banner>{t(renew ? "The renewal is “Pending HQ verification” until HQ checks it. Until then the current expiry date is used for eligibility." : "The certificate is “Pending HQ verification” until HQ checks it; only then does it count for eligibility.")}</Banner>
       {refused && <Banner tone="crit">{refused}</Banner>}

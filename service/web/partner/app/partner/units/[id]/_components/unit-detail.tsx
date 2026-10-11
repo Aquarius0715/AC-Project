@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Badge, Banner, BarChart, Card, ConnBadge, LinkBtn, Page, SeverityBadge, SummaryList, UtilBar, cx } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import type { UnitLive } from "../_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 /** The contractor's unit view (FR-P04, FR-P08, Figma Contractor Unit View): diagnosis only — the register, the job
  * context with its access window, past work, alert evidence, readings and the last 24 hours — or, after the
@@ -53,7 +54,7 @@ export function PartnerUnitDetail({ live }: { live: UnitLive }) {
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={t("Alert evidence")}>
             {live.alerts.length === 0 ? <p className="text-[13px] text-muted">{t("No alerts on this unit.")}</p> : live.alerts.map((a) => (
-              <div key={a.id} className={cx("border-t border-line py-2 first:border-0", a.resolved && "opacity-70")}><b className="text-[13px]">⚠ {a.title}</b> <SeverityBadge s={a.severity} /><div className="text-xs text-muted">{a.sub}</div></div>
+              <div key={a.id} className={cx("border-t border-line py-2 first:border-0", a.resolved && "opacity-70")}><b className="inline-flex items-center gap-1 text-[13px]"><Icon name="warning" />{a.title}</b> <SeverityBadge s={a.severity} /><div className="text-xs text-muted">{a.sub}</div></div>
             ))}
           </Card>
           <Card title={t("Readings (diagnosis only)")} sub={t("observed {time}", { time: live.readings.observed })}>

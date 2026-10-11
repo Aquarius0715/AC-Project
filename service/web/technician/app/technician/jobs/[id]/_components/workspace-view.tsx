@@ -14,6 +14,7 @@ import {
   type ApiTechReport, type Draft, type DraftPart, type DraftRefrigerant, type Group, type Issue, type Known, type Result, type TimeOnSite,
 } from "@ac/web/lib/techJob";
 import { acknowledge, checkIn, pauseWork, resumeRework, saveDraft, signOff, submitReport, uploadPhoto } from "../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 export type WorkspaceLive = {
   now: string; known: Known; zone: string;
@@ -165,8 +166,8 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
         {ph.linked.length > 0 && (
           <div className="flex flex-wrap gap-1.5">{ph.linked.map((x) => (
             <span key={x.id} className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2 py-0.5 text-xs">
-              📷 {x.status === "missing" ? x.name : <a href={photoUrl(x)} target="_blank" rel="noreferrer" className="font-semibold text-primary">{x.name}</a>}
-              {editable && <button type="button" aria-label={t("Unlink {photo} from {item}", { photo: x.name, item: name })} className="text-muted hover:text-ink" onClick={() => edit((d) => linkPhoto(d, it.componentKey, x.id, false))}>✕</button>}
+              <Icon name="camera" /> {x.status === "missing" ? x.name : <a href={photoUrl(x)} target="_blank" rel="noreferrer" className="font-semibold text-primary">{x.name}</a>}
+              {editable && <button type="button" aria-label={t("Unlink {photo} from {item}", { photo: x.name, item: name })} className="text-muted hover:text-ink" onClick={() => edit((d) => linkPhoto(d, it.componentKey, x.id, false))}><Icon name="close" /></button>}
             </span>
           ))}</div>
         )}
@@ -179,7 +180,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
         {actions && !photos.some((x) => x.status === "ready") && <p className="text-[11px] text-muted">{t("Add a photo under Photos first, then link it to this finding.")}</p>}
         {actions && linking === it.componentKey && ph.free.length > 0 && (
           <div role="group" aria-label={t("Report photos to link to {item}", { item: name })} className="flex flex-wrap gap-1.5 rounded-lg border border-line p-2">
-            {ph.free.map((x) => <Btn key={x.id} size="sm" variant="ghost" onClick={() => { edit((d) => linkPhoto(d, it.componentKey, x.id, true)); setLinking(null); }}>📷 {x.name}</Btn>)}
+            {ph.free.map((x) => <Btn key={x.id} size="sm" variant="ghost" onClick={() => { edit((d) => linkPhoto(d, it.componentKey, x.id, true)); setLinking(null); }}><Icon name="camera" />{x.name}</Btn>)}
           </div>
         )}
       </div>
@@ -190,7 +191,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
     <Page>
       {head}
       {refused && <Banner tone="crit">{refused}</Banner>}
-      {job.status === "assigned" && ack === "pending" && <Banner tone="primary" action={<span className="flex gap-2"><Btn size="sm" variant="primary" disabled={pending} onClick={() => run(() => acknowledge(job.id, job.version, "accept", null, null), t("Assignment accepted"), undefined, failed)}>{t("✓ Accept assignment")}</Btn><Btn size="sm" disabled={pending} onClick={() => setModal("cant")}>{t("Can’t make this time…")}</Btn></span>}>{t("New assignment for {window}. Accepting tells your coordinator and HQ you will attend; the client then sees your name.", { window: win.text })}</Banner>}
+      {job.status === "assigned" && ack === "pending" && <Banner tone="primary" action={<span className="flex gap-2"><Btn size="sm" variant="primary" disabled={pending} onClick={() => run(() => acknowledge(job.id, job.version, "accept", null, null), t("Assignment accepted"), undefined, failed)}><Icon name="check" />{t("Accept assignment")}</Btn><Btn size="sm" disabled={pending} onClick={() => setModal("cant")}>{t("Can’t make this time…")}</Btn></span>}>{t("New assignment for {window}. Accepting tells your coordinator and HQ you will attend; the client then sees your name.", { window: win.text })}</Banner>}
       {job.status === "assigned" && ack === "cant_make" && <Banner tone="warn">{job.assignment?.cantMakeReason ? t("You said you can’t make this time (“{reason}”). Your coordinator reassigns the job or asks the client for another time.", { reason: job.assignment.cantMakeReason }) : t("You said you can’t make this time. Your coordinator reassigns the job or asks the client for another time.")}</Banner>}
       {job.status === "assigned" && ack === "accepted" && <Banner tone={win.phase === "before" ? "primary" : "ok"} action={<Btn size="sm" variant="primary" disabled={pending || win.phase !== "open" && win.phase !== "ending"} onClick={() => setModal("checkin")}>{t("Start job (check in)")}</Btn>}>{win.phase === "before" ? t("Before the work window ({window}): read-only, Start is disabled (IR76).", { window: win.text }) : win.phase === "ended" ? t("The work window has ended — ask your coordinator to reschedule.") : t("On site: Start job opens Check in (location + unit QR); checking in starts the work (IR111).")}</Banner>}
       {job.status === "on_hold" && <Banner tone="warn">{t("On hold by HQ — saving and submitting are blocked (CONFLICT, IR93). Your saved draft is kept; continue when HQ resumes the job.")}</Banner>}
@@ -528,7 +529,7 @@ function SignModal({ open, pending, summary, onClose, onSign }: { open: boolean;
             onPointerDown={(e) => { drawing.current = true; const c = e.currentTarget.getContext("2d")!; const [x, y] = point(e); c.lineWidth = 2.5; c.lineCap = "round"; c.strokeStyle = "#0f172a"; c.beginPath(); c.moveTo(x, y); e.currentTarget.setPointerCapture(e.pointerId); }}
             onPointerMove={(e) => { if (!drawing.current) return; const c = e.currentTarget.getContext("2d")!; const [x, y] = point(e); c.lineTo(x, y); c.stroke(); setDrawn(true); }}
             onPointerUp={() => { drawing.current = false; }} />
-          <div className="mt-1 flex justify-between text-[11px] text-muted"><span>{t("✍ Sign here")}</span><button type="button" className="font-semibold text-primary" onClick={clear}>{t("Clear")}</button></div>
+          <div className="mt-1 flex justify-between text-[11px] text-muted"><span className="flex items-center gap-1"><Icon name="signature" />{t("Sign here")}</span><button type="button" className="font-semibold text-primary" onClick={clear}>{t("Clear")}</button></div>
         </div>
       )}
       {error && <Banner tone="crit">{error}</Banner>}

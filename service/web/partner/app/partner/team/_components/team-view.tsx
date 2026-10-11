@@ -10,6 +10,7 @@ import { unavailabilityConflicts, unavailabilityErrors, unavailabilityRefusal, t
 import { setUnavailability } from "../actions";
 import { Certifications } from "./certifications";
 import type { TeamLive } from "../_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 type Live = Extract<TeamLive, { notFound: false }>;
 const cellTone: Record<WeekCell["kind"], string> = {
@@ -57,7 +58,7 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
           {live.qualifications.map((x) => <option key={x.code} value={x.code}>{x.text}</option>)}
         </Select>
         <Btn size="sm" aria-pressed={q.activeOnly} className={cx(q.activeOnly && "border-primary bg-primary-soft text-primary")} onClick={() => patch({ activeOnly: q.activeOnly ? "false" : null })}>
-          {q.activeOnly ? `✓ ${t("Active only")}` : t("Include expired")}
+          {q.activeOnly ? <><Icon name="check" />{t("Active only")}</> : t("Include expired")}
         </Btn>
       </div>
       <Card title={`${t("Technicians — {company}", { company: live.company })}${q.activeOnly ? ` · ${t("{n} active", { n: live.activeCount })}` : ""}`}
@@ -72,7 +73,7 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
           <ul className="divide-y divide-line">
             {live.rows.map((r) => (
               <li key={r.id} className="flex flex-wrap items-center gap-3 py-3">
-                <span aria-hidden className={cx("grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary", !r.active && "opacity-50")}>☻</span>
+                <span aria-hidden className={cx("grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary", !r.active && "opacity-50")}><Icon name="account" /></span>
                 <div className="min-w-[200px] flex-1"><b className={cx("block text-[13px]", !r.active && "text-muted")}>{r.name}</b><span className="block text-[11px] text-muted">{r.sub}</span></div>
                 {r.active && (
                   <div className="w-44">

@@ -7,6 +7,7 @@ import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { baselineDraft, baselineErrors, baselineInput, type BaselineDraft, type BaselineRow, type SummaryView } from "@ac/web/lib/energy";
 import { saveBaseline } from "../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 type UnitOption = { id: string; label: string; customerId: string; propertyId: string };
 export type EnergyLive = {
@@ -59,7 +60,7 @@ function Analysis({ live, a }: { live: EnergyLive; a: NonNullable<EnergyLive["an
           <Btn size="sm" disabled={!from || !to || (from === a.from && to === a.to)} onClick={() => nav({ from, to })}>{t("Apply period")}</Btn>
         </div>
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{units.map((u) => <Check key={u.id} label={u.label} checked={a.unitIds.includes(u.id)} onChange={(on) => setUnits(on ? [...a.unitIds, u.id] : a.unitIds.filter((x) => x !== u.id))} />)}</div>
-        {a.error ? <p className="mt-2 text-xs text-crit">✕ {a.error}</p> : a.unitIds.length === 0 ? <p className="mt-2 text-xs text-muted">{t("Choose at least one unit.")}</p> : s && <p className="mt-2 text-xs">{s.comparable ? <span className="text-ok">{t("✓ comparable with the baseline")}</span> : a.baselineId ? <span className="text-crit">{t("✕ No difference can be calculated — see the quality warnings.")}</span> : <span className="text-muted">{t("Choose a baseline to compare.")}</span>}</p>}
+        {a.error ? <p className="mt-2 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{a.error}</p> : a.unitIds.length === 0 ? <p className="mt-2 text-xs text-muted">{t("Choose at least one unit.")}</p> : s && <p className="mt-2 text-xs">{s.comparable ? <span className="inline-flex items-center gap-1 text-ok"><Icon name="check" />{t("comparable with the baseline")}</span> : a.baselineId ? <span className="inline-flex items-center gap-1 text-crit"><Icon name="error" />{t("No difference can be calculated — see the quality warnings.")}</span> : <span className="text-muted">{t("Choose a baseline to compare.")}</span>}</p>}
       </Card>
       {s && (
         <>

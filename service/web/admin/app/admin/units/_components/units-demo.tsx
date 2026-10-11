@@ -5,6 +5,7 @@ import { setSearchParam, useSearchParam } from "@ac/web/lib/urlState";
 import { ImportCsvModal, WarrantyTab } from "@ac/web/components/Features";
 import { ClientRole, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
 import { Badge, Banner, Btn, Card, DataTable, Field, Input, Kpi, ListRow, Modal, Page, PowerBadge, ConnBadge, Search, Select, SummaryList, Tabs, useToast } from "@ac/web/components/ui";
+import { Icon } from "@ac/web/components/Icon";
 
 type Cust = { id: string; name: string; status: "active" | "inactive"; props: number; units: number; op: string; alerts: number | string; contract: string };
 const customers: Cust[] = [
@@ -71,7 +72,7 @@ export function UnitsDemo() {
       {tab === "units" && (
         <div className="split-rev">
           <Card title="Locations" action={<Btn size="sm" onClick={() => setModal("location")}>+ Add</Btn>} className="self-start">
-            <div className="flex flex-col gap-1.5">{locations.map((l) => <ListRow key={l.id} selected={loc === l.id} onClick={() => { setLoc(l.id); setUnit(null); }}><b className="flex-1 text-[13px]">⌂ {l.name}</b><button aria-label="Rename" className="text-muted" onClick={(e) => { e.stopPropagation(); setName(l.name); setModal("rename"); }}>✎</button></ListRow>)}</div>
+            <div className="flex flex-col gap-1.5">{locations.map((l) => <ListRow key={l.id} selected={loc === l.id} onClick={() => { setLoc(l.id); setUnit(null); }}><b className="flex flex-1 items-center gap-1.5 text-[13px]"><Icon name="home" className="text-muted" />{l.name}</b><button aria-label="Rename" className="text-muted" onClick={(e) => { e.stopPropagation(); setName(l.name); setModal("rename"); }}><Icon name="edit" /></button></ListRow>)}</div>
             <Btn size="sm" variant="danger" className="mt-3" onClick={() => setModal("delete")}>Delete location…</Btn>
           </Card>
           <div className="flex min-w-0 flex-col gap-4">
@@ -79,7 +80,7 @@ export function UnitsDemo() {
               <DataTable rows={loc === "bedroom" ? unitRows.slice(0, 2) : unitRows} rowKey={(r) => r.id} selectedKey={unit?.id} onRowClick={setUnit} cols={[{ key: "n", label: "Unit", render: (r) => <><b>{r.name}</b><div className="text-xs text-muted">{r.id}</div></> }, { key: "l", label: "Location", render: (r) => r.loc, hideBelow: "sm" }, { key: "m", label: "Model", render: (r) => r.model, hideBelow: "md" }, { key: "p", label: "Power", render: (r) => <PowerBadge s={r.power} /> }, { key: "c", label: "Conn.", render: (r) => <ConnBadge s={r.conn} />, hideBelow: "sm" }]} />
             </Card>
             {unit && (
-              <Card title={`Unit edit — ${unit.name}`} sub={unit.id} action={<Btn size="sm" variant="ghost" onClick={() => setUnit(null)}>✕</Btn>}>
+              <Card title={`Unit edit — ${unit.name}`} sub={unit.id} action={<Btn size="sm" variant="ghost" aria-label="Close" onClick={() => setUnit(null)}><Icon name="close" /></Btn>}>
                 <SummaryList cols={2} items={[["Name", unit.name], ["Location", unit.loc], ["Model", unit.model], ["Status", "Active"]]} />
                 <div className="mt-3 flex flex-wrap gap-2"><Btn size="sm" onClick={() => setModal("move")}>Change location…</Btn><Btn size="sm" onClick={() => setModal("attach")}>+ Attach policy</Btn><Btn size="sm" variant="danger" onClick={() => setModal("deleteUnit")}>Delete unit…</Btn></div>
               </Card>

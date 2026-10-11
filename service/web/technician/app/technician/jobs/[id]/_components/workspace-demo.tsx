@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilBar, cx, useToast } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
+import { Icon } from "@ac/web/components/Icon";
 
 type R = "normal" | "attention" | "not_inspected" | "not_applicable" | null;
 const groups: Record<string, string[]> = {
@@ -44,7 +45,7 @@ function LiveAssignment({ j }: { j: Job }) {
         <Card title={ack === "pending" ? "New assignment — please accept" : "Job — assigned to you"} className="self-start">
           <SummaryList items={[["Job", `${j.type} · ${j.customer} · ${j.unitId}`], ["Origin", <OriginBadge key="o" origin={j.origin} />], ["Visit time", <b key="v">{j.scheduled ? longDate(j.scheduled) : "—"}</b>], ["Assigned by", coord ?? "HQ"], ["Agreed with", j.origin === "plan" ? "periodic plan (client notified)" : "the client (via HQ)"]]} />
           <div className="mt-3"><Banner>Accepting tells {coord} and HQ that you will attend at this time. The client then sees your name.</Banner></div>
-          {ack === "pending" && <div className="mt-3 flex flex-col gap-2"><Btn variant="primary" onClick={() => { jobActions.techAccept(j.id); toast("Assignment accepted"); }}>✓ Accept assignment</Btn><Btn variant="danger" onClick={() => setCant(true)}>Can’t make this time…</Btn></div>}
+          {ack === "pending" && <div className="mt-3 flex flex-col gap-2"><Btn variant="primary" onClick={() => { jobActions.techAccept(j.id); toast("Assignment accepted"); }}><Icon name="check" />Accept assignment</Btn><Btn variant="danger" onClick={() => setCant(true)}>Can’t make this time…</Btn></div>}
           {ack === "accepted" && <div className="mt-3"><Btn variant="primary" disabled className="w-full">Start job (opens check-in)</Btn></div>}
         </Card>
       </div>
@@ -149,12 +150,12 @@ function Workspace({ id }: { id: string }) {
       <Modal open={signModal} onClose={() => setSignModal(false)} title="Customer sign-off" footer={<><Btn onClick={() => setSignModal(false)}>Cancel</Btn><Btn variant="primary" onClick={() => { setSigned("Ms Tan · 11:52"); setSignModal(false); toast("Signature saved for report v2"); }}>Save signature</Btn></>}>
         <SummaryList items={[["Report", "draft v2 · 7 / 18 results"], ["Parts", `${parts.length} lines`], ["Time on site", "10:05 – now"]]} />
         <Field label="Signer name"><Input defaultValue="Ms Tan" /></Field>
-        <div className="grid h-32 place-items-center rounded-xl border border-dashed border-line text-xs text-muted">✍ Sign here</div>
+        <div className="grid h-32 place-items-center rounded-xl border border-dashed border-line text-xs text-muted"><span className="flex items-center gap-1"><Icon name="signature" />Sign here</span></div>
         <p className="text-[11px] text-muted">The signature is bound to this report version; saving the draft again clears it.</p>
       </Modal>
       <Modal open={checkIn} onClose={() => setCheckIn(false)} title="Check in at site" footer={<><Btn onClick={() => setCheckIn(false)}>Cancel</Btn><Btn variant="primary" onClick={() => { setCheckIn(false); toast("Checked in — job started (demo)"); }}>Check in & start</Btn></>}>
         <p className="text-xs text-muted">{id} · Bedroom AC · Now 14:02</p>
-        <SummaryList items={[["Location", <Badge key="l" tone="ok">✓ 78 m from site (within 200 m)</Badge>], ["Unit QR", <Badge key="q" tone="ok">✓ unit-online-rto matched</Badge>], ["Arrival", <Badge key="a" tone="ok">✓ inside work window</Badge>]]} />
+        <SummaryList items={[["Location", <Badge key="l" tone="ok" icon="check">78 m from site (within 200 m)</Badge>], ["Unit QR", <Badge key="q" tone="ok" icon="check">unit-online-rto matched</Badge>], ["Arrival", <Badge key="a" tone="ok" icon="check">inside work window</Badge>]]} />
         <Banner>If location is unavailable or the QR code is missing, check in manually with a reason.</Banner>
       </Modal>
     </Page>

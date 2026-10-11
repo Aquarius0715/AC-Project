@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Btn, Card, Check, Field, Input, ListRow, Page, Select, SummaryList, Tabs, useToast } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
+import { Icon } from "@ac/web/components/Icon";
 
 const baselines = [
   { id: "baseline-energy-100", name: "baseline-energy-100", sub: "unit-online-rto · 100.0 kWh · demo_fixed", kwh: 100, units: ["unit-online-rto"] },
@@ -30,7 +31,7 @@ export function EnergyDemo() {
         <>
           <Card title="Scope">
             <div className="flex flex-wrap items-end gap-4"><div className="flex flex-wrap items-center gap-3 text-[13px]">{allUnits.map((u) => <Check key={u} label={u} checked={units.includes(u)} onChange={(v) => setUnits((s) => (v ? [...s, u] : s.length > 1 ? s.filter((x) => x !== u) : s))} />)}</div><div className="min-w-[200px]"><Field label="Baseline"><Select value={bid} onChange={(e) => setBid(e.target.value)}>{baselines.map((x) => <option key={x.id}>{x.id}</option>)}</Select></Field></div><div className="w-32"><Field label="Actual (kWh, demo)"><Input type="number" value={actual} onChange={(e) => setActual(+e.target.value)} /></Field></div></div>
-            <p className="mt-2 text-xs">{mismatch ? <span className="text-crit">✕ Unit set mismatch → no difference can be calculated.</span> : <span className="text-ok">✓ comparable</span>}</p>
+            <p className="mt-2 text-xs">{mismatch ? <span className="inline-flex items-center gap-1 text-crit"><Icon name="error" />Unit set mismatch → no difference can be calculated.</span> : <span className="inline-flex items-center gap-1 text-ok"><Icon name="check" />comparable</span>}</p>
           </Card>
           <div className="grid-fluid" style={{ ["--min"as string]: "190px" }}>
             <div className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted">Actual</div><div className="text-2xl font-bold">{actual.toFixed(1)} kWh</div><div className="text-[11px] text-muted">measured · coverage 100%</div></div>

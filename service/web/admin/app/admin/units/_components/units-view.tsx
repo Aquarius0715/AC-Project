@@ -913,7 +913,7 @@ function ImportWizard({ live, onClose }: { live: UnitsLive; onClose: () => void 
           <input aria-label={t("CSV file")} type="file" accept=".csv,text/csv" className="text-[13px]" onChange={(v) => pick(v.target.files?.[0])} />
           <Btn size="sm" variant="ghost" onClick={() => download("units-template.csv", importTemplate)}>{t("Download template")}</Btn>
         </div>
-        {file && <p className="text-[12px] text-muted">📄 {file.name} · {count(t, shape?.rows ?? 0, "1 row", "{n} rows")} · {count(t, shape?.header.length ?? 0, "1 column", "{n} columns")} · UTF-8 · {Math.max(1, Math.round(file.size / 1024))} KB{tooBig ? ` — ${t("too large: split the file (at most about 900 KB, 1000 rows)")}` : ""}</p>}
+        {file && <p className="text-[12px] text-muted"><Icon name="document" /> {file.name} · {count(t, shape?.rows ?? 0, "1 row", "{n} rows")} · {count(t, shape?.header.length ?? 0, "1 column", "{n} columns")} · UTF-8 · {Math.max(1, Math.round(file.size / 1024))} KB{tooBig ? ` — ${t("too large: split the file (at most about 900 KB, 1000 rows)")}` : ""}</p>}
         {tried && !file && <p className="text-[12px] text-crit">{t("Choose a CSV file")}</p>}
         {file && (
           <div className="rounded-xl border border-line">

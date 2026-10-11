@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, Timeline, cx, useToast } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge, PreferredSlotsInput, Rank, preferredError } from "@ac/web/components/JobBits";
 import { Job, JobStatus, Slot, fitFor, fmt, jobActions, longDate, statusLabel, useJobs } from "@ac/web/lib/jobs";
+import { Icon } from "@ac/web/components/Icon";
 
 const PIPE: JobStatus[] = ["requested", "time_proposed", "offered", "accepted", "assigned", "in_progress", "submitted", "rework_requested", "completed", "on_hold"];
 const ORDER: JobStatus[] = ["requested", "time_proposed", "offered", "accepted", "assigned", "in_progress", "on_hold", "submitted", "rework_requested", "completed", "cancelled"];
@@ -38,7 +39,7 @@ export function JobsDemo({ jobId, tab: initial }: { jobId?: string; tab?: string
             <div className="flex flex-wrap gap-2">
               <Select className="w-auto" aria-label="Origin" value={origin} onChange={(e) => setOrigin(e.target.value as typeof origin)}><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>
               <Select className="w-auto" aria-label="Delivery" value={delivery} onChange={(e) => setDelivery(e.target.value as typeof delivery)}><option value="all">Delivery: All</option><option value="internal">Delivery: Internal</option><option value="contractor">Delivery: Contractor</option></Select>
-              {stage && <Btn size="sm" variant="ghost" onClick={() => setStage(null)}>✕ {statusLabel[stage]}</Btn>}
+              {stage && <Btn size="sm" variant="ghost" onClick={() => setStage(null)}><Icon name="close" />{statusLabel[stage]}</Btn>}
             </div>
             <Btn variant="primary" onClick={() => setModal({ kind: "new" })}>+ New job</Btn>
           </div>
@@ -86,13 +87,13 @@ export function PlansDemo() {
 }
 
 function rowLine(j: Job) {
-  if (j.followUpClass === "pending") return `↩ Follow-up of ${j.followUpOf} · classify by 09-23 11:05`;
+  if (j.followUpClass === "pending") return `Follow-up of ${j.followUpOf} · classify by 09-23 11:05`;
   switch (j.status) {
     case "requested": return j.declined ? `Client declined · round ${j.round} · ${j.preferred.length} new times` : `${j.preferred.length} preferred times · book one or propose`;
     case "time_proposed": return `Proposed ${fmt(j.proposal?.slot)} · reply by ${j.proposal?.replyBy}`;
     case "offered": return j.partnerProposal?.status === "pending" ? `${j.contractor} proposes ${fmt(j.partnerProposal.slot)} · needs client OK` : `Offer to ${j.contractor} · ${fmt(j.scheduled)}`;
     case "accepted": return `${j.contractor} accepted · assign technician`;
-    case "assigned": return `${j.delivery === "contractor" ? j.contractor + " · " : "Internal · "}${j.technician} · ${j.techAck?.status === "accepted" ? "accepted ✓" : j.techAck?.status === "cant_make" ? "can’t make it ⚠" : "awaiting acceptance"}`;
+    case "assigned": return `${j.delivery === "contractor" ? j.contractor + " · " : "Internal · "}${j.technician} · ${j.techAck?.status === "accepted" ? "accepted" : j.techAck?.status === "cant_make" ? "can’t make it" : "awaiting acceptance"}`;
     default: return `${j.delivery === "contractor" ? j.contractor : "Internal"} · ${j.technician ?? "—"} · ${fmt(j.scheduled)}`;
   }
 }
@@ -110,7 +111,7 @@ function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot }
       </Card>
 
       {j.followUpOf && (
-        <Card tone="warn" title={j.followUpClass === "pending" ? "↩ Follow-up request — classify within 1 business day" : `↩ Follow-up of ${j.followUpOf}`} action={j.followUpClass === "pending" ? <Badge tone="warn">Pending classification</Badge> : <Badge tone={j.followUpClass === "rework" ? "ok" : "primary"}>{j.followUpClass === "rework" ? "Rework (free)" : "New request"}</Badge>}>
+        <Card tone="warn" title={<span className="inline-flex items-center gap-1.5"><Icon name="undo" />{j.followUpClass === "pending" ? "Follow-up request — classify within 1 business day" : `Follow-up of ${j.followUpOf}`}</span>} action={j.followUpClass === "pending" ? <Badge tone="warn">Pending classification</Badge> : <Badge tone={j.followUpClass === "rework" ? "ok" : "primary"}>{j.followUpClass === "rework" ? "Rework (free)" : "New request"}</Badge>}>
           <SummaryList items={[
             ["Created by", `customer-a · “Report a problem” on ${j.followUpOf} (Client app)`],
             ["Client’s report", j.symptom],
@@ -162,14 +163,14 @@ function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot }
           <SummaryList items={[
             ["Agreed time", j.scheduled ? `${longDate(j.scheduled)} (${j.origin === "plan" ? "from plan" : "client-approved"})` : "—"],
             ...(j.delivery === "contractor" ? [["Contractor", `${j.contractor} · ${j.status === "offered" ? "offer open · expires 09-25 12:00" : "accepted"}`] as [string, string]] : []),
-            ["Technician", j.technician ? `${j.technician} · ${j.techAck?.status === "accepted" ? `accepted ✓ ${j.techAck.at ?? ""}` : j.techAck?.status === "cant_make" ? "can’t make this time" : "awaiting acceptance"}` : "not assigned yet"],
+            ["Technician", j.technician ? `${j.technician} · ${j.techAck?.status === "accepted" ? `accepted ${j.techAck.at ?? ""}` : j.techAck?.status === "cant_make" ? "can’t make this time" : "awaiting acceptance"}` : "not assigned yet"],
           ]} />
           {j.techAck?.status === "cant_make" && <div className="mt-3"><Banner tone="warn" action={<span className="flex gap-2">{j.delivery === "internal" && <Btn size="sm" onClick={() => open({ kind: "reason", what: "reassign" })}>Reassign…</Btn>}<Btn size="sm" variant="primary" onClick={() => open({ kind: "propose" })}>Propose another time…</Btn></span>}>{j.technician}: “{j.techAck.reason}”{j.techAck.alt ? ` · could do ${j.techAck.alt}` : ""}. Any new time needs the client’s approval.</Banner></div>}
         </Card>
       )}
 
       {j.status === "offered" && j.partnerProposal?.status === "pending" && (
-        <Card tone="warn" title={`⇄ ${j.contractor} proposes a different time`} action={<Badge tone="warn">Needs client approval</Badge>}>
+        <Card tone="warn" title={<span className="inline-flex items-center gap-1.5"><Icon name="swap" />{`${j.contractor} proposes a different time`}</span>} action={<Badge tone="warn">Needs client approval</Badge>}>
           <SummaryList items={[["Agreed with client", <s key="s" className="text-muted">{fmt(j.scheduled)}</s>], ["Proposed by contractor", <b key="b">{longDate(j.partnerProposal.slot)} · {j.partnerProposal.tech}</b>], ["Reason", `“${j.partnerProposal.reason}” — ${j.contractor}, ${j.partnerProposal.sentAt}`]]} />
           <div className="mt-3 flex flex-wrap justify-end gap-2"><Btn onClick={() => toast("Use “+ New job › Offer” to choose another contractor (demo)")}>Offer to another contractor…</Btn><Btn onClick={() => { jobActions.keepTime(j.id); toast("Agreed time kept"); }}>Keep {fmt(j.scheduled)} · ask again</Btn><Btn variant="primary" onClick={() => { jobActions.forwardPartner(j.id, "09-25 12:00"); toast("Sent to the client for approval"); }}>Send to client for approval</Btn></div>
           <p className="mt-2 text-[11px] text-muted">An agreed time never changes without the client’s OK. The offer stays reserved for {j.contractor} while the client decides.</p>
@@ -202,7 +203,7 @@ function BookModal({ j, slot, onClose }: { j: Job; slot: Slot; onClose: () => vo
   return (
     <Modal open onClose={onClose} title={`Book ${j.id}`} footer={<><Btn onClick={onClose}>← Back</Btn><Btn variant="primary" onClick={() => { jobActions.book(j.id, slot, d, d === "internal" ? "tech-internal-a" : "contractor-a"); toast(d === "internal" ? "Assigned — technician notified" : "Offer sent to contractor-a"); onClose(); }}>{d === "internal" ? "Assign" : "Send offer"}</Btn></>}>
       <p className="text-xs text-muted">{j.type} · {j.unit} · {j.customer} · {j.origin === "plan" ? "Periodic plan" : "Client request"}</p>
-      <Field label="Visit time · from the client" hint="Cannot be edited here. Need another time? Close and use “Propose another time…” — the client must accept it."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold">🔒 {longDate(slot)}</div></Field>
+      <Field label="Visit time · from the client" hint="Cannot be edited here. Need another time? Close and use “Propose another time…” — the client must accept it."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {longDate(slot)}</div></Field>
       <Field label="Who does the work" hint={f.fits === "contractor" ? "No qualified HQ technician is free at this time — offer to a contractor." : undefined}><Choice value={d} onChange={setD} options={[...(f.fits === "contractor" ? [] : [{ id: "internal" as const, label: "Assign internally" }]), { id: "contractor" as const, label: "Offer to contractor" }]} /></Field>
       {d === "internal" ? (
         <Field label="Technician" hint="Only members with valid qualifications for the whole slot are listed"><Select><option>tech-internal-a · Available</option></Select></Field>
@@ -236,7 +237,7 @@ function ProposeModal({ j, onClose }: { j: Job; onClose: () => void }) {
           <Field label="Window"><Select value={win} onChange={(e) => setWin(e.target.value)}>{["09:00–11:00", "10:00–12:00", "14:00–16:00"].map((w) => <option key={w}>{w}</option>)}</Select></Field>
         </div>
         <Field label="Who does it" className="mt-2"><Select value={who} onChange={(e) => setWho(e.target.value)}><option>contractor-a · tech-external-a</option><option>tech-internal-a</option></Select></Field>
-        {pre && <p className="mt-1 text-xs text-crit">✕ This is one of the client’s own times — book it directly instead.</p>}
+        {pre && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />This is one of the client’s own times — book it directly instead.</p>}
       </div>
       <Field label="Message to the client · required" error={tried && !msg.trim() ? "A message is required" : undefined}><Textarea value={msg} onChange={(e) => setMsg(e.target.value)} /></Field>
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label="Reply by"><Select><option>09-24 18:00 (48 h)</option><option>09-23 18:00 (24 h)</option></Select></Field><Field label="If no reply"><Select><option>Keep “Requested” and call the client</option></Select></Field></div>
@@ -307,7 +308,7 @@ export function Contractors() {
       </Card>
       <div className="flex min-w-0 flex-col gap-4">
         <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}>
-          <Kpi label="Offer acceptance" value="92 %" sub="23 / 25 offers · 90 d" /><Kpi label="Arrival in window" value="96 %" sub="target ≥ 95 %" /><Kpi label="Report accepted first time" value="84 %" tone="warn" sub="below 90 % target" /><Kpi label="Customer rating" value="4.6 ★" sub="12 ratings (Client)" /><Kpi label="Rework rate" value="8 %" sub="2 of 25 jobs" />
+          <Kpi label="Offer acceptance" value="92 %" sub="23 / 25 offers · 90 d" /><Kpi label="Arrival in window" value="96 %" sub="target ≥ 95 %" /><Kpi label="Report accepted first time" value="84 %" tone="warn" sub="below 90 % target" /><Kpi label="Customer rating" value="4.6" icon="star" sub="12 ratings (Client)" /><Kpi label="Rework rate" value="8 %" sub="2 of 25 jobs" />
         </div>
         <div className="split">
           <Card title={sel.id} action={<span className="flex gap-2"><Btn size="sm">Edit</Btn><Btn size="sm" variant="danger" onClick={() => { setList((l) => l.map((c) => (c.id === sel.id ? { ...c, st: c.st === "Active" ? "Suspended" : "Active" } : c))); toast(sel.st === "Active" ? "Offers suspended — existing jobs continue" : "Offers resumed", "warn"); }}>{list.find((c) => c.id === sel.id)?.st === "Active" ? "Suspend offers" : "Resume offers"}</Btn></span>}>
@@ -330,10 +331,10 @@ export function Sla() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
-        <Kpi label="Response ≤ 4 h" value="94 %" tone="warn" sub="target 95 %" /><Kpi label="Arrival in window" value="96 %" sub="target 95 %" /><Kpi label="First-time fix" value="86 %" sub="target 85 %" /><Kpi label="Avg. customer rating" value="4.5 ★" sub="27 ratings" /><Kpi label="Open & overdue" value="1" tone="crit" sub="1 breach this week" />
+        <Kpi label="Response ≤ 4 h" value="94 %" tone="warn" sub="target 95 %" /><Kpi label="Arrival in window" value="96 %" sub="target 95 %" /><Kpi label="First-time fix" value="86 %" sub="target 85 %" /><Kpi label="Avg. customer rating" value="4.5" icon="star" sub="27 ratings" /><Kpi label="Open & overdue" value="1" tone="crit" sub="1 breach this week" />
       </div>
       <Card title="Customers" action={<span className="flex gap-2"><Btn size="sm">Edit SLA targets</Btn><Btn size="sm">Export CSV</Btn></span>}>
-        <DataTable rowKey={(r) => r.c} rows={[{ c: "customer-a", sub: "Home A, Office A · 5 units", jobs: 18, resp: "95 %", arr: "97 %", ftf: "88 %", rate: "4.6 ★", od: 0, st: "On track" }, { c: "customer-b", sub: "2 properties · 9 units", jobs: "—", resp: "89 %", arr: "92 %", ftf: "78 %", rate: "4.1 ★", od: 1, st: "At risk" }]} cols={[
+        <DataTable rowKey={(r) => r.c} rows={[{ c: "customer-a", sub: "Home A, Office A · 5 units", jobs: 18, resp: "95 %", arr: "97 %", ftf: "88 %", rate: "4.6", od: 0, st: "On track" }, { c: "customer-b", sub: "2 properties · 9 units", jobs: "—", resp: "89 %", arr: "92 %", ftf: "78 %", rate: "4.1", od: 1, st: "At risk" }]} cols={[
           { key: "c", label: "Customer", render: (r) => <div><b>{r.c}</b><div className="text-[11px] text-muted">{r.sub}</div></div> }, { key: "j", label: "Jobs", render: (r) => r.jobs }, { key: "r", label: "Response ≤ 4 h", render: (r) => r.resp }, { key: "a", label: "Arrival", render: (r) => r.arr, hideBelow: "sm" }, { key: "f", label: "First-time fix", render: (r) => r.ftf, hideBelow: "sm" }, { key: "ra", label: "Rating", render: (r) => r.rate, hideBelow: "sm" }, { key: "o", label: "Overdue", render: (r) => (r.od ? <Badge tone="crit">{r.od}</Badge> : "0") }, { key: "s", label: "Status", render: (r) => <Badge tone={r.st === "On track" ? "ok" : "warn"}>{r.st}</Badge> },
         ]} />
         <p className="mt-2 text-[11px] text-muted">Response = request → offer accepted. Arrival = technician check-in inside the work window. First-time fix = report accepted without rework and no repeat job on the unit within 30 days.</p>

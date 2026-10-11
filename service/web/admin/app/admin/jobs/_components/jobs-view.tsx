@@ -16,6 +16,7 @@ import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { assignInternal, cancelJob, classifyFollowUp, createJob, extendAccess, holdJob, offerToContractor, proposeSlot, resolvePartnerSlot, resumeJob, reviewReport, saveCosts, withdrawProposal } from "../actions";
 import type { JobsLive } from "../_lib/load";
 import { JobsTabs, ScopeBar } from "./jobs-header";
+import { Icon } from "@ac/web/components/Icon";
 
 type Detail = NonNullable<JobsLive["detail"]>;
 const TYPES = [{ id: "", label: "All" }, { id: "reactive", label: "Repair" }, { id: "periodic", label: "Periodic" }, { id: "preventive", label: "Preventive" }];
@@ -64,7 +65,7 @@ function JobsTab({ live, patch, fresh, onFresh }: { live: JobsLive; patch: (p: R
         <Select aria-label={t("Assignee")} className="w-auto" value={q.assignee ?? ""} onChange={(e) => patch({ assignee: e.target.value || null })}><option value="">{t("Assignee: All")}</option>{live.assignees.map((a) => <option key={a.id} value={a.id}>{t("Assignee: {name}", { name: a.name })}</option>)}</Select>
         <Select aria-label={t("Sort")} className="w-auto" value={live.sort} onChange={(e) => patch({ sort: e.target.value === "status" ? null : e.target.value })}>{live.sorts.map((s) => <option key={s.id} value={s.id}>{t("Sort: {sort}", { sort: s.text })}</option>)}</Select>
         <label className="flex items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1.5 text-[13px]"><input type="checkbox" checked={q.overdue === "1"} onChange={(e) => patch({ overdue: e.target.checked ? "1" : null })} /> {t("Overdue only")}</label>
-        {live.periodChip && <button type="button" onClick={() => patch({ from: null, to: null, jobId: null })} className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary" aria-label={t("{period} — clear the requested-time period", { period: live.periodChip })}>{live.periodChip} <span aria-hidden>✕</span></button>}
+        {live.periodChip && <button type="button" onClick={() => patch({ from: null, to: null, jobId: null })} className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary" aria-label={t("{period} — clear the requested-time period", { period: live.periodChip })}>{live.periodChip} <Icon name="close" /></button>}
       </div>
       <div className="split-rev">
         <Card title={t("Jobs · all customers")} sub={live.sorts.find((s) => s.id === live.sort)!.text} className="self-start">
@@ -118,7 +119,7 @@ function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fre
           {c.resume && <Btn size="sm" disabled={pending} onClick={() => setModal({ kind: "reason", what: "resume" })}>{t("Resume…")}</Btn>}
           <Btn size="sm" variant="danger" disabled={pending || !c.cancel} title={c.cancelWhy ?? undefined} onClick={() => setModal({ kind: "reason", what: "cancel" })}>{t("Cancel…")}</Btn>
         </div>}>
-        <ol className="flex flex-wrap gap-4">{d.steps.map((s, i) => <li key={s.label} className="flex items-center gap-1.5 text-xs"><span className={cx("grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold", s.state === "done" ? "bg-primary text-white" : s.state === "current" ? "border-2 border-primary text-primary" : "border border-line text-muted")}>{s.state === "done" ? "✓" : i + 1}</span><span className={s.state === "todo" ? "text-muted" : s.state === "current" ? "font-semibold text-primary" : ""}>{s.label}</span></li>)}</ol>
+        <ol className="flex flex-wrap gap-4">{d.steps.map((s, i) => <li key={s.label} className="flex items-center gap-1.5 text-xs"><span className={cx("grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold", s.state === "done" ? "bg-primary text-white" : s.state === "current" ? "border-2 border-primary text-primary" : "border border-line text-muted")}>{s.state === "done" ? <Icon name="check" /> : i + 1}</span><span className={s.state === "todo" ? "text-muted" : s.state === "current" ? "font-semibold text-primary" : ""}>{s.label}</span></li>)}</ol>
         {!c.cancel && c.cancelWhy && <p className="mt-2 text-[11px] text-muted">{j.contractorOrgId ? "" : `${t("Internal delivery skips Offered / Accepted.")} `}{t("Cancel: {why}", { why: c.cancelWhy })}</p>}
         <div className="mt-3 grid-fluid" style={{ ["--min" as string]: "180px" }}>
           {d.facts.map((f) => <div key={f.label} className="rounded-xl border border-line p-3"><div className="text-[11px] text-muted">{f.label}</div><div className="text-[13px] font-semibold">{f.value}</div><div className="text-[11px] text-muted">{f.sub}</div></div>)}
@@ -126,7 +127,7 @@ function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fre
       </Card>
 
       {j.followUpOfJobId && (
-        <Card tone="warn" title={j.followUpClass === "pending" ? t("↩ Follow-up request — classify within 1 business day") : t("↩ Follow-up of {id}", { id: j.followUpOfJobId.slice(0, 8) })} action={j.followUpClass === "pending" ? <Badge tone="warn">{t("Classify by {time}", { time: d.texts.classifyBy })}</Badge> : <Badge tone={j.followUpClass === "rework" ? "ok" : "primary"}>{t(j.followUpClass === "rework" ? "Rework (free)" : "New request")}</Badge>}>
+        <Card tone="warn" title={<span className="inline-flex items-center gap-1.5"><Icon name="undo" />{j.followUpClass === "pending" ? t("Follow-up request — classify within 1 business day") : t("Follow-up of {id}", { id: j.followUpOfJobId.slice(0, 8) })}</span>} action={j.followUpClass === "pending" ? <Badge tone="warn">{t("Classify by {time}", { time: d.texts.classifyBy })}</Badge> : <Badge tone={j.followUpClass === "rework" ? "ok" : "primary"}>{t(j.followUpClass === "rework" ? "Rework (free)" : "New request")}</Badge>}>
           <SummaryList items={[[t("Client’s report"), j.symptom || "—"], [t("Original job"), <Link key="o" className="text-primary" href={`/admin/jobs?jobId=${j.followUpOfJobId}`}>{j.followUpOfJobId.slice(0, 8)} →</Link>]]} />
           {j.followUpClass === "pending" && <div className="mt-3 flex items-center justify-between gap-2"><span className="text-[11px] text-muted">{t("Set once with a reason. Until then the client sees “Under HQ review”.")}</span><Btn variant="primary" disabled={pending} onClick={() => setModal({ kind: "classify" })}>{t("Classify…")}</Btn></div>}
         </Card>
@@ -167,7 +168,7 @@ function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fre
       )}
 
       {pp?.status === "pending" && j.offer && (
-        <Card tone="warn" title={t("⇄ {name} proposes a different time", { name: live.contractors.find((x) => x.id === j.offer!.contractorOrgId)?.name ?? t("The contractor") })} action={<Badge tone="warn">{t("Needs the client’s approval")}</Badge>}>
+        <Card tone="warn" title={<span className="inline-flex items-center gap-1.5"><Icon name="swap" />{t("{name} proposes a different time", { name: live.contractors.find((x) => x.id === j.offer!.contractorOrgId)?.name ?? t("The contractor") })}</span>} action={<Badge tone="warn">{t("Needs the client’s approval")}</Badge>}>
           <SummaryList items={[[t("Agreed with the client"), <s key="s" className="text-muted">{d.texts.agreed}</s>], [t("Proposed by the contractor"), <b key="b">{d.texts.partnerSlot} · {d.partnerTech}</b>], [t("Reason"), `“${pp.reason}” — ${d.texts.partnerSent}`]]} />
           <div className="mt-3 flex flex-wrap justify-end gap-2">
             <Btn disabled={pending} onClick={() => run(() => resolvePartnerSlot(j.id, j.version, pp.id, "keep"), t("Agreed time kept"), () => close(t("Kept the agreed time — the contractor can accept or decline it.")), failed)}>{t("Keep the agreed time")}</Btn>
@@ -267,7 +268,7 @@ function BookModal({ d, live, row: first, fresh, onClose, onFail }: ModalProps &
       <p className="text-xs text-muted">{fresh ? `${t("Created {id} (requested) · choose who does the work —", { id: j.id.slice(0, 8) })} ` : ""}{d.title} · {d.customer} · {t(j.origin === "periodic_plan" ? "Periodic plan" : "Client request")}</p>
       {fresh && ahead.length > 1 ? (
         <Field label={t("Visit time · one of the customer’s preferred times")} hint={t("Only these times are agreed (IR113); another time needs a proposal the customer accepts.")}><Select value={String(rank)} onChange={(e) => pick(Number(e.target.value))}>{ahead.map((r) => <option key={r.rank} value={r.rank}>{t(RANK[r.rank - 1] ?? "{n}th", { n: r.rank })} · {r.text}{r.fits ? "" : ` · ${t("no HQ technician free")}`}</option>)}</Select></Field>
-      ) : <Field label={t(row.plan ? "Visit time · the plan occurrence" : "Visit time · from the client")} hint={t("Fixed here. Need another time? Use “Propose another time…” — the client must accept it.")}><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold">🔒 {longSlot(row.slot, i)}</div></Field>}
+      ) : <Field label={t(row.plan ? "Visit time · the plan occurrence" : "Visit time · from the client")} hint={t("Fixed here. Need another time? Use “Propose another time…” — the client must accept it.")}><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {longSlot(row.slot, i)}</div></Field>}
       <Field label={t("Who does the work")} hint={row.people.length ? undefined : t("No qualified HQ technician is free at this time — offer it to a contractor.")}><Choice value={who} onChange={setWho} options={[...(row.people.length ? [{ id: "internal" as const, label: t("Assign internally") }] : []), { id: "contractor" as const, label: t("Offer to contractor") }]} /></Field>
       {who === "internal" ? (
         <Field label={t("Technician")} hint={t("Free and qualified for the whole slot (members.eligible)")}><Select value={tech} onChange={(e) => setTech(e.target.value)}>{row.people.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)}</Select></Field>
@@ -321,7 +322,7 @@ function ProposeModal({ d, live, onClose, onFail }: ModalProps) {
         <Field label={t("From")}><Input type="time" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
         <Field label={t("To")} error={tried && from >= to ? t("The end must be after the start") : undefined}><Input type="time" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
       </div>
-      {preferred && <p className="text-xs text-crit">{t("✕ This is one of the client’s own times — book it directly instead.")}</p>}
+      {preferred && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{t("This is one of the client’s own times — book it directly instead.")}</p>}
       <Field label={t("Capacity held for the time")}><Select value={who} onChange={(e) => setWho(e.target.value)}>{options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</Select></Field>
       <Field label={t("Message to the client · required (1–1000)")} error={tried && !msg.trim() ? t("A message is required") : undefined}><Textarea value={msg} maxLength={1000} onChange={(e) => setMsg(e.target.value)} placeholder={t("All qualified technicians are booked on your times. The earliest free slot is Thursday morning.")} /></Field>
       <Field label={t("Reply by")}><Select value={reply} onChange={(e) => setReply(e.target.value)}>{["24", "48", "72"].map((h) => <option key={h} value={h}>{t("{n} h", { n: h })}</option>)}</Select></Field>
@@ -376,7 +377,7 @@ function ClassifyModal({ d, onClose, onFail }: Omit<ModalProps, "live">) {
 /** The report photos linked to an inspection finding (InspectionItem.evidenceIds, IR352). */
 function LinkedPhotos({ names }: { names: string[] }) {
   const t = useT();
-  return names.length ? <span className="block text-xs text-muted">📷 {t("Linked photos: {names}", { names: names.join(", ") })}</span> : null;
+  return names.length ? <span className="flex items-center gap-1 text-xs text-muted"><Icon name="camera" />{t("Linked photos: {names}", { names: names.join(", ") })}</span> : null;
 }
 
 function ReportRows({ rows }: { rows: NonNullable<Detail["report"]>["rows"] }) {

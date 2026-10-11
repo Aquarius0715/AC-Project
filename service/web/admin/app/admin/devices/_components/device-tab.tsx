@@ -9,6 +9,7 @@ import { metrics, metricUnit, type Metric } from "@ac/web/lib/devices";
 import { filterOf, HQ_FILTERS, type Filter } from "@ac/web/lib/techDevices";
 import { bindDevice, calibrateSensor, checkDevice, registerDevice, updateFirmware } from "../actions";
 import type { DevicesLive } from "./devices-view";
+import { Icon } from "@ac/web/components/Icon";
 
 const dot: Record<string, string> = { ok: "bg-ok", crit: "bg-crit", warn: "bg-warn", primary: "bg-primary", muted: "bg-line" };
 
@@ -159,7 +160,7 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
                     <tbody>{dv.events.map((e) => (
                       <tr key={e.id} className="border-t border-line align-top">
                         <td className="px-3 py-2 text-xs text-muted">{e.time}</td><td className="py-2"><Badge tone={e.tone === "muted" ? "muted" : e.tone}>{e.type}</Badge></td>
-                        <td className="py-2">{e.detail}{e.notes.map((n) => <div key={n} className="text-[11px] text-muted">✎ {n}</div>)}</td>
+                        <td className="py-2">{e.detail}{e.notes.map((n) => <div key={n} className="flex items-center gap-1 text-[11px] text-muted"><Icon name="edit" />{n}</div>)}</td>
                         <td className="py-2 pr-3 text-xs">{e.recovery}</td>
                       </tr>
                     ))}</tbody>

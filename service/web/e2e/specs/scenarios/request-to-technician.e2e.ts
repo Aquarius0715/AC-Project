@@ -78,9 +78,9 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
       await expect(tech.locator(`main a[href="/technician/jobs/${jobId}"]`).first()).toBeVisible();
       await tech.locator(`main a[href="/technician/jobs/${jobId}"]`).first().click();
       await expect(tech.getByRole("main")).not.toContainText("This page isn’t available");
-      await tech.getByRole("button", { name: "✓ Accept assignment" }).click();
+      await tech.getByRole("button", { name: "Accept assignment" }).click();
       await expect(tech.getByText("Assignment accepted").first()).toBeVisible();
-      await expect(tech.getByRole("button", { name: "✓ Accept assignment" })).toHaveCount(0);
+      await expect(tech.getByRole("button", { name: "Accept assignment" })).toHaveCount(0);
     });
 
     await test.step("the partner and the customer see it accepted", async () => {

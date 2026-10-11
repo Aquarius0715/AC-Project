@@ -10,6 +10,7 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { CHANNELS, channelText, communicationRefusal, ROLES, TEMPLATES, type TimelineItem } from "@ac/web/lib/partnerHistory";
 import { communicate, type Communication, type CommunicationFailure } from "../actions";
 import type { HistoryLive } from "../_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 const dot: Record<string, string> = { ok: "bg-ok/15 text-ok", warn: "bg-warn/15 text-warn", none: "bg-primary/10 text-primary" };
 
@@ -95,7 +96,7 @@ function Detail({ live, detail }: { live: HistoryLive; detail: Detail }) {
             {items.length === 0 && <li className="py-3 text-[13px] text-muted">{t("No events in this view.")}</li>}
             {items.map((e) => (
               <li key={e.id} className="flex items-start gap-3 border-t border-line py-2.5 first:border-0">
-                <span aria-hidden className={cx("grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs", dot[e.tone ?? "none"])}>{e.tone === "warn" ? "!" : e.tone === "ok" ? "✓" : "•"}</span>
+                <span aria-hidden className={cx("grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs", dot[e.tone ?? "none"])}><Icon name={e.tone === "warn" ? "alert" : e.tone === "ok" ? "check" : "dot"} /></span>
                 <span className="min-w-0 flex-1"><b className="block text-[13px]">{e.title}</b><span className="block text-[11px] text-muted">{[e.detail, e.at].filter(Boolean).join(" · ")}</span></span>
                 <Badge tone={e.badge === "customer" ? "primary" : "muted"}>{t(e.badge)}</Badge>
               </li>

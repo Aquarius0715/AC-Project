@@ -6,6 +6,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { Period, SeriesChart, Tile } from "@ac/web/lib/techUnit";
 import type { UnitLive } from "../_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 /** The technician's unit (FR-T02, FR-T03, Figma Technician 02-10…02-13): the register with its components, the
  * maintenance history and open alerts, the latest values and one metric over a period — the metric and the period in
@@ -27,7 +28,7 @@ export function TechUnitView({ live }: { live: UnitLive }) {
           <div className="flex min-w-0 flex-col gap-4">
             <Card title={t("Unit register")}>
               <SummaryList items={live.register.rows} />
-              <p className="mt-2 rounded-xl bg-primary-soft/40 px-3 py-2 text-[11px] text-muted">ⓘ {live.register.note}</p>
+              <p className="mt-2 rounded-xl bg-primary-soft/40 px-3 py-2 text-[11px] text-muted"><Icon name="info" /> {live.register.note}</p>
               <div className="mt-3 flex flex-col gap-2">
                 <LinkBtn href={live.alertsHref} size="sm">{t("Alert evidence →")}</LinkBtn>
                 {live.controlHref ? <LinkBtn href={live.controlHref} size="sm">{t("Diagnostics →")}</LinkBtn> : <p className="text-[11px] text-muted">{t("Diagnostic control opens for a job you are assigned to on this AC (assigned or in progress).")}</p>}

@@ -12,6 +12,7 @@ import { deviceFieldText, deviceRefusal, FILTERS, filterOf, openAlerts, type Eve
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { acknowledgeAlert, addResponseNote, bindDevice, calibrateSensor, checkDevice, registerDevice, updateFirmware } from "../actions";
 import type { UnitSymbol } from "@ac/web/lib/contracts.gen";
+import { Icon } from "@ac/web/components/Icon";
 
 export type TechDevicesLive = {
   rows: TechDeviceRow[]; canMaintain: boolean; canAcknowledge: boolean; events: boolean;
@@ -189,7 +190,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
                       <tbody>{dv.events.map((e) => (
                         <tr key={e.id} className="border-t border-line align-top">
                           <td className="px-3 py-2 text-xs text-muted">{e.time}</td><td className="py-2"><Badge tone={e.tone === "muted" ? "muted" : e.tone}>{e.type}</Badge></td>
-                          <td className="py-2">{e.detail}{e.notes.map((n) => <div key={n} className="text-[11px] text-muted">✎ {n}</div>)}</td>
+                          <td className="py-2">{e.detail}{e.notes.map((n) => <div key={n} className="flex items-center gap-1 text-[11px] text-muted"><Icon name="edit" />{n}</div>)}</td>
                           <td className="py-2 pr-3 text-xs">{e.recovery}</td>
                         </tr>
                       ))}</tbody>
@@ -251,7 +252,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
         </Field>
         <div><p className="mb-1 flex justify-between text-xs font-semibold"><span>{t("Sensor types")}</span><span className="font-normal text-muted">{t("Only metrics in the unit’s capability")}</span></p>
           <div className="flex flex-wrap gap-2">{(regUnit?.sensors ?? []).map((m) => <Check key={m} label={m} checked={reg.sensors.includes(m)} onChange={(v) => setReg({ ...reg, sensors: v ? [...reg.sensors, m] : reg.sensors.filter((x) => x !== m) })} />)}{regUnit && regUnit.sensors.length === 0 && <span className="text-xs text-muted">{t("The model defines no sensors.")}</span>}</div>
-          {errors.sensorTypes && <p className="mt-1 text-xs text-crit">✕ {errors.sensorTypes}</p>}</div>
+          {errors.sensorTypes && <p className="mt-1 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{errors.sensorTypes}</p>}</div>
         <Field label={t("Job · required")} error={errors.jobId}><Select value={reg.jobId} onChange={(e) => setReg({ ...reg, jobId: e.target.value })}>{(regUnit?.jobs ?? []).map((j) => <option key={j.id} value={j.id}>{j.label}</option>)}</Select></Field>
         <Banner>{t("After registering, run “Check connection”. The device stays Unknown until its first heartbeat.")}</Banner>
       </Modal>

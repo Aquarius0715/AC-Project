@@ -5,6 +5,7 @@ import { Btn, Check } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import { useOp } from "@ac/web/lib/useOp";
 import { evidenceRows, MAX_EVIDENCE, type ApiEvidenceAttachment } from "@ac/web/lib/mrv";
+import { Icon } from "@ac/web/components/Icon";
 
 type Units = { id: string; label: string }[];
 type Period = { unitIds: string[]; from: string; to: string };
@@ -34,7 +35,7 @@ export function EvidencePicker({ ids, onChange, period, units }: { ids: string[]
           const name = byId.get(id)?.name ?? id.slice(0, 8);
           return (
             <span key={id} className="inline-flex items-center gap-1.5 rounded-full bg-surface2 px-2.5 py-1 text-xs">
-              {name}<button type="button" aria-label={t("Remove {name}", { name })} className="text-muted hover:text-ink" onClick={() => onChange(ids.filter((x) => x !== id))}>✕</button>
+              {name}<button type="button" aria-label={t("Remove {name}", { name })} className="text-muted hover:text-ink" onClick={() => onChange(ids.filter((x) => x !== id))}><Icon name="close" /></button>
             </span>
           );
         })}
