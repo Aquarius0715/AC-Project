@@ -127,7 +127,7 @@ function Baselines({ live, l }: { live: EnergyLive; l: NonNullable<EnergyLive["l
         <span className="ml-auto pb-2 text-xs text-muted">{t(l.rows.length === 1 ? "1 baseline in scope" : "{n} baselines in scope", { n: l.rows.length })}</span>
       </div>
       <div className="split-rev">
-        <Card title={customer ? t("Baselines · {customer}", { customer }) : t("Baselines · all customers")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => setCreating(true)}>{t("+ New baseline")}</Btn>} className="self-start">
+        <Card title={customer ? t("Baselines · {customer}", { customer }) : t("Baselines · all customers")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => setCreating(true)}><Icon name="add" /> {t("New baseline")}</Btn>} className="self-start">
           {l.rows.length === 0 ? <EmptyState title={t("No baselines")}>{t("No baseline matches this scope.")}</EmptyState> : <div className="flex flex-col gap-2">{l.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setCreating(false); nav({ baselineId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={x.method === "demo_fixed" ? "muted" : "primary"}>{t(x.method === "demo_fixed" ? "v{v} · modeled" : "v{v} · measured", { v: x.version })}</Badge></div><div className="text-[11px] text-muted">{x.units} · {x.period}</div><div className="text-[11px] text-muted">{x.method} · {x.value} · {x.boundaryId}</div></div></ListRow>)}</div>}
         </Card>
         {creating || sel ? (

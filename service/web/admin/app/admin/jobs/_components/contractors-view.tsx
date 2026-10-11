@@ -29,10 +29,10 @@ export function ContractorsView({ live }: { live: ContractorsLive }) {
   const fail = (f: ActionFailure) => { setModal(null); setResult({ tone: f.code === "CONFLICT" ? "warn" : "crit", text: contractorRefusal(f, t) }); };
   return (
     <Page className="max-w-[1440px]">
-      <JobsTabs tab="contractors" counts={live.counts} q={{}} action={<Btn variant="primary" size="sm" onClick={() => setModal({ kind: "job" })}>{t("+ New job")}</Btn>} />
+      <JobsTabs tab="contractors" counts={live.counts} q={{}} action={<Btn variant="primary" size="sm" onClick={() => setModal({ kind: "job" })}><Icon name="add" /> {t("New job")}</Btn>} />
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
       <div className="split-rev">
-        <Card title={t("Contractors")} className="self-start" action={<Btn size="sm" disabled={!live.withoutProfile.length} title={live.withoutProfile.length ? undefined : t("Every contractor organization has a profile — add the organization in Access & roles first.")} onClick={() => setModal({ kind: "profile", organizationId: live.withoutProfile[0]?.id ?? null })}>{t("+ Add contractor")}</Btn>}>
+        <Card title={t("Contractors")} className="self-start" action={<Btn size="sm" disabled={!live.withoutProfile.length} title={live.withoutProfile.length ? undefined : t("Every contractor organization has a profile — add the organization in Access & roles first.")} onClick={() => setModal({ kind: "profile", organizationId: live.withoutProfile[0]?.id ?? null })}><Icon name="add" /> {t("Add contractor")}</Btn>}>
           {live.rows.length === 0 ? <EmptyState title={t("No contractor organizations")}>{t("Contractor organizations are created in Access & roles (A03).")}</EmptyState> : (
             <div className="flex flex-col gap-1.5">{live.rows.map((r) => (
               <ListRow key={r.id} selected={d?.org.id === r.id} href={`/admin/jobs?tab=contractors&contractorId=${r.id}`}>
@@ -64,7 +64,7 @@ function ContractorDetail({ d, open }: { d: Detail; open: (m: ModalState) => voi
       <div className="split">
         <Card title={d.org.name} sub={p ? undefined : t("No contractor profile yet — offers still work; add one to record its registration, areas and insurance")}
           action={p ? <span className="flex gap-2"><Btn size="sm" onClick={() => open({ kind: "profile", organizationId: p.organizationId })}>{t("Edit")}</Btn><Btn size="sm" variant={p.status === "active" ? "danger" : "primary"} onClick={() => open({ kind: "status" })}>{t(p.status === "active" ? "Suspend offers" : "Resume offers")}</Btn></span>
-            : <Btn size="sm" variant="primary" onClick={() => open({ kind: "profile", organizationId: d.org.id })}>{t("+ Add profile")}</Btn>}>
+            : <Btn size="sm" variant="primary" onClick={() => open({ kind: "profile", organizationId: d.org.id })}><Icon name="add" /> {t("Add profile")}</Btn>}>
           {p?.status === "suspended" && <div className="mb-3"><Banner tone="crit">{p.suspendedReason ? t("Offers suspended — “{reason}”. New offers to {name} are refused; open offers and jobs continue (IR111).", { reason: p.suspendedReason, name: p.name }) : t("Offers suspended. New offers to {name} are refused; open offers and jobs continue (IR111).", { name: p.name })}</Banner></div>}
           {d.facts && <SummaryList items={d.facts} />}
           <p className="mt-3 text-[13px] font-bold">{r.current ? r.current.title : t("No rate card in effect")}</p>

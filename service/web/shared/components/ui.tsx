@@ -250,6 +250,21 @@ export const Input = ({ className, ...p }: React.ComponentProps<"input">) => <in
 export const Select = ({ className, children, ...p }: React.SelectHTMLAttributes<HTMLSelectElement>) => (
   <select {...p} className={cx(control(className), "pr-8", className)}>{children}</select>
 );
+/** A row's actions behind the "more" icon (DEC-74): a transparent native select lies over the icon, so the keyboard,
+ * the screen reader (by `label`) and the platform's own menu work as with a plain select. The first option keeps the
+ * menu unchosen; `onChoose` gets the chosen option's value. */
+export function ActionMenu({ label, disabled, onChoose, children }: { label: string; disabled?: boolean; onChoose: (value: string) => void; children: React.ReactNode }) {
+  return (
+    <span className="relative inline-grid h-7 w-8 shrink-0 place-items-center rounded-md text-[15px] text-muted hover:bg-surface2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-primary">
+      <Icon name="more" />
+      <select aria-label={label} disabled={disabled} value="" onChange={(e) => e.target.value && onChoose(e.target.value)}
+        className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed">
+        <option value="">{label}</option>
+        {children}
+      </select>
+    </span>
+  );
+}
 export const Textarea = ({ className, ...p }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...p} className={cx(control(className), "min-h-[84px] resize-y", className)} />;
 /** A one-time code as separate boxes (Figma 10g): one transparent input over the boxes, so typing, pasting and the
  * browser's one-time-code autofill all work; the box for the next digit is outlined while the input has focus. */

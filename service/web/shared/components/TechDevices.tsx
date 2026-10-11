@@ -40,7 +40,7 @@ export function DevicesView({ initial }: { initial?: string }) {
     <Page>
       <Tabs value={filter} onChange={setFilter} tabs={(["all", "online", "offline", "tamper"] as F[]).map((k) => ({ id: k, label: k[0].toUpperCase() + k.slice(1), count: count(k) }))} />
       <div className="split-rev">
-        <Card title="Devices — assigned units" sub="your jobs only" action={<Btn size="sm" onClick={() => setReg(true)}>+ Register</Btn>} className="self-start">
+        <Card title="Devices — assigned units" sub="your jobs only" action={<Btn size="sm" onClick={() => setReg(true)}><Icon name="add" /> Register</Btn>} className="self-start">
           <div className="mb-2"><Search placeholder="Search serial, device or unit…" value={q} onChange={setQ} /></div>
           <div className="flex flex-col gap-2">{shown.map((d) => <ListRow key={d.id} selected={sel.id === d.id} onClick={() => pick(d)}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b>{d.serial}</b><span className="flex gap-1">{d.tamper && <Badge tone="crit">Tamper</Badge>}<ConnBadge s={d.conn} /></span></div><div className="truncate text-[11px] text-muted">{d.dev}</div><div className="truncate text-[11px] text-muted">{d.unit} · {d.fw}</div></div></ListRow>)}{shown.length === 0 && <p className="text-xs text-muted">No devices match.</p>}</div>
         </Card>

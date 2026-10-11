@@ -44,7 +44,7 @@ test("the customer screens in Malay keep IDs and units and use the display time 
   await expect(main.getByRole("columnheader", { name: "Peraturan" })).toBeVisible();
   await page.goto("/customer/maintenance");
   await expect(page.getByRole("tab", { name: "Permintaan saya" })).toHaveAttribute("aria-selected", "true");
-  await page.getByRole("button", { name: "+ Permintaan penyelenggaraan baharu" }).click();
+  await page.getByRole("button", { name: "Permintaan penyelenggaraan baharu" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "Permintaan penyelenggaraan baharu" })).toBeVisible();
   await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
@@ -78,7 +78,7 @@ test("the customer screens in Malay keep IDs and units and use the display time 
   await page.goto("/customer/users");
   await expect(main.getByRole("heading", { name: "Pengguna", level: 1 })).toBeVisible();
   await expect(main.getByRole("columnheader", { name: "Peranan" })).toBeVisible();
-  await page.getByRole("button", { name: "+ Jemput ahli" }).click(); // opened and cancelled: nothing is invited
+  await page.getByRole("button", { name: "Jemput ahli" }).click(); // opened and cancelled: nothing is invited
   await expect(dialog.getByRole("heading", { name: "Jemput ahli" })).toBeVisible();
   await dialog.getByRole("button", { name: "Batal" }).click();
   await expect(dialog).toBeHidden();

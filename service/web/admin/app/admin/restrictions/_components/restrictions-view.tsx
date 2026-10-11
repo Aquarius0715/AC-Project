@@ -59,7 +59,7 @@ function Manager({ live }: { live: NonNullable<RestrictionsLive> }) {
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">{states.map((s) => <button key={s} onClick={() => nav({ status: live.scope.status === s ? null : s, restrictionId: null })} aria-pressed={live.scope.status === s} className={`rounded-full px-2.5 py-1 text-xs ${live.scope.status === s ? "bg-primary-soft text-primary" : "bg-surface2"}`}><span className="text-muted">{stateWord(s, t)}</span> <b>{live.counts[s]}</b></button>)}</div>
-        {live.canWrite && <Btn size="sm" variant="primary" onClick={() => setScheduling(true)}>{t("+ Schedule restriction")}</Btn>}
+        {live.canWrite && <Btn size="sm" variant="primary" onClick={() => setScheduling(true)}><Icon name="add" /> {t("Schedule restriction")}</Btn>}
       </div>
       {live.full && (
         <div className="flex flex-wrap items-end gap-3">

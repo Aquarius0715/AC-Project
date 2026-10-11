@@ -30,7 +30,7 @@ test("the device list filters by state and the detail shows the device as Figma 
 });
 
 // The model editor (DD-A04, Figma Admin 106:3, IR350): a saved model shows its capability version; an edit marks the
-// draft "Editing → v<next>" and names what changed; the firmware candidates are chips with "+ Add version" (a listed
+// draft "Editing → v<next>" and names what changed; the firmware candidates are chips with "Add version" (a listed
 // version is refused); Discard puts the saved capability back. Nothing is saved.
 test("the model editor marks a draft, adds a firmware version and discards it", async ({ page }) => {
   await page.goto("/admin/devices?tab=models");
@@ -41,7 +41,7 @@ test("the model editor marks a draft, adds a firmware version and discards it", 
   const firmware = main.getByRole("region", { name: "Firmware candidates" });
   await expect(firmware.getByRole("button", { name: "Remove v1" })).toBeVisible();
 
-  await firmware.getByRole("button", { name: "+ Add version" }).click();
+  await firmware.getByRole("button", { name: "Add version" }).click();
   const version = firmware.getByRole("textbox", { name: "Firmware version" });
   await version.fill("v1");
   await expect(firmware).toContainText("v1 is already a candidate");

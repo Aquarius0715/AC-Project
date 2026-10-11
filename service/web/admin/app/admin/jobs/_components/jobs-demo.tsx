@@ -41,7 +41,7 @@ export function JobsDemo({ jobId, tab: initial }: { jobId?: string; tab?: string
               <Select className="w-auto" aria-label="Delivery" value={delivery} onChange={(e) => setDelivery(e.target.value as typeof delivery)}><option value="all">Delivery: All</option><option value="internal">Delivery: Internal</option><option value="contractor">Delivery: Contractor</option></Select>
               {stage && <Btn size="sm" variant="ghost" onClick={() => setStage(null)}><Icon name="close" />{statusLabel[stage]}</Btn>}
             </div>
-            <Btn variant="primary" onClick={() => setModal({ kind: "new" })}>+ New job</Btn>
+            <Btn variant="primary" onClick={() => setModal({ kind: "new" })}><Icon name="add" /> New job</Btn>
           </div>
           <div className="split-rev">
             <Card title="Jobs · all customers" sub="status, earliest stage first" className="self-start">
@@ -188,7 +188,7 @@ function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot }
       )}
 
       <Card title="History"><Timeline items={j.history.slice(-6).map((h) => ({ time: h.at, title: h.text }))} /></Card>
-      <Card title="Costs" action={<Btn size="sm" onClick={() => toast("Cost line added")}>+ Add cost line</Btn>}>
+      <Card title="Costs" action={<Btn size="sm" onClick={() => toast("Cost line added")}><Icon name="add" /> Add cost line</Btn>}>
         <SummaryList items={[["Estimate", "Labour 80.00 MYR · Parts 25.00 MYR"], ["Actual", "80.00 MYR + 6.20 USD"]]} />
         <p className="mt-1 text-[11px] text-muted">Totals are shown per currency — never converted.</p>
       </Card>
@@ -302,7 +302,7 @@ export function Contractors() {
   const [list, setList] = useState(contractors);
   return (
     <div className="split-rev">
-      <Card title="Contractors" action={<Btn size="sm" onClick={() => toast("Add contractor (demo)")}>+ Add contractor</Btn>} className="self-start">
+      <Card title="Contractors" action={<Btn size="sm" onClick={() => toast("Add contractor (demo)")}><Icon name="add" /> Add contractor</Btn>} className="self-start">
         <div className="flex flex-col gap-2">{list.map((c) => <ListRow key={c.id} selected={sel.id === c.id} onClick={() => setSel(c)}><div className="min-w-0 flex-1"><b className="text-[13px]">{c.id}</b><div className="text-[11px] text-muted">{c.area}</div></div><Badge tone={c.st === "Active" ? "ok" : "crit"}>{c.st}</Badge></ListRow>)}</div>
         <p className="mt-2 text-[11px] text-muted">Contractor companies are partners, not users — their staff accounts are managed in Access & roles.</p>
       </Card>

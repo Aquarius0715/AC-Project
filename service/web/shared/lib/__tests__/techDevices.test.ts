@@ -119,7 +119,7 @@ describe("operation history", () => {
       op({ id: "4", kind: "firmware", status: "running", targetVersion: "v2", finishedAt: null }), op({ id: "5", kind: "firmware", status: "succeeded", targetVersion: "v2" }),
       op({ id: "6", status: "failed", failureCode: "TIMEOUT" }),
     ], "v1");
-    expect(rows.map((r) => r.detail)).toEqual(["heartbeat confirmed", "waiting for the heartbeat", "starts within a second", "v1 → v2", "→ v2 installed", "TIMEOUT — no confirmation within 60 s"]);
+    expect(rows.map((r) => r.detail)).toEqual(["heartbeat confirmed", "waiting for the heartbeat", "starts within a second", "v1 → v2", "v2 installed", "TIMEOUT — no confirmation within 60 s"]);
     expect(rows[1].time).toBe("14 Sept 2026, 9:00 am MYT"); // startedAt, else createdAt
     expect(rows[0]).toMatchObject({ id: "1", kind: "Connection check", status: "succeeded", statusText: "Succeeded" });
   });

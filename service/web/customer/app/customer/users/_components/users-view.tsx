@@ -30,7 +30,7 @@ export function UsersView({ live }: { live: { customerId: string; customer: stri
   const close = () => { setOpen(false); setTried(false); setEmail(""); };
   return (
     <Page>
-      <PageHead title={live.customer ? t("Users of {customer}", { customer: live.customer }) : t("Users")} sub={t("People who can sign in to this customer app. As the owner you can invite members.")} action={<Btn variant="primary" onClick={() => setOpen(true)}>{t("+ Invite member")}</Btn>} />
+      <PageHead title={live.customer ? t("Users of {customer}", { customer: live.customer }) : t("Users")} sub={t("People who can sign in to this customer app. As the owner you can invite members.")} action={<Btn variant="primary" onClick={() => setOpen(true)}><Icon name="add" /> {t("Invite member")}</Btn>} />
       <Card pad={false}>
         <DataTable rows={live.rows} rowKey={(u) => u.id} cols={[
           { key: "u", label: t("User"), render: (u) => <div><b>{u.name ?? u.email}{u.you ? ` ${t("(you)")}` : ""}</b><div className="text-xs text-muted">{u.sub}</div></div> },

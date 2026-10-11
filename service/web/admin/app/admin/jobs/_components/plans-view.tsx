@@ -33,7 +33,7 @@ export function PlansView({ live }: { live: PlansLive }) {
   const href = (id: string) => `/admin/jobs?${new URLSearchParams({ ...Object.fromEntries(Object.entries(live.q).filter(([, v]) => v) as [string, string][]), tab: "plans", planId: id })}`;
   return (
     <Page className="max-w-[1440px]">
-      <JobsTabs tab="plans" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => setCreating(true)}>{t("+ New plan")}</Btn>} />
+      <JobsTabs tab="plans" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => setCreating(true)}><Icon name="add" /> {t("New plan")}</Btn>} />
       <ScopeBar scope={live.scope} q={live.q} text={t(live.plansTotal === 1 ? "1 plan in scope" : "{n} plans in scope", { n: live.plansTotal })} clear="planId" />
       <div className="split-rev">
         <Card title={t("Recurring plans")} sub={t("next due, soonest first")} className="self-start">

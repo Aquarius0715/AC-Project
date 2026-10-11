@@ -118,7 +118,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
           </button>
         ))}</div>
         <div className="flex flex-wrap items-center gap-2"><div className="w-64"><Search placeholder={t("Search serial, device or unit…")} value={q} onChange={setQ} /></div>
-          {live.canMaintain && <Btn variant="primary" disabled={live.register.length === 0} title={live.register.length ? undefined : t("Every assigned unit already has a device")} onClick={() => { setErrors({}); setModal("register"); }}>{t("+ Register device")}</Btn>}</div>
+          {live.canMaintain && <Btn variant="primary" disabled={live.register.length === 0} title={live.register.length ? undefined : t("Every assigned unit already has a device")} onClick={() => { setErrors({}); setModal("register"); }}><Icon name="add" /> {t("Register device")}</Btn>}</div>
       </div>
       {refused && <Banner tone="crit">{refused}</Banner>}
       <div className="split-rev">

@@ -62,7 +62,7 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
         </Btn>
       </div>
       <Card title={`${t("Technicians — {company}", { company: live.company })}${q.activeOnly ? ` · ${t("{n} active", { n: live.activeCount })}` : ""}`}
-        action={<div className="flex flex-wrap gap-2"><LinkBtn href="/partner/schedule" size="sm">{t("Open schedule")} <Icon name="arrowRight" /></LinkBtn><Btn size="sm" onClick={() => setOpen(true)} disabled={!live.technicians.length}>{t("+ Unavailable days")}</Btn></div>}>
+        action={<div className="flex flex-wrap gap-2"><LinkBtn href="/partner/schedule" size="sm">{t("Open schedule")} <Icon name="arrowRight" /></LinkBtn><Btn size="sm" onClick={() => setOpen(true)} disabled={!live.technicians.length}><Icon name="add" /> {t("Unavailable days")}</Btn></div>}>
         {none ? (
           <div className="py-6 text-center">
             <b className="text-[13px]">{t("No {company} technicians hold this qualification", { company: live.company })}</b>

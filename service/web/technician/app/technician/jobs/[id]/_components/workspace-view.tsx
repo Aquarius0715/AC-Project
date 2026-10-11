@@ -173,8 +173,8 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
         )}
         {actions && (
           <div className="flex flex-wrap gap-2">
-            <Btn size="sm" onClick={() => { addReading(it.componentKey); setView("readings"); }}>{t("+ Add reading")}</Btn>
-            <Btn size="sm" disabled={ph.free.length === 0} aria-expanded={linking === it.componentKey} onClick={() => setLinking((k) => (k === it.componentKey ? null : it.componentKey))}>{t("+ Link photo")}</Btn>
+            <Btn size="sm" onClick={() => { addReading(it.componentKey); setView("readings"); }}><Icon name="add" /> {t("Add reading")}</Btn>
+            <Btn size="sm" disabled={ph.free.length === 0} aria-expanded={linking === it.componentKey} onClick={() => setLinking((k) => (k === it.componentKey ? null : it.componentKey))}><Icon name="add" /> {t("Link photo")}</Btn>
           </div>
         )}
         {actions && !photos.some((x) => x.status === "ready") && <p className="text-[11px] text-muted">{t("Add a photo under Photos first, then link it to this finding.")}</p>}
@@ -249,8 +249,8 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
             </div>
           </div>
           <Card title={<Tabs value={view} onChange={setView} tabs={[{ id: "readings", label: t("Readings"), count: draft.readings.length }, { id: "parts", label: t("Parts & refrigerant"), count: draft.parts.length + draft.refrigerant.length }, { id: "time", label: t("Time on site") }]} />}
-            action={view === "readings" && editable ? <Btn size="sm" onClick={() => addReading(tab === "outdoor" ? "refrigerant_pipe" : live.components[0]?.key ?? "filter")}>{t("+ Add reading")}</Btn>
-              : view === "parts" && editable ? <span className="flex gap-2"><Btn size="sm" onClick={() => setModal("part")}>{t("+ Add part")}</Btn><Btn size="sm" onClick={() => setModal("refrigerant")}>{t("+ Refrigerant")}</Btn></span> : null}>
+            action={view === "readings" && editable ? <Btn size="sm" onClick={() => addReading(tab === "outdoor" ? "refrigerant_pipe" : live.components[0]?.key ?? "filter")}><Icon name="add" /> {t("Add reading")}</Btn>
+              : view === "parts" && editable ? <span className="flex gap-2"><Btn size="sm" onClick={() => setModal("part")}><Icon name="add" /> {t("Add part")}</Btn><Btn size="sm" onClick={() => setModal("refrigerant")}><Icon name="add" /> {t("Refrigerant")}</Btn></span> : null}>
             {view === "readings" && (draft.readings.length === 0 ? <p className="text-[13px] text-muted">{t("No readings yet. Record each measurement with its unit and the component it belongs to — an unmeasured value is left empty, never 0.")}</p> : (
               <div className="scroll-x"><table className="w-full min-w-[560px] text-[13px]">
                 <thead className="text-left text-[11px] uppercase text-muted"><tr><th className="py-1">{t("Metric")}</th><th>{t("Value")}</th><th>{t("Unit")}</th><th>{t("Linked item")}</th><th>{t("Observed")}</th><th /></tr></thead>

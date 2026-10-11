@@ -117,7 +117,7 @@ export function operationRows(ops: (ApiDeviceOperation & { startedAt?: string | 
   return ops.map((o) => {
     const open = o.status === "queued" || o.status === "running";
     const detail = o.status === "failed" ? failureText(o.failureCode, t)
-      : o.kind === "firmware" ? (open ? `${current} → ${o.targetVersion}` : t("→ {version} installed", { version: o.targetVersion ?? "—" }))
+      : o.kind === "firmware" ? (open ? `${current} → ${o.targetVersion}` : t("{version} installed", { version: o.targetVersion ?? "—" }))
       : o.status === "succeeded" ? t("heartbeat confirmed") : o.status === "running" ? t("waiting for the heartbeat") : t("starts within a second");
     return { id: o.id, kind: t(KIND[o.kind] ?? o.kind), status: o.status, statusText: t(STATUS[o.status] ?? o.status), time: showTime(o.startedAt ?? o.createdAt, display), detail };
   });

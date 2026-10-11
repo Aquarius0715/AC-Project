@@ -6,7 +6,7 @@
 import {
   AirVent, ArrowDown, ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUp, Ban, Banknote, Bell, BellRing, Building2, CalendarClock,
   Camera, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, CircleAlert, CircleCheck, CircleDashed, CircleDot, CircleHelp, CirclePause, CircleSlash,
-  CircleX, ClipboardCheck, ClipboardList, Clock, CloudSun, Cpu, Download, ExternalLink, FileText, FlaskConical, Gauge, Globe, Handshake, History, House, Info, KeyRound,
+  CircleX, ClipboardCheck, ClipboardList, Clock, CloudSun, Cpu, Download, Ellipsis, ExternalLink, FileText, FlaskConical, Gauge, Globe, Handshake, History, House, Info, KeyRound,
   LayoutDashboard, Leaf, LoaderCircle, LocateFixed, Lock, LogOut, Mail, Menu, Mic, Minus, OctagonAlert, Pencil, PersonStanding, Play, Plug, Plus, Printer,
   QrCode, Receipt, RefreshCw, Repeat, ScrollText, Search, Send, Settings, Signature, Snowflake, Sparkles, Sprout, Square, SquareCheck,
   Star, Sun, Thermometer, Trash2, TriangleAlert, Undo2, Upload, UserCheck, UserRound, Users, Wifi, WifiOff, Wind, Workflow, Wrench, X, Zap,
@@ -45,6 +45,7 @@ const ICONS = {
   demo: FlaskConical,
   signOut: LogOut,
   menu: Menu,
+  more: Ellipsis,
   // states
   info: Info,
   warning: TriangleAlert,

@@ -30,7 +30,7 @@ export function SlaView({ live }: { live: SlaLive }) {
   };
   return (
     <Page className="max-w-[1440px]">
-      <JobsTabs tab="sla" counts={live.counts} q={{}} action={<Btn variant="primary" size="sm" onClick={() => setModal("job")}>{t("+ New job")}</Btn>} />
+      <JobsTabs tab="sla" counts={live.counts} q={{}} action={<Btn variant="primary" size="sm" onClick={() => setModal("job")}><Icon name="add" /> {t("New job")}</Btn>} />
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
         <Select aria-label={t("Period")} className="w-auto" value={live.period.id} onChange={(e) => patch({ period: e.target.value === "90" ? null : e.target.value })}>{live.periods.map((p) => <option key={p.id} value={p.id}>{t("Period: {label}", { label: p.label })}</option>)}</Select>

@@ -1,6 +1,6 @@
 ---
 document_id: UX-COMMON
-version: 0.36.0
+version: 0.37.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -36,7 +36,7 @@ Validate each screen's cases that add detail to the source (AT-*-SRC) together w
 | Purpose | Standard/source | Project usage rules |
 |---|---|---|
 | Basic UI | In-house components on Tailwind CSS 4 (`shared/components/ui.tsx`), following the Figma UI Guideline | One shared set for the four apps: buttons, Modal, Tabs, Select, Field, Badge, Banner, DataTable and the like. Do not build separate versions of equivalent UI for each role |
-| Icons | Lucide (`lucide-react`, pinned) through the shared `Icon` component (`shared/components/Icon.tsx`, DEC-74) | Every icon comes from this one library. Screens name a meaning (`alerts`, `warning`, `edit`), and the component's map picks the drawing, so a meaning has one icon everywhere. Size 1em of the text, stroke 2, on the text baseline. No emoji or symbol characters as icons. An icon next to text is aria-hidden; an icon-only button always has a label |
+| Icons | Lucide (`lucide-react`, pinned) through the shared `Icon` component (`shared/components/Icon.tsx`, DEC-74); in Figma the `Icon/<name>` components of UI Guideline board 07 | Every icon comes from this one library, and the rules below apply (IR393–IR399). See the rules after this table |
 | Forms | Controlled inputs in the shared Field, with one pure validator per form in `shared/lib` | Keep input state in the form component; the Server Action returns the Core API's field errors, shown on the same fields |
 | Input validation | The form's pure validator (Vitest covers it); the Core API checks again (VALIDATION with fieldErrors) | Keep required fields, formats and conditional rules for each use case in its validator; keep them apart from the API types |
 | Data reads/updates | Server Components through the DAL (`shared/lib/dal.ts`); writes are Server Actions | No client-side query cache in API mode. The Phase 1A browser demo keeps its in-browser Repository |
@@ -44,6 +44,20 @@ Validate each screen's cases that add detail to the source (AT-*-SRC) together w
 | Date input | Native date and time inputs | Times are typed in the display time zone and converted with `zonedInstant` (NFR-08); display uses `showTime` / `showSpan` (IR44) |
 | Translation | Plain dictionaries chosen on the server, as in the Next.js internationalization guide (English keys, `shared/lib/i18n-ms.ts`) | Update en (English)/ms (Malay) together; English is the default. The i18n key check keeps the code's texts and the dictionary the same |
 | Testing | Vitest, React Testing Library, Playwright, axe-core | Assign separate roles for logic tests, user interaction tests, E2E tests across screens, and automated accessibility checks |
+
+**Icon rules (DEC-74).**
+- **Meaning, not drawing.** Screens name a meaning (`alerts`, `warning`, `edit`), and the `Icon` map picks the drawing, so a meaning has one icon everywhere. Figma uses the same names: one `Icon/<name>` component per meaning on the UI Guideline board "07 — Icons".
+- **Size and colour.** An icon is 1em of its text, stroke 2, on the text baseline, in the text colour.
+- **No character as an icon.** Emoji and symbol characters (✓ ⚠ ● ★ ⋯ and the like) are never icons.
+- **Arrows in links and buttons.** A link or button affordance is an icon: `arrowRight` after a forward link, `arrowLeft` before a back link, `chevronRight` at the end of a row, `chevronLeft` for an icon-only back link.
+- **Arrows that stay text.** An arrow inside a sentence ("requested → offered", "v1 → v2") is text. So is the "›" between the parts of a location path or a breadcrumb.
+- **Add, menus and sort hints.**
+  - An add action is `add` before the label, never "+ Add …".
+  - A row's actions menu is `ActionMenu` (the `more` icon over a native select).
+  - Sort hints are words ("most severe first").
+  - A native `<option>` cannot hold an icon, so its text is words.
+- **Accessibility.** An icon next to text is aria-hidden. An icon-only button or menu always has a label.
+- **The guard.** `shared/lib/__tests__/icons.test.ts` reads every UI string of the four apps and the Malay dictionary. It fails on a symbol character, on an arrow at the start or end of a text, and on "+ " before a label.
 
 DEC-03 was decided on 2026-10-10 by the product owner: the build's approach stands instead of the earlier proposal (shadcn/ui, Lucide, React Hook Form, Zod, TanStack Query, i18next). It follows the user's instruction to follow the Next.js documentation (2026-10-08). Do not add a UI kit, or a form, schema, query or translation library. The one exception is the icon set: Lucide since 2026-10-12 (DEC-74). For an exception, record the required feature, why the in-house approach is insufficient, the cost and impact, and whether replacement is possible. Do not force a component where semantic HTML is enough.
 

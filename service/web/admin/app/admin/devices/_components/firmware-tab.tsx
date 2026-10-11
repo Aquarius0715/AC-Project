@@ -9,6 +9,7 @@ import { showTime } from "@ac/web/lib/i18n";
 import { campaignErrors, campaignFacts, campaignStart, resultReason, waveStates, type CampaignDraft, type CampaignRow, type WaveState } from "@ac/web/lib/devices";
 import { controlCampaign, scheduleCampaign } from "../actions";
 import type { DevicesLive } from "./devices-view";
+import { Icon } from "@ac/web/components/Icon";
 
 const tone = (s: CampaignRow["state"]) => (s === "completed" ? "ok" : s === "running" ? "primary" : s === "paused" ? "warn" : s === "aborted" ? "crit" : "muted");
 const stateWord: Record<CampaignRow["state"], string> = { scheduled: "scheduled", running: "running", paused: "paused", aborted: "aborted", completed: "completed" };
@@ -47,7 +48,7 @@ export function FirmwareTab({ live }: { live: DevicesLive }) {
 
   return (
     <div className="split-rev">
-      <Card title={t("Campaigns")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { setD(blank()); setModal("new"); }}>{t("+ New campaign")}</Btn>} className="self-start">
+      <Card title={t("Campaigns")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { setD(blank()); setModal("new"); }}><Icon name="add" /> {t("New campaign")}</Btn>} className="self-start">
         {(live.campaigns ?? []).length === 0 ? <EmptyState title={t("No campaigns")}>{t("Schedule a firmware campaign for a model.")}</EmptyState> : <div className="flex flex-col gap-2">{live.campaigns!.map((c) => <ListRow key={c.id} selected={sel?.id === c.id} onClick={() => nav({ campaignId: c.id })}><div className="min-w-0 flex-1"><b className="text-[13px]">{c.model}</b><div className="text-[11px] text-muted">{c.versions} · {t(c.devices === 1 ? "1 device" : "{n} devices", { n: c.devices })} · {t("starts {time}", { time: c.start })}</div></div><Badge tone={tone(c.state)}>{t(stateWord[c.state])}</Badge></ListRow>)}</div>}
       </Card>
       {!sel ? <Card title={t("Campaign")}><EmptyState title={t("Nothing selected")}>{t("Choose or schedule a campaign.")}</EmptyState></Card> : (

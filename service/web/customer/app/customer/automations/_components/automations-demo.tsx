@@ -42,14 +42,14 @@ export function AutomationsDemo() {
   const onCount = list.filter((a) => a.on).length;
   return (
     <Page>
-      <PageHead title="Your automations" sub={`${list.length} automations · ${onCount} on · each rule controls one AC · checked again when it runs`} action={<Btn variant="primary" onClick={() => open("new")}>+ Create automation</Btn>} />
+      <PageHead title="Your automations" sub={`${list.length} automations · ${onCount} on · each rule controls one AC · checked again when it runs`} action={<Btn variant="primary" onClick={() => open("new")}><Icon name="add" /> Create automation</Btn>} />
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><div className="flex items-center gap-1.5 font-bold"><Icon name="location" />Location consent — for arrival/departure automations only</div><div className="text-xs text-muted">{consent ? "Granted Sep 10, 2026 · used only by 2 location automations · demo location events (no real GPS history)." : "Withdrawn — location automations are paused. Schedule automations are unaffected."}</div></div>
           <Btn size="sm" variant={consent ? "danger" : "primary"} onClick={() => { setConsent(!consent); toast(consent ? "Location consent withdrawn" : "Location consent granted", consent ? "warn" : "ok"); }}>{consent ? "Withdraw consent" : "Grant consent"}</Btn>
         </div>
       </Card>
-      {list.length === 0 ? <EmptyState title="No automations yet" action={<Btn size="sm" onClick={() => open("new")}>+ Create automation</Btn>}>Create one to pre-cool before you arrive. Empty is a valid state — not an error.</EmptyState> : (
+      {list.length === 0 ? <EmptyState title="No automations yet" action={<Btn size="sm" onClick={() => open("new")}><Icon name="add" /> Create automation</Btn>}>Create one to pre-cool before you arrive. Empty is a valid state — not an error.</EmptyState> : (
         <div className="flex flex-col gap-3">
           {list.map((a) => {
             const paused = a.kind === "Location" && !consent;
@@ -67,7 +67,7 @@ export function AutomationsDemo() {
                     <OnOffBadge on={a.on && !paused} />
                     <Toggle on={a.on} onChange={(v) => setList((l) => l.map((x) => (x.id === a.id ? { ...x, on: v } : x)))} label={`Toggle ${a.name}`} />
                     <Btn size="sm" onClick={() => open(a)}>Edit</Btn>
-                    <Btn size="sm" variant="ghost" aria-label="More" onClick={() => setMenu(menu === a.id ? null : a.id)}>⋯</Btn>
+                    <Btn size="sm" variant="ghost" aria-label="More" onClick={() => setMenu(menu === a.id ? null : a.id)}><Icon name="more" /></Btn>
                     {menu === a.id && <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-xl border border-line bg-surface p-1 shadow-lg"><button className="w-full rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-crit hover:bg-crit-soft" onClick={() => { setDel(a); setMenu(null); }}>Delete…</button></div>}
                   </div>
                 </div>

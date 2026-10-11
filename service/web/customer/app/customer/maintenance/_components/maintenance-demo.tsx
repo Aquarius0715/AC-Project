@@ -44,7 +44,7 @@ export function MaintenanceDemo({ jobId, initialTab }: { jobId?: string; initial
         <>
           {replyCount > 0 && <Banner tone="warn" icon="swap" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); setSelId(jobs.find((j) => j.status === "time_proposed")?.id ?? null); }}>Review</Btn>}>A new visit time needs your reply ({replyCount}). Nothing is booked until you accept.</Banner>}
           {(() => { const done = all.find((j) => j.status === "completed" && j.id === "job-c02"); return done && !rated.has(done.id) ? <Banner tone="ok" icon="check" action={<span className="flex gap-2"><Btn size="sm" onClick={() => { setSelId(done.id); setModal("problem"); }}>Report a problem</Btn><Btn size="sm" variant="primary" onClick={() => { setSelId(done.id); setModal("rate"); }}>Confirm & rate</Btn></span>}><b>Work finished — job-c02 · Living room AC · Sep 8.</b> Is everything working? Your confirmation closes the job.</Banner> : null; })()}
-          <PageHead title="My requests" sub={`${jobs.length} requests · sorted by status (business order)`} action={<Btn variant="primary" onClick={() => setModal("new")}>+ New maintenance request</Btn>} />
+          <PageHead title="My requests" sub={`${jobs.length} requests · sorted by status (business order)`} action={<Btn variant="primary" onClick={() => setModal("new")}><Icon name="add" /> New maintenance request</Btn>} />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Tabs value={tab} onChange={setTab} tabs={([["all", "All"], ["reply", "Needs your reply"], ["requested", "Requested"], ["scheduled", "Scheduled"], ["progress", "In progress"], ["completed", "Completed"], ["cancelled", "Cancelled"]] as [StatusTab, string][]).filter(([t]) => t !== "reply" || replyCount > 0).map(([id, label]) => ({ id, label, count: count(id) }))} />
             <Select aria-label="Origin" value={origin} onChange={(e) => setOrigin(e.target.value as typeof origin)} className="w-auto"><option value="all">Origin: All</option><option value="request">Origin: Client request</option><option value="plan">Origin: Periodic plan</option></Select>
@@ -140,7 +140,7 @@ function Detail({ j, onClose, open }: { j: Job; onClose: () => void; open: (m: "
       <Timeline items={j.history.slice(-5).map((h) => ({ time: h.at, title: h.text }))} />
       <div className="mt-3 flex flex-wrap justify-between gap-2">
         {(j.status === "requested" || j.status === "time_proposed") && j.origin === "request" ? <Btn size="sm" variant="danger" onClick={() => open("cancel")}>Cancel request</Btn> : <span />}
-        {j.status !== "completed" && j.status !== "cancelled" && <Btn size="sm" onClick={() => open("note")}>+ Add note</Btn>}
+        {j.status !== "completed" && j.status !== "cancelled" && <Btn size="sm" onClick={() => open("note")}><Icon name="add" /> Add note</Btn>}
       </div>
       <p className="mt-2 text-[11px] text-muted">Cancel is possible until a time is booked. Any time outside your preferred times is booked only after you accept it. Notes can’t change the time or technician.</p>
     </Card>

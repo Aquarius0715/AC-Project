@@ -38,7 +38,7 @@ test("another company's roster reads as not found", async ({ page }) => {
 
 test("the unavailable days form checks its days before saving", async ({ page }) => {
   await page.goto("/partner/team?date=2026-09-16");
-  await page.getByRole("button", { name: "+ Unavailable days" }).click();
+  await page.getByRole("button", { name: "Unavailable days" }).click();
   const dialog = page.getByRole("dialog", { name: "Add unavailable days" });
   await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   const to = dialog.getByLabel(/^To/); // the label also holds the field's error once shown
@@ -63,7 +63,7 @@ test("the Certifications tab counts the certificates and checks an upload before
   await main.getByRole("combobox", { name: "Expiring within" }).selectOption("30");
   await page.waitForURL(/expiringWithinDays=30/);
   await expect(main.getByRole("region", { name: /^Expiring ≤ 30 days$/ })).toBeVisible();
-  await main.getByRole("button", { name: "+ Add certificate" }).click();
+  await main.getByRole("button", { name: "Add certificate" }).click();
   const dialog = page.getByRole("dialog", { name: "Add certificate" });
   await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   await dialog.getByRole("button", { name: "Submit for verification" }).click();

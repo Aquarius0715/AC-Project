@@ -42,7 +42,7 @@ function ConsentCard({ live, compact }: { live: AutomationsLive; compact?: boole
   return (
     <div className={cx("rounded-2xl border p-4", c.tone === "warn" ? "border-crit bg-warn-soft/60" : compact ? "border-line bg-primary-soft/40" : "border-line bg-surface")}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2 text-[13px]"><b>{!compact && <Icon name="location" />}{t(compact ? "Location consent" : "Location consent — for arrival/departure automations only")}</b>{badge}</div>
+        <div className="flex flex-wrap items-center gap-2 text-[13px]"><b className="inline-flex items-center gap-1.5">{!compact && <Icon name="location" />}{t(compact ? "Location consent" : "Location consent — for arrival/departure automations only")}</b>{badge}</div>
         {action}
       </div>
       <p className="mt-1.5 text-xs text-muted">{compact ? t("Required for this automation. Used only for arrival/departure automations; phase 1A uses predefined demo events — no real GPS history is collected.") : c.text}</p>
@@ -64,10 +64,10 @@ function List({ live, notice, setNotice, create, edit }: { live: AutomationsLive
   });
   return (
     <Page>
-      <PageHead title={t("Your automations")} sub={t(live.cards.length === 1 ? "{n} automation · {on} on · each rule controls one AC · checked again when it runs" : "{n} automations · {on} on · each rule controls one AC · checked again when it runs", { n: live.cards.length, on })} action={<Btn variant="primary" onClick={create}>{t("+ Create automation")}</Btn>} />
+      <PageHead title={t("Your automations")} sub={t(live.cards.length === 1 ? "{n} automation · {on} on · each rule controls one AC · checked again when it runs" : "{n} automations · {on} on · each rule controls one AC · checked again when it runs", { n: live.cards.length, on })} action={<Btn variant="primary" onClick={create}><Icon name="add" /> {t("Create automation")}</Btn>} />
       {notice && <Banner tone="ok" action={<Btn size="sm" variant="ghost" onClick={() => setNotice(null)}>{t("Dismiss")}</Btn>}><b>{notice.title}</b><div className="text-xs text-muted">{notice.text}</div></Banner>}
       <ConsentCard live={live} />
-      {live.cards.length === 0 ? <EmptyState title={t("No automations yet")} action={<Btn size="sm" onClick={create}>{t("+ Create automation")}</Btn>}>{t("Create one to pre-cool before you arrive or to stop an empty room. Saving sends no command — the automation runs at its time or event.")}</EmptyState> : (
+      {live.cards.length === 0 ? <EmptyState title={t("No automations yet")} action={<Btn size="sm" onClick={create}><Icon name="add" /> {t("Create automation")}</Btn>}>{t("Create one to pre-cool before you arrive or to stop an empty room. Saving sends no command — the automation runs at its time or event.")}</EmptyState> : (
         <div className="flex flex-col gap-3">
           {live.cards.map((c) => (
             <Card key={c.id} className={cx(c.status.tone === "warn" && "border-crit")}>
@@ -87,7 +87,7 @@ function List({ live, notice, setNotice, create, edit }: { live: AutomationsLive
                   </span>
                   <span className="flex gap-2">
                     <Btn size="sm" onClick={() => edit(c.id)}>{t("Edit")}</Btn>
-                    <Btn size="sm" variant="ghost" aria-label={t("More for {name}", { name: c.name })} aria-expanded={menu === c.id} onClick={() => setMenu(menu === c.id ? null : c.id)}>⋯</Btn>
+                    <Btn size="sm" variant="ghost" aria-label={t("More for {name}", { name: c.name })} aria-expanded={menu === c.id} onClick={() => setMenu(menu === c.id ? null : c.id)}><Icon name="more" /></Btn>
                   </span>
                   {menu === c.id && (
                     <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-xl border border-line bg-surface p-1 shadow-lg">
@@ -330,7 +330,7 @@ function OnlyIf({ draft, errors, set }: { draft: Draft; errors: Record<string, s
       {errors.onlyIf && <p className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{errors.onlyIf}</p>}
       <div className="flex flex-wrap items-center gap-2">
         {adding && choices.length > 0 ? choices.map((c) => <Btn key={c} size="sm" onClick={() => { set({ extras: [...extras, newExtra(c)] }); setAdding(false); }}>{t(extraLabel[c])}</Btn>)
-          : <Btn size="sm" disabled={choices.length === 0} onClick={() => setAdding(true)}>{t("+ Add condition")}</Btn>}
+          : <Btn size="sm" disabled={choices.length === 0} onClick={() => setAdding(true)}><Icon name="add" /> {t("Add condition")}</Btn>}
         <span className="text-xs text-muted">{t(choices.length === 0 && extras.length > 0 ? "No more condition types for this trigger" : "e.g. only if someone is home · only if outdoor ≥ 30°C")}</span>
       </div>
     </div>

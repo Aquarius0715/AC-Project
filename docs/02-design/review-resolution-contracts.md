@@ -6267,3 +6267,40 @@ The wireframes now draw every icon with the same Lucide drawings as the web. The
    - The web still shows two kinds of character icon that the earlier scans missed: the "⋯" of the location menus (U+22EF), and the ASCII "+" before "Add …" and "New …" texts.
    - They come with the guard test and the icon rules in the docs.
 6. **Checks.** A scan of the four role pages finds no icon character left outside a sentence. Screenshots of the HQ overview, the units tree, customer automations and the technician workspace show the icons in the text colour, sized to the text. Security: govulncheck (v1.9.0) and `npm audit --omit=dev` report no known vulnerabilities.
+
+## IR399 One icon library, part 7: the last character icons, a guard test and the icon rules — 2026-10-12
+
+The web's last character icons are Lucide icons, a test keeps characters from coming back as icons, and the UI/UX specification states the icon rules.
+
+1. **The last character icons.** The earlier scans covered symbols and arrows, but not these:
+   - **"+ " before 47 labels** ("+ Add room", "+ New unit", "+ Create automation" and so on, in 45 files) is now the `add` icon before the label.
+     - A native `<option>` cannot hold an icon, so it says "Add a unit to compare".
+     - The partner history's preview button draws the icon from its mapper (`NoteMode.add`).
+   - **"⋯" (U+22EF):**
+     - The location menus and the users' actions in HQ customers & units use the new shared `ActionMenu`. It draws the `more` icon under a transparent native select, so the keyboard, the screen reader (the menu's label) and the platform's own menu work as before.
+     - The customer automations' "More" buttons draw the icon, and the tree's hint names the menu with it.
+   - **"→ {version} installed"** in the technician's device history reads "{version} installed".
+   - The web's `Icon` map gains `more` (Ellipsis), as the Figma set has.
+2. **Spacing.** Two icons that touched their text now have a gap: the location consent heading, and the Single AC / Group control buttons.
+3. **The guard, `shared/lib/__tests__/icons.test.ts`.**
+   - It parses every source file of the four apps and the shared package with the TypeScript parser. It reads string literals, template text and JSX text, but not comments. The Malay dictionary is included.
+   - It refuses symbol and pictograph characters, an arrow, ‹ or › at the start or end of a text, and "+ " before a label.
+   - An arrow between words, and a separator with spaces on both sides on the same line, are typography and pass.
+   - A table of cases pins the rules. The test passes on the code, and fails on a planted "⚠ Offline" and "Open →".
+4. **The icon rules** are now in the UI/UX specification (0.37.0):
+   - meaning not drawing, 1em, stroke 2, in the text colour;
+   - no character as an icon;
+   - link and button arrows are icons, and sentence arrows and path separators stay text;
+   - `add`, `ActionMenu` and sort hints in words;
+   - labels for icon-only controls;
+   - the guard, and the Figma board.
+   DD-COMMON (0.112.0) and the design assumptions (0.21.1) no longer say "glyph icons".
+5. **The Malay dictionary.** 49 keys follow their texts. A check of the merged keys found no change of meaning.
+6. **Tests.**
+   - 14 E2E spec files name the buttons without "+".
+   - Two unit tests expect the new texts: the partner history preview, and the device history.
+7. **Checks.** Typecheck, lint, the web unit tests (460), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped.
+8. **Security (secrets).** No AWS, private-key, Stripe, GitHub, Slack, JWT or Google key pattern was found:
+   - in any of the 1,168 tracked files;
+   - in any of the 275 commits.
+   No `.env` file is tracked.

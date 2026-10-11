@@ -4,7 +4,7 @@ import { useState } from "react";
 import { setSearchParam, useSearchParam } from "@ac/web/lib/urlState";
 import { ImportCsvModal, WarrantyTab } from "@ac/web/components/Features";
 import { ClientRole, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
-import { Badge, Banner, Btn, Card, DataTable, Field, Input, Kpi, ListRow, Modal, Page, PowerBadge, ConnBadge, Search, Select, SummaryList, Tabs, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, DataTable, Field, Input, Kpi, ListRow, Modal, Page, PowerBadge, ConnBadge, Search, Select, SummaryList, Tabs, useToast, ActionMenu } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 
 type Cust = { id: string; name: string; status: "active" | "inactive"; props: number; units: number; op: string; alerts: number | string; contract: string };
@@ -55,7 +55,7 @@ export function UnitsDemo() {
         <ImportCsvModal open={imp} onClose={() => setImp(false)} />
         {top === "warranty" ? <WarrantyTab /> : <>
         <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}><Kpi label="Customers" value={2} sub="+1 inactive (not counted)" /><Kpi label="Properties" value={2} sub="Home A · Home B" /><Kpi label="Units" value={5} sub="Running 2 · Stopped 2 · unknown 1" /><Kpi label="Needs attention" value={1} tone="warn" sub="overdue billing / open alert" /></div>
-        <Card title="Customers" sub="Select a customer to manage its properties, spaces, and units" action={<Btn size="sm" variant="primary" onClick={() => setModal("customer")}>+ New customer</Btn>}>
+        <Card title="Customers" sub="Select a customer to manage its properties, spaces, and units" action={<Btn size="sm" variant="primary" onClick={() => setModal("customer")}><Icon name="add" /> New customer</Btn>}>
           <div className="mb-3 flex flex-wrap items-center gap-3"><div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder="Search customer name, ID, or property…" value={q} onChange={setQ} /></div><Select aria-label="Status" className="w-auto" value={status} onChange={(e) => setStatus(e.target.value as "all")}><option value="active">Status: Active</option><option value="all">Status: All</option></Select></div>
           <DataTable rows={rows} rowKey={(r) => r.id} onRowClick={(c) => setCust(c)} cols={[{ key: "c", label: "Customer", render: (c) => <><b>{c.id}</b><div className="text-xs text-muted">{c.name}</div></> }, { key: "s", label: "Status", render: (c) => <Badge tone={c.status === "active" ? "ok" : "unknown"}>{c.status}</Badge> }, { key: "p", label: "Properties", render: (c) => c.props, hideBelow: "sm" }, { key: "u", label: "Units", render: (c) => c.units }, { key: "o", label: "Operation", render: (c) => c.op, hideBelow: "md" }, { key: "a", label: "Alerts", render: (c) => c.alerts, hideBelow: "md" }, { key: "k", label: "Contract", render: (c) => c.contract, hideBelow: "md" }, { key: "x", label: "", render: () => <span className="text-muted"><Icon name="chevronRight" /></span> }]} />
           <p className="mt-2 text-[11px] text-muted">{rows.length} of 3 · sorted by name · Inactive customers appear only with Status: All (IR40). Archived properties/spaces/units never appear in lists, summaries, or KPI denominators (IR39).</p>
@@ -67,22 +67,22 @@ export function UnitsDemo() {
   }
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px]"><button className="font-semibold text-primary" onClick={() => { setCust(null); setUnit(null); }}><Icon name="arrowLeft" /> Customers & units</button><span className="text-muted">› {cust.id} · {cust.name}</span></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px]"><button className="font-semibold text-primary" onClick={() => { setCust(null); setUnit(null); }}><Icon name="arrowLeft" /> Customers & units</button><span className="text-muted"> › {cust.id} · {cust.name}</span></div>
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "units", label: "Units & locations" }, { id: "users", label: "Users" }, { id: "policies", label: "Alert policies" }]} />
       {tab === "units" && (
         <div className="split-rev">
-          <Card title="Locations" action={<Btn size="sm" onClick={() => setModal("location")}>+ Add</Btn>} className="self-start">
+          <Card title="Locations" action={<Btn size="sm" onClick={() => setModal("location")}><Icon name="add" /> Add</Btn>} className="self-start">
             <div className="flex flex-col gap-1.5">{locations.map((l) => <ListRow key={l.id} selected={loc === l.id} onClick={() => { setLoc(l.id); setUnit(null); }}><b className="flex flex-1 items-center gap-1.5 text-[13px]"><Icon name="home" className="text-muted" />{l.name}</b><button aria-label="Rename" className="text-muted" onClick={(e) => { e.stopPropagation(); setName(l.name); setModal("rename"); }}><Icon name="edit" /></button></ListRow>)}</div>
             <Btn size="sm" variant="danger" className="mt-3" onClick={() => setModal("delete")}>Delete location…</Btn>
           </Card>
           <div className="flex min-w-0 flex-col gap-4">
-            <Card title={`${loc === "home-a" ? "Home A" : "Bedroom"} — units`} action={<Btn size="sm" variant="primary" onClick={() => setModal("unit")}>+ New unit</Btn>}>
+            <Card title={`${loc === "home-a" ? "Home A" : "Bedroom"} — units`} action={<Btn size="sm" variant="primary" onClick={() => setModal("unit")}><Icon name="add" /> New unit</Btn>}>
               <DataTable rows={loc === "bedroom" ? unitRows.slice(0, 2) : unitRows} rowKey={(r) => r.id} selectedKey={unit?.id} onRowClick={setUnit} cols={[{ key: "n", label: "Unit", render: (r) => <><b>{r.name}</b><div className="text-xs text-muted">{r.id}</div></> }, { key: "l", label: "Location", render: (r) => r.loc, hideBelow: "sm" }, { key: "m", label: "Model", render: (r) => r.model, hideBelow: "md" }, { key: "p", label: "Power", render: (r) => <PowerBadge s={r.power} /> }, { key: "c", label: "Conn.", render: (r) => <ConnBadge s={r.conn} />, hideBelow: "sm" }]} />
             </Card>
             {unit && (
               <Card title={`Unit edit — ${unit.name}`} sub={unit.id} action={<Btn size="sm" variant="ghost" aria-label="Close" onClick={() => setUnit(null)}><Icon name="close" /></Btn>}>
                 <SummaryList cols={2} items={[["Name", unit.name], ["Location", unit.loc], ["Model", unit.model], ["Status", "Active"]]} />
-                <div className="mt-3 flex flex-wrap gap-2"><Btn size="sm" onClick={() => setModal("move")}>Change location…</Btn><Btn size="sm" onClick={() => setModal("attach")}>+ Attach policy</Btn><Btn size="sm" variant="danger" onClick={() => setModal("deleteUnit")}>Delete unit…</Btn></div>
+                <div className="mt-3 flex flex-wrap gap-2"><Btn size="sm" onClick={() => setModal("move")}>Change location…</Btn><Btn size="sm" onClick={() => setModal("attach")}><Icon name="add" /> Attach policy</Btn><Btn size="sm" variant="danger" onClick={() => setModal("deleteUnit")}>Delete unit…</Btn></div>
               </Card>
             )}
           </div>
@@ -120,13 +120,13 @@ function ClientUsersTab() {
     if (a === "remove") run(clientUserActions.remove(u.id), `${u.email} removed from customer-a`);
   };
   return (
-    <Card title="Client users of customer-a" sub="People who sign in to the customer app. They only ever see customer-a’s properties and units." action={<Btn size="sm" variant="primary" onClick={() => setOpen(true)}>+ Invite user</Btn>}>
+    <Card title="Client users of customer-a" sub="People who sign in to the customer app. They only ever see customer-a’s properties and units." action={<Btn size="sm" variant="primary" onClick={() => setOpen(true)}><Icon name="add" /> Invite user</Btn>}>
       <DataTable rows={users} rowKey={(u) => u.id} cols={[
         { key: "u", label: "User", render: (u) => <><b>{u.name ?? u.email}</b><div className="text-xs text-muted">{u.name ? u.email : `invited ${u.invitedAt ?? ""} by ${u.invitedBy ?? "—"}`}</div></> },
         { key: "r", label: "Role", render: (u) => <Badge tone={u.role === "owner" ? "primary" : "muted"}>{u.role === "owner" ? "Owner" : "Member"}</Badge> },
         { key: "s", label: "Status", render: (u) => <Badge tone={u.status === "active" ? "ok" : u.status === "invited" ? "warn" : "muted"}>{u.status === "active" ? "Active" : u.status === "invited" ? "Invite pending" : "Disabled"}</Badge> },
         { key: "l", label: "Last sign-in", render: (u) => u.lastSignIn ?? "—", hideBelow: "md" },
-        { key: "a", label: "", render: (u) => <Select aria-label="Actions" className="w-auto" value="" onChange={(e) => act(u, e.target.value)}><option value="">⋯</option><option value="role">Change role (Owner / Member)</option>{u.status === "invited" && <option value="resend">Resend invite</option>}<option value="reset">Reset password</option><option value="disable">{u.status === "disabled" ? "Enable sign-in" : "Disable sign-in"}</option><option value="remove">Remove from customer</option></Select> },
+        { key: "a", label: "", render: (u) => <ActionMenu label="Actions" onChoose={(v) => act(u, v)}><option value="role">Change role (Owner / Member)</option>{u.status === "invited" && <option value="resend">Resend invite</option>}<option value="reset">Reset password</option><option value="disable">{u.status === "disabled" ? "Enable sign-in" : "Disable sign-in"}</option><option value="remove">Remove from customer</option></ActionMenu> },
       ]} />
       <p className="mt-2 text-[11px] text-muted">Client users have no permission editor — the owner can also invite members from the customer app (Users). HQ, contractor and technician accounts are managed in Access &amp; roles.</p>
       <Modal open={open} onClose={close} title="Invite client user" footer={<><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); const e = clientUserActions.invite(email, role, "hq-operator"); if (e) return; toast(`Invitation preview created for ${email.trim()}`); close(); }}>Send invite</Btn></>}>

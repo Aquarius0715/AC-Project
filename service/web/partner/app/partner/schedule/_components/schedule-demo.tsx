@@ -55,7 +55,7 @@ export function ScheduleDemo({ jobId }: { jobId?: string }) {
           </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={`Assign — ${sel.id} · ${sel.unit}`} sub={`Delegation period: ${sel.win.replace("→", "–")} — work must fit within this window.`}>
+          <Card title={`Assign — ${sel.id} · ${sel.unit}`} sub={`Delegation period: ${sel.win.replace(" → ", " – ")} — work must fit within this window.`}>
             <div className="grid-fluid" style={{ ["--min"as string]: "200px" }}>
               <Field label="Technician (own company, active, qualified)"><Select value={tech} onChange={(e) => setTech(e.target.value)}><option value="tech-external-a">tech-external-a — refrigerant handling, active</option><option value="tech-external-a2">tech-external-a2 — general maintenance, active</option></Select></Field>
               {lj ? <Field label="Visit time (agreed with the client)" hint="Fixed. A different time needs the client’s approval via HQ."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {lj.scheduled ? longDate(lj.scheduled) : "—"}</div></Field> : <>

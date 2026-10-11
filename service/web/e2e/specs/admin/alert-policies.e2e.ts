@@ -26,7 +26,7 @@ test("HQ creates an alert policy for a customer, edits it and deletes it", async
   const name = `E2E too hot ${Date.now()}`;
   await page.goto("/admin/alerts?tab=policies");
   const main = page.getByRole("main");
-  await main.getByRole("button", { name: "+ New policy" }).click();
+  await main.getByRole("button", { name: "New policy" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "New alert policy" })).toBeVisible();
   await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
@@ -48,7 +48,7 @@ test("HQ creates an alert policy for a customer, edits it and deletes it", async
   await expect(main).toContainText("Add at least one recipient");
 
   await main.getByRole("textbox", { name: /^Name/ }).fill(name);
-  await main.getByRole("button", { name: "+ Add recipient" }).click();
+  await main.getByRole("button", { name: "Add recipient" }).click();
   const picker = page.getByRole("dialog");
   await expect(picker.getByRole("heading", { name: "Add recipients" })).toBeVisible();
   await picker.getByRole("checkbox", { name: /^hq-operator/ }).check(); // HQ with alert.read, next to the customer's users
@@ -88,7 +88,7 @@ test("the unit page's new-policy link opens a draft for that customer", async ({
   await page.waitForURL(/customerId=/);
   await main.getByRole("tab", { name: /^Alert policies/ }).click();
   await page.waitForURL(/tab=policies/);
-  await main.getByRole("link", { name: "+ New policy for Demo Customer A" }).click();
+  await main.getByRole("link", { name: "New policy for Demo Customer A" }).click();
   await page.waitForURL(/\/admin\/alerts\?tab=policies&customerId=([0-9a-f-]{36})&new=\1$/); // scoped to that customer
   await expect(main.getByRole("heading", { name: /New alert policy/ })).toBeVisible();
   await expect(main).toContainText("Demo Customer A");
@@ -106,7 +106,7 @@ test("the Policies tab's scope, Show disabled and a scoped new policy with activ
   const main = page.getByRole("main");
   await main.getByRole("combobox", { name: "Customer" }).selectOption({ label: "Demo Customer A" });
   await page.waitForURL(/customerId=/);
-  await main.getByRole("button", { name: "+ New policy for Demo Customer A" }).click();
+  await main.getByRole("button", { name: "New policy for Demo Customer A" }).click();
   await page.waitForURL((u) => u.searchParams.get("tab") === "policies" && !!u.searchParams.get("new") && u.searchParams.get("new") === u.searchParams.get("customerId"));
 
   await expect(main).toContainText("Any day · any time");
@@ -115,7 +115,7 @@ test("the Policies tab's scope, Show disabled and a scoped new policy with activ
   await main.getByRole("button", { name: "Mon", exact: true }).click();
   await expect(main).toContainText("only 08:00–19:00 on Tue, Wed, Thu, Fri");
   await main.getByRole("textbox", { name: /^Name/ }).fill(name);
-  await main.getByRole("button", { name: "+ Add recipient" }).click();
+  await main.getByRole("button", { name: "Add recipient" }).click();
   const picker = page.getByRole("dialog");
   await picker.getByRole("checkbox", { name: /^hq-operator/ }).check();
   await picker.getByRole("button", { name: "Add 1 recipient" }).click();
@@ -232,12 +232,12 @@ test("the notification preview and the demo test of a policy attached to a unit"
   const main = page.getByRole("main");
   await main.getByRole("combobox", { name: "Customer" }).selectOption({ label: "Demo Customer A" });
   await page.waitForURL(/customerId=/);
-  await main.getByRole("button", { name: "+ New policy for Demo Customer A" }).click();
+  await main.getByRole("button", { name: "New policy for Demo Customer A" }).click();
   await page.waitForURL(/new=/);
   await main.getByRole("textbox", { name: /^Name/ }).fill(name);
   await main.getByRole("spinbutton", { name: /^Alert when ≥/ }).fill("45");
   await main.getByRole("spinbutton", { name: /^Recover/ }).fill("43");
-  await main.getByRole("button", { name: "+ Add recipient" }).click();
+  await main.getByRole("button", { name: "Add recipient" }).click();
   await page.getByRole("dialog").getByRole("checkbox", { name: /^hq-operator/ }).check();
   await page.getByRole("dialog").getByRole("button", { name: "Add 1 recipient" }).click();
 
@@ -260,7 +260,7 @@ test("the notification preview and the demo test of a policy attached to a unit"
   await main.getByRole("button", { name: /Possible open window/ }).click();
   await main.getByRole("link", { name: "Open unit", exact: true }).click();
   await page.waitForURL(/unitId=/);
-  await main.getByRole("button", { name: "+ Attach policy" }).click();
+  await main.getByRole("button", { name: "Attach policy" }).click();
   await page.getByRole("dialog").getByRole("checkbox", { name: new RegExp(name) }).check();
   await page.getByRole("dialog").getByRole("button", { name: "Attach 1 policy" }).click();
   await main.locator(`a[href*="policyId=${created}"]`).click();

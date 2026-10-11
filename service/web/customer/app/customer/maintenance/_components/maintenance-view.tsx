@@ -64,7 +64,7 @@ export function MaintenanceView({ live }: { live: MaintenanceLive }) {
         <>
           {replies > 0 && <Banner tone="warn" icon="swap" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); const r = live.rows.find((x) => x.tab === "reply"); if (r) open(r.id); }}>{t("Review")}</Btn>}>{t("A new visit time needs your reply ({n}). Nothing is booked until you accept.", { n: replies })}</Banner>}
           {live.rateBanner && <Banner tone="ok" icon="check" action={<Btn size="sm" variant="primary" onClick={() => open(live.rateBanner!.jobId)}>{t("Confirm & rate")}</Btn>}><b>{live.rateBanner.text}</b> {t("Is everything working? Your confirmation closes the job.")}</Banner>}
-          <PageHead title={t("My requests")} sub={t(live.rows.length === 1 ? "{n} request · sorted by status (business order)" : "{n} requests · sorted by status (business order)", { n: live.rows.length })} action={<Btn variant="primary" onClick={() => setModal("new")}>{t("+ New maintenance request")}</Btn>} />
+          <PageHead title={t("My requests")} sub={t(live.rows.length === 1 ? "{n} request · sorted by status (business order)" : "{n} requests · sorted by status (business order)", { n: live.rows.length })} action={<Btn variant="primary" onClick={() => setModal("new")}><Icon name="add" /> {t("New maintenance request")}</Btn>} />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Tabs value={tab} onChange={setTab} tabs={STATUS_TABS.filter(([s]) => s !== "reply" || replies > 0).map(([id, label]) => ({ id, label: t(label), count: count(id) }))} />
             <Select aria-label={t("Origin")} value={origin} onChange={(e) => setOrigin(e.target.value as typeof origin)} className="w-auto"><option value="all">{t("Origin: All")}</option><option value="request">{t("Origin: Client request")}</option><option value="plan">{t("Origin: Periodic plan")}</option></Select>
@@ -164,7 +164,7 @@ function JobDetail({ d, open, onDone, onFail }: { d: Detail; open: (m: ModalKind
       <Timeline items={d.history.map((h) => ({ time: h.time, title: h.title }))} />
       <div className="mt-3 flex flex-wrap justify-between gap-2">
         {(j.status === "requested") && j.origin === "client_request" ? <Btn size="sm" variant="danger" onClick={() => open("cancel")}>{t("Cancel request")}</Btn> : <span />}
-        {!closed && <Btn size="sm" onClick={() => open("note")}>{t("+ Add note")}</Btn>}
+        {!closed && <Btn size="sm" onClick={() => open("note")}><Icon name="add" /> {t("Add note")}</Btn>}
       </div>
       <p className="mt-2 text-[11px] text-muted">{t("Cancel is possible until a time is booked. Any time outside your preferred times is booked only after you accept it. Notes can’t change the time or technician.")}</p>
     </Card>

@@ -81,7 +81,7 @@ export function PoliciesPanel() {
   const isOwner = CURRENT_CLIENT.role === "owner";
   return (
     <>
-          <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-[15px] font-bold">Alert policies</h2><p className="max-w-xl text-xs text-muted">A policy is a set of limits. It only runs on the ACs you attach it to (open an AC › Alert policies). Every AC also has the default policy.</p></div><Btn variant="primary" onClick={() => { setEdit("new"); setF({ name: "", metric: "co2", op: "≥", val: "1200", dur: "15", rec: "1000", sev: "warning" }); }}>+ Create policy</Btn></div>
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-[15px] font-bold">Alert policies</h2><p className="max-w-xl text-xs text-muted">A policy is a set of limits. It only runs on the ACs you attach it to (open an AC › Alert policies). Every AC also has the default policy.</p></div><Btn variant="primary" onClick={() => { setEdit("new"); setF({ name: "", metric: "co2", op: "≥", val: "1200", dur: "15", rec: "1000", sev: "warning" }); }}><Icon name="add" /> Create policy</Btn></div>
           <Card title="Default policy" sub="Limits set by HQ · on / off is set by the account owner">
             <p className="mb-3 text-xs text-muted">Covers ventilation and the usual causes of breakdowns. It is attached to every AC and cannot be detached or edited, but the account owner can switch each rule on or off for your account (all your ACs). Ask HQ if a limit should change.</p>
             {!isOwner && <p className="mb-3 text-xs text-warn">Only the account owner can change this.</p>}

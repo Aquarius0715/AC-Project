@@ -25,7 +25,7 @@ test.afterEach(async ({ page }) => {
 test("a schedule previews its next runs, is saved off and deleted", async ({ page, app }) => {
   test.skip(app.id !== "customer", "client only");
   await page.goto("/customer/automations");
-  await page.getByRole("button", { name: "+ Create automation" }).first().click();
+  await page.getByRole("button", { name: "Create automation" }).first().click();
   await page.waitForURL(/automationId=new/);
   const name = `E2E schedule ${Date.now()}`;
   await page.getByLabel("Name").fill(name);

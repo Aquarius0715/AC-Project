@@ -122,7 +122,7 @@ export function FirmwareCampaigns() {
   const waves = [["Pilot · 5", 100, "5 / 5 · done"], ["Wave 1 · 20 %", 100, "30 / 30 · done"], ["Wave 2 · 100 %", 24, "12 / 50 · running"]] as const;
   return (
     <div className="split-rev">
-      <Card title="Campaigns" action={<Btn size="sm" variant="primary" onClick={() => setModal(true)}>+ New campaign</Btn>} className="self-start">
+      <Card title="Campaigns" action={<Btn size="sm" variant="primary" onClick={() => setModal(true)}><Icon name="add" /> New campaign</Btn>} className="self-start">
         <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">fw-2.0.0-rollout</b><div className="text-[11px] text-muted">CTRL-A1 · 1.9.2 → 2.0.0</div></div><Badge tone={paused ? "warn" : "primary"}>{paused ? "Paused" : "Running"}</Badge></ListRow>
         <ListRow><div className="min-w-0 flex-1"><b className="text-[13px]">fw-1.9.3-hotfix</b><div className="text-[11px] text-muted">CTRL-B2 · 1.9.2 → 1.9.3</div></div><Badge tone="ok">Completed</Badge></ListRow>
         <ListRow><div className="min-w-0 flex-1"><b className="text-[13px]">fw-2.0.0-pilot</b><div className="text-[11px] text-muted">CTRL-A1 · 5 devices</div></div><Badge tone="ok">Completed</Badge></ListRow>

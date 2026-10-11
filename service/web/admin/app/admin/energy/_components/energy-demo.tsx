@@ -50,7 +50,7 @@ export function EnergyDemo() {
         </>
       ) : (
         <div className="split-rev">
-          <Card title="Baselines" action={<Btn size="sm" variant="primary" onClick={() => toast("Baseline draft created")}>+ New</Btn>} className="self-start"><div className="flex flex-col gap-2">{baselines.map((x) => <ListRow key={x.id} selected={sel.id === x.id} onClick={() => setSel(x)}><div><b className="text-[13px]">{x.name}</b><div className="text-[11px] text-muted">{x.sub}</div></div></ListRow>)}</div></Card>
+          <Card title="Baselines" action={<Btn size="sm" variant="primary" onClick={() => toast("Baseline draft created")}><Icon name="add" /> New</Btn>} className="self-start"><div className="flex flex-col gap-2">{baselines.map((x) => <ListRow key={x.id} selected={sel.id === x.id} onClick={() => setSel(x)}><div><b className="text-[13px]">{x.name}</b><div className="text-[11px] text-muted">{x.sub}</div></div></ListRow>)}</div></Card>
           <Card title={sel.name} sub="demo_fixed · version 1"><SummaryList items={[["Units", sel.units.join(", ")], ["Value", `${sel.kwh.toFixed(1)} kWh`], ["Hour", "2026-09-14 08:00–09:00"], ["Method", "demo_fixed (fictional value)"]]} />
             <div className="mt-3 grid-fluid" style={{ ["--min"as string]: "160px" }}><Field label="New version value (kWh)"><Input type="number" value={kwh} onChange={(e) => setKwh(e.target.value)} /></Field></div>
             <div className="mt-3 flex justify-end"><Btn variant="primary" onClick={() => toast("Baseline saved as version 2")}>Save as v2</Btn></div></Card>

@@ -17,7 +17,7 @@ test("the invite dialog refuses a bad or existing address and invites nobody whe
   const me = page.locator("main tr", { hasText: "(you)" });
   const email = ((await me.locator("td").first().innerText()).match(/\S+@\S+/) ?? [""])[0];
   expect(email).not.toBe("");
-  await page.getByRole("button", { name: "+ Invite member" }).click();
+  await page.getByRole("button", { name: "Invite member" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: /^Invite a member to \S/ })).toBeVisible();
   await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)

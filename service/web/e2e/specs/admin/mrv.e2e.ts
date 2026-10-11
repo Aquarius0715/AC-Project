@@ -7,19 +7,19 @@ import { expectAccessible } from "../../fixtures/a11y";
 test("a new report's evidence comes from the photos of accepted work reports", async ({ page }) => {
   await page.goto("/admin/mrv");
   const main = page.getByRole("main");
-  await main.getByRole("button", { name: "+ New report" }).click();
+  await main.getByRole("button", { name: "New report" }).click();
   const dialog = page.getByRole("dialog", { name: "New Scope 2 report" });
   await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   const evidence = dialog.getByRole("group", { name: "Evidence to attach" });
   await expect(evidence).toContainText("None yet.");
-  await expect(evidence.getByRole("button", { name: "+ Add evidence" })).toBeDisabled();
+  await expect(evidence.getByRole("button", { name: "Add evidence" })).toBeDisabled();
   await expect(evidence).toContainText("Choose the units and the period first");
 
   await dialog.getByLabel("Customer organization").selectOption({ label: "Demo Customer A" });
   await dialog.getByRole("checkbox").first().check();
   await dialog.getByLabel("Start (Kuala Lumpur)").fill("2026-09-01T00:00");
   await dialog.getByLabel("End", { exact: true }).fill("2026-09-14T00:00");
-  await evidence.getByRole("button", { name: "+ Add evidence" }).click();
+  await evidence.getByRole("button", { name: "Add evidence" }).click();
   await expect(evidence).toContainText("No photos of accepted work reports on these units in this period.");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(dialog).toBeHidden();

@@ -34,7 +34,7 @@ test("an owner switches a default rule and back", async ({ page }) => {
 
 test("a policy is created, edited, switched off and deleted", async ({ page }) => {
   await page.goto("/customer/alerts?tab=policies");
-  await page.getByRole("link", { name: "+ Create policy" }).click();
+  await page.getByRole("link", { name: "Create policy" }).click();
   await page.waitForURL(/policyId=new/);
   await page.getByLabel("Name").fill(NAME);
   await page.getByLabel("Threshold").fill("30");

@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.111.0
+version: 0.112.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -48,7 +48,7 @@ service/web/
 **Navigation.** `next/link` and `next/navigation` are used directly. Filters, tabs and the selection live in the URL: `lib/urlState.ts` reads them through `useSyncExternalStore`, and `useUrlPatch` writes them, replacing the history entry. One router serves every app, so the earlier Navigation-interface proposal is not used.
 
 **UI and forms — DEC-03, decided 2026-10-10.** The SRC-02 production condition “shared libraries, reactForms” has no archived original. DEC-03 first proposed shadcn/ui, Lucide, React Hook Form, Zod and TanStack Query. On 2026-10-10 the product owner decided to keep the build's approach, which follows the Next.js guides; the role designs and the UIUX specification (UX-01–UX-03) now describe it:
-- UI: in-house components on Tailwind CSS 4 (`shared/components/ui.tsx`) that follow the Figma UI Guideline, with glyph icons.
+- UI: in-house components on Tailwind CSS 4 (`shared/components/ui.tsx`) that follow the Figma UI Guideline. Icons are Lucide, through the shared `Icon` component (DEC-74, since 2026-10-12; [icon rules](../03-uiux/UIUXSpecification.md)).
 - Forms: controlled inputs, pure validators per form in `shared/lib`, and the Core API's field errors from Server Actions.
 - Translation: plain dictionaries chosen on the server, as in the Next.js internationalization guide (UX-01).
 

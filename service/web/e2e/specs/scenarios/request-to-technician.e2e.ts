@@ -22,7 +22,7 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
   try {
     await test.step("the customer asks for a visit", async () => {
       await customer.goto("/customer/maintenance");
-      await customer.getByRole("button", { name: "+ New maintenance request" }).click();
+      await customer.getByRole("button", { name: "New maintenance request" }).click();
       const dialog = customer.getByRole("dialog");
       await dialog.getByLabel(/Symptoms/).fill("E2E scenario: water drips from the indoor unit.");
       await dialog.getByLabel(/Contact window/).fill("Weekdays 09:00-18:00");

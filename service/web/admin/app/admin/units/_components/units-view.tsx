@@ -2,10 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Badge, Banner, Btn, Card, Check, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Input, Kpi, LinkBtn, Modal, Page, PowerBadge, Search, Select, SummaryList, Tabs,
-  Textarea, TextLink, Toggle,
-} from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Input, Kpi, LinkBtn, Modal, Page, PowerBadge, Search, Select, SummaryList, Tabs, Textarea, TextLink, Toggle, ActionMenu } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -93,7 +90,7 @@ function CustomerList({ live }: { live: UnitsLive }) {
         <Kpi label={t("Units")} value={k.units} sub={k.power} />
         <Kpi label={t("Needs attention")} value={k.attention} tone={k.attention ? "warn" : undefined} sub={t(live.standingKnown ? "overdue billing / restriction / open alert" : "open alerts (billing needs billing.read)")} />
       </div>
-      <Card title={t("Customers")} sub={t("Select a customer to manage its properties, spaces and units")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => setOpen(true)}>{t("+ New customer")}</Btn>}>
+      <Card title={t("Customers")} sub={t("Select a customer to manage its properties, spaces and units")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => setOpen(true)}><Icon name="add" /> {t("New customer")}</Btn>}>
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder={t("Search customer name, ID or property…")} value={q} onChange={setQ} /></div>
           <Select aria-label={t("Status")} className="w-auto" value={status} onChange={(e) => setStatus(e.target.value as "active" | "all")}><option value="active">{t("Status: Active")}</option><option value="all">{t("Status: All")}</option></Select>
@@ -173,7 +170,7 @@ function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
         {r.marks.map((x) => <Badge key={x.label} tone={x.tone} icon={x.icon}>{x.label}</Badge>)}
         <div className="ml-auto flex gap-2">
           {canWrite && <Btn size="sm" onClick={() => setM({ kind: "customer" })}>{t("Edit customer")}</Btn>}
-          {canWrite && r.status === "active" && c.tree.length > 0 && <Btn size="sm" variant="primary" onClick={newUnitAt}>{t("+ New unit")}</Btn>}
+          {canWrite && r.status === "active" && c.tree.length > 0 && <Btn size="sm" variant="primary" onClick={newUnitAt}><Icon name="add" /> {t("New unit")}</Btn>}
         </div>
       </div>
       <Card>
@@ -202,7 +199,7 @@ function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
       ]} />
       {c.tab === "policies" ? <PoliciesTab c={c} run={run} pending={pending} /> : c.tab === "users" ? <UsersTab live={live} c={c} run={run} pending={pending} /> : (
         <div className="split-rev">
-          <Card title={t("Locations")} action={canWrite && <Btn size="sm" onClick={() => setM({ kind: "property" })}>{t("+ Add property")}</Btn>} className="self-start">
+          <Card title={t("Locations")} action={canWrite && <Btn size="sm" onClick={() => setM({ kind: "property" })}><Icon name="add" /> {t("Add property")}</Btn>} className="self-start">
             {c.tree.length === 0 ? <EmptyState title={t("No properties yet")}>{t(canWrite ? "Add the customer’s home or office first." : "HQ has not registered a property yet.")}</EmptyState> : (
               <div className="flex flex-col gap-0.5">
                 {c.tree.map((p) => (
@@ -211,12 +208,12 @@ function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
                       menu={canWrite && <LocationMenu onRename={() => setM({ kind: "rename", p })} onDelete={() => setM({ kind: "archive", p })} />} />
                     {p.spaces.map((x) => <SpaceNode key={x.id} s={x} depth={1} selId={selId} nav={nav} canWrite={canWrite} setM={setM} />)}
                     {p.unassigned > 0 && <Node depth={1} selected={selId === `unassigned:${p.id}`} onClick={() => nav({ locationId: `unassigned:${p.id}`, ...clearUnit })} icon="dot" name={t("Unassigned")} meta={units(t, p.unassigned)} />}
-                    {canWrite && <AddLink depth={1} onClick={() => setM({ kind: "space", propertyId: p.id, parentSpaceId: null, spaceKind: p.kind === "office" ? "area" : "floor" })}>{t(p.kind === "office" ? "+ Add floor / area" : "+ Add floor")}</AddLink>}
+                    {canWrite && <AddLink depth={1} onClick={() => setM({ kind: "space", propertyId: p.id, parentSpaceId: null, spaceKind: p.kind === "office" ? "area" : "floor" })}><Icon name="add" /> {t(p.kind === "office" ? "Add floor / area" : "Add floor")}</AddLink>}
                   </div>
                 ))}
               </div>
             )}
-            <p className="mt-3 text-[11px] text-muted">{t("⋯ on any location: Rename · Delete. Delete is blocked while it still contains locations or units.")}</p>
+            <p className="mt-3 text-[11px] text-muted"><Icon name="more" /> {t("on any location: Rename · Delete. Delete is blocked while it still contains locations or units.")}</p>
           </Card>
           <div className="flex min-w-0 flex-col gap-4">
             {c.unitMissing && <Banner tone="warn" action={<Btn size="sm" onClick={() => nav(clearUnit)}>{t("Close")}</Btn>}>{t("This unit no longer exists or belongs to another customer.")}</Banner>}
@@ -259,7 +256,7 @@ function SpaceNode({ s, depth, selId, nav, canWrite, setM }: { s: TreeSpace; dep
       <Node depth={depth} selected={selId === s.id} onClick={() => nav({ locationId: s.id, ...clearUnit })} icon={s.children.length ? "chevronDown" : "chevronRight"} name={s.name}
         meta={`${t(kindLabel[s.kind])}${s.units ? ` · ${s.units}` : ""}`} menu={canWrite && <LocationMenu onRename={() => setM({ kind: "rename", s })} onDelete={() => setM({ kind: "archive", s })} />} />
       {s.children.map((x) => <SpaceNode key={x.id} s={x} depth={depth + 1} selId={selId} nav={nav} canWrite={canWrite} setM={setM} />)}
-      {canWrite && container && <AddLink depth={depth + 1} onClick={() => setM({ kind: "space", propertyId: s.propertyId, parentSpaceId: s.id, spaceKind: "room" })}>{t("+ Add room")}</AddLink>}
+      {canWrite && container && <AddLink depth={depth + 1} onClick={() => setM({ kind: "space", propertyId: s.propertyId, parentSpaceId: s.id, spaceKind: "room" })}><Icon name="add" /> {t("Add room")}</AddLink>}
     </>
   );
 }
@@ -269,10 +266,9 @@ const AddLink = ({ depth, onClick, children }: { depth: number; onClick: () => v
 function LocationMenu({ onRename, onDelete }: { onRename: () => void; onDelete: () => void }) {
   const t = useT();
   return (
-    <select aria-label={t("Location actions")} className="h-7 w-8 shrink-0 cursor-pointer appearance-none rounded-md bg-transparent text-center text-[15px] font-bold leading-none text-muted hover:bg-surface2" value=""
-      onChange={(e) => (e.target.value === "rename" ? onRename() : e.target.value === "delete" && onDelete())}>
-      <option value="">⋯</option><option value="rename">{t("Rename")}</option><option value="delete">{t("Delete…")}</option>
-    </select>
+    <ActionMenu label={t("Location actions")} onChoose={(v) => (v === "rename" ? onRename() : v === "delete" && onDelete())}>
+      <option value="rename">{t("Rename")}</option><option value="delete">{t("Delete…")}</option>
+    </ActionMenu>
   );
 }
 
@@ -286,7 +282,7 @@ function LocationCard({ c, sel, canWrite, active, setM }: { c: CustomerLive; sel
     return (
       <Card title={p.name} sub={[t("{kind} · property", { kind: t(kindLabel[p.kind]) }), p.address, count(t, p.floors, "1 floor", "{n} floors"), count(t, p.rooms, "1 room", "{n} rooms"), units(t, p.units)].filter(Boolean).join(" · ")}
         action={canWrite && <div className="flex flex-wrap gap-2"><Btn size="sm" onClick={() => setM({ kind: "rename", p })}>{t("Rename")}</Btn><Btn size="sm" onClick={() => setM({ kind: "property", p })}>{t("Edit details")}</Btn>
-          <Btn size="sm" onClick={() => setM({ kind: "space", propertyId: p.id, parentSpaceId: null, spaceKind: p.kind === "office" ? "area" : "floor" })}>{t(p.kind === "office" ? "+ Add floor / area" : "+ Add floor")}</Btn><Btn size="sm" variant="danger" onClick={() => setM({ kind: "archive", p })}>{t("Delete")}</Btn></div>}>
+          <Btn size="sm" onClick={() => setM({ kind: "space", propertyId: p.id, parentSpaceId: null, spaceKind: p.kind === "office" ? "area" : "floor" })}><Icon name="add" /> {t(p.kind === "office" ? "Add floor / area" : "Add floor")}</Btn><Btn size="sm" variant="danger" onClick={() => setM({ kind: "archive", p })}>{t("Delete")}</Btn></div>}>
         <SummaryList cols={2} items={[[t("Type"), t(kindLabel[p.kind])], [t("Address"), p.address ?? "—"], [t("Access instructions"), p.accessInstructions ?? "—"], [t("Time zone"), "Asia/Kuala_Lumpur"], [t("Last edited"), c.lastEdit ?? "—"]]} />
       </Card>
     );
@@ -296,9 +292,9 @@ function LocationCard({ c, sel, canWrite, active, setM }: { c: CustomerLive; sel
   return (
     <Card title={s.name} sub={`${t(kindLabel[s.kind])} · ${sel.path} · ${units(t, s.units)}`}
       action={canWrite && <div className="flex flex-wrap gap-2"><Btn size="sm" onClick={() => setM({ kind: "rename", s })}>{t("Rename")}</Btn>
-        {!holds && <Btn size="sm" onClick={() => setM({ kind: "space", propertyId: s.propertyId, parentSpaceId: s.id, spaceKind: "room" })}>{t("+ Add room")}</Btn>}
+        {!holds && <Btn size="sm" onClick={() => setM({ kind: "space", propertyId: s.propertyId, parentSpaceId: s.id, spaceKind: "room" })}><Icon name="add" /> {t("Add room")}</Btn>}
         <Btn size="sm" variant="danger" onClick={() => setM({ kind: "archive", s })}>{t("Delete")}</Btn>
-        {holds && active && <Btn size="sm" variant="primary" onClick={() => setM({ kind: "unit", propertyId: s.propertyId, spaceId: s.id })}>{t("+ New unit in {name}", { name: s.name })}</Btn>}</div>}>
+        {holds && active && <Btn size="sm" variant="primary" onClick={() => setM({ kind: "unit", propertyId: s.propertyId, spaceId: s.id })}><Icon name="add" /> {t("New unit in {name}", { name: s.name })}</Btn>}</div>}>
       <SummaryList cols={2} items={[[t("Kind"), t(kindLabel[s.kind])], [t("Child locations"), s.children.length || t("none")], [t("Units here"), s.direct], [t("Last edited"), c.lastEdit ?? "—"]]} />
     </Card>
   );
@@ -312,7 +308,7 @@ function UnitsCard({ c, sel, nav, canWrite, onNew }: { c: CustomerLive; sel: Sel
   const title = sel.kind === "property" ? t("All units in {name}", { name: sel.property.name }) : sel.kind === "space" ? t("Units in {name}", { name: sel.space.name }) : t("Unassigned units in {name}", { name: sel.property.name });
   const conn = (x: Connection) => t(connLabel[x]);
   return (
-    <Card title={`${title} · ${filtered || q.trim() ? t("{n} of {total}", { n: rows.length, total: c.total }) : c.total}`} action={canWrite && <Btn size="sm" variant="primary" onClick={onNew}>{t("+ New unit")}</Btn>}>
+    <Card title={`${title} · ${filtered || q.trim() ? t("{n} of {total}", { n: rows.length, total: c.total }) : c.total}`} action={canWrite && <Btn size="sm" variant="primary" onClick={onNew}><Icon name="add" /> {t("New unit")}</Btn>}>
       {filtered && <div className="mb-3"><Banner action={<Btn size="sm" onClick={() => nav({ powerState: null, connections: null })}>{t("Clear filters")}</Btn>}>
         {t("Filtered by {filters} — clear the filter to see all {units}.", { filters: [c.filter.powerState && t("Power: {state}", { state: t(powerLabel[c.filter.powerState]) }), c.filter.connections.length && t("Connection: {state}", { state: c.filter.connections.map(conn).join(", ") })].filter(Boolean).join(" · "), units: units(t, c.total) })}
       </Banner></div>}
@@ -408,7 +404,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: { live: UnitsLive; c: Custo
         )}
       </Card>
       <Card title={t("Alert policies on this unit")} sub={t("Only {name}’s policies can be attached. The unit carries the policies, not the other way round (IR108).", { name: c.row.name })}
-        action={c.canAttach && !u.archived && <Btn size="sm" onClick={() => setModal("attach")}>{t("+ Attach policy")}</Btn>}>
+        action={c.canAttach && !u.archived && <Btn size="sm" onClick={() => setModal("attach")}><Icon name="add" /> {t("Attach policy")}</Btn>}>
         {c.policies === null ? <p className="text-[13px] text-muted">{t("Policies need alert.policy.read.")}</p> : (
           <div className="flex flex-col">
             {x.attached.map((p) => (
@@ -445,7 +441,7 @@ function PoliciesTab({ c, run, pending }: { c: CustomerLive; run: Run; pending: 
   return (
     <>
       <Card title={t("Alert policies of {name}", { name: c.row.name })} sub={t("Policies belong to the customer. Each unit picks which of them it carries (unit edit › Alert policies). Air-quality limits are alert policies too.")}
-        action={<LinkBtn size="sm" variant="primary" href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}>{t("+ New policy for {name}", { name: c.row.name })}</LinkBtn>}>
+        action={<LinkBtn size="sm" variant="primary" href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t("New policy for {name}", { name: c.row.name })}</LinkBtn>}>
         <DataTable rows={c.policies} rowKey={(p) => p.id} onRowClick={(p) => router.push(`/admin/alerts?tab=policies&customerId=${c.row.id}&policyId=${p.id}`)} cols={[
           { key: "n", label: t("Policy"), render: (p) => <><b>{p.name}</b>{!p.enabled && <Badge className="ml-2">{t("Off")}</Badge>}</> },
           { key: "t", label: t("Type"), render: (p) => <Badge tone={p.kind === "default_alert" ? "primary" : "muted"}>{p.type}</Badge> },
@@ -649,7 +645,7 @@ function AttachModal({ c, unit, attached, pending, onClose, onSave }: { c: Custo
             </div>
           );
         })}
-        <p className="text-[11px] text-muted">{t("Disabled policies can be attached; they start alerting once enabled.")} <TextLink href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}>{t("+ New policy for {name}", { name: c.row.name })}</TextLink></p>
+        <p className="text-[11px] text-muted">{t("Disabled policies can be attached; they start alerting once enabled.")} <TextLink href={`/admin/alerts?tab=policies&customerId=${c.row.id}&new=${c.row.id}`}><Icon name="add" /> {t("New policy for {name}", { name: c.row.name })}</TextLink></p>
       </div>
     </Modal>
   );
@@ -669,7 +665,7 @@ function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive;
   };
   return (
     <Card title={t("Client users of {name}", { name: c.row.name })} sub={t("People who sign in to the customer app. They only ever see {name}’s properties and units.", { name: c.row.name })}
-      action={canWrite && <Btn size="sm" variant="primary" onClick={() => setInvite(true)}>{t("+ Invite user")}</Btn>}>
+      action={canWrite && <Btn size="sm" variant="primary" onClick={() => setInvite(true)}><Icon name="add" /> {t("Invite user")}</Btn>}>
       {c.users.length === 0 ? <EmptyState title={t("No client users yet")}>{t("Invite the customer’s owner first; the owner can then invite members from the customer app.")}</EmptyState> : (
         <DataTable rows={c.users} rowKey={(u) => u.id} cols={[
           { key: "u", label: t("User"), render: (u) => <><b>{u.name ?? u.email}</b><div className="text-xs text-muted">{u.sub}</div></> },
@@ -678,15 +674,14 @@ function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive;
           { key: "l", label: t("Last sign-in"), render: (u) => u.lastSignIn, hideBelow: "md" },
           { key: "c", label: t("Notification channels"), render: (u) => u.channels, hideBelow: "md" },
           { key: "a", label: "", render: (u) => canWrite && (
-            <Select aria-label={t("Actions for {email}", { email: u.email })} className="w-auto" value="" disabled={pending} onChange={(e) => act(u, e.target.value)}>
-              <option value="">⋯</option>
+            <ActionMenu label={t("Actions for {email}", { email: u.email })} disabled={pending} onChoose={(v) => act(u, v)}>
               {!u.lastOwner && <option value="role">{t("Change role (Owner / Member)")}</option>}
               {u.status === "invited" && <option value="resend">{t("Resend invite")}</option>}
               <option value="reset">{t("Reset password")}</option>
               {u.status === "active" && u.membershipId && <option value="signout">{t("Sign out everywhere…")}</option>}
               {u.status !== "invited" && !u.lastOwner && <option value="status">{t(u.status === "disabled" ? "Enable sign-in" : "Disable sign-in")}</option>}
               {!u.lastOwner && <option value="remove">{t("Remove from customer")}</option>}
-            </Select>
+            </ActionMenu>
           ) },
         ]} />
       )}

@@ -143,8 +143,8 @@ export function AdminAlertsView({ live }: { live?: Live }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Tabs value={tab} onChange={setTab} tabs={[{ id: "alerts", label: t("Alerts"), count: openish.length }, { id: "policies", label: t("Policies"), count: pols.length }]} />
         {(live ? live.pol.canWrite : true) && (scopeOwner
-          ? <Btn size="sm" variant="primary" onClick={() => startPolicy(scopeOwner.id)}>{t("+ New policy for {name}", { name: scopeOwner.name })}</Btn>
-          : <Btn size="sm" variant="primary" onClick={() => setAsking({ from: null })}>{t("+ New policy")}</Btn>)}
+          ? <Btn size="sm" variant="primary" onClick={() => startPolicy(scopeOwner.id)}><Icon name="add" /> {t("New policy for {name}", { name: scopeOwner.name })}</Btn>
+          : <Btn size="sm" variant="primary" onClick={() => setAsking({ from: null })}><Icon name="add" /> {t("New policy")}</Btn>)}
       </div>
       {tab === "alerts" ? (
         <>

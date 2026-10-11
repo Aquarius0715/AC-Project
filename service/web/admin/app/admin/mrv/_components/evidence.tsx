@@ -39,7 +39,7 @@ export function EvidencePicker({ ids, onChange, period, units }: { ids: string[]
             </span>
           );
         })}
-        {ids.length < MAX_EVIDENCE && <Btn size="sm" variant="ghost" disabled={!ready} aria-expanded={open} onClick={() => setOpen((v) => !v)}>{t("+ Add evidence")}</Btn>}
+        {ids.length < MAX_EVIDENCE && <Btn size="sm" variant="ghost" disabled={!ready} aria-expanded={open} onClick={() => setOpen((v) => !v)}><Icon name="add" /> {t("Add evidence")}</Btn>}
       </div>
       {!ready && <p className="mt-1 text-[11px] text-muted">{t("Choose the units and the period first: the candidates are their work-report photos.")}</p>}
       {open && ready && (

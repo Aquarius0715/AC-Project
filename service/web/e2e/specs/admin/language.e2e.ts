@@ -50,7 +50,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
     await expect(main).toContainText(/GMT\+9/); // the requested window in the display zone
   }
   // New job: its texts and that the typed times are in the display zone; closed without saving
-  await main.getByRole("button", { name: "+ Kerja baharu" }).click();
+  await main.getByRole("button", { name: "Kerja baharu" }).click();
   const create = page.getByRole("dialog", { name: "Kerja penyelenggaraan baharu · langkah 1 daripada 2" });
   await expect(create).toContainText("masa dalam Asia/Tokyo");
   await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
@@ -65,7 +65,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await main.getByRole("tab", { name: /^Kontraktor/ }).click();
   await page.waitForURL(/tab=contractors/);
   await expect(main.getByRole("heading", { name: "Kontraktor", exact: true })).toBeVisible();
-  await expect(main.getByRole("button", { name: "+ Tambah kontraktor" })).toBeVisible();
+  await expect(main.getByRole("button", { name: "Tambah kontraktor" })).toBeVisible();
   if (await main.getByRole("heading", { name: "Juruteknik & sijil", exact: true }).count()) await expect(main).toContainText("Hari-hari itu ialah hari di Kuala Lumpur.");
   await main.getByRole("tab", { name: "SLA mengikut pelanggan" }).click();
   await page.waitForURL(/tab=sla/);
@@ -117,7 +117,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(main).toContainText(/kali terakhir dilihat/i); // the connection tile's evidence line
   await main.getByRole("tab", { name: /^Kempen perisian tegar/ }).click();
   await page.waitForURL(/tab=firmware/);
-  await main.getByRole("button", { name: "+ Kempen baharu" }).click();
+  await main.getByRole("button", { name: "Kempen baharu" }).click();
   const campaign = page.getByRole("dialog", { name: "Kempen perisian tegar baharu" });
   await expect(campaign).toContainText("masa dalam Asia/Tokyo"); // the start is typed in the display zone
   await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
@@ -136,7 +136,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await page.waitForURL(/tab=baselines/);
   await expect(main.getByLabel("Tempoh bermula dari (Kuala Lumpur)")).toBeVisible();
   await expect(main).toContainText(/\d+ garis dasar dalam skop/); // the scope's count (IR323)
-  await main.getByRole("button", { name: "+ Garis dasar baharu" }).click();
+  await main.getByRole("button", { name: "Garis dasar baharu" }).click();
   await expect(main.getByRole("heading", { name: "Garis dasar baharu", exact: true })).toBeVisible();
   await main.getByRole("button", { name: "Cipta garis dasar" }).click();
   for (const text of ["Pilih 1–100 unit", "Tamat mesti selepas mula", "Nilai ≥ 0 kWh"]) await expect(main).toContainText(text);
@@ -148,7 +148,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(main.getByRole("tab", { name: /^Laporan/ })).toHaveAttribute("aria-selected", "true");
   await expect(main.getByRole("heading", { name: "Laporan Skop 2", exact: true })).toBeVisible();
   await expect(main.getByLabel("Tempoh bermula dari (Kuala Lumpur)")).toBeVisible();
-  await main.getByRole("button", { name: "+ Laporan baharu" }).click();
+  await main.getByRole("button", { name: "Laporan baharu" }).click();
   const report = page.getByRole("dialog", { name: "Laporan Skop 2 baharu" });
   await report.getByRole("button", { name: "Pratonton", exact: true }).click();
   for (const text of ["Pilih organisasi pelanggan", "Pilih versi garis dasar", "Pilih versi faktor pelepasan"]) await expect(report).toContainText(text);
@@ -167,7 +167,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(report).toBeHidden();
   await main.getByRole("tab", { name: /^Faktor pelepasan/ }).click();
   await page.waitForURL(/tab=factors/);
-  await main.getByRole("button", { name: "+ Faktor baharu" }).click();
+  await main.getByRole("button", { name: "Faktor baharu" }).click();
   await expect(main.getByRole("heading", { name: "Faktor baharu", exact: true })).toBeVisible();
   await main.getByRole("button", { name: "Cipta faktor" }).click();
   for (const text of ["1–120 aksara", "Melebihi 0 dan paling banyak 10 kgCO₂e/kWh"]) await expect(main).toContainText(text);
@@ -177,7 +177,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(main).toContainText("Demo sahaja — sebut harga, pembelian dan pembatalan disimulasikan.");
   await expect(main.getByRole("tab", { name: /^Rekod demo/ })).toHaveAttribute("aria-selected", "true");
   await expect(main.getByRole("heading", { name: "Rekod ofset demo", exact: true })).toBeVisible();
-  await main.getByRole("button", { name: "+ Sebut harga demo baharu" }).click();
+  await main.getByRole("button", { name: "Sebut harga demo baharu" }).click();
   const quote = page.getByRole("dialog", { name: "Sebut harga demo baharu" });
   await expect(quote.getByLabel("Mula tempoh (Kuala Lumpur)")).toBeVisible(); // the quote's period is Kuala Lumpur time
   await quote.getByRole("button", { name: "Dapatkan sebut harga demo" }).click();
@@ -207,7 +207,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
     await pay.getByRole("button", { name: "Batal", exact: true }).click();
     await expect(pay).toBeHidden();
   }
-  await main.getByRole("button", { name: "+ Cipta invois" }).click();
+  await main.getByRole("button", { name: "Cipta invois" }).click();
   const newInvoice = page.getByRole("dialog", { name: "Cipta invois" });
   await expect(newInvoice).toContainText("Tarikh ialah hari Kuala Lumpur (Asia/Kuala_Lumpur).");
   await newInvoice.getByRole("button", { name: "Cipta", exact: true }).click();
@@ -225,7 +225,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   for (const name of ["RTO", "Umum", "Tenaga", "Alam sekitar"]) await expect(main.getByRole("tab", { name: new RegExp(`^${name}\\s*\\d+$`) })).toBeVisible(); // each with its count (IR322)
   await expect(main).toContainText(/\d+ kontrak dalam skop/);
   await expect(main.getByRole("tab", { name: /^Semua/ })).toHaveAttribute("aria-selected", "true");
-  await main.getByRole("button", { name: "+ Kontrak baharu" }).click();
+  await main.getByRole("button", { name: "Kontrak baharu" }).click();
   await expect(main.getByRole("heading", { name: "Kontrak baharu", exact: true })).toBeVisible();
   await expect(main).toContainText("Tarikh ialah hari Kuala Lumpur (Asia/Kuala_Lumpur).");
   await main.getByRole("button", { name: "Cipta kontrak" }).click();
@@ -244,7 +244,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(main).toContainText(/GMT\+9 → /); // the valid period in the display zone
   await expect(main).toContainText("Masa dalam Asia/Tokyo");
   await expect(main.getByRole("columnheader", { name: "Baca" })).toBeVisible();
-  await main.getByRole("button", { name: "+ Keahlian baharu" }).click();
+  await main.getByRole("button", { name: "Keahlian baharu" }).click();
   await page.waitForURL(/membershipId=new/);
   await expect(main.getByRole("heading", { name: "Keahlian baharu", exact: true })).toBeVisible();
   await main.getByRole("button", { name: "Cipta keahlian" }).click();
@@ -253,7 +253,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   // any call
   await page.goto("/admin/settings/automation");
   await expect(main.getByRole("heading", { name: "Polisi automasi HQ", exact: true })).toBeVisible();
-  await main.getByRole("button", { name: "+ Polisi baharu" }).click();
+  await main.getByRole("button", { name: "Polisi baharu" }).click();
   await page.waitForURL(/policyId=new/);
   for (const name of ["Penghunian", "Tarif", "Puncak", "Solar", "Bateri"]) await expect(main.getByRole("button", { name, exact: true })).toBeVisible();
   await expect(main).toContainText("Apabila tarif elektrik > 0.6 MYR/kWh → tetapkan suhu kepada 26 °C.");

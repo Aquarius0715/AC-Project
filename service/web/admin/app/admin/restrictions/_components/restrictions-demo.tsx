@@ -28,7 +28,7 @@ export function RestrictionsDemo() {
   const execErr = tried && (!f.exec ? "Execute-after is required" : (new Date(f.exec).getTime() - openedAt) < 24 * 3600e3 ? "Execute-after must be at least 24 h after the notice" : undefined);
   return (
     <Page>
-      <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2">{flow.map((s) => <span key={s} className="rounded-full bg-surface2 px-2.5 py-1 text-xs"><span className="text-muted">{s}</span> <b>{list.filter((x) => x.st === s).length}</b></span>)}</div><Btn size="sm" variant="primary" onClick={() => setModal(true)}>+ Schedule restriction</Btn></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-2">{flow.map((s) => <span key={s} className="rounded-full bg-surface2 px-2.5 py-1 text-xs"><span className="text-muted">{s}</span> <b>{list.filter((x) => x.st === s).length}</b></span>)}</div><Btn size="sm" variant="primary" onClick={() => setModal(true)}><Icon name="add" /> Schedule restriction</Btn></div>
       <div className="split-rev">
         <Card title="Restrictions" sub="restriction.read · sorted by ID" className="self-start"><div className="flex flex-col gap-2">{list.map((x) => <ListRow key={x.id} selected={sel.id === x.id} onClick={() => setSel(x)}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.id}</b><Badge tone={x.tone}>{x.st}</Badge></div><div className="text-[11px] text-muted">{x.meta}</div><div className="text-[11px] text-muted">{x.policy} · {x.prog}</div></div></ListRow>)}</div></Card>
         <div className="flex min-w-0 flex-col gap-4">

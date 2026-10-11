@@ -4,10 +4,10 @@
 import { test, expect } from "../../fixtures/test";
 
 const DIALOGS: Record<string, [path: string, trigger: string | RegExp]> = {
-  customer: ["/customer/users", "+ Invite member"],
-  partner: ["/partner/team", "+ Unavailable days"],
+  customer: ["/customer/users", "Invite member"],
+  partner: ["/partner/team", "Unavailable days"],
   technician: ["/technician", /Scan QR/],
-  admin: ["/admin/alerts?tab=policies", "+ New policy"],
+  admin: ["/admin/alerts?tab=policies", "New policy"],
 };
 
 test("a dialog opened by keyboard keeps focus inside and returns it to its trigger", async ({ page, app }) => {

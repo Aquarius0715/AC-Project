@@ -43,7 +43,7 @@ test("the HQ restriction screens in Malay with times in the display time zone", 
   }
 
   // the schedule dialog: the execution time typed in the display zone; the checks stop before any call
-  await main.getByRole("button", { name: "+ Jadualkan sekatan" }).click();
+  await main.getByRole("button", { name: "Jadualkan sekatan" }).click();
   const schedule = page.getByRole("dialog", { name: "Jadualkan sekatan" });
   await expect(schedule).toContainText("masa dalam Asia/Tokyo");
   await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)

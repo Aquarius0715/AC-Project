@@ -40,7 +40,7 @@ export function UsersDemo() {
 
   return (
     <Page>
-      <PageHead title="Users of customer-a" sub="People who can sign in to this customer app. As the owner you can invite members." action={<Btn variant="primary" onClick={() => setOpen(true)}>+ Invite member</Btn>} />
+      <PageHead title="Users of customer-a" sub="People who can sign in to this customer app. As the owner you can invite members." action={<Btn variant="primary" onClick={() => setOpen(true)}><Icon name="add" /> Invite member</Btn>} />
       <Card pad={false}>
         <DataTable rows={users} rowKey={(u) => u.id} cols={[
           { key: "u", label: "User", render: (u) => <div><b>{u.name ? `${u.name}${u.id === CURRENT_CLIENT.userId ? " (you)" : ""}` : u.email}</b><div className="text-xs text-muted">{u.name ? u.email : `invited ${u.invitedAt ?? ""} by ${u.invitedBy ?? "—"}`}</div></div> },

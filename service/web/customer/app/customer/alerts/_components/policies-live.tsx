@@ -37,7 +37,7 @@ function PolicyList({ p, onDone, onFail }: Props) {
     <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h2 className="text-[15px] font-bold">{t("Alert policies")}</h2><p className="max-w-xl text-xs text-muted">{t("A policy is a set of limits. It only runs on the ACs you attach it to (open an AC › Alert policies). Every AC also has the default policy.")}</p></div>
-        <Link href={`${base}&policyId=new`} className="inline-flex items-center rounded-control border border-primary bg-primary px-3.5 py-2 text-[13px] font-semibold text-white">{t("+ Create policy")}</Link>
+        <Link href={`${base}&policyId=new`} className="inline-flex items-center rounded-control border border-primary bg-primary px-3.5 py-2 text-[13px] font-semibold text-white"><Icon name="add" /> {t("Create policy")}</Link>
       </div>
       {d && (
         <Card title={<span className="flex flex-wrap items-center gap-2">{t("Default policy")} <Badge tone="primary">{t("Default · set by HQ")}</Badge><Badge tone="primary">{t("{on} of {n} rules on", { on: d.on, n: d.rows.length })}</Badge></span>} action={<span className="text-[11px] text-muted">{t("Limits set by HQ · on / off is set by the account owner")}</span>}>

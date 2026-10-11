@@ -83,7 +83,7 @@ describe("partner job history", () => {
     expect([h.title, h.sub, h.delegation, h.tech.sub]).toEqual(["Pemeriksaan berkala", "1 peristiwa keputusan sendiri · delegasi tamat (rakaman baca sahaja)", "tamat — sejarah sahaja", "tidak ditunjukkan selepas delegasi"]);
     expect(eventItem(events[1], byUser(members, "u-me", ms), MS)).toMatchObject({ title: "Nota ditambah", detail: "“Missing filter photo” · dalaman · oleh contractor-a", at: "20 Sep 2026, 3:05 PTG GMT+9" });
     expect(eventItem(ev("m", "offer.accepted", "2026-09-20T00:00:00Z", null, "u-me"), byUser(members, "u-me", ms), MS).detail).toBe("oleh anda");
-    expect(noteMode({ ended: false, status: "completed" }, ms)).toEqual({ kind: "preview", button: "+ Cipta pratonton", text: "Nota ditutup untuk kerja yang selesai — hanya pratonton dicipta." });
+    expect(noteMode({ ended: false, status: "completed" }, ms)).toEqual({ kind: "preview", button: "Cipta pratonton", add: true, text: "Nota ditutup untuk kerja yang selesai — hanya pratonton dicipta." });
     expect(communicationRefusal({ code: "VALIDATION", messageKey: "error.validation", fieldErrors: { message: "error.required" } }, ms)).toBe("Mesej: diperlukan");
   });
 });

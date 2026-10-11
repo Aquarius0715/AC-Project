@@ -203,7 +203,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
               </section>
               <section><h3 className="mb-1 text-[13px] font-bold">{t("Severity")}</h3><Choice value={draft.severity} onChange={(v) => set("severity", v)} options={[{ id: "normal", label: t("Info") }, { id: "warning", label: t("Warning") }, { id: "critical", label: t("Critical") }]} /><p className="mt-1 text-[11px] text-muted">{t("A severity change on an open alert counts as a new notification reason.")}</p></section>
               <section>
-                <div className="mb-1 flex flex-wrap items-center justify-between gap-2"><h3 className="text-[13px] font-bold">{t("Notify")}</h3>{canWrite && <Btn size="sm" variant="ghost" onClick={() => setPicking(true)}>{t("+ Add recipient")}</Btn>}</div>
+                <div className="mb-1 flex flex-wrap items-center justify-between gap-2"><h3 className="text-[13px] font-bold">{t("Notify")}</h3>{canWrite && <Btn size="sm" variant="ghost" onClick={() => setPicking(true)}><Icon name="add" /> {t("Add recipient")}</Btn>}</div>
                 <p className="mb-2 text-xs text-muted">{t("Recipients come from notifications.recipients — only people allowed to see these units.")}</p>
                 {draft.recipients.map((r) => (
                   <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px]">

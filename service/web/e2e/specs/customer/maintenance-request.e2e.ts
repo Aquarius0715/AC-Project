@@ -21,7 +21,7 @@ test("a request is validated, sent with three preferred times, noted and cancell
   let jobId: string | null = null;
   try {
     await page.goto("/customer/maintenance");
-    await page.getByRole("button", { name: "+ New maintenance request" }).click();
+    await page.getByRole("button", { name: "New maintenance request" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("button", { name: "Submit request" }).click();
     await expect(dialog).toContainText("Symptoms must be 10–2000 characters");
@@ -36,7 +36,7 @@ test("a request is validated, sent with three preferred times, noted and cancell
     await expect(page.getByText(/sent with 3 preferred times/).first()).toBeVisible();
     await expect(page.getByRole("main")).toContainText("Your preferred times");
 
-    await page.getByRole("button", { name: "+ Add note" }).click();
+    await page.getByRole("button", { name: "Add note" }).click();
     await dialog.getByLabel(/Note to the HQ coordinator/).fill("E2E: the room is free after 15:00 on weekdays.");
     await dialog.getByRole("button", { name: "Send note" }).click();
     await expect(page.getByText("Note sent").first()).toBeVisible();

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, ListRow, Modal, Page, Search, Select, Textarea, useToast } from "@ac/web/components/ui";
+import { Icon } from "@ac/web/components/Icon";
 
 type U = { id: string; role: string; org: string; email: string; role2: "admin" | "contractor" | "technician" };
 const users: U[] = [
@@ -70,7 +71,7 @@ export function AccessDemo() {
   return (
     <Page>
       <div className="split-rev">
-        <Card title="Users" action={<Btn size="sm" variant="primary" onClick={() => pick("new")}>+ New user</Btn>} sub={`${users.length} · members.list · identity.write`} className="self-start">
+        <Card title="Users" action={<Btn size="sm" variant="primary" onClick={() => pick("new")}><Icon name="add" /> New user</Btn>} sub={`${users.length} · members.list · identity.write`} className="self-start">
           <div className="mb-2"><Search placeholder="Search name, email, organization…" value={q} onChange={setQ} /></div>
           <div className="flex flex-col gap-1.5">{list.map((u) => <ListRow key={u.id} selected={sel !== "new" && sel.id === u.id} onClick={() => pick(u)}><div className="min-w-0"><b className="text-[13px]">{u.id}</b><div className="truncate text-[11px] text-muted">{u.role}</div></div></ListRow>)}</div>
           <p className="mt-3 text-[11px] text-muted">Client accounts are not listed here — they are managed per customer in Customers & units › Users.</p>

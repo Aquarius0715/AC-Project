@@ -58,7 +58,7 @@ export function Certifications({ live }: { live: Live }) {
         ))}
       </div>
       <div className="split">
-        <Card title={t("Certificates — {company}", { company: live.company })} action={<Btn size="sm" onClick={() => setOpen({ kind: "add", row: null })} disabled={!c.people.some((p) => p.active)}>{t("+ Add certificate")}</Btn>}>
+        <Card title={t("Certificates — {company}", { company: live.company })} action={<Btn size="sm" onClick={() => setOpen({ kind: "add", row: null })} disabled={!c.people.some((p) => p.active)}><Icon name="add" /> {t("Add certificate")}</Btn>}>
           {c.rows.length === 0 ? <p className="py-4 text-[13px] text-muted">{t("No certificates match these filters.")}</p> : (
             <DataTable rowKey={(r) => r.key} rows={c.rows} cols={[
               { key: "t", label: t("Technician"), render: (r) => <b className="whitespace-nowrap">{r.technician}</b> },

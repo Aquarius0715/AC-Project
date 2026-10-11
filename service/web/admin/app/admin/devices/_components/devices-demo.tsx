@@ -42,7 +42,7 @@ export function DevicesDemo() {
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "models", label: "Models", count: 2 }, { id: "devices", label: "IoT devices", count: 5 }, { id: "firmware", label: "Firmware campaigns", count: 1 }]} />
       {tab === "firmware" ? <FirmwareCampaigns /> : tab === "models" ? (
         <div className="split-rev">
-          <Card title="Models" sub="tenant-a" action={<Btn size="sm" onClick={() => setModal("newModel")}>+ New</Btn>} className="self-start">
+          <Card title="Models" sub="tenant-a" action={<Btn size="sm" onClick={() => setModal("newModel")}><Icon name="add" /> New</Btn>} className="self-start">
             <div className="flex flex-col gap-2">{models.map((x) => <ListRow key={x.id} selected={m.id === x.id} onClick={() => setM(x)}><div className="min-w-0"><b className="text-[13px]">{x.name}</b> {x.tag && <Badge tone="primary">{x.tag}</Badge>}<div className="text-[11px] text-muted">{x.cap}</div><div className="text-[11px] text-muted">{x.used}</div></div></ListRow>)}</div>
             <p className="mt-3 text-[11px] text-muted">Saving a change creates a new capability version. Unverified capabilities stay false/unknown (BR-A04).</p>
           </Card>
@@ -65,7 +65,7 @@ export function DevicesDemo() {
         </div>
       ) : (
         <div className="split-rev">
-          <Card title="IoT devices" action={<Btn size="sm" onClick={() => setModal("register")}>+ Register device</Btn>} className="self-start">
+          <Card title="IoT devices" action={<Btn size="sm" onClick={() => setModal("register")}><Icon name="add" /> Register device</Btn>} className="self-start">
             <div className="mb-2"><Search placeholder="Search serial, device or unit…" value={q} onChange={setQ} /></div>
             <div className="flex flex-col gap-2">{shown.map((x) => <ListRow key={x.id} selected={d.id === x.id} onClick={() => setD(x)}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.serial}</b><ConnBadge s={x.conn} /></div><div className="text-[11px] text-muted">{x.id} · {x.unit}</div></div></ListRow>)}</div>
           </Card>

@@ -60,7 +60,7 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
 
   return (
     <div className="split-rev">
-      <Card title={t("Models")} action={live.canWrite && <Btn size="sm" onClick={() => setSelId("new")}>{t("+ New model")}</Btn>} className="self-start">
+      <Card title={t("Models")} action={live.canWrite && <Btn size="sm" onClick={() => setSelId("new")}><Icon name="add" /> {t("New model")}</Btn>} className="self-start">
         {live.models.length === 0 ? <EmptyState title={t("No models")}>{t("Register the first model.")}</EmptyState> : <div className="flex flex-col gap-2">{live.models.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => setSelId(x.id)}><div className="min-w-0"><b className="text-[13px]">{x.name}</b> {x.ventilation && <Badge tone="primary">{t("Ventilation")}</Badge>}<div className="text-[11px] text-muted">{t("capability v{v} · updated {time}", { v: x.version, time: x.updated })}</div><div className="text-[11px] text-muted">{x.used}</div></div></ListRow>)}</div>}
         <p className="mt-3 text-[11px] text-muted">{t("Saving a change creates a new capability version. Unverified capabilities stay false/unknown (BR-A04).")}</p>
       </Card>
@@ -106,7 +106,7 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
                   </span>
                 );
               })}
-              {adding === null ? <Btn size="sm" variant="ghost" onClick={() => setAdding("")}>{t("+ Add version")}</Btn> : (
+              {adding === null ? <Btn size="sm" variant="ghost" onClick={() => setAdding("")}><Icon name="add" /> {t("Add version")}</Btn> : (
                 <span className="inline-flex items-center gap-1.5">
                   <Input aria-label={t("Firmware version")} className="w-28" autoFocus value={adding} maxLength={32} placeholder="v3" onChange={(e) => setAdding(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addVersion(); if (e.key === "Escape") setAdding(null); }} />
                   <Btn size="sm" disabled={!!addProblem} onClick={addVersion}>{t("Add")}</Btn><Btn size="sm" variant="ghost" onClick={() => setAdding(null)}>{t("Cancel")}</Btn>

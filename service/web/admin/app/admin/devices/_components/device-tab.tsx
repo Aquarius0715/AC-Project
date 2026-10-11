@@ -70,7 +70,7 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
           </button>
         ))}</div>
         <div className="flex flex-wrap items-center gap-2"><div className="w-64"><Search placeholder={t("Search serial, device or unit…")} value={q} onChange={setQ} /></div>
-          {live.canWrite && <Btn variant="primary" onClick={() => setModal("register")}>{t("+ Register device")}</Btn>}</div>
+          {live.canWrite && <Btn variant="primary" onClick={() => setModal("register")}><Icon name="add" /> {t("Register device")}</Btn>}</div>
       </div>
       <div className="split-rev">
         <Card title={t("Devices")} sub={t("sorted by serial")} className="self-start">

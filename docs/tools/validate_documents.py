@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.282.0 (2026-10-12): IR399 icons part 7 (guard test, icon rules; UIUX 0.37.0, DD-COMMON 0.112.0, design assumptions 0.21.1); counts unchanged.
 # 0.281.0 (2026-10-12): IR398 icons part 6 (Figma); counts unchanged.
 # 0.280.0 (2026-10-12): IR397 icons part 5 (link and button arrows); counts unchanged.
 # 0.279.0 (2026-10-12): IR396 icons part 4 (partner, technician, HQ screens); counts unchanged.

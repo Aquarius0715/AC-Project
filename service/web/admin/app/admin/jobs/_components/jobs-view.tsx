@@ -36,7 +36,7 @@ export function JobsView({ live }: { live: JobsLive }) {
   useEffect(() => { pendingFresh = null; }, []);
   return (
     <Page className="max-w-[1440px]">
-      <JobsTabs tab="jobs" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => setCreating(true)}>{t("+ New job")}</Btn>} />
+      <JobsTabs tab="jobs" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => setCreating(true)}><Icon name="add" /> {t("New job")}</Btn>} />
       {creating && <NewJobModal live={live} initial={live.newJob ?? undefined} onClose={() => { setCreating(false); if (live.newJob) patch({ new: null, alertId: null }); }} onCreated={(f) => { setCreating(false); setFresh(f); }} />}
       <JobsTab live={live} patch={patch} fresh={fresh} onFresh={() => setFresh(null)} />
     </Page>
@@ -200,7 +200,7 @@ function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fre
         </Card>
       ) : d.draft ? <Card title={t("Work report")}><p className="text-[13px] text-muted">{t("The technician is drafting the report — nothing submitted yet.")}</p></Card> : null}
 
-      <Card title={t("Costs")} action={<Btn size="sm" disabled={pending || j.status === "cancelled"} title={j.status === "cancelled" ? t("A cancelled job’s costs cannot change.") : undefined} onClick={() => setModal({ kind: "cost" })}>{t("+ Add cost line")}</Btn>}>
+      <Card title={t("Costs")} action={<Btn size="sm" disabled={pending || j.status === "cancelled"} title={j.status === "cancelled" ? t("A cancelled job’s costs cannot change.") : undefined} onClick={() => setModal({ kind: "cost" })}><Icon name="add" /> {t("Add cost line")}</Btn>}>
         {d.costs.length === 0 ? <p className="text-[13px] text-muted">{t("No cost lines yet — add estimates before the work and actuals after it.")}</p> : (
           <div className="scroll-x"><table className="w-full min-w-[560px] text-[13px]">
             <thead><tr className="text-left text-[11px] uppercase text-muted"><th className="py-1.5">{t("Kind")}</th><th>{t("Description")}</th><th>{t("Visibility")}</th><th className="text-right">{t("Amount")}</th><th className="w-8"><span className="sr-only">{t("Remove")}</span></th></tr></thead>
@@ -547,7 +547,7 @@ export function NewJobModal({ live, initial, onClose, onCreated }: { live: { now
             {n > 0 && <Btn size="sm" className="mb-1" onClick={() => setTimes(times.filter((_, m) => m !== n))}>{t("Remove")}</Btn>}
           </div>
         ))}
-        {times.length < 3 && <div><Btn size="sm" onClick={() => setTimes([...times, { ...times[times.length - 1], date: nextDay(times[times.length - 1].date) }])}>{t("+ Add another time")}</Btn></div>}
+        {times.length < 3 && <div><Btn size="sm" onClick={() => setTimes([...times, { ...times[times.length - 1], date: nextDay(times[times.length - 1].date) }])}><Icon name="add" /> {t("Add another time")}</Btn></div>}
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
         <Field label={t("Due · optional")} hint={t("Defaults to the end of the 1st time (IR38).")} error={tried ? dueError : undefined}><Input type="datetime-local" value={due} onChange={(e) => setDue(e.target.value)} /></Field>

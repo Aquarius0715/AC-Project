@@ -40,7 +40,7 @@ test("the policy editor's footer, Show disabled and a simulation with an added f
   // Simulate: the policy's tariff fact, + Add fact for a missing solar reading, Run simulation (no command)
   const sim = main.locator("section").filter({ has: page.getByRole("heading", { name: "Simulate", exact: true }) });
   await sim.getByLabel("Value", { exact: true }).first().fill("0.7");
-  await sim.getByRole("button", { name: "+ Add fact" }).click();
+  await sim.getByRole("button", { name: "Add fact" }).click();
   await expect(sim.getByLabel("Fact", { exact: true })).toHaveCount(2);
   await sim.getByLabel("Fact", { exact: true }).nth(1).selectOption("solar");
   await sim.getByLabel("Quality", { exact: true }).nth(1).selectOption("missing");
