@@ -34,13 +34,13 @@ function LiveAssignment({ j }: { j: Job }) {
   const coord = j.delivery === "contractor" ? j.contractor : "HQ";
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/technician" className="font-semibold text-primary">← Overview</Link><b className="text-ink">{j.id} · {j.unit} — {ack === "pending" ? "new assignment" : "assigned"}</b></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> Overview</Link><b className="text-ink">{j.id} · {j.unit} — {ack === "pending" ? "new assignment" : "assigned"}</b></div>
       {ack === "accepted" && <Banner tone="ok">You accepted this assignment. Start job (with check-in) unlocks at the start of the window on {j.scheduled?.date.slice(5)}.</Banner>}
       {ack === "cant_make" && <Banner tone="warn">You told {coord} you can’t make it (“{j.techAck?.reason}”). They will reassign the job or ask the client for a new time.</Banner>}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Inspection checklist" sub="Read-only until you accept and the work window opens."><p className="text-xs text-muted">Indoor (8) · Outdoor (5) · Electrical (5) — all results start empty.</p></Card>
-          <Card title="Job & unit" action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${j.unitId}`}>Unit →</Link>}><SummaryList items={[["Window", j.scheduled ? longDate(j.scheduled) : "—"], ["Site", `${j.customer} · ${j.loc}`], ["Access", "Security desk · show job ID"], ["Unit", `${j.unitId} · Split 2.5 kW`], ["Request", `“${j.symptom}”`]]} /></Card>
+          <Card title="Job & unit" action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${j.unitId}`}>Unit <Icon name="arrowRight" /></Link>}><SummaryList items={[["Window", j.scheduled ? longDate(j.scheduled) : "—"], ["Site", `${j.customer} · ${j.loc}`], ["Access", "Security desk · show job ID"], ["Unit", `${j.unitId} · Split 2.5 kW`], ["Request", `“${j.symptom}”`]]} /></Card>
         </div>
         <Card title={ack === "pending" ? "New assignment — please accept" : "Job — assigned to you"} className="self-start">
           <SummaryList items={[["Job", `${j.type} · ${j.customer} · ${j.unitId}`], ["Origin", <OriginBadge key="o" origin={j.origin} />], ["Visit time", <b key="v">{j.scheduled ? longDate(j.scheduled) : "—"}</b>], ["Assigned by", coord ?? "HQ"], ["Agreed with", j.origin === "plan" ? "periodic plan (client notified)" : "the client (via HQ)"]]} />
@@ -101,7 +101,7 @@ function Workspace({ id }: { id: string }) {
   };
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/technician" className="font-semibold text-primary">← Overview</Link><b className="text-ink">{id} · Bedroom AC</b><Badge tone={status === "Submitted" ? "ok" : status === "Assigned" ? "primary" : "warn"}>{status}</Badge></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> Overview</Link><b className="text-ink">{id} · Bedroom AC</b><Badge tone={status === "Submitted" ? "ok" : status === "Assigned" ? "primary" : "warn"}>{status}</Badge></div>
       {status === "Assigned" && <Banner action={<span className="flex gap-2"><Btn size="sm" disabled>Start job</Btn><Btn size="sm" variant="ghost" onClick={() => setCheckIn(true)}>Preview check-in</Btn></span>}>Before the work window (starts 14:00): read-only, Start is disabled (IR76). On site, Start job opens Check in (location + unit QR).</Banner>}
       {status === "Submitted" && <Banner tone="ok">Submitted v1 — read-only, awaiting quality review.</Banner>}
       {status === "In progress" && <Banner tone="warn">Work window ends in 15 min — unsaved input will be discarded at 12:00 (IR89).</Banner>}
@@ -137,7 +137,7 @@ function Workspace({ id }: { id: string }) {
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Checklist progress"><div className="mb-2 flex justify-between text-xs"><b>{done} / {all.length}</b><span className="text-muted">{all.length - done} items still null</span></div><UtilBar pct={(done / all.length) * 100} />{Object.keys(groups).map((g) => <div key={g} className="mt-2 flex justify-between text-xs"><span className="capitalize">{g}</span><span>{groups[g].length - left(g)} / {groups[g].length}</span></div>)}</Card>
-          <Card title="Job & unit" action={<Link className="text-xs font-semibold text-primary" href="/technician/units/unit-online-rto">Unit →</Link>}><SummaryList items={[["Window", "10:00–12:00 today"], ["Site", "customer-a · Home A › 1F › Bedroom"], ["Access", "Security desk · show job ID"], ["Unit", "unit-online-rto · Split 2.5 kW"], ["Linked alert", "Bedroom too hot · warning"]]} /><div className="mt-3 flex flex-wrap gap-2"><Link className="text-xs font-semibold text-primary" href="/technician/units/unit-online-rto/alerts?jobId=job-t07">Alert evidence →</Link><Link className="text-xs font-semibold text-primary" href="/technician/units/unit-online-rto/control?jobId=job-contractor-a">Diagnostics →</Link></div></Card>
+          <Card title="Job & unit" action={<Link className="text-xs font-semibold text-primary" href="/technician/units/unit-online-rto">Unit <Icon name="arrowRight" /></Link>}><SummaryList items={[["Window", "10:00–12:00 today"], ["Site", "customer-a · Home A › 1F › Bedroom"], ["Access", "Security desk · show job ID"], ["Unit", "unit-online-rto · Split 2.5 kW"], ["Linked alert", "Bedroom too hot · warning"]]} /><div className="mt-3 flex flex-wrap gap-2"><Link className="text-xs font-semibold text-primary" href="/technician/units/unit-online-rto/alerts?jobId=job-t07">Alert evidence <Icon name="arrowRight" /></Link><Link className="text-xs font-semibold text-primary" href="/technician/units/unit-online-rto/control?jobId=job-contractor-a">Diagnostics <Icon name="arrowRight" /></Link></div></Card>
           <Card title="Versions & autosave"><SummaryList items={[["Draft v2", "autosaved 11:44 · 7 results · 1 photo"], ["Draft v1", "saved 10:40 · 3 results · no photos"], ["Work window", "10:00–12:00 · warning at 11:45 · discard at 12:00"]]} /></Card>
         </div>
       </div>

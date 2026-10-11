@@ -16,7 +16,7 @@ export function OffsetsDemo() {
   const valid = +amount > 0;
   return (
     <Page>
-      <div className="text-[13px] text-muted"><Link href="/customer/energy" className="font-semibold text-primary">← Energy & cost</Link> › Carbon offsets (demo)</div>
+      <div className="text-[13px] text-muted"><Link href="/customer/energy" className="font-semibold text-primary"><Icon name="arrowLeft" /> Energy & cost</Link> › Carbon offsets (demo)</div>
       <Banner tone="warn" action={<DemoBadge />}>Demo only — no real carbon credits are bought or retired. Energy savings do not become a tradable balance. Records are labelled “Demo”.</Banner>
       <Steps steps={["Amount", "Quote", "Confirm"]} current={done ? 3 : step} />
       <Card title="Based on Energy & cost" sub="Bedroom AC · Sep 14–20 · factor-demo-2026">
@@ -37,13 +37,13 @@ export function OffsetsDemo() {
       ) : step === 1 ? (
         <Card title="Demo quote">
           <SummaryList items={[["Amount", `${amount} kgCO2e`], ["Period / units", "Sep 14–20 · Bedroom AC"], ["Quote ID", "quote-0107 (demo)"], ["Expires", "09:55 (15 minutes from now)"], ["Records created", "None yet"]]} />
-          <div className="mt-3 flex gap-2"><Btn onClick={() => setStep(0)}>← Back</Btn><Btn variant="primary" onClick={() => setStep(2)}>Continue</Btn></div>
+          <div className="mt-3 flex gap-2"><Btn onClick={() => setStep(0)}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={() => setStep(2)}>Continue</Btn></div>
         </Card>
       ) : (
         <Card title="Confirm demo request">
           <SummaryList items={[["Amount", `${amount} kgCO2e`], ["Quote", "quote-0107 · expires 09:55"], ["Result", "A demo record “Demo requested” is created. Proof stays “Not issued”."]]} />
           <div className="mt-3"><Check checked={ack} onChange={setAck} label="I understand this is a simulated request — not a real purchase." /></div>
-          <div className="mt-3 flex gap-2"><Btn onClick={() => setStep(1)}>← Back</Btn><Btn variant="primary" disabled={!ack} onClick={() => { setDone(true); toast("Demo request recorded"); }}>Confirm demo request</Btn></div>
+          <div className="mt-3 flex gap-2"><Btn onClick={() => setStep(1)}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" disabled={!ack} onClick={() => { setDone(true); toast("Demo request recorded"); }}>Confirm demo request</Btn></div>
         </Card>
       )}
       <Card title="Demo offset records" sub="Demo retirement ≠ certified credit">

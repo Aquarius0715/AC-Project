@@ -57,7 +57,7 @@ export function SlaView({ live }: { live: SlaLive }) {
           {live.breaches.length === 0 ? <p className="text-[13px] text-muted">{t("No breaches in this period.")}</p> : (
             <ul className="divide-y divide-line">{live.breaches.map((b) => (
               <li key={b.key} className="flex items-start justify-between gap-2 py-2">
-                <span className="min-w-0"><Link className="text-[13px] font-semibold text-primary hover:underline" href={`/admin/jobs?jobId=${b.jobId}`}>{b.short} →</Link><span className="block text-[11px] text-muted">{b.text}</span></span>
+                <span className="min-w-0"><Link className="text-[13px] font-semibold text-primary hover:underline" href={`/admin/jobs?jobId=${b.jobId}`}>{b.short} <Icon name="arrowRight" /></Link><span className="block text-[11px] text-muted">{b.text}</span></span>
                 <Badge tone={b.tone}>{b.kind}</Badge>
               </li>
             ))}</ul>

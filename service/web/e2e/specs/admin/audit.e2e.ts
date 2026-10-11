@@ -41,8 +41,8 @@ test("the audit log keeps its filters and the open entry in the URL", async ({ p
   const target = (await fact(detail.first(), "Target").locator("span.font-mono").innerText()).trim(); // "kind · id"
   const [kind, id] = target.split(" · ");
 
-  // Filter by target → keeps the entry open; every shown entry has that target; the chip clears it
-  await detail.first().getByRole("button", { name: "Filter by target →" }).click();
+  // Filter by target keeps the entry open; every shown entry has that target; the chip clears it
+  await detail.first().getByRole("button", { name: "Filter by target" }).click();
   await page.waitForURL((u) => u.searchParams.get("targetId") === id && u.searchParams.get("targetKind") === kind && u.searchParams.get("entryId") === entryId);
   await expect(main.getByRole("combobox", { name: "Target" })).toHaveValue(kind);
   await expect(main).toContainText(`Target ID · ${kind} · ${id}`);
@@ -53,19 +53,19 @@ test("the audit log keeps its filters and the open entry in the URL", async ({ p
   // the related records of the newest entry of that kind link the records' own screens
   const related = card(page, /./).filter({ has: page.getByRole("heading", { name: "Related records", exact: true }) });
   await expect(related.first()).toBeVisible();
-  if (kind === "job") await expect(related.first().getByRole("link", { name: "Open job →" })).toHaveAttribute("href", /^\/admin\/jobs\?jobId=[0-9a-f-]{36}$/);
-  if (kind === "unit") await expect(related.first().getByRole("link", { name: "Open unit →" })).toHaveAttribute("href", /^\/admin\/units\?unitId=[0-9a-f-]{36}$/);
+  if (kind === "job") await expect(related.first().getByRole("link", { name: "Open job", exact: true })).toHaveAttribute("href", /^\/admin\/jobs\?jobId=[0-9a-f-]{36}$/);
+  if (kind === "unit") await expect(related.first().getByRole("link", { name: "Open unit", exact: true })).toHaveAttribute("href", /^\/admin\/units\?unitId=[0-9a-f-]{36}$/);
   await expect(related.first()).toContainText("Links open the existing detail screens");
 
-  // Filter by actor → and Filter by ID → (the correlation) keep the open entry; the list then names the correlation
+  // Filter by actor and Filter by ID (the correlation) keep the open entry; the list then names the correlation
   await main.getByRole("button", { name: "Reset" }).click();
   await page.waitForURL((u) => !u.search);
   const open = card(page, /./).filter({ has: page.getByText("Role at the time", { exact: true }) }).first();
-  await open.getByRole("button", { name: "Filter by actor →" }).click();
+  await open.getByRole("button", { name: "Filter by actor" }).click();
   await page.waitForURL(/actorId=/);
   const actor = new URL(page.url()).searchParams.get("actorId")!;
   await expect(main.getByRole("combobox", { name: "Actor" })).toHaveValue(actor);
-  await open.getByRole("button", { name: "Filter by ID →" }).click();
+  await open.getByRole("button", { name: "Filter by ID" }).click();
   await page.waitForURL(/correlationId=/);
   const corr = new URL(page.url()).searchParams.get("correlationId")!;
   await expect(main.getByRole("heading", { name: `Correlation ${corr}`, exact: true })).toBeVisible();
@@ -103,7 +103,7 @@ test("device events load only for a picked device and link the event's audit tra
     const eventId = new URL(page.url()).searchParams.get("eventId")!;
     const detail = card(page, /./).filter({ has: page.getByRole("heading", { name: "Linked alerts and audit", exact: true }) });
     for (const label of ["Event type", "Evidence", "Sequence", "Unit at the time", "Occurred", "Recovery"]) await expect(detail.locator("dt", { hasText: new RegExp(`^${label}$`) })).toBeVisible();
-    await expect(detail.getByRole("link", { name: "Filter log →" })).toHaveAttribute("href", `/admin/audit?targetKind=device_event&targetId=${eventId}`);
+    await expect(detail.getByRole("link", { name: "Filter log" })).toHaveAttribute("href", `/admin/audit?targetKind=device_event&targetId=${eventId}`);
     await expect(detail).toContainText("Notes are added from Devices & models (device.write), not here.");
   } else {
     await expect(main.getByRole("heading", { name: "No device events in this period" })).toBeVisible();

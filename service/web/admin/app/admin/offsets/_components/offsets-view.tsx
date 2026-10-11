@@ -9,6 +9,7 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { showTime } from "@ac/web/lib/i18n";
 import { conceptText, kg3, quoteErrors, quoteInput, type ApiQuote, type QuoteDraft, type RecordRow } from "@ac/web/lib/offsets";
 import { quoteOffset, requestOffset, retryOffset, simulateOffset } from "../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 type Live = {
   tab: "records" | "market"; canWrite: boolean; rows: RecordRow[]; selectedId: string | null; customers: { id: string; name: string }[];
@@ -92,7 +93,7 @@ export function OffsetsView({ live }: { live: Live }) {
                   <div className="flex flex-wrap gap-2"><Btn variant="primary" disabled={pending || !ack} onClick={() => step("retire")}>{t("Retire whole amount (demo)")}</Btn><Btn disabled={pending} onClick={() => step("fail")}>{t("Simulate a failure")}</Btn></div>
                 </Card>
               )}
-              <Card title={t("Event history")} action={<Link className="text-xs font-semibold text-primary" href="/admin/audit">{t("Open in audit →")}</Link>}>
+              <Card title={t("Event history")} action={<Link className="text-xs font-semibold text-primary" href="/admin/audit">{t("Open in audit")} <Icon name="arrowRight" /></Link>}>
                 {sel.events.length === 0 ? <p className="text-xs text-muted">{t("No events yet.")}</p> : <Timeline items={sel.events} />}
               </Card>
             </div>

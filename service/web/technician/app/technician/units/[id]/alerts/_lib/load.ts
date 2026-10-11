@@ -38,11 +38,11 @@ export async function loadAlerts(unitId: string, sp: { jobId?: string; alertId?:
       const job = sp.jobId ? await optional(coreOp<TechJobRead<{ assignment: { scheduledStart: string } | null }>>("jobs.get", { jobId: sp.jobId }), null) : null;
       const start = job?.projection === "detail" ? job.assignment?.scheduledStart ?? null : null;
       return {
-        kind: "unavailable" as const, title: t("Not started yet"), unitHref, back: t("← Unit"),
+        kind: "unavailable" as const, title: t("Not started yet"), unitHref, back: t("Unit"),
         text: start ? t("You can see this AC from {time}, when your work window starts.", { time: showTime(start, display) }) : t("Available from the work start time of your assigned job."),
       };
     }
-    return { kind: "unavailable" as const, title: t("Alerts aren’t available"), unitHref, back: t("← Unit"), text: UNAVAILABLE[alerts.messageKey] ? t(UNAVAILABLE[alerts.messageKey]) : alerts.code };
+    return { kind: "unavailable" as const, title: t("Alerts aren’t available"), unitHref, back: t("Unit"), text: UNAVAILABLE[alerts.messageKey] ? t(UNAVAILABLE[alerts.messageKey]) : alerts.code };
   }
   const [unit, job, permissions] = await Promise.all([
     optional(coreOp<ApiUnitDetail>("units.get", { id: unitId }), null),

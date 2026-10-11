@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Banner, Btn, Card, DataTable, Field, Input, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, useToast, cx } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
+import { Icon } from "@ac/web/components/Icon";
 
 const reports = [
   { id: "mrv-a14-a", meta: "org-customer-a · unit-online-rto · 09-14 08:00–09:00", sub: "40.0 kgCO₂e · v1", ok: true, versions: 1 },
@@ -28,7 +29,7 @@ export function MRVDemo() {
         <div className="split-rev">
           <Card title="Scope 2 reports" action={<Btn size="sm" variant="primary" onClick={() => setNw(true)}>+ New</Btn>} className="self-start"><div className="flex flex-col gap-2">{reports.map((r) => <ListRow key={r.id} selected={sel.id === r.id} onClick={() => { setSel(r); setVer(r.versions); }}><div className="min-w-0"><b className="text-[13px]">{r.id}</b><div className="text-[11px] text-muted">{r.meta}</div><div className={cx("text-[11px]", r.ok ? "text-muted" : "text-warn")}>{r.sub}</div></div></ListRow>)}</div><p className="mt-3 text-[11px] text-muted">Every report is a demo — “Demo — unverified”. Demo review is not external certification.</p></Card>
           <div className="flex min-w-0 flex-col gap-4">
-            <Card title="Scope 2 electricity — demo summary" sub={`${sel.id} · org-customer-a`} action={<div className="flex items-center gap-2"><Select aria-label="Version" className="w-auto" value={ver} onChange={(e) => setVer(+e.target.value)}>{Array.from({ length: sel.versions }, (_, i) => <option key={i} value={i + 1}>Version {i + 1}{i + 1 === sel.versions ? " (latest)" : ""}</option>)}</Select>{sel.versions > 1 && <Btn size="sm" onClick={() => setCmp(true)}>Compare versions →</Btn>}</div>}>
+            <Card title="Scope 2 electricity — demo summary" sub={`${sel.id} · org-customer-a`} action={<div className="flex items-center gap-2"><Select aria-label="Version" className="w-auto" value={ver} onChange={(e) => setVer(+e.target.value)}>{Array.from({ length: sel.versions }, (_, i) => <option key={i} value={i + 1}>Version {i + 1}{i + 1 === sel.versions ? " (latest)" : ""}</option>)}</Select>{sel.versions > 1 && <Btn size="sm" onClick={() => setCmp(true)}>Compare versions <Icon name="arrowRight" /></Btn>}</div>}>
               {!sel.ok ? <Banner tone="warn">Calculation incomplete (draft) — missing readings block the totals. Nothing is shown as zero.</Banner> : (
                 <div className="grid-fluid" style={{ ["--min"as string]: "170px" }}>{[["Electricity used", "80.0 kWh", "coverage 100%"], ["Scope 2 emissions", "40.0 kgCO₂e", "80.0 kWh × 0.5 kgCO₂e/kWh"], ["Energy vs baseline", "Reduction 20.0 kWh", "Reduction 20.0% · not adjusted"], ["Emissions vs baseline", "Reduction 10.0 kgCO₂e", "shown separately from energy"]].map(([a, b, c]) => <div key={a} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted">{a}</div><b>{b}</b><div className="text-[10px] text-muted">{c}</div></div>)}</div>
               )}

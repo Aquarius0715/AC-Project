@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Btn, Card, Field, Input, Banner } from "@ac/web/components/ui";
+import { Icon } from "@ac/web/components/Icon";
 
 export default function Forgot() {
   const [email, setEmail] = useState("");
@@ -22,7 +23,7 @@ export default function Forgot() {
             <Field label="Email" error={err}><Input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" /></Field>
             <Btn variant="primary" type="submit">Send reset preview</Btn>
             {sent && <Banner tone="ok">If an account exists for that address, a reset link preview has been sent.<div className="text-xs text-muted">deliveryState: preview · no real email sent · same message shown whether or not the address is registered</div></Banner>}
-            <Link href="/login" className="text-xs font-semibold text-primary hover:underline">← Back to sign in</Link>
+            <Link href="/login" className="text-xs font-semibold text-primary hover:underline"><Icon name="arrowLeft" /> Back to sign in</Link>
             <p className="text-[11px] text-muted">Demo authentication only — email format is checked but no message is actually delivered.</p>
           </form>
         </Card>

@@ -63,7 +63,7 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
 
     await test.step("the partner opens the unit — diagnosis only (FR-P04, IR280)", async () => {
       await partner.goto(`/partner/jobs/${jobId}`);
-      await partner.getByRole("link", { name: "Open unit →" }).first().click();
+      await partner.getByRole("link", { name: "Open unit", exact: true }).first().click();
       await partner.waitForURL(/\/partner\/units\/[^/?]+\?jobId=/);
       const main = partner.getByRole("main");
       for (const name of ["Unit register", "Job context", "Alert evidence", "Readings (diagnosis only)"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();

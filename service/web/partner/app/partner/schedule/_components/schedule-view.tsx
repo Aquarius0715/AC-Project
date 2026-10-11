@@ -28,7 +28,7 @@ export function ScheduleView({ live }: { live: ScheduleLive }) {
   if (!live.rows.length) {
     return (
       <Page>
-        <EmptyState title={t("No accepted jobs")} action={<Link className="text-sm font-semibold text-primary" href="/partner/jobs?tab=offered">{t("Open offers →")}</Link>}>
+        <EmptyState title={t("No accepted jobs")} action={<Link className="text-sm font-semibold text-primary" href="/partner/jobs?tab=offered">{t("link::Open offers")} <Icon name="arrowRight" /></Link>}>
           {t("Jobs your company has accepted appear here to assign a technician for the agreed visit time.")}
         </EmptyState>
       </Page>
@@ -116,7 +116,7 @@ function AssignCard({ sel, choice, zone, otherZone }: { sel: Selected; choice: C
         <div className="flex flex-col gap-3">
           <Banner tone={m.banner.tone === "muted" ? undefined : m.banner.tone}>{m.banner.text}</Banner>
           {window && <Banner>{window}</Banner>}
-          <div className="flex flex-wrap gap-2"><Link className="text-xs font-semibold text-primary" href={`/partner/jobs/${sel.id}`}>{t("Open the job →")}</Link><Link className="text-xs font-semibold text-primary" href={`/partner/history?jobId=${sel.id}`}>{t("Job history →")}</Link></div>
+          <div className="flex flex-wrap gap-2"><Link className="text-xs font-semibold text-primary" href={`/partner/jobs/${sel.id}`}>{t("Open the job")} <Icon name="arrowRight" /></Link><Link className="text-xs font-semibold text-primary" href={`/partner/history?jobId=${sel.id}`}>{t("Job history")} <Icon name="arrowRight" /></Link></div>
         </div>
       </Card>
     );
@@ -191,7 +191,7 @@ function WeekCard({ week, members, sel, choice, zone }: { week: NonNullable<Sche
   const proposal = slot && sel.mode.kind !== "blocked" && choice.tech && !unchanged ? { technicianId: choice.tech, slot, short: sel.short } : null;
   const rows = weekGrid(week.dates, members, week.capacity, new Map(Object.entries(week.jobsOf)), proposal, t);
   return (
-    <Card title={week.title} action={<Link href="/partner/team" className="text-xs font-semibold text-primary">{t("Team & capacity →")}</Link>}>
+    <Card title={week.title} action={<Link href="/partner/team" className="text-xs font-semibold text-primary">{t("Team & capacity")} <Icon name="arrowRight" /></Link>}>
       {rows.length === 0 ? <p className="text-[13px] text-muted">{t("No technicians in your company yet.")}</p> : (
         <div className="scroll-x">
           <table className="w-full min-w-[720px] text-[11px]">

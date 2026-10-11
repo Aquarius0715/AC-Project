@@ -11,6 +11,7 @@ import { actionCode, actionWord, fieldText, refusal } from "@ac/web/lib/techCont
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { sendDiagnostic, startTestRun } from "../actions";
 import type { ControlLive } from "../_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 /** Diagnostic control (FR-T10, Figma Technician 02-18…02-28) in API mode: one diagnostic command or one test run at a
  * time for the assigned job, each confirmed first; device acknowledgements and the run's end are shown only when the
@@ -35,9 +36,9 @@ export function ControlView({ live }: { live: ControlLive }) {
     const timer = setInterval(() => router.refresh(), 4000);
     return () => clearInterval(timer);
   }, [live.active, router]);
-  const back = <div className="flex flex-wrap items-center gap-2 text-[13px]"><Link href={live.unitHref} className="font-semibold text-primary" aria-label={t("Back")}>‹</Link><h1 className="text-base font-bold">{t("Diagnostic control")}</h1><span className="text-muted">· {live.unit.name}</span></div>;
+  const back = <div className="flex flex-wrap items-center gap-2 text-[13px]"><Link href={live.unitHref} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{t("Diagnostic control")}</h1><span className="text-muted">· {live.unit.name}</span></div>;
   if (!live.canDiagnose) return <Page>{back}<EmptyState title={t("No diagnostic permission")}>{t("Diagnostic control needs control.diagnose on an assigned job. Ask HQ if you should have it.")}</EmptyState></Page>;
-  if (!live.job) return <Page>{back}<EmptyState title={t("Choose the job first")} action={<Link href={live.unitHref} className="text-xs font-semibold text-primary">{t("← Unit and its jobs")}</Link>}>{t("Diagnostic commands and test runs belong to a job you are assigned to, inside its work window — open diagnostic control from the unit or the job.")}</EmptyState></Page>;
+  if (!live.job) return <Page>{back}<EmptyState title={t("Choose the job first")} action={<Link href={live.unitHref} className="text-xs font-semibold text-primary"><Icon name="arrowLeft" /> {t("Unit and its jobs")}</Link>}>{t("Diagnostic commands and test runs belong to a job you are assigned to, inside its work window — open diagnostic control from the unit or the job.")}</EmptyState></Page>;
   const job = live.job;
   const busy = live.active || !!live.unit.blocked;
   const failed = (f: ActionFailure) => {

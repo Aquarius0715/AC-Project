@@ -56,7 +56,7 @@ export async function loadTechUnit(id: string, sp: { jobId?: string; metric?: st
     return {
       kind: "not_started" as const, title: t("Not started yet"),
       text: start ? t("You can see this AC from {time}, when your work window starts.", { time: showTime(start, display) }) : t("Available from the work start time of your assigned job."),
-      job: start && sp.jobId ? { href: `/technician/jobs/${sp.jobId}`, label: t("Open the job →") } : null,
+      job: start && sp.jobId ? { href: `/technician/jobs/${sp.jobId}`, label: t("Open the job") } : null,
     };
   }
   const tab = sp.metric ? "monitoring" as const : "register" as const;

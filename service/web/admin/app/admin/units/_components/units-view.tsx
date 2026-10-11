@@ -83,7 +83,7 @@ function CustomerList({ live }: { live: UnitsLive }) {
           { id: "customers" as const, label: t("Customers & units"), count: k.customers },
           { id: "warranty" as const, label: t("Warranty & coverage"), count: live.coverageAttention ?? "—" },
         ]} />
-        {live.canWrite && live.top === "customers" && <Btn size="sm" onClick={() => setImporting(true)}>{t("↑ Import CSV")}</Btn>}
+        {live.canWrite && live.top === "customers" && <Btn size="sm" onClick={() => setImporting(true)}><Icon name="upload" />{t("Import CSV")}</Btn>}
       </div>
       {live.top === "warranty" ? <WarrantyTab live={live} /> : <>
       {live.missing && <Banner tone="warn">{t("This customer no longer exists or is outside your scope — showing the register.")}</Banner>}
@@ -112,7 +112,7 @@ function CustomerList({ live }: { live: UnitsLive }) {
             { key: "o", label: t("Operation"), render: (r) => r.operation, hideBelow: "md" },
             { key: "a", label: t("Alerts"), render: (r) => (r.status === "inactive" ? "—" : r.alerts), hideBelow: "md" },
             ...(live.standingKnown ? [{ key: "k", label: t("Contract"), render: (r: CustomerRow) => <div className="flex flex-wrap gap-1">{r.marks.map((m) => <Badge key={m.label} tone={m.tone} icon={m.icon}>{m.label}</Badge>)}</div>, hideBelow: "md" as const }] : []),
-            { key: "x", label: "", render: () => "›" },
+            { key: "x", label: "", render: () => <span className="text-muted"><Icon name="chevronRight" /></span> },
           ]} />
         )}
         <p className="mt-2 text-[11px] text-muted">{t("{n} of {total} · sorted by name · Inactive customers appear only with Status: All and are not counted (IR40). Archived properties, spaces and units never appear in lists, summaries or KPI denominators (IR39).", { n: rows.length, total: live.rows.length })}</p>
@@ -168,7 +168,7 @@ function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
-        <button type="button" className="font-semibold text-primary" onClick={() => nav({ customerId: null, tab: null, locationId: null, propertyId: null, unitId: null, powerState: null, connections: null, search: null })}>{t("‹ Customers")}</button>
+        <button type="button" className="font-semibold text-primary" onClick={() => nav({ customerId: null, tab: null, locationId: null, propertyId: null, unitId: null, powerState: null, connections: null, search: null })}><Icon name="chevronLeft" /> {t("Customers")}</button>
         <span className="text-muted">/ {r.name}{c.unit ? ` / ${c.unit.u.displayName}` : ""}</span>
         {r.marks.map((x) => <Badge key={x.label} tone={x.tone} icon={x.icon}>{x.label}</Badge>)}
         <div className="ml-auto flex gap-2">
@@ -189,11 +189,11 @@ function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
         <Kpi label={t("Units")} value={unitsTotal} sub={c.perProperty} />
         <Kpi label={t("Operation")} value={r.operation} sub={t("Running {on} / known {known}", { on: r.running, known: r.known })} />
-        <Kpi label={t("Open alerts")} value={r.alerts} tone={r.alerts ? "warn" : undefined} sub={c.alertsSub ?? t("severity needs alert.read")} href="/admin/alerts" link={t("Alerts ›")} />
+        <Kpi label={t("Open alerts")} value={r.alerts} tone={r.alerts ? "warn" : undefined} sub={c.alertsSub ?? t("severity needs alert.read")} href="/admin/alerts" link={t("Alerts")} />
         {s ? <Kpi label={t("Overdue billing")} value={s.overdueAmount ?? t("None")} tone={s.overdue ? "crit" : undefined}
           sub={s.restriction ? (s.restriction.state === "active" ? t("Restriction active") : t("Restriction {state}", { state: t(s.restriction.state.replace("_", " ")) })) : s.overdue ? count(t, s.overdue, "1 invoice overdue", "{n} invoices overdue") : t("no overdue invoice")}
           href={s.restriction && s.restriction.state !== "active" ? `/admin/restrictions?restrictionId=${s.restriction.id}` : s.overdue ? `/admin/billing?customerId=${r.id}&overdueOnly=true` : undefined}
-          link={s.restriction && s.restriction.state !== "active" ? t("View restriction →") : s.overdue ? t("View invoices →") : undefined} />
+          link={s.restriction && s.restriction.state !== "active" ? t("View restriction") : s.overdue ? t("View invoices") : undefined} />
           : <Kpi label={t("Overdue billing")} value="—" sub={t("needs billing.read")} />}
       </div>
       <Tabs value={c.tab} onChange={(v) => nav({ tab: v === "overview" ? null : v, unitId: null })} tabs={[
@@ -333,7 +333,7 @@ function UnitsCard({ c, sel, nav, canWrite, onNew }: { c: CustomerLive; sel: Sel
           { key: "c", label: t("Connection"), render: (u) => <ConnBadge s={u.conn} />, hideBelow: "sm" },
           { key: "a", label: t("Alerts"), render: (u) => (u.alerts ? <Badge tone="warn" icon="warning">{u.alerts}</Badge> : "—"), hideBelow: "md" },
           { key: "y", label: t("Policies"), render: (u) => u.policies, hideBelow: "md" },
-          { key: "x", label: "", render: () => "›" },
+          { key: "x", label: "", render: () => <span className="text-muted"><Icon name="chevronRight" /></span> },
         ]} />
       )}
       <p className="mt-2 text-[11px] text-muted">{t("Pick a room in the tree to list only its units; a row opens the unit edit. Power is the derived state (SR27): unknown never counts as running or stopped.")}</p>
@@ -373,7 +373,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: { live: UnitsLive; c: Custo
   return (
     <>
       <Card title={<span className="flex flex-wrap items-center gap-2">{u.displayName}<PowerBadge s={u.effectivePowerState === "on" ? "running" : u.effectivePowerState === "off" ? "stopped" : "unknown"} /><ConnBadge s={u.connection} />{x.seen && <span className="text-[11px] font-normal text-muted">{t("seen {time}", { time: x.seen })}</span>}{u.activeAlertCount > 0 && <Badge tone="warn" icon="warning">{count(t, u.activeAlertCount, "1 open alert", "{n} open alerts")}</Badge>}</span>}
-        sub={<>{u.id.slice(0, 8)} · {t("version {v}", { v: u.version })} · <button type="button" className="font-semibold text-primary" onClick={() => nav({ unitId: null, locationId: u.archived ? null : u.spaceId ?? `unassigned:${u.propertyId}` })}>{t("‹ back to {place}", { place: back })}</button></>}
+        sub={<>{u.id.slice(0, 8)} · {t("version {v}", { v: u.version })} · <button type="button" className="font-semibold text-primary" onClick={() => nav({ unitId: null, locationId: u.archived ? null : u.spaceId ?? `unassigned:${u.propertyId}` })}><Icon name="chevronLeft" /> {t("back to {place}", { place: back })}</button></>}
         action={live.canWrite && !u.archived && <Btn size="sm" variant="danger" onClick={() => setModal("delete")}>{t("Delete unit…")}</Btn>}>
         {u.archived && <div className="mb-3"><Banner tone="warn">{t("Read only — {note}. Archived units are excluded from lists, summaries and KPI denominators (IR39).", { note: x.archivedNote ?? "" })}</Banner></div>}
         <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
@@ -393,7 +393,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: { live: UnitsLive; c: Custo
           <Field label={t("Installed at")} hint={t("A Kuala Lumpur day · leave empty for “Not registered” (IR44)")} error={err("installedAt")}><Input type="date" max={live.todayKL} value={d.installedAt} disabled={ro} onChange={(e) => set({ installedAt: e.target.value })} /></Field>
           <Field label={t("Warranty end")} hint={t("Manufacturer warranty; coverage also counts active maintenance contracts (FR-A19)")} error={err("warrantyEnd")}><Input type="date" min={d.installedAt || undefined} value={d.warrantyEnd} disabled={ro} onChange={(e) => set({ warrantyEnd: e.target.value })} /></Field>
           <Field label={t("IoT device")} hint={x.device ? t("Rebinding is done in Devices and keeps the command history on the unit.") : undefined}>
-            <div className="flex min-h-9 items-center gap-2 text-[13px]">{x.device ? <><b>{x.device.serial}</b><ConnBadge s={x.device.connection} /><TextLink href={`/admin/devices?tab=devices&deviceId=${x.device.id}`}>{t("Devices ›")}</TextLink></> : x.deviceKnown ? <span className="text-muted">{t("No device bound")}</span> : <span className="text-muted">{t("Needs device.read")}</span>}</div>
+            <div className="flex min-h-9 items-center gap-2 text-[13px]">{x.device ? <><b>{x.device.serial}</b><ConnBadge s={x.device.connection} /><TextLink href={`/admin/devices?tab=devices&deviceId=${x.device.id}`}>{t("Devices")} <Icon name="chevronRight" /></TextLink></> : x.deviceKnown ? <span className="text-muted">{t("No device bound")}</span> : <span className="text-muted">{t("Needs device.read")}</span>}</div>
           </Field>
           <Field label={t("Service scope")} hint={t("Target inspection groups")} error={err("serviceScope")}>
             <div className="flex flex-wrap gap-3">{scopes.map((sc) => <Check key={sc} label={t(scopeLabel[sc])} disabled={ro} checked={d.serviceScope.includes(sc)} onChange={(on) => set({ serviceScope: on ? [...d.serviceScope, sc] : d.serviceScope.filter((v) => v !== sc) })} />)}</div>
@@ -422,8 +422,8 @@ function UnitEdit({ live, c, x, nav, run, pending }: { live: UnitsLive; c: Custo
         )}
       </Card>
       <div className="flex flex-wrap gap-4 text-[13px]">
-        {x.device && <TextLink href={`/admin/audit?tab=devices&deviceId=${x.device.id}`}>{t("Device events ›")}</TextLink>}
-        <TextLink href="/admin/audit">{t("Audit log ›")}</TextLink>
+        {x.device && <TextLink href={`/admin/audit?tab=devices&deviceId=${x.device.id}`}>{t("Device events")} <Icon name="chevronRight" /></TextLink>}
+        <TextLink href="/admin/audit">{t("Audit log")} <Icon name="chevronRight" /></TextLink>
       </div>
       {modal === "relocate" && <RelocateModal u={u} from={x.path} to={c.places.find((p) => `${p.propertyId}|${p.spaceId}` === place)?.label ?? ""} pending={pending} onClose={() => setModal(null)}
         onSave={(reason) => run(() => saveUnit(unitInput(d, c.row.orgId, u.id, reason), u.version), t("Location changed — the old location stays in the history"), () => setModal(null))} />}
@@ -803,7 +803,7 @@ function WarrantyTab({ live }: { live: UnitsLive }) {
             {w.claims.map((x) => (
               <div key={x.jobId} className="flex flex-wrap items-center gap-3 border-t border-line py-2.5 text-[13px] first:border-0">
                 <div className="min-w-0 flex-1"><b>{x.unit}</b> <span className="text-muted">· {t("{type} job {id} · completed {date}", { type: typeLabel(x.type, t), id: x.jobId.slice(0, 8), date: x.completed })}</span><div className="text-xs text-muted">{t("Parts: {parts} · Claim {amount} · not filed", { parts: x.parts, amount: x.amountMinor ? amount(x.amountMinor, x.currency) : t("amount to enter") })}</div></div>
-                <TextLink href={`/admin/jobs?jobId=${x.jobId}`}>{t("Job ›")}</TextLink>
+                <TextLink href={`/admin/jobs?jobId=${x.jobId}`}>{t("Job")} <Icon name="chevronRight" /></TextLink>
                 {w.canClaim && <Btn size="sm" disabled={pending} onClick={() => setClaim(x)}>{t("Mark claim filed")}</Btn>}
               </div>
             ))}
@@ -886,7 +886,7 @@ function ImportWizard({ live, onClose }: { live: UnitsLive; onClose: () => void 
     const importable = preview.readyCount + preview.warningCount;
     return (
       <Modal open wide onClose={onClose} title={t("Import units from CSV · 2 / 2 — preview")} footer={<>
-        <Btn onClick={() => setPreview(null)}>{t("← Back")}</Btn>
+        <Btn onClick={() => setPreview(null)}><Icon name="arrowLeft" /> {t("Back")}</Btn>
         <Btn disabled={!preview.errorCount && !preview.warningCount} onClick={() => download(`${preview.fileName.replace(/\.csv$/i, "")}-report.csv`, errorReportCsv(preview.rows, t))}>{t("Download error report")}</Btn>
         <Btn variant="primary" disabled={pending || !importable} onClick={() => run(() => importCommit(preview.previewId, customerId), (x) => t("{units} imported", { units: units(t, x.createdUnitIds.length) }), setResult)}>{count(t, importable, "Import 1 valid row", "Import {n} valid rows")}</Btn>
       </>}>
@@ -904,7 +904,7 @@ function ImportWizard({ live, onClose }: { live: UnitsLive; onClose: () => void 
     );
   }
   return (
-    <Modal open wide onClose={onClose} title={t("Import units from CSV · 1 / 2")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={validate}>{t("Validate →")}</Btn></>}>
+    <Modal open wide onClose={onClose} title={t("Import units from CSV · 1 / 2")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={validate}>{t("Validate")} <Icon name="arrowRight" /></Btn></>}>
       <div className="flex flex-col gap-3">
         <Field label={t("Customer")} hint={t("Rows are created under this customer only. Properties, floors and rooms that do not exist yet are created.")} error={tried && !customerId ? t("Choose a customer") : undefined}>
           <Select value={customerId} onChange={(v) => { setCustomerId(v.target.value); setPreview(null); }}>{live.activeCustomers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select>

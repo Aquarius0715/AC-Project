@@ -21,7 +21,7 @@ test("the contract scope, plan counts, eligibility and the restricted contract's
   for (const name of ["Customer & units", "Plan", "Restriction eligibility"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();
   await expect(main).toContainText("1 active restriction");
   await expect(main).toContainText("Save is disabled (SR19)");
-  await expect(main.getByRole("link", { name: "Open restriction →" })).toHaveAttribute("href", /^\/admin\/restrictions\?restrictionId=[0-9a-f-]{36}$/);
+  await expect(main.getByRole("link", { name: "Open restriction" })).toHaveAttribute("href", /^\/admin\/restrictions\?restrictionId=[0-9a-f-]{36}$/);
   await expect(main.getByRole("button", { name: "Save as version 2" })).toBeDisabled();
 
   // a scope without contracts

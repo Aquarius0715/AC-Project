@@ -9,6 +9,7 @@ import { conditionErrors, copyable, metricLabel, ruleChanges, settingText, type 
 import { saveDefaultRules, switchDefaultRule } from "../actions";
 import { ConditionFields, WindowEditor } from "./policy-parts";
 import { DefaultRulePreview, DemoTest } from "./policy-checks";
+import { Icon } from "@ac/web/components/Icon";
 
 const CATEGORY: Record<string, string> = { air_quality: "Air quality", fault: "Fault", maintenance: "Maintenance", connection: "Connection" };
 const SHOWN = 20; // the customers listed before the search-select (DD-A05 item 9, Figma 268:2)
@@ -86,7 +87,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
     <Card title={<span className="inline-flex flex-wrap items-center gap-2">{t("Default policy")} › {rule.name}<Badge tone="muted">{t("Policy v{n}", { n: p.version })}</Badge></span>}
       sub={`${p.id} · ${t("HQ template")} · ${t("rule {n} of {total}", { n: idx + 1, total: rules.length })}`} action={<Badge tone="ok">{t("Enabled (template)")}</Badge>}>
       <div className="flex flex-col gap-5">
-        <Banner tone="warn" action={canWrite && copyable(rule) ? <Btn size="sm" onClick={() => onCopy(rule.ruleKey)}>{copyFor ? t("Copy as a {customer} policy →", { customer: copyFor.name }) : t("Copy as a customer policy →")}</Btn> : undefined}>
+        <Banner tone="warn" action={canWrite && copyable(rule) ? <Btn size="sm" onClick={() => onCopy(rule.ruleKey)}>{copyFor ? t("Copy as a {customer} policy", { customer: copyFor.name }) : t("Copy as a customer policy")}<Icon name="arrowRight" /></Btn> : undefined}>
           <span><b>{t("Default policy rule — runs on every unit of every customer")}</b><span className="block text-xs">{t("Saving changes affects all units. Customers and HQ can add their own policies on top; this rule cannot be detached from a unit.")}</span>
             {!copyable(rule) && <span className="block text-xs">{t("{metric} is not a metric a customer policy can watch, so this rule cannot be copied.", { metric: metricLabel[rule.metric] ? t(metricLabel[rule.metric]) : rule.metric })}</span>}</span>
         </Banner>

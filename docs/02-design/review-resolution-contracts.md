@@ -6208,3 +6208,36 @@ The last 90 symbol glyphs, in the screens of the other three apps, are Lucide ic
 5. **The Malay dictionary** follows every changed key. The i18n check passes in both directions.
 6. **Tests.** Three E2E specs name buttons without glyphs: Active only, Accept assignment, All months.
 7. **Checks.** Typecheck, lint, the web unit tests (458), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped.
+
+## IR397 One icon library, part 5: the arrows in link and button texts — 2026-10-12
+
+Link and button texts no longer start or end with an arrow character. The text names the action, and the arrow is a Lucide icon through `Icon`: after the text for a forward link, before it for a back link. That is 200 icons in 86 files.
+
+1. **Forward links and buttons.**
+   - "View details →" becomes "View details" with `arrowRight` after it (125 places).
+   - A "›" at the end of a row becomes `chevronRight` (28 places).
+   - "↑ Import CSV" becomes the `upload` icon with "Import CSV".
+2. **Back links.**
+   - "← Jobs" becomes `arrowLeft` before "Jobs" (38 places).
+   - The icon-only "‹" back links become `chevronLeft` (7 places) and keep their name "Back".
+   - The partner unit page's back link had no name and now has one.
+3. **Shared parts.**
+   - `Kpi` draws the arrow after its `link` text, so the tiles and the partner overview mapper pass plain words.
+   - The technician loaders pass plain labels ("Open the job", "Unit", "Overview"), and their pages draw the arrows.
+   - The sign-in button has a gap for its icon.
+4. **Sort hints are words.**
+   - Card subtitles say "most severe first", "next due, soonest first" and "sorted by ID" instead of ↓ and ↑. This matches the sort labels of IR394.
+5. **Kept as text.** These are typography, not icons:
+   - an arrow inside a sentence ("requested → offered", "Editing → v3");
+   - the "›" between the parts of a location path or a breadcrumb.
+6. **The Malay dictionary.**
+   - Every key that lost an arrow is renamed, and its Malay text loses the arrow too.
+   - Two plain texts were already keys with another meaning, so the links got context keys. "link::Open alerts" (Buka amaran) sits beside "Open alerts" (Amaran terbuka). "link::Open offers" (Buka tawaran) sits beside "Open offers" (Tawaran terbuka).
+   - The i18n check passes in both directions.
+7. **Tests.**
+   - 15 E2E files name the links and buttons without arrows, and short names use `exact`.
+   - Two unit tests expect the Malay texts without arrows.
+8. **Left for the next parts.**
+   - Figma: the wireframes and components use Lucide.
+   - A guard test that refuses symbol and emoji icons, and the icon rules in the docs.
+9. **Checks.** Typecheck, lint, the web unit tests (458), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped.

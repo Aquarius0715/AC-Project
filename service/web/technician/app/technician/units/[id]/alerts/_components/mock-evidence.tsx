@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Field, Page, SummaryList, Textarea, Timeline, useToast } from "@ac/web/components/ui";
+import { Icon } from "@ac/web/components/Icon";
 
 type St = "Open" | "Acknowledged" | "Resolved";
 
@@ -20,7 +21,7 @@ export function MockAlertEvidence({ id }: { id: string }) {
   };
   return (
     <Page>
-      <div className="text-[13px] text-muted"><Link href={`/technician/units/${id}`} className="font-semibold text-primary">← Unit</Link> › Alert evidence · {id}</div>
+      <div className="text-[13px] text-muted"><Link href={`/technician/units/${id}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> Unit</Link> › Alert evidence · {id}</div>
       <div className="flex flex-wrap items-center gap-2"><h1 className="text-lg font-bold">alert-temp-a · Bedroom too hot</h1><Badge tone={st === "Resolved" ? "ok" : st === "Acknowledged" ? "primary" : "warn"}>{st}</Badge></div>
       <p className="text-xs text-muted">Policy: temperature ≥ 30°C, recovery ≤ 28°C, duration 60s</p>
       <div className="split">

@@ -1,6 +1,6 @@
 // HQ restrictions (FR-A09, DD-A09, SCR-A09, Figma Admin 38:8, IR321): signed in as the restriction manager in its own
 // browser context, the Cause invoice filter offers the invoices that restrictions cite and keeps the choice in the URL
-// (invoiceId); each unit of the selected restriction links its unit screen (Details →). Nothing is scheduled,
+// (invoiceId); each unit of the selected restriction links its unit screen (Details). Nothing is scheduled,
 // executed or released.
 import type { BrowserContext } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
@@ -30,7 +30,7 @@ test("the cause invoice filter and the units' Details links", async ({ browser, 
 
   // the selected restriction's units open their unit screen, which finds the customer itself
   const units = main.locator("section").filter({ has: page.getByRole("heading", { name: "Units", exact: true }) });
-  const details = units.getByRole("link", { name: "Details →" }).first();
+  const details = units.getByRole("link", { name: "Details", exact: true }).first();
   await expect(details).toHaveAttribute("href", /^\/admin\/units\?unitId=[0-9a-f-]{36}$/);
   await details.click();
   await page.waitForURL(/\/admin\/units\?customerId=[0-9a-f-]{36}&unitId=[0-9a-f-]{36}$/);

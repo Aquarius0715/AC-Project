@@ -24,7 +24,7 @@ test("Sign out ends the session, at the identity provider too", async ({ browser
     await page.waitForURL(/\/login$/);
     await page.goto(app.home);
     await expect(page).toHaveURL(new RegExp(`/login\\?returnTo=${encodeURIComponent(app.home)}`));
-    const again = page.getByRole("link", { name: `Continue as ${app.user} →` });
+    const again = page.getByRole("link", { name: `Continue as ${app.user}` });
     await expect(again).toHaveAttribute("href", new RegExp(`^/bff/auth/login\\?login_hint=${app.user}&returnTo=`));
     // the provider's session ended with the sign-out: signing in again asks for the password instead of coming back
     await again.click();

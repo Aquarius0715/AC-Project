@@ -131,7 +131,7 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
                     <thead className="bg-surface2 text-left text-[11px] uppercase text-muted"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><th /></tr></thead>
                     <tbody>{dv.sensors.map((x) => (
                       <tr key={x.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{x.metric}</td><td>{x.unit}</td><td>{x.stale}</td><td className="text-xs">{x.calibrated}</td>
-                        <td className="pr-3 text-right">{live.canWrite && <button type="button" disabled={pending || busy} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => calibrateOf(x.id)}>{t("Calibrate →")}</button>}</td></tr>
+                        <td className="pr-3 text-right">{live.canWrite && <button type="button" disabled={pending || busy} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => calibrateOf(x.id)}>{t("Calibrate")} <Icon name="arrowRight" /></button>}</td></tr>
                     ))}</tbody>
                   </table></div>
                 )}

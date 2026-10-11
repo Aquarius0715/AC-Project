@@ -131,7 +131,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
 
   const head = (
     <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted">
-      <Link href="/technician" className="font-semibold text-primary">{t("← Overview")}</Link>
+      <Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Overview")}</Link>
       <b className="text-ink">{job.id.slice(0, 8)} · {live.unit?.name ?? t("Unit")} — {statusText[job.status] ? t(statusText[job.status]) : job.status}</b>
       {dirty && <Badge tone="warn">{t("Unsaved changes")}</Badge>}
     </div>
@@ -232,17 +232,17 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                 ))}
                 <p className="text-[11px] text-muted">{issues?.length ? t(issues.length === 1 ? "1 issue blocks submit — see the summary on the right." : "{n} issues block submit — see the summary on the right.", { n: issues.length }) : t("{n} items still empty — each needs a result, or not inspected / not applicable with a reason, before submit.", { n: draft.items.filter((x) => x.result === null).length })}</p>
               </Card>
-              <Card title={t("Job & unit")} action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${job.unitId}?jobId=${job.id}`}>{t("Unit →")}</Link>}>
+              <Card title={t("Job & unit")} action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${job.unitId}?jobId=${job.id}`}>{t("Unit")} <Icon name="arrowRight" /></Link>}>
                 <SummaryList items={[
                   [t("Window"), <span key="w" className={win.phase === "ending" || win.phase === "ended" ? "font-semibold text-crit" : undefined}>{job.assignment ? f.span(job.assignment.scheduledStart, job.assignment.scheduledEnd) : "—"}</span>],
                   [t("Site"), live.unit?.place ?? (live.unitRefused ? t("opens at the start of your window") : "—")], [t("Access"), live.unit?.access ?? "—"], [t("Unit"), live.unit ? `${live.unit.name} · ${live.unit.model}` : job.unitId.slice(0, 8)],
                   [t("Job"), `${typeLabel(job.type, t)} · ${t(job.origin === "periodic_plan" ? "periodic plan" : "client request")}`], [t("Request"), job.symptom ? `“${job.symptom}”` : "—"],
-                  [t("Linked alerts"), job.alertCount ? <Link key="a" className="font-semibold text-crit" href={`/technician/units/${job.unitId}/alerts?jobId=${job.id}`}>{t(job.alertCount === 1 ? "1 alert →" : "{n} alerts →", { n: job.alertCount })}</Link> : t("none")],
+                  [t("Linked alerts"), job.alertCount ? <Link key="a" className="font-semibold text-crit" href={`/technician/units/${job.unitId}/alerts?jobId=${job.id}`}>{t(job.alertCount === 1 ? "1 alert" : "{n} alerts", { n: job.alertCount })} <Icon name="arrowRight" /></Link> : t("none")],
                 ]} />
                 {unitOpen && (
                   <div className="mt-3 flex flex-wrap gap-3 text-xs font-semibold">
-                    <Link className="text-primary" href={`/technician/units/${job.unitId}/alerts?jobId=${job.id}`}>{t("Alert evidence →")}</Link>
-                    <Link className="text-primary" href={`/technician/units/${job.unitId}/control?jobId=${job.id}`}>{t("Diagnostics →")}</Link>
+                    <Link className="text-primary" href={`/technician/units/${job.unitId}/alerts?jobId=${job.id}`}>{t("Alert evidence")} <Icon name="arrowRight" /></Link>
+                    <Link className="text-primary" href={`/technician/units/${job.unitId}/control?jobId=${job.id}`}>{t("Diagnostics")} <Icon name="arrowRight" /></Link>
                   </div>
                 )}
               </Card>

@@ -142,11 +142,11 @@ export function AuditView({ live }: { live?: AuditLive }) {
               : sel && (
                 <Card title={<span className="flex flex-wrap items-center gap-2">{sel.op}<Badge tone={resultTone(sel.res)}>{resultWord(sel.res, t)}</Badge></span>} sub={`${sel.target}${sel.versions ? ` · ${sel.versions}` : ""}`} className="self-start">
                   <SummaryList items={[
-                    [t("Actor"), <span key="a" className="flex flex-wrap items-center justify-between gap-2"><span>{sel.actor}{sel.actorId !== sel.actor && <span className="ml-2 font-mono text-xs text-muted">{sel.actorId}</span>}</span><FilterLink onClick={() => search({ actorId: sel.actorId }, true)}>{t("Filter by actor →")}</FilterLink></span>],
+                    [t("Actor"), <span key="a" className="flex flex-wrap items-center justify-between gap-2"><span>{sel.actor}{sel.actorId !== sel.actor && <span className="ml-2 font-mono text-xs text-muted">{sel.actorId}</span>}</span><FilterLink onClick={() => search({ actorId: sel.actorId }, true)}>{t("Filter by actor")} <Icon name="arrowRight" /></FilterLink></span>],
                     [t("Role at the time"), t("{role} — kept as recorded, not rewritten by the current membership", { role: sel.role })],
                     [t("Occurred"), sel.occurred],
-                    [t("Correlation ID"), <span key="c" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">{sel.corr}</span><FilterLink onClick={() => search({ correlationId: sel.corr }, true)}>{t("Filter by ID →")}</FilterLink></span>],
-                    [t("Target"), <span key="t" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">{sel.target}</span><FilterLink onClick={() => search({ targetKind: sel.targetKind, targetId: sel.targetId }, true)}>{t("Filter by target →")}</FilterLink></span>],
+                    [t("Correlation ID"), <span key="c" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">{sel.corr}</span><FilterLink onClick={() => search({ correlationId: sel.corr }, true)}>{t("Filter by ID")} <Icon name="arrowRight" /></FilterLink></span>],
+                    [t("Target"), <span key="t" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">{sel.target}</span><FilterLink onClick={() => search({ targetKind: sel.targetKind, targetId: sel.targetId }, true)}>{t("Filter by target")} <Icon name="arrowRight" /></FilterLink></span>],
                     [t("Reason"), sel.reason ?? "—"],
                   ]} />
                   {trace.length > 0 && (
@@ -195,10 +195,10 @@ function RelatedRecords({ related, demo }: { related: Related; demo: boolean }) 
     <>
       <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Related records")}</h3>
       <SummaryList items={[
-        row(t("Restriction"), related.restriction, t("No related restriction"), (r) => <TextLink href={`/admin/restrictions?restrictionId=${r.id}`}>{t("Open restriction →")}</TextLink>),
+        row(t("Restriction"), related.restriction, t("No related restriction"), (r) => <TextLink href={`/admin/restrictions?restrictionId=${r.id}`}>{t("Open restriction")} <Icon name="arrowRight" /></TextLink>),
         [t("Command"), related.command ? <CommandLine key="cmd" r={related.command} demo={demo} line={line(related.command)} /> : <span key="cmd" className="text-muted">{t("No related command")}</span>],
-        row(t("Job"), related.job, t("No related job"), (r) => <TextLink href={`/admin/jobs?jobId=${r.id}`}>{t("Open job →")}</TextLink>),
-        ...(related.unit ? [row(t("Unit"), related.unit, "", (r) => <TextLink href={`/admin/units?unitId=${r.id}`}>{t("Open unit →")}</TextLink>)] : []),
+        row(t("Job"), related.job, t("No related job"), (r) => <TextLink href={`/admin/jobs?jobId=${r.id}`}>{t("Open job")} <Icon name="arrowRight" /></TextLink>),
+        ...(related.unit ? [row(t("Unit"), related.unit, "", (r) => <TextLink href={`/admin/units?unitId=${r.id}`}>{t("Open unit")} <Icon name="arrowRight" /></TextLink>)] : []),
       ]} />
       <p className="mt-2 rounded-lg bg-primary-soft/50 px-3 py-2 text-[11px] text-muted">{t("Links open the existing detail screens, and each checks your permission there. “Load command” reads the command only when you click it. Audit entries cannot be edited, deleted or exported.")}</p>
     </>
@@ -225,7 +225,7 @@ function CommandLine({ r, demo, line }: { r: RelatedRef; demo: boolean; line: Re
   return (
     <span className="flex flex-col gap-1">
       <span className="flex flex-wrap items-center justify-between gap-2">{line}{c.state !== "done" && <Btn size="sm" disabled={c.state === "loading"} onClick={load}>{t("Load command")}</Btn>}</span>
-      {c.state === "done" && <span className="flex flex-wrap items-center justify-between gap-2 text-xs"><span>{c.text} · {c.when}</span>{c.unitId && <TextLink href={`/admin/units?unitId=${c.unitId}`}>{t("Open unit →")}</TextLink>}</span>}
+      {c.state === "done" && <span className="flex flex-wrap items-center justify-between gap-2 text-xs"><span>{c.text} · {c.when}</span>{c.unitId && <TextLink href={`/admin/units?unitId=${c.unitId}`}>{t("Open unit")} <Icon name="arrowRight" /></TextLink>}</span>}
       {c.state === "error" && <span className="text-xs text-crit">{c.text}</span>}
     </span>
   );
@@ -269,8 +269,8 @@ function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEv
               <SummaryList items={ev.facts} />
               <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Linked alerts and audit")}</h3>
               <SummaryList items={[
-                ...ev.alerts.map((a): [string, ReactNode] => [t("Alert"), <span key={a.id} className="flex flex-wrap items-center justify-between gap-2"><span>{a.text}</span><TextLink href={a.href}>{t("Open alert →")}</TextLink></span>]),
-                [t("Audit"), <span key="audit" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">device_event · {ev.id.slice(0, 8)}</span><TextLink href={`/admin/audit?targetKind=device_event&targetId=${ev.id}`}>{t("Filter log →")}</TextLink></span>],
+                ...ev.alerts.map((a): [string, ReactNode] => [t("Alert"), <span key={a.id} className="flex flex-wrap items-center justify-between gap-2"><span>{a.text}</span><TextLink href={a.href}>{t("Open alert")} <Icon name="arrowRight" /></TextLink></span>]),
+                [t("Audit"), <span key="audit" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">device_event · {ev.id.slice(0, 8)}</span><TextLink href={`/admin/audit?targetKind=device_event&targetId=${ev.id}`}>{t("Filter log")} <Icon name="arrowRight" /></TextLink></span>],
               ]} />
               <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Response notes (read-only here)")}</h3>
               {ev.notes.length === 0 ? <p className="text-xs text-muted">{t("No response notes.")}</p> : <ul className="flex flex-col gap-2">{ev.notes.map((n, k) => <li key={k} className="rounded-lg border border-line px-3 py-2 text-[13px]">“{n.text}”<div className="text-[11px] text-muted">{n.by}</div></li>)}</ul>}

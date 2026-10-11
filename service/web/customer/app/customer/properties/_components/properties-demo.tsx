@@ -82,11 +82,11 @@ export function PropertiesDemo() {
             <div className="mb-3 flex flex-wrap items-center gap-2"><span className="text-xs text-muted">{groupUnits[sel].length} ACs ·</span>{(["single", "group"] as const).map((m) => <button key={m} aria-pressed={mode === m} onClick={() => setMode(m)} className={cx("rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{m === "single" ? "Single AC" : "Group control"}</button>)}</div>
           )}
           {groupUnits[sel] && mode === "group" && <GroupControl space={sel === "ws" ? "Workstations" : sel === "meeting" ? "Meeting room" : "Bedroom"} units={groupUnits[sel]} />}
-          {sel === "ws" && mode === "single" && <div className="flex flex-col gap-2">{groupUnits.ws.map((u) => <Link key={u.id} href="/customer/units/unit-online-rto" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><b className="flex items-center gap-1.5"><Icon name="units" className="text-primary" />{u.name}</b><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} />{u.temp ?? "—"} °C ›</span></Link>)}</div>}
+          {sel === "ws" && mode === "single" && <div className="flex flex-col gap-2">{groupUnits.ws.map((u) => <Link key={u.id} href="/customer/units/unit-online-rto" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><b className="flex items-center gap-1.5"><Icon name="units" className="text-primary" />{u.name}</b><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} />{u.temp ?? "—"} °C <Icon name="chevronRight" /></span></Link>)}</div>}
           {us && mode === "single" && (
             <div className="flex flex-col gap-2">
               {us.map((u) => (
-                <Link key={u.id} href={`/customer/units/${u.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3 hover:bg-surface2/60"><span className="flex items-center gap-2 font-bold"><Icon name="units" className="text-primary" />{u.name}</span><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} /><span>{u.temp} °C</span><span>{u.w} W</span><span className="text-muted">›</span></span></Link>
+                <Link key={u.id} href={`/customer/units/${u.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3 hover:bg-surface2/60"><span className="flex items-center gap-2 font-bold"><Icon name="units" className="text-primary" />{u.name}</span><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} /><span>{u.temp} °C</span><span>{u.w} W</span><span className="text-muted"><Icon name="chevronRight" /></span></span></Link>
               ))}
             </div>
           )}
@@ -94,7 +94,7 @@ export function PropertiesDemo() {
           {(sel === "home-a" || sel === "unassigned") && (
             <div className="mt-2">
               <div className="mb-2 text-[13px] font-bold">? Unassigned units (1) <span className="text-xs font-normal text-muted">Not in any room</span></div>
-              <Link href="/customer/units/unit-guest" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><span><b className="inline-flex items-center gap-1.5"><Icon name="units" className="text-primary" />Guest AC</b><span className="block text-[11px] text-muted">Home A · no room assigned</span></span><span className="text-xs">25.5 °C · 0 W ›</span></Link>
+              <Link href="/customer/units/unit-guest" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><span><b className="inline-flex items-center gap-1.5"><Icon name="units" className="text-primary" />Guest AC</b><span className="block text-[11px] text-muted">Home A · no room assigned</span></span><span className="text-xs">25.5 °C · 0 W <Icon name="chevronRight" /></span></Link>
               <p className="mt-2 text-[11px] text-muted">Moving a unit into a room is done in HQ’s unit register — contact HQ.</p>
             </div>
           )}

@@ -53,11 +53,11 @@ test("the HQ restriction screens in Malay with times in the display time zone", 
   await expect(schedule).toBeHidden();
 
   // the exception screen of the selected restriction
-  const exception = main.getByRole("link", { name: "Pengecualian / pelepasan manual →" });
+  const exception = main.getByRole("link", { name: "Pengecualian / pelepasan manual" });
   if (await exception.count()) {
     await exception.click();
     await page.waitForURL(/\/admin\/restrictions\/[0-9a-f-]{36}$/);
-    await expect(main.getByRole("link", { name: "← Sekatan" })).toBeVisible();
+    await expect(main.getByRole("link", { name: "Sekatan", exact: true })).toBeVisible();
     await expect(main.getByRole("heading", { name: "Pilih tindakan", exact: true })).toBeVisible();
     for (const name of ["Tempoh tangguh", "Pengecualian", "Batal", "Lepaskan secara manual"]) await expect(main.getByRole("button", { name: new RegExp(`^${name}`) }).first()).toBeVisible();
     for (const name of ["Apa yang berlaku", "Ringkasan", "Audit"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();

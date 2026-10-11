@@ -140,8 +140,8 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div><h2 className="text-lg font-bold">{dv.row.serial}</h2><p className="text-xs text-muted">{dv.detail.id.slice(0, 8)} · {dv.row.unit} · {dv.jobId ? t("job {id} (your assignment)", { id: dv.jobId.slice(0, 8) }) : t("no assigned job on this unit")}</p></div>
-                {live.events ? <Link href={`/technician/devices?deviceId=${dv.detail.id}`} className="rounded-control border border-line px-3 py-1.5 text-xs font-semibold">{t("← Device detail")}</Link>
-                  : <Link href={`/technician/devices/${dv.detail.id}`} className="rounded-control border border-line px-3 py-1.5 text-xs font-semibold">{t("Device events →")}</Link>}
+                {live.events ? <Link href={`/technician/devices?deviceId=${dv.detail.id}`} className="rounded-control border border-line px-3 py-1.5 text-xs font-semibold"><Icon name="arrowLeft" /> {t("Device detail")}</Link>
+                  : <Link href={`/technician/devices/${dv.detail.id}`} className="rounded-control border border-line px-3 py-1.5 text-xs font-semibold">{t("Device events")} <Icon name="arrowRight" /></Link>}
               </div>
               <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}>
                 {dv.tiles.map((t) => (
@@ -201,7 +201,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
                       {live.canMaintain && <Btn size="sm" disabled={pending || !canWrite} onClick={() => { setNote({ eventId: dv.events![0].id, text: "" }); setErrors({}); setModal("note"); }}>{t("Add response note…")}</Btn>}
                       {live.canAcknowledge && openAlerts(dv.events).map((a) => (
                         <button key={a.id} type="button" disabled={pending} className="text-[13px] font-semibold text-primary disabled:opacity-50"
-                          onClick={() => run(() => acknowledgeAlert(a.id, a.version), t("Alert acknowledged — the tamper state stays until the device reports it clear"), ok(), failed)}>{t("Acknowledge {type} alert {id} →", { type: a.type, id: a.id.slice(0, 8) })}</button>
+                          onClick={() => run(() => acknowledgeAlert(a.id, a.version), t("Alert acknowledged — the tamper state stays until the device reports it clear"), ok(), failed)}>{t("Acknowledge {type} alert {id}", { type: a.type, id: a.id.slice(0, 8) })} <Icon name="arrowRight" /></button>
                       ))}
                     </div>
                   )}
@@ -215,7 +215,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
                         <thead className="bg-surface2 text-left text-[11px] uppercase text-muted"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><th /></tr></thead>
                         <tbody>{dv.sensors.map((s) => (
                           <tr key={s.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{s.metric}</td><td>{s.unit}</td><td>{s.stale}</td><td className="text-xs">{s.calibrated}</td>
-                            <td className="pr-3 text-right">{live.canMaintain && <button type="button" disabled={pending || busy || !canWrite} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => { setCal({ sensorId: s.id, reference: "", measured: "" }); setErrors({}); setModal("calibrate"); }}>{t("Calibrate →")}</button>}</td></tr>
+                            <td className="pr-3 text-right">{live.canMaintain && <button type="button" disabled={pending || busy || !canWrite} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => { setCal({ sensorId: s.id, reference: "", measured: "" }); setErrors({}); setModal("calibrate"); }}>{t("Calibrate")} <Icon name="arrowRight" /></button>}</td></tr>
                         ))}</tbody>
                       </table></div>
                     )}

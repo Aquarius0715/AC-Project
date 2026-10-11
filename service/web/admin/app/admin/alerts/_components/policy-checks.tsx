@@ -51,7 +51,7 @@ export function NotificationPreview({ recipients, severity, customerName, unit, 
                   <div className="min-w-0 flex-1 text-[13px]">
                     <div className="flex flex-wrap items-baseline justify-between gap-2"><b>{row.t}</b><span className="text-[11px] text-muted">{row.w}</span></div>
                     {row.d && <div className="text-xs text-muted">{row.d}</div>}
-                    <div className="mt-1 text-xs text-muted">{t("Open unit →")} · {t("Request maintenance →")}</div>
+                    <div className="mt-1 text-xs text-muted">{t("Open unit")} <Icon name="arrowRight" /> · {t("Request maintenance")} <Icon name="arrowRight" /></div>
                   </div>
                 </div>
               )}

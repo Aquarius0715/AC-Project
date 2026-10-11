@@ -31,7 +31,7 @@ export async function loadControl(unitId: string, jobId: string | null) {
     const job = jobId ? await coreOp<JobRead>("jobs.get", { jobId }).catch(() => null) : null;
     const start = job?.projection === "detail" ? job.assignment?.scheduledStart ?? null : null;
     return {
-      kind: "not_started" as const, title: t("Not started yet"), back: t("← Unit"), unitHref,
+      kind: "not_started" as const, title: t("Not started yet"), back: t("Unit"), unitHref,
       text: start ? t("Diagnostic control opens at {time}, when your work window starts.", { time: showTime(start, display) }) : t("Available from the work start time of your assigned job."),
     };
   }

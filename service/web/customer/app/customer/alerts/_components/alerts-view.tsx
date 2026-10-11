@@ -44,7 +44,7 @@ export function AlertsView({ rows = seed }: { rows?: Alert[] }) {
     <button onClick={() => openAlert(a)} className="flex w-full items-start gap-3 border-t border-line px-1 py-3 text-left first:border-0 hover:bg-surface2/50">
       <Icon name={a.icon} className="mt-0.5" />
       <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><b className={cx(!a.read && "text-primary")}>{a.title}</b><Badge tone="muted" icon={a.kindIcon}>{a.kind}</Badge>{a.read && <Badge tone="ok" icon="check">Read</Badge>}</span><span className="block text-xs text-muted">{a.where}</span><span className="mt-1 block text-xs">{a.ev}</span></span>
-      <span className="text-muted">›</span>
+      <span className="text-muted"><Icon name="chevronRight" /></span>
     </button>
   );
 

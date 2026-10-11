@@ -1,6 +1,6 @@
 // HQ IoT devices (FR-A04, DD-A04, Figma Admin 246:2, IR319): the list is sorted by serial with the state chips — All,
 // Online, Offline, Tamper, No sensors — and a search; the detail shows the tiles, the bound unit, the actions, sensors
-// with Calibrate →, the operation and calibration history and the events. In the seed AC-DEMO-0003 (Meeting room AC)
+// with Calibrate, the operation and calibration history and the events. In the seed AC-DEMO-0003 (Meeting room AC)
 // is offline and AC-DEMO-0005 (Bedroom AC B) has no sensors. Nothing is sent to a device.
 import { test, expect } from "../../fixtures/test";
 
@@ -25,7 +25,7 @@ test("the device list filters by state and the detail shows the device as Figma 
   await page.waitForURL(/deviceId=/);
   for (const label of ["Connection", "Power signal", "Tamper", "Firmware", "Bound to unit"]) await expect(main).toContainText(label);
   for (const name of [/^Sensors \(\d+\) · from the unit’s capability$/, "Operation history", "Calibration history", "Device events"]) await expect(main.getByRole("heading", { name })).toBeVisible();
-  await expect(main.getByRole("button", { name: "Calibrate →" }).first()).toBeVisible();
+  await expect(main.getByRole("button", { name: "Calibrate", exact: true }).first()).toBeVisible();
   for (const name of [/^Check connection/, /^Calibrate sensor/, /^Update firmware/]) await expect(main.getByRole("button", { name })).toBeVisible();
 });
 

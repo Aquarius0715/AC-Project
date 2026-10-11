@@ -48,17 +48,17 @@ test("the technician overview in Malay keeps the timeline in Kuala Lumpur hours"
     await job.click();
     await page.waitForURL(/\/technician\/jobs\/[^/?]+$/);
     for (const name of ["Kemajuan senarai semak", "Kerja & unit", "Versi & simpan automatik"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();
-    await expect(main.getByRole("link", { name: "← Gambaran keseluruhan" })).toBeVisible();
+    await expect(main.getByRole("link", { name: "Gambaran keseluruhan", exact: true })).toBeVisible();
     await expect(main).toContainText(/GMT\+9/); // the work window in the display zone
     // the site's access instructions, as written, and inside the window the unit's alert evidence and diagnostics for
     // an assigned job too (Figma 423:604, IR94, IR283, IR317)
     await expect(main.getByRole("term").filter({ hasText: /^Akses$/ })).toBeVisible();
     await expect(main).toContainText("Ring the demo bell (fictional)"); // the seed property's entry instructions stay as written
     if (await main.getByRole("button", { name: /Mulakan kerja/ }).isEnabled()) {
-      for (const name of ["Bukti amaran →", "Diagnostik →"]) await expect(main.getByRole("link", { name, exact: true }).first()).toBeVisible();
+      for (const name of ["Bukti amaran", "Diagnostik"]) await expect(main.getByRole("link", { name, exact: true }).first()).toBeVisible();
     }
     // the job's unit (IR283): the register, the history and alerts, then Monitoring with another period in the URL
-    await main.getByRole("link", { name: "Unit →", exact: true }).click();
+    await main.getByRole("link", { name: "Unit", exact: true }).click();
     await page.waitForURL(/\/technician\/units\/[^/?]+\?jobId=/);
     for (const name of ["Daftar unit", "Pemantauan siri masa", "Sejarah penyelenggaraan", /^Amaran terbuka \(\d+\)$/, /^Komponen \(\d+\)$/]) await expect(main.getByRole("heading", { name })).toBeVisible();
     await expect(main.getByRole("tab", { name: "Daftar", exact: true })).toHaveAttribute("aria-selected", "true");
@@ -71,7 +71,7 @@ test("the technician overview in Malay keeps the timeline in Kuala Lumpur hours"
     await expect(main.getByRole("heading", { name: /· 7 hari terakhir \(hari kalendar Kuala Lumpur\)$/ })).toBeVisible();
     // the unit's alert evidence (IR284): the policy's condition or that there is none, resolution, history, related
     await main.getByRole("tab", { name: "Daftar", exact: true }).click();
-    await main.getByRole("link", { name: "Bukti amaran →", exact: true }).click();
+    await main.getByRole("link", { name: "Bukti amaran", exact: true }).click();
     await page.waitForURL(/\/technician\/units\/[^/?]+\/alerts/);
     await expect(main.getByRole("heading", { name: "Bukti amaran", exact: true })).toBeVisible();
     if (await main.getByRole("heading", { name: "Penyelesaian", exact: true }).count()) {
@@ -82,7 +82,7 @@ test("the technician overview in Malay keeps the timeline in Kuala Lumpur hours"
     // the job's diagnostic control (IR286): its cards in Malay, nothing sent
     await main.getByRole("link", { name: "Kembali", exact: true }).click();
     await page.waitForURL(/\/technician\/units\/[^/?]+\?jobId=/);
-    const control = main.getByRole("link", { name: "Diagnostik →", exact: true });
+    const control = main.getByRole("link", { name: "Diagnostik", exact: true });
     if (await control.count()) {
       await control.click();
       await page.waitForURL(/\/control\?jobId=/);
@@ -95,12 +95,12 @@ test("the technician overview in Malay keeps the timeline in Kuala Lumpur hours"
   await page.goto("/technician/devices");
   await expect(main.getByRole("heading", { name: "Peranti — unit yang ditugaskan", exact: true })).toBeVisible();
   await expect(main.getByRole("button", { name: /^Semua \d+$/ })).toBeVisible();
-  const events = main.getByRole("link", { name: "Peristiwa peranti →", exact: true });
+  const events = main.getByRole("link", { name: "Peristiwa peranti", exact: true });
   if (await events.count()) {
     await events.click();
     await page.waitForURL(/\/technician\/devices\/[^/?]+$/);
     await expect(main).toContainText(/Peristiwa peranti|Peristiwa peranti dibuka semasa/);
-    await expect(main.getByRole("link", { name: "← Butiran peranti", exact: true })).toBeVisible();
+    await expect(main.getByRole("link", { name: "Butiran peranti", exact: true })).toBeVisible();
   }
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;

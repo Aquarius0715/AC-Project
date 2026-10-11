@@ -78,7 +78,7 @@ export function MaintenanceView({ live }: { live: MaintenanceLive }) {
                     <div className="text-xs text-muted">{r.place ? `${r.place} · ` : ""}{r.type}</div>
                     <div className={cx("flex items-center gap-1.5 text-xs", r.warn && "font-semibold text-warn")}><Icon name={r.icon} className="shrink-0" />{r.line}</div>
                   </div>
-                  <JobStatusBadge s={r.status as JobStatus} /><span className="text-muted">›</span>
+                  <JobStatusBadge s={r.status as JobStatus} /><span className="text-muted"><Icon name="chevronRight" /></span>
                 </ListRow>
               ))}
               {shown.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-center text-xs text-muted">{t(live.rows.length ? "No requests in this filter." : "No requests yet — “+ New maintenance request” asks HQ for a visit.")}</p>}

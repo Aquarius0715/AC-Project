@@ -14,6 +14,7 @@ import { useNow, useOp } from "@ac/web/lib/useOp";
 import { showClock } from "@ac/web/lib/i18n";
 import { useI18n } from "./I18n";
 import { qrMatch, qrRefusal, scanCode, type ApiQrJob, type ApiQrResolution, type ApiQrUnit, type QrMatch } from "@ac/web/lib/techQr";
+import { Icon } from "@ac/web/components/Icon";
 
 const OPEN = ["assigned", "in_progress", "on_hold", "rework_requested"]; // the jobs units.resolveQr opens (IR230)
 
@@ -57,7 +58,7 @@ export function QrScan({ open, onClose }: { open: boolean; onClose: () => void }
       <>
         <Btn variant="ghost" onClick={() => input.current?.focus()}>{t("Enter ID manually")}</Btn>
         {m ? <Link href={m.unitHref} onClick={close} className="inline-flex items-center rounded-control border border-line bg-surface px-3.5 py-2 text-[13px] font-semibold hover:bg-surface2">{t("Open unit")}</Link> : <Btn disabled>{t("Open unit")}</Btn>}
-        {m?.jobHref ? <Link href={m.jobHref} onClick={close} className="inline-flex items-center rounded-control border border-primary bg-primary px-3.5 py-2 text-[13px] font-semibold text-white">{t("Open job →")}</Link> : <Btn variant="primary" disabled>{t("Open job →")}</Btn>}
+        {m?.jobHref ? <Link href={m.jobHref} onClick={close} className="inline-flex items-center rounded-control border border-primary bg-primary px-3.5 py-2 text-[13px] font-semibold text-white">{t("Open job")} <Icon name="arrowRight" /></Link> : <Btn variant="primary" disabled>{t("Open job")} <Icon name="arrowRight" /></Btn>}
       </>
     }>
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">

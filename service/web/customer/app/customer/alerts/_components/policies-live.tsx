@@ -115,7 +115,7 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,320px)]">
       <Card>
-        <div className="mb-3 text-[13px]"><Link href={base} className="font-semibold text-primary">{t("← Alert policies")}</Link> › {t(editor.policy ? "Edit alert policy" : "Create alert policy")}</div>
+        <div className="mb-3 text-[13px]"><Link href={base} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Alert policies")}</Link> › {t(editor.policy ? "Edit alert policy" : "Create alert policy")}</div>
         <Field label={t("Name")} error={tried ? err.name : undefined}><Input value={f.name} maxLength={120} onChange={(e) => set({ name: e.target.value })} /></Field>
         <h3 className="mt-4 text-[13px] font-bold">{t("1 · When …")} <span className="font-normal text-muted">{t("What to watch")}</span></h3>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">

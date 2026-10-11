@@ -44,7 +44,7 @@ export function JobsDemo({ jobId, tab: initial }: { jobId?: string; tab?: string
             <Btn variant="primary" onClick={() => setModal({ kind: "new" })}>+ New job</Btn>
           </div>
           <div className="split-rev">
-            <Card title="Jobs · all customers" sub="status ↑" className="self-start">
+            <Card title="Jobs · all customers" sub="status, earliest stage first" className="self-start">
               <div className="flex flex-col gap-1.5">{list.map((j) => (
                 <ListRow key={j.id} selected={sel?.id === j.id} onClick={() => setSelId(j.id)}>
                   <div className="min-w-0 flex-1">
@@ -201,7 +201,7 @@ function BookModal({ j, slot, onClose }: { j: Job; slot: Slot; onClose: () => vo
   const f = fitFor(slot);
   const [d, setD] = useState<"internal" | "contractor">(f.fits === "both" || f.fits === "internal" ? "internal" : "contractor");
   return (
-    <Modal open onClose={onClose} title={`Book ${j.id}`} footer={<><Btn onClick={onClose}>← Back</Btn><Btn variant="primary" onClick={() => { jobActions.book(j.id, slot, d, d === "internal" ? "tech-internal-a" : "contractor-a"); toast(d === "internal" ? "Assigned — technician notified" : "Offer sent to contractor-a"); onClose(); }}>{d === "internal" ? "Assign" : "Send offer"}</Btn></>}>
+    <Modal open onClose={onClose} title={`Book ${j.id}`} footer={<><Btn onClick={onClose}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={() => { jobActions.book(j.id, slot, d, d === "internal" ? "tech-internal-a" : "contractor-a"); toast(d === "internal" ? "Assigned — technician notified" : "Offer sent to contractor-a"); onClose(); }}>{d === "internal" ? "Assign" : "Send offer"}</Btn></>}>
       <p className="text-xs text-muted">{j.type} · {j.unit} · {j.customer} · {j.origin === "plan" ? "Periodic plan" : "Client request"}</p>
       <Field label="Visit time · from the client" hint="Cannot be edited here. Need another time? Close and use “Propose another time…” — the client must accept it."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {longDate(slot)}</div></Field>
       <Field label="Who does the work" hint={f.fits === "contractor" ? "No qualified HQ technician is free at this time — offer to a contractor." : undefined}><Choice value={d} onChange={setD} options={[...(f.fits === "contractor" ? [] : [{ id: "internal" as const, label: "Assign internally" }]), { id: "contractor" as const, label: "Offer to contractor" }]} /></Field>

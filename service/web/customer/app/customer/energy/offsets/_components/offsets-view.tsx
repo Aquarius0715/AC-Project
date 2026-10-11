@@ -43,7 +43,7 @@ export function OffsetsView({ live }: { live: Live }) {
   const restart = () => { setDone(null); setQuote(null); setAck(false); setStep(0); };
   return (
     <Page>
-      <div className="text-[13px] text-muted"><Link href={`/customer/energy?${live.back}`} className="font-semibold text-primary">{t("← Energy & cost")}</Link> › {t("Carbon offsets (demo)")}</div>
+      <div className="text-[13px] text-muted"><Link href={`/customer/energy?${live.back}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Energy & cost")}</Link> › {t("Carbon offsets (demo)")}</div>
       <Banner tone="warn" action={<DemoBadge />}>{t("Demo only — no real carbon credits are bought or retired. Energy savings do not become a tradable balance. Records are labelled “Demo”.")}</Banner>
       <Steps steps={[t("Amount"), t("Quote"), t("Confirm")]} current={step} />
       <Card title={t("Based on Energy & cost")} sub={`${live.subject} · ${live.period.label}${live.estimate ? ` · ${live.estimate.factor}` : ""}`}>
@@ -72,13 +72,13 @@ export function OffsetsView({ live }: { live: Live }) {
             [t("Quote ID"), t("{id} (demo)", { id: quote.id.slice(0, 8) })], [t("Estimated amount"), quote.estimatedAmountMinor !== null && quote.currency ? t("{amount} (demo)", { amount: amount(quote.estimatedAmountMinor, quote.currency) }) : "—"],
             [t("Expires"), showTime(quote.expiresAt, display)], [t("Records created"), t("None yet")],
           ]} />
-          <div className="mt-3 flex gap-2"><Btn onClick={() => setStep(0)}>{t("← Back")}</Btn><Btn variant="primary" onClick={() => setStep(2)}>{t("Continue")}</Btn></div>
+          <div className="mt-3 flex gap-2"><Btn onClick={() => setStep(0)}><Icon name="arrowLeft" /> {t("Back")}</Btn><Btn variant="primary" onClick={() => setStep(2)}>{t("Continue")}</Btn></div>
         </Card>
       ) : quote ? (
         <Card title={t("Confirm demo request")}>
           <SummaryList items={[[t("Amount"), `${kg3(quote.amountKg)} kgCO₂e`], [t("Quote"), t("{id} · expires {when}", { id: quote.id.slice(0, 8), when: showTime(quote.expiresAt, display) })], [t("Result"), t("A demo record “Demo requested” is created. Proof stays “Not issued”.")]]} />
           <div className="mt-3"><Check checked={ack} onChange={setAck} label={t("I understand this is a simulated request — not a real purchase.")} /></div>
-          <div className="mt-3 flex gap-2"><Btn onClick={() => setStep(1)}>{t("← Back")}</Btn><Btn variant="primary" disabled={!ack || pending} onClick={confirm}>{t("Submit demo request")}</Btn></div>
+          <div className="mt-3 flex gap-2"><Btn onClick={() => setStep(1)}><Icon name="arrowLeft" /> {t("Back")}</Btn><Btn variant="primary" disabled={!ack || pending} onClick={confirm}>{t("Submit demo request")}</Btn></div>
         </Card>
       ) : null}
       <Card title={t("Demo offset records")} sub={t("Demo retirement ≠ certified credit")}>

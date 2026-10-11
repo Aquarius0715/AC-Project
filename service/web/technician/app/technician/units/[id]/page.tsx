@@ -10,6 +10,7 @@ import { apiMode } from "@ac/web/lib/dal";
 import { TechUnitDemo } from "./_components/unit-demo";
 import { TechUnitView } from "./_components/unit-view";
 import { loadTechUnit } from "./_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 export default async function TechnicianUnitPage({ params, searchParams }: PageProps<"/technician/units/[id]">) {
   const { id } = await params;
@@ -22,7 +23,7 @@ export default async function TechnicianUnitPage({ params, searchParams }: PageP
   if (live.kind === "not_started") {
     return (
       <Page className="max-w-xl">
-        <Card title={live.title} sub={live.text}>{live.job && <LinkBtn href={live.job.href} size="sm" variant="primary">{live.job.label}</LinkBtn>}</Card>
+        <Card title={live.title} sub={live.text}>{live.job && <LinkBtn href={live.job.href} size="sm" variant="primary">{live.job.label}<Icon name="arrowRight" /></LinkBtn>}</Card>
       </Page>
     );
   }

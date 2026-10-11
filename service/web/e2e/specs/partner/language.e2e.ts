@@ -32,7 +32,7 @@ test("the contractor screens in Malay keep Kuala Lumpur days and show instants i
   if (await job.count()) {
     await job.click();
     await page.waitForURL(/\/partner\/(jobs\/[^/?]+|history|schedule)/);
-    if (/\/partner\/jobs\/[^/?]+$/.test(new URL(page.url()).pathname)) await expect(main.getByRole("link", { name: "← Kerja" })).toBeVisible(); // the offer, detail or history page
+    if (/\/partner\/jobs\/[^/?]+$/.test(new URL(page.url()).pathname)) await expect(main.getByRole("link", { name: "Kerja", exact: true })).toBeVisible(); // the offer, detail or history page
   }
   await page.goto("/partner/jobs?tab=completed");
   const done = main.locator("a[href^='/partner/jobs/']").first(); // a completed job inside its delegation: its quality review

@@ -16,7 +16,7 @@ export function ReviewDemo({ id }: { id: string }) {
   const checks: [string, string, string][] = [["Indoor unit — filter condition", "Normal", "ok"], ["Outdoor unit — refrigerant pressure", "Normal", "ok"], ["Electrical — wiring insulation", "Not applicable", "muted"], ["Drainage — condensate flow", "Normal", "ok"]];
   return (
     <Page>
-      <div className="text-[13px] text-muted"><Link href="/partner/jobs" className="font-semibold text-primary">← Jobs</Link> › {id} · Quality review</div>
+      <div className="text-[13px] text-muted"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> Jobs</Link> › {id} · Quality review</div>
       {state === "accepted" && <Banner tone="ok">Accepted → completed (receipt). Report v1 is now visible to the customer. The linked alert stays open.</Banner>}
       {state === "returned" && <Banner tone="warn">Returned for rework. tech-external-a can resume as v2.</Banner>}
       <div className="split">

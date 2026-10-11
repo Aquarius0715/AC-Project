@@ -209,7 +209,7 @@ test("the default policy's rules, a customer's switch and a rule copied as a cus
   await rules.getByRole("button", { name: /Clogged filter/ }).click();
   await expect(main).toContainText("is not a metric a customer policy can watch, so this rule cannot be copied.");
   await rules.getByRole("button", { name: /^Ventilation/ }).click();
-  await main.getByRole("button", { name: "Copy as a customer policy →" }).click();
+  await main.getByRole("button", { name: "Copy as a customer policy" }).click();
   const owner = page.getByRole("dialog").getByRole("combobox", { name: "Owner (customer)" });
   await owner.click();
   await owner.fill("Demo Customer A");
@@ -258,7 +258,7 @@ test("the notification preview and the demo test of a policy attached to a unit"
   // attach it on Bedroom AC's unit page, then back by the unit's Edit link (scoped to the customer and the unit)
   await page.goto("/admin/alerts");
   await main.getByRole("button", { name: /Possible open window/ }).click();
-  await main.getByRole("link", { name: "Open unit →" }).click();
+  await main.getByRole("link", { name: "Open unit", exact: true }).click();
   await page.waitForURL(/unitId=/);
   await main.getByRole("button", { name: "+ Attach policy" }).click();
   await page.getByRole("dialog").getByRole("checkbox", { name: new RegExp(name) }).check();

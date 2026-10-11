@@ -27,7 +27,7 @@ export function PartnerUnitDetail({ live }: { live: UnitLive }) {
   const conn = live.register.connection;
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href={live.context ? `/partner/jobs/${live.context.id}` : "/partner/jobs"} className="font-semibold text-primary">‹</Link><b className="text-ink">{live.name}</b><span>· {live.id.slice(0, 8)}</span></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href={live.context ? `/partner/jobs/${live.context.id}` : "/partner/jobs"} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><b className="text-ink">{live.name}</b><span>· {live.id.slice(0, 8)}</span></div>
       <Banner>{live.banner}</Banner>
       <div className="split-rev">
         <div className="flex min-w-0 flex-col gap-4">
@@ -35,7 +35,7 @@ export function PartnerUnitDetail({ live }: { live: UnitLive }) {
             <SummaryList items={[...live.register.rows, [t("Connection"), <ConnBadge key="c" s={conn} />], [t("Last seen"), live.register.lastSeen]]} />
             <p className="mt-2 rounded-xl bg-primary-soft/40 px-3 py-2 text-[11px] text-muted">{t("Read-only — no remote-control actions available to contractors.")}</p>
           </Card>
-          <Card title={t("Job context")} action={live.context && <Link className="text-xs font-semibold text-primary" href={`/partner/jobs/${live.context.id}`}>{t("Job →")}</Link>}>
+          <Card title={t("Job context")} action={live.context && <Link className="text-xs font-semibold text-primary" href={`/partner/jobs/${live.context.id}`}>{t("Job")} <Icon name="arrowRight" /></Link>}>
             {!live.context ? <p className="text-[13px] text-muted">{t("No current job of your company on this unit.")}</p> : (
               <>
                 <SummaryList items={live.context.rows.map(([k, v], n): [string, React.ReactNode] => [k, n === 1 && live.context!.techMissing ? <span key="t" className="font-semibold text-crit">{v}</span> : v])} />

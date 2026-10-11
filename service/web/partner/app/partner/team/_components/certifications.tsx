@@ -76,7 +76,7 @@ export function Certifications({ live }: { live: Live }) {
             <div className="flex flex-col gap-3">
               <Banner tone="warn">{c.impact.text}</Banner>
               <SummaryList items={c.impact.rows} />
-              <div><LinkBtn href={`/partner/schedule?jobId=${c.impact.jobId}`} size="sm">{t("Open assignment →")}</LinkBtn></div>
+              <div><LinkBtn href={`/partner/schedule?jobId=${c.impact.jobId}`} size="sm">{t("Open assignment")} <Icon name="arrowRight" /></LinkBtn></div>
             </div>
           ) : <p className="text-[13px] text-muted">{t("No booked job depends on an expiring, expired or missing certificate.")}</p>}
           <p className="mt-3 text-[11px] text-muted">{t("Reminders are sent 60, 30 and 7 days before expiry to the contractor admin (Notifications).")}</p>

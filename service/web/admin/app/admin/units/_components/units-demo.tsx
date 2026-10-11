@@ -51,13 +51,13 @@ export function UnitsDemo() {
   if (!cust) {
     return (
       <Page>
-        <div className="flex flex-wrap items-center justify-between gap-2"><Tabs value={top} onChange={setTop} tabs={[{ id: "customers", label: "Customers & units", count: 3 }, { id: "warranty", label: "Warranty & coverage", count: 5 }]} /><Btn size="sm" onClick={() => setImp(true)}>↑ Import CSV</Btn></div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><Tabs value={top} onChange={setTop} tabs={[{ id: "customers", label: "Customers & units", count: 3 }, { id: "warranty", label: "Warranty & coverage", count: 5 }]} /><Btn size="sm" onClick={() => setImp(true)}><Icon name="upload" />Import CSV</Btn></div>
         <ImportCsvModal open={imp} onClose={() => setImp(false)} />
         {top === "warranty" ? <WarrantyTab /> : <>
         <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}><Kpi label="Customers" value={2} sub="+1 inactive (not counted)" /><Kpi label="Properties" value={2} sub="Home A · Home B" /><Kpi label="Units" value={5} sub="Running 2 · Stopped 2 · unknown 1" /><Kpi label="Needs attention" value={1} tone="warn" sub="overdue billing / open alert" /></div>
         <Card title="Customers" sub="Select a customer to manage its properties, spaces, and units" action={<Btn size="sm" variant="primary" onClick={() => setModal("customer")}>+ New customer</Btn>}>
           <div className="mb-3 flex flex-wrap items-center gap-3"><div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder="Search customer name, ID, or property…" value={q} onChange={setQ} /></div><Select aria-label="Status" className="w-auto" value={status} onChange={(e) => setStatus(e.target.value as "all")}><option value="active">Status: Active</option><option value="all">Status: All</option></Select></div>
-          <DataTable rows={rows} rowKey={(r) => r.id} onRowClick={(c) => setCust(c)} cols={[{ key: "c", label: "Customer", render: (c) => <><b>{c.id}</b><div className="text-xs text-muted">{c.name}</div></> }, { key: "s", label: "Status", render: (c) => <Badge tone={c.status === "active" ? "ok" : "unknown"}>{c.status}</Badge> }, { key: "p", label: "Properties", render: (c) => c.props, hideBelow: "sm" }, { key: "u", label: "Units", render: (c) => c.units }, { key: "o", label: "Operation", render: (c) => c.op, hideBelow: "md" }, { key: "a", label: "Alerts", render: (c) => c.alerts, hideBelow: "md" }, { key: "k", label: "Contract", render: (c) => c.contract, hideBelow: "md" }, { key: "x", label: "", render: () => "›" }]} />
+          <DataTable rows={rows} rowKey={(r) => r.id} onRowClick={(c) => setCust(c)} cols={[{ key: "c", label: "Customer", render: (c) => <><b>{c.id}</b><div className="text-xs text-muted">{c.name}</div></> }, { key: "s", label: "Status", render: (c) => <Badge tone={c.status === "active" ? "ok" : "unknown"}>{c.status}</Badge> }, { key: "p", label: "Properties", render: (c) => c.props, hideBelow: "sm" }, { key: "u", label: "Units", render: (c) => c.units }, { key: "o", label: "Operation", render: (c) => c.op, hideBelow: "md" }, { key: "a", label: "Alerts", render: (c) => c.alerts, hideBelow: "md" }, { key: "k", label: "Contract", render: (c) => c.contract, hideBelow: "md" }, { key: "x", label: "", render: () => <span className="text-muted"><Icon name="chevronRight" /></span> }]} />
           <p className="mt-2 text-[11px] text-muted">{rows.length} of 3 · sorted by name · Inactive customers appear only with Status: All (IR40). Archived properties/spaces/units never appear in lists, summaries, or KPI denominators (IR39).</p>
         </Card>
         </>}
@@ -67,7 +67,7 @@ export function UnitsDemo() {
   }
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px]"><button className="font-semibold text-primary" onClick={() => { setCust(null); setUnit(null); }}>← Customers & units</button><span className="text-muted">› {cust.id} · {cust.name}</span></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px]"><button className="font-semibold text-primary" onClick={() => { setCust(null); setUnit(null); }}><Icon name="arrowLeft" /> Customers & units</button><span className="text-muted">› {cust.id} · {cust.name}</span></div>
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "units", label: "Units & locations" }, { id: "users", label: "Users" }, { id: "policies", label: "Alert policies" }]} />
       {tab === "units" && (
         <div className="split-rev">

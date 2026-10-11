@@ -15,7 +15,7 @@ test("billing months filter the invoices and the related restriction opens on th
 
   // the related restriction: its short ID and a link to it on the Restrictions screen
   const related = main.locator("section").filter({ has: page.getByRole("heading", { name: "Related restriction", exact: true }) });
-  await expect(related.getByRole("link", { name: "Open restriction →" })).toHaveAttribute("href", /^\/admin\/restrictions\?restrictionId=[0-9a-f-]{36}$/);
+  await expect(related.getByRole("link", { name: "Open restriction" })).toHaveAttribute("href", /^\/admin\/restrictions\?restrictionId=[0-9a-f-]{36}$/);
   await expect(related).toContainText("This invoice is a cause of this restriction.");
 
   // a month without invoices, then all months again

@@ -78,7 +78,7 @@ export function AutomationsDemo() {
       )}
       <p className="text-xs text-muted">Priority when rules overlap: device capabilities & active restrictions → HQ policy → your automations. List order is not run priority. Missing condition data never counts as a match.</p>
 
-      <Modal open={!!edit} onClose={() => setEdit(null)} wide title={step === "review" ? "Review / Test result" : edit === "new" ? "Create automation" : "Edit automation"} footer={step === "form" ? <><Btn onClick={() => setEdit(null)}>Cancel</Btn><Btn variant="primary" onClick={review}>Review</Btn></> : <><Btn onClick={() => setStep("form")}>← Back</Btn><Btn variant="primary" onClick={save}>Save automation</Btn></>}>
+      <Modal open={!!edit} onClose={() => setEdit(null)} wide title={step === "review" ? "Review / Test result" : edit === "new" ? "Create automation" : "Edit automation"} footer={step === "form" ? <><Btn onClick={() => setEdit(null)}>Cancel</Btn><Btn variant="primary" onClick={review}>Review</Btn></> : <><Btn onClick={() => setStep("form")}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={save}>Save automation</Btn></>}>
         {step === "form" ? (
           <>
             <Field label="Name" error={err.name}><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="e.g. Weekday pre-cool" /></Field>

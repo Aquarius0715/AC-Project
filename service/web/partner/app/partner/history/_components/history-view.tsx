@@ -51,7 +51,7 @@ function List({ live }: { live: HistoryLive }) {
                     <td className="py-2.5 pr-3"><b className={cx("font-semibold", r.tech.tone === "crit" && "text-crit")}>{r.tech.name}</b><span className="block text-[11px] text-muted">{r.tech.sub}</span></td>
                     <td className="py-2.5 pr-3">{r.last ? <><b className={cx("font-semibold", r.overdue && "text-crit")}>{r.overdue ? t("Work window ended") : r.last.title}</b><span className="block text-[11px] text-muted">{r.last.when}</span></> : <span className="text-muted">—</span>}</td>
                     <td className="py-2.5 pr-3"><Badge tone={r.badge.tone}>{r.badge.text}</Badge></td>
-                    <td className="py-2.5 text-right"><Link href={hrefOf(live, r.id)} aria-label={t("Open the history of {id}", { id: r.short })} className="text-muted hover:text-primary">›</Link></td>
+                    <td className="py-2.5 text-right"><Link href={hrefOf(live, r.id)} aria-label={t("Open the history of {id}", { id: r.short })} className="text-muted hover:text-primary"><Icon name="chevronRight" /></Link></td>
                   </tr>
                 ))}
               </tbody>
@@ -119,7 +119,7 @@ function Detail({ live, detail }: { live: HistoryLive; detail: Detail }) {
 
 function Crumb({ live, text }: { live: HistoryLive; text: string }) {
   const t = useT();
-  return <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href={hrefOf(live)} className="font-semibold text-primary">{t("← Job history")}</Link> › <b className="text-ink">{text}</b></div>;
+  return <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href={hrefOf(live)} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Job history")}</Link> › <b className="text-ink">{text}</b></div>;
 }
 
 function Compose({ detail, onPreview }: { detail: Extract<Detail, { missing: false }>; onPreview: (p: SessionPreview) => void }) {

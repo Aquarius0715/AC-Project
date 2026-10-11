@@ -14,6 +14,7 @@ import type { JobStatus } from "@ac/web/lib/jobs";
 import { generateJob, savePlan } from "../actions";
 import type { PlansLive } from "../_lib/load";
 import { JobsTabs, ScopeBar } from "./jobs-header";
+import { Icon } from "@ac/web/components/Icon";
 
 type Detail = NonNullable<PlansLive["detail"]>;
 /** What the last write on a plan left to show: saved, generated (the box names the job), a refused Generate job (the
@@ -35,7 +36,7 @@ export function PlansView({ live }: { live: PlansLive }) {
       <JobsTabs tab="plans" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => setCreating(true)}>{t("+ New plan")}</Btn>} />
       <ScopeBar scope={live.scope} q={live.q} text={t(live.plansTotal === 1 ? "1 plan in scope" : "{n} plans in scope", { n: live.plansTotal })} clear="planId" />
       <div className="split-rev">
-        <Card title={t("Recurring plans")} sub={t("next due ↑")} className="self-start">
+        <Card title={t("Recurring plans")} sub={t("next due, soonest first")} className="self-start">
           {live.rows.length === 0 ? <EmptyState title={t("No plans in this scope")}>{t("“+ New plan” sets up a recurring visit for a unit.")}</EmptyState> : (
             <div className="flex flex-col gap-1.5">{live.rows.map((r) => (
               <ListRow key={r.id} selected={sel ? sel.plan.id === r.id : false} href={href(r.id)}>
@@ -104,7 +105,7 @@ function PlanDetail({ d, now, notice, setNotice }: { d: Detail; now: number; not
               <tr key={o.jobId} className="border-t border-line">
                 <td className="py-2 font-semibold">{o.date}</td><td className="text-xs">{o.jobId.slice(0, 8)}</td>
                 <td>{o.status ? <JobStatusBadge s={o.status as JobStatus} /> : <span className="text-xs text-muted">—</span>}</td>
-                <td className="text-right"><Link className="text-xs font-semibold text-primary hover:underline" href={`/admin/jobs?jobId=${o.jobId}`}>{t("Open job →")}</Link></td>
+                <td className="text-right"><Link className="text-xs font-semibold text-primary hover:underline" href={`/admin/jobs?jobId=${o.jobId}`}>{t("Open job")} <Icon name="arrowRight" /></Link></td>
               </tr>
             ))}</tbody>
           </table></div>

@@ -62,7 +62,7 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
         </Btn>
       </div>
       <Card title={`${t("Technicians — {company}", { company: live.company })}${q.activeOnly ? ` · ${t("{n} active", { n: live.activeCount })}` : ""}`}
-        action={<div className="flex flex-wrap gap-2"><LinkBtn href="/partner/schedule" size="sm">{t("Open schedule →")}</LinkBtn><Btn size="sm" onClick={() => setOpen(true)} disabled={!live.technicians.length}>{t("+ Unavailable days")}</Btn></div>}>
+        action={<div className="flex flex-wrap gap-2"><LinkBtn href="/partner/schedule" size="sm">{t("Open schedule")} <Icon name="arrowRight" /></LinkBtn><Btn size="sm" onClick={() => setOpen(true)} disabled={!live.technicians.length}>{t("+ Unavailable days")}</Btn></div>}>
         {none ? (
           <div className="py-6 text-center">
             <b className="text-[13px]">{t("No {company} technicians hold this qualification", { company: live.company })}</b>
@@ -117,7 +117,7 @@ function WeekCard({ live }: { live: Live }) {
   const t = useT();
   const w = live.week;
   return (
-    <Card title={w.title} action={<TextLink href="/partner/schedule">{t("Open schedule →")}</TextLink>}>
+    <Card title={w.title} action={<TextLink href="/partner/schedule">{t("Open schedule")} <Icon name="arrowRight" /></TextLink>}>
       <div className="scroll-x">
         <table className="w-full min-w-[560px] text-xs">
           <thead><tr><th />{w.days.map((d, k) => <th key={w.dates[k]} className={cx("p-1 text-center font-semibold", k === w.dayIndex ? "text-primary" : "text-muted")}>{d}</th>)}</tr></thead>
@@ -169,7 +169,7 @@ function UnavailableDays({ live, onClose }: { live: Live; onClose: () => void })
   return (
     <Modal open onClose={onClose} title={t("Add unavailable days")} footer={<>
       <Btn onClick={onClose}>{t("Cancel")}</Btn>
-      <LinkBtn href={conflicts[0] ? `/partner/schedule?jobId=${conflicts[0].jobId}` : "/partner/schedule"}>{t("Open schedule →")}</LinkBtn>
+      <LinkBtn href={conflicts[0] ? `/partner/schedule?jobId=${conflicts[0].jobId}` : "/partner/schedule"}>{t("Open schedule")} <Icon name="arrowRight" /></LinkBtn>
       <Btn variant="primary" disabled={pending} onClick={save}>{t("Save")}</Btn>
     </>}>
       <Field label={t("Technician")}>

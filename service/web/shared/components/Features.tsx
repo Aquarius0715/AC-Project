@@ -71,7 +71,7 @@ export function ImportCsvModal({ open, onClose }: { open: boolean; onClose: () =
   const [step, setStep] = useState(0);
   const close = () => { setStep(0); onClose(); };
   return (
-    <Modal wide open={open} onClose={close} title={`Import units from CSV · ${step + 1} / 2`} footer={step === 0 ? <><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => setStep(1)}>Preview →</Btn></> : <><Btn onClick={() => setStep(0)}>← Back</Btn><Btn variant="primary" onClick={() => { close(); toast("22 rows imported · 2 skipped · undo available for 30 min"); }}>Import 22 rows</Btn></>}>
+    <Modal wide open={open} onClose={close} title={`Import units from CSV · ${step + 1} / 2`} footer={step === 0 ? <><Btn onClick={close}>Cancel</Btn><Btn variant="primary" onClick={() => setStep(1)}>Preview <Icon name="arrowRight" /></Btn></> : <><Btn onClick={() => setStep(0)}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={() => { close(); toast("22 rows imported · 2 skipped · undo available for 30 min"); }}>Import 22 rows</Btn></>}>
       <Steps steps={["Upload & mapping", "Preview"]} current={step} />
       {step === 0 ? <>
         <Field label="Customer" hint="Rows are created under this customer only. Properties / floors / rooms that do not exist are created."><Select><option>customer-a · Tan household</option><option>customer-b · Lim Trading Sdn Bhd</option></Select></Field>

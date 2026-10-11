@@ -16,5 +16,5 @@ test("table rows that open a record work with Enter and Space", async ({ page })
   await expect(unit).toBeFocused();
   await page.keyboard.press(" ");
   await page.waitForURL(/unitId=/);
-  await expect(main.getByRole("button", { name: /‹ back to / })).toBeVisible();
+  await expect(main.getByRole("button", { name: /^back to / })).toBeVisible();
 });

@@ -13,5 +13,5 @@ test("a customer's row marks the overdue invoice and the active restriction", as
   await page.waitForURL(/customerId=/);
   const tile = page.getByRole("main").getByText("Restriction active").first();
   await expect(tile).toBeVisible(); // the header's billing tile says so too
-  await expect(page.getByRole("main").getByRole("link", { name: "View restriction →" })).toHaveCount(0);
+  await expect(page.getByRole("main").getByRole("link", { name: "View restriction" })).toHaveCount(0);
 });

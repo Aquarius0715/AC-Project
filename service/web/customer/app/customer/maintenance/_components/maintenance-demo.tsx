@@ -60,7 +60,7 @@ export function MaintenanceDemo({ jobId, initialTab }: { jobId?: string; initial
                       <div className="text-xs text-muted">{j.loc} · {j.origin === "plan" ? "Periodic inspection" : j.type}</div>
                       <div className={cx("flex items-center gap-1.5 text-xs", l.warn && "font-semibold text-warn")}><Icon name={l.icon} className="shrink-0" />{l.text}</div>
                     </div>
-                    <JobStatusBadge s={j.status} /><span className="text-muted">›</span>
+                    <JobStatusBadge s={j.status} /><span className="text-muted"><Icon name="chevronRight" /></span>
                   </ListRow>
                 );
               })}

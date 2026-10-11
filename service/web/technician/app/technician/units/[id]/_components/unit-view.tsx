@@ -20,7 +20,7 @@ export function TechUnitView({ live }: { live: UnitLive }) {
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
-        <Link href={live.back} className="font-semibold text-primary" aria-label={t("Back")}>‹</Link><h1 className="text-base font-bold">{live.name}</h1><span className="text-muted">· {live.short}</span><ConnBadge s={live.connection} />
+        <Link href={live.back} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{live.name}</h1><span className="text-muted">· {live.short}</span><ConnBadge s={live.connection} />
       </div>
       <div><Tabs value={live.tab} onChange={(v) => patch({ metric: v === "monitoring" ? live.metric : null })} tabs={live.tabs} /></div>
       {live.tab === "register" ? (
@@ -30,8 +30,8 @@ export function TechUnitView({ live }: { live: UnitLive }) {
               <SummaryList items={live.register.rows} />
               <p className="mt-2 rounded-xl bg-primary-soft/40 px-3 py-2 text-[11px] text-muted"><Icon name="info" /> {live.register.note}</p>
               <div className="mt-3 flex flex-col gap-2">
-                <LinkBtn href={live.alertsHref} size="sm">{t("Alert evidence →")}</LinkBtn>
-                {live.controlHref ? <LinkBtn href={live.controlHref} size="sm">{t("Diagnostics →")}</LinkBtn> : <p className="text-[11px] text-muted">{t("Diagnostic control opens for a job you are assigned to on this AC (assigned or in progress).")}</p>}
+                <LinkBtn href={live.alertsHref} size="sm">{t("Alert evidence")} <Icon name="arrowRight" /></LinkBtn>
+                {live.controlHref ? <LinkBtn href={live.controlHref} size="sm">{t("Diagnostics")} <Icon name="arrowRight" /></LinkBtn> : <p className="text-[11px] text-muted">{t("Diagnostic control opens for a job you are assigned to on this AC (assigned or in progress).")}</p>}
               </div>
               {live.register.missing && <p className="mt-2 text-[11px] text-muted">{t("Missing values are never filled from similar models or today’s date (BR-T02).")}</p>}
             </Card>
@@ -56,7 +56,7 @@ export function TechUnitView({ live }: { live: UnitLive }) {
               ))}
               <p className="mt-1 text-[11px] text-muted">{t("Only your own assignments on this unit are listed.")}</p>
             </Card>
-            <Card title={t("Open alerts ({n})", { n: live.alerts.length })} action={<TextLink href={live.alertsHref}>{t("Evidence →")}</TextLink>}>
+            <Card title={t("Open alerts ({n})", { n: live.alerts.length })} action={<TextLink href={live.alertsHref}>{t("Evidence")} <Icon name="arrowRight" /></TextLink>}>
               {live.alerts.length === 0 ? <p className="text-[13px] text-muted">{t("No open alerts.")}</p> : live.alerts.map((a) => (
                 <Link key={a.id} href={a.href} className="block border-t border-line py-2 first:border-0 hover:bg-surface2/60">
                   <div className="flex items-start justify-between gap-2"><span className="min-w-0"><b className="block text-[13px]">{a.title}</b><span className="text-xs text-muted">{a.sub}</span></span><SeverityBadge s={a.severity} /></div>
@@ -78,7 +78,7 @@ export function TechUnitView({ live }: { live: UnitLive }) {
               {live.others.map((m) => (
                 <Card key={m.metric} title={m.label} action={<b className={cx("text-[13px]", m.tone === "warn" && "text-warn")}>{m.value}</b>}>
                   {m.points.every((v) => v === null) ? <p className="text-xs text-muted">{t("No valid readings in this period.")}</p> : <LineChart points={m.points} height={56} width={500} />}
-                  <div className="mt-1 flex justify-between gap-2 text-[11px] text-muted"><span>{m.sub}</span><button type="button" className="font-semibold text-primary" onClick={() => patch({ metric: m.metric })}>{t("Chart →")}</button></div>
+                  <div className="mt-1 flex justify-between gap-2 text-[11px] text-muted"><span>{m.sub}</span><button type="button" className="font-semibold text-primary" onClick={() => patch({ metric: m.metric })}>{t("Chart")} <Icon name="arrowRight" /></button></div>
                 </Card>
               ))}
             </div>

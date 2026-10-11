@@ -10,6 +10,7 @@ import type { InvoiceStatus } from "@ac/web/lib/billing";
 import { stateTone } from "@ac/web/lib/restrictions";
 import { methodLabel, previewText, type InquiryLine, type NoticeUnit, type PaymentLine, type PreviewParams, type RestrictionNotice } from "@ac/web/lib/clientBilling";
 import { demoOutcome, paymentInstructions, previewMessage, sendInquiry, startPayment } from "../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 export type InvoiceLive = {
   tab: "payment" | "restriction" | "inquiry";
@@ -40,7 +41,7 @@ export function InvoiceView({ live }: { live: InvoiceLive }) {
   const i = live.invoice;
   return (
     <Page>
-      <div className="text-[13px] text-muted"><Link href="/customer/payments" className="font-semibold text-primary">{t("← Contracts & payments")}</Link> › {t("Invoice {number}", { number: i.number })}</div>
+      <div className="text-[13px] text-muted"><Link href="/customer/payments" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Contracts & payments")}</Link> › {t("Invoice {number}", { number: i.number })}</div>
       <Tabs value={live.tab} onChange={(x) => nav({ tab: x === "payment" ? null : x })} tabs={[
         { id: "payment" as const, label: t("Payment") },
         ...(live.restriction ? [{ id: "restriction" as const, label: t("Cooling restriction") }] : []),
@@ -141,7 +142,7 @@ function RestrictionBanner({ live }: { live: InvoiceLive }) {
   const n = live.restriction!.notice;
   if (!n.live) return null;
   return (
-    <Banner tone={n.state === "release_requested" ? "primary" : "warn"} action={<Link className="text-xs font-semibold text-primary" href={`/customer/payments/${live.invoice.id}?tab=restriction&restrictionId=${n.id}`}>{t("View restriction details →")}</Link>}>
+    <Banner tone={n.state === "release_requested" ? "primary" : "warn"} action={<Link className="text-xs font-semibold text-primary" href={`/customer/payments/${live.invoice.id}?tab=restriction&restrictionId=${n.id}`}>{t("View restriction details")} <Icon name="arrowRight" /></Link>}>
       <span className="flex flex-wrap items-center gap-2"><b>{t(n.state === "release_requested" ? "Cooling restriction — release requested" : "Cooling restriction active")}</b><Badge tone={stateTone(n.state)}>{n.label}</Badge></span>
       <div className="text-xs">{t("{units} — {policy}. Related to payment, but separate from it: paying does not restore cooling immediately.", { units: n.units, policy: n.policy })}</div>
     </Banner>

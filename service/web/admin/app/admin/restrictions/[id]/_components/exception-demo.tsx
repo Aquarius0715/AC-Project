@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Banner, Btn, Card, Check, Field, Input, Page, SummaryList, Textarea, Timeline, useToast } from "@ac/web/components/ui";
+import { Icon } from "@ac/web/components/Icon";
 
 type A = "defer" | "exempt" | "cancel" | "override";
 const acts: [A, string, string, string][] = [
@@ -27,7 +28,7 @@ export function ExceptionDemo({ id }: { id: string }) {
   const run = () => { setTried(true); if (!reason.trim() || dateErr) return; if (act === "override" && !hasOverride) return toast("FORBIDDEN — restriction.override required", "crit"); setDone(true); toast("Action recorded"); };
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/admin/restrictions" className="font-semibold text-primary">← Back</Link>/ <b className="text-ink">{id}</b></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/admin/restrictions" className="font-semibold text-primary"><Icon name="arrowLeft" /> Back</Link>/ <b className="text-ink">{id}</b></div>
       {done && <Banner tone="ok">State: applied → release_requested; a remove command was sent to unit-limited. Released only after the unit confirms. invoice-overdue-a stays unpaid.</Banner>}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">

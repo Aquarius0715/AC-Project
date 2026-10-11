@@ -6,6 +6,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { BUCKETS, DAY_END, DAY_START, type ActionRow } from "@ac/web/lib/partnerOverview";
 import type { OverviewLive } from "../_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 const badgeTone: Record<ActionRow["kind"], "primary" | "crit" | "warn"> = { offer: "primary", overdue: "crit", review: "primary", unassigned: "primary" };
 const hours = Array.from({ length: (DAY_END - DAY_START) / 2 + 1 }, (_, i) => DAY_START + i * 2);
@@ -33,7 +34,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
       <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
         {live.kpis.map((k) => <Kpi key={k.href + k.label} label={k.label} value={k.value} sub={k.sub} href={k.href} link={k.link} tone={k.tone} />)}
       </div>
-      <Card title={t("Job progress — {period}", { period })} action={<TextLink href="/partner/jobs">{t("Open all jobs →")}</TextLink>}>
+      <Card title={t("Job progress — {period}", { period })} action={<TextLink href="/partner/jobs">{t("Open all jobs")} <Icon name="arrowRight" /></TextLink>}>
         <p className="mb-2 text-xs text-muted">{pr.total ? t(pr.total === 1 ? "{n} job · {done} completed ({pct}%) · counts use the same period as the Jobs list" : "{n} jobs · {done} completed ({pct}%) · counts use the same period as the Jobs list", { n: pr.total, done: pr.counts.completed, pct: pr.completedPct }) : t("No jobs yet — offers from HQ to your company will appear here and in Jobs.")}</p>
         <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface2" role="img" aria-label={t("Jobs by status")}>
           {pr.total > 0 && BUCKETS.map((b) => pr.counts[b.id] > 0 && <div key={b.id} className={cx("h-full", b.tone)} style={{ width: `${(pr.counts[b.id] / pr.total) * 100}%` }} title={`${t(b.label)}: ${pr.counts[b.id]}`} />)}
@@ -59,7 +60,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
               </ul>
             )}
           </Card>
-          <Card title={t("Team capacity — {period}", { period })} action={<TextLink href="/partner/team">{t("Team & capacity →")}</TextLink>}>
+          <Card title={t("Team capacity — {period}", { period })} action={<TextLink href="/partner/team">{t("Team & capacity")} <Icon name="arrowRight" /></TextLink>}>
             {live.capacity.length === 0 ? <p className="text-[13px] text-muted">{t("No technicians in your company yet.")}</p> : live.capacity.map((c) => (
               <div key={c.id} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{c.name}</b><span className="text-muted">{c.text}</span></div><UtilBar pct={c.pct} tone={c.pct !== null && c.pct >= 90 ? "warn" : "primary"} label={`${c.name}: ${c.text}`} /></div>
             ))}
@@ -67,7 +68,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
           </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title={live.today.title} action={<TextLink href="/partner/schedule">{t("Open schedule →")}</TextLink>}>
+          <Card title={live.today.title} action={<TextLink href="/partner/schedule">{t("Open schedule")} <Icon name="arrowRight" /></TextLink>}>
             <div className="scroll-x"><div className="min-w-[320px]">
               <div className="grid grid-cols-[104px_1fr] text-[11px] text-muted"><span /><div className="flex justify-between">{hours.map((h) => <span key={h}>{String(h).padStart(2, "0")}</span>)}</div></div>
               {live.timeline.length === 0 && <p className="py-2 text-[13px] text-muted">{t("No technicians in your company yet.")}</p>}
@@ -88,7 +89,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
             </p>
             {unassigned > 0 && <div className="mt-2"><Banner tone="warn">{t(unassigned === 1 ? "1 accepted job still has no technician — assign it before the delegation period ends." : "{n} accepted jobs still have no technician — assign them before the delegation period ends.", { n: unassigned })}</Banner></div>}
           </Card>
-          <Card title={t("Recent activity")} action={<TextLink href="/partner/history">{t("Job history →")}</TextLink>}>
+          <Card title={t("Recent activity")} action={<TextLink href="/partner/history">{t("Job history")} <Icon name="arrowRight" /></TextLink>}>
             {live.activity.length === 0 ? <p className="text-[13px] text-muted">{t("No job activity in this period.")}</p> : (
               <ul className="flex flex-col gap-2 text-[13px]">
                 {live.activity.map((a) => <li key={a.id} className="grid grid-cols-[auto_1fr] gap-3"><span className="whitespace-nowrap text-xs text-muted">{a.time}</span><Link href={a.href} className="hover:text-primary">{a.text}</Link></li>)}

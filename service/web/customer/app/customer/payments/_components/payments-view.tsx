@@ -6,6 +6,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { stateTone } from "@ac/web/lib/restrictions";
 import type { ClientInvoiceRow, ContractCard, RestrictionNotice, StatusFilter } from "@ac/web/lib/clientBilling";
+import { Icon } from "@ac/web/components/Icon";
 
 export type PaymentsLive = {
   cards: ContractCard[]; selected: string | null; status: StatusFilter; invoices: ClientInvoiceRow[]; total: number; notice: (RestrictionNotice & { invoiceId: string }) | null;
@@ -43,7 +44,7 @@ export function PaymentsView({ live }: { live: PaymentsLive }) {
             <h3 className="mb-2 mt-4 text-[11px] font-bold uppercase tracking-wide text-muted">{t("Contract scope — equipment this contract relates to")}</h3>
             {sel.units.length === 0 ? <p className="text-xs text-muted">{t("No unit in this contract.")}</p> : (
               <div className="flex flex-col divide-y divide-line">
-                {sel.units.map((u) => <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[13px]"><span><b>{u.name}</b><span className="block text-xs text-muted">{u.place || "—"}</span></span><TextLink href={`/customer/units/${u.id}`}>{t("View unit ›")}</TextLink></div>)}
+                {sel.units.map((u) => <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[13px]"><span><b>{u.name}</b><span className="block text-xs text-muted">{u.place || "—"}</span></span><TextLink href={`/customer/units/${u.id}`}>{t("View unit")} <Icon name="chevronRight" /></TextLink></div>)}
               </div>
             )}
           </Card>
@@ -54,7 +55,7 @@ export function PaymentsView({ live }: { live: PaymentsLive }) {
                 <div key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
                   <div><b>{i.number}</b><div className="text-xs text-muted">{i.due}</div></div>
                   <div className="flex items-center gap-3"><b>{i.amount}</b><Badge tone={statusTone[i.status]} icon={i.status === "Overdue" ? "alert" : i.status === "Paid" ? "check" : undefined}>{t(i.status)}</Badge>
-                    {i.payable ? <LinkBtn size="sm" variant="primary" href={`/customer/payments/${i.id}`}>{t("Pay now")}</LinkBtn> : <Link href={`/customer/payments/${i.id}`} className="text-muted" aria-label={t("Open {number}", { number: i.number })}>›</Link>}</div>
+                    {i.payable ? <LinkBtn size="sm" variant="primary" href={`/customer/payments/${i.id}`}>{t("Pay now")}</LinkBtn> : <Link href={`/customer/payments/${i.id}`} className="text-muted" aria-label={t("Open {number}", { number: i.number })}><Icon name="chevronRight" /></Link>}</div>
                 </div>
               ))}
               {live.invoices.length === 0 && <p className="text-xs text-muted">{t(live.total ? "No invoice matches this filter." : "No invoices yet — this is not an overdue payment.")}</p>}

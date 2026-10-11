@@ -19,7 +19,7 @@ export function InvoiceDemo({ id, tab }: { id: string; tab?: string }) { // SCR-
   if (tab === "restriction") {
     return (
       <Page>
-        <div className="text-[13px] text-muted"><Link href={`/customer/payments/${id}`} className="font-semibold text-primary">← Invoice {id}</Link> › Cooling restriction</div>
+        <div className="text-[13px] text-muted"><Link href={`/customer/payments/${id}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> Invoice {id}</Link> › Cooling restriction</div>
         <Card title="Cooling restriction · restriction-limited-a" sub="RTO Plan · contract-rto-a">
           <SummaryList items={[["Reason", "Unpaid invoice invoice-overdue-a (120.00 MYR, due Sep 10)"], ["Notice", "Sent Sep 12 · in-app (demo)"], ["Start time", "Sep 13, 08:00 — policy: minimum cooling setpoint 24 °C"], ["Target units", "1 — Lobby AC (Office A)"], ["Release condition", "All cause invoices paid"], ["Release requested", "Sep 24, 09:41 — automatically after payment confirmation"]]} />
           <h3 className="mt-4 mb-2 text-[13px] font-bold">Per-unit state</h3>
@@ -42,7 +42,7 @@ export function InvoiceDemo({ id, tab }: { id: string; tab?: string }) { // SCR-
   };
   return (
     <Page>
-      <div className="text-[13px] text-muted"><Link href="/customer/payments" className="font-semibold text-primary">← Contracts & payments</Link> › Invoice {id}</div>
+      <div className="text-[13px] text-muted"><Link href="/customer/payments" className="font-semibold text-primary"><Icon name="arrowLeft" /> Contracts & payments</Link> › Invoice {id}</div>
       <Banner tone="warn" action={<DemoBadge />}>Demo payment — no real money moves. No card number, CVV or expiry is collected.</Banner>
       <div className="split">
         <Card title="Amount due" action={paid ? <Badge tone="ok" icon="check">Paid</Badge> : phase === "confirmed" ? <Badge tone="ok" icon="check">Confirmed</Badge> : phase === "processing" ? <Badge tone="primary">Processing</Badge> : <Badge tone="crit">Unpaid</Badge>}>
@@ -71,7 +71,7 @@ export function InvoiceDemo({ id, tab }: { id: string; tab?: string }) { // SCR-
           </Card>
         </div>
       </div>
-      <Banner tone="warn" action={<Link className="text-xs font-semibold text-primary" href={`/customer/payments/${id}?tab=restriction`}>View restriction →</Link>}><b>Cooling restriction active</b> — 1 unit in scope · Lobby AC (Office A) — minimum cooling setpoint 24 °C. Paying does not restore cooling immediately.</Banner>
+      <Banner tone="warn" action={<Link className="text-xs font-semibold text-primary" href={`/customer/payments/${id}?tab=restriction`}>View restriction <Icon name="arrowRight" /></Link>}><b>Cooling restriction active</b> — 1 unit in scope · Lobby AC (Office A) — minimum cooling setpoint 24 °C. Paying does not restore cooling immediately.</Banner>
       <Modal open={!!preview} onClose={() => setPreview(null)} title={`${preview} preview`} footer={<Btn onClick={() => setPreview(null)}>Close</Btn>}><p className="rounded-xl bg-surface2 p-3 text-[13px]">Your invoice invoice-overdue-a (120.00 MYR) was due on 10 Sep. Pay by card or view payment instructions in the app.</p><p className="text-xs text-muted">Preview only — nothing was sent.</p></Modal>
     </Page>
   );

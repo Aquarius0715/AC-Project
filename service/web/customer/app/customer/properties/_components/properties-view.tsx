@@ -97,7 +97,7 @@ function UnitRows({ units }: { units: (RoomUnit & { place: string })[] }) {
       {units.map((u) => (
         <Link key={u.id} href={`/customer/units/${u.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3 hover:bg-surface2/60">
           <span className="min-w-0"><span className="flex items-center gap-2 font-bold"><Icon name="units" className="text-primary" />{u.name}</span><span className="block text-[11px] text-muted">{u.set} · {u.place}</span></span>
-          <span className="flex flex-wrap items-center gap-3 text-xs"><span>{u.temp}</span><span>{u.watts}</span><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{!u.online && u.seen && <span className="text-muted">{t("seen {time}", { time: u.seen })}</span>}<span className="font-semibold text-primary">{t("Open control →")}</span></span>
+          <span className="flex flex-wrap items-center gap-3 text-xs"><span>{u.temp}</span><span>{u.watts}</span><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{!u.online && u.seen && <span className="text-muted">{t("seen {time}", { time: u.seen })}</span>}<span className="font-semibold text-primary">{t("Open control")} <Icon name="arrowRight" /></span></span>
         </Link>
       ))}
     </div>

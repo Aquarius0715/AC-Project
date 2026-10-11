@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Banner, Card, ConnBadge, LineChart, Page, SeverityBadge, SummaryList, Tabs } from "@ac/web/components/ui";
+import { Icon } from "@ac/web/components/Icon";
 
 const comps = { Indoor: ["Filter: attention (2026-06-12)"], Outdoor: ["All normal (2026-06-12)"], Electrical: ["Capacitor not inspected — reason given"] };
 const counts = { Indoor: 8, Outdoor: 5, Electrical: 5 };
@@ -28,9 +29,9 @@ export function TechUnitDemo({ id }: { id: string }) {
             <Card title="Maintenance history">{[["job-contractor-a · Reactive", "today 10:00–12:00 · you"], ["job-c01 · Preventive", "2026-06-12 · filter replaced"], ["job-a17 · Installation check", "2025-03-01 · commissioning"]].map(([a, b]) => <div key={a} className="border-t border-line py-2 text-[13px] first:border-0"><b>{a}</b><div className="text-xs text-muted">{b}</div></div>)}</Card>
           </div>
           <div className="flex min-w-0 flex-col gap-4">
-            <Card title="Open alerts (1)" action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${id}/alerts`}>Evidence →</Link>}><b className="text-[13px]">Bedroom too hot</b> <SeverityBadge s="warning" /><p className="text-xs text-muted">30.4 °C since 09:12 · policy ≥ 30 °C</p><p className="mt-1 text-xs text-muted">Acknowledged by nobody yet. Completing the job does not resolve it.</p></Card>
+            <Card title="Open alerts (1)" action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${id}/alerts`}>Evidence <Icon name="arrowRight" /></Link>}><b className="text-[13px]">Bedroom too hot</b> <SeverityBadge s="warning" /><p className="text-xs text-muted">30.4 °C since 09:12 · policy ≥ 30 °C</p><p className="mt-1 text-xs text-muted">Acknowledged by nobody yet. Completing the job does not resolve it.</p></Card>
             <Card title="Live"><SummaryList items={[["Temperature", "24.5°C · updated 2s ago"], ["Power", "1200 W · updated 2s ago"], ["Connection", lost ? "Offline" : "Online · last seen 09:41"]]} /><button className="mt-2 text-[11px] text-muted underline" onClick={() => setLost((l) => !l)}>preview: communication lost</button></Card>
-            <Card title="Diagnostics"><Link href={`/technician/units/${id}/control`} className="text-xs font-semibold text-primary">Open diagnostic control →</Link></Card>
+            <Card title="Diagnostics"><Link href={`/technician/units/${id}/control`} className="text-xs font-semibold text-primary">Open diagnostic control <Icon name="arrowRight" /></Link></Card>
           </div>
         </div>
       ) : (

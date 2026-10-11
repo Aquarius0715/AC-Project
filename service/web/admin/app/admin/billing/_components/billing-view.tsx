@@ -223,7 +223,7 @@ export function BillingView({ live }: { live?: BillingLive }) {
                 <RelatedRestrictions ids={live ? detail?.restrictionIds ?? [] : ["restriction-limited-a"]} />
                 <Card title={t("Customer inquiries")}>
                   {linked.length === 0 ? <p className="text-xs text-muted">{t("No inquiry about this invoice.")}</p> : <div className="flex flex-col gap-2">{linked.map((q) => (
-                    <div key={q.id} className={`rounded-xl p-2 ${live?.selectedInquiryId === q.id ? "bg-primary-soft" : ""}`}><p className="text-[13px]">{q.text}</p><p className="flex flex-wrap items-center gap-2 text-[11px] text-muted">{t("{kind} · received {time} · {customer}", { kind: q.kind, time: q.at, customer: q.cust })} {q.state === "answered" && <Badge tone="ok">{t("Answered")}</Badge>}<button className="font-semibold text-primary" onClick={() => openInquiry(q.id)}>{t("Open in Inquiries →")}</button></p></div>
+                    <div key={q.id} className={`rounded-xl p-2 ${live?.selectedInquiryId === q.id ? "bg-primary-soft" : ""}`}><p className="text-[13px]">{q.text}</p><p className="flex flex-wrap items-center gap-2 text-[11px] text-muted">{t("{kind} · received {time} · {customer}", { kind: q.kind, time: q.at, customer: q.cust })} {q.state === "answered" && <Badge tone="ok">{t("Answered")}</Badge>}<button className="font-semibold text-primary" onClick={() => openInquiry(q.id)}>{t("Open in Inquiries")} <Icon name="arrowRight" /></button></p></div>
                   ))}</div>}
                 </Card>
               </div>
@@ -238,7 +238,7 @@ export function BillingView({ live }: { live?: BillingLive }) {
             {iq && (
               <Card title={t("{kind} inquiry · {customer}", { kind: iq.kind, customer: iq.cust })} sub={t("received {time}", { time: iq.at })}>
                 <p className="rounded-xl bg-surface2 p-3 text-[13px]">{iq.text}</p>
-                <SummaryList items={[[t("Invoice"), iq.invoiceId ? <button key="i" className="font-semibold text-primary" onClick={() => openInvoice(iq.invoiceId!)}>{invoiceLabel(iq.invoiceId)} →</button> : "—"], [t("Restriction"), iq.restrictionId ? (live ? <Link key="r" className="font-mono font-semibold text-primary" href={`/admin/restrictions?restrictionId=${iq.restrictionId}`}>{shortId(iq.restrictionId)}</Link> : iq.restrictionId) : "—"]]} />
+                <SummaryList items={[[t("Invoice"), iq.invoiceId ? <button key="i" className="font-semibold text-primary" onClick={() => openInvoice(iq.invoiceId!)}>{invoiceLabel(iq.invoiceId)} <Icon name="arrowRight" /></button> : "—"], [t("Restriction"), iq.restrictionId ? (live ? <Link key="r" className="font-mono font-semibold text-primary" href={`/admin/restrictions?restrictionId=${iq.restrictionId}`}>{shortId(iq.restrictionId)}</Link> : iq.restrictionId) : "—"]]} />
                 {iq.reply ? <p className="mt-3 text-[13px]"><b>{t("Reply:")}</b> {iq.reply}</p> : <>
                   <div className="mt-3"><Field label={t("Reply (in-app only)")} error={tried && !reply.trim() ? t("A reply is required") : undefined}><Textarea value={reply} onChange={(e) => setReply(e.target.value)} maxLength={2000} /></Field></div>
                   <p className="mt-1 text-[11px] text-muted">{t("A reply never changes invoices or restrictions.")}</p>
@@ -276,7 +276,7 @@ function RelatedRestrictions({ ids }: { ids: string[] }) {
     <Card title={t(ids.length > 1 ? "Related restrictions" : "Related restriction")}>
       {ids.length === 0 ? <p className="text-xs text-muted">{t("No restriction cites this invoice.")}</p> : (
         <div className="flex flex-col gap-1.5">{ids.map((id) => (
-          <p key={id} className="flex flex-wrap items-center justify-between gap-2 text-[13px]"><span className="font-mono font-semibold">{shortId(id)}</span><Link className="text-xs font-semibold text-primary" href={`/admin/restrictions?restrictionId=${id}`}>{t("Open restriction →")}</Link></p>
+          <p key={id} className="flex flex-wrap items-center justify-between gap-2 text-[13px]"><span className="font-mono font-semibold">{shortId(id)}</span><Link className="text-xs font-semibold text-primary" href={`/admin/restrictions?restrictionId=${id}`}>{t("Open restriction")} <Icon name="arrowRight" /></Link></p>
         ))}
           <p className="text-xs text-muted">{t(ids.length > 1 ? "This invoice is a cause of these restrictions. Once all cause invoices of a restriction are paid, it moves to release_requested. State and units are shown on the Restrictions screen (restriction.read)."
             : "This invoice is a cause of this restriction. Once all of its cause invoices are paid, it moves to release_requested. State and units are shown on the Restrictions screen (restriction.read).")}</p>

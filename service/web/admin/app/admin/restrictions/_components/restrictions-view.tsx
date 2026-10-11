@@ -13,6 +13,7 @@ import {
   type ApiRestriction, type Policy, type RestrictionRow, type RestrictionState, type UnitRow,
 } from "@ac/web/lib/restrictions";
 import { executeRestriction, reconcileUnits, requestRelease, retryUnits, scheduleRestriction } from "../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 type ScheduleContract = {
   id: string; version: number; label: string; rulesVersion: string; recipients: number; invoices: { id: string; number: string }[];
@@ -77,7 +78,7 @@ function Manager({ live }: { live: NonNullable<RestrictionsLive> }) {
         </Card>
         {!r || !sel ? <Card title={t("Restriction")}><EmptyState title={t("Nothing selected")}>{t("Choose a restriction.")}</EmptyState></Card> : (
           <div className="flex min-w-0 flex-col gap-4">
-            <Card title={t("Restriction {id}", { id: r.id.slice(0, 8) })} sub={t("{contract} · rules {rules} · version {v}", { contract: sel.contract, rules: r.rulesVersion, v: r.version })} action={<Link className="text-xs font-semibold text-primary" href={`/admin/restrictions/${r.id}`}>{t("Exception / override →")}</Link>}>
+            <Card title={t("Restriction {id}", { id: r.id.slice(0, 8) })} sub={t("{contract} · rules {rules} · version {v}", { contract: sel.contract, rules: r.rulesVersion, v: r.version })} action={<Link className="text-xs font-semibold text-primary" href={`/admin/restrictions/${r.id}`}>{t("Exception / override")} <Icon name="arrowRight" /></Link>}>
               {step >= 0 ? <Steps steps={lifecycleStates.map((s) => stateWord(s, t))} current={step} /> : <Banner tone="muted">{t("Cancelled — no further commands.")}</Banner>}
               <div className="mt-4"><SummaryList cols={2} items={[
                 [t("Policy"), policyText(r.policy, t)], [t("Notice"), sel.texts.notice],
@@ -96,7 +97,7 @@ function Manager({ live }: { live: NonNullable<RestrictionsLive> }) {
               )}
             </Card>
             {live.full && (
-              <Card title={t("Cause invoices")} action={<Link className="text-xs font-semibold text-primary" href="/admin/billing?overdueOnly=true">{t("Open in Billing →")}</Link>}>
+              <Card title={t("Cause invoices")} action={<Link className="text-xs font-semibold text-primary" href="/admin/billing?overdueOnly=true">{t("Open in Billing")} <Icon name="arrowRight" /></Link>}>
                 {sel.causes.map((c) => <p key={c.id} className="text-[13px]"><Link className="font-semibold text-primary" href={`/admin/billing?invoiceId=${c.id}`}>{c.number}</Link> · {c.amountMinor === null ? "—" : amount(c.amountMinor, c.currency)} <Badge tone={c.paid ? "ok" : "warn"}>{c.paid ? t("paid") : t("unpaid")}</Badge></p>)}
                 <p className="mt-1 text-xs text-muted">{t("{unpaid} of {total} cause invoices unpaid. When every cause invoice is paid, a scheduled restriction is cancelled and an applied one moves to release_requested.", { unpaid: sel.causes.filter((c) => !c.paid).length, total: sel.causes.length })}</p>
               </Card>
@@ -106,7 +107,7 @@ function Manager({ live }: { live: NonNullable<RestrictionsLive> }) {
                 { key: "u", label: t("Unit"), render: (u) => <b>{u.name}</b> }, { key: "a", label: t("restriction::Apply"), render: (u) => u.apply }, { key: "r", label: t("Release"), render: (u) => u.release },
                 { key: "o", label: t("Observed"), render: (u) => <span className="text-xs">{u.observed}{u.pending ? ` · ${t("pending: {reason}", { reason: u.pending })}` : ""}</span>, hideBelow: "sm" },
                 { key: "c", label: t("Commands"), render: (u) => <span className="text-xs">{u.commands}</span>, hideBelow: "md" },
-                ...(live.canUnits ? [{ key: "d", label: "", render: (u: UnitRow) => <Link className="text-xs font-semibold text-primary" href={`/admin/units?unitId=${u.unitId}`}>{t("Details →")}</Link> }] : []),
+                ...(live.canUnits ? [{ key: "d", label: "", render: (u: UnitRow) => <Link className="text-xs font-semibold text-primary" href={`/admin/units?unitId=${u.unitId}`}>{t("Details")} <Icon name="arrowRight" /></Link> }] : []),
                 { key: "x", label: "", render: (u) => live.canWrite && <span className="flex flex-wrap gap-1">{u.retryApply && <Btn size="sm" onClick={() => setRetry({ phase: "apply", unitIds: [u.unitId], reason: "" })}>{t("Retry apply")}</Btn>}{u.retryRelease && <Btn size="sm" onClick={() => setRetry({ phase: "release", unitIds: [u.unitId], reason: "" })}>{t("Retry release")}</Btn>}{u.reconcile && <Btn size="sm" disabled={pending} onClick={() => run(() => reconcileUnits(r.id, r.version, [u.unitId]), t("Reconciled with the latest observation"))}>{t("Reconcile")}</Btn>}</span> },
               ]} />
               <p className="mt-2 text-[11px] text-muted">{t("Retry and Reconcile appear only for units that are pending, failed or waiting for reconciliation (SR26). Reaching the deadline never stops real equipment by itself.")}</p>

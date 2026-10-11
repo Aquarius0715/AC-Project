@@ -117,7 +117,7 @@ export function Kpi({ label, value, icon, unit, badge, sub, href, link, tone }: 
         {unit && <span className="ml-1 text-sm font-medium text-muted">{unit}</span>}
       </div>
       {sub && <p className="text-xs text-muted">{sub}</p>}
-      {href && link && <TextLink href={href} className="mt-auto pt-1">{link}</TextLink>}
+      {href && link && <TextLink href={href} className="mt-auto pt-1">{link} <Icon name="arrowRight" /></TextLink>}
     </div>
   );
 }

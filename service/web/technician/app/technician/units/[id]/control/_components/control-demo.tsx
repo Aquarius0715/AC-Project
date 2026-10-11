@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Banner, Btn, Card, Field, Input, Modal, Page, Select, SummaryList, Textarea, useToast } from "@ac/web/components/ui";
+import { Icon } from "@ac/web/components/Icon";
 
 /** The Phase 1A demo of diagnostic control (fixtures; DATA_SOURCE=api uses ControlView). */
 export function ControlDemo({ id }: { id: string }) {
@@ -31,7 +32,7 @@ export function ControlDemo({ id }: { id: string }) {
   };
   return (
     <Page>
-      <div className="text-[13px] text-muted"><Link href={`/technician/units/${id}`} className="font-semibold text-primary">← Unit</Link> › Diagnostic control · {id}</div>
+      <div className="text-[13px] text-muted"><Link href={`/technician/units/${id}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> Unit</Link> › Diagnostic control · {id}</div>
       {errs.length > 0 && <Banner tone="crit">{errs.map((e) => <div key={e}>{e}</div>)}</Banner>}
       {restricted && <Banner tone="warn">Cooling restriction active — minimum 24 °C applies to diagnostics too.</Banner>}
       <div className="split">

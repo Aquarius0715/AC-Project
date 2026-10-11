@@ -45,13 +45,13 @@ export function JobDetailView({ live }: { live: JobDetailLive }) {
 
 function Crumb({ text }: { text: string }) {
   const t = useT();
-  return <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/partner/jobs" className="font-semibold text-primary">{t("← Jobs")}</Link> › <b className="text-ink">{text}</b></div>;
+  return <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Jobs")}</Link> › <b className="text-ink">{text}</b></div>;
 }
 
 function FitCard({ title, rows, note, footer }: { title: string; rows: FitRow[]; note: string; footer?: React.ReactNode }) {
   const t = useT();
   return (
-    <Card title={title} action={<Link className="text-xs font-semibold text-primary" href="/partner/team">{t("Team & capacity →")}</Link>}>
+    <Card title={title} action={<Link className="text-xs font-semibold text-primary" href="/partner/team">{t("Team & capacity")} <Icon name="arrowRight" /></Link>}>
       <p className="mb-2 text-[11px] text-muted">{note}</p>
       {rows.length === 0 && <p className="text-[13px] text-muted">{t("No technicians in your company yet.")}</p>}
       {rows.map((r) => (
@@ -94,7 +94,7 @@ function OfferView({ live }: { live: Extract<JobDetailLive, { kind: "offer" }> }
       {open && <Banner tone="warn">{t(p!.status === "sent_to_client" ? "HQ asked the client about your proposed time ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered." : "Your proposed time is with HQ ({slot} · {name}) — the offer stays reserved for you; Accept is disabled until it is answered.", { slot: x.proposal ?? "", name: live.names[p!.technicianMembershipId] ?? t("technician") })}</Banner>}
       {p?.status === "approved" && <Banner tone="ok">{t("The client approved your proposed time — the visit is now {slot}. Accept the offer to continue.", { slot: x.visit })}</Banner>}
       {(p?.status === "declined" || p?.status === "kept") && <Banner tone="warn">{t("Your time change was not taken — the agreed time stays {slot}. Accept or decline.", { slot: x.visit })}</Banner>}
-      {j.status === "accepted" && <Banner tone="ok" action={<LinkBtn size="sm" variant="primary" href={`/partner/schedule?jobId=${j.jobId}`}>{t("Assign technician →")}</LinkBtn>}>{t("Accepted — the delegation period starts {time}; unit details open then. Assign your technician for exactly {slot}.", { time: x.accessFrom, slot: x.visit })}</Banner>}
+      {j.status === "accepted" && <Banner tone="ok" action={<LinkBtn size="sm" variant="primary" href={`/partner/schedule?jobId=${j.jobId}`}>{t("Assign technician")} <Icon name="arrowRight" /></LinkBtn>}>{t("Accepted — the delegation period starts {time}; unit details open then. Assign your technician for exactly {slot}.", { time: x.accessFrom, slot: x.visit })}</Banner>}
       <Card title={t("{id} · Offer from HQ", { id: short })} action={j.status === "offered" ? <Badge tone="warn">{t("Expires {time}", { time: x.expires })}</Badge> : <Badge tone="primary">{t("Accepted")}</Badge>}>
         <Banner>{t("Before acceptance: job type, registered installation address and required qualifications only. No live telemetry, entry instructions or billing.")}</Banner>
         <div className="mt-3"><SummaryList items={[
@@ -191,13 +191,13 @@ function DetailView({ live }: { live: Extract<JobDetailLive, { kind: "detail" }>
               [t("Scheduled slot"), x.scheduled ? `${x.scheduled} · ${x.tech}` : <b key="n" className="text-crit">{t("Not assigned yet")}</b>],
             ]} />
             <div className="mt-4 flex flex-wrap gap-2">
-              {needsTech && <LinkBtn variant="primary" href={`/partner/schedule?jobId=${j.id}`}>{t(j.assignment ? "Reassign technician →" : "Assign technician →")}</LinkBtn>}
-              {j.status === "submitted" && <LinkBtn variant="primary" href={`/partner/jobs/${j.id}/review`}>{t("Review report →")}</LinkBtn>}
-              <LinkBtn href={`/partner/units/${j.unitId}?jobId=${j.id}`}>{t("Open unit →")}</LinkBtn>
-              <LinkBtn href={`/partner/history?jobId=${j.id}`}>{t("Job history →")}</LinkBtn>
+              {needsTech && <LinkBtn variant="primary" href={`/partner/schedule?jobId=${j.id}`}>{t(j.assignment ? "Reassign technician" : "Assign technician")}<Icon name="arrowRight" /></LinkBtn>}
+              {j.status === "submitted" && <LinkBtn variant="primary" href={`/partner/jobs/${j.id}/review`}>{t("Review report")} <Icon name="arrowRight" /></LinkBtn>}
+              <LinkBtn href={`/partner/units/${j.unitId}?jobId=${j.id}`}>{t("Open unit")} <Icon name="arrowRight" /></LinkBtn>
+              <LinkBtn href={`/partner/history?jobId=${j.id}`}>{t("Job history")} <Icon name="arrowRight" /></LinkBtn>
             </div>
           </Card>
-          <Card title={t("Target unit — {name}", { name: u?.displayName ?? t("not readable now") })} action={<Link className="text-xs font-semibold text-primary" href={`/partner/units/${j.unitId}?jobId=${j.id}`}>{t("Open unit →")}</Link>}>
+          <Card title={t("Target unit — {name}", { name: u?.displayName ?? t("not readable now") })} action={<Link className="text-xs font-semibold text-primary" href={`/partner/units/${j.unitId}?jobId=${j.id}`}>{t("Open unit")} <Icon name="arrowRight" /></Link>}>
             {u ? (
               <>
                 <div className="grid-fluid" style={{ ["--min" as string]: "300px" }}>

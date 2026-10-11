@@ -134,7 +134,7 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
   };
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/customer/properties" className="font-semibold text-primary">{t("← Back to {place}", { place: d ? d.location.pathLabels.at(-1) ?? t("Units") : "Bedroom" })}</Link><span>{unit.loc} › <b className="text-ink">{unit.name}</b></span></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/customer/properties" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Back to {place}", { place: d ? d.location.pathLabels.at(-1) ?? t("Units") : "Bedroom" })}</Link><span>{unit.loc} › <b className="text-ink">{unit.name}</b></span></div>
       <div className="split-rev">
         <Card title={t("DEVICES IN THIS ROOM")} sub={d ? t(roomUnits.data.length === 1 ? "{room} · {n} AC" : "{room} · {n} ACs", { room: d.location.pathLabels.at(-1) ?? t("Room"), n: roomUnits.data.length }) : "Bedroom · 2 ACs · Home A › 1F"} className="self-start">
           <div className="flex flex-col gap-2">
@@ -159,8 +159,8 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
             )}
           </Card>
           {blocked && <Banner tone="warn">{t("Remote control is paused while HQ checks this AC’s restriction state. Try again later.")}</Banner>}
-          {policy?.kind === "power_off" && <Banner tone="warn">{t("Service restriction active — this AC is kept off.")} <Link className="font-semibold text-primary" href="/customer/payments">{t("View details →")}</Link></Banner>}
-          {restricted && <Banner tone="warn">{t("Cooling restriction active — minimum {min} °C.", { min })} <Link className="font-semibold text-primary" href={d ? "/customer/payments" : "/customer/payments/invoice-overdue-a?tab=restriction"}>{t("View details →")}</Link></Banner>}
+          {policy?.kind === "power_off" && <Banner tone="warn">{t("Service restriction active — this AC is kept off.")} <Link className="font-semibold text-primary" href="/customer/payments">{t("View details")} <Icon name="arrowRight" /></Link></Banner>}
+          {restricted && <Banner tone="warn">{t("Cooling restriction active — minimum {min} °C.", { min })} <Link className="font-semibold text-primary" href={d ? "/customer/payments" : "/customer/payments/invoice-overdue-a?tab=restriction"}>{t("View details")} <Icon name="arrowRight" /></Link></Banner>}
           <Card title={t("REMOTE CONTROL")} sub={t("Controls apply to this AC only; you confirm before sending")}>
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="font-semibold">{t("Power")}</div><div className="text-xs text-muted">{t("Sent as its own command")}</div></div><Toggle on={on} onChange={(v) => (!disabled && !waiting && policy?.kind !== "power_off" ? togglePower(v) : undefined)} label={t("Power")} /></div>

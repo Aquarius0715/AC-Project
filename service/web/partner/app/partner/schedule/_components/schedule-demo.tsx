@@ -47,7 +47,7 @@ export function ScheduleDemo({ jobId }: { jobId?: string }) {
       {jobs.length === 0 && <EmptyState title="No accepted jobs" />}
       <div className="split-rev">
         <div className="flex min-w-0 flex-col gap-4 self-start">
-          <Card title="Accepted jobs" sub="sort: status ↑">
+          <Card title="Accepted jobs" sub="status, earliest stage first">
             <div className="flex flex-col gap-2">{jobs.map((j) => <ListRow key={j.id} selected={sel.id === j.id} onClick={() => { setSel(j); setMsg(null); }}><div className="min-w-0"><div className="flex flex-wrap items-center gap-1.5"><b className="text-[13px]">{j.id} · {j.unit}</b>{j.live && <OriginBadge origin={store.find((x) => x.id === j.id)?.origin ?? "request"} />}</div><div className="text-xs text-muted">{assigned.includes(j.id) ? "Assigned · awaiting technician acceptance" : j.st}</div></div></ListRow>)}</div>
           </Card>
           <Card title="Delegation windows" sub="Work must fit inside each window. Access ends automatically at the end time.">
@@ -68,7 +68,7 @@ export function ScheduleDemo({ jobId }: { jobId?: string }) {
             {msg && <div className="mt-3"><Banner tone={msg.tone}>{msg.t}</Banner></div>}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="text-[11px] text-muted">Hint: start 09:00 shows the overlap conflict · end after window shows validation.</span><Btn variant="primary" onClick={save}>{inProg || lj?.status === "assigned" ? "Reassign" : "Assign technician"}</Btn></div>
           </Card>
-          <Card title="Team schedule — week of 09-21" action={<Link href="/partner/team" className="text-xs font-semibold text-primary">Team & capacity →</Link>}>
+          <Card title="Team schedule — week of 09-21" action={<Link href="/partner/team" className="text-xs font-semibold text-primary">Team & capacity <Icon name="arrowRight" /></Link>}>
             <div className="scroll-x"><table className="w-full min-w-[640px] text-[11px]"><thead><tr><th className="p-1 text-left" />{days.map((d) => <th key={d} className="p-1 text-left text-muted">{d}</th>)}</tr></thead><tbody>{grid.map(([n, q, cells]) => <tr key={n} className="border-t border-line"><td className="p-1.5"><b className="text-xs">{n}</b><div className="text-muted">{q}</div></td>{cells.map((c, i) => <td key={i} className="p-1"><div className={cx("rounded-lg px-1.5 py-1", c === "free" ? "bg-ok-soft text-ok" : c === "no hours" ? "bg-surface2 text-muted" : c.includes("Leave") ? "bg-warn-soft text-warn" : "bg-primary-soft text-primary")}>{c}</div></td>)}</tr>)}</tbody></table></div>
             <p className="mt-2 flex flex-wrap gap-3 text-[11px] text-muted"><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-primary-soft" />Confirmed assignment</span><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-warn-soft" />Leave / unavailable</span><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-surface2" />No available hours</span></p>
             <p className="text-[11px] text-muted">Only own-company technicians are shown. Times in Asia/Kuala_Lumpur. Overlap with a confirmed block is rejected on save (CONFLICT).</p>

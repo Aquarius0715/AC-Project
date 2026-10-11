@@ -118,9 +118,9 @@ describe("partner overview", () => {
       .toEqual(["15 j", "3 hari 15 j", "2 hari", "tamat", "20 min"]);
     const tiles = kpis({ offerCount: 1, activeCount: 5, reviewCount: 1, overdueCount: 1 }, fixture(), now, names, undefined, i);
     expect(tiles.map((t) => [t.label, t.sub, t.link])).toEqual([
-      ["Tawaran untuk dijawab", "p09 · tamat dalam 15 j", "Buka tawaran →"], ["Menunggu penugasan", "Diterima, belum ada juruteknik", "Tugaskan →"],
-      ["Sedang berjalan / dijadualkan", "tech-external-a di tapak sejak hari ini 11:00 PG GMT+9", "Lihat kerja →"], ["Laporan untuk disemak", "p05 · Server room AC · menunggu semakan", "Semak →"],
-      ["Tertunggak", "Melepasi tarikh akhir atau tetingkap kerja (IR89)", "Lihat →"],
+      ["Tawaran untuk dijawab", "p09 · tamat dalam 15 j", "Buka tawaran"], ["Menunggu penugasan", "Diterima, belum ada juruteknik", "Tugaskan"],
+      ["Sedang berjalan / dijadualkan", "tech-external-a di tapak sejak hari ini 11:00 PG GMT+9", "Lihat kerja"], ["Laporan untuk disemak", "p05 · Server room AC · menunggu semakan", "Semak"],
+      ["Tertunggak", "Melepasi tarikh akhir atau tetingkap kerja (IR89)", "Lihat"],
     ]);
     expect(actions(fixture(), now, names, i).slice(0, 2).map((r) => [r.badge, r.detail, r.button])).toEqual([
       ["Tawaran", "Jawab sebelum 22 Sep 2026, 2:00 PG GMT+9 (15 j lagi)", "Jawab"], ["Tertunggak", "Tetingkap kerja tamat 20 Sep 2026, 6:00 PTG GMT+9 · tech-external-a", "Tugaskan semula"],

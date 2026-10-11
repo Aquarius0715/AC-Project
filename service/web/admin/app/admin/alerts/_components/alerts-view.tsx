@@ -15,6 +15,7 @@ import type { AdminAlert, AdminPolicy, AlertState, Severity } from "@ac/web/lib/
 import { acknowledgeAlert, resolveAlert, type ActionResult } from "../actions";
 import { demoCustomers, NewPolicyModal, PoliciesTab, seedPolicies, type PoliciesLive, type PolicySel } from "./policies-tab";
 import { ScopeBar } from "../../jobs/_components/jobs-header";
+import { Icon } from "@ac/web/components/Icon";
 
 const ST: Record<AlertState, string> = { open: "Open", acknowledged: "Acknowledged", resolved: "Resolved" };
 const LIST: Record<AlertState, string> = { open: "Open alerts", acknowledged: "Acknowledged alerts", resolved: "Resolved alerts" };
@@ -161,7 +162,7 @@ export function AdminAlertsView({ live }: { live?: Live }) {
             )}
           </div>
           <div className="split-rev">
-            <Card title={`${t(LIST[status])} · ${scopeName}`} sub={t("severity ↓")} className="self-start">
+            <Card title={`${t(LIST[status])} · ${scopeName}`} sub={t("most severe first")} className="self-start">
               <div className="flex flex-col gap-2">
                 {shown.length === 0 ? <EmptyState title={t("No alerts in this scope")}>{t("Change the scope, severity or status.")}</EmptyState> : shown.map((x) => (
                   <ListRow key={x.id} selected={a?.id === x.id} onClick={() => pick(x.id)}>
@@ -177,7 +178,7 @@ export function AdminAlertsView({ live }: { live?: Live }) {
                     <Btn size="sm" disabled={a.state !== "open" || pending} onClick={acknowledge}>{t("Acknowledge")}</Btn>
                     <Btn size="sm" variant="primary" disabled={a.state === "resolved" || pending} onClick={() => { setPicked([]); setTried(false); setResolve(true); }}>{t("Resolve…")}</Btn>
                     {a.state !== "resolved" && <Link href={`/admin/jobs?new=${a.unitId}&alertId=${a.id}`} className="inline-flex items-center rounded-control border border-line bg-surface px-2.5 py-1 text-xs font-semibold hover:bg-surface2">{t("Request maintenance")}</Link>}
-                    <Link href={a.customerId ? `/admin/units?customerId=${a.customerId}&unitId=${a.unitId}` : `/admin/units?unitId=${a.unitId}`} className="inline-flex items-center px-1 text-xs font-semibold text-primary">{t("Open unit →")}</Link>
+                    <Link href={a.customerId ? `/admin/units?customerId=${a.customerId}&unitId=${a.unitId}` : `/admin/units?unitId=${a.unitId}`} className="inline-flex items-center px-1 text-xs font-semibold text-primary">{t("Open unit")} <Icon name="arrowRight" /></Link>
                   </div>
                 }>
                   <SummaryList items={[[t("Unit"), a.unit], [t("Context"), a.context], [t("Severity"), <SeverityBadge key="s" s={a.sev} />], [t("Status"), a.st]]} />

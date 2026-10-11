@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Banner, Card, Kpi, LinkBtn, Page, SeverityBadge, Tabs, TextLink, UtilBar } from "@ac/web/components/ui";
 import { fmt, useJobs } from "@ac/web/lib/jobs";
 import { JobList, useTechJobs } from "@ac/web/components/TechJobList";
+import { Icon } from "@ac/web/components/Icon";
 
 /** The Phase 1A demo of the technician overview (fixture jobs and the in-browser job store). */
 export function OverviewDemo({ tab: initial }: { tab?: string }) {
@@ -31,7 +32,7 @@ export function OverviewDemo({ tab: initial }: { tab?: string }) {
           </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Alerts on my units (2)" action={<TextLink href="/technician/units/unit-online-rto/alerts?jobId=job-t07">All →</TextLink>}>
+          <Card title="Alerts on my units (2)" action={<TextLink href="/technician/units/unit-online-rto/alerts?jobId=job-t07">All <Icon name="arrowRight" /></TextLink>}>
             {[["Bedroom too hot", "unit-online-rto · 30.4 °C · 09:12", "warning", "/technician/units/unit-online-rto/alerts"], ["Filter pressure drop", "unit-t07-sr · suspected · 08:40", "normal", "/technician/units/unit-online-rto/alerts"]].map(([t, d, s, h]) => <Link key={t} href={h} className="flex items-center justify-between gap-2 border-t border-line py-2 first:border-0"><span><b className="text-[13px]">{t}</b><span className="block text-xs text-muted">{d}</span></span><SeverityBadge s={s as "warning"} /></Link>)}
             <p className="mt-1 text-[11px] text-muted">Only units in your assignments. Finishing a job does not resolve its alert.</p>
           </Card>

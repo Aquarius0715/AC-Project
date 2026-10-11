@@ -30,7 +30,7 @@ export function LoginScreen({ role, others = {}, params = {}, api }: { role: Rol
           <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary text-sm text-white"><Icon name="account" /></span>
           <span className="min-w-0"><span className="block text-[13px] font-bold">{cfg.loginUser}</span><span className="block text-[11px] text-muted">{cfg.loginDesc}</span></span>
         </div>
-        <ContinueLink role={role} href={href}>Continue as {cfg.loginUser} →</ContinueLink>
+        <ContinueLink role={role} href={href}>Continue as {cfg.loginUser} <Icon name="arrowRight" /></ContinueLink>
         <p className="mt-4 text-[11px] text-muted">Looking for a different AC Project service?{" "}
           {names.map((r, i) => (
             <span key={r}>{i > 0 && (i === names.length - 1 ? ", and " : ", ")}{others[r] ? <a className="font-semibold text-primary hover:underline" href={`${others[r]}/login`}>{ROLES[r].loginTitle}</a> : ROLES[r].loginTitle}</span>

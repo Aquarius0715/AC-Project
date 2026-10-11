@@ -41,7 +41,7 @@ export function ReviewView({ live }: { live: ReviewLive }) {
   const [refused, setRefused] = useState<string | null>(null);
   const r = live.report;
   const status = statusWord(live.job.status, t);
-  const head = <div className="text-[13px] text-muted"><Link href="/partner/jobs" className="font-semibold text-primary">{t("← Jobs")}</Link> › {t("{id} · Quality review", { id: live.job.id.slice(0, 8) })}{live.job.unit ? ` · ${live.job.unit}` : ""}</div>;
+  const head = <div className="text-[13px] text-muted"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Jobs")}</Link> › {t("{id} · Quality review", { id: live.job.id.slice(0, 8) })}{live.job.unit ? ` · ${live.job.unit}` : ""}</div>;
   if (!r) {
     return <Page>{head}<Card title={t("No report to review")}><EmptyState title={t(live.job.status === "submitted" ? "Report not readable" : "Nothing submitted yet")}>{live.job.status === "submitted" ? t("The submitted report is outside your company's delegation window.") : t("This job is {status}; a review opens once the technician submits the report.", { status })}</EmptyState></Card></Page>;
   }

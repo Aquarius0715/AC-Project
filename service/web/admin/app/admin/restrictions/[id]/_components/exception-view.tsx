@@ -8,6 +8,7 @@ import { useAction } from "@ac/web/lib/useAction";
 import { zonedInstant, zonedParts } from "@ac/web/lib/i18n";
 import { actionOutcome, policyText, stateTone, stateWord, type ActionKind, type ApiRestriction, type UnitRow } from "@ac/web/lib/restrictions";
 import { cancelRestriction, deferRestriction, exemptRestriction, overrideRestriction, reconcileUnits, retryUnits } from "../../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 type Live = {
   now: string; r: ApiRestriction; units: UnitRow[]; canWrite: boolean; canOverride: boolean; canAudit: boolean;
@@ -57,7 +58,7 @@ export function ExceptionView({ live }: { live: Live }) {
   const followUp = live.canWrite || (live.canOverride && (r.releaseIntent?.source === "override" || r.recoveryCases.some((c) => c.state !== "resolved")));
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href={`/admin/restrictions?restrictionId=${r.id}`} className="font-semibold text-primary">{t("← Restrictions")}</Link>/ <b className="text-ink">{r.id.slice(0, 8)}</b> <Badge tone={stateTone(r.state)}>{stateWord(r.state, t)}</Badge></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href={`/admin/restrictions?restrictionId=${r.id}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Restrictions")}</Link>/ <b className="text-ink">{r.id.slice(0, 8)}</b> <Badge tone={stateTone(r.state)}>{stateWord(r.state, t)}</Badge></div>
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={t("Choose an action")} sub={t("Version {v} · the result for the current state is shown before saving", { v: r.version })}>

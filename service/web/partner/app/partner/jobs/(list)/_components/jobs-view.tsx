@@ -7,6 +7,7 @@ import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { TabId } from "@ac/web/lib/partnerJobs";
 import type { JobsLive } from "../_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 const toneText = { warn: "text-warn", crit: "text-crit", ok: "text-ok", primary: "text-primary", muted: "text-muted" } as const;
 
@@ -46,7 +47,7 @@ export function JobsView({ live }: { live: JobsLive }) {
                 <div className="text-xs"><b className={cx(j.tech.tone && toneText[j.tech.tone])}>{j.tech.name}</b><div className={cx("text-muted", j.tech.subTone && toneText[j.tech.subTone])}>{j.tech.sub}</div></div>
                 <div className="text-xs"><b className={cx(j.slot.tone && toneText[j.slot.tone])}>{j.slot.main}</b><div className="text-muted">{j.slot.sub}</div></div>
                 <div><Badge tone={j.badge.tone}>{j.badge.text}</Badge></div>
-                <span aria-hidden className="hidden text-muted @3xl:block">›</span>
+                <span className="hidden text-muted @3xl:block"><Icon name="chevronRight" /></span>
               </Link>
             ))}
           </div>
@@ -54,9 +55,9 @@ export function JobsView({ live }: { live: JobsLive }) {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted">
           <span>{t("Showing {shown} of {total} · Sorted by {sort} · KPI counts on Overview use the same period (your company only)", { shown: live.rows.length, total: live.total, sort: live.sortText })}</span>
           <span className="flex items-center gap-3">
-            {live.paging.page > 1 && <button className="font-semibold text-primary" onClick={() => patch(reset)}>{t("‹ First page")}</button>}
+            {live.paging.page > 1 && <button className="font-semibold text-primary" onClick={() => patch(reset)}><Icon name="chevronLeft" /> {t("First page")}</button>}
             <span>{t("Page {page} of {of}", { page: live.paging.page, of: live.paging.of })}</span>
-            {live.nextCursor && <button className="font-semibold text-primary" onClick={() => patch({ cursor: live.nextCursor, page: String(live.paging.page + 1) })}>{t("Next ›")}</button>}
+            {live.nextCursor && <button className="font-semibold text-primary" onClick={() => patch({ cursor: live.nextCursor, page: String(live.paging.page + 1) })}>{t("Next")} <Icon name="chevronRight" /></button>}
           </span>
         </div>
       </section>

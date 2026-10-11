@@ -8,6 +8,7 @@ import { apiMode } from "@ac/web/lib/dal";
 import { AlertEvidenceView } from "./_components/alert-evidence";
 import { MockAlertEvidence } from "./_components/mock-evidence";
 import { loadAlerts } from "./_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 export default async function TechnicianAlertsPage({ params, searchParams }: PageProps<"/technician/units/[id]/alerts">) {
   const { id } = await params;
@@ -19,7 +20,7 @@ export default async function TechnicianAlertsPage({ params, searchParams }: Pag
   if (live.kind === "unavailable") {
     return (
       <Page className="max-w-xl">
-        <Card title={live.title} sub={live.text}><LinkBtn href={live.unitHref} size="sm">{live.back}</LinkBtn></Card>
+        <Card title={live.title} sub={live.text}><LinkBtn href={live.unitHref} size="sm"><Icon name="arrowLeft" />{live.back}</LinkBtn></Card>
       </Page>
     );
   }

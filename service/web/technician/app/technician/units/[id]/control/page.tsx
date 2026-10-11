@@ -10,6 +10,7 @@ import { apiMode } from "@ac/web/lib/dal";
 import { ControlDemo } from "./_components/control-demo";
 import { ControlView } from "./_components/control-view";
 import { loadControl } from "./_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 export default async function TechnicianControlPage({ params, searchParams }: PageProps<"/technician/units/[id]/control">) {
   const { id } = await params;
@@ -20,7 +21,7 @@ export default async function TechnicianControlPage({ params, searchParams }: Pa
   const live = await loadControl(id, jobId);
   if (!live) notFound();
   if (live.kind === "not_started") {
-    return <Page className="max-w-xl"><Card title={live.title} sub={live.text}><LinkBtn href={live.unitHref} size="sm">{live.back}</LinkBtn></Card></Page>;
+    return <Page className="max-w-xl"><Card title={live.title} sub={live.text}><LinkBtn href={live.unitHref} size="sm"><Icon name="arrowLeft" />{live.back}</LinkBtn></Card></Page>;
   }
   return <ControlView live={live} />;
 }

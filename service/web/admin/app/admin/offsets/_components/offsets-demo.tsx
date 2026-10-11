@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Banner, Btn, Card, Check, DemoBadge, Field, Input, ListRow, Modal, Page, Steps, SummaryList, Tabs, Timeline, useToast } from "@ac/web/components/ui";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
+import { Icon } from "@ac/web/components/Icon";
 
 type O = { id: string; cust: string; kind: string; amt: string; st: string; stage: number; tone: "primary" | "ok" | "warn" | "crit" };
 const seed: O[] = [
@@ -38,7 +39,7 @@ export function OffsetsDemo() {
             <Card title="Record details"><SummaryList items={[["Quote", `quote-${sel.id.slice(-4)} · version 1 · expires 09-14 10:15`], ["Amount", `${sel.amt} kgCO₂e`], ["Provider / scheme", "Not selected · demo"], ["Current attempt", "attempt-01"], ["Demo certificate", sel.stage === 4 ? "DEMO-CERT-0231 (demo — not a real certificate)" : "Shown only after demo retirement (DEMO-…)"]]} /></Card>
             {sel.stage === 3 && <Card title="Next step · Demo retirement"><Check label="I understand this is a demo retirement. It does not retire a real credit." checked={ack} onChange={setAck} /><p className="my-1 text-[11px] text-muted">Disabled until confirmed. Retiring before purchase is not possible.</p><Btn variant="primary" disabled={!ack} onClick={() => { upd({ stage: 4, st: "DEMO-CERT-" + sel.id.slice(-4) + " · just now", tone: "ok" }); toast("Demo retired"); }}>Retire (demo)</Btn></Card>}
             {sel.stage === 2 && <Card title="Next step · Demo purchase"><Btn variant="primary" onClick={() => { upd({ stage: 3, st: "Next: demo retirement" }); toast("Demo purchase confirmed"); }}>Confirm simulated purchase</Btn></Card>}
-            <Card title="Event history" action={<a className="text-xs font-semibold text-primary" href="/admin/audit">Open in audit →</a>}><Timeline items={[{ time: "09-14 10:05", title: "purchase_confirm · evt-0198-03 · attempt-01", detail: "hq-operator · demoConfirmed" }, { time: "09-14 10:02", title: "request · quote-0198 v1", detail: "hq-operator · demoConfirmed" }, { time: "09-14 10:00", title: "offsets.preview · 2.500 kgCO₂e", detail: "hq-operator · demoConfirmed" }]} /></Card>
+            <Card title="Event history" action={<a className="text-xs font-semibold text-primary" href="/admin/audit">Open in audit <Icon name="arrowRight" /></a>}><Timeline items={[{ time: "09-14 10:05", title: "purchase_confirm · evt-0198-03 · attempt-01", detail: "hq-operator · demoConfirmed" }, { time: "09-14 10:02", title: "request · quote-0198 v1", detail: "hq-operator · demoConfirmed" }, { time: "09-14 10:00", title: "offsets.preview · 2.500 kgCO₂e", detail: "hq-operator · demoConfirmed" }]} /></Card>
           </div>
         </div>
       ) : (

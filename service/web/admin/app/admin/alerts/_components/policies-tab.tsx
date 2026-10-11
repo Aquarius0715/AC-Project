@@ -191,7 +191,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
                 <div className="mt-1"><Badge tone="primary">{draft.customerName}</Badge></div>
                 <div className="mt-2 rounded-xl bg-surface2 px-3 py-2 text-[13px]">
                   <div>{draft.unitIds.length ? t("Attached to {units} of {customer}: {names}", { units: draft.units, customer: draft.customerName, names: draft.unitNames.join(", ") }) : t("Not attached to any unit yet")}</div>
-                  {draft.customerId && <TextLink href={`/admin/units?customerId=${draft.customerId}&tab=policies`}>{t("Read-only here · attach / detach on each unit ›")}</TextLink>}
+                  {draft.customerId && <TextLink href={`/admin/units?customerId=${draft.customerId}&tab=policies`}>{t("Read-only here · attach / detach on each unit")} <Icon name="chevronRight" /></TextLink>}
                 </div>
               </section>
               <section><h3 className="mb-2 text-[13px] font-bold">{t("Condition")}</h3><p className="mb-2 text-xs text-muted">{t("Missing or stale readings never count toward the condition — they raise a data-quality notice instead.")}</p>

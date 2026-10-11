@@ -48,10 +48,10 @@ export function OverviewView({ live }: { live: OverviewLive }) {
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Kpi label={t("Running")} badge={<PowerBadge s="running" />} value={c.powerOn} sub={live.propertyName ? t("{units} in {property} · latest observation", { units: units(c.total), property: live.propertyName }) : t("{units} · latest observation", { units: units(c.total) })} href="/customer/properties?powerState=on" link={t("View running units →")} />
-          <Kpi label={t("Stopped")} badge={<PowerBadge s="stopped" />} value={c.powerOff} sub={t("Stopped — confirmed by the device")} href="/customer/properties?powerState=off" link={t("View stopped units →")} />
-          <Kpi label={t("Unknown")} badge={<PowerBadge s="unknown" />} value={c.powerUnknown} sub={t("Offline or missing data — counted here, never as running/normal")} href="/customer/properties?connections=offline" link={t("View unknown units →")} />
-          <Kpi label={t("Needs attention")} badge={<SeverityBadge s="warning" />} value={c.alertCount} tone={c.alertCount ? "warn" : undefined} sub={`${t("Unresolved warnings")}${a.info.count ? t(a.info.count === 1 ? " · +{n} reminder & info (not counted)" : " · +{n} reminders & info (not counted)", { n: a.info.count }) : ""}`} href="/customer/alerts" link={t("Open alerts →")} />
+          <Kpi label={t("Running")} badge={<PowerBadge s="running" />} value={c.powerOn} sub={live.propertyName ? t("{units} in {property} · latest observation", { units: units(c.total), property: live.propertyName }) : t("{units} · latest observation", { units: units(c.total) })} href="/customer/properties?powerState=on" link={t("View running units")} />
+          <Kpi label={t("Stopped")} badge={<PowerBadge s="stopped" />} value={c.powerOff} sub={t("Stopped — confirmed by the device")} href="/customer/properties?powerState=off" link={t("View stopped units")} />
+          <Kpi label={t("Unknown")} badge={<PowerBadge s="unknown" />} value={c.powerUnknown} sub={t("Offline or missing data — counted here, never as running/normal")} href="/customer/properties?connections=offline" link={t("View unknown units")} />
+          <Kpi label={t("Needs attention")} badge={<SeverityBadge s="warning" />} value={c.alertCount} tone={c.alertCount ? "warn" : undefined} sub={`${t("Unresolved warnings")}${a.info.count ? t(a.info.count === 1 ? " · +{n} reminder & info (not counted)" : " · +{n} reminders & info (not counted)", { n: a.info.count }) : ""}`} href="/customer/alerts" link={t("link::Open alerts")} />
         </div>
         <Card title={t("Energy used")} sub={live.energy?.sub ?? t("No units in this selection")} action={<span className="text-xs text-muted">kWh</span>}>
           {live.energy ? <>
@@ -61,7 +61,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
             <div className="mt-1 flex gap-4 text-[11px] text-muted"><span><i className="mr-1 inline-block h-2 w-2 bg-primary" />{t("Last 7 days")}</span><span><i className="mr-1 inline-block h-2 w-2 bg-[#c9d8ee]" />{t("7 days before")}</span></div>
             {live.energy.gaps && <p className="mt-1 text-[11px] text-muted">{t("Days without readings show no bar — not 0 kWh.")}</p>}
           </> : <p className="text-[13px] text-muted">{t("Choose a property with units.")}</p>}
-          <TextLink href="/customer/energy" className="mt-2 inline-block">{t("Energy details & table view →")}</TextLink>
+          <TextLink href="/customer/energy" className="mt-2 inline-block">{t("Energy details & table view")} <Icon name="arrowRight" /></TextLink>
         </Card>
         <Card title={t("Estimated emissions")} sub={live.emissions ? `${live.periodLabel} · ${live.emissions.scope}` : t("No units in this selection")} action={<span className="text-xs text-muted">kgCO2e</span>}>
           {live.emissions && <>
@@ -71,7 +71,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
               : <p className="mt-2 text-xs text-muted">{t("No comparable baseline for these units — no saving is estimated.")}</p>}
             <p className="mt-2 text-[11px] text-muted">{t("Estimate only — savings are not a tradable balance.")}</p>
           </>}
-          <TextLink href="/customer/energy" className="mt-2 inline-block">{t("Carbon impact →")}</TextLink>
+          <TextLink href="/customer/energy" className="mt-2 inline-block">{t("Carbon impact")} <Icon name="arrowRight" /></TextLink>
         </Card>
         <Card title={live.air ? t("Air quality · {room}", { room: live.air.room }) : t("Air quality")} action={live.air && <Badge tone={live.air.co2.feed.tone} icon={live.air.co2.feed.icon}>{live.air.co2.feed.text}</Badge>}>
           {live.air ? <>
@@ -83,12 +83,12 @@ export function OverviewView({ live }: { live: OverviewLive }) {
             {live.air.cut && <p className="text-[11px] text-muted">{t("Chart from the latest 300 readings.")}</p>}
             <p className="mt-1 text-xs">PM2.5 <b>{live.air.pm25.value === null ? "—" : `${live.air.pm25.value} µg/m³`}</b> <span className="text-muted">· {live.air.pm25.advice}</span></p>
           </> : <p className="text-[13px] text-muted">{t("No units in this selection.")}</p>}
-          <TextLink href={live.air ? `/customer/air-quality?unitId=${live.air.id}` : "/customer/air-quality"} className="mt-1 inline-block">{t("Air quality details →")}</TextLink>
+          <TextLink href={live.air ? `/customer/air-quality?unitId=${live.air.id}` : "/customer/air-quality"} className="mt-1 inline-block">{t("Air quality details")} <Icon name="arrowRight" /></TextLink>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
-        <Card title={live.propertyName ? t("Units in {property}", { property: live.propertyName }) : t("Units in all properties")} sub={t("Latest value per unit — no averaged temperature across rooms (BR-C01)")} action={<TextLink href="/customer/properties">{t("View all →")}</TextLink>}>
+        <Card title={live.propertyName ? t("Units in {property}", { property: live.propertyName }) : t("Units in all properties")} sub={t("Latest value per unit — no averaged temperature across rooms (BR-C01)")} action={<TextLink href="/customer/properties">{t("View all")} <Icon name="arrowRight" /></TextLink>}>
           <div className="flex flex-col divide-y divide-line">
             <div className="hidden grid-cols-[minmax(0,1fr)_72px_72px_72px_120px_14px] gap-2 pb-2 text-[11px] text-muted lg:grid">
               <span>{t("Unit · location · observed")}</span><span>{t("Room temp")}</span><span>{t("Humidity")}</span><span>{t("Power now")}</span><span>{t("Status")}</span><span />
@@ -102,7 +102,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
                   ))}
                 </div>
                 <div className="col-start-2 row-start-1 flex flex-col items-end gap-1 lg:col-auto lg:row-auto lg:items-start"><PowerBadge s={u.state} /><ConnBadge s={u.conn} /></div>
-                <span className="hidden text-muted lg:block">›</span>
+                <span className="hidden text-muted lg:block"><Icon name="chevronRight" /></span>
               </Link>
             ))}
             {live.rows.length === 0 && <p className="py-4 text-center text-xs text-muted">{t("No units in this selection.")}</p>}
@@ -113,20 +113,20 @@ export function OverviewView({ live }: { live: OverviewLive }) {
             {a.items.length ? (
               <ul className="flex flex-col divide-y divide-line">
                 {a.items.map((x) => (
-                  <li key={x.id}><Link href="/customer/alerts" className="flex items-center justify-between gap-2 py-2.5"><div><div className="font-bold">{x.title}</div><div className="my-1"><SeverityBadge s={x.severity} /></div><div className="text-[11px] text-muted">{x.where}</div></div><span className="text-muted">›</span></Link></li>
+                  <li key={x.id}><Link href="/customer/alerts" className="flex items-center justify-between gap-2 py-2.5"><div><div className="font-bold">{x.title}</div><div className="my-1"><SeverityBadge s={x.severity} /></div><div className="text-[11px] text-muted">{x.where}</div></div><span className="text-muted"><Icon name="chevronRight" /></span></Link></li>
                 ))}
               </ul>
             ) : <p className="text-xs text-muted">{t("Nothing needs your attention.")}</p>}
             {a.more > 0 && <p className="text-[11px] text-muted">{t("+{n} more", { n: a.more })}</p>}
             {a.info.count > 0 && <p className="mt-2 border-t border-line pt-2 text-[11px] text-muted">{t("Reminders & info ({n}) — {list}", { n: a.info.count, list: a.info.text })}</p>}
-            <TextLink href="/customer/alerts" className="mt-1 inline-block">{t("Open alerts →")}</TextLink>
+            <TextLink href="/customer/alerts" className="mt-1 inline-block">{t("link::Open alerts")} <Icon name="arrowRight" /></TextLink>
           </Card>
           <Card title={t("Automations")} action={<span className="text-xs text-muted">{t("{on} on · {off} off", { on: live.automations.on, off: live.automations.off })}</span>}>
             {live.automations.items.map((x) => (
               <div key={x.id} className="flex items-center justify-between gap-2 py-2"><div className="min-w-0"><div className="font-bold">{x.name}</div><div className="text-[11px] text-muted">{x.line}</div></div><Badge tone={x.status.tone} icon={x.status.tone === "ok" ? "live" : undefined}>{x.status.text}</Badge></div>
             ))}
             {live.automations.items.length === 0 && <p className="text-xs text-muted">{t("No automations for these units.")}</p>}
-            <TextLink href="/customer/automations" className="mt-1 inline-block">{t("Manage automations →")}</TextLink>
+            <TextLink href="/customer/automations" className="mt-1 inline-block">{t("Manage automations")} <Icon name="arrowRight" /></TextLink>
           </Card>
         </div>
       </div>

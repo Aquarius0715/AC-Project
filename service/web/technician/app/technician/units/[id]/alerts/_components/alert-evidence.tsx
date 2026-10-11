@@ -10,6 +10,7 @@ import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { refusal } from "@ac/web/lib/techAlerts";
 import { acknowledgeAlert, resolveAlert } from "../actions";
 import type { AlertsLive } from "../_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 const BANNER = { crit: "border-crit/40 bg-crit-soft text-crit", warn: "border-[#fdba74] bg-warn-soft text-warn", ok: "border-ok/40 bg-ok-soft text-ok", primary: "border-line bg-surface2 text-ink", muted: "border-line bg-surface2 text-ink" } as const;
 
@@ -44,7 +45,7 @@ export function AlertEvidenceView({ live }: { live: AlertsLive }) {
   };
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px]"><Link href={live.unitHref} className="font-semibold text-primary" aria-label={t("Back")}>‹</Link><h1 className="text-base font-bold">{t("Alert evidence")}</h1><span className="text-muted">· {live.unitName}</span></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px]"><Link href={live.unitHref} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{t("Alert evidence")}</h1><span className="text-muted">· {live.unitName}</span></div>
       {!a ? <Card><EmptyState title={t("No alerts on this unit")}>{t("Alerts raised on this unit appear here with their evidence.")}</EmptyState></Card> : (
         <>
           <div className={cx("flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3", BANNER[a.banner.tone])}>

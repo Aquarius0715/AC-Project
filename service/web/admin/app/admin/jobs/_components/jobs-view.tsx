@@ -128,7 +128,7 @@ function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fre
 
       {j.followUpOfJobId && (
         <Card tone="warn" title={<span className="inline-flex items-center gap-1.5"><Icon name="undo" />{j.followUpClass === "pending" ? t("Follow-up request — classify within 1 business day") : t("Follow-up of {id}", { id: j.followUpOfJobId.slice(0, 8) })}</span>} action={j.followUpClass === "pending" ? <Badge tone="warn">{t("Classify by {time}", { time: d.texts.classifyBy })}</Badge> : <Badge tone={j.followUpClass === "rework" ? "ok" : "primary"}>{t(j.followUpClass === "rework" ? "Rework (free)" : "New request")}</Badge>}>
-          <SummaryList items={[[t("Client’s report"), j.symptom || "—"], [t("Original job"), <Link key="o" className="text-primary" href={`/admin/jobs?jobId=${j.followUpOfJobId}`}>{j.followUpOfJobId.slice(0, 8)} →</Link>]]} />
+          <SummaryList items={[[t("Client’s report"), j.symptom || "—"], [t("Original job"), <Link key="o" className="text-primary" href={`/admin/jobs?jobId=${j.followUpOfJobId}`}>{j.followUpOfJobId.slice(0, 8)} <Icon name="arrowRight" /></Link>]]} />
           {j.followUpClass === "pending" && <div className="mt-3 flex items-center justify-between gap-2"><span className="text-[11px] text-muted">{t("Set once with a reason. Until then the client sees “Under HQ review”.")}</span><Btn variant="primary" disabled={pending} onClick={() => setModal({ kind: "classify" })}>{t("Classify…")}</Btn></div>}
         </Card>
       )}
@@ -180,7 +180,7 @@ function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fre
 
       {d.report ? (
         <Card title={d.report.title} sub={d.report.sub} tone={d.report.tone === "warn" ? "warn" : d.report.tone === "ok" ? "ok" : undefined}
-          action={<button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => setModal({ kind: "report" })}>{t("Open report →")}</button>}>
+          action={<button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => setModal({ kind: "report" })}>{t("Open report")} <Icon name="arrowRight" /></button>}>
           <ReportRows rows={d.report.rows} />
           {d.report.readings.length > 0 && <div className="mt-2"><SummaryList items={d.report.readings} /></div>}
           {d.report.photos.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{d.report.photos.map((p) => (
@@ -264,7 +264,7 @@ function BookModal({ d, live, row: first, fresh, onClose, onFail }: ModalProps &
     ? run(() => assignInternal(j.id, j.version, tech, row.slot), t("Assigned — the technician must accept"), () => onClose(t("Assigned {name} for {slot}. The technician must accept (受領).", { name: row.people.find((p) => p.id === tech)?.displayName ?? "", slot: slotText(row.slot, i) })), onFail)
     : run(() => offerToContractor(j.id, j.version, { contractorOrgId: org, visitSlot: row.slot, offerExpiresAt: fromZonedInput(expires, zone), accessValidFrom: fromZonedInput(from, zone), accessValidUntil: fromZonedInput(until, zone), termsVersion: terms.trim() }), t("Offer sent"), () => onClose(t("Offered {slot} to {name}. They accept, decline or propose another time — a different time goes back to the client.", { slot: slotText(row.slot, i), name: active.find((c) => c.id === org)?.name ?? "" })), onFail);
   return (
-    <Modal open onClose={() => onClose()} title={fresh ? t("New maintenance job · step 2 of 2") : t("Book {id}", { id: j.id.slice(0, 8) })} footer={<><Btn onClick={() => onClose()}>{t(fresh ? "Leave it requested" : "← Back")}</Btn><Btn variant="primary" disabled={pending || (who === "internal" ? !tech : !org || !terms.trim())} onClick={book}>{t(who === "internal" ? "Assign" : "Send offer")}</Btn></>}>
+    <Modal open onClose={() => onClose()} title={fresh ? t("New maintenance job · step 2 of 2") : t("Book {id}", { id: j.id.slice(0, 8) })} footer={<><Btn onClick={() => onClose()}>{!fresh && <Icon name="arrowLeft" />}{t(fresh ? "Leave it requested" : "Back")}</Btn><Btn variant="primary" disabled={pending || (who === "internal" ? !tech : !org || !terms.trim())} onClick={book}>{t(who === "internal" ? "Assign" : "Send offer")}</Btn></>}>
       <p className="text-xs text-muted">{fresh ? `${t("Created {id} (requested) · choose who does the work —", { id: j.id.slice(0, 8) })} ` : ""}{d.title} · {d.customer} · {t(j.origin === "periodic_plan" ? "Periodic plan" : "Client request")}</p>
       {fresh && ahead.length > 1 ? (
         <Field label={t("Visit time · one of the customer’s preferred times")} hint={t("Only these times are agreed (IR113); another time needs a proposal the customer accepts.")}><Select value={String(rank)} onChange={(e) => pick(Number(e.target.value))}>{ahead.map((r) => <option key={r.rank} value={r.rank}>{t(RANK[r.rank - 1] ?? "{n}th", { n: r.rank })} · {r.text}{r.fits ? "" : ` · ${t("no HQ technician free")}`}</option>)}</Select></Field>
@@ -529,7 +529,7 @@ export function NewJobModal({ live, initial, onClose, onCreated }: { live: { now
   };
   const groups = [...new Set(live.units.map((u) => u.customer))];
   return (
-    <Modal open wide onClose={onClose} title={t("New maintenance job · step 1 of 2")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn disabled={pending} onClick={() => save(false)}>{t("Save as requested")}</Btn><Btn variant="primary" disabled={pending} onClick={() => save(true)}>{t("Next: choose delivery →")}</Btn></>}>
+    <Modal open wide onClose={onClose} title={t("New maintenance job · step 1 of 2")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn disabled={pending} onClick={() => save(false)}>{t("Save as requested")}</Btn><Btn variant="primary" disabled={pending} onClick={() => save(true)}>{t("Next: choose delivery")} <Icon name="arrowRight" /></Btn></>}>
       {refusal && <Banner tone="crit">{refusal}</Banner>}
       <div className="grid-fluid" style={{ ["--min" as string]: "220px" }}>
         <Field label={t("Unit · required")} error={tried ? errors.unitId : undefined}><Select value={unitId} onChange={(e) => setUnitId(e.target.value)}>{groups.map((g) => <optgroup key={g} label={g}>{live.units.filter((u) => u.customer === g).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</optgroup>)}</Select></Field>

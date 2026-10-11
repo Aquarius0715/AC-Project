@@ -141,14 +141,14 @@ export function kpis(counts: ApiCounts, jobs: PartnerJob[], now: number, names: 
   const active = Math.max(0, counts.activeCount - unassigned.length);
   const who = (id: string | null) => names.get(id ?? "") ?? t("Technician");
   return [
-    { label: t("Offers to answer"), value: counts.offerCount, sub: offers[0] ? t("{job} · expires in {left}", { job: offers[0].short, left: until(offers[0].offerExpiresAt!, now, t) }) : t("No open offers"), href: list("offered"), link: t("Open offers →") },
-    { label: t("Awaiting assignment"), value: unassigned.length, sub: unassigned.length ? t("Accepted, no technician yet") : "—", href: "/partner/schedule", link: t("Assign →"), tone: unassigned.length ? "warn" : undefined },
+    { label: t("Offers to answer"), value: counts.offerCount, sub: offers[0] ? t("{job} · expires in {left}", { job: offers[0].short, left: until(offers[0].offerExpiresAt!, now, t) }) : t("No open offers"), href: list("offered"), link: t("link::Open offers") },
+    { label: t("Awaiting assignment"), value: unassigned.length, sub: unassigned.length ? t("Accepted, no technician yet") : "—", href: "/partner/schedule", link: t("Assign"), tone: unassigned.length ? "warn" : undefined },
     {
-      label: t("In progress / scheduled"), value: active, href: list("active"), link: t("View jobs →"),
+      label: t("In progress / scheduled"), value: active, href: list("active"), link: t("View jobs"),
       sub: next ? t(next.status === "in_progress" ? "{name} on site from {time}" : "{name} starts {time}", { name: who(next.technicianId), time: relativeTime(next.slot!.startAt, now, i) }) : "—",
     },
-    { label: t("Reports to review"), value: counts.reviewCount, sub: review[0] ? t("{job} · awaiting review", { job: label(review[0], t) }) : "—", href: review.length === 1 ? `/partner/jobs/${review[0].id}/review` : list("review"), link: t("Review →") },
-    { label: t("Overdue"), value: counts.overdueCount, sub: counts.overdueCount ? t("Past the due date or the work window (IR89)") : "—", href: list("active"), link: t("View →"), tone: counts.overdueCount ? "crit" : undefined },
+    { label: t("Reports to review"), value: counts.reviewCount, sub: review[0] ? t("{job} · awaiting review", { job: label(review[0], t) }) : "—", href: review.length === 1 ? `/partner/jobs/${review[0].id}/review` : list("review"), link: t("Review") },
+    { label: t("Overdue"), value: counts.overdueCount, sub: counts.overdueCount ? t("Past the due date or the work window (IR89)") : "—", href: list("active"), link: t("View"), tone: counts.overdueCount ? "crit" : undefined },
   ];
 }
 

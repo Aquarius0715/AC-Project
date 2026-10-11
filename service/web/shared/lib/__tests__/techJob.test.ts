@@ -161,7 +161,7 @@ describe("the server's formatting and Malay (IR282)", () => {
     expect(historyCard({ projection: "history", jobId: "job-9-aaaa", type: "periodic", status: "completed", asOf: "2026-09-21T08:00:00Z", completedAt: "2026-09-21T07:00:00Z", redactedReportSummary: { hasReport: true, acceptance: "accepted" } }, MS)).toEqual({
       title: "job-9-aa · Pemeriksaan berkala", sub: "Selesai — tugasan anda tamat bersama kerja",
       rows: [["Status", "Selesai 21 Sep 2026"], ["Laporan anda", "Diterima dalam semakan kualiti"], ["Tugasan tamat", "21 Sep 2026, 5:00 PTG GMT+9"]],
-      note: "Masa anda lapang untuk kerja lain. Laporan, unit dan perantinya kekal dengan HQ dan pelanggan.", back: "← Gambaran keseluruhan",
+      note: "Masa anda lapang untuk kerja lain. Laporan, unit dan perantinya kekal dengan HQ dan pelanggan.", back: "Gambaran keseluruhan",
     });
   });
 });

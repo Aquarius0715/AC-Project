@@ -52,7 +52,7 @@ export async function enterPassword(page: Page, user: string): Promise<void> {
 
 export async function signIn(page: Page, app: App, as = app.user): Promise<void> {
   await page.goto(`${app.url}/login`);
-  await page.getByRole("link", { name: `Continue as ${app.user} →` }).click();
+  await page.getByRole("link", { name: `Continue as ${app.user}` }).click();
   if (as !== app.user) await page.locator("#username").fill(as);
   await page.locator("#password").fill(passwordOf(as));
   await page.locator("#kc-login").click();

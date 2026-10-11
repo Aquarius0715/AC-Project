@@ -1,6 +1,6 @@
 // HQ alerts (FR-A05, DD-A05 items 5 and 11, Figma Admin 256:2, IR318): the scope, severity, status and selected alert
 // live in the URL; the detail explains why the alert was raised and its activity, and offers Request maintenance (New
-// job for the unit, its symptom from the alert) and Open unit →. The seed has two open alerts on Demo Customer A: the
+// job for the unit, its symptom from the alert) and Open unit. The seed has two open alerts on Demo Customer A: the
 // warning "Possible open window" and the Info filter cleaning reminder. Nothing is acknowledged, resolved or created.
 import { test, expect } from "../../fixtures/test";
 import { expectAccessible } from "../../fixtures/a11y";
@@ -31,7 +31,7 @@ test("the alerts tab filters in the URL and opens a job or the unit from an aler
   await page.waitForURL(/alertId=/);
   for (const name of ["Why we think this", "Activity"]) await expect(main.getByRole("heading", { name, exact: true })).toBeVisible();
   await expect(main).toContainText("No policy escalation — this alert was not raised by a policy");
-  await expect(main.getByRole("link", { name: "Open unit →" })).toHaveAttribute("href", /^\/admin\/units\?customerId=[0-9a-f-]{36}&unitId=[0-9a-f-]{36}$/);
+  await expect(main.getByRole("link", { name: "Open unit", exact: true })).toHaveAttribute("href", /^\/admin\/units\?customerId=[0-9a-f-]{36}&unitId=[0-9a-f-]{36}$/);
   await main.getByRole("link", { name: "Request maintenance" }).click();
   await page.waitForURL(/\/admin\/jobs\?new=[0-9a-f-]{36}&alertId=/);
   const dialog = page.getByRole("dialog");

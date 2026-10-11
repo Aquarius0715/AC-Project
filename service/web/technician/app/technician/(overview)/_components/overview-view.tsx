@@ -6,6 +6,7 @@ import { OriginBadge } from "@ac/web/components/JobBits";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { OverviewLive } from "../_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 /** The technician overview (FR-T01, Figma Technician 01-1…01-5) from the Core API. Texts in the user's display
  * language; the times come formatted from the loader — today's timeline in Kuala Lumpur hours (IR281). */
@@ -36,7 +37,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
       </div>
       <Card title={live.title}>
         {live.rows.length === 0 ? (
-          <EmptyState title={t(live.tab === "today" ? "No assigned jobs today" : "No assigned jobs")} action={live.tab === "today" && all ? <button type="button" className="text-sm font-semibold text-primary" onClick={() => patch({ tab: "all" })}>{t("All assigned ({n}) →", { n: all })}</button> : undefined}>
+          <EmptyState title={t(live.tab === "today" ? "No assigned jobs today" : "No assigned jobs")} action={live.tab === "today" && all ? <button type="button" className="text-sm font-semibold text-primary" onClick={() => patch({ tab: "all" })}>{t("All assigned ({n})", { n: all })} <Icon name="arrowRight" /></button> : undefined}>
             {t("Jobs assigned to you appear here. Past assignments stay in their job history.")}
           </EmptyState>
         ) : (
@@ -44,7 +45,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
             {live.rows.map((j) => (
               <Link key={j.id} href={`/technician/jobs/${j.id}`} className="flex items-center justify-between gap-3 border-t border-line py-2.5 first:border-0 hover:bg-surface2/60">
                 <span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><b className="text-[13px]">{j.short} · {j.title}</b>{j.origin && <OriginBadge origin={j.origin === "periodic_plan" ? "plan" : "request"} />}</span><span className="block text-xs text-muted">{j.line}</span></span>
-                <span className="flex shrink-0 items-center gap-2"><Badge tone={j.badge.tone}>{j.badge.text}</Badge><span aria-hidden className="text-muted">›</span></span>
+                <span className="flex shrink-0 items-center gap-2"><Badge tone={j.badge.tone}>{j.badge.text}</Badge><span className="text-muted"><Icon name="chevronRight" /></span></span>
               </Link>
             ))}
           </div>
@@ -71,7 +72,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
             {live.otherZone && ` ${t("The timeline is in Kuala Lumpur time (Asia/Kuala_Lumpur).")}`}
           </p>
         </Card>
-        <Card title={t("Alerts on my units ({n})", { n: live.alerts.length })} action={live.alerts[0] && <TextLink href={live.alerts[0].href}>{t("All →")}</TextLink>}>
+        <Card title={t("Alerts on my units ({n})", { n: live.alerts.length })} action={live.alerts[0] && <TextLink href={live.alerts[0].href}>{t("All")} <Icon name="arrowRight" /></TextLink>}>
           {live.alerts.length === 0 && <p className="text-[13px] text-muted">{t("No open alerts on your units.")}</p>}
           {live.alerts.slice(0, 4).map((a) => <Link key={a.id} href={a.href} className="flex items-center justify-between gap-2 border-t border-line py-2 first:border-0"><span className="min-w-0"><b className="text-[13px]">{a.title}</b><span className="block truncate text-xs text-muted">{a.sub}</span></span><SeverityBadge s={a.severity} /></Link>)}
           <p className="mt-1 text-[11px] text-muted">{t("Only units in your assignments. Finishing a job does not resolve its alert.")}</p>

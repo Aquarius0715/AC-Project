@@ -135,7 +135,7 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
   const scheduleOk = sched && !local.weekdays && !local.startLocal && !local.endLocal && !local.endsNextDay;
   const preview = useOp<ApiOccurrence[], ApiOccurrence[]>("automations.nextRuns", { draft: scheduleDraft(useDebounced(draft, 400)), count: 8 }, [], (d) => d, scheduleOk);
   if (live.editing !== "new" && !rule) {
-    return <Page><EmptyState title={t("This automation no longer exists")} action={<Btn size="sm" onClick={onCancel}>{t("← Automations")}</Btn>}>{t("It may have been deleted on another device.")}</EmptyState></Page>;
+    return <Page><EmptyState title={t("This automation no longer exists")} action={<Btn size="sm" onClick={onCancel}><Icon name="arrowLeft" /> {t("Automations")}</Btn>}>{t("It may have been deleted on another device.")}</EmptyState></Page>;
   }
   const ac = live.acs.find((u) => u.id === draft.unitId);
   const options = actionOptions(live.caps[draft.unitId] ?? null, t);
@@ -176,7 +176,7 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
   const step = (n: number, title: string, sub?: string) => <div className="flex items-start gap-2"><span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white">{n}</span><div><div className="text-[15px] font-bold">{title}</div>{sub && <div className="text-xs text-muted">{sub}</div>}</div></div>;
   return (
     <Page>
-      <div className="text-[13px] text-muted"><button type="button" className="font-semibold text-primary" onClick={onCancel}>{t("← Automations")}</button> › <b className="text-ink">{t(rule ? "Edit automation" : "Create automation")}</b></div>
+      <div className="text-[13px] text-muted"><button type="button" className="font-semibold text-primary" onClick={onCancel}><Icon name="arrowLeft" /> {t("Automations")}</button> › <b className="text-ink">{t(rule ? "Edit automation" : "Create automation")}</b></div>
       <div className="split">
         <Card>
           <div className="flex flex-col gap-4">
