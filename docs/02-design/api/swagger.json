@@ -15964,6 +15964,120 @@
                 }
             }
         },
+        "/v1/members/{membershipId}/revoke-sessions": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Authorization: admin:identity.write | admin:asset.write:client-membership\nValidation: D01; input constraints in the corresponding DD; IR384 reason 1–1000; every membership of the target's user in the tenant records sessionsRevokedAt (wall clock); a token signed in before it is UNAUTHENTICATED errors.session_revoked; a client membership needs asset.write, any other identity.write\nRecovery: D04: call writes.getResult with the key, then retry the same intent\nDesign: DD-A03, DD-A17",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "members"
+                ],
+                "summary": "members.revokeSessions (write)",
+                "operationId": "members.revokeSessions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "D04: the same key replays the stored response; another body for the same key is CONFLICT",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "input field membershipId",
+                        "name": "membershipId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "input; the path parameters come from the route",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/identity.RevokeSessionsInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/ops.Envelope"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/identity.SessionsRevoked"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "UNAUTHENTICATED",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "403": {
+                        "description": "FORBIDDEN",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "404": {
+                        "description": "NOT_FOUND",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "409": {
+                        "description": "CONFLICT / OFFLINE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "422": {
+                        "description": "VALIDATION (fieldErrors)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "429": {
+                        "description": "RATE_LIMITED (retryAfterSeconds)",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "503": {
+                        "description": "UNAVAILABLE",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    },
+                    "504": {
+                        "description": "TIMEOUT",
+                        "schema": {
+                            "$ref": "#/definitions/apperr.DomainError"
+                        }
+                    }
+                }
+            }
+        },
         "/v1/mrv": {
             "get": {
                 "security": [
@@ -30629,6 +30743,17 @@
                 }
             }
         },
+        "identity.RevokeSessionsInput": {
+            "type": "object",
+            "properties": {
+                "membershipId": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
         "identity.ScopeRef": {
             "type": "object",
             "properties": {
@@ -30693,6 +30818,26 @@
                 },
                 "viewEpoch": {
                     "type": "integer"
+                }
+            }
+        },
+        "identity.SessionsRevoked": {
+            "type": "object",
+            "properties": {
+                "membershipId": {
+                    "type": "string"
+                },
+                "membershipIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "revokedAt": {
+                    "type": "string"
+                },
+                "userId": {
+                    "type": "string"
                 }
             }
         },

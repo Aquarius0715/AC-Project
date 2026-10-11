@@ -117,6 +117,7 @@ locations.rename,write,Assets,assets.properties;assets.spaces,assets.properties;
 members.capacity,read,Maintenance,maintenance.assignments;maintenance.unavailability,,Identity & access,,
 members.eligible,read,Maintenance,maintenance.certificates;maintenance.unavailability,,Identity & access,,
 members.list,read,Identity & access,identity.memberships;identity.membership_permissions;identity.membership_scopes;identity.qualification_grants,,,,
+members.revokeSessions,write,Identity & access,identity.memberships,identity.memberships,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 members.save,write,Identity & access,identity.memberships;identity.membership_permissions;identity.membership_scopes;identity.qualification_grants,identity.memberships;identity.membership_permissions;identity.membership_scopes,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 members.setUnavailability,write,Maintenance,,maintenance.unavailability,Identity & access,audit.audit_log;platform.idempotency_keys;platform.outbox,
 mrv.get,read,Energy & carbon,energy.mrv_reports,,,,

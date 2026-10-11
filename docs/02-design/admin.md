@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.61.0
+version: 0.62.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -45,7 +45,7 @@ Show retry only for recoverable errors. For forbidden and not-found, follow IR57
 |---|---|---|---|---|
 | DD-A01 / FR-A01 | `/admin` / `AdminOverview` | `admin.summary`, `customers.list`, `properties.list` | Specify organization and period. Show both target and unknown unit counts with operating rates | Never automatically classify unmeasured units as inactive or normal |
 | DD-A02 / FR-A02 | `/admin/units` / `AssetRegistry` | `organizations.list`、`organizations.save`、`customers.list`、`customers.save`、`properties.save`、`spaces.save`、`units.save`、`units.archive`、`units.list`、`units.get`、`properties.list`、`spaces.list`、`capabilities.list`、`units.delete`、`commands.create`、`commands.get`、`diagnosticRuns.list`、`diagnosticRuns.get`、`properties.archive`、`spaces.archive`、`units.setAlertPolicies`、`policies.list` | Require a 1–120-character name. Enter parent ID, modelId, split type, and installation date. Derive tenantId from Session, not input (IR74) | Do not delete spaces in use; move related units first. Prefer archiving (taking out of use) to deletion |
-| DD-A03 / FR-A03 | `/admin/settings/access` / `AccessManager` | `members.list`、`members.save`、`organizations.list` | Use identity.read/identity.write, membershipId, role (admin/contractor/technician only), scope, validFrom/Until, qualifications, and the 38-value permission matrix (IR107). Write implies Read | Demo policy forbids indefinite external assignments. Prevent users from granting themselves stronger permissions |
+| DD-A03 / FR-A03 | `/admin/settings/access` / `AccessManager` | `members.list`、`members.save`、`members.revokeSessions`、`organizations.list` | Use identity.read/identity.write, membershipId, role (admin/contractor/technician only), scope, validFrom/Until, qualifications, and the 38-value permission matrix (IR107). Write implies Read | Demo policy forbids indefinite external assignments. Prevent users from granting themselves stronger permissions |
 | DD-A04 / FR-A04 | `/admin/devices` / `DeviceRegistry` | `capabilities.list`、`capabilities.save`、`devices.list`、`devices.get`、`devices.register`、`devices.bind`、`devices.check`、`devices.calibrate`、`devices.updateFirmware`、`units.list`、`units.get`、`devices.calibrations`、`devices.operations`、`devices.events`、`audit.list` | Temperature requires min<=max and step>0. Specify allowed modes/fan levels and explicit ventilation support | Show the impact of capability changes incompatible with current Commands. Do not assume supported features |
 | DD-A05 / FR-A05 | `/admin/alerts` / `AlertPolicyEditor` | `alerts.list`、`policies.save`、`notifications.preview`、`policies.list`、`policies.get`、`alerts.get`、`alerts.acknowledge`、`alerts.resolve`、`alerts.evidence`、`notifications.recipients`、`units.list`、`units.get`、`telemetry.series`、`policies.setDefaultRule`、`policies.delete`、`units.setAlertPolicies`、`customers.list`、`automations.simulate`、`automations.fire` | Policies belong to one customer (IR108); units attach them on unit edit. HQ default policy on every unit with per-customer rule on/off. Require upper/lower thresholds, positive duration, and recipients. Thresholds are fictional demo values | Marking a notification read does not resolve the Alert. External sending is preview only |
 | DD-A06 / FR-A06 | `/admin/jobs` / `MaintenanceCoordinator` | `jobs.list`、`jobs.create`、`jobs.offer`、`jobs.assign`、`jobs.proposeSlot`、`jobs.withdrawProposal`、`jobs.resolvePartnerSlot`、`jobs.review`、`jobs.saveCost`、`jobs.hold`、`jobs.resumeHold`、`jobs.cancel`、`plans.save`、`plans.generateNext`、`jobs.get`、`reports.get`、`attachments.getContent`、`members.eligible`、`organizations.list`、`jobs.extendAccess`、`plans.list`、`plans.get`、`units.list`、`jobs.classifyFollowUp`、`jobs.events`、`customers.list`、`properties.list`、`members.list`、`units.get` | Enter maintenance type, target, and deadline. Choose internal or outsourced work. Enter nonnegative costs with currency. Contractors accept before assigning their staff | Re-offer to another contractor after decline. Judge completion separately from alert resolution. Do not send real contractor payments |
@@ -59,7 +59,7 @@ Show retry only for recoverable errors. For forbidden and not-found, follow IR57
 | DD-A14 / FR-A14 | `/admin/mrv` / `MRVWorkspace` | `mrv.preview`、`mrv.saveDraft`、`mrv.recordReview`、`factors.list`、`factors.save`、`mrv.list`、`mrv.get`、`baselines.list`、`organizations.list`、`units.list`、`mrv.versions`、`attachments.list` | Require period, units, baseline version, factor version, and boundary. List evidence | Note missing data and estimates. Use “Demo review,” not “Externally verified” |
 | DD-A15 / FR-A15 | `/admin/offsets` / `OffsetRegistry` | `offsets.preview`、`offsets.simulate`、`offsets.list`、`customers.list`、`units.list` | Quantity must be >0. Label scheme/provider “Not selected” and require the demo flag | Do not copy emission amounts into credit balances. No real trading or certificate issuance |
 | DD-A16 / FR-A16 | `/admin/audit` / `AuditExplorer` | `audit.list`、`devices.events` | Use audit.read permission, period, actor, target, and event type. Mask confidential values | Show denied and successful actions separately. No deletion or changes through the screen. Demo records are not guaranteed tamper-proof |
-| DD-A17 / FR-A17 | `/admin/units?customerId=&tab=users` / `ClientUserList` | `clientUsers.list`、`clientUsers.save`、`clientUsers.remove`、`clientUsers.resendInvite` | Email unique per customer; role owner/member; reason for removal | Last active owner cannot be demoted, disabled, or removed |
+| DD-A17 / FR-A17 | `/admin/units?customerId=&tab=users` / `ClientUserList` | `clientUsers.list`、`clientUsers.save`、`clientUsers.remove`、`clientUsers.resendInvite`、`members.revokeSessions` | Email unique per customer; role owner/member; reason for removal | Last active owner cannot be demoted, disabled, or removed |
 | DD-A18 / FR-A18 | `/admin/units` (Import CSV) / `UnitImportWizard` | `units.importPreview`、`units.importCommit`、`units.importUndo`、`customers.list` | UTF-8 CSV ≤ 1000 rows; 8 mapped columns; nothing written before import | Error rows skipped; undo only 24 h and before telemetry/jobs |
 | DD-A19 / FR-A19 | `/admin/units?tab=warranty` / `WarrantyCoverage` | `units.coverage`、`jobs.recordWarrantyClaim`、`contracts.list` | Coverage = warranty or active contract; claim amount > 0 | Claims only for parts replaced under warranty |
 | DD-A20 / FR-A20 | `/admin/devices?tab=firmware` / `FirmwareCampaigns` | `firmwareCampaigns.list`、`firmwareCampaigns.get`、`firmwareCampaigns.schedule`、`firmwareCampaigns.control`、`devices.list` | Signed version; start ≥ 24 h ahead; waves end at 100 %; auto-pause 1–50 % | Busy/offline/tampered devices skipped; failed devices keep the old version |
@@ -159,7 +159,7 @@ Scope: FR-A02 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 **Source mapping**: SRC-06 BIZ-04 → FR-A03 → DD-A03. Source category: design additions supporting company goals. Design additions: permissions, memberships, and assignment periods. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-A03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `members.list, members.save, organizations.list`.
+Scope: FR-A03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `members.list, members.save, members.revokeSessions, organizations.list`.
 
 **Initial view and prerequisites**: identity.write permission; the target's current role, scope, and valid period are fetched. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -180,6 +180,7 @@ Scope: FR-A03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 3. Update Membership version and scopeVersion. Discard caches from old sessions; evaluate subsequent mutations using new permissions.
 4. Queries to update: `members / session scope / all affected query caches / audit`。
 5. Language and time (IR302): texts, roles and matrix resources follow the display language; permission codes stay codes. The valid period is typed and shown in the display time zone, and the form names it. A revoke ends the access at now.
+6. Sign out everywhere (IR384, Figma Admin 03-8): “Sign out everywhere…” in the editor's footer opens a centered modal with a required reason (1–1000 characters, kept in the audit log). `members.revokeSessions` ends every session of the membership's user in this tenant at once, in all four apps and at the identity provider; the access stays, so the user signs in again with their password and two-step code. Use it for a lost device or a suspected takeover; Revoke access ends the membership instead.
 
 **Boundary cases and failures**: Reject other-tenant scopes, external access without an end date, validFrom at or after validUntil, and adding override to oneself. Reject saves from old screens after permissions expire.
 
@@ -697,7 +698,7 @@ Convert condition forms to the Condition type's discriminated union. occupancy i
 
 **Source mapping**: SRC-06 BIZ-04 → FR-A17 → DD-A17. Source category: Figma-confirmed screen specification (Admin 02-15, 2026-10-01).
 
-Scope: FR-A17 / Main display pattern: **UI-LIST**. Service boundary: `clientUsers.list, clientUsers.save, clientUsers.remove, clientUsers.resendInvite`.
+Scope: FR-A17 / Main display pattern: **UI-LIST**. Service boundary: `clientUsers.list, clientUsers.save, clientUsers.remove, clientUsers.resendInvite, members.revokeSessions`.
 
 **Initial view and prerequisites**: asset.read; customer selected; tab `users`.
 
@@ -711,7 +712,7 @@ Scope: FR-A17 / Main display pattern: **UI-LIST**. Service boundary: `clientUser
 **Steps**
 
 1. Table: user (name, email), role, status (“Invite pending · invited <date> by <actor>”), last sign-in, notification channels, ⋯ menu.
-2. “+ Invite user” (centered modal) → `clientUsers.save` without id. Menu: change role / disable (`clientUsers.save` with id), resend invite (`clientUsers.resendInvite`, preview only), reset password (`auth.previewPasswordReset`, generic message), remove (`clientUsers.remove`).
+2. “+ Invite user” (centered modal) → `clientUsers.save` without id. Menu: change role / disable (`clientUsers.save` with id), resend invite (`clientUsers.resendInvite`, preview only), reset password (`auth.previewPasswordReset`, generic message), sign out everywhere (`members.revokeSessions` with the user's membership, the modal of Admin 03-8, IR384; not offered while the invite is pending), remove (`clientUsers.remove`).
 3. Queries to update: `client users / audit`.
 
 **Boundary cases and failures**: Last active owner → CONFLICT; duplicate email → VALIDATION. No permission editor for client users.
@@ -884,7 +885,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.61.0: Read IR01–IR368 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.62.0: Read IR01–IR384 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

@@ -1,6 +1,6 @@
 ---
 document_id: DD-DATABASE
-version: 0.39.0
+version: 0.40.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -115,6 +115,7 @@ Cross-schema references without foreign keys (logical only): units → capabilit
 |---|---|
 | External technician needs an end date (FR-A03) | CHECK on `identity.memberships` |
 | Client memberships carry a client role; others do not | CHECK `(role = 'client') = (client_role IS NOT NULL)` |
+| A sign-in before HQ signed the user out everywhere is refused (IR384) | `identity.memberships.sessions_revoked_at` (wall clock), compared with the token's `auth_time` on every request |
 | One active device binding per device and per unit | Partial unique indexes on `devices.device_bindings` where `unbound_at IS NULL` |
 | Duplicate serial (AT-T11-E) | Unique index on `upper(btrim(serial))` per tenant |
 | One firmware operation in progress per device | Partial unique index on `device_operations`; the campaign runner skips a device with an unfinished operation (IR339) |
@@ -194,4 +195,4 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 - `identity.users.last_sign_in_at` is the business time of the latest sign-in, and `sign_in_auth_time` is the identity provider's `auth_time` of that sign-in. Only a later `auth_time` replaces them (IR268).
 - Personal data anonymisation (backend architecture §7) updates `identity.users` (status `anonymised`, e-mail replaced) and `identity.client_users`; audit rows keep IDs but never contact data (masked at write time).
 
-Additional contracts for current version 0.39.0: Read IR01–IR382 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.40.0: Read IR01–IR384 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

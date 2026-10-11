@@ -209,6 +209,7 @@ export type InvoiceReminderReceipt = {invoiceId:ID;invoiceVersion:number;notific
 
 /** IR107–IR112: Figma-confirmed screens (2026-10-01). */
 export type ClientRole = 'owner'|'member';
+export type SessionsRevoked = {membershipId:ID;userId:ID;revokedAt:Instant;membershipIds:ID[]};
 export type ClientUser = Entity & {customerId:ID;membershipId:ID|null;email:string;displayName:string|null;clientRole:ClientRole;status:'invited'|'active'|'disabled';lastSignInAt:Instant|null;allowedChannels:Channel[];invitedAt:Instant;invitedByMembershipId:ID};
 export type LocationTarget = {kind:'property'|'space'|'unit';id:ID};
 export type VentilationLog = Entity & {spaceId:ID;unitId:ID|null;method:'window_opened'|'door_opened'|'ventilation_fan'|'other';durationMinutes:number;co2AtLog:{value:number;unit:'ppm';observedAt:Instant}|null;loggedByMembershipId:ID;loggedAt:Instant};
@@ -333,6 +334,7 @@ export type OperationContracts = {
   'members.capacity': {input:{date:string;query:Query};result:Page<Capacity>;mode:'read'};
   'members.eligible': {input:{jobId:ID;startAt:Instant;endAt:Instant;query:Query};result:Page<Membership>;mode:'read'};
   'members.list': {input:Query;result:Page<Membership>;mode:'read'};
+  'members.revokeSessions': {input:{membershipId:ID;reason:string};result:SessionsRevoked;mode:'write'};
   'members.save': {input:{id?:ID;userId:ID;organizationId:ID;role:Role;employment:Membership["employment"];permissions:Permission[];scopes:ScopeRef[];validFrom:Instant;validUntil:Instant|null;reason:string};result:Membership;mode:'write'};
   'mrv.get': {input:{id:ID;reportVersion?:number};result:MRVReport;mode:'read'};
   'mrv.list': {input:Query;result:Page<MRVReport>;mode:'read'};

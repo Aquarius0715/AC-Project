@@ -535,8 +535,98 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 	return ms[0], nil
 }
 
-// RegisterMembers binds members.list / members.save.
+// RevokeSessionsInput is members.revokeSessions input (IR384).
+type RevokeSessionsInput struct {
+	MembershipID uuid.UUID `json:"membershipId"`
+	Reason       string    `json:"reason"`
+}
+
+// Validate implements ops.Validator: a membership and a reason of 1–1000 characters.
+func (in *RevokeSessionsInput) Validate() map[string]string {
+	fe := map[string]string{}
+	if in.MembershipID == uuid.Nil {
+		fe["membershipId"] = "error.required"
+	}
+	in.Reason = strings.TrimSpace(in.Reason)
+	if n := utf8.RuneCountInString(in.Reason); n < 1 || n > 1000 {
+		fe["reason"] = "error.length"
+	}
+	return fe
+}
+
+// SessionsRevoked is SessionsRevoked of service-contracts.ts.
+type SessionsRevoked struct {
+	MembershipID  uuid.UUID   `json:"membershipId"`
+	UserID        uuid.UUID   `json:"userId"`
+	RevokedAt     time.Time   `json:"revokedAt"`
+	MembershipIDs []uuid.UUID `json:"membershipIds"`
+}
+
+// wallClock is the time a revocation starts from: tokens carry the identity provider's auth_time, which is wall-clock
+// time, so the demo scenario clock would not compare (IR384). A variable, so tests can move it.
+var wallClock = func() time.Time { return time.Now().UTC() }
+
+// membersRevokeSessions signs the membership's user out everywhere in this tenant (IR384, Figma Admin 03-8): every
+// membership of the user records the revocation time, and a token signed in before it is refused by every service.
+// Access itself stays; the user signs in again. An HQ user with asset.write may do it for a client membership (the
+// customer's Users tab), any other membership needs identity.write (Access & roles).
+//
+//	@Summary		members.revokeSessions (write)
+//	@ID				members.revokeSessions
+//	@Description	Authorization: admin:identity.write | admin:asset.write:client-membership
+//	@Description	Validation: D01; input constraints in the corresponding DD; IR384 reason 1–1000; every membership of the target's user in the tenant records sessionsRevokedAt (wall clock); a token signed in before it is UNAUTHENTICATED errors.session_revoked; a client membership needs asset.write, any other identity.write
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-A03, DD-A17
+//	@Tags			members
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key	header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			membershipId	path		string				true	"input field membershipId"
+//	@Param			request			body		RevokeSessionsInput	true	"input; the path parameters come from the route"
+//	@Success		200				{object}	ops.Envelope{data=SessionsRevoked}
+//	@Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409				{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422				{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429				{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503				{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504				{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/members/{membershipId}/revoke-sessions [post]
+func membersRevokeSessions(ctx context.Context, c *ops.Call, in *RevokeSessionsInput) (SessionsRevoked, error) {
+	var user uuid.UUID
+	var role string
+	err := c.Tx.QueryRow(ctx, `SELECT user_id, role FROM identity.memberships WHERE id = $1`, in.MembershipID).Scan(&user, &role)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return SessionsRevoked{}, apperr.E(apperr.NotFound, "error.notFound")
+	}
+	if err != nil {
+		return SessionsRevoked{}, err
+	}
+	if err := c.Require(authz.Facts{"client-membership": role == "client"}); err != nil {
+		return SessionsRevoked{}, err
+	}
+	at := wallClock()
+	rows, err := c.Tx.Query(ctx, `UPDATE identity.memberships SET sessions_revoked_at = $2 WHERE user_id = $1 RETURNING id`, user, at)
+	if err != nil {
+		return SessionsRevoked{}, err
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return SessionsRevoked{}, err
+	}
+	slices.SortFunc(ids, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
+	when := at.Format(time.RFC3339)
+	c.Audit(ops.AuditEntry{Action: "members.revokeSessions", TargetKind: "membership", TargetID: in.MembershipID.String(), Reason: in.Reason,
+		After: map[string]*string{"sessionsRevokedAt": &when}})
+	c.Emit(ops.Event{AggregateType: "membership", AggregateID: in.MembershipID, Type: "SessionsRevoked", Payload: map[string]any{"userId": user, "revokedAt": at}})
+	return SessionsRevoked{MembershipID: in.MembershipID, UserID: user, RevokedAt: at, MembershipIDs: ids}, nil
+}
+
+// RegisterMembers binds members.list / members.save / members.revokeSessions.
 func RegisterMembers(r *ops.Registry) {
 	ops.Register(r, "members.list", membersList)
 	ops.Register(r, "members.save", membersSave)
+	ops.Register(r, "members.revokeSessions", membersRevokeSessions)
 }

@@ -99,6 +99,7 @@ func testVerifier(t *testing.T) testTokens {
 	for _, a := range f.Actors {
 		v["tok-"+map[string]string{"hq-operator": "hq", "customer-a": "a", "customer-b": "b", "tech-external-b": "tb", "tech-internal-a": "ti", "tech-external-a": "ta", "contractor-a": "ca", "contractor-b": "cb", "hq-restriction-manager": "rm", "hq-override-only": "oo"}[a.MembershipID]] = seed.ID(a.UserID).String()
 	}
+	v["tok-rv"] = seed.ID("user-test-revoke").String() // TestRevokeSessions' own user: revoking a seed user would end the other tests' tokens
 	return v
 }
 

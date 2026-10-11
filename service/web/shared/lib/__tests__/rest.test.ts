@@ -12,8 +12,8 @@ const query = (path: string) => {
 
 describe("coreRequest", () => {
   it("covers every operation of the catalog", () => {
-    expect(Object.keys(coreRoutes)).toHaveLength(203); // IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead
-    expect(Object.values(coreRoutes).flat()).toHaveLength(223);
+    expect(Object.keys(coreRoutes)).toHaveLength(204); // IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions
+    expect(Object.values(coreRoutes).flat()).toHaveLength(224);
     expect(coreRequest("filterCare.getSettings", {})).toEqual({ method: "GET", path: "/v1/filter-care/settings" });
     expect(coreRequest("alerts.evidence", { alertId: "a1", query: { limit: 100 } })).toEqual({ method: "GET", path: "/v1/alerts/a1/evidence?limit=100", body: undefined });
     // IR349: the MRV evidence candidates take their units and period in the query string

@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.267.0 (2026-10-11): IR384 members.revokeSessions (DD-A 0.62.0, DD-COMMON 0.111.0, backend architecture 0.47.0, backend Go design 0.44.0, database design 0.40.0); 204 operations.
 # 0.266.0 (2026-10-11): IR383 Permissions-Policy, web container check (network architecture 0.37.0); counts unchanged.
 # 0.265.0 (2026-10-11): IR382 server-side session store (backend architecture 0.46.0, container design 0.41.0, database design 0.39.0, network architecture 0.36.0); counts unchanged.
 # 0.264.0 (2026-10-11): IR381 checks round, local AWS resource names (container design 0.40.0); counts unchanged.
@@ -357,8 +358,8 @@ opnames = unique(operations, 'operation', 'operation')
 opmap = {row['operation']: row for row in operations}
 types = (ROOT / '02-design/service-contracts.ts').read_text()
 typed = {name:(input_, result, mode) for name,input_,result,mode in re.findall(r"^  '([^']+)': \{input:(.*);result:(.*);mode:'(read|write)'\};$", types, re.M)}
-if set(typed) != opnames or len(operations) != 203:  # IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead
-    fail('203 operation/TypeScript contract keys differ')
+if set(typed) != opnames or len(operations) != 204:  # IR214 automations.delete, IR216 commands.list, IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list, IR379 notifications.markAllRead, IR384 members.revokeSessions
+    fail('204 operation/TypeScript contract keys differ')
 for row in operations:
     name = row['operation']
     if typed.get(name) != (row['input_contract'], row['result_contract'], row['mode']):

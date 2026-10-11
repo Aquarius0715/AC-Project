@@ -184,6 +184,7 @@ CREATE TABLE identity.memberships (
   scope_version   int NOT NULL DEFAULT 1,
   valid_from      timestamptz NOT NULL,
   valid_until     timestamptz,
+  sessions_revoked_at timestamptz,   -- members.revokeSessions: tokens signed in before it are refused (wall clock, IR384)
   version         int NOT NULL DEFAULT 1,
   created_at      timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at      timestamptz NOT NULL DEFAULT platform.app_now(),

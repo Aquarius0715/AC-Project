@@ -81,6 +81,7 @@ jobs.submit,all,job,jobs.get;reports.get,required,reportVersion=WorkReport.versi
 jobs.withdrawPartnerSlot,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 jobs.withdrawProposal,all,job,jobs.get;jobs.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 locations.rename,all,property|space|unit,properties.list;spaces.list;units.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+members.revokeSessions,all,none,members.list,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 members.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 members.save,id present,members,members.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 members.setUnavailability,all,none,members.capacity,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects

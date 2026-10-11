@@ -739,6 +739,7 @@ Qualifiers in the operation catalog's authorization column have only the meaning
 | admin:<permission> | Holds the permission and is within managed scope |
 | admin:<permission>:scope-candidate-read-only | D12 supporting reads |
 | admin:<permission>:kind=… | Permission for each Policy.kind |
+| admin:<permission>:client-membership | The target membership's role is client (IR384) |
 | admin:job.write:internal-job / internal-or-escalation | Jobs with contractorOrgId=null / for outsourced jobs, jobs.review reviewMode=hq_escalation (D06) |
 | admin:restriction.override:release-projection / release-intent-or-terminal-recovery-only | IR03 |
 | IR01:same-key-receipt… | IR01 |
@@ -5810,3 +5811,39 @@ This round's security check took up the last open item of the session design.
    - A real QR scanner would allow `camera=(self)` in the technician app only.
 3. **Tests.** E2E `shared/security-headers` asserts the policy in each of the four apps, both on the host-run apps and on the container.
 4. **Checks.** The web checks and the E2E suite pass. The backend did not change.
+
+## IR384 HQ signs a user out everywhere: `members.revokeSessions` refuses every earlier sign-in — 2026-10-11
+
+User request (2026-10-11): access and refresh tokens should be revocable on the server, from the Admin screen, against unauthorized access.
+
+1. **What could already be stopped.** The Core API reloads the selected membership on every request.
+   - A disabled user or a revoked membership (Revoke access, 03-6) is refused at once, even with a valid access token.
+   - The user's own sign-out revokes the BFF session (IR382) and the identity provider's session with its refresh token (IR357).
+   - What was missing: ending all sessions of a person while keeping the account, for a lost device or a suspected takeover.
+2. **Figma (the spec).**
+   - Admin 03-2: "Sign out everywhere…" beside "Revoke access…".
+   - Admin 03-8: the confirmation modal, with a required reason, its ClickMap, hotspots and flow arrows.
+   - Admin 02-15: the client user's row menu gains "Sign out everywhere…" (the same modal). It is not offered while the invite is pending.
+3. **The operation.**
+   - `members.revokeSessions` takes `{membershipId, reason}` and returns `SessionsRevoked {membershipId, userId, revokedAt, membershipIds}`.
+     - Route `POST /v1/members/{membershipId}/revoke-sessions`.
+     - Authorization `admin:identity.write | admin:asset.write:client-membership`: the customer's Users tab can sign out a client user, and Access & roles any membership.
+     - The catalog now has 204 operations and 224 routes; the identity service has 29.
+   - The reason is 1–1000 characters, and the action is audited with it. The write version is `omit`.
+   - Every membership of the target's user in this tenant records `sessions_revoked_at`. Another tenant's memberships are not touched (row-level security), and another tenant's membership is NOT_FOUND.
+   - The time is the wall clock, not the demo scenario clock, because tokens carry the identity provider's `auth_time`.
+4. **The cutoff.**
+   - The principal carries `sessionsRevokedAt`, also over identity-api's internal principal endpoint.
+   - Each service compares it with its own token: a token whose `auth_time` is earlier, or that has none, is UNAUTHENTICATED `errors.session_revoked`.
+   - A refreshed token keeps the sign-in's `auth_time`, so a refresh does not bring the session back. Only a new sign-in, with the password and the two-step code, works again.
+   - In identity-api the refusal is immediate. The other services cache principals for 30 seconds (backend Go design §4), so there it takes at most 30 seconds.
+5. **Still to come.** The Admin UI (03-2, 02-15) and the apps sending a refused session to sign-in. Ending the identity provider's sessions (Keycloak's admin logout, Cognito's AdminUserGlobalSignOut) and the BFF's stored records from the `SessionsRevoked` event. The User Flows and Use Cases boards.
+6. **Tests.**
+   - Integration `TestRevokeSessions` uses a user of its own, because revoking a seed user would end the other tests' tokens. It covers:
+     - the reason and the membership required;
+     - FORBIDDEN without either permission;
+     - asset.write refused (NOT_FOUND) on a technician membership but allowed on a client membership;
+     - another tenant's membership NOT_FOUND and untouched;
+     - after the revocation, earlier tokens and a token without a sign-in time refused, in identity and in the equipment service;
+     - a later sign-in accepted, and the audit entry with its reason.
+   - With the cutoff check switched off, the four refusals become 200 and the test fails.

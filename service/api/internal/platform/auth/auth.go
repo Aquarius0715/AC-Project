@@ -44,6 +44,16 @@ func (s StaticVerifier) Verify(_ context.Context, token string) (Identity, error
 	return Identity{}, errors.New("unknown token")
 }
 
+// Revoked reports whether a sign-in at signedIn ended with the principal's sessions (members.revokeSessions, IR384):
+// it began before the revocation, or the token does not say when it began. Both are wall-clock times, compared to
+// the second, as auth_time is.
+func Revoked(p *ops.Principal, signedIn time.Time) bool {
+	if p == nil || p.SessionsRevokedAt == nil {
+		return false
+	}
+	return signedIn.IsZero() || signedIn.Before(p.SessionsRevokedAt.Truncate(time.Second))
+}
+
 // PrincipalSource resolves the selected Membership of a token subject into an ops.Principal (IR181 step 1):
 // identity-api reads its own tables (DB), every other service asks identity-api (RemoteSource). signedIn is the
 // token's sign-in time (zero: none), which identity records as the user's last sign-in (IR268).
@@ -106,6 +116,9 @@ func (a *Authenticator) Middleware() echo.MiddlewareFunc {
 			if err != nil {
 				return unauth(c, "error.membershipInvalid")
 			}
+			if Revoked(p, id.SignedIn) { // HQ signed this user out everywhere after this sign-in (IR384)
+				return unauth(c, "errors.session_revoked")
+			}
 			c.SetRequest(c.Request().WithContext(ops.WithPrincipal(c.Request().Context(), p)))
 			return next(c)
 		}
@@ -162,10 +175,10 @@ func (a *Authenticator) Load(ctx context.Context, subject string, tenant, member
 		var validUntil *time.Time
 		var validFrom time.Time
 		var status string
-		if err := tx.QueryRow(ctx, `SELECT m.user_id, m.organization_id, m.role, m.client_role, m.employment, m.scope_version, m.valid_from, m.valid_until, u.status, pf.timezone
+		if err := tx.QueryRow(ctx, `SELECT m.user_id, m.organization_id, m.role, m.client_role, m.employment, m.scope_version, m.valid_from, m.valid_until, m.sessions_revoked_at, u.status, pf.timezone
 			FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id LEFT JOIN identity.preferences pf ON pf.user_id = u.id
 			WHERE m.id = $1 AND (u.cognito_sub = $2 OR u.id::text = $2)`, membership, subject).
-			Scan(&p.UserID, &p.OrgID, &p.Role, &clientRole, &employment, &p.ScopeVersion, &validFrom, &validUntil, &status, &timezone); err != nil {
+			Scan(&p.UserID, &p.OrgID, &p.Role, &clientRole, &employment, &p.ScopeVersion, &validFrom, &validUntil, &p.SessionsRevokedAt, &status, &timezone); err != nil {
 			return err
 		}
 		if status != "active" || now.Before(validFrom) || (validUntil != nil && !now.Before(*validUntil)) {

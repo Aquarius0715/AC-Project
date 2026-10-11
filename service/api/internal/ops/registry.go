@@ -34,6 +34,9 @@ type Principal struct {
 	Scopes       map[string][]uuid.UUID // membership_scopes by kind (tenant, organization, property, unit)
 	Employment   string                 // internal | external (technicians)
 	Timezone     string                 // the user's preferences timezone ("" when unset), IR189
+	// SessionsRevokedAt ends every sign-in before it (members.revokeSessions, IR384): a token whose sign-in time is
+	// earlier is refused. Wall clock, as the identity provider's auth_time is; nil when never revoked.
+	SessionsRevokedAt *time.Time
 }
 
 // Event is an outbox row recorded by a handler (backend architecture §8).
