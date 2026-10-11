@@ -276,7 +276,7 @@ export function QrCode({ qr, label, className }: { qr: { size: number; path: str
 export function Check({ label, checked, onChange, disabled }: { label: React.ReactNode; checked?: boolean; onChange?: (v: boolean) => void; disabled?: boolean }) {
   return (
     <label className="inline-flex items-center gap-2 text-[13px]">
-      <input type="checkbox" className="h-4 w-4 accent-[#005bea]" checked={checked} disabled={disabled} onChange={(e) => onChange?.(e.target.checked)} />
+      <input type="checkbox" className="h-5 w-5 shrink-0 accent-[#005bea]" checked={checked} disabled={disabled} onChange={(e) => onChange?.(e.target.checked)} /> {/* 20 px: with the lists' gaps, targets keep 24 px apart (WCAG 2.5.8, IR360) */}
       {label}
     </label>
   );

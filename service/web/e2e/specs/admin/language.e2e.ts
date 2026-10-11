@@ -17,6 +17,7 @@
 // afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
+import { expectAccessible } from "../../fixtures/a11y";
 
 let zoneBefore: string | null = null;
 test.afterEach(async ({ page }) => {
@@ -52,6 +53,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await main.getByRole("button", { name: "+ Kerja baharu" }).click();
   const create = page.getByRole("dialog", { name: "Kerja penyelenggaraan baharu · langkah 1 daripada 2" });
   await expect(create).toContainText("masa dalam Asia/Tokyo");
+  await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   await expect(create.getByRole("button", { name: "Simpan sebagai diminta" })).toBeVisible();
   await create.getByRole("button", { name: "Batal", exact: true }).click();
   await expect(create).toBeHidden();
@@ -118,6 +120,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await main.getByRole("button", { name: "+ Kempen baharu" }).click();
   const campaign = page.getByRole("dialog", { name: "Kempen perisian tegar baharu" });
   await expect(campaign).toContainText("masa dalam Asia/Tokyo"); // the start is typed in the display zone
+  await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   await expect(campaign).toContainText("Waktu tempatan peranti"); // the install window is the device's local time
   await campaign.getByRole("button", { name: "Batal", exact: true }).click();
   await expect(campaign).toBeHidden();

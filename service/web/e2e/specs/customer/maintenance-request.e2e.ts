@@ -3,6 +3,7 @@
 // reason. Whatever happens, the request this test sent is cancelled at the end.
 import type { Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
+import { expectAccessible } from "../../fixtures/a11y";
 
 async function cancelRequest(page: Page, jobId: string, reason: string) {
   await page.goto(`/customer/maintenance?jobId=${jobId}`);
@@ -10,6 +11,7 @@ async function cancelRequest(page: Page, jobId: string, reason: string) {
   if ((await cancel.count()) === 0) return; // already cancelled
   await cancel.click();
   const dialog = page.getByRole("dialog");
+  await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   await dialog.getByLabel(/Reason/).fill(reason);
   await dialog.getByRole("button", { name: "Cancel request" }).click();
   await expect(page.getByText("Request cancelled.").first()).toBeVisible();

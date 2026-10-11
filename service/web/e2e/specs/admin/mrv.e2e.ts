@@ -2,12 +2,14 @@
 // accepted work reports on its units uploaded in its period (attachments.list), once the units and the period are
 // chosen. The seed has no work-report photos, so the list says so. Nothing is saved: the dialog is cancelled.
 import { test, expect } from "../../fixtures/test";
+import { expectAccessible } from "../../fixtures/a11y";
 
 test("a new report's evidence comes from the photos of accepted work reports", async ({ page }) => {
   await page.goto("/admin/mrv");
   const main = page.getByRole("main");
   await main.getByRole("button", { name: "+ New report" }).click();
   const dialog = page.getByRole("dialog", { name: "New Scope 2 report" });
+  await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   const evidence = dialog.getByRole("group", { name: "Evidence to attach" });
   await expect(evidence).toContainText("None yet.");
   await expect(evidence.getByRole("button", { name: "+ Add evidence" })).toBeDisabled();

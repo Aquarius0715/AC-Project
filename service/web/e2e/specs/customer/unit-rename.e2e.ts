@@ -3,6 +3,7 @@
 // test fails half-way.
 import type { Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
+import { expectAccessible } from "../../fixtures/a11y";
 
 const SEED = "Bedroom AC", TEMP = "Bedroom AC E2E";
 let href: string | null = null;
@@ -12,6 +13,7 @@ async function rename(page: Page, from: string, to: string) {
   await main.getByRole("button", { name: "✎ Rename" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: `Rename ${from}` })).toBeVisible();
+  await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   await dialog.getByRole("textbox").fill(to); // the dialog's one field (its name includes the hint)
   const saved = page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === new URL(page.url()).pathname);
   await dialog.getByRole("button", { name: "Save name" }).click();

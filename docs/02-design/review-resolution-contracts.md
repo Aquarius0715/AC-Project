@@ -5312,3 +5312,21 @@ NFR-01 targets WCAG 2.2 AA through automated checks and manual tests. The determ
    - The smoke crawl in each app is clean (40 + 40 + 14 + 40 pages).
    - E2E `admin/jobs-period` finds the period chip by its new name.
    - The Malay dictionary follows the renamed keys.
+
+## IR360 The axe-core check covers open dialogs — 2026-10-11
+
+IR359 left open dialogs and other states that need an action outside the smoke crawl. The E2E specs already open the main dialogs, so the check now runs inside them.
+
+1. **Helper.** `e2e/fixtures/a11y.ts` runs axe-core (WCAG 2.0 / 2.1 / 2.2 A and AA) on the page, or on what a selector picks:
+   - `axeViolations(page, scope?)` returns the critical and serious violations;
+   - `expectAccessible(page, scope?)` fails the test on any of them.
+   The smoke crawl uses the same helper.
+2. **Dialogs checked**, 16 call sites in 14 specs, with Malay where the spec runs in Malay:
+   - HQ: new alert policy; new MRV report; Resolve alert; Generate drafts; new job; new firmware campaign; schedule a restriction.
+   - Customer: the cancel reason; the assistant; rename an AC; invite a member; a new maintenance request.
+   - Contractor: unavailable days; add certificate.
+   - Technician: the QR scan.
+   - Every app: the two-step setup.
+3. **Fix the check found.** The New job dialog's checkboxes stood less than 24 px apart (WCAG 2.5.8 target size). The shared `Check` input is 20 px now, so the lists' gaps keep its targets 24 px apart. The Access & roles list keeps its 8 px row gap (IR359).
+4. **Still manual.** The deterministic contracts §151 checks with NVDA + Chrome and VoiceOver + Safari, and the keyboard-only scenarios.
+5. **Tests.** The 14 specs pass with their dialogs clean, and the full suite passes.

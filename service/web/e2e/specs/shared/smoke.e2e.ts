@@ -3,11 +3,8 @@
 // serious axe-core violation of WCAG 2.x A / AA (NFR-01, deterministic contracts: zero unresolved axe critical /
 // serious issues, IR359). Follows the app's own links only, navigations only. axe runs through page.evaluate, which the
 // page CSP does not govern, so the policy itself stays as strict as in production.
-import { readFileSync } from "node:fs";
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
-
-const AXE = readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
-type AxeViolation = { id: string; impact: string | null; help: string; nodes: { target: string[] }[] };
+import { axeViolations } from "../../fixtures/a11y";
 
 test("every linked page of the app renders", async ({ page, app }) => {
   test.setTimeout(240_000);
@@ -26,10 +23,7 @@ test("every linked page of the app renders", async ({ page, app }) => {
     const res = await page.goto(path, { waitUntil: "networkidle" });
     const text = await page.locator("body").innerText();
     if (!res || res.status() >= 400 || FAILED_PAGE.test(text)) failed.push(`${path} (${res?.status() ?? "no response"})`);
-    await page.evaluate(AXE);
-    const violations = await page.evaluate(async () => (await (window as unknown as { axe: { run: (c: Document, o: object) => Promise<{ violations: AxeViolation[] }> } }).axe
-      .run(document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] } })).violations);
-    for (const v of violations.filter((x) => x.impact === "critical" || x.impact === "serious")) inaccessible.push(`${path}: ${v.id} (${v.impact}) ×${v.nodes.length} — ${v.help} — ${v.nodes[0]?.target.join(" ")}`);
+    for (const v of await axeViolations(page)) inaccessible.push(`${path}: ${v}`);
     const links = await page.locator("a[href^='/']").evaluateAll((as) => as.map((a) => a.getAttribute("href") ?? ""));
     for (const href of links) {
       const p = href.split("#")[0];

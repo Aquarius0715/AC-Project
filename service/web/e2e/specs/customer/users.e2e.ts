@@ -2,6 +2,7 @@
 // signed in through the identity provider, and the Core API records the token's sign-in time — and the invite dialog
 // refuses a bad address and an existing user, then closes without inviting anyone.
 import { test, expect } from "../../fixtures/test";
+import { expectAccessible } from "../../fixtures/a11y";
 
 test("the owner's own row shows the last sign-in", async ({ page }) => {
   await page.goto("/customer/users");
@@ -19,6 +20,7 @@ test("the invite dialog refuses a bad or existing address and invites nobody whe
   await page.getByRole("button", { name: "+ Invite member" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: /^Invite a member to \S/ })).toBeVisible();
+  await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   await dialog.getByLabel("Email").fill("not-an-address");
   await dialog.getByRole("button", { name: "Send invite" }).click();
   await expect(dialog).toContainText("A valid email address (up to 254 characters)");

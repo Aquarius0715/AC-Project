@@ -3,6 +3,7 @@
 // job for the unit, its symptom from the alert) and Open unit →. The seed has two open alerts on Demo Customer A: the
 // warning "Possible open window" and the Info filter cleaning reminder. Nothing is acknowledged, resolved or created.
 import { test, expect } from "../../fixtures/test";
+import { expectAccessible } from "../../fixtures/a11y";
 
 test("the alerts tab filters in the URL and opens a job or the unit from an alert", async ({ page }) => {
   await page.goto("/admin/alerts");
@@ -53,6 +54,7 @@ test("the Resolve dialog requires evidence for an alert without a policy", async
   await main.getByRole("button", { name: "Resolve…" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "Resolve alert" })).toBeVisible();
+  await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   const evidence = dialog.getByRole("group", { name: "Resolution evidence · required" });
   await expect(evidence.getByRole("checkbox", { name: /^Remeasurement · / })).toHaveCount(5);
   await expect(evidence.getByRole("checkbox", { name: /Evidence attached to this alert/ })).toBeDisabled(); // none attached

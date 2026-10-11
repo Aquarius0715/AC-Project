@@ -6,6 +6,7 @@
 // earlier zone come back at the end, or in afterEach when the test fails.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
+import { expectAccessible } from "../../fixtures/a11y";
 
 let zoneBefore: string | null = null;
 test.afterEach(async ({ page }) => {
@@ -46,6 +47,7 @@ test("the customer screens in Malay keep IDs and units and use the display time 
   await page.getByRole("button", { name: "+ Permintaan penyelenggaraan baharu" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "Permintaan penyelenggaraan baharu" })).toBeVisible();
+  await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   await expect(dialog).toContainText("masa dalam Asia/Tokyo"); // the preferred times are typed in the display time zone
   await dialog.getByRole("button", { name: "Batal" }).click();
   await expect(dialog).toBeHidden();

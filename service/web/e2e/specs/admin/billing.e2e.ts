@@ -3,6 +3,7 @@
 // restriction on the Restrictions screen. The seed has one invoice, INV-202608-0001 (August 2026, overdue), the cause of
 // Demo Customer A's applied restriction. Nothing is paid, reminded or created.
 import { test, expect } from "../../fixtures/test";
+import { expectAccessible } from "../../fixtures/a11y";
 
 test("billing months filter the invoices and the related restriction opens on the Restrictions screen", async ({ page }) => {
   await page.goto("/admin/billing?from=2026-08&to=2026-08");
@@ -49,6 +50,7 @@ test("the payouts filters live in the URL and Generate drafts takes only an ende
   // Generate drafts: the last month that has ended is the default; a month still running is refused before any call
   await main.getByRole("button", { name: "Generate drafts" }).click();
   const dialog = page.getByRole("dialog");
+  await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   const month = dialog.getByLabel("Month");
   await expect(month).toHaveValue(/^\d{4}-\d{2}$/);
   await month.fill("2099-01");

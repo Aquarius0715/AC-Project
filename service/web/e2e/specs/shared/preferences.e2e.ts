@@ -3,6 +3,7 @@
 // two-step verification turns on (setup QR, six code boxes, recovery codes once) and off. Every change is put back.
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, savePreferences as save, setDisplay } from "../../fixtures/display";
+import { expectAccessible } from "../../fixtures/a11y";
 
 // English and the earlier zone come back at the end of the language test, or here when it fails (also on a timeout)
 let zoneBefore: string | null = null;
@@ -60,6 +61,7 @@ test("two-step verification turns on with the setup QR and off again", async ({ 
   await page.getByRole("button", { name: "Turn on" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("img", { name: /QR code with the setup key/ })).toBeVisible();
+  await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   await expect(dialog).toContainText(/or enter key\s+[A-Z2-7]{4}( [A-Z2-7]{4})+/);
   const code = dialog.getByLabel("6-digit code", { exact: true });
   await code.fill("12345");

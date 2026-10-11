@@ -8,6 +8,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { signIn } from "../../fixtures/auth";
 import { displayZone, ENGLISH, MALAY, setDisplay } from "../../fixtures/display";
+import { expectAccessible } from "../../fixtures/a11y";
 
 const MANAGER = "hq-restriction-manager"; // restriction.read / .write / .override and audit.read (demo seed)
 let context: BrowserContext | null = null;
@@ -45,6 +46,7 @@ test("the HQ restriction screens in Malay with times in the display time zone", 
   await main.getByRole("button", { name: "+ Jadualkan sekatan" }).click();
   const schedule = page.getByRole("dialog", { name: "Jadualkan sekatan" });
   await expect(schedule).toContainText("masa dalam Asia/Tokyo");
+  await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   await schedule.getByRole("button", { name: "Jadualkan", exact: true }).click();
   for (const text of ["Pilih kontrak RTO yang layak", "Unit yang dipilih memerlukan julat suhu", "1–1000 aksara, ditunjukkan kepada pelanggan"]) await expect(schedule).toContainText(text); // the units show once a contract is chosen
   await schedule.getByRole("button", { name: "Batal", exact: true }).click();

@@ -5,6 +5,7 @@
 import type { BrowserContext } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { signIn } from "../../fixtures/auth";
+import { expectAccessible } from "../../fixtures/a11y";
 
 let context: BrowserContext | null = null;
 test.afterEach(async () => {
@@ -20,6 +21,7 @@ test("an unknown label is refused and a unit's label matches", async ({ browser,
   await page.getByRole("button", { name: /Scan QR/ }).click();
   const dialog = page.getByRole("dialog", { name: "Scan unit QR" });
   await expect(dialog).toBeVisible();
+  await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   await dialog.getByLabel("Label code, device serial or unit ID").fill("ac-unit:00000000-0000-4000-8000-000000000000");
   await dialog.getByRole("button", { name: "Scan" }).click();
   await expect(dialog.getByRole("status")).toBeVisible();

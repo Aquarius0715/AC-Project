@@ -5,12 +5,14 @@
 // from Preferences: off is text only, and turning it off while listening discards the request (AT-X02-E ③). An
 // ambiguous room is asked, never guessed: the room, then the AC (Figma 09d, AT-X02-B). No command is sent.
 import { test, expect } from "../../fixtures/test";
+import { expectAccessible } from "../../fixtures/a11y";
 
 test("the assistant answers with the fixed grammar and confirms a change before sending", async ({ page }) => {
   await page.goto("/customer");
   await page.getByRole("button", { name: /Assistant/ }).click();
   const panel = page.getByRole("dialog", { name: /^(Assistant|Pembantu)$/ }); // the panel speaks its chosen language
   await expect(panel).toContainText("Idle");
+  await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   await panel.getByRole("button", { name: "“help”" }).click();
   await expect(panel).toContainText("Ask “temperature <room>”");
   await panel.getByRole("button", { name: "“temperature Bedroom”" }).click();

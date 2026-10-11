@@ -4,6 +4,7 @@
 // footer; Delete policy removes it. A policy left behind by a failed run is deleted in afterEach through the app's
 // operation relay (policies.delete with its version). The unit page's “+ New policy for …” opens the same draft.
 import { test, expect } from "../../fixtures/test";
+import { expectAccessible } from "../../fixtures/a11y";
 
 let created: string | null = null;
 
@@ -28,6 +29,7 @@ test("HQ creates an alert policy for a customer, edits it and deletes it", async
   await main.getByRole("button", { name: "+ New policy" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: "New alert policy" })).toBeVisible();
+  await expectAccessible(page, '[role="dialog"]'); // the open dialog (IR360)
   const owner = dialog.getByRole("combobox", { name: "Owner (customer)" });
   await owner.click();
   await owner.fill("Demo Customer A");
