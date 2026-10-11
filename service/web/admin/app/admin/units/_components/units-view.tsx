@@ -20,10 +20,7 @@ import {
 } from "@ac/web/lib/assets";
 import { amount } from "@ac/web/lib/energy";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
-import {
-  archiveLocation, archiveUnit, createCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim,
-  removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer,
-} from "../actions";
+import { archiveLocation, archiveUnit, createCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
 
 export type UnitLive = {
   u: ApiUnitDetail; path: string; model: string; device: { id: string; serial: string; connection: Connection } | null; deviceKnown: boolean;
@@ -662,10 +659,10 @@ function AttachModal({ c, unit, attached, pending, onClose, onSave }: { c: Custo
 function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive; run: Run; pending: boolean }) {
   const t = useT();
   const [invite, setInvite] = useState(false);
-  const [change, setChange] = useState<null | { u: ClientUserRow; kind: "role" | "status" | "remove" }>(null);
+  const [change, setChange] = useState<null | { u: ClientUserRow; kind: "role" | "status" | "remove" | "signout" }>(null);
   const canWrite = live.canWrite;
   const act = (u: ClientUserRow, a: string) => {
-    if (a === "role" || a === "status" || a === "remove") setChange({ u, kind: a });
+    if (a === "role" || a === "status" || a === "remove" || a === "signout") setChange({ u, kind: a });
     if (a === "resend") run(() => resendInvite(u.id), t("Invitation preview re-created for {email} — nothing is sent in the demo", { email: u.email }));
     if (a === "reset") run(() => previewPasswordReset(u.email), t("Password reset preview created — the same generic message for every address"));
   };
@@ -685,6 +682,7 @@ function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive;
               {!u.lastOwner && <option value="role">{t("Change role (Owner / Member)")}</option>}
               {u.status === "invited" && <option value="resend">{t("Resend invite")}</option>}
               <option value="reset">{t("Reset password")}</option>
+              {u.status === "active" && u.membershipId && <option value="signout">{t("Sign out everywhere…")}</option>}
               {u.status !== "invited" && !u.lastOwner && <option value="status">{t(u.status === "disabled" ? "Enable sign-in" : "Disable sign-in")}</option>}
               {!u.lastOwner && <option value="remove">{t("Remove from customer")}</option>}
             </Select>
@@ -697,6 +695,7 @@ function UsersTab({ live, c, run, pending }: { live: UnitsLive; c: CustomerLive;
         const { u, kind } = change;
         const close = () => setChange(null);
         if (kind === "remove") return run(() => removeClientUser(u.id, u.version, reason), t("{email} removed from {name}", { email: u.email, name: c.row.name }), close);
+        if (kind === "signout") return run(() => signOutEverywhere(u.membershipId ?? "", reason), t("Signed out everywhere — every session of {email} has ended", { email: u.email }), close);
         const status = kind === "status" ? (u.status === "disabled" ? "active" : "disabled") : undefined;
         run(() => updateClientUser(u.id, u.version, { customerId: c.row.id, email: u.email, clientRole: role, ...(status ? { status } : {}), reason }),
           t(kind === "role" ? (role === "owner" ? "Role changed to Owner" : "Role changed to Member") : status === "active" ? "Sign-in enabled" : "Sign-in disabled"), close);
@@ -721,19 +720,20 @@ function InviteModal({ c, pending, onClose, onSave }: { c: CustomerLive; pending
   );
 }
 
-function ClientUserModal({ change, pending, onClose, onSave }: { change: { u: ClientUserRow; kind: "role" | "status" | "remove" }; pending: boolean; onClose: () => void; onSave: (role: "owner" | "member", reason: string) => void }) {
+function ClientUserModal({ change, pending, onClose, onSave }: { change: { u: ClientUserRow; kind: "role" | "status" | "remove" | "signout" }; pending: boolean; onClose: () => void; onSave: (role: "owner" | "member", reason: string) => void }) {
   const t = useT();
   const { u, kind } = change;
   const [role, setRole] = useState<"owner" | "member">(u.role === "owner" ? "member" : "owner");
   const [reason, setReason] = useState("");
   const [tried, setTried] = useState(false);
   const e = reasonError(reason, t);
-  const title = t(kind === "role" ? "Change role of {email}" : kind === "remove" ? "Remove {email}?" : u.status === "disabled" ? "Enable sign-in for {email}" : "Disable sign-in for {email}", { email: u.email });
+  const title = t(kind === "role" ? "Change role of {email}" : kind === "remove" ? "Remove {email}?" : kind === "signout" ? "Sign out {email} everywhere?" : u.status === "disabled" ? "Enable sign-in for {email}" : "Disable sign-in for {email}", { email: u.email });
   return (
-    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant={kind === "remove" ? "danger" : "primary"} disabled={pending} onClick={() => { setTried(true); if (!e) onSave(kind === "role" ? role : u.role, reason.trim()); }}>{t(kind === "remove" ? "Remove user" : "Save")}</Btn></>}>
+    <Modal open onClose={onClose} title={title} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant={kind === "remove" || kind === "signout" ? "danger" : "primary"} disabled={pending} onClick={() => { setTried(true); if (!e) onSave(kind === "role" ? role : u.role, reason.trim()); }}>{t(kind === "remove" ? "Remove user" : kind === "signout" ? "Sign out everywhere" : "Save")}</Btn></>}>
       <div className="flex flex-col gap-3">
         {kind === "role" && <Field label={t("New role")}><Choice value={role} onChange={(v: "owner" | "member") => setRole(v)} options={[{ id: "member", label: t("Member") }, { id: "owner", label: t("Owner") }]} /></Field>}
         {kind === "remove" && <p className="text-[13px] text-muted">{t("The user loses access to the customer app; their membership ends now. The history stays in the audit log.")}</p>}
+        {kind === "signout" && <p className="text-[13px] text-muted">{t("Ends every session of this user now, in all four apps. Their access stays: the next sign-in asks for their password again. For a lost device or a suspected takeover.")}</p>}
         {kind === "status" && <p className="text-[13px] text-muted">{t(u.status === "disabled" ? "The user can sign in again." : "The user cannot sign in until sign-in is enabled again; the membership ends now.")}</p>}
         <Field label={t("Reason · required")} hint={t("1–1000 characters, stored in the audit log")} error={tried ? e : undefined}><Textarea rows={2} value={reason} onChange={(x) => setReason(x.target.value)} /></Field>
       </div>

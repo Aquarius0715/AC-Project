@@ -41,6 +41,15 @@ export function totp(secret: string, at = Date.now()): string {
 const home = (app: App) => (u: URL) => u.origin === new URL(app.url).origin && (u.pathname === app.home || u.pathname.startsWith(app.home + "/"));
 
 /** `as` signs in another account of the same role (the identity provider's username field takes it). */
+/** The identity provider asks for the password again (prompt=login, after a revocation, IR385): enter it for `user`.
+ * The account may already be shown; the credentials stay in this file's realm reader. */
+export async function enterPassword(page: Page, user: string): Promise<void> {
+  const name = page.locator("#username");
+  if (await name.isVisible().catch(() => false)) await name.fill(user);
+  await page.locator("#password").fill(passwordOf(user));
+  await page.locator("#kc-login").click();
+}
+
 export async function signIn(page: Page, app: App, as = app.user): Promise<void> {
   await page.goto(`${app.url}/login`);
   await page.getByRole("link", { name: `Continue as ${app.user} →` }).click();

@@ -1,6 +1,7 @@
 // HQ access & roles (FR-A03, DD-A03, SCR-A03, Figma Admin 539:16956, IR321): the organization filter is a
 // search-select in the URL (organizationId) beside the role and status filters, and a membershipId the list does not
-// hold says so instead of opening another membership. Nothing is saved.
+// hold says so instead of opening another membership. Nothing is saved, except by the last test: it signs
+// hq-override-only out everywhere (IR384, IR385), which is no project's shared user.
 import { test, expect } from "../../fixtures/test";
 
 test("the organization filter narrows the memberships; an unknown membership is not opened", async ({ page }) => {
@@ -44,4 +45,21 @@ test("the organization filter narrows the memberships; an unknown membership is 
   await main.getByRole("button", { name: "Clear the filters" }).click();
   await page.waitForURL((u) => !u.searchParams.has("role") && u.searchParams.get("membershipId") === "00000000-0000-4000-8000-000000000000");
   await expect(main.getByRole("heading", { name: "○ That membership is not in this list" })).toBeVisible();
+});
+
+// Figma Admin 03-2 → 03-8 (IR384, IR385): Sign out everywhere asks for a reason, then ends every session of the user
+test("Sign out everywhere asks for a reason and ends the member's sessions", async ({ page }) => {
+  await page.goto("/admin/settings/access");
+  const main = page.getByRole("main");
+  await main.locator("button[aria-pressed]", { hasText: "hq-override-only" }).first().click();
+  await page.waitForURL(/membershipId=[0-9a-f-]{36}/);
+  await main.getByRole("button", { name: "Sign out everywhere…" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText(/Sign out .+ everywhere\?/);
+  const confirm = dialog.getByRole("button", { name: "Sign out everywhere", exact: true });
+  await expect(confirm).toBeDisabled(); // a reason first
+  await dialog.getByRole("textbox").fill("E2E: laptop reported lost");
+  await confirm.click();
+  await expect(page.getByText(/Signed out everywhere — every session of .+ has ended/).first()).toBeVisible();
+  await expect(dialog).toHaveCount(0);
 });

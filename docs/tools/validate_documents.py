@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.268.0 (2026-10-11): IR385 Admin UI, refused sessions, prompt=login, same-second cutoff (DD-A 0.63.0, backend architecture 0.48.0, implementation contracts 0.36.0); counts unchanged.
 # 0.267.0 (2026-10-11): IR384 members.revokeSessions (DD-A 0.62.0, DD-COMMON 0.111.0, backend architecture 0.47.0, backend Go design 0.44.0, database design 0.40.0); 204 operations.
 # 0.266.0 (2026-10-11): IR383 Permissions-Policy, web container check (network architecture 0.37.0); counts unchanged.
 # 0.265.0 (2026-10-11): IR382 server-side session store (backend architecture 0.46.0, container design 0.41.0, database design 0.39.0, network architecture 0.36.0); counts unchanged.

@@ -24,6 +24,13 @@ const ERRORS: Record<string, string> = {
   membership: "This account has no active AC Project membership.",
   role: "This account belongs to another AC Project service — use that service's own sign-in.",
   expired: "Your session ended — sign in again.",
+  revoked: "You were signed out everywhere — sign in again with your password.",
 };
+/** Why the Core API refused the session: HQ signed the user out everywhere (IR384), or it ended otherwise. */
+export const signedOutReason = (messageKey?: string): "revoked" | "expired" => (messageKey === "errors.session_revoked" ? "revoked" : "expired");
+
+/** Sign-in again after a refused session, back to the page it was on (IR385). */
+export const signInAgainHref = (reason: "revoked" | "expired", path: string): string => `/login?error=${reason}&returnTo=${encodeURIComponent(path)}`;
+
 /** Why the browser is back on sign-in, or null for a plain visit. */
 export const loginError = (code: string | undefined): string | null => (code ? ERRORS[code] ?? "The sign-in did not complete — try again." : null);

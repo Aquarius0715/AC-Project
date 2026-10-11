@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTRACTS
-version: 0.35.0
+version: 0.36.0
 status: proposed-frontend-contract
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -223,7 +223,7 @@ If the main grouped data fetch fails, show a page error. If an independent suppo
 
 | Screen/action | Inputs and defaults | Processing and completion | Failure/cancellation |
 |---|---|---|---|
-| /login | demoActorId: unselected; returnTo: optional relative route | Set a known actor's Membership in the mock session and open its role home. No real email or password needed | Reject missing/unknown actors. Discard external returnTo URLs |
+| /login | demoActorId: unselected; returnTo: optional relative route | Set a known actor's Membership in the mock session and open its role home. No real email or password needed. API mode (IR385): `?error=revoked` after HQ signed the user out everywhere, `?error=expired` after any other refused session; both keep the page in returnTo | Reject missing/unknown actors. Discard external returnTo URLs |
 | /forgot-password | demoEmail: empty; valid format, at most 254 characters | Show the same demo completion message for registered and unregistered addresses: “Instructions will be shown if applicable” | Send no real email. Invalid format shows a field error |
 | /settings/preferences | locale=en, zone=Asia/Kuala_Lumpur, currency=MYR (read-only) | Apply locale immediately. zone is a display setting. currency is a fixed MYR demo display attribute. Show invoices with Money.currency without conversion. Data/contract currencies do not change | Reject unsupported locale or invalid IANA timezone |
 | Shared notifications | unreadOnly=false, cursor=null, limit=25 | Show scoped notifications as Pages. Allow mark-read mutations and navigation via reference IDs. “Mark all as read” sends the listed unread notifications in one `notifications.markAllRead` write and names how many were marked (IR351, IR379) | Expired-scope links show a safe “Unavailable” message. A listed notification that is already read or no longer available is skipped |
@@ -402,4 +402,4 @@ Customer notes allow only `visibility=customer`; contractor notes allow `interna
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.35.0: Read IR01–IR380 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.36.0: Read IR01–IR385 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

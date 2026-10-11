@@ -93,6 +93,15 @@ func TestRevokeSessions(t *testing.T) {
 			t.Errorf("%s as %s signed in before: %d %v", c.op, c.who.token, code, m)
 		}
 	}
+	// a sign-in in the revocation's own second: auth_time has whole seconds, so it cannot be told from one just before
+	revokedAt, err := time.Parse(time.RFC3339Nano, data(m)["revokedAt"].(string))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sameSecond := signedIn("test-revoke-tech", revokedAt.Truncate(time.Second))
+	if code, m := post(s, &sameSecond, "session.get", `{}`); code != 401 || m["messageKey"] != "errors.session_revoked" {
+		t.Errorf("a sign-in in the revocation's second: %d %v", code, m)
+	}
 	later := signedIn("test-revoke-tech", time.Now().Add(time.Minute))
 	if code, m := post(s, &later, "session.get", `{}`); code != 200 {
 		t.Errorf("a sign-in after the revocation: %d %v", code, m)

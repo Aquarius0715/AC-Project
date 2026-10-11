@@ -45,13 +45,14 @@ func (s StaticVerifier) Verify(_ context.Context, token string) (Identity, error
 }
 
 // Revoked reports whether a sign-in at signedIn ended with the principal's sessions (members.revokeSessions, IR384):
-// it began before the revocation, or the token does not say when it began. Both are wall-clock times, compared to
-// the second, as auth_time is.
+// it began before the revocation or within its second, or the token does not say when it began. auth_time has whole
+// seconds, so a sign-in in the revocation's own second cannot be told from one just before it and is refused too: a
+// sign-in a second later works (IR385; the E2E run found such a sign-in surviving).
 func Revoked(p *ops.Principal, signedIn time.Time) bool {
 	if p == nil || p.SessionsRevokedAt == nil {
 		return false
 	}
-	return signedIn.IsZero() || signedIn.Before(p.SessionsRevokedAt.Truncate(time.Second))
+	return signedIn.IsZero() || !signedIn.After(p.SessionsRevokedAt.Truncate(time.Second))
 }
 
 // PrincipalSource resolves the selected Membership of a token subject into an ops.Principal (IR181 step 1):

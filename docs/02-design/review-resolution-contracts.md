@@ -5847,3 +5847,46 @@ User request (2026-10-11): access and refresh tokens should be revocable on the 
      - after the revocation, earlier tokens and a token without a sign-in time refused, in identity and in the equipment service;
      - a later sign-in accepted, and the audit entry with its reason.
    - With the cutoff check switched off, the four refusals become 200 and the test fails.
+
+## IR385 Sign out everywhere in the Admin screens; refused sessions go to sign-in; a same-second sign-in no longer survives — 2026-10-11
+
+IR384 built the operation and the cutoff. This round wires the screens and the apps' handling of a refused session.
+
+1. **The screens.**
+   - Access & roles (Figma Admin 03-2): "Sign out everywhere…" beside "Revoke access…" opens the confirmation modal (03-8). Confirming is disabled until a reason is entered.
+   - The customer's Users tab (02-15): the row menu offers "Sign out everywhere…" for an active client user with a membership. It opens the same kind of modal.
+   - Both call `members.revokeSessions` through a Server Action. The toast reads "Signed out everywhere — every session of … has ended".
+2. **A refused session.**
+   - When the Core API answers 401, the DAL deletes the stored BFF session (IR382). The caller still gets the refusal.
+   - The shared `useAction` sends a refused action to `/login?error=revoked` (for `errors.session_revoked`) or `?error=expired`, with the page kept in `returnTo`.
+   - The route error state checks `/bff/session` and goes to sign-in when the session is gone. A page that showed no error leaves it to the next page: the proxy then finds no session.
+3. **Signing in again.**
+   - The identity provider's single sign-on would answer a new sign-in with the old `auth_time`, so the Core API would refuse it again, in a loop.
+   - So the BFF callback asks the Core API once (`GET /v1/session`). On `errors.session_revoked` it restarts the sign-in with `prompt=login`, and the identity provider asks for the password.
+   - A second refusal goes to `/login?error=revoked` ("You were signed out everywhere — sign in again with your password") rather than looping.
+   - A holder of only the single sign-on cookie therefore cannot get back in.
+4. **Finding (security): a sign-in in the revocation's own second survived.**
+   - The new E2E test signed in and revoked within the same second. `auth_time` has whole seconds (16:34:57) and the revocation did not (16:34:57.829).
+   - The cutoff refused only sign-ins strictly before the revocation's second, so that sign-in kept working.
+   - Such a sign-in cannot be told from one just before the revocation, so it is now refused too. A sign-in a second later works.
+   - This also refuses a new sign-in in that same second. A person cannot type the password that fast, but the full E2E run did, and landed on `/login?error=revoked`. The next attempt works, and the scenario now waits for the next second before typing the password.
+   - `TestRevokeSessions` gained this case, and it fails with the old comparison.
+5. **Figma.**
+   - The 03-8 modal now says what happens: the next sign-in asks for the password and two-step code again.
+   - The Admin user-flow board: lane 03 gives room to a card for 03-8, with an arrow "Sign out everywhere…" from 03-2, "↩ 03-2" and "← 02-15". The 02-15 card links "→ 03-8".
+   - Use Cases: UC-A49 "Sign out a user everywhere" («extend» UC-A10) is on board 05 and in the catalogue, which now has 127 use cases (HQ 49).
+6. **Tests.**
+   - `signOutEverywhere.test.ts` covers:
+     - the DAL dropping a refused session;
+     - `prompt=login` with `reauth=1`;
+     - one password prompt after a revoked single sign-on, then giving up instead of looping;
+     - the session started when the Core API takes the sign-in.
+     - Against the old code, 4 of its 6 cases fail.
+   - E2E `scenarios/sign-out-everywhere`:
+     1. customer-b signs in;
+     2. HQ signs them out from the Users tab;
+     3. their next page asks to sign in;
+     4. single sign-on cannot bring them back, so the identity provider asks for the password;
+     5. the password signs them in again.
+   - E2E `admin/access`: the modal needs a reason, then signs hq-override-only out everywhere.
+7. **Still to come.** Ending the identity provider's sessions from the `SessionsRevoked` event: Keycloak's admin logout needs a service-account client in the realm, and Cognito's call is AdminUserGlobalSignOut.

@@ -9,7 +9,7 @@ import {
   allowedFor, allPermissions, memberDraft, memberErrors, memberInput, orgKind, permissionRows, resourceWord, roleDefaults, roleWord, selfBlocked, zonedLocal,
   type ApiOrganization, type MemberDraft, type MemberRow, type PermissionRow, type Role, type ScopeRef,
 } from "@ac/web/lib/members";
-import { saveMember } from "../actions";
+import { saveMember, signOutEverywhere } from "../actions";
 
 type Live = {
   now: string; canWrite: boolean; selfUserId: string; tenantId: string; scope: { role?: string; status?: string; organizationId?: string }; rows: MemberRow[];
@@ -34,6 +34,7 @@ export function AccessView({ live }: { live: Live }) {
   const [d, setD] = useState<MemberDraft>(memberDraft(sel?.m, live.tenantId, zone));
   const [tried, setTried] = useState(false);
   const [revoke, setRevoke] = useState<string | null>(null);
+  const [signOut, setSignOut] = useState<string | null>(null); // the reason while the Sign out everywhere modal is open (IR385)
   const [scopeKind, setScopeKind] = useState<"unit" | "property" | "organization">("unit");
   const [scopeId, setScopeId] = useState("");
   if (source !== key) { // the form restarts from each saved membership version (adjust state during render)
@@ -69,6 +70,7 @@ export function AccessView({ live }: { live: Live }) {
   const doRevoke = () => sel && revoke !== null && revoke.trim() && run(
     () => saveMember(memberInput({ ...d, permissions: sel.m.permissions, scopes: sel.m.scopes, validUntil: zonedLocal(live.now, zone), reason: revoke.trim() }, sel.id, zone), sel.version),
     t("Access revoked — the membership is now inactive"), () => setRevoke(null));
+  const doSignOut = () => sel && signOut !== null && signOut.trim() && run(() => signOutEverywhere(sel.id, signOut), t("Signed out everywhere — every session of {name} has ended", { name: sel.name }), () => setSignOut(null));
   const err = (k: string) => (tried ? errors[k] : undefined);
   const shown = live.rows.filter((r) => !q || `${r.name} ${r.label}`.toLowerCase().includes(q.toLowerCase()));
   return (
@@ -132,7 +134,7 @@ export function AccessView({ live }: { live: Live }) {
             </section>
             {live.canWrite && <>
               <Field label={t("Change reason · required")} error={err("reason")} hint={t("1–1000 characters, stored in the audit log")}><Textarea value={d.reason} maxLength={1000} onChange={(e) => set({ reason: e.target.value })} /></Field>
-              <div className="flex flex-wrap justify-end gap-2">{sel?.active && <Btn variant="danger" disabled={pending} onClick={() => setRevoke("")}>{t("Revoke access…")}</Btn>}<Btn variant="primary" disabled={pending} onClick={save}>{sel ? t("Save changes") : t("Create membership")}</Btn></div>
+              <div className="flex flex-wrap justify-end gap-2">{sel?.active && <Btn variant="danger" disabled={pending} onClick={() => setRevoke("")}>{t("Revoke access…")}</Btn>}{sel?.active && <Btn disabled={pending} onClick={() => setSignOut("")}>{t("Sign out everywhere…")}</Btn>}<Btn variant="primary" disabled={pending} onClick={save}>{sel ? t("Save changes") : t("Create membership")}</Btn></div>
             </>}
           </div>
         </Card>
@@ -141,6 +143,11 @@ export function AccessView({ live }: { live: Live }) {
       <Modal open={revoke !== null} onClose={() => setRevoke(null)} title={t("Revoke access — {name}", { name: sel?.name ?? "" })} footer={<><Btn onClick={() => setRevoke(null)}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !revoke?.trim()} onClick={doRevoke}>{t("Revoke")}</Btn></>}>
         <p className="text-[13px]">{t("Revoking sets “Valid until” to now. The membership stays listed as inactive; nothing is deleted.")}</p>
         <Field label={t("Reason")}><Textarea value={revoke ?? ""} maxLength={1000} onChange={(e) => setRevoke(e.target.value)} /></Field>
+      </Modal>
+      <Modal open={signOut !== null} onClose={() => setSignOut(null)} title={t("Sign out {name} everywhere?", { name: sel?.name ?? "" })} footer={<><Btn onClick={() => setSignOut(null)}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending || !signOut?.trim()} onClick={doSignOut}>{t("Sign out everywhere")}</Btn></>}>
+        <p className="text-[13px]">{t("Ends every session of this user now, in all four apps. Their access stays: the next sign-in asks for their password and two-step code again.")}</p>
+        <Field label={t("Reason · required")} hint={t("1–1000 characters, stored in the audit log")}><Textarea value={signOut ?? ""} maxLength={1000} onChange={(e) => setSignOut(e.target.value)} /></Field>
+        <p className="mt-2 text-[11px] text-muted">{t("For a lost device or a suspected takeover. Revoke access ends the membership instead.")}</p>
       </Modal>
     </Page>
   );

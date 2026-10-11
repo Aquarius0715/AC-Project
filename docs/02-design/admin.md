@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.62.0
+version: 0.63.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -180,7 +180,7 @@ Scope: FR-A03 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 3. Update Membership version and scopeVersion. Discard caches from old sessions; evaluate subsequent mutations using new permissions.
 4. Queries to update: `members / session scope / all affected query caches / audit`。
 5. Language and time (IR302): texts, roles and matrix resources follow the display language; permission codes stay codes. The valid period is typed and shown in the display time zone, and the form names it. A revoke ends the access at now.
-6. Sign out everywhere (IR384, Figma Admin 03-8): “Sign out everywhere…” in the editor's footer opens a centered modal with a required reason (1–1000 characters, kept in the audit log). `members.revokeSessions` ends every session of the membership's user in this tenant at once, in all four apps and at the identity provider; the access stays, so the user signs in again with their password and two-step code. Use it for a lost device or a suspected takeover; Revoke access ends the membership instead.
+6. Sign out everywhere (IR384, Figma Admin 03-8): “Sign out everywhere…” in the editor's footer opens a centered modal with a required reason (1–1000 characters, kept in the audit log). `members.revokeSessions` ends every session of the membership's user in this tenant at once, in all four apps: the user's next page asks to sign in, and the identity provider asks for the password again (IR385). The access stays, so the user signs in again with their password and two-step code. Use it for a lost device or a suspected takeover; Revoke access ends the membership instead.
 
 **Boundary cases and failures**: Reject other-tenant scopes, external access without an end date, validFrom at or after validUntil, and adding override to oneself. Reject saves from old screens after permissions expire.
 
@@ -885,7 +885,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.62.0: Read IR01–IR384 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.63.0: Read IR01–IR385 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

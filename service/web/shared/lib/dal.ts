@@ -4,7 +4,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { loadSession, needsRefresh, SESSION_COOKIE, type Session } from "@ac/web/lib/session";
+import { dropSession, loadSession, needsRefresh, SESSION_COOKIE, type Session } from "@ac/web/lib/session";
 import type { DomainError } from "@ac/web/lib/ops";
 import { coreRequest } from "@ac/web/lib/rest";
 import { DEFAULT_DISPLAY, isLocale, type Display } from "@ac/web/lib/i18n";
@@ -108,6 +108,9 @@ async function coreCall<T>(operation: string, input: unknown, opts: CoreOptions)
   if (opts.expectedVersion !== undefined) headers["X-Expected-Version"] = String(opts.expectedVersion);
   const res = await fetch(`${process.env.CORE_API_URL ?? "http://localhost:8080"}${req.path}`, { method: req.method, headers, body: req.body, cache: "no-store" });
   const body = await res.json().catch(() => null);
+  // the Core API no longer takes this sign-in (HQ signed the user out everywhere, IR384, or the membership ended): the
+  // stored session goes too, so the next page asks to sign in; the caller still gets the refusal (IR385)
+  if (res.status === 401) await dropSession((await cookies()).get(SESSION_COOKIE)?.value);
   if (!res.ok) throw new CoreError(res.status, body ?? { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {}, correlationId: "", retryAfterSeconds: null });
   return body as { data: T; meta?: { snapshotAt?: string } };
 }

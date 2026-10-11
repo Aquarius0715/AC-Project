@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useToast } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
+import { signInAgainHref, signedOutReason } from "@ac/web/lib/login";
 import { actionMessage, type ActionFailure } from "@ac/web/lib/actionMessage";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
@@ -19,6 +20,10 @@ export function useAction() {
       if (r.ok) {
         toast(typeof ok === "string" ? ok : ok(r.value));
         after?.(r.value);
+        return;
+      }
+      if (r.code === "UNAUTHENTICATED") { // the session was refused: sign in again, then back here (IR385)
+        window.location.assign(signInAgainHref(signedOutReason(r.messageKey), window.location.pathname + window.location.search));
         return;
       }
       toast(actionMessage(r, t), "crit");

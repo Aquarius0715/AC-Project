@@ -99,6 +99,11 @@ export async function updateClientUser(id: string, version: number, input: { cus
 export async function removeClientUser(id: string, version: number, reason: string) {
   return run(() => coreOp("clientUsers.remove", { id, reason: reason.trim() }, write(version)).then(() => null));
 }
+/** members.revokeSessions for the client user's membership: every session of the user ends at once; the access stays
+ * (Figma Admin 02-15 → 03-8, IR384, IR385). */
+export async function signOutEverywhere(membershipId: string, reason: string) {
+  return run(() => coreOp("members.revokeSessions", { membershipId, reason: reason.trim() }, write()).then(() => null));
+}
 /** clientUsers.resendInvite only builds the invite preview again (nothing is sent, IR144). */
 export async function resendInvite(id: string) {
   return run(() => coreOp("clientUsers.resendInvite", { id }).then(() => null));

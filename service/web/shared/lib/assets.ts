@@ -340,6 +340,7 @@ export type ApiClientUser = {
 export type ClientUserRow = {
   id: string; version: number; email: string; name: string | null; role: "owner" | "member"; status: ApiClientUser["status"]; sub: string; lastSignIn: string; channels: string;
   lastOwner: boolean; you: boolean;
+  membershipId: string | null; // the membership Sign out everywhere ends the sessions of (IR385); null while the invite is pending
 };
 const channelLabel: Record<Channel, string> = { inApp: "In-app", email: "Email", whatsapp: "WhatsApp" };
 /** Rows by name; the last active owner is marked because it cannot be demoted, disabled or removed (CONFLICT). The
@@ -353,7 +354,7 @@ export function clientUserRows(us: ApiClientUser[], who: (membershipId: string) 
     sub: u.displayName ? u.email : t("invited {date} by {who}", { date: i ? showDate(u.invitedAt, i.display) : klDate(u.invitedAt), who: who(u.invitedByMembershipId) }),
     lastSignIn: u.lastSignInAt ? (i ? showTime(u.lastSignInAt, i.display) : klStamp(u.lastSignInAt)) : "—",
     channels: u.status === "active" && u.allowedChannels.length ? u.allowedChannels.map((c) => t(channelLabel[c])).join(" · ") : "—",
-    lastOwner: u.clientRole === "owner" && u.status === "active" && owners === 1, you: !!self && u.membershipId === self,
+    lastOwner: u.clientRole === "owner" && u.status === "active" && owners === 1, you: !!self && u.membershipId === self, membershipId: u.membershipId,
   }));
 }
 /** A plain address up to 254 characters, not yet a user of this customer (case-insensitive). */
