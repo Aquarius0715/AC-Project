@@ -81,3 +81,42 @@ func TestTenantIsolationEverywhere(t *testing.T) {
 		}
 	}
 }
+
+// TestIdempotencyKeysIsolated: platform.idempotency_keys keeps the stored response of every write, so it holds
+// tenant data like a business table. Its readers (the write pipeline and writes.getResult) all run in a tenant
+// transaction, so it is under the same row-level security; the relay's platform.outbox and the scheduler's
+// platform.scheduled_items stay outside (IR377).
+func TestIdempotencyKeysIsolated(t *testing.T) {
+	ctx := context.Background()
+	var rls, force, policy bool
+	ownerScan(t, `SELECT c.relrowsecurity, c.relforcerowsecurity,
+		EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'platform' AND p.tablename = 'idempotency_keys' AND p.policyname = 'tenant_isolation')
+		FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'platform' AND c.relname = 'idempotency_keys'`, nil, &rls, &force, &policy)
+	if !rls || !force || !policy {
+		t.Errorf("platform.idempotency_keys: rls %v, forced %v, tenant_isolation %v", rls, force, policy)
+	}
+	key := "idem-" + uuid.NewString()
+	owner(t, `INSERT INTO platform.idempotency_keys (tenant_id, membership_id, key, operation, request_hash, status, response)
+		VALUES ($1,$2,$3,'preferences.update','\x00','completed','{"data":"tenant B"}')`, seed.ID("tenant-b"), uuid.New(), key)
+	t.Cleanup(func() { owner(t, `DELETE FROM platform.idempotency_keys WHERE key = $1`, key) })
+	app, err := pgx.Connect(ctx, testDB("ac_app_login"))
+	if err != nil {
+		t.Skip(err)
+	}
+	defer app.Close(ctx)
+	tx, err := app.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `SELECT set_config('app.tenant_id', $1, true)`, seed.ID("tenant-a").String()); err != nil {
+		t.Fatal(err)
+	}
+	var n int
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM platform.idempotency_keys WHERE key = $1`, key).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Errorf("tenant A's service role reads %d stored response(s) of tenant B", n)
+	}
+}

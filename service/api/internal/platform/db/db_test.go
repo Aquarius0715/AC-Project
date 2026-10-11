@@ -73,8 +73,11 @@ func TestIdempotencyLifecycle(t *testing.T) {
 	if got, err := s.Begin(ctx, p, "units.save", k2, hash); err != nil || got != nil {
 		t.Fatalf("after abort: %v", err)
 	}
-	// expired keys are reusable
-	if _, err := m.Writer.Exec(ctx, `UPDATE platform.idempotency_keys SET expires_at = now() - interval '1 second' WHERE key=$1`, key); err != nil {
+	// expired keys are reusable (the keys are under the tenant's row-level security, IR377: edit them in its transaction)
+	if err := m.Run(ctx, false, p, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, `UPDATE platform.idempotency_keys SET expires_at = now() - interval '1 second' WHERE key=$1`, key)
+		return err
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if got, err := s.Begin(ctx, p, "units.list", key, "aa"); err != nil || got != nil {

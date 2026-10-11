@@ -1890,6 +1890,15 @@ BEGIN
   END LOOP;
 END $$;
 
+-- platform.idempotency_keys keeps the stored response of every write: tenant data, read only inside a tenant
+-- transaction (the write pipeline, writes.getResult), so it has the same policy (IR377). platform.outbox and
+-- platform.scheduled_items stay outside: the relay and the scheduler read them across tenants.
+ALTER TABLE platform.idempotency_keys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE platform.idempotency_keys FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation ON platform.idempotency_keys
+  USING (tenant_id = current_setting('app.tenant_id', true)::uuid)
+  WITH CHECK (tenant_id = current_setting('app.tenant_id', true)::uuid);
+
 -- ---------------------------------------------------------------------------------------------
 -- Roles (created by the migration owner; passwords come from Secrets Manager / IAM auth)
 -- ---------------------------------------------------------------------------------------------

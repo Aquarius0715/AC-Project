@@ -5628,3 +5628,15 @@ The second security cycle checks the strongest boundary, between tenants, in the
    - **The fix.** The RLS block now includes partitions, and a query through the parent is unchanged. The local database got the same three statements for its four partitions. In production the partitions pg_partman creates get them in the same step.
 3. **Tests.** `TestTenantIsolationEverywhere` lists every table and partition with `tenant_id` outside `platform` and requires RLS enabled, forced and `tenant_isolation`. It then reads a partition directly as a service role of another tenant. Without the fix it reports the four partitions and the row of tenant B.
 4. **Checks.** `make test-all` and the E2E suite pass.
+
+## IR377 Row-level security on the stored write responses — 2026-10-11
+
+Following IR376, the `platform` schema was checked table by table. RLS leaves it out because the outbox relay and the scheduler read it across tenants.
+
+1. **Which `platform` tables hold tenant data.**
+   - `outbox` and `scheduled_items` are read across tenants by design, and set the tenant per item. They stay outside.
+   - `demo_clock`, `processed_events`, `stream_checkpoints` and `tenants` carry no tenant rows.
+   - `idempotency_keys` keeps the stored response of every write (IR01), which is tenant data. All its readers run in a tenant transaction: the write pipeline (`Begin`, `Complete`, `Abort` through `TxManager.Run` with the principal) and `writes.getResult` (inside the operation's transaction). No job reads it across tenants.
+2. **Fix.** `platform.idempotency_keys` now has row-level security enabled, forced and `tenant_isolation`. Before, tenant A's service role could read tenant B's stored response; the code never did, because it reads by tenant, membership and key, so this is the safety net. The local database got the same statements, and the migration image was rebuilt.
+3. **A test that changed.** The test that expires a key edited the table straight through the pool, outside a tenant transaction. Under RLS the empty `app.tenant_id` of a reused connection then fails the UUID cast. That is the same loud failure as for every business table read without a tenant, and better than a silent empty result. The test now edits the key inside the tenant's transaction.
+4. **Tests.** `TestIdempotencyKeysIsolated` requires the policy and reads a key row of tenant B as tenant A's service role. Without the fix it reports the missing policy and the row. `make test-all`, with its replay, conflict and `writes.getResult` tests, and the E2E suite pass.
