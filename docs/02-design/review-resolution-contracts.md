@@ -6241,3 +6241,29 @@ Link and button texts no longer start or end with an arrow character. The text n
    - Figma: the wireframes and components use Lucide.
    - A guard test that refuses symbol and emoji icons, and the icon rules in the docs.
 9. **Checks.** Typecheck, lint, the web unit tests (458), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped.
+
+## IR398 One icon library, part 6: Figma uses the same Lucide icons — 2026-10-12
+
+The wireframes now draw every icon with the same Lucide drawings as the web. The Figma file (VOeKPrid46kOf24ktEfe8r) has a component per icon meaning, and the screens use those components instead of symbol characters.
+
+1. **The icon components.**
+   - UI Guideline has a new board, "07 — Icons (Lucide, DEC-74)" (node 1405:9034).
+   - It holds 102 components, `Icon/<name>`, named like the web's `Icon` (shared/components/Icon.tsx), plus `Icon/more` for the "⋯" menus.
+   - They were built from lucide-react 1.55.0's own icon data: stroke 2 on 24 px, scaling with the instance.
+2. **The shared components.**
+   - The 17 badge sets, the job steps and the search select draw icons instead of characters (159 places). Each badge uses the web's icon for its meaning, for example connecting → refresh and Unavailable → offline, and the job states as in `JobStatusBadge`.
+   - The four sidebars use the web's nav icons (642 items), as do the brand marks (48) and the role chip.
+   - `Button` has "Icon before" and "Icon after" slots, each with a Lucide instance swap. `StatusBadge/Tone` has one "Icon" slot.
+3. **The screens of the four role pages.**
+   - 1,380 icon characters standing alone became icon instances.
+   - 258 texts that started with one, and 554 that ended with one, became the text with an icon before or after it.
+   - 265 button and badge labels moved their character into the new slots. 42 buttons that showed only a character became icon-only buttons.
+   - Sort hints are words, as in the web ("most severe first", "Sort: Status, earliest stage first"; 53 texts).
+   - Trigger badges use the web's trigger icons: schedule, presence, weather and routine (29 icons).
+4. **Kept as text.**
+   - 721 arrows inside sentences, location paths and breadcrumbs stay text, as in the web (IR397).
+   - The User Flows, Use Cases and System Architecture diagrams keep their arrows and numbering as notation.
+5. **Left for part 7.**
+   - The web still shows two kinds of character icon that the earlier scans missed: the "⋯" of the location menus (U+22EF), and the ASCII "+" before "Add …" and "New …" texts.
+   - They come with the guard test and the icon rules in the docs.
+6. **Checks.** A scan of the four role pages finds no icon character left outside a sentence. Screenshots of the HQ overview, the units tree, customer automations and the technician workspace show the icons in the text colour, sized to the text. Security: govulncheck (v1.9.0) and `npm audit --omit=dev` report no known vulnerabilities.

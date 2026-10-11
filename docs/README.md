@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.280.0 / Created: 2026-09-14 / Updated: 2026-10-12 / Status: Draft for review / Language: English
+Version: 0.281.0 / Created: 2026-09-14 / Updated: 2026-10-12 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.281.0 (2026-10-12): Icons part 6: the Figma wireframes and components draw the same Lucide icons as the web, from 102 icon components on UI Guideline (IR398).
 0.280.0 (2026-10-12): Icons part 5: link and button texts carry their arrows as Lucide icons, sort hints are words, and the Malay keys follow (IR397).
 0.279.0 (2026-10-12): Icons part 4: the partner, technician and HQ screens use Lucide icons; the web code has no symbol or emoji icon left besides the link arrows (IR396).
 0.278.0 (2026-10-12): Icons part 3: every glyph of the customer app's screens is a Lucide icon, icon-only buttons all have names, and ratings draw stars (IR395).
