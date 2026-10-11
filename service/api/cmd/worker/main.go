@@ -8,7 +8,6 @@ import (
 	"context"
 	"flag"
 	"log"
-	"log/slog"
 	"os"
 	"os/signal"
 	"slices"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
+	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 	"github.com/pradita/ac-project/service/api/internal/scheduler"
 	"github.com/pradita/ac-project/service/api/internal/server"
 )
@@ -45,7 +45,7 @@ func main() {
 	if *domain != "" {
 		name = *domain + "-scheduler"
 	}
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", name)
+	logger := logging.New(os.Stdout, name)
 	cfg, err := server.ConfigFromEnv(logger, domains)
 	if err != nil {
 		log.Fatal(err)

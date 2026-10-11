@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND-GO
-version: 0.39.0
+version: 0.40.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -262,7 +262,7 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 
 ## 8. Security in the code
 
-- Secrets (database credentials via IAM authentication tokens or Secrets Manager, Stripe restricted key, provider keys) are loaded at start-up and refreshed on rotation; they are never logged (the slog handler masks keys named `*secret*`, `*token*`, `*password*`, `authorization`, e-mail and phone values).
+- Secrets (database credentials via IAM authentication tokens or Secrets Manager, Stripe restricted key, provider keys) are loaded at start-up and refreshed on rotation; they are never logged (the slog handler masks keys named `*secret*`, `*token*`, `*password*`, `authorization`, e-mail and phone values). As built (IR369), `internal/platform/logging` builds every process's logger. It masks the value of a key naming a secret, cookie or authorization, and e-mail addresses, international phone numbers and connection-URL passwords in messages, strings and errors.
 - The database role used by the services (`ac_app` / `ac_worker`) has no `BYPASSRLS` and no DDL rights; migrations run with a separate owner role.
 - All SQL is parameterised (pgx placeholders); dynamic list filters are built from an allowlist of column names.
 - Request bodies are size-limited and strictly decoded; outbound HTTP clients have timeouts and only allowlisted hosts (enforced again by the Network Firewall).
@@ -296,4 +296,4 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | OPEN-GO-01 | Final choice of the TypeScript → Go contract generator (output reviewed for union types such as `UnitAction` and `Policy`) |
 | OPEN-GO-02 | WhatsApp provider SDK (depends on OPEN-BE-04) |
 
-Additional contracts for current version 0.39.0: Read IR01–IR367 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.40.0: Read IR01–IR369 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

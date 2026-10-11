@@ -18,6 +18,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/platform/democlock"
+	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 )
 
 // Main runs one domain service (IR180): it serves only the operations of domains, with /healthz and /readyz and the
@@ -32,7 +33,7 @@ func Main(service string, domains ...string) {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", service) // JSON logs (backend Go design: log/slog)
+	logger := logging.New(os.Stdout, service) // JSON logs that mask secrets and personal data (backend Go design: log/slog, IR369)
 	slog.SetDefault(logger)
 	cfg, err := ConfigFromEnv(logger, domains)
 	if err != nil {

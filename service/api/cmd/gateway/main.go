@@ -6,7 +6,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,6 +15,7 @@ import (
 	"github.com/labstack/echo/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/gateway"
+	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 )
 
 // @title						AC Project Core API
@@ -43,7 +43,7 @@ func main() {
 		}
 		os.Exit(0)
 	}
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil)).With("service", "gateway")
+	logger := logging.New(os.Stdout, "gateway")
 	targets, err := gateway.TargetsFromEnv(os.Getenv)
 	if err != nil {
 		logger.Error("config", "err", err)

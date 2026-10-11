@@ -1,3 +1,6 @@
+# Never in an image (IR369): env files hold deployment values, set through the environment at run time.
+**/.env*
+.test-all
 coverage.out
 .cover
 test

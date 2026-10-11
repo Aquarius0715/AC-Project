@@ -1,3 +1,11 @@
+# Never in an image (IR369): env files hold deployment values, which reach the containers through the environment at
+# run time (container design §4). Next.js also copies a loaded .env / .env.production into the standalone output.
+**/.env*
+# Local test runs: the E2E sign-in state holds signed-in sessions; reports and coverage are not needed to build.
+e2e
+**/test-results
+**/playwright-report
+**/coverage
 **/node_modules
 **/.next
 **/tsconfig.tsbuildinfo

@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTAINER
-version: 0.35.0
+version: 0.36.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -45,7 +45,7 @@ One backend image with several entry commands keeps every service on the same bu
 | Shutdown | Next.js handles SIGTERM | Echo `Shutdown` with a 25 s drain inside ECS `stopTimeout` 30 s; workers stop polling and finish in-flight messages |
 | Architecture | `linux/arm64` for Fargate Graviton; `linux/amd64` also built for x86 developer machines and CI | same |
 | Pinning | Base images pinned by digest in CI builds (Renovate updates) | same |
-| Contents | `.dockerignore` excludes `node_modules`, `.next`, `.env*` | `.dockerignore` excludes `bin/`, test data, `.env*` |
+| Contents | `.dockerignore` excludes `node_modules`, `.next`, `.env*` (as built, IR369: also the E2E sign-in state, test results, reports and coverage; Next.js copies a loaded `.env` / `.env.production` into the standalone output) | `.dockerignore` excludes `bin/`, test data, `.env*` (as built, IR369: also the test-run logs) |
 | Secrets | Never in images or build args; injected at run time (ECS secrets from Secrets Manager, compose `.env.local`) | same |
 
 Backend Dockerfile (pattern verified with the Core API entry point):
@@ -176,4 +176,4 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 | OPEN-CT-03 | The server-side session store (ElastiCache in production, Valkey locally) with revocation on sign-out (backend architecture §6). Until then the BFF keeps the tokens in its sealed session cookie (IR333). Sign-out already ends the identity provider's session (IR357), so a copied cookie cannot be refreshed after it |
 | OPEN-CT-04 | OpenTelemetry instrumentation of the Go services and the web apps. The collector, Jaeger and `OTEL_EXPORTER_OTLP_ENDPOINT` are ready, but nothing exports traces or metrics yet (IR334) |
 
-Additional contracts for current version 0.35.0: Read IR01–IR367 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.36.0: Read IR01–IR369 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

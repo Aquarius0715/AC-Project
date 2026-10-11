@@ -5485,3 +5485,26 @@ The fifth security check reviewed uploads: their type, their size, their names a
    - The CSV tests guard formula-like cells and keep numbers.
    - Without the fixes the tests fail: the route throws "Cannot convert argument to a ByteString", a name with a line break is stored, and the exports keep `=…` as it is.
 5. **Checks.** `make test-all`, the web checks (402 unit tests) and the E2E suite pass.
+
+## IR369 Secrets: the repository, its history, the images, the client bundles and the logs — 2026-10-11
+
+The sixth security check looked for secrets wherever they could end up. No value was printed while checking: the scans report file, line, commit and kind only.
+
+1. **Checked and clean.**
+   - **The tracked files (1,137) and all 245 commits of the history.** No private key, cloud key, Stripe live or test key, webhook secret, GitHub or Slack token, API key or JWT. `.env.local` is git-ignored and absent, and `.env.local.example` holds empty values.
+   - **The local values in `compose.yaml`** (session secret, client secrets, internal token) and in the local Keycloak realm. They are local test values by design (container design §4). Production takes them from Secrets Manager.
+   - **The browser bundles of the four apps.** None of the eight local server values appears in their 186 client files, so no server secret is inlined.
+   - **The Dockerfiles.** Multi-stage builds with distroless non-root runtimes. No secret is passed as `ARG` or `ENV`, and only the needed folders are copied.
+2. **Findings and fixes.**
+   - **Env files could reach the web image.** Next.js copies a loaded `.env` or `.env.production` into the standalone output (`writeStandaloneDirectory`), and the web image copies that output. `service/web/.dockerignore` excluded only `node_modules`, `.next` and the build info, although container design §3 says `.env*`. So an app folder's `.env.production` was copied into the build, then into the image (`app/<app>/.env.production`). Checked with a marker file: present before the fix, absent after.
+     - Both `.dockerignore` files now exclude `**/.env*`.
+     - The web's also excludes the E2E sign-in state (`e2e/`, signed-in sessions), test results, reports and coverage.
+     - The API's also excludes the test-run logs.
+   - **Git ignored only `.env.local`.** An app's `.env` or `.env.production` could be committed. `.gitignore` now ignores `.env` and `.env.*` anywhere, except the tracked `.env.local.example`.
+   - **The log masking of the Go design was not built.** §8 says the slog handler masks secret-named keys and personal data. The processes used a plain JSON handler. Nothing logged a secret (the access log records method, URI, status, request ID and latency, no headers and no bodies), but nothing stopped a future log call from doing so. `internal/platform/logging` now builds the logger of every service, the worker and the gateway. Its handler masks:
+     - the value of a key naming a secret (`*secret*`, `*token*`, `*password*`, `*authorization*`, `*cookie*`);
+     - e-mail addresses, international phone numbers (`+60…`) and the password of a connection URL, in messages, strings and errors.
+
+     IDs, dates and paths stay readable. A search by e-mail in a list URI is logged as `search=[masked]`.
+3. **Tests.** `TestMasking` logs a token, an `Authorization` header, a client secret, a cookie, an e-mail, a phone number and a database URL with its password. None reaches the line, while a UUID, a date range and a latency stay. The image check is the marker build above. Locally, the gateway's services log `search=[masked]` for a search by e-mail.
+4. **Checks.** `make test-all` (24 packages) and the E2E suite pass.
