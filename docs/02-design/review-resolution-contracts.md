@@ -4802,3 +4802,18 @@ BR-P09 sends the contractor admin a reminder 60, 30 and 7 days before a certific
    - Integration: `TestCertificateReminders`, in both suites. It covers the 60/30/7 sequence without repeats, a late approval, every skipped case, the pending renewal, the inbox fields and markRead, and that contractor-b cannot read contractor-a's certificate. `TestReplicas` checks the new copy.
    - Web: the inbox row in English and Malay.
 8. **Figma.** Contractor Notifications (/notifications, FR-X07) shows a read 60-day reminder, “Certificate expiring — tech-external-a · Electrical basics”, “Expires 15 Oct 2026”, which opens Team & capacity → Certifications. The All tab counts 10.
+
+## IR337 The work window warning as Figma shows it — 2026-10-11
+
+Backend architecture §10 listed the 15-minute work window warning (IR89) as not built. It is not a scheduled item: IR89 makes it a notice that the technician's screens derive from the business clock, and the job workspace already showed it. Its wording differed from Figma, though: Technician row 02 (Assigned jobs) is the final spec of 2026-10-01. The overview also left out the ending window that Figma Technician row 01 shows.
+
+1. **Job workspace.**
+   - While the window is open, the Work window line reads "<window> · warning at <end − 15 min> · discard at <end>".
+   - In the last 15 minutes the report card shows the banner (role=status) "Work window ends in n min — unsaved input will be discarded at <end> (IR89).", and the line keeps its Ending badge.
+   - The loader formats the warning time on the server with the other instants (IR282).
+2. **Overview.** An assigned or in-progress job adds "window ends in n min" to its row in the last 15 minutes of its window (Figma: "… · window ends in 15 min").
+3. **Screens.** IR89 also named the unit, alert, control and device screens. Figma shows the notice on the job workspace and the overview only, and the control screen states its own window rule (IR94). Figma's banner has no close button, so it stays for the last 15 minutes instead of being dismissed once.
+4. **Backend architecture §10** moves the warning from "not built" to "shown by the app"; DD-T04 describes the texts.
+5. **Tests.**
+   - `windowState`: open, the 15-minute boundary, one minute left, Malay with Asia/Tokyo.
+   - Overview rows: in progress and assigned in the last 15 minutes; a submitted job without the warning.

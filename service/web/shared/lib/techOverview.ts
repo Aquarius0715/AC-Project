@@ -9,6 +9,7 @@ import { EN, relativeTime, showSpan, showTime, translator, type I18n, type T } f
 import { alertTitle, type ApiAlert } from "@ac/web/lib/alerts";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
+import { WARN_MINUTES } from "@ac/web/lib/techJob";
 
 const en = translator("en");
 
@@ -72,9 +73,12 @@ export function techRow(j: ApiTechJobRow, now: number, units: Map<string, string
   else [badge, note] = [{ text: statusWord(j.status, t), tone: "muted" }, ""];
   const alert = j.severity === "critical" ? t("critical alert on the unit") : j.severity === "warning" ? t("warning on the unit") : "";
   const slotText = s ? showSpan(s.startAt, s.endAt, display) : "";
+  // the last 15 minutes of an open window before unsaved input is discarded (IR89, Figma Technician 01)
+  const left = s && !before && !ended && (j.status === "assigned" || j.status === "in_progress") ? Math.ceil((Date.parse(s.endAt) - now) / 60000) : null;
+  const ending = left !== null && left <= WARN_MINUTES ? t("window ends in {n} min", { n: left }) : "";
   return {
     id: j.id, short: j.id.slice(0, 8), title: units.get(j.unitId) ?? t("Unit"), origin: j.origin ?? null, status: j.status, severity: j.severity,
-    line: [typeLabel(j.type, t), s ? t("window {slot}", { slot: slotText }) : "", alert, note].filter(Boolean).join(" · "), badge, today: isToday(s, now), slot: s, slotText,
+    line: [typeLabel(j.type, t), s ? t("window {slot}", { slot: slotText }) : "", alert, note, ending].filter(Boolean).join(" · "), badge, today: isToday(s, now), slot: s, slotText,
     ackPending: j.status === "assigned" && ack === "pending", opensAt: before && s ? s.startAt : null, opens,
   };
 }

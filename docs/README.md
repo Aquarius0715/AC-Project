@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.220.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
+Version: 0.221.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.221.0 (2026-10-11): The work window warning reads as Figma shows it — the job workspace's Work window line and banner and the overview's "window ends in n min"; backend architecture §10 counts it as shown by the technician app, not as a missing scheduled item (IR337).
 0.220.0 (2026-10-11): Certificate expiry reminders (BR-P09) go to the contractor admins 60, 30 and 7 days before expiry from the maintenance scheduler; notifications gain the certificate target and the certificate_expiry type; backend architecture §10 states the 30-day expiring status (IR336).
 0.219.0 (2026-10-11): The wireframes, User Flows, Use Cases and screen catalog match screen for screen; the backend architecture lists the scheduled transitions that are built and those that wait (OPEN-BE-08); the database design names the six tables nothing uses yet (IR335).
 0.218.0 (2026-10-11): docker/ matches the container design (Keycloak realm, Mosquitto, WireMock, OpenTelemetry collector); the container design names the AWS, MQTT, Stripe, weather and OpenTelemetry variables that nothing reads yet and the LocalStack resources prepared for them (IR334).

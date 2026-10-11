@@ -135,8 +135,13 @@ export function progress(d: Draft, issues: Issue[], t: T = en) {
   }).filter((g) => g.total > 0);
 }
 
-/** The work window (IR76 before the start, IR89 warning 15 minutes before the end and the end itself). */
-export type WindowState = { phase: "none" | "before" | "open" | "ending" | "ended"; text: string };
+/** The work window (IR76 before the start, IR89 warning 15 minutes before the end and the end itself). text is the
+ * Work window line — while open, the range with the warning and discard times (Figma Technician 02); notice is the
+ * warning banner of the last 15 minutes. */
+export type WindowState = { phase: "none" | "before" | "open" | "ending" | "ended"; text: string; notice?: string };
+export const WARN_MINUTES = 15;
+/** The instant of the IR89 warning: 15 minutes before the window ends (formatted by the loader, IR282). */
+export const warnAt = (scheduledEnd: string) => new Date(Date.parse(scheduledEnd) - WARN_MINUTES * 60000).toISOString();
 export function windowState(a: { scheduledStart: string; scheduledEnd: string } | null, now: number, f: Fmt = EN_FMT): WindowState {
   const { t } = f;
   if (!a) return { phase: "none", text: t("No work window") };
@@ -144,8 +149,11 @@ export function windowState(a: { scheduledStart: string; scheduledEnd: string } 
   const range = f.span(a.scheduledStart, a.scheduledEnd);
   if (now < start) return { phase: "before", text: t("Starts {time} · {range}", { time: f.stamp(a.scheduledStart), range }) };
   if (now >= end) return { phase: "ended", text: t("Ended {time} · {range}", { time: f.stamp(a.scheduledEnd), range }) };
+  const text = t("{range} · warning at {warn} · discard at {end}", { range, warn: f.clock(warnAt(a.scheduledEnd)), end: f.clock(a.scheduledEnd) });
   const left = Math.ceil((end - now) / 60000);
-  return left <= 15 ? { phase: "ending", text: t("Ends in {n} min — unsaved input is discarded at {time} (IR89)", { n: left, time: f.clock(a.scheduledEnd) }) } : { phase: "open", text: range };
+  return left <= WARN_MINUTES
+    ? { phase: "ending", text, notice: t("Work window ends in {n} min — unsaved input will be discarded at {time} (IR89).", { n: left, time: f.clock(a.scheduledEnd) }) }
+    : { phase: "open", text };
 }
 
 /** Time on site (FR-T13 / T14): arrival and check-in evidence, start, pauses, finish and the counted minutes. */

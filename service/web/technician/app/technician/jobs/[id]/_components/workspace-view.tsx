@@ -255,7 +255,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={t("Work report — {version}", { version: rep ? t("draft v{version}", { version: rep.version }) : live.report ? `v${live.report.version}` : t("not started") })}>
             {issues && issues.length > 0 && <Banner tone="crit"><b>{t(issues.length === 1 ? "Not submitted (VALIDATION) — 1 issue:" : "Not submitted (VALIDATION) — {n} issues:", { n: issues.length })}</b> {issues.slice(0, 6).map((x) => x.text).join(" · ")}{issues.length > 6 ? " · …" : ""}. {t("The draft is kept.")}</Banner>}
-            {editable && win.phase === "ending" && <div className="mt-2"><Banner tone="warn">{win.text}</Banner></div>}
+            {editable && win.notice && <div className="mt-2"><Banner tone="warn">{win.notice}</Banner></div>}
             {!inWork && !live.report && <p className="text-[13px] text-muted">{t("The report opens when you check in at the site.")}</p>}
             {(inWork || live.report) && (
               <div className="mt-2 flex flex-col gap-3">

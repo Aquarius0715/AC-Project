@@ -8,7 +8,7 @@ import "server-only";
 import { coreAll, coreDisplay, coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { i18nOf } from "@ac/web/lib/i18n";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
-import { componentsFor, historyCard, knownOf, timeInstants, type ApiTechHistory, type ApiTechReport, type TimeOnSite } from "@ac/web/lib/techJob";
+import { componentsFor, historyCard, knownOf, timeInstants, warnAt, type ApiTechHistory, type ApiTechReport, type TimeOnSite } from "@ac/web/lib/techJob";
 import type { WorkspaceLive } from "../_components/workspace-view";
 
 /** jobs.get for the technician: the detail while the job is theirs, the snapshot after the window (IR124); an offer
@@ -47,7 +47,7 @@ export async function loadWorkspace(jobId: string): Promise<WorkspaceLive | { ki
   const r = report === null || isRefused(report) ? null : report;
   const a = job.assignment;
   const known = knownOf(i,
-    [...timeInstants(job.timeOnSite), a?.scheduledEnd, r?.signOff?.signedAt, ...(r?.measurements ?? []).map((m) => m.observedAt)],
+    [...timeInstants(job.timeOnSite), a?.scheduledEnd, a && warnAt(a.scheduledEnd), r?.signOff?.signedAt, ...(r?.measurements ?? []).map((m) => m.observedAt)],
     [a?.scheduledStart, a?.scheduledEnd, ...(r?.reviewHistory ?? []).map((h) => h.occurredAt)],
     a ? [[a.scheduledStart, a.scheduledEnd]] : []);
   return {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { componentsFor, draftFrom, draftInput, fmtOf, followUpText, groupOf, historyCard, knownOf, progress, submitIssues, timeRows, versionRows, windowState, type ApiTechReport, type Draft } from "@ac/web/lib/techJob";
+import { componentsFor, draftFrom, draftInput, fmtOf, followUpText, groupOf, historyCard, knownOf, progress, submitIssues, timeRows, versionRows, warnAt, windowState, type ApiTechReport, type Draft } from "@ac/web/lib/techJob";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
@@ -86,9 +86,13 @@ describe("work window (IR76 / IR89)", () => {
   it("tells before, open, ending and ended apart", () => {
     expect(windowState(null, NOW).phase).toBe("none");
     expect(windowState(a, Date.parse("2026-09-14T01:00:00Z"))).toEqual({ phase: "before", text: "Starts 14 Sept 2026, 10:00 am MYT · 14 Sept, 10:00 am – 12:00 pm MYT" });
-    expect(windowState(a, NOW)).toEqual({ phase: "open", text: "14 Sept, 10:00 am – 12:00 pm MYT" });
-    expect(windowState(a, Date.parse("2026-09-14T03:46:00Z"))).toEqual({ phase: "ending", text: "Ends in 14 min — unsaved input is discarded at 12:00 pm MYT (IR89)" });
+    const line = "14 Sept, 10:00 am – 12:00 pm MYT · warning at 11:45 am MYT · discard at 12:00 pm MYT"; // Figma Technician 02
+    expect(windowState(a, NOW)).toEqual({ phase: "open", text: line });
+    expect(windowState(a, Date.parse("2026-09-14T03:44:59Z")).phase).toBe("open");
+    expect(windowState(a, Date.parse("2026-09-14T03:45:00Z"))).toEqual({ phase: "ending", text: line, notice: "Work window ends in 15 min — unsaved input will be discarded at 12:00 pm MYT (IR89)." });
+    expect(windowState(a, Date.parse("2026-09-14T03:59:30Z")).notice).toBe("Work window ends in 1 min — unsaved input will be discarded at 12:00 pm MYT (IR89).");
     expect(windowState(a, Date.parse("2026-09-14T04:00:00Z")).phase).toBe("ended");
+    expect(warnAt(a.scheduledEnd)).toBe("2026-09-14T03:45:00.000Z");
   });
 });
 
@@ -122,7 +126,9 @@ describe("the server's formatting and Malay (IR282)", () => {
     expect(known).toEqual({ clock: { "2026-09-14T04:00:00Z": "1:00 PTG GMT+9" }, stamp: { "2026-09-14T02:00:00Z": "14 Sep 2026, 11:00 PG GMT+9" }, span: { "2026-09-14T02:00:00Z|2026-09-14T04:00:00Z": "14 Sep, 11:00 PG – 1:00 PTG GMT+9" } });
     const f = fmtOf(MS, { clock: { "2026-09-14T04:00:00Z": "SERVER" }, stamp: {}, span: {} }); // a known instant is never formatted again
     expect([f.clock("2026-09-14T04:00:00Z"), f.clock("2026-09-14T05:00:00Z")]).toEqual(["SERVER", "2:00 PTG GMT+9"]);
-    expect(windowState(a, Date.parse("2026-09-14T03:46:00Z"), fmtOf(MS, known)).text).toBe("Tamat dalam 14 min — input yang belum disimpan dibuang pada 1:00 PTG GMT+9 (IR89)");
+    const ending = windowState(a, Date.parse("2026-09-14T03:46:00Z"), fmtOf(MS, known));
+    expect([ending.notice, ending.text]).toEqual(["Tetingkap kerja tamat dalam 14 min — input yang belum disimpan akan dibuang pada 1:00 PTG GMT+9 (IR89).",
+      "14 Sep, 11:00 PG – 1:00 PTG GMT+9 · amaran pada 12:45 PTG GMT+9 · dibuang pada 1:00 PTG GMT+9"]);
   });
   it("words the checks, time on site, versions and the history in Malay", () => {
     const ms = translator("ms");

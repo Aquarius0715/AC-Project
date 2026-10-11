@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.221.0 (2026-10-11): IR337 work window warning as in Figma (backend architecture 0.34.0, DD-T 0.42.0); counts unchanged.
 # 0.220.0 (2026-10-11): IR336 certificate expiry reminders; Target certificate, certificate_expiry (backend architecture 0.33.0, database design 0.33.0, DD-P 0.33.0); counts unchanged.
 # 0.219.0 (2026-10-11): IR335 screens/flows/use cases complete; scheduler and unused tables as built (backend architecture 0.32.0, database design 0.32.0); counts unchanged.
 # 0.218.0 (2026-10-11): IR334 docker/ vs container design (container design 0.32.0); counts unchanged.

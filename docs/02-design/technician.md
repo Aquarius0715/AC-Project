@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.41.0
+version: 0.42.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -79,7 +79,7 @@ Scope: FR-T01 / Main display pattern: **UI-OVERVIEW**. Service boundary: `jobs.l
 4. Queries to update: `jobs / assignments / alerts`.
 5. Tabs (IR115, Figma Technician 01-1/01-2): `tab=today` (default; jobs scheduled today) and `tab=all` (all assigned jobs, opened from Sidebar › Assigned jobs).
 
-**Overview (`/technician`, Figma 01-1…01-5, IR229)**: Tiles from `summaries.get` (kind technician): assigned units (the units of the current rows), not started (accepted and assigned jobs, with their IDs), overdue. One banner per new assignment to accept (several are listed in one banner, each opening the job). Tabs Today (slots touching today in Kuala Lumpur) and All assigned (every current assignment; Sidebar › Assigned jobs opens it and is shown as active), sorted by severity, deadline or progress (IR34). Rows: job · unit with the origin badge; the job type, the window (time today, date and time on another day, both dates across days), a linked alert and what can be done now — not accepted yet, opens at a time (read-only until then, IR49), check in, in progress, work window ended (ask the contractor or HQ, IR89), on hold, returned for rework, submitted (read-only), completed; the status badge. Below: today's timeline 08:00–18:00 with the slots and the now line, the slots of today; the open alerts on the assigned units (`alerts.list`, worst first, each to the unit's alerts with its job); the reports by state (draft, returned, submitted). Unit names come from `units.list`. Past assignments (history projection) are not listed. Empty: “No assigned jobs today” with a link to all assigned jobs.
+**Overview (`/technician`, Figma 01-1…01-5, IR229)**: Tiles from `summaries.get` (kind technician): assigned units (the units of the current rows), not started (accepted and assigned jobs, with their IDs), overdue. One banner per new assignment to accept (several are listed in one banner, each opening the job). Tabs Today (slots touching today in Kuala Lumpur) and All assigned (every current assignment; Sidebar › Assigned jobs opens it and is shown as active), sorted by severity, deadline or progress (IR34). Rows: job · unit with the origin badge; the job type, the window (time today, date and time on another day, both dates across days), a linked alert and what can be done now — not accepted yet, opens at a time (read-only until then, IR49), check in, in progress, the window ending within 15 minutes (“window ends in n min”, IR89), work window ended (ask the contractor or HQ, IR89), on hold, returned for rework, submitted (read-only), completed; the status badge. Below: today's timeline 08:00–18:00 with the slots and the now line, the slots of today; the open alerts on the assigned units (`alerts.list`, worst first, each to the unit's alerts with its job); the reports by state (draft, returned, submitted). Unit names come from `units.list`. Past assignments (history projection) are not listed. Empty: “No assigned jobs today” with a link to all assigned jobs.
 
 **Boundary cases and failures**: Hide live unit information when an external technician's assignment expires. Before work starts, show assigned jobs as read-only within the viewing window; actions before the work window return FORBIDDEN (IR49). Directly entering another technician's job ID must not allow work to start.
 
@@ -284,7 +284,12 @@ Scope: FR-T08 / Main display pattern: **UI-DETAIL**. Service boundary: `jobs.get
 3. Save start time, submission time, and `reportVersion`. The quality review determines completion.
 4. Queries to update: `jobs / reports / job events / notifications / audit`.
 
-**Boundary cases and failures**: Reject start and submission if unassigned, cancelled, `on_hold`, or outside the valid period. Before the work window, show the job read-only in work-not-started state (IR76). Follow IR89 for the 15-minute end warning and discarding unsaved inputs at the end. If submission fails, keep `in_progress` and the draft.
+**Boundary cases and failures**: Reject start and submission if unassigned, cancelled, `on_hold`, or outside the valid period. Before the work window, show the job read-only in work-not-started state (IR76). Follow IR89 for the 15-minute end warning and discarding unsaved inputs at the end. As built (IR337, Figma Technician 02):
+- The Work window line reads “<window> · warning at <end − 15 min> · discard at <end>”.
+- In the last 15 minutes the report shows the banner “Work window ends in n min — unsaved input will be discarded at <end> (IR89).”
+- The unit, alert, control and device screens show no such banner.
+
+If submission fails, keep `in_progress` and the draft.
 
 **Verification**: Check the traceability entries under AT-T08 (N/E/B and applicable SRC/R01) and the relevant S scenarios.
 
@@ -481,6 +486,6 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 
 0.10.0: T12 fetches alerts.get using DeviceEvent.alertIds and acknowledges using Alert.version (SR23). Filter device history by scope at event time (SR24).
 
-Additional contracts for current version 0.41.0: Read IR01–IR333 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.42.0: Read IR01–IR337 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.
