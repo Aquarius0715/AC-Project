@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { createContext, isValidElement, useCallback, useContext, useEffect, useId, useState } from "react";
+import { createContext, isValidElement, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import { useT } from "@ac/web/components/I18n";
 
 export const cx = (...a: unknown[]) => a.filter((x): x is string => typeof x === "string" && x !== "").join(" ");
@@ -351,25 +351,56 @@ export function SearchSelect({ value, onChange, options, label, placeholder, lim
 }
 
 /* ───────────── Modal ───────────── */
+// the open dialogs, innermost last: only it answers Escape and Tab
+const openModals: symbol[] = [];
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** A modal dialog as the WAI-ARIA dialog pattern and UX-06 ask (IR361). On open, focus moves into it: the first field
+ * or control of the body, else the first footer button (Cancel), else ✕. Tab and Shift+Tab cycle inside it. Escape
+ * closes it, and on close focus returns to what had it before (the trigger). */
 export function Modal({ open, title, onClose, children, footer, wide }: { open: boolean; title: string; onClose: () => void; children: React.ReactNode; footer?: React.ReactNode; wide?: boolean }) {
   const id = useId();
   const t = useT();
+  const box = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  useEffect(() => { close.current = onClose; });
   useEffect(() => {
     if (!open) return;
-    const h = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [open, onClose]);
+    const me = Symbol("modal");
+    openModals.push(me);
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const inside = (part?: string) => [...(box.current?.querySelectorAll<HTMLElement>(part ? `[data-part="${part}"] :is(${FOCUSABLE})` : FOCUSABLE) ?? [])]
+      .filter((el) => !el.closest("[hidden], [inert]"));
+    (inside("body")[0] ?? inside("footer")[0] ?? inside("header")[0])?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (openModals[openModals.length - 1] !== me) return;
+      if (e.key === "Escape") return close.current();
+      if (e.key !== "Tab") return;
+      const all = inside();
+      if (!all.length) return;
+      const [a, z] = [all[0], all[all.length - 1]];
+      const at = document.activeElement;
+      if (!box.current?.contains(at)) { e.preventDefault(); (e.shiftKey ? z : a).focus(); }
+      else if (e.shiftKey && at === a) { e.preventDefault(); z.focus(); }
+      else if (!e.shiftKey && at === z) { e.preventDefault(); a.focus(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      openModals.splice(openModals.indexOf(me), 1);
+      if (trigger?.isConnected) trigger.focus();
+    };
+  }, [open]);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-labelledby={id} className={cx("flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl", wide ? "sm:max-w-3xl" : "sm:max-w-[560px]")}>
-        <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
+      <div ref={box} role="dialog" aria-modal="true" aria-labelledby={id} className={cx("flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl", wide ? "sm:max-w-3xl" : "sm:max-w-[560px]")}>
+        <div data-part="header" className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
           <h2 id={id} className="text-base font-bold">{title}</h2>
           <button aria-label={t("Close")} onClick={onClose} className="rounded-lg px-2 py-1 text-muted hover:bg-surface2">✕</button>
         </div>
-        <div className="flex flex-col gap-3 overflow-y-auto px-5 py-4">{children}</div>
-        {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}
+        <div data-part="body" className="flex flex-col gap-3 overflow-y-auto px-5 py-4">{children}</div>
+        {footer && <div data-part="footer" className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}
       </div>
     </div>
   );

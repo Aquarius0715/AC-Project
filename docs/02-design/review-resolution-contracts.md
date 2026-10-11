@@ -5330,3 +5330,20 @@ IR359 left open dialogs and other states that need an action outside the smoke c
 3. **Fix the check found.** The New job dialog's checkboxes stood less than 24 px apart (WCAG 2.5.8 target size). The shared `Check` input is 20 px now, so the lists' gaps keep its targets 24 px apart. The Access & roles list keeps its 8 px row gap (IR359).
 4. **Still manual.** The deterministic contracts §151 checks with NVDA + Chrome and VoiceOver + Safari, and the keyboard-only scenarios.
 5. **Tests.** The 14 specs pass with their dialogs clean, and the full suite passes.
+
+## IR361 Dialogs keep keyboard focus: initial focus, a focus trap, and focus back to the trigger — 2026-10-11
+
+UX-06 says that when a dialog closes, focus returns to its trigger; NFR-01 asks that main actions work with a keyboard alone. The shared `Modal` (`aria-modal="true"`) only closed on Escape:
+- focus stayed on the page behind the backdrop, and Tab walked through the page instead of the dialog;
+- on close nothing restored focus;
+- its Escape listener was re-registered on every render, because `onClose` is a new function each time;
+- with two dialogs open, both closed on one Escape.
+
+1. **Opening.** Focus moves into the dialog: the first field or control of its body, else its first footer button (for a confirmation, Cancel), else ✕.
+2. **Inside.** Tab after the last control goes to the first, and Shift+Tab before the first goes to the last. A Tab while focus is outside the dialog brings it back in.
+3. **Closing.** Escape closes the dialog, and so do ✕ and a click on the backdrop. Focus returns to the element that had it when the dialog opened, if it is still on the page.
+4. **Stacked dialogs.** Only the innermost dialog answers Escape and Tab. Closing it returns focus to its own trigger inside the outer dialog.
+5. **Implementation.** The key listener is registered once per opening, and `onClose` is read through a ref.
+6. **Tests.**
+   - Component test (Testing Library, jsdom): the first field takes focus, Tab and Shift+Tab cycle, Escape closes, and focus is back on the trigger. Cancel takes focus in a confirmation. Escape closes only the innermost of two dialogs, and focus returns to its trigger.
+   - E2E `shared/keyboard`, one dialog per app (customer invite, contractor unavailable days, technician QR scan, HQ new policy): opened with Enter, 12 Tabs and a Shift+Tab stay inside, Escape closes it, and the trigger has focus.

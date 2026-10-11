@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.243.0
+version: 0.244.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -269,6 +269,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.244.0: Dialogs keep keyboard focus (IR361). Phase 1A unchanged.
 0.243.0: The accessibility check covers dialogs (IR360). Phase 1A unchanged.
 0.242.0: WCAG AA contrast and the axe-core check in the smoke crawl (IR359). Phase 1A unchanged.
 0.241.0: The BFF refuses other sites' requests (IR358). Phase 1A unchanged.

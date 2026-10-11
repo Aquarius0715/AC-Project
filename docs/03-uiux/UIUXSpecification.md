@@ -1,6 +1,6 @@
 ---
 document_id: UX-COMMON
-version: 0.33.0
+version: 0.34.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -154,7 +154,7 @@ Charts and status cards must let users move from an overview to evidence and det
 
 Validate English/Malay keys, plurals, and long translations. Mark ms dictionary text as an unverified implementation-agent draft; Business/UI/UX must review it before company acceptance (IR74). Fall back to en for missing ms keys; if both are missing, show the key string. Lint must check that en/ms key sets match (IR44). Use locale tags en-MY/ms-MY, amounts in the order "120.00 MYR," temperatures with one decimal place, and decimal half-up rounding (IR44). Format times with Intl.DateTimeFormat and money with Intl.NumberFormat; show the time zone for bookings. Changing language must not change measurement units or stored UTC values. For voice demos, confirm the transcript, target, and action, then process it as a normal Command.
 
-Use WCAG 2.2 AA as the design target. Normal text must have at least 4.5:1 contrast; large text at least 3:1. Check that controls are recognizable and focus is visible. These are implementation test criteria, not a guarantee of compliance. As built (IR359): secondary text (`text-muted`, Figma `color/text-muted`) is #5B6E84 (4.56:1 or more on every light surface), and placeholders and chart labels on white (`text-subtle`) are #64788E (4.55:1). The E2E smoke crawl runs axe-core (WCAG 2.x A / AA) on every page it reaches and fails on any critical or serious violation, and the specs that open the main dialogs check each dialog the same way (IR360). Checkboxes are 20 px, so neighbours keep 24 px apart (WCAG 2.5.8). [Official W3C quick reference](https://www.w3.org/WAI/WCAG22/quickref/)
+Use WCAG 2.2 AA as the design target. Normal text must have at least 4.5:1 contrast; large text at least 3:1. Check that controls are recognizable and focus is visible. These are implementation test criteria, not a guarantee of compliance. As built (IR359): secondary text (`text-muted`, Figma `color/text-muted`) is #5B6E84 (4.56:1 or more on every light surface), and placeholders and chart labels on white (`text-subtle`) are #64788E (4.55:1). The E2E smoke crawl runs axe-core (WCAG 2.x A / AA) on every page it reaches and fails on any critical or serious violation, and the specs that open the main dialogs check each dialog the same way (IR360). Checkboxes are 20 px, so neighbours keep 24 px apart (WCAG 2.5.8). Dialogs follow the WAI-ARIA dialog pattern: focus moves in when one opens, Tab stays inside, and Escape returns focus to the trigger (IR361). [Official W3C quick reference](https://www.w3.org/WAI/WCAG22/quickref/)
 
 The project's target touch area is 44×44px. Allow the main scenarios to be completed with a keyboard alone. When a Dialog closes, return focus to its trigger. Announce critical errors through suitable live regions; do not announce every telemetry (sensor measurement, Measurement) update. When refetching displayed data, use aria-busy and an "Updating" indicator; do not return to a skeleton (IR83). Also test at 200% browser zoom, 360px width, and with a screen reader.
 
@@ -209,7 +209,7 @@ For shared routes, select schedule/event for C04/C05 and payment/restriction/inq
 
 Approvals applied on 2026-09-16: Use SR17 for period presets. Show the offset retry button only for failed, and label the failed purchase/retirement stage (SR18). Follow SR19 for contract edit denial reasons and links to restriction cancellation/release.
 
-Additional contracts for current version 0.33.0: Read IR01–IR360 in the [review resolution contracts](../02-design/review-resolution-contracts.md). They take priority over older text on the same issue; follow IR72 when rules conflict.
+Additional contracts for current version 0.34.0: Read IR01–IR361 in the [review resolution contracts](../02-design/review-resolution-contracts.md). They take priority over older text on the same issue; follow IR72 when rules conflict.
 
 0.14.0: Under IR25, get the address before acceptance from the unit's installation property. After expiry, freeze only whether a report exists and its acceptance status.
 
