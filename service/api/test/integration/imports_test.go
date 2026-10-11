@@ -295,8 +295,15 @@ func TestUnitsImportRevalidation(t *testing.T) {
 	if code, m := write(s, &hq, "units.importCommit", `{"previewId":"`+data(pm)["previewId"].(string)+`","customerId":"`+cust+`"}`, 0); code != 409 || m["messageKey"] != "error.previewExpired" {
 		t.Errorf("serial bound since the preview: %d %v", code, m)
 	}
-	_, m = post(s, &hq, "units.list", `{"filters":{"customerId":"`+cust+`","search":"Late AC"},"limit":100}`)
-	if len(items(m)) != 0 {
-		t.Errorf("nothing imported: %v", items(m))
+	// nothing imported: units.list has no search filter, so look through the customer's units (IR388: the earlier
+	// check sent one, got VALIDATION and passed on an empty list)
+	code, m = post(s, &hq, "units.list", `{"filters":{"customerId":"`+cust+`"},"limit":100}`)
+	if code != 200 {
+		t.Fatalf("units.list: %d %v", code, m)
+	}
+	for _, u := range items(m) {
+		if u["displayName"] == "Late AC" {
+			t.Errorf("imported after all: %v", u)
+		}
 	}
 }

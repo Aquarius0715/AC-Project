@@ -129,7 +129,7 @@ func (m *Module) unitsCoverage(ctx context.Context, c *ops.Call, in *paging.Quer
 		conds = append(conds, "cu.id = "+add(*f.CustomerID))
 	}
 	if f.Search != nil && strings.TrimSpace(*f.Search) != "" {
-		q := "%" + strings.ToLower(strings.TrimSpace(*f.Search)) + "%"
+		q := paging.Contains(strings.ToLower(*f.Search))
 		conds = append(conds, "(lower(u.display_name) LIKE "+add(q)+" OR u.id::text LIKE "+add(q)+")")
 	}
 	rows, err := c.Tx.Query(ctx, `SELECT u.id, cu.id, u.model_id, u.warranty_ends_at, u.display_name FROM assets.units u

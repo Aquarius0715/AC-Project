@@ -129,7 +129,7 @@ func clientUsersList(ctx context.Context, c *ops.Call, in *paging.Query) (paging
 		conds = append(conds, "x.client_role = "+add(*f.ClientRole))
 	}
 	if f.Search != nil && strings.TrimSpace(*f.Search) != "" {
-		p := add("%" + strings.TrimSpace(*f.Search) + "%")
+		p := add(paging.Contains(*f.Search))
 		conds = append(conds, "(x.email ILIKE "+p+" OR x.display_name ILIKE "+p+")")
 	}
 	where := strings.Join(conds, " AND ")

@@ -258,7 +258,7 @@ func (m Partners) list(ctx context.Context, c *ops.Call, in *paging.Query) (pagi
 		conds = append(conds, fmt.Sprintf("p.status = $%d", len(args)))
 	}
 	if f.Search != nil && strings.TrimSpace(*f.Search) != "" {
-		args = append(args, "%"+strings.TrimSpace(*f.Search)+"%")
+		args = append(args, paging.Contains(*f.Search))
 		n := len(args)
 		conds = append(conds, fmt.Sprintf("(p.name ILIKE $%d OR p.registration_no ILIKE $%d OR EXISTS (SELECT 1 FROM unnest(p.service_areas) a WHERE a ILIKE $%d))", n, n, n))
 	}

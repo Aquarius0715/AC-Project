@@ -5963,3 +5963,26 @@ IR384 and IR385 left one step open: ending the identity provider's sessions from
    - Board 02's test note had stale web counts. It now says 74 suites and 450 tests, 371 literal Core API calls and 407 typed calls.
    - Board 06 lists the new `idp` package under `internal/platform`.
 4. **Checks.** `make test-all` (both modes), the web unit tests, typecheck and lint pass, and so do the validators. Only tests changed in the code.
+
+## IR388 Checks round: SQL built from input, second pass; a search term is matched as written — 2026-10-12
+
+1. **SQL built from input (security, second pass after IR365).**
+   - Since IR365, one new query is built by concatenation: `notifications.markRead` / `markAllRead` (IR379). Its pieces are constant SQL expressions, and every value is a `$n` parameter.
+   - The new code of IR384–IR386 uses fixed statements with parameters.
+   - Nothing reachable was found.
+2. **Finding: a search term's own `%` and `_` were wildcards.** Four lists have a `search` filter: `clientUsers.list`, `contractors.list`, `parts.list` and `units.coverage`. The query catalog says "contains".
+   - The term was passed as `%term%` to (I)LIKE without escaping. So `%` alone found every row, `_` matched any character, and "50%" found every value with "50" in it.
+   - It stayed inside the caller's scope (the other conditions still applied), so no data leaked. But the answers did not mean what the catalog says.
+   - Fixed with `paging.Contains`, one pattern for all four. It escapes `\`, `%` and `_`, using PostgreSQL's default escape character.
+   - Deterministic contracts D12 now says so: the term is matched as written, case-insensitively, and `%`, `_` and `\` are ordinary characters.
+3. **Finding: a test that passed without checking.** The unit import test checked "nothing imported" with `units.list` and a `search` filter.
+   - `units.list` has no such filter, so the call was VALIDATION `error.notAllowed`, and the empty list passed.
+   - The test now lists the customer's units, requires 200, and looks for the row by name.
+4. **Tests.**
+   - Unit `TestContains`.
+   - Integration `TestSearchIsLiteral`, for the four lists:
+     - a term from each list's first row, in other case, finds it;
+     - `%`, `_` and `\` alone find only rows that contain them.
+   - For a part and a contractor with `%` and `_` in their names, each wildcard character is matched as written ("50% grade", "l_5", "50%_c" find them; "SEAL%", "seal_kit", "s_arch" do not).
+   - With the escaping removed, the test fails.
+5. **Checks.** `make test-all` (both modes) and the validators pass. With the identity, maintenance and equipment images rebuilt, the E2E suite passes: 117 tests, 8 skipped.

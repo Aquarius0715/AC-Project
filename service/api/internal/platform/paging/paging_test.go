@@ -99,3 +99,19 @@ func TestOrderByDirection(t *testing.T) {
 		t.Errorf("Direction desc: %q %v", got, err)
 	}
 }
+
+// TestContains: the search term is matched as written, anywhere in the value (IR388).
+func TestContains(t *testing.T) {
+	for in, want := range map[string]string{
+		"filter":   `%filter%`,
+		"  mesh  ": `%mesh%`,
+		"50%":      `%50\%%`,
+		"a_b":      `%a\_b%`,
+		`C:\x`:     `%C:\\x%`,
+		"%_%":      `%\%\_\%%`,
+	} {
+		if got := Contains(in); got != want {
+			t.Errorf("Contains(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

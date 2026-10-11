@@ -1,6 +1,6 @@
 ---
 document_id: DD-DETERMINISTIC
-version: 0.31.0
+version: 0.32.0
 status: accepted-demo-policy-under-review
 scope: frontend-demo-1A
 ---
@@ -164,7 +164,7 @@ write-version-catalog.csv is authoritative for every operation's writeOptions.ex
 
 Support-read permissions: HQ with a specific action permission may read needed Unit/Capability/Organization/Customer/Property/Space/Membership candidates within managed scope. This grants reads only, not register editing or billing fields. Repository decides from action permission and target relationships, not only screens named in catalog design_ids. client/contractor/technician use their own scopes, not this HQ support permission.
 
-Allowed Query filters/sort are fixed in query-catalog.csv. A real field still returns VALIDATION if not allowed for that operation. kind/status use returned-model enums; from/to must both be present or absent; date is a real YYYY-MM-DD. Combine filters with AND, unitIds with OR; empty unitIds gives zero results. Unknown enums return VALIDATION. Text/all-field search is outside scope. Missing sort uses catalog default, nulls last, ties id asc. All Pages support cursor/limit. Subscription afterCursor is an integer, separate from opaque Page cursor.
+Allowed Query filters/sort are fixed in query-catalog.csv. A real field still returns VALIDATION if not allowed for that operation. kind/status use returned-model enums; from/to must both be present or absent; date is a real YYYY-MM-DD. Combine filters with AND, unitIds with OR; empty unitIds gives zero results. Unknown enums return VALIDATION. Text/all-field search is outside scope. The `search` filters of query-catalog.csv match their trimmed term as written, case-insensitively, anywhere in the named fields: `%`, `_` and `\` in the term are ordinary characters, not wildcards (IR388). Missing sort uses catalog default, nulls last, ties id asc. All Pages support cursor/limit. Subscription afterCursor is an integer, separate from opaque Page cursor.
 
 offsets.preview is a write saving quote snapshot and 15-minute expiry; requests check saved quoteId/version. notifications.preview is a non-saving read. Business events create historical Notifications. Repository generates notification params from targets; UI-supplied params return VALIDATION. Only message/reason allow DD free text. Recipients must be current participants passing billing/internal visibility rules. Participation does not grant access to another person's notification list/read state.
 
@@ -220,4 +220,4 @@ In the same memory transition, append {occurrenceAt,jobId} to generatedOccurrenc
 
 SR17–19 were approved by the user on 2026-09-16. Periods use calendar days/completed minutes; offsets retry only the failed stage on the same record; contract edits during active restrictions are rejected. Follow strict-review-contracts.md for details and precedence.
 
-Additional contracts for current version 0.31.0: Read IR01–IR333 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.32.0: Read IR01–IR388 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

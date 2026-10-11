@@ -485,7 +485,7 @@ func (m Certificates) parts(ctx context.Context, c *ops.Call, in *paging.Query) 
 	}
 	q, args := `SELECT code, name FROM maintenance.parts_catalog WHERE active`, []any{}
 	if f.Search != nil {
-		q, args = q+` AND (code ILIKE $1 OR name ILIKE $1)`, append(args, "%"+strings.TrimSpace(*f.Search)+"%")
+		q, args = q+` AND (code ILIKE $1 OR name ILIKE $1)`, append(args, paging.Contains(*f.Search))
 	}
 	rows, err := c.Tx.Query(ctx, q+" ORDER BY lower(name), code", args...) // name asc, id asc (query catalog)
 	if err != nil {

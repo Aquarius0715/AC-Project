@@ -152,6 +152,15 @@ func Direction(s *SortSpec) (string, error) {
 	return "", apperr.Fields(map[string]string{"sort.direction": "error.invalid"})
 }
 
+// likeEscape takes the LIKE wildcards of a search term literally; the backslash is PostgreSQL's default escape character.
+var likeEscape = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
+
+// Contains is the LIKE / ILIKE pattern of filters.search: the trimmed term anywhere in the value. A %, _ or \ in the term
+// is matched as itself, so "50%" finds "50%" and not every value with "50" in it (IR388).
+func Contains(search string) string {
+	return "%" + likeEscape.Replace(strings.TrimSpace(search)) + "%"
+}
+
 // SortSlice orders in-memory items by the requested sort: keys compares two items per allowed field (like
 // strings.Compare); ties fall back to the "id" comparator when there is one. A nil sort keeps the current order; a
 // field outside keys is VALIDATION.
