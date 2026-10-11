@@ -1864,8 +1864,10 @@ CREATE TRIGGER certificates_capture AFTER INSERT OR DELETE OR UPDATE OF organiza
   FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'organization_id', 'membership_id', 'name');
 
 -- ---------------------------------------------------------------------------------------------
--- Row-level security: every business table with tenant_id. platform.* is infrastructure read across
--- tenants by the outbox relay and scheduler, which then SET LOCAL app.tenant_id per item.
+-- Row-level security: every business table with tenant_id, partitions included. A partition is a table of its own:
+-- read directly it does not apply its parent's policy, so it carries the same one (IR376). A partition added later
+-- needs the same three statements. platform.* is infrastructure read across tenants by the outbox relay and
+-- scheduler, which then SET LOCAL app.tenant_id per item.
 -- ---------------------------------------------------------------------------------------------
 DO $$
 DECLARE r record;
@@ -1878,7 +1880,6 @@ BEGIN
     WHERE c.column_name = 'tenant_id'
       AND c.table_schema IN ('identity','assets','devices','control','monitoring','maintenance','billing','restrictions','energy','notify','audit')
       AND pc.relkind IN ('r','p')
-      AND NOT pc.relispartition
   LOOP
     EXECUTE format('ALTER TABLE %I.%I ENABLE ROW LEVEL SECURITY', r.table_schema, r.table_name);
     EXECUTE format('ALTER TABLE %I.%I FORCE ROW LEVEL SECURITY', r.table_schema, r.table_name);

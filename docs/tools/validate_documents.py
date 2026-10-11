@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.259.0 (2026-10-11): IR376 RLS on partitions (database design 0.37.0, schema.sql); counts unchanged.
 # 0.258.0 (2026-10-11): IR375 write limit (backend Go design 0.42.0, network 0.35.0, container 0.39.0); counts unchanged.
 # 0.257.0 (2026-10-11): IR374 cookie prefixes (backend architecture 0.44.0); counts unchanged.
 # 0.256.0 (2026-10-11): IR373 container hardening (container design 0.38.0); counts unchanged.

@@ -5613,3 +5613,18 @@ The second security cycle continues with the limit IR370 left open. Network arch
    - `TestWriteLimit` puts the limit in the pipeline. The fourth write of the minute, of any operation, is RATE_LIMITED with `Retry-After: 40` and `retryAfterSeconds` 40. Reads and other members go on, and the next minute is free. A store that does not answer lets the writes through.
    - The action-message test reads the waiting time.
 4. **Checks.** `make test-all` and `make vuln` pass, as do the web checks (407 unit tests, the build). The E2E suite passes on the stack with the limit on: 111 passed, 8 skipped. Afterwards Valkey held 7 counters of the last two minutes; the busiest membership-minute counted 17 writes, well under 60.
+
+## IR376 Tenant isolation in the database: row-level security on partitions too — 2026-10-11
+
+The second security cycle checks the strongest boundary, between tenants, in the database itself. Row-level security is the safety net under every query (database design §7).
+
+1. **Checked and in order.**
+   - All 115 business tables with `tenant_id` have row-level security enabled and forced, with the `tenant_isolation` policy.
+   - The service roles (`ac_*_login`) are neither superusers nor `BYPASSRLS`.
+   - There are no views and no `SECURITY DEFINER` functions that could read with another role's rights.
+   - `platform.*` stays outside by design: the relay and the scheduler read it across tenants and set the tenant per item. The code reads `platform.idempotency_keys` by tenant, membership and key.
+2. **Finding and fix: partitions.**
+   - **The gap.** The RLS block of the schema skipped partitions (`NOT relispartition`). A partition is a table of its own, and read directly it does not apply its parent's policy. The four `DEFAULT` partitions (`monitoring.measurements_default`, `_15m_default`, `_1h_default`, `audit.audit_log_default`) had no RLS, and the service roles could read them, because the schema grants read on every table. A query naming a partition would therefore have shown every tenant's rows. Tenant A's service role, reading `monitoring.measurements_default` directly, saw tenant B's measurement; through the parent it saw none. No query names a partition (and IR365 found no SQL built from input), so this is the safety net itself.
+   - **The fix.** The RLS block now includes partitions, and a query through the parent is unchanged. The local database got the same three statements for its four partitions. In production the partitions pg_partman creates get them in the same step.
+3. **Tests.** `TestTenantIsolationEverywhere` lists every table and partition with `tenant_id` outside `platform` and requires RLS enabled, forced and `tenant_isolation`. It then reads a partition directly as a service role of another tenant. Without the fix it reports the four partitions and the row of tenant B.
+4. **Checks.** `make test-all` and the E2E suite pass.
