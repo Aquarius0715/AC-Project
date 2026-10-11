@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND
-version: 0.32.0
+version: 0.33.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -216,7 +216,7 @@ Modelling rules:
 | Auto-confirm completed jobs | 7 days after completion without rating | FR-C17 (BR-C17) |
 | Follow-up classification reminder | createdAt + 1 business day | IR114 |
 | Invoice reminders | Due and overdue dates | FR-A08 |
-| Certificate expiry warnings | Status `expiring` from expiry − 60 days, `expired` at expiry | FR-P09, FR-A21 |
+| Certificate expiry reminders | 60, 30 and 7 days before expiry: one reminder each to the contractor admins (BR-P09). The status reads `expiring` within 30 days of expiry and `expired` from it on (IR133 item 2) | FR-P09, FR-A21, IR336 |
 | Filter cleaning reminders | Every 15 minutes of business time: an overdue unit once per cleaning cycle (customer settings) | FR-C18, IR239 |
 | Automation schedules | Schedule start / end | FR-C04 |
 | Monthly energy report | Month end, when enabled in preferences | FR-C16 |
@@ -229,7 +229,7 @@ As built (IR335), the worker runs one scheduler per business domain (IR195). Eac
 | Scheduler | Built transitions |
 |---|---|
 | Equipment | Command expiry at `expiresAt`, diagnostic run ends (IR123), automation schedules (FR-C04, IR54), device operation start and time-out (IR67) |
-| Maintenance | Offer expiry, the slot proposal reply deadline (IR113), auto-confirm of completed jobs (FR-C17), the work window end (the assignment history is frozen, IR89), filter cleaning reminders (IR239) |
+| Maintenance | Offer expiry, the slot proposal reply deadline (IR113), auto-confirm of completed jobs (FR-C17), the work window end (the assignment history is frozen, IR89), filter cleaning reminders (IR239), certificate expiry reminders (IR336) |
 
 Items of the table above that are not scheduled yet:
 
@@ -237,7 +237,7 @@ Items of the table above that are not scheduled yet:
   - restriction execution: `restrictions.execute` is refused before `executeAfter` and the 24-hour notice, and while an exception or grace period holds;
   - periodic plan job generation: `plans.generateNext`;
   - invoice reminders: HQ previews one with `notifications.preview` and sends it with `invoices.remind`, which saves the customer's notification; external delivery is simulated (DD-A08).
-- **Computed when read:** grace and exception expiry (compared at execution) and certificate expiry (the status, IR133).
+- **Computed when read:** grace and exception expiry (compared at execution) and the certificate status (IR133); the certificate reminders are scheduled (IR336).
 - **Not built:** the 15-minute work window warning, the follow-up classification reminder, the monthly energy report (exported on demand with `energy.exportReport`) and the start of firmware campaign waves.
 
 ## 11. External integrations
@@ -305,4 +305,4 @@ Items of the table above that are not scheduled yet:
 | OPEN-BE-07 | Contractor payout rail (bank transfer file or Stripe Connect) | Payouts (FR-A23) |
 | OPEN-BE-08 | The scheduled items that are not built yet (§10 as built) and the lease (`platform.scheduled_items`, `FOR UPDATE SKIP LOCKED`) for running several scheduler instances per domain | Scheduler, worker |
 
-Additional contracts for current version 0.32.0: Read IR01–IR335 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.33.0: Read IR01–IR336 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

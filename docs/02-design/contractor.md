@@ -1,6 +1,6 @@
 ---
 document_id: DD-P
-version: 0.32.0
+version: 0.33.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -330,6 +330,8 @@ Scope: FR-P09 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 **As built (IR277)**: one row per technician and qualification — the certificate on file (its latest, with a pending renewal noted), else the HQ grant without a certificate on file (also while a first upload waits for HQ or after HQ rejected it), else “not held” when a booked job's unit scope needs it. A certificate is “Expiring” within the URL's window (`expiringWithinDays` 30 / 60 / 90, default 60); it blocks the technician's booked jobs that end after it. Upload renewal sends `renewalOf`; a grant or a missing qualification gets a new certificate; Request training needs a certificate on file. Dates are Kuala Lumpur days: Issued on and Expires on stand for the start of those days. Only active technicians can get a new certificate.
 
+**Reminders (BR-P09, IR336)**: the maintenance scheduler sends each contractor admin (partner.assign) an in-app reminder 60, 30 and 7 days before a valid certificate expires — each once, and only the latest one reached when HQ approved the certificate late. None goes for a certificate that waits for HQ, was rejected, has expired or was replaced by a valid renewal, or for a technician who left. A pending renewal does not stop them. The notification reads “Certificate expiring — <technician> · <certificate>”, “Expires <date>”, and opens this tab.
+
 **Verification**: Check the traceability entries under AT-P09 (N/E/B).
 
 ### DD-P10 Details
@@ -358,7 +360,7 @@ Scope: FR-P10 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.32.0: Read IR01–IR333 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.33.0: Read IR01–IR336 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 0.14.0: Under IR25, get the pre-acceptance address from the unit's installation property. After expiry, freeze only report presence and acceptance state for report display.
 

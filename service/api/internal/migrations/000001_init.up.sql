@@ -1255,6 +1255,16 @@ CREATE TABLE maintenance.certificates (          -- FR-P09
   updated_at                timestamptz NOT NULL DEFAULT platform.app_now()
 );
 CREATE INDEX certificates_expiry ON maintenance.certificates (tenant_id, organization_id, expires_at);
+CREATE INDEX certificates_valid_expiry ON maintenance.certificates (tenant_id, expires_at) WHERE status = 'valid';  -- expiry reminders (IR336)
+
+CREATE TABLE maintenance.certificate_reminders (  -- BR-P09: each expiry reminder once per certificate (IR336)
+  certificate_id  uuid NOT NULL REFERENCES maintenance.certificates(id),
+  days_before     int NOT NULL CHECK (days_before IN (60, 30, 7)),
+  tenant_id       uuid NOT NULL,
+  sent_at         timestamptz NOT NULL,
+  notifications   int NOT NULL DEFAULT 0,             -- in-app notifications to the contractor admins
+  PRIMARY KEY (certificate_id, days_before)
+);
 
 CREATE TABLE maintenance.unavailability (        -- FR-P06
   id                         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1669,7 +1679,7 @@ CREATE TABLE notify.notifications (
   scope_version_at_creation  int NOT NULL,
   type                       text NOT NULL,
   channel                    text NOT NULL DEFAULT 'inApp' CHECK (channel IN ('inApp','email','whatsapp')),   -- inApp simulated, email/whatsapp preview (IR04)
-  template_key               text NOT NULL CHECK (template_key IN ('alert','quality','schedule_change','report_return','completion','payment','payment_reminder','restriction','inquiry','job_update','device_operation','invite')),
+  template_key               text NOT NULL CHECK (template_key IN ('alert','quality','schedule_change','report_return','completion','payment','payment_reminder','restriction','inquiry','job_update','device_operation','invite','certificate_expiry')),
   target                     jsonb NOT NULL,     -- {kind,id}
   params                     jsonb NOT NULL,
   source_alert_id            uuid,
@@ -1759,6 +1769,7 @@ CREATE TABLE notify.ref_restrictions (id uuid PRIMARY KEY, tenant_id uuid NOT NU
 CREATE TABLE notify.ref_restriction_units (restriction_id uuid NOT NULL, unit_id uuid NOT NULL, tenant_id uuid NOT NULL, PRIMARY KEY (restriction_id, unit_id));
 CREATE TABLE notify.ref_devices (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, serial text, unit_id uuid);
 CREATE TABLE notify.ref_properties (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, customer_org_id uuid);  -- identity: membership scopes (IR194)
+CREATE TABLE notify.ref_certificates (id uuid PRIMARY KEY, tenant_id uuid NOT NULL, organization_id uuid, membership_id uuid, name text);  -- expiry reminders (IR336)
 
 -- Reference copies for billing (IR194), kept by the billing-api consumer: customer organizations of restrictions and
 -- inquiries, and the property of each contract unit (invoices.list propertyId, IR199).
@@ -1827,6 +1838,8 @@ CREATE TRIGGER restriction_units_capture AFTER INSERT OR DELETE ON restrictions.
   FOR EACH ROW EXECUTE FUNCTION platform.capture_row('restriction_id', 'unit_id', 'tenant_id');
 CREATE TRIGGER devices_capture AFTER INSERT OR DELETE OR UPDATE OF serial, unit_id ON devices.devices
   FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'serial', 'unit_id');
+CREATE TRIGGER certificates_capture AFTER INSERT OR DELETE OR UPDATE OF organization_id, membership_id, name ON maintenance.certificates
+  FOR EACH ROW EXECUTE FUNCTION platform.capture_row('id', 'tenant_id', 'organization_id', 'membership_id', 'name');
 
 -- ---------------------------------------------------------------------------------------------
 -- Row-level security: every business table with tenant_id. platform.* is infrastructure read across

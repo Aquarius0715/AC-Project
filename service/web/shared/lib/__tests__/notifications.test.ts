@@ -30,6 +30,15 @@ describe("inbox rows and alert rows", () => {
     expect([r.t, r.d, r.href]).toEqual(["Filter cleaning due on Bedroom AC", "Cleaning due (268 h of run time since the last cleaning). Not a fault. · open", "/customer/maintenance?tab=filter-care"]);
   });
 
+  it("opens the certifications from a certificate reminder and names its expiry day (BR-P09, IR336)", () => {
+    const n = note({ type: "certificate_expiry", templateKey: "certificate_expiry", target: { kind: "certificate", id: "c1" },
+      params: { targetName: "Aisha · Indoor AC", at: "2026-10-13T20:00:00Z", status: "expiring", reason: null, message: null } });
+    const r = inboxRow(n, "contractor");
+    expect([r.t, r.d, r.href]).toEqual(["Certificate expiring — Aisha · Indoor AC", "Expires 14 Oct 2026", "/partner/team?tab=certifications"]);
+    expect([inboxRow(n, "contractor", { locale: "ms", timeZone: "UTC" }).t, inboxRow(n, "contractor", { locale: "ms", timeZone: "UTC" }).d])
+      .toEqual(["Sijil hampir tamat — Aisha · Indoor AC", "Tamat tempoh 13 Okt 2026"]);
+  });
+
   it("lists alerts with their status and the read state of their notifications (DD-C08, IR242)", () => {
     const alert = (id: string, severity: ApiAlert["severity"], status: string, over: Partial<ApiAlert> = {}): ApiAlert => ({
       id, unitId: "u1", type: "sensor", severity, status, causeCode: "unknown", evidenceKind: "inferred", evidenceText: "Cleaning due (250 h of run time since the last cleaning). Not a fault.", detectedAt: "2026-09-14T01:00:00Z", ...over,

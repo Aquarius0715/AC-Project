@@ -4776,3 +4776,29 @@ R326 checked the wireframes, the User Flows, the Use Cases and the screen catalo
    - The energy figures integrate `energy.ref_power_samples`.
    - `identity.permissions` holds the 38 codes inserted by schema.sql and is used through its foreign key.
 4. **No code change.**
+
+## IR336 Certificate expiry reminders from the maintenance scheduler — 2026-10-11
+
+BR-P09 sends the contractor admin a reminder 60, 30 and 7 days before a certificate expires. The Figma Contractor frames of Team & capacity → Certifications (FR-P09) say so too: "Reminders are sent 60, 30 and 7 days before expiry to the contractor admin (Notifications)". Nothing sent them. Backend architecture §10 also said the status reads `expiring` from 60 days before expiry; IR133 item 2 and the code use 30 days. The reminder is now a maintenance scheduler job (registry job, IR54 pattern, like IR239).
+
+1. **Which reminder.** Each tick, a valid (approved) certificate that expires within 60 days gets the latest reminder it has reached: 60, 30 or 7 days before `expiresAt`. Each one goes once (`maintenance.certificate_reminders`, one row per certificate and reminder). An earlier reminder never follows a later one, so a certificate that HQ approved with 20 days left gets the 30-day and the 7-day reminders only.
+2. **No reminder for:**
+   - a certificate that waits for HQ, was rejected or has expired;
+   - a certificate replaced by a valid one of the same technician that expires later: its renewal (`renewalOf`), or for a qualification code a later certificate of that code. Two `other` certificates are not renewals of each other;
+   - a technician who is no longer an active member (maintenance's membership copy, IR192).
+   A pending renewal does not stop the reminders: the current expiry applies until HQ verifies the renewal (BR-P09).
+3. **Notifications.** One in-app notification to each contractor admin of the certificate's organization: active contractor memberships with partner.assign (`identity.members`, the partner recipients of IR95).
+   - type and templateKey `certificate_expiry`; severity normal, warning for the 7-day reminder;
+   - target `{kind: certificate, id}`; params `at` = expiresAt and status `expiring`.
+   The job audits `certificates.remind` on the certificate with the reason "<n> days before expiry". The reminder row counts the notifications; a company without an admin records 0, and nothing is sent again.
+4. **Contracts.**
+   - `Target.kind` gains `certificate`; `NotificationType` and `Notification.templateKey` gain `certificate_expiry`. Like `client_user` and `invite` (IR144), `notifications.preview` and `notifications.recipients` do not take them.
+   - Notify resolves the target from `notify.ref_certificates`, a new reference copy of `maintenance.certificates` (IR188: id, tenant, organization, membership, name). The target name is "<technician> · <certificate name>".
+   - A contractor reads the certificate notifications of its own organization (IR58 current scope); other roles never receive them.
+5. **Web.** The contractor inbox titles the notification "Certificate expiring — <technician> · <certificate>". The detail reads "Expires <date>" in the user's language and time zone, and the row opens Team & capacity → Certifications. DD-P09 describes the reminders.
+6. **Documents.** Backend architecture §10: the row names the reminders and the 30-day status, and the maintenance scheduler lists them. Database design §2 adds `certificate_reminders`. schema.sql adds the table, the reference copy, its change-capture trigger, a partial index on valid certificates by expiry, and the template key in the CHECK.
+7. **Tests.**
+   - Unit: `reminderStage` at each boundary.
+   - Integration: `TestCertificateReminders`, in both suites. It covers the 60/30/7 sequence without repeats, a late approval, every skipped case, the pending renewal, the inbox fields and markRead, and that contractor-b cannot read contractor-a's certificate. `TestReplicas` checks the new copy.
+   - Web: the inbox row in English and Malay.
+8. **Figma.** Contractor Notifications (/notifications, FR-X07) shows a read 60-day reminder, “Certificate expiring — tech-external-a · Electrical basics”, “Expires 15 Oct 2026”, which opens Team & capacity → Certifications. The All tab counts 10.

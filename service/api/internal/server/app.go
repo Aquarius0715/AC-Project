@@ -173,7 +173,9 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	filters := maintenance.FilterCare{Units: eq, Run: eq}
 	maintenance.RegisterFilterCare(reg, filters)
 	reg.AddJob(ops.DomainMaintenance, filters.Remind) // IR239: filter cleaning reminders from the maintenance scheduler
-	maintenance.RegisterCertificates(reg, maintenance.Certificates{Delivery: delivery, Grants: identity.Directory{}, Blobs: blobs})
+	certs := maintenance.Certificates{Delivery: delivery, Grants: identity.Directory{}, Blobs: blobs}
+	maintenance.RegisterCertificates(reg, certs)
+	reg.AddJob(ops.DomainMaintenance, certs.Remind) // IR336: certificate expiry reminders (BR-P09)
 	monitoring.RegisterTelemetry(reg, monitoring.Telemetry{Units: am, Sensors: devices.Models{}})
 	monitoring.RegisterPolicies(reg, monitoring.Policies{Units: am, Recipients: identity.Directory{}, Caps: unitCaps{am}})
 	dm := &devices.Module{Units: am, Exclusion: []devices.Exclusion{control.Busy{}, restrictions.Busy{}}}

@@ -5459,6 +5459,8 @@ export const ms: Record<string, string> = {
   "Invitation — {name}": "Jemputan — {name}",
   "Notification — {name}": "Pemberitahuan — {name}",
   "Filter cleaning due on {name}": "Pembersihan penapis perlu dibuat pada {name}",
+  "Certificate expiring — {name}": "Sijil hampir tamat — {name}",
+  "Expires {date}": "Tamat tempoh {date}",
 
   // demo controls
   "Visually separated from business screens. Nothing here reaches real devices, payments, notifications, or IoT connections (FR-X05).":

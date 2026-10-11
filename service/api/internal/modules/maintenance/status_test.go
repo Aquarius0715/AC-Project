@@ -29,6 +29,31 @@ func TestReadStatus(t *testing.T) {
 	}
 }
 
+// TestReminderStage: the latest BR-P09 reminder a certificate has reached — 60, 30 or 7 days before it expires, each
+// from that very instant — and none earlier than 60 days (IR336).
+func TestReminderStage(t *testing.T) {
+	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
+	day := 24 * time.Hour
+	for name, c := range map[string]struct {
+		expires time.Time
+		want    int
+	}{
+		"61 days":           {now.Add(61 * day), 0},
+		"a second early":    {now.Add(60*day + time.Second), 0},
+		"60 days":           {now.Add(60 * day), 60},
+		"31 days":           {now.Add(31 * day), 60},
+		"30 days":           {now.Add(30 * day), 30},
+		"8 days":            {now.Add(8 * day), 30},
+		"7 days":            {now.Add(7 * day), 7},
+		"an hour":           {now.Add(time.Hour), 7},
+		"expired is past 7": {now.Add(-day), 7},
+	} {
+		if got := reminderStage(c.expires, now); got != c.want {
+			t.Errorf("%s: %d, want %d", name, got, c.want)
+		}
+	}
+}
+
 // TestContentMatches: a file is what its leading bytes say — the PNG signature, the JPEG start of image, the PDF
 // header — and a type outside the three never matches (IR308).
 func TestContentMatches(t *testing.T) {

@@ -71,8 +71,8 @@ func EventHandlers() map[string]events.Handler {
 }
 
 // Replicas are notify's reference copies of other domains' rows (IR188), kept by the identity-api consumer from
-// RowChanged events: targets (units, jobs, invoices, restrictions, devices, inquiries) and job parties (offers,
-// assignments) for the IR142 read scope and recipients.
+// RowChanged events: targets (units, jobs, invoices, restrictions, devices, inquiries, certificates) and job parties
+// (offers, assignments) for the IR142 read scope and recipients.
 var Replicas = []events.Replica{
 	{Source: "assets.units", Table: "notify.ref_units", Keys: []string{"id"}, Cols: []string{"tenant_id", "customer_org_id", "property_id", "display_name"}},
 	{Source: "assets.customers", Table: "notify.ref_customers", Keys: []string{"id"}, Cols: []string{"tenant_id", "organization_id"}},
@@ -84,5 +84,6 @@ var Replicas = []events.Replica{
 	{Source: "restrictions.restrictions", Table: "notify.ref_restrictions", Keys: []string{"id"}, Cols: []string{"tenant_id", "customer_id"}},
 	{Source: "restrictions.restriction_units", Table: "notify.ref_restriction_units", Keys: []string{"restriction_id", "unit_id"}, Cols: []string{"tenant_id"}},
 	{Source: "devices.devices", Table: "notify.ref_devices", Keys: []string{"id"}, Cols: []string{"tenant_id", "serial", "unit_id"}},
-	{Source: "assets.properties", Table: "notify.ref_properties", Keys: []string{"id"}, Cols: []string{"tenant_id", "customer_org_id"}}, // identity scopes (IR194)
+	{Source: "assets.properties", Table: "notify.ref_properties", Keys: []string{"id"}, Cols: []string{"tenant_id", "customer_org_id"}},                                   // identity scopes (IR194)
+	{Source: "maintenance.certificates", Table: "notify.ref_certificates", Keys: []string{"id"}, Cols: []string{"tenant_id", "organization_id", "membership_id", "name"}}, // IR336
 }

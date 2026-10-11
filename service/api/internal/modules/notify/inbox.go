@@ -30,6 +30,8 @@ const targetLateral = `LATERAL (
 		FROM notify.ref_restrictions r JOIN notify.ref_customers cu ON cu.id = r.customer_id WHERE %[1]s = 'restriction' AND r.id = %[2]s
 	UNION ALL SELECT u.customer_org_id, d.serial, u.id, u.property_id FROM notify.ref_devices d LEFT JOIN notify.ref_units u ON u.id = d.unit_id WHERE %[1]s = 'device' AND d.id = %[2]s
 	UNION ALL SELECT cu.organization_id, q.subject_type, NULL, NULL FROM notify.ref_inquiries q JOIN notify.ref_customers cu ON cu.id = q.customer_id WHERE %[1]s = 'inquiry' AND q.id = %[2]s
+	UNION ALL SELECT c.organization_id, COALESCE(us.display_name || ' · ', '') || c.name, NULL, NULL FROM notify.ref_certificates c
+		LEFT JOIN identity.memberships m ON m.id = c.membership_id LEFT JOIN identity.users us ON us.id = m.user_id WHERE %[1]s = 'certificate' AND c.id = %[2]s
 ) t`
 
 // adminKinds lists the target kinds an HQ membership can read and the permissions that grant each (IR142).
@@ -53,7 +55,8 @@ func kindsFor(perms map[string]bool) []string {
 
 // readableSQL is the IR58 current-scope condition on the resolved target t for the principal at now; kind / id are the
 // SQL expressions of the target. A technician reads a job while the assignment lets them open it (IR49: active and its
-// scheduled window not over, as jobs.get; IR253), so a revoked or ended assignment hides the job's notifications.
+// scheduled window not over, as jobs.get; IR253), so a revoked or ended assignment hides the job's notifications. A
+// contractor reads the jobs offered to its organization and the certificates of its technicians (IR336).
 func readableSQL(p *ops.Principal, now time.Time, kind, id string, args *[]any) string {
 	add := func(v any) string { *args = append(*args, v); return fmt.Sprintf("$%d", len(*args)) }
 	switch p.Role {
@@ -62,7 +65,9 @@ func readableSQL(p *ops.Principal, now time.Time, kind, id string, args *[]any) 
 	case "client":
 		return "t.org = " + add(p.OrgID)
 	case "contractor":
-		return kind + " = 'job' AND EXISTS (SELECT 1 FROM notify.ref_offers o WHERE o.job_id = " + id + " AND o.contractor_org_id = " + add(p.OrgID) + ")"
+		org := add(p.OrgID)
+		return "((" + kind + " = 'job' AND EXISTS (SELECT 1 FROM notify.ref_offers o WHERE o.job_id = " + id + " AND o.contractor_org_id = " + org + ")) OR (" +
+			kind + " = 'certificate' AND t.org = " + org + "))"
 	default:
 		unitScope := "(t.unit_id = ANY(" + add(p.Scopes["unit"]) + ") OR t.property_id = ANY(" + add(p.Scopes["property"]) + ") OR t.org = ANY(" + add(p.Scopes["organization"]) + "))"
 		return "((" + kind + " = 'job' AND EXISTS (SELECT 1 FROM notify.ref_assignments a WHERE a.job_id = " + id + " AND a.technician_membership_id = " + add(p.MembershipID) +
@@ -160,7 +165,7 @@ func inboxFrom() string {
 
 var (
 	severities = []string{"critical", "warning", "normal"}
-	types      = []string{"cleaning_due", "fault", "quality", "schedule_change", "report_return", "completion", "payment", "payment_reminder", "restriction", "inquiry", "job_update", "device_operation"}
+	types      = []string{"cleaning_due", "fault", "quality", "schedule_change", "report_return", "completion", "payment", "payment_reminder", "restriction", "inquiry", "job_update", "device_operation", "certificate_expiry"}
 )
 
 // @Summary		notifications.list (read)

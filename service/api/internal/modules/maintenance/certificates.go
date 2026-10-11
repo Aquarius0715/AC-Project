@@ -12,6 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/pradita/ac-project/service/api/internal/modules/identity"
+	"github.com/pradita/ac-project/service/api/internal/modules/notify"
 	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
 	"github.com/pradita/ac-project/service/api/internal/platform/blob"
@@ -511,6 +513,84 @@ func (m Certificates) parts(ctx context.Context, c *ops.Call, in *paging.Query) 
 		return paging.Page[PartItem]{}, err
 	}
 	return pageOf(all, *in, f, c.Principal.ScopeVersion)
+}
+
+// ---- expiry reminders (scheduler job) ----
+
+// reminderDays are the BR-P09 reminders in days before expiry, the latest first.
+var reminderDays = []int{7, 30, 60}
+
+// reminderStage is the latest reminder the certificate has reached at now (0 when it expires later than 60 days).
+func reminderStage(expires, now time.Time) int {
+	for _, d := range reminderDays {
+		if !now.Before(expires.Add(-time.Duration(d) * 24 * time.Hour)) {
+			return d
+		}
+	}
+	return 0
+}
+
+// Remind is the maintenance scheduler job of BR-P09 (IR336). A valid certificate that expires within 60 days gets
+// the latest reminder it has reached — 60, 30 or 7 days before expiresAt — once, and never an earlier one after a later
+// one: one certificate_expiry notification to each contractor admin of its organization (partner.assign). No reminder
+// goes for a certificate that waits for HQ, was rejected or has expired, that a valid renewal or a later valid
+// certificate of the same qualification replaced, or whose technician is no longer an active member. A pending renewal
+// does not stop the reminders: the current expiry applies until HQ verifies it.
+func (m Certificates) Remind(ctx context.Context, c *ops.Call) (int, error) {
+	rows, err := c.Tx.Query(ctx, `SELECT c.id, c.organization_id, c.expires_at FROM maintenance.certificates c
+		JOIN maintenance.ref_memberships rm ON rm.id = c.membership_id AND rm.valid_from <= $1 AND (rm.valid_until IS NULL OR rm.valid_until > $1)
+		WHERE c.status = 'valid' AND c.expires_at > $1 AND c.expires_at <= $2
+		  AND NOT EXISTS (SELECT 1 FROM maintenance.certificates n WHERE n.membership_id = c.membership_id AND n.status = 'valid' AND n.expires_at > c.expires_at
+		    AND (n.renewal_of = c.id OR (n.code = c.code AND c.code <> 'other')))
+		ORDER BY c.expires_at, c.id`, c.Now, c.Now.Add(time.Duration(reminderDays[len(reminderDays)-1])*24*time.Hour))
+	if err != nil {
+		return 0, err
+	}
+	type due struct {
+		id, org uuid.UUID
+		expires time.Time
+	}
+	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (due, error) {
+		var d due
+		return d, r.Scan(&d.id, &d.org, &d.expires)
+	})
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, d := range list {
+		days := reminderStage(d.expires, c.Now)
+		tag, err := c.Tx.Exec(ctx, `INSERT INTO maintenance.certificate_reminders (certificate_id, days_before, tenant_id, sent_at)
+			SELECT $1, $2, current_setting('app.tenant_id')::uuid, $3
+			WHERE NOT EXISTS (SELECT 1 FROM maintenance.certificate_reminders WHERE certificate_id = $1 AND days_before <= $2) ON CONFLICT DO NOTHING`, d.id, days, c.Now)
+		if err != nil {
+			return n, err
+		}
+		if tag.RowsAffected() == 0 { // this reminder (or a later one) went already
+			continue
+		}
+		recipients, err := identity.Members(ctx, c, identity.MembersInput{Role: "contractor", OrganizationID: &d.org, Permission: "partner.assign"})
+		if err != nil {
+			return n, err
+		}
+		severity := "normal"
+		if days == reminderDays[0] {
+			severity = "warning"
+		}
+		for _, r := range recipients {
+			if _, err := (notify.Store{}).Create(ctx, c, notify.New{RecipientMembershipID: r, Type: "certificate_expiry", TemplateKey: "certificate_expiry",
+				TargetKind: "certificate", TargetID: d.id, Severity: severity, Params: map[string]any{"at": d.expires, "status": "expiring"}}); err != nil {
+				return n, err
+			}
+		}
+		if _, err := c.Tx.Exec(ctx, `UPDATE maintenance.certificate_reminders SET notifications = $3 WHERE certificate_id = $1 AND days_before = $2`,
+			d.id, days, len(recipients)); err != nil {
+			return n, err
+		}
+		c.Audit(ops.AuditEntry{Action: "certificates.remind", TargetKind: "certificate", TargetID: d.id.String(), Reason: fmt.Sprintf("%d days before expiry", days)})
+		n++
+	}
+	return n, nil
 }
 
 // RegisterCertificates binds the IR133 operations.
