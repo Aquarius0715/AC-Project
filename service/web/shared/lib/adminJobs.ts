@@ -8,6 +8,7 @@
 // times HQ types are read in it too (NFR-08). Business days (a follow-up's classify-by day, "from tomorrow") stay
 // Kuala Lumpur days.
 import { EN, showSpan, showTime, translator, zonedInstant, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
+import { actionMessage } from "@ac/web/lib/actionMessage";
 import { statusWord, typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 import { inspectionRows, readingRows, resultText, type ApiWorkReport } from "@ac/web/lib/partnerReview";
@@ -207,7 +208,7 @@ export function classifyBy(createdAt: string, i: I18n = EN): string {
 }
 
 /** Readable refusals of the HQ job actions. */
-export function hqRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, t: T = en): string {
+export function hqRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
   const keys: Record<string, string> = {
     "errors.slot_not_agreed": "only one of the client’s preferred times (or an accepted proposal) can be booked",
     "errors.slot_is_preferred": "that is one of the client’s own times — book it directly instead",
@@ -237,7 +238,7 @@ export function hqRefusal(f: { code: string; messageKey: string; fieldErrors: Re
   if (fields.length) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved (CONFLICT): {reason}.", { reason: t(keys[f.messageKey]) }) : `${t(keys[f.messageKey])}.`;
   if (f.code === "NOT_FOUND") return t("The job no longer exists in your scope.");
-  return `${f.code} — ${f.messageKey}`;
+  return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }
 
 export type CostLine = { kind: "estimate" | "actual"; description: string; visibility: "internal" | "customer"; amountMinor: number; currency: "MYR" | "USD" };

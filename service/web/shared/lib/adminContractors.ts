@@ -6,6 +6,7 @@
 // as on the contractor's own certifications (IR277).
 import { businessDay, KL } from "@ac/web/lib/clientBilling";
 import { EN, showDayMonth, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { actionMessage } from "@ac/web/lib/actionMessage";
 import { qualificationLabel } from "@ac/web/lib/partnerJobDetail";
 
 const en = translator("en");
@@ -142,7 +143,7 @@ export function nextMonthStart(now: number): string {
 }
 
 /** Readable refusals of the contractor register writes. */
-export function contractorRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, t: T = en): string {
+export function contractorRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
   const keys: Record<string, string> = {
     "errors.profile_exists": "this organization already has a contractor profile",
     "error.notContractor": "the organization is not a contractor", "error.organizationFixed": "a profile’s organization cannot change",
@@ -154,5 +155,5 @@ export function contractorRefusal(f: { code: string; messageKey: string; fieldEr
   if (fields.length) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved (CONFLICT): {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;
   if (f.code === "NOT_FOUND") return t("The contractor or the certificate no longer exists.");
-  return `${f.code} — ${f.messageKey}`;
+  return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

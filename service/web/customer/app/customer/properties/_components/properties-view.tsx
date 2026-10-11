@@ -9,6 +9,8 @@ import type { Connection, PowerState, Selection, TreeProperty, TreeSpace } from 
 import { changeText, groupPlan, type GroupChange, type PlanRow, type RoomUnit } from "@ac/web/lib/clientProperties";
 import { historyRow, type ApiCommand, type ApiUnitDetail } from "@ac/web/lib/units";
 import { waitForCommand } from "@ac/web/lib/unitCommands";
+import { sendPaced } from "@ac/web/lib/writeLimit";
+import { actionMessage } from "@ac/web/lib/actionMessage";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import type { T } from "@ac/web/lib/i18n";
 import { sendCommand } from "../actions";
@@ -171,7 +173,7 @@ function Panel({ live, sel, rename, go }: { live: PropertiesLive; sel: Selection
 
 // ---- group control (FR-C14) ----
 
-type Track = { status: "Sending" | "Confirmed" | "Failed"; note: string };
+type Track = { status: "Sending" | "Waiting" | "Confirmed" | "Failed"; note: string };
 function GroupPanel({ live, space }: { live: PropertiesLive; space: string }) {
   const i = useI18n();
   const { t } = i;
@@ -191,11 +193,14 @@ function GroupPanel({ live, space }: { live: PropertiesLive; space: string }) {
     setSending(true);
     setReview(null);
     setTrack((t) => ({ ...t, ...Object.fromEntries(rows.map((r) => [r.id, { status: "Sending" as const, note: "" }])) }));
-    // each AC on its own (no rollback across ACs); its settings one after the other, stopping at the first failure
+    // each AC on its own (no rollback across ACs); its settings one after the other, stopping at the first failure. A
+    // command over the member's write limit waits the advised seconds and is sent again (IR375, IR380)
+    const wait = (id: string) => (s: number) => setTrack((x) => ({ ...x, [id]: { status: "Waiting", note: t("Write limit reached — sending again in {s} s", { s }) } }));
     await Promise.all(rows.map(async (r) => {
       for (const a of r.actions) {
-        const created = await sendCommand(r.id, a);
-        if (!created.ok) return setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: created.messageKey.replace(/^errors?\./, "").replace(/_/g, " ") } }));
+        const created = await sendPaced(() => sendCommand(r.id, a), wait(r.id));
+        if (!created.ok) return setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: actionMessage(created, t) } }));
+        setTrack((x) => ({ ...x, [r.id]: { status: "Sending", note: "" } }));
         const c: ApiCommand = await waitForCommand(created.value, () => {});
         if (c.status !== "acknowledged") return setTrack((x) => ({ ...x, [r.id]: { status: "Failed", note: historyRow(c, t, i.display).text } }));
       }
@@ -218,8 +223,8 @@ function GroupPanel({ live, space }: { live: PropertiesLive; space: string }) {
               className={cx("rounded-xl border p-3 text-left disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
               <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><span aria-hidden className="text-xs">{sel.includes(u.id) ? "☑" : "☐"}</span></div>
               <div className="text-[11px] text-muted">{!u.online ? (u.seen ? t("last seen {when}", { when: u.seen }) : t("no connection yet")) : u.temp === "—" && u.watts === "—" ? t("no recent reading") : `${u.temp} · ${u.watts}`}</div>
-              <div className="mt-1 flex flex-wrap gap-1"><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{tr && <Badge tone={tr.status === "Confirmed" ? "ok" : tr.status === "Failed" ? "crit" : "primary"}>{t(tr.status)}</Badge>}</div>
-              {tr?.status === "Failed" && <div className="mt-1 text-[11px] text-crit">{tr.note}</div>}
+              <div className="mt-1 flex flex-wrap gap-1"><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{tr && <Badge tone={tr.status === "Confirmed" ? "ok" : tr.status === "Failed" ? "crit" : tr.status === "Waiting" ? "warn" : "primary"}>{t(tr.status)}</Badge>}</div>
+              {(tr?.status === "Failed" || tr?.status === "Waiting") && <div className={cx("mt-1 text-[11px]", tr.status === "Failed" ? "text-crit" : "text-warn")}>{tr.note}</div>}
             </button>
           );
         })}

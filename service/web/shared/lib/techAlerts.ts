@@ -5,6 +5,7 @@
 // the server loader and the view; Vitest covers it. Texts in the display language; instants in the user's display time
 // zone (IR44).
 import { EN, relativeTime, showDate, type I18n, type T } from "@ac/web/lib/i18n";
+import { actionMessage } from "@ac/web/lib/actionMessage";
 import { alertTitle } from "@ac/web/lib/alerts";
 import { metricLabel, metricUnit } from "@ac/web/lib/adminAlerts";
 import { airNumber } from "@ac/web/lib/air";
@@ -122,10 +123,10 @@ const REFUSED: Record<string, string> = {
   "error.notFound": "This alert is not in your assignments.",
 };
 /** A refused acknowledge or resolve in words; a missing alert.resolve says how the alert can still resolve. */
-export function refusal(r: { code: string; messageKey: string }, forbidden: string, t: T): string {
+export function refusal(r: { code: string; messageKey: string; retryAfterSeconds?: number | null }, forbidden: string, t: T): string {
   if (r.messageKey === "error.forbidden") return forbidden;
   if (REFUSED[r.messageKey]) return `${r.code} — ${t(REFUSED[r.messageKey])}`;
   if (r.code === "VALIDATION") return t("VALIDATION — a resolution reason is required (1–1000 characters).");
   if (r.code === "UNAVAILABLE" || r.code === "TIMEOUT") return t("UNAVAILABLE — not sent; your reason is kept. Try again.");
-  return `${r.code} — ${r.messageKey}`;
+  return actionMessage({ ...r, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

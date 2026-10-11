@@ -4,6 +4,7 @@
 // by the server loader and the client view; Vitest covers it. Texts in the display language (`i` / `t`, IR291); a
 // plan's dates are its instants in the user's display time zone, the zone its next date is typed in (D16, NFR-08).
 import { EN, showDate, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
+import { actionMessage } from "@ac/web/lib/actionMessage";
 
 const en = translator("en");
 
@@ -75,7 +76,7 @@ export function generateConflict(p: ApiPlan, attempted: string, i: I18n = EN): {
 }
 
 /** Readable refusals of plans.save / plans.generateNext. */
-export function planRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, t: T = en): string {
+export function planRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
   const keys: Record<string, string> = {
     "errors.occurrence_generated": "this date already has a job",
     "errors.occurrence_mismatch": "the plan’s next date changed meanwhile — the latest plan is shown",
@@ -89,5 +90,5 @@ export function planRefusal(f: { code: string; messageKey: string; fieldErrors: 
   if (fields.length) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved (CONFLICT): {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;
   if (f.code === "NOT_FOUND") return t("The plan or its unit no longer exists in your scope.");
-  return `${f.code} — ${f.messageKey}`;
+  return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

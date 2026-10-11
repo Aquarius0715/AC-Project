@@ -102,7 +102,7 @@ describe("capability, restriction and refusals (IR286)", () => {
     expect(refusal({ code: "FORBIDDEN", messageKey: "errors.restriction_active" })).toMatch(/^FORBIDDEN — the active restriction/);
     expect(refusal({ code: "OFFLINE", messageKey: "error.offline" })).toMatch(/^OFFLINE — the device is not reachable/);
     expect(refusal({ code: "VALIDATION", messageKey: "error.validation" })).toBeNull(); // the fields say it
-    expect(refusal({ code: "RATE_LIMITED", messageKey: "error.rateLimited" })).toBe("RATE_LIMITED — error.rateLimited");
+    expect(refusal({ code: "RATE_LIMITED", messageKey: "error.rateLimited" })).toBe("Too many changes in a short time — try again shortly"); // IR380
     expect([fieldText("error.range"), fieldText("errors.unit_busy")]).toEqual(["1–15 minutes", "unit busy"]);
   });
   it("speaks Malay with the display time zone", () => {

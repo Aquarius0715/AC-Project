@@ -114,7 +114,7 @@ describe("partner schedule", () => {
     expect(f("VALIDATION", "error.validation", { reason: "error.required" })).toBe("Reason: required (1–1000 characters)");
     expect(f("VALIDATION", "error.validation", { endAt: "errors.extension_only", other: "error.odd" })).toBe("End: keep the start and set an end at or after the current end · other: error.odd");
     expect(f("VALIDATION", "error.validation")).toBe("Check the input.");
-    expect(f("UNAVAILABLE", "error.unavailable")).toBe("UNAVAILABLE — error.unavailable");
+    expect(f("UNAVAILABLE", "error.unavailable")).toBe("The service is unavailable — try again shortly"); // IR380: worded, not the raw key
     expect(f("NOT_FOUND", "error.notFound")).toBe("The job is no longer delegated to your company.");
   });
 

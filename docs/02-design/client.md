@@ -1,6 +1,6 @@
 ---
 document_id: DD-C
-version: 0.35.0
+version: 0.36.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -515,6 +515,7 @@ Scope: FR-C14 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 1. Toggle Single AC / Group control. Cards show each AC with power/connection badges; “Select all online” and Clear.
 2. Choose the change; Review & send opens a centered modal listing each AC: change (before → after), Will send, Skipped (offline), or clamped value under a restriction (IR46).
 3. Send calls `commands.create` per AC that will be sent and per changed setting (a Command carries one UnitAction, as in single control), each with its own idempotency key and expectedUnitVersion (IR109, IR211); an AC's settings go one after another and stop at its first failure. Each card follows its Command with `commands.get` (Sending → Confirmed / Failed); Retry resends one AC.
+   - As built (IR380): a command refused by the member's write limit (RATE_LIMITED, IR375) changed nothing, so it waits the advised seconds and is sent again, up to five times. Meanwhile its card shows Waiting with the seconds. Any other refusal shows the shared wording on the card.
 4. Queries to update: `units / commands`.
 
 **Boundary cases and failures**: Mixed spaces → VALIDATION before sending. A failure of one AC never rolls back others.
@@ -660,6 +661,6 @@ Convert condition forms to the Condition type's discriminated union. occupancy i
 
 2026-09-16 approved updates: C01/C06 period boundaries follow SR17. C13 retry follows SR18 like A15; get the current version and attemptId through offsets.list.
 
-Additional contracts for current version 0.35.0: Read IR01–IR379 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.36.0: Read IR01–IR380 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

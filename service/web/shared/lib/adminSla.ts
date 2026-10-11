@@ -5,6 +5,7 @@
 // is phrased from its kind and its response minutes, and the targets' start times are instants in the display time
 // zone, as typed (NFR-08).
 import { EN, showDate, showTime, translator, zonedParts, type I18n, type T } from "@ac/web/lib/i18n";
+import { actionMessage } from "@ac/web/lib/actionMessage";
 import { planLabel } from "@ac/web/lib/contracts";
 import { csvQuoted } from "@ac/web/lib/csv";
 
@@ -128,11 +129,11 @@ export function slaCsv(rows: SlaRow[], period: { from: string; to: string }, i: 
 }
 
 /** Readable refusals of sla.saveTargets. */
-export function slaRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, t: T = en): string {
+export function slaRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
   const keys: Record<string, string> = { "errors.targets_exist": "targets for this plan already start at that time", "error.past": "must be now or later", "error.range": "out of range", "error.invalid": "not a valid value", "error.required": "required" };
   const word = (k: string) => (keys[k] ? t(keys[k]) : k);
   const fields = Object.entries(f.fieldErrors ?? {}).map(([k, v]) => `${k}: ${word(v)}`);
   if (fields.length) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved (CONFLICT): {reason}.", { reason: word(f.messageKey) }) : `${word(f.messageKey)}.`;
-  return `${f.code} — ${f.messageKey}`;
+  return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

@@ -1784,6 +1784,10 @@ export const ms: Record<string, string> = {
   "Your session ended — sign in again": "Sesi anda telah tamat — log masuk semula",
   "Too many changes in a short time — try again in {s} s": "Terlalu banyak perubahan dalam masa yang singkat — cuba lagi dalam {s} saat",
   "Too many changes in a short time — try again shortly": "Terlalu banyak perubahan dalam masa yang singkat — cuba lagi sebentar lagi",
+  "Write limit reached — sending again in {s} s": "Had perubahan dicapai — dihantar semula dalam {s} saat",
+  "Not marked as read: {reason}": "Tidak ditanda sebagai dibaca: {reason}",
+  "This notification changed — the latest state is shown.": "Pemberitahuan ini telah berubah — keadaan terkini dipaparkan.",
+  "This notification is no longer available.": "Pemberitahuan ini tidak lagi tersedia.",
   "Check the entered values": "Semak nilai yang dimasukkan",
 
   // partner overview (lib/partnerOverview)

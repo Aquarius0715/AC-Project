@@ -7,7 +7,8 @@ import { useStoredRole } from "@ac/web/components/AppShell";
 import { useT } from "@ac/web/components/I18n";
 import { jobActions, useNotes } from "@ac/web/lib/jobs";
 import type { InboxRow } from "@ac/web/lib/notifications";
-import { actionMessage } from "@ac/web/lib/actionMessage";
+import { actionMessage, type ActionFailure } from "@ac/web/lib/actionMessage";
+import type { T } from "@ac/web/lib/i18n";
 import { markAllRead, markRead } from "../actions";
 
 const initial = [
@@ -16,6 +17,10 @@ const initial = [
   { id: "s3", t: "Invoice inv-0231 is now unpaid", d: "Read · restriction notice pending", w: "2 days ago", read: false, href: "" },
   { id: "s4", t: "Session extended by 30 minutes", d: "System · read", w: "3 days ago", read: true, href: "" },
 ];
+
+// why a notification was not marked read, in the display language (the write limit says how long to wait, IR380)
+const readFailure = (f: ActionFailure, t: T) => f.messageKey === "error.versionConflict" ? t("This notification changed — the latest state is shown.")
+  : f.messageKey === "error.notFound" ? t("This notification is no longer available.") : t("Not marked as read: {reason}", { reason: actionMessage(f, t) });
 
 /** The inbox. `rows` come from the Server Component in API mode; without them the Phase 1A demo rows are shown. */
 export function NotificationsView({ rows }: { rows?: InboxRow[] }) {
@@ -35,7 +40,7 @@ export function NotificationsView({ rows }: { rows?: InboxRow[] }) {
   const open = (n: { id: string; version: number; read: boolean; live: boolean }) => {
     if (api) {
       if (n.read) return;
-      return start(async () => setFailed(await markRead(n.id, n.version))); // Server Action; the page re-renders with fresh rows
+      return start(async () => { const f = await markRead(n.id, n.version); setFailed(f && readFailure(f, t)); }); // Server Action; the page re-renders with fresh rows
     }
     return n.live ? jobActions.markRead(n.id) : setItems((s) => s.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
   };
@@ -50,7 +55,7 @@ export function NotificationsView({ rows }: { rows?: InboxRow[] }) {
     start(async () => {
       const r = await markAllRead(unread.map((n) => n.id));
       setFailed(null);
-      if (r.failure) return toast(actionMessage(r.failure, t), "crit");
+      if (r.failure) return toast(readFailure(r.failure, t), "crit");
       toast(r.skipped ? t("{n} marked as read · {skipped} skipped — read meanwhile or no longer available", { n: r.marked, skipped: r.skipped }) : t(r.marked === 1 ? "1 notification marked as read" : "{n} notifications marked as read", { n: r.marked }));
     });
   };

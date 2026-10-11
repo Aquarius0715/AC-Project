@@ -4,6 +4,7 @@
 // Pure code shared by the Server Component and the client view; texts in the display language and days in the user's
 // display time zone (`i`, IR262).
 import { EN, intlTag, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
+import { actionMessage } from "@ac/web/lib/actionMessage";
 
 const en = translator("en");
 
@@ -149,7 +150,7 @@ export const reminderInput = (f: ReminderForm) => ({
 });
 
 /** A refused Mark cleaned or reminder save in the client's words. */
-export function filterRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, t: T = en): string {
+export function filterRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
   if (f.code === "FORBIDDEN") return t("Not saved: only the account owner can change the reminders.");
   if (f.code === "NOT_FOUND") return t("Not saved: that AC is no longer in your account.");
   const fe = f.fieldErrors ?? {};
@@ -157,5 +158,5 @@ export function filterRefusal(f: { code: string; messageKey: string; fieldErrors
   if (fe.thresholdHours) return t("Not saved: remind at 50–2000 h of running, or use the model default.");
   if (fe.fallbackDays) return t("Not saved: the fallback is 7–180 days.");
   if (fe.channels || fe.recipients) return t("Not saved: choose who gets the reminder and keep the app notification on.");
-  return `${f.code} — ${f.messageKey}`;
+  return actionMessage({ ...f, fieldErrors: fe }, t); // the write limit's wait, other fields and codes (IR380)
 }

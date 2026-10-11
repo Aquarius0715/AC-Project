@@ -7,6 +7,7 @@
 // as Kuala Lumpur dates — while `when` / `range` keep the Kuala Lumpur form for the screens not translated yet.
 import { klTime } from "@ac/web/lib/devices";
 import { EN, intlTag, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { actionMessage } from "@ac/web/lib/actionMessage";
 import { jobEventTitle, klDay, until, type ApiCapacity, type ApiJobEvent, type ApiMember, type Slot } from "@ac/web/lib/partnerOverview";
 
 const en = translator("en");
@@ -162,7 +163,7 @@ const FIELD_TEXT: Record<string, string> = {
 };
 /** Readable refusals of the offer decisions (DD-P02 boundary cases) in the display language; a field is named by its
  * API key. */
-export function decisionRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, t: T = en): string {
+export function decisionRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
   switch (f.messageKey) {
     case "errors.offer_expired": return t("This offer expired or was cancelled by HQ — no decision is possible. The page shows the latest state.");
     case "errors.terms_changed": return t("The delegation terms changed — reload to read the new terms before deciding.");
@@ -174,7 +175,7 @@ export function decisionRefusal(f: { code: string; messageKey: string; fieldErro
   if (f.code === "NOT_FOUND") return t("This offer is no longer available to your company.");
   const text = (v: string) => (FIELD_TEXT[v] ? t(FIELD_TEXT[v]) : v);
   if (f.code === "VALIDATION") return Object.entries(f.fieldErrors).map(([k, v]) => k === "_" ? text(v) : `${k}: ${text(v)}`).join(" · ") || t("Check the input.");
-  return `${f.code} — ${f.messageKey}`;
+  return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }
 
 /** The job event rows of a history snapshot or the detail's history card, the times in the display time zone. */

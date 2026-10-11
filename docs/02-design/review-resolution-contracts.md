@@ -5696,3 +5696,37 @@ This round's security check compared each operation's authorization in the catal
    - `TestForeignTargets`: customer B sends customer A's notification; nothing is marked, and A's notification stays as it was.
    - Web: `markAllRead.test.ts` requires one call for the whole list and passes refusals on with the wait. Against the old action all three cases fail.
 6. **Checks.** `make test-all`, the web checks and the E2E suite pass.
+
+## IR380 Refusals over the write limit: worded on every screen, and Group control waits and sends again — 2026-10-11
+
+After IR379, the web code was searched for writes sent one after another and for refusal texts that print the raw code.
+
+1. **Writes sent one after another.**
+   - Group control (DD-C14) sends one command per AC and changed setting. A space with 16 ACs and four changed settings therefore sends 64 commands.
+   - The member's write limit is 60 a minute (IR375). The last commands were refused, and their cards read "rateLimited".
+   - A write refused by the limit has changed nothing: the pipeline refuses it before the idempotency record and the transaction.
+   - So Group control now waits the advised seconds and sends that command again, up to five times. The wait comes from `retryAfterSeconds`, kept within 1–60 s.
+   - While it waits, the card shows Waiting with "Write limit reached — sending again in N s".
+   - `sendPaced` in `shared/lib/writeLimit.ts` does this, and any screen can use it.
+   - The other loops stay well under the limit:
+     - single AC control sends at most four commands;
+     - the job workspace autosaves 20 s after the last edit;
+     - "Mark all as read" is one write since IR379.
+2. **Refusal texts with the raw code.**
+   - Ten refusal mappers across the four apps, and the technician's job workspace, ended in `` `${code} — ${messageKey}` ``.
+   - So a refusal they did not map read like "RATE_LIMITED — error.rateLimited", in English even in Malay. That is now mostly RATE_LIMITED.
+   - They now end in the shared `actionMessage`, in the display language:
+     - the write limit says how long to wait;
+     - a field error names its field;
+     - each known code has a sentence.
+   - The inbox's mark-read and the customer alert's read state returned English sentences from the Server Action, also with the raw code. They now return the refusal, and the screen words it ("Not marked as read: …").
+3. **Also checked (security): the images.**
+   - The backend images copy only the binaries. The binaries embed only the migrations and the API description.
+   - The Dockerfiles set no secret ARG or ENV, and the schema holds no password. The migrate tool reads `APP_LOGIN_PASSWORD` from the environment.
+   - Our containers run read-only, with every capability dropped and `no-new-privileges` (IR373).
+4. **Tests.**
+   - `writeLimit.test.ts` covers the advised waits, the 1–60 s bounds, giving up after the last try, and returning any other answer at once.
+   - `refusals.test.ts` checks that the ten mappers name the wait in English and Malay, and word an unmapped code.
+   - Against the old mappers, and without pacing, 23 of the 24 cases fail.
+   - Three tests that expected the raw text now expect the wording.
+5. **Checks.** The web checks and the E2E suite pass. The backend did not change.

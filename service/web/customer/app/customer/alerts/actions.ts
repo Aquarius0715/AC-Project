@@ -24,14 +24,15 @@ const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
   }
 };
 
-/** Marks the alert's unread notifications read in one write (one already read meanwhile is skipped); returns an error
- * message or null. */
-export async function readAlert(ids: string[]): Promise<string | null> {
+/** Marks the alert's unread notifications read in one write (one already read meanwhile is skipped); returns why they
+ * were not marked (the view words it, IR380) or null. */
+export async function readAlert(ids: string[]): Promise<ActionFailure | null> {
   try {
     await coreOp("notifications.markAllRead", { ids }, { write: true });
     return null;
   } catch (e) {
-    return e instanceof CoreError ? `Not marked as read (${e.error.code}).` : "Not marked as read.";
+    if (e instanceof CoreError) return { code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
+    return { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {} };
   } finally {
     refresh();
   }

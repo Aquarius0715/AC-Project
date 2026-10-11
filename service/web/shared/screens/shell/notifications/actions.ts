@@ -7,18 +7,19 @@ import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import type { NotificationsMarked } from "@ac/web/lib/contracts.gen";
 
-const messages: Record<string, string> = {
-  "error.versionConflict": "This notification changed — the latest state is shown.",
-  "error.notFound": "This notification is no longer available.",
-};
+// the Core API is unreachable: nothing was marked
+const unreachable: ActionFailure = { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {} };
+const failure = (e: unknown): ActionFailure => (e instanceof CoreError
+  ? { code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds }
+  : unreachable);
 
-/** notifications.markRead with the row version; returns an error message or null. */
-export async function markRead(id: string, version: number): Promise<string | null> {
+/** notifications.markRead with the row version; returns why it was not marked (the view words it, IR380) or null. */
+export async function markRead(id: string, version: number): Promise<ActionFailure | null> {
   try {
     await coreOp("notifications.markRead", { id }, { write: true, expectedVersion: version });
     return null;
   } catch (e) {
-    return e instanceof CoreError ? (messages[e.error.messageKey] ?? `Not marked as read (${e.error.code}).`) : "Not marked as read.";
+    return failure(e);
   } finally {
     refresh(); // re-render the current route so the Server Component reads the updated list
   }
@@ -32,10 +33,7 @@ export async function markAllRead(ids: string[]): Promise<{ marked: number; skip
     const r = await coreOp<NotificationsMarked>("notifications.markAllRead", { ids }, { write: true });
     return { marked: r.markedIds.length, skipped: r.skippedIds.length, failure: null };
   } catch (e) {
-    const failure = e instanceof CoreError
-      ? { code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds }
-      : { code: "UNAVAILABLE", messageKey: "error.unavailable", fieldErrors: {} }; // the Core API is unreachable: everything stays unread
-    return { marked: 0, skipped: 0, failure };
+    return { marked: 0, skipped: 0, failure: failure(e) }; // everything stays unread
   } finally {
     refresh();
   }

@@ -6,6 +6,7 @@
 // IR275): the loader formats the job's instants in the user's display time zone; the team's capacity — the free hours
 // and the week — stays on Kuala Lumpur working days and clock times, and the screen says so.
 import { EN, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { actionMessage } from "@ac/web/lib/actionMessage";
 import { hhmm, shortQualification, unavailabilityLabel, until, type ApiCapacity, type ApiMember, type ApiPartnerJob, type Slot } from "@ac/web/lib/partnerOverview";
 import { qualificationLabel, qualified, statusWord, type ApiDetail, type ApiOffer } from "@ac/web/lib/partnerJobDetail";
 
@@ -180,7 +181,7 @@ const FIELD_ERRORS: Record<string, string> = {
   "error.required": "required (1–1000 characters)", "error.length": "at most 1000 characters", "error.range": "the end must be after the start",
 };
 /** Readable refusals of jobs.assign (DD-P03 boundary cases), in the display language. */
-export function assignRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, tech: string, t: T = en): string {
+export function assignRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, tech: string, t: T = en): string {
   switch (f.messageKey) {
     case "errors.assignment_overlap": return t("Overlaps a confirmed schedule for {name} (CONFLICT) — choose another technician.", { name: tech });
     case "errors.access_window": return t("Outside the delegation period — assignments are possible only inside it.");
@@ -193,5 +194,5 @@ export function assignRefusal(f: { code: string; messageKey: string; fieldErrors
   if (f.code === "VALIDATION") {
     return Object.entries(f.fieldErrors).map(([k, v]) => `${FIELDS[k] ? t(FIELDS[k]) : k}: ${FIELD_ERRORS[v] ? t(FIELD_ERRORS[v]) : v}`).join(" · ") || t("Check the input.");
   }
-  return `${f.code} — ${f.messageKey}`;
+  return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

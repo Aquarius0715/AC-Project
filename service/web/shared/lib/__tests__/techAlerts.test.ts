@@ -66,7 +66,7 @@ describe("technician alert evidence", () => {
     expect(refusal({ code: "FORBIDDEN", messageKey: "error.forbidden" }, forbidden, EN.t)).toBe(forbidden);
     expect(refusal({ code: "FORBIDDEN", messageKey: "errors.assignment_ended" }, forbidden, EN.t)).toBe("FORBIDDEN — Your work window on this unit has ended.");
     expect(refusal({ code: "VALIDATION", messageKey: "error.validation" }, forbidden, EN.t)).toBe("VALIDATION — a resolution reason is required (1–1000 characters).");
-    expect(refusal({ code: "CONFLICT", messageKey: "error.weird" }, forbidden, EN.t)).toBe("CONFLICT — error.weird");
+    expect(refusal({ code: "CONFLICT", messageKey: "error.weird" }, forbidden, EN.t)).toBe("CONFLICT: Weird"); // IR380: the shared wording
   });
 
   it("words the evidence in Malay with the display time zone (IR284)", () => {

@@ -4,6 +4,7 @@
 // history from the job events, and the form checks. Pure code shared by the server loader and the client view; Vitest
 // covers it. Texts in the display language and times in the user's display time zone (`i`, IR262).
 import { EN, showDate, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { Slot } from "@ac/web/lib/partnerOverview";
 
 export type ApiClientRow = {
@@ -165,7 +166,7 @@ export function notesOf(events: ApiClientEvent[], me: string, i: I18n = EN): { i
 }
 
 /** Readable refusals of the client's maintenance actions. */
-export function clientJobRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string> }, t: T = en): string {
+export function clientJobRefusal(f: { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null }, t: T = en): string {
   const keys: Record<string, string> = {
     "error.invalidState": "not possible in the request's current state", "error.versionConflict": "the request changed meanwhile — the latest state is shown",
     "errors.reschedule_too_late": "less than 48 h before the visit — contact HQ", "errors.rating_locked": "the rating can no longer be changed",
@@ -177,5 +178,5 @@ export function clientJobRefusal(f: { code: string; messageKey: string; fieldErr
   if (fields.length) return fields.join(" · ");
   if (keys[f.messageKey]) return f.code === "CONFLICT" ? t("Not saved: {reason}.", { reason: t(keys[f.messageKey]) }) : `${t(keys[f.messageKey])}.`;
   if (f.code === "NOT_FOUND") return t("The request no longer exists.");
-  return `${f.code} — ${f.messageKey}`;
+  return actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait and other codes (IR380)
 }

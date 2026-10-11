@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTRACTS
-version: 0.34.0
+version: 0.35.0
 status: proposed-frontend-contract
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -161,7 +161,7 @@ Return only fields needed by each role, even for the same entity. Do not send al
 | OFFLINE (target device offline) | Show device last-contact time and pending/unavailable actions | No new controls. Query existing sends; do not assume success |
 | UNAVAILABLE + messageKey=errors.network_disconnected (simulated network loss, IR37) | Show screen offline, last-success time, and “Updates stopped” | Unsubscribe and recover with a fresh snapshot after reconnection. Separate this from the device-offline display |
 | TIMEOUT | Show unresolved processing and correlation ID | For writes, query writes.getResult by key, then retry with the same idempotency key and original payload. Do not assume the original never ran |
-| RATE_LIMITED | Show waiting time and retry guidance | Show mock retryAfterSeconds. Keep form inputs as usual. As built (IR375): the action's line reads “Too many changes in a short time — try again in N s” from `retryAfterSeconds` |
+| RATE_LIMITED | Show waiting time and retry guidance | Show mock retryAfterSeconds. Keep form inputs as usual. As built (IR375): the action's line reads “Too many changes in a short time — try again in N s” from `retryAfterSeconds`. Since IR380 every screen's refusal text falls back to this shared wording, never the raw code and key. Group control waits the seconds and sends again |
 | UNAVAILABLE | Show an in-screen error and allow retry | Automatically retry reads at most twice. Retry writes only on explicit user action |
 
 Follow IR83 for refreshing/failure after successful data and for batching subscription invalidations. Never replace KPI values with zero or healthy values on errors. If keeping previous values, mark stale and show last-success time. Do not keep them after target or role changes.
@@ -402,4 +402,4 @@ Customer notes allow only `visibility=customer`; contractor notes allow `interna
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.34.0: Read IR01–IR379 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.35.0: Read IR01–IR380 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

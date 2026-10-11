@@ -4,6 +4,7 @@
 // Pure code shared by the Server Component and the client view; Vitest covers it. Texts in the display language (`i`
 // / `t`, IR286); instants in the user's display time zone (IR44). Command codes (“set_mode = cool”) stay codes.
 import { EN, showClock, showSpan, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { UnitAction } from "@ac/web/lib/contracts.gen";
 import { FAN_LABEL, MODE_LABEL, type ApiUnitDetail, type CommandAction } from "@ac/web/lib/units";
 import { airNumber } from "@ac/web/lib/air";
@@ -137,9 +138,9 @@ const CODES: Record<string, string> = {
 };
 /** The DomainError of a refused diagnostic write, in the words of Figma Technician 02 (IR46 / IR47 / D04); null for a
  * VALIDATION that only marks fields. */
-export function refusal(f: { code: string; messageKey: string }, t: T = en): string | null {
+export function refusal(f: { code: string; messageKey: string; retryAfterSeconds?: number | null }, t: T = en): string | null {
   if (REFUSED[f.messageKey]) return t(REFUSED[f.messageKey]);
-  return CODES[f.code] ? t(CODES[f.code]) : f.code === "VALIDATION" ? null : `${f.code} — ${f.messageKey}`;
+  return CODES[f.code] ? t(CODES[f.code]) : f.code === "VALIDATION" ? null : actionMessage({ ...f, fieldErrors: {} }, t); // the write limit's wait (IR380)
 }
 const FIELD: Record<string, string> = { "error.length": "1–1000 characters", "error.required": "Required", "error.range": "1–15 minutes", "error.unsupportedAction": "Not supported by this AC", "error.invalid": "Not valid" };
 /** A field error of the Core API in words. */

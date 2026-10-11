@@ -6,6 +6,7 @@ import { Badge, Banner, Btn, Card, Check, Modal, Page, Select, SeverityBadge, Su
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { InboxAlert } from "@ac/web/lib/alerts";
 import { policyRefusal } from "@ac/web/lib/customerPolicies";
+import { actionMessage } from "@ac/web/lib/actionMessage";
 import { showClock } from "@ac/web/lib/i18n";
 import { useT } from "@ac/web/components/I18n";
 import { readAlert } from "../actions";
@@ -34,7 +35,7 @@ export function AlertsLiveView({ live }: { live: AlertsLive }) {
   const info = live.rows.filter((a) => a.group === "info");
   const show = (a: InboxAlert) => {
     setOpen(a);
-    if (a.unread.length) start(async () => setFailed(await readAlert(a.unread.map((n) => n.id))));
+    if (a.unread.length) start(async () => { const f = await readAlert(a.unread.map((n) => n.id)); setFailed(f && t("Not marked as read: {reason}", { reason: actionMessage(f, t) })); });
   };
   const Item = ({ a }: { a: InboxAlert }) => (
     <div className="flex w-full items-start gap-3 border-t border-line px-1 py-3 first:border-0">
