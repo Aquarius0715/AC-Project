@@ -4000,6 +4000,15 @@ export const ms: Record<string, string> = {
   "Escalate if still unacknowledged (1–1440)": "Eskalasi jika masih belum diakui (1–1440)",
   "Fix the validation errors first": "Betulkan ralat pengesahan dahulu",
   // HQ alert policy creation (IR345)
+  // Mark all as read; the diagnostic end retry (IR351)
+  "{n} marked as read · {failed} not marked — they changed meanwhile or are no longer available": "{n} ditanda sebagai dibaca · {failed} tidak ditanda — ia berubah sementara itu atau tidak lagi tersedia",
+  "Mark all as read": "Tanda semua sebagai dibaca",
+  "1 notification marked as read": "1 pemberitahuan ditanda sebagai dibaca",
+  "{n} notifications marked as read": "{n} pemberitahuan ditanda sebagai dibaca",
+  "End of test run sent again: {reason}": "Penamat larian ujian dihantar semula: {reason}",
+  "Retry end command": "Cuba semula arahan penamat",
+  "Retry not available — no authorization": "Cuba semula tidak tersedia — tiada kebenaran",
+  "Start new test run": "Mulakan larian ujian baharu",
   // HQ model editor: versions, firmware chips, changes (IR350)
   "Enter a version": "Masukkan versi",
   "{v} is already a candidate": "{v} sudah menjadi calon",

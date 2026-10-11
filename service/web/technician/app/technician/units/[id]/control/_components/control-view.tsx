@@ -76,6 +76,14 @@ export function ControlView({ live }: { live: ControlLive }) {
     </Select>
   );
   const latest = live.history.find((h) => !h.run); // this card's own last command
+  // the end of a run that got no answer can be sent again as a diagnostic command of the job (Figma Technician
+  // 425:474, IR351): the run stays end_failed in the history; the new command carries the run's reason
+  const retryEnd = () => {
+    const r = live.run;
+    if (!r) return;
+    run(() => sendDiagnostic({ unitId: live.unit.id, jobId: job.id, action: r.endAction, reason: t("End of test run sent again: {reason}", { reason: r.reason }).slice(0, 1000), expectedUnitVersion: live.unit.version }),
+      (c) => t("{id} sent — waiting for the device", { id: c.id.slice(0, 8) }), () => { setErrors({}); setRefused(null); }, failed);
+  };
   return (
     <Page>
       {back}
@@ -118,7 +126,9 @@ export function ControlView({ live }: { live: ControlLive }) {
             <div className="mt-3"><Field label={t("End action")}>{select(end, setEnd, t("End action"))}</Field></div>
             <div className="mt-3"><Field label={t("Reason (required)")} error={errors.trReason}><Textarea value={trReason} maxLength={1000} placeholder={t("What the test run should show")} onChange={(e) => setTrReason(e.target.value)} /></Field></div>
             {live.banner && <div className="mt-3"><Banner tone={live.banner.tone}><b>{live.banner.title}</b><div className="text-xs">{live.banner.text}</div></Banner></div>}
-            <div className="mt-3"><Btn className="w-full" disabled={pending || busy || options.length === 0} onClick={() => review("run")}>{t(live.run && live.active ? "Start test run (running)" : "Start test run")}</Btn></div>
+            {live.run?.state === "end_failed" && <div className="mt-2"><Btn className="w-full" variant="danger" disabled={pending || live.active || !job.inWindow} onClick={retryEnd}>{t("Retry end command")}</Btn>{!job.inWindow && <p className="mt-1 text-[11px] text-muted">{t("Retry not available — no authorization")}</p>}</div>}
+            {live.run?.state === "end_blocked" && <p className="mt-2 text-[11px] text-muted">{t("Retry not available — no authorization")}</p>}
+            <div className="mt-3"><Btn className="w-full" disabled={pending || busy || options.length === 0} onClick={() => review("run")}>{t(live.run && live.active ? "Start test run (running)" : live.run?.state === "completed" ? "Start new test run" : "Start test run")}</Btn></div>
             <p className="mt-2 text-[11px] text-muted">{t("1–15 minutes only. Reason required. Cannot start during firmware updates or an unfinished command.")}</p>
           </Card>
           <Card title={t("Authorization")}>

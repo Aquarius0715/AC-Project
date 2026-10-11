@@ -5128,3 +5128,29 @@ A recheck of the HQ create and edit actions against Figma (R343) found the edito
    - Web unit: the changed parts (the reason and equal values written differently are no change; Malay names), the firmware check, and the save input without duplicates.
    - E2E `admin/devices`: "+ Add version" refuses a listed version and adds another; "Editing → v<n>" and "1 change · firmware candidates" appear; Discard clears them. Nothing is saved.
    - E2E `admin/mrv`: a factor edit marks the draft and Discard restores the value.
+
+## IR351 "Mark all as read" and the retry of a test run's end, as Figma Client 10c and Technician 425:474 draw — 2026-10-11
+
+R344 audited the labels of the customer, partner and technician screens against Figma. Most differences were wording. Two functions were missing:
+- the shared inbox had no "Mark all as read" (Figma Client 10c);
+- a test run whose end got no answer offered no retry. Figma Technician 425:474 draws "Retry end command", "Retry not available — no authorization" and "Start new test run".
+
+This IR adds no operation.
+
+1. **Mark all as read (DDC-07, SCR-X-notifications).**
+   - The inbox shows "Mark all as read" beside the All and Unread tabs while a listed notification is unread.
+   - It calls `notifications.markRead` for each listed unread notification at its version, one after another, then re-renders the list. A refused notification (changed meanwhile or no longer available) stays unread. An unreachable Core API stops the rest.
+   - A toast names the result: "n notifications marked as read", or "n marked as read · m not marked — they changed meanwhile or are no longer available".
+   - Only the listed notifications are marked: the inbox reads the 100 newest, and no bulk operation exists. Reading still never resolves an alert.
+   - The Phase 1A demo marks its rows in the browser.
+2. **Retry of a test run's end (DD-T10).**
+   - A run in `end_failed` shows "Retry end command" under its banner. `end_failed` means the end command expired unanswered or the device was offline at the end.
+   - The retry sends the run's end action again with `commands.create`, as an ordinary command of the job: source `ui`, no run link. Its reason reads "End of test run sent again: <run reason>". The usual checks apply: the work window, restrictions, a busy unit, the device's connection.
+   - The run stays `end_failed` in the history; the retry is a new command with its own acknowledgement. Only that acknowledgement shows the unit stopped (DD-T10 step 2).
+   - Outside the job's work window the button is disabled and the card reads "Retry not available — no authorization". A run in `end_blocked` shows the same note: a restriction prohibits its end action.
+   - After a completed run, the start button reads "Start new test run".
+3. **Not changed.** The diagnostic run states, `diagnosticRuns.*` and `notifications.markRead` stay as they are. The remaining label differences are wording; the screens keep their as-built text.
+4. **Tests.**
+   - Integration `TestDiagnosticRuns`: after a run's end fails because the device was offline, the end action sent again as a command of the job is accepted (source `ui`, the job, no run), and the run stays `end_failed`.
+   - E2E `shared/notifications`, in each of the four apps as its user: "Mark all as read" empties the Unread tab, names the count and hides itself. With nothing unread, the button is not offered.
+   - A real-stack check used a temporary `end_failed` run on Bedroom AC for job-contractor-a, inside its window. The card showed the banner and an enabled "Retry end command". The temporary rows were deleted.

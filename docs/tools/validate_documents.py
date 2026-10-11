@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.235.0 (2026-10-11): IR351 Mark all as read, test-run end retry (DD-CONTRACTS 0.32.0, DD-T 0.43.0); counts unchanged.
 # 0.234.0 (2026-10-11): IR350 model and factor editor drafts (DD-A 0.59.0); counts unchanged.
 # 0.233.0 (2026-10-11): IR349 attachments.list, MRV evidence (DD-A 0.58.0, DD-COMMON 0.107.0, backend architecture 0.39.0); 202 operations.
 # 0.232.0 (2026-10-11): IR348 notifications.preview severity, HQ policy preview and demo test (DD-A 0.57.0); counts unchanged.

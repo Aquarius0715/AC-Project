@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.42.0
+version: 0.43.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -342,6 +342,7 @@ Scope: FR-T10 / Main display pattern: **UI-DETAIL** and **UI-FORM**. Service bou
 1. Check current state and assigned job. Set diagnostic action, test-run duration, and reason. Confirm the details, then view Command acknowledgements and history.
 2. Do not start a new action during firmware (FW) updates or while a Command is unfinished. Ending a test run also requires an end-Command acknowledgement. A browser timer ending alone does not prove the device has stopped.
 3. Use `commands.create` for normal diagnosis. Use `diagnosticRuns.create` for test runs and save jobId, reason, durationMinutes, and endAction in shared memory. Link start and end Commands by `runId`. Show scheduled end time separately from actual end acknowledgement. Record failed endings as warnings.
+   - As built (IR351, Figma 425:474): a run in `end_failed` offers “Retry end command”, which sends the end action again with `commands.create` as a command of the job; the run stays `end_failed`. Outside the work window, and for `end_blocked`, the card reads “Retry not available — no authorization”. After a completed run, the start button reads “Start new test run”.
 4. Queries to update: `commands / unit detail / audit`. The job's command history is `commands.list` (IR216); the page is opened for one job (`jobId`, from the unit or job page — in progress first, else assigned).
 
 **Boundary cases and failures**: Reject attempts to bypass temperature limits, actions outside the assignment period, test runs of 16 minutes or more, and missing reasons. Follow IR46 for actions under restrictions and IR47 for rejection based on connection/power signals. Do not show stopped without an end acknowledgement. The actions follow the unit's capabilities, ventilation included on a model with a fresh-air function. A URL job whose window has ended answers jobs.get with its history snapshot; it is not the technician's job to control and shows as not found (IR314).
@@ -486,6 +487,6 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 
 0.10.0: T12 fetches alerts.get using DeviceEvent.alertIds and acknowledges using Alert.version (SR23). Filter device history by scope at event time (SR24).
 
-Additional contracts for current version 0.42.0: Read IR01–IR337 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.43.0: Read IR01–IR351 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

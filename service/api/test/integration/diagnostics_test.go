@@ -156,6 +156,15 @@ func TestDiagnosticRuns(t *testing.T) {
 	if _, m := post(s, &hq, "diagnosticRuns.get", `{"diagnosticRunId":"`+r4+`"}`); data(m)["state"] != "end_failed" || data(m)["failureCode"] != "OFFLINE" || data(m)["endCommandId"] != nil {
 		t.Fatalf("end offline: %v", m)
 	}
+	// the retry of the end (Figma Technician 425:474, IR351): once the device is back, the technician sends the end action
+	// again as an ordinary command of the job (commands.create); the run stays end_failed
+	_, m = post(s, &hq, "units.get", `{"id":"`+unit+`"}`)
+	if code, m := write(s, &techInt, "commands.create", `{"unitId":"`+unit+`","jobId":"`+job+`","action":`+on+`,"reason":"End of test run sent again: check cooling","expectedUnitVersion":`+itoa(ver(m))+`}`, 0); code != 200 || data(m)["source"] != "ui" || data(m)["jobId"] != job || data(m)["diagnosticRunId"] != nil {
+		t.Errorf("retry the end: %d %v", code, m)
+	}
+	if _, m := post(s, &hq, "diagnosticRuns.get", `{"diagnosticRunId":"`+r4+`"}`); data(m)["state"] != "end_failed" {
+		t.Errorf("the run after the retry: %v", data(m)["state"])
+	}
 	// reads
 	if _, m := post(s, &techInt, "diagnosticRuns.list", `{"unitId":"`+unit+`","jobId":"`+job+`","query":{}}`); len(items(m)) != 4 {
 		t.Errorf("list: %d", len(items(m)))

@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { Badge, Card, Page, Tabs, cx } from "@ac/web/components/ui";
+import { Badge, Btn, Card, Page, Tabs, useToast, cx } from "@ac/web/components/ui";
 import { useStoredRole } from "@ac/web/components/AppShell";
 import { useT } from "@ac/web/components/I18n";
 import { jobActions, useNotes } from "@ac/web/lib/jobs";
 import type { InboxRow } from "@ac/web/lib/notifications";
-import { markRead } from "../actions";
+import { markAllRead, markRead } from "../actions";
 
 const initial = [
   { id: "s1", t: "Alert opened on Bedroom AC", d: "alert-window-a · unresolved · linked evidence available", w: "09:12 today", read: false, href: "" },
@@ -25,6 +25,7 @@ export function NotificationsView({ rows }: { rows?: InboxRow[] }) {
   const [items, setItems] = useState(initial);
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
+  const toast = useToast();
   const api = rows !== undefined;
   const all = api
     ? rows.map((n) => ({ ...n, live: true }))
@@ -37,9 +38,26 @@ export function NotificationsView({ rows }: { rows?: InboxRow[] }) {
     }
     return n.live ? jobActions.markRead(n.id) : setItems((s) => s.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
   };
+  const unread = all.filter((i) => !i.read);
+  // “Mark all as read” (Figma Client 10c): every unread notification of the list, each at its version
+  const readAll = () => {
+    if (!api) {
+      unread.forEach((n) => (n.live ? jobActions.markRead(n.id) : null));
+      setItems((s) => s.map((x) => ({ ...x, read: true })));
+      return toast(t(unread.length === 1 ? "1 notification marked as read" : "{n} notifications marked as read", { n: unread.length }));
+    }
+    start(async () => {
+      const r = await markAllRead(unread.map((n) => ({ id: n.id, version: n.version })));
+      setFailed(null);
+      toast(r.failed ? t("{n} marked as read · {failed} not marked — they changed meanwhile or are no longer available", { n: r.marked, failed: r.failed }) : t(r.marked === 1 ? "1 notification marked as read" : "{n} notifications marked as read", { n: r.marked }), r.failed ? "crit" : undefined);
+    });
+  };
   return (
     <Page className="max-w-3xl">
-      <Tabs value={tab} onChange={setTab} tabs={[{ id: "all", label: t("All"), count: all.length }, { id: "unread", label: t("Unread"), count: all.filter((i) => !i.read).length }]} />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Tabs value={tab} onChange={setTab} tabs={[{ id: "all", label: t("All"), count: all.length }, { id: "unread", label: t("Unread"), count: unread.length }]} />
+        {unread.length > 0 && <Btn size="sm" disabled={pending} onClick={readAll}>{t("Mark all as read")}</Btn>}
+      </div>
       {failed && <p role="alert" className="text-xs text-crit">{failed}</p>}
       <Card pad={false} className={pending ? "opacity-70" : undefined}>
         <ul className="divide-y divide-line">

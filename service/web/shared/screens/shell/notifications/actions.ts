@@ -21,3 +21,19 @@ export async function markRead(id: string, version: number): Promise<string | nu
     refresh(); // re-render the current route so the Server Component reads the updated list
   }
 }
+
+/** “Mark all as read” (Figma Client 10c): notifications.markRead for each listed unread notification at its version, one
+ * after another; returns how many were marked and how many were refused (changed meanwhile or no longer available). */
+export async function markAllRead(items: { id: string; version: number }[]): Promise<{ marked: number; failed: number }> {
+  let marked = 0;
+  for (const n of items) {
+    try {
+      await coreOp("notifications.markRead", { id: n.id }, { write: true, expectedVersion: n.version });
+      marked++;
+    } catch (e) {
+      if (!(e instanceof CoreError)) break; // the Core API is unreachable: stop, the rest stays unread
+    }
+  }
+  refresh();
+  return { marked, failed: items.length - marked };
+}
