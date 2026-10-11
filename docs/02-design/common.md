@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.107.0
+version: 0.108.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -40,6 +40,8 @@ service/web/
 - Writes: Server Actions in `actions.ts` next to the route. Each one checks its input, calls the operation with the row version (`X-Expected-Version`) and an Idempotency-Key, and calls `refresh()` so the route renders again. Field errors return to the form.
 - Interactive reads: reads that follow a gesture, such as the technician's QR scan, go through the BFF Route Handler `/bff/ops/<operation>`.
 - The browser never calls the Core API.
+
+**Security headers (IR354).** Every response carries nosniff, a referrer policy and `X-Frame-Options: DENY` (each app's `next.config.ts`). Every page also carries a Content-Security-Policy with a fresh nonce from `proxy.ts`, which Next.js puts on its scripts and styles. Pages therefore render per request: the root layout awaits `connection()`. HSTS is added over HTTPS.
 
 **Phase 1A demo (`DATA_SOURCE` unset).** The same routes render the demo components with in-browser fixture rows; nothing reaches a network. The shared demo stores (jobs, client users) live in the tab (`lib/demoStore`); their actions run in the tab and return refusals at once (IR309). The four apps of a tab on one origin see the same demo data, and switching roles keeps it; a reload or the reset on `/demo` brings back the seed (FR-X05).
 
@@ -260,4 +262,4 @@ API paths, HTTP methods, databases, server authentication and authorization, rea
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.107.0: Read IR01–IR349 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.108.0: Read IR01–IR355 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

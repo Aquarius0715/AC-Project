@@ -131,7 +131,7 @@ func TestContractorRegister(t *testing.T) {
 	if _, m := post(s, &hq, "rateCards.list", `{"filters":{"contractorOrgId":"`+org+`"}}`); len(items(m)) != 2 || items(m)[0]["version"].(float64) != 2 {
 		t.Fatalf("rate card list: %v", m)
 	}
-	if _, m := post(s, &contrA, "rateCards.list", `{"filters":{"contractorOrgId":"`+org+`"}}`); len(items(m)) != 0 && items(m)[0]["contractorOrgId"] == org {
+	if code, m := post(s, &contrA, "rateCards.list", `{"filters":{"contractorOrgId":"`+org+`"}}`); code != 200 || len(items(m)) != 0 && items(m)[0]["contractorOrgId"] == org {
 		t.Error("contractor sees another company's rate cards")
 	}
 	if code, m := post(s, &hq, "rateCards.list", `{"filters":{"x":1}}`); code != 422 || fields(m) != "x=error.notAllowed" {

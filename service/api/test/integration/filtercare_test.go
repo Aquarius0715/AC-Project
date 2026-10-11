@@ -114,7 +114,7 @@ func TestFilterCare(t *testing.T) {
 	if len(items(m)) != 1 || items(m)[0]["runHoursSinceCleaning"] != nil {
 		t.Fatalf("unknown: %v", m)
 	}
-	if _, m := post(s, &customerA, "filterCare.list", `{"filters":{"unitId":"`+u+`"}}`); len(items(m)) != 0 {
+	if code, m := post(s, &customerA, "filterCare.list", `{"filters":{"unitId":"`+u+`"}}`); code != 200 || len(items(m)) != 0 {
 		t.Error("customer-a sees customer-b's unit")
 	}
 	if _, m := post(s, &customerB, "filterCare.list", `{"sort":{"field":"status","direction":"desc"},"limit":100}`); len(items(m)) < 2 {

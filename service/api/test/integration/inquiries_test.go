@@ -61,7 +61,7 @@ func TestInquiries(t *testing.T) {
 	if _, m := post(s, &customerB, "inquiries.list", `{"filters":{"restrictionId":"`+rid+`"}}`); len(items(m)) != 1 {
 		t.Error("client list")
 	}
-	if _, m := post(s, &customerA, "inquiries.list", `{"filters":{"restrictionId":"`+rid+`"}}`); len(items(m)) != 0 {
+	if code, m := post(s, &customerA, "inquiries.list", `{"filters":{"restrictionId":"`+rid+`"}}`); code != 200 || len(items(m)) != 0 {
 		t.Error("other customer's inquiries")
 	}
 	if _, m := post(s, &hq, "inquiries.list", `{"filters":{"status":"received","subjectType":"restriction","invoiceId":"`+inv+`"},"limit":100}`); len(items(m)) != 1 {
@@ -124,7 +124,7 @@ func TestAuditList(t *testing.T) {
 	if _, m := post(s, &hq, "audit.list", `{"filters":{`+day+`,"correlationId":"`+corr+`"},"limit":100}`); len(items(m)) < 1 {
 		t.Error("by correlation")
 	}
-	if _, m := post(s, &hq, "audit.list", `{"filters":{`+day+`,"correlationId":"`+uuid.NewString()+`"}}`); len(items(m)) != 0 {
+	if code, m := post(s, &hq, "audit.list", `{"filters":{`+day+`,"correlationId":"`+uuid.NewString()+`"}}`); code != 200 || len(items(m)) != 0 {
 		t.Error("unknown correlation is empty")
 	}
 	if _, m := post(s, &hq, "audit.list", `{"filters":{`+day+`,"result":"denied"},"sort":{"field":"occurredAt","direction":"asc"},"limit":2}`); m["data"] == nil {

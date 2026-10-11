@@ -10,6 +10,14 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@ac/web"],
   outputFileTracingRoot: path.join(__dirname, ".."),
   turbopack: { root: path.join(__dirname, "..") },
+  // the security headers of network architecture §6 on every response (IR354); the page CSP comes from proxy.ts
+  async headers() {
+    return [{ source: "/:path*", headers: [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "X-Frame-Options", value: "DENY" },
+    ] }];
+  },
 };
 
 export default nextConfig;

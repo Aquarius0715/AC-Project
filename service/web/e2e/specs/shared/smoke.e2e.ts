@@ -1,11 +1,14 @@
 // Every page an app links to renders for its signed-in role (API mode): no error boundary or not-found text, no page
-// error, no failed document (the R222 smoke crawl as a test). Follows the app's own links only, navigations only.
+// error, no failed document (the R222 smoke crawl as a test), and nothing the page CSP refuses (IR354). Follows the
+// app's own links only, navigations only.
 import { test, expect, FAILED_PAGE } from "../../fixtures/test";
 
 test("every linked page of the app renders", async ({ page, app }) => {
   test.setTimeout(240_000);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(`${page.url()}: ${e.message}`));
+  const refused: string[] = []; // Chromium logs each CSP violation as a console error
+  page.on("console", (m) => { if (m.type() === "error" && /Content Security Policy/i.test(m.text())) refused.push(`${page.url()}: ${m.text().slice(0, 200)}`); });
   const seen = new Set<string>();
   const queue = [app.home];
   const failed: string[] = [];
@@ -25,5 +28,6 @@ test("every linked page of the app renders", async ({ page, app }) => {
   }
   expect(failed, "pages that did not render").toEqual([]);
   expect(errors, "page errors").toEqual([]);
+  expect(refused, "CSP violations").toEqual([]);
   expect(seen.size).toBeGreaterThan(3);
 });

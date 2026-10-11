@@ -117,7 +117,7 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 		t.Error("unknown attachment")
 	}
 	// saving the draft clears the sign-off
-	if _, m := write(s, &techInt, "jobs.saveDraft", body, 3); data(m)["signOff"] != nil {
+	if code, m := write(s, &techInt, "jobs.saveDraft", body, 3); code != 200 || data(m)["signOff"] != nil {
 		t.Fatal("saveDraft clears the sign-off")
 	}
 	// limit of 10 per report

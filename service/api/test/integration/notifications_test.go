@@ -75,7 +75,7 @@ func TestNotificationsInbox(t *testing.T) {
 		t.Error("markRead again keeps the record")
 	}
 	// HQ sees the restriction notice target; technicians see nothing for it
-	if _, m := post(s, &techB, "notifications.list", `{"filters":{"type":"restriction"}}`); len(items(m)) != 0 {
+	if code, m := post(s, &techB, "notifications.list", `{"filters":{"type":"restriction"}}`); code != 200 || len(items(m)) != 0 {
 		t.Error("technician restriction notices")
 	}
 }
@@ -331,7 +331,7 @@ func TestContractorInbox(t *testing.T) {
 	if !seen[offered] || seen[other] || seen[unit] {
 		t.Errorf("contractor inbox: offered %v, another job %v, a unit %v", seen[offered], seen[other], seen[unit])
 	}
-	if _, m := post(s, &contrB, "notifications.list", `{"limit":100}`); len(items(m)) > 0 {
+	if code, m := post(s, &contrB, "notifications.list", `{"limit":100}`); code != 200 || len(items(m)) > 0 {
 		for _, it := range items(m) {
 			if it["id"] == offered {
 				t.Error("another contractor reads the notification")

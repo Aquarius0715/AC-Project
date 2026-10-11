@@ -231,7 +231,7 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	if _, m := post(s, &contrA, "jobs.get", `{"jobId":"`+j2+`"}`); data(m)["offer"] == nil || len(data(m)["costs"].([]any)) != 0 {
 		t.Fatalf("contractor detail: %v", m)
 	}
-	if _, m := post(s, &customerA, "jobs.get", `{"jobId":"`+j2+`"}`); data(m)["offer"] != nil {
+	if code, m := post(s, &customerA, "jobs.get", `{"jobId":"`+j2+`"}`); code != 200 || data(m)["offer"] != nil {
 		t.Fatal("client sees the offer")
 	}
 }

@@ -133,7 +133,7 @@ func TestBaselines(t *testing.T) {
 	if _, m := post(s, &customerB, "baselines.list", `{"filters":{"unitId":"`+u+`"},"limit":100}`); len(items(m)) != 2 {
 		t.Errorf("client list: %v", m)
 	}
-	if _, m := post(s, &customerA, "baselines.list", `{"limit":100}`); len(items(m)) != 0 {
+	if code, m := post(s, &customerA, "baselines.list", `{"limit":100}`); code != 200 || len(items(m)) != 0 {
 		t.Error("seed baseline spans two customers: not visible to customer-a")
 	}
 	if code, m := post(s, &hq, "baselines.list", `{"filters":{"method":"magic"}}`); code != 422 || fields(m) != "filters=error.invalid" {
@@ -207,7 +207,7 @@ func TestEnergySummary(t *testing.T) {
 	if tot := data(m)["totals"].(map[string]any); tot["kWh"] != nil || tot["amountMinor"] != nil || data(m)["coverage"].(float64) != 0 {
 		t.Errorf("no data: %v", m)
 	}
-	if _, m := post(s, &hq, "energy.summary", `{"from":"2026-09-01T00:00:00Z","to":"2026-09-01T00:10:00Z","unitIds":[]}`); data(m)["coverage"] != nil {
+	if code, m := post(s, &hq, "energy.summary", `{"from":"2026-09-01T00:00:00Z","to":"2026-09-01T00:10:00Z","unitIds":[]}`); code != 200 || data(m)["coverage"] != nil {
 		t.Errorf("no units: %v", m)
 	}
 	for b, want := range map[string]string{

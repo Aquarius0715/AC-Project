@@ -5207,3 +5207,37 @@ The audit's remaining items are wording; the screens keep their as-built text (I
      - `telemetry.series`: any query filter is refused; an empty or null object passes.
 4. **Kept.** The other zero-count blocks are database error returns or defensive checks behind authorization. For example, the client branch of the restriction projection is unreachable: every caller is HQ-only.
 5. **Coverage after the round:** 88.24 % (13,508 of 15,308 statements; the removed branch took 6). The scan finds no untested validation rule. 93 unit tests and 144 integration tests.
+
+## IR354 The web apps send the security headers of network architecture §6 themselves — 2026-10-11
+
+Network architecture §6 asks for security headers on `app`: HSTS, a Content-Security-Policy (the app, the identity provider and the payment page redirect), X-Content-Type-Options, a Referrer-Policy, and no framing. Only the planned production edge was to add them. The web apps sent none, so local and staging responses had none.
+
+1. **Static headers.** Each app's `next.config.ts` adds three headers to every response, static assets included: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and `X-Frame-Options: DENY`.
+2. **Page Content-Security-Policy**, as in the Next.js CSP guide. `proxy.ts` (`shared/proxy.ts`) makes a fresh nonce for every page request. It sets the policy on the response and on the request, where Next.js reads the nonce and puts it on its own scripts and styles.
+   - `default-src 'self'`.
+   - `script-src 'self' 'nonce-…' 'strict-dynamic'`.
+   - `style-src 'self' 'nonce-…'`, with `style-src-attr 'unsafe-inline'` for React style attributes.
+   - `img-src 'self' blob: data:` (report photos as data URLs, local previews); `font-src`, `connect-src` and `base-uri` are `'self'`; `object-src 'none'`.
+   - `form-action 'self'` plus the identity provider's origin (from `OIDC_ISSUER`). No payment page redirect is built yet; its origin joins when it is.
+   - `frame-ancestors 'none'`.
+   - `next dev` adds `'unsafe-eval'` and inline styles, as the guide says.
+3. **HTTPS.** When a request reached the app over HTTPS, directly or through the edge (`X-Forwarded-Proto: https`), the response adds `Strict-Transport-Security: max-age=63072000; includeSubDomains` and the policy adds `upgrade-insecure-requests`. Plain local HTTP gets neither.
+4. **Dynamic rendering.** A nonce needs a page rendered per request. Each app's root layout awaits `connection()`, so the three pages that were static are dynamic too: `/`, `/forgot-password` and not-found. Every other page was dynamic already.
+5. **Both modes.** The headers and the policy apply in the Phase 1A demo and in API mode.
+6. **Tests.**
+   - Web unit: the policy's directives in production, `next dev` and HTTPS; a fresh nonce; the identity provider's origin. The proxy sets the policy on the response and the request in both modes, adds HSTS behind an HTTPS edge, and still sends a signed-out user to sign-in.
+   - E2E `shared/security-headers` (each app): a page carries the policy with a nonce, which every script of its HTML has. A second request gets another nonce. The static headers are on the page and on the stylesheet.
+   - E2E `shared/smoke` now also fails on any console error the policy reports. Its crawl of every linked page reported none.
+   - A temporary check injected markup with an inline event handler and a style element: both were refused and reported on the console.
+
+## IR355 Integration checks of an empty or absent result also require the status — 2026-10-11
+
+IR353 found a test that expected no rows and passed because the request was refused (422). A refused request also has no `data`, so any check that expects an empty list, a missing field, or "not selected" passes on a refusal.
+
+1. Twenty-five such checks across the integration tests now also require status 200. Examples:
+   - lists expected empty for another tenant or scope;
+   - `signOff`, `coverage` or `offer` expected null;
+   - a job expected absent from a contractor's list;
+   - an automation outcome expected not selected.
+   All of them hold, so none was hiding a defect.
+2. The restriction schedule test only logged "notifications.list not implemented yet". It now checks that the customer's inbox holds the restriction notice the schedule returned (`noticeNotificationIds`).

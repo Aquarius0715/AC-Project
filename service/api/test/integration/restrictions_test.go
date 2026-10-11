@@ -2,7 +2,7 @@ package integration
 
 import (
 	"context"
-	apiserver "github.com/pradita/ac-project/service/api/internal/server"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +12,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/modules/control"
 	"github.com/pradita/ac-project/service/api/internal/seed"
+	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
 // boundUnit creates a customer-b unit with a bound device in the given connection state.
@@ -139,8 +140,17 @@ func TestRestrictionLifecycle(t *testing.T) {
 	if code, _ := write(s, &restrMgr, "restrictions.schedule", scheduleBody(k, inv, []string{online}, nil), 0); code != 409 {
 		t.Error("second active restriction on a unit")
 	}
-	if _, m := post(s, &customerB, "notifications.list", `{"limit":100}`); m == nil {
-		t.Log("notifications.list not implemented yet")
+	// the customer's notice is in their inbox (noticeNotificationIds, FR-C12)
+	notice := data(m)["noticeNotificationIds"].([]any)
+	nc, inbox := post(s, &customerB, "notifications.list", `{"filters":{"type":"restriction"},"limit":100}`)
+	found := 0
+	for _, it := range items(inbox) {
+		if slices.Contains(notice, it["id"]) {
+			found++
+		}
+	}
+	if nc != 200 || found == 0 {
+		t.Errorf("the customer's restriction notice: %d, %d of %d notices in the inbox", nc, found, len(notice))
 	}
 	exec := func(rules string, v int) (int, map[string]any) {
 		return write(s, &restrMgr, "restrictions.execute", `{"restrictionId":"`+id+`","confirmedRulesVersion":"`+rules+`"}`, v)
@@ -544,7 +554,7 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 	if _, m := post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{"filters":{"contractId":"`+k+`"}}}`); len(items(m)) != 1 {
 		t.Errorf("forInvoice contract filter: %v", m)
 	}
-	if _, m := post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{"filters":{"contractId":"`+uuid.NewString()+`"}}}`); len(items(m)) != 0 {
+	if code, m := post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{"filters":{"contractId":"`+uuid.NewString()+`"}}}`); code != 200 || len(items(m)) != 0 {
 		t.Errorf("forInvoice other contract: %v", m)
 	}
 	code, m = post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{"filters":{"invoiceId":"`+uuid.NewString()+`"}}}`)

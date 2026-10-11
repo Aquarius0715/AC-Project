@@ -112,7 +112,7 @@ func TestScheduleAutomationsFire(t *testing.T) {
 	if code != 200 || data(m)["deleted"] != true || data(m)["id"] != id {
 		t.Fatalf("delete: %d %v", code, m)
 	}
-	if _, m := post(s, &customerB, "automations.list", `{"filters":{"unitId":"`+u+`"}}`); len(items(m)) != 0 {
+	if code, m := post(s, &customerB, "automations.list", `{"filters":{"unitId":"`+u+`"}}`); code != 200 || len(items(m)) != 0 {
 		t.Fatalf("deleted rule listed: %v", items(m))
 	}
 	if code, _ := write(s, &customerB, "automations.delete", `{"id":"`+id+`"}`, 3); code != 404 {

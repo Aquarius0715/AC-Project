@@ -146,7 +146,7 @@ func TestJobsReadAndTransitions(t *testing.T) {
 		`{"filters":{"unitId":"` + unit + `","from":"` + clock.Add(24*time.Hour).Format(time.RFC3339) + `","to":"` + clock.Add(26*time.Hour).Format(time.RFC3339) + `"}}`: 1,
 		`{"filters":{"unitId":"` + unit + `","from":"` + clock.Add(26*time.Hour).Format(time.RFC3339) + `"}}`:                                                             0,
 	} {
-		if _, m := post(s, &hq, "jobs.list", body); len(items(m)) != n {
+		if code, m := post(s, &hq, "jobs.list", body); code != 200 || len(items(m)) != n {
 			t.Errorf("%s: %d want %d", body, len(items(m)), n)
 		}
 	}

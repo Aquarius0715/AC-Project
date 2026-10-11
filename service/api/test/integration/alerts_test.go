@@ -50,7 +50,7 @@ func TestAlerts(t *testing.T) {
 		`{"filters":{"propertyId":"` + seed.ID("property-home-b").String() + `","unitId":"` + u + `"}}`:                                                3,
 		`{"filters":{"unitId":"` + u + `","customerId":"` + uuid.NewString() + `"}}`:                                                                   0,
 	} {
-		if _, m := post(s, &hq, "alerts.list", body); len(items(m)) != n {
+		if code, m := post(s, &hq, "alerts.list", body); code != 200 || len(items(m)) != n {
 			t.Errorf("%s: %d want %d", body, len(items(m)), n)
 		}
 	}

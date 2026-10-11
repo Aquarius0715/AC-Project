@@ -1,6 +1,6 @@
 ---
 document_id: DD-NETWORK
-version: 0.31.0
+version: 0.32.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, review-agent, operations]
@@ -121,6 +121,7 @@ Give these to customer IT before installation (office sites; homes normally need
 - Rate limits (PROPOSED): sign-in and password reset 10 per minute per IP and per account; writes 60 per minute per session; webhook endpoint per provider; MQTT connect attempts per device certificate.
 - DDoS protection at the edge for `app`, `hooks`, and `mqtt`.
 - Security headers on `app`: HSTS, Content-Security-Policy (self + identity provider + payment page redirect), X-Content-Type-Options, Referrer-Policy, frame-ancestors none.
+  - As built (IR354): the web apps send these headers themselves, so every environment has them. `next.config.ts` sets nosniff, `strict-origin-when-cross-origin` and `X-Frame-Options: DENY`. `proxy.ts` sets a per-request nonce Content-Security-Policy, with forms limited to the app and the identity provider. HSTS and `upgrade-insecure-requests` are added when the request came over HTTPS.
 
 ## 7. Certificates and keys
 
@@ -151,4 +152,4 @@ Give these to customer IT before installation (office sites; homes normally need
 | OPEN-NW-03 | Decided 2026-10-07: HQ admin app only from the company network (§3, DEC-68); the company must supply its office egress addresses and VPN egress addresses | — |
 | OPEN-NW-04 | Decided 2026-10-07: customer office firewall requirements in §5a | — |
 
-Additional contracts for current version 0.31.0: Read IR01–IR333 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.32.0: Read IR01–IR355 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

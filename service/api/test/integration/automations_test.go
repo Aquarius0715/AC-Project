@@ -114,7 +114,7 @@ func TestAutomationSchedules(t *testing.T) {
 	if _, m := post(s, &customerB, "automations.list", `{"filters":{"unitId":"`+u+`","kind":"schedule","enabled":true}}`); len(items(m)) != 1 {
 		t.Errorf("list: %v", m)
 	}
-	if _, m := post(s, &customerA, "automations.list", `{"filters":{"unitId":"`+u+`"}}`); len(items(m)) != 0 {
+	if code, m := post(s, &customerA, "automations.list", `{"filters":{"unitId":"`+u+`"}}`); code != 200 || len(items(m)) != 0 {
 		t.Error("another customer's list")
 	}
 	if code, m := post(s, &customerB, "automations.list", `{"filters":{"kind":"cron"}}`); code != 422 || fields(m) != "filters=error.invalid" {

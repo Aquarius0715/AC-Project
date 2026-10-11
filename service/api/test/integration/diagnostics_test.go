@@ -183,7 +183,7 @@ func TestDiagnosticRuns(t *testing.T) {
 	if code, _ := post(s, &techInt, "diagnosticRuns.get", `{"diagnosticRunId":"`+r1+`"}`); code != 200 {
 		t.Errorf("get after revoke: %d", code)
 	}
-	if _, m := post(s, &techB, "diagnosticRuns.list", `{"unitId":"`+unit+`","query":{}}`); len(items(m)) != 0 {
+	if code, m := post(s, &techB, "diagnosticRuns.list", `{"unitId":"`+unit+`","query":{}}`); code != 200 || len(items(m)) != 0 {
 		t.Error("other technician lists runs")
 	}
 	if code, _ := post(s, &techB, "diagnosticRuns.get", `{"diagnosticRunId":"`+r1+`"}`); code != 404 && code != 403 {

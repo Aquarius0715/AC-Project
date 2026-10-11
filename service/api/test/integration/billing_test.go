@@ -78,7 +78,7 @@ func TestContractsAndInvoices(t *testing.T) {
 	if _, m := post(s, &customerB, "contracts.list", `{"filters":{"unitId":"`+u+`"}}`); len(items(m)) != 1 || items(m)[0]["priceMinor"].(float64) != 15000 {
 		t.Fatalf("client contracts: %v", m)
 	}
-	if _, m := post(s, &customerA, "contracts.list", `{"filters":{"unitId":"`+u+`"}}`); len(items(m)) != 0 {
+	if code, m := post(s, &customerA, "contracts.list", `{"filters":{"unitId":"`+u+`"}}`); code != 200 || len(items(m)) != 0 {
 		t.Error("other customer's contract")
 	}
 	if code, m := post(s, &hq, "contracts.list", `{"filters":{"kind":"vip"}}`); code != 422 || fields(m) != "filters=error.invalid" {
@@ -149,7 +149,7 @@ func TestContractsAndInvoices(t *testing.T) {
 	if _, m := post(s, &customerB, "invoices.list", `{"filters":{"contractId":"`+k+`","status":"unpaid"}}`); len(items(m)) != 1 {
 		t.Error("client invoice list")
 	}
-	if _, m := post(s, &hq, "invoices.list", `{"filters":{"contractId":"`+k+`","overdueOnly":true}}`); len(items(m)) != 0 {
+	if code, m := post(s, &hq, "invoices.list", `{"filters":{"contractId":"`+k+`","overdueOnly":true}}`); code != 200 || len(items(m)) != 0 {
 		t.Error("not yet overdue")
 	}
 	if code, m := post(s, &hq, "invoices.list", `{"filters":{"status":"late"}}`); code != 422 || fields(m) != "filters=error.invalid" {
@@ -166,7 +166,7 @@ func TestContractsAndInvoices(t *testing.T) {
 		"period start at to": {`"to":"` + ts(-24*14) + `"`, 0},
 		"period start after": {`"from":"` + ts(-24*13) + `"`, 0},
 	} {
-		if _, m := post(s, &hq, "invoices.list", `{"filters":{"contractId":"`+k+`",`+tc.f+`}}`); len(items(m)) != tc.n {
+		if code, m := post(s, &hq, "invoices.list", `{"filters":{"contractId":"`+k+`",`+tc.f+`}}`); code != 200 || len(items(m)) != tc.n {
 			t.Errorf("invoice filter %s: %v", name, m)
 		}
 	}

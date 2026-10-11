@@ -93,7 +93,7 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		`{"sort":{"field":"dueAt","direction":"asc"},"limit":100}`:                                          true,
 		`{"sort":{"field":"id","direction":"desc"},"limit":100}`:                                            true,
 	} {
-		if _, m := post(s, &contrA, "jobs.list", body); (byJob(m, job) != nil) != want {
+		if code, m := post(s, &contrA, "jobs.list", body); code != 200 || (byJob(m, job) != nil) != want {
 			t.Errorf("%s: want %v", body, want)
 		}
 	}
@@ -137,17 +137,17 @@ func TestContractorAndTechnicianProjections(t *testing.T) {
 		h["redactedReportSummary"].(map[string]any)["hasReport"] != false {
 		t.Fatalf("history: %d %v", code, m)
 	}
-	if _, m := post(s, &contrA, "jobs.list", `{"filters":{"status":"assigned"},"limit":100}`); byJob(m, job) != nil {
+	if code, m := post(s, &contrA, "jobs.list", `{"filters":{"status":"assigned"},"limit":100}`); code != 200 || byJob(m, job) != nil {
 		t.Error("history status filter")
 	}
-	if _, m := post(s, &contrA, "jobs.list", `{"filters":{"from":"`+ts(-100)+`"},"limit":100}`); byJob(m, job) != nil {
+	if code, m := post(s, &contrA, "jobs.list", `{"filters":{"from":"`+ts(-100)+`"},"limit":100}`); code != 200 || byJob(m, job) != nil {
 		t.Error("history period filter on null completedAt")
 	}
 	if _, m := post(s, &contrA, "jobs.list", `{"filters":{"status":"accepted","organizationId":"`+seed.ID("org-contractor-a").String()+`"},"limit":100}`); byJob(m, job) == nil {
 		t.Error("history with own organization")
 	}
 	for typ, want := range map[string]bool{"reactive": true, "preventive": false} { // the history's public type (IR290)
-		if _, m := post(s, &contrA, "jobs.list", `{"filters":{"type":"`+typ+`"},"limit":100}`); (byJob(m, job) != nil) != want {
+		if code, m := post(s, &contrA, "jobs.list", `{"filters":{"type":"`+typ+`"},"limit":100}`); code != 200 || (byJob(m, job) != nil) != want {
 			t.Errorf("history type filter %s: want %v", typ, want)
 		}
 	}
