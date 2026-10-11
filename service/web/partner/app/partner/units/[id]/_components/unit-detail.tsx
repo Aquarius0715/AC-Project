@@ -38,7 +38,7 @@ export function PartnerUnitDetail({ live }: { live: UnitLive }) {
             {!live.context ? <p className="text-[13px] text-muted">{t("No current job of your company on this unit.")}</p> : (
               <>
                 <SummaryList items={live.context.rows.map(([k, v], n): [string, React.ReactNode] => [k, n === 1 && live.context!.techMissing ? <span key="t" className="font-semibold text-crit">{v}</span> : v])} />
-                {live.context.pct !== null && <div className="mt-2"><UtilBar pct={live.context.pct} tone={live.context.pct >= 80 ? "crit" : "primary"} /></div>}
+                {live.context.pct !== null && <div className="mt-2"><UtilBar pct={live.context.pct} tone={live.context.pct >= 80 ? "crit" : "primary"} label={live.context.note} /></div>}
                 <p className="mt-2 text-[11px] text-muted">{live.context.note}</p>
               </>
             )}

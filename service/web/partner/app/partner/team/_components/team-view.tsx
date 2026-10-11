@@ -13,7 +13,7 @@ import type { TeamLive } from "../_lib/load";
 
 type Live = Extract<TeamLive, { notFound: false }>;
 const cellTone: Record<WeekCell["kind"], string> = {
-  busy: "bg-primary/70 text-white", free: "border border-line bg-surface text-muted", off: "bg-warn-soft text-warn", none: "bg-surface2 text-muted",
+  busy: "bg-primary text-white", free: "border border-line bg-surface text-muted", off: "bg-warn-soft text-warn", none: "bg-surface2 text-muted",
 };
 
 /** Team & capacity (FR-P06, Figma Contractor 04-1…04-5, 04-8) from the Core API: the URL's date, qualification and
@@ -71,13 +71,13 @@ function Team({ live, tab, tabs }: { live: Live; tab: "members" | "certs"; tabs:
         ) : (
           <ul className="divide-y divide-line">
             {live.rows.map((r) => (
-              <li key={r.id} className={cx("flex flex-wrap items-center gap-3 py-3", !r.active && "opacity-70")}>
-                <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary">☻</span>
-                <div className="min-w-[200px] flex-1"><b className="block text-[13px]">{r.name}</b><span className="block text-[11px] text-muted">{r.sub}</span></div>
+              <li key={r.id} className="flex flex-wrap items-center gap-3 py-3">
+                <span aria-hidden className={cx("grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary", !r.active && "opacity-50")}>☻</span>
+                <div className="min-w-[200px] flex-1"><b className={cx("block text-[13px]", !r.active && "text-muted")}>{r.name}</b><span className="block text-[11px] text-muted">{r.sub}</span></div>
                 {r.active && (
                   <div className="w-44">
                     <div className="mb-1 flex justify-between gap-2 text-[11px]"><span className="text-muted">{live.week.short}</span><b>{r.week.text}</b></div>
-                    <UtilBar pct={r.week.pct} />
+                    <UtilBar pct={r.week.pct} label={`${r.name}: ${r.week.text}`} />
                   </div>
                 )}
                 <div className="min-w-[180px] text-right"><span className={cx("block text-xs", r.day.tone === "crit" ? "text-crit" : r.day.tone === "warn" ? "text-warn" : "text-ink")}>{r.day.main}</span><span className="block text-[11px] text-muted">{r.day.sub}</span></div>

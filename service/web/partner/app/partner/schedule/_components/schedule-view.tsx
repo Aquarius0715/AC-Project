@@ -199,7 +199,7 @@ function WeekCard({ week, members, sel, choice, zone }: { week: NonNullable<Sche
               {rows.map((r) => (
                 <tr key={r.id} className="border-t border-line">
                   <td className="p-1.5 align-top"><b className="text-xs">{r.name}</b><div className="text-muted">{r.sub}</div></td>
-                  {r.cells.map((c, k) => <td key={k} className="p-1"><div className={cx("min-h-9 rounded-lg px-1.5 py-1", cellTone[c.kind])}><b className="block">{c.text}</b>{c.sub && <span className="block truncate opacity-80">{c.sub}</span>}</div></td>)}
+                  {r.cells.map((c, k) => <td key={k} className="p-1"><div className={cx("min-h-9 rounded-lg px-1.5 py-1", cellTone[c.kind])}><b className="block">{c.text}</b>{c.sub && <span className="block truncate">{c.sub}</span>}</div></td>)}
                 </tr>
               ))}
             </tbody>

@@ -64,7 +64,7 @@ function JobsTab({ live, patch, fresh, onFresh }: { live: JobsLive; patch: (p: R
         <Select aria-label={t("Assignee")} className="w-auto" value={q.assignee ?? ""} onChange={(e) => patch({ assignee: e.target.value || null })}><option value="">{t("Assignee: All")}</option>{live.assignees.map((a) => <option key={a.id} value={a.id}>{t("Assignee: {name}", { name: a.name })}</option>)}</Select>
         <Select aria-label={t("Sort")} className="w-auto" value={live.sort} onChange={(e) => patch({ sort: e.target.value === "status" ? null : e.target.value })}>{live.sorts.map((s) => <option key={s.id} value={s.id}>{t("Sort: {sort}", { sort: s.text })}</option>)}</Select>
         <label className="flex items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1.5 text-[13px]"><input type="checkbox" checked={q.overdue === "1"} onChange={(e) => patch({ overdue: e.target.checked ? "1" : null })} /> {t("Overdue only")}</label>
-        {live.periodChip && <button type="button" onClick={() => patch({ from: null, to: null, jobId: null })} className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary" aria-label={t("Clear the requested-time period")}>{live.periodChip} ✕</button>}
+        {live.periodChip && <button type="button" onClick={() => patch({ from: null, to: null, jobId: null })} className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary" aria-label={t("{period} — clear the requested-time period", { period: live.periodChip })}>{live.periodChip} <span aria-hidden>✕</span></button>}
       </div>
       <div className="split-rev">
         <Card title={t("Jobs · all customers")} sub={live.sorts.find((s) => s.id === live.sort)!.text} className="self-start">

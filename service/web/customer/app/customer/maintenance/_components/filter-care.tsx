@@ -35,7 +35,7 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
       <td className="px-3 py-2.5">
         <div className="flex justify-end gap-1.5 whitespace-nowrap">
           {r.state === "overdue" && <Btn size="sm" variant="primary" onClick={() => onRequest({ unitId: r.unitId, symptom: cleaningSymptom(r, t) })}>{t("Request cleaning")}</Btn>}
-          <Btn size="sm" disabled={pending} onClick={() => mark(r)} aria-label={t("Mark {unit} cleaned", { unit: r.unit })}>{t("Mark cleaned")}</Btn>
+          <Btn size="sm" disabled={pending} onClick={() => mark(r)} aria-label={t("Mark cleaned — {unit}", { unit: r.unit })}>{t("Mark cleaned")}</Btn>
         </div>
       </td>
     </tr>
@@ -90,7 +90,7 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
 }
 
 function Progress({ pct, tone, text }: { pct: number | null; tone: "ok" | "warn" | "crit" | "unknown" | "primary" | "muted"; text: string }) {
-  return <div className="w-36"><UtilBar pct={pct} tone={tone} /><div className="mt-1 text-[11px] text-muted">{text}</div></div>;
+  return <div className="w-36"><UtilBar pct={pct} tone={tone} label={text} /><div className="mt-1 text-[11px] text-muted">{text}</div></div>;
 }
 
 function ReminderModal({ init, onClose, onFail }: { init: ReminderForm; onClose: (text?: string) => void; onFail: (f: ActionFailure) => void }) {

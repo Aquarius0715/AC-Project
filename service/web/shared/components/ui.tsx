@@ -462,7 +462,7 @@ export function BarChart({ labels, series, unit, height = 160, colors = ["#c9d8e
       {[0, 0.5, 1].map((f) => (
         <g key={f}>
           <line x1={pad.l} x2={W} y1={pad.t + (height - pad.t - pad.b) * (1 - f)} y2={pad.t + (height - pad.t - pad.b) * (1 - f)} stroke="#e3edf8" />
-          <text x={0} y={pad.t + (height - pad.t - pad.b) * (1 - f) + 4} fontSize="10" fill="#8ca0b3">{Math.round(max * f)}</text>
+          <text x={0} y={pad.t + (height - pad.t - pad.b) * (1 - f) + 4} fontSize="10" fill="#64788e">{Math.round(max * f)}</text>
         </g>
       ))}
       {labels.map((l, i) => (
@@ -471,10 +471,10 @@ export function BarChart({ labels, series, unit, height = 160, colors = ["#c9d8e
             const h = ((height - pad.t - pad.b) * s[i]) / max;
             return <rect key={j} x={pad.l + i * bw + bw * 0.15 + j * gw} y={height - pad.b - h} width={gw - 1} height={h} rx={2} fill={colors[j % colors.length]} />;
           })}
-          <text x={pad.l + i * bw + bw / 2} y={height - 5} fontSize="10" textAnchor="middle" fill="#71849a">{l}</text>
+          <text x={pad.l + i * bw + bw / 2} y={height - 5} fontSize="10" textAnchor="middle" fill="#5b6e84">{l}</text>
         </g>
       ))}
-      {unit && <text x={W - 2} y={10} fontSize="10" textAnchor="end" fill="#8ca0b3">{unit}</text>}
+      {unit && <text x={W - 2} y={10} fontSize="10" textAnchor="end" fill="#64788e">{unit}</text>}
     </svg>
   );
 }
@@ -508,18 +508,19 @@ export function LineChart({ points, min, max, threshold, height = 120, width = 6
   return (
     <svg viewBox={`0 0 ${W} ${height}`} className="w-full" style={{ height: "auto", aspectRatio: `${W}/${height}` }} role="img" aria-label="Line chart">
       {shadeGaps && vals.length > 0 && gaps.map(([a, b]) => <rect key={a} x={clampX(x(a) - step / 2)} y={4} width={Math.max(1, clampX(x(b) + step / 2) - clampX(x(a) - step / 2))} height={height - 24} fill="#94a3b8" opacity={0.14} />)}
-      {ticks?.map((t) => <g key={t}><line x1={0} x2={W} y1={y(t)} y2={y(t)} stroke="#e2e8f0" /><text x={2} y={y(t) - 2} fontSize="9" fill="#71849a">{t}</text></g>)}
+      {ticks?.map((t) => <g key={t}><line x1={0} x2={W} y1={y(t)} y2={y(t)} stroke="#e2e8f0" /><text x={2} y={y(t) - 2} fontSize="9" fill="#5b6e84">{t}</text></g>)}
       {threshold !== undefined && <line x1={0} x2={W} y1={y(threshold)} y2={y(threshold)} stroke="#dc2626" strokeDasharray="4 3" />}
       {runs.map((r, i) => r.length === 1 ? <circle key={i} cx={x(r[0])} cy={y(points[r[0]]!)} r={3} fill={color} />
         : <path key={i} d={r.map((j, k) => `${k ? "L" : "M"}${x(j).toFixed(1)},${y(points[j]!).toFixed(1)}`).join("")} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />)}
-      {labels?.map((l, i) => <text key={i} x={6 + ((W - 12) * i) / Math.max(1, labels.length - 1)} y={height - 4} fontSize="10" fill="#71849a" textAnchor={i === 0 ? "start" : i === labels.length - 1 ? "end" : "middle"}>{l}</text>)}
+      {labels?.map((l, i) => <text key={i} x={6 + ((W - 12) * i) / Math.max(1, labels.length - 1)} y={height - 4} fontSize="10" fill="#5b6e84" textAnchor={i === 0 ? "start" : i === labels.length - 1 ? "end" : "middle"}>{l}</text>)}
     </svg>
   );
 }
 
-export function UtilBar({ pct, tone = "primary" }: { pct: number | null; tone?: Tone }) {
+/** A progress bar; `label` names it for assistive technology (WCAG 4.1.2, IR359). */
+export function UtilBar({ pct, tone = "primary", label }: { pct: number | null; tone?: Tone; label?: string }) {
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-surface2" role="progressbar" aria-valuenow={pct ?? undefined}>
+    <div className="h-2 w-full overflow-hidden rounded-full bg-surface2" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct ?? undefined}>
       <div className={cx("h-full rounded-full", tone === "ok" ? "bg-ok" : tone === "warn" ? "bg-warn" : tone === "crit" ? "bg-crit" : "bg-primary")} style={{ width: `${pct ?? 0}%` }} />
     </div>
   );

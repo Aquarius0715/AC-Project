@@ -7,8 +7,8 @@
   --color-primary: #005bea;
   --color-primary-soft: #e6f0ff;
   --color-ink: #0d2238;
-  --color-muted: #71849a;
-  --color-subtle: #8ca0b3;
+  --color-muted: #5b6e84; /* 4.5:1 or more on every light surface (WCAG 2.2 AA 1.4.3, IR359) */
+  --color-subtle: #64788e; /* placeholders and chart labels on white: 4.55:1 */
   --color-line: #d6e4f5;
   --color-surface: #ffffff;
   --color-surface2: #edf6ff;

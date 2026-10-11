@@ -61,7 +61,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
           </Card>
           <Card title={t("Team capacity — {period}", { period })} action={<TextLink href="/partner/team">{t("Team & capacity →")}</TextLink>}>
             {live.capacity.length === 0 ? <p className="text-[13px] text-muted">{t("No technicians in your company yet.")}</p> : live.capacity.map((c) => (
-              <div key={c.id} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{c.name}</b><span className="text-muted">{c.text}</span></div><UtilBar pct={c.pct} tone={c.pct !== null && c.pct >= 90 ? "warn" : "primary"} /></div>
+              <div key={c.id} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{c.name}</b><span className="text-muted">{c.text}</span></div><UtilBar pct={c.pct} tone={c.pct !== null && c.pct >= 90 ? "warn" : "primary"} label={`${c.name}: ${c.text}`} /></div>
             ))}
             <p className="text-[11px] text-muted">{t("Utilization = assigned hours ÷ available hours. Undefined hours show “—”.")}</p>
           </Card>

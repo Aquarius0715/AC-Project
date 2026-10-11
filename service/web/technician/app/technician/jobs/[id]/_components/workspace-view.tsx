@@ -227,7 +227,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
             <div className="flex min-w-0 flex-col gap-4">
               <Card title={t("Checklist progress")}>
                 {groups.map((g) => (
-                  <div key={g.group} className="mb-2"><div className="mb-1 flex justify-between text-xs"><b>{g.label}</b><span className="text-muted">{g.done} / {g.total}</span></div><UtilBar pct={g.total ? (g.done / g.total) * 100 : 0} tone={g.issues ? "warn" : "primary"} /></div>
+                  <div key={g.group} className="mb-2"><div className="mb-1 flex justify-between text-xs"><b>{g.label}</b><span className="text-muted">{g.done} / {g.total}</span></div><UtilBar pct={g.total ? (g.done / g.total) * 100 : 0} tone={g.issues ? "warn" : "primary"}  label={`${g.label} ${g.done} / ${g.total}`} /></div>
                 ))}
                 <p className="text-[11px] text-muted">{issues?.length ? t(issues.length === 1 ? "1 issue blocks submit — see the summary on the right." : "{n} issues block submit — see the summary on the right.", { n: issues.length }) : t("{n} items still empty — each needs a result, or not inspected / not applicable with a reason, before submit.", { n: draft.items.filter((x) => x.result === null).length })}</p>
               </Card>

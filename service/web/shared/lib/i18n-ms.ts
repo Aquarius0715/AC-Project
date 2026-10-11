@@ -851,7 +851,7 @@ export const ms: Record<string, string> = {
   "Marked cleaned": "Ditanda sudah dibersihkan",
   "{unit}: marked cleaned — the counter restarts at 0 h and your technician sees it.": "{unit}: ditanda sudah dibersihkan — pembilang bermula semula pada 0 j dan juruteknik anda melihatnya.",
   "Request cleaning": "Minta pembersihan",
-  "Mark {unit} cleaned": "Tanda {unit} sudah dibersihkan",
+  "Mark cleaned — {unit}": "Tanda sudah dibersihkan — {unit}",
   "Mark cleaned": "Tanda sudah dibersihkan",
   "Hide": "Sembunyi",
   "View {n}": "Lihat {n}",
@@ -3380,7 +3380,7 @@ export const ms: Record<string, string> = {
   "Assignee: All": "Penerima tugasan: Semua",
   "Assignee: {name}": "Penerima tugasan: {name}",
   "Overdue only": "Tertunggak sahaja",
-  "Clear the requested-time period": "Kosongkan tempoh masa yang diminta",
+  "{period} — clear the requested-time period": "{period} — kosongkan tempoh masa yang diminta",
   "Jobs · all customers": "Kerja · semua pelanggan",
   "Change the scope or the filters.": "Tukar skop atau penapis.",
   "!! Overdue": "!! Tertunggak",
@@ -4000,6 +4000,9 @@ export const ms: Record<string, string> = {
   "Escalate if still unacknowledged (1–1440)": "Eskalasi jika masih belum diakui (1–1440)",
   "Fix the validation errors first": "Betulkan ralat pengesahan dahulu",
   // HQ alert policy creation (IR345)
+  // Accessible names of the automation editor's fields (IR359)
+  "Temperature (°C)": "Suhu (°C)",
+  "Level": "Tahap",
   // Photos linked to an inspection finding (IR352)
   "+ Link photo": "+ Pautkan foto",
   "Linked photos: {names}": "Foto yang dipautkan: {names}",
@@ -4950,8 +4953,7 @@ export const ms: Record<string, string> = {
   "Answer": "Jawab",
   "Contractors see approved and paid statements only (Partner › Payouts).": "Kontraktor hanya melihat penyata yang diluluskan dan dibayar (Rakan kongsi › Pembayaran).",
   "All contracts": "Semua kontrak",
-  "Show all invoices, not only overdue": "Tunjukkan semua invois, bukan hanya yang tertunggak",
-  "Overdue only ✕": "Tertunggak sahaja ✕",
+  "Overdue only — show all invoices": "Tertunggak sahaja — tunjukkan semua invois",
   "Outstanding": "Belum dijelaskan",
   "unpaid · processing": "belum dibayar · sedang diproses",
   "reminders allowed": "peringatan dibenarkan",

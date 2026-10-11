@@ -5288,3 +5288,27 @@ Backend architecture §6 asks for CSRF protection on all BFF write routes. Since
      - the sign-out route: a cross-site sign-out refused, with the session kept.
    - Contract test: every literal `callOp` / `useOp` operation of the apps is a read.
    - E2E `shared/security-headers` (each app): a same-origin read is served. Another site's read, write and sign-out are refused, and the user stays signed in.
+
+## IR359 WCAG 2.2 AA: secondary text contrast and the axe-core check in the smoke crawl — 2026-10-11
+
+NFR-01 targets WCAG 2.2 AA through automated checks and manual tests. The deterministic contracts require zero unresolved axe critical or serious issues, and UX-06 sets 4.5:1 for normal text. No test ran axe. An axe-core 4.14 scan of every linked page of the four apps (WCAG 2.0 / 2.1 / 2.2 A and AA, 134 pages) found these critical or serious issues:
+- **color-contrast:** about 5,460 elements. Almost all were secondary text, `text-muted` #71849A, which reaches only 3.84:1 on white and 3.52:1 on `surface2`. UX-01's reference value, ink at 72 %, gives about 6.4:1.
+- **aria-progressbar-name:** progress bars without a name.
+- **label-content-name-mismatch:** "Mark Meeting room AC cleaned", "Show all invoices, not only overdue" and the period chip, whose names do not contain their visible text.
+- **label / select-name:** the automation editor's value fields and selects had no name.
+- **target-size:** the Access & roles action checkboxes had 4 px between rows.
+- **link-in-text-block:** inline links on the offsets screen were told apart by colour only.
+
+1. **Tokens.** `--color-muted` is #5B6E84 (4.56:1 or more on white, background, `surface2` and `primary-soft`). `--color-subtle` is #64788E (4.55:1 on white) for input placeholders and chart labels. The charts' hard-coded SVG text fills follow. In Figma, the variables `color/text-muted` and `color/text-subtle` take the same values. Every text that carried the old values as raw fills is bound to them now: Admin 5,657, Technician 1,371, Contractor 935, Client 300, UI Guideline 24. The UI Guideline swatch labels read the new values.
+2. **Faded text.** The partner schedule cell's sub-line and the assistant's "You · voice" line had reduced opacity, which brought their contrast below the minimum. They use full colour now. A busy day of the team week is solid primary instead of 70 %. An inactive team member is marked by a faded avatar and a muted name instead of a faded row.
+3. **Names.**
+   - `UtilBar` takes a `label` (`aria-label`, with `aria-valuemin` and `aria-valuemax`), and every API-mode bar passes one.
+   - Accessible names start with the visible text: "Mark cleaned — <unit>", "Overdue only — show all invoices", "<period> — clear the requested-time period". The ✕ glyph is `aria-hidden`.
+   - The automation editor names its condition, comparison, value, action, temperature, power, mode and level fields.
+4. **Targets and links.** The Access & roles checkboxes have 8 px between rows (WCAG 2.5.8). The offsets screen underlines its inline links.
+5. **The check.** The E2E smoke crawl injects axe-core with `page.evaluate`, which the page CSP does not govern. On every page it reaches, it fails on any critical or serious violation. `axe-core` 4.14.0 is a pinned dev dependency.
+6. **Not covered by the crawl.** Open dialogs and states that need an action to appear, and the manual checks of deterministic contracts §151 (NVDA, VoiceOver, keyboard-only scenarios).
+7. **Tests.**
+   - The smoke crawl in each app is clean (40 + 40 + 14 + 40 pages).
+   - E2E `admin/jobs-period` finds the period chip by its new name.
+   - The Malay dictionary follows the renamed keys.

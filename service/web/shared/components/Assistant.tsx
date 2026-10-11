@@ -163,7 +163,7 @@ function LiveAssistant({ onClose, context }: { onClose: () => void; context: str
           <div className="mt-1 flex flex-col gap-1 text-xs">{[ex.temperature, ex.change, ex.help].map((s) => <button key={s} disabled={busy} className="rounded-lg border border-line bg-surface px-2 py-1 text-left hover:bg-primary-soft disabled:opacity-50" onClick={() => ask(s, "text")}>“{s}”</button>)}</div>
         </div>
         {msgs.map((m, n) => {
-          if (m.kind === "user") return <div key={n} className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-[13px] text-white">{m.text}<div className="text-[10px] opacity-70">{m.via === "voice" ? t("You · voice") : t("You · text")}</div></div>;
+          if (m.kind === "user") return <div key={n} className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-[13px] text-white">{m.text}<div className="text-[10px]">{m.via === "voice" ? t("You · voice") : t("You · text")}</div></div>;
           if (m.kind === "bot") return <div key={n} className={cx("max-w-[90%] rounded-2xl rounded-bl-sm px-3 py-2 text-[13px]", m.tone === "crit" ? "bg-crit-soft text-crit" : "bg-surface2")}>{m.text}</div>;
           if (m.kind === "candidates") return (
             <CandidatePicker key={n} m={m} t={t} busy={busy}
@@ -303,7 +303,7 @@ function DemoAssistant({ onClose, context }: { onClose: () => void; context: str
       </>}>
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
         {msgs.map((m, n) => {
-          if (m.kind === "user") return <div key={n} className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-[13px] text-white">{m.text}<div className="text-[10px] opacity-70">You · {m.via}</div></div>;
+          if (m.kind === "user") return <div key={n} className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-[13px] text-white">{m.text}<div className="text-[10px]">You · {m.via}</div></div>;
           if (m.kind === "bot") return <div key={n} className="max-w-[90%] rounded-2xl rounded-bl-sm bg-surface2 px-3 py-2 text-[13px]">{m.text}{n === 0 && (
             <div className="mt-2 flex flex-col gap-1 text-xs">{["What’s the temperature in Bedroom?", "Set Bedroom AC to 24 degrees", "Help: how do schedules work?"].map((s) => <button key={s} className="rounded-lg border border-line bg-surface px-2 py-1 text-left hover:bg-primary-soft" onClick={() => interpret(s, "text")}>“{s}”</button>)}</div>)}</div>;
           if (m.kind === "confirm") return (
