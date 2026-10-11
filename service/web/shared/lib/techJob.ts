@@ -104,6 +104,25 @@ export function draftInput(jobId: string, reportId: string | null, d: Draft): Op
   };
 }
 
+/** The report photos linked to a component's finding (InspectionItem.evidenceIds, Figma Technician 423:204, IR352):
+ * `linked` in link order — a photo the report no longer lists keeps its ID as its name — and `free`, the ready photos
+ * of the report not linked to it yet. */
+export type PhotoRef = { id: string; name: string; status: string };
+export function itemPhotos(d: Draft, key: string, photos: PhotoRef[]): { linked: PhotoRef[]; free: PhotoRef[] } {
+  const ids = d.items.find((x) => x.componentKey === key)?.evidenceIds ?? [];
+  return {
+    linked: ids.map((id) => photos.find((p) => p.id === id) ?? { id, name: id.slice(0, 8), status: "missing" }),
+    free: photos.filter((p) => p.status === "ready" && !ids.includes(p.id)),
+  };
+}
+/** Links a report photo to a component's finding (`on`) or unlinks it; a photo is linked to a finding at most once. */
+export function linkPhoto(d: Draft, key: string, id: string, on: boolean): Draft {
+  return {
+    ...d, items: d.items.map((x) => (x.componentKey !== key ? x
+      : { ...x, evidenceIds: on ? (x.evidenceIds.includes(id) ? x.evidenceIds : [...x.evidenceIds, id]) : x.evidenceIds.filter((e) => e !== id) })),
+  };
+}
+
 /** What blocks a submit (the IR100 / IR126 submit rules of the Core API, checked first in the browser so the
  * technician sees every issue at once; the API stays the authority). */
 export type Issue = { key: string | null; group: Group | null; text: string };

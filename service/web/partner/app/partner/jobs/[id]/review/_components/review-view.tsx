@@ -65,7 +65,7 @@ export function ReviewView({ live }: { live: ReviewLive }) {
           <Card title={t("Submitted report — version {version}", { version: r.version })} sub={r.submitted ? t("{name} · submitted {time}", { name: r.author, time: r.submitted }) : r.author}>
             <ul className="divide-y divide-line">{r.items.map((it) => {
               const res = it.result ? resultText[it.result] : { label: "No result", tone: "crit" as const };
-              return <li key={it.id} className="py-2 text-[13px]"><div className="flex flex-wrap items-center justify-between gap-2"><span>{it.label}</span><Badge tone={res.tone}>{t(res.label)}</Badge></div>{it.reason && <div className="text-xs text-muted">{t("Reason: {reason}", { reason: it.reason })}</div>}</li>;
+              return <li key={it.id} className="py-2 text-[13px]"><div className="flex flex-wrap items-center justify-between gap-2"><span>{it.label}</span><Badge tone={res.tone}>{t(res.label)}</Badge></div>{it.reason && <div className="text-xs text-muted">{t("Reason: {reason}", { reason: it.reason })}</div>}{it.photos.length > 0 && <div className="text-xs text-muted">📷 {t("Linked photos: {names}", { names: it.photos.join(", ") })}</div>}</li>;
             })}</ul>
             <h3 className="mt-4 mb-1 text-[13px] font-bold">{t("Photos")}</h3>
             {r.photos.length === 0 ? <p className="text-xs text-muted">{t("No photos attached.")}</p> : (

@@ -26,6 +26,11 @@ describe("inspection rows", () => {
     expect(rows[2]).toMatchObject({ result: "not_applicable", reason: "No exposed wiring" });
     expect(inspectionRows([item({ componentKey: "new_part" })])[0].label).toBe("Indoor unit — new part");
   });
+  it("names the photos linked to a finding (IR352)", () => {
+    const r = report({ items: [item({ result: "attention", reason: "Dusty", evidenceIds: ["a1", "fedcba9876543210"] })] });
+    expect(inspectionRows(r.items, undefined, r.attachmentRefs)[0].photos).toEqual(["p1.png", "fedcba98"]); // a photo the report no longer lists keeps its ID
+    expect(inspectionRows(report().items)[0].photos).toEqual([]);
+  });
   it("prints readings with their quality", () => {
     expect(readingRows(report().measurements)).toEqual([["Refrigerant pressure (refrigerant)", "460 kPa · recorded"]]);
     expect(readingRows([{ id: "m", metric: "temperature", value: null, unit: "°C", quality: "missing", observedAt: "" }])).toEqual([["Supply air temperature", "no value"]]);

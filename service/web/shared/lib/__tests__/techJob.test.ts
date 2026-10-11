@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { componentsFor, draftFrom, draftInput, fmtOf, followUpText, groupOf, historyCard, knownOf, progress, submitIssues, timeRows, versionRows, warnAt, windowState, type ApiTechReport, type Draft } from "@ac/web/lib/techJob";
+import { componentsFor, draftFrom, draftInput, fmtOf, followUpText, groupOf, historyCard, itemPhotos, knownOf, linkPhoto, progress, submitIssues, timeRows, versionRows, warnAt, windowState, type ApiTechReport, type Draft } from "@ac/web/lib/techJob";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
@@ -52,6 +52,26 @@ describe("draft", () => {
     ]);
     expect(body.nextAction).toEqual({ kind: "follow_up", date: "2026-10-01T00:00:00.000Z", note: "replace filter" });
     expect("reportId" in draftInput("job", null, d)).toBe(false);
+  });
+});
+
+// IR352: a finding links report photos (InspectionItem.evidenceIds, Figma Technician 423:204)
+describe("photos linked to a finding", () => {
+  const photos = [...report().attachmentRefs, { id: "a3", name: "p3.png", mime: "image/png", size: 10, status: "processing" as const }];
+  it("links a ready photo once, unlinks it, and sends the links with the draft", () => {
+    const d0 = draftFrom(report(), all);
+    expect(itemPhotos(d0, "filter", photos)).toEqual({ linked: [], free: [photos[0]] }); // failed and processing photos are not offered
+    const d1 = linkPhoto(linkPhoto(d0, "filter", "a1", true), "filter", "a1", true);
+    expect(d1.items.find((i) => i.componentKey === "filter")?.evidenceIds).toEqual(["a1"]);
+    expect(d0.items.find((i) => i.componentKey === "filter")?.evidenceIds).toEqual([]); // the draft is not changed in place
+    expect(itemPhotos(d1, "filter", photos)).toEqual({ linked: [photos[0]], free: [] });
+    expect(itemPhotos(d1, "louver", photos).free).toEqual([photos[0]]); // a photo may also back another finding
+    expect(draftInput("job", "rep", d1).items.find((i) => i.componentKey === "filter")?.evidenceIds).toEqual(["a1"]);
+    expect(linkPhoto(d1, "filter", "a1", false).items.find((i) => i.componentKey === "filter")?.evidenceIds).toEqual([]);
+  });
+  it("keeps a linked photo the report no longer lists by its ID", () => {
+    const d = draftFrom(report({ items: [{ ...report().items[0], evidenceIds: ["0123456789abcdef"] }] }), all);
+    expect(itemPhotos(d, "filter", photos).linked).toEqual([{ id: "0123456789abcdef", name: "01234567", status: "missing" }]);
   });
 });
 

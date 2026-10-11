@@ -5154,3 +5154,30 @@ This IR adds no operation.
    - Integration `TestDiagnosticRuns`: after a run's end fails because the device was offline, the end action sent again as a command of the job is accepted (source `ui`, the job, no run), and the run stays `end_failed`.
    - E2E `shared/notifications`, in each of the four apps as its user: "Mark all as read" empties the Unread tab, names the count and hides itself. With nothing unread, the button is not offered.
    - A real-stack check used a temporary `end_failed` run on Bedroom AC for job-contractor-a, inside its window. The card showed the banner and an enabled "Retry end command". The temporary rows were deleted.
+
+## IR352 Photos linked to an inspection finding, as Figma Technician 423:204 draws — 2026-10-11
+
+R345 continued the label audit and found one more missing function. A technician could attach photos to the report, but not to a finding:
+- DD-T04–T06 step 1 says "Link findings, measurements, and photos as needed", and the workspace layout (DD-T04 step 5) says photos attach to components.
+- `InspectionItemInput.evidenceIds` carries the links. `jobs.saveDraft` already accepts only attachments of the same report (`items=error.otherReportAttachment`).
+- Figma Technician 423:204 draws a Capacitor finding with its reading, "+ Add reading" and "+ Link photo".
+
+The audit's remaining items are wording; the screens keep their as-built text (IR351).
+
+1. **Technician workspace (DD-T04–T06).**
+   - Under each component, the checklist shows its own readings and the report photos linked to its finding. A reading reads "Reading · <metric> · <value> <unit> · observed <time>"; a linked photo is a chip that opens the photo.
+   - "+ Add reading" and "+ Link photo" appear on a finding that needs attention, or that already has a reading or a photo. "+ Add reading" adds a reading of this component and switches the side view to Readings.
+   - "+ Link photo" lists the report's ready photos not yet linked to the finding; choosing one links it. Each chip has an unlink button. A photo may back several findings; a finding links a photo once.
+   - Without a ready photo in the report, "+ Link photo" is disabled and the row reads "Add a photo under Photos first, then link it to this finding."
+   - Linking and unlinking are draft edits: the draft autosaves and the customer sign-off clears, as with any edit (DD-T15).
+2. **Reviews.** Two reviews name the photos linked to each finding ("📷 Linked photos: …"): the partner quality review (DD-P05) and the HQ report review of the Jobs tab (DD-A06, also in "Open report →"). A linked photo the report no longer lists keeps its ID.
+3. **Not changed.**
+   - `jobs.saveDraft`, `jobs.submit` and the review rules stay as they are. A finding needs no photo to be submitted or accepted.
+   - The Phase 1A demo workspace is unchanged.
+4. **Tests.**
+   - Web unit: a ready photo linked once and unlinked, the draft input carrying the links, and a missing photo kept by its ID. The partner and HQ review rows name the linked photos.
+   - Integration `TestAttachmentsAndSignOff`: the saved draft returns the finding's linked photo.
+   - Real-stack check with a temporary in-progress job for tech-internal-a on Bedroom AC, with two photos, one linked to the filter finding:
+     - The row showed the linked photo. "+ Link photo" linked the second; a reading was added and the photo unlinked again. Nothing was saved.
+     - Submitted, the HQ report review and "Open report →" named the linked photo.
+     - The temporary rows were deleted, and no projection or notification kept them.

@@ -1,6 +1,6 @@
 ---
 document_id: DD-T
-version: 0.43.0
+version: 0.44.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -165,6 +165,7 @@ Scope: FR-T04 / Main display pattern: **UI-FORM**. Service boundary: `jobs.get, 
 3. Link inspection results to the report version, author, and observation time. Keep sensor estimates as separate evidence. Do not overwrite original sensor data with on-site inspection results.
 4. Queries to update: `report draft / inspection items`.
 5. Tabs (IR115, Figma Technician 02-2/02-3/02-29): the URL `tab` selects the checklist group — `tab=indoor` (default), `tab=outdoor`, `tab=electrical` (DD-T05/DD-T06 use the same layout). The side view switch Readings / Parts & refrigerant / Time on site (DD-T14) is local state, not a URL key; photos attach to components and readings, and the work report (submit, customer sign-off DD-T15) is the footer panel, not a tab.
+   - As built (IR352, Figma 423:204): each component shows its own readings and the report photos linked to its finding (`evidenceIds`). A finding that needs attention, or already has evidence, offers “+ Add reading” and “+ Link photo”; the latter lists the report's ready photos not yet linked to it. Each linked photo has an unlink button.
 
 **Boundary cases and failures**: Reject missing entries, measurements without units, not-inspected results without reasons, and photos from other jobs. Never default to normal and treat uninspected work as complete. After the viewing window ends — completion releases the assignment (IR234), or a reassignment / cancellation revokes it — `/technician/jobs/:id` shows the history snapshot (status, completion, whether the report was accepted, when the assignment ended) instead of not found.
 
@@ -487,6 +488,6 @@ Scope: FR-T15 / Main display pattern: **UI-FORM**. Service boundary: `reports.si
 
 0.10.0: T12 fetches alerts.get using DeviceEvent.alertIds and acknowledges using Alert.version (SR23). Filter device history by scope at event time (SR24).
 
-Additional contracts for current version 0.43.0: Read IR01–IR351 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.44.0: Read IR01–IR352 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 Apply IR34 to job-list and jobs.list sorting. When URL sort is absent, use status:asc. Changing the selection discards cursor, keeps filters, and fetches page one of a new snapshot. Allow ascending/descending sorting by state, severity, or deadline.

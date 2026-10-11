@@ -50,7 +50,7 @@ export async function loadReview(jobId: string): Promise<ReviewLive> {
   return {
     ...base,
     report: {
-      id: r.id, version: r.version, author, submitted: r.submittedAt ? showTime(r.submittedAt, display) : null, items: inspectionRows(r.items, t), readings: readingRows(r.measurements, t),
+      id: r.id, version: r.version, author, submitted: r.submittedAt ? showTime(r.submittedAt, display) : null, items: inspectionRows(r.items, t, r.attachmentRefs), readings: readingRows(r.measurements, t),
       parts: partLines(r.parts, r.refrigerant, t), signOff: r.signOff ? `${r.signOff.signerName} · ${showTime(r.signOff.signedAt, display)}` : null, workText: r.workText, next, photos,
       timeOnSite: timeOnSiteText(job.timeOnSite, i), evidence: check.rows, acceptable: check.acceptable, missing: check.missing,
       allowed: r.reviewAvailability.allowed, blocked: availabilityText(r.reviewAvailability, job.status, t),

@@ -1,6 +1,6 @@
 ---
 document_id: DD-P
-version: 0.34.0
+version: 0.35.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -200,6 +200,7 @@ Scope: FR-P05 / Main display pattern: **UI-DETAIL / UI-FORM**. Service boundary:
 **Steps**
 
 1. Review the submitted inspections, photos, measurements, work details, and next actions. Enter acceptance or return with a reason. Share the result with the technician, customer, and HQ.
+   - As built (IR352): each inspection row names the report photos linked to its finding (“📷 Linked photos: …”).
 2. Apply the following business rules to both reads and actions.
    - Accept only when required inspection records and evidence are complete.
    - Check whether reasons for “Not inspected” or “Not applicable” items are valid.
@@ -362,7 +363,7 @@ Scope: FR-P10 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.34.0: Read IR01–IR341 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.35.0: Read IR01–IR352 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 0.14.0: Under IR25, get the pre-acceptance address from the unit's installation property. After expiry, freeze only report presence and acceptance state for report display.
 

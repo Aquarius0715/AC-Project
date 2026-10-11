@@ -4000,6 +4000,12 @@ export const ms: Record<string, string> = {
   "Escalate if still unacknowledged (1–1440)": "Eskalasi jika masih belum diakui (1–1440)",
   "Fix the validation errors first": "Betulkan ralat pengesahan dahulu",
   // HQ alert policy creation (IR345)
+  // Photos linked to an inspection finding (IR352)
+  "+ Link photo": "+ Pautkan foto",
+  "Linked photos: {names}": "Foto yang dipautkan: {names}",
+  "Unlink {photo} from {item}": "Nyahpaut {photo} daripada {item}",
+  "Add a photo under Photos first, then link it to this finding.": "Tambah foto di bawah Foto dahulu, kemudian pautkannya pada penemuan ini.",
+  "Report photos to link to {item}": "Foto laporan untuk dipautkan pada {item}",
   // Mark all as read; the diagnostic end retry (IR351)
   "{n} marked as read · {failed} not marked — they changed meanwhile or are no longer available": "{n} ditanda sebagai dibaca · {failed} tidak ditanda — ia berubah sementara itu atau tidak lagi tersedia",
   "Mark all as read": "Tanda semua sebagai dibaca",

@@ -290,7 +290,7 @@ export const extendDefault = (until: string) => new Date(Date.parse(until) + 24 
  * inspection result and reading, and whether HQ may decide — a normal review of an internal job, an escalation (reason
  * required) of a contractor's job, never a version the reviewer authored (IR31). */
 export type ReportCard = {
-  id: string; version: number; title: string; sub: string; author: string; rows: { id: string; label: string; result: string; tone: Tone; reason: string | null }[]; readings: [string, string][];
+  id: string; version: number; title: string; sub: string; author: string; rows: { id: string; label: string; result: string; tone: Tone; reason: string | null; photos: string[] }[]; readings: [string, string][];
   workText: string; mode: "normal" | "hq_escalation"; decide: boolean; note: string; tone: "primary" | "warn" | "ok" | "muted"; rework: { label: string; checked: boolean }[];
   reviews: { text: string; tone: Tone }[];
   /** The rest of the report for “Open report →”: parts and refrigerant, the next action and the customer's sign-off. */
@@ -309,9 +309,9 @@ export function reportCard(j: ApiHqJob, r: ApiWorkReport, byUser: Map<string, st
     : !av.allowed ? (av.reason === "self_authored" ? "You submitted this report version, so you cannot accept or return it (self-approval is rejected)." : av.reason === "not_current" ? "A newer report version exists — reload to review it." : "Reviewing needs the job.write permission.")
     : mode === "hq_escalation" ? "The contractor reviews its own reports first. HQ may accept or return this one only by escalation, with a reason (IR31)."
     : "You did not contribute to this report, so you can review it (self-approval is rejected).");
-  const rows = inspectionRows(r.items, t).map((it) => {
+  const rows = inspectionRows(r.items, t, r.attachmentRefs).map((it) => {
     const x = it.result ? resultText[it.result] : { label: "No result", tone: "crit" as const };
-    return { id: it.id, label: it.label, result: t(x.label), tone: x.tone, reason: it.reason };
+    return { id: it.id, label: it.label, result: t(x.label), tone: x.tone, reason: it.reason, photos: it.photos };
   });
   const readings = readingRows(r.measurements, t);
   const submitted = r.submittedAt ? t(j.reportRefs.length > 1 ? "Resubmitted {time}" : "Submitted {time}", { time: showTime(r.submittedAt, display) }) : t("Not submitted");

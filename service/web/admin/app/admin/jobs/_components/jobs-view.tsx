@@ -373,9 +373,15 @@ function ClassifyModal({ d, onClose, onFail }: Omit<ModalProps, "live">) {
 }
 
 /** The inspection results: the items that are not OK first, the OK ones folded into one line. */
+/** The report photos linked to an inspection finding (InspectionItem.evidenceIds, IR352). */
+function LinkedPhotos({ names }: { names: string[] }) {
+  const t = useT();
+  return names.length ? <span className="block text-xs text-muted">📷 {t("Linked photos: {names}", { names: names.join(", ") })}</span> : null;
+}
+
 function ReportRows({ rows }: { rows: NonNullable<Detail["report"]>["rows"] }) {
   const t = useT();
-  const row = (r: (typeof rows)[number]) => <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-[13px]"><span>{r.label}{r.reason && <span className="text-xs text-muted"> · {r.reason}</span>}</span><Badge tone={r.tone}>{r.result}</Badge></li>;
+  const row = (r: (typeof rows)[number]) => <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-[13px]"><span>{r.label}{r.reason && <span className="text-xs text-muted"> · {r.reason}</span>}<LinkedPhotos names={r.photos} /></span><Badge tone={r.tone}>{r.result}</Badge></li>;
   const ok = rows.filter((r) => r.tone === "ok");
   return (
     <>
@@ -392,7 +398,7 @@ function ReportModal({ report: r, draft, onClose }: { report: NonNullable<Detail
   return (
     <Modal open wide onClose={onClose} title={r.title} footer={<Btn onClick={onClose}>{t("Close")}</Btn>}>
       <p className="text-xs text-muted">{r.sub}</p>
-      <ul className="divide-y divide-line">{r.rows.map((x) => <li key={x.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-[13px]"><span>{x.label}{x.reason && <span className="text-xs text-muted"> · {x.reason}</span>}</span><Badge tone={x.tone}>{x.result}</Badge></li>)}</ul>
+      <ul className="divide-y divide-line">{r.rows.map((x) => <li key={x.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-[13px]"><span>{x.label}{x.reason && <span className="text-xs text-muted"> · {x.reason}</span>}<LinkedPhotos names={x.photos} /></span><Badge tone={x.tone}>{x.result}</Badge></li>)}</ul>
       <SummaryList items={[...r.readings, ...r.parts, [t("Work performed"), r.workText || "—"], [t("Next action"), r.next], [t("Customer sign-off"), r.signOff]]} />
       {r.photos.length > 0 && <div className="flex flex-wrap gap-2">{r.photos.map((p) => (
         // eslint-disable-next-line @next/next/no-img-element -- data URL read through the DAL (attachments.getContent)

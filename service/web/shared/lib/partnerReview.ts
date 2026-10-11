@@ -41,12 +41,16 @@ const componentLabel: Record<string, string> = {
 export const resultText: Record<NonNullable<ApiInspectionItem["result"]>, { label: string; tone: "ok" | "warn" | "muted" | "crit" }> = {
   normal: { label: "OK", tone: "ok" }, attention: { label: "Attention", tone: "warn" }, not_inspected: { label: "Not inspected", tone: "crit" }, not_applicable: { label: "Not applicable", tone: "muted" },
 };
-/** One inspection row (Figma 03 “Indoor unit — filter condition · OK”, reason under not-applicable items). */
-export type InspectionRow = { id: string; label: string; result: ApiInspectionItem["result"]; reason: string | null };
-export function inspectionRows(items: ApiInspectionItem[], t: T = en): InspectionRow[] {
+/** One inspection row (Figma 03 “Indoor unit — filter condition · OK”, reason under not-applicable items) with the
+ * names of the report photos linked to its finding (InspectionItem.evidenceIds, IR352); a photo the report no longer
+ * lists keeps its ID. */
+export type InspectionRow = { id: string; label: string; result: ApiInspectionItem["result"]; reason: string | null; photos: string[] };
+export function inspectionRows(items: ApiInspectionItem[], t: T = en, attachments: Pick<ApiAttachment, "id" | "name">[] = []): InspectionRow[] {
   const order = { indoor: 0, outdoor: 1, electrical: 2 };
+  const names = new Map(attachments.map((a) => [a.id, a.name]));
   return [...items].sort((a, b) => order[a.componentGroup] - order[b.componentGroup]).map((it) => ({
     id: it.id, label: `${t(groupLabel[it.componentGroup])} — ${componentLabel[it.componentKey] ? t(componentLabel[it.componentKey]) : it.componentKey.replace(/_/g, " ")}`, result: it.result, reason: it.reason,
+    photos: it.evidenceIds.map((id) => names.get(id) ?? id.slice(0, 8)),
   }));
 }
 

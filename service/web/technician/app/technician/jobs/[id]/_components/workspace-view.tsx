@@ -10,7 +10,7 @@ import { zonedInstant, type T } from "@ac/web/lib/i18n";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import {
-  componentLabel, draftFrom, draftInput, fmtOf, followUpText, groupLabel, progress, readingMetrics, submitIssues, timeRows, versionRows, windowState,
+  componentLabel, draftFrom, draftInput, fmtOf, followUpText, groupLabel, itemPhotos, linkPhoto, progress, readingMetrics, submitIssues, timeRows, versionRows, windowState,
   type ApiTechReport, type Draft, type DraftPart, type DraftRefrigerant, type Group, type Issue, type Known, type Result, type TimeOnSite,
 } from "@ac/web/lib/techJob";
 import { acknowledge, checkIn, pauseWork, resumeRework, saveDraft, signOff, submitReport, uploadPhoto } from "../actions";
@@ -75,6 +75,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   const [view, setView] = useState<"readings" | "parts" | "time">("readings");
   const [modal, setModal] = useState<null | "checkin" | "cant" | "part" | "refrigerant" | "sign" | "submit">(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [linking, setLinking] = useState<string | null>(null); // the component whose “+ Link photo” list is open
   const win = windowState(job.assignment, now, f);
   const inWork = job.status === "in_progress";
   const paused = !!job.timeOnSite?.pauses?.some((p) => !p.to);
@@ -145,6 +146,45 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   );
   const label = (key: string) => t(componentLabel[key] ?? key);
   const netKg = draft.refrigerant.reduce((s, r) => s + r.chargedKg - r.recoveredKg, 0);
+  const addReading = (key: string) => edit((d) => ({ ...d, readings: [...d.readings, { componentKey: key, metric: "temperature", value: "", observedAt: new Date(now).toISOString() }] }));
+  // a finding's own readings and linked report photos, with “+ Add reading” and “+ Link photo” on a finding that needs
+  // attention or already has evidence (Figma Technician 423:204, DD-T04–T06 step 1, IR352)
+  const evidence = (it: Draft["items"][number]) => {
+    const own = draft.readings.filter((m) => m.componentKey === it.componentKey);
+    const ph = itemPhotos(draft, it.componentKey, photos);
+    const actions = editable && (it.result === "attention" || own.length > 0 || ph.linked.length > 0);
+    if (!actions && own.length === 0 && ph.linked.length === 0) return null;
+    const name = label(it.componentKey);
+    return (
+      <div className="mt-1.5 flex flex-col gap-1.5">
+        {own.map((m, k) => (
+          <div key={k} className="flex flex-wrap items-baseline gap-x-2 rounded-lg bg-primary-soft/60 px-2.5 py-1.5 text-xs">
+            <b>{t("Reading")}</b><span>{t(readingMetrics.find((x) => x.metric === m.metric)?.label ?? m.metric)} · {m.value.trim() || "—"} {metricUnit[m.metric]}</span><span className="text-muted">{t("observed {time}", { time: f.clock(m.observedAt) })}</span>
+          </div>
+        ))}
+        {ph.linked.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">{ph.linked.map((x) => (
+            <span key={x.id} className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2 py-0.5 text-xs">
+              📷 {x.status === "missing" ? x.name : <a href={photoUrl(x)} target="_blank" rel="noreferrer" className="font-semibold text-primary">{x.name}</a>}
+              {editable && <button type="button" aria-label={t("Unlink {photo} from {item}", { photo: x.name, item: name })} className="text-muted hover:text-ink" onClick={() => edit((d) => linkPhoto(d, it.componentKey, x.id, false))}>✕</button>}
+            </span>
+          ))}</div>
+        )}
+        {actions && (
+          <div className="flex flex-wrap gap-2">
+            <Btn size="sm" onClick={() => { addReading(it.componentKey); setView("readings"); }}>{t("+ Add reading")}</Btn>
+            <Btn size="sm" disabled={ph.free.length === 0} aria-expanded={linking === it.componentKey} onClick={() => setLinking((k) => (k === it.componentKey ? null : it.componentKey))}>{t("+ Link photo")}</Btn>
+          </div>
+        )}
+        {actions && !photos.some((x) => x.status === "ready") && <p className="text-[11px] text-muted">{t("Add a photo under Photos first, then link it to this finding.")}</p>}
+        {actions && linking === it.componentKey && ph.free.length > 0 && (
+          <div role="group" aria-label={t("Report photos to link to {item}", { item: name })} className="flex flex-wrap gap-1.5 rounded-lg border border-line p-2">
+            {ph.free.map((x) => <Btn key={x.id} size="sm" variant="ghost" onClick={() => { edit((d) => linkPhoto(d, it.componentKey, x.id, true)); setLinking(null); }}>📷 {x.name}</Btn>)}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <Page>
@@ -177,6 +217,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                     {it.result && it.result !== "normal" && (editable
                       ? <div className="mt-1.5"><Input placeholder={t("Reason (required for {result})", { result: t(results.find((r) => r.id === it.result)?.label ?? "") })} maxLength={1000} value={it.reason} onChange={(e) => edit((d) => ({ ...d, items: d.items.map((x) => (x.componentKey === it.componentKey ? { ...x, reason: e.target.value } : x)) }))} /></div>
                       : it.reason ? <div className="text-xs text-muted">{t("Reason: {reason}", { reason: it.reason })}</div> : null)}
+                    {evidence(it)}
                     {issueOf(it.componentKey) && <p className="mt-1 text-xs text-crit">{issueOf(it.componentKey)}</p>}
                   </li>
                 ))}</ul>
@@ -207,7 +248,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
             </div>
           </div>
           <Card title={<Tabs value={view} onChange={setView} tabs={[{ id: "readings", label: t("Readings"), count: draft.readings.length }, { id: "parts", label: t("Parts & refrigerant"), count: draft.parts.length + draft.refrigerant.length }, { id: "time", label: t("Time on site") }]} />}
-            action={view === "readings" && editable ? <Btn size="sm" onClick={() => edit((d) => ({ ...d, readings: [...d.readings, { componentKey: tab === "outdoor" ? "refrigerant_pipe" : live.components[0]?.key ?? "filter", metric: "temperature", value: "", observedAt: new Date(now).toISOString() }] }))}>{t("+ Add reading")}</Btn>
+            action={view === "readings" && editable ? <Btn size="sm" onClick={() => addReading(tab === "outdoor" ? "refrigerant_pipe" : live.components[0]?.key ?? "filter")}>{t("+ Add reading")}</Btn>
               : view === "parts" && editable ? <span className="flex gap-2"><Btn size="sm" onClick={() => setModal("part")}>{t("+ Add part")}</Btn><Btn size="sm" onClick={() => setModal("refrigerant")}>{t("+ Refrigerant")}</Btn></span> : null}>
             {view === "readings" && (draft.readings.length === 0 ? <p className="text-[13px] text-muted">{t("No readings yet. Record each measurement with its unit and the component it belongs to — an unmeasured value is left empty, never 0.")}</p> : (
               <div className="scroll-x"><table className="w-full min-w-[560px] text-[13px]">

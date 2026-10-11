@@ -56,8 +56,17 @@ func TestAttachmentsAndSignOff(t *testing.T) {
 	// the draft moved to version 2; link the photo as evidence
 	body := strings.Replace(draftBody(job, "normal", map[string]string{"reportId": `"` + rep + `"`, "attachmentIds": `["` + att + `"]`}),
 		`"componentKey":"filter","result":"normal","reason":null,"evidenceIds":[]`, `"componentKey":"filter","result":"normal","reason":null,"evidenceIds":["`+att+`"]`, 1)
-	if code, m := write(s, &techInt, "jobs.saveDraft", body, 2); code != 200 || len(data(m)["attachmentRefs"].([]any)) != 1 {
+	code, m = write(s, &techInt, "jobs.saveDraft", body, 2)
+	if code != 200 || len(data(m)["attachmentRefs"].([]any)) != 1 {
 		t.Fatalf("draft with attachment: %d %v", code, m)
+	}
+	// the finding keeps its linked photo (InspectionItem.evidenceIds, IR352)
+	for _, it := range data(m)["items"].([]any) {
+		if x := it.(map[string]any); x["componentKey"] == "filter" {
+			if ev, _ := x["evidenceIds"].([]any); len(ev) != 1 || ev[0] != att {
+				t.Errorf("filter evidence: %v", x["evidenceIds"])
+			}
+		}
 	}
 	// sign-off
 	sign := func(extra string, v, rv int) (int, map[string]any) {
