@@ -20,7 +20,7 @@ func TestOIDCVerifier(t *testing.T) {
 		return s
 	}
 	base := func() jwt.MapClaims {
-		return jwt.MapClaims{"iss": v.Issuer, "sub": "user-1", "azp": "ac-web", "exp": time.Now().Add(time.Hour).Unix()}
+		return jwt.MapClaims{"iss": v.Issuer, "sub": "user-1", "azp": "ac-web", "typ": "Bearer", "exp": time.Now().Add(time.Hour).Unix()}
 	}
 	if id, err := v.Verify(context.Background(), sign(key, base())); err != nil || id.Subject != "user-1" || !id.SignedIn.IsZero() {
 		t.Fatalf("valid token: %+v %v", id, err)
@@ -41,6 +41,12 @@ func TestOIDCVerifier(t *testing.T) {
 	if _, err := v.Verify(context.Background(), sign(key, c)); err != nil {
 		t.Fatalf("aud claim: %v", err)
 	}
+	c = base() // Cognito: an access token says token_use=access and has no typ
+	delete(c, "typ")
+	c["token_use"] = "access"
+	if _, err := v.Verify(context.Background(), sign(key, c)); err != nil {
+		t.Fatalf("Cognito access token: %v", err)
+	}
 	bad := map[string]jwt.MapClaims{}
 	c = base()
 	c["iss"] = "evil"
@@ -57,6 +63,23 @@ func TestOIDCVerifier(t *testing.T) {
 	c = base()
 	delete(c, "sub")
 	bad["no sub"] = c
+	// IR367: only access tokens; the ID token of the same client has the same issuer, audience and key
+	c = base()
+	c["typ"] = "ID"
+	bad["Keycloak ID token"] = c
+	c = base()
+	delete(c, "typ")
+	c["token_use"] = "id"
+	bad["Cognito ID token"] = c
+	c = base()
+	c["token_use"] = "id" // token_use decides when both are present
+	bad["token_use id with typ Bearer"] = c
+	c = base()
+	c["typ"] = "Refresh"
+	bad["Keycloak refresh token"] = c
+	c = base()
+	delete(c, "typ")
+	bad["no token type"] = c
 	for name, cl := range bad {
 		if _, err := v.Verify(context.Background(), sign(key, cl)); err == nil {
 			t.Errorf("%s must fail", name)

@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTAINER
-version: 0.34.0
+version: 0.35.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -130,7 +130,7 @@ Configuration is twelve-factor: every service reads environment variables only. 
 | `DEMO_OPS` / `DEMO_CLOCK_START` | domain services, workers | `1` / not set (the fixture clock) | not set (demo operations off) — `demo.*` operations and the shared scenario clock (IR154, IR36, IR168) |
 | `APP_LOGIN_PASSWORD` / `SEED_FIXTURE` | migrate | a local password / the fixture path | not set (logins from infrastructure as code; no fixture) — Local logins `ac_app_login` and `ac_<domain>_login`, and the demo fixture (IR167, IR194) |
 | `INTERNAL_API_TOKEN` / `IDENTITY_INTERNAL_URL` | Core API services | secret / `http://identity-api:8080` | service-to-service calls; principals from identity-api (IR182) |
-| `SESSION_SECRET` | web (BFF) | a local value in `compose.yaml` | Secrets Manager — Key material of the sealed session cookie (AES-256-GCM, key derived with HKDF, IR333) |
+| `SESSION_SECRET` | web (BFF) | a local value in `compose.yaml` | Secrets Manager — Key material of the sealed session cookie (AES-256-GCM, key derived with HKDF, IR333). Required on https, at least 32 characters: without it the app seals and opens no session (IR367) |
 | `APP_URL` / `OIDC_APP_CLIENT_SECRET` | web (BFF) | `http://localhost:3000`–`3003` / the Keycloak client secret | the app's host name / Secrets Manager — The OIDC redirect URI and the confidential client |
 | `CUSTOMER_WEB_URL` / `PARTNER_WEB_URL` / `TECHNICIAN_WEB_URL` / `ADMIN_WEB_URL` | web | `http://localhost:3000`–`3003` | the four host names — Links between the four apps (IR178) |
 | `SESSION_STORE_URL` | web (BFF) | `redis://valkey:6379` | ElastiCache endpoint (TLS) — Reserved for the server-side session store: not read yet, sessions live in the sealed cookie (OPEN-CT-03) |
@@ -176,4 +176,4 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 | OPEN-CT-03 | The server-side session store (ElastiCache in production, Valkey locally) with revocation on sign-out (backend architecture §6). Until then the BFF keeps the tokens in its sealed session cookie (IR333). Sign-out already ends the identity provider's session (IR357), so a copied cookie cannot be refreshed after it |
 | OPEN-CT-04 | OpenTelemetry instrumentation of the Go services and the web apps. The collector, Jaeger and `OTEL_EXPORTER_OTLP_ENDPOINT` are ready, but nothing exports traces or metrics yet (IR334) |
 
-Additional contracts for current version 0.34.0: Read IR01–IR357 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.35.0: Read IR01–IR367 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

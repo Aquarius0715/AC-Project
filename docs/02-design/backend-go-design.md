@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND-GO
-version: 0.38.0
+version: 0.39.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -105,7 +105,7 @@ Echo middleware order:
 | 3 | OpenTelemetry (`otelecho`) | Span per request, attributes `ac.operation`, `ac.tenant` |
 | 4 | Access log | `middleware.RequestLoggerWithConfig` writing one `slog` JSON line (method, URI, status after the error handler, request ID, latency); bodies are never logged |
 | 5 | Body limit / timeout | 1 MiB JSON checked by the dispatcher per operation, file operations more: attachments.add and jobs.reportProblem 8 MiB, reports.signOff 16 MiB (base64 files in the demo; production uploads go to S3, IR221), larger bodies VALIDATION `error.bodyTooLarge`; `middleware.ContextTimeout` 30 s on the request context used by the database (per-operation 5 s / 10 s deadlines remain the production target) |
-| 6 | Authentication | Verifies the Cognito access token (issuer, audience = app client, expiry, `token_use=access`), loads the selected Membership (`X-Tenant-Id` + `X-Membership-Id` from the BFF session context; the membership must belong to the token subject, be inside its validity window and the user must be active, otherwise UNAUTHENTICATED) with permissions, scopes, client role and validity; requests without a token stay anonymous and reach only `public:` operations; caches it for 30 s keyed by membershipId + scopeVersion. A token whose `auth_time` is later than the user's recorded sign-in sets `last_sign_in_at` to the business time (IR268) |
+| 6 | Authentication | Verifies the Cognito access token (issuer, audience = app client, expiry, `token_use=access`; as built, IR367: Cognito's `token_use=access` or Keycloak's `typ=Bearer`, so an ID or refresh token is UNAUTHENTICATED), loads the selected Membership (`X-Tenant-Id` + `X-Membership-Id` from the BFF session context; the membership must belong to the token subject, be inside its validity window and the user must be active, otherwise UNAUTHENTICATED) with permissions, scopes, client role and validity; requests without a token stay anonymous and reach only `public:` operations; caches it for 30 s keyed by membershipId + scopeVersion. A token whose `auth_time` is later than the user's recorded sign-in sets `last_sign_in_at` to the business time (IR268) |
 | 7 | HQ network | Admin-role principals must carry a token from the admin app client (served only on `admin.<domain>`, IR117); otherwise FORBIDDEN |
 | 8 | Dispatcher | The REST route of an operation: `ops.Binding` builds the JSON input from the path, the query string or the body, and the route's fixed field, then the pipeline below runs |
 
@@ -296,4 +296,4 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | OPEN-GO-01 | Final choice of the TypeScript → Go contract generator (output reviewed for union types such as `UnitAction` and `Policy`) |
 | OPEN-GO-02 | WhatsApp provider SDK (depends on OPEN-BE-04) |
 
-Additional contracts for current version 0.38.0: Read IR01–IR366 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.39.0: Read IR01–IR367 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

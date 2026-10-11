@@ -20,10 +20,18 @@ export const APP_ROLE = (process.env.AC_APP_ROLE ?? "client") as Session["role"]
 export const SESSION_COOKIE = `ac_session_${APP_ROLE}`;
 export const OIDC_COOKIE = `ac_oidc_${APP_ROLE}`;
 
-/** The cookie key: 32 bytes derived from SESSION_SECRET with HKDF-SHA256 (the secret itself is never the key). */
+/** Shortest SESSION_SECRET a deployment on https accepts. */
+export const MIN_SECRET_LENGTH = 32;
+
+/** The cookie key: 32 bytes derived from SESSION_SECRET with HKDF-SHA256 (the secret itself is never the key). On https
+ * a missing, empty or short secret is refused rather than replaced by the local one, so a deployment without its secret
+ * cannot seal or open a session and fails closed (IR367). Plain-http local runs keep the local default. */
 export function cookieKey(): Buffer {
-  const secret = process.env.SESSION_SECRET ?? "local-dev-session-secret-change-me";
-  return Buffer.from(hkdfSync("sha256", secret, "", "ac bff session cookie", 32));
+  const secret = process.env.SESSION_SECRET || undefined;
+  if (oidcConfig().appUrl.startsWith("https") && (secret === undefined || secret.length < MIN_SECRET_LENGTH)) {
+    throw new Error(`SESSION_SECRET of at least ${MIN_SECRET_LENGTH} characters is required on https`);
+  }
+  return Buffer.from(hkdfSync("sha256", secret ?? "local-dev-session-secret-change-me", "", "ac bff session cookie", 32));
 }
 
 const IV_BYTES = 12, TAG_BYTES = 16;

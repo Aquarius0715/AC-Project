@@ -5442,3 +5442,22 @@ The third security check reviewed authorization by target: can a client, a contr
    - `TestFireAuthorizesFirst`: customer B gets NOT_FOUND for A's event, for A's input under another event, and for other facts in the same minute. A's own retry still gets its result.
    - Without the fixes the tests fail: the device moves, B gets A's evaluation result, and the six writes answer CONFLICT.
 4. **Checks.** `make test-all` and the E2E suite pass.
+
+## IR367 Authentication: access tokens only, and no default cookie key on https — 2026-10-11
+
+The fourth security check reviewed authentication: token verification in the Core API, the BFF's session cookie, and the return path after sign-in.
+
+1. **Findings and fixes.**
+   - **An ID token passed as an access token.** The OIDC verifier checked the issuer, the audience (or `azp` / `client_id`), expiry and the RS256 signature, but not the token type. The ID token of the same client has the same issuer, audience and key, so it was accepted like the access token. The pipeline (backend Go design §4 step 6) asks for `token_use=access`. Now only an access token passes: Cognito's say `token_use=access`, Keycloak's `typ=Bearer`. When both claims are present, `token_use` decides. ID tokens, refresh tokens and tokens without a type are UNAUTHENTICATED.
+   - **The cookie key fell back to a built-in default.** Without `SESSION_SECRET`, or with an empty one, the BFF derived its AES-256-GCM cookie key from a fixed local value. A deployment that lost its secret would seal sessions that anyone knowing the default could open or forge. On https, a missing, empty or short secret (under 32 characters) is now refused. The app then seals no cookie and opens none, so it fails closed and visitors are signed out. Plain-http local runs keep the local value.
+2. **Checked and in order.**
+   - **Core API tokens.** The algorithm is pinned to RS256, so `none` and HS256 are refused. Keys come from the JWKS, with refresh for an unknown key ID.
+   - **The selected membership.** It must belong to the token's subject and be inside its validity window, and the user must be active.
+   - **Internal endpoints.** They need the internal token, which is compared in constant time, and the gateway forwards only the catalog's REST routes. An unset token mounts no internal endpoint.
+   - **Demo operations.** The `demoSession.*` operations of the Core API create no session (the BFF signs in). The `demo.*` operations are refused without `DEMO_OPS`. The password-reset preview answers the same for every e-mail.
+   - **Sign-in.** The authorization-code flow uses PKCE S256 and a random state in a sealed cookie that lasts 10 minutes. The local realm's clients allow no direct password grant.
+   - **The session cookie.** It is httpOnly, SameSite=Lax, Secure on https, and sealed with AES-256-GCM, so a single altered byte invalidates it. A refreshed token must keep the same tenant and membership. Sign-out ends the identity provider's session (IR357).
+   - **The return path.** Only a same-origin path is kept. Absolute URLs, `//host`, backslash forms and control characters are refused, the last because the URL parser drops tab and newline and `/\t/host` would become `//host`.
+3. **Follow-up.** On https the cookie names should carry the `__Host-` (session) and `__Secure-` (sign-in state) prefixes. The browser then keeps the cookies to this host, so a sibling subdomain cannot set or shadow them. Every deletion must then be sent with `Secure` and the same path. That https path is not reached by the local plain-http E2E suite, so it is a change of its own.
+4. **Tests.** The OIDC verifier test refuses a Keycloak ID token, a Cognito ID token, `token_use=id` with `typ=Bearer`, a refresh token and a token without a type, and accepts a Cognito access token. The session test refuses no, empty and 31-character secrets on https, and a cookie sealed before the secret went missing is not opened. Without the fixes both tests fail.
+5. **Checks.** `make test-all`, the web checks (396 unit tests) and the E2E suite pass. The E2E sign-ins use real Keycloak access tokens, and they carry `typ=Bearer`.

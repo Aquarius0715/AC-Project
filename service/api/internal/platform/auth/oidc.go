@@ -14,8 +14,8 @@ import (
 )
 
 // OIDCVerifier verifies RS256 access tokens from Cognito (production) or Keycloak (local): issuer, audience
-// (one of the app clients), expiry and signature against the JWKS (container design §4: OIDC_ISSUER, OIDC_JWKS_URL,
-// OIDC_APP_CLIENT_ID, OIDC_ADMIN_CLIENT_ID).
+// (one of the app clients), expiry, the token type and the signature against the JWKS (container design §4:
+// OIDC_ISSUER, OIDC_JWKS_URL, OIDC_APP_CLIENT_ID, OIDC_ADMIN_CLIENT_ID).
 type OIDCVerifier struct {
 	Issuer    string
 	Audiences []string
@@ -33,6 +33,9 @@ func (v *OIDCVerifier) Verify(_ context.Context, token string) (Identity, error)
 	claims := t.Claims.(jwt.MapClaims)
 	if !audienceOK(claims, v.Audiences) {
 		return Identity{}, errors.New("audience")
+	}
+	if !accessToken(claims) {
+		return Identity{}, errors.New("not an access token")
 	}
 	sub, _ := claims["sub"].(string)
 	if sub == "" {
@@ -54,6 +57,17 @@ func authTime(c jwt.MapClaims) time.Time {
 		return time.Time{}
 	}
 	return time.Unix(int64(sec), 0).UTC()
+}
+
+// accessToken reports whether the claims are an access token's: Cognito's say token_use=access, Keycloak's typ=Bearer.
+// The ID token of the same client has the same issuer, audience and signature (token_use=id, typ=ID), so without this
+// check it would pass as an access token (backend Go design §4 step 6: token_use=access, IR367).
+func accessToken(c jwt.MapClaims) bool {
+	if use, ok := c["token_use"]; ok {
+		return use == "access"
+	}
+	typ, _ := c["typ"].(string)
+	return strings.EqualFold(typ, "Bearer")
 }
 
 // audienceOK accepts `aud` or Keycloak/Cognito `azp` / `client_id` matching an allowed client.

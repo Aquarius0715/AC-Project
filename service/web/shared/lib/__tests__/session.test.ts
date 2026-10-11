@@ -53,6 +53,21 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
     expect(unseal(t)).toEqual({ a: 1 });
   });
 
+  it("on https needs a real secret: none, an empty or a short one seals nothing (IR367)", () => {
+    vi.stubEnv("APP_URL", "https://ac.example.com");
+    for (const v of [undefined, "", "x".repeat(31)]) {
+      vi.stubEnv("SESSION_SECRET", v);
+      expect(() => cookieKey()).toThrow(/SESSION_SECRET/);
+      expect(() => seal({ a: 1 })).toThrow(/SESSION_SECRET/);
+    }
+    vi.stubEnv("SESSION_SECRET", "test-".padEnd(32, "s"));
+    expect(unseal(seal({ a: 1 }))).toEqual({ a: 1 });
+    // a cookie sealed before the secret went missing cannot be opened either: the visitor is signed out
+    const t = seal({ a: 1 });
+    vi.stubEnv("SESSION_SECRET", "");
+    expect(unseal(t)).toBeNull();
+  });
+
   it("refuses a correctly sealed body that is not JSON", () => {
     vi.stubEnv("SESSION_SECRET", "s");
     const iv = randomBytes(12);
