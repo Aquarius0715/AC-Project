@@ -84,4 +84,9 @@ cover: testdb-exists
 		$(GO) test -count=1 -coverpkg=./internal/... -coverprofile=.cover/$$(echo $$p | tr / _).out $$p >.cover/last.log 2>&1 || { cat .cover/last.log; exit 1; }; done
 	python3 scripts/covermerge.py coverage.out .cover/*.out
 
-.PHONY: swagger gen seed test test-run test-unit test-integration test-cluster test-cluster-run test-all cover migrations resetdb testdb testdb-cluster testdb-exists test-fresh
+# vuln checks the modules against the Go vulnerability database (govulncheck reports only what the code reaches;
+# it needs the network and its own newer toolchain, which the go command fetches; IR364)
+vuln:
+	$(GO) run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+.PHONY: swagger gen seed test test-run test-unit test-integration test-cluster test-cluster-run test-all cover migrations resetdb testdb testdb-cluster testdb-exists test-fresh vuln

@@ -5379,3 +5379,17 @@ A question on the backend's style ("does it follow MVC?") led to a reread of the
    - §5 describes operation functions, guarded status updates (`WHERE status IN (…)` → CONFLICT), and the business clock with `platform/democlock`.
    - The tooling rows name the local test database, `gofmt` and `go vet`. The test table names unit tests for pure helpers and integration tests for SQL, RLS and constraints.
 6. **No code changes.**
+
+## IR364 Dependency advisories: govulncheck and npm audit, and the fixes — 2026-10-11
+
+From this round on, every development round also looks for security vulnerabilities. This first check scanned the dependencies against the advisory databases.
+
+1. **Go: `govulncheck`.** One advisory reached the code:
+   - GO-2026-6629: a panic on crafted input in `golang.org/x/text/secure/precis`, reachable through pgx's connection setup.
+   - `golang.org/x/text` 0.40.0 → 0.41.0 fixes it; `go mod tidy` moved the indirect `x/mod`, `x/tools` and `go-internal` along with it. The module stays on Go 1.25.
+   - The rescan finds no vulnerabilities.
+   - `make vuln` runs govulncheck v1.9.0, which fetches its own newer toolchain.
+2. **Web: `npm audit`.** Eight advisories, all in development tooling; the production dependencies have none (`npm audit --omit=dev`: 0).
+   - **The test runner.** `vitest` 3.2.7 brought tinypool 1.1.1 (critical: a prototype-pollution gadget leading to code execution through worker options, GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr) and `@vitest/mocker` 3.2.7 (moderate: path traversal through a redirect mock, GHSA-82fw-gwwq-j7x9). `vitest` ^4.1.11 removes both. npm 10 failed on the install (`edgesOut` of null in arborist's peer-set step), so npm 11 resolved it. Only vitest and its own dependencies changed in the lockfile; the 395 unit tests pass unchanged on vitest 4.
+   - **The lint tool.** `braces` 3.0.3 (GHSA-vfj7-8cjw-p6xm, high: stack exhaustion on deeply nested patterns) is reached through `fast-glob` → `micromatch` from `eslint-config-next`. Every released version is affected, and npm's suggested "fix" is a downgrade to eslint-config-next 14. The patterns braces expands are the lint configuration's own globs, never input from users, and lint does not ship. The five advisories of that chain are accepted until upstream releases a fix.
+3. **Checks.** `make test-all`, the web checks and the E2E suite pass on the upgraded dependencies.

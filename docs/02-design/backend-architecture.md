@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND
-version: 0.42.0
+version: 0.43.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -293,6 +293,7 @@ Items of the table above that are not scheduled yet:
 
 - Everything runs in Docker (IR119): the same images run in Compose locally and in CI and on ECS Fargate in staging and production; infrastructure as code for every environment; immutable image digests promoted from dev to staging to production.
 - CI runs type checks, lint, unit, contract, and end-to-end tests (NFR-07), database migration checks, and security scans; production deploys use rolling or blue-green releases with automatic rollback on health checks.
+  - As built (IR364): the dependency scans are `make vuln` (govulncheck at a pinned version) for the Go modules and `npm audit` for the web workspace (`--omit=dev` for what ships). Each development round also reviews one class of vulnerability in the code.
 - Database migrations are backward compatible for one release (expand, migrate, contract).
 
 ## 15. Migration from the Phase 1A mock
@@ -316,4 +317,4 @@ Items of the table above that are not scheduled yet:
 | OPEN-BE-07 | Contractor payout rail (bank transfer file or Stripe Connect) | Payouts (FR-A23) |
 | OPEN-BE-08 | The scheduled items that are not built yet (§10 as built): the monthly energy report e-mail waits for a decision. Several instances per domain are decided: the advisory lock per domain and tenant (IR356) | Scheduler, worker |
 
-Additional contracts for current version 0.42.0: Read IR01–IR358 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.43.0: Read IR01–IR364 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
