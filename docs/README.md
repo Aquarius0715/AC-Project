@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.247.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
+Version: 0.248.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.248.0 (2026-10-11): SQL built from caller input was reviewed: no caller text reaches a query. The sort direction becomes an SQL keyword where it is used (`paging.Direction`), so no ORDER BY depends on an earlier check, and every list operation refuses an injected direction in the tests (IR365).
 0.247.0 (2026-10-11): Dependency advisories are scanned: golang.org/x/text 0.41.0 fixes GO-2026-6629, and vitest 4.1.11 removes tinypool's critical and @vitest/mocker's moderate advisories. The lint tool's braces chain has no fixed release and is accepted; `make vuln` runs govulncheck (IR364).
 0.246.0 (2026-10-11): The backend Go design describes the code as built: package per business area, one transaction-script function per operation with pgx SQL, the operation pipeline in internal/ops, and the first plan's unbuilt parts (sqlc, domain/, types_gen.go) listed as such (IR363).
 0.245.0 (2026-10-11): Errors are announced at once: error banners are alerts and error toasts go to an alert region (IR362).

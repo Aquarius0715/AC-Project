@@ -1,6 +1,7 @@
 package paging
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/pradita/ac-project/service/api/internal/platform/apperr"
@@ -75,5 +76,26 @@ func TestOrderBy(t *testing.T) {
 	}
 	if _, err := OrderBy(&SortSpec{Field: "evil; drop", Direction: "asc"}, allowed, ""); code(err) != apperr.Validation {
 		t.Fatal("unknown sort field")
+	}
+}
+
+// TestOrderByDirection: only asc and desc reach the ORDER BY; anything else — an injection attempt among them — is
+// VALIDATION on sort.direction before any SQL is built (IR365).
+func TestOrderByDirection(t *testing.T) {
+	allowed := map[string]string{"id": "r.id", "createdAt": "r.created_at"}
+	for dir, want := range map[string]string{"asc": "r.created_at ASC, r.id ASC", "desc": "r.created_at DESC, r.id ASC"} {
+		if got, err := OrderBy(&SortSpec{Field: "createdAt", Direction: dir}, allowed, ""); err != nil || got != want {
+			t.Errorf("%s: %q %v", dir, got, err)
+		}
+	}
+	for _, dir := range []string{"DESC", "", "sideways", "desc, (SELECT pg_sleep(5))", "asc; DROP TABLE x --"} {
+		got, err := OrderBy(&SortSpec{Field: "createdAt", Direction: dir}, allowed, "")
+		var de *apperr.DomainError
+		if got != "" || !errors.As(err, &de) || de.FieldErrors["sort.direction"] != "error.invalid" {
+			t.Errorf("direction %q: %q %v", dir, got, err)
+		}
+	}
+	if got, err := Direction(&SortSpec{Direction: "desc"}); err != nil || got != "DESC" {
+		t.Errorf("Direction desc: %q %v", got, err)
 	}
 }

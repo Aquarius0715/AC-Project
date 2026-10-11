@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND-GO
-version: 0.36.0
+version: 0.37.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -18,7 +18,7 @@ This document turns the [backend architecture](backend-architecture.md) into an 
 | Language | Go 1.25 or later (one module `github.com/pradita/ac-project/service/api` (`service/api/go.mod`) in the official Go server layout (IR174): commands in `service/api/cmd/{api,worker,migrate,seed,gen}`, every package in `service/api/internal/`, DB integration tests in `service/api/test/integration`, Dockerfiles in `service/api/build/`; current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
 | HTTP framework | Echo v5 (`github.com/labstack/echo/v5`, checked with v5.4.0) for the Core API and the webhook receiver, structured as in the official Echo guide (IR173): handlers `func(c *echo.Context) error` return errors to one central `HTTPErrorHandler`; middleware from `echo/v5/middleware`; route group `/v1`; graceful shutdown with `echo.StartConfig`; `log/slog` as `e.Logger`; tests with `net/http/httptest` against `e.ServeHTTP` |
 | Database driver | pgx v5 (`github.com/jackc/pgx/v5`, `pgxpool`); no ORM |
-| Query code | As built (IR363): pgx with the SQL written in each operation function; list filters and sort columns come from allowlists (`paging.OrderBy`, filter maps). sqlc, planned first, is not adopted (§2) |
+| Query code | As built (IR363): pgx with the SQL written in each operation function; list filters and sort columns come from allowlists (`paging.OrderBy`, filter maps), and the sort direction is one of two SQL keywords (`paging.Direction`, IR365). sqlc, planned first, is not adopted (§2) |
 | Migrations | `cmd/migrate` + `internal/migrate` + `internal/migrations` (IR167, IR174): embedded `migrations/NNNNNN_name.up.sql` files applied in order under an advisory lock, one transaction each (`-- migrate:no-transaction` for `CONCURRENTLY`), bookkeeping in the golang-migrate compatible `schema_migrations` table; `000001_init` is [db/schema.sql](db/schema.sql) |
 | IDs | UUIDv7 from `github.com/google/uuid` (`uuid.NewV7`), time-ordered for index locality |
 | Validation | Generated input structs + a `Validate() *DomainError` method per input (rules from the DD documents); `go-playground/validator` only for simple tags |
@@ -296,4 +296,4 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | OPEN-GO-01 | Final choice of the TypeScript → Go contract generator (output reviewed for union types such as `UnitAction` and `Policy`) |
 | OPEN-GO-02 | WhatsApp provider SDK (depends on OPEN-BE-04) |
 
-Additional contracts for current version 0.36.0: Read IR01–IR363 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.37.0: Read IR01–IR365 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

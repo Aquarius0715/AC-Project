@@ -5393,3 +5393,22 @@ From this round on, every development round also looks for security vulnerabilit
    - **The test runner.** `vitest` 3.2.7 brought tinypool 1.1.1 (critical: a prototype-pollution gadget leading to code execution through worker options, GHSA-5gmw-xhrv-c9v3, GHSA-85c8-ppgw-ccpr) and `@vitest/mocker` 3.2.7 (moderate: path traversal through a redirect mock, GHSA-82fw-gwwq-j7x9). `vitest` ^4.1.11 removes both. npm 10 failed on the install (`edgesOut` of null in arborist's peer-set step), so npm 11 resolved it. Only vitest and its own dependencies changed in the lockfile; the 395 unit tests pass unchanged on vitest 4.
    - **The lint tool.** `braces` 3.0.3 (GHSA-vfj7-8cjw-p6xm, high: stack exhaustion on deeply nested patterns) is reached through `fast-glob` → `micromatch` from `eslint-config-next`. Every released version is affected, and npm's suggested "fix" is a downgrade to eslint-config-next 14. The patterns braces expands are the lint configuration's own globs, never input from users, and lint does not ship. The five advisories of that chain are accepted until upstream releases a fix.
 3. **Checks.** `make test-all`, the web checks and the E2E suite pass on the upgraded dependencies.
+
+## IR365 SQL built from caller input: the sort direction becomes a keyword where it is used — 2026-10-11
+
+The second security check reviewed the SQL the Core API puts together in code (`fmt.Sprintf` and string concatenation, 42 places) for text that comes from a caller.
+
+1. **Review.** No caller text reaches a query:
+   - filter values travel as pgx parameters (`$n`);
+   - columns, sort columns, tables and the replica tables of the events come from allowlists and constants in the code;
+   - limit and offset are integers.
+   
+   One place relied on the order of the calls. `paging.OrderBy` and the severity sort of `alerts.list` upper-cased `sort.direction` into the ORDER BY. They depended on `paging.Resolve`, which every list runs first, to refuse anything but asc and desc. A list that called OrderBy without Resolve, or a later refactor, would have put the caller's direction into the query.
+2. **Fix.** `paging.Direction` maps `asc` and `desc` to the SQL keywords and refuses anything else as VALIDATION on `sort.direction`.
+   - `paging.OrderBy` and the severity sort of `alerts.list` use it, so the ORDER BY no longer depends on an earlier check.
+   - The lists that sort in code (filter care, telemetry, policies, coverage, jobs) compare the direction with `"desc"` and choose between constants.
+   - The REST binder still passes the direction after `:` on as given; the two checks above refuse it.
+3. **Tests.**
+   - `TestOrderByDirection` checks asc and desc. It refuses `DESC`, an empty direction, `sideways` and two injection strings (`desc, (SELECT pg_sleep(5))` and `asc; DROP TABLE x --`). Without the fix it fails, and the injected text appears in the ORDER BY.
+   - The query catalog test sends `desc, (SELECT 1)` with every allowed sort field of every list operation (48 operations), and expects 422 on `sort.direction` (or `query.sort.direction`).
+4. **Checks.** `make test-all` and the E2E suite pass.

@@ -177,6 +177,11 @@ func TestQueryCatalogFilters(t *testing.T) {
 						t.Errorf("sort %s %s: %d %v", field, dir, code, m)
 					}
 				}
+				// a direction other than asc / desc never reaches the ORDER BY: an injection attempt is refused on
+				// the direction (IR365)
+				if code, m := sorted(field, `desc, (SELECT 1)`); code != 422 || !directionError(m) {
+					t.Errorf("injected direction on %s: %d %v", field, code, m)
+				}
 			}
 			// an unknown sort field is refused on the sort (sort.field, query.sort.field; query where nothing sorts)
 			if code, m := sorted("zzUnknown", "asc"); code != 422 || !sortError(m) {
@@ -184,6 +189,12 @@ func TestQueryCatalogFilters(t *testing.T) {
 			}
 		})
 	}
+}
+
+// directionError reports whether a VALIDATION result names the sort direction.
+func directionError(m map[string]any) bool {
+	fe, _ := m["fieldErrors"].(map[string]any)
+	return fe["sort.direction"] != nil || fe["query.sort.direction"] != nil
 }
 
 // sortError reports whether a VALIDATION result names the sort.

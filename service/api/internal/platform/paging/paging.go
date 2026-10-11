@@ -126,7 +126,10 @@ func OrderBy(s *SortSpec, allowed map[string]string, def string) (string, error)
 	if !ok {
 		return "", apperr.Fields(map[string]string{"sort.field": "error.invalid"})
 	}
-	dir := strings.ToUpper(s.Direction)
+	dir, err := Direction(s)
+	if err != nil {
+		return "", err
+	}
 	if s.Field == "id" {
 		return col + " " + dir, nil
 	}
@@ -135,6 +138,18 @@ func OrderBy(s *SortSpec, allowed map[string]string, def string) (string, error)
 		tie = idCol // qualified tie-breaker, unambiguous in joins
 	}
 	return col + " " + dir + ", " + tie + " ASC", nil
+}
+
+// Direction is the SQL keyword of a sort direction. Only asc and desc ever reach a query; anything else is VALIDATION on
+// sort.direction here, so no ORDER BY depends on Resolve having refused it first (IR365).
+func Direction(s *SortSpec) (string, error) {
+	switch s.Direction {
+	case "asc":
+		return "ASC", nil
+	case "desc":
+		return "DESC", nil
+	}
+	return "", apperr.Fields(map[string]string{"sort.direction": "error.invalid"})
 }
 
 // SortSlice orders in-memory items by the requested sort: keys compares two items per allowed field (like

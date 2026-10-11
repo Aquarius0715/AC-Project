@@ -167,7 +167,11 @@ func (m Alerts) list(ctx context.Context, c *ops.Call, in *paging.Query) (paging
 	order := severityRank + " DESC, a.id ASC"
 	if in.Sort != nil {
 		if in.Sort.Field == "severity" {
-			order = severityRank + " " + strings.ToUpper(in.Sort.Direction) + ", a.id ASC"
+			dir, err := paging.Direction(in.Sort)
+			if err != nil {
+				return paging.Page[Alert]{}, err
+			}
+			order = severityRank + " " + dir + ", a.id ASC"
 		} else {
 			o, err := paging.OrderBy(in.Sort, map[string]string{"id": "a.id", "createdAt": "a.created_at", "updatedAt": "a.updated_at"}, "")
 			if err != nil {
