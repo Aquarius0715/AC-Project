@@ -5,12 +5,13 @@ import { Badge, Banner, Btn, Card, Check, DemoBadge, EmptyState, Field, Input, L
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
-import type { BaselineRow } from "@ac/web/lib/energy";
+import { klInstant, type BaselineRow } from "@ac/web/lib/energy";
 import {
   factorErrors, factorInput, mrvConditions, mrvDraftErrors, mrvDraftOf, mrvView, statusWord, versionKey,
   type ApiFactor, type ApiMRVReport, type FactorDraft, type MRVDraft, type MRVView as Figures, type ReportRow,
 } from "@ac/web/lib/mrv";
 import { previewReport, recordReview, saveFactor, saveReportDraft } from "../actions";
+import { EvidenceList, EvidencePicker } from "./evidence";
 
 type UnitOption = { id: string; label: string; organizationId: string };
 export type MRVLive = {
@@ -87,7 +88,6 @@ function Reports({ live, r }: { live: MRVLive; r: NonNullable<MRVLive["reports"]
     run(() => recordReview(sel.report.id, sel.report.version, comment.trim()), (v) => t("Demo review recorded — version {v}", { v }), () => { setComment(""); nav({ reportVersion: null }); });
   };
   const orgUnits = d ? live.units.filter((u) => u.organizationId === d.organizationId) : [];
-  const evidence = draft?.evidenceIds.length ?? 0;
   return (
     <>
       <div className="flex flex-wrap items-end gap-3">
@@ -110,7 +110,7 @@ function Reports({ live, r }: { live: MRVLive; r: NonNullable<MRVLive["reports"]
               {!isLatest && <p className="mt-2 text-[11px] text-muted">{t("An earlier version — read only. Its conditions and results never change.")}</p>}
             </Card>
             <Card title={t("Calculation conditions (snapshot)")}><SummaryList items={sel.view.conditions} />{sel.view.summary.warnings.length > 0 && <div className="mt-2 flex flex-col gap-1">{sel.view.summary.warnings.map((w) => <Banner key={w} tone="warn">{w}</Banner>)}</div>}<p className="mt-2 text-[11px] text-muted">{t("Snapshots are stored with the version; later baseline or factor versions do not change it.")}</p></Card>
-            <Card title={t("Evidence")}>{sel.report.evidenceIds.length === 0 ? <p className="text-xs text-muted">{t("No evidence attached.")}</p> : <ul className="list-disc pl-5 text-[13px]">{sel.report.evidenceIds.map((e) => <li key={e} className="font-mono text-xs">{e}</li>)}</ul>}</Card>
+            <Card title={t("Evidence")}><EvidenceList ids={sel.report.evidenceIds} units={live.units} period={{ unitIds: sel.report.conditions.unitIds, from: sel.report.conditions.from, to: sel.report.conditions.to }} /></Card>
             <Card title={t("Demo review")}>
               {sel.review.length > 0 && <Timeline items={sel.review} />}
               {sel.report.status === "demo_reviewed" ? <p className="text-xs text-muted">{t("This version is demo reviewed. Sending the same review again returns the existing result.")}</p>
@@ -133,7 +133,8 @@ function Reports({ live, r }: { live: MRVLive; r: NonNullable<MRVLive["reports"]
           </div>
           <Field label={t("Boundary description")} error={tried ? errors.boundary : undefined}><Input value={d.boundary} maxLength={500} onChange={(e) => setD({ boundary: e.target.value })} placeholder={t("AC unit input electricity only")} /></Field>
           <div><p className="mb-1 text-[13px] font-semibold">{t("Units")}</p>{!d.organizationId ? <p className="text-xs text-muted">{t("Choose the organization first.")}</p> : <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{orgUnits.map((u) => <Check key={u.id} label={u.label} checked={d.unitIds.includes(u.id)} onChange={(on) => setD({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) })} />)}</div>}{tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}</div>
-          <p className="text-[11px] text-muted">{evidence === 0 ? t("Evidence: none — no operation lists attachments outside a work report yet.") : t(evidence === 1 ? "Evidence: 1 attachment carried over from the previous version." : "Evidence: {n} attachments carried over from the previous version.", { n: evidence })}</p>
+          <EvidencePicker ids={draft!.evidenceIds} onChange={(ids) => setDraft((x) => (x ? { ...x, evidenceIds: ids } : x))} units={live.units}
+            period={{ unitIds: d.unitIds, from: d.from ? klInstant(d.from) : "", to: d.to ? klInstant(d.to) : "" }} />
           {preview && <div className="flex flex-col gap-2 rounded-xl border border-line p-3"><div className="flex items-center gap-2"><b className="text-[13px]">{t("Preview · not saved")}</b><DemoBadge /><span className="text-[11px] text-muted">{t("Demo — unverified")}</span></div><FiguresGrid v={preview} /></div>}
           {!preview && <p className="text-[11px] text-muted">{t("Preview first: saving stores the conditions and the result computed at save time.")}</p>}
         </>}

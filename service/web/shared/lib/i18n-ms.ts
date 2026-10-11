@@ -4000,6 +4000,15 @@ export const ms: Record<string, string> = {
   "Escalate if still unacknowledged (1–1440)": "Eskalasi jika masih belum diakui (1–1440)",
   "Fix the validation errors first": "Betulkan ralat pengesahan dahulu",
   // HQ alert policy creation (IR345)
+  // MRV evidence attachments (IR349)
+  "uploaded {time}": "dimuat naik {time}",
+  "Evidence to attach": "Bukti untuk dilampirkan",
+  "+ Add evidence": "+ Tambah bukti",
+  "Choose the units and the period first: the candidates are their work-report photos.": "Pilih unit dan tempoh dahulu: calonnya ialah foto laporan kerja unit tersebut.",
+  "Loading the attachments…": "Memuatkan lampiran…",
+  "The attachments could not be loaded — try again.": "Lampiran tidak dapat dimuatkan — cuba lagi.",
+  "No photos of accepted work reports on these units in this period.": "Tiada foto laporan kerja yang diterima pada unit ini dalam tempoh ini.",
+  "Photos of accepted work reports on these units, uploaded in the period (attachments.list). Up to 20.": "Foto laporan kerja yang diterima pada unit ini, dimuat naik dalam tempoh tersebut (attachments.list). Sehingga 20.",
   // the HQ policy preview and demo test (IR348)
   "The policy did not run on {name} — it is no longer attached to it.": "Polisi tidak berjalan pada {name} — ia tidak lagi dilampirkan padanya.",
   "✓ {value} {unit} on {name} raises an alert and notifies the recipients — simulated, nothing is stored.": "✓ {value} {unit} pada {name} menimbulkan amaran dan memaklumkan penerima — disimulasikan, tiada yang disimpan.",
@@ -4779,9 +4788,6 @@ export const ms: Record<string, string> = {
   "Baseline version": "Versi garis dasar",
   "Emission factor version": "Versi faktor pelepasan",
   "Choose the organization first.": "Pilih organisasi dahulu.",
-  "Evidence: none — no operation lists attachments outside a work report yet.": "Bukti: tiada — belum ada operasi yang menyenaraikan lampiran di luar laporan kerja.",
-  "Evidence: 1 attachment carried over from the previous version.": "Bukti: 1 lampiran dibawa dari versi sebelumnya.",
-  "Evidence: {n} attachments carried over from the previous version.": "Bukti: {n} lampiran dibawa dari versi sebelumnya.",
   "Preview · not saved": "Pratonton · tidak disimpan",
   "Demo — unverified": "Demo — belum disahkan",
   "Preview first: saving stores the conditions and the result computed at save time.": "Pratonton dahulu: menyimpan merekodkan syarat dan keputusan yang dikira semasa menyimpan.",

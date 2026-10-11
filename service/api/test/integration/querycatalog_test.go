@@ -31,7 +31,10 @@ func TestQueryCatalogFilters(t *testing.T) {
 	alert := newAlert(t, newUnit(t, s, "Query catalog AC"), seed.ID("org-customer-b").String(), "warning", clock.Add(-time.Hour)) // the seed has no alerts
 	// input wraps the Query of operations whose input is not a bare Query
 	input := map[string]func(q string) string{
-		"alerts.evidence":      func(q string) string { return `{"alertId":"` + alert + `","query":` + q + `}` },
+		"alerts.evidence": func(q string) string { return `{"alertId":"` + alert + `","query":` + q + `}` },
+		"attachments.list": func(q string) string { // IR349: the MRV evidence candidates of a unit set and period
+			return `{"unitIds":["` + seed.ID("unit-online-rto").String() + `"],"from":"2026-09-01T00:00:00Z","to":"2026-09-30T00:00:00Z","query":` + q + `}`
+		},
 		"devices.events":       func(q string) string { return `{"id":"` + device + `","query":` + q + `}` },
 		"devices.calibrations": func(q string) string { return `{"deviceId":"` + device + `","query":` + q + `}` },
 		"devices.operations":   func(q string) string { return `{"deviceId":"` + device + `","query":` + q + `}` },

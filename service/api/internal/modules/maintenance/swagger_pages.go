@@ -41,6 +41,16 @@ type EventPage struct {
 
 var _ = paging.Page[Event](EventPage{})
 
+// EvidenceAttachmentPage is paging.Page[EvidenceAttachment].
+type EvidenceAttachmentPage struct {
+	Items           []EvidenceAttachment `json:"items"`
+	NextCursor      *string              `json:"nextCursor"`
+	Total           int                  `json:"total"`
+	SnapshotVersion int                  `json:"snapshotVersion"`
+}
+
+var _ = paging.Page[EvidenceAttachment](EvidenceAttachmentPage{})
+
 // FilterStatusPage is paging.Page[FilterStatus].
 type FilterStatusPage struct {
 	Items           []FilterStatus `json:"items"`

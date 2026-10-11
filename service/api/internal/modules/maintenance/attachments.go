@@ -321,5 +321,6 @@ func (m Files) content(ctx context.Context, c *ops.Call, in *ContentInput) (Blob
 func RegisterFiles(r *ops.Registry, m Files) {
 	ops.Register(r, "attachments.add", m.add)
 	ops.Register(r, "attachments.getContent", m.content)
+	ops.Register(r, "attachments.list", m.list)
 	ops.Register(r, "reports.signOff", m.signOff)
 }

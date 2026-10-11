@@ -5081,3 +5081,30 @@ DD-A05 item 7 orders the editor's last steps: the notification preview per recip
    - E2E `admin/alert-policies`:
      - A policy at 45 °C attached to Bedroom AC: the preview before saving, at warning and then critical. The test reads "off" until the policy is on; then 45 alerts and 44.9 is not met. Deleting the policy detaches it.
      - The default policy's PM2.5 rule: the preview for a customer user; 35 alerts and 34.9 is not met. AC offline has no test.
+
+## IR349 MRV evidence from the photos of accepted work reports (`attachments.list`) — 2026-10-11
+
+DD-A14 item 6 saves a new report or version "with the selected evidence", and Figma Admin 324:2 shows "Evidence to attach" with "+ Add evidence". IR203 left the choice open. `mrv.saveDraft` takes 0–20 attachment IDs (IR149 item 3), but no read listed attachments outside a job's work report. IR203 proposed such a read: `attachments.list` filtered by a unit set and a period, returning the ready attachments of accepted reports. This IR adds it as proposed. The web dialog said instead that no operation lists attachments yet.
+
+1. **Contract (202 operations).**
+   - `attachments.list`: input `{unitIds, from, to, query}`, result `Page<EvidenceAttachment>`. The route is `GET /v1/attachments` (`unitIds` repeated or comma-separated). It belongs to the maintenance service, which now has 61 operations.
+   - `EvidenceAttachment` = `Attachment` plus the job's `unitId` and the report's `acceptedAt`.
+   - Authorization: `admin:mrv.write | admin:job.read`.
+   - The query takes no filters. Sort fields are id, createdAt and name (case-insensitive); the default is newest first, then by id.
+2. **Selection.** The ready attachments of accepted work reports on the units, uploaded in [from, to). Excluded: processing or failed files, reports that are not accepted, other units, and uploads outside the period.
+3. **Input rules.** 1–500 distinct units (`unitIds=error.invalid`); `from` required; `to` after `from` and within 366 days (`to=error.range`).
+4. **`mrv.saveDraft` is unchanged.** It accepts any 0–20 existing attachments. A new version still carries the previous version's evidence, even after its conditions change.
+5. **Web (DD-A14 item 6, Figma 324:2).**
+   - The dialog of a new report or version shows "Evidence to attach": the chosen files as chips, each with a remove button.
+   - "+ Add evidence" lists the candidates of the draft's units and period, each with its unit and upload time. Choosing the units and the period comes first. At most 20 can be chosen.
+   - The report detail names its evidence the same way. An attachment that is no longer a candidate of the report's units and period keeps its ID.
+6. **Catalogs and documents.**
+   - The operation, query and persistence catalogs gain the row; SCR-A14 and DD-A14's boundary gain the operation.
+   - Common design and backend architecture read 202 operations, and the validator counts 202.
+   - Figma System Architecture boards 01, 02, 03 and 06 read 202 operations and 222 routes; board 08 reads 61 maintenance operations.
+   - The tests that count operations and routes read 202 and 222: in Go, cmd/gen/ops, the ops registry, the gateway's description and routes, and the server's REST routes; in the web, the REST mapping test, which also checks the new route's query string.
+7. **Tests.**
+   - Integration `TestMRVEvidenceAttachments`: the selection, newest first, by name, the first page, each input rule, and a client and a contractor refused. The query catalog test wraps the new input.
+   - Web unit: the candidate rows in English and Malay.
+   - E2E `admin/mrv`: the dialog's evidence waits for the units and the period, then says the seed has no photos.
+   - A real-stack check with a temporary photo of an accepted report on Bedroom AC listed it ("Bedroom AC · uploaded 5 Sept 2026, 10:30 am MYT"), attached it as a chip and removed it again. The temporary rows were deleted.

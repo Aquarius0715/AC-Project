@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ApiEnergySummary } from "@ac/web/lib/energy";
 import { i18nOf, translator } from "@ac/web/lib/i18n";
 import {
-  factorErrors, factorInput, mrvConditions, mrvDraftErrors, mrvDraftOf, mrvView, reportRows, reviewItems, statusWord, versionKey,
+  evidenceRows, factorErrors, factorInput, MAX_EVIDENCE, mrvConditions, mrvDraftErrors, mrvDraftOf, mrvView, reportRows, reviewItems, statusWord, versionKey,
   type ApiMRVReport, type FactorDraft, type MRVDraft,
 } from "@ac/web/lib/mrv";
 
@@ -84,5 +84,16 @@ describe("HQ digital MRV in Malay with the display time zone (IR297)", () => {
     expect(reviewItems(report, MS)).toEqual([{ time: "14 Sep 2026, 10:30 PG GMT+9", title: "“Looks consistent”", detail: "versi 1 · user-hq-" }]);
     expect(mrvDraftErrors(draft({ factor: "" }), t)).toEqual({ factor: "Pilih versi faktor pelepasan" });
     expect(factorErrors({ region: "x", year: "2026", kgCO2ePerKWh: "11", source: "demo" }, t)).toEqual({ kgCO2ePerKWh: "Melebihi 0 dan paling banyak 10 kgCO₂e/kWh" });
+  });
+});
+
+describe("MRV evidence candidates (DD-A14 item 6, IR349)", () => {
+  it("names each attachment with its unit and upload time in the display zone", () => {
+    const a = { id: "att-1", jobId: "j1", reportId: "r1", name: "meter.png", mime: "image/png", size: 10, status: "ready", createdAt: "2026-09-13T02:30:00Z", unitId: "u1", acceptedAt: "2026-09-13T04:00:00Z" };
+    expect(evidenceRows([a, { ...a, id: "att-2", unitId: "u9" }], [{ id: "u1", label: "Bedroom AC" }])).toEqual([
+      { id: "att-1", name: "meter.png", sub: "Bedroom AC · uploaded 13 Sept 2026, 10:30 am MYT" }, { id: "att-2", name: "meter.png", sub: "u9 · uploaded 13 Sept 2026, 10:30 am MYT" },
+    ]);
+    expect(evidenceRows([a], [], i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" }))[0].sub).toBe("u1 · dimuat naik 13 Sep 2026, 11:30 PG GMT+9");
+    expect(MAX_EVIDENCE).toBe(20);
   });
 });

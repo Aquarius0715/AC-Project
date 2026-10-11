@@ -14,6 +14,7 @@ export const coreRoutes: Readonly<Record<string, readonly CoreRoute[]>> = {
   "alerts.resolve": [{ method: "POST", path: "/v1/alerts/{alertId}/resolve" }],
   "attachments.add": [{ method: "POST", path: "/v1/jobs/{jobId}/reports/{reportId}/attachments" }],
   "attachments.getContent": [{ method: "GET", path: "/v1/jobs/{jobId}/reports/{reportId}/attachments/{attachmentId}/content" }],
+  "attachments.list": [{ method: "GET", path: "/v1/attachments" }],
   "audit.list": [{ method: "GET", path: "/v1/audit" }],
   "auth.previewPasswordReset": [{ method: "POST", path: "/v1/auth/password-reset-preview" }],
   "automations.delete": [{ method: "DELETE", path: "/v1/automations/{id}" }],

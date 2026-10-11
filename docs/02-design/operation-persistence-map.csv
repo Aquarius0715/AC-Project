@@ -7,6 +7,7 @@ alerts.list,read,Monitoring & alerts,monitoring.alerts,,,,
 alerts.resolve,write,Monitoring & alerts,monitoring.alerts;monitoring.measurements,monitoring.alerts,Devices,audit.audit_log;platform.idempotency_keys;platform.outbox,
 attachments.add,write,Maintenance,maintenance.attachments,maintenance.attachments,,audit.audit_log;platform.idempotency_keys;platform.outbox,
 attachments.getContent,read,Maintenance,maintenance.attachments,,,,
+attachments.list,read,Maintenance,maintenance.attachments;maintenance.work_reports;maintenance.jobs,,,,IR349 MRV evidence candidates
 audit.list,read,Audit,audit.audit_log,,,,
 auth.previewPasswordReset,read,Identity & access,identity.users,,,,preview only; real reset is a Cognito flow
 automations.delete,write,Control,control.automations;control.automation_units;control.automation_runs,control.automations;control.automation_units,,audit.audit_log;platform.idempotency_keys;platform.outbox,

@@ -12,10 +12,13 @@ const query = (path: string) => {
 
 describe("coreRequest", () => {
   it("covers every operation of the catalog", () => {
-    expect(Object.keys(coreRoutes)).toHaveLength(201); // IR238 filterCare.getSettings, IR327 alerts.evidence
-    expect(Object.values(coreRoutes).flat()).toHaveLength(221);
+    expect(Object.keys(coreRoutes)).toHaveLength(202); // IR238 filterCare.getSettings, IR327 alerts.evidence, IR349 attachments.list
+    expect(Object.values(coreRoutes).flat()).toHaveLength(222);
     expect(coreRequest("filterCare.getSettings", {})).toEqual({ method: "GET", path: "/v1/filter-care/settings" });
     expect(coreRequest("alerts.evidence", { alertId: "a1", query: { limit: 100 } })).toEqual({ method: "GET", path: "/v1/alerts/a1/evidence?limit=100", body: undefined });
+    // IR349: the MRV evidence candidates take their units and period in the query string
+    expect(query(coreRequest("attachments.list", { unitIds: ["u1", "u2"], from: "2026-09-01T00:00:00Z", to: "2026-09-14T00:00:00Z", query: { limit: 100 } })!.path))
+      .toEqual({ pathname: "/v1/attachments", out: { unitIds: ["u1", "u2"], from: ["2026-09-01T00:00:00Z"], to: ["2026-09-14T00:00:00Z"], limit: ["100"] } });
     for (const routes of Object.values(coreRoutes)) for (const r of routes) expect(r.path).toMatch(/^\/v1(\/([a-z0-9-]+|\{[A-Za-z]\w*(\.[A-Za-z]\w*)?\}))+$/);
   });
 

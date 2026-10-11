@@ -120,3 +120,15 @@ export function factorErrors(d: FactorDraft, t: T = en): Record<string, string> 
 export const factorInput = (d: FactorDraft, id?: string) => ({
   ...(id ? { id } : {}), region: d.region.trim(), year: Number(d.year), kgCO2ePerKWh: Number(d.kgCO2ePerKWh), source: d.source.trim(), isDemo: true as const,
 });
+
+/** EvidenceAttachment of service-contracts.ts: a ready attachment of an accepted work report an MRV report may cite
+ * (attachments.list, IR349). */
+export type ApiEvidenceAttachment = { id: string; jobId: string; reportId: string; name: string; mime: string; size: number; status: string; createdAt: string; unitId: string; acceptedAt: string };
+export type EvidenceRow = { id: string; name: string; sub: string };
+/** mrv.saveDraft keeps 0–20 evidence attachments (IR149 item 3). */
+export const MAX_EVIDENCE = 20;
+/** The candidates as the picker lists them: the file, its unit and when it was uploaded, in the display time zone. */
+export function evidenceRows(as: ApiEvidenceAttachment[], units: { id: string; label: string }[], i: I18n = EN): EvidenceRow[] {
+  const unit = new Map(units.map((u) => [u.id, u.label]));
+  return as.map((a) => ({ id: a.id, name: a.name, sub: `${unit.get(a.unitId) ?? a.unitId} · ${i.t("uploaded {time}", { time: showTime(a.createdAt, i.display) })}` }));
+}

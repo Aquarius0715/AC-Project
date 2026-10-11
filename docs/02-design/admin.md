@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.57.0
+version: 0.58.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -56,7 +56,7 @@ Show retry only for recoverable errors. For forbidden and not-found, follow IR57
 | DD-A11 / FR-A11 | `/admin/settings/automation` / `ControlPolicy` | `policies.save`、`automations.simulate`、`automations.fire`、`policies.list`、`policies.get`、`units.list`、`units.get` | Enter units, priority, trigger event, action, and stop conditions. Prioritize contract restrictions and safety capabilities | Suppress automatic execution when data is unavailable. Send no real commands to external power equipment |
 | DD-A12 / FR-A12 | `/admin/alerts?tab=policies` (former `/admin/settings/air-quality` removed) / `AlertPolicyEditor` | `policies.save`、`policies.list`、`policies.get`、`automations.simulate`、`automations.fire`、`telemetry.series`、`notifications.recipients`、`units.list` | CO₂ (ppm) and PM2.5 (µg/m³) limits are customer-owned alert policies (IR108); fix ppm, µg/m³, °C, and % to their matching metrics | Do not guarantee health or safety. Air-quality policies notify only and never create Commands |
 | DD-A13 / FR-A13 | `/admin/energy` / `EnergyAnalysis` | `energy.summary`、`baselines.list`、`baselines.save`、`units.list` | Enter baseline period, boundary, model version, and unit set. Validate period overlaps and missing data | Cannot calculate without a baseline. Do not guarantee reductions such as 10–20% or more |
-| DD-A14 / FR-A14 | `/admin/mrv` / `MRVWorkspace` | `mrv.preview`、`mrv.saveDraft`、`mrv.recordReview`、`factors.list`、`factors.save`、`mrv.list`、`mrv.get`、`baselines.list`、`organizations.list`、`units.list`、`mrv.versions` | Require period, units, baseline version, factor version, and boundary. List evidence | Note missing data and estimates. Use “Demo review,” not “Externally verified” |
+| DD-A14 / FR-A14 | `/admin/mrv` / `MRVWorkspace` | `mrv.preview`、`mrv.saveDraft`、`mrv.recordReview`、`factors.list`、`factors.save`、`mrv.list`、`mrv.get`、`baselines.list`、`organizations.list`、`units.list`、`mrv.versions`、`attachments.list` | Require period, units, baseline version, factor version, and boundary. List evidence | Note missing data and estimates. Use “Demo review,” not “Externally verified” |
 | DD-A15 / FR-A15 | `/admin/offsets` / `OffsetRegistry` | `offsets.preview`、`offsets.simulate`、`offsets.list`、`customers.list`、`units.list` | Quantity must be >0. Label scheme/provider “Not selected” and require the demo flag | Do not copy emission amounts into credit balances. No real trading or certificate issuance |
 | DD-A16 / FR-A16 | `/admin/audit` / `AuditExplorer` | `audit.list`、`devices.events` | Use audit.read permission, period, actor, target, and event type. Mask confidential values | Show denied and successful actions separately. No deletion or changes through the screen. Demo records are not guaranteed tamper-proof |
 | DD-A17 / FR-A17 | `/admin/units?customerId=&tab=users` / `ClientUserList` | `clientUsers.list`、`clientUsers.save`、`clientUsers.remove`、`clientUsers.resendInvite` | Email unique per customer; role owner/member; reason for removal | Last active owner cannot be demoted, disabled, or removed |
@@ -579,7 +579,7 @@ Verification: AT-A14-SRC. With the same consumption, changing factor version cha
 
 **Source mapping**: SRC-06 BIZ-25 → FR-A14 → DD-A14. Source category: original company requirements SRC-06 + design additions. Design additions: report fields, evidence, and previews. Field types, required status, defaults, and action order are implementation proposals.
 
-Scope: FR-A14 / Main display pattern: **UI-ANALYSIS / UI-FORM / UI-DETAIL**. Service boundary: `mrv.preview, mrv.saveDraft, mrv.recordReview, factors.list, factors.save, mrv.list, mrv.get, baselines.list, organizations.list, units.list, mrv.versions`.
+Scope: FR-A14 / Main display pattern: **UI-ANALYSIS / UI-FORM / UI-DETAIL**. Service boundary: `mrv.preview, mrv.saveDraft, mrv.recordReview, factors.list, factors.save, mrv.list, mrv.get, baselines.list, organizations.list, units.list, mrv.versions, attachments.list`.
 
 **Initial view and prerequisites**: mrv.write permission; period, units, baseline version, factor version, and boundary are selected. Display in this order: validate route/conditions → check session scope → fetch the required Queries. Distinguish “not yet loaded” from “zero results.”
 
@@ -599,6 +599,7 @@ Scope: FR-A14 / Main display pattern: **UI-ANALYSIS / UI-FORM / UI-DETAIL**. Ser
 4. Queries to update: `mrv / review history / audit`。
 5. Tabs: `tab=reports` (default) and `tab=factors`. Reports: filters `organizationId`, `unitId`, period and status (URL keys; `mrv.list` filters). The `reportId` detail shows a version selector (`mrv.versions`, `reportVersion`; old versions read-only), results (electricity kWh, Scope 2 kgCO₂e, energy vs baseline and emissions vs baseline as separate figures using IR68 wording), the stored condition snapshots (organization, sites/units, period, boundary, baseline and factor with region/year/value/source/version), evidence, and demo review history with the review action for the latest version only.
 6. New report: conditions from `organizations.list` → `units.list`, `baselines.list`, `factors.list`, boundary; `mrv.preview` shows a “Not saved” preview with “Demo — unverified”; missing factor/region/boundary or zero coverage shows “Calculation incomplete” without zero-filling; “Save draft” calls `mrv.saveDraft` with the selected evidence.
+   - As built (IR349, Figma 324:2): “Evidence to attach” lists the chosen attachments as chips; “+ Add evidence” offers `attachments.list` for the draft's units and period (ready attachments of accepted work reports uploaded in it, at most 20 chosen). The report detail names its evidence the same way.
 7. Factors: `factors.list` and a form (region, year, kgCO₂e/kWh with the fixed unit, source stating demo) saved with `factors.save` as a new version; existing reports keep the factor version they reference.
 8. Language and time (IR297): texts follow the display language. Report periods are Kuala Lumpur business time in every display time zone. They are typed in it, and the labels and the condition snapshot name it. The list's period filter is `[from, to)` on a report's period start, labelled “Period starts from (Kuala Lumpur)” / “Period starts before”. Demo review times are in the display time zone.
 
@@ -879,7 +880,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.57.0: Read IR01–IR348 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.58.0: Read IR01–IR349 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

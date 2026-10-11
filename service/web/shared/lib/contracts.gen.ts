@@ -91,6 +91,8 @@ export type WorkReport = Entity & {reviewAvailability:ReviewAvailability;jobId:I
 export type Review = {reviewerUserId:ID;reportVersion:number;decision:'accept'|'return';reason:string|null;occurredAt:Instant};
 export type WorkReportDraft = {jobId:ID;reportId?:ID;items:InspectionItemInput[];measurements:InspectionMeasurementInput[];parts:Part[];refrigerant:RefrigerantRecord[];workText:string;nextAction:NextAction|null;attachmentIds:ID[]};
 export type Attachment = Entity & {jobId:ID;reportId:ID;blobId:ID;name:string;mime:'image/jpeg'|'image/png';size:number;status:'processing'|'ready'|'failed'};
+/** A ready attachment of an accepted work report that an MRV report may cite (IR349): the job's unit and the report's acceptance. */
+export type EvidenceAttachment = Attachment & {unitId:ID;acceptedAt:Instant};
 export type JobNote = Entity & {jobId:ID;authorId:ID;visibility:'internal'|'customer';message:string};
 export type JobEvent = Entity & {jobId:ID;actorUserId:ID;action:string;occurredAt:Instant;note:JobNote|null;reportRef:ReportRef|null};
 export type MaintenancePlan = Entity & {unitId:ID;recurrence:{kind:'monthly';intervalMonths:number};timezone:'UTC';anchorDay:number;nextDueAt:Instant;generatedOccurrences:{occurrenceAt:Instant;jobId:ID}[]};
@@ -250,6 +252,7 @@ export type OperationContracts = {
   'alerts.acknowledge': {input:{alertId:ID};result:Alert;mode:'write'};
   'alerts.get': {input:{id:ID};result:Alert;mode:'read'};
   'alerts.evidence': {input:{alertId:ID;query:Query};result:Page<EvidenceCandidate>;mode:'read'};
+  'attachments.list': {input:{unitIds:ID[];from:Instant;to:Instant;query:Query};result:Page<EvidenceAttachment>;mode:'read'};
   'alerts.list': {input:Query;result:Page<Alert>;mode:'read'};
   'alerts.resolve': {input:{alertId:ID;resolutionReason:string;resolutionEvidenceIds:ID[]};result:Alert;mode:'write'};
   'attachments.add': {input:{jobId:ID;reportId:ID;file:BlobInput};result:Attachment;mode:'write'};
