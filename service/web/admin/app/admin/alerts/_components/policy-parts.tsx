@@ -50,10 +50,10 @@ export function WindowEditor({ value, onChange, timezone, error }: { value: Wind
           <Btn size="sm" onClick={() => set({ weekdays: [1, 2, 3, 4, 5] })}>{t("Mon–Fri")}</Btn><Btn size="sm" onClick={() => set({ weekdays: [1, 2, 3, 4, 5, 6, 7] })}>{t("Every day")}</Btn>
           {DAYS.map((d, i) => <button key={d} type="button" aria-pressed={value.weekdays.includes(i + 1)} onClick={() => set({ weekdays: value.weekdays.includes(i + 1) ? value.weekdays.filter((x) => x !== i + 1) : [...value.weekdays, i + 1].sort() })} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", value.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</button>)}
           <Input aria-label={t("From")} type="time" className="w-32" value={value.startLocal} onChange={(e) => set({ startLocal: e.target.value })} /> – <Input aria-label={t("To")} type="time" className="w-32" value={value.endLocal} onChange={(e) => set({ endLocal: e.target.value })} />
-          <span className="text-xs text-muted">{timezone}</span>
+          <span className="text-xs text-muted-foreground">{timezone}</span>
         </div>
       ) : <p className="text-[13px]">{t("Any day · any time")}</p>}
-      {value && !error && <p className="text-xs text-muted">{windowText(value, t)}</p>}
+      {value && !error && <p className="text-xs text-muted-foreground">{windowText(value, t)}</p>}
       {error && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{error}</p>}
     </div>
   );

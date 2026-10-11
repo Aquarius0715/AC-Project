@@ -126,7 +126,7 @@ test("the Policies tab's scope, Show disabled and a scoped new policy with activ
   expect(new URL(page.url()).searchParams.get("customerId")).toBeTruthy(); // still scoped
 
   // Show disabled off: the new policy is off, yet it stays listed while it is open
-  const list = main.locator("section").filter({ has: page.getByRole("heading", { name: "Alert policies", exact: true }) });
+  const list = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Alert policies", exact: true }) });
   await main.getByRole("checkbox", { name: "Show disabled" }).uncheck();
   await expect(list.getByRole("button", { name: new RegExp(name) })).toBeVisible();
   await list.getByRole("button", { name: /Default policy/ }).click();
@@ -172,7 +172,7 @@ test("the default policy's rules, a customer's switch and a rule copied as a cus
   await page.goto("/admin/alerts?tab=policies");
   before = (await relay(page, "policies.list", { limit: 1, filters: { kind: "default_alert" } })).body.data.items[0] as DefaultPolicy;
   const main = page.getByRole("main");
-  const list = main.locator("section").filter({ has: page.getByRole("heading", { name: "Alert policies", exact: true }) });
+  const list = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Alert policies", exact: true }) });
   await list.getByRole("button", { name: /Default policy/ }).click();
   await page.waitForURL(/policyId=/);
   await expect(main.getByRole("heading", { name: "Default policy › Ventilation" })).toBeVisible();
@@ -242,13 +242,13 @@ test("the notification preview and the demo test of a policy attached to a unit"
   await page.getByRole("dialog").getByRole("button", { name: "Add 1 recipient" }).click();
 
   // the preview before saving: what hq-operator is shown for a unit of the customer, at the policy's severity
-  const preview = main.locator("section").filter({ has: page.getByRole("heading", { name: "Notification preview", exact: true }) }).last(); // the editor card is a section too
+  const preview = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Notification preview", exact: true }) }).last(); // the editor card is a section too
   await expect(preview).toContainText(/What hq-operator sees for .+ \(notifications\.preview · in-app\)\./);
   await expect(preview).toContainText(/Alert on /);
   await expect(preview).toContainText("Warning");
   await main.getByRole("button", { name: "Critical", exact: true }).click();
   await expect(preview).toContainText("Critical");
-  const check = main.locator("section").filter({ has: page.getByRole("heading", { name: "Test with demo data", exact: true }) }).last(); // the editor card is a section too
+  const check = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Test with demo data", exact: true }) }).last(); // the editor card is a section too
   await expect(check).toContainText("Save the policy first: the test evaluates the saved version.");
   await main.getByRole("button", { name: "Save policy" }).click();
   await page.waitForURL(/policyId=[0-9a-f-]{36}/);
@@ -294,16 +294,16 @@ test("the default policy's demo test on a unit of the scoped customer", async ({
   const main = page.getByRole("main");
   await main.getByRole("combobox", { name: "Customer" }).selectOption({ label: "Demo Customer A" });
   await page.waitForURL(/customerId=/);
-  await main.locator("section").filter({ has: page.getByRole("heading", { name: "Alert policies", exact: true }) }).getByRole("button", { name: /Default policy/ }).click();
+  await main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Alert policies", exact: true }) }).getByRole("button", { name: /Default policy/ }).click();
   await page.waitForURL(/policyId=/);
   const rules = main.getByRole("region", { name: "Rules" });
   await rules.getByRole("button", { name: /^Dust \/ filter/ }).click();
   // the preview: what one of the customer's users is shown, at the rule's severity
-  const preview = main.locator("section").filter({ has: page.getByRole("heading", { name: "Notification preview", exact: true }) }).last();
+  const preview = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Notification preview", exact: true }) }).last();
   await expect(preview).toContainText(/What .+ sees for .+ \(notifications\.preview · in-app\)\./);
   await expect(preview).toContainText(/Alert on /);
   await expect(preview).toContainText("Warning");
-  const check = main.locator("section").filter({ has: page.getByRole("heading", { name: "Test with demo data", exact: true }) }).last();
+  const check = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Test with demo data", exact: true }) }).last();
   await expect(check.getByRole("spinbutton", { name: "Reading" })).toHaveValue("35");
   await check.getByRole("button", { name: "Evaluate (demo)" }).click();
   await expect(check.getByRole("status")).toHaveText(/^35 µg\/m³ on .+ raises an alert and notifies the recipients — simulated, nothing is stored\.$/);

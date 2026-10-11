@@ -46,7 +46,7 @@ export function PreferredSlotsInput({ value, onChange, error, label = "Preferred
           <Select aria-label={`${RANKS[i]} preferred window`} value={s.win} onChange={(e) => set(i, { win: e.target.value })} className="min-w-0 flex-1">{WINDOWS.map((w) => <option key={w}>{w}</option>)}</Select>
         </div>
       ))}
-      {error ? <span className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{error}</span> : <span className="text-[11px] text-muted">{hint ?? "3 different times, at least 1 day ahead. HQ books one of them. If none can be met, HQ proposes another time — you accept or decline it."}</span>}
+      {error ? <span className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{error}</span> : <span className="text-[11px] text-muted-foreground">{hint ?? "3 different times, at least 1 day ahead. HQ books one of them. If none can be met, HQ proposes another time — you accept or decline it."}</span>}
     </fieldset>
   );
 }
@@ -63,8 +63,8 @@ export function SlotLine({ i, slot, struck, note }: { i: number; slot: Slot; str
   return (
     <div className="flex flex-wrap items-center gap-2 text-[13px]">
       <Rank i={i} />
-      <span className={cx("font-semibold", struck && "text-muted line-through")}>{slot.date.slice(5)} · {slot.win}</span>
-      {note && <span className="text-xs text-muted">{note}</span>}
+      <span className={cx("font-semibold", struck && "text-muted-foreground line-through")}>{slot.date.slice(5)} · {slot.win}</span>
+      {note && <span className="text-xs text-muted-foreground">{note}</span>}
     </div>
   );
 }

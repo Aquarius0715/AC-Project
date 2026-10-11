@@ -58,10 +58,10 @@ export function HistoryDemo() {
       <div className="flex flex-wrap items-center gap-2"><Select aria-label="Job" className="max-w-xs" value={job} onChange={(e) => setJob(e.target.value)}><option value="">Select a job…</option>{api ? jobs.data?.map((j) => <option key={j.id} value={j.id}>{j.label}</option>) : <><option value="job-p03">job-p03 · Office AC</option><option value="job-p04">job-p04 · Meeting room AC</option></>}</Select></div>
       {!job || (api && !sel) ? <Card title="Select a job" sub="Choose a job above to see its history." /> : (
         <>
-          <Card><div className="grid-fluid text-[13px]" style={{ ["--min"as string]: "150px" }}>{(sel ? [["JOB", sel.id.slice(0, 8)], ["STATUS", sel.status], ["COMPLETED", sel.completedAt ? kl(sel.completedAt) : "—"], ["ACCESS", sel.projection === "history" ? "ended — history only" : "current"]] : [["UNIT", "Office AC · customer-a"], ["TECHNICIAN", "tech-external-a"], ["STATUS", "Completed"], ["DELEGATION", "ended 09-22 00:00"]]).map(([a, b]) => <div key={a}><div className="text-[10px] font-bold tracking-wide text-muted">{a}</div><b>{b}</b></div>)}</div></Card>
+          <Card><div className="grid-fluid text-[13px]" style={{ ["--min"as string]: "150px" }}>{(sel ? [["JOB", sel.id.slice(0, 8)], ["STATUS", sel.status], ["COMPLETED", sel.completedAt ? kl(sel.completedAt) : "—"], ["ACCESS", sel.projection === "history" ? "ended — history only" : "current"]] : [["UNIT", "Office AC · customer-a"], ["TECHNICIAN", "tech-external-a"], ["STATUS", "Completed"], ["DELEGATION", "ended 09-22 00:00"]]).map(([a, b]) => <div key={a}><div className="text-[10px] font-bold tracking-wide text-muted-foreground">{a}</div><b>{b}</b></div>)}</div></Card>
           <div className="split">
             <Card title={`Job history — ${job}`} action={<Tabs value={f} onChange={setF} tabs={[{ id: "all", label: "All events", count: all.length }, { id: "customer", label: "Customer-visible", count: all.filter((e) => e.c).length }, { id: "internal", label: "Internal", count: all.filter((e) => !e.c).length }]} />}>
-              {shown.length === 0 && <p className="text-[13px] text-muted">{evs.loading ? "Loading…" : "No events in this view."}</p>}
+              {shown.length === 0 && <p className="text-[13px] text-muted-foreground">{evs.loading ? "Loading…" : "No events in this view."}</p>}
               <Timeline items={shown.map((e) => ({ time: e.t.slice(5), title: e.title, detail: e.d, tone: e.title.startsWith("Rework") ? "warn" : e.title.includes("accepted") && e.title.startsWith("Report") ? "ok" : undefined }))} />
             </Card>
             <div className="flex min-w-0 flex-col gap-4">
@@ -72,10 +72,10 @@ export function HistoryDemo() {
                   <Field label="Recipient role"><Select value={role} onChange={(e) => setRole(e.target.value)}><option value="hq">hq</option><option value="technician">technician</option><option value="customer">customer</option></Select></Field>
                   <Field label="Message (1–2000 chars)" error={tried && !msg.trim() ? "Message is required" : undefined}><Textarea value={msg} onChange={(e) => setMsg(e.target.value)} /></Field>
                   <Btn variant="primary" disabled={api && sel?.projection === "history"} onClick={() => { setTried(true); if (!msg.trim()) return; setPreviews((p) => [{ k: `schedule_change → ${role}`, d: `in-app · preview · ${vis} · just now` }, ...p]); toast("Note saved + preview created"); }}>Save note & create preview</Btn>
-                  <p className="text-[11px] text-muted">No real sending. Free-form external recipients and other-job recipients are rejected. Internal notes stay hidden from customers.</p>
+                  <p className="text-[11px] text-muted-foreground">No real sending. Free-form external recipients and other-job recipients are rejected. Internal notes stay hidden from customers.</p>
                 </div>
               </Card>
-              <Card title={`Previews on ${job} (${previews.length})`}>{previews.map((p, i) => <div key={i} className="border-t border-line py-2 text-[13px] first:border-0"><b>{p.k}</b><div className="text-xs text-muted">{p.d}</div></div>)}<p className="mt-1 text-[11px] text-muted">deliveryState stays “preview” — nothing is sent in phase 1A.</p></Card>
+              <Card title={`Previews on ${job} (${previews.length})`}>{previews.map((p, i) => <div key={i} className="border-t border-line py-2 text-[13px] first:border-0"><b>{p.k}</b><div className="text-xs text-muted-foreground">{p.d}</div></div>)}<p className="mt-1 text-[11px] text-muted-foreground">deliveryState stays “preview” — nothing is sent in phase 1A.</p></Card>
             </div>
           </div>
         </>

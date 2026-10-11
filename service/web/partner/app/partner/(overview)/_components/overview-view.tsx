@@ -24,7 +24,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
   const anyBlock = live.timeline.some((r) => r.blocks.length);
   return (
     <Page>
-      <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-muted">
+      <div className="flex flex-wrap items-center justify-end gap-3 text-xs text-muted-foreground">
         <span>{t("Updated {time} · your company’s jobs only", { time: live.updated })}</span>
         <Select aria-label={t("Period")} className="w-auto" value={live.period.value} onChange={(e) => { const [from, to] = e.target.value.split("|"); patch({ from, to }); }}>
           {live.period.custom && <option value={live.period.value}>{live.period.label}</option>}
@@ -35,11 +35,11 @@ export function OverviewView({ live }: { live: OverviewLive }) {
         {live.kpis.map((k) => <Kpi key={k.href + k.label} label={k.label} value={k.value} sub={k.sub} href={k.href} link={k.link} tone={k.tone} />)}
       </div>
       <Card title={t("Job progress — {period}", { period })} action={<TextLink href="/partner/jobs">{t("Open all jobs")} <Icon name="arrowRight" /></TextLink>}>
-        <p className="mb-2 text-xs text-muted">{pr.total ? t(pr.total === 1 ? "{n} job · {done} completed ({pct}%) · counts use the same period as the Jobs list" : "{n} jobs · {done} completed ({pct}%) · counts use the same period as the Jobs list", { n: pr.total, done: pr.counts.completed, pct: pr.completedPct }) : t("No jobs yet — offers from HQ to your company will appear here and in Jobs.")}</p>
+        <p className="mb-2 text-xs text-muted-foreground">{pr.total ? t(pr.total === 1 ? "{n} job · {done} completed ({pct}%) · counts use the same period as the Jobs list" : "{n} jobs · {done} completed ({pct}%) · counts use the same period as the Jobs list", { n: pr.total, done: pr.counts.completed, pct: pr.completedPct }) : t("No jobs yet — offers from HQ to your company will appear here and in Jobs.")}</p>
         <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface2" role="img" aria-label={t("Jobs by status")}>
           {pr.total > 0 && BUCKETS.map((b) => pr.counts[b.id] > 0 && <div key={b.id} className={cx("h-full", b.tone)} style={{ width: `${(pr.counts[b.id] / pr.total) * 100}%` }} title={`${t(b.label)}: ${pr.counts[b.id]}`} />)}
         </div>
-        <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+        <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           {BUCKETS.map((b) => <li key={b.id} className="flex items-center gap-1.5"><span className={cx("inline-block h-2.5 w-2.5 rounded-full", b.tone)} />{t(b.label)} <b className="text-ink">{pr.counts[b.id]}</b></li>)}
         </ul>
       </Card>
@@ -52,7 +52,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
                   <li key={`${a.kind}-${a.href}`} className="flex flex-wrap items-center justify-between gap-3 py-2.5">
                     <span className="flex min-w-0 items-center gap-3">
                       <Badge tone={badgeTone[a.kind]}>{a.badge}</Badge>
-                      <span className="min-w-0"><b className="block truncate text-[13px]">{a.title}</b><span className="block text-xs text-muted">{a.detail}</span></span>
+                      <span className="min-w-0"><b className="block truncate text-[13px]">{a.title}</b><span className="block text-xs text-muted-foreground">{a.detail}</span></span>
                     </span>
                     <LinkBtn size="sm" href={a.href}>{a.button}</LinkBtn>
                   </li>
@@ -61,38 +61,38 @@ export function OverviewView({ live }: { live: OverviewLive }) {
             )}
           </Card>
           <Card title={t("Team capacity — {period}", { period })} action={<TextLink href="/partner/team">{t("Team & capacity")} <Icon name="arrowRight" /></TextLink>}>
-            {live.capacity.length === 0 ? <p className="text-[13px] text-muted">{t("No technicians in your company yet.")}</p> : live.capacity.map((c) => (
-              <div key={c.id} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{c.name}</b><span className="text-muted">{c.text}</span></div><UtilBar pct={c.pct} tone={c.pct !== null && c.pct >= 90 ? "warn" : "primary"} label={`${c.name}: ${c.text}`} /></div>
+            {live.capacity.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : live.capacity.map((c) => (
+              <div key={c.id} className="mb-3"><div className="mb-1 flex justify-between text-xs"><b>{c.name}</b><span className="text-muted-foreground">{c.text}</span></div><UtilBar pct={c.pct} tone={c.pct !== null && c.pct >= 90 ? "warn" : "primary"} label={`${c.name}: ${c.text}`} /></div>
             ))}
-            <p className="text-[11px] text-muted">{t("Utilization = assigned hours ÷ available hours. Undefined hours show “—”.")}</p>
+            <p className="text-[11px] text-muted-foreground">{t("Utilization = assigned hours ÷ available hours. Undefined hours show “—”.")}</p>
           </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={live.today.title} action={<TextLink href="/partner/schedule">{t("Open schedule")} <Icon name="arrowRight" /></TextLink>}>
             <div className="scroll-x"><div className="min-w-[320px]">
-              <div className="grid grid-cols-[104px_1fr] text-[11px] text-muted"><span /><div className="flex justify-between">{hours.map((h) => <span key={h}>{String(h).padStart(2, "0")}</span>)}</div></div>
-              {live.timeline.length === 0 && <p className="py-2 text-[13px] text-muted">{t("No technicians in your company yet.")}</p>}
+              <div className="grid grid-cols-[104px_1fr] text-[11px] text-muted-foreground"><span /><div className="flex justify-between">{hours.map((h) => <span key={h}>{String(h).padStart(2, "0")}</span>)}</div></div>
+              {live.timeline.length === 0 && <p className="py-2 text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p>}
               {live.timeline.map((r) => (
                 <div key={r.id} className="grid grid-cols-[104px_1fr] items-center border-t border-line py-2 text-xs">
-                  <span><b>{r.name}</b><span className="block text-[11px] text-muted">{r.sub}</span></span>
+                  <span><b>{r.name}</b><span className="block text-[11px] text-muted-foreground">{r.sub}</span></span>
                   <div className="relative h-8 rounded-lg bg-surface2">
                     {r.blocks.map((b) => <div key={b.text} className="absolute top-1 h-6 truncate rounded bg-primary px-2 text-[11px] leading-6 text-white" style={{ left: `${b.left}%`, width: `${b.width}%` }}>{b.text}</div>)}
-                    {!r.blocks.length && <span className="absolute inset-0 grid place-items-center text-[11px] text-muted">{r.off ? t("Unavailable · {reason}", { reason: r.off }) : t("Free all day")}</span>}
+                    {!r.blocks.length && <span className="absolute inset-0 grid place-items-center text-[11px] text-muted-foreground">{r.off ? t("Unavailable · {reason}", { reason: r.off }) : t("Free all day")}</span>}
                     {live.today.nowPct > 0 && live.today.nowPct < 100 && <span className="absolute inset-y-0 w-px bg-crit" style={{ left: `${live.today.nowPct}%` }} aria-hidden />}
                   </div>
                 </div>
               ))}
             </div></div>
-            <p className="mt-2 text-[11px] text-muted">
+            <p className="mt-2 text-[11px] text-muted-foreground">
               {t("Red line = now ({time}).", { time: live.today.now })} {t(anyBlock ? "Blue = assigned work windows (members.capacity)." : "No assignments today.")}
               {live.otherZone && ` ${t("The timeline is in Kuala Lumpur time (Asia/Kuala_Lumpur).")}`}
             </p>
             {unassigned > 0 && <div className="mt-2"><Banner tone="warn">{t(unassigned === 1 ? "1 accepted job still has no technician — assign it before the delegation period ends." : "{n} accepted jobs still have no technician — assign them before the delegation period ends.", { n: unassigned })}</Banner></div>}
           </Card>
           <Card title={t("Recent activity")} action={<TextLink href="/partner/history">{t("Job history")} <Icon name="arrowRight" /></TextLink>}>
-            {live.activity.length === 0 ? <p className="text-[13px] text-muted">{t("No job activity in this period.")}</p> : (
+            {live.activity.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No job activity in this period.")}</p> : (
               <ul className="flex flex-col gap-2 text-[13px]">
-                {live.activity.map((a) => <li key={a.id} className="grid grid-cols-[auto_1fr] gap-3"><span className="whitespace-nowrap text-xs text-muted">{a.time}</span><Link href={a.href} className="hover:text-primary">{a.text}</Link></li>)}
+                {live.activity.map((a) => <li key={a.id} className="grid grid-cols-[auto_1fr] gap-3"><span className="whitespace-nowrap text-xs text-muted-foreground">{a.time}</span><Link href={a.href} className="hover:text-primary">{a.text}</Link></li>)}
               </ul>
             )}
           </Card>

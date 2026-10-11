@@ -41,10 +41,10 @@ export function EnergyView({ live }: { live: EnergyLive }) {
       <Card>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <Btn size="sm" className="order-last ml-auto" onClick={() => setExporting(true)}><Icon name="download" />{t("Export")}</Btn>
-          <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted">{t("Period")}</span>
+          <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">{t("Period")}</span>
             <Tabs value={live.period.kind} onChange={(k: PeriodKind) => nav({ period: k === "7d" ? null : k, from: null, to: null })} tabs={[{ id: "today", label: t("Today") }, { id: "7d", label: t("7d") }, { id: "30d", label: t("30d") }, { id: "custom", label: t("Custom") }]} />
           </div>
-          <span className="text-xs text-muted">{live.period.label}</span>
+          <span className="text-xs text-muted-foreground">{live.period.label}</span>
         </div>
         {live.period.kind === "custom" && (
           <div className="mt-3 flex flex-wrap items-end gap-3">
@@ -56,21 +56,21 @@ export function EnergyView({ live }: { live: EnergyLive }) {
           </div>
         )}
         <div className="mt-3 flex flex-wrap items-center gap-3 text-[13px]">
-          <span className="text-xs text-muted">{t("Baseline")}</span>
+          <span className="text-xs text-muted-foreground">{t("Baseline")}</span>
           <Select aria-label={t("Baseline")} className="w-auto" value={live.baselineId ?? "none"} onChange={(e) => nav({ baselineId: e.target.value })}>
             {live.baselines.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}<option value="none">{t("No baseline")}</option>
           </Select>
-          {!live.baselines.length && <span className="text-[11px] text-muted">{t("No baseline covers exactly these units — actual energy stays viewable (DD-C06).")}</span>}
+          {!live.baselines.length && <span className="text-[11px] text-muted-foreground">{t("No baseline covers exactly these units — actual energy stays viewable (DD-C06).")}</span>}
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
-          <span className="text-xs text-muted">{t("Units")}</span>
+          <span className="text-xs text-muted-foreground">{t("Units")}</span>
           {live.unitIds.map((u) => <Badge key={u} tone="primary">{names.get(u)}{live.unitIds.length > 1 && <button type="button" aria-label={t("Remove {name}", { name: names.get(u) ?? "" })} className="ml-1" onClick={() => setUnits(live.unitIds.filter((x) => x !== u))}><Icon name="close" /></button>}</Badge>)}
           {live.unitIds.length < 4 && (
             <Select aria-label={t("Compare unit")} className="w-auto" value="" onChange={(e) => e.target.value && setUnits([...live.unitIds, e.target.value])}>
               <option value="">{t("Add a unit to compare")}</option>{live.units.filter((u) => !live.unitIds.includes(u.id)).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </Select>
           )}
-          <span className="text-[11px] text-muted">{t("up to 4 units")}</span>
+          <span className="text-[11px] text-muted-foreground">{t("up to 4 units")}</span>
         </div>
       </Card>
       {live.error && <Banner tone="warn">{live.error}</Banner>}
@@ -84,13 +84,13 @@ export function EnergyView({ live }: { live: EnergyLive }) {
         </div>
         <Card title={t(multi ? "Daily actual energy by unit" : "Daily energy — Actual vs Baseline")} sub={multi ? t("kWh per day · max 4 units · baselines are compared in the table") : t(r.baseline !== null ? "kWh per day · {subject} · baseline shown as an even daily share" : "kWh per day · {subject}", { subject })}
           action={<Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: t("Chart") }, { id: "table", label: t("Table") }]} />}>
-          {view === "chart" && live.daily.every((d) => !d.actual) ? <p className="rounded-xl bg-surface2 p-4 text-center text-[13px] text-muted">{t("No valid power readings in this period — the chart appears once the units report minute readings (coverage {coverage}).", { coverage: s.coverage })}</p>
+          {view === "chart" && live.daily.every((d) => !d.actual) ? <p className="rounded-xl bg-surface2 p-4 text-center text-[13px] text-muted-foreground">{t("No valid power readings in this period — the chart appears once the units report minute readings (coverage {coverage}).", { coverage: s.coverage })}</p>
             : view === "chart" ? (multi ? (live.compare?.series
             ? <><BarChart labels={live.daily.map((d) => d.label)} series={live.compare.series} unit="kWh" height={200} colors={colors} />
-              <div className="mt-1 flex flex-wrap gap-4 text-[11px] text-muted">{live.unitIds.map((u, i) => <span key={u}><i className="mr-1 inline-block h-2 w-2" style={{ background: colors[i] }} />{names.get(u)}</span>)}</div></>
-            : <p className="text-[13px] text-muted">{t("The per-unit daily chart covers up to 7 days — see the table for this period.")}</p>)
+              <div className="mt-1 flex flex-wrap gap-4 text-[11px] text-muted-foreground">{live.unitIds.map((u, i) => <span key={u}><i className="mr-1 inline-block h-2 w-2" style={{ background: colors[i] }} />{names.get(u)}</span>)}</div></>
+            : <p className="text-[13px] text-muted-foreground">{t("The per-unit daily chart covers up to 7 days — see the table for this period.")}</p>)
             : <><BarChart labels={live.daily.map((d) => d.label)} series={r.baseline !== null ? [live.daily.map((d) => d.baseline ?? 0), live.daily.map((d) => d.actual ?? 0)] : [live.daily.map((d) => d.actual ?? 0)]} unit="kWh" height={200} />
-              <div className="mt-1 flex flex-wrap gap-4 text-[11px] text-muted"><span><i className="mr-1 inline-block h-2 w-2 bg-primary" />{t("Actual (measured)")}</span>{r.baseline !== null && <span><i className="mr-1 inline-block h-2 w-2 bg-[#c9d8ee]" />{t("Baseline (normal operation)")}</span>}</div></>)
+              <div className="mt-1 flex flex-wrap gap-4 text-[11px] text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 bg-primary" />{t("Actual (measured)")}</span>{r.baseline !== null && <span><i className="mr-1 inline-block h-2 w-2 bg-[#c9d8ee]" />{t("Baseline (normal operation)")}</span>}</div></>)
             : multi && live.compare ? (
               <DataTable rows={live.compare.rows} rowKey={(x) => x.unitId} cols={[
                 { key: "u", label: t("Unit"), render: (x) => <b>{x.name}</b> }, { key: "a", label: t("Actual (kWh)"), render: (x) => x.actual }, { key: "b", label: t("Baseline (kWh)"), render: (x) => x.baseline },
@@ -102,17 +102,17 @@ export function EnergyView({ live }: { live: EnergyLive }) {
                 { key: "b", label: t("Baseline (kWh)"), render: (d) => (d.baseline === null ? "—" : one(d.baseline)) },
               ]} />
             )}
-          {multi && <p className="mt-3 text-[11px] text-muted">{t("Totals across units are shown only when all units share the same calculation boundary; increases are labelled, never shown as a negative saving.")}</p>}
+          {multi && <p className="mt-3 text-[11px] text-muted-foreground">{t("Totals across units are shown only when all units share the same calculation boundary; increases are labelled, never shown as a negative saving.")}</p>}
           {s.warnings.length > 0 && <div className="mt-3"><Banner tone="warn">{s.warnings.join(" · ")}</Banner></div>}
-          <details className="mt-3 text-[12px]"><summary className="cursor-pointer font-semibold text-muted">{t("Calculation conditions")}</summary><div className="mt-2"><SummaryList items={s.conditions} /></div></details>
+          <details className="mt-3 text-[12px]"><summary className="cursor-pointer font-semibold text-muted-foreground">{t("Calculation conditions")}</summary><div className="mt-2"><SummaryList items={s.conditions} /></div></details>
         </Card>
         <Card title={t("Carbon impact")} sub={t("Same period & units as above · {factor}", { factor: r.factor ?? t("emission factor missing") })} action={<LinkBtn size="sm" href={`/customer/energy/offsets?${live.query}`}><Icon name="info" />{t("Learn about offsets")}</LinkBtn>}>
           <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-            <div><div className="text-xs text-muted">{t("Estimated emissions")}</div><div className="text-2xl font-bold">{s.emissions}</div><div className="text-[11px] text-muted">{r.kWh === null ? t("no valid readings") : t("{kWh} kWh actual × factor", { kWh: one(r.kWh) })}</div></div>
-            <div><div className="text-xs text-muted">{t("Estimated savings vs baseline")}</div><div className={`text-2xl font-bold ${s.comparable ? (s.increase ? "text-warn" : "text-ok") : "text-muted"}`}>{s.savedEmissions}</div><div className="text-[11px] text-muted">{s.comparable ? `${s.baseline} → ${s.actual}` : t("needs a comparable baseline")}</div></div>
-            <div><div className="text-xs text-muted">{t("Offsets")} <Badge tone="muted">{t("Optional")}</Badge></div><div className="text-[13px]">{t("Demo requests only — see records on the Offsets page")}</div></div>
+            <div><div className="text-xs text-muted-foreground">{t("Estimated emissions")}</div><div className="text-2xl font-bold">{s.emissions}</div><div className="text-[11px] text-muted-foreground">{r.kWh === null ? t("no valid readings") : t("{kWh} kWh actual × factor", { kWh: one(r.kWh) })}</div></div>
+            <div><div className="text-xs text-muted-foreground">{t("Estimated savings vs baseline")}</div><div className={`text-2xl font-bold ${s.comparable ? (s.increase ? "text-warn" : "text-ok") : "text-muted-foreground"}`}>{s.savedEmissions}</div><div className="text-[11px] text-muted-foreground">{s.comparable ? `${s.baseline} → ${s.actual}` : t("needs a comparable baseline")}</div></div>
+            <div><div className="text-xs text-muted-foreground">{t("Offsets")} <Badge tone="muted">{t("Optional")}</Badge></div><div className="text-[13px]">{t("Demo requests only — see records on the Offsets page")}</div></div>
           </div>
-          <p className="mt-3 text-[11px] text-muted">{t("Estimates only. Savings are not a tradable balance and are not converted into carbon credits.")}</p>
+          <p className="mt-3 text-[11px] text-muted-foreground">{t("Estimates only. Savings are not a tradable balance and are not converted into carbon credits.")}</p>
         </Card>
       </>}
       {exporting && <ExportModal live={live} onClose={() => setExporting(false)} />}
@@ -146,7 +146,7 @@ function ExportModal({ live, onClose }: { live: EnergyLive; onClose: () => void 
       {file ? (
         <div className="flex flex-col gap-3">
           <Banner tone="ok" action={<DemoBadge />}><b>{t("Report ready")}</b><div className="text-xs">{t("{file} · {kb} KB · {format} — a demo file; nothing is e-mailed now.", { file: file.fileName, kb: Math.max(1, Math.round(file.size / 1024)), format: file.mime === "text/csv" ? "CSV" : "PDF" })}</div></Banner>
-          {live.prefs && email !== live.prefs.monthlyReportEmail && <p className="text-xs text-muted">{t(email ? "Monthly e-mail turned on in your preferences." : "Monthly e-mail turned off in your preferences.")}</p>}
+          {live.prefs && email !== live.prefs.monthlyReportEmail && <p className="text-xs text-muted-foreground">{t(email ? "Monthly e-mail turned on in your preferences." : "Monthly e-mail turned off in your preferences.")}</p>}
         </div>
       ) : (
         <div className="flex flex-col gap-3">

@@ -76,19 +76,19 @@ export function QrScan({ open, onClose }: { open: boolean; onClose: () => void }
           )}
         </div>
         <div className="flex min-w-0 flex-col gap-2 text-[13px]">
-          {state.kind === "idle" && <p className="text-muted">{t("Scan the label on the unit, or enter its label code, device serial or unit ID. Only units in your assignments are shown.")}</p>}
-          {state.kind === "busy" && <p className="text-muted" aria-busy>{t("Reading the label…")}</p>}
+          {state.kind === "idle" && <p className="text-muted-foreground">{t("Scan the label on the unit, or enter its label code, device serial or unit ID. Only units in your assignments are shown.")}</p>}
+          {state.kind === "busy" && <p className="text-muted-foreground" aria-busy>{t("Reading the label…")}</p>}
           {state.kind === "refused" && <Banner tone={state.absent ? "warn" : "crit"}><b>{state.title}</b> — {state.text}</Banner>}
           {m && state.kind === "matched" && (
             <>
-              <p className="flex flex-wrap items-center gap-2"><Badge tone="ok" icon="check">{t("Matched")}</Badge><span className="text-xs text-muted">{t("label {code} · scanned {time}", { code: state.code.length > 24 ? `${state.code.slice(0, 24)}…` : state.code, time: showClock(state.at, i18n.display) })}</span></p>
+              <p className="flex flex-wrap items-center gap-2"><Badge tone="ok" icon="check">{t("Matched")}</Badge><span className="text-xs text-muted-foreground">{t("label {code} · scanned {time}", { code: state.code.length > 24 ? `${state.code.slice(0, 24)}…` : state.code, time: showClock(state.at, i18n.display) })}</span></p>
               <b className="text-[15px]">{m.title}</b>
-              {m.sub && <span className="text-xs text-muted">{m.sub}</span>}
+              {m.sub && <span className="text-xs text-muted-foreground">{m.sub}</span>}
               {m.job ? <div className={m.job.tone === "ok" ? "rounded-xl bg-ok-soft p-3 text-ok" : "rounded-xl bg-primary-soft p-3 text-primary"}><b className="block">{m.job.label}</b><span className="text-xs">{m.job.text}</span></div>
-                : <div className="rounded-xl bg-surface2 p-3 text-xs text-muted">{t("No open job of yours on this unit right now — the unit register is still readable.")}</div>}
+                : <div className="rounded-xl bg-surface2 p-3 text-xs text-muted-foreground">{t("No open job of yours on this unit right now — the unit register is still readable.")}</div>}
             </>
           )}
-          <p className="mt-auto text-[11px] text-muted">{t("Not in your assignments → “Page unavailable”, no unit data (same as a direct link). Unknown or damaged label → enter the unit ID manually.")}</p>
+          <p className="mt-auto text-[11px] text-muted-foreground">{t("Not in your assignments → “Page unavailable”, no unit data (same as a direct link). Unknown or damaged label → enter the unit ID manually.")}</p>
         </div>
       </div>
     </Modal>

@@ -17,7 +17,7 @@ export function AdminOverviewDemo() {
   const empty = state === "empty";
   return (
     <Page>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted"><span>As of 09:00 MYT · 2026-09-14 00:00–09:00 (Asia/Kuala_Lumpur)</span><span className="flex gap-3"><button className="underline" onClick={() => setState("loading")}>skeleton</button><button className="underline" onClick={() => setState("error")}>error</button><button className="underline" onClick={() => setState(empty ? "ok" : "empty")}>{empty ? "normal" : "zero units"}</button></span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><span>As of 09:00 MYT · 2026-09-14 00:00–09:00 (Asia/Kuala_Lumpur)</span><span className="flex gap-3"><button className="underline" onClick={() => setState("loading")}>skeleton</button><button className="underline" onClick={() => setState("error")}>error</button><button className="underline" onClick={() => setState(empty ? "ok" : "empty")}>{empty ? "normal" : "zero units"}</button></span></div>
       {empty && <Banner tone="warn">Zero units in scope — nothing to show yet.</Banner>}
       <div className="grid-fluid" style={{ ["--min"as string]: "200px" }}>
         <Kpi label="Active customers" value={empty ? 0 : k.customers} sub="Customer active (IR40)" href="/admin/units" link="Open" />
@@ -31,25 +31,25 @@ export function AdminOverviewDemo() {
       </div>
       <Card title="Energy-saving forecast" sub="Forecast (prorated assumed baseline, demo)" action={<TextLink href="/admin/energy">Energy analysis <Icon name="arrowRight" /></TextLink>}>
         <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}>
-          {[["Forecast savings", "Expected reduction 9.9 kWh", "forecastSavedKWh · this period"], ["Forecast saving rate", "Expected reduction 30.6%", "saved ÷ predicted baseline"], ["Predicted baseline", "32.4 kWh", "baseline-demo-tenant-a v1 · demo_fixed"], ["Predicted actual", "22.5 kWh", "9.0 kWh on valid slots ÷ 1,080 × 2,700 unit-min"]].map(([a, b, c]) => <div key={a} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted">{a}</div><b>{b}</b><div className="text-[10px] text-muted">{c}</div></div>)}
+          {[["Forecast savings", "Expected reduction 9.9 kWh", "forecastSavedKWh · this period"], ["Forecast saving rate", "Expected reduction 30.6%", "saved ÷ predicted baseline"], ["Predicted baseline", "32.4 kWh", "baseline-demo-tenant-a v1 · demo_fixed"], ["Predicted actual", "22.5 kWh", "9.0 kWh on valid slots ÷ 1,080 × 2,700 unit-min"]].map(([a, b, c]) => <div key={a} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{a}</div><b>{b}</b><div className="text-[10px] text-muted-foreground">{c}</div></div>)}
         </div>
-        <p className="mt-2 text-[11px] text-muted">Coverage 1,080 / 2,700 unit-min. A forecast, not a measured saving.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Coverage 1,080 / 2,700 unit-min. A forecast, not a measured saving.</p>
       </Card>
       <div className="grid-fluid" style={{ ["--min"as string]: "300px" }}>
         <Card title="Operation (power state)" action={<TextLink href="/admin/units">Open units <Icon name="arrowRight" /></TextLink>}>
-          {[["Running", "powerState=on", 2], ["Stopped", "powerState=off", 2], ["Unknown (stale / no valid power signal)", "powerState=unknown", 1]].map(([a, b, n]) => <div key={a as string} className="flex items-center justify-between gap-2 border-t border-line py-2 first:border-0"><span className="text-[13px]">{a}<span className="block text-[10px] text-muted">{b} <Icon name="arrowRight" /></span></span><b className="text-lg">{empty ? 0 : n}</b></div>)}
-          <p className="text-[11px] text-muted">Operation rate = ON ÷ (ON + OFF) = 2 ÷ 4</p>
+          {[["Running", "powerState=on", 2], ["Stopped", "powerState=off", 2], ["Unknown (stale / no valid power signal)", "powerState=unknown", 1]].map(([a, b, n]) => <div key={a as string} className="flex items-center justify-between gap-2 border-t border-line py-2 first:border-0"><span className="text-[13px]">{a}<span className="block text-[10px] text-muted-foreground">{b} <Icon name="arrowRight" /></span></span><b className="text-lg">{empty ? 0 : n}</b></div>)}
+          <p className="text-[11px] text-muted-foreground">Operation rate = ON ÷ (ON + OFF) = 2 ÷ 4</p>
         </Card>
         <Card title="Connection" action={<TextLink href="/admin/units">Open units <Icon name="arrowRight" /></TextLink>}>
-          {[["Online", "connections=online", 5], ["Offline", "connections=offline", 0], ["Unknown / connecting / error", "connections=connecting,error,unknown", 0]].map(([a, b, n]) => <div key={a as string} className="flex items-center justify-between gap-2 border-t border-line py-2 first:border-0"><span className="text-[13px]">{a}<span className="block text-[10px] text-muted">{b} <Icon name="arrowRight" /></span></span><b className="text-lg">{empty ? 0 : n}</b></div>)}
-          <p className="text-[11px] text-muted">Connection is a separate axis from power</p>
+          {[["Online", "connections=online", 5], ["Offline", "connections=offline", 0], ["Unknown / connecting / error", "connections=connecting,error,unknown", 0]].map(([a, b, n]) => <div key={a as string} className="flex items-center justify-between gap-2 border-t border-line py-2 first:border-0"><span className="text-[13px]">{a}<span className="block text-[10px] text-muted-foreground">{b} <Icon name="arrowRight" /></span></span><b className="text-lg">{empty ? 0 : n}</b></div>)}
+          <p className="text-[11px] text-muted-foreground">Connection is a separate axis from power</p>
         </Card>
         <Card title="Maintenance jobs by status — this period" action={<TextLink href="/admin/jobs">Open jobs <Icon name="arrowRight" /></TextLink>}>
-          <div className="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-x-4">{jobs.map(([s, n]) => <div key={s} className="flex justify-between border-t border-line py-1.5 text-[13px]"><span className="text-muted">{s}</span><b>{n}</b></div>)}</div>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(110px,1fr))] gap-x-4">{jobs.map(([s, n]) => <div key={s} className="flex justify-between border-t border-line py-1.5 text-[13px]"><span className="text-muted-foreground">{s}</span><b>{n}</b></div>)}</div>
         </Card>
         <Card title="Billing — unpaid by currency" action={<TextLink href="/admin/billing?overdueOnly=true">Open overdue <Icon name="arrowRight" /></TextLink>}>
           <div className="flex justify-between border-t border-line py-2 text-[13px]"><span>Overdue invoices</span><b>1</b></div><div className="flex justify-between border-t border-line py-2 text-[13px]"><span>MYR (unpaid)</span><b>120.00 MYR</b></div>
-          <p className="text-[11px] text-muted">amountsByCurrency is listed per currency — never converted.</p>
+          <p className="text-[11px] text-muted-foreground">amountsByCurrency is listed per currency — never converted.</p>
         </Card>
       </div>
     </Page>

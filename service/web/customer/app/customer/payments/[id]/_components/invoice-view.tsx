@@ -41,7 +41,7 @@ export function InvoiceView({ live }: { live: InvoiceLive }) {
   const i = live.invoice;
   return (
     <Page>
-      <div className="text-[13px] text-muted"><Link href="/customer/payments" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Contracts & payments")}</Link> › {t("Invoice {number}", { number: i.number })}</div>
+      <div className="text-[13px] text-muted-foreground"><Link href="/customer/payments" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Contracts & payments")}</Link> › {t("Invoice {number}", { number: i.number })}</div>
       <Tabs value={live.tab} onChange={(x) => nav({ tab: x === "payment" ? null : x })} tabs={[
         { id: "payment" as const, label: t("Payment") },
         ...(live.restriction ? [{ id: "restriction" as const, label: t("Cooling restriction") }] : []),
@@ -76,14 +76,14 @@ function PaymentTab({ live }: { live: InvoiceLive }) {
       <Banner tone="warn" action={<DemoBadge />}>{t("Demo payment — no real money moves. No card number, CVV or expiry is collected.")}</Banner>
       <div className="split">
         <Card title={t(i.status === "Paid" ? "Amount paid" : "Amount due")} action={<Badge tone={statusTone[i.status]} icon={i.status === "Overdue" ? "alert" : i.status === "Paid" ? "check" : i.status === "Processing" ? "refresh" : undefined}>{t(i.status)}</Badge>}>
-          <div className="text-[32px] font-bold">{i.amount.split(" ")[0]} <span className="text-base text-muted">{i.amount.split(" ")[1]}</span></div>
-          <p className="text-xs text-muted">{i.due}{live.otherZone && ` · ${t("Kuala Lumpur date (Asia/Kuala_Lumpur)")}`}</p>
+          <div className="text-[32px] font-bold">{i.amount.split(" ")[0]} <span className="text-base text-muted-foreground">{i.amount.split(" ")[1]}</span></div>
+          <p className="text-xs text-muted-foreground">{i.due}{live.otherZone && ` · ${t("Kuala Lumpur date (Asia/Kuala_Lumpur)")}`}</p>
           <SummaryList items={[[t("Contract"), live.contract ? `${live.contract.name} · ${live.contract.id.slice(0, 8)}` : "—"], [t("Contract scope"), live.contract?.scope ?? "—"]]} />
           {open && (
             <div className="mt-4 flex flex-col gap-3">
               <Banner icon="refresh"><b>{t("Processing payment")}</b><div className="text-xs">{t("{id} · {method}. Processing is not paid — please don’t start another payment. This page updates when the receipt is confirmed.", { id: open.id.slice(0, 8), method: methodText(open.method, "demo") })}</div></Banner>
               <div className="rounded-xl border border-dashed border-warn bg-warn-soft/30 p-3 text-[13px]">
-                <div className="mb-2 flex items-center gap-2"><DemoBadge /><b>{t("Demo payment provider")}</b><span className="text-xs text-muted">{t("test events, separate from the payment form")}</span></div>
+                <div className="mb-2 flex items-center gap-2"><DemoBadge /><b>{t("Demo payment provider")}</b><span className="text-xs text-muted-foreground">{t("test events, separate from the payment form")}</span></div>
                 <div className="flex flex-wrap gap-2">
                   {open.status === "initiated" && <Btn size="sm" disabled={pending} onClick={() => run(() => demoOutcome(open.id, open.version, "processing"), t("Payment is processing"))}>{t("Processing")}</Btn>}
                   {open.status === "processing" && <Btn size="sm" variant="primary" disabled={pending} onClick={() => run(() => demoOutcome(open.id, open.version, "confirm"), t("Payment confirmed — the invoice is paid"))}>{t("Confirm receipt")}</Btn>}
@@ -99,7 +99,7 @@ function PaymentTab({ live }: { live: InvoiceLive }) {
               <h3 className="mb-2 mt-4 text-[13px] font-bold">{t("Payment method")}</h3>
               <div className="flex flex-col gap-2">
                 {methods.map(([k, label, d]) => (
-                  <button key={k} type="button" onClick={() => setMethod(k)} aria-pressed={method === k} className={`rounded-xl border p-3 text-left ${method === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}><b className="text-[13px]">{t(label)}</b><div className="text-xs text-muted">{t(d)}</div></button>
+                  <button key={k} type="button" onClick={() => setMethod(k)} aria-pressed={method === k} className={`rounded-xl border p-3 text-left ${method === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}><b className="text-[13px]">{t(label)}</b><div className="text-xs text-muted-foreground">{t(d)}</div></button>
                 ))}
               </div>
               <div className="mt-3 flex justify-end"><Btn variant="primary" disabled={pending} onClick={pay}>{t(method === "instructions" ? "View instructions" : failed ? "Try again — Demo" : "Continue to payment — Demo")}</Btn></div>
@@ -108,14 +108,14 @@ function PaymentTab({ live }: { live: InvoiceLive }) {
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={t("Payment history")}>
-            {live.payments.length === 0 ? <p className="text-xs text-muted">{t("No payments yet")}</p> : (
+            {live.payments.length === 0 ? <p className="text-xs text-muted-foreground">{t("No payments yet")}</p> : (
               <div className="flex flex-col">
-                {live.payments.map((p) => <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px] first:border-0"><span>{p.label}<span className="block text-xs text-muted">{p.at}{p.reference ? ` · ${p.reference}` : ""}</span></span><Badge tone={paymentTone[p.status]}>{t(paymentLabel[p.status])}</Badge></div>)}
+                {live.payments.map((p) => <div key={p.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px] first:border-0"><span>{p.label}<span className="block text-xs text-muted-foreground">{p.at}{p.reference ? ` · ${p.reference}` : ""}</span></span><Badge tone={paymentTone[p.status]}>{t(paymentLabel[p.status])}</Badge></div>)}
               </div>
             )}
           </Card>
           <Card title={t("Payment reminders")} sub={t("Notifications only — not payment methods")}>
-            {live.reminders.length === 0 ? <p className="text-xs text-muted">{t("No reminder has been sent for this invoice.")}</p> : live.reminders.map((r) => (
+            {live.reminders.length === 0 ? <p className="text-xs text-muted-foreground">{t("No reminder has been sent for this invoice.")}</p> : live.reminders.map((r) => (
               <div key={r.id} className="border-t border-line py-2 text-[13px] first:border-0">{t("{channel} · sent {date} (demo record)", { channel: channelName[r.channel] ? t(channelName[r.channel]) : r.channel, date: r.at })}</div>
             ))}
             <div className="mt-2 flex gap-2"><Btn size="sm" variant="ghost" disabled={pending} onClick={() => show("email")}>{t("Preview email")}</Btn><Btn size="sm" variant="ghost" disabled={pending} onClick={() => show("whatsapp")}>{t("Preview WhatsApp")}</Btn></div>
@@ -124,13 +124,13 @@ function PaymentTab({ live }: { live: InvoiceLive }) {
       </div>
       {live.restriction && <RestrictionBanner live={live} />}
       <Modal open={!!instructions} onClose={() => setInstructions(null)} title={t("Payment instructions (demo)")} footer={<Btn onClick={() => setInstructions(null)}>{t("Close")}</Btn>}>
-        {instructions && <><p className="rounded-xl bg-surface2 p-3 text-[13px]">{t("Transfer {amount} for {target} to the demo bank account “AC Project HQ (demo)” with the invoice number as the reference. HQ records the transfer when it arrives.", { amount: i.amount, target: instructions.targetName })}</p><p className="mt-2 text-xs text-muted">{t("Viewing the instructions does not pay the invoice — it stays unpaid until HQ confirms the transfer.")}</p></>}
+        {instructions && <><p className="rounded-xl bg-surface2 p-3 text-[13px]">{t("Transfer {amount} for {target} to the demo bank account “AC Project HQ (demo)” with the invoice number as the reference. HQ records the transfer when it arrives.", { amount: i.amount, target: instructions.targetName })}</p><p className="mt-2 text-xs text-muted-foreground">{t("Viewing the instructions does not pay the invoice — it stays unpaid until HQ confirms the transfer.")}</p></>}
       </Modal>
       <Modal open={!!preview} onClose={() => setPreview(null)} title={preview ? t("{channel} preview", { channel: t(channelName[preview.channel]) }) : ""} footer={<Btn onClick={() => setPreview(null)}>{t("Close")}</Btn>}>
         {preview && <>
           <div className="mb-2"><Choice value={preview.channel} onChange={(v: "email" | "whatsapp") => show(v)} options={[{ id: "email", label: t("Email") }, { id: "whatsapp", label: t("WhatsApp") }]} /></div>
           <div className="rounded-xl bg-surface2 p-3 text-[13px]">{preview.text.subject && <b className="mb-1 block">{t("Subject: {subject}", { subject: preview.text.subject })}</b>}{preview.text.body}</div>
-          <p className="mt-2 text-xs text-muted">{t("Preview — not sent.")}</p>
+          <p className="mt-2 text-xs text-muted-foreground">{t("Preview — not sent.")}</p>
         </>}
       </Modal>
     </>
@@ -161,7 +161,7 @@ function RestrictionTab({ live }: { live: InvoiceLive }) {
           {r.units.map((u) => (
             <div key={u.unitId} className="rounded-xl border border-line p-3 text-[13px]">
               <span className="flex flex-wrap items-center gap-2"><b>{u.name}</b><Badge tone={u.tone}>{u.apply}</Badge>{u.release && <Badge tone={u.releaseTone}>{u.release}</Badge>}</span>
-              {u.note && <div className="text-xs text-muted">{u.note}</div>}
+              {u.note && <div className="text-xs text-muted-foreground">{u.note}</div>}
             </div>
           ))}
         </div>
@@ -191,7 +191,7 @@ function InquiryCard({ title, lines, input, selected }: { title: string; lines: 
         <div className="flex flex-col gap-2">
           {lines.map((q) => (
             <div key={q.id} className={`rounded-xl border p-3 text-[13px] ${q.id === selected ? "border-primary bg-primary-soft/40" : "border-line"}`}>
-              <div className="flex flex-wrap items-center justify-between gap-2"><b>{q.subject}</b><span className="flex items-center gap-2 text-xs text-muted">{q.at}<Badge tone={q.state === "answered" ? "ok" : "primary"}>{t(q.state === "answered" ? "Answered" : "Received")}</Badge></span></div>
+              <div className="flex flex-wrap items-center justify-between gap-2"><b>{q.subject}</b><span className="flex items-center gap-2 text-xs text-muted-foreground">{q.at}<Badge tone={q.state === "answered" ? "ok" : "primary"}>{t(q.state === "answered" ? "Answered" : "Received")}</Badge></span></div>
               <p className="mt-1 whitespace-pre-wrap">{q.message}</p>
               {q.reply && <p className="mt-2 rounded-lg bg-surface2 p-2 text-xs"><b>HQ:</b> {q.reply}</p>}
             </div>

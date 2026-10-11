@@ -56,16 +56,16 @@ export function MaintenanceDemo({ jobId, initialTab }: { jobId?: string; initial
                 return (
                   <ListRow key={j.id} selected={sel?.id === j.id} onClick={() => setSelId(j.id)}>
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-muted">{j.id}</span><b>{j.unit}</b><OriginBadge origin={j.origin} />{j.followUpOf && <FollowUpBadge j={j} />}</div>
-                      <div className="text-xs text-muted">{j.loc} · {j.origin === "plan" ? "Periodic inspection" : j.type}</div>
+                      <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-muted-foreground">{j.id}</span><b>{j.unit}</b><OriginBadge origin={j.origin} />{j.followUpOf && <FollowUpBadge j={j} />}</div>
+                      <div className="text-xs text-muted-foreground">{j.loc} · {j.origin === "plan" ? "Periodic inspection" : j.type}</div>
                       <div className={cx("flex items-center gap-1.5 text-xs", l.warn && "font-semibold text-warn")}><Icon name={l.icon} className="shrink-0" />{l.text}</div>
                     </div>
-                    <JobStatusBadge s={j.status} /><span className="text-muted"><Icon name="chevronRight" /></span>
+                    <JobStatusBadge s={j.status} /><span className="text-muted-foreground"><Icon name="chevronRight" /></span>
                   </ListRow>
                 );
               })}
-              {shown.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-center text-xs text-muted">No requests in this filter.</p>}
-              <p className="text-[11px] text-muted">“Scheduled” = a time is confirmed: one of your 3 preferred times, or a new time you accepted. Periodic plan visits are scheduled from your maintenance plan.</p>
+              {shown.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-center text-xs text-muted-foreground">No requests in this filter.</p>}
+              <p className="text-[11px] text-muted-foreground">“Scheduled” = a time is confirmed: one of your 3 preferred times, or a new time you accepted. Periodic plan visits are scheduled from your maintenance plan.</p>
             </div>
             {sel && <Detail j={sel} onClose={() => setSelId(null)} open={setModal} />}
           </div>
@@ -124,16 +124,16 @@ function Detail({ j, onClose, open }: { j: Job; onClose: () => void; open: (m: "
       )}
       {j.status === "completed" && (
         <>
-          <p className="mt-3 text-[13px] font-bold">Completed report <span className="text-xs font-normal text-muted">Accepted by HQ (visible after review)</span></p>
+          <p className="mt-3 text-[13px] font-bold">Completed report <span className="text-xs font-normal text-muted-foreground">Accepted by HQ (visible after review)</span></p>
           <SummaryList items={[["Filter", "Cleaned — normal"], ["Evaporator coil", "Normal"], ["Drain pipe", "Attention — partly blocked, cleared"], ["Parts", "None"], ["Supply air", "12.5 °C"], ["Return air", "25.0 °C"]]} />
-          <p className="mt-2 text-xs text-muted">Photos (2) · <Icon name="document" /> service-report.pdf</p>
+          <p className="mt-2 text-xs text-muted-foreground">Photos (2) · <Icon name="document" /> service-report.pdf</p>
           {!rated.has(j.id) && <div className="mt-3 flex justify-end gap-2"><Btn onClick={() => open("problem")}>Report a problem</Btn><Btn variant="primary" onClick={() => open("rate")}>Confirm & rate</Btn></div>}
         </>
       )}
       {j.status !== "completed" && j.status !== "cancelled" && (
         <>
           <p className="mt-4 text-[13px] font-bold">Notes to coordinator</p>
-          {(j.notes ?? []).length === 0 ? <p className="text-xs text-muted">No notes yet.</p> : <ul className="mt-1 flex flex-col gap-1 text-[13px]">{(j.notes ?? []).map((n, i) => <li key={i}><span className="text-muted">You · {n.at} — </span>“{n.text}”</li>)}</ul>}
+          {(j.notes ?? []).length === 0 ? <p className="text-xs text-muted-foreground">No notes yet.</p> : <ul className="mt-1 flex flex-col gap-1 text-[13px]">{(j.notes ?? []).map((n, i) => <li key={i}><span className="text-muted-foreground">You · {n.at} — </span>“{n.text}”</li>)}</ul>}
         </>
       )}
       <p className="mt-4 text-[13px] font-bold">History</p>
@@ -142,7 +142,7 @@ function Detail({ j, onClose, open }: { j: Job; onClose: () => void; open: (m: "
         {(j.status === "requested" || j.status === "time_proposed") && j.origin === "request" ? <Btn size="sm" variant="danger" onClick={() => open("cancel")}>Cancel request</Btn> : <span />}
         {j.status !== "completed" && j.status !== "cancelled" && <Btn size="sm" onClick={() => open("note")}><Icon name="add" /> Add note</Btn>}
       </div>
-      <p className="mt-2 text-[11px] text-muted">Cancel is possible until a time is booked. Any time outside your preferred times is booked only after you accept it. Notes can’t change the time or technician.</p>
+      <p className="mt-2 text-[11px] text-muted-foreground">Cancel is possible until a time is booked. Any time outside your preferred times is booked only after you accept it. Notes can’t change the time or technician.</p>
     </Card>
   );
 }
@@ -183,7 +183,7 @@ function DeclineModal({ open, j, onClose, onDone }: { open: boolean; j: Job; onC
   const label = { not_home: "I’m not at home then", too_late: "Too late for me", other: "Other" }[reason];
   return (
     <Modal open={open} onClose={onClose} title="Decline the proposed time" footer={<><Btn onClick={onClose}>Back</Btn><Btn variant="primary" onClick={() => { setTried(true); if (give && preferredError(slots)) return; jobActions.decline(j.id, label, comment.trim(), give ? slots : []); onDone(); }}>{give ? "Decline & send new times" : "Decline"}</Btn></>}>
-      <p className="text-xs text-muted">{j.id} · {j.unit} · proposed {j.proposal ? longDate(j.proposal.slot) : ""}</p>
+      <p className="text-xs text-muted-foreground">{j.id} · {j.unit} · proposed {j.proposal ? longDate(j.proposal.slot) : ""}</p>
       <Field label="Reason"><Choice value={reason} onChange={setReason} options={[{ id: "not_home", label: "I’m not at home then" }, { id: "too_late", label: "Too late for me" }, { id: "other", label: "Other" }]} /></Field>
       <Field label="Comment to HQ (optional)"><Input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Away on Oct 1. Any weekday afternoon next week works." /></Field>
       <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" className="h-4 w-4 accent-[#005bea]" checked={give} onChange={(e) => setGive(e.target.checked)} />Give 3 new preferred times (recommended)</label>
@@ -200,7 +200,7 @@ function OtherTimeModal({ open, j, onClose, onDone }: { open: boolean; j: Job; o
   const err = tried ? preferredError(slots) : undefined;
   return (
     <Modal open={open} onClose={onClose} title="Request another time" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (preferredError(slots)) return; jobActions.requestOther(j.id, slots, comment.trim()); onDone(); }}>Send to HQ</Btn></>}>
-      <p className="text-xs text-muted">{j.id} · periodic visit {fmt(j.scheduled)} · up to 48 h before the visit</p>
+      <p className="text-xs text-muted-foreground">{j.id} · periodic visit {fmt(j.scheduled)} · up to 48 h before the visit</p>
       <PreferredSlotsInput value={slots} onChange={setSlots} error={err} />
       <Field label="Comment (optional)"><Input value={comment} onChange={(e) => setComment(e.target.value)} /></Field>
     </Modal>
@@ -217,7 +217,7 @@ function RateModal({ open, onClose, onDone }: { open: boolean; onClose: () => vo
       <Field label="What went well? (optional)"><div className="flex flex-wrap gap-1.5">{TAGS.map((t) => <button key={t} aria-pressed={tags.includes(t)} onClick={() => setTags((s) => (s.includes(t) ? s.filter((x) => x !== t) : [...s, t]))} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", tags.includes(t) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t}</button>)}</div></Field>
       {stars <= 2 && <Banner tone="warn">What went wrong? You can also “Report a problem” instead.</Banner>}
       <Field label="Comment (optional)"><Textarea placeholder="Technician was quick and tidy." /></Field>
-      <p className="text-[11px] text-muted">You can edit the rating for 7 days. Unconfirmed jobs are confirmed automatically after 7 days.</p>
+      <p className="text-[11px] text-muted-foreground">You can edit the rating for 7 days. Unconfirmed jobs are confirmed automatically after 7 days.</p>
     </Modal>
   );
 }
@@ -283,13 +283,13 @@ function FilterCare({ onRequest }: { onRequest: () => void }) {
     <div className="split">
       <Card title="Filters by AC" sub="Run time since the last cleaning, from telemetry · reminder at 250 h (model default)">
         <DataTable rowKey={(r) => r.unit} rows={rows} cols={[
-          { key: "u", label: "AC", render: (r) => <div><b>{r.unit}</b><div className="text-[11px] text-muted">{r.loc}</div></div> },
+          { key: "u", label: "AC", render: (r) => <div><b>{r.unit}</b><div className="text-[11px] text-muted-foreground">{r.loc}</div></div> },
           { key: "h", label: "Run time", render: (r) => `${r.h} h since cleaning` },
           { key: "p", label: "Progress", render: (r) => <div className="w-28"><UtilBar pct={Math.min(100, (r.h / 250) * 100)} tone={r.st === "Overdue" ? "crit" : r.st === "Due soon" ? "warn" : "ok"} /></div>, hideBelow: "sm" },
           { key: "s", label: "Status", render: (r) => <Badge tone={r.st === "Overdue" ? "crit" : r.st === "Due soon" ? "warn" : "ok"}>{r.st}</Badge> },
           { key: "a", label: "", render: (r) => r.st === "Overdue" ? <Btn size="sm" variant="primary" onClick={onRequest}>Request cleaning</Btn> : <Btn size="sm" onClick={() => { setRows((s) => s.map((x) => (x.unit === r.unit ? { ...x, h: 0, st: "OK", loc: x.loc.split(" · ")[0] + " · cleaned by you just now" } : x))); toast("Marked cleaned — counter reset"); }}>Mark cleaned</Btn> },
         ]} />
-        <p className="mt-2 text-[11px] text-muted">Run time counts hours the AC was running. Unknown connection → “Unknown”.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Run time counts hours the AC was running. Unknown connection → “Unknown”.</p>
       </Card>
       <Card title="Reminders" action={<Btn size="sm" onClick={() => toast("Reminder settings saved")}>Edit reminders</Btn>}>
         <SummaryList items={[["Remind at", "250 h of running (or 90 days)"], ["Channel", "In-app notification"], ["Next due", "Bedroom AC in ~38 h"]]} />

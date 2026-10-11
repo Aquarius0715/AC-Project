@@ -42,15 +42,15 @@ export function PlansView({ live }: { live: PlansLive }) {
               <ListRow key={r.id} selected={sel ? sel.plan.id === r.id : false} href={href(r.id)}>
                 <div className="min-w-0 flex-1">
                   <b className="block truncate text-[13px]">{r.unit} · {r.customer}</b>
-                  <div className="text-[11px] text-muted">{r.short}</div>
-                  <div className="text-[11px]"><span className="text-muted">{r.line}</span> · <b>{r.next}</b></div>
+                  <div className="text-[11px] text-muted-foreground">{r.short}</div>
+                  <div className="text-[11px]"><span className="text-muted-foreground">{r.line}</span> · <b>{r.next}</b></div>
                 </div>
               </ListRow>
             ))}</div>
           )}
         </Card>
         {sel ? <PlanDetail key={`${sel.plan.id}:${sel.plan.version}`} d={sel} now={Date.parse(live.now)} notice={notice?.planId === sel.plan.id ? notice : null} setNotice={setNotice} />
-          : <Card title={t("Plan")}><p className="text-[13px] text-muted">{t("missing" in live ? "That plan no longer exists in your scope." : live.rows.length ? "Pick a plan." : "No plan yet.")}</p></Card>}
+          : <Card title={t("Plan")}><p className="text-[13px] text-muted-foreground">{t("missing" in live ? "That plan no longer exists in your scope." : live.rows.length ? "Pick a plan." : "No plan yet.")}</p></Card>}
       </div>
       {creating && <NewPlanModal live={live} onClose={() => setCreating(false)} onCreated={(id) => { setCreating(false); setNotice({ planId: id, kind: "saved", text: t("Plan created — Generate job creates the job of its first occurrence.") }); }} href={href} />}
     </Page>
@@ -93,18 +93,18 @@ function PlanDetail({ d, now, notice, setNotice }: { d: Detail; now: number; not
           <Field label={t("Next due")} hint={then ? t("Anchor day {n} · Recurrence uses UTC · then {date} · times in {zone}", { n: anchor, date: then, zone }) : t("Anchor day {n} · Recurrence uses UTC · times in {zone}", { n: anchor, zone })} error={errors.nextDueAt}><Input type="datetime-local" value={next} onChange={(e) => setNext(e.target.value)} /></Field>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-[#b9cdf5] bg-primary-soft p-4">
-          <div className="min-w-0 flex-1"><b className="text-[13px]">{box.title}</b><p className="text-xs text-muted">{box.text}</p></div>
+          <div className="min-w-0 flex-1"><b className="text-[13px]">{box.title}</b><p className="text-xs text-muted-foreground">{box.text}</p></div>
           <Btn variant="primary" disabled={pending || !box.generate} title={box.why ?? undefined} onClick={generate}>{t("Generate job")}</Btn>
         </div>
-        {box.why && <p className="mt-1 text-right text-[11px] text-muted">{box.why}</p>}
+        {box.why && <p className="mt-1 text-right text-[11px] text-muted-foreground">{box.why}</p>}
         <h3 className="mt-4 mb-1.5 text-[13px] font-bold">{t("Generated occurrences")}</h3>
-        {d.occurrences.length === 0 ? <p className="text-[13px] text-muted">{t("None yet.")}</p> : (
+        {d.occurrences.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("None yet.")}</p> : (
           <div className="scroll-x"><table className="w-full min-w-[520px] text-[13px]">
-            <thead><tr className="text-left text-[11px] uppercase text-muted"><th className="py-1.5">{t("Occurrence")}</th><th>{t("Job")}</th><th>{t("Status")}</th><th className="text-right"><span className="sr-only">{t("Open")}</span></th></tr></thead>
+            <thead><tr className="text-left text-[11px] uppercase text-muted-foreground"><th className="py-1.5">{t("Occurrence")}</th><th>{t("Job")}</th><th>{t("Status")}</th><th className="text-right"><span className="sr-only">{t("Open")}</span></th></tr></thead>
             <tbody>{d.occurrences.map((o) => (
               <tr key={o.jobId} className="border-t border-line">
                 <td className="py-2 font-semibold">{o.date}</td><td className="text-xs">{o.jobId.slice(0, 8)}</td>
-                <td>{o.status ? <JobStatusBadge s={o.status as JobStatus} /> : <span className="text-xs text-muted">—</span>}</td>
+                <td>{o.status ? <JobStatusBadge s={o.status as JobStatus} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
                 <td className="text-right"><Link className="text-xs font-semibold text-primary hover:underline" href={`/admin/jobs?jobId=${o.jobId}`}>{t("Open job")} <Icon name="arrowRight" /></Link></td>
               </tr>
             ))}</tbody>
@@ -114,7 +114,7 @@ function PlanDetail({ d, now, notice, setNotice }: { d: Detail; now: number; not
           {dirty && <Btn disabled={pending} onClick={() => { setEvery(p.recurrence.intervalMonths); setNext(zonedInput(p.nextDueAt, zone)); }}>{t("Discard")}</Btn>}
           <Btn variant="primary" disabled={pending || !dirty || Object.keys(errors).length > 0} onClick={save}>{t("Save plan")}</Btn>
         </div>
-        <p className="mt-2 text-[11px] text-muted">{t("Generating creates one job for the saved next date only — no automatic generation or catch-up (D16). Saving does not change jobs already generated.")}</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">{t("Generating creates one job for the saved next date only — no automatic generation or catch-up (D16). Saving does not change jobs already generated.")}</p>
       </Card>
     </div>
   );

@@ -11,6 +11,8 @@ type Violation = { id: string; impact: string | null; help: string; nodes: { tar
 /** The critical and serious violations of the page, or of the elements `scope` selects, as readable lines. */
 export async function axeViolations(page: Page, scope?: string): Promise<string[]> {
   if (scope) await page.locator(scope).first().waitFor({ state: "visible" });
+  // a transition still running (a button fading from disabled, a dialog opening) would be measured half-way
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.effect?.getComputedTiming().endTime === Infinity || a.playState !== "running"));
   await page.evaluate(AXE);
   const found = await page.evaluate(async ([s, tags]) => {
     const axe = (window as unknown as { axe: { run: (c: unknown, o: object) => Promise<{ violations: Violation[] }> } }).axe;

@@ -31,10 +31,10 @@ export function EnergyDemo() {
       <Card>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
           <Btn size="sm" className="order-last ml-auto" onClick={() => setExp(true)}><Icon name="download" />Export</Btn>
-          <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted">Period</span><Tabs value={range} onChange={setRange} tabs={[{ id: "today", label: "Today" }, { id: "7d", label: "7d" }, { id: "30d", label: "30d" }, { id: "custom", label: "Custom" }]} /></div>
-          <span className="text-xs text-muted">Sep 14 00:00 – Sep 21 00:00 (7 days) · Asia/Kuala_Lumpur</span>
+          <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">Period</span><Tabs value={range} onChange={setRange} tabs={[{ id: "today", label: "Today" }, { id: "7d", label: "7d" }, { id: "30d", label: "30d" }, { id: "custom", label: "Custom" }]} /></div>
+          <span className="text-xs text-muted-foreground">Sep 14 00:00 – Sep 21 00:00 (7 days) · Asia/Kuala_Lumpur</span>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-[13px]"><span className="text-xs text-muted">Units (up to 4)</span>{Object.keys(perUnit).map((u) => <Check key={u} label={u} checked={sel.includes(u)} onChange={() => toggle(u)} />)}</div>
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-[13px]"><span className="text-xs text-muted-foreground">Units (up to 4)</span>{Object.keys(perUnit).map((u) => <Check key={u} label={u} checked={sel.includes(u)} onChange={() => toggle(u)} />)}</div>
       </Card>
       <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
         <Kpi label="Actual energy" value={sumA.toFixed(1)} unit="kWh" sub={`${sel.length === 1 ? sel[0] : sel.length + " units"} · 7 days · coverage 100%`} />
@@ -46,18 +46,18 @@ export function EnergyDemo() {
         {view === "chart" ? (
           <>
             <BarChart labels={week} series={[base, actual]} unit="kWh" height={200} />
-            <div className="mt-1 flex flex-wrap gap-4 text-[11px] text-muted"><span><i className="mr-1 inline-block h-2 w-2 bg-primary" />Actual (measured)</span><span><i className="mr-1 inline-block h-2 w-2 bg-[#c9d8ee]" />Baseline (normal operation)</span></div>
+            <div className="mt-1 flex flex-wrap gap-4 text-[11px] text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 bg-primary" />Actual (measured)</span><span><i className="mr-1 inline-block h-2 w-2 bg-[#c9d8ee]" />Baseline (normal operation)</span></div>
           </>
         ) : <DataTable rows={days.map((d, i) => ({ d, a: actual[i], b: base[i] }))} rowKey={(r) => r.d} cols={[{ key: "d", label: "Day", render: (r) => r.d }, { key: "a", label: "Actual (kWh)", render: (r) => r.a }, { key: "b", label: "Baseline (kWh)", render: (r) => r.b }, { key: "s", label: "Difference", render: (r) => (r.b - r.a).toFixed(1) }]} />}
-        <p className="mt-3 text-xs text-muted"><Icon name="time" /> <b>Peak window 17:00–21:00</b> — 34% of energy used in peak · highest draw 1.2 kW (Thu 18:40) · pre-cooling before 17:00 lowers peak cost</p>
+        <p className="mt-3 text-xs text-muted-foreground"><Icon name="time" /> <b>Peak window 17:00–21:00</b> — 34% of energy used in peak · highest draw 1.2 kW (Thu 18:40) · pre-cooling before 17:00 lowers peak cost</p>
       </Card>
       <Card title="Carbon impact" sub="Same period & units as above · factor-demo-2026 (0.5 kgCO2e/kWh, demo factor)" action={<LinkBtn size="sm" href="/customer/energy/offsets"><Icon name="info" />Learn about offsets</LinkBtn>}>
         <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
-          <div><div className="text-xs text-muted">Estimated emissions</div><div className="text-2xl font-bold">{(sumA * 0.5).toFixed(1)} <span className="text-sm text-muted">kgCO2e</span></div><div className="text-[11px] text-muted">{sumA} kWh actual × factor</div></div>
-          <div><div className="text-xs text-muted">Estimated savings vs baseline</div><div className="text-2xl font-bold text-ok">{(saved * 0.5).toFixed(1)} <span className="text-sm text-muted">kgCO2e</span></div><div className="text-[11px] text-muted">{sumB} → {sumA} kWh</div></div>
-          <div><div className="text-xs text-muted">Offsets <Badge tone="muted">Optional</Badge></div><div className="text-[13px]">Demo requests only — see records on the Offsets page</div></div>
+          <div><div className="text-xs text-muted-foreground">Estimated emissions</div><div className="text-2xl font-bold">{(sumA * 0.5).toFixed(1)} <span className="text-sm text-muted-foreground">kgCO2e</span></div><div className="text-[11px] text-muted-foreground">{sumA} kWh actual × factor</div></div>
+          <div><div className="text-xs text-muted-foreground">Estimated savings vs baseline</div><div className="text-2xl font-bold text-ok">{(saved * 0.5).toFixed(1)} <span className="text-sm text-muted-foreground">kgCO2e</span></div><div className="text-[11px] text-muted-foreground">{sumB} → {sumA} kWh</div></div>
+          <div><div className="text-xs text-muted-foreground">Offsets <Badge tone="muted">Optional</Badge></div><div className="text-[13px]">Demo requests only — see records on the Offsets page</div></div>
         </div>
-        <p className="mt-3 text-[11px] text-muted">Estimates only. Savings are not a tradable balance and are not converted into carbon credits.</p>
+        <p className="mt-3 text-[11px] text-muted-foreground">Estimates only. Savings are not a tradable balance and are not converted into carbon credits.</p>
       </Card>
     <ExportReportModal open={exp} onClose={() => setExp(false)} />
     </Page>

@@ -16,8 +16,8 @@ export function DemoMock() {
   return (
     <DemoFrame
       clock={<ClockFace time="2026-09-14 09:41 UTC" onMinute={() => toast(t("Clock advanced +1 min (demo)"))} onHour={() => toast(t("Clock advanced +1 hour (demo)"))} />}
-      scenario={<><Select aria-label={t("Scenario")} value={sim ? "on" : "off"} onChange={(e) => setSim(e.target.value === "on")}><option value="off">{t("simulator = false (baseline seed)")}</option><option value="on">simulator = true</option></Select><p className="mt-2 text-[11px] text-muted">{t("fixture-contract.json demoSeed is the source of truth")}</p></>}
-      reset={<><p className="text-[11px] text-muted">{t("Returns clock, subscriptions, image URLs, caches, and business data to their initial seed")}</p><Btn variant="danger" className="mt-3" onClick={() => { setSim(false); jobActions.reset(); clientUserActions.reset(); toast(t("Demo data reset to seed")); }}>{t("Reset demo data")}</Btn></>}
+      scenario={<><Select aria-label={t("Scenario")} value={sim ? "on" : "off"} onChange={(e) => setSim(e.target.value === "on")}><option value="off">{t("simulator = false (baseline seed)")}</option><option value="on">simulator = true</option></Select><p className="mt-2 text-[11px] text-muted-foreground">{t("fixture-contract.json demoSeed is the source of truth")}</p></>}
+      reset={<><p className="text-[11px] text-muted-foreground">{t("Returns clock, subscriptions, image URLs, caches, and business data to their initial seed")}</p><Btn variant="danger" className="mt-3" onClick={() => { setSim(false); jobActions.reset(); clientUserActions.reset(); toast(t("Demo data reset to seed")); }}>{t("Reset demo data")}</Btn></>}
       triggers={
         <div className="grid-fluid" style={{ ["--min" as string]: "240px" }}>
           <TriggerTile icon="offline" title={t("Device offline")} sub={t("communication_lost on {unit}", { unit: "unit-online-rto" })} onClick={() => toast(t("Device offline triggered"), "warn")} />

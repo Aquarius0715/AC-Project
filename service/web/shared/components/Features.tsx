@@ -20,7 +20,7 @@ export function ExportReportModal({ open, onClose }: { open: boolean; onClose: (
       <div className="flex flex-col gap-1.5"><span className="text-xs font-semibold">Include</span>{["Energy & cost by AC (kWh, MYR)", "Comparison with last month", "CO₂ and offsets", "Alerts & maintenance done"].map((l, i) => <Check key={l} label={l} checked={i < 3 ? true : undefined} />)}</div>
       <Field label="Format"><Choice value={fmt} onChange={setFmt} options={[{ id: "pdf", label: "PDF" }, { id: "csv", label: "CSV (raw data)" }]} /></Field>
       <Check label="Email this report to me on the 1st of every month" checked={monthly} onChange={setMonthly} />
-      <p className="text-[11px] text-muted">Figures use the same tariff and estimation labels as the screen (estimated values stay marked).</p>
+      <p className="text-[11px] text-muted-foreground">Figures use the same tariff and estimation labels as the screen (estimated values stay marked).</p>
     </Modal>
   );
 }
@@ -43,7 +43,7 @@ export function GroupControl({ space, units }: { space: string; units: GUnit[] }
         {units.map((u) => (
           <button key={u.id} disabled={!u.online} onClick={() => toggle(u.id)} aria-pressed={sel.includes(u.id)} className={cx("rounded-xl border p-3 text-left disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
             <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><Icon name={sel.includes(u.id) ? "checked" : "unchecked"} className="text-sm" /></div>
-            <div className="text-[11px] text-muted">{u.temp === null ? "—" : `${u.temp} °C · ${u.w} W`}</div>
+            <div className="text-[11px] text-muted-foreground">{u.temp === null ? "—" : `${u.temp} °C · ${u.w} W`}</div>
             <div className="mt-1 flex gap-1"><PowerBadge s={u.state} />{!u.online && <Badge tone="unknown">Offline</Badge>}{u.min && <Badge tone="warn">min {u.min} °C</Badge>}</div>
           </button>
         ))}
@@ -51,11 +51,11 @@ export function GroupControl({ space, units }: { space: string; units: GUnit[] }
       <Card title={`Apply to ${sel.length} selected ACs`}>
         <div className="flex flex-wrap items-center gap-4">
           <Choice value={power} onChange={setPower} options={[{ id: "on", label: "On" }, { id: "off", label: "Off" }]} />
-          <div className="flex items-center gap-2"><Btn size="sm" onClick={() => setTemp((t) => Math.max(16, t - 1))}>−</Btn><b className="w-14 text-center">{temp} °C</b><Btn size="sm" onClick={() => setTemp((t) => Math.min(30, t + 1))}>+</Btn></div>
+          <div className="flex items-center gap-2"><Btn size="sm" onClick={() => setTemp((t) => Math.max(16, t - 1))} aria-label="Lower the temperature"><Icon name="remove" /></Btn><b className="w-14 text-center">{temp} °C</b><Btn size="sm" onClick={() => setTemp((t) => Math.min(30, t + 1))} aria-label="Raise the temperature"><Icon name="add" /></Btn></div>
           <Choice value={mode} onChange={setMode} options={[{ id: "cool", label: "Cool" }, { id: "auto", label: "Auto" }, { id: "fan", label: "Fan" }]} />
           <Btn variant="primary" disabled={!sel.length} onClick={() => setReview(true)}>Review & send</Btn>
         </div>
-        <p className="mt-2 text-[11px] text-muted">Each AC gets its own command and confirmation (same as single control). One space only · owner role only.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Each AC gets its own command and confirmation (same as single control). One space only · owner role only.</p>
       </Card>
       <Modal open={review} onClose={() => setReview(false)} title={`Send to ${chosen.length} ACs in ${space}?`} footer={<><Btn onClick={() => setReview(false)}>Back</Btn><Btn variant="primary" onClick={() => { setReview(false); toast(`${chosen.length} commands sent — results arrive per AC`); }}>Send {chosen.length} commands</Btn></>}>
         <DataTable rowKey={(r) => r.id} rows={chosen} cols={[{ key: "n", label: "AC", render: (r) => <b>{r.name}</b> }, { key: "c", label: "Change", render: (r) => (r.min && temp < r.min ? <span className="text-warn">Set to {r.min} °C (restriction)</span> : `${power === "on" ? "On" : "Off"} · ${temp} °C · ${mode}`) }]} />
@@ -75,7 +75,7 @@ export function ImportCsvModal({ open, onClose }: { open: boolean; onClose: () =
       <Steps steps={["Upload & mapping", "Preview"]} current={step} />
       {step === 0 ? <>
         <Field label="Customer" hint="Rows are created under this customer only. Properties / floors / rooms that do not exist are created."><Select><option>customer-a · Tan household</option><option>customer-b · Lim Trading Sdn Bhd</option></Select></Field>
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-line p-3 text-[13px]"><span><Icon name="document" /> units-office-a.csv <span className="text-xs text-muted">· 24 rows · 9 columns · UTF-8 · 6 KB</span></span><Btn size="sm">Download template</Btn></div>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-line p-3 text-[13px]"><span><Icon name="document" /> units-office-a.csv <span className="text-xs text-muted-foreground">· 24 rows · 9 columns · UTF-8 · 6 KB</span></span><Btn size="sm">Download template</Btn></div>
         <DataTable rowKey={(r) => r.c} rows={[{ c: "property", f: "Property name", req: true }, { c: "floor", f: "Floor", req: false }, { c: "room", f: "Room / space", req: true }, { c: "unit_name", f: "Unit name", req: true }, { c: "model", f: "Model", req: true }, { c: "installed_on", f: "Install date (warranty)", req: false }]} cols={[{ key: "c", label: "CSV column", render: (r) => <code>{r.c}</code> }, { key: "f", label: "Field", render: (r) => <Select className="w-auto"><option>{r.f}</option></Select> }, { key: "r", label: "", render: (r) => <Badge tone={r.req ? "primary" : "muted"}>{r.req ? "Required" : "Optional"}</Badge> }]} />
       </> : <>
         <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}><Kpi label="Rows" value={24} /><Kpi label="Will be created" value={22} tone="ok" /><Kpi label="Errors (skipped)" value={2} tone="crit" /></div>
@@ -101,8 +101,8 @@ export function WarrantyTab() {
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Kpi label="Under warranty" value={38} sub="of 52 units" /><Kpi label="Warranty ends ≤ 90 days" value={5} tone="warn" sub="2 within 30 days" /><Kpi label="Out of warranty, no contract" value={4} tone="crit" sub="Offer maintenance" /><Kpi label="Maintenance contract" value={31} sub="contract-rto-a, contract-b …" /></div>
       <div className="split">
         <Card title="Units by coverage end" action={<Btn size="sm" onClick={() => toast("CSV exported (demo)")}>Export CSV</Btn>}>
-          <DataTable rowKey={(r) => r.id} rows={rows} cols={[{ key: "u", label: "Unit", render: (r) => <div><b>{r.u}</b><div className="text-[11px] text-muted">{r.id}</div></div> }, { key: "c", label: "Customer", render: (r) => r.c, hideBelow: "sm" }, { key: "m", label: "Model", render: (r) => r.m, hideBelow: "md" }, { key: "e", label: "Warranty end", render: (r) => r.end }, { key: "k", label: "Contract", render: (r) => r.k, hideBelow: "md" }, { key: "s", label: "Status", render: (r) => <Badge tone={r.tone}>{r.st}</Badge> }, { key: "a", label: "", render: (r) => (r.k === "—" ? <Btn size="sm" variant="primary" onClick={() => toast("Renewal offer drafted")}>Renewal offer</Btn> : null) }]} />
-          <p className="mt-2 text-[11px] text-muted">Warranty end comes from the unit (install date + model warranty). Coverage = warranty OR an active maintenance contract.</p>
+          <DataTable rowKey={(r) => r.id} rows={rows} cols={[{ key: "u", label: "Unit", render: (r) => <div><b>{r.u}</b><div className="text-[11px] text-muted-foreground">{r.id}</div></div> }, { key: "c", label: "Customer", render: (r) => r.c, hideBelow: "sm" }, { key: "m", label: "Model", render: (r) => r.m, hideBelow: "md" }, { key: "e", label: "Warranty end", render: (r) => r.end }, { key: "k", label: "Contract", render: (r) => r.k, hideBelow: "md" }, { key: "s", label: "Status", render: (r) => <Badge tone={r.tone}>{r.st}</Badge> }, { key: "a", label: "", render: (r) => (r.k === "—" ? <Btn size="sm" variant="primary" onClick={() => toast("Renewal offer drafted")}>Renewal offer</Btn> : null) }]} />
+          <p className="mt-2 text-[11px] text-muted-foreground">Warranty end comes from the unit (install date + model warranty). Coverage = warranty OR an active maintenance contract.</p>
         </Card>
         <Card title="Warranty on jobs">
           <Banner>job-a06 (Living room AC) replaced a fan motor while under warranty — parts cost is claimable from the manufacturer.</Banner>
@@ -123,12 +123,12 @@ export function FirmwareCampaigns() {
   return (
     <div className="split-rev">
       <Card title="Campaigns" action={<Btn size="sm" variant="primary" onClick={() => setModal(true)}><Icon name="add" /> New campaign</Btn>} className="self-start">
-        <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">fw-2.0.0-rollout</b><div className="text-[11px] text-muted">CTRL-A1 · 1.9.2 → 2.0.0</div></div><Badge tone={paused ? "warn" : "primary"}>{paused ? "Paused" : "Running"}</Badge></ListRow>
-        <ListRow><div className="min-w-0 flex-1"><b className="text-[13px]">fw-1.9.3-hotfix</b><div className="text-[11px] text-muted">CTRL-B2 · 1.9.2 → 1.9.3</div></div><Badge tone="ok">Completed</Badge></ListRow>
-        <ListRow><div className="min-w-0 flex-1"><b className="text-[13px]">fw-2.0.0-pilot</b><div className="text-[11px] text-muted">CTRL-A1 · 5 devices</div></div><Badge tone="ok">Completed</Badge></ListRow>
+        <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">fw-2.0.0-rollout</b><div className="text-[11px] text-muted-foreground">CTRL-A1 · 1.9.2 → 2.0.0</div></div><Badge tone={paused ? "warn" : "primary"}>{paused ? "Paused" : "Running"}</Badge></ListRow>
+        <ListRow><div className="min-w-0 flex-1"><b className="text-[13px]">fw-1.9.3-hotfix</b><div className="text-[11px] text-muted-foreground">CTRL-B2 · 1.9.2 → 1.9.3</div></div><Badge tone="ok">Completed</Badge></ListRow>
+        <ListRow><div className="min-w-0 flex-1"><b className="text-[13px]">fw-2.0.0-pilot</b><div className="text-[11px] text-muted-foreground">CTRL-A1 · 5 devices</div></div><Badge tone="ok">Completed</Badge></ListRow>
       </Card>
       <Card title="fw-2.0.0-rollout" sub="Auto-pause if failures exceed 5 % within a wave" action={<Btn size="sm" onClick={() => { setPaused((p) => !p); toast(paused ? "Campaign resumed" : "Campaign paused", "warn"); }}>{paused ? "Resume" : "Pause"}</Btn>}>
-        <div className="flex flex-col gap-3">{waves.map(([l, p, d]) => <div key={l}><div className="mb-1 flex justify-between text-xs"><b>{l}</b><span className="text-muted">{d}</span></div><UtilBar pct={p} tone={p >= 95 ? "ok" : "primary"} /></div>)}</div>
+        <div className="flex flex-col gap-3">{waves.map(([l, p, d]) => <div key={l}><div className="mb-1 flex justify-between text-xs"><b>{l}</b><span className="text-muted-foreground">{d}</span></div><UtilBar pct={p} tone={p >= 95 ? "ok" : "primary"} /></div>)}</div>
         <div className="mt-3"><SummaryList items={[["Succeeded / installing / pending", "47 / 4 / 34"], ["Failed", "2 · old version kept (AC-DEMO-0003 checksum mismatch → rolled back to 1.9.2)"], ["Skipped", "3 · offline / busy (AC-DEMO-0002 test run job-t12)"]]} /></div>
       </Card>
       <Modal open={modal} onClose={() => setModal(false)} title="New firmware campaign" footer={<><Btn onClick={() => setModal(false)}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(false); toast("Campaign scheduled"); }}>Schedule</Btn></>}>
@@ -148,13 +148,13 @@ export function ContractorPayouts() {
   return (
     <div className="split-rev">
       <Card title="Statements · September 2026" action={<Btn size="sm" onClick={() => toast("Draft statements regenerated for September")}>Generate</Btn>} className="self-start">
-        <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">contractor-a</b><div className="text-[11px] text-muted">stmt-2026-09-a · 5 jobs</div></div><Badge tone={st === "Paid" ? "ok" : st === "Draft" ? "muted" : "primary"}>{st}</Badge></ListRow>
-        <ListRow><div className="min-w-0 flex-1"><b className="text-[13px]">contractor-b</b><div className="text-[11px] text-muted">stmt-2026-09-b · 3 jobs</div></div><Badge>Draft</Badge></ListRow>
+        <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">contractor-a</b><div className="text-[11px] text-muted-foreground">stmt-2026-09-a · 5 jobs</div></div><Badge tone={st === "Paid" ? "ok" : st === "Draft" ? "muted" : "primary"}>{st}</Badge></ListRow>
+        <ListRow><div className="min-w-0 flex-1"><b className="text-[13px]">contractor-b</b><div className="text-[11px] text-muted-foreground">stmt-2026-09-b · 3 jobs</div></div><Badge>Draft</Badge></ListRow>
       </Card>
       <Card title="contractor-a · stmt-2026-09-a" sub="Priced by the rate card effective at acceptance · pays 10-15" action={<span className="flex gap-2">{st === "Draft" && <Btn size="sm" variant="primary" onClick={() => setSt("Approved")}>Approve</Btn>}{st === "Approved" && <Btn size="sm" variant="primary" onClick={() => { setSt("Paid"); toast("Marked paid"); }}>Mark paid</Btn>}</span>}>
         <SummaryList items={[["Jobs accepted in September", "5"], ["Gross", "2,110.00 MYR"], ["Deductions", "− 120.00 MYR (job-p07 rework)"], ["Total", "1,990.00 MYR"], ["Open question", "job-p07 deduction — “caused by a missing part from HQ stock”"]]} />
         <div className="mt-3 flex flex-wrap gap-2"><Btn size="sm" onClick={() => toast("Answered · adjustment +120.00 MYR added to the next draft")}>Answer with adjustment</Btn><Btn size="sm" onClick={() => toast("Answered without adjustment")}>Answer</Btn></div>
-        <p className="mt-2 text-[11px] text-muted">Contractors see approved and paid statements only (Partner › Payouts).</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Contractors see approved and paid statements only (Partner › Payouts).</p>
       </Card>
     </div>
   );

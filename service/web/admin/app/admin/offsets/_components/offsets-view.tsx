@@ -60,15 +60,15 @@ export function OffsetsView({ live }: { live: Live }) {
       ) : (
         <>
         <div className="flex flex-wrap items-end gap-3">
-          <span className="pb-2 text-xs font-semibold text-muted">{t("Filter")}</span>
+          <span className="pb-2 text-xs font-semibold text-muted-foreground">{t("Filter")}</span>
           <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => nav({ customerId: e.target.value || null, recordId: null })}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
           <Field label={t("Status")}><Select value={live.scope.status ?? ""} onChange={(e) => nav({ status: e.target.value || null, recordId: null })}><option value="">{t("All statuses")}</option>{(["demo_requested", "demo_purchased", "demo_retired", "failed"] as const).map((x) => <option key={x} value={x}>{t(x === "demo_requested" ? "Demo requested" : x === "demo_purchased" ? "Demo purchased" : x === "demo_retired" ? "Demo retired" : "Failed")}</option>)}</Select></Field>
           <Field label={t("Created")}><Select value={live.scope.created} onChange={(e) => nav({ created: e.target.value === "30d" ? null : e.target.value, recordId: null })}><option value="7d">{t("Last 7 days")}</option><option value="30d">{t("Last 30 days")}</option><option value="90d">{t("Last 90 days")}</option><option value="all">{t("All time")}</option></Select></Field>
         </div>
         <div className="split-rev">
           <Card title={t("Demo offset records")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => { setD(blank); setModal(true); }}><Icon name="add" /> {t("New demo quote")}</Btn>} className="self-start">
-            {live.rows.length === 0 ? <EmptyState title={t("No records")}>{t(live.scope.customerId || live.scope.status || live.scope.created !== "all" ? "No record matches these filters — widen them, or get a demo quote and request it to create a record." : "Get a demo quote and request it to create a record.")}</EmptyState> : <div className="flex flex-col gap-2">{live.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setAck(false); nav({ recordId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={tone(x.state)}>{x.stateText}</Badge></div><div className="text-[11px] text-muted">{x.customer} · {x.amount}</div><div className="text-[11px] text-muted">{x.next}</div></div></ListRow>)}</div>}
-            <p className="mt-3 text-[11px] text-muted">{t("Energy savings and MRV estimates are shown separately and never converted into credits.")} <Link className="text-primary underline" href="/admin/energy">{t("Energy analysis")}</Link> · <Link className="text-primary underline" href="/admin/mrv">MRV</Link></p>
+            {live.rows.length === 0 ? <EmptyState title={t("No records")}>{t(live.scope.customerId || live.scope.status || live.scope.created !== "all" ? "No record matches these filters — widen them, or get a demo quote and request it to create a record." : "Get a demo quote and request it to create a record.")}</EmptyState> : <div className="flex flex-col gap-2">{live.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setAck(false); nav({ recordId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={tone(x.state)}>{x.stateText}</Badge></div><div className="text-[11px] text-muted-foreground">{x.customer} · {x.amount}</div><div className="text-[11px] text-muted-foreground">{x.next}</div></div></ListRow>)}</div>}
+            <p className="mt-3 text-[11px] text-muted-foreground">{t("Energy savings and MRV estimates are shown separately and never converted into credits.")} <Link className="text-primary underline" href="/admin/energy">{t("Energy analysis")}</Link> · <Link className="text-primary underline" href="/admin/mrv">MRV</Link></p>
           </Card>
           {!sel ? <Card title={t("Record")}>{live.recordMissing ? <EmptyState title={t("That record is not in this list")}>{t("It does not exist, or the customer, status or created filter hides it.")}</EmptyState> : <EmptyState title={t("Nothing selected")}>{t("Choose a record.")}</EmptyState>}</Card> : (
             <div className="flex min-w-0 flex-col gap-4">
@@ -89,12 +89,12 @@ export function OffsetsView({ live }: { live: Live }) {
               {live.canWrite && sel.state === "demo_purchased" && sel.current && (
                 <Card title={t("Next step · demo retirement")}>
                   <Check label={t("I understand this is a demo retirement. It does not retire a real credit.")} checked={ack} onChange={setAck} />
-                  <p className="my-1 text-[11px] text-muted">{t("Disabled until confirmed. Retiring before the purchase is not possible.")}</p>
+                  <p className="my-1 text-[11px] text-muted-foreground">{t("Disabled until confirmed. Retiring before the purchase is not possible.")}</p>
                   <div className="flex flex-wrap gap-2"><Btn variant="primary" disabled={pending || !ack} onClick={() => step("retire")}>{t("Retire whole amount (demo)")}</Btn><Btn disabled={pending} onClick={() => step("fail")}>{t("Simulate a failure")}</Btn></div>
                 </Card>
               )}
               <Card title={t("Event history")} action={<Link className="text-xs font-semibold text-primary" href="/admin/audit">{t("Open in audit")} <Icon name="arrowRight" /></Link>}>
-                {sel.events.length === 0 ? <p className="text-xs text-muted">{t("No events yet.")}</p> : <Timeline items={sel.events} />}
+                {sel.events.length === 0 ? <p className="text-xs text-muted-foreground">{t("No events yet.")}</p> : <Timeline items={sel.events} />}
               </Card>
             </div>
           )}
@@ -109,7 +109,7 @@ export function OffsetsView({ live }: { live: Live }) {
           <Field label={t("Period end")}><Input type="datetime-local" value={d.to} onChange={(e) => set({ to: e.target.value })} /></Field>
         </div>
         <Field label={t("Purpose")} error={tried ? errors.purpose : undefined}><Textarea value={d.purpose} maxLength={1000} onChange={(e) => set({ purpose: e.target.value })} placeholder={t("Offset the demo office's Scope 2 for August (simulation)")} /></Field>
-        <div><p className="mb-1 text-[13px] font-semibold">{t("Units")}</p>{!d.customerId ? <p className="text-xs text-muted">{t("Choose the customer first.")}</p> : <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{units.map((u) => <Check key={u.id} label={u.label} checked={d.unitIds.includes(u.id)} onChange={(on) => set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) })} />)}</div>}{tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}</div>
+        <div><p className="mb-1 text-[13px] font-semibold">{t("Units")}</p>{!d.customerId ? <p className="text-xs text-muted-foreground">{t("Choose the customer first.")}</p> : <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{units.map((u) => <Check key={u.id} label={u.label} checked={d.unitIds.includes(u.id)} onChange={(on) => set({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) })} />)}</div>}{tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}</div>
         {quote && (
           <div className="flex flex-col gap-2 rounded-xl border border-line p-3">
             <div className="flex items-center gap-2"><b className="text-[13px]">{t("Demo quote {id} · v{version}", { id: quote.id.slice(0, 8), version: quote.version })}</b><DemoBadge /></div>

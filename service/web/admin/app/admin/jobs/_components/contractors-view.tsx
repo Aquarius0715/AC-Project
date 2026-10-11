@@ -36,14 +36,14 @@ export function ContractorsView({ live }: { live: ContractorsLive }) {
           {live.rows.length === 0 ? <EmptyState title={t("No contractor organizations")}>{t("Contractor organizations are created in Access & roles (A03).")}</EmptyState> : (
             <div className="flex flex-col gap-1.5">{live.rows.map((r) => (
               <ListRow key={r.id} selected={d?.org.id === r.id} href={`/admin/jobs?tab=contractors&contractorId=${r.id}`}>
-                <div className="min-w-0 flex-1"><b className="block truncate text-[13px]">{r.name}</b><div className="text-[11px] text-muted">{r.sub}</div></div>
+                <div className="min-w-0 flex-1"><b className="block truncate text-[13px]">{r.name}</b><div className="text-[11px] text-muted-foreground">{r.sub}</div></div>
                 <Badge tone={r.badge.tone}>{r.badge.label}</Badge>
               </ListRow>
             ))}</div>
           )}
-          <p className="mt-2 text-[11px] text-muted">{t("Contractor companies are partners, not users — their staff accounts are managed in Access & roles (A03).")}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("Contractor companies are partners, not users — their staff accounts are managed in Access & roles (A03).")}</p>
         </Card>
-        {d ? <ContractorDetail key={`${d.org.id}:${d.profile?.version ?? 0}`} d={d} open={setModal} /> : <Card title={t("Contractor")}><p className="text-[13px] text-muted">{t("missing" in live ? "That contractor no longer exists." : "Pick a contractor.")}</p></Card>}
+        {d ? <ContractorDetail key={`${d.org.id}:${d.profile?.version ?? 0}`} d={d} open={setModal} /> : <Card title={t("Contractor")}><p className="text-[13px] text-muted-foreground">{t("missing" in live ? "That contractor no longer exists." : "Pick a contractor.")}</p></Card>}
       </div>
       {modal?.kind === "profile" && <ProfileModal live={live} d={d} organizationId={modal.organizationId} onClose={close} onFail={fail} />}
       {modal?.kind === "status" && d?.profile && <StatusModal d={d} onClose={close} onFail={fail} />}
@@ -70,20 +70,20 @@ function ContractorDetail({ d, open }: { d: Detail; open: (m: ModalState) => voi
           <p className="mt-3 text-[13px] font-bold">{r.current ? r.current.title : t("No rate card in effect")}</p>
           {r.current && (
             <div className="scroll-x mt-1"><table className="w-full min-w-[420px] text-[13px]">
-              <thead><tr className="bg-surface2 text-left text-[11px] uppercase text-muted"><th className="px-2 py-1.5">{t("Work type")}</th><th className="px-2 text-right">{r.current.currency}</th></tr></thead>
-              <tbody>{r.current.lines.map((l) => <tr key={l.workType} className="border-t border-line"><td className="px-2 py-1.5 font-semibold">{l.label}{l.note && <span className="block text-[11px] font-normal text-muted">{l.note}</span>}</td><td className="px-2 text-right">{l.amount}</td></tr>)}</tbody>
+              <thead><tr className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><th className="px-2 py-1.5">{t("Work type")}</th><th className="px-2 text-right">{r.current.currency}</th></tr></thead>
+              <tbody>{r.current.lines.map((l) => <tr key={l.workType} className="border-t border-line"><td className="px-2 py-1.5 font-semibold">{l.label}{l.note && <span className="block text-[11px] font-normal text-muted-foreground">{l.note}</span>}</td><td className="px-2 text-right">{l.amount}</td></tr>)}</tbody>
             </table></div>
           )}
-          {r.scheduled.map((s) => <p key={s.id} className="mt-2 text-xs text-muted">{t("Next: {title} — {lines}", { title: s.title, lines: s.lines.map((l) => `${l.label} ${l.amount}`).join(" · ") })}</p>)}
+          {r.scheduled.map((s) => <p key={s.id} className="mt-2 text-xs text-muted-foreground">{t("Next: {title} — {lines}", { title: s.title, lines: s.lines.map((l) => `${l.label} ${l.amount}`).join(" · ") })}</p>)}
           <div className="mt-3"><Btn size="sm" onClick={() => open({ kind: "rates" })}>{t("Edit rate card")}</Btn></div>
         </Card>
         <Card title={t("Technicians & certificates")}>
-          {d.techs.length === 0 ? <p className="text-[13px] text-muted">{t("No technician memberships in this organization.")}</p> : (
-            <ul className="divide-y divide-line">{d.techs.map((x) => <li key={x.id} className="flex items-center justify-between gap-2 py-2"><span className="min-w-0"><b className="block text-[13px]">{x.name}</b><span className="text-[11px] text-muted">{x.sub}</span></span><Badge tone={x.badge.tone}>{x.badge.label}</Badge></li>)}</ul>
+          {d.techs.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technician memberships in this organization.")}</p> : (
+            <ul className="divide-y divide-line">{d.techs.map((x) => <li key={x.id} className="flex items-center justify-between gap-2 py-2"><span className="min-w-0"><b className="block text-[13px]">{x.name}</b><span className="text-[11px] text-muted-foreground">{x.sub}</span></span><Badge tone={x.badge.tone}>{x.badge.label}</Badge></li>)}</ul>
           )}
           <div className="mt-3"><Banner>{d.pending.length ? t(d.pending.length === 1 ? "1 renewal upload is waiting for verification." : "{n} renewal uploads are waiting for verification.", { n: d.pending.length }) : t("No renewal uploads are waiting for verification.")} {t("Certificates uploaded by the contractor need HQ verification before they count.")}</Banner></div>
           <div className="mt-3"><Btn size="sm" variant={d.pending.length ? "primary" : "secondary"} disabled={!d.pending.length} onClick={() => open({ kind: "verify" })}>{t("Verify uploads ({n})", { n: d.pending.length })}</Btn></div>
-          <p className="mt-2 text-[11px] text-muted">{t("KPIs: last 90 days. Customer rating comes from the Client “Confirm & rate” step after completion; SLA targets per plan are in the SLA tab.")}{i.display.timeZone !== KL && ` ${t("The days are Kuala Lumpur days.")}`}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("KPIs: last 90 days. Customer rating comes from the Client “Confirm & rate” step after completion; SLA targets per plan are in the SLA tab.")}{i.display.timeZone !== KL && ` ${t("The days are Kuala Lumpur days.")}`}</p>
         </Card>
       </div>
     </div>
@@ -166,7 +166,7 @@ function RatesModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now: 
   };
   return (
     <Modal open wide onClose={() => onClose()} title={t("New rate card for {name} · v{v}", { name: d.org.name, v: d.rates.nextVersion })} footer={<><Btn onClick={() => onClose()}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Save rate card")}</Btn></>}>
-      <p className="text-xs text-muted">{base ? `${t("Starts from {card}.", { card: base.since })} ` : ""}{t("A rate card never changes once saved — each edit is a new version from a future date.")}</p>
+      <p className="text-xs text-muted-foreground">{base ? `${t("Starts from {card}.", { card: base.since })} ` : ""}{t("A rate card never changes once saved — each edit is a new version from a future date.")}</p>
       <div className="grid-fluid" style={{ ["--min" as string]: "200px" }}>
         <Field label={t("Effective from · required")} hint={t("A Kuala Lumpur day, from 00:00")} error={tried ? errors.effectiveFrom : undefined}><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
         <Field label={t("Currency")}><Select value={currency} onChange={(e) => setCurrency(e.target.value as "MYR" | "USD")}><option value="MYR">MYR</option><option value="USD">USD</option></Select></Field>

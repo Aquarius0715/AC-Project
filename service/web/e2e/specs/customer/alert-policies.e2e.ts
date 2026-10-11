@@ -9,7 +9,7 @@ const NAME = `E2E too hot ${Date.now() % 100_000}`;
 async function deleteE2EPolicies(page: Page) {
   await page.goto("/customer/alerts?tab=policies");
   for (let i = 0; i < 5; i++) {
-    const card = page.locator("main section", { has: page.getByRole("switch", { name: /^E2E / }) }).first();
+    const card = page.locator('main section, main [data-slot="card"]', { has: page.getByRole("switch", { name: /^E2E / }) }).first();
     if ((await page.getByRole("switch", { name: /^E2E / }).count()) === 0) return;
     await card.getByRole("button", { name: "Delete" }).first().click();
     await page.getByRole("dialog").getByRole("button", { name: "Delete policy" }).click();
@@ -47,7 +47,7 @@ test("a policy is created, edited, switched off and deleted", async ({ page }) =
   await expect(page.getByText(`“${NAME}” saved`)).toBeVisible();
   await expect(page.getByRole("switch", { name: NAME })).toHaveAttribute("aria-checked", "true");
 
-  const card = page.locator("main section", { has: page.getByRole("switch", { name: NAME }) }); // each policy is a Card
+  const card = page.locator('main section, main [data-slot="card"]', { has: page.getByRole("switch", { name: NAME }) }); // each policy is a Card
   await card.getByRole("link", { name: "Edit" }).click();
   await page.waitForURL(/policyId=[0-9a-f-]{36}/);
   await page.getByLabel("Threshold").fill("29");

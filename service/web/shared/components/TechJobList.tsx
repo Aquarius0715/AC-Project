@@ -27,7 +27,7 @@ export function JobList({ jobs }: { jobs: TechRow[] }) {
     <div className="flex flex-col gap-2">
       {jobs.map((j) => (
         <Link key={j.id} href={`/technician/jobs/${j.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-surface p-3 hover:bg-surface2/60">
-          <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><b className="text-[13px]">{j.id} · {j.unit} · {j.cust}</b><OriginBadge origin={j.origin} /></div><div className="text-xs text-muted">{j.type} · window {j.win} · {j.note}</div><div className="text-xs">{j.progress}</div></div>
+          <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><b className="text-[13px]">{j.id} · {j.unit} · {j.cust}</b><OriginBadge origin={j.origin} /></div><div className="text-xs text-muted-foreground">{j.type} · window {j.win} · {j.note}</div><div className="text-xs">{j.progress}</div></div>
           <Badge tone={j.tone}>{j.status}</Badge>
         </Link>
       ))}

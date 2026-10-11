@@ -48,7 +48,7 @@ function FiguresGrid({ v }: { v: Figures }) {
   return (
     <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
       {tiles.map(([a, b, c]) => (
-        <div key={a} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted">{a}</div><b>{b}</b><div className="text-[10px] text-muted">{c}</div></div>
+        <div key={a} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{a}</div><b>{b}</b><div className="text-[10px] text-muted-foreground">{c}</div></div>
       ))}
     </div>
   );
@@ -101,22 +101,22 @@ function Reports({ live, r }: { live: MRVLive; r: NonNullable<MRVLive["reports"]
       </div>
       <div className="split-rev">
         <Card title={t("Scope 2 reports")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => openDraft()}><Icon name="add" /> {t("New report")}</Btn>} className="self-start">
-          {r.rows.length === 0 ? <EmptyState title={t("No reports")}>{t("No report matches these filters.")}</EmptyState> : <div className="flex flex-col gap-2">{r.rows.map((x) => <ListRow key={x.id} selected={sel?.report.id === x.id} onClick={() => nav({ reportId: x.id, reportVersion: null })}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)} · v{x.version}</b><Badge tone={x.status === "demo_reviewed" ? "ok" : "muted"}>{x.status === "demo_reviewed" ? t("Demo reviewed") : t("Draft")}</Badge></div><div className="text-[11px] text-muted">{x.org} · {x.units} · {x.period}</div><div className={`text-[11px] ${x.incomplete ? "text-warn" : "text-muted"}`}>{x.result}</div></div></ListRow>)}</div>}
-          <p className="mt-3 text-[11px] text-muted">{t("Every report is a demo — “Demo — unverified”. A demo review is not external certification.")}</p>
+          {r.rows.length === 0 ? <EmptyState title={t("No reports")}>{t("No report matches these filters.")}</EmptyState> : <div className="flex flex-col gap-2">{r.rows.map((x) => <ListRow key={x.id} selected={sel?.report.id === x.id} onClick={() => nav({ reportId: x.id, reportVersion: null })}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)} · v{x.version}</b><Badge tone={x.status === "demo_reviewed" ? "ok" : "muted"}>{x.status === "demo_reviewed" ? t("Demo reviewed") : t("Draft")}</Badge></div><div className="text-[11px] text-muted-foreground">{x.org} · {x.units} · {x.period}</div><div className={`text-[11px] ${x.incomplete ? "text-warn" : "text-muted-foreground"}`}>{x.result}</div></div></ListRow>)}</div>}
+          <p className="mt-3 text-[11px] text-muted-foreground">{t("Every report is a demo — “Demo — unverified”. A demo review is not external certification.")}</p>
         </Card>
         {!sel ? <Card title={t("Report")}><EmptyState title={t("Nothing selected")}>{t("Choose a report or create one.")}</EmptyState></Card> : (
           <div className="flex min-w-0 flex-col gap-4">
             <Card title={t("Scope 2 electricity — demo summary")} sub={`${sel.report.id.slice(0, 8)} · ${statusWord(sel.report.status, t)}`} action={<div className="flex items-center gap-2"><DemoBadge /><Select aria-label={t("Version")} className="w-auto" value={sel.report.version} onChange={(e) => nav({ reportVersion: Number(e.target.value) === sel.latestVersion ? null : e.target.value })}>{sel.versions.map((v) => <option key={v.version} value={v.version}>{t(v.version === sel.latestVersion ? "Version {n} (latest) · {status}" : "Version {n} · {status}", { n: v.version, status: statusWord(v.status, t) })}</option>)}</Select>{live.canWrite && isLatest && <Btn size="sm" onClick={() => openDraft(sel.report)}>{t("New version…")}</Btn>}</div>}>
               <FiguresGrid v={sel.view} />
-              {!isLatest && <p className="mt-2 text-[11px] text-muted">{t("An earlier version — read only. Its conditions and results never change.")}</p>}
+              {!isLatest && <p className="mt-2 text-[11px] text-muted-foreground">{t("An earlier version — read only. Its conditions and results never change.")}</p>}
             </Card>
-            <Card title={t("Calculation conditions (snapshot)")}><SummaryList items={sel.view.conditions} />{sel.view.summary.warnings.length > 0 && <div className="mt-2 flex flex-col gap-1">{sel.view.summary.warnings.map((w) => <Banner key={w} tone="warn">{w}</Banner>)}</div>}<p className="mt-2 text-[11px] text-muted">{t("Snapshots are stored with the version; later baseline or factor versions do not change it.")}</p></Card>
+            <Card title={t("Calculation conditions (snapshot)")}><SummaryList items={sel.view.conditions} />{sel.view.summary.warnings.length > 0 && <div className="mt-2 flex flex-col gap-1">{sel.view.summary.warnings.map((w) => <Banner key={w} tone="warn">{w}</Banner>)}</div>}<p className="mt-2 text-[11px] text-muted-foreground">{t("Snapshots are stored with the version; later baseline or factor versions do not change it.")}</p></Card>
             <Card title={t("Evidence")}><EvidenceList ids={sel.report.evidenceIds} units={live.units} period={{ unitIds: sel.report.conditions.unitIds, from: sel.report.conditions.from, to: sel.report.conditions.to }} /></Card>
             <Card title={t("Demo review")}>
               {sel.review.length > 0 && <Timeline items={sel.review} />}
-              {sel.report.status === "demo_reviewed" ? <p className="text-xs text-muted">{t("This version is demo reviewed. Sending the same review again returns the existing result.")}</p>
-                : !isLatest ? <p className="text-xs text-muted">{t("Only the latest version can be reviewed.")}</p>
-                : sel.view.incomplete ? <p className="text-xs text-muted">{t("An incomplete calculation cannot be reviewed.")}</p>
+              {sel.report.status === "demo_reviewed" ? <p className="text-xs text-muted-foreground">{t("This version is demo reviewed. Sending the same review again returns the existing result.")}</p>
+                : !isLatest ? <p className="text-xs text-muted-foreground">{t("Only the latest version can be reviewed.")}</p>
+                : sel.view.incomplete ? <p className="text-xs text-muted-foreground">{t("An incomplete calculation cannot be reviewed.")}</p>
                 : live.canReview && <><Field label={t("Review comment")}><Textarea value={comment} maxLength={1000} onChange={(e) => setComment(e.target.value)} /></Field><div className="mt-2"><Btn variant="primary" disabled={pending || !comment.trim()} onClick={doReview}>{t("Submit demo review")}</Btn></div></>}
             </Card>
           </div>
@@ -133,11 +133,11 @@ function Reports({ live, r }: { live: MRVLive; r: NonNullable<MRVLive["reports"]
             <Field label={t("Boundary")}><Select value={d.boundaryId} onChange={(e) => setD({ boundaryId: e.target.value as MRVDraft["boundaryId"] })}><option value="ac_input_electricity">ac_input_electricity</option><option value="whole_building_electricity">whole_building_electricity</option></Select></Field>
           </div>
           <Field label={t("Boundary description")} error={tried ? errors.boundary : undefined}><Input value={d.boundary} maxLength={500} onChange={(e) => setD({ boundary: e.target.value })} placeholder={t("AC unit input electricity only")} /></Field>
-          <div><p className="mb-1 text-[13px] font-semibold">{t("Units")}</p>{!d.organizationId ? <p className="text-xs text-muted">{t("Choose the organization first.")}</p> : <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{orgUnits.map((u) => <Check key={u.id} label={u.label} checked={d.unitIds.includes(u.id)} onChange={(on) => setD({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) })} />)}</div>}{tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}</div>
+          <div><p className="mb-1 text-[13px] font-semibold">{t("Units")}</p>{!d.organizationId ? <p className="text-xs text-muted-foreground">{t("Choose the organization first.")}</p> : <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{orgUnits.map((u) => <Check key={u.id} label={u.label} checked={d.unitIds.includes(u.id)} onChange={(on) => setD({ unitIds: on ? [...d.unitIds, u.id] : d.unitIds.filter((x) => x !== u.id) })} />)}</div>}{tried && errors.unitIds && <p className="mt-1 text-xs text-crit">{errors.unitIds}</p>}</div>
           <EvidencePicker ids={draft!.evidenceIds} onChange={(ids) => setDraft((x) => (x ? { ...x, evidenceIds: ids } : x))} units={live.units}
             period={{ unitIds: d.unitIds, from: d.from ? klInstant(d.from) : "", to: d.to ? klInstant(d.to) : "" }} />
-          {preview && <div className="flex flex-col gap-2 rounded-xl border border-line p-3"><div className="flex items-center gap-2"><b className="text-[13px]">{t("Preview · not saved")}</b><DemoBadge /><span className="text-[11px] text-muted">{t("Demo — unverified")}</span></div><FiguresGrid v={preview} /></div>}
-          {!preview && <p className="text-[11px] text-muted">{t("Preview first: saving stores the conditions and the result computed at save time.")}</p>}
+          {preview && <div className="flex flex-col gap-2 rounded-xl border border-line p-3"><div className="flex items-center gap-2"><b className="text-[13px]">{t("Preview · not saved")}</b><DemoBadge /><span className="text-[11px] text-muted-foreground">{t("Demo — unverified")}</span></div><FiguresGrid v={preview} /></div>}
+          {!preview && <p className="text-[11px] text-muted-foreground">{t("Preview first: saving stores the conditions and the result computed at save time.")}</p>}
         </>}
       </Modal>
     </>
@@ -172,8 +172,8 @@ function Factors({ live }: { live: MRVLive }) {
   return (
     <div className="split-rev">
       <Card title={t("Emission factors")} action={live.canFactors && <Btn size="sm" onClick={() => setSelId("new")}><Icon name="add" /> {t("New factor")}</Btn>} className="self-start">
-        {live.factors.length === 0 ? <EmptyState title={t("No factors")}>{t("Add a demo factor.")}</EmptyState> : <div className="flex flex-col gap-2">{live.factors.map((f) => <ListRow key={f.id} selected={sel?.id === f.id} onClick={() => setSelId(f.id)}><div className="min-w-0"><b className="text-[13px]">{f.region} · {f.year}</b><div className="text-[11px] text-muted">v{f.version} · {f.kgCO2ePerKWh} kgCO₂e/kWh</div></div></ListRow>)}</div>}
-        <p className="mt-3 text-[11px] text-muted">{t("Demo factors only — not real regional factors. One current factor per region and year.")}</p>
+        {live.factors.length === 0 ? <EmptyState title={t("No factors")}>{t("Add a demo factor.")}</EmptyState> : <div className="flex flex-col gap-2">{live.factors.map((f) => <ListRow key={f.id} selected={sel?.id === f.id} onClick={() => setSelId(f.id)}><div className="min-w-0"><b className="text-[13px]">{f.region} · {f.year}</b><div className="text-[11px] text-muted-foreground">v{f.version} · {f.kgCO2ePerKWh} kgCO₂e/kWh</div></div></ListRow>)}</div>}
+        <p className="mt-3 text-[11px] text-muted-foreground">{t("Demo factors only — not real regional factors. One current factor per region and year.")}</p>
       </Card>
       <Card title={sel ? <span className="inline-flex flex-wrap items-center gap-2">{sel.region} · {sel.year}{dirty && <Badge tone="warn">{t("Editing → v{v}", { v: sel.version + 1 })}</Badge>}</span> : t("New factor")} sub={sel ? t("Version {v} · saving creates version {next}", { v: sel.version, next: sel.version + 1 }) : t("Saving creates version 1")}>
         <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
@@ -185,7 +185,7 @@ function Factors({ live }: { live: MRVLive }) {
         {sel && <p className="mt-3 rounded-xl bg-surface2 p-3 text-xs">{t("Existing reports keep the factor version they reference.")}</p>}
         {live.canFactors && (
           <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-            {sel && <span className="mr-auto text-[12px] text-muted">{t(dirty ? "Unsaved changes" : "No unsaved changes")}</span>}
+            {sel && <span className="mr-auto text-[12px] text-muted-foreground">{t(dirty ? "Unsaved changes" : "No unsaved changes")}</span>}
             {!sel && live.factors[0] && <Btn onClick={() => setSelId(live.factors[0].id)}>{t("Cancel")}</Btn>}
             {sel && saved && <Btn disabled={pending || !dirty} onClick={() => { setD(saved); setTried(false); }}>{t("Discard")}</Btn>}
             <Btn variant="primary" disabled={pending || (!!sel && !dirty)} onClick={save}>{sel ? t("Save as v{n}", { n: sel.version + 1 }) : t("Create factor")}</Btn>

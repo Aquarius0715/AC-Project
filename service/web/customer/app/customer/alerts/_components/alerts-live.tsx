@@ -47,7 +47,7 @@ export function AlertsLiveView({ live }: { live: AlertsLive }) {
             <b className={cx(a.unread.length > 0 && "text-primary")}>{a.title}</b><SeverityBadge s={a.severity} /><Badge tone="muted" icon={a.kindIcon}>{a.kind}</Badge>
             <Badge tone={a.status.tone}>{a.status.text}</Badge>{a.unread.length > 0 ? <Badge tone="primary">{t("Unread")}</Badge> : a.notes > 0 && <Badge tone="ok" icon="check">{t("Read")}</Badge>}
           </span>
-          <span className="block text-xs text-muted">{a.where}</span><span className="mt-1 block text-xs">{a.evidence}</span>
+          <span className="block text-xs text-muted-foreground">{a.where}</span><span className="mt-1 block text-xs">{a.evidence}</span>
         </button>
         <div className="mt-2 flex flex-wrap gap-2">
           <Link href={`/customer/units/${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("View unit")}</Link>
@@ -55,7 +55,7 @@ export function AlertsLiveView({ live }: { live: AlertsLive }) {
           {a.cause === "fault" && a.group === "attn" && <Link href={`/customer/maintenance?new=${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Request repair")}</Link>}
         </div>
       </div>
-      <button type="button" aria-label={t("Open {title}", { title: a.title })} onClick={() => show(a)} className="text-muted"><Icon name="chevronRight" /></button>
+      <button type="button" aria-label={t("Open {title}", { title: a.title })} onClick={() => show(a)} className="text-muted-foreground"><Icon name="chevronRight" /></button>
     </div>
   );
   return (
@@ -64,7 +64,7 @@ export function AlertsLiveView({ live }: { live: AlertsLive }) {
       {result && <Banner tone={result.tone}>{result.text}</Banner>}
       {live.tab === "alerts" ? (
         <>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <Select aria-label={t("Severity")} className="w-auto text-xs" value={live.severity ?? ""} onChange={(e) => patch({ severity: e.target.value || null })}>
               <option value="">{t("Severity: All")}</option><option value="critical">{t("Severity: Critical")}</option><option value="warning">{t("Severity: Warning")}</option>
             </Select>
@@ -76,10 +76,10 @@ export function AlertsLiveView({ live }: { live: AlertsLive }) {
           </div>
           {failed && <Banner tone="warn">{failed}</Banner>}
           <Card title={t("Needs attention")} sub={t("Unresolved warnings & faults — stays here until resolved, even after you read it")} action={<Badge tone="warn">{attn.length}</Badge>}>
-            {attn.length ? attn.map((a) => <Item key={a.id} a={a} />) : <p className="text-xs text-muted">{t(live.unreadOnly || live.severity ? "Nothing in this filter." : "Nothing needs your attention.")}</p>}
+            {attn.length ? attn.map((a) => <Item key={a.id} a={a} />) : <p className="text-xs text-muted-foreground">{t(live.unreadOnly || live.severity ? "Nothing in this filter." : "Nothing needs your attention.")}</p>}
           </Card>
           <Card title={t("Reminders & information")} sub={t("Maintenance reminders, inspection records, notices and resolved alerts")} action={<Badge tone="muted">{info.length}</Badge>}>
-            {info.length ? info.map((a) => <Item key={a.id} a={a} />) : <p className="text-xs text-muted">{t("Nothing here.")}</p>}
+            {info.length ? info.map((a) => <Item key={a.id} a={a} />) : <p className="text-xs text-muted-foreground">{t("Nothing here.")}</p>}
           </Card>
         </>
       ) : (
@@ -90,7 +90,7 @@ export function AlertsLiveView({ live }: { live: AlertsLive }) {
           <>
             <div className="flex flex-wrap gap-2"><SeverityBadge s={open.severity} /><Badge tone={open.status.tone}>{open.status.text}</Badge>{open.notes > 0 && <Badge tone="ok" icon="check">{t("Read")}</Badge>}</div>
             <SummaryList items={[[t("Where"), open.where], [t("Evidence"), open.evidence], [t("Status"), open.status.detail]]} />
-            <p className="text-xs text-muted">{t(open.status.state === "resolved" ? "This alert is resolved. It stays in the list as a record." : "Reading an alert does not resolve it. It stays under “Needs attention” until the cause is resolved.")}</p>
+            <p className="text-xs text-muted-foreground">{t(open.status.state === "resolved" ? "This alert is resolved. It stays in the list as a record." : "Reading an alert does not resolve it. It stays under “Needs attention” until the cause is resolved.")}</p>
           </>
         )}
       </Modal>

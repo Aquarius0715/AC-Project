@@ -32,19 +32,19 @@ export function PaymentsView({ live }: { live: PaymentsLive }) {
           <div className="flex flex-col gap-2">
             {live.cards.map((c) => (
               <ListRow key={c.id} selected={c.id === sel.id} onClick={() => nav({ contractId: c.id, status: null })}>
-                <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate">{c.name}</b><Badge tone={contractTone[c.status]}>{t(c.status)}</Badge></div><div className="truncate text-xs text-muted">{c.sub}</div></div>
+                <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate">{c.name}</b><Badge tone={contractTone[c.status]}>{t(c.status)}</Badge></div><div className="truncate text-xs text-muted-foreground">{c.sub}</div></div>
               </ListRow>
             ))}
           </div>
-          <p className="mt-3 text-[11px] text-muted">{t("Contract expiry does not stop monitoring or control.")}</p>
+          <p className="mt-3 text-[11px] text-muted-foreground">{t("Contract expiry does not stop monitoring or control.")}</p>
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={sel.name} sub={t("{id} · plan type {plan}", { id: sel.id.slice(0, 8), plan: sel.planType.toUpperCase() })} action={<Badge tone={contractTone[sel.status]}>{t(sel.status)}</Badge>}>
             <SummaryList items={[[t("Period"), sel.period], [t("Plan"), sel.plan]]} />
-            <h3 className="mb-2 mt-4 text-[11px] font-bold uppercase tracking-wide text-muted">{t("Contract scope — equipment this contract relates to")}</h3>
-            {sel.units.length === 0 ? <p className="text-xs text-muted">{t("No unit in this contract.")}</p> : (
+            <h3 className="mb-2 mt-4 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{t("Contract scope — equipment this contract relates to")}</h3>
+            {sel.units.length === 0 ? <p className="text-xs text-muted-foreground">{t("No unit in this contract.")}</p> : (
               <div className="flex flex-col divide-y divide-line">
-                {sel.units.map((u) => <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[13px]"><span><b>{u.name}</b><span className="block text-xs text-muted">{u.place || "—"}</span></span><TextLink href={`/customer/units/${u.id}`}>{t("View unit")} <Icon name="chevronRight" /></TextLink></div>)}
+                {sel.units.map((u) => <div key={u.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-[13px]"><span><b>{u.name}</b><span className="block text-xs text-muted-foreground">{u.place || "—"}</span></span><TextLink href={`/customer/units/${u.id}`}>{t("View unit")} <Icon name="chevronRight" /></TextLink></div>)}
               </div>
             )}
           </Card>
@@ -53,14 +53,14 @@ export function PaymentsView({ live }: { live: PaymentsLive }) {
             <div className="flex flex-col gap-2">
               {live.invoices.map((i) => (
                 <div key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
-                  <div><b>{i.number}</b><div className="text-xs text-muted">{i.due}</div></div>
+                  <div><b>{i.number}</b><div className="text-xs text-muted-foreground">{i.due}</div></div>
                   <div className="flex items-center gap-3"><b>{i.amount}</b><Badge tone={statusTone[i.status]} icon={i.status === "Overdue" ? "alert" : i.status === "Paid" ? "check" : undefined}>{t(i.status)}</Badge>
-                    {i.payable ? <LinkBtn size="sm" variant="primary" href={`/customer/payments/${i.id}`}>{t("Pay now")}</LinkBtn> : <Link href={`/customer/payments/${i.id}`} className="text-muted" aria-label={t("Open {number}", { number: i.number })}><Icon name="chevronRight" /></Link>}</div>
+                    {i.payable ? <LinkBtn size="sm" variant="primary" href={`/customer/payments/${i.id}`}>{t("Pay now")}</LinkBtn> : <Link href={`/customer/payments/${i.id}`} className="text-muted-foreground" aria-label={t("Open {number}", { number: i.number })}><Icon name="chevronRight" /></Link>}</div>
                 </div>
               ))}
-              {live.invoices.length === 0 && <p className="text-xs text-muted">{t(live.total ? "No invoice matches this filter." : "No invoices yet — this is not an overdue payment.")}</p>}
+              {live.invoices.length === 0 && <p className="text-xs text-muted-foreground">{t(live.total ? "No invoice matches this filter." : "No invoices yet — this is not an overdue payment.")}</p>}
             </div>
-            <p className="mt-2 text-[11px] text-muted">{t("Paid invoices have no payment button. “Processing” is not paid.")}{live.otherZone && ` ${t("Due dates and contract periods are Kuala Lumpur dates (Asia/Kuala_Lumpur).")}`}</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">{t("Paid invoices have no payment button. “Processing” is not paid.")}{live.otherZone && ` ${t("Due dates and contract periods are Kuala Lumpur dates (Asia/Kuala_Lumpur).")}`}</p>
           </Card>
           {live.notice && (
             <Banner tone={live.notice.state === "release_requested" ? "primary" : "warn"} action={<LinkBtn size="sm" href={`/customer/payments/${live.notice.invoiceId}?tab=restriction&restrictionId=${live.notice.id}`}>{t("View restriction details")}</LinkBtn>}>

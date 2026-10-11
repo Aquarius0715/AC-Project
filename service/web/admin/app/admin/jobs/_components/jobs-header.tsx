@@ -19,7 +19,7 @@ export function JobsTabs({ tab, counts, q, action }: { tab: string; counts: { jo
   return (
     <div className="flex flex-wrap items-end justify-between gap-2 border-b border-line">
       <div role="tablist" className="flex flex-wrap gap-4">
-        {tabs.map((x) => <Link key={x.id} role="tab" aria-selected={tab === x.id} href={keep(q, x.id === "jobs" ? {} : { tab: x.id })} className={cx("-mb-px border-b-2 px-1 pb-2 text-[13px] font-semibold", tab === x.id ? "border-primary text-primary" : "border-transparent text-muted hover:text-ink")}>{t(x.label)}{x.count !== undefined && <span className="ml-1.5 rounded bg-surface2 px-1.5 text-[11px]">{x.count}</span>}</Link>)}
+        {tabs.map((x) => <Link key={x.id} role="tab" aria-selected={tab === x.id} href={keep(q, x.id === "jobs" ? {} : { tab: x.id })} className={cx("-mb-px border-b-2 px-1 pb-2 text-[13px] font-semibold", tab === x.id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-ink")}>{t(x.label)}{x.count !== undefined && <span className="ml-1.5 rounded bg-surface2 px-1.5 text-[11px]">{x.count}</span>}</Link>)}
       </div>
       {action && <div className="mb-1.5">{action}</div>}
     </div>
@@ -36,11 +36,11 @@ export function ScopeBar({ scope, q, text, clear, children }: { scope: { custome
   const cleared = Object.fromEntries((Array.isArray(clear) ? clear : [clear]).map((k) => [k, null]));
   return (
     <div className="flex flex-wrap items-center gap-2 text-[13px]">
-      <span className="text-muted">{t("Scope")}</span>
+      <span className="text-muted-foreground">{t("Scope")}</span>
       <Select aria-label={t("Customer")} className="w-auto" value={q.customerId ?? ""} onChange={(e) => patch({ customerId: e.target.value || null, propertyId: null, unitId: null, ...cleared })}><option value="">{t("Customer: All")}</option>{scope.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
       <Select aria-label={t("Property")} className="w-auto" value={q.propertyId ?? ""} onChange={(e) => patch({ propertyId: e.target.value || null, unitId: null, ...cleared })}><option value="">{t("Property: All")}</option>{scope.properties.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select>
       <Select aria-label={t("Unit")} className="w-auto" value={q.unitId ?? ""} onChange={(e) => patch({ unitId: e.target.value || null, ...cleared })}><option value="">{t("Unit: All")}</option>{scope.units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</Select>
-      <span className="ml-auto text-xs text-muted">{text}</span>
+      <span className="ml-auto text-xs text-muted-foreground">{text}</span>
       {children}
     </div>
   );

@@ -34,12 +34,12 @@ function LiveAssignment({ j }: { j: Job }) {
   const coord = j.delivery === "contractor" ? j.contractor : "HQ";
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> Overview</Link><b className="text-ink">{j.id} · {j.unit} — {ack === "pending" ? "new assignment" : "assigned"}</b></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> Overview</Link><b className="text-ink">{j.id} · {j.unit} — {ack === "pending" ? "new assignment" : "assigned"}</b></div>
       {ack === "accepted" && <Banner tone="ok">You accepted this assignment. Start job (with check-in) unlocks at the start of the window on {j.scheduled?.date.slice(5)}.</Banner>}
       {ack === "cant_make" && <Banner tone="warn">You told {coord} you can’t make it (“{j.techAck?.reason}”). They will reassign the job or ask the client for a new time.</Banner>}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Inspection checklist" sub="Read-only until you accept and the work window opens."><p className="text-xs text-muted">Indoor (8) · Outdoor (5) · Electrical (5) — all results start empty.</p></Card>
+          <Card title="Inspection checklist" sub="Read-only until you accept and the work window opens."><p className="text-xs text-muted-foreground">Indoor (8) · Outdoor (5) · Electrical (5) — all results start empty.</p></Card>
           <Card title="Job & unit" action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${j.unitId}`}>Unit <Icon name="arrowRight" /></Link>}><SummaryList items={[["Window", j.scheduled ? longDate(j.scheduled) : "—"], ["Site", `${j.customer} · ${j.loc}`], ["Access", "Security desk · show job ID"], ["Unit", `${j.unitId} · Split 2.5 kW`], ["Request", `“${j.symptom}”`]]} /></Card>
         </div>
         <Card title={ack === "pending" ? "New assignment — please accept" : "Job — assigned to you"} className="self-start">
@@ -50,7 +50,7 @@ function LiveAssignment({ j }: { j: Job }) {
         </Card>
       </div>
       <Modal open={cant} onClose={() => setCant(false)} title="Can’t make this time" footer={<><Btn onClick={() => setCant(false)}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!comment.trim()) return; jobActions.techCantMake(j.id, comment.trim(), alt); setCant(false); toast(`Sent to ${coord}`, "warn"); }}>Send to {coord}</Btn></>}>
-        <p className="text-xs text-muted">{j.id} · {fmt(j.scheduled)} · assigned by {coord}</p>
+        <p className="text-xs text-muted-foreground">{j.id} · {fmt(j.scheduled)} · assigned by {coord}</p>
         <Field label="Reason"><Choice value={reason} onChange={setReason} options={[{ id: "training", label: "Training / course" }, { id: "overrun", label: "Another job runs over" }, { id: "sick", label: "Sick" }, { id: "other", label: "Other" }]} /></Field>
         <Field label="Comment (required)" error={tried && !comment.trim() ? "Tell your coordinator why" : undefined}><Input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Medical appointment on 10-01 morning." /></Field>
         <Field label="A time you could do instead (optional)"><Select value={alt} onChange={(e) => setAlt(e.target.value)}><option>Fri 10-02 14:00–16:00</option><option>Mon 10-05 10:00–12:00</option><option value="">—</option></Select></Field>
@@ -101,12 +101,12 @@ function Workspace({ id }: { id: string }) {
   };
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> Overview</Link><b className="text-ink">{id} · Bedroom AC</b><Badge tone={status === "Submitted" ? "ok" : status === "Assigned" ? "primary" : "warn"}>{status}</Badge></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> Overview</Link><b className="text-ink">{id} · Bedroom AC</b><Badge tone={status === "Submitted" ? "ok" : status === "Assigned" ? "primary" : "warn"}>{status}</Badge></div>
       {status === "Assigned" && <Banner action={<span className="flex gap-2"><Btn size="sm" disabled>Start job</Btn><Btn size="sm" variant="ghost" onClick={() => setCheckIn(true)}>Preview check-in</Btn></span>}>Before the work window (starts 14:00): read-only, Start is disabled (IR76). On site, Start job opens Check in (location + unit QR).</Banner>}
       {status === "Submitted" && <Banner tone="ok">Submitted v1 — read-only, awaiting quality review.</Banner>}
       {status === "In progress" && <Banner tone="warn">Work window ends in 15 min — unsaved input will be discarded at 12:00 (IR89).</Banner>}
       {status === "On hold" && <Banner tone="warn" action={<Btn size="sm" variant="ghost" onClick={() => setStatus("In progress")}>Demo: HQ resumes</Btn>}>On hold by HQ — save and submit are blocked (CONFLICT, IR93). Your draft v2 is kept; you can continue when HQ resumes the job.</Banner>}
-      {status === "In progress" && <p className="text-right text-[11px] text-muted"><button className="underline" onClick={() => setStatus("On hold")}>Demo: HQ puts the job on hold</button></p>}
+      {status === "In progress" && <p className="text-right text-[11px] text-muted-foreground"><button className="underline" onClick={() => setStatus("On hold")}>Demo: HQ puts the job on hold</button></p>}
       {errs.length > 0 && <Banner tone="crit"><b>Can’t submit:</b><ul className="list-disc pl-5 text-xs">{errs.slice(0, 5).map((e) => <li key={e}>{e}</li>)}</ul></Banner>}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
@@ -120,23 +120,23 @@ function Workspace({ id }: { id: string }) {
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-[11px] text-muted">Initial result is always null — normal is never preselected. Not inspected/not applicable require a reason.</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">Initial result is always null — normal is never preselected. Not inspected/not applicable require a reason.</p>
           </Card>
           <Card title={<Tabs value={view} onChange={setView} tabs={[{ id: "readings", label: "Readings", count: readings.length }, { id: "parts", label: "Parts & refrigerant", count: parts.length }, { id: "time", label: "Time on site" }]} />} action={view === "readings" ? <Btn size="sm" disabled={readOnly} onClick={() => setReadings((r) => [...r, ["New reading", "", "", ""]])}><Icon name="add" /> Add reading</Btn> : view === "parts" ? <Btn size="sm" disabled={readOnly} onClick={() => setPartModal(true)}><Icon name="add" /> Add part</Btn> : null}>
-            {view === "parts" ? <PartsView parts={parts} readOnly={readOnly} onRemove={(i) => setParts((p) => p.filter((_, k) => k !== i))} /> : view === "time" ? <TimeView /> : <div className="scroll-x"><table className="w-full min-w-[460px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted"><tr><th>Metric</th><th>Value</th><th>Unit</th><th>Linked item</th></tr></thead><tbody>{readings.map((r, i) => <tr key={i} className="border-t border-line">{r.map((c, j) => <td key={j} className="py-1.5 pr-2"><Input disabled={readOnly} value={c} onChange={(e) => setReadings((rs) => rs.map((x, a) => (a === i ? x.map((y, b) => (b === j ? e.target.value : y)) : x)))} /></td>)}</tr>)}</tbody></table></div>}
+            {view === "parts" ? <PartsView parts={parts} readOnly={readOnly} onRemove={(i) => setParts((p) => p.filter((_, k) => k !== i))} /> : view === "time" ? <TimeView /> : <div className="scroll-x"><table className="w-full min-w-[460px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>Metric</th><th>Value</th><th>Unit</th><th>Linked item</th></tr></thead><tbody>{readings.map((r, i) => <tr key={i} className="border-t border-line">{r.map((c, j) => <td key={j} className="py-1.5 pr-2"><Input disabled={readOnly} value={c} onChange={(e) => setReadings((rs) => rs.map((x, a) => (a === i ? x.map((y, b) => (b === j ? e.target.value : y)) : x)))} /></td>)}</tr>)}</tbody></table></div>}
           </Card>
           <Card title="Work report — draft v2">
             <Field label="Work performed & next action (10–4000 characters)"><Textarea disabled={readOnly} value={work} onChange={(e) => setWork(e.target.value)} className="min-h-[110px]" /></Field>
             <p className="mt-3 text-[13px] font-semibold">Replacement parts: {parts.length} lines · R32 +0.25 kg <button className="text-xs text-primary" onClick={() => setView("parts")}>(see Parts & refrigerant)</button></p>
             <div className="grid-fluid mt-2" style={{ ["--min"as string]: "150px" }}><Field label="Next action"><Select disabled={readOnly}><option>None</option><option>Re-inspect</option><option>Replace part</option></Select></Field></div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3"><div><b className="text-[13px]">Customer sign-off</b><div>{signed ? <Badge tone="ok">Signed · {signed}</Badge> : <Badge tone="warn">Not signed</Badge>}</div></div><Btn size="sm" disabled={readOnly} onClick={() => setSignModal(true)}>{signed ? "Sign again" : "Get signature"}</Btn></div>
-            <div className="mt-3 rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted">Photos (JPEG/PNG, ≤5 MiB, ≤10) · 1 attached · <button disabled={readOnly} className="font-semibold text-primary disabled:opacity-50" onClick={() => toast("Photo added (demo)")}><Icon name="add" /> Add photo</button></div>
-            <p className="mt-2 text-[11px] text-muted">Submitted versions become read-only. Rework resumes from rework_requested as a new draft version.</p>
+            <div className="mt-3 rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted-foreground">Photos (JPEG/PNG, ≤5 MiB, ≤10) · 1 attached · <button disabled={readOnly} className="font-semibold text-primary disabled:opacity-50" onClick={() => toast("Photo added (demo)")}><Icon name="add" /> Add photo</button></div>
+            <p className="mt-2 text-[11px] text-muted-foreground">Submitted versions become read-only. Rework resumes from rework_requested as a new draft version.</p>
             {!readOnly && <div className="mt-3 flex flex-wrap justify-end gap-2"><Btn onClick={() => toast("Draft autosaved 11:44")}>Save draft</Btn><Btn variant="primary" onClick={submit}>Submit report</Btn></div>}
           </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Checklist progress"><div className="mb-2 flex justify-between text-xs"><b>{done} / {all.length}</b><span className="text-muted">{all.length - done} items still null</span></div><UtilBar pct={(done / all.length) * 100} />{Object.keys(groups).map((g) => <div key={g} className="mt-2 flex justify-between text-xs"><span className="capitalize">{g}</span><span>{groups[g].length - left(g)} / {groups[g].length}</span></div>)}</Card>
+          <Card title="Checklist progress"><div className="mb-2 flex justify-between text-xs"><b>{done} / {all.length}</b><span className="text-muted-foreground">{all.length - done} items still null</span></div><UtilBar pct={(done / all.length) * 100} />{Object.keys(groups).map((g) => <div key={g} className="mt-2 flex justify-between text-xs"><span className="capitalize">{g}</span><span>{groups[g].length - left(g)} / {groups[g].length}</span></div>)}</Card>
           <Card title="Job & unit" action={<Link className="text-xs font-semibold text-primary" href="/technician/units/unit-online-rto">Unit <Icon name="arrowRight" /></Link>}><SummaryList items={[["Window", "10:00–12:00 today"], ["Site", "customer-a · Home A › 1F › Bedroom"], ["Access", "Security desk · show job ID"], ["Unit", "unit-online-rto · Split 2.5 kW"], ["Linked alert", "Bedroom too hot · warning"]]} /><div className="mt-3 flex flex-wrap gap-2"><Link className="text-xs font-semibold text-primary" href="/technician/units/unit-online-rto/alerts?jobId=job-t07">Alert evidence <Icon name="arrowRight" /></Link><Link className="text-xs font-semibold text-primary" href="/technician/units/unit-online-rto/control?jobId=job-contractor-a">Diagnostics <Icon name="arrowRight" /></Link></div></Card>
           <Card title="Versions & autosave"><SummaryList items={[["Draft v2", "autosaved 11:44 · 7 results · 1 photo"], ["Draft v1", "saved 10:40 · 3 results · no photos"], ["Work window", "10:00–12:00 · warning at 11:45 · discard at 12:00"]]} /></Card>
         </div>
@@ -150,11 +150,11 @@ function Workspace({ id }: { id: string }) {
       <Modal open={signModal} onClose={() => setSignModal(false)} title="Customer sign-off" footer={<><Btn onClick={() => setSignModal(false)}>Cancel</Btn><Btn variant="primary" onClick={() => { setSigned("Ms Tan · 11:52"); setSignModal(false); toast("Signature saved for report v2"); }}>Save signature</Btn></>}>
         <SummaryList items={[["Report", "draft v2 · 7 / 18 results"], ["Parts", `${parts.length} lines`], ["Time on site", "10:05 – now"]]} />
         <Field label="Signer name"><Input defaultValue="Ms Tan" /></Field>
-        <div className="grid h-32 place-items-center rounded-xl border border-dashed border-line text-xs text-muted"><span className="flex items-center gap-1"><Icon name="signature" />Sign here</span></div>
-        <p className="text-[11px] text-muted">The signature is bound to this report version; saving the draft again clears it.</p>
+        <div className="grid h-32 place-items-center rounded-xl border border-dashed border-line text-xs text-muted-foreground"><span className="flex items-center gap-1"><Icon name="signature" />Sign here</span></div>
+        <p className="text-[11px] text-muted-foreground">The signature is bound to this report version; saving the draft again clears it.</p>
       </Modal>
       <Modal open={checkIn} onClose={() => setCheckIn(false)} title="Check in at site" footer={<><Btn onClick={() => setCheckIn(false)}>Cancel</Btn><Btn variant="primary" onClick={() => { setCheckIn(false); toast("Checked in — job started (demo)"); }}>Check in & start</Btn></>}>
-        <p className="text-xs text-muted">{id} · Bedroom AC · Now 14:02</p>
+        <p className="text-xs text-muted-foreground">{id} · Bedroom AC · Now 14:02</p>
         <SummaryList items={[["Location", <Badge key="l" tone="ok" icon="check">78 m from site (within 200 m)</Badge>], ["Unit QR", <Badge key="q" tone="ok" icon="check">unit-online-rto matched</Badge>], ["Arrival", <Badge key="a" tone="ok" icon="check">inside work window</Badge>]]} />
         <Banner>If location is unavailable or the QR code is missing, check in manually with a reason.</Banner>
       </Modal>
@@ -165,10 +165,10 @@ function Workspace({ id }: { id: string }) {
 function PartsView({ parts, readOnly, onRemove }: { parts: { p: string; c: string; src: string; q: number; lot: string }[]; readOnly: boolean; onRemove: (i: number) => void }) {
   return (
     <div className="flex flex-col gap-3">
-      <DataTable rowKey={(r) => r.p} rows={parts} cols={[{ key: "p", label: "Part", render: (r) => <div><b>{r.p}</b><div className="text-[11px] text-muted">{r.c}</div></div> }, { key: "s", label: "Source", render: (r) => r.src }, { key: "q", label: "Qty", render: (r) => r.q }, { key: "l", label: "Lot / serial", render: (r) => r.lot }, { key: "x", label: "", render: (r) => <button disabled={readOnly} className="text-xs font-semibold text-primary" onClick={() => onRemove(parts.indexOf(r))}>Remove</button> }]} />
+      <DataTable rowKey={(r) => r.p} rows={parts} cols={[{ key: "p", label: "Part", render: (r) => <div><b>{r.p}</b><div className="text-[11px] text-muted-foreground">{r.c}</div></div> }, { key: "s", label: "Source", render: (r) => r.src }, { key: "q", label: "Qty", render: (r) => r.q }, { key: "l", label: "Lot / serial", render: (r) => r.lot }, { key: "x", label: "", render: (r) => <button disabled={readOnly} className="text-xs font-semibold text-primary" onClick={() => onRemove(parts.indexOf(r))}>Remove</button> }]} />
       <b className="text-[13px]">Refrigerant (R32) — cylinder CYL-R32-0182</b>
-      <div className="grid-fluid" style={{ ["--min" as string]: "120px" }}>{[["Recovered", "0.40 kg"], ["Charged", "0.65 kg"], ["Net added", "+0.25 kg"], ["Leak check", "Pass · electronic detector"]].map(([k, v]) => <div key={k} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted">{k}</div><div className="font-bold">{v}</div></div>)}</div>
-      <p className="text-[11px] text-muted">Stock is deducted from your van when the report is accepted. Refrigerant amounts are kept per unit for leak-check logs.</p>
+      <div className="grid-fluid" style={{ ["--min" as string]: "120px" }}>{[["Recovered", "0.40 kg"], ["Charged", "0.65 kg"], ["Net added", "+0.25 kg"], ["Leak check", "Pass · electronic detector"]].map(([k, v]) => <div key={k} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{k}</div><div className="font-bold">{v}</div></div>)}</div>
+      <p className="text-[11px] text-muted-foreground">Stock is deducted from your van when the report is accepted. Refrigerant amounts are kept per unit for leak-check logs.</p>
     </div>
   );
 }
@@ -176,7 +176,7 @@ function TimeView() {
   return (
     <div>
       <SummaryList items={[["Arrived", <Badge key="a" tone="ok">10:05 · checked in</Badge>], ["Location", "78 m from site · QR matched"], ["Started", "10:12"], ["Paused", "—"], ["Finished", "— (on submit)"], ["On-site time", "1 h 33 min"]]} />
-      <p className="mt-2 text-[11px] text-muted">Arrival inside the agreed window counts toward SLA. Times are part of the report and visible to the contractor and HQ.</p>
+      <p className="mt-2 text-[11px] text-muted-foreground">Arrival inside the agreed window counts toward SLA. Times are part of the report and visible to the contractor and HQ.</p>
     </div>
   );
 }

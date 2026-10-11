@@ -13,10 +13,10 @@ import { assignTechnician } from "../actions";
 import type { ScheduleLive } from "../_lib/load";
 import { Icon } from "@ac/web/components/Icon";
 
-const toneText: Record<string, string> = { crit: "text-crit", warn: "text-warn", muted: "text-muted", primary: "text-primary", ok: "text-ok" };
-const barTone: Record<string, string> = { crit: "bg-crit", warn: "bg-warn", primary: "bg-primary", muted: "bg-muted", ok: "bg-ok" };
+const toneText: Record<string, string> = { crit: "text-crit", warn: "text-warn", muted: "text-muted-foreground", primary: "text-primary", ok: "text-ok" };
+const barTone: Record<string, string> = { crit: "bg-crit", warn: "bg-warn", primary: "bg-primary", muted: "bg-muted-foreground", ok: "bg-ok" };
 const cellTone: Record<WeekCell["kind"], string> = {
-  booked: "bg-primary text-white", free: "border border-dashed border-line text-muted", leave: "bg-warn-soft text-warn", none: "bg-surface2 text-muted", proposal: "border-2 border-dashed border-primary bg-primary-soft/60 text-primary",
+  booked: "bg-primary text-white", free: "border border-dashed border-line text-muted-foreground", leave: "bg-warn-soft text-warn", none: "bg-surface2 text-muted-foreground", proposal: "border-2 border-dashed border-primary bg-primary-soft/60 text-primary",
 };
 
 /** The contractor's schedule & assignments (FR-P03, Figma Contractor 03-1…03-10) from the Core API. Texts in the user's
@@ -39,7 +39,7 @@ export function ScheduleView({ live }: { live: ScheduleLive }) {
       <div className="split-rev">
         <div className="flex min-w-0 flex-col gap-4 self-start">
           <Card title={t("Accepted jobs")} action={
-            <label className="flex items-center gap-1 text-[11px] text-muted">{t("Sort")}
+            <label className="flex items-center gap-1 text-[11px] text-muted-foreground">{t("Sort")}
               <Select aria-label={t("Sort")} className="w-auto py-1 text-[11px]" value={live.sort} onChange={(e) => patch({ sort: e.target.value === "status" ? null : e.target.value })}>
                 {live.sorts.map((s) => <option key={s.id} value={s.id}>{s.text}</option>)}
               </Select>
@@ -50,25 +50,25 @@ export function ScheduleView({ live }: { live: ScheduleLive }) {
                 <ListRow key={r.id} selected={sel?.id === r.id} href={`/partner/schedule?jobId=${r.id}${live.sort === "status" ? "" : `&sort=${live.sort}`}`}>
                   <div className="min-w-0">
                     <b className={cx("block truncate text-[13px]", sel?.id === r.id && "text-primary")}>{r.short} · {r.title}</b>
-                    <span className={cx("block text-xs", r.tone ? toneText[r.tone] : "text-muted")}>{r.line}</span>
+                    <span className={cx("block text-xs", r.tone ? toneText[r.tone] : "text-muted-foreground")}>{r.line}</span>
                   </div>
                 </ListRow>
               ))}
             </div>
-            {live.total > live.rows.length && <p className="mt-2 text-[11px] text-muted">{t("Showing {shown} of {total}.", { shown: live.rows.length, total: live.total })}</p>}
+            {live.total > live.rows.length && <p className="mt-2 text-[11px] text-muted-foreground">{t("Showing {shown} of {total}.", { shown: live.rows.length, total: live.total })}</p>}
           </Card>
           <Card title={t("Delegation windows")} sub={t("Work must fit inside each window. Access ends automatically at the end time.")}>
             {live.rows.map((r) => (
               <div key={r.id} className="border-t border-line py-2 first:border-0">
                 <div className="flex items-center justify-between gap-2 text-xs"><b>{r.short}</b><span className={cx("font-semibold", toneText[r.leftTone])}>{r.left}</span></div>
                 <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface2"><div className={cx("h-full rounded-full", barTone[r.leftTone])} style={{ width: `${r.ended ? 100 : r.elapsedPct}%` }} /></div>
-                <div className="mt-1 text-[11px] text-muted">{r.windowText}</div>
+                <div className="mt-1 text-[11px] text-muted-foreground">{r.windowText}</div>
               </div>
             ))}
           </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          {sel ? <Workspace key={sel.id} sel={sel} week={live.week} members={live.members} zone={live.zone} otherZone={live.otherZone} /> : <Card title={t("Assign")}><p className="text-[13px] text-muted">{t("The job is no longer delegated to your company — pick another one.")}</p></Card>}
+          {sel ? <Workspace key={sel.id} sel={sel} week={live.week} members={live.members} zone={live.zone} otherZone={live.otherZone} /> : <Card title={t("Assign")}><p className="text-[13px] text-muted-foreground">{t("The job is no longer delegated to your company — pick another one.")}</p></Card>}
         </div>
       </div>
     </Page>
@@ -140,16 +140,16 @@ function AssignCard({ sel, choice, zone, otherZone }: { sel: Selected; choice: C
         {window && <Banner>{window}</Banner>}
         <Field label={sel.currentId ? t("New technician (current: {name})", { name: currentName ?? "—" }) : t("Technician (own company, active, qualified)")} error={tried && !tech ? t("Choose a technician") : tried && same ? t("Choose another technician or a later end") : undefined}>
           <div role="radiogroup" aria-label={t("Technician")} className="flex flex-col gap-1.5">
-            {sel.candidates.length === 0 && <p className="text-[13px] text-muted">{t("No technicians in your company yet — add them in Team & capacity.")}</p>}
+            {sel.candidates.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet — add them in Team & capacity.")}</p>}
             {sel.candidates.map((c) => (
               <button key={c.id} type="button" role="radio" aria-checked={tech === c.id} disabled={!c.eligible} onClick={() => setTech(c.id)}
                 className={cx("flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left", tech === c.id ? "border-primary bg-primary-soft/60" : "border-line bg-surface", !c.eligible && "cursor-not-allowed opacity-70")}>
-                <span className="min-w-0"><b className={cx("block text-[13px]", tech === c.id && "text-primary")}>{c.name}</b><span className="block text-[11px] text-muted">{c.sub}</span></span>
+                <span className="min-w-0"><b className={cx("block text-[13px]", tech === c.id && "text-primary")}>{c.name}</b><span className="block text-[11px] text-muted-foreground">{c.sub}</span></span>
                 <Badge tone={c.badge.tone === "muted" ? "muted" : c.badge.tone}>{c.badge.text}</Badge>
               </button>
             ))}
           </div>
-          <p className="mt-1 text-[11px] text-muted">
+          <p className="mt-1 text-[11px] text-muted-foreground">
             {t("Only active technicians of your company are listed; eligibility is checked again on save.")}
             {otherZone && ` ${t("Free hours are in Kuala Lumpur time (Asia/Kuala_Lumpur).")}`}
           </p>
@@ -171,14 +171,14 @@ function AssignCard({ sel, choice, zone, otherZone }: { sel: Selected; choice: C
         )}
         {m.kind === "extend" && chosen && chosen.id !== sel.currentId && <Banner tone="warn">{t("On save, {current} loses action access immediately. The job keeps its state; {name} continues in a new draft version and the original report authorship is kept.", { current: currentName ?? t("the current technician"), name: chosen.name })}</Banner>}
         {sel.ack && m.kind === "reassign" && sel.ack.status !== "cant_make" && <Banner tone={sel.ack.status === "accepted" ? "ok" : "primary"}>{t(sel.ack.status === "accepted" ? "The current technician accepted the assignment" : "Waiting for the current technician to accept (受領).")}</Banner>}
-        {sel.text.alternative && <p className="text-[11px] text-muted">{t("The technician could do {slot} instead — a different time needs the client’s approval via HQ.", { slot: sel.text.alternative })}</p>}
+        {sel.text.alternative && <p className="text-[11px] text-muted-foreground">{t("The technician could do {slot} instead — a different time needs the client’s approval via HQ.", { slot: sel.text.alternative })}</p>}
         {sel.candidates.length > 0 && !sel.candidates.some((c) => c.eligible) && <Banner tone="warn">{t("No technician of your company can take this time (busy, unavailable or not qualified). Free a technician in Team & capacity, or ask HQ to agree another time with the client.")}</Banner>}
         {chosen && (chosen.eligible
           ? <Banner tone="ok">{t("No overlapping confirmed schedule for {name} in this window.", { name: chosen.name })}</Banner>
           : <Banner tone="warn">{t("{name}: {reason} — saving is refused.", { name: chosen.name, reason: chosen.badge.text })}</Banner>)}
         {result && <Banner tone={result.tone}>{result.text}</Banner>}
         <Btn variant="primary" className="w-full justify-center" disabled={pending || !sel.candidates.some((c) => c.eligible)} onClick={save}>{m.kind === "extend" && tech === sel.currentId ? t("Save new slot") : m.button}</Btn>
-        <p className="text-[11px] text-muted">{t("Reassigning a job already in progress requires a reason and immediately revokes the previous technician’s access.")}</p>
+        <p className="text-[11px] text-muted-foreground">{t("Reassigning a job already in progress requires a reason and immediately revokes the previous technician’s access.")}</p>
       </div>
     </Card>
   );
@@ -192,14 +192,14 @@ function WeekCard({ week, members, sel, choice, zone }: { week: NonNullable<Sche
   const rows = weekGrid(week.dates, members, week.capacity, new Map(Object.entries(week.jobsOf)), proposal, t);
   return (
     <Card title={week.title} action={<Link href="/partner/team" className="text-xs font-semibold text-primary">{t("Team & capacity")} <Icon name="arrowRight" /></Link>}>
-      {rows.length === 0 ? <p className="text-[13px] text-muted">{t("No technicians in your company yet.")}</p> : (
+      {rows.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p> : (
         <div className="scroll-x">
           <table className="w-full min-w-[720px] text-[11px]">
-            <thead><tr><th className="p-1 text-left" />{week.dates.map((d, k) => <th key={d} className={cx("p-1 text-center font-semibold", d === week.today ? "text-primary" : "text-muted")}>{week.days[k]}</th>)}</tr></thead>
+            <thead><tr><th className="p-1 text-left" />{week.dates.map((d, k) => <th key={d} className={cx("p-1 text-center font-semibold", d === week.today ? "text-primary" : "text-muted-foreground")}>{week.days[k]}</th>)}</tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-t border-line">
-                  <td className="p-1.5 align-top"><b className="text-xs">{r.name}</b><div className="text-muted">{r.sub}</div></td>
+                  <td className="p-1.5 align-top"><b className="text-xs">{r.name}</b><div className="text-muted-foreground">{r.sub}</div></td>
                   {r.cells.map((c, k) => <td key={k} className="p-1"><div className={cx("min-h-9 rounded-lg px-1.5 py-1", cellTone[c.kind])}><b className="block">{c.text}</b>{c.sub && <span className="block truncate">{c.sub}</span>}</div></td>)}
                 </tr>
               ))}
@@ -207,13 +207,13 @@ function WeekCard({ week, members, sel, choice, zone }: { week: NonNullable<Sche
           </table>
         </div>
       )}
-      <p className="mt-2 flex flex-wrap gap-3 text-[11px] text-muted">
+      <p className="mt-2 flex flex-wrap gap-3 text-[11px] text-muted-foreground">
         <span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-primary" />{t("Confirmed assignment")}</span>
         <span><i className="mr-1 inline-block h-2 w-2 rounded-sm border border-dashed border-primary" />{t("This proposal")}</span>
         <span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-warn-soft" />{t("Leave / unavailable")}</span>
         <span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-surface2" />{t("No available hours")}</span>
       </p>
-      <p className="text-[11px] text-muted">{t("Only own-company technicians are shown. Days and times in Kuala Lumpur time (Asia/Kuala_Lumpur). Overlap with a confirmed block is rejected on save (CONFLICT).")}</p>
+      <p className="text-[11px] text-muted-foreground">{t("Only own-company technicians are shown. Days and times in Kuala Lumpur time (Asia/Kuala_Lumpur). Overlap with a confirmed block is rejected on save (CONFLICT).")}</p>
     </Card>
   );
 }

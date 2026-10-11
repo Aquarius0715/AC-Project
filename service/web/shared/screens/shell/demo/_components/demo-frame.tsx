@@ -29,7 +29,7 @@ export function ClockFace({ time, onMinute, onHour, disabled }: { time: string; 
   return (
     <>
       <div className="font-mono text-xl font-bold tracking-tight">{time}</div>
-      <p className="mt-1 text-[11px] text-muted">{t("Real-time speed · advancing jumps do not consume session lifetime")}</p>
+      <p className="mt-1 text-[11px] text-muted-foreground">{t("Real-time speed · advancing jumps do not consume session lifetime")}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <button type="button" className={jump} disabled={disabled} onClick={onMinute}>{t("+1 min")}</button>
         <button type="button" className={jump} disabled={disabled} onClick={onHour}>{t("+1 hour")}</button>
@@ -43,7 +43,7 @@ export function TriggerTile({ icon, title, sub, onClick, disabled, tone }: { ico
   return (
     <button type="button" onClick={onClick} disabled={disabled || !onClick} className={cx("flex min-w-0 flex-col items-start gap-0.5 rounded-xl border border-line bg-surface px-3 py-2.5 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-60", tone === "ok" && "border-[#86efac]")}>
       <span className="flex items-center gap-2 text-[13px] font-semibold"><Icon name={icon} className={cx("text-crit", tone === "ok" && "text-ok")} />{title}</span>
-      <span className="text-[11px] text-muted">{sub}</span>
+      <span className="text-[11px] text-muted-foreground">{sub}</span>
     </button>
   );
 }

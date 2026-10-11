@@ -34,7 +34,7 @@ export function RenameModal({ r, onClose, demo = false }: { r: Renaming; onClose
   return (
     <Modal open onClose={onClose} title={t("Rename {name}", { name: r.name })} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || name.trim() === r.name} onClick={save}>{t("Save name")}</Btn></>}>
       <div className="flex flex-col gap-3">
-        <p className="text-[13px] text-muted">{t("Only the name changes. Floors, rooms and units stay as they are — HQ manages the structure.")}</p>
+        <p className="text-[13px] text-muted-foreground">{t("Only the name changes. Floors, rooms and units stay as they are — HQ manages the structure.")}</p>
         <SummaryList items={[[t(r.kind === "unit" ? "AC" : "Location"), r.where]]} />
         <Field label={t("New name")} hint={t("1–120 characters, unique among its siblings. HQ and technicians see the new name too.")} error={err}><Input value={name} onChange={(e) => { setName(e.target.value); setErr(undefined); }} autoFocus /></Field>
       </div>

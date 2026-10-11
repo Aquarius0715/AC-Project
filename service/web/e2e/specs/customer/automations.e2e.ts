@@ -9,7 +9,7 @@ let leftover: string | null = null;
 
 async function remove(page: Page, name: string) {
   await page.goto("/customer/automations");
-  const card = page.locator("section", { hasText: name });
+  const card = page.locator('section, [data-slot="card"]', { hasText: name });
   if (!(await card.count())) return;
   await card.getByRole("button", { name: `More for ${name}` }).click();
   await card.getByRole("button", { name: "Delete" }).click();
@@ -36,15 +36,15 @@ test("a schedule previews its next runs, is saved off and deleted", async ({ pag
   await page.getByRole("button", { name: "Save automation" }).click();
   leftover = name;
   await expect(page.getByText("Automation saved").first()).toBeVisible();
-  const card = page.locator("section", { hasText: name });
+  const card = page.locator('section, [data-slot="card"]', { hasText: name });
   await expect(card).toContainText("Weekdays at 18:00 (Asia/Kuala_Lumpur)");
   await expect(card.getByRole("switch")).toHaveAttribute("aria-checked", "false");
   // switched on (the next run is 18:00, so nothing is sent now), the overview shows when it runs next
   await card.getByRole("switch").click();
   await expect(card.getByRole("switch")).toHaveAttribute("aria-checked", "true");
   await page.goto("/customer");
-  await expect(page.locator("section", { hasText: name })).toContainText(/Next run: .* · /);
+  await expect(page.locator('section, [data-slot="card"]', { hasText: name })).toContainText(/Next run: .* · /);
   await remove(page, name);
   leftover = null;
-  await expect(page.locator("section", { hasText: name })).toHaveCount(0);
+  await expect(page.locator('section, [data-slot="card"]', { hasText: name })).toHaveCount(0);
 });

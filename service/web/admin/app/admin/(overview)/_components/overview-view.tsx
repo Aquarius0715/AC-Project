@@ -14,7 +14,7 @@ type Live = {
   summary: AdminSummary | null; asOf: string | null;
 };
 const PERIODS = [{ id: "today", label: "Today" }, { id: "7d", label: "Last 7 days" }, { id: "30d", label: "Last 30 days" }, { id: "custom", label: "Custom" }];
-const barTone: Record<AxisRow["tone"], string> = { primary: "bg-primary", muted: "bg-muted/50", warn: "bg-warn", ok: "bg-ok", crit: "bg-crit" };
+const barTone: Record<AxisRow["tone"], string> = { primary: "bg-primary", muted: "bg-muted-foreground/50", warn: "bg-warn", ok: "bg-ok", crit: "bg-crit" };
 
 /** The HQ dashboard (FR-A01, DD-A01, Figma Admin 01) from one admin.summary: scope and period in the URL. Texts in the
  * user's display language; the as-of time and the period come formatted from the page (IR289). */
@@ -48,7 +48,7 @@ export function AdminOverviewView({ live }: { live: Live }) {
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2 text-xs text-muted">{live.asOf && <span>{live.asOf}</span>}<Btn size="sm" onClick={() => router.refresh()}><Icon name="refresh" />{t("Refresh")}</Btn></div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">{live.asOf && <span>{live.asOf}</span>}<Btn size="sm" onClick={() => router.refresh()}><Icon name="refresh" />{t("Refresh")}</Btn></div>
       </div>
       {live.period.error && <Banner tone="warn">{t("{error} — choose another period.", { error: live.period.error })}</Banner>}
       {s && <Sections s={s} links={links} />}
@@ -89,39 +89,39 @@ function Sections({ s, links }: { s: AdminSummary; links: ReturnType<typeof over
             <p className="mt-2 flex flex-wrap items-center gap-2 text-xs">{t("Coverage {coverage} (validUnitMinutes / expectedUnitMinutes)", { coverage: f.coverage })}{f.warnings.map((w) => <Badge key={w} tone="primary">{w}</Badge>)}</p>
           </>
         ) : <p className="flex flex-wrap items-center gap-2 text-[13px] font-semibold">{f.text}{f.warnings.map((w) => <Badge key={w} tone="muted">{w}</Badge>)}</p>}
-        <p className="mt-2 text-[11px] text-muted">{t("A forecast, not a measured saving. Actual results for the period are in the “Energy used” KPI; baseline comparison lives in Energy analysis (A13).")}</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">{t("A forecast, not a measured saving. Actual results for the period are in the “Energy used” KPI; baseline comparison lives in Energy analysis (A13).")}</p>
       </Card>
       <div className="grid-fluid" style={{ ["--min" as string]: "420px" }}>
-        <Card title={t("Operation (power state)")} action={<TextLink href={links.units}>{t("Open units")} <Icon name="arrowRight" /></TextLink>}><Axis rows={axes.power} /><p className="mt-2 text-[11px] text-muted">{axes.rateNote}</p></Card>
-        <Card title={t("Connection")} action={<TextLink href={links.units}>{t("Open units")} <Icon name="arrowRight" /></TextLink>}><Axis rows={axes.connection} /><p className="mt-2 text-[11px] text-muted">{t("Connection is a separate axis from power state: an online unit can still have unknown power (no power sensor).")}</p></Card>
+        <Card title={t("Operation (power state)")} action={<TextLink href={links.units}>{t("Open units")} <Icon name="arrowRight" /></TextLink>}><Axis rows={axes.power} /><p className="mt-2 text-[11px] text-muted-foreground">{axes.rateNote}</p></Card>
+        <Card title={t("Connection")} action={<TextLink href={links.units}>{t("Open units")} <Icon name="arrowRight" /></TextLink>}><Axis rows={axes.connection} /><p className="mt-2 text-[11px] text-muted-foreground">{t("Connection is a separate axis from power state: an online unit can still have unknown power (no power sensor).")}</p></Card>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "420px" }}>
         <Card title={t("Maintenance jobs by status — this period")} action={<TextLink href={links.jobs()}>{t("Open jobs")} <Icon name="arrowRight" /></TextLink>}>
           <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
             {[jobs.slice(0, half), jobs.slice(half)].map((col, i) => (
-              <div key={i} className="rounded-xl border border-line">{col.map((j) => <Link key={j.status} href={j.href} className="flex justify-between border-t border-line px-3 py-1.5 text-[13px] first:border-0 hover:bg-surface2"><span className="text-muted">{j.label}</span><b>{j.count}</b></Link>)}</div>
+              <div key={i} className="rounded-xl border border-line">{col.map((j) => <Link key={j.status} href={j.href} className="flex justify-between border-t border-line px-3 py-1.5 text-[13px] first:border-0 hover:bg-surface2"><span className="text-muted-foreground">{j.label}</span><b>{j.count}</b></Link>)}</div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-muted">{t("Jobs whose requested time starts in the period. The status rows open the Jobs tab with that stage, the scope and the period (IR245).")}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("Jobs whose requested time starts in the period. The status rows open the Jobs tab with that stage, the scope and the period (IR245).")}</p>
         </Card>
         <Card title={t("Billing — unpaid by currency")} action={!bill.forbidden && <TextLink href={links.billing}>{t("Open overdue")} <Icon name="arrowRight" /></TextLink>}>
-          {bill.forbidden ? <p className="text-[13px] text-muted">{t("Hidden — billing.read is required.")}</p> : (
+          {bill.forbidden ? <p className="text-[13px] text-muted-foreground">{t("Hidden — billing.read is required.")}</p> : (
             <div className="rounded-xl border border-line">
-              <div className="flex justify-between px-3 py-1.5 text-[13px]"><span className="text-muted">{t("Overdue invoices")}</span><b>{bill.overdue}</b></div>
-              {bill.rows.map((r) => <div key={r.currency} className="flex justify-between border-t border-line px-3 py-1.5 text-[13px]"><span className="text-muted">{t("{currency} (unpaid)", { currency: r.currency })}</span><b className="text-crit">{r.text}</b></div>)}
-              {bill.rows.length === 0 && <div className="border-t border-line px-3 py-1.5 text-[13px] text-muted">{t("Nothing unpaid past due.")}</div>}
+              <div className="flex justify-between px-3 py-1.5 text-[13px]"><span className="text-muted-foreground">{t("Overdue invoices")}</span><b>{bill.overdue}</b></div>
+              {bill.rows.map((r) => <div key={r.currency} className="flex justify-between border-t border-line px-3 py-1.5 text-[13px]"><span className="text-muted-foreground">{t("{currency} (unpaid)", { currency: r.currency })}</span><b className="text-crit">{r.text}</b></div>)}
+              {bill.rows.length === 0 && <div className="border-t border-line px-3 py-1.5 text-[13px] text-muted-foreground">{t("Nothing unpaid past due.")}</div>}
             </div>
           )}
-          <p className="mt-2 text-[11px] text-muted">{t("amountsByCurrency is listed per currency and never summed across currencies. The link opens /admin/billing?overdueOnly=true — no period (IR50, SR06).")}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("amountsByCurrency is listed per currency and never summed across currencies. The link opens /admin/billing?overdueOnly=true — no period (IR50, SR06).")}</p>
         </Card>
       </div>
-      <p className="text-[11px] text-muted">{t("KPI → list links pass the same customer / property but not the period for current-state KPIs (units, alerts, unpaid); Back restores this URL including the period (IR50, D13).")}</p>
+      <p className="text-[11px] text-muted-foreground">{t("KPI → list links pass the same customer / property but not the period for current-state KPIs (units, alerts, unpaid); Back restores this URL including the period (IR50, D13).")}</p>
     </>
   );
 }
 
 function Tile({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: "ok" | "crit" | "muted" }) {
-  return <div className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted">{label}</div><b className={cx(tone === "ok" && "text-ok", tone === "crit" && "text-crit")}>{value}</b><div className="text-[10px] text-muted">{sub}</div></div>;
+  return <div className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{label}</div><b className={cx(tone === "ok" && "text-ok", tone === "crit" && "text-crit")}>{value}</b><div className="text-[10px] text-muted-foreground">{sub}</div></div>;
 }
 
 function Axis({ rows }: { rows: AxisRow[] }) {

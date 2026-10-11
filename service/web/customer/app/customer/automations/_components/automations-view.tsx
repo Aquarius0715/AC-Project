@@ -45,7 +45,7 @@ function ConsentCard({ live, compact }: { live: AutomationsLive; compact?: boole
         <div className="flex flex-wrap items-center gap-2 text-[13px]"><b className="inline-flex items-center gap-1.5">{!compact && <Icon name="location" />}{t(compact ? "Location consent" : "Location consent — for arrival/departure automations only")}</b>{badge}</div>
         {action}
       </div>
-      <p className="mt-1.5 text-xs text-muted">{compact ? t("Required for this automation. Used only for arrival/departure automations; phase 1A uses predefined demo events — no real GPS history is collected.") : c.text}</p>
+      <p className="mt-1.5 text-xs text-muted-foreground">{compact ? t("Required for this automation. Used only for arrival/departure automations; phase 1A uses predefined demo events — no real GPS history is collected.") : c.text}</p>
     </div>
   );
 }
@@ -65,7 +65,7 @@ function List({ live, notice, setNotice, create, edit }: { live: AutomationsLive
   return (
     <Page>
       <PageHead title={t("Your automations")} sub={t(live.cards.length === 1 ? "{n} automation · {on} on · each rule controls one AC · checked again when it runs" : "{n} automations · {on} on · each rule controls one AC · checked again when it runs", { n: live.cards.length, on })} action={<Btn variant="primary" onClick={create}><Icon name="add" /> {t("Create automation")}</Btn>} />
-      {notice && <Banner tone="ok" action={<Btn size="sm" variant="ghost" onClick={() => setNotice(null)}>{t("Dismiss")}</Btn>}><b>{notice.title}</b><div className="text-xs text-muted">{notice.text}</div></Banner>}
+      {notice && <Banner tone="ok" action={<Btn size="sm" variant="ghost" onClick={() => setNotice(null)}>{t("Dismiss")}</Btn>}><b>{notice.title}</b><div className="text-xs text-muted-foreground">{notice.text}</div></Banner>}
       <ConsentCard live={live} />
       {live.cards.length === 0 ? <EmptyState title={t("No automations yet")} action={<Btn size="sm" onClick={create}><Icon name="add" /> {t("Create automation")}</Btn>}>{t("Create one to pre-cool before you arrive or to stop an empty room. Saving sends no command — the automation runs at its time or event.")}</EmptyState> : (
         <div className="flex flex-col gap-3">
@@ -74,15 +74,15 @@ function List({ live, notice, setNotice, create, edit }: { live: AutomationsLive
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2"><b className="text-[15px]">{c.name}</b><Badge tone="primary" icon={triggerInfo[c.trigger].icon}>{t(triggerInfo[c.trigger].label)}</Badge><Badge tone={c.status.tone} icon={c.status.tone === "ok" ? "live" : c.status.tone === "warn" ? "unsupported" : "dot"}>{c.status.text}</Badge></div>
-                  <p className="mt-1 text-[13px]"><span className="text-muted">{t("When")}</span> {c.when}</p>
-                  <p className="text-[13px]"><span className="text-muted">{t("Then")}</span> {c.then}</p>
-                  <p className="text-xs text-muted">{c.place}</p>
-                  {c.note && <p className="mt-1 text-xs font-semibold text-crit">⊘ {c.note}</p>}
-                  {c.skipped && <p className="mt-1 flex items-center gap-1 text-xs text-muted"><Icon name="info" />{c.skipped}</p>}
+                  <p className="mt-1 text-[13px]"><span className="text-muted-foreground">{t("When")}</span> {c.when}</p>
+                  <p className="text-[13px]"><span className="text-muted-foreground">{t("Then")}</span> {c.then}</p>
+                  <p className="text-xs text-muted-foreground">{c.place}</p>
+                  {c.note && <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-crit"><Icon name="unsupported" />{c.note}</p>}
+                  {c.skipped && <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Icon name="info" />{c.skipped}</p>}
                 </div>
                 <div className="relative flex flex-col items-end gap-2">
                   <span className="flex items-center gap-2 text-xs font-semibold">
-                    <span className={c.enabled ? "text-ok" : c.status.tone === "warn" ? "text-warn" : "text-muted"}>{t(c.enabled ? "On" : c.status.tone === "warn" ? "Disabled" : "Off")}</span>
+                    <span className={c.enabled ? "text-ok" : c.status.tone === "warn" ? "text-warn" : "text-muted-foreground"}>{t(c.enabled ? "On" : c.status.tone === "warn" ? "Disabled" : "Off")}</span>
                     <span title={c.toggle.hint ?? undefined}><Toggle on={c.enabled} disabled={pending || !c.toggle.allowed} onChange={() => toggle(c)} label={t(c.enabled ? "Switch {name} off" : "Switch {name} on", { name: c.name })} /></span>
                   </span>
                   <span className="flex gap-2">
@@ -100,10 +100,10 @@ function List({ live, notice, setNotice, create, edit }: { live: AutomationsLive
           ))}
         </div>
       )}
-      <p className="text-xs text-muted">{t("Priority when rules overlap: device capabilities & active restrictions → HQ policy → your automations. List order is not run priority. Missing condition data never counts as a match.")}</p>
+      <p className="text-xs text-muted-foreground">{t("Priority when rules overlap: device capabilities & active restrictions → HQ policy → your automations. List order is not run priority. Missing condition data never counts as a match.")}</p>
       <Modal open={!!del} onClose={() => setDel(null)} title={t("Delete automation?")} footer={<><Btn onClick={() => setDel(null)}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={() => del && remove(del)}>{t("Delete automation")}</Btn></>}>
         <p className="text-[13px]">{t("“{name}” will no longer run.", { name: del?.name ?? "" })}</p>
-        <p className="text-xs text-muted">{del && `${del.place.split(t(" · next run {when}", { when: "" }).trimEnd())[0]} · ${t(triggerInfo[del.trigger].label)} · ${del.when}.`} {t("Manual control and other automations are not affected. Commands it already sent stay in the history.")}</p>
+        <p className="text-xs text-muted-foreground">{del && `${del.place.split(t(" · next run {when}", { when: "" }).trimEnd())[0]} · ${t(triggerInfo[del.trigger].label)} · ${del.when}.`} {t("Manual control and other automations are not affected. Commands it already sent stay in the history.")}</p>
       </Modal>
     </Page>
   );
@@ -173,10 +173,10 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
       </Select>
     </Field>
   );
-  const step = (n: number, title: string, sub?: string) => <div className="flex items-start gap-2"><span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white">{n}</span><div><div className="text-[15px] font-bold">{title}</div>{sub && <div className="text-xs text-muted">{sub}</div>}</div></div>;
+  const step = (n: number, title: string, sub?: string) => <div className="flex items-start gap-2"><span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white">{n}</span><div><div className="text-[15px] font-bold">{title}</div>{sub && <div className="text-xs text-muted-foreground">{sub}</div>}</div></div>;
   return (
     <Page>
-      <div className="text-[13px] text-muted"><button type="button" className="font-semibold text-primary" onClick={onCancel}><Icon name="arrowLeft" /> {t("Automations")}</button> › <b className="text-ink">{t(rule ? "Edit automation" : "Create automation")}</b></div>
+      <div className="text-[13px] text-muted-foreground"><button type="button" className="font-semibold text-primary" onClick={onCancel}><Icon name="arrowLeft" /> {t("Automations")}</button> › <b className="text-ink">{t(rule ? "Edit automation" : "Create automation")}</b></div>
       <div className="split">
         <Card>
           <div className="flex flex-col gap-4">
@@ -186,11 +186,11 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
               {triggers.map((tr) => (
                 <button key={tr} type="button" role="radio" aria-checked={draft.trigger === tr} disabled={!!rule && (tr === "schedule") !== sched} onClick={() => set({ trigger: tr, extras: fitExtras({ ...draft, trigger: tr }) })}
                   className={cx("rounded-xl border px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50", draft.trigger === tr ? "border-primary bg-primary-soft text-primary ring-1 ring-primary" : "border-line bg-surface hover:bg-surface2")}>
-                  <div className="flex items-center gap-1.5 text-[13px] font-semibold"><Icon name={triggerInfo[tr].icon} />{t(triggerInfo[tr].label)}</div><div className="text-[11px] text-muted">{t(triggerInfo[tr].sub)}</div>
+                  <div className="flex items-center gap-1.5 text-[13px] font-semibold"><Icon name={triggerInfo[tr].icon} />{t(triggerInfo[tr].label)}</div><div className="text-[11px] text-muted-foreground">{t(triggerInfo[tr].sub)}</div>
                 </button>
               ))}
             </div>
-            {!!rule && <p className="-mt-2 text-[11px] text-muted">{t("A saved schedule stays a schedule and an event rule stays an event rule — create a new automation to switch.")}</p>}
+            {!!rule && <p className="-mt-2 text-[11px] text-muted-foreground">{t("A saved schedule stays a schedule and an event rule stays an event rule — create a new automation to switch.")}</p>}
             {sched && (
               <>
                 <Field label={t("Weekdays (start day)")} error={errors.weekdays}>
@@ -207,7 +207,7 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
                   <Field label={t("End")} hint={t("24-hour HH:mm")} error={errors.endLocal}><Input inputMode="numeric" maxLength={5} placeholder="HH:mm" value={draft.endLocal} onChange={(e) => set({ endLocal: e.target.value })} /></Field>
                   <Field label={t("Time zone")} hint={t("From your preferences")}><Input value={draft.timezone} readOnly className="bg-surface2" /></Field>
                 </div>
-                <label className="flex items-center gap-2 text-xs text-muted"><input type="checkbox" checked={draft.endsNextDay} onChange={(e) => set({ endsNextDay: e.target.checked })} />{t("Ends next day (overnight) — off: end must be later than start; equal start/end is invalid")}</label>
+                <label className="flex items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={draft.endsNextDay} onChange={(e) => set({ endsNextDay: e.target.checked })} />{t("Ends next day (overnight) — off: end must be later than start; equal start/end is invalid")}</label>
                 {errors.endsNextDay && <p className="-mt-2 flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{errors.endsNextDay}</p>}
               </>
             )}
@@ -252,25 +252,25 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           <Card className="bg-primary-soft/40">
-            <div className="text-[11px] font-bold uppercase tracking-wide text-muted">{t("Summary")}</div>
+            <div className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">{t("Summary")}</div>
             <p className="mt-1 text-[13px] font-bold">{summaryText(draft, ac?.name ?? t("the AC"), ac?.property ?? t("the AC's place"), t)}</p>
-            <p className="mt-1 text-[11px] text-muted">{t(summaryNote[draft.trigger])}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">{t(summaryNote[draft.trigger])}</p>
             {sched && (
               <div className="mt-3 grid grid-cols-[90px_1fr] gap-2 border-t border-line pt-2 text-xs">
-                <span className="text-muted">{t("Next runs")}</span>
+                <span className="text-muted-foreground">{t("Next runs")}</span>
                 <span>{!scheduleOk ? t("Fix the schedule to preview") : preview.loading ? t("Checking…") : Object.keys(previewError).length ? <span className="text-crit">{Object.values(previewError)[0]}</span>
                   : runsShown.length === 0 ? t("None in the next weeks") : runsShown.map((r) => <span key={r.start.at} className="block">{runText(r.start.at, draft.timezone, i18n)}{r.end ? ` · ${runClock(r.end.at, draft.timezone, i18n)}` : ""}</span>)}</span>
               </div>
             )}
             <div className="mt-2 flex items-center justify-between gap-2 border-t border-line pt-2 text-xs">
-              <span className="text-muted">{t("Status")}</span>
+              <span className="text-muted-foreground">{t("Status")}</span>
               <span className="flex items-center gap-2 font-semibold">{t(draft.enabled ? "Enabled on save" : "Off on save")}<Toggle on={draft.enabled} onChange={(v) => set({ enabled: v })} label={t("Enabled on save")} /></span>
             </div>
           </Card>
           <Card title={t("Review & test")} sub={t("Simulate an event to see what would happen. Test sends no command.")}>
             <div className="flex flex-col gap-2">
               <Btn onClick={runTest} disabled={pending || !!eventTestHint} title={eventTestHint ?? undefined}><Icon name="running" />{t("Test / Simulate")}</Btn>
-              {eventTestHint && <p className="text-[11px] text-muted">{eventTestHint}</p>}
+              {eventTestHint && <p className="text-[11px] text-muted-foreground">{eventTestHint}</p>}
               <Btn variant="primary" disabled={pending} onClick={save}>{t("Save automation")}</Btn>
               <Btn variant="ghost" onClick={onCancel}>{t("Cancel")}</Btn>
             </div>
@@ -278,14 +278,14 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
         </div>
       </div>
       <Modal open={test !== null} onClose={() => setTest(null)} title={t("Test result — simulation only")} footer={<><Btn onClick={() => setTest(null)}>{t("Back to edit")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTest(null); save(); }}>{t("Save automation")}</Btn></>}>
-        <p className="text-xs text-muted"><Badge tone="primary" icon="info">{t("No command sent")}</Badge> {t("Simulated events for “{name}” ({zone}):", { name: draft.name.trim() || t("this automation"), zone: draft.timezone })}</p>
-        {test?.length === 0 && <p className="text-[13px] text-muted">{t("No upcoming run in the next weeks.")}</p>}
+        <p className="text-xs text-muted-foreground"><Badge tone="primary" icon="info">{t("No command sent")}</Badge> {t("Simulated events for “{name}” ({zone}):", { name: draft.name.trim() || t("this automation"), zone: draft.timezone })}</p>
+        {test?.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No upcoming run in the next weeks.")}</p>}
         {test?.map((r) => (
           <div key={r.at + r.title} className={cx("rounded-xl px-3 py-2 text-[13px]", r.tone === "ok" ? "bg-ok-soft/70" : "bg-surface2")}>
-            <b className={cx("flex items-center gap-1.5", r.tone === "ok" && "text-ok")}><Icon name={r.tone === "ok" ? "check" : "dot"} />{r.title}</b><div className="text-xs text-muted">{r.detail}</div>
+            <b className={cx("flex items-center gap-1.5", r.tone === "ok" && "text-ok")}><Icon name={r.tone === "ok" ? "check" : "dot"} />{r.title}</b><div className="text-xs text-muted-foreground">{r.detail}</div>
           </div>
         ))}
-        <p className="text-[11px] text-muted">{t("At run time the automation is re-checked (permissions, capabilities, restrictions).")}</p>
+        <p className="text-[11px] text-muted-foreground">{t("At run time the automation is re-checked (permissions, capabilities, restrictions).")}</p>
       </Modal>
     </Page>
   );
@@ -311,7 +311,7 @@ function OnlyIf({ draft, errors, set }: { draft: Draft; errors: Record<string, s
           {x.type === "weather" && (
             <>
               <Select className="w-auto py-1" value={x.operator} onChange={(e) => put(i, { ...x, operator: e.target.value as typeof x.operator })}>{compares.map((c) => <option key={c} value={c}>{compareText(c)}</option>)}</Select>
-              <Input className="w-24 py-1" inputMode="decimal" value={x.value} onChange={(e) => put(i, { ...x, value: e.target.value })} aria-label={t("Outdoor temperature °C")} /><span className="text-xs text-muted">{t("°C (demo weather)")}</span>
+              <Input className="w-24 py-1" inputMode="decimal" value={x.value} onChange={(e) => put(i, { ...x, value: e.target.value })} aria-label={t("Outdoor temperature °C")} /><span className="text-xs text-muted-foreground">{t("°C (demo weather)")}</span>
             </>
           )}
           {x.type === "weekday" && (
@@ -331,7 +331,7 @@ function OnlyIf({ draft, errors, set }: { draft: Draft; errors: Record<string, s
       <div className="flex flex-wrap items-center gap-2">
         {adding && choices.length > 0 ? choices.map((c) => <Btn key={c} size="sm" onClick={() => { set({ extras: [...extras, newExtra(c)] }); setAdding(false); }}>{t(extraLabel[c])}</Btn>)
           : <Btn size="sm" disabled={choices.length === 0} onClick={() => setAdding(true)}><Icon name="add" /> {t("Add condition")}</Btn>}
-        <span className="text-xs text-muted">{t(choices.length === 0 && extras.length > 0 ? "No more condition types for this trigger" : "e.g. only if someone is home · only if outdoor ≥ 30°C")}</span>
+        <span className="text-xs text-muted-foreground">{t(choices.length === 0 && extras.length > 0 ? "No more condition types for this trigger" : "e.g. only if someone is home · only if outdoor ≥ 30°C")}</span>
       </div>
     </div>
   );

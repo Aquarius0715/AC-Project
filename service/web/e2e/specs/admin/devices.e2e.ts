@@ -7,7 +7,7 @@ import { test, expect } from "../../fixtures/test";
 test("the device list filters by state and the detail shows the device as Figma draws it", async ({ page }) => {
   await page.goto("/admin/devices?tab=devices");
   const main = page.getByRole("main");
-  const list = main.getByRole("heading", { name: "Devices", exact: true }).locator("xpath=ancestor::section[1]");
+  const list = main.getByRole("heading", { name: "Devices", exact: true }).locator('xpath=ancestor::*[self::section or @data-slot="card"][1]');
   const serials = async () => (await list.getByRole("button").allInnerTexts()).map((x) => x.split("\n")[0].trim());
   await expect(list.getByRole("button").first()).toBeVisible();
   const all = await serials();

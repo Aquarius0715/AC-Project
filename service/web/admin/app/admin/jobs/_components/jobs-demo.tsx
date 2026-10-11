@@ -33,7 +33,7 @@ export function JobsDemo({ jobId, tab: initial }: { jobId?: string; tab?: string
       {tab === "jobs" && (
         <>
           <div className="scroll-x"><div className="grid min-w-[880px] grid-cols-10 overflow-hidden rounded-2xl border border-line bg-surface">
-            {PIPE.map((s) => <button key={s} onClick={() => setStage(stage === s ? null : s)} className={cx("border-r border-line px-3 py-2 text-left last:border-r-0 hover:bg-surface2", stage === s && "bg-primary-soft")}><div className="text-[11px] text-muted">{statusLabel[s]}</div><div className={cx("text-lg font-bold", s === "time_proposed" && jobs.some((j) => j.status === s) && "text-warn")}>{jobs.filter((j) => j.status === s).length}</div></button>)}
+            {PIPE.map((s) => <button key={s} onClick={() => setStage(stage === s ? null : s)} className={cx("border-r border-line px-3 py-2 text-left last:border-r-0 hover:bg-surface2", stage === s && "bg-primary-soft")}><div className="text-[11px] text-muted-foreground">{statusLabel[s]}</div><div className={cx("text-lg font-bold", s === "time_proposed" && jobs.some((j) => j.status === s) && "text-warn")}>{jobs.filter((j) => j.status === s).length}</div></button>)}
           </div></div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">
@@ -49,11 +49,11 @@ export function JobsDemo({ jobId, tab: initial }: { jobId?: string; tab?: string
                 <ListRow key={j.id} selected={sel?.id === j.id} onClick={() => setSelId(j.id)}>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{j.id} · {j.unit}</b><JobStatusBadge s={j.status} /></div>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted"><OriginBadge origin={j.origin} />{j.customer} · {j.type}</div>
-                    <div className={cx("text-[11px]", j.followUpClass === "pending" ? "font-semibold text-warn" : "text-muted")}>{rowLine(j)}</div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground"><OriginBadge origin={j.origin} />{j.customer} · {j.type}</div>
+                    <div className={cx("text-[11px]", j.followUpClass === "pending" ? "font-semibold text-warn" : "text-muted-foreground")}>{rowLine(j)}</div>
                   </div>
                 </ListRow>
-              ))}{list.length === 0 && <p className="text-xs text-muted">No jobs in this filter.</p>}</div>
+              ))}{list.length === 0 && <p className="text-xs text-muted-foreground">No jobs in this filter.</p>}</div>
             </Card>
             {sel && <JobDetail j={sel} open={setModal} />}
           </div>
@@ -77,7 +77,7 @@ export function PlansDemo() {
   const [plan, setPlan] = useState(plans[0]);
   return (
     <div className="split-rev">
-      <Card title="Recurring plans" className="self-start"><div className="flex flex-col gap-2">{plans.map((p) => <ListRow key={p.id} selected={plan.id === p.id} onClick={() => setPlan(p)}><div><b className="text-[13px]">{p.id}</b><div className="text-[11px] text-muted">{p.name}</div></div></ListRow>)}</div></Card>
+      <Card title="Recurring plans" className="self-start"><div className="flex flex-col gap-2">{plans.map((p) => <ListRow key={p.id} selected={plan.id === p.id} onClick={() => setPlan(p)}><div><b className="text-[13px]">{p.id}</b><div className="text-[11px] text-muted-foreground">{p.name}</div></div></ListRow>)}</div></Card>
       <Card title={plan.name} sub={plan.rule} action={<Btn size="sm" variant="primary" onClick={() => toast("CONFLICT — an occurrence already exists for this period", "warn")}>Generate job</Btn>}>
         <SummaryList items={[["Plan", plan.id], ["Unit", plan.unit], ["Rule", plan.rule], ["Delivery", plan.delivery], ["Client notice", "1 month before each visit · origin “Periodic plan”"]]} />
         <div className="mt-3"><Banner>Generated visits get a fixed time and go straight to assignment / offer. The client can “Request another time” with 3 options — that sends the visit back to triage like a client request (IR113).</Banner></div>
@@ -106,7 +106,7 @@ function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot }
     <div className="flex min-w-0 flex-col gap-4">
       <Card title={<span className="flex flex-wrap items-center gap-2">{j.id} · {j.unit} <JobStatusBadge s={j.status} /><OriginBadge origin={j.origin} /></span>} sub={`${j.type} · ${j.customer} · ${j.loc}${j.planId ? ` · ${j.planId} (${j.planVisit})` : ""}`} action={<div className="flex gap-2"><Btn size="sm" onClick={() => open({ kind: "reason", what: "hold" })}>Hold…</Btn><Btn size="sm" variant="danger" onClick={() => { jobActions.cancel(j.id, "cancelled by HQ"); toast("Job cancelled", "warn"); }}>Cancel…</Btn></div>}>
         <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
-          {[["Symptom", j.symptom], ["Needs", j.type === "Periodic" ? "General maintenance" : "Refrigerant handling · 2 h"], ["Scheduled", j.scheduled ? longDate(j.scheduled) : "not booked"], ["Contact", "9:00–18:00 · call before arriving"]].map(([k, v]) => <div key={k} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted">{k}</div><div className="text-[13px] font-semibold">{v}</div></div>)}
+          {[["Symptom", j.symptom], ["Needs", j.type === "Periodic" ? "General maintenance" : "Refrigerant handling · 2 h"], ["Scheduled", j.scheduled ? longDate(j.scheduled) : "not booked"], ["Contact", "9:00–18:00 · call before arriving"]].map(([k, v]) => <div key={k} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{k}</div><div className="text-[13px] font-semibold">{v}</div></div>)}
         </div>
       </Card>
 
@@ -121,10 +121,10 @@ function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot }
           ]} />
           {j.followUpClass === "pending" && <>
             <div className="grid-fluid mt-3" style={{ ["--min" as string]: "220px" }}>
-              <div className="rounded-xl border border-line bg-surface p-3"><b className="text-[13px]">Rework (free)</b><p className="text-xs text-muted">Linked to {j.followUpOf}. No charge for the client; counts against the first-time-fix KPI of the original technician / contractor.</p></div>
-              <div className="rounded-xl border border-line bg-surface p-3"><b className="text-[13px]">New request</b><p className="text-xs text-muted">A separate, billable job; {j.followUpOf} stays closed.</p></div>
+              <div className="rounded-xl border border-line bg-surface p-3"><b className="text-[13px]">Rework (free)</b><p className="text-xs text-muted-foreground">Linked to {j.followUpOf}. No charge for the client; counts against the first-time-fix KPI of the original technician / contractor.</p></div>
+              <div className="rounded-xl border border-line bg-surface p-3"><b className="text-[13px]">New request</b><p className="text-xs text-muted-foreground">A separate, billable job; {j.followUpOf} stays closed.</p></div>
             </div>
-            <div className="mt-3 flex items-center justify-between gap-2"><span className="text-[11px] text-muted">Set once with a reason (jobs.classifyFollowUp). Until then the client sees “Under HQ review”.</span><Btn variant="primary" onClick={() => open({ kind: "classify" })}>Classify…</Btn></div>
+            <div className="mt-3 flex items-center justify-between gap-2"><span className="text-[11px] text-muted-foreground">Set once with a reason (jobs.classifyFollowUp). Until then the client sees “Under HQ review”.</span><Btn variant="primary" onClick={() => open({ kind: "classify" })}>Classify…</Btn></div>
           </>}
         </Card>
       )}
@@ -136,12 +136,12 @@ function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot }
             <DataTable rowKey={(r) => r.i + ""} rows={j.preferred.map((s, i) => ({ s, i, f: fits[i] }))} cols={[
               { key: "r", label: "Rank", render: (r) => <Rank i={r.i} /> },
               { key: "t", label: "Time", render: (r) => <b>{longDate(r.s)}</b> },
-              { key: "h", label: "HQ technicians", render: (r) => <span className="text-xs text-muted">{r.f.hq}</span>, hideBelow: "md" },
-              { key: "c", label: "Contractors", render: (r) => <span className="text-xs text-muted">{r.f.partner}</span>, hideBelow: "md" },
+              { key: "h", label: "HQ technicians", render: (r) => <span className="text-xs text-muted-foreground">{r.f.hq}</span>, hideBelow: "md" },
+              { key: "c", label: "Contractors", render: (r) => <span className="text-xs text-muted-foreground">{r.f.partner}</span>, hideBelow: "md" },
               { key: "f", label: "Fit", render: (r) => r.f.fits === "none" ? <Badge tone="crit">No fit</Badge> : <Badge tone="ok">Fits</Badge> },
               { key: "a", label: "Action", render: (r) => <Btn size="sm" variant={r.f.fits === "none" ? "secondary" : "primary"} disabled={r.f.fits === "none"} onClick={() => open({ kind: "book", slot: r.s })}>Use this time</Btn> },
             ]} />
-            <p className="mt-2 text-[11px] text-muted">“Use this time” books with the time locked. HQ cannot book a time outside the client’s preferred times without the client’s approval.</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">“Use this time” books with the time locked. HQ cannot book a time outside the client’s preferred times without the client’s approval.</p>
           </Card>
           <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#f5c473] bg-[#fff8ec] p-4">
             <div className="min-w-0 flex-1"><b className="text-warn">{anyFit ? "Prefer another time?" : "None of the times works — propose another time"}</b><p className="text-xs">Earliest fits: Thu 10-01 10:00–12:00 (contractor-a · tech-external-a) · Thu 10-01 14:00–16:00 (tech-internal-a). Nothing is booked until the client accepts.</p></div>
@@ -154,7 +154,7 @@ function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot }
         <Card tone="warn" title={j.proposal.by === "contractor" ? "Partner’s time sent to the client — waiting" : "Proposal sent — waiting for the client"} action={<Badge tone="warn">Reply by {j.proposal.replyBy}</Badge>}>
           <SummaryList items={[["Proposed time", longDate(j.proposal.slot)], ["Held capacity", `${j.proposal.who} — booked automatically when the client accepts`], ["Message", `“${j.proposal.message}”`], ["Client", "Notified in the Client app · reminder 24 h before the deadline"]]} />
           <div className="mt-3 flex flex-wrap justify-end gap-2"><Btn variant="danger" onClick={() => { jobActions.withdraw(j.id); toast("Proposal withdrawn", "warn"); }}>Withdraw proposal</Btn><Btn onClick={() => open({ kind: "propose" })}>Edit proposal…</Btn><Btn onClick={() => toast("Reminder sent to the client")}>Remind client</Btn></div>
-          <p className="mt-2 text-[11px] text-muted">Accept → booked with the held partner (no extra HQ step). Decline → back to Requested with the client’s reason and new times. No reply → stays Requested and a “Call the client” task is created.</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">Accept → booked with the held partner (no extra HQ step). Decline → back to Requested with the client’s reason and new times. No reply → stays Requested and a “Call the client” task is created.</p>
         </Card>
       )}
 
@@ -171,16 +171,16 @@ function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot }
 
       {j.status === "offered" && j.partnerProposal?.status === "pending" && (
         <Card tone="warn" title={<span className="inline-flex items-center gap-1.5"><Icon name="swap" />{`${j.contractor} proposes a different time`}</span>} action={<Badge tone="warn">Needs client approval</Badge>}>
-          <SummaryList items={[["Agreed with client", <s key="s" className="text-muted">{fmt(j.scheduled)}</s>], ["Proposed by contractor", <b key="b">{longDate(j.partnerProposal.slot)} · {j.partnerProposal.tech}</b>], ["Reason", `“${j.partnerProposal.reason}” — ${j.contractor}, ${j.partnerProposal.sentAt}`]]} />
+          <SummaryList items={[["Agreed with client", <s key="s" className="text-muted-foreground">{fmt(j.scheduled)}</s>], ["Proposed by contractor", <b key="b">{longDate(j.partnerProposal.slot)} · {j.partnerProposal.tech}</b>], ["Reason", `“${j.partnerProposal.reason}” — ${j.contractor}, ${j.partnerProposal.sentAt}`]]} />
           <div className="mt-3 flex flex-wrap justify-end gap-2"><Btn onClick={() => toast("Use “+ New job › Offer” to choose another contractor (demo)")}>Offer to another contractor…</Btn><Btn onClick={() => { jobActions.keepTime(j.id); toast("Agreed time kept"); }}>Keep {fmt(j.scheduled)} · ask again</Btn><Btn variant="primary" onClick={() => { jobActions.forwardPartner(j.id, "09-25 12:00"); toast("Sent to the client for approval"); }}>Send to client for approval</Btn></div>
-          <p className="mt-2 text-[11px] text-muted">An agreed time never changes without the client’s OK. The offer stays reserved for {j.contractor} while the client decides.</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">An agreed time never changes without the client’s OK. The offer stays reserved for {j.contractor} while the client decides.</p>
         </Card>
       )}
 
       {j.status === "submitted" && (
         <Card title="Work report · version 1" sub={`Submitted by ${j.technician}`}>
           <SummaryList items={[["Filter cleaned", "Normal"], ["Drain line", "Normal"], ["Refrigerant pressure", "Normal · 412 kPa"], ["Airflow", "Needs attention · reduced on Low"]]} />
-          {j.delivery === "contractor" ? <p className="mt-2 text-xs text-muted">Outsourced job — the contractor reviews first; HQ reviews only on escalation.</p> : <>
+          {j.delivery === "contractor" ? <p className="mt-2 text-xs text-muted-foreground">Outsourced job — the contractor reviews first; HQ reviews only on escalation.</p> : <>
             <p className="mt-2 text-xs text-ok">You did not contribute to this report, so you can review it (self-approval is rejected).</p>
             <div className="mt-3 flex flex-wrap gap-2"><Btn variant="primary" onClick={() => toast("Report accepted — job completed")}>Accept report</Btn><Btn onClick={() => open({ kind: "reason", what: "rework" })}>Return for rework…</Btn></div>
           </>}
@@ -190,7 +190,7 @@ function JobDetail({ j, open }: { j: Job; open: (m: { kind: "book"; slot: Slot }
       <Card title="History"><Timeline items={j.history.slice(-6).map((h) => ({ time: h.at, title: h.text }))} /></Card>
       <Card title="Costs" action={<Btn size="sm" onClick={() => toast("Cost line added")}><Icon name="add" /> Add cost line</Btn>}>
         <SummaryList items={[["Estimate", "Labour 80.00 MYR · Parts 25.00 MYR"], ["Actual", "80.00 MYR + 6.20 USD"]]} />
-        <p className="mt-1 text-[11px] text-muted">Totals are shown per currency — never converted.</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">Totals are shown per currency — never converted.</p>
       </Card>
     </div>
   );
@@ -202,7 +202,7 @@ function BookModal({ j, slot, onClose }: { j: Job; slot: Slot; onClose: () => vo
   const [d, setD] = useState<"internal" | "contractor">(f.fits === "both" || f.fits === "internal" ? "internal" : "contractor");
   return (
     <Modal open onClose={onClose} title={`Book ${j.id}`} footer={<><Btn onClick={onClose}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={() => { jobActions.book(j.id, slot, d, d === "internal" ? "tech-internal-a" : "contractor-a"); toast(d === "internal" ? "Assigned — technician notified" : "Offer sent to contractor-a"); onClose(); }}>{d === "internal" ? "Assign" : "Send offer"}</Btn></>}>
-      <p className="text-xs text-muted">{j.type} · {j.unit} · {j.customer} · {j.origin === "plan" ? "Periodic plan" : "Client request"}</p>
+      <p className="text-xs text-muted-foreground">{j.type} · {j.unit} · {j.customer} · {j.origin === "plan" ? "Periodic plan" : "Client request"}</p>
       <Field label="Visit time · from the client" hint="Cannot be edited here. Need another time? Close and use “Propose another time…” — the client must accept it."><div className="rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] font-semibold"><Icon name="locked" /> {longDate(slot)}</div></Field>
       <Field label="Who does the work" hint={f.fits === "contractor" ? "No qualified HQ technician is free at this time — offer to a contractor." : undefined}><Choice value={d} onChange={setD} options={[...(f.fits === "contractor" ? [] : [{ id: "internal" as const, label: "Assign internally" }]), { id: "contractor" as const, label: "Offer to contractor" }]} /></Field>
       {d === "internal" ? (
@@ -229,7 +229,7 @@ function ProposeModal({ j, onClose }: { j: Job; onClose: () => void }) {
   const pre = j.preferred.some((s) => s.date === date && s.win === win);
   return (
     <Modal open onClose={onClose} title="Propose another time to the client" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!msg.trim() || pre) return; jobActions.propose(j.id, { date, win }, who, msg.trim(), "09-24 18:00"); toast("Proposal sent — waiting for the client"); onClose(); }}>Send proposal</Btn></>}>
-      <p className="text-xs text-muted">{j.id} · {j.customer} · {j.unit}</p>
+      <p className="text-xs text-muted-foreground">{j.id} · {j.customer} · {j.unit}</p>
       <div className="rounded-xl border-2 border-primary bg-primary-soft/50 p-3">
         <div className="mb-2 flex items-center justify-between"><b className="text-[13px] text-primary">Option A</b><Badge tone="ok">Fits · capacity held</Badge></div>
         <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>
@@ -257,7 +257,7 @@ function NewJobModal({ onClose, onDone }: { onClose: () => void; onDone: (id: st
       <Field label="Customer · unit"><Select><option>customer-a · Bedroom AC (unit-online-rto)</option></Select></Field>
       <Field label="Symptom / scope (10+ characters)" error={tried && sym.trim().length < 10 ? "Enter at least 10 characters" : undefined}><Textarea value={sym} onChange={(e) => setSym(e.target.value)} placeholder="Customer called: unit leaks water at night." /></Field>
       <PreferredSlotsInput value={slots} onChange={setSlots} error={err} label="Customer’s preferred times (asked on the phone)" hint="Same rule as client requests: book one of these, or propose another time for the customer to accept." />
-      <p className="text-[11px] text-muted">Periodic visits are created from Plans, not here.</p>
+      <p className="text-[11px] text-muted-foreground">Periodic visits are created from Plans, not here.</p>
     </Modal>
   );
 }
@@ -270,7 +270,7 @@ function ClassifyModal({ j, onClose }: { j: Job; onClose: () => void }) {
   const bad = !r.trim() || r.length > 1000;
   return (
     <Modal open onClose={onClose} title="Classify follow-up request" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (bad) return; const e = jobActions.classifyFollowUp(j.id, cls, r); if (e) { toast(e, "warn"); return; } toast(cls === "rework" ? "Classified as rework (free) — book the client’s preferred visit" : "Classified as a new request — book it like any client request"); onClose(); }}>Classify</Btn></>}>
-      <p className="text-xs text-muted">{j.id} · {j.customer} · {j.unit} — follow-up of {j.followUpOf}</p>
+      <p className="text-xs text-muted-foreground">{j.id} · {j.customer} · {j.unit} — follow-up of {j.followUpOf}</p>
       <Field label="Classification · required"><Choice value={cls} onChange={setCls} options={[{ id: "rework", label: "Rework (free)" }, { id: "new_request", label: "New request" }]} /></Field>
       <Field label="Reason · required (1–1000 characters)" error={tried && bad ? "A reason is required (1–1000 characters)" : undefined}><Textarea value={r} onChange={(e) => setR(e.target.value)} placeholder={`Drain pan still overflowing — same leak as ${j.followUpOf}.`} /></Field>
       <Banner>Set once — cannot be changed later. The job stays “Requested” and is booked like any client request (IR113); the client sees “Rework (free)” or “New request” instead of “Under HQ review”.</Banner>
@@ -303,8 +303,8 @@ export function Contractors() {
   return (
     <div className="split-rev">
       <Card title="Contractors" action={<Btn size="sm" onClick={() => toast("Add contractor (demo)")}><Icon name="add" /> Add contractor</Btn>} className="self-start">
-        <div className="flex flex-col gap-2">{list.map((c) => <ListRow key={c.id} selected={sel.id === c.id} onClick={() => setSel(c)}><div className="min-w-0 flex-1"><b className="text-[13px]">{c.id}</b><div className="text-[11px] text-muted">{c.area}</div></div><Badge tone={c.st === "Active" ? "ok" : "crit"}>{c.st}</Badge></ListRow>)}</div>
-        <p className="mt-2 text-[11px] text-muted">Contractor companies are partners, not users — their staff accounts are managed in Access & roles.</p>
+        <div className="flex flex-col gap-2">{list.map((c) => <ListRow key={c.id} selected={sel.id === c.id} onClick={() => setSel(c)}><div className="min-w-0 flex-1"><b className="text-[13px]">{c.id}</b><div className="text-[11px] text-muted-foreground">{c.area}</div></div><Badge tone={c.st === "Active" ? "ok" : "crit"}>{c.st}</Badge></ListRow>)}</div>
+        <p className="mt-2 text-[11px] text-muted-foreground">Contractor companies are partners, not users — their staff accounts are managed in Access & roles.</p>
       </Card>
       <div className="flex min-w-0 flex-col gap-4">
         <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}>
@@ -335,9 +335,9 @@ export function Sla() {
       </div>
       <Card title="Customers" action={<span className="flex gap-2"><Btn size="sm">Edit SLA targets</Btn><Btn size="sm">Export CSV</Btn></span>}>
         <DataTable rowKey={(r) => r.c} rows={[{ c: "customer-a", sub: "Home A, Office A · 5 units", jobs: 18, resp: "95 %", arr: "97 %", ftf: "88 %", rate: "4.6", od: 0, st: "On track" }, { c: "customer-b", sub: "2 properties · 9 units", jobs: "—", resp: "89 %", arr: "92 %", ftf: "78 %", rate: "4.1", od: 1, st: "At risk" }]} cols={[
-          { key: "c", label: "Customer", render: (r) => <div><b>{r.c}</b><div className="text-[11px] text-muted">{r.sub}</div></div> }, { key: "j", label: "Jobs", render: (r) => r.jobs }, { key: "r", label: "Response ≤ 4 h", render: (r) => r.resp }, { key: "a", label: "Arrival", render: (r) => r.arr, hideBelow: "sm" }, { key: "f", label: "First-time fix", render: (r) => r.ftf, hideBelow: "sm" }, { key: "ra", label: "Rating", render: (r) => r.rate, hideBelow: "sm" }, { key: "o", label: "Overdue", render: (r) => (r.od ? <Badge tone="crit">{r.od}</Badge> : "0") }, { key: "s", label: "Status", render: (r) => <Badge tone={r.st === "On track" ? "ok" : "warn"}>{r.st}</Badge> },
+          { key: "c", label: "Customer", render: (r) => <div><b>{r.c}</b><div className="text-[11px] text-muted-foreground">{r.sub}</div></div> }, { key: "j", label: "Jobs", render: (r) => r.jobs }, { key: "r", label: "Response ≤ 4 h", render: (r) => r.resp }, { key: "a", label: "Arrival", render: (r) => r.arr, hideBelow: "sm" }, { key: "f", label: "First-time fix", render: (r) => r.ftf, hideBelow: "sm" }, { key: "ra", label: "Rating", render: (r) => r.rate, hideBelow: "sm" }, { key: "o", label: "Overdue", render: (r) => (r.od ? <Badge tone="crit">{r.od}</Badge> : "0") }, { key: "s", label: "Status", render: (r) => <Badge tone={r.st === "On track" ? "ok" : "warn"}>{r.st}</Badge> },
         ]} />
-        <p className="mt-2 text-[11px] text-muted">Response = request → offer accepted. Arrival = technician check-in inside the work window. First-time fix = report accepted without rework and no repeat job on the unit within 30 days.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Response = request → offer accepted. Arrival = technician check-in inside the work window. First-time fix = report accepted without rework and no repeat job on the unit within 30 days.</p>
       </Card>
       <Card title="Recent breaches">
         <DataTable rowKey={(r) => r.j} rows={[{ j: "job-a11", d: "customer-b · offer re-sent, response 6 h 10 min (target 4 h)", k: "Response" }, { j: "job-p07", d: "customer-a · report returned twice → not first-time fix", k: "First-time fix" }, { j: "job-p12", d: "customer-b · check-in 13:40, window 13:00–17:00", k: "OK" }]} cols={[

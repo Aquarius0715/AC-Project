@@ -73,29 +73,29 @@ export function AccessDemo() {
       <div className="split-rev">
         <Card title="Users" action={<Btn size="sm" variant="primary" onClick={() => pick("new")}><Icon name="add" /> New user</Btn>} sub={`${users.length} · members.list · identity.write`} className="self-start">
           <div className="mb-2"><Search placeholder="Search name, email, organization…" value={q} onChange={setQ} /></div>
-          <div className="flex flex-col gap-1.5">{list.map((u) => <ListRow key={u.id} selected={sel !== "new" && sel.id === u.id} onClick={() => pick(u)}><div className="min-w-0"><b className="text-[13px]">{u.id}</b><div className="truncate text-[11px] text-muted">{u.role}</div></div></ListRow>)}</div>
-          <p className="mt-3 text-[11px] text-muted">Client accounts are not listed here — they are managed per customer in Customers & units › Users.</p>
+          <div className="flex flex-col gap-1.5">{list.map((u) => <ListRow key={u.id} selected={sel !== "new" && sel.id === u.id} onClick={() => pick(u)}><div className="min-w-0"><b className="text-[13px]">{u.id}</b><div className="truncate text-[11px] text-muted-foreground">{u.role}</div></div></ListRow>)}</div>
+          <p className="mt-3 text-[11px] text-muted-foreground">Client accounts are not listed here — they are managed per customer in Customers & units › Users.</p>
         </Card>
         <Card title={cur ? cur.id : "New user"} sub={cur ? `${cur.email} · scopeVersion 1 · last changed 2026-09-02 by hq-operator` : "Identity & role"}>
           <div className="flex flex-col gap-5">
             <section>
               <h3 className="mb-2 text-[13px] font-bold">Identity & role</h3>
-              <p className="mb-2 text-xs text-muted">Choosing a role only pre-checks its typical permissions; every permission below stays editable.</p>
+              <p className="mb-2 text-xs text-muted-foreground">Choosing a role only pre-checks its typical permissions; every permission below stays editable.</p>
               <div className="grid-fluid" style={{ ["--min"as string]: "220px" }}>
                 <Field label="Organization"><Select defaultValue={cur?.org}><option>HQ (tenant)</option><option>contractor-a</option></Select></Field>
                 <Field label="Person (email)"><Input defaultValue={cur?.email ?? ""} placeholder="name@example.com" /></Field>
               </div>
-              <div className="mt-3"><div className="mb-1 text-xs font-semibold">Role</div><Choice value={role} onChange={choose} options={[{ id: "admin", label: "Admin" }, { id: "contractor", label: "Contractor" }, { id: "technician", label: "Technician" }]} /><p className="mt-1 text-[11px] text-muted">Client role is not offered here (Customers & units › Users).</p></div>
+              <div className="mt-3"><div className="mb-1 text-xs font-semibold">Role</div><Choice value={role} onChange={choose} options={[{ id: "admin", label: "Admin" }, { id: "contractor", label: "Contractor" }, { id: "technician", label: "Technician" }]} /><p className="mt-1 text-[11px] text-muted-foreground">Client role is not offered here (Customers & units › Users).</p></div>
             </section>
-            <section><h3 className="mb-1 text-[13px] font-bold">Scope</h3><p className="text-xs text-muted">Admins act on every customer of the tenant. <Badge tone="primary">All customers (HQ tenant)</Badge></p></section>
+            <section><h3 className="mb-1 text-[13px] font-bold">Scope</h3><p className="text-xs text-muted-foreground">Admins act on every customer of the tenant. <Badge tone="primary">All customers (HQ tenant)</Badge></p></section>
             <section>
               <h3 className="mb-2 text-[13px] font-bold">Valid period</h3>
               <div className="grid-fluid" style={{ ["--min"as string]: "200px" }}><Field label="Valid from"><Input defaultValue="2026-01-05 09:00" /></Field><Field label="Valid until" hint="Optional for HQ and contractors. Revoking = setting “Valid until” to now."><Input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></Field></div>
             </section>
             <section>
               <h3 className="mb-2 text-[13px] font-bold">Permissions · {checked.length} of {total}</h3>
-              <div className="scroll-x"><table className="w-full min-w-[560px] text-left text-[13px]"><thead className="text-[11px] uppercase text-muted"><tr><th className="py-1.5 pr-3">Resource</th><th className="pr-3">Read</th><th className="pr-3">Write</th><th>Actions</th></tr></thead><tbody>{rows.map((r) => <tr key={r.res} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{r.res}</td><td className="pr-3">{r.read ? <Check label={<span className="font-mono text-xs">{r.read}</span>} checked={has(r.read)} disabled={has(r.write)} onChange={(v) => set(r.read!, v)} /> : <span className="text-muted">—</span>}</td><td className="pr-3">{r.write ? <Check label={<span className="font-mono text-xs">{r.write}</span>} checked={has(r.write)} onChange={(v) => setWrite(r, v)} /> : <span className="text-muted">—</span>}</td><td><div className="flex flex-wrap gap-x-3 gap-y-1">{(r.actions ?? []).map((a) => <Check key={a} label={<span className="font-mono text-xs">{a}</span>} checked={has(a)} onChange={(v) => set(a, v)} />)}{!r.actions && <span className="text-muted">—</span>}</div></td></tr>)}</tbody></table></div>
-              <p className="mt-2 text-[11px] text-muted">Write includes Read (Read is locked on while Write is on). Actions are independent of Read / Write.</p>
+              <div className="scroll-x"><table className="w-full min-w-[560px] text-left text-[13px]"><thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1.5 pr-3">Resource</th><th className="pr-3">Read</th><th className="pr-3">Write</th><th>Actions</th></tr></thead><tbody>{rows.map((r) => <tr key={r.res} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{r.res}</td><td className="pr-3">{r.read ? <Check label={<span className="font-mono text-xs">{r.read}</span>} checked={has(r.read)} disabled={has(r.write)} onChange={(v) => set(r.read!, v)} /> : <span className="text-muted-foreground">—</span>}</td><td className="pr-3">{r.write ? <Check label={<span className="font-mono text-xs">{r.write}</span>} checked={has(r.write)} onChange={(v) => setWrite(r, v)} /> : <span className="text-muted-foreground">—</span>}</td><td><div className="flex flex-wrap gap-x-3 gap-y-1">{(r.actions ?? []).map((a) => <Check key={a} label={<span className="font-mono text-xs">{a}</span>} checked={has(a)} onChange={(v) => set(a, v)} />)}{!r.actions && <span className="text-muted-foreground">—</span>}</div></td></tr>)}</tbody></table></div>
+              <p className="mt-2 text-[11px] text-muted-foreground">Write includes Read (Read is locked on while Write is on). Actions are independent of Read / Write.</p>
             </section>
             <Field label="Change reason · required" hint="1–1000 characters. Stored in the audit log."><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
             {msg && <Banner tone={msg.t}>{msg.m}</Banner>}

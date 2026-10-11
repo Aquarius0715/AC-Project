@@ -27,9 +27,9 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
     <tr key={r.unitId} className="border-t border-line">
       <td className={cx("px-3 py-2.5 align-middle", inner && "pl-8")}>
         <b>{r.unit}</b>
-        <div className="text-[11px] text-muted">{r.place ? `${r.place} · ` : ""}{r.last}{r.jobId && <> (<Link className="text-primary hover:underline" href={`/customer/maintenance?jobId=${r.jobId}`}>{r.jobId.slice(0, 8)}</Link>)</>}</div>
+        <div className="text-[11px] text-muted-foreground">{r.place ? `${r.place} · ` : ""}{r.last}{r.jobId && <> (<Link className="text-primary hover:underline" href={`/customer/maintenance?jobId=${r.jobId}`}>{r.jobId.slice(0, 8)}</Link>)</>}</div>
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5">{r.run}{r.runNote && <div className="text-[11px] text-muted">{r.runNote}</div>}</td>
+      <td className="whitespace-nowrap px-3 py-2.5">{r.run}{r.runNote && <div className="text-[11px] text-muted-foreground">{r.runNote}</div>}</td>
       <td className="px-3 py-2.5 max-sm:hidden"><Progress pct={r.pct} tone={filterStatus[r.state].bar} text={r.progress} /></td>
       <td className="px-3 py-2.5"><Badge tone={filterStatus[r.state].badge}>{t(filterStatus[r.state].label)}</Badge></td>
       <td className="px-3 py-2.5">
@@ -45,7 +45,7 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
     return (
       <Fragment key={g.key}>
         <tr className="border-t border-line bg-surface2/40">
-          <td className="px-3 py-2.5"><b>{g.title}</b><div className="text-[11px] text-muted">{g.place}</div></td>
+          <td className="px-3 py-2.5"><b>{g.title}</b><div className="text-[11px] text-muted-foreground">{g.place}</div></td>
           <td className="whitespace-nowrap px-3 py-2.5">{g.run}</td>
           <td className="px-3 py-2.5 max-sm:hidden"><Progress pct={g.pct} tone={g.badge.tone === "crit" ? "crit" : g.badge.tone === "warn" ? "warn" : "primary"} text={g.progress} /></td>
           <td className="px-3 py-2.5"><Badge tone={g.badge.tone}>{g.badge.label}</Badge></td>
@@ -63,18 +63,18 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
         <div className="scroll-x rounded-xl border border-line">
           <table className="w-full border-collapse text-left text-[13px]">
             <thead>
-              <tr className="bg-surface2 text-[11px] uppercase tracking-wide text-muted">
+              <tr className="bg-surface2 text-[11px] uppercase tracking-wide text-muted-foreground">
                 <th className="px-3 py-2 font-semibold">AC</th><th className="px-3 py-2 font-semibold">{t("Run time")}</th><th className="px-3 py-2 font-semibold max-sm:hidden">{t("Progress")}</th>
                 <th className="px-3 py-2 font-semibold">{t("Status")}</th><th className="px-3 py-2"><span className="sr-only">{t("Actions")}</span></th>
               </tr>
             </thead>
             <tbody>
               {f.lines.map((l) => (l.kind === "unit" ? unitRow(l.row) : groupRow(l.group)))}
-              {f.lines.length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-center text-muted">{t("No ACs in your account yet.")}</td></tr>}
+              {f.lines.length === 0 && <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">{t("No ACs in your account yet.")}</td></tr>}
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-[11px] text-muted">{t("Run time counts hours the AC was running (from telemetry). “Mark cleaned” is for cleaning you did yourself — it resets the counter and is shown to your technician. A technician visit that cleans the filter resets it too.")}</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">{t("Run time counts hours the AC was running (from telemetry). “Mark cleaned” is for cleaning you did yourself — it resets the counter and is shown to your technician. A technician visit that cleans the filter resets it too.")}</p>
       </Card>
       <Card title={t("Reminders")} sub={t(f.settings.version === 0 ? "Default settings" : "Set by the account owner")} className="self-start">
         <SummaryList items={f.reminders} />
@@ -90,7 +90,7 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
 }
 
 function Progress({ pct, tone, text }: { pct: number | null; tone: "ok" | "warn" | "crit" | "unknown" | "primary" | "muted"; text: string }) {
-  return <div className="w-36"><UtilBar pct={pct} tone={tone} label={text} /><div className="mt-1 text-[11px] text-muted">{text}</div></div>;
+  return <div className="w-36"><UtilBar pct={pct} tone={tone} label={text} /><div className="mt-1 text-[11px] text-muted-foreground">{text}</div></div>;
 }
 
 function ReminderModal({ init, onClose, onFail }: { init: ReminderForm; onClose: (text?: string) => void; onFail: (f: ActionFailure) => void }) {

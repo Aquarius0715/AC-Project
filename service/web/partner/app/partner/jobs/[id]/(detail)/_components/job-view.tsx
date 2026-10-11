@@ -37,7 +37,7 @@ export function JobDetailView({ live }: { live: JobDetailLive }) {
       <Card title={`${h.jobId.slice(0, 8)} · ${typeLabel(h.type, t)}`} action={<Badge tone={h.status === "completed" ? "ok" : "muted"}>{status}</Badge>}>
         <SummaryList items={[[t("Job type"), typeLabel(h.type, t)], [t("Status"), status], [t("Completed"), live.text.completed], [t("Snapshot"), live.text.snapshot]]} />
         <h3 className="mb-1 mt-4 text-[13px] font-semibold">{t("Your company’s decisions")}</h3>
-        {live.text.events.length ? <ul className="flex flex-col gap-1 text-xs">{live.text.events.map((e) => <li key={e.id}><span className="text-muted">{e.at}</span> · {e.text}</li>)}</ul> : <p className="text-xs text-muted">{t("No decision recorded.")}</p>}
+        {live.text.events.length ? <ul className="flex flex-col gap-1 text-xs">{live.text.events.map((e) => <li key={e.id}><span className="text-muted-foreground">{e.at}</span> · {e.text}</li>)}</ul> : <p className="text-xs text-muted-foreground">{t("No decision recorded.")}</p>}
       </Card>
     </Page>
   );
@@ -45,20 +45,20 @@ export function JobDetailView({ live }: { live: JobDetailLive }) {
 
 function Crumb({ text }: { text: string }) {
   const t = useT();
-  return <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Jobs")}</Link> › <b className="text-ink">{text}</b></div>;
+  return <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Jobs")}</Link> › <b className="text-ink">{text}</b></div>;
 }
 
 function FitCard({ title, rows, note, footer }: { title: string; rows: FitRow[]; note: string; footer?: React.ReactNode }) {
   const t = useT();
   return (
     <Card title={title} action={<Link className="text-xs font-semibold text-primary" href="/partner/team">{t("Team & capacity")} <Icon name="arrowRight" /></Link>}>
-      <p className="mb-2 text-[11px] text-muted">{note}</p>
-      {rows.length === 0 && <p className="text-[13px] text-muted">{t("No technicians in your company yet.")}</p>}
+      <p className="mb-2 text-[11px] text-muted-foreground">{note}</p>
+      {rows.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet.")}</p>}
       {rows.map((r) => (
         <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 first:border-0">
-          <span className="min-w-0"><b className="text-[13px]">{r.name}</b><span className="block text-[11px] text-muted">{r.sub}</span></span>
+          <span className="min-w-0"><b className="text-[13px]">{r.name}</b><span className="block text-[11px] text-muted-foreground">{r.sub}</span></span>
           <span className="flex items-center gap-1.5">
-            {r.days.length > 1 && r.days.map((d, i) => <span key={i} className={`rounded-md px-1.5 py-0.5 text-center text-[10px] leading-tight ${d.free ? "bg-ok/15 text-ok" : "bg-surface2 text-muted"}`}>{d.label}<br />{d.text}</span>)}
+            {r.days.length > 1 && r.days.map((d, i) => <span key={i} className={`rounded-md px-1.5 py-0.5 text-center text-[10px] leading-tight ${d.free ? "bg-ok/15 text-ok" : "bg-surface2 text-muted-foreground"}`}>{d.label}<br />{d.text}</span>)}
             <Badge tone={r.badge.tone}>{r.badge.text}</Badge>
           </span>
         </div>
@@ -121,9 +121,9 @@ function OfferView({ live }: { live: Extract<JobDetailLive, { kind: "offer" }> }
       <FitCard title={t("Can your team take it? — visit {slot}", { slot: x.visit })} rows={live.fits}
         note={t("Own-company technicians holding {quals}. Free hours per day — no customer data is shown before acceptance.", { quals: quals.join(", ") || t("the required qualifications") })}
         footer={<div className="mt-2 grid grid-cols-3 gap-2 rounded-xl bg-surface2 p-3 text-[11px]">
-          <span><span className="block uppercase text-muted">{t("Offered")}</span>{t("{time} by HQ", { time: x.offered })}</span>
-          <span><span className="block uppercase text-muted">{t("Offer ID")}</span>{t("{id} ({nth} offer)", { id: j.offerId.slice(0, 8), nth: x.nth })}</span>
-          <span><span className="block uppercase text-muted">{t("Open offers")}</span>{t("1 of {n} · answer within {left}", { n: x.offers, left: x.left })}</span>
+          <span><span className="block uppercase text-muted-foreground">{t("Offered")}</span>{t("{time} by HQ", { time: x.offered })}</span>
+          <span><span className="block uppercase text-muted-foreground">{t("Offer ID")}</span>{t("{id} ({nth} offer)", { id: j.offerId.slice(0, 8), nth: x.nth })}</span>
+          <span><span className="block uppercase text-muted-foreground">{t("Open offers")}</span>{t("1 of {n} · answer within {left}", { n: x.offers, left: x.left })}</span>
         </div>} />
       {modal === "decline" && (
         <Modal open onClose={() => setModal(null)} title={t("Decline offer {id}?", { id: short })} footer={<><Btn onClick={() => setModal(null)}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={() => run(() => declineOffer(j.jobId, j.offerId, j.jobVersion, reason.trim()), t("Offer declined"), () => { setModal(null); setDeclined(true); }, (f) => { setModal(null); failed(f); })}>{t("Confirm decline")}</Btn></>}>
@@ -148,7 +148,7 @@ function ProposeModal({ j, x, technicians, onClose, onSend, pending }: { j: ApiO
   const order = !!startAt && !!endAt && startAt < endAt;
   return (
     <Modal open onClose={onClose} title={t("Propose another time")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!reason.trim() || !order || !tech) return; onSend({ startAt, endAt }, tech, reason.trim()); }}>{t("Send to HQ")}</Btn></>}>
-      <p className="text-xs text-muted">{t("{id} · agreed with the client: {slot} · times in {zone}", { id: j.jobId.slice(0, 8), slot: x.visit, zone: x.propose.zone })}</p>
+      <p className="text-xs text-muted-foreground">{t("{id} · agreed with the client: {slot} · times in {zone}", { id: j.jobId.slice(0, 8), slot: x.visit, zone: x.propose.zone })}</p>
       <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
         <Field label={t("Date")}><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
         <Field label={t("From")}><Input type="time" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
@@ -214,7 +214,7 @@ function DetailView({ live }: { live: Extract<JobDetailLive, { kind: "detail" }>
                 </div>
                 {live.alerts.map((a) => <div key={a.id} className="mt-2"><Banner tone={a.severity === "critical" ? "crit" : "warn"}>{t("{alert} — raised {time} · linked to this job. Completing the job does not resolve the alert.", { alert: alertTitle(a, t), time: x.raised[a.id] ?? "" })}</Banner></div>)}
               </>
-            ) : <p className="text-[13px] text-muted">{t("The unit is readable only inside the delegation period.")}</p>}
+            ) : <p className="text-[13px] text-muted-foreground">{t("The unit is readable only inside the delegation period.")}</p>}
           </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
@@ -222,16 +222,16 @@ function DetailView({ live }: { live: Extract<JobDetailLive, { kind: "detail" }>
             <ol className="flex flex-col gap-2">
               {x.steps.map((s, i) => (
                 <li key={s.label} className="flex items-start gap-2 text-xs">
-                  <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${s.state === "done" ? "bg-primary text-white" : s.state === "current" ? "border-2 border-primary text-primary" : "border border-line text-muted"}`}>{s.state === "done" ? <Icon name="check" /> : i + 1}</span>
-                  <span><b className={s.state === "todo" ? "text-muted" : s.state === "current" ? "text-primary" : ""}>{s.label}</b><span className="block text-[11px] text-muted">{s.atText ?? (s.state === "todo" ? t("next") : "")} · {s.sub}</span></span>
+                  <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold ${s.state === "done" ? "bg-primary text-white" : s.state === "current" ? "border-2 border-primary text-primary" : "border border-line text-muted-foreground"}`}>{s.state === "done" ? <Icon name="check" /> : i + 1}</span>
+                  <span><b className={s.state === "todo" ? "text-muted-foreground" : s.state === "current" ? "text-primary" : ""}>{s.label}</b><span className="block text-[11px] text-muted-foreground">{s.atText ?? (s.state === "todo" ? t("next") : "")} · {s.sub}</span></span>
                 </li>
               ))}
             </ol>
-            <p className="mt-2 text-[11px] text-muted">{t("Live unit values are visible only within the delegation period. After it ends this page shows a minimal history snapshot.")}</p>
-            {settled && x.delegation && <p className="mt-2 text-[11px] text-muted">{x.delegation.left}</p>}
+            <p className="mt-2 text-[11px] text-muted-foreground">{t("Live unit values are visible only within the delegation period. After it ends this page shows a minimal history snapshot.")}</p>
+            {settled && x.delegation && <p className="mt-2 text-[11px] text-muted-foreground">{x.delegation.left}</p>}
           </Card>
           {!settled && <FitCard title={t("Who can take it")} rows={live.fits} note={t("Own-company technicians: qualification for the unit’s scope and free hours from the visit day (members.capacity).")}
-            footer={j.offer && x.delegation && <p className={`mt-2 text-[11px] ${!j.assignment || Date.parse(j.offer.accessValidUntil) - now < 2 * 86_400_000 ? "text-crit" : "text-muted"}`}>{j.assignment ? x.delegation.left : x.delegation.toSchedule}</p>} />}
+            footer={j.offer && x.delegation && <p className={`mt-2 text-[11px] ${!j.assignment || Date.parse(j.offer.accessValidUntil) - now < 2 * 86_400_000 ? "text-crit" : "text-muted-foreground"}`}>{j.assignment ? x.delegation.left : x.delegation.toSchedule}</p>} />}
         </div>
       </div>
     </Page>

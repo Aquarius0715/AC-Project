@@ -11,7 +11,7 @@ function Row({ title, sub, checked, disabled, onChange }: { title: string; sub: 
   return (
     <label className="flex items-start gap-2.5 border-t border-line py-2 text-[13px] first:border-0">
       <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-[#005bea]" checked={checked} disabled={disabled} onChange={(e) => onChange?.(e.target.checked)} />
-      <span className="min-w-0"><b className="block font-semibold">{title}</b><span className="block text-[11px] text-muted">{sub}</span></span>
+      <span className="min-w-0"><b className="block font-semibold">{title}</b><span className="block text-[11px] text-muted-foreground">{sub}</span></span>
     </label>
   );
 }
@@ -25,10 +25,10 @@ export function EvidencePicker({ rows, policyless, picked, onChange, loading, er
   return (
     <fieldset className="flex min-w-0 flex-col rounded-xl border border-line px-3 pb-1 pt-2">
       <legend className="px-1 text-xs font-semibold">{h.title}</legend>
-      <p className="mb-1 text-[11px] text-muted">{h.sub}</p>
-      {loading ? <p className="py-2 text-xs text-muted">{t("Loading the evidence…")}</p> : (
+      <p className="mb-1 text-[11px] text-muted-foreground">{h.sub}</p>
+      {loading ? <p className="py-2 text-xs text-muted-foreground">{t("Loading the evidence…")}</p> : (
         <div className="flex flex-col">
-          {later.length ? later.map(row) : <p className="py-2 text-xs text-muted">{t("No remeasurement since detection yet — remeasure the unit or record an inspection.")}</p>}
+          {later.length ? later.map(row) : <p className="py-2 text-xs text-muted-foreground">{t("No remeasurement since detection yet — remeasure the unit or record an inspection.")}</p>}
           {attached.length ? attached.map(row) : <Row title={t("Evidence attached to this alert")} sub={t("none attached")} checked={false} disabled />}
         </div>
       )}

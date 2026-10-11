@@ -69,14 +69,14 @@ export function NotificationsView({ rows }: { rows?: InboxRow[] }) {
       <Card pad={false} className={pending ? "opacity-70" : undefined}>
         <ul className="divide-y divide-line">
           {shown.map((n) => {
-            const body = <><span className={cx("mt-1.5 h-2 w-2 shrink-0 rounded-full", n.read ? "bg-transparent" : "bg-primary")} /><span className="min-w-0 flex-1"><span className={cx("block text-[13px]", !n.read && "font-bold")}>{n.t}</span><span className="block text-xs text-muted">{n.d}</span></span><span className="shrink-0 text-xs text-muted">{n.w}</span></>;
+            const body = <><span className={cx("mt-1.5 h-2 w-2 shrink-0 rounded-full", n.read ? "bg-transparent" : "bg-primary")} /><span className="min-w-0 flex-1"><span className={cx("block text-[13px]", !n.read && "font-bold")}>{n.t}</span><span className="block text-xs text-muted-foreground">{n.d}</span></span><span className="shrink-0 text-xs text-muted-foreground">{n.w}</span></>;
             const cls = "flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-surface2/60";
             return <li key={n.id}>{n.href ? <Link href={n.href} onClick={() => open(n)} className={cls}>{body}</Link> : <button onClick={() => open(n)} className={cls}>{body}</button>}</li>;
           })}
-          {shown.length === 0 && <li className="p-6 text-center text-muted">{t(tab === "unread" ? "No unread notifications" : "No notifications")}</li>}
+          {shown.length === 0 && <li className="p-6 text-center text-muted-foreground">{t(tab === "unread" ? "No unread notifications" : "No notifications")}</li>}
         </ul>
       </Card>
-      <p className="text-xs text-muted">{t("Reading a notification is separate from resolving the linked alert (FR-X07). Maintenance scheduling events (new request, time proposed, accepted/declined, new offer, new assignment) appear here for the role that has to act (IR113).")} {!api && <Badge tone="muted">{t("preview only")}</Badge>}</p>
+      <p className="text-xs text-muted-foreground">{t("Reading a notification is separate from resolving the linked alert (FR-X07). Maintenance scheduling events (new request, time proposed, accepted/declined, new offer, new assignment) appear here for the role that has to act (IR113).")} {!api && <Badge tone="muted">{t("preview only")}</Badge>}</p>
     </Page>
   );
 }

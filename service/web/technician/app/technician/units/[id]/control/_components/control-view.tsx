@@ -36,7 +36,7 @@ export function ControlView({ live }: { live: ControlLive }) {
     const timer = setInterval(() => router.refresh(), 4000);
     return () => clearInterval(timer);
   }, [live.active, router]);
-  const back = <div className="flex flex-wrap items-center gap-2 text-[13px]"><Link href={live.unitHref} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{t("Diagnostic control")}</h1><span className="text-muted">· {live.unit.name}</span></div>;
+  const back = <div className="flex flex-wrap items-center gap-2 text-[13px]"><Link href={live.unitHref} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{t("Diagnostic control")}</h1><span className="text-muted-foreground">· {live.unit.name}</span></div>;
   if (!live.canDiagnose) return <Page>{back}<EmptyState title={t("No diagnostic permission")}>{t("Diagnostic control needs control.diagnose on an assigned job. Ask HQ if you should have it.")}</EmptyState></Page>;
   if (!live.job) return <Page>{back}<EmptyState title={t("Choose the job first")} action={<Link href={live.unitHref} className="text-xs font-semibold text-primary"><Icon name="arrowLeft" /> {t("Unit and its jobs")}</Link>}>{t("Diagnostic commands and test runs belong to a job you are assigned to, inside its work window — open diagnostic control from the unit or the job.")}</EmptyState></Page>;
   const job = live.job;
@@ -101,18 +101,18 @@ export function ControlView({ live }: { live: ControlLive }) {
             </div>
             <div className="mt-3"><Field label={t("Reason (required)")} error={errors.reason}><Textarea value={reason} maxLength={1000} placeholder={t("Why this command is needed for the diagnosis")} onChange={(e) => setReason(e.target.value)} /></Field></div>
             <div className="mt-3 flex justify-end"><Btn variant="primary" disabled={pending || busy || options.length === 0} onClick={() => review("cmd")}>{t("Review & send")}</Btn></div>
-            {latest && <p className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ${latest.badge.tone === "ok" ? "bg-ok-soft text-ok" : latest.badge.tone === "crit" ? "bg-crit-soft text-crit" : "bg-surface2 text-muted"}`}>{latest.title} — {latest.sub}</p>}
+            {latest && <p className={`mt-3 rounded-xl px-3 py-2 text-xs font-semibold ${latest.badge.tone === "ok" ? "bg-ok-soft text-ok" : latest.badge.tone === "crit" ? "bg-crit-soft text-crit" : "bg-surface2 text-muted-foreground"}`}>{latest.title} — {latest.sub}</p>}
           </Card>
-          <Card title={t("Current unit state")} action={<span className="text-xs text-muted">{live.unit.observed}</span>}>
+          <Card title={t("Current unit state")} action={<span className="text-xs text-muted-foreground">{live.unit.observed}</span>}>
             <div className="grid-fluid" style={{ ["--min" as string]: "120px" }}>
-              {live.unit.tiles.map((x) => <div key={x.label} className="rounded-xl bg-surface2 px-3 py-2"><div className="text-[11px] text-muted">{x.label}</div><div className={`text-[15px] font-bold ${x.warn ? "text-crit" : ""}`}>{x.value}</div></div>)}
+              {live.unit.tiles.map((x) => <div key={x.label} className="rounded-xl bg-surface2 px-3 py-2"><div className="text-[11px] text-muted-foreground">{x.label}</div><div className={`text-[15px] font-bold ${x.warn ? "text-crit" : ""}`}>{x.value}</div></div>)}
             </div>
-            <p className="mt-2 text-[11px] text-muted">{live.unit.capabilityText}</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">{live.unit.capabilityText}</p>
           </Card>
           <Card title={t("Command history — this job")} sub={t("Newest first · the device's acknowledgement is the only proof a setting changed")}>
-            {live.history.length === 0 ? <p className="text-[13px] text-muted">{t("No commands for this job yet.")}</p> : live.history.map((h) => (
+            {live.history.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No commands for this job yet.")}</p> : live.history.map((h) => (
               <div key={h.id} className="flex flex-wrap items-start justify-between gap-2 border-t border-line py-2 text-[13px] first:border-0">
-                <div><b>{h.at} · {h.title}</b><div className={`text-xs ${h.badge.tone === "crit" ? "text-crit" : "text-muted"}`}>{h.sub}</div></div>
+                <div><b>{h.at} · {h.title}</b><div className={`text-xs ${h.badge.tone === "crit" ? "text-crit" : "text-muted-foreground"}`}>{h.sub}</div></div>
                 <Badge tone={h.badge.tone}>{h.badge.text}</Badge>
               </div>
             ))}
@@ -127,14 +127,14 @@ export function ControlView({ live }: { live: ControlLive }) {
             <div className="mt-3"><Field label={t("End action")}>{select(end, setEnd, t("End action"))}</Field></div>
             <div className="mt-3"><Field label={t("Reason (required)")} error={errors.trReason}><Textarea value={trReason} maxLength={1000} placeholder={t("What the test run should show")} onChange={(e) => setTrReason(e.target.value)} /></Field></div>
             {live.banner && <div className="mt-3"><Banner tone={live.banner.tone}><b>{live.banner.title}</b><div className="text-xs">{live.banner.text}</div></Banner></div>}
-            {live.run?.state === "end_failed" && <div className="mt-2"><Btn className="w-full" variant="danger" disabled={pending || live.active || !job.inWindow} onClick={retryEnd}>{t("Retry end command")}</Btn>{!job.inWindow && <p className="mt-1 text-[11px] text-muted">{t("Retry not available — no authorization")}</p>}</div>}
-            {live.run?.state === "end_blocked" && <p className="mt-2 text-[11px] text-muted">{t("Retry not available — no authorization")}</p>}
+            {live.run?.state === "end_failed" && <div className="mt-2"><Btn className="w-full" variant="danger" disabled={pending || live.active || !job.inWindow} onClick={retryEnd}>{t("Retry end command")}</Btn>{!job.inWindow && <p className="mt-1 text-[11px] text-muted-foreground">{t("Retry not available — no authorization")}</p>}</div>}
+            {live.run?.state === "end_blocked" && <p className="mt-2 text-[11px] text-muted-foreground">{t("Retry not available — no authorization")}</p>}
             <div className="mt-3"><Btn className="w-full" disabled={pending || busy || options.length === 0} onClick={() => review("run")}>{t(live.run && live.active ? "Start test run (running)" : live.run?.state === "completed" ? "Start new test run" : "Start test run")}</Btn></div>
-            <p className="mt-2 text-[11px] text-muted">{t("1–15 minutes only. Reason required. Cannot start during firmware updates or an unfinished command.")}</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">{t("1–15 minutes only. Reason required. Cannot start during firmware updates or an unfinished command.")}</p>
           </Card>
           <Card title={t("Authorization")}>
             <SummaryList items={[[t("Assignment"), job.id.slice(0, 8)], [t("Window"), <span key="w" className={job.inWindow ? "" : "text-crit"}>{job.window}</span>], [t("Restriction"), live.unit.restriction ?? t("none")], [t("Pending commands"), String(live.unit.pending)]]} />
-            <p className="mt-2 text-[11px] text-muted">{t("Checked again just before each command. When the window ends, no end command can be sent (end_blocked).")}</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">{t("Checked again just before each command. When the window ends, no end command can be sent (end_blocked).")}</p>
           </Card>
         </div>
       </div>
@@ -145,7 +145,7 @@ export function ControlView({ live }: { live: ControlLive }) {
           [t("Action"), confirm === "run" ? t("{start} for {n} min, then {end}", { start: actionWord(actionOf(start), t), n: minutes, end: actionWord(actionOf(end), t) }) : actionCode(actionOf(action))],
           [t("Current (confirmed)"), live.unit.current], [t("Reason"), (confirm === "run" ? trReason : reason).trim()],
         ]} />
-        <p className="text-xs text-muted">{t("Permission, work window, capability and restriction are checked again just before sending. The setting changes only after the device acknowledges the command.")}</p>
+        <p className="text-xs text-muted-foreground">{t("Permission, work window, capability and restriction are checked again just before sending. The setting changes only after the device acknowledges the command.")}</p>
       </Modal>
     </Page>
   );

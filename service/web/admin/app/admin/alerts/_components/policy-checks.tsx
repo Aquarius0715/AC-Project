@@ -11,7 +11,7 @@ import { testPolicy } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
 
 type Unit = { id: string; name: string };
-const TONE = { ok: "text-ok", warn: "text-warn", crit: "text-crit", muted: "text-muted" } as const;
+const TONE = { ok: "text-ok", warn: "text-warn", crit: "text-crit", muted: "text-muted-foreground" } as const;
 
 /** Notification preview (DD-A05 item 7, Figma Admin 38:5 / 268:2, IR348): what one recipient is shown for one of the
  * policy's units — `notifications.preview` of the alert template with the policy's (or rule's) severity, as the
@@ -38,20 +38,20 @@ export function NotificationPreview({ recipients, severity, customerName, unit, 
           </Select>
         )}
       </div>
-      {!unit ? <p className="text-xs text-muted">{t("The preview needs a unit of {customer}, and it has none yet.", { customer: customerName })}</p>
-        : !who ? <p className="text-xs text-muted">{t("Add a recipient to see what they are shown.")}</p>
+      {!unit ? <p className="text-xs text-muted-foreground">{t("The preview needs a unit of {customer}, and it has none yet.", { customer: customerName })}</p>
+        : !who ? <p className="text-xs text-muted-foreground">{t("Add a recipient to see what they are shown.")}</p>
         : (
           <>
-            <p className="mb-2 text-xs text-muted">{t("What {name} sees for {unit} (notifications.preview · in-app).", { name: who.label, unit: unit.name })}</p>
-            {preview.loading ? <p className="text-xs text-muted">{t("Loading the preview…")}</p>
+            <p className="mb-2 text-xs text-muted-foreground">{t("What {name} sees for {unit} (notifications.preview · in-app).", { name: who.label, unit: unit.name })}</p>
+            {preview.loading ? <p className="text-xs text-muted-foreground">{t("Loading the preview…")}</p>
               : preview.error ? <p className="text-xs text-crit">{preview.error.error.messageKey === "errors.recipient_ineligible" ? t("{name} cannot get this notification: they may not see {unit}.", { name: who.label, unit: unit.name }) : t("The preview could not be loaded — try again.")}</p>
               : row && preview.data && (
                 <div className="flex items-start gap-3 rounded-xl border border-line bg-surface2/60 px-3 py-2.5">
                   {preview.data.severity && <SeverityBadge s={preview.data.severity} />}
                   <div className="min-w-0 flex-1 text-[13px]">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2"><b>{row.t}</b><span className="text-[11px] text-muted">{row.w}</span></div>
-                    {row.d && <div className="text-xs text-muted">{row.d}</div>}
-                    <div className="mt-1 text-xs text-muted">{t("Open unit")} <Icon name="arrowRight" /> · {t("Request maintenance")} <Icon name="arrowRight" /></div>
+                    <div className="flex flex-wrap items-baseline justify-between gap-2"><b>{row.t}</b><span className="text-[11px] text-muted-foreground">{row.w}</span></div>
+                    {row.d && <div className="text-xs text-muted-foreground">{row.d}</div>}
+                    <div className="mt-1 text-xs text-muted-foreground">{t("Open unit")} <Icon name="arrowRight" /> · {t("Request maintenance")} <Icon name="arrowRight" /></div>
                   </div>
                 </div>
               )}
@@ -100,9 +100,9 @@ export function DemoTest({ saved, dirty, unit, demo }: { saved: Tested; dirty: b
   return (
     <section>
       <h3 className="mb-1 text-[13px] font-bold">{t("Test with demo data")}</h3>
-      <p className="mb-2 text-xs text-muted">{t("Evaluates the saved policy against a synthetic reading on one of its units (automations.simulate). The reading counts as lasting the policy's duration; nothing is stored.")}</p>
-      {!saved.id ? <p className="text-xs text-muted">{t("Save the policy first: the test evaluates the saved version.")}</p>
-        : !unit ? <p className="text-xs text-muted">{t("Attach the policy to a unit first: the test runs on one of its units.")}</p>
+      <p className="mb-2 text-xs text-muted-foreground">{t("Evaluates the saved policy against a synthetic reading on one of its units (automations.simulate). The reading counts as lasting the policy's duration; nothing is stored.")}</p>
+      {!saved.id ? <p className="text-xs text-muted-foreground">{t("Save the policy first: the test evaluates the saved version.")}</p>
+        : !unit ? <p className="text-xs text-muted-foreground">{t("Attach the policy to a unit first: the test runs on one of its units.")}</p>
         : (
           <>
             {dirty && <p className="mb-1 text-xs text-warn">{t("Unsaved changes are not tested: the saved version is.")}</p>}

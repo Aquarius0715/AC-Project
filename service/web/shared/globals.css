@@ -1,13 +1,96 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 /* Each app builds from its own directory and Tailwind skips node_modules, where @ac/web is linked: scan the shared
    components, screens and libs too, or classes used only there (the app shell grid, for one) are never generated. */
 @source ".";
 
+/* shadcn/ui's dark styles apply only under a .dark ancestor. The product has no dark mode, so an operating system set to
+   dark never restyles a component half-way (Tailwind's default dark variant follows prefers-color-scheme). */
+@custom-variant dark (&:is(.dark *));
+
+/* shadcn/ui theme (DEC-75): the components' semantic colours and radii, mapped below to the palette of the Figma UI
+   Guideline. muted is a surface; grey text is muted-foreground. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: #f8fbff;
+  --foreground: #0d2238;
+  --card: #ffffff;
+  --card-foreground: #0d2238;
+  --popover: #ffffff;
+  --popover-foreground: #0d2238;
+  --primary: #005bea;
+  --primary-foreground: #ffffff;
+  --secondary: #edf6ff;
+  --secondary-foreground: #0d2238;
+  --muted: #edf6ff;
+  --muted-foreground: #5b6e84; /* 4.5:1 or more on every light surface (WCAG 2.2 AA 1.4.3, IR359) */
+  --accent: #e6f0ff;
+  --accent-foreground: #0d2238;
+  --destructive: #b91c1c;
+  --border: #d6e4f5;
+  --input: #d6e4f5;
+  --ring: #005bea;
+  --chart-1: #005bea;
+  --chart-2: #94a3b8;
+  --chart-3: #d97706;
+  --chart-4: #166534;
+  --chart-5: #b91c1c;
+  --radius: 0.625rem; /* 10px, the control radius of the UI Guideline */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0d2238;
+  --sidebar-primary: #005bea;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e6f0ff;
+  --sidebar-accent-foreground: #005bea;
+  --sidebar-border: #d6e4f5;
+  --sidebar-ring: #005bea;
+}
+
+/* The product palette beyond shadcn's semantic colours: status tones and the UI Guideline surfaces. */
 @theme {
-  --color-primary: #005bea;
   --color-primary-soft: #e6f0ff;
   --color-ink: #0d2238;
-  --color-muted: #5b6e84; /* 4.5:1 or more on every light surface (WCAG 2.2 AA 1.4.3, IR359) */
   --color-subtle: #64788e; /* placeholders and chart labels on white: 4.55:1 */
   --color-line: #d6e4f5;
   --color-surface: #ffffff;
@@ -28,7 +111,8 @@
 /* Element defaults sit in the base layer: unlayered rules beat every Tailwind utility, so an unlayered `a { color: inherit }`
    turned `text-primary` / `text-white` on links (tabs, TextLink, LinkBtn) into the body colour. */
 @layer base {
-  html, body { background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans); }
+  * { @apply border-border outline-ring/50; }
+  html, body { background: var(--background); color: var(--foreground); font-family: var(--font-sans); }
   body { font-size: 14px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
   * { box-sizing: border-box; }
   a { color: inherit; text-decoration: none; }

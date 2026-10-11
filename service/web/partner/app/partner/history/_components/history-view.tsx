@@ -43,22 +43,22 @@ function List({ live }: { live: HistoryLive }) {
         {live.rows.length === 0 ? <EmptyState title={t(all ? "No jobs in this view" : "No jobs yet")}>{t("Jobs appear here once your company accepts an offer.")}</EmptyState> : (
           <div className="scroll-x">
             <table className="w-full min-w-[880px] text-[13px]">
-              <thead><tr className="text-left text-[11px] uppercase tracking-wide text-muted"><th className="py-2 font-semibold">{t("Job")}</th><th className="py-2 font-semibold">{t("Technician")}</th><th className="py-2 font-semibold">{t("Last event")}</th><th className="py-2 font-semibold">{t("Status")}</th><th /></tr></thead>
+              <thead><tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground"><th className="py-2 font-semibold">{t("Job")}</th><th className="py-2 font-semibold">{t("Technician")}</th><th className="py-2 font-semibold">{t("Last event")}</th><th className="py-2 font-semibold">{t("Status")}</th><th /></tr></thead>
               <tbody>
                 {live.rows.map((r) => (
                   <tr key={r.id} className="border-t border-line align-top hover:bg-surface2/60">
-                    <td className="py-2.5 pr-3"><Link href={hrefOf(live, r.id)} className="font-semibold text-ink hover:text-primary">{r.short} · {r.title}</Link>{r.origin && <span className="ml-2 align-middle"><OriginBadge origin={r.origin === "periodic_plan" ? "plan" : "request"} /></span>}<span className="block text-[11px] text-muted">{r.sub}</span></td>
-                    <td className="py-2.5 pr-3"><b className={cx("font-semibold", r.tech.tone === "crit" && "text-crit")}>{r.tech.name}</b><span className="block text-[11px] text-muted">{r.tech.sub}</span></td>
-                    <td className="py-2.5 pr-3">{r.last ? <><b className={cx("font-semibold", r.overdue && "text-crit")}>{r.overdue ? t("Work window ended") : r.last.title}</b><span className="block text-[11px] text-muted">{r.last.when}</span></> : <span className="text-muted">—</span>}</td>
+                    <td className="py-2.5 pr-3"><Link href={hrefOf(live, r.id)} className="font-semibold text-ink hover:text-primary">{r.short} · {r.title}</Link>{r.origin && <span className="ml-2 align-middle"><OriginBadge origin={r.origin === "periodic_plan" ? "plan" : "request"} /></span>}<span className="block text-[11px] text-muted-foreground">{r.sub}</span></td>
+                    <td className="py-2.5 pr-3"><b className={cx("font-semibold", r.tech.tone === "crit" && "text-crit")}>{r.tech.name}</b><span className="block text-[11px] text-muted-foreground">{r.tech.sub}</span></td>
+                    <td className="py-2.5 pr-3">{r.last ? <><b className={cx("font-semibold", r.overdue && "text-crit")}>{r.overdue ? t("Work window ended") : r.last.title}</b><span className="block text-[11px] text-muted-foreground">{r.last.when}</span></> : <span className="text-muted-foreground">—</span>}</td>
                     <td className="py-2.5 pr-3"><Badge tone={r.badge.tone}>{r.badge.text}</Badge></td>
-                    <td className="py-2.5 text-right"><Link href={hrefOf(live, r.id)} aria-label={t("Open the history of {id}", { id: r.short })} className="text-muted hover:text-primary"><Icon name="chevronRight" /></Link></td>
+                    <td className="py-2.5 text-right"><Link href={hrefOf(live, r.id)} aria-label={t("Open the history of {id}", { id: r.short })} className="text-muted-foreground hover:text-primary"><Icon name="chevronRight" /></Link></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-        <p className="mt-3 text-[11px] text-muted">{t(live.total > 100 ? "Showing {shown} of {total} (the latest 100) · own company only (FR-P08) · offers appear here after acceptance." : "Showing {shown} of {total} · own company only (FR-P08) · offers appear here after acceptance.", { shown: live.rows.length, total: all })}</p>
+        <p className="mt-3 text-[11px] text-muted-foreground">{t(live.total > 100 ? "Showing {shown} of {total} (the latest 100) · own company only (FR-P08) · offers appear here after acceptance." : "Showing {shown} of {total} · own company only (FR-P08) · offers appear here after acceptance.", { shown: live.rows.length, total: all })}</p>
       </Card>
     </Page>
   );
@@ -85,7 +85,7 @@ function Detail({ live, detail }: { live: HistoryLive; detail: Detail }) {
       <div className="split">
         <Card title={t("Job history — {id}", { id: r.short })} action={<Select aria-label={t("Job")} className="w-auto" value={r.id} onChange={(e) => patch({ jobId: e.target.value })}>{live.options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}</Select>}>
           <div className="grid-fluid rounded-xl border border-line bg-surface2/60 p-3 text-[13px]" style={{ ["--min" as string]: "150px" }}>
-            {([["unit", t("Unit"), r.unit ?? r.title], ["tech", t("Technician"), r.tech.name], ["status", t("Status"), r.badge.text], ["delegation", t("Delegation"), r.delegation]] as const).map(([k, label, v]) => <div key={k}><div className="text-[10px] font-bold uppercase tracking-wide text-muted">{label}</div><b className={cx(k === "status" && r.badge.tone === "ok" && "text-ok", k === "status" && r.badge.tone === "crit" && "text-crit")}>{v}</b></div>)}
+            {([["unit", t("Unit"), r.unit ?? r.title], ["tech", t("Technician"), r.tech.name], ["status", t("Status"), r.badge.text], ["delegation", t("Delegation"), r.delegation]] as const).map(([k, label, v]) => <div key={k}><div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</div><b className={cx(k === "status" && r.badge.tone === "ok" && "text-ok", k === "status" && r.badge.tone === "crit" && "text-crit")}>{v}</b></div>)}
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {([["all", t("All events"), detail.items.length], ["customer", t("Customer-visible"), count("customer")], ["internal", t("Internal"), count("internal")]] as const).map(([id, label, n]) => (
@@ -93,23 +93,23 @@ function Detail({ live, detail }: { live: HistoryLive; detail: Detail }) {
             ))}
           </div>
           <ol className="mt-3 flex flex-col">
-            {items.length === 0 && <li className="py-3 text-[13px] text-muted">{t("No events in this view.")}</li>}
+            {items.length === 0 && <li className="py-3 text-[13px] text-muted-foreground">{t("No events in this view.")}</li>}
             {items.map((e) => (
               <li key={e.id} className="flex items-start gap-3 border-t border-line py-2.5 first:border-0">
                 <span aria-hidden className={cx("grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs", dot[e.tone ?? "none"])}><Icon name={e.tone === "warn" ? "alert" : e.tone === "ok" ? "check" : "dot"} /></span>
-                <span className="min-w-0 flex-1"><b className="block text-[13px]">{e.title}</b><span className="block text-[11px] text-muted">{[e.detail, e.at].filter(Boolean).join(" · ")}</span></span>
+                <span className="min-w-0 flex-1"><b className="block text-[13px]">{e.title}</b><span className="block text-[11px] text-muted-foreground">{[e.detail, e.at].filter(Boolean).join(" · ")}</span></span>
                 <Badge tone={e.badge === "customer" ? "primary" : "muted"}>{t(e.badge)}</Badge>
               </li>
             ))}
           </ol>
-          <p className="mt-2 text-[11px] text-muted">{t("The customer sees every event except internal notes.")}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("The customer sees every event except internal notes.")}</p>
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           <Compose detail={detail} onPreview={(p) => setPreviews((list) => [p, ...list])} />
           <Card title={t("Previews on {id} ({n})", { id: r.short, n: previews.length })}>
-            {previews.length === 0 && <p className="text-[13px] text-muted">{t("No previews yet in this session.")}</p>}
-            {previews.map((p) => <div key={p.id} className="flex items-start justify-between gap-2 border-t border-line py-2 first:border-0"><span><b className="block text-[13px]">{p.title}</b><span className="text-[11px] text-muted">{p.sub}</span></span><Badge tone="primary">{t("preview")}</Badge></div>)}
-            <p className="mt-1 text-[11px] text-muted">{t("deliveryState stays “preview” — nothing is sent in phase 1A, and previews are not stored.")}</p>
+            {previews.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No previews yet in this session.")}</p>}
+            {previews.map((p) => <div key={p.id} className="flex items-start justify-between gap-2 border-t border-line py-2 first:border-0"><span><b className="block text-[13px]">{p.title}</b><span className="text-[11px] text-muted-foreground">{p.sub}</span></span><Badge tone="primary">{t("preview")}</Badge></div>)}
+            <p className="mt-1 text-[11px] text-muted-foreground">{t("deliveryState stays “preview” — nothing is sent in phase 1A, and previews are not stored.")}</p>
           </Card>
         </div>
       </div>
@@ -119,7 +119,7 @@ function Detail({ live, detail }: { live: HistoryLive; detail: Detail }) {
 
 function Crumb({ live, text }: { live: HistoryLive; text: string }) {
   const t = useT();
-  return <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href={hrefOf(live)} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Job history")}</Link> › <b className="text-ink">{text}</b></div>;
+  return <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href={hrefOf(live)} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Job history")}</Link> › <b className="text-ink">{text}</b></div>;
 }
 
 function Compose({ detail, onPreview }: { detail: Extract<Detail, { missing: false }>; onPreview: (p: SessionPreview) => void }) {
@@ -178,7 +178,7 @@ function Compose({ detail, onPreview }: { detail: Extract<Detail, { missing: fal
           <Textarea value={message} disabled={closed} onChange={(e) => setMessage(e.target.value)} placeholder={t("Schedule moved to 2026-09-22 09:00–11:00 due to technician availability.")} />
         </Field>
         <div className="flex gap-2"><Btn disabled={pending || closed} onClick={() => { setMessage(""); setTried(false); setResult(null); }}>{t("Clear")}</Btn><Btn variant="primary" disabled={pending || closed || !chosen} onClick={send}>{mode.add && <Icon name="add" />}{mode.button}</Btn></div>
-        <p className="text-[11px] text-muted">{t("No real sending. Only people involved in this job are offered; free-form external recipients and other jobs’ recipients are rejected. Internal notes stay hidden from customers.")}</p>
+        <p className="text-[11px] text-muted-foreground">{t("No real sending. Only people involved in this job are offered; free-form external recipients and other jobs’ recipients are rejected. Internal notes stay hidden from customers.")}</p>
       </div>
     </Card>
   );

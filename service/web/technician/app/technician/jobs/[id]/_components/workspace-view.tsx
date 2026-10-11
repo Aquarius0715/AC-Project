@@ -130,7 +130,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   const submit = () => withSaved((r) => run(() => submitReport(job.id, job.version, r.version), t("Report v{version} submitted", { version: r.version }), () => setModal(null), failed));
 
   const head = (
-    <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted">
+    <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
       <Link href="/technician" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Overview")}</Link>
       <b className="text-ink">{job.id.slice(0, 8)} · {live.unit?.name ?? t("Unit")} — {statusText[job.status] ? t(statusText[job.status]) : job.status}</b>
       {dirty && <Badge tone="warn">{t("Unsaved changes")}</Badge>}
@@ -140,7 +140,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
   const groups = progress(draft, issues ?? [], t);
   const items = draft.items.filter((i) => i.componentGroup === tab);
   const issueOf = (key: string) => issues?.find((x) => x.key === key)?.text;
-  const readOnlyResult = (r: Result) => { const x = results.find((o) => o.id === r); return x ? <Badge tone={x.tone}>{t(x.label)}</Badge> : <span className="text-xs text-muted">{t("— no result")}</span>; };
+  const readOnlyResult = (r: Result) => { const x = results.find((o) => o.id === r); return x ? <Badge tone={x.tone}>{t(x.label)}</Badge> : <span className="text-xs text-muted-foreground">{t("— no result")}</span>; };
   const versions = versionRows(
     rep ? { version: rep.version, results: draft.items.filter((x) => x.result !== null).length, photos: photos.filter((a) => a.status === "ready").length, savedAt } : null,
     job.reportRefs, live.report?.reviewHistory ?? [], f,
@@ -160,14 +160,14 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
       <div className="mt-1.5 flex flex-col gap-1.5">
         {own.map((m, k) => (
           <div key={k} className="flex flex-wrap items-baseline gap-x-2 rounded-lg bg-primary-soft/60 px-2.5 py-1.5 text-xs">
-            <b>{t("Reading")}</b><span>{t(readingMetrics.find((x) => x.metric === m.metric)?.label ?? m.metric)} · {m.value.trim() || "—"} {metricUnit[m.metric]}</span><span className="text-muted">{t("observed {time}", { time: f.clock(m.observedAt) })}</span>
+            <b>{t("Reading")}</b><span>{t(readingMetrics.find((x) => x.metric === m.metric)?.label ?? m.metric)} · {m.value.trim() || "—"} {metricUnit[m.metric]}</span><span className="text-muted-foreground">{t("observed {time}", { time: f.clock(m.observedAt) })}</span>
           </div>
         ))}
         {ph.linked.length > 0 && (
           <div className="flex flex-wrap gap-1.5">{ph.linked.map((x) => (
             <span key={x.id} className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2 py-0.5 text-xs">
               <Icon name="camera" /> {x.status === "missing" ? x.name : <a href={photoUrl(x)} target="_blank" rel="noreferrer" className="font-semibold text-primary">{x.name}</a>}
-              {editable && <button type="button" aria-label={t("Unlink {photo} from {item}", { photo: x.name, item: name })} className="text-muted hover:text-ink" onClick={() => edit((d) => linkPhoto(d, it.componentKey, x.id, false))}><Icon name="close" /></button>}
+              {editable && <button type="button" aria-label={t("Unlink {photo} from {item}", { photo: x.name, item: name })} className="text-muted-foreground hover:text-ink" onClick={() => edit((d) => linkPhoto(d, it.componentKey, x.id, false))}><Icon name="close" /></button>}
             </span>
           ))}</div>
         )}
@@ -177,7 +177,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
             <Btn size="sm" disabled={ph.free.length === 0} aria-expanded={linking === it.componentKey} onClick={() => setLinking((k) => (k === it.componentKey ? null : it.componentKey))}><Icon name="add" /> {t("Link photo")}</Btn>
           </div>
         )}
-        {actions && !photos.some((x) => x.status === "ready") && <p className="text-[11px] text-muted">{t("Add a photo under Photos first, then link it to this finding.")}</p>}
+        {actions && !photos.some((x) => x.status === "ready") && <p className="text-[11px] text-muted-foreground">{t("Add a photo under Photos first, then link it to this finding.")}</p>}
         {actions && linking === it.componentKey && ph.free.length > 0 && (
           <div role="group" aria-label={t("Report photos to link to {item}", { item: name })} className="flex flex-wrap gap-1.5 rounded-lg border border-line p-2">
             {ph.free.map((x) => <Btn key={x.id} size="sm" variant="ghost" onClick={() => { edit((d) => linkPhoto(d, it.componentKey, x.id, true)); setLinking(null); }}><Icon name="camera" />{x.name}</Btn>)}
@@ -217,20 +217,20 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                     </div>
                     {it.result && it.result !== "normal" && (editable
                       ? <div className="mt-1.5"><Input placeholder={t("Reason (required for {result})", { result: t(results.find((r) => r.id === it.result)?.label ?? "") })} maxLength={1000} value={it.reason} onChange={(e) => edit((d) => ({ ...d, items: d.items.map((x) => (x.componentKey === it.componentKey ? { ...x, reason: e.target.value } : x)) }))} /></div>
-                      : it.reason ? <div className="text-xs text-muted">{t("Reason: {reason}", { reason: it.reason })}</div> : null)}
+                      : it.reason ? <div className="text-xs text-muted-foreground">{t("Reason: {reason}", { reason: it.reason })}</div> : null)}
                     {evidence(it)}
                     {issueOf(it.componentKey) && <p className="mt-1 text-xs text-crit">{issueOf(it.componentKey)}</p>}
                   </li>
                 ))}</ul>
               )}
-              <p className="mt-2 text-[11px] text-muted">{t("Initial result is always empty — normal is never preselected. Attention, not inspected and not applicable need a reason.")}</p>
+              <p className="mt-2 text-[11px] text-muted-foreground">{t("Initial result is always empty — normal is never preselected. Attention, not inspected and not applicable need a reason.")}</p>
             </Card>
             <div className="flex min-w-0 flex-col gap-4">
               <Card title={t("Checklist progress")}>
                 {groups.map((g) => (
-                  <div key={g.group} className="mb-2"><div className="mb-1 flex justify-between text-xs"><b>{g.label}</b><span className="text-muted">{g.done} / {g.total}</span></div><UtilBar pct={g.total ? (g.done / g.total) * 100 : 0} tone={g.issues ? "warn" : "primary"}  label={`${g.label} ${g.done} / ${g.total}`} /></div>
+                  <div key={g.group} className="mb-2"><div className="mb-1 flex justify-between text-xs"><b>{g.label}</b><span className="text-muted-foreground">{g.done} / {g.total}</span></div><UtilBar pct={g.total ? (g.done / g.total) * 100 : 0} tone={g.issues ? "warn" : "primary"}  label={`${g.label} ${g.done} / ${g.total}`} /></div>
                 ))}
-                <p className="text-[11px] text-muted">{issues?.length ? t(issues.length === 1 ? "1 issue blocks submit — see the summary on the right." : "{n} issues block submit — see the summary on the right.", { n: issues.length }) : t("{n} items still empty — each needs a result, or not inspected / not applicable with a reason, before submit.", { n: draft.items.filter((x) => x.result === null).length })}</p>
+                <p className="text-[11px] text-muted-foreground">{issues?.length ? t(issues.length === 1 ? "1 issue blocks submit — see the summary on the right." : "{n} issues block submit — see the summary on the right.", { n: issues.length }) : t("{n} items still empty — each needs a result, or not inspected / not applicable with a reason, before submit.", { n: draft.items.filter((x) => x.result === null).length })}</p>
               </Card>
               <Card title={t("Job & unit")} action={<Link className="text-xs font-semibold text-primary" href={`/technician/units/${job.unitId}?jobId=${job.id}`}>{t("Unit")} <Icon name="arrowRight" /></Link>}>
                 <SummaryList items={[
@@ -251,16 +251,16 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
           <Card title={<Tabs value={view} onChange={setView} tabs={[{ id: "readings", label: t("Readings"), count: draft.readings.length }, { id: "parts", label: t("Parts & refrigerant"), count: draft.parts.length + draft.refrigerant.length }, { id: "time", label: t("Time on site") }]} />}
             action={view === "readings" && editable ? <Btn size="sm" onClick={() => addReading(tab === "outdoor" ? "refrigerant_pipe" : live.components[0]?.key ?? "filter")}><Icon name="add" /> {t("Add reading")}</Btn>
               : view === "parts" && editable ? <span className="flex gap-2"><Btn size="sm" onClick={() => setModal("part")}><Icon name="add" /> {t("Add part")}</Btn><Btn size="sm" onClick={() => setModal("refrigerant")}><Icon name="add" /> {t("Refrigerant")}</Btn></span> : null}>
-            {view === "readings" && (draft.readings.length === 0 ? <p className="text-[13px] text-muted">{t("No readings yet. Record each measurement with its unit and the component it belongs to — an unmeasured value is left empty, never 0.")}</p> : (
+            {view === "readings" && (draft.readings.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No readings yet. Record each measurement with its unit and the component it belongs to — an unmeasured value is left empty, never 0.")}</p> : (
               <div className="scroll-x"><table className="w-full min-w-[560px] text-[13px]">
-                <thead className="text-left text-[11px] uppercase text-muted"><tr><th className="py-1">{t("Metric")}</th><th>{t("Value")}</th><th>{t("Unit")}</th><th>{t("Linked item")}</th><th>{t("Observed")}</th><th /></tr></thead>
+                <thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th className="py-1">{t("Metric")}</th><th>{t("Value")}</th><th>{t("Unit")}</th><th>{t("Linked item")}</th><th>{t("Observed")}</th><th /></tr></thead>
                 <tbody>{draft.readings.map((m, i) => (
                   <tr key={i} className="border-t border-line align-middle">
                     <td className="py-1.5 pr-2">{editable ? <Select aria-label={t("Metric")} value={m.metric} onChange={(e) => edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, metric: e.target.value as Metric } : x)) }))}>{readingMetrics.map((x) => <option key={x.metric} value={x.metric}>{t(x.label)}</option>)}</Select> : t(readingMetrics.find((x) => x.metric === m.metric)?.label ?? m.metric)}</td>
                     <td className="pr-2">{editable ? <Input inputMode="decimal" value={m.value} aria-invalid={m.value.trim() !== "" && !Number.isFinite(Number(m.value))} onChange={(e) => edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, value: e.target.value } : x)) }))} /> : m.value || "—"}</td>
-                    <td className="pr-2 text-muted">{metricUnit[m.metric]}</td>
+                    <td className="pr-2 text-muted-foreground">{metricUnit[m.metric]}</td>
                     <td className="pr-2">{editable ? <Select aria-label={t("Linked item")} value={m.componentKey} onChange={(e) => edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, componentKey: e.target.value } : x)) }))}>{live.components.map((c) => <option key={c.key} value={c.key}>{t(groupLabel[c.group])} › {label(c.key)}</option>)}</Select> : label(m.componentKey)}</td>
-                    <td className="pr-2 text-xs text-muted">{f.clock(m.observedAt)}</td>
+                    <td className="pr-2 text-xs text-muted-foreground">{f.clock(m.observedAt)}</td>
                     <td>{editable && <button type="button" className="text-xs font-semibold text-primary" onClick={() => edit((d) => ({ ...d, readings: d.readings.filter((_, k) => k !== i) }))}>{t("Remove")}</button>}</td>
                   </tr>
                 ))}</tbody>
@@ -268,9 +268,9 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
             ))}
             {view === "parts" && (
               <div className="flex flex-col gap-3">
-                {draft.parts.length === 0 ? <p className="text-[13px] text-muted">{t("No parts used.")}</p> : (
+                {draft.parts.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No parts used.")}</p> : (
                   <DataTable rowKey={(p) => `${p.name}-${draft.parts.indexOf(p)}`} rows={draft.parts} cols={[
-                    { key: "p", label: t("Part"), render: (p) => <div><b>{p.name}</b><div className="text-[11px] text-muted">{p.catalogCode ?? t("custom")}{p.replacesComponentKey ? ` · ${t("replaces {part}", { part: label(p.replacesComponentKey) })}` : ""}</div></div> },
+                    { key: "p", label: t("Part"), render: (p) => <div><b>{p.name}</b><div className="text-[11px] text-muted-foreground">{p.catalogCode ?? t("custom")}{p.replacesComponentKey ? ` · ${t("replaces {part}", { part: label(p.replacesComponentKey) })}` : ""}</div></div> },
                     { key: "s", label: t("Source"), render: (p) => t(sources.find((x) => x.id === p.source)?.label ?? p.source) }, { key: "q", label: t("Qty"), render: (p) => p.quantity },
                     { key: "l", label: t("Lot / serial"), render: (p) => p.lotSerial ?? "—" },
                     { key: "x", label: "", render: (p) => editable ? <button type="button" className="text-xs font-semibold text-primary" onClick={() => edit((d) => ({ ...d, parts: d.parts.filter((x) => x !== p) }))}>{t("Remove")}</button> : null },
@@ -279,17 +279,17 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                 {draft.refrigerant.map((r, i) => (
                   <div key={i}>
                     <div className="mb-1 flex items-center justify-between"><b className="text-[13px]">{t("Refrigerant ({kind}) — cylinder {id}", { kind: r.refrigerant, id: r.cylinderId })}</b>{editable && <button type="button" className="text-xs font-semibold text-primary" onClick={() => edit((d) => ({ ...d, refrigerant: d.refrigerant.filter((_, k) => k !== i) }))}>{t("Remove")}</button>}</div>
-                    <div className="grid-fluid" style={{ ["--min" as string]: "120px" }}>{[[t("Recovered"), `${r.recoveredKg.toFixed(2)} kg`], [t("Charged"), `${r.chargedKg.toFixed(2)} kg`], [t("Net added"), `${r.chargedKg - r.recoveredKg >= 0 ? "+" : "−"}${Math.abs(r.chargedKg - r.recoveredKg).toFixed(2)} kg`], [t("Leak check"), `${t(LEAK[r.leakCheck] ?? r.leakCheck)}${r.leakCheckMethod ? ` · ${r.leakCheckMethod}` : ""}`]].map(([k, v]) => <div key={k} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted">{k}</div><div className="font-bold">{v}</div></div>)}</div>
+                    <div className="grid-fluid" style={{ ["--min" as string]: "120px" }}>{[[t("Recovered"), `${r.recoveredKg.toFixed(2)} kg`], [t("Charged"), `${r.chargedKg.toFixed(2)} kg`], [t("Net added"), `${r.chargedKg - r.recoveredKg >= 0 ? "+" : "−"}${Math.abs(r.chargedKg - r.recoveredKg).toFixed(2)} kg`], [t("Leak check"), `${t(LEAK[r.leakCheck] ?? r.leakCheck)}${r.leakCheckMethod ? ` · ${r.leakCheckMethod}` : ""}`]].map(([k, v]) => <div key={k} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{k}</div><div className="font-bold">{v}</div></div>)}</div>
                   </div>
                 ))}
-                <p className="text-[11px] text-muted">{t("Stock is deducted from your van when the report is accepted. Refrigerant amounts are kept per unit for leak-check and regulatory logs.")}</p>
+                <p className="text-[11px] text-muted-foreground">{t("Stock is deducted from your van when the report is accepted. Refrigerant amounts are kept per unit for leak-check and regulatory logs.")}</p>
               </div>
             )}
             {view === "time" && (
               <div>
                 <SummaryList items={timeRows(job.timeOnSite, now, f)} />
                 {inWork && <div className="mt-3"><Btn size="sm" disabled={pending || !editable} onClick={() => withSaved(() => run(() => pauseWork(job.id, job.version, !paused), t(paused ? "Work resumed" : "Work paused"), undefined, failed))}>{t(paused ? "Resume work" : "Pause work")}</Btn></div>}
-                <p className="mt-2 text-[11px] text-muted">{t("Arrival inside the window counts toward the SLA. Times are part of the report and visible to the contractor and HQ.")}</p>
+                <p className="mt-2 text-[11px] text-muted-foreground">{t("Arrival inside the window counts toward the SLA. Times are part of the report and visible to the contractor and HQ.")}</p>
               </div>
             )}
           </Card>
@@ -298,7 +298,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
           <Card title={t("Work report — {version}", { version: rep ? t("draft v{version}", { version: rep.version }) : live.report ? `v${live.report.version}` : t("not started") })}>
             {issues && issues.length > 0 && <Banner tone="crit"><b>{t(issues.length === 1 ? "Not submitted (VALIDATION) — 1 issue:" : "Not submitted (VALIDATION) — {n} issues:", { n: issues.length })}</b> {issues.slice(0, 6).map((x) => x.text).join(" · ")}{issues.length > 6 ? " · …" : ""}. {t("The draft is kept.")}</Banner>}
             {editable && win.notice && <div className="mt-2"><Banner tone="warn">{win.notice}</Banner></div>}
-            {!inWork && !live.report && <p className="text-[13px] text-muted">{t("The report opens when you check in at the site.")}</p>}
+            {!inWork && !live.report && <p className="text-[13px] text-muted-foreground">{t("The report opens when you check in at the site.")}</p>}
             {(inWork || live.report) && (
               <div className="mt-2 flex flex-col gap-3">
                 <Field label={t("Work performed & next action (10–4000 characters)")}>{editable ? <Textarea value={draft.workText} maxLength={4000} className="min-h-[110px]" onChange={(e) => edit((d) => ({ ...d, workText: e.target.value }))} /> : <p className="font-normal">{draft.workText || "—"}</p>}</Field>
@@ -308,11 +308,11 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                   <div className="flex flex-wrap gap-2">
                     {photos.map((a) => <Photo key={a.id} src={photoUrl(a)} name={a.name} />)}
                     {editable && photos.length < MAX_PHOTOS && (
-                      <label className={cx("grid h-16 w-20 cursor-pointer place-items-center rounded-lg border border-dashed border-line text-xl text-muted hover:bg-surface2", pending && "pointer-events-none opacity-50")}>
+                      <label className={cx("grid h-16 w-20 cursor-pointer place-items-center rounded-lg border border-dashed border-line text-xl text-muted-foreground hover:bg-surface2", pending && "pointer-events-none opacity-50")}>
                         +<input type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
                       </label>
                     )}
-                    {!editable && photos.length === 0 && <span className="text-xs text-muted">{t("No photos.")}</span>}
+                    {!editable && photos.length === 0 && <span className="text-xs text-muted-foreground">{t("No photos.")}</span>}
                   </div>
                   {photoError && <div className="mt-2"><Banner tone="crit">{photoError}</Banner></div>}
                 </div>
@@ -332,14 +332,14 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                   {editable && <Btn size="sm" disabled={pending} onClick={() => setModal("sign")}>{t((rep ?? live.report)?.signOff ? "Sign again" : "Get signature")}</Btn>}
                 </div>
                 {editable && <div className="flex flex-wrap justify-end gap-2"><Btn disabled={pending || !dirty && !!rep} onClick={() => save()}>{t("Save draft")}</Btn><Btn variant="primary" disabled={pending} onClick={trySubmit}>{t("Submit report")}</Btn></div>}
-                <p className="text-[11px] text-muted">{t("Submitted versions become read-only. Rework resumes from rework_requested as a new draft version. Saving again clears the sign-off.")}</p>
+                <p className="text-[11px] text-muted-foreground">{t("Submitted versions become read-only. Rework resumes from rework_requested as a new draft version. Saving again clears the sign-off.")}</p>
               </div>
             )}
           </Card>
           <Card title={t("Versions & autosave")}>
             <ul className="divide-y divide-line">
-              {versions.map((v, k) => <li key={k} className="flex items-start justify-between gap-2 py-2"><div><b className="text-[13px]">{v.title}</b><div className="text-[11px] text-muted">{v.sub}</div></div><Badge tone={v.badge.tone}>{v.badge.text}</Badge></li>)}
-              <li className="flex items-start justify-between gap-2 py-2"><div><b className="text-[13px]">{t("Work window")}</b><div className="text-[11px] text-muted">{win.text}</div></div>{win.phase === "ending" && <Badge tone="warn">{t("ending")}</Badge>}</li>
+              {versions.map((v, k) => <li key={k} className="flex items-start justify-between gap-2 py-2"><div><b className="text-[13px]">{v.title}</b><div className="text-[11px] text-muted-foreground">{v.sub}</div></div><Badge tone={v.badge.tone}>{v.badge.text}</Badge></li>)}
+              <li className="flex items-start justify-between gap-2 py-2"><div><b className="text-[13px]">{t("Work window")}</b><div className="text-[11px] text-muted-foreground">{win.text}</div></div>{win.phase === "ending" && <Badge tone="warn">{t("ending")}</Badge>}</li>
             </ul>
           </Card>
         </div>
@@ -385,7 +385,7 @@ function CheckInModal({ open, unitId, pending, onClose, onCheckIn }: { open: boo
         </div>
       ) : <Field label={t("Reason (required)")}><Textarea value={reason} maxLength={1000} placeholder={t("No GPS signal in the basement plant room")} onChange={(e) => setReason(e.target.value)} /></Field>}
       {error && <Banner tone="crit">{error}</Banner>}
-      <p className="text-[11px] text-muted">{t("Arrival must be inside your work window. Checking in records the arrival and starts the work (IR111).")}</p>
+      <p className="text-[11px] text-muted-foreground">{t("Arrival must be inside your work window. Checking in records the arrival and starts the work (IR111).")}</p>
     </Modal>
   );
 }
@@ -444,7 +444,7 @@ function PartModal({ open, parts, components, onClose, onAdd }: { open: boolean;
         <Field label={t("Replaces checklist item (optional)")}><Select value={replaces} onChange={(e) => setReplaces(e.target.value)}><option value="">—</option>{components.map((c) => <option key={c.key} value={c.key}>{t(groupLabel[c.group])} › {t(componentLabel[c.key] ?? c.key)}</option>)}</Select></Field>
         {replaces && <Field label={t("Old part")}><Select value={disposal} onChange={(e) => setDisposal(e.target.value as typeof disposal)}><option value="">{t("Disposed on site")}</option><option value="returned">{t("Returned")}</option></Select></Field>}
       </div>
-      {source === "bought_locally" && <p className="text-[11px] text-muted">{t("Keep the receipt — attach a photo of it with the report photos.")}</p>}
+      {source === "bought_locally" && <p className="text-[11px] text-muted-foreground">{t("Keep the receipt — attach a photo of it with the report photos.")}</p>}
       {error && <Banner tone="crit">{error}</Banner>}
     </Modal>
   );
@@ -515,7 +515,7 @@ function SignModal({ open, pending, summary, onClose, onSign }: { open: boolean;
   };
   return (
     <Modal open={open} onClose={onClose} title={t("Customer sign-off")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={sign}>{t("Save sign-off")}</Btn></>}>
-      <p className="text-xs text-muted">{t("Report {summary}", { summary })}</p>
+      <p className="text-xs text-muted-foreground">{t("Report {summary}", { summary })}</p>
       <Field label={t("Signer name")}><Input value={name} maxLength={120} placeholder="Ms Tan" onChange={(e) => setName(e.target.value)} /></Field>
       <Field label={t("How")}><Choice value={absent ? "absent" : "sign"} onChange={(v) => setAbsent(v === "absent")} options={[{ id: "sign", label: t("Signature") }, { id: "absent", label: t("Customer not available") }]} /></Field>
       {absent ? (
@@ -529,11 +529,11 @@ function SignModal({ open, pending, summary, onClose, onSign }: { open: boolean;
             onPointerDown={(e) => { drawing.current = true; const c = e.currentTarget.getContext("2d")!; const [x, y] = point(e); c.lineWidth = 2.5; c.lineCap = "round"; c.strokeStyle = "#0f172a"; c.beginPath(); c.moveTo(x, y); e.currentTarget.setPointerCapture(e.pointerId); }}
             onPointerMove={(e) => { if (!drawing.current) return; const c = e.currentTarget.getContext("2d")!; const [x, y] = point(e); c.lineTo(x, y); c.stroke(); setDrawn(true); }}
             onPointerUp={() => { drawing.current = false; }} />
-          <div className="mt-1 flex justify-between text-[11px] text-muted"><span className="flex items-center gap-1"><Icon name="signature" />{t("Sign here")}</span><button type="button" className="font-semibold text-primary" onClick={clear}>{t("Clear")}</button></div>
+          <div className="mt-1 flex justify-between text-[11px] text-muted-foreground"><span className="flex items-center gap-1"><Icon name="signature" />{t("Sign here")}</span><button type="button" className="font-semibold text-primary" onClick={clear}>{t("Clear")}</button></div>
         </div>
       )}
       {error && <Banner tone="crit">{error}</Banner>}
-      <p className="text-[11px] text-muted">{t("The sign-off is bound to this report version; saving the draft again clears it.")}</p>
+      <p className="text-[11px] text-muted-foreground">{t("The sign-off is bound to this report version; saving the draft again clears it.")}</p>
     </Modal>
   );
 }
@@ -542,7 +542,7 @@ function SignModal({ open, pending, summary, onClose, onSign }: { open: boolean;
 function Photo({ src, name }: { src: string; name: string }) {
   const t = useT();
   const [broken, setBroken] = useState(false);
-  if (broken) return <span title={name} className="grid h-16 w-20 place-items-center rounded-lg border border-dashed border-line bg-surface2 px-1 text-center text-[10px] leading-tight text-muted">{t("Photo unavailable")}</span>;
+  if (broken) return <span title={name} className="grid h-16 w-20 place-items-center rounded-lg border border-dashed border-line bg-surface2 px-1 text-center text-[10px] leading-tight text-muted-foreground">{t("Photo unavailable")}</span>;
   // eslint-disable-next-line @next/next/no-img-element -- streamed through the DAL route (attachments.getContent)
   return <img src={src} alt={name} onError={() => setBroken(true)} className="h-16 w-20 rounded-lg bg-surface2 object-cover" />;
 }

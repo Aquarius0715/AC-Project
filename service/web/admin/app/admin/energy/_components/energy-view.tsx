@@ -18,7 +18,7 @@ export type EnergyLive = {
 };
 
 const kpi = (label: string, value: string, sub: string, tone?: "ok" | "crit" | "muted") => (
-  <div className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted">{label}</div><div className={`text-xl font-bold ${tone === "ok" ? "text-ok" : tone === "crit" ? "text-crit" : tone === "muted" ? "text-muted" : ""}`}>{value}</div><div className="text-[11px] text-muted">{sub}</div></div>
+  <div className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted-foreground">{label}</div><div className={`text-xl font-bold ${tone === "ok" ? "text-ok" : tone === "crit" ? "text-crit" : tone === "muted" ? "text-muted-foreground" : ""}`}>{value}</div><div className="text-[11px] text-muted-foreground">{sub}</div></div>
 );
 
 /** Energy-saving analysis (FR-A13) in API mode: the scope, period and baseline live in the URL and the server reads
@@ -60,7 +60,7 @@ function Analysis({ live, a }: { live: EnergyLive; a: NonNullable<EnergyLive["an
           <Btn size="sm" disabled={!from || !to || (from === a.from && to === a.to)} onClick={() => nav({ from, to })}>{t("Apply period")}</Btn>
         </div>
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-[13px]">{units.map((u) => <Check key={u.id} label={u.label} checked={a.unitIds.includes(u.id)} onChange={(on) => setUnits(on ? [...a.unitIds, u.id] : a.unitIds.filter((x) => x !== u.id))} />)}</div>
-        {a.error ? <p className="mt-2 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{a.error}</p> : a.unitIds.length === 0 ? <p className="mt-2 text-xs text-muted">{t("Choose at least one unit.")}</p> : s && <p className="mt-2 text-xs">{s.comparable ? <span className="inline-flex items-center gap-1 text-ok"><Icon name="check" />{t("comparable with the baseline")}</span> : a.baselineId ? <span className="inline-flex items-center gap-1 text-crit"><Icon name="error" />{t("No difference can be calculated — see the quality warnings.")}</span> : <span className="text-muted">{t("Choose a baseline to compare.")}</span>}</p>}
+        {a.error ? <p className="mt-2 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{a.error}</p> : a.unitIds.length === 0 ? <p className="mt-2 text-xs text-muted-foreground">{t("Choose at least one unit.")}</p> : s && <p className="mt-2 text-xs">{s.comparable ? <span className="inline-flex items-center gap-1 text-ok"><Icon name="check" />{t("comparable with the baseline")}</span> : a.baselineId ? <span className="inline-flex items-center gap-1 text-crit"><Icon name="error" />{t("No difference can be calculated — see the quality warnings.")}</span> : <span className="text-muted-foreground">{t("Choose a baseline to compare.")}</span>}</p>}
       </Card>
       {s && (
         <>
@@ -73,7 +73,7 @@ function Analysis({ live, a }: { live: EnergyLive; a: NonNullable<EnergyLive["an
           <div className="split">
             <Card title={t("Cost")}>
               <SummaryList items={[[t("Actual cost"), s.cost], [t("Saved cost"), s.savedCost]]} />
-              <p className="mt-3 text-xs text-muted">{t("Actual below the baseline shows “Reduction”, above it “Increase” (100 → 120 kWh is “Increase 20.0 kWh / Increase 20.0%”). Increases are never hidden or clamped to zero; a missing or zero baseline shows “Cannot calculate”. Results are not weather-adjusted.")}</p>
+              <p className="mt-3 text-xs text-muted-foreground">{t("Actual below the baseline shows “Reduction”, above it “Increase” (100 → 120 kWh is “Increase 20.0 kWh / Increase 20.0%”). Increases are never hidden or clamped to zero; a missing or zero baseline shows “Cannot calculate”. Results are not weather-adjusted.")}</p>
             </Card>
             <Card title={t("Calculation conditions")}>
               <SummaryList items={s.conditions} />
@@ -117,18 +117,18 @@ function Baselines({ live, l }: { live: EnergyLive; l: NonNullable<EnergyLive["l
   return (
     <>
       <div className="flex flex-wrap items-end gap-3">
-        <span className="pb-2 text-xs font-semibold text-muted">{t("Scope")}</span>
+        <span className="pb-2 text-xs font-semibold text-muted-foreground">{t("Scope")}</span>
         <Field label={t("Customer")}><Select value={live.scope.customerId ?? ""} onChange={(e) => nav({ customerId: e.target.value || null, propertyId: null, unitId: null, baselineId: null })}><option value="">{t("All customers")}</option>{live.customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></Field>
         <Field label={t("Property")}><Select value={live.scope.propertyId ?? ""} onChange={(e) => nav({ propertyId: e.target.value || null, unitId: null, baselineId: null })}><option value="">{t("All properties")}</option>{props.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></Field>
         <Field label={t("Unit")}><Select value={live.scope.unitId ?? ""} onChange={(e) => nav({ unitId: e.target.value || null, baselineId: null })}><option value="">{t("All units")}</option>{scopeUnits.map((u) => <option key={u.id} value={u.id}>{u.label}</option>)}</Select></Field>
         <Field label={t("Period starts from (Kuala Lumpur)")}><Input type="datetime-local" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
         <Field label={t("Period starts before")}><Input type="datetime-local" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
         <Btn size="sm" disabled={from === l.from && to === l.to} onClick={() => nav({ from: from || null, to: to || null, baselineId: null })}>{t("Apply")}</Btn>
-        <span className="ml-auto pb-2 text-xs text-muted">{t(l.rows.length === 1 ? "1 baseline in scope" : "{n} baselines in scope", { n: l.rows.length })}</span>
+        <span className="ml-auto pb-2 text-xs text-muted-foreground">{t(l.rows.length === 1 ? "1 baseline in scope" : "{n} baselines in scope", { n: l.rows.length })}</span>
       </div>
       <div className="split-rev">
         <Card title={customer ? t("Baselines · {customer}", { customer }) : t("Baselines · all customers")} action={live.canWrite && <Btn size="sm" variant="primary" onClick={() => setCreating(true)}><Icon name="add" /> {t("New baseline")}</Btn>} className="self-start">
-          {l.rows.length === 0 ? <EmptyState title={t("No baselines")}>{t("No baseline matches this scope.")}</EmptyState> : <div className="flex flex-col gap-2">{l.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setCreating(false); nav({ baselineId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={x.method === "demo_fixed" ? "muted" : "primary"}>{t(x.method === "demo_fixed" ? "v{v} · modeled" : "v{v} · measured", { v: x.version })}</Badge></div><div className="text-[11px] text-muted">{x.units} · {x.period}</div><div className="text-[11px] text-muted">{x.method} · {x.value} · {x.boundaryId}</div></div></ListRow>)}</div>}
+          {l.rows.length === 0 ? <EmptyState title={t("No baselines")}>{t("No baseline matches this scope.")}</EmptyState> : <div className="flex flex-col gap-2">{l.rows.map((x) => <ListRow key={x.id} selected={sel?.id === x.id} onClick={() => { setCreating(false); nav({ baselineId: x.id }); }}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.id.slice(0, 8)}</b><Badge tone={x.method === "demo_fixed" ? "muted" : "primary"}>{t(x.method === "demo_fixed" ? "v{v} · modeled" : "v{v} · measured", { v: x.version })}</Badge></div><div className="text-[11px] text-muted-foreground">{x.units} · {x.period}</div><div className="text-[11px] text-muted-foreground">{x.method} · {x.value} · {x.boundaryId}</div></div></ListRow>)}</div>}
         </Card>
         {creating || sel ? (
           <Card title={sel ? <span className="flex flex-wrap items-center gap-2">{t("Baseline {id}", { id: sel.id.slice(0, 8) })}<Badge>{t("Version {v}", { v: sel.version })}</Badge><Badge tone="warn">{t("Editing → v{n}", { n: sel.version + 1 })}</Badge></span> : t("New baseline")}
@@ -140,7 +140,7 @@ function Baselines({ live, l }: { live: EnergyLive; l: NonNullable<EnergyLive["l
                 <Field label={t("Period to")} hint={t("Up to 366 days")}><Input type="datetime-local" value={d.to} onChange={(e) => set({ to: e.target.value })} /></Field>
               </section>
               <Field label={t("Method")}><Choice value={d.method} onChange={(v) => set({ method: v })} options={[{ id: "demo_fixed" as const, label: `demo_fixed · ${t("entered value")}` }, { id: "demo_period_comparison" as const, label: `demo_period_comparison · ${t("measured")}` }]} /></Field>
-              {d.method === "demo_fixed" ? <div className="max-w-xs"><Field label={t("Baseline energy (kWh)")} error={err("baselineKWh")} hint={t("Fictional demo value · ≥ 0 · not used for demo_period_comparison")}><Input type="number" min="0" step="0.1" value={d.baselineKWh} onChange={(e) => set({ baselineKWh: e.target.value })} /></Field></div> : <p className="text-xs text-muted">{t("Measured from the period’s readings when saved; no value is entered (SR29).")}</p>}
+              {d.method === "demo_fixed" ? <div className="max-w-xs"><Field label={t("Baseline energy (kWh)")} error={err("baselineKWh")} hint={t("Fictional demo value · ≥ 0 · not used for demo_period_comparison")}><Input type="number" min="0" step="0.1" value={d.baselineKWh} onChange={(e) => set({ baselineKWh: e.target.value })} /></Field></div> : <p className="text-xs text-muted-foreground">{t("Measured from the period’s readings when saved; no value is entered (SR29).")}</p>}
               <Field label={t("Boundary")} error={err("boundaryId")}><Choice value={d.boundaryId} onChange={(v) => set({ boundaryId: v })} options={[{ id: "ac_input_electricity" as const, label: t("AC input electricity") }, { id: "whole_building_electricity" as const, label: t("Whole-building electricity") }]} /></Field>
               <Field label={t("Boundary description")} error={err("boundary")} hint={t("1–500 characters")}><Input value={d.boundary} maxLength={500} onChange={(e) => set({ boundary: e.target.value })} placeholder={t("AC unit input electricity only")} /></Field>
               <Field label={t("Assumptions")} error={err("assumptions")} hint={t("1–2000 characters")}><Textarea value={d.assumptions} maxLength={2000} onChange={(e) => set({ assumptions: e.target.value })} /></Field>

@@ -8,7 +8,7 @@ import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { displayZone, ENGLISH, setDisplay } from "../../fixtures/display";
 
-const card = (page: Page, heading: string | RegExp) => page.getByRole("main").locator("section").filter({ has: page.getByRole("heading", { name: heading, exact: typeof heading === "string" }) });
+const card = (page: Page, heading: string | RegExp) => page.getByRole("main").locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: heading, exact: typeof heading === "string" }) });
 /** The value of a SummaryList row of the open entry. */
 const fact = (detail: Locator, label: string) => detail.locator("dt", { hasText: new RegExp(`^${label}$`) }).locator("xpath=following-sibling::dd[1]");
 

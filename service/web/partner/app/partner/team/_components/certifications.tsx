@@ -30,7 +30,7 @@ export function Certifications({ live }: { live: Live }) {
       {r.actions.includes("training") && <Btn size="sm" onClick={() => setOpen({ kind: "training", row: r })}>{t("Request training")}</Btn>}
       {r.actions.includes("view") && <Btn size="sm" variant="ghost" onClick={() => setOpen({ kind: "view", row: r })}>{t("View")}</Btn>}
       {r.renewalPending && <span className="text-[11px] text-primary">{t("Renewal pending HQ verification")}</span>}
-      {r.training && <span className="text-[11px] text-muted">{r.training}</span>}
+      {r.training && <span className="text-[11px] text-muted-foreground">{r.training}</span>}
     </div>
   );
   return (
@@ -51,25 +51,25 @@ export function Certifications({ live }: { live: Live }) {
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
         {c.kpis.map((k) => (
           <section key={k.label} aria-label={k.label} className="rounded-2xl border border-line bg-surface p-4">
-            <div className="text-xs text-muted">{k.label}</div>
+            <div className="text-xs text-muted-foreground">{k.label}</div>
             <div className="text-2xl font-bold">{k.value}</div>
-            {k.chip ? <span className="mt-1 inline-block rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-semibold text-warn">{k.chip}</span> : <div className="mt-1 text-[11px] text-muted">{k.sub}</div>}
+            {k.chip ? <span className="mt-1 inline-block rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-semibold text-warn">{k.chip}</span> : <div className="mt-1 text-[11px] text-muted-foreground">{k.sub}</div>}
           </section>
         ))}
       </div>
       <div className="split">
         <Card title={t("Certificates — {company}", { company: live.company })} action={<Btn size="sm" onClick={() => setOpen({ kind: "add", row: null })} disabled={!c.people.some((p) => p.active)}><Icon name="add" /> {t("Add certificate")}</Btn>}>
-          {c.rows.length === 0 ? <p className="py-4 text-[13px] text-muted">{t("No certificates match these filters.")}</p> : (
+          {c.rows.length === 0 ? <p className="py-4 text-[13px] text-muted-foreground">{t("No certificates match these filters.")}</p> : (
             <DataTable rowKey={(r) => r.key} rows={c.rows} cols={[
               { key: "t", label: t("Technician"), render: (r) => <b className="whitespace-nowrap">{r.technician}</b> },
-              { key: "c", label: t("Certificate"), render: (r) => <span><b className="block">{r.name}</b><span className="block text-[11px] text-muted">{r.detail}</span></span> },
+              { key: "c", label: t("Certificate"), render: (r) => <span><b className="block">{r.name}</b><span className="block text-[11px] text-muted-foreground">{r.detail}</span></span> },
               { key: "e", label: t("Expires"), render: (r) => <span className="whitespace-nowrap">{r.expires}</span> },
               { key: "s", label: t("Status"), render: (r) => <Badge tone={r.badge.tone}>{r.badge.text}</Badge> },
               { key: "b", label: t("Blocks"), render: (r) => (r.blocks.length ? r.blocks.map((b) => b.text).join(", ") : "—") },
               { key: "a", label: t("Action"), render: action },
             ]} />
           )}
-          <p className="mt-2 text-[11px] text-muted">{t("Certificates are checked when you assign a technician (members.eligible). An expired certificate makes the technician ineligible for jobs that need it; nothing is revoked automatically before expiry.")}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("Certificates are checked when you assign a technician (members.eligible). An expired certificate makes the technician ineligible for jobs that need it; nothing is revoked automatically before expiry.")}</p>
         </Card>
         <Card title={t("Assignment impact")}>
           {c.impact ? (
@@ -78,8 +78,8 @@ export function Certifications({ live }: { live: Live }) {
               <SummaryList items={c.impact.rows} />
               <div><LinkBtn href={`/partner/schedule?jobId=${c.impact.jobId}`} size="sm">{t("Open assignment")} <Icon name="arrowRight" /></LinkBtn></div>
             </div>
-          ) : <p className="text-[13px] text-muted">{t("No booked job depends on an expiring, expired or missing certificate.")}</p>}
-          <p className="mt-3 text-[11px] text-muted">{t("Reminders are sent 60, 30 and 7 days before expiry to the contractor admin (Notifications).")}</p>
+          ) : <p className="text-[13px] text-muted-foreground">{t("No booked job depends on an expiring, expired or missing certificate.")}</p>}
+          <p className="mt-3 text-[11px] text-muted-foreground">{t("Reminders are sent 60, 30 and 7 days before expiry to the contractor admin (Notifications).")}</p>
         </Card>
       </div>
       {open?.kind === "renew" || open?.kind === "add" ? <CertificateModal live={live} kind={open.kind} row={open.row} onClose={() => setOpen(null)} /> : null}
@@ -151,7 +151,7 @@ function CertificateModal({ live, kind, row, onClose }: { live: Live; kind: "ren
         <label className={cx("block cursor-pointer rounded-xl border border-dashed px-4 py-4 text-center hover:bg-surface2", err("file") ? "border-crit" : "border-line")}>
           <input type="file" accept={FILE_TYPES.join(",")} className="sr-only" onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); set({ file: f ? { name: f.name, type: f.type, size: f.size } : null }); }} />
           <b className="flex items-center gap-1 text-[13px]">{file ? <><Icon name="document" />{`${file.name} · ${fileSize(file.size)}`}</> : t("Choose a file")}</b>
-          <span className="block text-[11px] font-normal text-muted">{t("PDF / JPG / PNG, up to 10 MB")}{file ? ` · ${t("Replace")}` : ""}</span>
+          <span className="block text-[11px] font-normal text-muted-foreground">{t("PDF / JPG / PNG, up to 10 MB")}{file ? ` · ${t("Replace")}` : ""}</span>
         </label>
         {err("file") && <span className="flex items-center gap-1 font-medium text-crit"><Icon name="error" />{err("file")}</span>}
       </div>
@@ -193,7 +193,7 @@ function ViewModal({ row, onClose }: { row: CertRow; onClose: () => void }) {
   return (
     <Modal open onClose={onClose} title={row.name} footer={<Btn onClick={onClose}>{t("Close")}</Btn>}>
       <SummaryList items={[[t("Technician"), row.technician], [t("Certificate number"), row.cert?.number ?? "—"], [t("Details"), row.detail], [t("Expires"), row.expires], [t("Status"), row.badge.text]]} />
-      <p className="text-[11px] text-muted">{t("HQ keeps the uploaded file; ask HQ for a copy.")}</p>
+      <p className="text-[11px] text-muted-foreground">{t("HQ keeps the uploaded file; ask HQ for a copy.")}</p>
     </Modal>
   );
 }

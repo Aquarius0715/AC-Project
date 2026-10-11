@@ -37,12 +37,12 @@ function TreeRow({ n, depth, sel, onSel, onRename }: { n: Node; depth: number; s
     <>
       <div className={cx("flex items-center gap-2 rounded-lg px-2 py-1.5", sel === n.id ? "bg-primary-soft" : "hover:bg-surface2")} style={{ paddingLeft: 8 + depth * 16 }}>
         <button onClick={() => onSel(n.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-          <Icon name={n.children ? "chevronDown" : n.unassigned ? "unknown" : "chevronRight"} className="text-muted" />
+          <Icon name={n.children ? "chevronDown" : n.unassigned ? "unknown" : "chevronRight"} className="text-muted-foreground" />
           <span className="truncate font-semibold">{n.name}</span>
-          {n.type && <span className="rounded bg-surface2 px-1.5 text-[10px] text-muted">{n.type}</span>}
-          {n.units !== undefined && <span className="text-[11px] text-muted">· {n.units} unit{n.units > 1 ? "s" : ""}</span>}
+          {n.type && <span className="rounded bg-surface2 px-1.5 text-[10px] text-muted-foreground">{n.type}</span>}
+          {n.units !== undefined && <span className="text-[11px] text-muted-foreground">· {n.units} unit{n.units > 1 ? "s" : ""}</span>}
         </button>
-        {!n.unassigned && <button aria-label={`Rename ${n.name}`} onClick={() => onRename(n)} className="text-muted hover:text-primary"><Icon name="edit" /></button>}
+        {!n.unassigned && <button aria-label={`Rename ${n.name}`} onClick={() => onRename(n)} className="text-muted-foreground hover:text-primary"><Icon name="edit" /></button>}
       </div>
       {n.children?.map((c) => <TreeRow key={c.id} n={c} depth={depth + 1} sel={sel} onSel={onSel} onRename={onRename} />)}
     </>
@@ -69,33 +69,33 @@ export function PropertiesDemo() {
       <div className="split-rev">
         <Card title="My properties" action={<Badge tone="muted">2</Badge>} className="self-start">
           <div className="flex flex-col text-[13px]">{tree.map((n) => <TreeRow key={n.id} n={n} depth={0} sel={sel} onSel={(id) => { setSel(id); setMode("single"); }} onRename={startRename} />)}</div>
-          <p className="mt-3 text-[11px] text-muted">Read-only — HQ sets up properties, floors, rooms and units. You can rename any location with its edit button or Rename; nothing else here changes the structure.</p>
+          <p className="mt-3 text-[11px] text-muted-foreground">Read-only — HQ sets up properties, floors, rooms and units. You can rename any location with its edit button or Rename; nothing else here changes the structure.</p>
         </Card>
         <Card title={sel === "ws" ? "Office A › Open office › Workstations" : sel === "meeting" ? "Office A › 3F › Meeting room" : sel === "home-a" || !us ? (sel === "unassigned" ? "Unassigned units (1)" : "Home A") : "Home A › 1F › " + sel[0].toUpperCase() + sel.slice(1)} sub={sel === "home-a" ? "Home A · Home" : undefined} action={sel !== "unassigned" && <Btn size="sm" onClick={() => startRename(tree[0])}><Icon name="edit" />Rename</Btn>}>
           {sel === "home-a" && (
             <>
               <SummaryList cols={2} items={[["Type", "Home"], ["Floors", "2 (1F, 2F)"], ["Rooms", "4"], ["Air conditioners", "5 in rooms · 1 unassigned"], ["Last edited", "Sep 12 · version 3"]]} />
-              <div className="my-4 rounded-xl bg-surface2 p-4 text-center"><div className="font-bold">Select a room to see its air conditioners</div><div className="text-xs text-muted">Floor → Room → Air conditioner. Each room lists every AC inside it; open one to control it.</div></div>
+              <div className="my-4 rounded-xl bg-surface2 p-4 text-center"><div className="font-bold">Select a room to see its air conditioners</div><div className="text-xs text-muted-foreground">Floor → Room → Air conditioner. Each room lists every AC inside it; open one to control it.</div></div>
             </>
           )}
           {groupUnits[sel] && (
-            <div className="mb-3 flex flex-wrap items-center gap-2"><span className="text-xs text-muted">{groupUnits[sel].length} ACs ·</span>{(["single", "group"] as const).map((m) => <button key={m} aria-pressed={mode === m} onClick={() => setMode(m)} className={cx("rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{m === "single" ? "Single AC" : "Group control"}</button>)}</div>
+            <div className="mb-3 flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">{groupUnits[sel].length} ACs ·</span>{(["single", "group"] as const).map((m) => <button key={m} aria-pressed={mode === m} onClick={() => setMode(m)} className={cx("rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{m === "single" ? "Single AC" : "Group control"}</button>)}</div>
           )}
           {groupUnits[sel] && mode === "group" && <GroupControl space={sel === "ws" ? "Workstations" : sel === "meeting" ? "Meeting room" : "Bedroom"} units={groupUnits[sel]} />}
           {sel === "ws" && mode === "single" && <div className="flex flex-col gap-2">{groupUnits.ws.map((u) => <Link key={u.id} href="/customer/units/unit-online-rto" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><b className="flex items-center gap-1.5"><Icon name="units" className="text-primary" />{u.name}</b><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} />{u.temp ?? "—"} °C <Icon name="chevronRight" /></span></Link>)}</div>}
           {us && mode === "single" && (
             <div className="flex flex-col gap-2">
               {us.map((u) => (
-                <Link key={u.id} href={`/customer/units/${u.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3 hover:bg-surface2/60"><span className="flex items-center gap-2 font-bold"><Icon name="units" className="text-primary" />{u.name}</span><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} /><span>{u.temp} °C</span><span>{u.w} W</span><span className="text-muted"><Icon name="chevronRight" /></span></span></Link>
+                <Link key={u.id} href={`/customer/units/${u.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3 hover:bg-surface2/60"><span className="flex items-center gap-2 font-bold"><Icon name="units" className="text-primary" />{u.name}</span><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} /><span>{u.temp} °C</span><span>{u.w} W</span><span className="text-muted-foreground"><Icon name="chevronRight" /></span></span></Link>
               ))}
             </div>
           )}
-          {sel !== "home-a" && !us && !groupUnits[sel] && sel !== "unassigned" && <p className="text-[13px] text-muted">{sel === "study" ? "Study AC is offline (unknown)." : "Select a room with air conditioners to see them here."}</p>}
+          {sel !== "home-a" && !us && !groupUnits[sel] && sel !== "unassigned" && <p className="text-[13px] text-muted-foreground">{sel === "study" ? "Study AC is offline (unknown)." : "Select a room with air conditioners to see them here."}</p>}
           {(sel === "home-a" || sel === "unassigned") && (
             <div className="mt-2">
-              <div className="mb-2 text-[13px] font-bold">? Unassigned units (1) <span className="text-xs font-normal text-muted">Not in any room</span></div>
-              <Link href="/customer/units/unit-guest" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><span><b className="inline-flex items-center gap-1.5"><Icon name="units" className="text-primary" />Guest AC</b><span className="block text-[11px] text-muted">Home A · no room assigned</span></span><span className="text-xs">25.5 °C · 0 W <Icon name="chevronRight" /></span></Link>
-              <p className="mt-2 text-[11px] text-muted">Moving a unit into a room is done in HQ’s unit register — contact HQ.</p>
+              <div className="mb-2 text-[13px] font-bold">? Unassigned units (1) <span className="text-xs font-normal text-muted-foreground">Not in any room</span></div>
+              <Link href="/customer/units/unit-guest" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><span><b className="inline-flex items-center gap-1.5"><Icon name="units" className="text-primary" />Guest AC</b><span className="block text-[11px] text-muted-foreground">Home A · no room assigned</span></span><span className="text-xs">25.5 °C · 0 W <Icon name="chevronRight" /></span></Link>
+              <p className="mt-2 text-[11px] text-muted-foreground">Moving a unit into a room is done in HQ’s unit register — contact HQ.</p>
             </div>
           )}
         </Card>

@@ -10,7 +10,7 @@ export function JobHistory({ card }: { card: ReturnType<typeof historyCard> }) {
     <Page narrow>
       <Card title={card.title} sub={card.sub}>
         <SummaryList items={card.rows} />
-        <p className="mt-3 text-xs text-muted">{card.note}</p>
+        <p className="mt-3 text-xs text-muted-foreground">{card.note}</p>
         <div className="mt-3"><LinkBtn href="/technician" size="sm"><Icon name="arrowLeft" />{card.back}</LinkBtn></div>
       </Card>
     </Page>

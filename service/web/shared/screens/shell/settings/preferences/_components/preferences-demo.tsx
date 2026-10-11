@@ -35,13 +35,13 @@ export function PreferencesDemo() {
       </Card>
       <Card title={t("Currency")} sub={`${t("MYR — Malaysian Ringgit")} · ${t("read-only demo")}`}><Select disabled><option>{t("MYR — Malaysian Ringgit")}</option></Select></Card>
       <Card title={t("Security · Two-step verification")} sub={t("Ask for a 6-digit code from an authenticator app when signing in on a new device")} action={twoFa ? <span className="flex items-center gap-2"><Badge tone="ok">{t("On")}</Badge><Btn size="sm" onClick={() => { setTwoFa(false); toast(t("Two-step verification turned off"), "warn"); }}>{t("Turn off")}</Btn></span> : <span className="flex items-center gap-2"><Badge>{t("Off")}</Badge><Btn size="sm" variant="primary" onClick={() => { setModal(true); setCodes(null); setCode(""); }}>{t("Turn on")}</Btn></span>}>
-        <p className="text-xs text-muted">{t("Demo only — demo sign-in is unchanged (FR-X08).")}</p>
+        <p className="text-xs text-muted-foreground">{t("Demo only — demo sign-in is unchanged (FR-X08).")}</p>
       </Card>
       {role === "client" && (
         <Card title={t("Consent")}>
           <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px] font-semibold">{t("Location, for voice room disambiguation")}</div><div className="text-xs text-muted">{t("Withdrawal discards pending voice requests only")}</div></div><Toggle on={loc} onChange={setLoc} label={t("Location consent")} /></div>
-            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px] font-semibold">{t("Microphone, for voice actions")}</div><div className="text-xs text-muted">{t("Text input always available as a fallback")}</div></div><Toggle on={mic} onChange={setMic} label={t("Microphone consent")} /></div>
+            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px] font-semibold">{t("Location, for voice room disambiguation")}</div><div className="text-xs text-muted-foreground">{t("Withdrawal discards pending voice requests only")}</div></div><Toggle on={loc} onChange={setLoc} label={t("Location consent")} /></div>
+            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px] font-semibold">{t("Microphone, for voice actions")}</div><div className="text-xs text-muted-foreground">{t("Text input always available as a fallback")}</div></div><Toggle on={mic} onChange={setMic} label={t("Microphone consent")} /></div>
             <Check label={t("Allow WhatsApp notifications")} checked={false} />
             <Check label={t("Email me the monthly energy report (1st of each month)")} checked={false} />
           </div>
@@ -53,7 +53,7 @@ export function PreferencesDemo() {
             <div className="grid h-[150px] w-[150px] shrink-0 place-items-center rounded-lg border border-line bg-white p-2"><QrCode qr={DEMO_QR} label={t("QR code with the setup key for an authenticator app")} className="h-full w-full" /></div>
             <div className="flex min-w-0 flex-col gap-2.5 text-[13px]">
               <b>1&nbsp;&nbsp;{t("Scan with an authenticator app")}</b>
-              <div className="text-xs text-muted">{t("or enter key")}&nbsp;&nbsp;<span className="font-mono">{groupKey(DEMO_KEY)}</span></div>
+              <div className="text-xs text-muted-foreground">{t("or enter key")}&nbsp;&nbsp;<span className="font-mono">{groupKey(DEMO_KEY)}</span></div>
               <b>2&nbsp;&nbsp;{t("Enter the 6-digit code")}</b>
               <CodeInput label={t("6-digit code")} value={code} onChange={setCode} autoFocus />
               <b>3&nbsp;&nbsp;{t("Save your 8 recovery codes (shown after verifying)")}</b>

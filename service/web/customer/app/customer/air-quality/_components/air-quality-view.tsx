@@ -54,7 +54,7 @@ export function AirQualityView({ live }: { live: AirLive | null }) {
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-4 py-3 text-xs">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted">{t("Viewing")}</span>
+          <span className="text-muted-foreground">{t("Viewing")}</span>
           <Select aria-label={t("Room")} className="w-auto py-1.5 font-semibold" value={live.roomKey} onChange={(e) => pickRoom(e.target.value)}>
             {live.rooms.map((r) => <option key={r.key} value={r.key}>{t("Room: {room}", { room: r.label })}</option>)}
           </Select>
@@ -68,55 +68,55 @@ export function AirQualityView({ live }: { live: AirLive | null }) {
         {live.cards.map((m) => (
           <button key={m.metric} type="button" aria-pressed={m.metric === live.metric} onClick={() => patch({ metric: m.metric })}
             className={cx("flex min-w-0 flex-col gap-1 rounded-2xl border bg-surface p-4 text-left", m.metric === live.metric ? "border-primary ring-1 ring-primary" : "border-line hover:border-primary/50")}>
-            <span className="flex items-center justify-between gap-2 text-xs text-muted">{m.label}<Badge tone={m.feed.tone} icon={m.feed.icon}>{m.feed.text}</Badge></span>
-            <span className="text-[28px] font-bold leading-9">{m.value ?? "—"}{m.value !== null && <span className="ml-1 text-sm font-medium text-muted">{m.unit}</span>}</span>
+            <span className="flex items-center justify-between gap-2 text-xs text-muted-foreground">{m.label}<Badge tone={m.feed.tone} icon={m.feed.icon}>{m.feed.text}</Badge></span>
+            <span className="text-[28px] font-bold leading-9">{m.value ?? "—"}{m.value !== null && <span className="ml-1 text-sm font-medium text-muted-foreground">{m.unit}</span>}</span>
             <span><Badge tone={m.status.tone} icon={m.status.icon}>{m.status.text}</Badge></span>
-            <span className="text-[11px] text-muted">{m.sub}</span>
+            <span className="text-[11px] text-muted-foreground">{m.sub}</span>
             <span className={cx("text-xs font-semibold", m.warn && "text-warn")}>{m.advice}</span>
           </button>
         ))}
       </div>
-      <Card><div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]"><b>{live.allergen.title}</b><Badge tone={live.allergen.badge.tone} icon={live.allergen.badge.icon}>{live.allergen.badge.text}</Badge><span className="text-xs text-muted">{live.allergen.text}</span></div></Card>
+      <Card><div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]"><b>{live.allergen.title}</b><Badge tone={live.allergen.badge.tone} icon={live.allergen.badge.icon}>{live.allergen.badge.text}</Badge><span className="text-xs text-muted-foreground">{live.allergen.text}</span></div></Card>
       {live.clean && <Banner tone="warn" action={<LinkBtn size="sm" href="/customer/maintenance">{t("Maintenance")}</LinkBtn>}>{live.clean}</Banner>}
       <Banner tone={live.strip.tone} action={<Btn size="sm" variant={live.strip.tone === "warn" ? "primary" : "secondary"} disabled={!live.spaceId} title={live.spaceId ? undefined : t("Logs belong to a room — this unit is not in one")} onClick={() => setOpen(true)}>{t("Log ventilation")}</Btn>}>
-        <b>{live.strip.title}</b><div className="text-xs text-muted">{live.strip.text}{!live.spaceId && ` ${t("Ventilation logs belong to a room — HQ sets up the rooms, so ask HQ to place this unit in one.")}`}</div>
+        <b>{live.strip.title}</b><div className="text-xs text-muted-foreground">{live.strip.text}{!live.spaceId && ` ${t("Ventilation logs belong to a room — HQ sets up the rooms, so ask HQ to place this unit in one.")}`}</div>
       </Banner>
       <Card title={c.title} sub={c.sub} action={<div className="flex flex-wrap gap-2">
         <Tabs value={live.metric} onChange={(m) => patch({ metric: m })} tabs={airMetrics.map((k) => ({ id: k, label: t(metricInfo[k].tab) }))} />
         <Tabs value={live.period} onChange={(p) => patch({ period: p })} tabs={airPeriods.map((p) => ({ id: p, label: t(p) }))} />
         <Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: t("Chart") }, { id: "table", label: t("Table") }]} />
       </div>}>
-        {!c.hasSensor ? <p className="text-[13px] text-muted">{t("{unit} has no {metric} sensor — nothing to chart.", { unit: live.unitName, metric: label })}</p>
-          : !c.valid ? <p className="text-[13px] text-muted">{noValid}</p>
+        {!c.hasSensor ? <p className="text-[13px] text-muted-foreground">{t("{unit} has no {metric} sensor — nothing to chart.", { unit: live.unitName, metric: label })}</p>
+          : !c.valid ? <p className="text-[13px] text-muted-foreground">{noValid}</p>
           : view === "chart" ? (
             <>
               <LineChart points={c.points} min={c.min} max={c.max} threshold={c.guide ?? undefined} ticks={c.ticks} shadeGaps width={1200} height={300} labels={c.labels} />
-              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                 <span className="text-primary">— {label} ({info.unit})</span>
                 {c.guide !== null && <span className="text-crit">- - {c.guide} {info.unit} {t(live.metric === "co2" ? "ventilation guide" : "cleaning guide")}</span>}
-                {c.gaps && <span className="inline-flex items-center gap-1"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm border border-dashed border-muted" />{t("No data (gap, not joined)")}</span>}
+                {c.gaps && <span className="inline-flex items-center gap-1"><span aria-hidden className="inline-block h-2.5 w-2.5 rounded-sm border border-dashed border-muted-foreground" />{t("No data (gap, not joined)")}</span>}
               </div>
             </>
           ) : (
             <div className="max-h-[420px] overflow-y-auto">
               <DataTable rows={live.rows} rowKey={(r) => r.key} cols={[
                 { key: "t", label: t("Time"), render: (r) => r.time },
-                { key: "v", label: `${label} (${info.unit})`, render: (r) => (r.gap ? <span className="text-muted">{r.value}</span> : r.value) },
-                { key: "n", label: t("Readings"), render: (r) => <span className="text-xs text-muted">{r.note}</span> },
+                { key: "v", label: `${label} (${info.unit})`, render: (r) => (r.gap ? <span className="text-muted-foreground">{r.value}</span> : r.value) },
+                { key: "n", label: t("Readings"), render: (r) => <span className="text-xs text-muted-foreground">{r.note}</span> },
               ]} />
             </div>
           )}
         {c.hasSensor && c.total > c.readings && <p className="mt-2 text-xs font-semibold text-warn">{t("Showing the latest {n} of {total} readings — earlier readings are not loaded, so the start of the window is incomplete.", { n: c.readings, total: c.total })}</p>}
       </Card>
       <Card title={t("Ventilation history")} sub={live.history ? `${live.path} · ${t(live.history.total === 1 ? "{n} log" : "{n} logs", { n: live.history.total })} · ${t("manual records, nothing sent to the AC or to HQ")}` : live.path}>
-        {!live.history ? <p className="text-[13px] text-muted">{t("Ventilation logs belong to a room — {unit} is not in one.", { unit: live.unitName })}</p>
-          : live.history.rows.length === 0 ? <p className="text-[13px] text-muted">{t("No ventilation logged in this room yet.")}</p>
+        {!live.history ? <p className="text-[13px] text-muted-foreground">{t("Ventilation logs belong to a room — {unit} is not in one.", { unit: live.unitName })}</p>
+          : live.history.rows.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No ventilation logged in this room yet.")}</p>
           : live.history.rows.map((l) => (
             <div key={l.id} className="flex flex-wrap justify-between gap-2 border-b border-line py-2 text-[13px] last:border-0">
-              <span>{l.text} <span className="text-xs text-muted">· {l.co2}</span></span><span className="text-xs text-muted">{l.when} · {l.by}</span>
+              <span>{l.text} <span className="text-xs text-muted-foreground">· {l.co2}</span></span><span className="text-xs text-muted-foreground">{l.when} · {l.by}</span>
             </div>
           ))}
-        {live.history && live.history.total > live.history.rows.length && <p className="mt-1 text-xs text-muted">{t("Showing the latest {n}.", { n: live.history.rows.length })}</p>}
+        {live.history && live.history.total > live.history.rows.length && <p className="mt-1 text-xs text-muted-foreground">{t("Showing the latest {n}.", { n: live.history.rows.length })}</p>}
       </Card>
       {open && live.spaceId && <LogModal spaceId={live.spaceId} unitId={live.unitId} path={live.path} co2Now={live.co2Now} onClose={() => setOpen(false)} />}
     </Page>
@@ -141,7 +141,7 @@ function LogModal({ spaceId, unitId, path, co2Now, onClose }: { spaceId: string;
         [t("Duration"), <Field key="d" label={t("Duration")} className="[&>span:first-child]:sr-only" error={errors.durationMinutes && t("1–240 minutes")}><Select className="w-auto self-start py-1" value={minutes} onChange={(e) => setMinutes(Number(e.target.value))}>{ventDurations.map((n) => <option key={n} value={n}>{t("{n} min", { n })}</option>)}</Select></Field>],
         [t("Current CO2"), co2Now ?? t("Not measured — the log keeps no CO2 value")],
       ]} />
-      <p className="text-xs text-muted">{t("Saved to this room’s ventilation log with your name and time. Nothing is sent to the AC or to HQ — keep watching the chart to see whether CO2 drops.")}</p>
+      <p className="text-xs text-muted-foreground">{t("Saved to this room’s ventilation log with your name and time. Nothing is sent to the AC or to HQ — keep watching the chart to see whether CO2 drops.")}</p>
     </Modal>
   );
 }

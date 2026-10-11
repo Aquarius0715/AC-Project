@@ -30,28 +30,28 @@ export function EvidencePicker({ ids, onChange, period, units }: { ids: string[]
     <div role="group" aria-label={t("Evidence to attach")}>
       <p className="mb-1 text-[13px] font-semibold">{t("Evidence to attach")}</p>
       <div className="flex flex-wrap items-center gap-2">
-        {ids.length === 0 && <span className="text-xs text-muted">{t("None yet.")}</span>}
+        {ids.length === 0 && <span className="text-xs text-muted-foreground">{t("None yet.")}</span>}
         {ids.map((id) => {
           const name = byId.get(id)?.name ?? id.slice(0, 8);
           return (
             <span key={id} className="inline-flex items-center gap-1.5 rounded-full bg-surface2 px-2.5 py-1 text-xs">
-              {name}<button type="button" aria-label={t("Remove {name}", { name })} className="text-muted hover:text-ink" onClick={() => onChange(ids.filter((x) => x !== id))}><Icon name="close" /></button>
+              {name}<button type="button" aria-label={t("Remove {name}", { name })} className="text-muted-foreground hover:text-ink" onClick={() => onChange(ids.filter((x) => x !== id))}><Icon name="close" /></button>
             </span>
           );
         })}
         {ids.length < MAX_EVIDENCE && <Btn size="sm" variant="ghost" disabled={!ready} aria-expanded={open} onClick={() => setOpen((v) => !v)}><Icon name="add" /> {t("Add evidence")}</Btn>}
       </div>
-      {!ready && <p className="mt-1 text-[11px] text-muted">{t("Choose the units and the period first: the candidates are their work-report photos.")}</p>}
+      {!ready && <p className="mt-1 text-[11px] text-muted-foreground">{t("Choose the units and the period first: the candidates are their work-report photos.")}</p>}
       {open && ready && (
         <div className="mt-2 flex flex-col gap-1.5 rounded-xl border border-line p-3">
-          {cands.loading ? <p className="text-xs text-muted">{t("Loading the attachments…")}</p>
+          {cands.loading ? <p className="text-xs text-muted-foreground">{t("Loading the attachments…")}</p>
             : cands.error ? <p className="text-xs text-crit">{t("The attachments could not be loaded — try again.")}</p>
-            : rows.length === 0 ? <p className="text-xs text-muted">{t("No photos of accepted work reports on these units in this period.")}</p>
+            : rows.length === 0 ? <p className="text-xs text-muted-foreground">{t("No photos of accepted work reports on these units in this period.")}</p>
             : rows.map((r) => (
               <Check key={r.id} checked={ids.includes(r.id)} disabled={!ids.includes(r.id) && ids.length >= MAX_EVIDENCE} onChange={(on) => onChange(on ? [...ids, r.id] : ids.filter((x) => x !== r.id))}
-                label={<span><b>{r.name}</b><span className="block text-xs text-muted">{r.sub}</span></span>} />
+                label={<span><b>{r.name}</b><span className="block text-xs text-muted-foreground">{r.sub}</span></span>} />
             ))}
-          <p className="text-[11px] text-muted">{t("Photos of accepted work reports on these units, uploaded in the period (attachments.list). Up to 20.")}</p>
+          <p className="text-[11px] text-muted-foreground">{t("Photos of accepted work reports on these units, uploaded in the period (attachments.list). Up to 20.")}</p>
         </div>
       )}
     </div>
@@ -65,12 +65,12 @@ export function EvidenceList({ ids, period, units }: { ids: string[]; period: Pe
   const { t } = i;
   const cands = useCandidates(period, ids.length > 0);
   const byId = new Map(evidenceRows(cands.data, units, i).map((r) => [r.id, r]));
-  if (ids.length === 0) return <p className="text-xs text-muted">{t("No evidence attached.")}</p>;
+  if (ids.length === 0) return <p className="text-xs text-muted-foreground">{t("No evidence attached.")}</p>;
   return (
     <ul className="flex flex-col gap-1 text-[13px]">
       {ids.map((id) => {
         const r = byId.get(id);
-        return <li key={id}>{r ? <><b>{r.name}</b> <span className="text-xs text-muted">· {r.sub}</span></> : <span className="font-mono text-xs">{id}</span>}</li>;
+        return <li key={id}>{r ? <><b>{r.name}</b> <span className="text-xs text-muted-foreground">· {r.sub}</span></> : <span className="font-mono text-xs">{id}</span>}</li>;
       })}
     </ul>
   );

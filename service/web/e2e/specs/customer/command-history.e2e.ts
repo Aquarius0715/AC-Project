@@ -8,7 +8,7 @@ test("the command history names a restriction's command and who sent it", async 
   const main = page.getByRole("main");
   const link = main.locator('a[href^="/customer/units/"]').filter({ hasText: "Lobby AC" }).first();
   await page.goto((await link.getAttribute("href"))!);
-  const history = main.getByRole("heading", { name: "Command history" }).locator("xpath=ancestor::section[1]");
+  const history = main.getByRole("heading", { name: "Command history" }).locator('xpath=ancestor::*[self::section or @data-slot="card"][1]');
   await expect(history).toContainText("Apply restriction: Temperature limit — cooling setpoint ≥ 24 °C — acknowledged by device · by a restriction");
   await expect(history).not.toContainText("undefined");
 });

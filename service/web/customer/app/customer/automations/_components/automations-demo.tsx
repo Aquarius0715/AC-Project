@@ -45,7 +45,7 @@ export function AutomationsDemo() {
       <PageHead title="Your automations" sub={`${list.length} automations · ${onCount} on · each rule controls one AC · checked again when it runs`} action={<Btn variant="primary" onClick={() => open("new")}><Icon name="add" /> Create automation</Btn>} />
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><div className="flex items-center gap-1.5 font-bold"><Icon name="location" />Location consent — for arrival/departure automations only</div><div className="text-xs text-muted">{consent ? "Granted Sep 10, 2026 · used only by 2 location automations · demo location events (no real GPS history)." : "Withdrawn — location automations are paused. Schedule automations are unaffected."}</div></div>
+          <div><div className="flex items-center gap-1.5 font-bold"><Icon name="location" />Location consent — for arrival/departure automations only</div><div className="text-xs text-muted-foreground">{consent ? "Granted Sep 10, 2026 · used only by 2 location automations · demo location events (no real GPS history)." : "Withdrawn — location automations are paused. Schedule automations are unaffected."}</div></div>
           <Btn size="sm" variant={consent ? "danger" : "primary"} onClick={() => { setConsent(!consent); toast(consent ? "Location consent withdrawn" : "Location consent granted", consent ? "warn" : "ok"); }}>{consent ? "Withdraw consent" : "Grant consent"}</Btn>
         </div>
       </Card>
@@ -58,9 +58,9 @@ export function AutomationsDemo() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2"><b className="text-[15px]">{a.name}</b><Badge tone="primary" icon={a.icon}>{a.kind}</Badge>{paused && <Badge tone="warn">Paused — consent withdrawn</Badge>}</div>
-                    <p className="mt-1 text-[13px]"><span className="text-muted">When</span> {a.when}</p>
-                    <p className="text-[13px]"><span className="text-muted">Then</span> {a.then}</p>
-                    <p className="text-xs text-muted">{a.unit}</p>
+                    <p className="mt-1 text-[13px]"><span className="text-muted-foreground">When</span> {a.when}</p>
+                    <p className="text-[13px]"><span className="text-muted-foreground">Then</span> {a.then}</p>
+                    <p className="text-xs text-muted-foreground">{a.unit}</p>
                     {a.note && <p className="mt-1 flex items-center gap-1 text-xs text-warn"><Icon name="info" />{a.note}</p>}
                   </div>
                   <div className="relative flex items-center gap-2">
@@ -76,7 +76,7 @@ export function AutomationsDemo() {
           })}
         </div>
       )}
-      <p className="text-xs text-muted">Priority when rules overlap: device capabilities & active restrictions → HQ policy → your automations. List order is not run priority. Missing condition data never counts as a match.</p>
+      <p className="text-xs text-muted-foreground">Priority when rules overlap: device capabilities & active restrictions → HQ policy → your automations. List order is not run priority. Missing condition data never counts as a match.</p>
 
       <Modal open={!!edit} onClose={() => setEdit(null)} wide title={step === "review" ? "Review / Test result" : edit === "new" ? "Create automation" : "Edit automation"} footer={step === "form" ? <><Btn onClick={() => setEdit(null)}>Cancel</Btn><Btn variant="primary" onClick={review}>Review</Btn></> : <><Btn onClick={() => setStep("form")}><Icon name="arrowLeft" /> Back</Btn><Btn variant="primary" onClick={save}>Save automation</Btn></>}>
         {step === "form" ? (
@@ -94,7 +94,7 @@ export function AutomationsDemo() {
           <>
             <Banner tone="ok">Simulation passed — no commands were sent.</Banner>
             <SummaryList items={[["Name", f.name], ["Trigger", f.kind], ["Target", f.unit], ["Action", `Set temperature ${f.temp}°C`], ["Next runs", "Mon Sep 28 18:00 · Wed Sep 30 18:00 · Mon Oct 5 18:00"]]} />
-            <p className="text-xs text-muted">Conditions are checked again each time the rule runs. Active restrictions and device capabilities take priority.</p>
+            <p className="text-xs text-muted-foreground">Conditions are checked again each time the rule runs. Active restrictions and device capabilities take priority.</p>
           </>
         )}
       </Modal>

@@ -32,7 +32,7 @@ export function ControlDemo({ id }: { id: string }) {
   };
   return (
     <Page>
-      <div className="text-[13px] text-muted"><Link href={`/technician/units/${id}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> Unit</Link> › Diagnostic control · {id}</div>
+      <div className="text-[13px] text-muted-foreground"><Link href={`/technician/units/${id}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> Unit</Link> › Diagnostic control · {id}</div>
       {errs.length > 0 && <Banner tone="crit">{errs.map((e) => <div key={e}>{e}</div>)}</Banner>}
       {restricted && <Banner tone="warn">Cooling restriction active — minimum 24 °C applies to diagnostics too.</Banner>}
       <div className="split">
@@ -49,11 +49,11 @@ export function ControlDemo({ id }: { id: string }) {
             {run === "ended" && <div className="mt-3"><Banner tone="ok">End acknowledged — test run completed, unit Stopped.</Banner></div>}
             <div className="mt-3 flex justify-end"><Btn variant="primary" disabled={run === "running"} onClick={() => check("test")}>Start test run</Btn></div>
           </Card>
-          <Card title="Command history — this job">{hist.map(([t, a, b], i) => <div key={i} className="border-t border-line py-2 text-[13px] first:border-0"><b>{t} · {a}</b><div className={`text-xs ${b.includes("rejected") ? "text-crit" : "text-muted"}`}>{b}</div></div>)}</Card>
+          <Card title="Command history — this job">{hist.map(([t, a, b], i) => <div key={i} className="border-t border-line py-2 text-[13px] first:border-0"><b>{t} · {a}</b><div className={`text-xs ${b.includes("rejected") ? "text-crit" : "text-muted-foreground"}`}>{b}</div></div>)}</Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
-          <Card title="Current unit state" sub="observed 09:41:02"><SummaryList items={[["Power", "On"], ["Mode", "Cool"], ["Setpoint", "24 °C"], ["Fan", "Auto"], ["Room", "30.4 °C"]]} /><p className="mt-2 text-[11px] text-muted">Capability v3 allows: set_mode (cool/dry/fan), set_temperature 16–30 °C, fan speed, test run 1–15 min. No firmware update running.</p></Card>
-          <Card title="Authorization"><SummaryList items={[["Assignment", "job-contractor-a"], ["Window", "10:00–12:00"], ["Restriction", restricted ? "min 24 °C" : "none"], ["Pending commands", "1 (test run)"]]} /><p className="mt-2 text-[11px] text-muted">Checked again just before each command. When the window ends, no end command can be sent (end_blocked).</p></Card>
+          <Card title="Current unit state" sub="observed 09:41:02"><SummaryList items={[["Power", "On"], ["Mode", "Cool"], ["Setpoint", "24 °C"], ["Fan", "Auto"], ["Room", "30.4 °C"]]} /><p className="mt-2 text-[11px] text-muted-foreground">Capability v3 allows: set_mode (cool/dry/fan), set_temperature 16–30 °C, fan speed, test run 1–15 min. No firmware update running.</p></Card>
+          <Card title="Authorization"><SummaryList items={[["Assignment", "job-contractor-a"], ["Window", "10:00–12:00"], ["Restriction", restricted ? "min 24 °C" : "none"], ["Pending commands", "1 (test run)"]]} /><p className="mt-2 text-[11px] text-muted-foreground">Checked again just before each command. When the window ends, no end command can be sent (end_blocked).</p></Card>
         </div>
       </div>
       <Modal open={!!confirm} onClose={() => setConfirm(null)} title="Send this diagnostic command?" footer={<><Btn onClick={() => setConfirm(null)}>Cancel</Btn><Btn variant="primary" onClick={send}>Send command</Btn></>}>

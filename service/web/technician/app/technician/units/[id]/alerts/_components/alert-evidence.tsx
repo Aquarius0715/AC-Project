@@ -45,7 +45,7 @@ export function AlertEvidenceView({ live }: { live: AlertsLive }) {
   };
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px]"><Link href={live.unitHref} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{t("Alert evidence")}</h1><span className="text-muted">· {live.unitName}</span></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px]"><Link href={live.unitHref} className="font-semibold text-primary" aria-label={t("Back")}><Icon name="chevronLeft" /></Link><h1 className="text-base font-bold">{t("Alert evidence")}</h1><span className="text-muted-foreground">· {live.unitName}</span></div>
       {!a ? <Card><EmptyState title={t("No alerts on this unit")}>{t("Alerts raised on this unit appear here with their evidence.")}</EmptyState></Card> : (
         <>
           <div className={cx("flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3", BANNER[a.banner.tone])}>
@@ -55,10 +55,10 @@ export function AlertEvidenceView({ live }: { live: AlertsLive }) {
           <div className="grid-fluid" style={{ ["--min" as string]: "260px" }}>
             {a.cards.map((c) => (
               <div key={c.title} className="rounded-2xl border border-line bg-surface p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted">{c.kind}</div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{c.kind}</div>
                 <div className="text-[13px] font-semibold">{c.title}</div>
                 <div className="mt-1 text-[15px] font-bold">{c.value}</div>
-                <div className="mt-1 text-[11px] text-muted">{c.sub}</div>
+                <div className="mt-1 text-[11px] text-muted-foreground">{c.sub}</div>
               </div>
             ))}
           </div>
@@ -72,13 +72,13 @@ export function AlertEvidenceView({ live }: { live: AlertsLive }) {
                 <div className="mt-3"><Btn variant="primary" className="w-full" disabled={busy} onClick={() => act("resolve")}>{t("Resolve alert")}</Btn></div>
               </>
             )}
-            <p className="mt-2 text-[11px] text-muted">{a.resolution.note}</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">{a.resolution.note}</p>
           </Card>
           <div className="split">
             <Card title={t("Alert history")}>
               {a.history.map((h) => (
                 <div key={h.id} className="flex items-start justify-between gap-2 border-t border-line py-2 first:border-0">
-                  <span className="min-w-0"><b className="block text-[13px]">{h.time} · {h.title}</b>{h.sub && <span className="text-xs text-muted">{h.sub}</span>}</span><Badge tone={h.badge.tone}>{h.badge.text}</Badge>
+                  <span className="min-w-0"><b className="block text-[13px]">{h.time} · {h.title}</b>{h.sub && <span className="text-xs text-muted-foreground">{h.sub}</span>}</span><Badge tone={h.badge.tone}>{h.badge.text}</Badge>
                 </div>
               ))}
             </Card>
@@ -88,7 +88,7 @@ export function AlertEvidenceView({ live }: { live: AlertsLive }) {
                 <Card title={t("Alerts on this unit ({n})", { n: live.count })}>
                   {live.choices.map((x) => (
                     <button key={x.id} type="button" onClick={() => { setMsg(null); setPicked([]); patch({ alertId: x.id }); }} className={cx("flex w-full items-center justify-between gap-2 border-t border-line py-2 text-left first:border-0", x.id === a.id && "font-bold")}>
-                      <span className="min-w-0"><span className="block text-[13px]">{x.title}</span><span className="text-xs font-normal text-muted">{x.sub}</span></span><SeverityBadge s={x.severity} />
+                      <span className="min-w-0"><span className="block text-[13px]">{x.title}</span><span className="text-xs font-normal text-muted-foreground">{x.sub}</span></span><SeverityBadge s={x.severity} />
                     </button>
                   ))}
                 </Card>

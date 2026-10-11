@@ -22,9 +22,9 @@ export default function Forgot() {
           <form onSubmit={submit} className="flex flex-col gap-3">
             <Field label="Email" error={err}><Input type="text" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" /></Field>
             <Btn variant="primary" type="submit">Send reset preview</Btn>
-            {sent && <Banner tone="ok">If an account exists for that address, a reset link preview has been sent.<div className="text-xs text-muted">deliveryState: preview · no real email sent · same message shown whether or not the address is registered</div></Banner>}
+            {sent && <Banner tone="ok">If an account exists for that address, a reset link preview has been sent.<div className="text-xs text-muted-foreground">deliveryState: preview · no real email sent · same message shown whether or not the address is registered</div></Banner>}
             <Link href="/login" className="text-xs font-semibold text-primary hover:underline"><Icon name="arrowLeft" /> Back to sign in</Link>
-            <p className="text-[11px] text-muted">Demo authentication only — email format is checked but no message is actually delivered.</p>
+            <p className="text-[11px] text-muted-foreground">Demo authentication only — email format is checked but no message is actually delivered.</p>
           </form>
         </Card>
       </div>

@@ -1288,6 +1288,8 @@ export const ms: Record<string, string> = {
   "No change {value}": "Tiada perubahan {value}",
   "Reduction {value}": "Pengurangan {value}",
   "Increase {value}": "Peningkatan {value}",
+  "Lower the temperature": "Turunkan suhu",
+  "Raise the temperature": "Naikkan suhu",
   "Partial coverage — some expected readings are missing or invalid": "Liputan separa — sesetengah bacaan yang dijangka tiada atau tidak sah",
   "Baseline not comparable — unit set, boundary, period length or coverage differ, so no difference is shown": "Garis dasar tidak setanding — set unit, sempadan, tempoh atau liputan berbeza, jadi tiada perbezaan ditunjukkan",
   "Modeled baseline — a demo assumption, not a measurement": "Garis dasar dimodelkan — andaian demo, bukan ukuran",

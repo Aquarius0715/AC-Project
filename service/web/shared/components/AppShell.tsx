@@ -34,7 +34,7 @@ const SHARED = [
 function NavLink({ href, label, icon, badge, active }: { href: string; label: string; icon: IconName; badge?: string; active: boolean }) {
   return (
     <Link href={href} aria-current={active ? "page" : undefined} className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold", active ? "bg-primary-soft text-primary" : "text-ink hover:bg-surface2")}>
-      <Icon name={icon} className={cx("text-[15px]", active ? "text-primary" : "text-muted")} />
+      <Icon name={icon} className={cx("text-[15px]", active ? "text-primary" : "text-muted-foreground")} />
       <span className="min-w-0 flex-1 leading-tight">{label}</span>
       {badge && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-crit px-1 text-[10px] font-bold text-white">{badge}</span>}
     </Link>
@@ -112,9 +112,9 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
         <aside className={cx("fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col gap-1 overflow-y-auto border-r border-line bg-surface p-4 transition-transform lg:sticky lg:top-0 lg:h-dvh lg:w-auto lg:translate-x-0", open ? "translate-x-0" : "-translate-x-full")}>
           <Link href={cfg.base} className="mb-3 flex items-center gap-2.5">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-lg text-white"><Icon name="cooling" /></span>
-            <span className="leading-tight"><span className="block text-[15px] font-bold">{cfg.app}</span><span className="block text-[11px] text-muted">{t(cfg.sub)}</span></span>
+            <span className="leading-tight"><span className="block text-[15px] font-bold">{cfg.app}</span><span className="block text-[11px] text-muted-foreground">{t(cfg.sub)}</span></span>
           </Link>
-          <div className="px-3 pb-1 text-[10px] font-bold tracking-wider text-muted">{scope}</div>
+          <div className="px-3 pb-1 text-[10px] font-bold tracking-wider text-muted-foreground">{scope}</div>
           <Suspense fallback={<RoleNav items={items} base={cfg.base} pathname={pathname} search="" />}><RoleNavWithQuery items={items} base={cfg.base} pathname={pathname} /></Suspense>
           <div className="my-2 border-t border-line" />
           <nav className="flex flex-col gap-0.5">

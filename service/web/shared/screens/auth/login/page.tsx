@@ -23,21 +23,21 @@ export function LoginScreen({ role, others = {}, params = {}, api }: { role: Rol
       <div className="w-full max-w-[350px] rounded-2xl border border-line bg-surface p-6 text-center shadow-sm">
         <span aria-hidden className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-xl bg-primary text-xl text-white"><Icon name="cooling" /></span>
         <h1 className="text-lg font-bold">AC Project — {cfg.loginTitle}</h1>
-        <p className="mt-1 text-[13px] text-muted">{cfg.loginSub}</p>
+        <p className="mt-1 text-[13px] text-muted-foreground">{cfg.loginSub}</p>
         <div className="mt-2"><Badge className="uppercase tracking-wide">Not real authentication</Badge></div>
         {error && <div className="mt-4 text-left"><Banner tone="crit">{error}</Banner></div>}
         <div className="mt-4 flex items-center gap-3 rounded-xl bg-primary-soft/70 p-3 text-left">
           <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary text-sm text-white"><Icon name="account" /></span>
-          <span className="min-w-0"><span className="block text-[13px] font-bold">{cfg.loginUser}</span><span className="block text-[11px] text-muted">{cfg.loginDesc}</span></span>
+          <span className="min-w-0"><span className="block text-[13px] font-bold">{cfg.loginUser}</span><span className="block text-[11px] text-muted-foreground">{cfg.loginDesc}</span></span>
         </div>
         <ContinueLink role={role} href={href}>Continue as {cfg.loginUser} <Icon name="arrowRight" /></ContinueLink>
-        <p className="mt-4 text-[11px] text-muted">Looking for a different AC Project service?{" "}
+        <p className="mt-4 text-[11px] text-muted-foreground">Looking for a different AC Project service?{" "}
           {names.map((r, i) => (
             <span key={r}>{i > 0 && (i === names.length - 1 ? ", and " : ", ")}{others[r] ? <a className="font-semibold text-primary hover:underline" href={`${others[r]}/login`}>{ROLES[r].loginTitle}</a> : ROLES[r].loginTitle}</span>
           ))}{" "}each have their own sign-in.
         </p>
         <Link href="/forgot-password" className="mt-3 inline-block text-xs font-semibold text-primary hover:underline">Forgot password?</Link>
-        <p className="mt-3 text-[11px] text-muted">Demo authentication only — no real accounts, emails, or passwords are used.</p>
+        <p className="mt-3 text-[11px] text-muted-foreground">Demo authentication only — no real accounts, emails, or passwords are used.</p>
       </div>
     </main>
   );

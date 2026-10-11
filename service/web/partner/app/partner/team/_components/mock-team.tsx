@@ -30,25 +30,25 @@ export function MockTeam() {
       <div className="flex flex-wrap items-center gap-4"><Check label="Active only" checked={activeOnly} onChange={setActiveOnly} /><div className="min-w-[220px] flex-1 sm:max-w-sm"><Search placeholder="Filter by qualification or technician" value={q} onChange={setQ} /></div></div>
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
-          <h2 className="text-[15px] font-bold">Technicians — contractor-a <span className="text-xs font-normal text-muted">· {techs.filter((t) => t.active).length} active</span></h2>
+          <h2 className="text-[15px] font-bold">Technicians — contractor-a <span className="text-xs font-normal text-muted-foreground">· {techs.filter((t) => t.active).length} active</span></h2>
           {list.length === 0 && <EmptyState title="No match">No technician matches this qualification.</EmptyState>}
           {list.map((t) => {
             const pct = t.tot ? Math.round((t.used / t.tot) * 100) : null;
-            return <Card key={t.id} title={t.id} sub={t.sub} action={<div className="text-right"><div className="text-xl font-bold">{pct === null ? "—" : pct + "%"}</div><div className="text-[11px] text-muted">utilization</div></div>}>
+            return <Card key={t.id} title={t.id} sub={t.sub} action={<div className="text-right"><div className="text-xl font-bold">{pct === null ? "—" : pct + "%"}</div><div className="text-[11px] text-muted-foreground">utilization</div></div>}>
               <div className="mb-2 flex justify-between text-xs"><span>Week of 09-14</span><b>{t.used} h / {t.tot} h</b></div><UtilBar pct={pct} />
               <div className="mt-2 grid-fluid text-xs" style={{ ["--min"as string]: "180px" }}><span>{t.asg}</span><span className="text-ok">{t.free}</span></div>
             </Card>;
           })}
-          <p className="text-[11px] text-muted">Utilization = assigned hours ÷ configured available hours (4 h / 8 h = 50%). Undefined available hours show “—”, not 0%. Read-only — membership changes are requested from HQ.</p>
+          <p className="text-[11px] text-muted-foreground">Utilization = assigned hours ÷ configured available hours (4 h / 8 h = 50%). Undefined available hours show “—”, not 0%. Read-only — membership changes are requested from HQ.</p>
           <Card title="Week of 09-14 — assigned / available hours" action={<Link className="text-xs font-semibold text-primary" href="/partner/schedule">Open schedule <Icon name="arrowRight" /></Link>}>
-            <div className="scroll-x"><table className="w-full min-w-[560px] text-xs"><thead><tr className="text-left text-muted"><th /><th>Mon 14</th><th>Tue 15</th><th>Wed 16</th><th>Thu 17</th><th>Fri 18</th><th>Sat 19</th><th>Sun 20</th></tr></thead><tbody>{techs.filter((t) => t.week.length).map((t) => <tr key={t.id} className="border-t border-line"><td className="py-2 font-bold">{t.id}</td>{t.week.map((w, i) => <td key={i}>{w}</td>)}</tr>)}</tbody></table></div>
-            <p className="mt-2 text-[11px] text-muted">Sat/Sun have no configured available hours, so utilization shows “—”.</p>
+            <div className="scroll-x"><table className="w-full min-w-[560px] text-xs"><thead><tr className="text-left text-muted-foreground"><th /><th>Mon 14</th><th>Tue 15</th><th>Wed 16</th><th>Thu 17</th><th>Fri 18</th><th>Sat 19</th><th>Sun 20</th></tr></thead><tbody>{techs.filter((t) => t.week.length).map((t) => <tr key={t.id} className="border-t border-line"><td className="py-2 font-bold">{t.id}</td>{t.week.map((w, i) => <td key={i}>{w}</td>)}</tr>)}</tbody></table></div>
+            <p className="mt-2 text-[11px] text-muted-foreground">Sat/Sun have no configured available hours, so utilization shows “—”.</p>
           </Card>
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           <div className="grid-fluid" style={{ ["--min"as string]: "120px" }}><Stat label="Assigned" value="18 h" /><Stat label="Available" value="80 h" /><Stat label="Team utilization" value="23%" /><Stat label="Free hours Tue" value="8 h" /></div>
-          <Card title="Qualifications">{quals.map(([a, b]) => <div key={a} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px] first:border-0"><span>{a}</span><span className="text-xs text-muted">{b}</span></div>)}</Card>
-          <p className="text-[11px] text-muted">{activeOnly ? "1 expired member hidden (Active only). " : ""}Qualification or membership changes are requested from HQ — contractors cannot grant permissions.</p>
+          <Card title="Qualifications">{quals.map(([a, b]) => <div key={a} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px] first:border-0"><span>{a}</span><span className="text-xs text-muted-foreground">{b}</span></div>)}</Card>
+          <p className="text-[11px] text-muted-foreground">{activeOnly ? "1 expired member hidden (Active only). " : ""}Qualification or membership changes are requested from HQ — contractors cannot grant permissions.</p>
         </div>
       </div>
       </>}
@@ -61,8 +61,8 @@ export function MockTeam() {
       <Modal open={modal === "upload"} onClose={() => setModal(null)} title="Upload renewal — Electrical basics" footer={<><Btn onClick={() => setModal(null)}>Cancel</Btn><Btn variant="primary" onClick={() => { setModal(null); toast("Renewal uploaded — pending HQ verification"); }}>Upload</Btn></>}>
         <Field label="Technician"><Input disabled value="tech-external-a" /></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}><Field label="Certificate no."><Input defaultValue="EB-2026-0442" /></Field><Field label="Valid until"><Input type="date" defaultValue="2028-10-15" /></Field></div>
-        <div className="rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted"><Icon name="upload" /> Drop a PDF / image (≤ 5 MiB)</div>
-        <p className="text-[11px] text-muted">A pending renewal does not extend eligibility until HQ verifies it.</p>
+        <div className="rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted-foreground"><Icon name="upload" /> Drop a PDF / image (≤ 5 MiB)</div>
+        <p className="text-[11px] text-muted-foreground">A pending renewal does not extend eligibility until HQ verifies it.</p>
       </Modal>
     </Page>
   );
@@ -84,7 +84,7 @@ function Certs({ onUpload }: { onUpload: () => void }) {
           { key: "s", label: "Status", render: (r) => <Badge tone={r.st === "Valid" ? "ok" : r.st === "Expired" ? "muted" : "warn"}>{r.st}</Badge> },
           { key: "a", label: "", render: (r) => (r.st.startsWith("Expiring") ? <Btn size="sm" variant="primary" onClick={onUpload}>Upload renewal</Btn> : null) },
         ]} />
-        <p className="mt-2 text-[11px] text-muted">Only valid, HQ-verified certificates make a technician eligible for offers that require them.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">Only valid, HQ-verified certificates make a technician eligible for offers that require them.</p>
       </Card>
     </div>
   );

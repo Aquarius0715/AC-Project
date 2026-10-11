@@ -6304,3 +6304,43 @@ The web's last character icons are Lucide icons, a test keeps characters from co
    - in any of the 1,168 tracked files;
    - in any of the 275 commits.
    No `.env` file is tracked.
+
+## IR400 shadcn/ui, phase 1: the foundation and the product components on it — 2026-10-12
+
+The product owner decided to build the UI from shadcn/ui components, and to use established libraries for the logic (DEC-75). This supersedes DEC-03. Phase 1 lays the foundation, and the product components every screen uses now render shadcn components.
+
+1. **The foundation.**
+   - shadcn CLI 4.21.4, style base-nova (Base UI 1.9.0, the CLI's default), Lucide icons.
+   - `shared/components.json` aliases the components into `@ac/web` (`shared/components/ui/`, `@ac/web/lib/utils`). `shared/tsconfig.json` maps `@ac/web/*` to the package itself, so the CLI can resolve them.
+   - Runtime dependencies are pinned exactly: @base-ui/react, class-variance-authority, cn (shadcn's class merger, clsx and tailwind-merge) and tw-animate-css.
+   - The shadcn package itself (CLI and `shadcn/tailwind.css`) is a root development dependency. The CSS is read at build time, the Docker deps stage runs a full `npm ci`, and the runtime image copies only the standalone output. `npm audit --omit=dev` stays at 0; with shadcn as a runtime dependency, its CLI chain showed 7 high-severity advisories (braces through fast-glob).
+2. **The theme.**
+   - shadcn's semantic colours (background, foreground, card, primary, muted, border, ring and so on) map to the UI Guideline palette. The radius is 10px, the control radius.
+   - The product palette stays for the status tones and surfaces.
+   - Dark styles apply only under a `.dark` class. The product has no dark mode, so an operating system set to dark does not restyle a component half-way.
+   - `muted` is now a surface, as in shadcn: 1,307 `text-muted` classes in 113 files are `text-muted-foreground`, and the few grey fills are `bg-muted-foreground`.
+3. **The components** (`shared/components/ui/`): Button, Badge, Card, Alert, Empty, Input, Textarea, NativeSelect, Label, Field, Separator, Skeleton, Spinner and Kbd, as the registry gives them.
+4. **The product components on them** (`shared/components/ui.tsx`):
+   - `Btn` and `LinkBtn` are the shadcn Button and its classes. Primary → default, secondary → outline, ghost → ghost in the primary colour, danger → destructive.
+   - `Badge` is the shadcn Badge in the tone's colours.
+   - `Card` and `Kpi` are the shadcn Card. The title stays a level-2 heading, and the overflow stays visible for the menus that still open inside a card.
+   - `Banner` is the shadcn Alert, a status unless critical.
+   - `EmptyState`, `ErrorState` and `OfflineState` are the shadcn Empty, with level-3 headings. OfflineState lost its "⊘".
+   - `Input`, `Textarea` and `Select` are the shadcn Input, Textarea and NativeSelect, so a select stays native.
+   - `cx` is `cn`, so a later class wins over a conflicting earlier one.
+   - A `Field` label is semibold, but its control's text is not.
+5. **Found on the way.**
+   - **The dialog focus trap.** The Base UI Button keeps `tabindex="0"` when disabled. The trap took a disabled footer button as its last stop, so Tab left the dialog. The trap now skips disabled controls and those out of the tab order. The keyboard E2E caught it in the HQ and technician dialogs.
+   - **axe and transitions.** The shadcn Button fades its opacity. A button turning enabled was measured half-way (2.27:1), so the accessibility helper now waits for finite animations and transitions before axe runs.
+   - **More character icons.** The icon guard missed "⊘" (circled operators are symbols now), and buttons whose only content is a sign: the "–"/"+" temperature steppers of the unit and properties screens and of the demo, and the "×" that removes a cost line. They are Lucide icons with labels ("Lower the temperature", "Raise the temperature"), and the guard now refuses such a button.
+6. **Tests.**
+   - The specs that scoped a card by `section` (13 locators and 2 XPath ancestors) now match `section, [data-slot="card"]`. Some screens still have their own `<section>` elements.
+   - No other spec changed: roles and names are the same.
+7. **Next phases** (DEC-75):
+   2. forms with React Hook Form and Zod;
+   3. Dialog, AlertDialog, DropdownMenu and Combobox;
+   4. tables (TanStack Table), charts (Recharts) and toasts (Sonner);
+   5. the screens on shadcn directly, with a guard against hand-built UI (about 140 elements);
+   6. Figma restyled to match;
+   7. a translation library.
+8. **Checks.** Typecheck, lint, the web unit tests (460), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped. Screenshots of the four apps show the new components.

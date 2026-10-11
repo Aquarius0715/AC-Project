@@ -37,13 +37,13 @@ function Frame({ title, state, children, footer, lang, setLang, onClose, context
     <div className="fixed inset-0 z-40 flex justify-end bg-ink/30" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <aside role="dialog" aria-label={title} className="flex h-full w-full flex-col bg-surface shadow-2xl sm:max-w-[420px]">
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <h2 className="flex items-center gap-2 font-bold"><Icon name="mic" /> {title} <span className="rounded-full bg-surface2 px-2 py-0.5 text-[11px] font-semibold text-muted">{state}</span></h2>
+          <h2 className="flex items-center gap-2 font-bold"><Icon name="mic" /> {title} <span className="rounded-full bg-surface2 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{state}</span></h2>
           <div className="flex items-center gap-2">
             <select aria-label={t("Language")} value={lang} onChange={(e) => setLang?.(e.target.value as Locale)} className="rounded-control border border-line px-2 py-1 text-xs"><option value="en">English</option><option value="ms">Bahasa Melayu</option></select>
-            <button aria-label={t("Close")} onClick={onClose} className="rounded-lg px-2 py-1 text-muted hover:bg-surface2"><Icon name="close" /></button>
+            <button aria-label={t("Close")} onClick={onClose} className="rounded-lg px-2 py-1 text-muted-foreground hover:bg-surface2"><Icon name="close" /></button>
           </div>
         </div>
-        <p className="border-b border-line bg-surface2/60 px-4 py-2 text-[11px] text-muted">{t("Context: {context} · you can control units you have permission for", { context })}</p>
+        <p className="border-b border-line bg-surface2/60 px-4 py-2 text-[11px] text-muted-foreground">{t("Context: {context} · you can control units you have permission for", { context })}</p>
         {children}
         {footer}
       </aside>
@@ -154,13 +154,13 @@ function LiveAssistant({ onClose, context }: { onClose: () => void; context: str
       footer={<>
         <form className="flex items-center gap-2 border-t border-line p-3" onSubmit={(e) => { e.preventDefault(); if (text.trim() && !busy) { ask(text.trim(), "text"); setText(""); } }}>
           <input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder={t("Type a message…")} aria-label={t("Message")} maxLength={200} className="min-w-0 flex-1 rounded-control border border-line px-3 py-2 text-[13px]" />
-          <button type="button" disabled={busy || state === "listening"} onClick={voice} aria-label={t("Voice input")} className={cx("grid h-10 w-10 place-items-center rounded-full text-white disabled:opacity-50", mic ? "bg-primary" : "bg-muted")}><Icon name="mic" className="text-lg" /></button>
+          <button type="button" disabled={busy || state === "listening"} onClick={voice} aria-label={t("Voice input")} className={cx("grid h-10 w-10 place-items-center rounded-full text-white disabled:opacity-50", mic ? "bg-primary" : "bg-muted-foreground")}><Icon name="mic" className="text-lg" /></button>
         </form>
-        <p className="px-4 pb-3 text-[11px] text-muted">{mic ? t("Voice or text · changes are always confirmed before sending · no business write before you confirm") : t("Text only — the microphone is off on this device · changes are always confirmed before sending")}</p>
+        <p className="px-4 pb-3 text-[11px] text-muted-foreground">{mic ? t("Voice or text · changes are always confirmed before sending · no business write before you confirm") : t("Text only — the microphone is off on this device · changes are always confirmed before sending")}</p>
       </>}>
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4" aria-live="polite">
         <div className="max-w-[90%] rounded-2xl rounded-bl-sm bg-surface2 px-3 py-2 text-[13px]">{t("Hi! Ask about temperatures, change a setting, or ask for help.")}
-          <div className="mt-2 text-[11px] font-semibold text-muted">{t("Try")}</div>
+          <div className="mt-2 text-[11px] font-semibold text-muted-foreground">{t("Try")}</div>
           <div className="mt-1 flex flex-col gap-1 text-xs">{[ex.temperature, ex.change, ex.help].map((s) => <button key={s} disabled={busy} className="rounded-lg border border-line bg-surface px-2 py-1 text-left hover:bg-primary-soft disabled:opacity-50" onClick={() => ask(s, "text")}>“{s}”</button>)}</div>
         </div>
         {msgs.map((m, n) => {
@@ -176,7 +176,7 @@ function LiveAssistant({ onClose, context }: { onClose: () => void; context: str
               <div key={n} className="rounded-2xl border border-line bg-surface p-3 text-[13px]">
                 <div className="mb-2 font-bold">{t("I understood:")}</div>
                 <SummaryList items={[[t("Intent"), t("Change set temperature")], [t("Target"), card.target], [t("Current"), card.current], [t("Requested"), card.requested], [t("Allowed range"), card.range]]} />
-                <p className="my-2 text-xs text-muted">{card.supported ? t("Only {unit} changes. Same permission checks as Unit Control.", { unit: card.unit }) : t("{value} is outside what {unit} supports — sending it will be refused, nothing changes.", { value: card.requested, unit: card.unit })}</p>
+                <p className="my-2 text-xs text-muted-foreground">{card.supported ? t("Only {unit} changes. Same permission checks as Unit Control.", { unit: card.unit }) : t("{value} is outside what {unit} supports — sending it will be refused, nothing changes.", { value: card.requested, unit: card.unit })}</p>
                 <div className="flex gap-2"><Btn size="sm" onClick={() => { drop("confirm"); setState("idle"); add({ kind: "bot", text: t("Cancelled — nothing was sent.") }); }}>{t("Cancel")}</Btn><Btn variant="primary" size="sm" disabled={busy} onClick={() => confirm(m, lastQuestion)}>{t("Confirm")}</Btn></div>
               </div>);
           }
@@ -185,18 +185,18 @@ function LiveAssistant({ onClose, context }: { onClose: () => void; context: str
               <b className={m.p.tone === "ok" ? "text-ok" : m.p.tone === "crit" ? "text-crit" : "text-primary"}><Icon name={m.p.tone === "ok" ? "success" : m.p.tone === "crit" ? "error" : "refresh"} /> {m.p.title}</b>
               {m.p.rows && <div className="mt-1"><SummaryList items={m.p.rows} /></div>}
               <p className="mt-1 text-xs">{m.p.detail}</p>
-              {m.p.tone !== "info" && <div className="mt-2 flex flex-wrap items-center gap-2">{m.p.tone === "crit" && <Btn size="sm" disabled={busy} onClick={() => ask(m.question, "text")}>{t("Try again")}</Btn>}<Link className="text-xs font-semibold text-primary" href={`/customer/units/${m.unitId}`}>{t("Open Unit Control")}</Link>{m.p.tone === "ok" && <span className="text-[11px] text-muted">{t("Undo is a new command")}</span>}</div>}
+              {m.p.tone !== "info" && <div className="mt-2 flex flex-wrap items-center gap-2">{m.p.tone === "crit" && <Btn size="sm" disabled={busy} onClick={() => ask(m.question, "text")}>{t("Try again")}</Btn>}<Link className="text-xs font-semibold text-primary" href={`/customer/units/${m.unitId}`}>{t("Open Unit Control")}</Link>{m.p.tone === "ok" && <span className="text-[11px] text-muted-foreground">{t("Undo is a new command")}</span>}</div>}
             </div>);
         })}
         {state === "listening" && (
           <div className="rounded-2xl bg-primary-soft p-3 text-[13px]">
             <b className="text-primary"><Icon name="live" /> {t("Listening…")}</b>
             <p className="mt-1">“{ex.change}”</p>
-            <p className="text-[11px] text-muted">{t("Live transcript (demo — no real microphone) · tap Stop when done")}</p>
+            <p className="text-[11px] text-muted-foreground">{t("Live transcript (demo — no real microphone) · tap Stop when done")}</p>
             <div className="mt-2"><Btn size="sm" variant="primary" onClick={() => { setState("idle"); ask(ex.change, "voice"); }}>{t("Stop")}</Btn></div>
           </div>
         )}
-        {busy && <p className="text-xs text-muted">{t("Thinking…")}</p>}
+        {busy && <p className="text-xs text-muted-foreground">{t("Thinking…")}</p>}
         <div ref={end} />
       </div>
     </Frame>
@@ -217,7 +217,7 @@ function CandidatePicker({ m, t, busy, onPick, onCancel }: {
   return (
     <div className="rounded-2xl bg-surface2 p-3 text-[13px]">
       <b>{several ? t("Which {room} did you mean?", { room: roomOf(m.groups) }) : t("Which AC in {path} did you mean?", { path: g.path })}</b>
-      <p className="text-xs text-muted">{t("I found more than one. I won’t choose for you.")}</p>
+      <p className="text-xs text-muted-foreground">{t("I found more than one. I won’t choose for you.")}</p>
       {several && (
         <fieldset className="mt-2 flex flex-col gap-1.5">
           <legend className="sr-only">{t("Room")}</legend>
@@ -242,7 +242,7 @@ function RadioCard({ name, checked, onChange, title, detail }: { name: string; c
   return (
     <label className={cx("flex cursor-pointer items-start gap-2 rounded-lg border bg-surface px-2.5 py-2", checked ? "border-primary ring-1 ring-primary" : "border-line hover:bg-primary-soft")}>
       <input type="radio" name={name} checked={checked} onChange={onChange} className="mt-1 accent-[var(--color-primary)]" />
-      <span><b className="block text-[13px]">{title}</b>{detail && <span className="block text-[11px] text-muted">{detail}</span>}</span>
+      <span><b className="block text-[13px]">{title}</b>{detail && <span className="block text-[11px] text-muted-foreground">{detail}</span>}</span>
     </label>
   );
 }
@@ -300,7 +300,7 @@ function DemoAssistant({ onClose, context }: { onClose: () => void; context: str
           <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type a message…" className="min-w-0 flex-1 rounded-control border border-line px-3 py-2 text-[13px]" />
           <button type="button" onClick={voice} aria-label="Voice input" className="grid h-10 w-10 place-items-center rounded-full bg-primary text-white"><Icon name="mic" className="text-lg" /></button>
         </form>
-        <p className="px-4 pb-3 text-[11px] text-muted">Voice or text · changes are always confirmed before sending · no business write before you confirm</p>
+        <p className="px-4 pb-3 text-[11px] text-muted-foreground">Voice or text · changes are always confirmed before sending · no business write before you confirm</p>
       </>}>
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
         {msgs.map((m, n) => {
@@ -311,7 +311,7 @@ function DemoAssistant({ onClose, context }: { onClose: () => void; context: str
             <div key={n} className="rounded-2xl border border-line bg-surface p-3 text-[13px]">
               <div className="mb-2 font-bold">I understood:</div>
               <SummaryList items={[["Intent", "Change set temperature"], ["Target", `Home A › 1F › Bedroom › ${m.target}`], ["Current", "26°C (confirmed by device)"], ["Requested", `${m.temp}°C`], ["Allowed range", "16–30°C · step 1"]]} />
-              <p className="my-2 text-xs text-muted">Only {m.target} changes. Same permission checks as Unit Control.</p>
+              <p className="my-2 text-xs text-muted-foreground">Only {m.target} changes. Same permission checks as Unit Control.</p>
               <div className="flex gap-2"><Btn variant="primary" size="sm" onClick={() => send(m.target, m.temp)}>Confirm & send</Btn><Btn size="sm" onClick={() => setMsgs((s) => [...s.filter((x) => x.kind !== "confirm"), { kind: "bot", text: "Cancelled — nothing was sent." }])}>Cancel</Btn></div>
             </div>);
           if (m.kind === "ask") return (

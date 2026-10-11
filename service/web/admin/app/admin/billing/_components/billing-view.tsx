@@ -196,34 +196,34 @@ export function BillingView({ live }: { live?: BillingLive }) {
               {live.scope.overdueOnly && <Btn size="sm" onClick={() => nav({ overdueOnly: null, invoiceId: null })} aria-label={t("Overdue only — show all invoices")}>{t("Overdue only")} <Icon name="close" /></Btn>}
             </div>
           )}
-          <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>{[[t("Outstanding"), totals(list, ["Unpaid", "Overdue", "Processing"]), t("unpaid · processing")], [t("Overdue"), totals(list, ["Overdue"]), t("reminders allowed")], [t("Processing"), totals(list, ["Processing"]), t("awaiting HQ confirmation")], live?.months ? [t("Paid in period"), totals(list, ["Paid"]), live.months] : [t("Paid"), totals(list, ["Paid"]), t("in this scope")]].map(([a, b, c]) => <div key={a} className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted">{a}</div><div className="text-xl font-bold">{b}</div><div className="text-[11px] text-muted">{c}</div></div>)}</div>
-          <p className="text-[11px] text-muted">{t("Totals per currency — never converted")}{otherZone && ` · ${t("Billing periods and due dates are Kuala Lumpur dates ({zone}).", { zone: KL })}`}</p>
+          <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>{[[t("Outstanding"), totals(list, ["Unpaid", "Overdue", "Processing"]), t("unpaid · processing")], [t("Overdue"), totals(list, ["Overdue"]), t("reminders allowed")], [t("Processing"), totals(list, ["Processing"]), t("awaiting HQ confirmation")], live?.months ? [t("Paid in period"), totals(list, ["Paid"]), live.months] : [t("Paid"), totals(list, ["Paid"]), t("in this scope")]].map(([a, b, c]) => <div key={a} className="rounded-2xl border border-line bg-surface p-4"><div className="text-xs text-muted-foreground">{a}</div><div className="text-xl font-bold">{b}</div><div className="text-[11px] text-muted-foreground">{c}</div></div>)}</div>
+          <p className="text-[11px] text-muted-foreground">{t("Totals per currency — never converted")}{otherZone && ` · ${t("Billing periods and due dates are Kuala Lumpur dates ({zone}).", { zone: KL })}`}</p>
           <div className="flex flex-wrap items-center justify-between gap-3"><Tabs value={f} onChange={setF} tabs={(["All", "Unpaid", "Overdue", "Processing", "Paid"] as const).map((k) => ({ id: k, label: k === "All" ? t("All") : statusText[k], count: k === "All" ? list.length : list.filter((x) => x.st === k).length }))} /><Btn size="sm" variant="primary" onClick={() => { setNw({ contractId: contracts[0]?.id ?? "", from: "", to: "", dueAt: "" }); setModal("create"); }}><Icon name="add" /> {t("Create invoice")}</Btn></div>
           {!sel ? <Card title={t("Invoices")}><EmptyState title={t("No invoices")}>{t("No invoice matches this scope.")}</EmptyState></Card> : (
             <div className="split-rev">
-              <Card title={t("Invoices")} className="self-start">{shown.length === 0 ? <EmptyState title={f === "All" ? t("No invoices") : t("No {status} invoices", { status: statusText[f].toLowerCase() })}>{t("Choose another status.")}</EmptyState> : <div className="flex flex-col gap-2">{shown.map((x) => <ListRow key={x.id} selected={sel.id === x.id} onClick={() => select(x.id)}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.number}</b><b className="text-[13px]">{x.amt}</b></div><div className="text-[11px] text-muted">{x.meta}</div><div className="mt-0.5 flex items-center gap-2 text-[11px]"><Badge tone={tone(x.st)}>{statusText[x.st]}</Badge><span className="text-muted">{x.method}</span></div></div></ListRow>)}</div>}</Card>
+              <Card title={t("Invoices")} className="self-start">{shown.length === 0 ? <EmptyState title={f === "All" ? t("No invoices") : t("No {status} invoices", { status: statusText[f].toLowerCase() })}>{t("Choose another status.")}</EmptyState> : <div className="flex flex-col gap-2">{shown.map((x) => <ListRow key={x.id} selected={sel.id === x.id} onClick={() => select(x.id)}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.number}</b><b className="text-[13px]">{x.amt}</b></div><div className="text-[11px] text-muted-foreground">{x.meta}</div><div className="mt-0.5 flex items-center gap-2 text-[11px]"><Badge tone={tone(x.st)}>{statusText[x.st]}</Badge><span className="text-muted-foreground">{x.method}</span></div></div></ListRow>)}</div>}</Card>
               <div className="flex min-w-0 flex-col gap-4">
                 <Card title={sel.number} sub={`${sel.meta} · ${t("Invoice v{version}", { version: sel.version })}`} action={<span className="text-lg font-bold">{sel.amt}</span>}>
                   <SummaryList cols={2} items={[[t("Billing period"), sel.period], [t("Due"), sel.due], [t("Payment method"), sel.methodName], [t("Payment status"), sel.st === "Paid" ? t("Paid") : sel.st === "Processing" ? t("Processing — confirm to settle") : hasPayment ? sel.paymentState ?? "—" : t("— no payment yet")]]} />
-                  {detail && detail.payments.length > 0 && <p className="mt-2 text-xs text-muted">{t("Payments: {list}", { list: detail.payments.join(" · ") })}</p>}
+                  {detail && detail.payments.length > 0 && <p className="mt-2 text-xs text-muted-foreground">{t("Payments: {list}", { list: detail.payments.join(" · ") })}</p>}
                   {sel.st === "Processing" && <div className="mt-3"><Btn variant="primary" disabled={pending || (live && !detail?.processingPaymentId)} onClick={() => { if (live) return openPayment("confirm"); setDemoList((l) => l.map((x) => (x.id === sel.id ? { ...x, st: "Paid" } : x))); toast(t("Card payment confirmed")); }}>{t("Confirm card payment")}</Btn></div>}
                   {(sel.st === "Unpaid" || sel.st === "Overdue") && (hasPayment
-                    ? <p className="mt-3 text-xs text-muted">{t("Manual recording is only for invoices without a payment — this invoice already has one ({method}). The customer can retry the card payment.", { method: sel.method })}</p>
-                    : <><p className="mt-3 text-xs text-muted">{t("The customer has not started a payment. Record a manual payment if it was received outside the app (e.g. bank transfer).")}</p><div className="mt-2"><Btn onClick={() => openPayment("manual")}>{t("Record manual payment…")}</Btn></div></>)}
+                    ? <p className="mt-3 text-xs text-muted-foreground">{t("Manual recording is only for invoices without a payment — this invoice already has one ({method}). The customer can retry the card payment.", { method: sel.method })}</p>
+                    : <><p className="mt-3 text-xs text-muted-foreground">{t("The customer has not started a payment. Record a manual payment if it was received outside the app (e.g. bank transfer).")}</p><div className="mt-2"><Btn onClick={() => openPayment("manual")}>{t("Record manual payment…")}</Btn></div></>)}
                   {conflict && <div className="mt-3"><Banner tone="warn">{t("CONFLICT — the invoice changed first (for example a payment arrived), so the action was stopped. The screen shows the latest version.")}</Banner></div>}
                 </Card>
                 {sel.st === "Overdue" && <Card title={t("Payment reminder")} sub={t("Only overdue unpaid invoices can be reminded. If payment arrives first, the reminder is stopped. Delivery is simulated.")}>
-                  {live && recipients.length === 0 ? <p className="text-xs text-muted">{t("No client of this customer can receive the reminder.")}</p> : <>
+                  {live && recipients.length === 0 ? <p className="text-xs text-muted-foreground">{t("No client of this customer can receive the reminder.")}</p> : <>
                     <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Recipient")}>{live ? <Select value={recipient?.id ?? ""} onChange={(e) => setReminder({ ...reminder, recipient: e.target.value, preview: "" })}>{recipients.map((r) => <option key={r.id} value={r.id}>{r.displayLabel} · {r.role}</option>)}</Select> : <Select><option>customer-a · Client</option></Select>}</Field><Field label={t("Channel")}><Select value={channel} onChange={(e) => setReminder({ ...reminder, channel: e.target.value, preview: "" })}>{channels.map((c) => <option key={c} value={c}>{channelName(c)}</option>)}</Select></Field></div>
                     <Field label={t("Reason · e.g. “2nd reminder after due date”")}><Input value={reminder.reason} onChange={(e) => setReminder({ ...reminder, reason: e.target.value, preview: "" })} /></Field>
-                    {message && <div className="my-3 rounded-xl bg-surface2 p-3 text-xs"><b>{t("Preview · {channel}", { channel: channelName(channel) })}</b> <span className="text-muted">{t("nothing is sent yet")}</span><br />{message.subject && <><b>{message.subject}</b><br /></>}{message.body}</div>}
+                    {message && <div className="my-3 rounded-xl bg-surface2 p-3 text-xs"><b>{t("Preview · {channel}", { channel: channelName(channel) })}</b> <span className="text-muted-foreground">{t("nothing is sent yet")}</span><br />{message.subject && <><b>{message.subject}</b><br /></>}{message.body}</div>}
                     <div className="mt-3 flex justify-end gap-2">{live && <Btn disabled={pending || !reminder.reason.trim()} onClick={preview}>{t("Preview")}</Btn>}<Btn variant="primary" disabled={pending || !reminder.reason.trim() || (live && !reminder.preview)} onClick={send}>{t("Send reminder")}</Btn></div>
                   </>}
                 </Card>}
                 <RelatedRestrictions ids={live ? detail?.restrictionIds ?? [] : ["restriction-limited-a"]} />
                 <Card title={t("Customer inquiries")}>
-                  {linked.length === 0 ? <p className="text-xs text-muted">{t("No inquiry about this invoice.")}</p> : <div className="flex flex-col gap-2">{linked.map((q) => (
-                    <div key={q.id} className={`rounded-xl p-2 ${live?.selectedInquiryId === q.id ? "bg-primary-soft" : ""}`}><p className="text-[13px]">{q.text}</p><p className="flex flex-wrap items-center gap-2 text-[11px] text-muted">{t("{kind} · received {time} · {customer}", { kind: q.kind, time: q.at, customer: q.cust })} {q.state === "answered" && <Badge tone="ok">{t("Answered")}</Badge>}<button className="font-semibold text-primary" onClick={() => openInquiry(q.id)}>{t("Open in Inquiries")} <Icon name="arrowRight" /></button></p></div>
+                  {linked.length === 0 ? <p className="text-xs text-muted-foreground">{t("No inquiry about this invoice.")}</p> : <div className="flex flex-col gap-2">{linked.map((q) => (
+                    <div key={q.id} className={`rounded-xl p-2 ${live?.selectedInquiryId === q.id ? "bg-primary-soft" : ""}`}><p className="text-[13px]">{q.text}</p><p className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">{t("{kind} · received {time} · {customer}", { kind: q.kind, time: q.at, customer: q.cust })} {q.state === "answered" && <Badge tone="ok">{t("Answered")}</Badge>}<button className="font-semibold text-primary" onClick={() => openInquiry(q.id)}>{t("Open in Inquiries")} <Icon name="arrowRight" /></button></p></div>
                   ))}</div>}
                 </Card>
               </div>
@@ -234,14 +234,14 @@ export function BillingView({ live }: { live?: BillingLive }) {
         <>
           <Tabs value={iqState} onChange={setIqState} tabs={(["all", "received", "answered"] as const).map((k) => ({ id: k, label: k === "all" ? t("All") : k === "received" ? t("Received") : t("Answered"), count: k === "all" ? inquiries.length : inquiries.filter((x) => x.state === k).length }))} />
           <div className="split-rev">
-            <Card title={t("Customer inquiries")} className="self-start">{iqShown.length === 0 ? <EmptyState title={iqState === "received" ? t("No received inquiries") : t("No answered inquiries")}>{t("Choose another state.")}</EmptyState> : <div className="flex flex-col gap-2">{iqShown.map((x) => <ListRow key={x.id} selected={iq?.id === x.id} onClick={() => openInquiry(x.id)}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.text}</b>{x.state === "answered" ? <Badge tone="ok">{t("Answered")}</Badge> : <Badge tone="warn">{t("Received")}</Badge>}</div><div className="text-[11px] text-muted">{x.kind} · {x.cust} · {x.at}</div></div></ListRow>)}</div>}</Card>
+            <Card title={t("Customer inquiries")} className="self-start">{iqShown.length === 0 ? <EmptyState title={iqState === "received" ? t("No received inquiries") : t("No answered inquiries")}>{t("Choose another state.")}</EmptyState> : <div className="flex flex-col gap-2">{iqShown.map((x) => <ListRow key={x.id} selected={iq?.id === x.id} onClick={() => openInquiry(x.id)}><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{x.text}</b>{x.state === "answered" ? <Badge tone="ok">{t("Answered")}</Badge> : <Badge tone="warn">{t("Received")}</Badge>}</div><div className="text-[11px] text-muted-foreground">{x.kind} · {x.cust} · {x.at}</div></div></ListRow>)}</div>}</Card>
             {iq && (
               <Card title={t("{kind} inquiry · {customer}", { kind: iq.kind, customer: iq.cust })} sub={t("received {time}", { time: iq.at })}>
                 <p className="rounded-xl bg-surface2 p-3 text-[13px]">{iq.text}</p>
                 <SummaryList items={[[t("Invoice"), iq.invoiceId ? <button key="i" className="font-semibold text-primary" onClick={() => openInvoice(iq.invoiceId!)}>{invoiceLabel(iq.invoiceId)} <Icon name="arrowRight" /></button> : "—"], [t("Restriction"), iq.restrictionId ? (live ? <Link key="r" className="font-mono font-semibold text-primary" href={`/admin/restrictions?restrictionId=${iq.restrictionId}`}>{shortId(iq.restrictionId)}</Link> : iq.restrictionId) : "—"]]} />
                 {iq.reply ? <p className="mt-3 text-[13px]"><b>{t("Reply:")}</b> {iq.reply}</p> : <>
                   <div className="mt-3"><Field label={t("Reply (in-app only)")} error={tried && !reply.trim() ? t("A reply is required") : undefined}><Textarea value={reply} onChange={(e) => setReply(e.target.value)} maxLength={2000} /></Field></div>
-                  <p className="mt-1 text-[11px] text-muted">{t("A reply never changes invoices or restrictions.")}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">{t("A reply never changes invoices or restrictions.")}</p>
                   <div className="mt-2 flex justify-end"><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!reply.trim()) return; if (!live) return toast(t("Reply recorded in-app")); act(() => answerInquiry(iq.id, iq.version, reply.trim()), t("Reply sent in-app"), () => { setReply(""); setTried(false); }); }}>{t("Send reply")}</Btn></div>
                 </>}
               </Card>
@@ -253,13 +253,13 @@ export function BillingView({ live }: { live?: BillingLive }) {
         {sel && <Field label={t("Amount (must equal invoice — full payment only)")} error={tried && Math.round(+m.amount * 100) !== sel.amountMinor ? t("Must equal {amount}", { amount: sel.amt }) : undefined}><Input type="number" value={m.amount} onChange={(e) => setM({ ...m, amount: e.target.value })} disabled={modal === "confirm"} /></Field>}
         <Field label={t("Reference")} error={tried && !m.ref.trim() ? t("Reference is required") : undefined}><Input value={m.ref} onChange={(e) => setM({ ...m, ref: e.target.value })} placeholder="manual-2026-0189" maxLength={128} /></Field>
         {live ? <Field label={t("Reason")} error={tried && !m.reason.trim() ? t("A reason is required") : undefined}><Input value={m.reason} onChange={(e) => setM({ ...m, reason: e.target.value })} placeholder={t("Bank transfer received")} maxLength={1000} /></Field> : <Field label={t("Paid on")}><Input type="date" value={m.paidAt} onChange={(e) => setM({ ...m, paidAt: e.target.value })} /></Field>}
-        {modal === "manual" && <p className="text-[11px] text-muted">{t("Marks the invoice paid; the payment method stays “not selected”. Related restrictions move to release_requested when all their cause invoices are paid. Resubmitting the same reference returns the same result.")}</p>}
+        {modal === "manual" && <p className="text-[11px] text-muted-foreground">{t("Marks the invoice paid; the payment method stays “not selected”. Related restrictions move to release_requested when all their cause invoices are paid. Resubmitting the same reference returns the same result.")}</p>}
       </Modal>
       <Modal open={modal === "create"} onClose={close} title={t("Create invoice")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={create}>{t("Create")}</Btn></>}>
         <Field label={t("Contract")}><Select value={contract?.id ?? ""} onChange={(e) => setNw({ ...nw, contractId: e.target.value })}>{contracts.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}</Select></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "150px" }}><Field label={t("Billing period start")} error={tried && !nw.from ? t("Required") : undefined}><Input type="date" value={nw.from} onChange={(e) => setNw({ ...nw, from: e.target.value })} /></Field><Field label={t("Billing period end")} error={tried && (!nw.to || nw.from >= nw.to) ? t("After the start") : undefined}><Input type="date" value={nw.to} onChange={(e) => setNw({ ...nw, to: e.target.value })} /></Field><Field label={t("Due date")} error={tried && !nw.dueAt ? t("Required") : undefined}><Input type="date" value={nw.dueAt} onChange={(e) => setNw({ ...nw, dueAt: e.target.value })} /></Field></div>
-        <p className="text-xs text-muted">{t("Dates are Kuala Lumpur days ({zone}).", { zone: KL })}</p>
-        {contract && <p className="text-xs text-muted">{t("Amount from the contract version: {amount}", { amount: `${(contract.priceMinor / 100).toFixed(2)} ${contract.currency}` })}</p>}
+        <p className="text-xs text-muted-foreground">{t("Dates are Kuala Lumpur days ({zone}).", { zone: KL })}</p>
+        {contract && <p className="text-xs text-muted-foreground">{t("Amount from the contract version: {amount}", { amount: `${(contract.priceMinor / 100).toFixed(2)} ${contract.currency}` })}</p>}
       </Modal>
     </Page>
   );
@@ -274,11 +274,11 @@ function RelatedRestrictions({ ids }: { ids: string[] }) {
   const { t } = useI18n();
   return (
     <Card title={t(ids.length > 1 ? "Related restrictions" : "Related restriction")}>
-      {ids.length === 0 ? <p className="text-xs text-muted">{t("No restriction cites this invoice.")}</p> : (
+      {ids.length === 0 ? <p className="text-xs text-muted-foreground">{t("No restriction cites this invoice.")}</p> : (
         <div className="flex flex-col gap-1.5">{ids.map((id) => (
           <p key={id} className="flex flex-wrap items-center justify-between gap-2 text-[13px]"><span className="font-mono font-semibold">{shortId(id)}</span><Link className="text-xs font-semibold text-primary" href={`/admin/restrictions?restrictionId=${id}`}>{t("Open restriction")} <Icon name="arrowRight" /></Link></p>
         ))}
-          <p className="text-xs text-muted">{t(ids.length > 1 ? "This invoice is a cause of these restrictions. Once all cause invoices of a restriction are paid, it moves to release_requested. State and units are shown on the Restrictions screen (restriction.read)."
+          <p className="text-xs text-muted-foreground">{t(ids.length > 1 ? "This invoice is a cause of these restrictions. Once all cause invoices of a restriction are paid, it moves to release_requested. State and units are shown on the Restrictions screen (restriction.read)."
             : "This invoice is a cause of this restriction. Once all of its cause invoices are paid, it moves to release_requested. State and units are shown on the Restrictions screen (restriction.read).")}</p>
         </div>
       )}
@@ -340,14 +340,14 @@ function PayoutsTab({ live, nav, act, pending }: { live: BillingLive; nav: (patc
         <Card title={p.period ? t("Statements · {period}", { period: monthsText(p.period, p.period, i) ?? p.period }) : t("Statements")} className="self-start" action={<Btn size="sm" onClick={() => { setMonth(p.period && p.period <= p.lastClosed ? p.period : p.lastClosed); setGenerating(true); }}>{t("Generate drafts")}</Btn>}>
           {rows.length === 0 ? <EmptyState title={t("No statements")}>{t(filtered ? "No statement matches these filters." : "Generate the drafts of a month that has ended.")}</EmptyState> : (
             <DataTable rows={rows} rowKey={(r) => r.id} selectedKey={st?.id} onRowClick={(r) => nav({ statementId: r.id })} cols={[
-              { key: "c", label: t("Contractor / statement"), render: (r) => <span><b className="text-[13px]">{r.contractor}</b><span className="block text-[11px] text-muted">{r.period} · {t(r.jobs === 1 ? "1 job" : "{n} jobs", { n: r.jobs })}</span></span> },
+              { key: "c", label: t("Contractor / statement"), render: (r) => <span><b className="text-[13px]">{r.contractor}</b><span className="block text-[11px] text-muted-foreground">{r.period} · {t(r.jobs === 1 ? "1 job" : "{n} jobs", { n: r.jobs })}</span></span> },
               { key: "q", label: t("Queries"), render: (r) => (r.queryCount === 0 ? "—" : <span>{t(r.queryCount === 1 ? "1 query" : "{n} queries", { n: r.queryCount })}{r.openQueries > 0 && <> <Badge tone="warn">{t("{n} open", { n: r.openQueries })}</Badge></>}</span>) },
               { key: "n", label: t("Net"), render: (r) => <span className="font-semibold">{r.net}</span> },
               { key: "s", label: t("Status"), render: (r) => <Badge tone={tone(r.status)}>{r.statusText}</Badge> },
               { key: "a", label: "", render: (r) => <span className="text-xs font-semibold text-primary">{t(r.status === "Draft" ? "Review" : "Open")}</span> },
             ]} />
           )}
-          <p className="mt-2 text-[11px] text-muted">{t("Drafts are generated on the 1st from review-accepted jobs × the contractor's rate card. Approve → the contractor sees it; Mark paid after the bank transfer (manual in this demo).")}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("Drafts are generated on the 1st from review-accepted jobs × the contractor's rate card. Approve → the contractor sees it; Mark paid after the bank transfer (manual in this demo).")}</p>
         </Card>
         {live.statementMissing ? <EmptyState title={t("That statement is not in this list")}>{t("It does not exist, or the period, contractor or status filter hides it.")}</EmptyState> : st && (
           <Card title={`${st.contractor} · ${st.period}`} sub={t("Priced by the rate card effective at acceptance · pays {date}", { date: st.payDate })} className="self-start"
@@ -356,13 +356,13 @@ function PayoutsTab({ live, nav, act, pending }: { live: BillingLive; nav: (patc
               [t("Jobs"), String(st.jobs)], [t("Gross"), st.gross], [t("Deductions"), st.deductions], [t("Net"), st.net], [t("Status"), st.statusText],
               ...(st.approvedBy ? [[t("Approved by"), st.approvedBy] as [string, string]] : []),
             ]} />
-            {st.status === "Approved" && !st.payable && <p className="mt-2 text-[11px] text-muted">{t("Mark paid unlocks on the pay date ({date}). Payouts need billing.payment; every action is audited.", { date: st.payDate })}</p>}
+            {st.status === "Approved" && !st.payable && <p className="mt-2 text-[11px] text-muted-foreground">{t("Mark paid unlocks on the pay date ({date}). Payouts need billing.payment; every action is audited.", { date: st.payDate })}</p>}
             {st.lines.length > 0 && <div className="mt-3"><DataTable rows={st.lines} rowKey={(r) => r.id} cols={[{ key: "j", label: t("Job"), render: (r) => <span className="font-mono text-xs">{r.job}</span> }, { key: "w", label: t("Work"), render: (r) => r.work }, { key: "k", label: t("Kind"), render: (r) => r.kind }, { key: "a", label: t("Amount"), render: (r) => r.amount }, { key: "n", label: t("Note"), render: (r) => r.note }]} /></div>}
             {st.queries.map((q) => (
               <div key={q.id} className="mt-3 rounded-xl bg-surface2 p-3 text-[13px]">
                 <b>{q.topic}</b> · {q.line} · <Badge tone={q.open ? "warn" : "ok"}>{q.state}</Badge>
                 <p className="mt-1">“{q.message}”</p>
-                {q.reply ? <p className="mt-1 text-xs text-muted">{q.adjustment ? t("Reply: {reply} · adjustment {amount}, added to the contractor's next draft", { reply: q.reply, amount: q.adjustment }) : t("Reply: {reply}", { reply: q.reply })}</p> : (
+                {q.reply ? <p className="mt-1 text-xs text-muted-foreground">{q.adjustment ? t("Reply: {reply} · adjustment {amount}, added to the contractor's next draft", { reply: q.reply, amount: q.adjustment }) : t("Reply: {reply}", { reply: q.reply })}</p> : (
                   <div className="mt-2 flex flex-col gap-2">
                     <Textarea aria-label={t("Reply to the contractor")} value={answer(q.id).reply} onChange={(e) => setAnswer(q.id, { reply: e.target.value })} placeholder={t("Reply to the contractor")} />
                     <div className="flex flex-wrap items-center gap-2"><Input aria-label={t("Adjustment")} type="number" value={answer(q.id).adjustment} onChange={(e) => setAnswer(q.id, { adjustment: e.target.value })} placeholder={t("Adjustment (optional)")} className="w-48" /><Btn size="sm" disabled={pending || !answer(q.id).reply.trim()} onClick={() => act(() => resolvePayoutQuery(st.id, st.version, q.id, answer(q.id).reply.trim(), answer(q.id).adjustment ? Math.round(+answer(q.id).adjustment * 100) : null), t("Answered"))}>{t("Answer")}</Btn></div>
@@ -370,13 +370,13 @@ function PayoutsTab({ live, nav, act, pending }: { live: BillingLive; nav: (patc
                 )}
               </div>
             ))}
-            <p className="mt-2 text-[11px] text-muted">{t("Contractors see approved and paid statements only (Partner › Payouts).")}</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">{t("Contractors see approved and paid statements only (Partner › Payouts).")}</p>
           </Card>
         )}
       </div>
       <Modal open={generating} onClose={() => setGenerating(false)} title={t("Generate drafts")} footer={<><Btn onClick={() => setGenerating(false)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || !ended} onClick={generate}>{t("Generate drafts")}</Btn></>}>
         <Field label={t("Month")} error={month && !ended ? t("Only a month that has ended (Kuala Lumpur) can be generated") : undefined} hint={t("Kuala Lumpur months; the last one that has ended is {month}", { month: monthsText(p.lastClosed, p.lastClosed, i) ?? p.lastClosed })}><Input type="month" value={month} max={p.lastClosed} onChange={(e) => setMonth(e.target.value)} /></Field>
-        <p className="text-xs text-muted">{t("Drafts come from the jobs whose report HQ accepted in that month, priced by each contractor's rate card. Generating again rebuilds the drafts; approved and paid statements stay as they are.")}</p>
+        <p className="text-xs text-muted-foreground">{t("Drafts come from the jobs whose report HQ accepted in that month, priced by each contractor's rate card. Generating again rebuilds the drafts; approved and paid statements stay as they are.")}</p>
       </Modal>
     </>
   );

@@ -4,8 +4,21 @@ import Link from "next/link";
 import { createContext, isValidElement, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import { useT } from "@ac/web/components/I18n";
 import { Icon, type IconName } from "@ac/web/components/Icon";
+import { Alert } from "@ac/web/components/ui/alert";
+import { Badge as UIBadge } from "@ac/web/components/ui/badge";
+import { Button, buttonVariants } from "@ac/web/components/ui/button";
+import { Card as UICard, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@ac/web/components/ui/card";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@ac/web/components/ui/empty";
+import { Input as UIInput } from "@ac/web/components/ui/input";
+import { NativeSelect } from "@ac/web/components/ui/native-select";
+import { Textarea as UITextarea } from "@ac/web/components/ui/textarea";
+import { cn } from "@ac/web/lib/utils";
 
-export const cx = (...a: unknown[]) => a.filter((x): x is string => typeof x === "string" && x !== "").join(" ");
+// The product's components (DEC-75): the screens' names (Btn, Card, Badge, …) built on the shadcn/ui components of
+// components/ui/. A later phase moves the screens to the shadcn components themselves.
+
+/** The class helper of the screens: shadcn/ui's cn, so a later class wins over a conflicting earlier one (w-auto over w-full). */
+export const cx = cn;
 
 /* ───────────── Badges ───────────── */
 export type Tone = "ok" | "warn" | "crit" | "unknown" | "primary" | "muted";
@@ -15,15 +28,16 @@ const toneCls: Record<Tone, string> = {
   crit: "bg-crit-soft text-crit",
   unknown: "bg-unknown-soft text-unknown",
   primary: "bg-primary-soft text-primary",
-  muted: "bg-surface2 text-muted",
+  muted: "bg-surface2 text-muted-foreground",
 };
 
+/** A status badge: the shadcn/ui Badge in the tone's colours. */
 export function Badge({ tone = "muted", icon, children, className }: { tone?: Tone; icon?: IconName; children: React.ReactNode; className?: string }) {
   return (
-    <span className={cx("inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold leading-4", toneCls[tone], className)}>
+    <UIBadge variant="secondary" className={cn(toneCls[tone], className)}>
       {icon && <Icon name={icon} />}
       {children}
-    </span>
+    </UIBadge>
   );
 }
 
@@ -49,18 +63,14 @@ export const DemoBadge = () => <Badge tone="warn" className="uppercase tracking-
 
 /* ───────────── Buttons ───────────── */
 type BtnVariant = "primary" | "secondary" | "ghost" | "danger";
-const btnCls = (v: BtnVariant, size: "sm" | "md") =>
-  cx(
-    "inline-flex items-center justify-center gap-1.5 rounded-control border font-semibold transition-colors whitespace-nowrap",
-    size === "sm" ? "px-2.5 py-1 text-xs" : "px-3.5 py-2 text-[13px]",
-    v === "primary" && "border-primary bg-primary text-white hover:bg-[#004bc4]",
-    v === "secondary" && "border-line bg-surface text-ink hover:bg-surface2",
-    v === "ghost" && "border-transparent bg-transparent text-primary hover:bg-primary-soft",
-    v === "danger" && "border-crit bg-surface text-crit hover:bg-crit-soft"
-  );
+// the product's button names on the shadcn/ui Button variants; ghost keeps the primary colour of a text action
+const variantOf = { primary: "default", secondary: "outline", ghost: "ghost", danger: "destructive" } as const;
+const variantCls = (v: BtnVariant) => cn(v === "secondary" && "bg-card", v === "ghost" && "text-primary hover:bg-accent hover:text-primary");
+const sizeOf = (size: "sm" | "md") => (size === "sm" ? "sm" : "default");
+const btnCls = (v: BtnVariant, size: "sm" | "md") => cn(buttonVariants({ variant: variantOf[v], size: sizeOf(size) }), variantCls(v));
 
 export function Btn({ variant = "secondary", size = "md", className, ...p }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: BtnVariant; size?: "sm" | "md" }) {
-  return <button type="button" {...p} className={cx(btnCls(variant, size), className)} />;
+  return <Button type="button" {...p} variant={variantOf[variant]} size={sizeOf(size)} className={cn(variantCls(variant), className)} />;
 }
 export function LinkBtn({ href, variant = "secondary", size = "md", className, children }: { href: string; variant?: BtnVariant; size?: "sm" | "md"; className?: string; children: React.ReactNode }) {
   return <Link href={href} className={cx(btnCls(variant, size), className)}>{children}</Link>;
@@ -75,20 +85,20 @@ export function Page({ children, className, narrow }: { children: React.ReactNod
   return <div className={cx("page mx-auto flex w-full flex-col gap-4", narrow ? "max-w-[640px]" : "max-w-[1280px]", className)}>{children}</div>;
 }
 
+/** A card: the shadcn/ui Card. The title stays a level-2 heading; `pad={false}` lets a table reach the edges; the
+ * overflow stays visible for the menus that still open inside a card. */
 export function Card({ title, sub, action, children, className, pad = true, tone }: { title?: React.ReactNode; sub?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode; className?: string; pad?: boolean; tone?: "crit" | "warn" | "ok" }) {
   return (
-    <section className={cx("min-w-0 rounded-2xl border bg-surface", tone === "crit" ? "border-crit" : tone === "warn" ? "border-[#fdba74]" : "border-line", className)}>
+    <UICard className={cn("min-w-0 overflow-visible", !pad && "pb-0", tone === "crit" && "ring-crit", tone === "warn" && "ring-[#fdba74]", tone === "ok" && "ring-[#86efac]", className)}>
       {(title || action) && (
-        <header className={cx("flex flex-wrap items-start justify-between gap-x-3 gap-y-1", pad ? "px-4 pt-4" : "px-4 pt-4")}>
-          <div className="min-w-0">
-            {title && <h2 className="text-[15px] font-bold text-ink">{title}</h2>}
-            {sub && <p className="mt-0.5 text-xs text-muted">{sub}</p>}
-          </div>
-          {action && <div className="shrink-0">{action}</div>}
-        </header>
+        <CardHeader>
+          {title && <CardTitle><h2>{title}</h2></CardTitle>}
+          {sub && <CardDescription className="text-xs">{sub}</CardDescription>}
+          {action && <CardAction>{action}</CardAction>}
+        </CardHeader>
       )}
-      <div className={cx(pad && "p-4", (title || action) && pad && "pt-3")}>{children}</div>
-    </section>
+      <CardContent className={cn("min-w-0", !pad && "px-0")}>{children}</CardContent>
+    </UICard>
   );
 }
 
@@ -97,7 +107,7 @@ export function PageHead({ title, sub, action }: { title: React.ReactNode; sub?:
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
         <h1 className="text-lg font-bold text-ink">{title}</h1>
-        {sub && <p className="text-xs text-muted">{sub}</p>}
+        {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
       </div>
       {action}
     </div>
@@ -106,67 +116,78 @@ export function PageHead({ title, sub, action }: { title: React.ReactNode; sub?:
 
 export function Kpi({ label, value, icon, unit, badge, sub, href, link, tone }: { label: string; value: React.ReactNode; icon?: IconName; unit?: string; badge?: React.ReactNode; sub?: React.ReactNode; href?: string; link?: string; tone?: "crit" | "warn" | "ok" }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-2xl border border-line bg-surface p-4">
-      <div className="flex items-center justify-between gap-2 text-xs text-muted">
+    <UICard className="min-w-0 gap-1 px-4">
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
         <span>{label}</span>
         {badge}
       </div>
       <div className={cx("text-[28px] font-bold leading-9", tone === "warn" && "text-warn", tone === "crit" && "text-crit", tone === "ok" && "text-ok")}>
         {value}
         {icon && <Icon name={icon} filled className="ml-1 text-[20px] text-warn" />}
-        {unit && <span className="ml-1 text-sm font-medium text-muted">{unit}</span>}
+        {unit && <span className="ml-1 text-sm font-medium text-muted-foreground">{unit}</span>}
       </div>
-      {sub && <p className="text-xs text-muted">{sub}</p>}
+      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
       {href && link && <TextLink href={href} className="mt-auto pt-1">{link} <Icon name="arrowRight" /></TextLink>}
-    </div>
+    </UICard>
   );
 }
 
 export function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
   return (
     <div className="min-w-0 rounded-xl bg-surface2 p-3">
-      <div className="text-[11px] text-muted">{label}</div>
+      <div className="text-[11px] text-muted-foreground">{label}</div>
       <div className="text-base font-bold text-ink">{value}</div>
-      {sub && <div className="text-[11px] text-muted">{sub}</div>}
+      {sub && <div className="text-[11px] text-muted-foreground">{sub}</div>}
     </div>
   );
 }
 
+/** A message line: the shadcn/ui Alert in the tone's colours, an alert only when critical (otherwise a status). */
 export function Banner({ tone = "primary", icon, children, action }: { tone?: Tone; icon?: IconName; children: React.ReactNode; action?: React.ReactNode }) {
-  const bd = tone === "warn" ? "border-[#fdba74] bg-warn-soft/60" : tone === "crit" ? "border-crit bg-crit-soft/60" : tone === "ok" ? "border-[#86efac] bg-ok-soft/60" : "border-line bg-primary-soft/50";
+  const bd = tone === "warn" ? "border-[#fdba74] bg-warn-soft/60" : tone === "crit" ? "border-crit bg-crit-soft/60" : tone === "ok" ? "border-[#86efac] bg-ok-soft/60" : "border-border bg-primary-soft/50";
   return (
-    <div role={tone === "crit" ? "alert" : "status"} className={cx("flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-3.5 py-2.5 text-[13px]", bd)}>
+    <Alert role={tone === "crit" ? "alert" : "status"} className={cn("flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl px-3.5 py-2.5 text-[13px] *:[svg]:translate-y-0", bd)}>
       <Icon name={icon ?? (tone === "warn" ? "warning" : tone === "crit" ? "error" : tone === "ok" ? "success" : "info")} className="text-[15px]" />
       <div className="min-w-0 flex-1">{children}</div>
       {action}
-    </div>
+    </Alert>
   );
 }
 
+/** No rows, a failed read, no connection: the shadcn/ui Empty. The title stays a level-3 heading. */
 export function EmptyState({ title, children, action }: { title: string; children?: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-5">
-      <h3 className="flex items-center gap-1.5 font-bold"><Icon name="info" className="text-muted" />{title}</h3>
-      {children && <p className="mt-1 text-xs text-muted">{children}</p>}
-      {action && <div className="mt-3">{action}</div>}
-    </div>
+    <Empty className="border bg-card">
+      <EmptyHeader>
+        <EmptyMedia variant="icon"><Icon name="info" /></EmptyMedia>
+        <EmptyTitle><h3>{title}</h3></EmptyTitle>
+        {children && <EmptyDescription>{children}</EmptyDescription>}
+      </EmptyHeader>
+      {action && <EmptyContent>{action}</EmptyContent>}
+    </Empty>
   );
 }
 export function ErrorState({ title, children, onRetry }: { title: string; children?: React.ReactNode; onRetry?: () => void }) {
   return (
-    <div className="rounded-2xl border border-crit bg-surface p-5">
-      <h3 className="flex items-center gap-1.5 font-bold text-crit"><Icon name="error" />{title}</h3>
-      {children && <p className="mt-1 text-xs text-muted">{children}</p>}
-      <div className="mt-3"><Btn size="sm" onClick={onRetry}><Icon name="refresh" /> Retry</Btn></div>
-    </div>
+    <Empty className="border border-solid border-crit bg-card">
+      <EmptyHeader>
+        <EmptyMedia variant="icon" className="bg-crit-soft text-crit"><Icon name="error" /></EmptyMedia>
+        <EmptyTitle className="text-crit"><h3>{title}</h3></EmptyTitle>
+        {children && <EmptyDescription>{children}</EmptyDescription>}
+      </EmptyHeader>
+      <EmptyContent><Btn size="sm" onClick={onRetry}><Icon name="refresh" /> Retry</Btn></EmptyContent>
+    </Empty>
   );
 }
 export function OfflineState({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-line bg-surface p-5">
-      <h3 className="font-bold text-muted">⊘ Offline — data may be stale</h3>
-      <p className="mt-1 text-xs text-muted">{children}</p>
-    </div>
+    <Empty className="border bg-card">
+      <EmptyHeader>
+        <EmptyMedia variant="icon"><Icon name="offline" /></EmptyMedia>
+        <EmptyTitle><h3>Offline — data may be stale</h3></EmptyTitle>
+        <EmptyDescription>{children}</EmptyDescription>
+      </EmptyHeader>
+    </Empty>
   );
 }
 
@@ -175,7 +196,7 @@ export function SummaryList({ items, cols = 1 }: { items: [string, React.ReactNo
     <dl className={cx("grid gap-x-6 text-[13px]", cols === 2 ? "grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))]" : "grid-cols-1")}>
       {items.map(([k, v]) => (
         <div key={k} className="grid grid-cols-[minmax(90px,38%)_1fr] gap-2 border-b border-line/70 py-1.5 last:border-b-0">
-          <dt className="text-muted">{k}</dt>
+          <dt className="text-muted-foreground">{k}</dt>
           <dd className="min-w-0 break-words font-medium">{v}</dd>
         </div>
       ))}
@@ -187,7 +208,7 @@ export function Steps({ steps, current }: { steps: string[]; current: number }) 
   return (
     <ol className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold">
       {steps.map((s, i) => (
-        <li key={s} className={cx("flex items-center gap-1.5", i === current ? "text-primary" : i < current ? "text-ok" : "text-muted")}>
+        <li key={s} className={cx("flex items-center gap-1.5", i === current ? "text-primary" : i < current ? "text-ok" : "text-muted-foreground")}>
           <span className={cx("grid h-5 w-5 place-items-center rounded-full text-[11px]", i === current ? "bg-primary text-white" : i < current ? "bg-ok-soft" : "bg-surface2")}>{i < current ? <Icon name="check" /> : i + 1}</span>
           {s}
         </li>
@@ -201,11 +222,11 @@ export function Timeline({ items }: { items: { time: string; title: React.ReactN
     <ol className="flex flex-col gap-3">
       {items.map((it, i) => (
         <li key={i} className="grid grid-cols-[84px_14px_1fr] items-start gap-2 text-[13px]">
-          <span className="text-xs text-muted">{it.time}</span>
+          <span className="text-xs text-muted-foreground">{it.time}</span>
           <span className={cx("mt-1.5 h-2.5 w-2.5 rounded-full", it.tone === "crit" ? "bg-crit" : it.tone === "warn" ? "bg-warn" : it.tone === "ok" ? "bg-ok" : "bg-primary")} />
           <div className="min-w-0">
             <div className="font-semibold">{it.title}</div>
-            {it.detail && <div className="text-xs text-muted">{it.detail}</div>}
+            {it.detail && <div className="text-xs text-muted-foreground">{it.detail}</div>}
           </div>
         </li>
       ))}
@@ -218,7 +239,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, className }: { t
   return (
     <div role="tablist" className={cx("inline-flex max-w-full flex-wrap gap-1 rounded-xl bg-surface2 p-1", className)}>
       {tabs.map((t) => (
-        <button key={t.id} role="tab" aria-selected={value === t.id} onClick={() => onChange(t.id)} className={cx("rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors", value === t.id ? "bg-surface text-ink shadow-sm" : "text-muted hover:text-ink")}>
+        <button key={t.id} role="tab" aria-selected={value === t.id} onClick={() => onChange(t.id)} className={cx("rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors", value === t.id ? "bg-surface text-ink shadow-sm" : "text-muted-foreground hover:text-ink")}>
           {t.label}
           {t.count !== undefined && <span className="ml-1.5 rounded-full bg-primary-soft px-1.5 text-[11px] text-primary">{t.count}</span>}
         </button>
@@ -228,7 +249,6 @@ export function Tabs<T extends string>({ tabs, value, onChange, className }: { t
 }
 
 /* ───────────── Forms ───────────── */
-const inputCls = "w-full rounded-control border border-line bg-surface px-3 py-2 text-[13px] text-ink placeholder:text-subtle focus:border-primary";
 export function Field({ label, hint, error, children, className }: { label: string; hint?: React.ReactNode; error?: React.ReactNode; children: React.ReactNode; className?: string }) {
   // Only a single form control sits inside a <label>. Anything else — choice buttons, a set of checkboxes or buttons, a
   // read-only box — is a labelled group: inside a <label> a button takes the label as its name (IR230, IR238).
@@ -236,26 +256,25 @@ export function Field({ label, hint, error, children, className }: { label: stri
   const group = !control;
   const Tag = group ? "div" : "label";
   return (
-    <Tag role={group ? "group" : undefined} aria-label={group ? label : undefined} className={cx("flex min-w-0 flex-col gap-1 text-xs font-semibold text-ink", className)}>
-      <span aria-hidden={group || undefined}>{label}</span>
+    <Tag role={group ? "group" : undefined} aria-label={group ? label : undefined} className={cx("flex min-w-0 flex-col gap-1 text-xs text-ink", className)}>
+      <span aria-hidden={group || undefined} className="font-semibold">{label}</span>
       {children}
-      {error ? <span className="flex items-center gap-1 font-medium text-crit"><Icon name="error" />{error}</span> : hint ? <span className="font-normal text-muted">{hint}</span> : null}
+      {error ? <span className="flex items-center gap-1 font-medium text-crit"><Icon name="error" />{error}</span> : hint ? <span className="font-normal text-muted-foreground">{hint}</span> : null}
     </Tag>
   );
 }
-/** The control classes; a width in className (w-auto, w-40, …) replaces w-full — two width utilities would be decided
- * by the stylesheet order, not by the order in className. */
-const control = (className?: string) => (className && /(^|\s)w-/.test(className) ? inputCls.replace("w-full ", "") : inputCls);
-export const Input = ({ className, ...p }: React.ComponentProps<"input">) => <input {...p} className={cx(control(className), className)} />; // React 19: ref is a prop
-export const Select = ({ className, children, ...p }: React.SelectHTMLAttributes<HTMLSelectElement>) => (
-  <select {...p} className={cx(control(className), "pr-8", className)}>{children}</select>
+// The form controls are the shadcn/ui Input, Textarea and NativeSelect. A width in className (w-auto, w-40) replaces the
+// default one (cn merges), and a select stays a native select, so the platform's own picker works everywhere.
+export const Input = ({ className, ...p }: React.ComponentProps<"input">) => <UIInput {...p} className={className} />; // React 19: ref is a prop
+export const Select = ({ className, children, ...p }: Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "size">) => (
+  <NativeSelect {...p} className={cn("w-full", className)}>{children}</NativeSelect>
 );
 /** A row's actions behind the "more" icon (DEC-74): a transparent native select lies over the icon, so the keyboard,
  * the screen reader (by `label`) and the platform's own menu work as with a plain select. The first option keeps the
  * menu unchosen; `onChoose` gets the chosen option's value. */
 export function ActionMenu({ label, disabled, onChoose, children }: { label: string; disabled?: boolean; onChoose: (value: string) => void; children: React.ReactNode }) {
   return (
-    <span className="relative inline-grid h-7 w-8 shrink-0 place-items-center rounded-md text-[15px] text-muted hover:bg-surface2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-primary">
+    <span className="relative inline-grid h-7 w-8 shrink-0 place-items-center rounded-md text-[15px] text-muted-foreground hover:bg-surface2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-primary">
       <Icon name="more" />
       <select aria-label={label} disabled={disabled} value="" onChange={(e) => e.target.value && onChoose(e.target.value)}
         className="absolute inset-0 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed">
@@ -265,7 +284,7 @@ export function ActionMenu({ label, disabled, onChoose, children }: { label: str
     </span>
   );
 }
-export const Textarea = ({ className, ...p }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <textarea {...p} className={cx(control(className), "min-h-[84px] resize-y", className)} />;
+export const Textarea = ({ className, ...p }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) => <UITextarea {...p} className={cn("min-h-[84px] resize-y", className)} />;
 /** A one-time code as separate boxes (Figma 10g): one transparent input over the boxes, so typing, pasting and the
  * browser's one-time-code autofill all work; the box for the next digit is outlined while the input has focus. */
 export function CodeInput({ value, onChange, label, length = 6, autoFocus }: { value: string; onChange: (v: string) => void; label: string; length?: number; autoFocus?: boolean }) {
@@ -319,7 +338,7 @@ export function Choice<T extends string>({ options, value, onChange }: { options
 export function Search({ placeholder, value, onChange }: { placeholder: string; value: string; onChange: (v: string) => void }) {
   return (
     <span className="relative flex w-full min-w-0 items-center">
-      <Icon name="search" className="pointer-events-none absolute left-3 text-muted" />
+      <Icon name="search" className="pointer-events-none absolute left-3 text-muted-foreground" />
       <Input type="search" placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className="pl-8" />
     </span>
   );
@@ -345,7 +364,7 @@ export function SearchSelect({ value, onChange, options, label, placeholder, lim
   const start = () => { setOpen(true); setQ(""); setActive(Math.max(0, options.slice(0, limit).findIndex((o) => o.id === value))); };
   return (
     <div className={cx("relative min-w-0", className)}>
-      <input
+      <UIInput
         role="combobox" aria-label={label} aria-expanded={open} aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={open && shown[active] ? `${id}-${active}` : undefined}
         value={open ? q : current?.label ?? ""} placeholder={placeholder ?? t("Type to search…")} onFocus={start} onBlur={close}
         onChange={(e) => { setQ(e.target.value); setActive(0); setOpen(true); }}
@@ -355,17 +374,17 @@ export function SearchSelect({ value, onChange, options, label, placeholder, lim
           else if (e.key === "Enter" && open && shown[active]) { e.preventDefault(); choose(shown[active]); }
           else if (e.key === "Escape" && open) { e.preventDefault(); close(); }
         }}
-        className={cx(inputCls, "pr-8")}
+        className="pr-8"
       />
-      <Icon name="chevronDown" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted" />
+      <Icon name="chevronDown" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
       {open && (
         <ul id={`${id}-list`} role="listbox" aria-label={label} className="absolute z-30 mt-1 max-h-72 w-full min-w-[220px] overflow-auto rounded-control border border-line bg-surface py-1 shadow-lg">
           {shown.map((o, k) => (
             <li key={o.id || "all"} id={`${id}-${k}`} role="option" aria-selected={o.id === value} onMouseDown={(e) => { e.preventDefault(); choose(o); }} onMouseEnter={() => setActive(k)}
               className={cx("cursor-pointer px-3 py-1.5 text-[13px]", k === active && "bg-primary-soft", o.id === value && "font-semibold")}>{o.label}</li>
           ))}
-          {shown.length === 0 && <li className="px-3 py-1.5 text-xs text-muted">{t("No match — try another name")}</li>}
-          {matches.length > shown.length && <li className="px-3 py-1.5 text-[11px] text-muted">{t("{n} more — type to narrow the list", { n: matches.length - shown.length })}</li>}
+          {shown.length === 0 && <li className="px-3 py-1.5 text-xs text-muted-foreground">{t("No match — try another name")}</li>}
+          {matches.length > shown.length && <li className="px-3 py-1.5 text-[11px] text-muted-foreground">{t("{n} more — type to narrow the list", { n: matches.length - shown.length })}</li>}
         </ul>
       )}
     </div>
@@ -392,7 +411,8 @@ export function Modal({ open, title, onClose, children, footer, wide }: { open: 
     openModals.push(me);
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const inside = (part?: string) => [...(box.current?.querySelectorAll<HTMLElement>(part ? `[data-part="${part}"] :is(${FOCUSABLE})` : FOCUSABLE) ?? [])]
-      .filter((el) => !el.closest("[hidden], [inert]"));
+      // a disabled control or one out of the tab order is not a stop (the shadcn/ui Button keeps tabindex="0" when disabled)
+      .filter((el) => !el.closest("[hidden], [inert]") && !(el as HTMLButtonElement).disabled && el.tabIndex >= 0);
     (inside("body")[0] ?? inside("footer")[0] ?? inside("header")[0])?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (openModals[openModals.length - 1] !== me) return;
@@ -419,7 +439,7 @@ export function Modal({ open, title, onClose, children, footer, wide }: { open: 
       <div ref={box} role="dialog" aria-modal="true" aria-labelledby={id} className={cx("flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl", wide ? "sm:max-w-3xl" : "sm:max-w-[560px]")}>
         <div data-part="header" className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
           <h2 id={id} className="text-base font-bold">{title}</h2>
-          <button aria-label={t("Close")} onClick={onClose} className="rounded-lg px-2 py-1 text-muted hover:bg-surface2"><Icon name="close" /></button>
+          <button aria-label={t("Close")} onClick={onClose} className="rounded-lg px-2 py-1 text-muted-foreground hover:bg-surface2"><Icon name="close" /></button>
         </div>
         <div data-part="body" className="flex flex-col gap-3 overflow-y-auto px-5 py-4">{children}</div>
         {footer && <div data-part="footer" className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}
@@ -474,7 +494,7 @@ export function DataTable<T>({ cols, rows, rowKey, onRowClick, selectedKey }: { 
     <div className="scroll-x rounded-xl border border-line">
       <table className="w-full border-collapse text-left text-[13px]">
         <thead>
-          <tr className="bg-surface2 text-[11px] uppercase tracking-wide text-muted">
+          <tr className="bg-surface2 text-[11px] uppercase tracking-wide text-muted-foreground">
             {cols.map((c) => (
               <th key={c.key} className={cx("whitespace-nowrap px-3 py-2 font-semibold", c.hideBelow === "sm" && "max-sm:hidden", c.hideBelow === "md" && "max-md:hidden", c.className)}>{c.label}</th>
             ))}
@@ -494,7 +514,7 @@ export function DataTable<T>({ cols, rows, rowKey, onRowClick, selectedKey }: { 
             );
           })}
           {rows.length === 0 && (
-            <tr><td colSpan={cols.length} className="px-3 py-6 text-center text-muted">{t("No data")}</td></tr>
+            <tr><td colSpan={cols.length} className="px-3 py-6 text-center text-muted-foreground">{t("No data")}</td></tr>
           )}
         </tbody>
       </table>

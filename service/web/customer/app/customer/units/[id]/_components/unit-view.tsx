@@ -134,18 +134,18 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
   };
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/customer/properties" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Back to {place}", { place: d ? d.location.pathLabels.at(-1) ?? t("Units") : "Bedroom" })}</Link><span>{unit.loc} › <b className="text-ink">{unit.name}</b></span></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/customer/properties" className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Back to {place}", { place: d ? d.location.pathLabels.at(-1) ?? t("Units") : "Bedroom" })}</Link><span>{unit.loc} › <b className="text-ink">{unit.name}</b></span></div>
       <div className="split-rev">
         <Card title={t("DEVICES IN THIS ROOM")} sub={d ? t(roomUnits.data.length === 1 ? "{room} · {n} AC" : "{room} · {n} ACs", { room: d.location.pathLabels.at(-1) ?? t("Room"), n: roomUnits.data.length }) : "Bedroom · 2 ACs · Home A › 1F"} className="self-start">
           <div className="flex flex-col gap-2">
             {(api ? roomUnits.data : siblings).map((s) => (
               <Link key={s.id} href={`/customer/units/${s.id}`} className={cx("rounded-xl border p-3", s.id === id ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2/60")}>
                 <div className="flex items-center justify-between font-bold">{s.name}{s.id === id && <Badge tone="primary">{t("Selected")}</Badge>}</div>
-                <div className="text-xs text-muted">{t("{temp}°C room", { temp: s.temp ?? "—" })}{s.power !== null ? ` · ${s.power} W` : ""}</div>
+                <div className="text-xs text-muted-foreground">{t("{temp}°C room", { temp: s.temp ?? "—" })}{s.power !== null ? ` · ${s.power} W` : ""}</div>
               </Link>
             ))}
           </div>
-          <p className="mt-3 text-[11px] text-muted">{t("Choose an AC to control it on its own, or use Group control in Units & locations to send one setting to several ACs in this space.")}</p>
+          <p className="mt-3 text-[11px] text-muted-foreground">{t("Choose an AC to control it on its own, or use Group control in Units & locations to send one setting to several ACs in this space.")}</p>
         </Card>
 
         <div className="flex min-w-0 flex-col gap-4">
@@ -163,18 +163,18 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
           {restricted && <Banner tone="warn">{t("Cooling restriction active — minimum {min} °C.", { min })} <Link className="font-semibold text-primary" href={d ? "/customer/payments" : "/customer/payments/invoice-overdue-a?tab=restriction"}>{t("View details")} <Icon name="arrowRight" /></Link></Banner>}
           <Card title={t("REMOTE CONTROL")} sub={t("Controls apply to this AC only; you confirm before sending")}>
             <div className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="font-semibold">{t("Power")}</div><div className="text-xs text-muted">{t("Sent as its own command")}</div></div><Toggle on={on} onChange={(v) => (!disabled && !waiting && policy?.kind !== "power_off" ? togglePower(v) : undefined)} label={t("Power")} /></div>
+              <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="font-semibold">{t("Power")}</div><div className="text-xs text-muted-foreground">{t("Sent as its own command")}</div></div><Toggle on={on} onChange={(v) => (!disabled && !waiting && policy?.kind !== "power_off" ? togglePower(v) : undefined)} label={t("Power")} /></div>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div><div className="font-semibold">{t("Set temperature")}</div><div className="text-xs text-muted">{t("{min}–{max}°C · step {step}°C · confirmed {confirmed}°C", { min, max, step: cap.step, confirmed })}</div></div>
-                <div className="flex items-center gap-2"><Btn disabled={disabled || temp - cap.step < min} onClick={() => setTemp((t) => t - cap.step)}>–</Btn><span className="w-14 text-center text-lg font-bold">{temp}°C</span><Btn disabled={disabled || temp + cap.step > max} onClick={() => setTemp((t) => t + cap.step)}>+</Btn></div>
+                <div><div className="font-semibold">{t("Set temperature")}</div><div className="text-xs text-muted-foreground">{t("{min}–{max}°C · step {step}°C · confirmed {confirmed}°C", { min, max, step: cap.step, confirmed })}</div></div>
+                <div className="flex items-center gap-2"><Btn disabled={disabled || temp - cap.step < min} onClick={() => setTemp((t) => t - cap.step)} aria-label={t("Lower the temperature")}><Icon name="remove" /></Btn><span className="w-14 text-center text-lg font-bold">{temp}°C</span><Btn disabled={disabled || temp + cap.step > max} onClick={() => setTemp((t) => t + cap.step)} aria-label={t("Raise the temperature")}><Icon name="add" /></Btn></div>
               </div>
               <div><div className="mb-1 font-semibold">{t("Mode")}</div><Choice value={mode} onChange={setMode} options={(["cool", "dry", "fan"] as const).map((m) => ({ id: m, label: t(MODE_LABEL[m]) }))} /></div>
               <div><div className="mb-1 font-semibold">{t("Fan speed")}</div><Choice value={fan} onChange={setFan} options={(["low", "mid", "high"] as const).map((f) => ({ id: f, label: t(FAN_LABEL[f]) }))} /></div>
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t((d ? changes().length : 1) === 1 ? "{n} change:" : "{n} changes:", { n: d ? changes().length : 1 })}</b> {d ? changes().map(changeText).join(" · ") || t("No change yet") : t("Set temperature {from}°C → {to}°C", { from: 26, to: temp })}<br /><span className="text-muted">{t("Target: {name} only · you will confirm before sending", { name: unit.name })}</span></span><Btn variant="primary" disabled={disabled || waiting || (d !== null && changes().length === 0)} onClick={() => setConfirm(true)}>{waiting ? t("Waiting for device…") : t("Review & send")}</Btn></div>
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs"><span><b>{t((d ? changes().length : 1) === 1 ? "{n} change:" : "{n} changes:", { n: d ? changes().length : 1 })}</b> {d ? changes().map(changeText).join(" · ") || t("No change yet") : t("Set temperature {from}°C → {to}°C", { from: 26, to: temp })}<br /><span className="text-muted-foreground">{t("Target: {name} only · you will confirm before sending", { name: unit.name })}</span></span><Btn variant="primary" disabled={disabled || waiting || (d !== null && changes().length === 0)} onClick={() => setConfirm(true)}>{waiting ? t("Waiting for device…") : t("Review & send")}</Btn></div>
               {waiting && <Banner>{t("Waiting for device response… The result is shown only after the device acknowledges (fails after 30 s).")}</Banner>}
               {offline && ( // Figma 02h: nothing is sent to an offline AC; a repair request is the way forward (IR243, IR315)
                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3 text-xs">
-                  <span><b>{t("Controls disabled while offline")}</b><br /><span className="text-muted">{t("Try again when the unit reconnects, or request a repair.")}</span></span>
+                  <span><b>{t("Controls disabled while offline")}</b><br /><span className="text-muted-foreground">{t("Try again when the unit reconnects, or request a repair.")}</span></span>
                   <Link href={`/customer/maintenance?new=${d?.id ?? unit.id}`} className="rounded-control bg-primary-soft px-2.5 py-1 font-semibold text-primary">{t("Request repair")}</Link>
                 </div>
               )}
@@ -185,21 +185,21 @@ export function UnitView({ id, detail, room: roomRows, policies, history = [] }:
             <Card title={t("Device information")}><SummaryList items={d ? [[t("Model"), `${d.capabilities.manufacturer} ${d.capabilities.model}`], [t("Remote control"), t(d.capabilities.control ? "supported" : "not supported")], [t("Capabilities"), t("Modes {modes} · fan {fans} · {min}–{max}°C step {step}", { modes: d.capabilities.modes.map(modeWord).join("/") || "—", fans: d.capabilities.fanLevels.map(fanWord).join("/") || "—", min: cap.min, max: cap.max, step: cap.step })]] : [[t("Model"), "Split 1.5HP (demo)"], [t("Firmware"), "v2.4.1"], [t("Protocol"), "MQTT/TLS"], [t("Uptime"), "14d 8h"], [t("Capabilities"), "Modes cool/dry/fan · fan low/mid/high · 16–30°C step 1"]]} /></Card>
           </div>
           <Card title={t("Alert policies on this AC")} sub={t("Limits that raise alerts for this AC. Policies are made in Alerts › Alert policies.")}>
-            <div className="flex flex-col gap-2 text-[13px]"><div className="rounded-xl border border-line p-3"><b>{t("Default policy")}</b><div className="text-xs text-muted">{t("6 rules · ventilation (CO₂, PM2.5) + fault causes · Always attached · 5 of 6 rules on")}</div></div>{customerPolicies.filter((pl) => attached.includes(pl.id)).map((pl) => <div key={pl.id} className="rounded-xl border border-line p-3"><b>{pl.name}</b><div className="text-xs text-muted">{pl.rule}</div><Btn size="sm" className="mt-2" onClick={() => savePolicies(attached.filter((y) => y !== pl.id), t("Detached from this AC only"), "warn")}>{t("Detach")}</Btn></div>)}<Btn size="sm" variant="ghost" onClick={() => { setPicked([]); setAttachOpen(true); }}><Icon name="add" /> {t("Attach policy")}</Btn></div>
-            <p className="mt-2 text-[11px] text-muted">{t("Detaching only removes it from this AC — the policy stays in your list.")}</p>
+            <div className="flex flex-col gap-2 text-[13px]"><div className="rounded-xl border border-line p-3"><b>{t("Default policy")}</b><div className="text-xs text-muted-foreground">{t("6 rules · ventilation (CO₂, PM2.5) + fault causes · Always attached · 5 of 6 rules on")}</div></div>{customerPolicies.filter((pl) => attached.includes(pl.id)).map((pl) => <div key={pl.id} className="rounded-xl border border-line p-3"><b>{pl.name}</b><div className="text-xs text-muted-foreground">{pl.rule}</div><Btn size="sm" className="mt-2" onClick={() => savePolicies(attached.filter((y) => y !== pl.id), t("Detached from this AC only"), "warn")}>{t("Detach")}</Btn></div>)}<Btn size="sm" variant="ghost" onClick={() => { setPicked([]); setAttachOpen(true); }}><Icon name="add" /> {t("Attach policy")}</Btn></div>
+            <p className="mt-2 text-[11px] text-muted-foreground">{t("Detaching only removes it from this AC — the policy stays in your list.")}</p>
           </Card>
           <Card title={t("Command history")} sub={t("This unit only · newest first")}>
-            <ul className="flex flex-col divide-y divide-line">{hist.length === 0 && <li className="py-2 text-[13px] text-muted">{t("No commands for this AC yet")}</li>}{hist.map((h) => <li key={h.id} className="flex flex-wrap justify-between gap-2 py-2 text-[13px]"><span className={h.bad ? "text-crit" : ""}>{h.text}</span><span className="text-xs text-muted">{h.id} · {h.when}</span></li>)}</ul>
+            <ul className="flex flex-col divide-y divide-line">{hist.length === 0 && <li className="py-2 text-[13px] text-muted-foreground">{t("No commands for this AC yet")}</li>}{hist.map((h) => <li key={h.id} className="flex flex-wrap justify-between gap-2 py-2 text-[13px]"><span className={h.bad ? "text-crit" : ""}>{h.text}</span><span className="text-xs text-muted-foreground">{h.id} · {h.when}</span></li>)}</ul>
           </Card>
         </div>
       </div>
       <Modal open={confirm} onClose={() => setConfirm(false)} title={t("Confirm command")} footer={<><Btn onClick={() => setConfirm(false)}>{t("Cancel")}</Btn><Btn variant="primary" onClick={send}>{t("Send to {name}", { name: unit.name })}</Btn></>}>
         <SummaryList items={[[t("Target"), `${unit.loc} › ${unit.name}`], [t("Change"), d ? changes().map(changeText).join(" · ") : t("Set temperature {from}°C → {to}°C", { from: 26, to: temp })], [t("Mode / fan"), `${modeWord(mode)} / ${fanWord(fan)}`]]} />
-        <p className="text-xs text-muted">{t("Only {name} changes. The result shows after the device acknowledges.", { name: unit.name })}</p>
+        <p className="text-xs text-muted-foreground">{t("Only {name} changes. The result shows after the device acknowledges.", { name: unit.name })}</p>
       </Modal>
       <Modal open={attachOpen} onClose={() => setAttachOpen(false)} title={t("Attach a policy to {name}", { name: unit.name })} footer={<><Btn onClick={() => setAttachOpen(false)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!picked.length} onClick={() => { savePolicies([...attached, ...picked], t(picked.length > 1 ? "{n} policies attached to this AC" : "{n} policy attached to this AC", { n: picked.length })); setAttachOpen(false); }}>{t("Attach")}</Btn></>}>
-        <p className="mb-2 text-[13px] text-muted">{t("Only your account’s policies are listed. The default policy is always attached.")}</p>
-        <div className="flex flex-col gap-2">{customerPolicies.filter((pl) => !attached.includes(pl.id)).map((pl) => <Check key={pl.id} label={<span><b>{pl.name}</b> <span className="text-xs text-muted">{pl.rule}</span></span>} checked={picked.includes(pl.id)} onChange={(v) => setPicked((x) => (v ? [...x, pl.id] : x.filter((y) => y !== pl.id)))} />)}</div>
+        <p className="mb-2 text-[13px] text-muted-foreground">{t("Only your account’s policies are listed. The default policy is always attached.")}</p>
+        <div className="flex flex-col gap-2">{customerPolicies.filter((pl) => !attached.includes(pl.id)).map((pl) => <Check key={pl.id} label={<span><b>{pl.name}</b> <span className="text-xs text-muted-foreground">{pl.rule}</span></span>} checked={picked.includes(pl.id)} onChange={(v) => setPicked((x) => (v ? [...x, pl.id] : x.filter((y) => y !== pl.id)))} />)}</div>
       </Modal>
       {renaming && <RenameModal demo={!api} r={{ kind: "unit", id: d?.id ?? unit.id, version: d?.version ?? 1, name: unit.name, where: `${unit.loc} › ${unit.name}` }} onClose={() => setRenaming(false)} />}
     </Page>

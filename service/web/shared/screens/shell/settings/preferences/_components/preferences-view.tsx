@@ -52,22 +52,22 @@ export function PreferencesView({ live }: { live: PreferencesLive }) {
         <Field label={t("Display timezone")} hint={t("Booked times keep their meaning across timezone changes.")}>
           <Select value={zone} onChange={(e) => setZone(e.target.value)}>{live.zones.map((z) => <option key={z.id} value={z.id}>{z.label}</option>)}</Select>
         </Field>
-        <div className="mt-4"><Field label={t("Currency")} hint={t("Invoices keep their own currency — nothing is converted.")}><div className="flex items-center justify-between rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] text-muted">{t("MYR — Malaysian Ringgit")} <span className="text-[11px]">{t("read-only demo")}</span></div></Field></div>
+        <div className="mt-4"><Field label={t("Currency")} hint={t("Invoices keep their own currency — nothing is converted.")}><div className="flex items-center justify-between rounded-control border border-line bg-surface2 px-3 py-2 text-[13px] text-muted-foreground">{t("MYR — Malaysian Ringgit")} <span className="text-[11px]">{t("read-only demo")}</span></div></Field></div>
         <div className="my-4 border-t border-line" />
         {live.client && (
           <div className="flex flex-col gap-3">
             <div className="text-[13px] font-semibold">{t("Consent")}</div>
-            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Location, for voice room disambiguation and location automations")}</div><div className="text-xs text-muted">{t("{when} · withdrawal turns off location automations and discards pending voice requests", { when: consentNote(live.consent, t) })}</div></div><Toggle on={location} onChange={setLocation} label={t("Location consent")} /></div>
-            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Microphone, for voice actions (this device)")}</div><div className="text-xs text-muted">{t("Text input always available as a fallback")}</div></div><Toggle on={mic} onChange={(v) => setStoredValue(MICROPHONE, v ? "on" : "off")} label={t("Microphone consent")} /></div>
+            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Location, for voice room disambiguation and location automations")}</div><div className="text-xs text-muted-foreground">{t("{when} · withdrawal turns off location automations and discards pending voice requests", { when: consentNote(live.consent, t) })}</div></div><Toggle on={location} onChange={setLocation} label={t("Location consent")} /></div>
+            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Microphone, for voice actions (this device)")}</div><div className="text-xs text-muted-foreground">{t("Text input always available as a fallback")}</div></div><Toggle on={mic} onChange={(v) => setStoredValue(MICROPHONE, v ? "on" : "off")} label={t("Microphone consent")} /></div>
             <div className="mt-1 text-[13px] font-semibold">{t("Reports")}</div>
-            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Email me the monthly energy report (1st of each month)")}</div><div className="text-xs text-muted">{t("Last month's report, to your account e-mail · also set from Energy & cost › Export report")}</div></div><Toggle on={monthly} onChange={setMonthly} label={t("Monthly energy report e-mail")} /></div>
+            <div className="flex items-center justify-between gap-3"><div><div className="text-[13px]">{t("Email me the monthly energy report (1st of each month)")}</div><div className="text-xs text-muted-foreground">{t("Last month's report, to your account e-mail · also set from Energy & cost › Export report")}</div></div><Toggle on={monthly} onChange={setMonthly} label={t("Monthly energy report e-mail")} /></div>
           </div>
         )}
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <div><div className="text-[13px] font-semibold">{t("Security · Two-step verification")}</div><div className="text-xs text-muted">{t("Ask for a 6-digit code from an authenticator app when signing in on a new device")}{tf.enabled && tf.recoveryCodesLeft !== null ? t(" · {n} recovery codes left", { n: tf.recoveryCodesLeft }) : ""}.</div></div>
+          <div><div className="text-[13px] font-semibold">{t("Security · Two-step verification")}</div><div className="text-xs text-muted-foreground">{t("Ask for a 6-digit code from an authenticator app when signing in on a new device")}{tf.enabled && tf.recoveryCodesLeft !== null ? t(" · {n} recovery codes left", { n: tf.recoveryCodesLeft }) : ""}.</div></div>
           <span className="flex items-center gap-2">{tf.enabled ? <><Badge tone="ok">{t("On")}</Badge><Btn size="sm" onClick={() => setModal("off")}>{t("Turn off")}</Btn></> : <><Badge>{t("Off")}</Badge><Btn size="sm" variant="primary" onClick={() => setModal("on")}>{t("Turn on")}</Btn></>}</span>
         </div>
-        <p className="mt-1 text-[11px] text-muted">{t("Demo only — any 6 digits are accepted and the demo sign-in is unchanged (FR-X08).")}</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">{t("Demo only — any 6 digits are accepted and the demo sign-in is unchanged (FR-X08).")}</p>
         <div className="mt-5 flex justify-end gap-2"><Btn disabled={!dirty || pending} onClick={reset}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!dirty || pending} onClick={save}><Icon name="check" />{t("Save preferences")}</Btn></div>
       </Card>
       {modal === "on" && <TurnOn setupKey={tf.setupKey} qr={live.qr} onClose={() => setModal(null)} />}
@@ -86,10 +86,10 @@ function TurnOn({ setupKey, qr, onClose }: { setupKey: string | null; qr: QrPath
     <Modal open onClose={onClose} title={t("Turn on two-step verification")} footer={codes ? <Btn variant="primary" onClick={onClose}>{t("I saved my codes")}</Btn> : <><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!codeComplete(code) || pending} onClick={() => run(() => enableTwoFactor(code), t("Two-step verification is on"), (c) => setCodes(c), (f) => setError(actionMessage(f, t)))}>{t("Verify & turn on")}</Btn></>}>
       {codes ? <><Banner tone="ok">{t("Two-step verification is on. Save these {n} recovery codes — they are shown only once.", { n: codes.length })}</Banner><div className="grid grid-cols-2 gap-2 font-mono text-sm">{codes.map((c) => <span key={c} className="rounded-lg bg-surface2 px-3 py-1.5">{c}</span>)}</div></> : <div className="flex flex-col gap-3.5">
         <div className="flex flex-col gap-5 sm:flex-row">
-          <div className="grid h-[150px] w-[150px] shrink-0 place-items-center rounded-lg border border-line bg-white p-2">{qr ? <QrCode qr={qr} label={t("QR code with the setup key for an authenticator app")} className="h-full w-full" /> : <span className="text-xs text-muted">{t("No setup key")}</span>}</div>
+          <div className="grid h-[150px] w-[150px] shrink-0 place-items-center rounded-lg border border-line bg-white p-2">{qr ? <QrCode qr={qr} label={t("QR code with the setup key for an authenticator app")} className="h-full w-full" /> : <span className="text-xs text-muted-foreground">{t("No setup key")}</span>}</div>
           <div className="flex min-w-0 flex-col gap-2.5 text-[13px]">
             <b>1&nbsp;&nbsp;{t("Scan with an authenticator app")}</b>
-            <div className="text-xs text-muted">{t("or enter key")}&nbsp;&nbsp;<span className="font-mono">{setupKey ? groupKey(setupKey) : "—"}</span></div>
+            <div className="text-xs text-muted-foreground">{t("or enter key")}&nbsp;&nbsp;<span className="font-mono">{setupKey ? groupKey(setupKey) : "—"}</span></div>
             <b>2&nbsp;&nbsp;{t("Enter the 6-digit code")}</b>
             <CodeInput label={t("6-digit code")} value={code} onChange={setCode} autoFocus />
             <b>3&nbsp;&nbsp;{t("Save your 8 recovery codes (shown after verifying)")}</b>

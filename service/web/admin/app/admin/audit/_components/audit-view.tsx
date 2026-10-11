@@ -122,7 +122,7 @@ export function AuditView({ live }: { live?: AuditLive }) {
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <Choice value={f.result} onChange={(v) => search({ result: v })} options={(["All", "Success", "Denied", "Failed", "Pending"] as const).map((k) => ({ id: k, label: k === "All" ? t("All") : resultWord(k, t) }))} />
               <span className="flex flex-wrap items-center gap-3">
-                {(!live || live.searched) && <span className="text-xs text-muted">{corr ? t("{n} entries with this correlation ID", { n: total }) : t("{n} entries", { n: total })}</span>}
+                {(!live || live.searched) && <span className="text-xs text-muted-foreground">{corr ? t("{n} entries with this correlation ID", { n: total }) : t("{n} entries", { n: total })}</span>}
                 <Btn size="sm" onClick={reset}>{t("Reset")}</Btn>
               </span>
             </div>
@@ -132,17 +132,17 @@ export function AuditView({ live }: { live?: AuditLive }) {
               {rows.length === 0 ? <NoEntries live={live} periodErr={periodErr} corr={corr} /> : (
                 <div className="flex flex-col gap-2">{rows.map((l) => (
                   <ListRow key={l.id} selected={sel?.id === l.id} onClick={() => open(l.id)}>
-                    <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{l.op}</b><Badge tone={resultTone(l.res)}>{resultWord(l.res, t)}</Badge></div><div className="truncate text-[11px] text-muted">{l.target}</div><div className="truncate text-[11px] text-muted">{l.actor} ({l.role}) · {l.at} · {l.corr}</div></div>
+                    <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{l.op}</b><Badge tone={resultTone(l.res)}>{resultWord(l.res, t)}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{l.target}</div><div className="truncate text-[11px] text-muted-foreground">{l.actor} ({l.role}) · {l.at} · {l.corr}</div></div>
                   </ListRow>
                 ))}</div>
               )}
-              <div className="mt-3 flex items-center justify-between gap-2"><p className="text-[11px] text-muted">{t("{n} of {total} · 25 per page", { n: rows.length, total })}</p>{more && <Btn size="sm" onClick={() => (live ? patch({ limit: String(Math.min(100, live.filters.limit + 25)) }) : setShown((s) => s + 25))}>{t("Load more")}</Btn>}</div>
+              <div className="mt-3 flex items-center justify-between gap-2"><p className="text-[11px] text-muted-foreground">{t("{n} of {total} · 25 per page", { n: rows.length, total })}</p>{more && <Btn size="sm" onClick={() => (live ? patch({ limit: String(Math.min(100, live.filters.limit + 25)) }) : setShown((s) => s + 25))}>{t("Load more")}</Btn>}</div>
             </Card>
             {live?.entryMissing ? <EmptyState title={t("That entry is not in these results")}>{t("Change the filters or load more to open it.")}</EmptyState>
               : sel && (
                 <Card title={<span className="flex flex-wrap items-center gap-2">{sel.op}<Badge tone={resultTone(sel.res)}>{resultWord(sel.res, t)}</Badge></span>} sub={`${sel.target}${sel.versions ? ` · ${sel.versions}` : ""}`} className="self-start">
                   <SummaryList items={[
-                    [t("Actor"), <span key="a" className="flex flex-wrap items-center justify-between gap-2"><span>{sel.actor}{sel.actorId !== sel.actor && <span className="ml-2 font-mono text-xs text-muted">{sel.actorId}</span>}</span><FilterLink onClick={() => search({ actorId: sel.actorId }, true)}>{t("Filter by actor")} <Icon name="arrowRight" /></FilterLink></span>],
+                    [t("Actor"), <span key="a" className="flex flex-wrap items-center justify-between gap-2"><span>{sel.actor}{sel.actorId !== sel.actor && <span className="ml-2 font-mono text-xs text-muted-foreground">{sel.actorId}</span>}</span><FilterLink onClick={() => search({ actorId: sel.actorId }, true)}>{t("Filter by actor")} <Icon name="arrowRight" /></FilterLink></span>],
                     [t("Role at the time"), t("{role} — kept as recorded, not rewritten by the current membership", { role: sel.role })],
                     [t("Occurred"), sel.occurred],
                     [t("Correlation ID"), <span key="c" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">{sel.corr}</span><FilterLink onClick={() => search({ correlationId: sel.corr }, true)}>{t("Filter by ID")} <Icon name="arrowRight" /></FilterLink></span>],
@@ -153,12 +153,12 @@ export function AuditView({ live }: { live?: AuditLive }) {
                     <>
                       <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Correlation trace")}</h3>
                       <Timeline items={trace.map((x) => ({ time: x.time, title: x.title, detail: x.detail, tone: x.id === sel.id ? "primary" : undefined }))} />
-                      <p className="mt-2 text-[11px] text-muted">{t("Pending is shown on its own; the final result is a new entry with the same correlation ID. Earlier entries are never edited.")}</p>
+                      <p className="mt-2 text-[11px] text-muted-foreground">{t("Pending is shown on its own; the final result is a new entry with the same correlation ID. Earlier entries are never edited.")}</p>
                     </>
                   )}
                   <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Before / after (masked)")}</h3>
-                  {sel.changes.length === 0 ? <p className="text-xs text-muted">{t("No field values were recorded for this entry.")}</p> : <DataTable rows={sel.changes} rowKey={(r) => r.field} cols={[{ key: "f", label: t("Field"), render: (r) => <span className="font-mono text-xs">{r.field}</span> }, { key: "a", label: t("Before"), render: (r) => r.before }, { key: "b", label: t("After"), render: (r) => <span className={r.changed ? "font-bold text-warn" : ""}>{r.after}</span> }]} />}
-                  <p className="mt-2 text-[11px] text-muted">{t("Changed fields are highlighted. Secrets and contact values stay masked in both columns; the original values are never shown.")}</p>
+                  {sel.changes.length === 0 ? <p className="text-xs text-muted-foreground">{t("No field values were recorded for this entry.")}</p> : <DataTable rows={sel.changes} rowKey={(r) => r.field} cols={[{ key: "f", label: t("Field"), render: (r) => <span className="font-mono text-xs">{r.field}</span> }, { key: "a", label: t("Before"), render: (r) => r.before }, { key: "b", label: t("After"), render: (r) => <span className={r.changed ? "font-bold text-warn" : ""}>{r.after}</span> }]} />}
+                  <p className="mt-2 text-[11px] text-muted-foreground">{t("Changed fields are highlighted. Secrets and contact values stay masked in both columns; the original values are never shown.")}</p>
                   {related && <RelatedRecords related={related} demo={!live} />}
                 </Card>
               )}
@@ -190,17 +190,17 @@ function RelatedRecords({ related, demo }: { related: Related; demo: boolean }) 
   const { t } = useI18n();
   const line = (r: RelatedRef) => <span><span className="font-mono text-xs">{r.id.slice(0, 8)}</span> · {r.note}</span>;
   const row = (label: string, r: RelatedRef | null, none: string, link?: (r: RelatedRef) => ReactNode): [string, ReactNode] =>
-    [label, r ? <span key={label} className="flex flex-wrap items-center justify-between gap-2">{line(r)}{link?.(r)}</span> : <span key={label} className="text-muted">{none}</span>];
+    [label, r ? <span key={label} className="flex flex-wrap items-center justify-between gap-2">{line(r)}{link?.(r)}</span> : <span key={label} className="text-muted-foreground">{none}</span>];
   return (
     <>
       <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Related records")}</h3>
       <SummaryList items={[
         row(t("Restriction"), related.restriction, t("No related restriction"), (r) => <TextLink href={`/admin/restrictions?restrictionId=${r.id}`}>{t("Open restriction")} <Icon name="arrowRight" /></TextLink>),
-        [t("Command"), related.command ? <CommandLine key="cmd" r={related.command} demo={demo} line={line(related.command)} /> : <span key="cmd" className="text-muted">{t("No related command")}</span>],
+        [t("Command"), related.command ? <CommandLine key="cmd" r={related.command} demo={demo} line={line(related.command)} /> : <span key="cmd" className="text-muted-foreground">{t("No related command")}</span>],
         row(t("Job"), related.job, t("No related job"), (r) => <TextLink href={`/admin/jobs?jobId=${r.id}`}>{t("Open job")} <Icon name="arrowRight" /></TextLink>),
         ...(related.unit ? [row(t("Unit"), related.unit, "", (r) => <TextLink href={`/admin/units?unitId=${r.id}`}>{t("Open unit")} <Icon name="arrowRight" /></TextLink>)] : []),
       ]} />
-      <p className="mt-2 rounded-lg bg-primary-soft/50 px-3 py-2 text-[11px] text-muted">{t("Links open the existing detail screens, and each checks your permission there. “Load command” reads the command only when you click it. Audit entries cannot be edited, deleted or exported.")}</p>
+      <p className="mt-2 rounded-lg bg-primary-soft/50 px-3 py-2 text-[11px] text-muted-foreground">{t("Links open the existing detail screens, and each checks your permission there. “Load command” reads the command only when you click it. Audit entries cannot be edited, deleted or exported.")}</p>
     </>
   );
 }
@@ -249,8 +249,8 @@ function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEv
           <Field label={t("To")}><Input type="date" value={f.to} onChange={(e) => onDate("to", e.target.value)} /></Field>
         </div>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[11px] text-muted">{t("The devices you may see. Events load only after you pick a device — there is no “all devices” view.")}</p>
-          <span className="flex items-center gap-3">{device.deviceId && <span className="text-xs text-muted">{t("{n} events", { n: device.total })}</span>}<Btn size="sm" onClick={onReset}>{t("Reset")}</Btn></span>
+          <p className="text-[11px] text-muted-foreground">{t("The devices you may see. Events load only after you pick a device — there is no “all devices” view.")}</p>
+          <span className="flex items-center gap-3">{device.deviceId && <span className="text-xs text-muted-foreground">{t("{n} events", { n: device.total })}</span>}<Btn size="sm" onClick={onReset}>{t("Reset")}</Btn></span>
         </div>
       </Card>
       {!device.deviceId ? <EmptyState title={device.missing ? t("That device is not in your list") : t("Pick a device")}>{t(device.missing ? "It does not exist or is outside your scope. Pick one of your devices." : "Choose a device above to see its connection, power and tamper events.")}</EmptyState> : (
@@ -259,7 +259,7 @@ function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEv
             {device.events.length === 0 ? <EmptyState title={t("No device events in this period")}>{periodErr ? t("The period must start before it ends and cover at most 366 days.") : t("This device recorded no events in the period.")}</EmptyState> : (
               <div className="flex flex-col gap-2">{device.events.map((e) => (
                 <ListRow key={e.id} selected={ev?.id === e.id} onClick={() => (live ? onEvent(e.id) : setPick(e.id))}>
-                  <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{e.title}</b><Badge tone={e.tone}>{e.type}</Badge></div><div className="truncate text-[11px] text-muted">{e.meta}</div><div className="truncate text-[11px] text-muted">{e.state}</div></div>
+                  <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="truncate text-[13px]">{e.title}</b><Badge tone={e.tone}>{e.type}</Badge></div><div className="truncate text-[11px] text-muted-foreground">{e.meta}</div><div className="truncate text-[11px] text-muted-foreground">{e.state}</div></div>
                 </ListRow>
               ))}</div>
             )}
@@ -273,8 +273,8 @@ function DeviceEvents({ device, f, periodErr, zone, live, onDate, onDevice, onEv
                 [t("Audit"), <span key="audit" className="flex flex-wrap items-center justify-between gap-2"><span className="font-mono text-xs">device_event · {ev.id.slice(0, 8)}</span><TextLink href={`/admin/audit?targetKind=device_event&targetId=${ev.id}`}>{t("Filter log")} <Icon name="arrowRight" /></TextLink></span>],
               ]} />
               <h3 className="mt-4 mb-2 text-[13px] font-bold">{t("Response notes (read-only here)")}</h3>
-              {ev.notes.length === 0 ? <p className="text-xs text-muted">{t("No response notes.")}</p> : <ul className="flex flex-col gap-2">{ev.notes.map((n, k) => <li key={k} className="rounded-lg border border-line px-3 py-2 text-[13px]">“{n.text}”<div className="text-[11px] text-muted">{n.by}</div></li>)}</ul>}
-              <p className="mt-2 rounded-lg bg-primary-soft/50 px-3 py-2 text-[11px] text-muted">{t("Notes are added from Devices & models (device.write), not here.")}</p>
+              {ev.notes.length === 0 ? <p className="text-xs text-muted-foreground">{t("No response notes.")}</p> : <ul className="flex flex-col gap-2">{ev.notes.map((n, k) => <li key={k} className="rounded-lg border border-line px-3 py-2 text-[13px]">“{n.text}”<div className="text-[11px] text-muted-foreground">{n.by}</div></li>)}</ul>}
+              <p className="mt-2 rounded-lg bg-primary-soft/50 px-3 py-2 text-[11px] text-muted-foreground">{t("Notes are added from Devices & models (device.write), not here.")}</p>
             </Card>
           )}
         </div>

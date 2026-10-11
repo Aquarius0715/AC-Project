@@ -59,8 +59,8 @@ export function MaintenanceView({ live }: { live: MaintenanceLive }) {
         live.filters && !going ? (
           <FilterCareTab f={live.filters} owner={live.owner} onRequest={(p) => { setPrefill(p); setModal("new"); }}
             onDone={(text) => setResult({ tone: "ok", text })} onFail={(f) => setResult({ tone: f.code === "FORBIDDEN" ? "warn" : "crit", text: filterRefusal(f, t) })} />
-        ) : <Card title={t("Filters by AC")}><p className="text-[13px] text-muted">{t("Loading filter care…")}</p></Card>
-      ) : going ? <Card title={t("My requests")}><p className="text-[13px] text-muted">{t("Loading your requests…")}</p></Card> : (
+        ) : <Card title={t("Filters by AC")}><p className="text-[13px] text-muted-foreground">{t("Loading filter care…")}</p></Card>
+      ) : going ? <Card title={t("My requests")}><p className="text-[13px] text-muted-foreground">{t("Loading your requests…")}</p></Card> : (
         <>
           {replies > 0 && <Banner tone="warn" icon="swap" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); const r = live.rows.find((x) => x.tab === "reply"); if (r) open(r.id); }}>{t("Review")}</Btn>}>{t("A new visit time needs your reply ({n}). Nothing is booked until you accept.", { n: replies })}</Banner>}
           {live.rateBanner && <Banner tone="ok" icon="check" action={<Btn size="sm" variant="primary" onClick={() => open(live.rateBanner!.jobId)}>{t("Confirm & rate")}</Btn>}><b>{live.rateBanner.text}</b> {t("Is everything working? Your confirmation closes the job.")}</Banner>}
@@ -74,18 +74,18 @@ export function MaintenanceView({ live }: { live: MaintenanceLive }) {
               {shown.map((r) => (
                 <ListRow key={r.id} selected={d?.job.id === r.id} href={`/customer/maintenance?jobId=${r.id}`}>
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-muted">{r.short}</span><b>{r.unit}</b><OriginBadge origin={r.origin} /></div>
-                    <div className="text-xs text-muted">{r.place ? `${r.place} · ` : ""}{r.type}</div>
+                    <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-muted-foreground">{r.short}</span><b>{r.unit}</b><OriginBadge origin={r.origin} /></div>
+                    <div className="text-xs text-muted-foreground">{r.place ? `${r.place} · ` : ""}{r.type}</div>
                     <div className={cx("flex items-center gap-1.5 text-xs", r.warn && "font-semibold text-warn")}><Icon name={r.icon} className="shrink-0" />{r.line}</div>
                   </div>
-                  <JobStatusBadge s={r.status as JobStatus} /><span className="text-muted"><Icon name="chevronRight" /></span>
+                  <JobStatusBadge s={r.status as JobStatus} /><span className="text-muted-foreground"><Icon name="chevronRight" /></span>
                 </ListRow>
               ))}
-              {shown.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-center text-xs text-muted">{t(live.rows.length ? "No requests in this filter." : "No requests yet — “+ New maintenance request” asks HQ for a visit.")}</p>}
-              <p className="text-[11px] text-muted">{t("“Scheduled” = a time is confirmed: one of your 3 preferred times, or a new time you accepted. Periodic plan visits are scheduled from your maintenance plan.")}</p>
+              {shown.length === 0 && <p className="rounded-xl border border-line bg-surface p-4 text-center text-xs text-muted-foreground">{t(live.rows.length ? "No requests in this filter." : "No requests yet — “+ New maintenance request” asks HQ for a visit.")}</p>}
+              <p className="text-[11px] text-muted-foreground">{t("“Scheduled” = a time is confirmed: one of your 3 preferred times, or a new time you accepted. Periodic plan visits are scheduled from your maintenance plan.")}</p>
             </div>
             {d ? <JobDetail key={`${d.job.id}:${d.job.version}`} d={d} open={setModal} onDone={close} onFail={fail} />
-              : "missing" in live ? <Card title={t("Request")}><p className="text-[13px] text-muted">{t("That request no longer exists in your account.")}</p></Card> : null}
+              : "missing" in live ? <Card title={t("Request")}><p className="text-[13px] text-muted-foreground">{t("That request no longer exists in your account.")}</p></Card> : null}
           </div>
         </>
       )}
@@ -110,7 +110,7 @@ function JobDetail({ d, open, onDone, onFail }: { d: Detail; open: (m: ModalKind
   const closed = j.status === "completed" || j.status === "cancelled";
   return (
     <Card title={j.id.slice(0, 8)} sub={`${d.unit.name} — ${j.origin === "periodic_plan" ? t("periodic inspection") : j.symptom.slice(0, 48)}`} className="self-start"
-      action={<div className="flex items-center gap-2"><JobStatusBadge s={status} /><Link href="/customer/maintenance" aria-label={t("Close")} className="rounded px-2 text-muted hover:bg-surface2"><Icon name="close" /></Link></div>}>
+      action={<div className="flex items-center gap-2"><JobStatusBadge s={status} /><Link href="/customer/maintenance" aria-label={t("Close")} className="rounded px-2 text-muted-foreground hover:bg-surface2"><Icon name="close" /></Link></div>}>
       <SummaryList items={d.facts} />
       {d.preferred.length > 0 && (
         <div className="mt-3 flex flex-col gap-1">
@@ -135,16 +135,16 @@ function JobDetail({ d, open, onDone, onFail }: { d: Detail; open: (m: ModalKind
         <div className="mt-3 rounded-xl border border-[#cdb8fa] bg-[#f7f2ff] p-4 text-[13px]">
           <b className="inline-flex items-center gap-1.5 text-[#6d28d9]"><Icon name="routine" />{t("Booked from your maintenance plan")}</b>
           <p className="mt-1">{t("You don’t need to request periodic visits — HQ schedules each one. If you can’t be home, ask for another time (3 options) up to 48 h before the visit.")}</p>
-          <div className="mt-2 flex items-center justify-end gap-2">{d.plan.why && <span className="mr-auto text-[11px] text-muted">{d.plan.why}</span>}<Btn disabled={!d.plan.can || pending} onClick={() => open("other")}>{t("Request another time…")}</Btn></div>
+          <div className="mt-2 flex items-center justify-end gap-2">{d.plan.why && <span className="mr-auto text-[11px] text-muted-foreground">{d.plan.why}</span>}<Btn disabled={!d.plan.can || pending} onClick={() => open("other")}>{t("Request another time…")}</Btn></div>
         </div>
       )}
       {j.status === "completed" && (
         <>
-          <p className="mt-3 text-[13px] font-bold">{t("Completed report")} {d.report ? <span className="text-xs font-normal text-muted">v{d.report.version}{d.report.accepted ? t(" · accepted {when}", { when: d.report.accepted }) : ""}</span> : <span className="text-xs font-normal text-muted">{t("visible once HQ accepts it")}</span>}</p>
+          <p className="mt-3 text-[13px] font-bold">{t("Completed report")} {d.report ? <span className="text-xs font-normal text-muted-foreground">v{d.report.version}{d.report.accepted ? t(" · accepted {when}", { when: d.report.accepted }) : ""}</span> : <span className="text-xs font-normal text-muted-foreground">{t("visible once HQ accepts it")}</span>}</p>
           {d.report && (
             <>
-              <ul className="divide-y divide-line">{d.report.items.filter((i) => i.tone !== "ok").map((i) => <li key={i.id} className="flex items-center justify-between gap-2 py-1 text-[13px]"><span>{i.label}{i.reason && <span className="text-xs text-muted"> · {i.reason}</span>}</span><Badge tone={i.tone as "ok"}>{i.result}</Badge></li>)}</ul>
-              <p className="mt-1 text-xs text-muted">{t("{n} checks OK", { n: d.report.items.filter((i) => i.tone === "ok").length })}{d.report.parts.length ? t(" · parts: {parts}", { parts: d.report.parts.join(", ") }) : t(" · no parts replaced")}</p>
+              <ul className="divide-y divide-line">{d.report.items.filter((i) => i.tone !== "ok").map((i) => <li key={i.id} className="flex items-center justify-between gap-2 py-1 text-[13px]"><span>{i.label}{i.reason && <span className="text-xs text-muted-foreground"> · {i.reason}</span>}</span><Badge tone={i.tone as "ok"}>{i.result}</Badge></li>)}</ul>
+              <p className="mt-1 text-xs text-muted-foreground">{t("{n} checks OK", { n: d.report.items.filter((i) => i.tone === "ok").length })}{d.report.parts.length ? t(" · parts: {parts}", { parts: d.report.parts.join(", ") }) : t(" · no parts replaced")}</p>
               {d.report.readings.length > 0 && <div className="mt-2"><SummaryList items={d.report.readings} /></div>}
               {d.report.workText && <p className="mt-2 text-xs">{d.report.workText}</p>}
               {d.report.photos.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{d.report.photos.map((p) => (
@@ -153,20 +153,20 @@ function JobDetail({ d, open, onDone, onFail }: { d: Detail; open: (m: ModalKind
               ))}</div>}
             </>
           )}
-          {d.feedback.kind === "rate" && <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[11px] text-muted">{d.feedback.text}</span><Btn onClick={() => open("problem")}>{t("Report a problem")}</Btn><Btn variant="primary" onClick={() => open("rate")}>{t("Confirm & rate")}</Btn></div>}
+          {d.feedback.kind === "rate" && <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[11px] text-muted-foreground">{d.feedback.text}</span><Btn onClick={() => open("problem")}>{t("Report a problem")}</Btn><Btn variant="primary" onClick={() => open("rate")}>{t("Confirm & rate")}</Btn></div>}
           {(d.feedback.kind === "edit" || d.feedback.kind === "rated") && <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[13px]">{t("Rated")} <span role="img" aria-label={t("{n} of 5 stars", { n: d.feedback.stars ?? 0 })} className="inline-flex align-[-0.125em] text-warn">{Array.from({ length: d.feedback.stars ?? 0 }, (_, k) => <Icon key={k} name="star" filled />)}</span>{d.feedback.text}</span>{d.feedback.kind === "edit" && <Btn size="sm" onClick={() => open("rate")}>{t("Edit rating")}</Btn>}<Btn size="sm" onClick={() => open("problem")}>{t("Report a problem")}</Btn></div>}
         </>
       )}
-      {j.followUpOfJobId && <p className="mt-3 text-xs text-muted">{t("Follow-up of")} <Link className="font-semibold text-primary hover:underline" href={`/customer/maintenance?jobId=${j.followUpOfJobId}`}>{j.followUpOfJobId.slice(0, 8)}</Link> · {followUpText(j.followUpClass, t)}</p>}
+      {j.followUpOfJobId && <p className="mt-3 text-xs text-muted-foreground">{t("Follow-up of")} <Link className="font-semibold text-primary hover:underline" href={`/customer/maintenance?jobId=${j.followUpOfJobId}`}>{j.followUpOfJobId.slice(0, 8)}</Link> · {followUpText(j.followUpClass, t)}</p>}
       <p className="mt-4 text-[13px] font-bold">{t("Notes to coordinator")}</p>
-      {d.notes.length === 0 ? <p className="text-xs text-muted">{t("No notes yet.")}</p> : <ul className="mt-1 flex flex-col gap-1 text-[13px]">{d.notes.map((n) => <li key={n.id}><span className="text-muted">{n.who} · {n.at} — </span>“{n.text}”</li>)}</ul>}
+      {d.notes.length === 0 ? <p className="text-xs text-muted-foreground">{t("No notes yet.")}</p> : <ul className="mt-1 flex flex-col gap-1 text-[13px]">{d.notes.map((n) => <li key={n.id}><span className="text-muted-foreground">{n.who} · {n.at} — </span>“{n.text}”</li>)}</ul>}
       <p className="mt-4 text-[13px] font-bold">{t("History")}</p>
       <Timeline items={d.history.map((h) => ({ time: h.time, title: h.title }))} />
       <div className="mt-3 flex flex-wrap justify-between gap-2">
         {(j.status === "requested") && j.origin === "client_request" ? <Btn size="sm" variant="danger" onClick={() => open("cancel")}>{t("Cancel request")}</Btn> : <span />}
         {!closed && <Btn size="sm" onClick={() => open("note")}><Icon name="add" /> {t("Add note")}</Btn>}
       </div>
-      <p className="mt-2 text-[11px] text-muted">{t("Cancel is possible until a time is booked. Any time outside your preferred times is booked only after you accept it. Notes can’t change the time or technician.")}</p>
+      <p className="mt-2 text-[11px] text-muted-foreground">{t("Cancel is possible until a time is booked. Any time outside your preferred times is booked only after you accept it. Notes can’t change the time or technician.")}</p>
     </Card>
   );
 }
@@ -180,7 +180,7 @@ function TimesInput({ rows, onChange, error, label }: { rows: Row[]; onChange: (
   const set = (i: number, k: keyof Row, v: string) => onChange(rows.map((r, n) => (n === i ? { ...r, [k]: v } : r)));
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[13px] font-semibold">{label ?? t("Your 3 preferred times")} <span className="font-normal text-muted">{t("· each 1–4 h, from tomorrow, all different · times in {zone}", { zone: timeZone })}</span></span>
+      <span className="text-[13px] font-semibold">{label ?? t("Your 3 preferred times")} <span className="font-normal text-muted-foreground">{t("· each 1–4 h, from tomorrow, all different · times in {zone}", { zone: timeZone })}</span></span>
       {rows.map((r, i) => (
         <div key={i} className="flex flex-wrap items-end gap-2">
           <span className="mb-2 w-8 text-xs font-semibold text-primary">{t(["1st", "2nd", "3rd"][i])}</span>
@@ -247,7 +247,7 @@ function DeclineModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
   };
   return (
     <Modal open wide onClose={() => onClose()} title={t("Decline the proposed time")} footer={<><Btn onClick={() => onClose()}>{t("Back")}</Btn><Btn variant="primary" disabled={pending} onClick={send}>{t(give ? "Decline & send new times" : "Decline")}</Btn></>}>
-      <p className="text-xs text-muted">{t("{job} · {unit} · proposed {when}", { job: j.id.slice(0, 8), unit: d.unit.name, when: d.proposal?.when ?? "" })}</p>
+      <p className="text-xs text-muted-foreground">{t("{job} · {unit} · proposed {when}", { job: j.id.slice(0, 8), unit: d.unit.name, when: d.proposal?.when ?? "" })}</p>
       <Field label={t("Reason")}><Choice value={reason} onChange={setReason} options={[{ id: "not_home", label: t("I’m not at home then") }, { id: "too_late", label: t("Too late for me") }, { id: "other", label: t("Other") }]} /></Field>
       <Field label={t("Comment to HQ (optional, up to 1000)")}><Input value={comment} maxLength={1000} onChange={(e) => setComment(e.target.value)} placeholder={t("Away that day. Any weekday afternoon next week works.")} /></Field>
       <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" className="h-4 w-4 accent-[#005bea]" checked={give} onChange={(e) => setGive(e.target.checked)} />{t("Give 3 new preferred times (recommended)")}</label>
@@ -269,7 +269,7 @@ function OtherTimeModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; n
   const err = preferredError(slots, now, 3, t);
   return (
     <Modal open wide onClose={() => onClose()} title={t("Request another time")} footer={<><Btn onClick={() => onClose()}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (err) return; run(() => requestReschedule(j.id, j.version, slots, comment), t("Sent to HQ"), () => onClose(t("Asked HQ for another time — the visit goes back to booking with your 3 times.")), onFail); }}>{t("Send to HQ")}</Btn></>}>
-      <p className="text-xs text-muted">{t("{job} · periodic visit {when} · up to 48 h before the visit", { job: j.id.slice(0, 8), when: j.scheduledSlot ? showTime(j.scheduledSlot.startAt, display) : "" })}</p>
+      <p className="text-xs text-muted-foreground">{t("{job} · periodic visit {when} · up to 48 h before the visit", { job: j.id.slice(0, 8), when: j.scheduledSlot ? showTime(j.scheduledSlot.startAt, display) : "" })}</p>
       <TimesInput rows={rows} onChange={setRows} error={tried ? err : null} />
       <Field label={t("Comment (optional, up to 1000)")}><Input value={comment} maxLength={1000} onChange={(e) => setComment(e.target.value)} /></Field>
     </Modal>
@@ -291,7 +291,7 @@ function RateModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
       <Field label={t("What went well? (optional)")}><div className="flex flex-wrap gap-1.5">{RATING_TAGS.map((tag) => <button key={tag} type="button" aria-pressed={tags.includes(tag)} onClick={() => setTags((s) => (s.includes(tag) ? s.filter((x) => x !== tag) : [...s, tag]))} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", tags.includes(tag) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(tag)}</button>)}</div></Field>
       {stars > 0 && stars <= 2 && <Banner tone="warn">{t("What went wrong? You can also “Report a problem” — HQ then looks at it as a follow-up.")}</Banner>}
       <Field label={t("Comment (optional, up to 1000)")}><Textarea value={comment} maxLength={1000} onChange={(e) => setComment(e.target.value)} placeholder={t("Technician was quick and tidy.")} /></Field>
-      <p className="text-[11px] text-muted">{t("You can edit the rating for 7 days. Unconfirmed jobs are confirmed automatically after 7 days.")}</p>
+      <p className="text-[11px] text-muted-foreground">{t("You can edit the rating for 7 days. Unconfirmed jobs are confirmed automatically after 7 days.")}</p>
     </Modal>
   );
 }

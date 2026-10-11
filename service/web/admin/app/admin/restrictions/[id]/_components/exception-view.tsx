@@ -58,7 +58,7 @@ export function ExceptionView({ live }: { live: Live }) {
   const followUp = live.canWrite || (live.canOverride && (r.releaseIntent?.source === "override" || r.recoveryCases.some((c) => c.state !== "resolved")));
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href={`/admin/restrictions?restrictionId=${r.id}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Restrictions")}</Link>/ <b className="text-ink">{r.id.slice(0, 8)}</b> <Badge tone={stateTone(r.state)}>{stateWord(r.state, t)}</Badge></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href={`/admin/restrictions?restrictionId=${r.id}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Restrictions")}</Link>/ <b className="text-ink">{r.id.slice(0, 8)}</b> <Badge tone={stateTone(r.state)}>{stateWord(r.state, t)}</Badge></div>
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={t("Choose an action")} sub={t("Version {v} · the result for the current state is shown before saving", { v: r.version })}>
@@ -67,7 +67,7 @@ export function ExceptionView({ live }: { live: Live }) {
               const permitted = allowedFor(k);
               return (
                 <button key={k} disabled={!permitted || !o.allowed} onClick={() => setAct(k)} aria-pressed={act === k} className={`rounded-xl border p-3 text-left disabled:opacity-50 ${act === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}>
-                  <b className="text-[13px]">{label[k]}</b><div className="font-mono text-[10px] text-muted">{ops[k]}</div><div className="mt-1 text-xs text-muted">{permitted ? o.result : k === "override" ? t("Needs restriction.override") : t("Needs restriction.write")}</div>
+                  <b className="text-[13px]">{label[k]}</b><div className="font-mono text-[10px] text-muted-foreground">{ops[k]}</div><div className="mt-1 text-xs text-muted-foreground">{permitted ? o.result : k === "override" ? t("Needs restriction.override") : t("Needs restriction.write")}</div>
                 </button>
               );
             })}</div>
@@ -78,7 +78,7 @@ export function ExceptionView({ live }: { live: Live }) {
           <Card title={t("What happens")}><ul className="list-disc pl-5 text-[13px]"><li>{outcome.result}</li><li>{t("A release still needs per-unit evidence (released or not required)")}</li><li>{t("Cause invoices stay unpaid — no action here settles billing")}</li><li>{t("Before/after, expiry, reason and your name are recorded in the audit log")}</li></ul></Card>
           {followUp && live.units.some((u) => u.reconcile || u.retryRelease) && (
             <Card title={t("Units needing follow-up")}>{live.units.filter((u) => u.reconcile || u.retryRelease).map((u) => (
-              <div key={u.unitId} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px] first:border-0"><span>{u.name} <span className="text-xs text-muted">{t("apply {apply} · release {release}", { apply: u.apply, release: u.release })}{u.pending ? ` · ${u.pending}` : ""}</span></span><span className="flex gap-1">{u.reconcile && <Btn size="sm" disabled={pending} onClick={() => run(() => reconcileUnits(r.id, r.version, [u.unitId]), t("Reconciled"))}>{t("Reconcile")}</Btn>}{u.retryRelease && <Btn size="sm" disabled={pending} onClick={() => run(() => retryUnits(r.id, r.version, [u.unitId], "release", r.rulesVersion, "Retry release from the exception screen"), t("Release retried"))}>{t("Retry release")}</Btn>}</span></div>
+              <div key={u.unitId} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px] first:border-0"><span>{u.name} <span className="text-xs text-muted-foreground">{t("apply {apply} · release {release}", { apply: u.apply, release: u.release })}{u.pending ? ` · ${u.pending}` : ""}</span></span><span className="flex gap-1">{u.reconcile && <Btn size="sm" disabled={pending} onClick={() => run(() => reconcileUnits(r.id, r.version, [u.unitId]), t("Reconciled"))}>{t("Reconcile")}</Btn>}{u.retryRelease && <Btn size="sm" disabled={pending} onClick={() => run(() => retryUnits(r.id, r.version, [u.unitId], "release", r.rulesVersion, "Retry release from the exception screen"), t("Release retried"))}>{t("Retry release")}</Btn>}</span></div>
             ))}</Card>
           )}
         </div>
@@ -92,7 +92,7 @@ export function ExceptionView({ live }: { live: Live }) {
               [t("Your permissions"), [live.canWrite && "restriction.write", live.canOverride && "restriction.override", live.canAudit && "audit.read"].filter(Boolean).join(" · ") || t("read only")],
             ]} />
           </Card>
-          {live.canAudit && <Card title={t("Audit")} sub="audit.read">{live.audit.length === 0 ? <p className="text-xs text-muted">{t("No audit entries yet.")}</p> : <Timeline items={live.audit} />}</Card>}
+          {live.canAudit && <Card title={t("Audit")} sub="audit.read">{live.audit.length === 0 ? <p className="text-xs text-muted-foreground">{t("No audit entries yet.")}</p> : <Timeline items={live.audit} />}</Card>}
         </div>
       </div>
     </Page>

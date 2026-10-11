@@ -42,22 +42,22 @@ export function SlaView({ live }: { live: SlaLive }) {
         <Card title={t("Customers")} action={<Btn size="sm" disabled={!live.rows.length} onClick={exportCsv}>{t("Export CSV")}</Btn>}>
           {live.rows.length === 0 ? <EmptyState title={t("No jobs in this period")}>{t(live.contractorId ? "The scorecard counts jobs created in the period and delivered by the contractor." : "The scorecard counts jobs created in the period.")}</EmptyState> : (
             <div className="scroll-x"><table className="w-full min-w-[760px] text-[13px]">
-              <thead><tr className="bg-surface2 text-left text-[11px] uppercase text-muted"><th className="px-2 py-1.5">{t("Customer")}</th><th>{t("Plan")}</th><th>{t("Jobs")}</th><th>{t("Response")}</th><th>{t("Arrival")}</th><th>{t("First-time fix")}</th><th>{t("Rating")}</th><th>{t("Overdue")}</th><th>{t("Status")}</th></tr></thead>
+              <thead><tr className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><th className="px-2 py-1.5">{t("Customer")}</th><th>{t("Plan")}</th><th>{t("Jobs")}</th><th>{t("Response")}</th><th>{t("Arrival")}</th><th>{t("First-time fix")}</th><th>{t("Rating")}</th><th>{t("Overdue")}</th><th>{t("Status")}</th></tr></thead>
               <tbody>{live.rows.map((r) => (
                 <tr key={r.id} className="border-t border-line">
-                  <td className="px-2 py-2"><b>{r.name}</b><div className="text-[11px] text-muted">{r.sub}</div></td><td className="text-xs">{r.plan}</td><td>{r.jobs}</td><td>{r.response}</td><td>{r.arrival}</td><td>{r.ftf}</td><td>{r.rating}{r.rating !== "—" && <Icon name="star" filled className="ml-0.5 text-warn" />}</td>
+                  <td className="px-2 py-2"><b>{r.name}</b><div className="text-[11px] text-muted-foreground">{r.sub}</div></td><td className="text-xs">{r.plan}</td><td>{r.jobs}</td><td>{r.response}</td><td>{r.arrival}</td><td>{r.ftf}</td><td>{r.rating}{r.rating !== "—" && <Icon name="star" filled className="ml-0.5 text-warn" />}</td>
                   <td>{r.overdue ? <Badge tone="crit">{r.overdue}</Badge> : "0"}</td><td><Badge tone={r.status.tone}>{r.status.label}</Badge></td>
                 </tr>
               ))}</tbody>
             </table></div>
           )}
-          <p className="mt-2 text-[11px] text-muted">{t("Response = request → offer accepted (contractor) or first assignment (internal). Arrival = technician check-in inside the scheduled slot. First-time fix = report accepted without rework and no repeat job on the unit within 30 days. Status compares each customer with its plan’s targets; metrics without data show “—”.")}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("Response = request → offer accepted (contractor) or first assignment (internal). Arrival = technician check-in inside the scheduled slot. First-time fix = report accepted without rework and no repeat job on the unit within 30 days. Status compares each customer with its plan’s targets; metrics without data show “—”.")}</p>
         </Card>
         <Card title={t("Recent breaches")} sub={t("{n} in the period · newest first", { n: live.breaches.length })}>
-          {live.breaches.length === 0 ? <p className="text-[13px] text-muted">{t("No breaches in this period.")}</p> : (
+          {live.breaches.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No breaches in this period.")}</p> : (
             <ul className="divide-y divide-line">{live.breaches.map((b) => (
               <li key={b.key} className="flex items-start justify-between gap-2 py-2">
-                <span className="min-w-0"><Link className="text-[13px] font-semibold text-primary hover:underline" href={`/admin/jobs?jobId=${b.jobId}`}>{b.short} <Icon name="arrowRight" /></Link><span className="block text-[11px] text-muted">{b.text}</span></span>
+                <span className="min-w-0"><Link className="text-[13px] font-semibold text-primary hover:underline" href={`/admin/jobs?jobId=${b.jobId}`}>{b.short} <Icon name="arrowRight" /></Link><span className="block text-[11px] text-muted-foreground">{b.text}</span></span>
                 <Badge tone={b.tone}>{b.kind}</Badge>
               </li>
             ))}</ul>
@@ -93,7 +93,7 @@ function TargetsModal({ live, onClose, onFail }: { live: SlaLive; onClose: (text
   };
   return (
     <Modal open wide onClose={() => onClose()} title={t("Edit SLA targets")} footer={<><Btn onClick={() => onClose()}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={save}>{t("Save targets")}</Btn></>}>
-      <ul className="flex flex-col gap-1 text-xs">{live.targets.map((x) => <li key={x.plan}><b>{x.label}</b> — {x.line}{x.scheduled.map((s) => <span key={s} className="block pl-3 text-muted">{t("next: {target}", { target: s })}</span>)}</li>)}</ul>
+      <ul className="flex flex-col gap-1 text-xs">{live.targets.map((x) => <li key={x.plan}><b>{x.label}</b> — {x.line}{x.scheduled.map((s) => <span key={s} className="block pl-3 text-muted-foreground">{t("next: {target}", { target: s })}</span>)}</li>)}</ul>
       <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>
         <Field label={t("Plan type")}><Select value={plan} onChange={(e) => pick(e.target.value)}>{live.targets.map((x) => <option key={x.plan} value={x.plan}>{x.label}</option>)}</Select></Field>
         <Field label={t("Effective from")} hint={t("Jobs created from then on · times in {zone}", { zone })} error={tried ? errors.effectiveFrom : undefined}><Input type="datetime-local" value={f.from} onChange={(e) => setF({ ...f, from: e.target.value })} /></Field>

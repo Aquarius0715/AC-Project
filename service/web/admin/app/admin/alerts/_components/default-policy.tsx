@@ -40,7 +40,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
   const [more, setMore] = useState<string[]>([]); // customers past the first 20 picked in the search-select
   const [switching, setSwitching] = useState<{ customer: { id: string; name: string }; on: boolean } | null>(null);
   const [reason, setReason] = useState("");
-  if (!rule) return <Card title={t("Default policy")}><p className="text-[13px] text-muted">{t("The default policy has no rules.")}</p></Card>;
+  if (!rule) return <Card title={t("Default policy")}><p className="text-[13px] text-muted-foreground">{t("The default policy has no rules.")}</p></Card>;
 
   const edit = (patch: Partial<DefaultRule>) => setRules((rs) => rs.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
   const errorsOf = (r: DefaultRule) => conditionErrors(r, t);
@@ -98,31 +98,31 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
               <ListRow key={r.ruleKey} selected={r.ruleKey === rule.ruleKey} onClick={() => setKey(r.ruleKey)}>
                 <div className="min-w-0 flex-1">
                   <b className="text-[13px]">{r.name}</b>{changed.includes(r.name) && <span className="ml-1 text-[11px] text-warn">· {t("edited")}</span>}
-                  <div className="text-[11px] text-muted">{t(CATEGORY[r.category] ?? r.category)} · {conditionText({ metric: r.metric, operator: r.operator, threshold: r.threshold, durationSeconds: r.duration, activeWindow: r.activeWindow, severity: r.severity }, i18n)}</div>
+                  <div className="text-[11px] text-muted-foreground">{t(CATEGORY[r.category] ?? r.category)} · {conditionText({ metric: r.metric, operator: r.operator, threshold: r.threshold, durationSeconds: r.duration, activeWindow: r.activeWindow, severity: r.severity }, i18n)}</div>
                 </div>
               </ListRow>
             ))}
           </div>
         </section>
         <fieldset disabled={!canWrite} className="flex min-w-0 flex-col gap-5">
-          <section><h3 className="mb-2 text-[13px] font-bold">{t("Condition")}</h3><p className="mb-2 text-xs text-muted">{t("Missing or stale readings never count toward the condition — they raise a data-quality notice instead.")}</p>
+          <section><h3 className="mb-2 text-[13px] font-bold">{t("Condition")}</h3><p className="mb-2 text-xs text-muted-foreground">{t("Missing or stale readings never count toward the condition — they raise a data-quality notice instead.")}</p>
             <ConditionFields c={rule} onChange={edit} errors={errors} tried={tried} fixedMetric />
           </section>
           <section><h3 className="mb-1 text-[13px] font-bold">{t("Only if … (optional) · active hours")}</h3>
-            <p className="mb-2 text-xs text-muted">{t("Evaluated in the policy timezone. Outside these hours the condition is not checked — the same field as “Only if” in the client app.")}</p>
+            <p className="mb-2 text-xs text-muted-foreground">{t("Evaluated in the policy timezone. Outside these hours the condition is not checked — the same field as “Only if” in the client app.")}</p>
             <WindowEditor value={rule.activeWindow} onChange={(w) => edit({ activeWindow: w })} timezone={p.timezone} error={errors.activeWindow} />
           </section>
-          <section><h3 className="mb-1 text-[13px] font-bold">{t("Severity")}</h3><Choice value={rule.severity} onChange={(v) => edit({ severity: v })} options={[{ id: "normal", label: t("Info") }, { id: "warning", label: t("Warning") }, { id: "critical", label: t("Critical") }]} /><p className="mt-1 text-[11px] text-muted">{t("A severity change on an open alert counts as a new notification reason.")}</p></section>
+          <section><h3 className="mb-1 text-[13px] font-bold">{t("Severity")}</h3><Choice value={rule.severity} onChange={(v) => edit({ severity: v })} options={[{ id: "normal", label: t("Info") }, { id: "warning", label: t("Warning") }, { id: "critical", label: t("Critical") }]} /><p className="mt-1 text-[11px] text-muted-foreground">{t("A severity change on an open alert counts as a new notification reason.")}</p></section>
         </fieldset>
         <section><h3 className="mb-1 text-[13px] font-bold">{t("On / off per customer — this rule")}</h3>
-          <p className="mb-2 text-xs text-muted">{t("Each customer (or HQ for them) can switch a default rule off. The limit itself stays the HQ template.")}</p>
+          <p className="mb-2 text-xs text-muted-foreground">{t("Each customer (or HQ for them) can switch a default rule off. The limit itself stays the HQ template.")}</p>
           {listed.map((c) => {
             const s = setting(c.id);
             const on = s?.enabled ?? true;
             return (
               <div key={c.id} className="flex flex-wrap items-center gap-3 border-t border-line py-2 text-[13px]">
                 <b className="min-w-[140px]">{c.name}</b>
-                <span className={cx("min-w-0 flex-1 text-xs", on ? "text-ok" : "text-muted")}>{settingText(s, i18n)}</span>
+                <span className={cx("min-w-0 flex-1 text-xs", on ? "text-ok" : "text-muted-foreground")}>{settingText(s, i18n)}</span>
                 <Toggle on={on} label={t("{rule} for {name}", { rule: rule.name, name: c.name })} disabled={!canWrite || pending} onChange={(v) => { setReason(""); setSwitching({ customer: c, on: v }); }} />
               </div>
             );
@@ -137,7 +137,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
           <DemoTest key={rule.ruleKey} saved={{ id: p.id, version: p.version, metric: savedRule.metric, operator: savedRule.operator, threshold: savedRule.threshold, on: true }}
             dirty={changed.includes(rule.name)} unit={{ id: testUnit.id, name: testUnit.name }} demo={demo} />
         ) : (
-          <section><h3 className="mb-1 text-[13px] font-bold">{t("Test with demo data")}</h3><p className="text-xs text-muted">{t(!copyable(rule) ? "A synthetic reading cannot be entered for this rule's metric."
+          <section><h3 className="mb-1 text-[13px] font-bold">{t("Test with demo data")}</h3><p className="text-xs text-muted-foreground">{t(!copyable(rule) ? "A synthetic reading cannot be entered for this rule's metric."
             : inScope.length ? "The rule is off for every customer in scope, so it cannot be tested here." : "There is no unit to test the rule on.")}</p></section>
         )}
         <section><h3 className="mb-1 text-[13px] font-bold">{t("Owner & units")}</h3>
@@ -146,7 +146,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
         </section>
         {canWrite && (
           <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
-            <span className={cx("mr-auto text-[12px]", tried && broken.length ? "text-crit" : "text-muted")}>{status}</span>
+            <span className={cx("mr-auto text-[12px]", tried && broken.length ? "text-crit" : "text-muted-foreground")}>{status}</span>
             <Btn disabled={pending || !changed.length} onClick={() => { setRules(p.rules); setTried(false); }}>{t("Discard")}</Btn>
             <Btn variant="primary" disabled={pending || !changed.length} onClick={save}>{t("Save policy")}</Btn>
           </div>
@@ -155,7 +155,7 @@ export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, on
       {switching && (
         <Modal open onClose={() => setSwitching(null)} title={t(switching.on ? "Switch “{rule}” on for {name}" : "Switch “{rule}” off for {name}", { rule: rule.name, name: switching.customer.name })}
           footer={<><Btn onClick={() => setSwitching(null)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || reason.length > 500} onClick={confirmSwitch}>{t(switching.on ? "Switch on" : "Switch off")}</Btn></>}>
-          <p className="text-[13px] text-muted">{t(switching.on ? "The rule runs again on every unit of {name}." : "The rule stops on every unit of {name}; its limit stays the HQ template for everyone else.", { name: switching.customer.name })}</p>
+          <p className="text-[13px] text-muted-foreground">{t(switching.on ? "The rule runs again on every unit of {name}." : "The rule stops on every unit of {name}; its limit stays the HQ template for everyone else.", { name: switching.customer.name })}</p>
           <Field label={t("Reason · optional")} hint={`${reason.length} / 500`} error={reason.length > 500 ? t("At most 500 characters") : undefined}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
         </Modal>
       )}

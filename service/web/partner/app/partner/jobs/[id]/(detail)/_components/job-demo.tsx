@@ -24,7 +24,7 @@ function LiveOffer({ j }: { j: Job }) {
   const pending = j.partnerProposal && (j.partnerProposal.status === "pending" || j.partnerProposal.status === "sent_to_client");
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> Jobs</Link> › {j.id} · {j.unit} · <JobStatusBadge s={j.status} /></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> Jobs</Link> › {j.id} · {j.unit} · <JobStatusBadge s={j.status} /></div>
       {j.status === "accepted" && <Banner tone="ok" action={<LinkBtn size="sm" variant="primary" href={`/partner/schedule?jobId=${j.id}`}>Assign technician <Icon name="arrowRight" /></LinkBtn>}>Accepted — assign your technician for exactly {fmt(j.scheduled)}.</Banner>}
       {(j.status === "assigned" || j.status === "in_progress") && <Banner tone="ok">Assigned to {j.technician} · {j.techAck?.status === "accepted" ? "accepted by the technician" : j.techAck?.status === "cant_make" ? "technician can’t make it — reassign in Schedule" : "waiting for the technician to accept"}.</Banner>}
       {j.status === "time_proposed" && <Banner tone="warn">HQ has asked the client about your proposed time. You will be notified of the answer.</Banner>}
@@ -38,7 +38,7 @@ function LiveOffer({ j }: { j: Job }) {
             ["Job type", j.origin === "plan" ? "Periodic inspection" : `${j.type} maintenance`],
             ["Installation address", "Home A, Kuala Lumpur (registered)"],
             ["Required qualification", "Split-unit refrigerant handling"],
-            ["Visit time (fixed)", pending ? <s key="s" className="text-muted">{fmt(j.scheduled)}</s> : <b key="b">{j.scheduled ? longDate(j.scheduled) : "—"} · {j.origin === "plan" ? "from the periodic plan" : "agreed with the client"}</b>],
+            ["Visit time (fixed)", pending ? <s key="s" className="text-muted-foreground">{fmt(j.scheduled)}</s> : <b key="b">{j.scheduled ? longDate(j.scheduled) : "—"} · {j.origin === "plan" ? "from the periodic plan" : "agreed with the client"}</b>],
             ...(pending ? [["Your proposal", <b key="p" className="text-warn">{longDate(j.partnerProposal!.slot)} · sent {j.partnerProposal!.sentAt}</b>] as [string, React.ReactNode]] : []),
             ["Offer / delegation terms", `offer-${j.id.slice(4)}-1 · terms v3`],
           ]} /></div>
@@ -52,9 +52,9 @@ function LiveOffer({ j }: { j: Job }) {
         <div className="flex min-w-0 flex-col gap-4">
           <Card title={`Can your team take it? — ${fmt(j.scheduled)}`} action={<Link className="text-xs font-semibold text-primary" href="/partner/team">Team & capacity <Icon name="arrowRight" /></Link>}>
             <SummaryList items={[["tech-external-a", <Badge key="a" tone="ok" icon="check">Fits · refrigerant qualified</Badge>], ["tech-external-a2", <Badge key="b" tone="muted">Not qualified</Badge>]]} />
-            <p className="mt-2 text-[11px] text-muted">Own-company technicians only. No customer data before acceptance.</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">Own-company technicians only. No customer data before acceptance.</p>
           </Card>
-          <Card title="Job history"><ul className="flex flex-col gap-1.5 text-xs">{j.history.slice(-5).map((h, i) => <li key={i}><span className="text-muted">{h.at}</span> · {h.text}</li>)}</ul></Card>
+          <Card title="Job history"><ul className="flex flex-col gap-1.5 text-xs">{j.history.slice(-5).map((h, i) => <li key={i}><span className="text-muted-foreground">{h.at}</span> · {h.text}</li>)}</ul></Card>
         </div>
       </div>
       {modal === "decline" && <DeclineModal id={j.id} onClose={() => setModal(null)} onDone={(r) => { jobActions.partnerDecline(j.id, r); toast("Offer declined", "warn"); setModal(null); }} />}
@@ -71,7 +71,7 @@ function ProposeTimeModal({ j, onClose, onDone }: { j: Pick<Job, "id" | "schedul
   const [tried, setTried] = useState(false);
   return (
     <Modal open onClose={onClose} title="Propose another time" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={() => { setTried(true); if (!reason.trim()) return; onDone({ date, win }, tech, reason.trim()); }}>Send to HQ</Btn></>}>
-      <p className="text-xs text-muted">{j.id} · agreed with the client: {fmt(j.scheduled)}</p>
+      <p className="text-xs text-muted-foreground">{j.id} · agreed with the client: {fmt(j.scheduled)}</p>
       <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}><Field label="Date"><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field><Field label="Window"><Select value={win} onChange={(e) => setWin(e.target.value)}>{WINDOWS.map((w) => <option key={w}>{w}</option>)}</Select></Field></div>
       <Field label="Technician"><Select value={tech} onChange={(e) => setTech(e.target.value)}><option value="tech-external-a">tech-external-a · free 14:00–18:00 · refrigerant qualified</option><option value="tech-external-a2">tech-external-a2 · not qualified</option></Select></Field>
       <Field label="Reason (sent to HQ and the client) · required" error={tried && !reason.trim() ? "A reason is required" : undefined}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="tech-external-a has a certificate renewal course on 10-01 morning." /></Field>
@@ -97,7 +97,7 @@ function StaticOffer({ id }: { id: string }) {
   const [modal, setModal] = useState<null | "decline" | "propose">(null);
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> Jobs</Link> › {id} · Lobby AC · {s === "offer" ? "offer" : s}</div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground"><Link href="/partner/jobs" className="font-semibold text-primary"><Icon name="arrowLeft" /> Jobs</Link> › {id} · Lobby AC · {s === "offer" ? "offer" : s}</div>
       {s === "expired" && <Banner tone="crit">This offer expired or was cancelled by HQ. No action is possible.</Banner>}
       {s === "accepted" && <Banner tone="ok">Accepted — receipt: {id} · access window 2026-09-14 01:00 – 2026-09-22 00:00. Assign a technician in Schedule.</Banner>}
       {s === "declined" && <Banner tone="warn">Declined with reason. HQ was notified.</Banner>}
@@ -110,11 +110,11 @@ function StaticOffer({ id }: { id: string }) {
         </Card>
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Can your team take it? — visit 09-16 10:00–12:00" action={<Link className="text-xs font-semibold text-primary" href="/partner/team">Team & capacity <Icon name="arrowRight" /></Link>}>
-            <p className="mb-2 text-[11px] text-muted">Own-company technicians holding “Split-unit refrigerant handling”. Free hours per day — no customer data is shown before acceptance.</p>
-            {cap.map(([n, q, h]) => <div key={n} className="mb-3"><b className="text-[13px]">{n}</b><div className="text-[11px] text-muted">{q}</div><div className="mt-1 grid grid-cols-5 gap-1 text-center text-[11px]">{["Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => <div key={d} className={`rounded-lg py-1 ${h[i] === "—" ? "bg-surface2 text-muted" : "bg-ok-soft text-ok"}`}>{d}<div className="font-bold">{h[i]}</div></div>)}</div></div>)}
+            <p className="mb-2 text-[11px] text-muted-foreground">Own-company technicians holding “Split-unit refrigerant handling”. Free hours per day — no customer data is shown before acceptance.</p>
+            {cap.map(([n, q, h]) => <div key={n} className="mb-3"><b className="text-[13px]">{n}</b><div className="text-[11px] text-muted-foreground">{q}</div><div className="mt-1 grid grid-cols-5 gap-1 text-center text-[11px]">{["Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => <div key={d} className={`rounded-lg py-1 ${h[i] === "—" ? "bg-surface2 text-muted-foreground" : "bg-ok-soft text-ok"}`}>{d}<div className="font-bold">{h[i]}</div></div>)}</div></div>)}
           </Card>
           <Card><SummaryList items={[["OFFERED", "09-13 18:20 by hq-operator"], ["OFFER ID", "offer-p09-1 (1st offer)"], ["OPEN OFFERS", "1 of 1"]]} /></Card>
-          <button className="text-left text-[11px] text-muted underline" onClick={() => setS("expired")}>Preview: expired / cancelled state</button>
+          <button className="text-left text-[11px] text-muted-foreground underline" onClick={() => setS("expired")}>Preview: expired / cancelled state</button>
         </div>
       </div>
       {modal === "decline" && <DeclineModal id={id} onClose={() => setModal(null)} onDone={() => { setModal(null); setS("declined"); toast("Offer declined", "warn"); }} />}

@@ -43,8 +43,8 @@ export function AlertsView({ rows = seed }: { rows?: Alert[] }) {
   const Item = ({ a }: { a: Alert }) => (
     <button onClick={() => openAlert(a)} className="flex w-full items-start gap-3 border-t border-line px-1 py-3 text-left first:border-0 hover:bg-surface2/50">
       <Icon name={a.icon} className="mt-0.5" />
-      <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><b className={cx(!a.read && "text-primary")}>{a.title}</b><Badge tone="muted" icon={a.kindIcon}>{a.kind}</Badge>{a.read && <Badge tone="ok" icon="check">Read</Badge>}</span><span className="block text-xs text-muted">{a.where}</span><span className="mt-1 block text-xs">{a.ev}</span></span>
-      <span className="text-muted"><Icon name="chevronRight" /></span>
+      <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><b className={cx(!a.read && "text-primary")}>{a.title}</b><Badge tone="muted" icon={a.kindIcon}>{a.kind}</Badge>{a.read && <Badge tone="ok" icon="check">Read</Badge>}</span><span className="block text-xs text-muted-foreground">{a.where}</span><span className="mt-1 block text-xs">{a.ev}</span></span>
+      <span className="text-muted-foreground"><Icon name="chevronRight" /></span>
     </button>
   );
 
@@ -53,17 +53,17 @@ export function AlertsView({ rows = seed }: { rows?: Alert[] }) {
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "alerts", label: "Alerts", count: list.length }, { id: "policies", label: "Alert policies", count: seedPolicies.length + 1 }]} />
       {tab === "alerts" ? (
         <>
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted"><Check label="Unread only" checked={unread} onChange={setUnread} /><span>Updated 09:13 · {list.filter((a) => !a.read).length} unread</span><button className="underline" onClick={() => setFailed((x) => !x)}>{failed ? "show list" : "show load error"}</button></div>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground"><Check label="Unread only" checked={unread} onChange={setUnread} /><span>Updated 09:13 · {list.filter((a) => !a.read).length} unread</span><button className="underline" onClick={() => setFailed((x) => !x)}>{failed ? "show list" : "show load error"}</button></div>
           {failed ? <ErrorState title="Couldn’t load alerts" onRetry={() => setFailed(false)}>This is not “0 alerts”. Previous values are not shown as current. Retry or open units directly.</ErrorState> : (
             <>
-              <Card title="Needs attention" sub="Unresolved warnings & faults — stays here until resolved, even after you read it" action={<Badge tone="warn">{attn.length}</Badge>}>{attn.length ? attn.map((a) => <Item key={a.id} a={a} />) : <p className="text-xs text-muted">Nothing here.</p>}</Card>
-              <Card title="Reminders & information" sub="Maintenance reminders, inspection records and system notices" action={<Badge tone="muted">{info.length}</Badge>}>{info.length ? info.map((a) => <Item key={a.id} a={a} />) : <p className="text-xs text-muted">Nothing here.</p>}</Card>
+              <Card title="Needs attention" sub="Unresolved warnings & faults — stays here until resolved, even after you read it" action={<Badge tone="warn">{attn.length}</Badge>}>{attn.length ? attn.map((a) => <Item key={a.id} a={a} />) : <p className="text-xs text-muted-foreground">Nothing here.</p>}</Card>
+              <Card title="Reminders & information" sub="Maintenance reminders, inspection records and system notices" action={<Badge tone="muted">{info.length}</Badge>}>{info.length ? info.map((a) => <Item key={a.id} a={a} />) : <p className="text-xs text-muted-foreground">Nothing here.</p>}</Card>
             </>
           )}
         </>
       ) : <PoliciesPanel />}
       <Modal open={!!open} onClose={() => setOpen(null)} title={open?.title ?? ""} footer={<Btn onClick={() => setOpen(null)}>Back to list</Btn>}>
-        {open && <><div className="flex gap-2"><SeverityBadge s={open.sev} /><Badge tone="ok" icon="check">Read</Badge><Badge tone="warn">Unresolved</Badge></div><SummaryList items={[["Where", open.where], ["Evidence", open.ev], ["Status", "Opened → auto Read, still Unresolved"]]} /><p className="text-xs text-muted">Reading an alert does not resolve it. It stays under “Needs attention” until the cause is resolved.</p></>}
+        {open && <><div className="flex gap-2"><SeverityBadge s={open.sev} /><Badge tone="ok" icon="check">Read</Badge><Badge tone="warn">Unresolved</Badge></div><SummaryList items={[["Where", open.where], ["Evidence", open.ev], ["Status", "Opened → auto Read, still Unresolved"]]} /><p className="text-xs text-muted-foreground">Reading an alert does not resolve it. It stays under “Needs attention” until the cause is resolved.</p></>}
       </Modal>
     </Page>
   );
@@ -81,23 +81,23 @@ export function PoliciesPanel() {
   const isOwner = CURRENT_CLIENT.role === "owner";
   return (
     <>
-          <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-[15px] font-bold">Alert policies</h2><p className="max-w-xl text-xs text-muted">A policy is a set of limits. It only runs on the ACs you attach it to (open an AC › Alert policies). Every AC also has the default policy.</p></div><Btn variant="primary" onClick={() => { setEdit("new"); setF({ name: "", metric: "co2", op: "≥", val: "1200", dur: "15", rec: "1000", sev: "warning" }); }}><Icon name="add" /> Create policy</Btn></div>
+          <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-[15px] font-bold">Alert policies</h2><p className="max-w-xl text-xs text-muted-foreground">A policy is a set of limits. It only runs on the ACs you attach it to (open an AC › Alert policies). Every AC also has the default policy.</p></div><Btn variant="primary" onClick={() => { setEdit("new"); setF({ name: "", metric: "co2", op: "≥", val: "1200", dur: "15", rec: "1000", sev: "warning" }); }}><Icon name="add" /> Create policy</Btn></div>
           <Card title="Default policy" sub="Limits set by HQ · on / off is set by the account owner">
-            <p className="mb-3 text-xs text-muted">Covers ventilation and the usual causes of breakdowns. It is attached to every AC and cannot be detached or edited, but the account owner can switch each rule on or off for your account (all your ACs). Ask HQ if a limit should change.</p>
+            <p className="mb-3 text-xs text-muted-foreground">Covers ventilation and the usual causes of breakdowns. It is attached to every AC and cannot be detached or edited, but the account owner can switch each rule on or off for your account (all your ACs). Ask HQ if a limit should change.</p>
             {!isOwner && <p className="mb-3 text-xs text-warn">Only the account owner can change this.</p>}
-            <div className="scroll-x"><table className="w-full text-left text-[13px]"><thead className="text-[11px] uppercase text-muted"><tr><th className="py-1.5 pr-3">Rule</th><th className="pr-3">Condition</th><th className="pr-3">Severity</th><th>On</th></tr></thead><tbody>{defaultRules.map((r, i) => <tr key={r[0]} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{r[0]}</td><td className="pr-3">{r[1]}</td><td className="pr-3"><SeverityBadge s={(r[2] === "Info" ? "normal" : r[2].toLowerCase()) as "warning"} /></td><td><Toggle on={rules[i]} disabled={!isOwner} onChange={(v) => setRules((s) => s.map((x, j) => (j === i ? v : x)))} label={r[0]} /></td></tr>)}</tbody></table></div>
+            <div className="scroll-x"><table className="w-full text-left text-[13px]"><thead className="text-[11px] uppercase text-muted-foreground"><tr><th className="py-1.5 pr-3">Rule</th><th className="pr-3">Condition</th><th className="pr-3">Severity</th><th>On</th></tr></thead><tbody>{defaultRules.map((r, i) => <tr key={r[0]} className="border-t border-line"><td className="py-2 pr-3 font-semibold">{r[0]}</td><td className="pr-3">{r[1]}</td><td className="pr-3"><SeverityBadge s={(r[2] === "Info" ? "normal" : r[2].toLowerCase()) as "warning"} /></td><td><Toggle on={rules[i]} disabled={!isOwner} onChange={(v) => setRules((s) => s.map((x, j) => (j === i ? v : x)))} label={r[0]} /></td></tr>)}</tbody></table></div>
             {!rules[5] && <p className="mt-2 text-xs text-warn">Turned off: “AC offline” — no alerts for heartbeat loss on any of your ACs. HQ still sees device status.</p>}
           </Card>
-          <div className="text-[13px] font-bold">Your policies <span className="text-xs font-normal text-muted">{policies.length} · added on top of the default policy · a policy belongs to your account and can be attached to many ACs</span></div>
+          <div className="text-[13px] font-bold">Your policies <span className="text-xs font-normal text-muted-foreground">{policies.length} · added on top of the default policy · a policy belongs to your account and can be attached to many ACs</span></div>
           <div className="grid-fluid" style={{ ["--min" as string]: "320px" }}>
             {policies.map((p) => (
               <Card key={p.id} title={p.name} action={<Toggle on={p.on} onChange={(v) => setPolicies((s) => s.map((x) => (x.id === p.id ? { ...x, on: v } : x)))} label={p.name} />}>
-                <p className="text-[13px]"><span className="text-muted">When</span> {p.when}</p><p className="text-[13px]"><span className="text-muted">Then</span> {p.then}</p><p className="my-1 text-xs text-muted">{p.att}</p>
+                <p className="text-[13px]"><span className="text-muted-foreground">When</span> {p.when}</p><p className="text-[13px]"><span className="text-muted-foreground">Then</span> {p.then}</p><p className="my-1 text-xs text-muted-foreground">{p.att}</p>
                 <div className="mt-2 flex gap-2"><Btn size="sm" onClick={() => { setEdit(p.id); setF({ ...f, name: p.name }); }}>Edit</Btn><Btn size="sm" variant="danger" onClick={() => { setPolicies((s) => s.filter((x) => x.id !== p.id)); toast("Policy deleted (detached from its ACs)", "warn"); }}>Delete</Btn></div>
               </Card>
             ))}
           </div>
-          <p className="text-xs text-muted">A unit can carry several policies; each rule is checked separately. Missing or stale readings never raise an alert — they show “not measured”. Air-quality limits (CO₂ ppm, PM2.5 µg/m³) are regular alert policies.</p>
+          <p className="text-xs text-muted-foreground">A unit can carry several policies; each rule is checked separately. Missing or stale readings never raise an alert — they show “not measured”. Air-quality limits (CO₂ ppm, PM2.5 µg/m³) are regular alert policies.</p>
       <Modal open={!!edit} onClose={() => setEdit(null)} wide title={edit === "new" ? "Create alert policy" : "Edit alert policy"} footer={<><Btn onClick={() => setEdit(null)}>Cancel</Btn><Btn variant="primary" disabled={!recOk || !f.name.trim()} onClick={() => { if (edit === "new") setPolicies((s) => [...s, { id: "n" + Date.now(), name: f.name, when: `${f.metric.toUpperCase()} ${f.op} ${f.val} for ${f.dur} min · recover below ${f.rec}`, then: `${f.sev} · notify in-app`, att: "Not attached to any AC yet — attach it from an AC’s page", on: true }]); toast("Policy saved"); setEdit(null); }}>Save policy</Btn></>}>
         <Field label="Name" error={!f.name.trim() ? "Name is required" : undefined}><Input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
         <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}>
@@ -109,7 +109,7 @@ export function PoliciesPanel() {
         </div>
         <p className={cx("flex items-center gap-1 text-xs", recOk ? "text-ok" : "text-crit")}><Icon name={recOk ? "check" : "error"} />{recOk ? `Recovery ${f.rec} is below the ${f.val} limit` : `Recovery must be below the ${f.val} limit`}</p>
         <Field label="Severity"><Choice value={f.sev as "warning"} onChange={(v) => setF({ ...f, sev: v })} options={[{ id: "normal" as "warning", label: "Info" }, { id: "warning", label: "Warning" }, { id: "critical" as "warning", label: "Critical" }]} /></Field>
-        <p className="text-[11px] text-muted">WhatsApp is only available after you allow it in Preferences. Missing or stale readings never trigger — they show “not measured”.</p>
+        <p className="text-[11px] text-muted-foreground">WhatsApp is only available after you allow it in Preferences. Missing or stale readings never trigger — they show “not measured”.</p>
       </Modal>
     </>
   );

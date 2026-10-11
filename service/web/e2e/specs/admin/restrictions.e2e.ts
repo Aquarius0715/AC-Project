@@ -25,11 +25,11 @@ test("the cause invoice filter and the units' Details links", async ({ browser, 
   await expect(cause.locator("option")).toContainText(["All cause invoices", "INV-202608-0001 · Demo Customer A"]);
   await cause.selectOption({ label: "INV-202608-0001 · Demo Customer A" });
   await page.waitForURL(/invoiceId=[0-9a-f-]{36}/);
-  const list = main.locator("section").filter({ has: page.getByRole("heading", { name: "Restrictions", exact: true }) });
+  const list = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Restrictions", exact: true }) });
   await expect(list.locator("button[aria-pressed]")).toHaveCount(1);
 
   // the selected restriction's units open their unit screen, which finds the customer itself
-  const units = main.locator("section").filter({ has: page.getByRole("heading", { name: "Units", exact: true }) });
+  const units = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Units", exact: true }) });
   const details = units.getByRole("link", { name: "Details", exact: true }).first();
   await expect(details).toHaveAttribute("href", /^\/admin\/units\?unitId=[0-9a-f-]{36}$/);
   await details.click();

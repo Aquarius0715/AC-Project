@@ -33,12 +33,12 @@ test("the policy editor's footer, Show disabled and a simulation with an added f
   await expect(main).toContainText("No unsaved changes · form loaded from policy v1");
 
   // Show disabled: the new policy is disabled, yet it stays listed while it is open
-  const list = main.locator("section").filter({ has: page.getByRole("heading", { name: "HQ automation policies", exact: true }) });
+  const list = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "HQ automation policies", exact: true }) });
   await main.getByRole("checkbox", { name: "Show disabled" }).uncheck();
   await expect(list.getByRole("button", { name: /E2E tariff policy/ })).toBeVisible();
 
   // Simulate: the policy's tariff fact, + Add fact for a missing solar reading, Run simulation (no command)
-  const sim = main.locator("section").filter({ has: page.getByRole("heading", { name: "Simulate", exact: true }) });
+  const sim = main.locator('section, [data-slot="card"]').filter({ has: page.getByRole("heading", { name: "Simulate", exact: true }) });
   await sim.getByLabel("Value", { exact: true }).first().fill("0.7");
   await sim.getByRole("button", { name: "Add fact" }).click();
   await expect(sim.getByLabel("Fact", { exact: true })).toHaveCount(2);

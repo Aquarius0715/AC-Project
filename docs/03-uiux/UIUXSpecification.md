@@ -1,6 +1,6 @@
 ---
 document_id: UX-COMMON
-version: 0.37.0
+version: 0.38.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -35,7 +35,7 @@ Validate each screen's cases that add detail to the source (AT-*-SRC) together w
 
 | Purpose | Standard/source | Project usage rules |
 |---|---|---|
-| Basic UI | In-house components on Tailwind CSS 4 (`shared/components/ui.tsx`), following the Figma UI Guideline | One shared set for the four apps: buttons, Modal, Tabs, Select, Field, Badge, Banner, DataTable and the like. Do not build separate versions of equivalent UI for each role |
+| Basic UI | shadcn/ui (style base-nova on Base UI, Tailwind CSS 4) in `shared/components/ui/`, themed with the UI Guideline palette (DEC-75) | One shared set for the four apps. Use the shadcn component where one exists (Button, Card, Badge, Alert, Empty, Input, Textarea, NativeSelect, Dialog, …), restyled in its own file. The product components of `shared/components/ui.tsx` are built on them while the screens move over. Do not build separate versions of equivalent UI for each role |
 | Icons | Lucide (`lucide-react`, pinned) through the shared `Icon` component (`shared/components/Icon.tsx`, DEC-74); in Figma the `Icon/<name>` components of UI Guideline board 07 | Every icon comes from this one library, and the rules below apply (IR393–IR399). See the rules after this table |
 | Forms | Controlled inputs in the shared Field, with one pure validator per form in `shared/lib` | Keep input state in the form component; the Server Action returns the Core API's field errors, shown on the same fields |
 | Input validation | The form's pure validator (Vitest covers it); the Core API checks again (VALIDATION with fieldErrors) | Keep required fields, formats and conditional rules for each use case in its validator; keep them apart from the API types |
@@ -57,9 +57,25 @@ Validate each screen's cases that add detail to the source (AT-*-SRC) together w
   - Sort hints are words ("most severe first").
   - A native `<option>` cannot hold an icon, so its text is words.
 - **Accessibility.** An icon next to text is aria-hidden. An icon-only button or menu always has a label.
-- **The guard.** `shared/lib/__tests__/icons.test.ts` reads every UI string of the four apps and the Malay dictionary. It fails on a symbol character, on an arrow at the start or end of a text, and on "+ " before a label.
+- **The guard.** `shared/lib/__tests__/icons.test.ts` reads every UI string of the four apps and the Malay dictionary. It fails on:
+  - a symbol character;
+  - an arrow at the start or end of a text;
+  - "+ " before a label;
+  - a button whose only content is one sign ("+", "−", "×").
 
-DEC-03 was decided on 2026-10-10 by the product owner: the build's approach stands instead of the earlier proposal (shadcn/ui, Lucide, React Hook Form, Zod, TanStack Query, i18next). It follows the user's instruction to follow the Next.js documentation (2026-10-08). Do not add a UI kit, or a form, schema, query or translation library. The one exception is the icon set: Lucide since 2026-10-12 (DEC-74). For an exception, record the required feature, why the in-house approach is insufficient, the cost and impact, and whether replacement is possible. Do not force a component where semantic HTML is enough.
+DEC-75 (2026-10-12, product owner) supersedes DEC-03:
+- The UI is built from shadcn/ui components.
+- Established libraries do the logic where one exists:
+  - React Hook Form and Zod for forms;
+  - Sonner for toasts;
+  - TanStack Table for tables;
+  - Recharts for charts;
+  - cmdk, react-day-picker and input-otp.
+- Server Components and Server Actions stay for data, the Next.js way.
+- The rows above that still name in-house parts (forms, lists and charts, translation) move to those libraries in the DEC-75 phases.
+- Pin every runtime dependency exactly. Keep the shadcn CLI a development dependency.
+
+For a library not listed here, record the required feature, the cost and impact, and whether replacement is possible. Do not force a component where semantic HTML is enough.
 
 ## UX-02. Responsibilities of State, Effect, and Context
 

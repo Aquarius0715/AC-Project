@@ -152,7 +152,7 @@ export function AdminAlertsView({ live }: { live?: Live }) {
           <div className="flex flex-wrap items-stretch gap-3">
             {counts.map(([s, n]) => (
               <button key={s} type="button" aria-pressed={status === s} onClick={() => pickStatus(s)} className={cx("min-w-[140px] flex-1 rounded-2xl border bg-surface p-4 text-left", status === s ? "border-primary ring-1 ring-primary" : "border-line hover:bg-surface2")}>
-                <div className="text-xs text-muted">{t(ST[s])}</div><div className="text-2xl font-bold">{n}</div>
+                <div className="text-xs text-muted-foreground">{t(ST[s])}</div><div className="text-2xl font-bold">{n}</div>
               </button>
             ))}
             {live && (
@@ -166,7 +166,7 @@ export function AdminAlertsView({ live }: { live?: Live }) {
               <div className="flex flex-col gap-2">
                 {shown.length === 0 ? <EmptyState title={t("No alerts in this scope")}>{t("Change the scope, severity or status.")}</EmptyState> : shown.map((x) => (
                   <ListRow key={x.id} selected={a?.id === x.id} onClick={() => pick(x.id)}>
-                    <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.title}</b><span className="text-[11px] text-muted">{x.time}</span></div><div className="mt-1 flex flex-wrap items-center gap-2"><SeverityBadge s={x.sev} /></div><div className="mt-1 truncate text-[11px] text-muted">{x.meta}</div></div>
+                    <div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><b className="text-[13px]">{x.title}</b><span className="text-[11px] text-muted-foreground">{x.time}</span></div><div className="mt-1 flex flex-wrap items-center gap-2"><SeverityBadge s={x.sev} /></div><div className="mt-1 truncate text-[11px] text-muted-foreground">{x.meta}</div></div>
                   </ListRow>
                 ))}
               </div>
@@ -185,12 +185,12 @@ export function AdminAlertsView({ live }: { live?: Live }) {
                 </Card>
                 <Card title={t("Why we think this")}>
                   <SummaryList items={[[t("Evidence"), a.evidence], [t("Cause"), a.cause], [t("Observed at"), a.observed], [t("Evidence records"), a.evidenceRecords]]} />
-                  {a.inferred && <p className="mt-2 text-xs text-muted">{t("This is an inference, not a confirmed cause. Ask the customer to check windows, or request an inspection to record evidence.")}</p>}
+                  {a.inferred && <p className="mt-2 text-xs text-muted-foreground">{t("This is an inference, not a confirmed cause. Ask the customer to check windows, or request an inspection to record evidence.")}</p>}
                 </Card>
                 <Card title={t("Activity")}>
                   <Timeline items={a.timeline} />
-                  <p className="mt-2 text-[11px] text-muted">{t("Reading a notification does not acknowledge or resolve the alert")}{a.policyless ? ` · ${t("No policy escalation — this alert was not raised by a policy")}` : ""}</p>
-                  <p className="mt-1 text-[11px] text-muted">{t("Resolving requires a reason and evidence (remeasurement or a recorded confirmation). Completing maintenance work does not resolve the alert by itself.")}</p>
+                  <p className="mt-2 text-[11px] text-muted-foreground">{t("Reading a notification does not acknowledge or resolve the alert")}{a.policyless ? ` · ${t("No policy escalation — this alert was not raised by a policy")}` : ""}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">{t("Resolving requires a reason and evidence (remeasurement or a recorded confirmation). Completing maintenance work does not resolve the alert by itself.")}</p>
                 </Card>
               </div>
             )}
@@ -203,7 +203,7 @@ export function AdminAlertsView({ live }: { live?: Live }) {
               <Check label={t("Show disabled")} checked={showOff} onChange={setShowOff} />
             </ScopeBar>
           ) : <div className="flex justify-end"><Check label={t("Show disabled")} checked={showOff} onChange={setShowOff} /></div>}
-          {scopeUnit && <p className="text-xs text-muted">{t("Showing the policies attached to {unit}: {names}.", { unit: scopeUnit, names: pols.map((x) => x.name).join(", ") })}</p>}
+          {scopeUnit && <p className="text-xs text-muted-foreground">{t("Showing the policies attached to {unit}: {names}.", { unit: scopeUnit, names: pols.map((x) => x.name).join(", ") })}</p>}
           <PoliciesTab pols={pols} live={live?.pol} sel={polSel} select={selectPolicy} showOff={showOff} copyFor={scopeOwner}
             onCopy={(ruleKey) => (scopeOwner ? startPolicy(scopeOwner.id, ruleKey) : setAsking({ from: ruleKey }))} />
         </>
@@ -212,12 +212,12 @@ export function AdminAlertsView({ live }: { live?: Live }) {
       <Modal open={resolve} onClose={() => setResolve(false)} title={t("Resolve alert")} footer={<><Btn onClick={() => setResolve(false)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || evidence.loading} onClick={doResolve}>{t("Resolve alert")}</Btn></>}>
         {a && (
           <>
-            <p className="text-xs text-muted">{a.id} · {a.title}</p>
+            <p className="text-xs text-muted-foreground">{a.id} · {a.title}</p>
             <EvidencePicker rows={evRows} policyless={a.policyless} picked={sendable} onChange={setPicked} loading={evidence.loading} error={evidence.error ? t("The evidence could not be loaded — close the dialog and try again.") : tried ? evProblem : null} />
           </>
         )}
         <Field label={t("Resolution reason · required")} hint={`${reason.length} / 1000`} error={tried && !reason.trim() ? t("A reason is required") : tried && reason.length > 1000 ? t("At most 1000 characters") : undefined}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
-        <p className="text-[11px] text-muted">{t("Resolved alerts stay in history. If the condition returns, a new alert is created.")}</p>
+        <p className="text-[11px] text-muted-foreground">{t("Resolved alerts stay in history. If the condition returns, a new alert is created.")}</p>
       </Modal>
     </Page>
   );

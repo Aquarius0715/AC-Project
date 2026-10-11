@@ -146,16 +146,16 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
         <Card title={t("Alert policies")} sub={t("by customer")} className="self-start">
           {groups.map((g) => (
             <div key={g} className="mb-3">
-              <div className="mb-1 text-[10px] font-bold tracking-wide text-muted">{g}</div>
+              <div className="mb-1 text-[10px] font-bold tracking-wide text-muted-foreground">{g}</div>
               <div className="flex flex-col gap-2">
                 {isNew && draft?.group === g && (
-                  <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">{draft.name.trim() || t("New alert policy")}</b><div className="text-[11px] text-muted">{t("not saved yet")}</div></div></ListRow>
+                  <ListRow selected><div className="min-w-0 flex-1"><b className="text-[13px]">{draft.name.trim() || t("New alert policy")}</b><div className="text-[11px] text-muted-foreground">{t("not saved yet")}</div></div></ListRow>
                 )}
                 {listed.filter((x) => x.group === g).map((x) => (
                   <ListRow key={x.id} selected={!isNew && draft?.id === x.id} onClick={() => select(x.id)}>
                     <div className="min-w-0 flex-1">
-                      <b className="text-[13px]">{x.name}</b><div className="text-[11px] text-muted">{x.sub}</div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted">{x.kind === "alert" && <SeverityBadge s={x.severity} />}<span>{x.units}{!x.on && ` · ${t("Off")}`}</span></div>
+                      <b className="text-[13px]">{x.name}</b><div className="text-[11px] text-muted-foreground">{x.sub}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">{x.kind === "alert" && <SeverityBadge s={x.severity} />}<span>{x.units}{!x.on && ` · ${t("Off")}`}</span></div>
                     </div>
                   </ListRow>
                 ))}
@@ -186,7 +186,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
                 </div>
               </section>
               <section><h3 className="mb-1 text-[13px] font-bold">{t("Owner & units")}</h3>
-                <p className="mb-2 text-xs text-muted">{t("A policy belongs to one customer. Units pick it up on their own page (Customers & units › unit › Alert policies) — units are never assigned from here.")}</p>
+                <p className="mb-2 text-xs text-muted-foreground">{t("A policy belongs to one customer. Units pick it up on their own page (Customers & units › unit › Alert policies) — units are never assigned from here.")}</p>
                 <div className="text-xs font-semibold">{t("Owner (customer) · fixed after creation")}</div>
                 <div className="mt-1"><Badge tone="primary">{draft.customerName}</Badge></div>
                 <div className="mt-2 rounded-xl bg-surface2 px-3 py-2 text-[13px]">
@@ -194,26 +194,26 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
                   {draft.customerId && <TextLink href={`/admin/units?customerId=${draft.customerId}&tab=policies`}>{t("Read-only here · attach / detach on each unit")} <Icon name="chevronRight" /></TextLink>}
                 </div>
               </section>
-              <section><h3 className="mb-2 text-[13px] font-bold">{t("Condition")}</h3><p className="mb-2 text-xs text-muted">{t("Missing or stale readings never count toward the condition — they raise a data-quality notice instead.")}</p>
+              <section><h3 className="mb-2 text-[13px] font-bold">{t("Condition")}</h3><p className="mb-2 text-xs text-muted-foreground">{t("Missing or stale readings never count toward the condition — they raise a data-quality notice instead.")}</p>
                 <ConditionFields c={draft} onChange={(c) => setDraft((d) => (d ? { ...d, ...c } : d))} errors={errors} tried={tried} />
               </section>
               <section><h3 className="mb-1 text-[13px] font-bold">{t("Only if … (optional) · active hours")}</h3>
-                <p className="mb-2 text-xs text-muted">{t("Evaluated in the policy timezone. Outside these hours the condition is not checked — the same field as “Only if” in the client app.")}</p>
+                <p className="mb-2 text-xs text-muted-foreground">{t("Evaluated in the policy timezone. Outside these hours the condition is not checked — the same field as “Only if” in the client app.")}</p>
                 <WindowEditor value={draft.activeWindow} onChange={(w) => set("activeWindow", w)} timezone={draft.timezone} error={errors.activeWindow} />
               </section>
-              <section><h3 className="mb-1 text-[13px] font-bold">{t("Severity")}</h3><Choice value={draft.severity} onChange={(v) => set("severity", v)} options={[{ id: "normal", label: t("Info") }, { id: "warning", label: t("Warning") }, { id: "critical", label: t("Critical") }]} /><p className="mt-1 text-[11px] text-muted">{t("A severity change on an open alert counts as a new notification reason.")}</p></section>
+              <section><h3 className="mb-1 text-[13px] font-bold">{t("Severity")}</h3><Choice value={draft.severity} onChange={(v) => set("severity", v)} options={[{ id: "normal", label: t("Info") }, { id: "warning", label: t("Warning") }, { id: "critical", label: t("Critical") }]} /><p className="mt-1 text-[11px] text-muted-foreground">{t("A severity change on an open alert counts as a new notification reason.")}</p></section>
               <section>
                 <div className="mb-1 flex flex-wrap items-center justify-between gap-2"><h3 className="text-[13px] font-bold">{t("Notify")}</h3>{canWrite && <Btn size="sm" variant="ghost" onClick={() => setPicking(true)}><Icon name="add" /> {t("Add recipient")}</Btn>}</div>
-                <p className="mb-2 text-xs text-muted">{t("Recipients come from notifications.recipients — only people allowed to see these units.")}</p>
+                <p className="mb-2 text-xs text-muted-foreground">{t("Recipients come from notifications.recipients — only people allowed to see these units.")}</p>
                 {draft.recipients.map((r) => (
                   <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-line py-2 text-[13px]">
-                    <span><b>{r.label}</b><span className="block text-xs text-muted">{r.role}</span></span>
+                    <span><b>{r.label}</b><span className="block text-xs text-muted-foreground">{r.role}</span></span>
                     {canWrite && <Btn size="sm" variant="ghost" aria-label={t("Remove {name}", { name: r.label })} onClick={() => set("recipients", draft.recipients.filter((x) => x.id !== r.id))}><Icon name="close" /></Btn>}
                   </div>
                 ))}
-                {(draft.recipients.length === 0 || (tried && errors.recipients)) && <p className={cx("py-1 text-xs", tried && errors.recipients ? "text-crit" : "text-muted")}>{tried && errors.recipients ? <span className="inline-flex items-center gap-1"><Icon name="error" />{errors.recipients}</span> : t("No recipients yet — add at least one.")}</p>}
-                <div className="flex flex-wrap gap-3 border-t border-line pt-2"><span className="text-xs text-muted">{t("Channels for every recipient:")}</span><Check label={t("In-app")} checked disabled /><Check label={t("Email")} checked={draft.channels.includes("email")} onChange={(v) => toggleChannel("email", v)} /><Check label="WhatsApp" checked={draft.channels.includes("whatsapp")} onChange={(v) => toggleChannel("whatsapp", v)} /></div>
-                <p className="text-[11px] text-muted">{t("In-app is always on. WhatsApp reaches only recipients who allowed that channel.")}</p>
+                {(draft.recipients.length === 0 || (tried && errors.recipients)) && <p className={cx("py-1 text-xs", tried && errors.recipients ? "text-crit" : "text-muted-foreground")}>{tried && errors.recipients ? <span className="inline-flex items-center gap-1"><Icon name="error" />{errors.recipients}</span> : t("No recipients yet — add at least one.")}</p>}
+                <div className="flex flex-wrap gap-3 border-t border-line pt-2"><span className="text-xs text-muted-foreground">{t("Channels for every recipient:")}</span><Check label={t("In-app")} checked disabled /><Check label={t("Email")} checked={draft.channels.includes("email")} onChange={(v) => toggleChannel("email", v)} /><Check label="WhatsApp" checked={draft.channels.includes("whatsapp")} onChange={(v) => toggleChannel("whatsapp", v)} /></div>
+                <p className="text-[11px] text-muted-foreground">{t("In-app is always on. WhatsApp reaches only recipients who allowed that channel.")}</p>
               </section>
               <section className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Cooldown (min)")} hint={t("Same severity is not re-sent within this window (1–1440)")} error={tried ? errors.cooldown : undefined}><Input type="number" value={draft.cooldown} onChange={(e) => set("cooldown", +e.target.value)} /></Field><Field label={t("Escalate after (min)")} hint={t("Escalate if still unacknowledged (1–1440)")} error={tried ? errors.escalate : undefined}><Input type="number" value={draft.escalate} onChange={(e) => set("escalate", +e.target.value)} /></Field></section>
             </fieldset>
@@ -224,7 +224,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
             {canWrite && (
               <div className="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
                 {!isNew && <Btn variant="danger" disabled={pending} onClick={() => setDeleting(true)}>{t("Delete policy")}</Btn>}
-                <span className={cx("mr-auto text-[12px]", tried && problems ? "text-crit" : "text-muted")}>{status}</span>
+                <span className={cx("mr-auto text-[12px]", tried && problems ? "text-crit" : "text-muted-foreground")}>{status}</span>
                 <Btn disabled={pending || (!isNew && !changes.length)} onClick={discard}>{t("Discard")}</Btn>
                 <Btn variant="primary" disabled={pending || (!isNew && !changes.length)} onClick={save}>{t("Save policy")}</Btn>
               </div>
@@ -237,7 +237,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
       {deleting && draft && (
         <Modal open onClose={() => setDeleting(false)} title={t("Delete policy")} footer={<><Btn onClick={() => setDeleting(false)}>{t("Cancel")}</Btn><Btn variant="danger" disabled={pending} onClick={remove}>{t("Delete policy")}</Btn></>}>
           <p className="text-[13px]">{draft.unitIds.length ? t("“{name}” is detached from {units} and deleted.", { name: draft.name, units: draft.units }) : t("“{name}” is deleted. It is not attached to any unit.", { name: draft.name })}</p>
-          <p className="text-[11px] text-muted">{t("The alerts it raised stay in the history.")}</p>
+          <p className="text-[11px] text-muted-foreground">{t("The alerts it raised stay in the history.")}</p>
         </Modal>
       )}
     </>
@@ -251,7 +251,7 @@ export function NewPolicyModal({ customers, initial, onClose, onStart }: { custo
   const [c, setC] = useState(customers.some((x) => x.id === initial) ? initial! : "");
   return (
     <Modal open onClose={onClose} title={t("New alert policy")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!c} onClick={() => onStart(c)}>{t("Start the policy")}</Btn></>}>
-      <p className="text-[13px] text-muted">{t("A policy belongs to one customer, and only that customer’s units can carry it. The owner cannot change once the policy is saved.")}</p>
+      <p className="text-[13px] text-muted-foreground">{t("A policy belongs to one customer, and only that customer’s units can carry it. The owner cannot change once the policy is saved.")}</p>
       {customers.length === 0 ? <EmptyState title={t("No active customers")}>{t("A policy needs an active customer to own it.")}</EmptyState> : (
         <Field label={t("Owner (customer)")}><SearchSelect label={t("Owner (customer)")} value={c} onChange={setC} options={customers.map((x) => ({ id: x.id, label: x.name }))} /></Field>
       )}
@@ -271,7 +271,7 @@ function RecipientPicker({ unitId, customer, chosen, demo, onClose, onAdd }: { u
   return (
     <Modal open onClose={onClose} title={t("Add recipients")} footer={<><Btn onClick={onClose}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!pick.length} onClick={add}>{pick.length ? t(pick.length === 1 ? "Add 1 recipient" : "Add {n} recipients", { n: pick.length }) : t("Add recipients")}</Btn></>}>
       {!unitId ? <EmptyState title={t("{customer} has no units yet", { customer })}>{t("Recipients are the people allowed to see the customer’s units. Add a unit first.")}</EmptyState>
-        : cands.loading ? <p className="text-[13px] text-muted">{t("Loading the recipients…")}</p>
+        : cands.loading ? <p className="text-[13px] text-muted-foreground">{t("Loading the recipients…")}</p>
         : cands.error ? <p className="text-[13px] text-crit">{t("The recipients could not be loaded — close the dialog and try again.")}</p>
         : options.length === 0 ? <EmptyState title={t("Everyone is already a recipient")}>{t("Only {customer}’s users and HQ staff who read alerts can be recipients.", { customer })}</EmptyState>
         : (
@@ -279,12 +279,12 @@ function RecipientPicker({ unitId, customer, chosen, demo, onClose, onAdd }: { u
             {options.map((r) => (
               <div key={r.id} className="rounded-xl border border-line px-3 py-2">
                 <Check checked={pick.includes(r.id)} onChange={(on) => setPick((v) => (on ? [...v, r.id] : v.filter((x) => x !== r.id)))}
-                  label={<span><b>{r.displayLabel}</b><span className="block text-xs text-muted">{recipientRole(r.role, t)} · {r.allowedChannels.map((c) => t(CHANNEL[c])).join(" · ")}</span></span>} />
+                  label={<span><b>{r.displayLabel}</b><span className="block text-xs text-muted-foreground">{recipientRole(r.role, t)} · {r.allowedChannels.map((c) => t(CHANNEL[c])).join(" · ")}</span></span>} />
               </div>
             ))}
           </div>
         )}
-      <p className="text-[11px] text-muted">{t("Only {customer}’s users and HQ staff who read alerts can be recipients.", { customer })}</p>
+      <p className="text-[11px] text-muted-foreground">{t("Only {customer}’s users and HQ staff who read alerts can be recipients.", { customer })}</p>
     </Modal>
   );
 }

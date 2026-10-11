@@ -65,28 +65,28 @@ export function PayoutsView({ live }: { live: PayoutsLive }) {
         <Card title={t("Statements")} className="self-start">
           {live.statements.length === 0 ? <EmptyState title={t("No statements yet")}>{t(live.period || live.status ? "No statement matches the filter." : "A statement appears here once HQ approves your first one.")}</EmptyState> : (
             <div className="flex flex-col gap-2">{live.statements.map((s) => (
-              <ListRow key={s.id} selected={sel?.statement.id === s.id} onClick={() => nav({ statementId: s.id })}><div className="min-w-0 flex-1"><b className="text-[13px]">{s.label}</b><div className="text-[11px] text-muted">{s.sub}</div></div><Badge tone={s.badge.tone}>{s.badge.label}</Badge></ListRow>
+              <ListRow key={s.id} selected={sel?.statement.id === s.id} onClick={() => nav({ statementId: s.id })}><div className="min-w-0 flex-1"><b className="text-[13px]">{s.label}</b><div className="text-[11px] text-muted-foreground">{s.sub}</div></div><Badge tone={s.badge.tone}>{s.badge.label}</Badge></ListRow>
             ))}</div>
           )}
-          <p className="mt-2 text-[11px] text-muted">{t("A statement is issued on the 1st for jobs whose report was accepted in the previous month. HQ approves it; payment follows on the 15th. Drafts stay with HQ.")}</p>
+          <p className="mt-2 text-[11px] text-muted-foreground">{t("A statement is issued on the 1st for jobs whose report was accepted in the previous month. HQ approves it; payment follows on the 15th. Drafts stay with HQ.")}</p>
         </Card>
         {!sel ? <Card title={t("Statement")}><EmptyState title={t("No statement selected")}>{t("Only approved and paid statements are shown; jobs still in review move to the next statement.")}</EmptyState></Card> : (
           <Card title={sel.title} sub={sel.sub}
             action={<div className="flex items-center gap-2"><Badge tone={sel.statement.status === "paid" ? "ok" : "primary"}>{t(sel.statement.status === "paid" ? "Paid" : "Approved")}</Badge><Btn size="sm" onClick={download}>{t("Download PDF")}</Btn></div>}>
             <DataTable rowKey={(r) => r.key} rows={sel.rows} cols={[
               { key: "job", label: t("Job"), render: (r) => <b>{r.job}</b> },
-              { key: "work", label: t("Work"), render: (r) => <><div>{r.work}</div>{r.sub && <div className="text-[11px] text-muted">{r.sub}</div>}</> },
+              { key: "work", label: t("Work"), render: (r) => <><div>{r.work}</div>{r.sub && <div className="text-[11px] text-muted-foreground">{r.sub}</div>}</> },
               { key: "accepted", label: t("Accepted"), render: (r) => <span className="whitespace-nowrap">{r.accepted}</span> },
               { key: "status", label: t("Status"), render: (r) => <Badge tone={r.tone}>{r.statusText}</Badge> },
               { key: "amount", label: sel.statement.currency, render: (r) => <span className="font-semibold">{r.amount}</span>, className: "text-right" },
-              { key: "action", label: "", render: (r) => r.question ? <span className="text-[11px] text-muted">{t(r.question.state === "open" ? "Question open" : r.question.state === "adjusted" ? "Adjusted" : "Answered")}</span>
+              { key: "action", label: "", render: (r) => r.question ? <span className="text-[11px] text-muted-foreground">{t(r.question.state === "open" ? "Question open" : r.question.state === "adjusted" ? "Adjusted" : "Answered")}</span>
                 : r.askable ? <button type="button" disabled={pending} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => { setAsk({ lineId: r.lineId! }); setTopic(r.status === "deduction" ? "deduction" : "amount"); setError(null); }}>{t("Ask HQ")}</button>
-                : <span className="text-[11px] text-muted">{r.status === "not_included" ? t("next statement") : ""}</span> },
+                : <span className="text-[11px] text-muted-foreground">{r.status === "not_included" ? t("next statement") : ""}</span> },
             ]} />
             <div className="mt-3"><SummaryList items={[...sel.totals.map(([k, v]): [string, React.ReactNode] => [k, <b key={k}>{v}</b>]), [t("Bank account"), t("set by HQ — not shown in this demo")]]} /></div>
-            <p className="mt-2 text-[11px] text-muted">{t("Rates come from your rate card with HQ. Only jobs whose report your review accepted (FR-P05) are paid; jobs still in review move to the next statement. Amounts are shown in {currency}.", { currency: sel.statement.currency })}</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">{t("Rates come from your rate card with HQ. Only jobs whose report your review accepted (FR-P05) are paid; jobs still in review move to the next statement. Amounts are shown in {currency}.", { currency: sel.statement.currency })}</p>
             {sel.questions.length > 0 && <div className="mt-4"><b className="text-[13px]">{t("Questions to HQ")}</b><ul className="mt-1 divide-y divide-line">{sel.questions.map((q) => (
-              <li key={q.id} className="py-2 text-[13px]"><div className="flex flex-wrap items-center justify-between gap-2"><span>{q.title}</span><Badge tone={q.tone}>{q.state}</Badge></div><div className="text-xs text-muted">“{q.message}”{q.reply ? ` — ${t("HQ: {reply}", { reply: q.reply })}` : ""}</div></li>
+              <li key={q.id} className="py-2 text-[13px]"><div className="flex flex-wrap items-center justify-between gap-2"><span>{q.title}</span><Badge tone={q.tone}>{q.state}</Badge></div><div className="text-xs text-muted-foreground">“{q.message}”{q.reply ? ` — ${t("HQ: {reply}", { reply: q.reply })}` : ""}</div></li>
             ))}</ul></div>}
           </Card>
         )}

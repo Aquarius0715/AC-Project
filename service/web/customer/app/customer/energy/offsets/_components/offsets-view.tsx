@@ -43,14 +43,14 @@ export function OffsetsView({ live }: { live: Live }) {
   const restart = () => { setDone(null); setQuote(null); setAck(false); setStep(0); };
   return (
     <Page>
-      <div className="text-[13px] text-muted"><Link href={`/customer/energy?${live.back}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Energy & cost")}</Link> › {t("Carbon offsets (demo)")}</div>
+      <div className="text-[13px] text-muted-foreground"><Link href={`/customer/energy?${live.back}`} className="font-semibold text-primary"><Icon name="arrowLeft" /> {t("Energy & cost")}</Link> › {t("Carbon offsets (demo)")}</div>
       <Banner tone="warn" action={<DemoBadge />}>{t("Demo only — no real carbon credits are bought or retired. Energy savings do not become a tradable balance. Records are labelled “Demo”.")}</Banner>
       <Steps steps={[t("Amount"), t("Quote"), t("Confirm")]} current={step} />
       <Card title={t("Based on Energy & cost")} sub={`${live.subject} · ${live.period.label}${live.estimate ? ` · ${live.estimate.factor}` : ""}`}>
-        {live.estimate ? <div className="flex flex-wrap gap-x-8 gap-y-1 text-[13px]"><span>{t("Estimated emissions")} <b>{live.estimate.emissions}</b></span><span>{t("Estimated savings")} <b className={live.estimate.comparable ? "text-ok" : "text-muted"}>{live.estimate.savedEmissions}</b></span></div>
-          : <p className="text-[13px] text-muted">{t("No estimate for this selection — the emission factor or valid readings are missing.")}</p>}
+        {live.estimate ? <div className="flex flex-wrap gap-x-8 gap-y-1 text-[13px]"><span>{t("Estimated emissions")} <b>{live.estimate.emissions}</b></span><span>{t("Estimated savings")} <b className={live.estimate.comparable ? "text-ok" : "text-muted-foreground"}>{live.estimate.savedEmissions}</b></span></div>
+          : <p className="text-[13px] text-muted-foreground">{t("No estimate for this selection — the emission factor or valid readings are missing.")}</p>}
         <button type="button" className="mt-2 text-xs font-semibold text-primary" aria-expanded={explain} onClick={() => setExplain((e) => !e)}><Icon name="info" /> {t("What is a carbon offset?")} <Icon name={explain ? "chevronDown" : "chevronRight"} /></button>
-        {explain && <p className="mt-1 text-xs text-muted">{t("An offset retires a carbon credit to compensate emissions. Here it is simulated — nothing real is purchased, and no market, price or balance exists.")}</p>}
+        {explain && <p className="mt-1 text-xs text-muted-foreground">{t("An offset retires a carbon credit to compensate emissions. Here it is simulated — nothing real is purchased, and no market, price or balance exists.")}</p>}
       </Card>
       {done ? (
         <Card title={t("Demo request recorded")} tone="ok">
@@ -63,7 +63,7 @@ export function OffsetsView({ live }: { live: Live }) {
             <Field label={t("Amount (kgCO₂e, > 0)")} hint={t("Up to 3 decimals")} error={amountError}><Input inputMode="decimal" value={amountKg} onChange={(e) => setAmountKg(e.target.value)} /></Field>
             <Field label={t("Purpose")} error={purposeError}><Input value={purpose} onChange={(e) => setPurpose(e.target.value)} /></Field>
           </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted">{t("Getting a quote creates no record.")}</span><Btn variant="primary" disabled={pending || !!amountError || !!purposeError} onClick={ask}>{t("Get demo quote")}</Btn></div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{t("Getting a quote creates no record.")}</span><Btn variant="primary" disabled={pending || !!amountError || !!purposeError} onClick={ask}>{t("Get demo quote")}</Btn></div>
         </Card>
       ) : step === 1 && quote ? (
         <Card title={<span className="flex items-center gap-2">{t("Demo quote")} <Badge tone="primary" icon="time">{t("Quoted")}</Badge></span>}>
@@ -82,15 +82,15 @@ export function OffsetsView({ live }: { live: Live }) {
         </Card>
       ) : null}
       <Card title={t("Demo offset records")} sub={t("Demo retirement ≠ certified credit")}>
-        {live.records.length === 0 ? <p className="text-[13px] text-muted">{t("No demo record yet.")}</p> : (
+        {live.records.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No demo record yet.")}</p> : (
           <ul className="flex flex-col divide-y divide-line text-[13px]">
-            {live.records.map((r) => <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><span><b>{r.id.slice(0, 8)}</b> <span className="text-xs text-muted">· {kg3(r.amountKg)} kgCO₂e · {showDate(r.createdAt, display)}</span></span><span className="flex items-center gap-2 text-muted">{t("Proof: {proof}", { proof: r.proof ?? t("Not issued") })}<Badge tone={stateTone[r.state]}>{t(stateLabel[r.state])}</Badge></span></li>)}
+            {live.records.map((r) => <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><span><b>{r.id.slice(0, 8)}</b> <span className="text-xs text-muted-foreground">· {kg3(r.amountKg)} kgCO₂e · {showDate(r.createdAt, display)}</span></span><span className="flex items-center gap-2 text-muted-foreground">{t("Proof: {proof}", { proof: r.proof ?? t("Not issued") })}<Badge tone={stateTone[r.state]}>{t(stateLabel[r.state])}</Badge></span></li>)}
           </ul>
         )}
       </Card>
       <details className="rounded-2xl border border-line bg-surface p-4 text-[13px]">
-        <summary className="cursor-pointer font-bold">{t("Future carbon market (concept)")} <span className="text-xs font-normal text-muted">{t("Not available · no prices, balances or trading")}</span></summary>
-        <p className="mt-2 text-xs text-muted">{t("Concept only — provider {provider}, verification {verification}, ledger {ledger}. Integration partners and verification conditions are undecided; nothing here is tradable.", { provider: quote ? quote.marketConcept.providerLabel : t("not selected"), verification: quote ? quote.marketConcept.verificationStatus : t("unverified"), ledger: quote ? quote.marketConcept.ledgerStatus.replace("_", " ") : t("not connected") })}</p>
+        <summary className="cursor-pointer font-bold">{t("Future carbon market (concept)")} <span className="text-xs font-normal text-muted-foreground">{t("Not available · no prices, balances or trading")}</span></summary>
+        <p className="mt-2 text-xs text-muted-foreground">{t("Concept only — provider {provider}, verification {verification}, ledger {ledger}. Integration partners and verification conditions are undecided; nothing here is tradable.", { provider: quote ? quote.marketConcept.providerLabel : t("not selected"), verification: quote ? quote.marketConcept.verificationStatus : t("unverified"), ledger: quote ? quote.marketConcept.ledgerStatus.replace("_", " ") : t("not connected") })}</p>
       </details>
     </Page>
   );
