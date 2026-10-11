@@ -77,4 +77,27 @@ func TestKeycloakEndSessions(t *testing.T) {
 	if err := bad.EndSessions(ctx, "u-1"); err == nil {
 		t.Error("a wrong client secret passes")
 	}
+	// the service's own HTTP client and the wall clock
+	own := &Keycloak{TokenURL: k.TokenURL, AdminURL: k.AdminURL, ClientID: "svc", ClientSecret: "test-secret", Client: srv.Client()}
+	if err := own.EndSessions(ctx, "u-1"); err != nil {
+		t.Errorf("with its own client: %v", err)
+	}
+}
+
+// TestKeycloakTokenAnswers: a token endpoint that answers without a token, or with something else than JSON, ends nothing.
+func TestKeycloakTokenAnswers(t *testing.T) {
+	for _, body := range []string{`{}`, `{"access_token":""}`, `not json`} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if strings.HasSuffix(r.URL.Path, "/token") {
+				_, _ = w.Write([]byte(body))
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		}))
+		k := &Keycloak{TokenURL: srv.URL + "/token", AdminURL: srv.URL + "/admin/realms/ac", ClientID: "svc", ClientSecret: "test-secret"}
+		if err := k.EndSessions(context.Background(), "u-1"); err == nil {
+			t.Errorf("token answer %s passes", body)
+		}
+		srv.Close()
+	}
 }

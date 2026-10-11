@@ -68,7 +68,7 @@ describe("signing in again after a revocation", () => {
     expect(new URL(plain.headers.get("location")!).searchParams.get("prompt")).toBeNull();
   });
 
-  const signIn = (pending: { reauth?: boolean }, coreAnswer: Response) => {
+  const signIn = (pending: { reauth?: boolean; returnTo?: string | null }, coreAnswer: Response) => {
     vi.stubGlobal("fetch", vi.fn(async (url: string) => (String(url).includes("/protocol/openid-connect/token") ? json(200, { access_token: token, refresh_token: "r-1", expires_in: 300 }) : coreAnswer)));
     const cookie = seal({ state: "s-1", verifier: "v-1", returnTo: "/customer/alerts", ...pending });
     return callback(new NextRequest("http://localhost:3000/bff/auth/callback?code=c-1&state=s-1", { headers: { cookie: `${OIDC_COOKIE}=${cookie}` } }));
@@ -88,5 +88,20 @@ describe("signing in again after a revocation", () => {
   it("starts the session when the Core API takes the sign-in", async () => {
     const res = await signIn({ reauth: true }, json(200, { data: {} }));
     expect([new URL(res.headers.get("location")!).pathname, kv.size]).toEqual(["/customer/alerts", 1]);
+  });
+
+  // open redirects (security check R380): a crafted returnTo goes through the sign-in, the password prompt after a
+  // refused single sign-on, and the second sign-in; every redirect on the way stays on the app's own origin
+  it("never leaves the app's origin, whatever returnTo says", async () => {
+    const crafted = ["https://evil.example/x", "//evil.example", "/\\evil.example", "/.//evil.example", "/customer/..//evil.example", "/%2F%2Fevil.example", "/\t/evil.example", "javascript:alert(1)", "/@evil.example", " //evil.example"];
+    const origin = "http://localhost:3000";
+    const kept = async (url: string) => unseal<{ returnTo: string | null; reauth?: boolean }>((await login(new NextRequest(url))).cookies.get(OIDC_COOKIE)?.value)!;
+    for (const returnTo of crafted) {
+      const first = await kept(`${origin}/bff/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
+      const hop = new URL((await signIn({ returnTo: first.returnTo }, json(401, revoked))).headers.get("location")!);
+      const second = await kept(hop.toString());
+      const home = new URL((await signIn({ returnTo: second.returnTo, reauth: second.reauth }, json(200, { data: {} }))).headers.get("location")!);
+      expect([returnTo, hop.origin, hop.pathname, home.origin]).toEqual([returnTo, origin, "/bff/auth/login", origin]);
+    }
   });
 });

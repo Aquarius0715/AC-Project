@@ -194,4 +194,11 @@ func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
 	if err := s.DrainEvents(context.Background()); err != nil || len(idp.take()) != 0 {
 		t.Errorf("a failed provider call is retried and holds up the consumer: %v", err)
 	}
+
+	// a user who is gone by the time the event is applied has no sessions to end
+	owner(t, `INSERT INTO platform.outbox (tenant_id, aggregate_type, aggregate_id, event_type, payload, correlation_id)
+		VALUES ($1, 'membership', $2, 'SessionsRevoked', jsonb_build_object('userId', $3::text), 'test-gone-user')`, seed.ID("tenant-a"), member, uuid.New())
+	if err := s.DrainEvents(context.Background()); err != nil || len(idp.take()) != 0 {
+		t.Errorf("a user who is gone: %v", err)
+	}
 }

@@ -5944,3 +5944,22 @@ IR384 and IR385 left one step open: ending the identity provider's sessions from
 6. **Checks.**
    - Keycloak re-imported the realm, and every backend image was rebuilt.
    - `make test-all` (both modes) passes. The E2E suite passes: 117 tests, 8 skipped. The validators pass.
+
+## IR387 Checks round: open redirects on the sign-in again path, coverage of IR386, counts in the architecture boards — 2026-10-12
+
+1. **Open redirects (security).** IR385 added new redirects with `returnTo`: the sign-in again link, the BFF's `reauth=1` hop and the second callback. All of them were checked.
+   - The sign-in page keeps `returnTo` only inside the role's own area. The BFF keeps it only as a path on its own origin: no scheme, no `//`, no backslash and no control character.
+   - The callback builds every redirect on the app's own URL. The `reauth=1` hop carries the kept value through the BFF again.
+   - `demoSession.signIn` takes a `returnTo` in its contract, but the Core API refuses the operation (`errors.session_via_bff`), so nothing uses it there.
+   - Nothing was found. The new case in `signOutEverywhere.test.ts` pins the whole chain:
+     - it sends ten crafted values (another host, `//`, a backslash, dot segments, an encoded slash, a tab, `javascript:`, `@` and a leading space) through the sign-in, the refused single sign-on and the second sign-in;
+     - every redirect on the way stays on the app's origin;
+     - with the BFF's check removed, the test fails, because the final redirect goes to the other host.
+2. **Coverage (88.6% of 15,569 statements).** The scanners found no untested Validate rule. Three paths of IR386 had not run, and tests now cover them:
+   - a token endpoint that answers without a token, or not with JSON;
+   - the service's own HTTP client and the wall clock;
+   - a `SessionsRevoked` event for a user who is gone by the time the event is applied. Nothing is ended and the event is done. A mutation that makes this path fail makes the test fail.
+3. **The architecture boards (Figma).**
+   - Board 02's test note had stale web counts. It now says 74 suites and 450 tests, 371 literal Core API calls and 407 typed calls.
+   - Board 06 lists the new `idp` package under `internal/platform`.
+4. **Checks.** `make test-all` (both modes), the web unit tests, typecheck and lint pass, and so do the validators. Only tests changed in the code.
