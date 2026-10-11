@@ -78,6 +78,7 @@ func TestRequiredInputs(t *testing.T) {
 		{"invoices.remind", `{"reason":` + long(1001) + `}`, map[string]string{"invoiceId": req, "reason": length}},
 		{"inquiries.answer", `{}`, map[string]string{"inquiryId": req}},
 		{"payments.confirm", `{}`, map[string]string{"paymentId": req}},
+		{"payments.recordManual", `{}`, map[string]string{"invoiceId": req}},
 		{"payments.simulate", `{}`, map[string]string{"event": inv}},
 		{"payments.simulate", `{"event":"confirm","paymentReference":` + long(129) + `}`, map[string]string{"paymentId": req, "paymentReference": length}},
 		{"payments.simulate", `{"event":"instructions","method":"demo_credit_card"}`, map[string]string{"invoiceId": req, "method": "error.notAllowed"}},

@@ -238,22 +238,15 @@ func refIf(ok bool, s *string) *string {
 
 // ---- payments.confirm / payments.recordManual ----
 
-// ConfirmInput is the input of payments.confirm (paymentId) and payments.recordManual (invoiceId).
-type ConfirmInput struct {
-	PaymentID            *uuid.UUID `json:"paymentId,omitempty"`
-	InvoiceID            *uuid.UUID `json:"invoiceId,omitempty"`
-	PaymentReference     string     `json:"paymentReference"`
-	ConfirmedAmountMinor int64      `json:"confirmedAmountMinor"`
-	Currency             string     `json:"currency"`
-	Reason               string     `json:"reason"`
+// PaymentEntry is what HQ enters for a payment it confirms or records: the bank reference, the full amount and why.
+type PaymentEntry struct {
+	PaymentReference     string `json:"paymentReference"`
+	ConfirmedAmountMinor int64  `json:"confirmedAmountMinor"`
+	Currency             string `json:"currency"`
+	Reason               string `json:"reason"`
 }
 
-// Validate implements ops.Validator.
-func (in *ConfirmInput) Validate() map[string]string {
-	fe := map[string]string{}
-	if (in.PaymentID == nil) == (in.InvoiceID == nil) {
-		fe["paymentId"] = "error.required"
-	}
+func (in *PaymentEntry) check(fe map[string]string) map[string]string {
 	if !refOK(&in.PaymentReference) {
 		fe["paymentReference"] = "error.length"
 	}
@@ -267,7 +260,38 @@ func (in *ConfirmInput) Validate() map[string]string {
 	return fe
 }
 
-func amountOK(in *ConfirmInput, inv Invoice) error {
+// ConfirmInput is the input of payments.confirm: a payment that is processing. It has no invoiceId: the contract's
+// input has none, so one is an unknown field (IR390).
+type ConfirmInput struct {
+	PaymentID uuid.UUID `json:"paymentId"`
+	PaymentEntry
+}
+
+// Validate implements ops.Validator.
+func (in *ConfirmInput) Validate() map[string]string {
+	fe := map[string]string{}
+	if in.PaymentID == uuid.Nil {
+		fe["paymentId"] = "error.required"
+	}
+	return in.check(fe)
+}
+
+// ManualInput is the input of payments.recordManual: a payment HQ received outside the payment page, for an invoice.
+type ManualInput struct {
+	InvoiceID uuid.UUID `json:"invoiceId"`
+	PaymentEntry
+}
+
+// Validate implements ops.Validator.
+func (in *ManualInput) Validate() map[string]string {
+	fe := map[string]string{}
+	if in.InvoiceID == uuid.Nil {
+		fe["invoiceId"] = "error.required"
+	}
+	return in.check(fe)
+}
+
+func amountOK(in PaymentEntry, inv Invoice) error {
 	if in.ConfirmedAmountMinor != inv.AmountMinor || in.Currency != inv.Currency {
 		return apperr.Fields(map[string]string{"confirmedAmountMinor": "errors.full_amount_only"})
 	}
@@ -298,10 +322,7 @@ func amountOK(in *ConfirmInput, inv Invoice) error {
 // @Security		BearerAuth
 // @Router			/v1/payments/confirm [post]
 func (m Billing) confirm(ctx context.Context, c *ops.Call, in *ConfirmInput) (Payment, error) {
-	if in.PaymentID == nil {
-		return Payment{}, apperr.Fields(map[string]string{"paymentId": "error.required"})
-	}
-	p, inv, err := m.loadPayment(ctx, c, *in.PaymentID)
+	p, inv, err := m.loadPayment(ctx, c, in.PaymentID)
 	if err != nil {
 		return p, err
 	}
@@ -311,7 +332,7 @@ func (m Billing) confirm(ctx context.Context, c *ops.Call, in *ConfirmInput) (Pa
 	if p.Status != "processing" {
 		return p, apperr.E(apperr.Conflict, "error.invalidState")
 	}
-	if err := amountOK(in, inv); err != nil {
+	if err := amountOK(in.PaymentEntry, inv); err != nil {
 		return p, err
 	}
 	if free, err := referenceFree(ctx, c, in.PaymentReference, p.ID); err != nil || !free {
@@ -339,9 +360,9 @@ func (m Billing) confirm(ctx context.Context, c *ops.Call, in *ConfirmInput) (Pa
 // @Tags			payments
 // @Accept			json
 // @Produce		json
-// @Param			Idempotency-Key		header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
-// @Param			X-Expected-Version	header		integer			true	"all: required (target invoice, read invoices.get)"
-// @Param			request				body		ConfirmInput	true	"input"
+// @Param			Idempotency-Key		header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+// @Param			X-Expected-Version	header		integer		true	"all: required (target invoice, read invoices.get)"
+// @Param			request				body		ManualInput	true	"input"
 // @Success		200					{object}	ops.Envelope{data=Payment}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
@@ -353,11 +374,8 @@ func (m Billing) confirm(ctx context.Context, c *ops.Call, in *ConfirmInput) (Pa
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/payments/manual [post]
-func (m Billing) recordManual(ctx context.Context, c *ops.Call, in *ConfirmInput) (Payment, error) {
-	if in.InvoiceID == nil {
-		return Payment{}, apperr.Fields(map[string]string{"invoiceId": "error.required"})
-	}
-	inv, err := m.loadInvoice(ctx, c, *in.InvoiceID, true)
+func (m Billing) recordManual(ctx context.Context, c *ops.Call, in *ManualInput) (Payment, error) {
+	inv, err := m.loadInvoice(ctx, c, in.InvoiceID, true)
 	if err != nil {
 		return Payment{}, err
 	}
@@ -380,7 +398,7 @@ func (m Billing) recordManual(ctx context.Context, c *ops.Call, in *ConfirmInput
 	if any || inv.Status == "paid" {
 		return Payment{}, apperr.E(apperr.Conflict, "errors.invoice_has_payment")
 	}
-	if err := amountOK(in, inv); err != nil {
+	if err := amountOK(in.PaymentEntry, inv); err != nil {
 		return Payment{}, err
 	}
 	if free, err := referenceFree(ctx, c, in.PaymentReference, uuid.Nil); err != nil || !free {

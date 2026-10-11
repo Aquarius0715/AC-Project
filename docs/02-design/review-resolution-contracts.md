@@ -6013,3 +6013,31 @@ IR384 and IR385 left one step open: ending the identity provider's sessions from
    - Each upload path gained a pixel-flood case: `attachments.add`, `jobs.reportProblem` and `certificates.submit`.
    - With the check removed, the attachment and problem cases are accepted (200), and the tests fail.
 5. **Checks.** `make test-all` (both modes) and the validators pass. With the maintenance image rebuilt, the E2E suite passes: 117 tests, 8 skipped.
+
+## IR390 Checks round: cross-site scripting again, each payment write takes its own ID, the sign-in redirects under test — 2026-10-12
+
+1. **Cross-site scripting (security, second pass after IR371).**
+   - The four apps and the shared package still use no raw markup: no `dangerouslySetInnerHTML`, `innerHTML`, `insertAdjacentHTML`, `document.write`, `eval`, `new Function` or `srcdoc`.
+   - Every `href` and `src` added since IR371 is an app path built from IDs: notification links, alert and unit links, the QR scan result, the photo route. The IDs are UUIDs from the Core API.
+   - The sign-in again links keep `returnTo` inside the app (IR387).
+   - Nothing was found.
+2. **Finding: the two payment writes shared one input.** `payments.confirm` takes `paymentId` and `payments.recordManual` takes `invoiceId` (service contracts). The code read both through one type with both IDs and required exactly one of them.
+   - So `payments.confirm` accepted an `invoiceId` and `recordManual` a `paymentId`. Both are fields outside their contract, which D12 says are VALIDATION as unknown fields.
+   - `recordManual` without an ID named `paymentId` as the missing field. The rule is that a refusal names its field (IR331).
+   - The handlers then refused the other ID with a second check, which is why nothing worse happened.
+   - Fixed: `ConfirmInput {paymentId}` and `ManualInput {invoiceId}` share `PaymentEntry` (reference, amount, currency, reason).
+     - Each requires its own ID.
+     - The other ID is an unknown field (`_=error.malformedInput`).
+     - The API description shows `ManualInput` for `POST /v1/payments/manual`.
+3. **The sign-in redirects under test.** IR385's redirects to sign-in after a refused session had no unit test.
+   - `useAction.test.tsx`:
+     - success shows the toast and runs `after`;
+     - a refusal shows the readable error;
+     - UNAUTHENTICATED `errors.session_revoked` goes to `/login?error=revoked&returnTo=` with the current page, and any other UNAUTHENTICATED goes to `?error=expired`.
+   - `routeError.test.tsx`: the route error state goes to sign-in only when `/bff/session` says API mode and signed out. It stays with "Try again" while signed in, in the demo, or when the check fails.
+   - Without the redirect branches, the tests fail.
+4. **Tests.**
+   - `payments_test.go`: `recordManual` without an ID names `invoiceId`, and the other ID is refused on both writes. All four cases fail on the old code.
+   - `required_inputs_test.go` gained `payments.recordManual`.
+5. **Coverage.** Go coverage is 88.6%, and no untested Validate rule remains. The web has 76 test files and 456 tests.
+6. **Checks.** `make test-all` (both modes), the web checks and the validators pass. With the billing and gateway images rebuilt, the E2E suite passes: 117 tests, 8 skipped.

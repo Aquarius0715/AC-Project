@@ -151,6 +151,17 @@ func TestHQPaymentsAndRelease(t *testing.T) {
 	if code, _ := write(s, &customerB, "payments.recordManual", `{"invoiceId":"`+inv+`","paymentReference":"X","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"}`, 1); code != 403 {
 		t.Error("client records payment")
 	}
+	// each operation takes its own ID only (IR390): the other one is an unknown field, and recordManual names invoiceId
+	entry := `"paymentReference":"X","confirmedAmountMinor":5000,"currency":"MYR","reason":"x"`
+	for _, c := range []struct{ op, body, want string }{
+		{"payments.recordManual", `{` + entry + `}`, "invoiceId=error.required"},
+		{"payments.recordManual", `{"paymentId":"` + inv + `",` + entry + `}`, "_=error.malformedInput"},
+		{"payments.recordManual", `{"invoiceId":"` + inv + `","paymentId":"` + inv + `",` + entry + `}`, "_=error.malformedInput"},
+		{"payments.confirm", `{"invoiceId":"` + inv + `",` + entry + `}`, "_=error.malformedInput"},
+	} {
+		code, m := write(s, &hq, c.op, c.body, 1)
+		refusal(t, c.op+" "+c.body, code, m, c.want)
+	}
 	if code, m := manual("5000", 9); code != 409 || m["messageKey"] != "error.versionConflict" {
 		t.Errorf("manual on a stale invoice version: %d %v", code, m)
 	}

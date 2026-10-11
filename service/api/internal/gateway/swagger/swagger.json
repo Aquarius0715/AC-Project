@@ -18518,7 +18518,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/billing.ConfirmInput"
+                            "$ref": "#/definitions/billing.ManualInput"
                         }
                     }
                 ],
@@ -27289,9 +27289,6 @@
                 "currency": {
                     "type": "string"
                 },
-                "invoiceId": {
-                    "type": "string"
-                },
                 "paymentId": {
                     "type": "string"
                 },
@@ -27667,6 +27664,26 @@
                 },
                 "total": {
                     "type": "integer"
+                }
+            }
+        },
+        "billing.ManualInput": {
+            "type": "object",
+            "properties": {
+                "confirmedAmountMinor": {
+                    "type": "integer"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "invoiceId": {
+                    "type": "string"
+                },
+                "paymentReference": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
                 }
             }
         },

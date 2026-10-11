@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.273.0 (2026-10-12): IR390 payment inputs, XSS second pass, redirect tests; counts unchanged.
 # 0.272.0 (2026-10-12): IR389 upload pixel limits (DD-T 0.46.0, DD-C 0.37.0, DD-P 0.36.0); counts unchanged.
 # 0.271.0 (2026-10-12): IR388 literal search terms, SQL second pass (deterministic contracts 0.32.0); counts unchanged.
 # 0.270.0 (2026-10-12): IR387 checks round (open redirects, coverage, board counts); counts unchanged.
