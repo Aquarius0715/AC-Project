@@ -17,8 +17,15 @@ export type Session = {
 // One web app per role (IR178). AC_APP_ROLE is set at build time by each app's next.config; the cookie names carry
 // it because local apps share the host "localhost" (cookies are not separated by port).
 export const APP_ROLE = (process.env.AC_APP_ROLE ?? "client") as Session["role"];
-export const SESSION_COOKIE = `ac_session_${APP_ROLE}`;
-export const OIDC_COOKIE = `ac_oidc_${APP_ROLE}`;
+
+/** True when the app is served over HTTPS (APP_URL): its cookies are Secure and carry the cookie prefixes. */
+const httpsApp = () => oidcConfig().appUrl.startsWith("https");
+
+// On https the names carry the cookie prefixes: __Host- for the session (Secure, Path=/, no Domain) and __Secure- for
+// the sign-in state (Secure, Path=/bff/auth). The browser then keeps them to this host and HTTPS, so a sibling
+// subdomain cannot set or shadow them (cookie tossing, IR374). Plain-http local runs keep the plain names.
+export const SESSION_COOKIE = `${httpsApp() ? "__Host-" : ""}ac_session_${APP_ROLE}`;
+export const OIDC_COOKIE = `${httpsApp() ? "__Secure-" : ""}ac_oidc_${APP_ROLE}`;
 
 /** Shortest SESSION_SECRET a deployment on https accepts. */
 export const MIN_SECRET_LENGTH = 32;
@@ -65,7 +72,18 @@ const SESSION_MAX_AGE = 30 * 60;
 const REFRESH_LEEWAY_SECONDS = 30;
 
 export function cookieOptions() {
-  return { httpOnly: true, sameSite: "lax" as const, secure: oidcConfig().appUrl.startsWith("https"), path: "/", maxAge: SESSION_MAX_AGE };
+  return { httpOnly: true, sameSite: "lax" as const, secure: httpsApp(), path: "/", maxAge: SESSION_MAX_AGE };
+}
+
+/** The attributes that remove the session cookie: the Secure flag and path it was set with. A browser ignores a
+ * deletion of a __Host- cookie that lacks them, which is what cookies.delete(name) sends (IR374). */
+export function clearedCookieOptions() {
+  return { ...cookieOptions(), maxAge: 0 };
+}
+
+/** The sign-in state cookie (state, PKCE verifier, return path): on /bff/auth only, for 10 minutes; 0 removes it. */
+export function oidcCookieOptions(maxAge = 600) {
+  return { httpOnly: true, sameSite: "lax" as const, secure: httpsApp(), path: "/bff/auth", maxAge };
 }
 
 /** Builds a session from a token response; null when the token lacks the tenant / membership / role claims. */
@@ -130,7 +148,7 @@ export async function readSession(): Promise<Session | null> {
   if (!needsRefresh(s)) return s;
   const next = await refresh(s);
   if (!next) {
-    jar.delete(SESSION_COOKIE);
+    jar.set(SESSION_COOKIE, "", clearedCookieOptions());
     return null;
   }
   jar.set(SESSION_COOKIE, seal(next), cookieOptions());

@@ -3,7 +3,7 @@
 // provider only to refresh a token that is about to expire. The Core API authorizes every operation (D01); this only keeps signed-out users and the wrong role
 // out of the role areas in API mode. The Phase 1A demo (DATA_SOURCE=mock) is unaffected.
 import { NextResponse, type NextRequest } from "next/server";
-import { cookieOptions, needsRefresh, oidcConfig, refresh, roleHome, SESSION_COOKIE, seal, unseal, type Session } from "@ac/web/lib/session";
+import { clearedCookieOptions, cookieOptions, needsRefresh, oidcConfig, refresh, roleHome, SESSION_COOKIE, seal, unseal, type Session } from "@ac/web/lib/session";
 import { contentSecurityPolicy, HSTS, newNonce, originOf } from "@ac/web/lib/securityHeaders";
 
 const sharedAreas = ["/notifications", "/settings"]; // shared pages that need a session but no particular role
@@ -42,7 +42,7 @@ export async function authProxy(req: NextRequest, appRole: Session["role"]) {
     }
     const res = NextResponse.next({ request: { headers } });
     if (renewed) res.cookies.set(SESSION_COOKIE, renewed, cookieOptions());
-    else if (renewed === null) res.cookies.delete(SESSION_COOKIE);
+    else if (renewed === null) res.cookies.set(SESSION_COOKIE, "", clearedCookieOptions());
     return secure(res);
   };
   const path = req.nextUrl.pathname;

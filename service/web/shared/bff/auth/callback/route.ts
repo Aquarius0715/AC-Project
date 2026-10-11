@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { APP_ROLE, cookieOptions, OIDC_COOKIE, oidcConfig, roleHome, SESSION_COOKIE, sessionFromTokens, seal, unseal } from "@ac/web/lib/session";
+import { APP_ROLE, cookieOptions, OIDC_COOKIE, oidcConfig, oidcCookieOptions, roleHome, SESSION_COOKIE, sessionFromTokens, seal, unseal } from "@ac/web/lib/session";
 
 type Pending = { state: string; verifier: string; returnTo: string | null };
 
@@ -26,6 +26,6 @@ export async function GET(req: NextRequest) {
   if (session.role !== APP_ROLE) return NextResponse.redirect(new URL("/login?error=role", cfg.appUrl)); // another role's app
   const res = NextResponse.redirect(new URL(pending.returnTo ?? roleHome[session.role], cfg.appUrl));
   res.cookies.set(SESSION_COOKIE, seal(session), cookieOptions());
-  res.cookies.delete({ name: OIDC_COOKIE, path: "/bff/auth" });
+  res.cookies.set(OIDC_COOKIE, "", oidcCookieOptions(0));
   return res;
 }

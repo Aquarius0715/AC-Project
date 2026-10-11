@@ -35,6 +35,20 @@ describe("POST /bff/auth/logout", () => {
     for (const res of [await signOut(), await signOut("forged"), await signOut(seal({ ...session, refreshToken: null }))]) expect([res.status, dropped(res)]).toEqual([303, true]);
     expect(fetch).not.toHaveBeenCalled();
   });
+  it("on https drops the __Host- session cookie with Secure and Path=/, as a browser requires (IR374)", async () => {
+    vi.stubEnv("APP_URL", "https://ac.example.com");
+    vi.stubEnv("SESSION_SECRET", "test-".padEnd(32, "s"));
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })));
+    vi.resetModules();
+    const { POST: post } = await import("@ac/web/bff/auth/logout/route");
+    const s = await import("@ac/web/lib/session");
+    const res = await post(new NextRequest("https://ac.example.com/bff/auth/logout", {
+      method: "POST", headers: { cookie: `${s.SESSION_COOKIE}=${s.seal(session)}`, origin: "https://ac.example.com", host: "ac.example.com", "sec-fetch-site": "same-origin" },
+    }));
+    const set = res.headers.get("set-cookie") ?? "";
+    expect([res.status, set.startsWith("__Host-ac_session_client=;"), /;\s*Secure/i.test(set), /;\s*Path=\/(;|$)/.test(set), /Max-Age=0/.test(set)]).toEqual([303, true, true, true, true]);
+    vi.resetModules();
+  });
   it("refuses a sign-out another site posts (CSRF, IR358)", async () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);

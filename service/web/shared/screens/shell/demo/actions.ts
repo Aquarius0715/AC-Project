@@ -8,7 +8,7 @@ import { refresh } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { coreClockFresh, coreOp, CoreError } from "@ac/web/lib/dal";
-import { SESSION_COOKIE } from "@ac/web/lib/session";
+import { clearedCookieOptions, SESSION_COOKIE } from "@ac/web/lib/session";
 import { advanceTarget, nextSequence, openFault, type ApiDevice, type ApiDeviceEvent } from "@ac/web/lib/demoPanel";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 
@@ -60,6 +60,6 @@ export async function deviceSignal(deviceId: string, restore: boolean) {
 
 /** Ends this app's session as if it had expired (D09): the next page asks to sign in again. */
 export async function expireSession() {
-  (await cookies()).delete(SESSION_COOKIE);
+  (await cookies()).set(SESSION_COOKIE, "", clearedCookieOptions());
   redirect("/login?error=expired");
 }

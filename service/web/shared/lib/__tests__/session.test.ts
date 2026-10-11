@@ -178,11 +178,30 @@ describe("reading the session in a route handler", () => {
     jar.get.mockReturnValue({ value: seal(session({ expiresAt: NOW / 1000 + 10 })) });
     vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 401 })));
     expect(await readSession()).toBeNull();
-    expect(jar.delete).toHaveBeenCalledWith(SESSION_COOKIE);
+    expect(jar.set).toHaveBeenCalledWith(SESSION_COOKIE, "", expect.objectContaining({ path: "/", maxAge: 0 })); // removed with the attributes it was set with (IR374)
     jar.get.mockReturnValue(undefined);
     expect(await readSession()).toBeNull();
     jar.get.mockReturnValue({ value: `${b64(session())}.forged` });
     expect(await readSession()).toBeNull();
+  });
+});
+
+describe("the cookie names (IR374)", () => {
+  it("carry __Host- / __Secure- on https, so only this host sets them, and are removed with the attributes they were set with", async () => {
+    vi.stubEnv("APP_URL", "https://ac.example.com");
+    vi.stubEnv("SESSION_SECRET", "test-".padEnd(32, "s"));
+    vi.resetModules();
+    const https = await import("@ac/web/lib/session");
+    expect([https.SESSION_COOKIE, https.OIDC_COOKIE]).toEqual(["__Host-ac_session_client", "__Secure-ac_oidc_client"]);
+    // a __Host- cookie must be Secure, on Path=/ and without a Domain; a deletion needs the same
+    expect(https.cookieOptions()).toMatchObject({ secure: true, path: "/" });
+    expect(https.cookieOptions()).not.toHaveProperty("domain");
+    expect(https.clearedCookieOptions()).toMatchObject({ secure: true, path: "/", maxAge: 0 });
+    expect(https.oidcCookieOptions()).toMatchObject({ secure: true, path: "/bff/auth", maxAge: 600 });
+    vi.unstubAllEnvs();
+    vi.resetModules();
+    const local = await import("@ac/web/lib/session");
+    expect([local.SESSION_COOKIE, local.OIDC_COOKIE, local.clearedCookieOptions().secure]).toEqual(["ac_session_client", "ac_oidc_client", false]);
   });
 });
 

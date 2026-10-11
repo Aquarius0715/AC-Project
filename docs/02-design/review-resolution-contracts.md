@@ -5583,3 +5583,16 @@ The tenth security check reviewed the containers: images, privileges, and what t
    - **The containers kept the default Linux capabilities.** Our own images (the four web apps, the domain services, the workers, the gateway and the migration job) run as non-root on ports above 1024 and need none. They now drop all of them (`cap_drop: [ALL]`), and the production task settings say the same (`linuxParameters.capabilities.drop`). A running container shows `CapDrop ["ALL"]`. The gateway and the services stay healthy, and a web container still serves `/login` and `/customer`.
    - **Two images floated on `:latest`.** `stripe/stripe-mock` and `stripe/stripe-cli` are now pinned to the release their `latest` pointed to, by tag and digest: v0.206.0, the image already pulled, and v1.53.1. The other third-party images name a release series.
 3. **Checks.** The Compose file validates. The stack runs recreated with the new settings: PostgreSQL with its volume, Keycloak re-imported, and the services after it. The E2E suite passes on it.
+
+## IR374 Cookie prefixes on https, and cookies removed with the attributes they were set with — 2026-10-11
+
+The second security cycle starts with the follow-up of IR367: cookie names that a sibling subdomain cannot set or shadow.
+
+1. **Why.** In production the apps live on their own hosts under one domain (for example `admin.<domain>`). A cookie set by another host of that domain for the parent domain is sent to every host, and a plain name such as `ac_session_admin` does not tell the server where it came from. A sibling host could therefore plant a session or sign-in state (cookie tossing). The `__Host-` prefix makes the browser accept a cookie only if it is Secure, on `Path=/` and has no Domain, which is to say set by this host alone. `__Secure-` needs Secure.
+2. **Change.**
+   - On https the session cookie is now `__Host-ac_session_<role>` and the sign-in state cookie (`Path=/bff/auth`) is `__Secure-ac_oidc_<role>`. Plain-http local runs keep the plain names, so the local stack and the E2E suite are unchanged.
+   - **Removal needed a change too.** `cookies.delete(name)` sends neither the Secure flag nor the path, and a browser ignores a deletion of a `__Host-` cookie that lacks them. Sign-out would then leave the session cookie in place. Each of the five removals now sends the attributes the cookie was set with, plus `Max-Age=0` (`clearedCookieOptions`, `oidcCookieOptions(0)`). The five are sign-out, a failed refresh in the proxy and in `readSession`, the callback's sign-in state, and Expire session.
+3. **Tests.**
+   - The session test reads the names on https (`__Host-` / `__Secure-`) and on http (plain), and checks the attributes of setting and of removing.
+   - The sign-out test, on https, requires the response to remove `__Host-ac_session_client` with Secure, `Path=/` and `Max-Age=0`. With the old `cookies.delete` it fails: no Secure and no `Max-Age`, so the browser would keep the session cookie.
+4. **Checks.** The web checks (407 unit tests, the build) and the E2E suite pass. On http, its sign-out and Expire session tests run the new removal.
