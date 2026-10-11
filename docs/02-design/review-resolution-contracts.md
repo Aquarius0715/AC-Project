@@ -5268,3 +5268,23 @@ Backend architecture §6 says sign-out revokes the server session and the IdP re
 4. **Tests.**
    - Web unit: the logout call (endpoint, body, time limit, refusal and network failure). The route ends the provider's session with the session's refresh token and returns 303 to `/login` with the cookie dropped. It still signs out when the provider is down, and calls nothing without a session.
    - E2E `shared/session` (each app): "Sign out ends the session, at the identity provider too" signs in a context of its own, signs out, and starts the sign-in again. The provider asks for the password instead of coming back. Against the build without the fix, this test failed.
+
+## IR358 The BFF's POST routes refuse other sites (CSRF), and the apps' browser code relays reads only — 2026-10-11
+
+Backend architecture §6 asks for CSRF protection on all BFF write routes. Since IR176, the web writes through Server Actions, which Next.js protects by comparing `Origin` with the host. Two BFF routes had no such check: the operation relay `POST /bff/ops/<operation>`, which relays any operation with the session's token, and `POST /bff/auth/logout`. The SameSite=Lax cookie keeps another site's requests unauthenticated, but another site could still post a sign-out. The demo's partner history component also kept an unused branch that sent a write through the relay (`jobsApi.addNote`); it never runs, because demo mode answers 503.
+
+1. **Same-origin requests.** `sameOriginRequest` checks the headers the way Next.js checks Server Actions:
+   - it refuses a `Sec-Fetch-Site` other than `same-origin` or `none`;
+   - it refuses an `Origin` whose host is not the request's host (`X-Forwarded-Host` behind the edge);
+   - a request with neither header does not come from a browser page, carries no victim's cookie, and passes.
+   The relay answers a refused request 403 FORBIDDEN `errors.cross_site_request`, before the Core API is called. The sign-out route answers 403 and keeps the session.
+2. **Reads from the apps.** `make gen` adds `coreWrites` to `routes.gen.ts`: the operations whose catalog mode is write (119 of 202). A contract test checks that every literal `callOp` / `useOp` call of the apps names a read (17 calls). The apps' writes are Server Actions. `shared/lib/jobsApi.ts` and the demo's unused write branch are removed.
+3. **Writes through the relay stay possible** for same-origin callers. The E2E suite's restore helpers delete what a failed test left, for example `policies.delete` in `admin/alert-policies` and `admin/automation`. A runtime refusal of writes was tried and dropped: it broke those restores without protecting anything that the same-origin check and the Core API's authorization do not already protect.
+4. **Unchanged.** The relay's reads: the QR scan, the assistant, command progress, the dialogs' candidate lists, `useOp`. Server Actions. The GET routes of sign-in and its callback, which `state` and PKCE protect.
+5. **Tests.**
+   - Web unit:
+     - the same-origin rule: an own page, behind the edge, no Origin, a typed address pass; another site, another app of the same site, a foreign Origin, `null` are refused;
+     - the relay: a read relayed to its route; another site's read and write refused without a Core API call;
+     - the sign-out route: a cross-site sign-out refused, with the session kept.
+   - Contract test: every literal `callOp` / `useOp` operation of the apps is a read.
+   - E2E `shared/security-headers` (each app): a same-origin read is served. Another site's read, write and sign-out are refused, and the user stays signed in.

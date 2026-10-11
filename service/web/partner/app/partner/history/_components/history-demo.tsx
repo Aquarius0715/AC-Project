@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { Btn, Card, Choice, Field, Page, Select, Tabs, Textarea, Timeline, useToast } from "@ac/web/components/ui";
 import { useOp } from "@ac/web/lib/useOp";
-import { jobsApi } from "@ac/web/lib/jobsApi";
-import { OpError } from "@ac/web/lib/ops";
 import { jobEventTitle } from "@ac/web/lib/partnerOverview";
 
 // DATA_SOURCE=api: the company's jobs (offer / summary / history projections, IR23) and their events (jobs.events)
@@ -55,14 +53,6 @@ export function HistoryDemo() {
   const evs = useOp<{ items: ApiEvent[] }, Ev[] | null>("jobs.events", { jobId: api ? job : "", query: { limit: 100, sort: { field: "occurredAt", direction: "desc" } } }, null, (p) => p.items.map(eventRow), !!sel);
   const all: Ev[] = api ? (sel ? (evs.data ?? []) : []) : events;
   const shown = all.filter((e) => f === "all" || (f === "customer" ? e.c : !e.c));
-  const saveApi = async () => {
-    try {
-      await jobsApi.addNote(job, msg.trim(), vis);
-      toast("Note saved");
-    } catch (e) {
-      toast(e instanceof OpError ? `Not saved: ${e.error.code}` : "Not saved", "warn");
-    }
-  };
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2"><Select aria-label="Job" className="max-w-xs" value={job} onChange={(e) => setJob(e.target.value)}><option value="">Select a job…</option>{api ? jobs.data?.map((j) => <option key={j.id} value={j.id}>{j.label}</option>) : <><option value="job-p03">job-p03 · Office AC</option><option value="job-p04">job-p04 · Meeting room AC</option></>}</Select></div>
@@ -81,7 +71,7 @@ export function HistoryDemo() {
                   <Field label="Visibility"><Choice value={vis} onChange={setVis} options={[{ id: "internal", label: "Internal (default)" }, { id: "customer", label: "Customer-visible" }]} /></Field>
                   <Field label="Recipient role"><Select value={role} onChange={(e) => setRole(e.target.value)}><option value="hq">hq</option><option value="technician">technician</option><option value="customer">customer</option></Select></Field>
                   <Field label="Message (1–2000 chars)" error={tried && !msg.trim() ? "Message is required" : undefined}><Textarea value={msg} onChange={(e) => setMsg(e.target.value)} /></Field>
-                  <Btn variant="primary" disabled={api && sel?.projection === "history"} onClick={() => { setTried(true); if (!msg.trim()) return; if (api) return void saveApi(); setPreviews((p) => [{ k: `schedule_change → ${role}`, d: `in-app · preview · ${vis} · just now` }, ...p]); toast("Note saved + preview created"); }}>Save note & create preview</Btn>
+                  <Btn variant="primary" disabled={api && sel?.projection === "history"} onClick={() => { setTried(true); if (!msg.trim()) return; setPreviews((p) => [{ k: `schedule_change → ${role}`, d: `in-app · preview · ${vis} · just now` }, ...p]); toast("Note saved + preview created"); }}>Save note & create preview</Btn>
                   <p className="text-[11px] text-muted">No real sending. Free-form external recipients and other-job recipients are rejected. Internal notes stay hidden from customers.</p>
                 </div>
               </Card>

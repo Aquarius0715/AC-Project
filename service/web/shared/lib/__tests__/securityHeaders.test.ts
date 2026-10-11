@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { contentSecurityPolicy, HSTS, newNonce, originOf } from "@ac/web/lib/securityHeaders";
+import { contentSecurityPolicy, HSTS, newNonce, originOf, sameOriginRequest } from "@ac/web/lib/securityHeaders";
 import { authProxy } from "@ac/web/proxy";
 
 // the proxy reads the session module, which is server code
@@ -61,5 +61,26 @@ describe("the proxy's security headers", () => {
     const open = await authProxy(new NextRequest("http://app.internal:3000/login", { headers: { "x-forwarded-proto": "https" } }), "client");
     expect(open.headers.get("strict-transport-security")).toBe(HSTS);
     expect(cspOf(open.headers)).toContain("upgrade-insecure-requests");
+  });
+});
+
+// IR358: the BFF's POST routes take requests from the app's own pages only (CSRF)
+describe("a same-origin request", () => {
+  const h = (o: Record<string, string>) => new Headers(o);
+  it("passes from the app's pages and from clients that are not browser pages", () => {
+    expect([
+      sameOriginRequest(h({ origin: "http://localhost:3000", host: "localhost:3000", "sec-fetch-site": "same-origin" })),
+      sameOriginRequest(h({ origin: "https://app.example.com", host: "app.internal:3000", "x-forwarded-host": "app.example.com" })), // behind the edge
+      sameOriginRequest(h({ host: "localhost:3000" })), // no Origin: not a browser page
+      sameOriginRequest(h({ "sec-fetch-site": "none", host: "localhost:3000" })), // typed in the address bar
+    ]).toEqual([true, true, true, true]);
+  });
+  it("refuses another site, another host or a broken Origin", () => {
+    expect([
+      sameOriginRequest(h({ "sec-fetch-site": "cross-site", host: "localhost:3000" })),
+      sameOriginRequest(h({ "sec-fetch-site": "same-site", origin: "http://localhost:3001", host: "localhost:3000" })), // another app of the same site
+      sameOriginRequest(h({ origin: "https://evil.example", host: "localhost:3000" })),
+      sameOriginRequest(h({ origin: "null", host: "localhost:3000" })),
+    ]).toEqual([false, false, false, false]);
   });
 });

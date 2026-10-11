@@ -4,6 +4,7 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
+import { coreWrites } from "@ac/web/lib/routes.gen";
 
 // The web's calls against the Core API contract (IR312): every coreOp / callOp / coreAll call with a literal operation
 // and an object literal input may use only the input fields of OperationContracts[op] (docs/02-design/
@@ -120,3 +121,25 @@ describe("the web's calls against the Core API contract (IR312)", () => {
     expect(calls).toBeGreaterThan(300); // the scan sees the calls
   });
 });
+
+// IR358: the browser reaches the Core API through the BFF relay for reads only; its writes are Server Actions
+describe("the browser's calls through the BFF relay", () => {
+  it("name read operations only", () => {
+    const problems: string[] = [];
+    let calls = 0;
+    for (const f of sources()) {
+      const sf = ts.createSourceFile(f, readFileSync(f, "utf8"), ts.ScriptTarget.Latest, true, f.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+      const visit = (n: ts.Node) => {
+        if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && ["callOp", "useOp"].includes(n.expression.text) && n.arguments[0] && ts.isStringLiteral(n.arguments[0])) {
+          calls++;
+          if (coreWrites.has(n.arguments[0].text)) problems.push(`${relative(web, f)}:${sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1} ${n.arguments[0].text}`);
+        }
+        ts.forEachChild(n, visit);
+      };
+      visit(sf);
+    }
+    expect(problems, "writes sent through the relay").toEqual([]);
+    expect(calls).toBeGreaterThan(10); // the scan sees the relay's calls (17 in R350)
+  });
+});
+

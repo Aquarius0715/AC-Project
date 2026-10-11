@@ -13,7 +13,7 @@ afterEach(() => {
 });
 
 const session: Session = { accessToken: "a.b.c", refreshToken: "r-1", tenantId: "t-1", membershipId: "m-1", role: "client", expiresAt: 9_999_999_999 };
-const signOut = (cookie?: string) => POST(new NextRequest("http://localhost:3000/bff/auth/logout", { method: "POST", headers: cookie ? { cookie: `${SESSION_COOKIE}=${cookie}` } : {} }));
+const signOut = (cookie?: string, extra: Record<string, string> = {}) => POST(new NextRequest("http://localhost:3000/bff/auth/logout", { method: "POST", headers: { ...(cookie ? { cookie: `${SESSION_COOKIE}=${cookie}` } : {}), ...extra } }));
 const dropped = (res: Response) => (res.headers.get("set-cookie") ?? "").startsWith(`${SESSION_COOKIE}=;`);
 
 // IR357: sign-out ends the identity provider's session of the sign-in, then drops the BFF session
@@ -33,6 +33,13 @@ describe("POST /bff/auth/logout", () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
     for (const res of [await signOut(), await signOut("forged"), await signOut(seal({ ...session, refreshToken: null }))]) expect([res.status, dropped(res)]).toEqual([303, true]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("refuses a sign-out another site posts (CSRF, IR358)", async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    const res = await signOut(seal(session), { origin: "https://evil.example", "sec-fetch-site": "cross-site" });
+    expect([res.status, dropped(res)]).toEqual([403, false]);
     expect(fetch).not.toHaveBeenCalled();
   });
 });

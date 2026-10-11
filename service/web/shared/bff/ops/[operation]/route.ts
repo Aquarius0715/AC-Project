@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readSession } from "@ac/web/lib/session";
 import { coreRequest } from "@ac/web/lib/rest";
+import { sameOriginRequest } from "@ac/web/lib/securityHeaders";
 
 const OP = /^[a-zA-Z]+(\.[a-zA-Z]+)+$/;
 
@@ -10,8 +11,11 @@ function domainError(status: number, code: string, messageKey: string) {
 
 // POST /bff/ops/<operation>: relays one operation call of the browser (its JSON input) to the operation's REST route
 // of the Core API (IR222) with the session token and the selected tenant / membership (backend architecture §5,
-// §15). DomainError bodies and status codes pass through unchanged.
+// §15). DomainError bodies and status codes pass through unchanged. Only the app's own pages may call it (CSRF, as
+// Next.js protects Server Actions, IR358). The apps send it reads only — their writes are Server Actions, which a
+// contract test checks (coreWrites); the E2E suite's restore helpers send writes through it.
 export async function POST(req: NextRequest, ctx: { params: Promise<{ operation: string }> }) {
+  if (!sameOriginRequest(req.headers)) return domainError(403, "FORBIDDEN", "errors.cross_site_request");
   if (process.env.DATA_SOURCE !== "api") return domainError(503, "UNAVAILABLE", "errors.api_data_source_disabled");
   const { operation } = await ctx.params;
   if (!OP.test(operation)) return domainError(404, "NOT_FOUND", "error.unknownOperation");

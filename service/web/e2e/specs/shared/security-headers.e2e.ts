@@ -21,3 +21,20 @@ test("pages carry the CSP with a fresh nonce and the static security headers", a
   expect(css, "the app's stylesheet").toBeTruthy();
   expect((await page.request.get(css!)).headers()["x-content-type-options"]).toBe("nosniff");
 });
+
+// IR358: the BFF's POST routes serve the app's own pages only (CSRF): another site's read, write or sign-out is refused.
+// The refused sign-out comes last: if it ever went through, it would end this project's shared session.
+test("the BFF takes requests from the app's own pages only", async ({ page, app }) => {
+  await page.goto(app.home);
+  const read = await page.request.post("/bff/ops/notifications.list", { data: { limit: 1 }, headers: { origin: app.url } });
+  expect(read.status()).toBe(200);
+  const evil = { origin: "https://evil.example" };
+  const cross = await page.request.post("/bff/ops/notifications.list", { data: { limit: 1 }, headers: evil });
+  expect([cross.status(), (await cross.json()).messageKey]).toEqual([403, "errors.cross_site_request"]);
+  const write = await page.request.post("/bff/ops/jobs.cancel", { data: { jobId: "00000000-0000-4000-8000-000000000000", cancelReason: "x" }, headers: evil });
+  expect([write.status(), (await write.json()).messageKey]).toEqual([403, "errors.cross_site_request"]);
+  const signOut = await page.request.post("/bff/auth/logout", { headers: { origin: "https://evil.example" }, maxRedirects: 0 });
+  expect(signOut.status()).toBe(403);
+  await page.goto(app.home);
+  await expect(page).not.toHaveURL(/\/login/); // still signed in
+});

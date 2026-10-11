@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND
-version: 0.41.0
+version: 0.42.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -138,7 +138,7 @@ Cross-module rules that the modules must keep:
 
 | Topic | Design |
 |---|---|
-| Sign-in | OIDC authorization code flow with PKCE against Amazon Cognito, performed by the BFF. Tokens stay on the server; the browser holds only an httpOnly, Secure, SameSite=Lax session cookie. As built (IR333) the cookie itself carries the tokens, sealed with AES-256-GCM so that only the BFF can read them; the server-side store with revocation on sign-out is OPEN-CT-03 of the container design. CSRF protection on all BFF write routes. The Core API records the access token's `auth_time` as the user's last sign-in (IR268). |
+| Sign-in | OIDC authorization code flow with PKCE against Amazon Cognito, performed by the BFF. Tokens stay on the server; the browser holds only an httpOnly, Secure, SameSite=Lax session cookie. As built (IR333) the cookie itself carries the tokens, sealed with AES-256-GCM so that only the BFF can read them; the server-side store with revocation on sign-out is OPEN-CT-03 of the container design. CSRF protection on all BFF write routes. The Core API records the access token's `auth_time` as the user's last sign-in (IR268). As built (IR358): the BFF's POST routes take requests only from the app's own pages: `Sec-Fetch-Site` and the `Origin` host are checked, as Next.js checks Server Actions. The apps send the operation relay `/bff/ops` reads only; their writes are Server Actions. |
 | Session lifetime | Idle lifetime 30 minutes with a warning 120 seconds before expiry and explicit extend (same behaviour as IR55); absolute lifetime 12 hours (PROPOSED). Sign-out revokes the server session and IdP refresh token. As built (IR357): sign-out ends the identity provider's session of the sign-in through Keycloak's back-channel logout, with the session's refresh token. A copied session cookie can no longer be refreshed; its access token lasts until it expires (5 minutes in the local realm). The server-side session store stays OPEN-CT-03. |
 | Two-step verification | TOTP in Amazon Cognito (FR-X08 becomes real). Required for every HQ user (PROPOSED). |
 | HQ network restriction | HQ users (role admin) sign in and work only through `admin.<domain>`, which AWS WAF allows only from the company network (office egress addresses and the company VPN). The BFF issues an admin session only on that host and marks it `channel=hq-network`; the Core API rejects admin-role operations without that mark (FORBIDDEN, shared Page unavailable). `/admin` routes on `app.<domain>` return the shared Page unavailable view. Contractors, technicians, and clients are not restricted. |
@@ -316,4 +316,4 @@ Items of the table above that are not scheduled yet:
 | OPEN-BE-07 | Contractor payout rail (bank transfer file or Stripe Connect) | Payouts (FR-A23) |
 | OPEN-BE-08 | The scheduled items that are not built yet (§10 as built): the monthly energy report e-mail waits for a decision. Several instances per domain are decided: the advisory lock per domain and tenant (IR356) | Scheduler, worker |
 
-Additional contracts for current version 0.41.0: Read IR01–IR357 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.42.0: Read IR01–IR358 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

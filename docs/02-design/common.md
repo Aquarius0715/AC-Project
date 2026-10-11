@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.108.0
+version: 0.109.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -38,7 +38,7 @@ service/web/
 **Data in API mode (`DATA_SOURCE=api`).**
 - Reads: a route's `page.tsx` is a Server Component. It reads through `lib/dal.ts`, which is `server-only`: the session comes from the app's sealed cookie (AES-256-GCM, IR333), and each operation goes to its Core API REST route; its input is typed by the contract (IR313). The page passes plain rows to Client Components. Mapping DTOs to view rows is done by pure functions in `shared/lib`.
 - Writes: Server Actions in `actions.ts` next to the route. Each one checks its input, calls the operation with the row version (`X-Expected-Version`) and an Idempotency-Key, and calls `refresh()` so the route renders again. Field errors return to the form.
-- Interactive reads: reads that follow a gesture, such as the technician's QR scan, go through the BFF Route Handler `/bff/ops/<operation>`.
+- Interactive reads: reads that follow a gesture, such as the technician's QR scan, go through the BFF Route Handler `/bff/ops/<operation>`. It takes requests from the app's own pages only: another site's request is refused (FORBIDDEN, CSRF, IR358). The apps send it reads only; a contract test checks every browser call against `coreWrites`, which is generated from the catalog's mode.
 - The browser never calls the Core API.
 
 **Security headers (IR354).** Every response carries nosniff, a referrer policy and `X-Frame-Options: DENY` (each app's `next.config.ts`). Every page also carries a Content-Security-Policy with a fresh nonce from `proxy.ts`, which Next.js puts on its scripts and styles. Pages therefore render per request: the root layout awaits `connection()`. HSTS is added over HTTPS.
@@ -262,4 +262,4 @@ API paths, HTTP methods, databases, server authentication and authorization, rea
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.108.0: Read IR01–IR355 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.109.0: Read IR01–IR358 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
