@@ -29,6 +29,20 @@ describe("coreRequest", () => {
     expect(query(r.path)).toEqual({ pathname: "/v1/jobs", out: { status: ["open"], unitIds: ["u1", "u2"], overdueOnly: ["false"], statuses: [""], sort: ["dueAt:asc"], limit: ["50"] } });
   });
 
+  it("names no route when a path parameter is a dot segment (IR372)", () => {
+    // fetch resolves "." and ".." (and %2E forms) in a URL path, which would send the call to another path
+    expect(new URL("http://core/v1/jobs/../reports/r1/attachments/a1/content").pathname).toBe("/v1/reports/r1/attachments/a1/content");
+    for (const v of [".", ".."]) {
+      expect(coreRequest("units.get", { id: v })).toBeNull();
+      expect(coreRequest("attachments.getContent", { jobId: v, reportId: "r1", reportVersion: 1, attachmentId: "a1" })).toBeNull();
+      expect(coreRequest("summaries.get", { kind: v, filters: {} })).toBeNull();
+    }
+    // dots inside a value stay one encoded segment
+    expect(coreRequest("units.get", { id: "../x" })!.path).toBe("/v1/units/..%2Fx");
+    expect(coreRequest("units.get", { id: "%2e%2e" })!.path).toBe("/v1/units/%252e%252e");
+    expect(new URL(`http://core${coreRequest("units.get", { id: "...", jobId: "j1" })!.path}`).pathname).toBe("/v1/units/...");
+  });
+
   it("fills and encodes path parameters and keeps the other fields in the query", () => {
     expect(coreRequest("units.get", { id: "a/b c", jobId: "j1" })).toEqual({ method: "GET", path: "/v1/units/a%2Fb%20c?jobId=j1" });
     expect(coreRequest("session.get", undefined)).toEqual({ method: "GET", path: "/v1/session" });

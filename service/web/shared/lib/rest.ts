@@ -74,7 +74,13 @@ export function coreRequest(operation: string, input: unknown): CoreRequest | nu
   const rest: Json = isObject(input) ? structuredClone(input) : {};
   const route = pick(routes, rest);
   let path = route.path;
-  for (const name of pathParams(route.path)) path = path.replace(`{${name}}`, encodeURIComponent(text(take(rest, name.split(".")))));
+  for (const name of pathParams(route.path)) {
+    const value = text(take(rest, name.split(".")));
+    // a path parameter is one whole segment: "." and ".." would turn the URL into another path once fetch resolves the
+    // dot segments (encodeURIComponent keeps dots, and %2E is resolved as a dot too), so they name no route (IR372)
+    if (value === "." || value === "..") return null;
+    path = path.replace(`{${name}}`, encodeURIComponent(value));
+  }
   if (route.fixed && text(rest[route.fixed[0]]) === route.fixed[1]) delete rest[route.fixed[0]];
   if (route.method === "GET" || route.method === "DELETE") {
     const q = new URLSearchParams();

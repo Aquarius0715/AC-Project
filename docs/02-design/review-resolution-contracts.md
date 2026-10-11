@@ -5547,3 +5547,18 @@ The eighth security check reviewed cross-site scripting: where content from user
    - **A strict policy.** `/docs` sends a policy that runs only that pinned file and its own script, connects only to its origin, and lets no one frame it. It also sends `nosniff` and `no-referrer`.
 3. **Tests.** `TestServesTheAPIDescription` requires the pinned files with their hashes, no floating version, no inline script, and the policy, and it reads `/docs/init.js`. In a headless browser, Swagger UI renders the API description under the policy with no console error, the same with the policy bypassed.
 4. **Checks.** `make test-all` and the E2E suite pass.
+
+## IR372 Server-side request forgery: where the servers send requests, and the path a request takes — 2026-10-11
+
+The ninth security check reviewed server-side request forgery (SSRF): can a client make the BFF or the Core API send a request to a target it chooses?
+
+1. **Checked and in order.**
+   - **Every outbound request of the BFF goes to a configured address.** That is the Core API (`CORE_API_URL`, in the relay, the DAL and the session read) and the identity provider's token and logout endpoints (`OIDC_INTERNAL_ISSUER`).
+   - **The Go code has two HTTP clients, both to configured internal addresses:** identity-api's principal endpoint and the service queries between domain services. The gateway proxies to configured targets. E-mail and WhatsApp are previews (IR111), and weather is evaluation input, not a fetch.
+   - **No contract field carries a URL,** so no request names a target (IR371).
+   - **Next.js fetches nothing for a request.** The apps configure no `images.remotePatterns` (the image optimizer serves local images only), no rewrites to other hosts, and no `next/image`.
+2. **Finding and fix: dot segments in path parameters.** `coreRequest` builds a Core API path from the route and the input. It encoded each path parameter with `encodeURIComponent`, which keeps dots. A parameter `.` or `..` therefore became a dot segment, and `fetch` resolves dot segments, so the call went to another path than the operation's route. For example, `attachments.getContent` with the job ID `..` reads `/v1/reports/…`. `%2E` forms resolve the same way, so encoding the dots would not help.
+   - The host stays the configured one. The gateway routes only the catalog's paths, so the internal endpoints are out of reach. A caller can already call any operation with their own session, so the traversal gave no privilege.
+   - Still, such a value is never valid input, and a link could steer a page's read to another path. A path parameter `.` or `..` now names no route: the relay answers `error.unknownOperation`, and a page gets NOT_FOUND as for a missing record. A value with dots inside (`../x`, `...`, `%2e%2e`) stays one encoded segment, as before.
+3. **Tests.** The `coreRequest` test shows that `fetch` resolves the dot segments. It refuses `.` and `..` in `units.get`, `attachments.getContent` and `summaries.get`, and keeps dotted values as one segment. Without the fix it fails.
+4. **Checks.** The web checks (405 unit tests, the build) and the E2E suite pass.
