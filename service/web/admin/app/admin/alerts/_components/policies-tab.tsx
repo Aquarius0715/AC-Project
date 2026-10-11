@@ -1,28 +1,28 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, LineChart, ListRow, Modal, SearchSelect, Select, SeverityBadge, TextLink, Toggle, useToast, cx } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, SearchSelect, Select, SeverityBadge, TextLink, Toggle, useToast, cx } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { useOp } from "@ac/web/lib/useOp";
 import { ZONES } from "@ac/web/lib/preferences";
-import { windowText } from "@ac/web/lib/customerPolicies";
 import {
-  HQ_METRICS, metricLabel, newPolicyDraft, opSymbol, policyChanges, policyErrors, recipientRole,
-  type AdminPolicy, type ApiRecipient, type Channel, type Operator, type PolicyRecipient,
+  newPolicyDraft, policyChanges, policyErrors, recipientRole,
+  type AdminPolicy, type ApiRecipient, type Channel, type DefaultRule, type PolicyRecipient,
 } from "@ac/web/lib/adminAlerts";
 import { deletePolicy, savePolicy } from "../actions";
+import { DefaultPolicyEditor } from "./default-policy";
+import { ConditionFields, WindowEditor } from "./policy-parts";
 
-/** API mode: the selected policy (`policyId`) or the owner customer of a new one (`new`) from the URL (DD-A05 items 5
- * and 8), whether the session may write policies, the display time zone a new one starts in, the active customers that
- * may own one, and each customer's units (notifications.recipients lists a policy's recipients for one of them). */
+/** API mode: the selected policy (`policyId`) or the owner customer of a new one (`new`, copied from the default rule
+ * `from`) from the URL (DD-A05 items 5, 8 and 9), whether the session may write policies, the display time zone a new
+ * one starts in, the active customers that may own one, and each customer's units (notifications.recipients lists a
+ * policy's recipients for one of them). */
 export type PoliciesLive = {
-  policyId: string | null; newFor: string | null; canWrite: boolean; timezone: string;
+  policyId: string | null; newFor: string | null; from: string | null; canWrite: boolean; timezone: string;
   customers: { id: string; name: string }[]; units: { id: string; customerId: string | null }[];
 };
 
-const OPERATORS: Operator[] = ["gte", "gt", "lte", "lt"];
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const CHANNEL: Record<Channel, string> = { inApp: "In-app", email: "Email", whatsapp: "WhatsApp" };
 // the Phase 1A demo's policies, customer and recipients (their data stays English, as the other demo screens)
 const demoRecipients: PolicyRecipient[] = [{ id: "customer-a", label: "customer-a", role: "client" }, { id: "hq-operator", label: "hq-operator", role: "HQ" }];
@@ -30,9 +30,20 @@ const demoPolicy = (id: string, name: string, sub: string, metric: string, thres
   id, version: 1, kind: "alert", name, group: "CUSTOMER-A", sub, on, units: units.length === 1 ? "1 unit" : `${units.length} units`, customerId: "customer-a", customerName: "customer-a",
   priority: 50, timezone: "Asia/Kuala_Lumpur", metric, operator: "gte", threshold, recovery, duration, severity: "warning", cooldown: 5, escalate: 60, channels: ["inApp", "email"],
   recipients: demoRecipients, activeWindow: null, madeBy: "hq-operator", unitIds: units, unitNames: units.map((u) => (u === "unit-online-rto" ? "Bedroom AC" : "Bedroom AC #2")),
+  rules: [], settings: [],
 });
+// the six default rules (IR120 item 1) and customer-a's offline rule switched off
+const rule = (ruleKey: string, name: string, category: string, metric: string, operator: DefaultRule["operator"], threshold: number, recovery: number, duration: number, severity: DefaultRule["severity"]): DefaultRule =>
+  ({ ruleKey, name, category, metric, operator, threshold, recovery, duration, severity, activeWindow: null });
+const demoRules: DefaultRule[] = [
+  rule("ventilation_co2", "Ventilation", "air_quality", "co2", "gte", 1000, 900, 600, "warning"), rule("dust_pm25", "Dust / filter", "air_quality", "pm25", "gte", 35, 30, 1800, "warning"),
+  rule("refrigerant_low_pressure", "Refrigerant low pressure", "fault", "refrigerant_pressure", "lte", 350, 380, 120, "critical"),
+  rule("compressor_short_cycling", "Compressor short-cycling", "fault", "compressor_cycles", "gte", 4, 3, 10800, "warning"),
+  rule("clogged_filter", "Clogged filter", "maintenance", "airflow_drop", "gte", 30, 20, 3600, "normal"), rule("ac_offline", "AC offline", "connection", "heartbeat_gap", "gte", 15, 1, 1, "warning"),
+];
 export const seedPolicies: AdminPolicy[] = [
-  { ...demoPolicy("policy-default", "Default policy", "6 rules · ventilation (CO₂, PM2.5) + fault causes", "co2", 1000, 900, 600, true, []), kind: "default_alert", group: "DEFAULT · ON EVERY UNIT", customerId: null, units: "every unit" },
+  { ...demoPolicy("policy-default", "Default policy", "6 rules · ventilation (CO₂, PM2.5) + fault causes", "co2", 1000, 900, 600, true, []), kind: "default_alert", group: "DEFAULT · ON EVERY UNIT", customerId: null, units: "every unit",
+    rules: demoRules, settings: [{ ruleKey: "ac_offline", customerId: "customer-a", enabled: false, version: 1, reason: "Demo: customer switched the offline rule off", by: "hq-operator", at: "2026-09-14T00:00:00Z" }] },
   demoPolicy("policy-temp-a", "Bedroom too hot", "Temperature ≥ 30 °C for 60 s", "temperature", 30, 28, 60, true, ["unit-online-rto", "unit-online-rto-2"]),
   demoPolicy("policy-co2-a", "Stuffy office", "CO₂ ≥ 1200 ppm · 15 min · weekdays", "co2", 1200, 1000, 900, true, ["unit-online-rto", "unit-online-rto-2"]),
   { ...demoPolicy("policy-humidity-a", "Night humidity", "Humidity ≥ 70 % · 30 min · 22–06", "humidity", 70, 65, 1800, false, []), severity: "normal" },
@@ -44,14 +55,19 @@ const demoCandidates: ApiRecipient[] = [
   { id: "hq-operator", role: "admin", displayLabel: "hq-operator", allowedChannels: ["inApp", "email"] },
 ];
 
-/** The selected policy, or the owner customer of a new one: URL state in API mode, local state in the demo. */
-export type PolicySel = { policyId: string | null; newFor: string | null };
+/** The selected policy, or the owner customer of a new one and the default rule it copies: URL state in API mode,
+ * local state in the demo. */
+export type PolicySel = { policyId: string | null; newFor: string | null; from: string | null };
 
 /** The Policies tab (DD-A05 items 7–9, Figma Admin 38:5 / 356:3714, IR345): the policies by customer and the editor of
  * the selected one. A new policy (`sel.newFor`, started by “+ New policy”) starts as DD-A05 says (display time zone,
  * off, priority 50) and is created by Save policy. Recipients are added from notifications.recipients; Delete policy
  * detaches it from every unit. The demo keeps its fixture policies and saves nothing. */
-export function PoliciesTab({ pols, live, sel, select, showOff = true }: { pols: AdminPolicy[]; live?: PoliciesLive; sel: PolicySel; select: (policyId: string | null, newFor?: string | null) => void; showOff?: boolean }) {
+export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, onCopy }: {
+  pols: AdminPolicy[]; live?: PoliciesLive; sel: PolicySel; select: (policyId: string | null, newFor?: string | null) => void; showOff?: boolean;
+  /** the scoped customer a default rule is copied for, else the copy asks for the owner (onCopy) */
+  copyFor: { id: string; name: string } | null; onCopy: (ruleKey: string) => void;
+}) {
   const t = useT();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
@@ -62,9 +78,10 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true }: { pols:
   // says so instead of opening another policy), else the first customer policy
   const owner = sel.newFor ? customers.find((c) => c.id === sel.newFor) ?? null : null;
   const missing = !sel.newFor && !!sel.policyId && !pols.some((x) => x.id === sel.policyId);
-  const p = owner ? newPolicyDraft(owner, live?.timezone ?? "Asia/Kuala_Lumpur")
+  const fromRule = sel.from ? pols.find((x) => x.kind === "default_alert")?.rules.find((r) => r.ruleKey === sel.from) : undefined;
+  const p = owner ? newPolicyDraft(owner, live?.timezone ?? "Asia/Kuala_Lumpur", fromRule)
     : sel.newFor || missing ? null : pols.find((x) => x.id === sel.policyId) ?? pols.find((x) => x.kind === "alert") ?? pols[0] ?? null;
-  const key = owner ? `new:${owner.id}` : p ? `${p.id}@${p.version}` : "";
+  const key = owner ? `new:${owner.id}:${fromRule?.ruleKey ?? ""}` : p ? `${p.id}@${p.version}` : "";
   const [draft, setDraft] = useState<AdminPolicy | null>(p);
   const [draftOf, setDraftOf] = useState(key);
   const [tried, setTried] = useState(false);
@@ -116,8 +133,6 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true }: { pols:
   // Show disabled off hides the disabled policies, but never the one that is open
   const listed = pols.filter((x) => showOff || x.on || (!isNew && x.id === draft?.id));
   const groups = [...new Set([...listed.map((x) => x.group), ...(isNew && draft ? [draft.group] : [])])];
-  const win = draft?.activeWindow ?? null;
-  const setWin = (w: Partial<NonNullable<AdminPolicy["activeWindow"]>>) => win && set("activeWindow", { ...win, ...w });
 
   return (
     <>
@@ -148,11 +163,8 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true }: { pols:
               {t(missing ? "It may have been deleted. Pick a policy in the list." : sel.newFor ? "A new policy needs an active owner customer — start it again with + New policy." : "Customers have no alert policies yet.")}
             </EmptyState>
           </Card>
-        ) : draft.kind === "default_alert" ? (
-          <Card title={draft.name} sub={draft.id} action={<Badge tone={draft.on ? "ok" : "muted"}>{t(draft.on ? "Enabled" : "Disabled")}</Badge>}>
-            <Banner>{t("The default policy runs on every unit of every customer and cannot be detached. Its rules are switched on or off per customer on each customer’s Alert policies tab — the customer’s owner can do the same in the customer app.")}</Banner>
-            <p className="mt-2"><TextLink href="/admin/units">{t("Open Customers & units ›")}</TextLink></p>
-          </Card>
+        ) : draft.kind === "default_alert" && p ? (
+          <DefaultPolicyEditor p={p} customers={customers} canWrite={canWrite} copyFor={copyFor} onCopy={onCopy} demo={!live} />
         ) : (
           <Card
             title={<span className="inline-flex flex-wrap items-center gap-2">{draft.name.trim() || t("New alert policy")}<Badge tone={isNew ? "warn" : "muted"}>{isNew ? t("Not saved") : t("Policy v{n}", { n: draft.version })}</Badge></span>}
@@ -177,31 +189,11 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true }: { pols:
                 </div>
               </section>
               <section><h3 className="mb-2 text-[13px] font-bold">{t("Condition")}</h3><p className="mb-2 text-xs text-muted">{t("Missing or stale readings never count toward the condition — they raise a data-quality notice instead.")}</p>
-                <div className="grid-fluid" style={{ ["--min" as string]: "130px" }}>
-                  <Field label={t("Metric")}><Select value={draft.metric} onChange={(e) => set("metric", e.target.value)}>{HQ_METRICS.map((k) => <option key={k} value={k}>{t(metricLabel[k])}</option>)}</Select></Field>
-                  <Field label={t("Comparison")}><Select value={draft.operator} onChange={(e) => set("operator", e.target.value as Operator)}>{OPERATORS.map((o) => <option key={o} value={o}>{opSymbol[o]}</option>)}</Select></Field>
-                  <Field label={t("Alert when {op}", { op: opSymbol[draft.operator] })}><Input type="number" value={draft.threshold} onChange={(e) => set("threshold", +e.target.value)} /></Field>
-                  <Field label={t("For (s)")} error={tried ? errors.duration : undefined}><Input type="number" value={draft.duration} onChange={(e) => set("duration", +e.target.value)} /></Field>
-                  <Field label={t("Recover")} error={errors.recovery}><Input type="number" value={draft.recovery} onChange={(e) => set("recovery", +e.target.value)} /></Field>
-                </div>
-                <div className="mt-2"><LineChart points={[20, 24, 28, 31, 32, 31, 29, 27, 25]} min={18} max={34} threshold={draft.threshold} height={90} /></div>
-                <p className={cx("text-xs", errors.recovery ? "text-crit" : "text-ok")}>{errors.recovery ? `✕ ${errors.recovery}` : t("✓ Recovery {recovery} is on the safe side of the {threshold} threshold ({op})", { recovery: draft.recovery, threshold: draft.threshold, op: opSymbol[draft.operator] })}</p>
+                <ConditionFields c={draft} onChange={(c) => setDraft((d) => (d ? { ...d, ...c } : d))} errors={errors} tried={tried} />
               </section>
               <section><h3 className="mb-1 text-[13px] font-bold">{t("Only if … (optional) · active hours")}</h3>
                 <p className="mb-2 text-xs text-muted">{t("Evaluated in the policy timezone. Outside these hours the condition is not checked — the same field as “Only if” in the client app.")}</p>
-                <div className="flex flex-col gap-2">
-                  <Check label={t("Only on some days and times")} checked={!!win} onChange={(v) => set("activeWindow", v ? { weekdays: [1, 2, 3, 4, 5], startLocal: "08:00", endLocal: "19:00" } : null)} />
-                  {win ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Btn size="sm" onClick={() => setWin({ weekdays: [1, 2, 3, 4, 5] })}>{t("Mon–Fri")}</Btn><Btn size="sm" onClick={() => setWin({ weekdays: [1, 2, 3, 4, 5, 6, 7] })}>{t("Every day")}</Btn>
-                      {DAYS.map((d, i) => <button key={d} type="button" aria-pressed={win.weekdays.includes(i + 1)} onClick={() => setWin({ weekdays: win.weekdays.includes(i + 1) ? win.weekdays.filter((x) => x !== i + 1) : [...win.weekdays, i + 1].sort() })} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", win.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</button>)}
-                      <Input aria-label={t("From")} type="time" className="w-32" value={win.startLocal} onChange={(e) => setWin({ startLocal: e.target.value })} /> – <Input aria-label={t("To")} type="time" className="w-32" value={win.endLocal} onChange={(e) => setWin({ endLocal: e.target.value })} />
-                      <span className="text-xs text-muted">{draft.timezone}</span>
-                    </div>
-                  ) : <p className="text-[13px]">{t("Any day · any time")}</p>}
-                  {win && !errors.activeWindow && <p className="text-xs text-muted">{windowText(win, t)}</p>}
-                  {errors.activeWindow && <p className="text-xs text-crit">✕ {errors.activeWindow}</p>}
-                </div>
+                <WindowEditor value={draft.activeWindow} onChange={(w) => set("activeWindow", w)} timezone={draft.timezone} error={errors.activeWindow} />
               </section>
               <section><h3 className="mb-1 text-[13px] font-bold">{t("Severity")}</h3><Choice value={draft.severity} onChange={(v) => set("severity", v)} options={[{ id: "normal", label: t("Info") }, { id: "warning", label: t("Warning") }, { id: "critical", label: t("Critical") }]} /><p className="mt-1 text-[11px] text-muted">{t("A severity change on an open alert counts as a new notification reason.")}</p></section>
               <section>

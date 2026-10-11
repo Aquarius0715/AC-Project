@@ -142,3 +142,80 @@ test("the Policies tab's scope, Show disabled and a scoped new policy with activ
   await page.waitForURL((u) => !u.searchParams.has("tab") && u.searchParams.has("unitId") && u.searchParams.has("customerId"));
   await expect(main.getByRole("heading", { name: "Open alerts · Demo Customer A", exact: true })).toBeVisible();
 });
+
+// DD-A05 item 9 (Figma 268:2, IR347): the default policy's six rules; a rule's limit saved for every unit and put back;
+// a customer's switch of one rule with a reason, switched back on; a rule copied as a customer's policy (the owner is
+// asked, the draft carries the rule's name and condition, nothing is saved); a rule whose metric no policy may watch
+// cannot be copied. afterEach puts the limits and the switch back through the operation relay if a run stopped halfway.
+type DefaultPolicy = { id: string; version: number; rules: { ruleKey: string; threshold: number }[]; ruleSettings: { ruleKey: string; customerId: string; enabled: boolean; version: number }[] };
+const relay = async (page: import("@playwright/test").Page, op: string, input: unknown, version?: number) => page.evaluate(async ({ op, input, version }) => {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (version !== undefined) Object.assign(headers, { "Idempotency-Key": crypto.randomUUID(), "X-Expected-Version": String(version) });
+  const r = await fetch(`/bff/ops/${op}`, { method: "POST", headers, body: JSON.stringify(input) });
+  return { status: r.status, body: await r.json() };
+}, { op, input, version });
+let before: DefaultPolicy | null = null;
+
+test.afterEach(async ({ page }) => {
+  if (!before) return;
+  const now = (await relay(page, "policies.list", { limit: 1, filters: { kind: "default_alert" } })).body.data.items[0] as DefaultPolicy;
+  if (JSON.stringify(now.rules) !== JSON.stringify(before.rules)) expect((await relay(page, "policies.save", { id: now.id, kind: "default_alert", rules: before.rules }, now.version)).status).toBe(200);
+  for (const s of now.ruleSettings.filter((x) => !x.enabled && !before!.ruleSettings.some((b) => b.ruleKey === x.ruleKey && b.customerId === x.customerId && !b.enabled))) {
+    expect((await relay(page, "policies.setDefaultRule", { policyId: now.id, ruleKey: s.ruleKey, customerId: s.customerId, enabled: true }, s.version)).status).toBe(200);
+  }
+  before = null;
+});
+
+test("the default policy's rules, a customer's switch and a rule copied as a customer policy", async ({ page }) => {
+  await page.goto("/admin/alerts?tab=policies");
+  before = (await relay(page, "policies.list", { limit: 1, filters: { kind: "default_alert" } })).body.data.items[0] as DefaultPolicy;
+  const main = page.getByRole("main");
+  const list = main.locator("section").filter({ has: page.getByRole("heading", { name: "Alert policies", exact: true }) });
+  await list.getByRole("button", { name: /Default policy/ }).click();
+  await page.waitForURL(/policyId=/);
+  await expect(main.getByRole("heading", { name: "Default policy › Ventilation" })).toBeVisible();
+  const rules = main.getByRole("region", { name: "Rules" });
+  await expect(rules.getByRole("button")).toHaveCount(6);
+
+  // a limit for every unit: Refrigerant low pressure ≤ 350 kPa → 340, saved, then put back
+  await rules.getByRole("button", { name: /Refrigerant low pressure/ }).click();
+  await expect(main).toContainText("rule 3 of 6");
+  await expect(main.getByRole("textbox", { name: /^Metric/ })).toHaveValue("Refrigerant pressure"); // fixed for a default rule
+  const threshold = main.getByRole("spinbutton", { name: /^Alert when ≤/ });
+  await threshold.fill("340");
+  await expect(main).toContainText("1 rule changed · Refrigerant low pressure");
+  await main.getByRole("button", { name: "Save policy" }).click();
+  await expect(main).toContainText(`Policy v${before.version + 1}`);
+  await expect(main).toContainText("No unsaved changes");
+  await threshold.fill("350");
+  await main.getByRole("button", { name: "Save policy" }).click();
+  await expect(main).toContainText(`Policy v${before.version + 2}`);
+
+  // one customer's switch, with a reason, then back on
+  const row = (name: string) => main.locator("div").filter({ has: page.getByRole("switch", { name: `Refrigerant low pressure for ${name}` }) }).last();
+  await row("Demo Customer B").getByRole("switch").click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByRole("heading", { name: "Switch “Refrigerant low pressure” off for Demo Customer B" })).toBeVisible();
+  await dialog.getByLabel(/^Reason · optional/).fill("E2E rooftop unit replaced");
+  await dialog.getByRole("button", { name: "Switch off" }).click();
+  await expect(row("Demo Customer B")).toContainText(/Off · by hq-operator, .* \(E2E rooftop unit replaced\)/);
+  await row("Demo Customer B").getByRole("switch").click();
+  await page.getByRole("dialog").getByRole("button", { name: "Switch on" }).click();
+  await expect(row("Demo Customer B")).toContainText(/^.*On · by hq-operator/);
+
+  // copy: Ventilation (CO₂) becomes a draft for the owner chosen; a metric no policy may watch cannot be copied
+  await rules.getByRole("button", { name: /Clogged filter/ }).click();
+  await expect(main).toContainText("is not a metric a customer policy can watch, so this rule cannot be copied.");
+  await rules.getByRole("button", { name: /^Ventilation/ }).click();
+  await main.getByRole("button", { name: "Copy as a customer policy →" }).click();
+  const owner = page.getByRole("dialog").getByRole("combobox", { name: "Owner (customer)" });
+  await owner.click();
+  await owner.fill("Demo Customer A");
+  await page.getByRole("dialog").getByRole("option", { name: "Demo Customer A" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Start the policy" }).click();
+  await page.waitForURL((u) => u.searchParams.get("from") === "ventilation_co2" && !!u.searchParams.get("new"));
+  await expect(main.getByRole("textbox", { name: /^Name/ })).toHaveValue("Ventilation");
+  await expect(main.getByRole("spinbutton", { name: /^Alert when ≥/ })).toHaveValue("1000");
+  await main.getByRole("button", { name: "Discard" }).click(); // nothing is created
+  await page.waitForURL((u) => !u.searchParams.has("new") && !u.searchParams.has("from"));
+});

@@ -5021,3 +5021,34 @@ IR345 item 7 left parts of DD-A05 items 7–10 off the HQ Policies tab. This rou
      - A unit scope lists only the default policy.
      - The Alerts tab keeps the scope.
    - The Malay language spec (`admin/language`) now clicks the create buttons IR345 item 6 renamed ("+ Laporan baharu", "+ Faktor baharu", "+ Kontrak baharu", "+ Polisi baharu"). IR345's suite run had used a build from before the rename.
+
+## IR347 The default policy's editor on the HQ Policies tab — 2026-10-11
+
+DD-A05 item 9 and Figma Admin 268:2 describe the default policy's editor: its rules, the selected rule's limit as the HQ template, the switch of each customer, and a copy as a customer's policy. The web showed only a note about the default policy. The Core API already had what the editor needs: `policies.save` with `DefaultPolicyInput` and `policies.setDefaultRule` (IR120 items 2 and 7).
+
+1. **Rules and the selected rule.**
+   - The six rules are listed with their category and condition ("Fault · Refrigerant pressure ≤ 350 kPa for 2 min → Critical"). The selected one is "Default policy › <rule>" with "Policy v<n>", "<id> · HQ template · rule n of 6" and "Enabled (template)".
+   - A warning says that saving changes every unit and that the rule cannot be detached.
+   - The condition (comparison, threshold, duration, recovery), "Only if …" and the severity can be changed. The metric is fixed, with its unit ("unit fixed: kPa").
+   - The key, name, category and metric of a rule are fixed (IR120 item 2). Figma drew the name as editable; IR120 is the later decision. `DefaultPolicyInput` carries no enabled, priority or time zone, so "Enabled (template)" is a label.
+   - Save policy sends all six rules at the policy's version. The changed rules are marked "edited". The footer reads "n rules changed · <names>" or "VALIDATION · n rules to fix · nothing saved: <names>". Discard puts the saved rules back.
+   - Without alert.policy.write the editor is read-only.
+2. **On / off per customer — this rule.**
+   - Each active customer is listed by name, the first 20 and then any picked in a search-select. Each shows its setting: "On", or "Off · by <member>, <date> (<reason>)" (Figma 268:2).
+   - A switch asks for an optional reason (0–500) and calls `policies.setDefaultRule` at that setting's version, 0 when the rule has none (IR120 item 7).
+   - The screen reads the default policy without the scope, so the editor has every customer's settings; a customer scope would keep only that customer's (IR120 item 5).
+3. **Copy as a <customer> policy →.**
+   - Offered for a rule whose metric an HQ alert policy may watch: Ventilation (CO₂), Dust / filter (PM2.5) and Refrigerant low pressure. The other rules say that their metric cannot be watched by a customer policy.
+   - Scoped to one customer, the copy opens that customer's draft at once; otherwise it asks for the owner. The URL is `tab=policies&new=<customerId>&from=<ruleKey>`.
+   - The draft takes the rule's name, condition, window and severity. It is created only by Save policy, as in IR345.
+4. **Shared parts.** One condition block and one "Only if …" block serve both editors. The illustrative chart now scales to the threshold.
+5. **Still to build.** The notification preview and the demo test of DD-A05 item 7 (IR346 item 5).
+   - **Figma 268:2** now follows IR120 item 2: "Basics · fixed for a default rule" with read-only name, priority and time zone; "Enabled (template) · always on" with a dimmed switch; the metric without a select caret.
+6. **Tests.**
+   - Web unit: the rules and settings as read; the setting text in English and Malay; which rules can be copied; a draft copied from a rule; a rule's checks; the changed rules; the save input.
+   - E2E `admin/alert-policies`:
+     - Changes Refrigerant low pressure from 350 to 340, saves, and saves it back.
+     - Switches the rule off for Demo Customer B with a reason, then on again.
+     - Shows that Clogged filter cannot be copied.
+     - Copies Ventilation as a Demo Customer A draft and discards it.
+   - afterEach restores the limits and switches through the operation relay if a run stops halfway.

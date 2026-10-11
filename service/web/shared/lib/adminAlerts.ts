@@ -2,7 +2,7 @@
 // members.list projected for the admin alerts screen. Pure code shared by the Server Component and the client view;
 // Vitest covers it. Texts in the display language (`i` / `t`, IR292); times IR44 in the user's display time zone, with
 // "today / yesterday" for the days next to now. Cause codes and evidence texts stay as the Core API records them.
-import { EN, relativeTime, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
+import { EN, relativeTime, showDate, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { alertTitle } from "@ac/web/lib/alerts";
 import type { OpInput } from "@ac/web/lib/opTypes";
 import type { Metric as ContractMetric } from "@ac/web/lib/contracts.gen";
@@ -25,7 +25,9 @@ export type ApiPolicy = {
   id: string; version: number; kind: "alert" | "default_alert" | "automation"; name: string; unitIds: string[]; timezone: string; enabled: boolean; priority: number;
   ownerMembershipId?: string; customerId?: string | null; recipientMembershipIds?: string[]; channels?: Channel[]; escalateAfterMinutes?: number; cooldownMinutes?: number;
   metric?: string; operator?: Operator; threshold?: number; recoveryThreshold?: number; durationSeconds?: number; severity?: Severity;
-  activeWindow?: { weekdays: number[]; startLocal: string; endLocal: string } | null; rules?: { ruleKey: string; name: string }[];
+  activeWindow?: { weekdays: number[]; startLocal: string; endLocal: string } | null;
+  rules?: { ruleKey: string; name: string; category?: string; metric?: string; operator?: Operator; threshold?: number; recoveryThreshold?: number; durationSeconds?: number; severity?: Severity; activeWindow?: { weekdays: number[]; startLocal: string; endLocal: string } | null }[];
+  ruleSettings?: { ruleKey: string; customerId: string; enabled: boolean; version: number; reason: string | null; changedByMembershipId: string; updatedAt: string }[];
 };
 export type ApiUnitName = { id: string; displayName: string; customerOrgId: string };
 export type ApiCustomerName = { id: string; name: string; organizationId: string };
@@ -33,6 +35,15 @@ export type ApiMemberName = { id: string; displayName: string; role: string };
 /** NotificationRecipient of service-contracts.ts: someone notifications.recipients lists for a unit's alerts. */
 export type ApiRecipient = { id: string; role: string; displayLabel: string; allowedChannels: Channel[] };
 export type PolicyRecipient = { id: string; label: string; role: string };
+/** One rule of the default policy (DefaultAlertRule of service-contracts.ts) as the editor holds it: the key, name,
+ * category and metric are fixed (IR120 item 2), the condition and severity are HQ's to change. */
+export type DefaultRule = {
+  ruleKey: string; name: string; category: string; metric: string; operator: Operator; threshold: number; recovery: number; duration: number;
+  severity: Severity; activeWindow: ApiPolicy["activeWindow"];
+};
+/** One customer's on/off setting of a default rule (DefaultRuleSetting); `by` names who changed it, "" when members
+ * cannot be read. A rule without a setting is on at version 0 (IR120 item 7). */
+export type RuleSettingRow = { ruleKey: string; customerId: string; enabled: boolean; version: number; reason: string | null; by: string; at: string };
 
 /** One alert of the screen: `state` is the alert's status for the logic, `st` its label in the display language. */
 export type AdminAlert = {
@@ -51,6 +62,8 @@ export type AdminPolicy = {
   recipients: PolicyRecipient[]; activeWindow: ApiPolicy["activeWindow"];
   /** who made it (ownerMembershipId), "" when members cannot be read; the attached units, read-only here (IR108) */
   madeBy: string; unitIds: string[]; unitNames: string[];
+  /** the default policy's rules and the customers' settings of them (empty for a customer policy) */
+  rules: DefaultRule[]; settings: RuleSettingRow[];
 };
 
 export const metricLabel: Record<string, string> = {
@@ -138,19 +151,41 @@ export function policyRows(policies: ApiPolicy[], customers: ApiCustomerName[], 
         threshold: p.threshold ?? 0, recovery: p.recoveryThreshold ?? 0, duration: p.durationSeconds ?? 60, severity: p.severity ?? "warning",
         cooldown: p.cooldownMinutes ?? 5, escalate: p.escalateAfterMinutes ?? 60, channels: p.channels ?? ["inApp"], recipients, activeWindow: p.activeWindow ?? null,
         madeBy: owner?.displayName ?? "", unitIds: p.unitIds, unitNames: p.unitIds.map((id) => unitName.get(id) ?? id),
+        rules: (p.rules ?? []).map((r) => ({
+          ruleKey: r.ruleKey, name: r.name, category: r.category ?? "", metric: r.metric ?? "", operator: r.operator ?? "gte", threshold: r.threshold ?? 0,
+          recovery: r.recoveryThreshold ?? 0, duration: r.durationSeconds ?? 60, severity: r.severity ?? "warning", activeWindow: r.activeWindow ?? null,
+        })),
+        settings: (p.ruleSettings ?? []).map((x) => ({
+          ruleKey: x.ruleKey, customerId: x.customerId, enabled: x.enabled, version: x.version, reason: x.reason, by: member.get(x.changedByMembershipId)?.displayName ?? "", at: x.updatedAt,
+        })),
       };
     });
+}
+
+/** Whether a default rule can become a customer policy: its metric must be one an HQ alert policy may watch. */
+export const copyable = (r: Pick<DefaultRule, "metric">) => (HQ_METRICS as readonly string[]).includes(r.metric);
+
+/** “On”, or the customer's setting: “Off · by hq-operator, 25 Sept 2026 (rooftop unit replaced)” (Figma 268:2). */
+export function settingText(s: RuleSettingRow | undefined, i: I18n = EN): string {
+  const { t } = i;
+  if (!s) return t("On");
+  const who = s.by ? `${t("by {name}", { name: s.by })}, ` : "";
+  return `${t(s.enabled ? "On" : "Off")} · ${who}${showDate(s.at, i.display)}${s.reason ? ` (${s.reason})` : ""}`;
 }
 
 /** A new, unsaved alert policy of a customer as DD-A05 starts one (IR345): the display time zone (Preferences), off and
  * priority 50; the condition of the Figma example (temperature ≥ 30 °C for 60 s, recovery 28), in-app only, nobody
  * notified yet. The owner is fixed once it is saved. */
-export function newPolicyDraft(customer: { id: string; name: string }, timezone: string): AdminPolicy {
-  return {
+export function newPolicyDraft(customer: { id: string; name: string }, timezone: string, from?: DefaultRule): AdminPolicy {
+  const draft: AdminPolicy = {
     id: "", version: 0, kind: "alert", name: "", group: customer.name.toUpperCase(), sub: "", on: false, units: "", customerId: customer.id, customerName: customer.name,
     priority: 50, timezone, metric: "temperature", operator: "gte", threshold: 30, recovery: 28, duration: 60, severity: "warning", cooldown: 5, escalate: 60,
-    channels: ["inApp"], recipients: [], activeWindow: null, madeBy: "", unitIds: [], unitNames: [],
+    channels: ["inApp"], recipients: [], activeWindow: null, madeBy: "", unitIds: [], unitNames: [], rules: [], settings: [],
   };
+  // “Copy as a <customer> policy →” (DD-A05 item 9): the rule's name and condition, for a metric a policy may watch
+  if (!from || !copyable(from)) return draft;
+  const { name, metric, operator, threshold, recovery, duration, severity, activeWindow } = from;
+  return { ...draft, name, metric, operator, threshold, recovery, duration, severity, activeWindow };
 }
 
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -159,19 +194,43 @@ const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
  * cooldown and escalation 1–1440 min, the recovery on the safe side of the threshold, and an “Only if …” window with
  * at least one day and two different HH:mm times. */
 export function policyErrors(p: Pick<AdminPolicy, "name" | "priority" | "duration" | "cooldown" | "escalate" | "operator" | "threshold" | "recovery" | "recipients" | "activeWindow">, t: T = en): Record<string, string> {
-  const e: Record<string, string> = {};
+  const e: Record<string, string> = conditionErrors(p, t);
   if (!p.name.trim() || p.name.length > 120) e.name = t("1–120 characters");
   if (!(Number.isInteger(p.priority) && p.priority >= 0 && p.priority <= 100)) e.priority = t("A whole number 0–100");
-  if (!(p.duration >= 1 && p.duration <= 86400)) e.duration = t("Duration must be 1–86400 s");
   if (!(p.cooldown >= 1 && p.cooldown <= 1440)) e.cooldown = t("1–1440");
   if (!(p.escalate >= 1 && p.escalate <= 1440)) e.escalate = t("1–1440");
-  const rec = recoveryError(p.operator, p.threshold, p.recovery, t);
-  if (rec) e.recovery = rec;
   if (!p.recipients.length) e.recipients = t("Add at least one recipient");
   else if (p.recipients.length > 20) e.recipients = t("At most 20 recipients");
+  return e;
+}
+
+/** The checks of one condition (IR120 item 3), for a policy and for a default rule: duration 1–86400 s, the recovery on
+ * the safe side of the threshold, and an “Only if …” window with a day and two different HH:mm times. */
+export function conditionErrors(p: Pick<DefaultRule, "duration" | "operator" | "threshold" | "recovery" | "activeWindow">, t: T = en): Record<string, string> {
+  const e: Record<string, string> = {};
+  if (!(Number.isInteger(p.duration) && p.duration >= 1 && p.duration <= 86400)) e.duration = t("Duration must be 1–86400 s");
+  const rec = recoveryError(p.operator, p.threshold, p.recovery, t);
+  if (rec) e.recovery = rec;
   const w = p.activeWindow;
   if (w && (!w.weekdays.length || !HHMM.test(w.startLocal) || !HHMM.test(w.endLocal) || w.startLocal === w.endLocal)) e.activeWindow = t("Pick at least one day and two different times.");
   return e;
+}
+
+const ruleShape = (r: DefaultRule) => [r.operator, r.threshold, r.recovery, r.duration, r.severity, r.activeWindow && [[...r.activeWindow.weekdays].sort(), r.activeWindow.startLocal, r.activeWindow.endLocal]];
+/** The default rules a draft changes against the saved policy, by name. */
+export const ruleChanges = (draft: AdminPolicy, saved: AdminPolicy): string[] =>
+  draft.rules.filter((r) => { const o = saved.rules.find((x) => x.ruleKey === r.ruleKey); return !o || JSON.stringify(ruleShape(r)) !== JSON.stringify(ruleShape(o)); }).map((r) => r.name);
+
+/** policies.save input for the default policy's limits (DefaultPolicyInput, IR120 item 2): all six rules in their order
+ * with their fixed key, name, category and metric; saving changes them for every unit. */
+export function defaultRulesInput(p: AdminPolicy): OpInput<"policies.save"> {
+  return {
+    id: p.id, kind: "default_alert" as const,
+    rules: p.rules.map((r) => ({
+      ruleKey: r.ruleKey, name: r.name, category: r.category as "air_quality" | "fault" | "maintenance" | "connection", metric: r.metric as ContractMetric,
+      operator: r.operator, threshold: r.threshold, recoveryThreshold: r.recovery, durationSeconds: r.duration, activeWindow: r.activeWindow ?? null, severity: r.severity,
+    })),
+  };
 }
 
 const CHANGES: [string, (p: AdminPolicy) => unknown][] = [

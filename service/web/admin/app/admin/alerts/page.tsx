@@ -30,9 +30,9 @@ export default async function AdminAlertsPage({ searchParams }: PageProps<"/admi
   };
   const scope = { ...(q.customerId ? { customerId: q.customerId } : {}), ...(q.propertyId ? { propertyId: q.propertyId } : {}), ...(q.unitId ? { unitId: q.unitId } : {}) };
   const filters = { ...scope, ...(severity ? { severity } : {}) };
-  // the policies in the same scope (DD-A05 item 8); a property or unit scope lists the attached policies only, so the
-  // default policy — on every unit — is read on its own and listed first (Figma 268:2)
-  const byUnits = !!(q.propertyId || q.unitId);
+  // the policies in the same scope (DD-A05 item 8). The default policy is read on its own, without the scope: a property
+  // or unit scope leaves it out though it runs on every unit (Figma 268:2), and a customer scope would keep only that
+  // customer's rule settings, while its editor switches the rules for every customer (item 9)
   const [now, perms, display, alerts, units, customers, properties, policies, members, defaults] = await Promise.all([
     coreNow(), corePermissions(), coreDisplay(),
     coreOp<Page<ApiAdminAlert>>("alerts.list", { limit: 100, filters }), // every status in the scope: the tiles count them
@@ -41,9 +41,9 @@ export default async function AdminAlertsPage({ searchParams }: PageProps<"/admi
     coreAll<{ id: string; name: string; customerOrgId: string }>("properties.list"),
     coreOp<Page<ApiPolicy>>("policies.list", { limit: 100, filters: scope }),
     optional(coreOp<Page<ApiMemberName>>("members.list", { limit: 100 }), { items: [] }),
-    byUnits ? coreOp<Page<ApiPolicy>>("policies.list", { limit: 1, filters: { kind: "default_alert" } }) : Promise.resolve({ items: [] as ApiPolicy[] }),
+    coreOp<Page<ApiPolicy>>("policies.list", { limit: 1, filters: { kind: "default_alert" } }),
   ]);
-  const scoped = [...defaults.items, ...policies.items];
+  const scoped = [...defaults.items, ...policies.items.filter((p) => p.kind !== "default_alert")];
   const i = i18nOf(display);
   const custOrg = customers.items.find((c) => c.id === q.customerId)?.organizationId;
   const custByOrg = new Map(customers.items.map((c) => [c.organizationId, c.id]));
@@ -60,7 +60,7 @@ export default async function AdminAlertsPage({ searchParams }: PageProps<"/admi
         alerts: adminAlertRows(alerts.items, units.items, customers.items, scoped, now.getTime(), i),
         policies: policyRows(scoped, customers.items, members.items, i.t, units.items),
         pol: {
-          policyId: one(sp.policyId) ?? null, newFor: one(sp.new) ?? null, canWrite: perms.has("alert.policy.write"), timezone: display.timeZone,
+          policyId: one(sp.policyId) ?? null, newFor: one(sp.new) ?? null, from: one(sp.from) ?? null, canWrite: perms.has("alert.policy.write"), timezone: display.timeZone,
           customers: customers.items.filter((c) => c.status !== "inactive").map((c) => ({ id: c.id, name: c.name })),
           units: units.items.filter((u) => !u.archived).map((u) => ({ id: u.id, customerId: custByOrg.get(u.customerOrgId) ?? null })),
         },

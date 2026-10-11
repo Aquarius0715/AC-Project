@@ -80,16 +80,17 @@ export function AdminAlertsView({ live }: { live?: Live }) {
   const pick = (id: string) => (live ? patch({ alertId: id }) : setDemoAlertId(id));
   const pickStatus = (s: AlertState) => (live ? patch({ status: s === "open" ? null : s, alertId: null }) : (setDemoStatus(s), setDemoAlertId(null)));
   // policies: the selected one and a new one's owner customer, in the URL in API mode (DD-A05 items 5 and 8, IR345)
-  const [demoSel, setDemoSel] = useState<PolicySel>({ policyId: null, newFor: null });
-  const polSel: PolicySel = live ? { policyId: live.pol.policyId, newFor: live.pol.newFor } : demoSel;
-  const selectPolicy = (policyId: string | null, newFor: string | null = null) => (live ? patch({ policyId, new: newFor }) : setDemoSel({ policyId, newFor }));
-  const [asking, setAsking] = useState(false);
+  const [demoSel, setDemoSel] = useState<PolicySel>({ policyId: null, newFor: null, from: null });
+  const polSel: PolicySel = live ? { policyId: live.pol.policyId, newFor: live.pol.newFor, from: live.pol.from } : demoSel;
+  const selectPolicy = (policyId: string | null, newFor: string | null = null) => (live ? patch({ policyId, new: newFor, from: null }) : setDemoSel({ policyId, newFor, from: null }));
+  // “+ New policy” asks for the owner; a default rule's copy remembers the rule it starts from (`from`, DD-A05 item 9)
+  const [asking, setAsking] = useState<{ from: string | null } | null>(null);
   const [showOff, setShowOff] = useState(true);
-  const startPolicy = (customerId: string) => {
-    setAsking(false);
-    if (live) return router.replace(scoped({ tab: "policies", new: customerId }), { scroll: false });
+  const startPolicy = (customerId: string, from: string | null = null) => {
+    setAsking(null);
+    if (live) return router.replace(scoped({ tab: "policies", new: customerId, ...(from ? { from } : {}) }), { scroll: false });
     setUrlTab("policies");
-    setDemoSel({ policyId: null, newFor: customerId });
+    setDemoSel({ policyId: null, newFor: customerId, from });
   };
   // scoped to one active customer, “+ New policy for <customer>” opens its draft at once (Figma 268:2)
   const scopeOwner = live?.q.customerId ? live.pol.customers.find((c) => c.id === live.q.customerId) ?? null : null;
@@ -142,7 +143,7 @@ export function AdminAlertsView({ live }: { live?: Live }) {
         <Tabs value={tab} onChange={setTab} tabs={[{ id: "alerts", label: t("Alerts"), count: openish.length }, { id: "policies", label: t("Policies"), count: pols.length }]} />
         {(live ? live.pol.canWrite : true) && (scopeOwner
           ? <Btn size="sm" variant="primary" onClick={() => startPolicy(scopeOwner.id)}>{t("+ New policy for {name}", { name: scopeOwner.name })}</Btn>
-          : <Btn size="sm" variant="primary" onClick={() => setAsking(true)}>{t("+ New policy")}</Btn>)}
+          : <Btn size="sm" variant="primary" onClick={() => setAsking({ from: null })}>{t("+ New policy")}</Btn>)}
       </div>
       {tab === "alerts" ? (
         <>
@@ -197,15 +198,16 @@ export function AdminAlertsView({ live }: { live?: Live }) {
       ) : (
         <>
           {live ? (
-            <ScopeBar scope={live.scope} q={live.q} text={t(pols.length === 1 ? "1 policy in scope" : "{n} policies in scope", { n: pols.length })} clear={["policyId", "new"]}>
+            <ScopeBar scope={live.scope} q={live.q} text={t(pols.length === 1 ? "1 policy in scope" : "{n} policies in scope", { n: pols.length })} clear={["policyId", "new", "from"]}>
               <Check label={t("Show disabled")} checked={showOff} onChange={setShowOff} />
             </ScopeBar>
           ) : <div className="flex justify-end"><Check label={t("Show disabled")} checked={showOff} onChange={setShowOff} /></div>}
           {scopeUnit && <p className="text-xs text-muted">{t("Showing the policies attached to {unit}: {names}.", { unit: scopeUnit, names: pols.map((x) => x.name).join(", ") })}</p>}
-          <PoliciesTab pols={pols} live={live?.pol} sel={polSel} select={selectPolicy} showOff={showOff} />
+          <PoliciesTab pols={pols} live={live?.pol} sel={polSel} select={selectPolicy} showOff={showOff} copyFor={scopeOwner}
+            onCopy={(ruleKey) => (scopeOwner ? startPolicy(scopeOwner.id, ruleKey) : setAsking({ from: ruleKey }))} />
         </>
       )}
-      {asking && <NewPolicyModal customers={live ? live.pol.customers : demoCustomers} initial={live?.q.customerId} onClose={() => setAsking(false)} onStart={startPolicy} />}
+      {asking && <NewPolicyModal customers={live ? live.pol.customers : demoCustomers} initial={live?.q.customerId} onClose={() => setAsking(null)} onStart={(id) => startPolicy(id, asking.from)} />}
       <Modal open={resolve} onClose={() => setResolve(false)} title={t("Resolve alert")} footer={<><Btn onClick={() => setResolve(false)}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending || evidence.loading} onClick={doResolve}>{t("Resolve alert")}</Btn></>}>
         {a && (
           <>

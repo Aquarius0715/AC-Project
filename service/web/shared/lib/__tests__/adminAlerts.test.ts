@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { adminAlertRows, alertPolicyInput, HQ_METRICS, newPolicyDraft, policyChanges, policyErrors, policyRows, recoveryError, type ApiAdminAlert, type ApiPolicy } from "@ac/web/lib/adminAlerts";
+import {
+  adminAlertRows, alertPolicyInput, conditionErrors, copyable, defaultRulesInput, HQ_METRICS, newPolicyDraft, policyChanges, policyErrors, policyRows, recoveryError, ruleChanges, settingText,
+  type ApiAdminAlert, type ApiPolicy,
+} from "@ac/web/lib/adminAlerts";
 import { i18nOf } from "@ac/web/lib/i18n";
 
 const MS = i18nOf({ locale: "ms", timeZone: "Asia/Tokyo" });
@@ -101,5 +104,47 @@ describe("HQ alerts in Malay with the display time zone (IR292)", () => {
     const p = policyRows([policy({})], customers, [{ id: "m-1", displayName: "customer-a", role: "admin" }], MS.t)[0];
     expect([p.sub, p.units, p.recipients[0].role]).toEqual(["Suhu ≥ 30 °C selama 60 s", "2 unit", "HQ"]);
     expect(policyErrors({ ...p, duration: 0 }, MS.t).duration).toBe("Tempoh mesti 1–86400 s");
+  });
+});
+
+describe("the default policy's rules and the customers' switches (DD-A05 item 9, Figma 268:2, IR347)", () => {
+  const def = (over: Partial<ApiPolicy> = {}): ApiPolicy => ({
+    id: "def", version: 3, kind: "default_alert", name: "Default policy", unitIds: [], timezone: "Asia/Kuala_Lumpur", enabled: true, priority: 0, customerId: null,
+    rules: [
+      { ruleKey: "refrigerant_low_pressure", name: "Refrigerant low pressure", category: "fault", metric: "refrigerant_pressure", operator: "lte", threshold: 350, recoveryThreshold: 380, durationSeconds: 120, severity: "critical", activeWindow: null },
+      { ruleKey: "ac_offline", name: "AC offline", category: "connection", metric: "heartbeat_gap", operator: "gte", threshold: 15, recoveryThreshold: 1, durationSeconds: 1, severity: "warning", activeWindow: null },
+    ],
+    ruleSettings: [{ ruleKey: "ac_offline", customerId: "c-b", enabled: false, version: 2, reason: "rooftop unit replaced", changedByMembershipId: "m-hq", updatedAt: "2026-09-25T02:00:00Z" }],
+    ...over,
+  });
+  const [p] = policyRows([def()], customers, [{ id: "m-hq", displayName: "hq-operator", role: "admin" }]);
+
+  it("keeps each rule's condition and names who switched a rule for a customer", () => {
+    expect(p.rules.map((r) => [r.ruleKey, r.metric, r.operator, r.threshold, r.recovery, r.duration, r.severity])).toEqual([
+      ["refrigerant_low_pressure", "refrigerant_pressure", "lte", 350, 380, 120, "critical"], ["ac_offline", "heartbeat_gap", "gte", 15, 1, 1, "warning"],
+    ]);
+    expect(p.settings).toEqual([{ ruleKey: "ac_offline", customerId: "c-b", enabled: false, version: 2, reason: "rooftop unit replaced", by: "hq-operator", at: "2026-09-25T02:00:00Z" }]);
+    expect([settingText(undefined), settingText(p.settings[0])]).toEqual(["On", "Off · by hq-operator, 25 Sept 2026 (rooftop unit replaced)"]);
+    expect(settingText({ ...p.settings[0], enabled: true, reason: null, by: "" }, MS)).toBe("Hidup · 25 Sep 2026");
+  });
+
+  it("copies only a rule whose metric a policy may watch, with its name and condition", () => {
+    expect(p.rules.map(copyable)).toEqual([true, false]); // heartbeat_gap is not one of the HQ metrics
+    const d = newPolicyDraft({ id: "c-a", name: "Demo Customer A" }, "Asia/Tokyo", p.rules[0]);
+    expect([d.id, d.name, d.metric, d.operator, d.threshold, d.recovery, d.duration, d.severity, d.on, d.timezone, d.customerId]).toEqual(["", "Refrigerant low pressure", "refrigerant_pressure", "lte", 350, 380, 120, "critical", false, "Asia/Tokyo", "c-a"]);
+    expect(newPolicyDraft({ id: "c-a", name: "A" }, "UTC", p.rules[1]).metric).toBe("temperature"); // not copyable: the plain draft
+  });
+
+  it("checks a rule's condition, names the changed rules and saves all six with their fixed fields", () => {
+    expect(conditionErrors(p.rules[0])).toEqual({});
+    expect(conditionErrors({ ...p.rules[0], recovery: 340, duration: 0 })).toEqual({ duration: "Duration must be 1–86400 s", recovery: "Recovery 340 must be above the 350 threshold (direction for ≤)" });
+    const edited = { ...p, rules: [{ ...p.rules[0], threshold: 340 }, p.rules[1]] };
+    expect([ruleChanges(edited, p), ruleChanges(p, p)]).toEqual([["Refrigerant low pressure"], []]);
+    expect(defaultRulesInput(edited)).toEqual({
+      id: "def", kind: "default_alert", rules: [
+        { ruleKey: "refrigerant_low_pressure", name: "Refrigerant low pressure", category: "fault", metric: "refrigerant_pressure", operator: "lte", threshold: 340, recoveryThreshold: 380, durationSeconds: 120, activeWindow: null, severity: "critical" },
+        { ruleKey: "ac_offline", name: "AC offline", category: "connection", metric: "heartbeat_gap", operator: "gte", threshold: 15, recoveryThreshold: 1, durationSeconds: 1, activeWindow: null, severity: "warning" },
+      ],
+    });
   });
 });

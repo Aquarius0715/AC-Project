@@ -26,7 +26,7 @@ export function JobsTabs({ tab, counts, q, action }: { tab: string; counts: { jo
   );
 }
 
-type Clear = "jobId" | "planId" | "alertId" | "policyId" | "new";
+type Clear = "jobId" | "planId" | "alertId" | "policyId" | "new" | "from";
 
 /** The scope selects; changing one clears the narrower ones and the selection (`clear`: the selected job, plan, alert
  * or policy, or a new policy's draft). `children` follow the count on the right (the Policies tab's Show disabled). */

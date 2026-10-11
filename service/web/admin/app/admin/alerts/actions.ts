@@ -4,7 +4,7 @@
 // Core API authorizes the call (alert.resolve, alert.policy.write) and checks the expected version.
 import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
-import { alertPolicyInput, type AdminPolicy } from "@ac/web/lib/adminAlerts";
+import { alertPolicyInput, defaultRulesInput, type AdminPolicy } from "@ac/web/lib/adminAlerts";
 
 export type ActionResult = { ok: true } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string> };
 
@@ -42,4 +42,15 @@ export async function savePolicy(policy: AdminPolicy): Promise<ActionResult & { 
 /** Deletes an alert policy: it is detached from every unit in the same change (IR108, IR120 item 6). */
 export async function deletePolicy(policyId: string, version: number): Promise<ActionResult> {
   return run(() => coreOp("policies.delete", { policyId }, { write: true, expectedVersion: version }));
+}
+
+/** Saves the default policy's limits: all six rules at the policy's version; they change for every unit (IR120 item 2). */
+export async function saveDefaultRules(policy: AdminPolicy): Promise<ActionResult> {
+  return run(() => coreOp("policies.save", defaultRulesInput(policy), { write: true, expectedVersion: policy.version }));
+}
+
+/** Switches one default rule on or off for one customer with an optional reason (0–500), at the version of that
+ * customer's setting (0 when the rule has none yet, IR120 item 7). */
+export async function switchDefaultRule(policyId: string, ruleKey: string, customerId: string, enabled: boolean, reason: string, version: number): Promise<ActionResult> {
+  return run(() => coreOp("policies.setDefaultRule", { policyId, ruleKey, customerId, enabled, ...(reason.trim() ? { reason: reason.trim() } : {}) }, { write: true, expectedVersion: version }));
 }
