@@ -1,14 +1,20 @@
 package integration
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 
+	"github.com/pradita/ac-project/service/api/internal/ops"
 	"github.com/pradita/ac-project/service/api/internal/seed"
+	apiserver "github.com/pradita/ac-project/service/api/internal/server"
 )
 
 // TestRevokeSessions: HQ signs a user out everywhere (members.revokeSessions, IR384, Figma Admin 03-8). Every membership
@@ -45,13 +51,17 @@ func TestRevokeSessions(t *testing.T) {
 			owner(t, `DELETE FROM identity.memberships WHERE id = $1`, m)
 		}
 	})
-	signedIn := func(membership string, at time.Time) actor { return actor{fmt.Sprintf("tok-rv@%d", at.Unix()), membership} }
+	signedIn := func(membership string, at time.Time) actor {
+		return actor{fmt.Sprintf("tok-rv@%d", at.Unix()), membership}
+	}
 	earlier := time.Now().Add(-time.Hour)
 	old, oldClient := signedIn("test-revoke-tech", earlier), signedIn("test-revoke-client", earlier)
 	if code, m := post(s, &old, "session.get", `{}`); code != 200 {
 		t.Fatalf("before the revocation: %d %v", code, m)
 	}
-	body := func(id any, reason string) string { return fmt.Sprintf(`{"membershipId":"%s","reason":%q}`, id, reason) }
+	body := func(id any, reason string) string {
+		return fmt.Sprintf(`{"membershipId":"%s","reason":%q}`, id, reason)
+	}
 
 	// the input and who may
 	code, m := write(s, &hq, "members.revokeSessions", body(tech, "   "), 0)
@@ -115,5 +125,73 @@ func TestRevokeSessions(t *testing.T) {
 	ownerScan(t, `SELECT count(*) FROM audit.audit_log WHERE action = 'members.revokeSessions' AND target_id = $1 AND reason = $2`, []any{client.String(), reason}, &audits)
 	if audits != 1 {
 		t.Errorf("audit entries: %d", audits)
+	}
+}
+
+// fakeIdP records the subjects whose identity-provider sessions were ended.
+type fakeIdP struct {
+	mu       sync.Mutex
+	subjects []string
+	err      error
+}
+
+func (f *fakeIdP) EndSessions(_ context.Context, subject string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.subjects = append(f.subjects, subject)
+	return f.err
+}
+
+func (f *fakeIdP) take() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := f.subjects
+	f.subjects = nil
+	return out
+}
+
+// TestRevokeSessionsEndsIdentityProviderSessions: after members.revokeSessions the identity service ends the user's
+// sessions at the identity provider (IR386): the user's ID in the realm locally, the Cognito sub once the user has one.
+// The event is applied once. A provider that fails is logged and the event is still done, so it does not hold up
+// the identity consumer's other events; the Core API refuses the old sign-ins either way (IR384).
+func TestRevokeSessionsEndsIdentityProviderSessions(t *testing.T) {
+	idp := &fakeIdP{}
+	s := serverCfg(t, func(c *apiserver.Config) { c.IdentityProvider = idp; c.Domains = ops.Domains })
+	user, member := seed.ID("user-test-revoke-idp"), seed.ID("test-revoke-idp-tech")
+	owner(t, `INSERT INTO identity.users (id, email, display_name) VALUES ($1, 'revoke.idp.test@example.com', 'Revoke IdP Test') ON CONFLICT DO NOTHING`, user)
+	owner(t, `UPDATE identity.users SET cognito_sub = NULL WHERE id = $1`, user)
+	owner(t, `INSERT INTO identity.memberships (id, tenant_id, user_id, organization_id, role, employment, valid_from) VALUES ($1,$2,$3,$4,'technician','internal',$5) ON CONFLICT DO NOTHING`,
+		member, seed.ID("tenant-a"), user, seed.ID("org-operator-a"), clock.Add(-24*time.Hour))
+	t.Cleanup(func() { owner(t, `DELETE FROM identity.memberships WHERE id = $1`, member) })
+	revoke := func() {
+		t.Helper()
+		if code, m := write(s, &hq, "members.revokeSessions", fmt.Sprintf(`{"membershipId":"%s","reason":"Laptop stolen"}`, member), 0); code != 200 {
+			t.Fatalf("revoke: %d %v", code, m)
+		}
+		if err := s.DrainEvents(context.Background()); err != nil {
+			t.Fatalf("drain: %v", err)
+		}
+	}
+
+	revoke()
+	if got := idp.take(); !slices.Contains(got, user.String()) {
+		t.Errorf("ended at the identity provider: %v, want %s", got, user)
+	}
+	if err := s.DrainEvents(context.Background()); err != nil || len(idp.take()) != 0 {
+		t.Errorf("the event was applied again: %v", err)
+	}
+
+	// a user with a Cognito sub is ended by it; a provider that does not answer leaves the event done
+	sub := "cognito-" + uuid.NewString()
+	owner(t, `UPDATE identity.users SET cognito_sub = $2 WHERE id = $1`, user, sub)
+	t.Cleanup(func() { owner(t, `UPDATE identity.users SET cognito_sub = NULL WHERE id = $1`, user) })
+	idp.err = errors.New("identity provider unavailable")
+	revoke()
+	if got := idp.take(); !slices.Contains(got, sub) || slices.Contains(got, user.String()) {
+		t.Errorf("ended with the Cognito sub: %v", got)
+	}
+	idp.err = nil
+	if err := s.DrainEvents(context.Background()); err != nil || len(idp.take()) != 0 {
+		t.Errorf("a failed provider call is retried and holds up the consumer: %v", err)
 	}
 }

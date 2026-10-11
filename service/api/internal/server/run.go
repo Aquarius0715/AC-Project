@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strconv"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/platform/democlock"
+	"github.com/pradita/ac-project/service/api/internal/platform/idp"
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
 	"github.com/pradita/ac-project/service/api/internal/platform/ratelimit"
 )
@@ -97,6 +99,19 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 			}
 		}
 		cfg.WriteLimit = &ratelimit.Window{Store: store, Limit: limit, Window: time.Minute, Prefix: "ac:rl:write:"}
+	}
+	// the identity provider's admin API ends a user's sessions when HQ signs them out everywhere (IR386): the token
+	// endpoint and admin API of the realm with a service-account client; all four or none
+	if v := []string{os.Getenv("IDP_TOKEN_URL"), os.Getenv("IDP_ADMIN_URL"), os.Getenv("IDP_ADMIN_CLIENT_ID"), os.Getenv("IDP_ADMIN_CLIENT_SECRET")}; v[0]+v[1]+v[2]+v[3] != "" {
+		if v[0] == "" || v[1] == "" || v[2] == "" || v[3] == "" {
+			return cfg, fmt.Errorf("IDP_TOKEN_URL, IDP_ADMIN_URL, IDP_ADMIN_CLIENT_ID and IDP_ADMIN_CLIENT_SECRET go together")
+		}
+		for i, k := range []string{"IDP_TOKEN_URL", "IDP_ADMIN_URL"} {
+			if u, err := url.Parse(v[i]); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+				return cfg, fmt.Errorf("%s: not an http(s) URL", k)
+			}
+		}
+		cfg.IdentityProvider = &idp.Keycloak{TokenURL: v[0], AdminURL: strings.TrimRight(v[1], "/"), ClientID: v[2], ClientSecret: v[3]}
 	}
 	if cfg.DemoOps { // fixture.clock unless DEMO_CLOCK_START overrides it (IR36); shared with the workers (IR168)
 		start, err := democlock.StartFromEnv(os.Getenv)

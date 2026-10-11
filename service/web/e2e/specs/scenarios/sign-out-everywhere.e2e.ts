@@ -1,6 +1,6 @@
-// HQ signs a client user out everywhere (FR-A17, Figma Admin 02-15 → 03-8; IR384, IR385). The user's open page asks to
-// sign in again; the identity provider's single sign-on cannot bring the old sign-in back, so it asks for the password;
-// with it the user is back. customer-b is not a project's shared user, so the other tests keep their sessions; a run
+// HQ signs a client user out everywhere (FR-A17, Figma Admin 02-15 → 03-8; IR384–IR386). The user's open page asks to
+// sign in again; identity has ended the user's sessions at the identity provider too, so it asks for the password at
+// once, without a single sign-on answer for the BFF to refuse; with it the user is back. customer-b is not a project's shared user, so the other tests keep their sessions; a run
 // leaves one audit entry and a revocation time on customer-b's membership.
 import { test, expect } from "../../fixtures/test";
 import { APPS, type App } from "../../fixtures/apps";
@@ -47,12 +47,15 @@ test("HQ signs a client user out everywhere, and the password signs them in agai
       await expect(user).toHaveURL(/\/login/);
     });
 
-    await test.step("single sign-on cannot bring the old sign-in back; the password does", async () => {
-      await user.getByRole("link", { name: /^Continue as / }).click();
-      await expect(user.locator("#password")).toBeVisible(); // prompt=login after the refused single sign-on answer
+    await test.step("the identity provider asks for the password at once; with it customer-b is back", async () => {
       // auth_time has whole seconds, so a sign-in within the revocation's own second is refused too (IR385); a person
-      // cannot type the password that fast, the test can
+      // cannot sign in again that fast, the test can. The second also gives identity time to end the provider's sessions.
       await user.waitForTimeout(Math.max(0, revokedAt + 1_100 - Date.now()));
+      const refusedSso: string[] = []; // the BFF's prompt=login hop after a refused single sign-on answer (IR385)
+      user.on("request", (r) => { if (/\/bff\/auth\/login\?(.*&)?reauth=1/.test(r.url())) refusedSso.push(r.url()); });
+      await user.getByRole("link", { name: /^Continue as / }).click();
+      await expect(user.locator("#password")).toBeVisible();
+      expect(refusedSso, "the provider's single sign-on session was ended (IR386)").toEqual([]);
       await enterPassword(user, "customer-b");
       await expect(user).toHaveURL(/\/customer/);
       await expect(user.getByRole("banner")).toContainText("customer-b");

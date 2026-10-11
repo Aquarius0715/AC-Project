@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTAINER
-version: 0.41.0
+version: 0.42.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -99,7 +99,7 @@ Local stand-ins for the AWS managed services:
 | ElastiCache (Valkey) | `valkey/valkey:8` | The BFF session store (IR382) and the write limit's counters (IR375) |
 | SQS / SNS FIFO, Kinesis, Firehose, S3, SES, Secrets Manager, KMS, EventBridge Scheduler | `localstack/localstack:4` | Resources created by `docker/localstack/init-aws.sh`; the AWS clients will use `AWS_ENDPOINT_URL` (none is built yet, IR334) |
 | AWS IoT Core (MQTT, rules) | `eclipse-mosquitto:2` + `iot-bridge` | Same topic layout; the bridge forwards topics to Kinesis / SQS like the IoT rules. Mutual TLS and IoT policies are verified in staging against IoT Core |
-| Amazon Cognito | `keycloak:26` realm `ac` (`docker/keycloak/realm-ac.json`) | Two OIDC clients `ac-web` and `ac-admin-web` (HQ network rule), TOTP (required for HQ users; the local realm pre-provisions a test TOTP credential per HQ user for end-to-end runs, IR177); one local user per fixture actor (username = `membershipId` in `docs/04-agentic-sdlc/fixture-contract.json`, password `local-pass`); the Go verifier is configured by issuer and JWKS URL only; brute-force protection like Cognito's lockout (10 failures lock an account for 60 s, growing to 15 min, IR370) |
+| Amazon Cognito | `keycloak:26` realm `ac` (`docker/keycloak/realm-ac.json`) | Two OIDC clients `ac-web` and `ac-admin-web` (HQ network rule), and identity-api's service-account client `ac-identity-admin` (no sign-in flow; its service account holds realm-management `manage-users` only, to end a user's sessions when HQ signs them out everywhere, IR386), TOTP (required for HQ users; the local realm pre-provisions a test TOTP credential per HQ user for end-to-end runs, IR177); one local user per fixture actor (username = `membershipId` in `docs/04-agentic-sdlc/fixture-contract.json`, password `local-pass`); the Go verifier is configured by issuer and JWKS URL only; brute-force protection like Cognito's lockout (10 failures lock an account for 60 s, growing to 15 min, IR370) |
 | Stripe API / webhooks | `stripe/stripe-mock` (offline) and Stripe CLI (test mode), each pinned by version and digest (IR373) | Live mode never outside production |
 | Weather source | `wiremock` (`docker/wiremock`) | Fixed demo responses |
 | CloudWatch / X-Ray | OpenTelemetry collector + Jaeger | Same OTLP exporter configuration |
@@ -133,6 +133,7 @@ Configuration is twelve-factor: every service reads environment variables only. 
 | `DEMO_OPS` / `DEMO_CLOCK_START` | domain services, workers | `1` / not set (the fixture clock) | not set (demo operations off) — `demo.*` operations and the shared scenario clock (IR154, IR36, IR168) |
 | `APP_LOGIN_PASSWORD` / `SEED_FIXTURE` | migrate | a local password / the fixture path | not set (logins from infrastructure as code; no fixture) — Local logins `ac_app_login` and `ac_<domain>_login`, and the demo fixture (IR167, IR194) |
 | `INTERNAL_API_TOKEN` / `IDENTITY_INTERNAL_URL` | Core API services | secret / `http://identity-api:8080` | service-to-service calls; principals from identity-api (IR182) |
+| `IDP_TOKEN_URL` / `IDP_ADMIN_URL` / `IDP_ADMIN_CLIENT_ID` / `IDP_ADMIN_CLIENT_SECRET` | identity-api only | `http://keycloak:8080/realms/ac/protocol/openid-connect/token` / `http://keycloak:8080/admin/realms/ac` / `ac-identity-admin` / a local value in `compose.yaml` | not set: a Cognito adapter calls AdminUserGlobalSignOut with identity-api's task role (`cognito-idp:AdminUserGlobalSignOut` on the user pool; planned with the AWS target) — Ends a user's sessions at the identity provider when HQ signs them out everywhere (IR386). All four or none, and the URLs are http(s), or the service does not start; unset = the Core API's cutoff only (IR384) |
 | `SESSION_SECRET` | web (BFF) | a local value in `compose.yaml` | Secrets Manager — Key material of the sealed session cookie (AES-256-GCM, key derived with HKDF, IR333). Required on https, at least 32 characters: without it the app seals and opens no session (IR367) |
 | `APP_URL` / `OIDC_APP_CLIENT_SECRET` | web (BFF) | `http://localhost:3000`–`3003` / the Keycloak client secret | the app's host name / Secrets Manager — The OIDC redirect URI and the confidential client |
 | `CUSTOMER_WEB_URL` / `PARTNER_WEB_URL` / `TECHNICIAN_WEB_URL` / `ADMIN_WEB_URL` | web | `http://localhost:3000`–`3003` | the four host names — Links between the four apps (IR178) |
@@ -191,4 +192,4 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 | OPEN-CT-03 | Closed by IR382: the BFF keeps each sign-in in the session store (ElastiCache in production, Valkey locally) and deletes it at sign-out (backend architecture §6) |
 | OPEN-CT-04 | OpenTelemetry instrumentation of the Go services and the web apps. The collector, Jaeger and `OTEL_EXPORTER_OTLP_ENDPOINT` are ready, but nothing exports traces or metrics yet (IR334) |
 
-Additional contracts for current version 0.41.0: Read IR01–IR382 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.42.0: Read IR01–IR386 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

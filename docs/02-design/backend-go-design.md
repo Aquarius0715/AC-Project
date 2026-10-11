@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND-GO
-version: 0.44.0
+version: 0.45.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -52,7 +52,8 @@ service/api/        (IR174; under service/api since IR179; the Next.js apps are 
     ops/            the operation pipeline: registry (catalog_gen.go), REST binding (rest.go), validation, authorization,
                     idempotency, expected version, transaction, events and audit (Call), internal queries between services
     platform/       apperr (DomainError), auth (OIDC / JWT, Principal), authz, db (pgx pools, TxManager, RLS context),
-                    events (envelope, publish, replica consumers), paging, blob (file store), democlock, unitscope
+                    events (envelope, publish, replica consumers), paging, blob (file store), democlock, unitscope,
+                    logging (slog handler), ratelimit (the write limit, IR375), idp (the identity provider's logout, IR386)
     modules/        one package per business area: identity assets devices control monitoring maintenance billing
                     restrictions energy notify audit summaries voice writes
     scheduler/      the clock-driven transitions per domain (IR195, IR356)
@@ -297,4 +298,4 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | OPEN-GO-01 | Final choice of the TypeScript → Go contract generator (output reviewed for union types such as `UnitAction` and `Policy`) |
 | OPEN-GO-02 | WhatsApp provider SDK (depends on OPEN-BE-04) |
 
-Additional contracts for current version 0.44.0: Read IR01–IR384 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.45.0: Read IR01–IR386 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

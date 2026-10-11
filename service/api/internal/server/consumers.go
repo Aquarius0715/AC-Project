@@ -20,7 +20,8 @@ import (
 
 // consumers returns the event subscribers of the served domains (all domains when none is given). Each consumer
 // name is stable: it is the de-duplication key in platform.processed_events (IR183).
-func consumers(m *db.TxManager, domains []string) []*events.Consumer {
+// ender ends a user's sessions at the identity provider when HQ signs them out everywhere (nil: none, IR386).
+func consumers(m *db.TxManager, domains []string, ender identity.SessionEnder) []*events.Consumer {
 	serves := func(d string) bool { return len(domains) == 0 || slices.Contains(domains, d) }
 	var out []*events.Consumer
 	add := func(domain, name string, handlers map[string]events.Handler) {
@@ -28,11 +29,11 @@ func consumers(m *db.TxManager, domains []string) []*events.Consumer {
 			out = append(out, &events.Consumer{Name: name, DB: m, Handlers: handlers})
 		}
 	}
-	add(ops.DomainEquipment, "equipment", merge(assets.EventHandlers(), monitoring.EventHandlers(), control.EventHandlers()))                                // IR184, IR185
-	add(ops.DomainBilling, "billing", merge(restrictions.EventHandlers(), events.Handlers(billing.Replicas...)))                                             // IR185
-	add(ops.DomainIdentity, "identity", merge(events.Handlers(notify.Replicas...), notify.EventHandlers(), identity.GrantHandlers(), audit.EventHandlers())) // IR188
-	add(ops.DomainMaintenance, "maintenance", merge(events.Handlers(maintenance.Replicas...), maintenance.NoteHandlers()))                                   // IR192
-	add(ops.DomainEnergy, "energy", events.Handlers(energy.Replicas...))                                                                                     // IR189
+	add(ops.DomainEquipment, "equipment", merge(assets.EventHandlers(), monitoring.EventHandlers(), control.EventHandlers()))                                                                 // IR184, IR185
+	add(ops.DomainBilling, "billing", merge(restrictions.EventHandlers(), events.Handlers(billing.Replicas...)))                                                                              // IR185
+	add(ops.DomainIdentity, "identity", merge(events.Handlers(notify.Replicas...), notify.EventHandlers(), identity.GrantHandlers(), audit.EventHandlers(), identity.SessionHandlers(ender))) // IR188, IR386
+	add(ops.DomainMaintenance, "maintenance", merge(events.Handlers(maintenance.Replicas...), maintenance.NoteHandlers()))                                                                    // IR192
+	add(ops.DomainEnergy, "energy", events.Handlers(energy.Replicas...))                                                                                                                      // IR189
 	return out
 }
 

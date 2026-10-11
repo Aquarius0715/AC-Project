@@ -41,16 +41,17 @@ type Config struct {
 	DatabaseReaderURL string
 	Addr              string
 	Clock             func() time.Time
-	DemoOps           bool              // demo environment only: demo.advanceClock / demo.trigger (IR154)
-	DemoStart         time.Time         // demo scenario clock at start (fixture.clock, IR36); zero keeps the base clock
-	Logger            *slog.Logger      // Echo's application logger (Echo v5 uses log/slog); nil keeps Echo's default
-	Domains           []string          // business domains this service serves (IR180); empty = all (tests)
-	IdentityURL       string            // identity-api base URL for principals (IR181); empty = read identity tables
-	InternalToken     string            // shared token of internal service-to-service endpoints
-	ServiceURLs       map[string]string // base URL per domain for internal queries of unserved domains (IR190)
-	PrincipalTTL      time.Duration     // principal cache of RemoteSource: 0 = 30 s, negative = no cache (IR181)
-	DemoClock         ScenarioClock     // shared scenario clock of several services in one binary (tests); overrides DemoStart
-	WriteLimit        ops.WriteLimiter  // writes per membership and minute (IR375); nil = no limit
+	DemoOps           bool                  // demo environment only: demo.advanceClock / demo.trigger (IR154)
+	DemoStart         time.Time             // demo scenario clock at start (fixture.clock, IR36); zero keeps the base clock
+	Logger            *slog.Logger          // Echo's application logger (Echo v5 uses log/slog); nil keeps Echo's default
+	Domains           []string              // business domains this service serves (IR180); empty = all (tests)
+	IdentityURL       string                // identity-api base URL for principals (IR181); empty = read identity tables
+	InternalToken     string                // shared token of internal service-to-service endpoints
+	ServiceURLs       map[string]string     // base URL per domain for internal queries of unserved domains (IR190)
+	PrincipalTTL      time.Duration         // principal cache of RemoteSource: 0 = 30 s, negative = no cache (IR181)
+	DemoClock         ScenarioClock         // shared scenario clock of several services in one binary (tests); overrides DemoStart
+	WriteLimit        ops.WriteLimiter      // writes per membership and minute (IR375); nil = no limit
+	IdentityProvider  identity.SessionEnder // ends a user's sessions at the identity provider (IR386); nil = none
 }
 
 // Server is the assembled Core API.
@@ -204,7 +205,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		m.Close()
 		return nil, err
 	}
-	srv := &Server{Echo: e, Registry: reg, DB: m, Consumers: consumers(m, cfg.Domains)}
+	srv := &Server{Echo: e, Registry: reg, DB: m, Consumers: consumers(m, cfg.Domains, cfg.IdentityProvider)}
 	if len(cfg.Domains) > 0 && len(cfg.ServiceURLs) > 0 { // read models ask the owning services (IR190)
 		q := &ops.HTTPQueries{Targets: map[string]*url.URL{}, Token: cfg.InternalToken}
 		for d, raw := range cfg.ServiceURLs {

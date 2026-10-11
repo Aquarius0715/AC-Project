@@ -620,7 +620,7 @@ func membersRevokeSessions(ctx context.Context, c *ops.Call, in *RevokeSessionsI
 	when := at.Format(time.RFC3339)
 	c.Audit(ops.AuditEntry{Action: "members.revokeSessions", TargetKind: "membership", TargetID: in.MembershipID.String(), Reason: in.Reason,
 		After: map[string]*string{"sessionsRevokedAt": &when}})
-	c.Emit(ops.Event{AggregateType: "membership", AggregateID: in.MembershipID, Type: "SessionsRevoked", Payload: map[string]any{"userId": user, "revokedAt": at}})
+	c.Emit(ops.Event{AggregateType: "membership", AggregateID: in.MembershipID, Type: EventSessionsRevoked, Payload: map[string]any{"userId": user, "revokedAt": at}}) // the identity provider's sessions end too (IR386)
 	return SessionsRevoked{MembershipID: in.MembershipID, UserID: user, RevokedAt: at, MembershipIDs: ids}, nil
 }
 

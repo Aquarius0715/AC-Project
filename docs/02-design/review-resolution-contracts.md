@@ -5890,3 +5890,57 @@ IR384 built the operation and the cutoff. This round wires the screens and the a
      5. the password signs them in again.
    - E2E `admin/access`: the modal needs a reason, then signs hq-override-only out everywhere.
 7. **Still to come.** Ending the identity provider's sessions from the `SessionsRevoked` event: Keycloak's admin logout needs a service-account client in the realm, and Cognito's call is AdminUserGlobalSignOut.
+
+## IR386 Signing a user out everywhere also ends their sessions at the identity provider — 2026-10-12
+
+IR384 and IR385 left one step open: ending the identity provider's sessions from the `SessionsRevoked` event.
+
+1. **What it adds.**
+   - The Core API already refuses every earlier sign-in (IR384). The BFF already turns a single sign-on answer with the old `auth_time` into a password prompt (IR385).
+   - Now identity-api also ends the user's sessions at the identity provider. Their refresh tokens and their single sign-on session end, so the next sign-in asks for the password at once.
+   - Locally this is Keycloak's admin logout, `POST /admin/realms/ac/users/{id}/logout`. In production, a Cognito adapter will call AdminUserGlobalSignOut in the same place, planned with the AWS target (DEC-68).
+2. **How it works.**
+   - `members.revokeSessions` emits `SessionsRevoked {userId}`.
+   - A new handler in the identity consumer finds the user's subject at the identity provider. That is the Cognito `sub` once the user has one; otherwise it is the user ID, which the local realm uses as its user ID.
+   - `internal/platform/idp` (Keycloak) gets the service account's token with the client-credentials grant. It keeps the token until 30 seconds before it expires.
+   - The user's ID is path-escaped, so it cannot leave the user's own admin path.
+   - A 404 (a user the realm does not know) counts as done. After a refused token, the next call fetches a new one.
+   - It is best effort. When the provider refuses, or does not answer within 5 seconds, the failure is logged and the event is done.
+     - A retried event would hold up the identity consumer's other events (notifications, audit).
+     - The Core API's cutoff refuses the old sign-ins either way.
+   - A late event, for example after identity-api was down, also ends any sign-in made after the revocation. The user then signs in again.
+3. **Least privilege (security check).**
+   - The realm has a new confidential client, `ac-identity-admin`. It is a service account only: the standard flow, the implicit flow and direct grants are off.
+   - Its service account holds realm-management `manage-users` and nothing else. That is the smallest Keycloak role that may log a user out.
+   - Checked against the running realm: the service account has no realm role and no other client role. Its token is refused (403) for the realm's clients, its roles, its settings and the master realm.
+   - Only identity-api gets `IDP_TOKEN_URL`, `IDP_ADMIN_URL`, `IDP_ADMIN_CLIENT_ID` and `IDP_ADMIN_CLIENT_SECRET` (container design §4).
+     - The service does not start when only some of them are set, or when a URL is not http(s).
+     - Without them there is no handler, and the cutoff alone applies.
+   - In production, identity-api's task role gets `cognito-idp:AdminUserGlobalSignOut` on the user pool and nothing more.
+   - The call is a new traffic flow, F20 in network architecture §4: identity service → the identity provider's admin API. Production goes through the Cognito interface endpoint where offered, else via Z5.
+   - The secret is never logged: a configuration error names the variable, not its value.
+4. **The BFF's stored records.** IR384 also listed deleting the BFF's stored records from the event. They need no deletion of their own:
+   - the next use of each record is refused, and that deletes it (IR385);
+   - its refresh token no longer works;
+   - it ends with its absolute lifetime of 12 hours anyway.
+5. **Tests.**
+   - Unit `TestKeycloakEndSessions` covers:
+     - one token reused for several logouts;
+     - path escaping;
+     - a 404 counted as done;
+     - a refused token fetched again;
+     - an expired token fetched again;
+     - no subject;
+     - a wrong client secret.
+   - Integration `TestRevokeSessionsEndsIdentityProviderSessions` uses a fake provider and covers:
+     - after the revocation, the user's ID is ended;
+     - the event is applied once;
+     - with a Cognito sub, the sub is ended;
+     - a failing provider leaves the event done.
+     - When the handler returns the provider's error instead, the test fails, because the consumer is held up.
+   - `TestConfigFromEnv`: all four variables or none, and the URLs are http(s).
+   - E2E `scenarios/sign-out-everywhere` now asserts that the browser makes no `reauth=1` hop. The identity provider asks for the password without a single sign-on answer for the BFF to refuse.
+     - With a wrong client secret on identity-api, the logout fails and leaves one warning in the log. The hop comes back, and the test fails.
+6. **Checks.**
+   - Keycloak re-imported the realm, and every backend image was rebuilt.
+   - `make test-all` (both modes) passes. The E2E suite passes: 117 tests, 8 skipped. The validators pass.

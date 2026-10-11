@@ -1,6 +1,6 @@
 ---
 document_id: DD-NETWORK
-version: 0.37.0
+version: 0.38.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, review-agent, operations]
@@ -19,7 +19,7 @@ Principles:
 2. Field devices connect **outbound only**; no inbound port is opened at customer sites.
 3. Every connection is encrypted (TLS 1.2 or later, TLS 1.3 preferred); device and internal service connections use mutual TLS where supported.
 4. Outbound traffic to the internet leaves through controlled egress with an allowlist of provider names.
-   - As built (IR372): every outbound target of the code comes from the configuration — the Core API (`CORE_API_URL`), the identity provider, identity-api and the service queries — and none from a request. No contract field carries a URL, and the web apps configure no remote images or rewrites. A path parameter `.` or `..`, which `fetch` would resolve into another path, names no route.
+   - As built (IR372): every outbound target of the code comes from the configuration — the Core API (`CORE_API_URL`), the identity provider and its admin API (`IDP_ADMIN_URL`, IR386), identity-api and the service queries — and none from a request. No contract field carries a URL, and the web apps configure no remote images or rewrites. A path parameter `.` or `..`, which `fetch` would resolve into another path, names no route.
 5. Two availability zones in the primary region; a second region for disaster recovery.
 
 ## 2. Zones
@@ -84,6 +84,7 @@ The Core API, databases, broker, and management interfaces have no public names.
 | F17 | CI/CD (Z6) | Container registry, Z2 / Z3 deploy APIs | HTTPS 443 | Workload identity | Signed images only |
 | F18 | All services | Monitoring collectors (Z6) | HTTPS / OTLP | Service identity | Logs, metrics, traces |
 | F19 | IoT module (Z7) | Time source | NTP 123 (or the module's trusted time service) | — | Correct observedAt and certificate validation |
+| F20 | Identity service (Z3) | Identity provider admin API (`cognito-idp`) | HTTPS 443, through the Cognito interface endpoint where offered, else via Z5 | Task role allowed `AdminUserGlobalSignOut` only | HQ's "Sign out everywhere" ends the user's provider sessions, best effort (as built locally, IR386: identity-api → Keycloak's admin API with a service-account client) |
 
 Any flow not in this table is denied.
 
@@ -158,4 +159,4 @@ Give these to customer IT before installation (office sites; homes normally need
 | OPEN-NW-03 | Decided 2026-10-07: HQ admin app only from the company network (§3, DEC-68); the company must supply its office egress addresses and VPN egress addresses | — |
 | OPEN-NW-04 | Decided 2026-10-07: customer office firewall requirements in §5a | — |
 
-Additional contracts for current version 0.37.0: Read IR01–IR383 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.38.0: Read IR01–IR386 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

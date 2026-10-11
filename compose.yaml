@@ -239,6 +239,11 @@ services:
       <<: *backend-env
       DATABASE_URL: postgres://ac_identity_login:local@postgres:5432/ac?sslmode=disable
       DATABASE_READER_URL: postgres://ac_identity_login:local@postgres:5432/ac?sslmode=disable
+      # ends a user's identity-provider sessions when HQ signs them out everywhere (IR386); identity-api only
+      IDP_TOKEN_URL: http://keycloak:8080/realms/ac/protocol/openid-connect/token
+      IDP_ADMIN_URL: http://keycloak:8080/admin/realms/ac
+      IDP_ADMIN_CLIENT_ID: ac-identity-admin
+      IDP_ADMIN_CLIENT_SECRET: local-identity-admin-08e3e9c976792a4915e39541   # local only; production calls Cognito with identity-api's task role, no secret
     healthcheck: { test: ["CMD", "/app/server", "healthcheck"], interval: 10s, timeout: 3s, retries: 5 }
 
   equipment-api:        # units, devices, control, monitoring, read models (internal; reached through the gateway)
