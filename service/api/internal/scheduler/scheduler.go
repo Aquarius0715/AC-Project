@@ -3,6 +3,11 @@
 // maintenance expires offers and proposals, confirms unrated jobs and freezes histories, billing generates the
 // monthly payout drafts (IR341). A domain scheduler uses the domain's database role and asks other domains through
 // the registry's internal queries; Tick (all domains, local) serves tests and single-process runs.
+//
+// Several instances of a domain's scheduler may run (IR356): each tenant transaction takes a transaction-scoped
+// advisory lock per domain and tenant before it changes anything. The background loop skips a domain and tenant whose
+// lock another instance holds, and its next tick catches up; Tick and TickDomains wait for the lock, so a demo clock
+// jump or a test sees its transitions applied.
 package scheduler
 
 import (
@@ -35,6 +40,7 @@ type Result struct {
 	ExpiredProposals int
 	FrozenHistories  int
 	Jobs             int // changes of the registry's domain jobs (IR54 schedule automations)
+	Skipped          int // domains × tenants left to the instance holding their lock (IR356)
 }
 
 func (r Result) changes() int {
@@ -47,9 +53,27 @@ func Tick(ctx context.Context, m *db.TxManager, now time.Time, reg *ops.Registry
 	return TickDomains(ctx, m, now, nil, reg)
 }
 
-// TickDomains runs the transitions of the given domains (nil: all) once per tenant. reg (may be nil) answers the
-// internal queries of other domains, so a domain scheduler needs only its own role.
+// TickDomains runs the transitions of the given domains (nil: all) once per tenant, waiting while another instance
+// ticks the same domain and tenant. reg (may be nil) answers the internal queries of other domains, so a domain
+// scheduler needs only its own role.
 func TickDomains(ctx context.Context, m *db.TxManager, now time.Time, domains []string, reg *ops.Registry) (Result, error) {
+	return tick(ctx, m, now, domains, reg, true)
+}
+
+// TryTickDomains is the background tick: a domain and tenant that another instance is ticking is skipped this time
+// (Result.Skipped), never waited for (IR356).
+func TryTickDomains(ctx context.Context, m *db.TxManager, now time.Time, domains []string, reg *ops.Registry) (Result, error) {
+	return tick(ctx, m, now, domains, reg, false)
+}
+
+// lockSQL takes the advisory lock of one domain's scheduler for one tenant until the transaction ends: keyed by the
+// hashes of "scheduler:<domain>" and the tenant ID. The try form answers whether the lock was free.
+const (
+	lockSQL    = `SELECT pg_advisory_xact_lock(hashtext('scheduler:' || $1), hashtext($2::text))`
+	tryLockSQL = `SELECT pg_try_advisory_xact_lock(hashtext('scheduler:' || $1), hashtext($2::text))`
+)
+
+func tick(ctx context.Context, m *db.TxManager, now time.Time, domains []string, reg *ops.Registry, wait bool) (Result, error) {
 	serves := func(d string) bool { return domains == nil || slices.Contains(domains, d) }
 	var tenants []uuid.UUID
 	rows, err := m.Writer.Query(ctx, `SELECT id FROM platform.tenants ORDER BY id`)
@@ -75,7 +99,29 @@ func TickDomains(ctx context.Context, m *db.TxManager, now time.Time, domains []
 			if _, err := tx.Exec(ctx, `SELECT set_config('app.now', $1, true)`, now.UTC().Format(time.RFC3339Nano)); err != nil {
 				return err
 			}
-			if serves(ops.DomainEquipment) {
+			// the domains this transaction ticks: those whose lock it holds, taken in the order of Domains (IR356)
+			held := map[string]bool{}
+			for _, d := range Domains {
+				if !serves(d) {
+					continue
+				}
+				if wait {
+					if _, err := tx.Exec(ctx, lockSQL, d, t); err != nil {
+						return err
+					}
+					held[d] = true
+					continue
+				}
+				var ok bool
+				if err := tx.QueryRow(ctx, tryLockSQL, d, t).Scan(&ok); err != nil {
+					return err
+				}
+				held[d] = ok
+				if !ok {
+					r.Skipped++
+				}
+			}
+			if held[ops.DomainEquipment] {
 				n, err := control.ExpireCommands(ctx, tx, now)
 				if err != nil {
 					return err
@@ -89,7 +135,7 @@ func TickDomains(ctx context.Context, m *db.TxManager, now time.Time, domains []
 			}
 			if reg != nil { // the modules' jobs of the served domains, recorded like a write (events, audits)
 				for _, d := range Domains {
-					if !serves(d) {
+					if !held[d] {
 						continue
 					}
 					for _, job := range reg.Jobs[d] {
@@ -108,7 +154,7 @@ func TickDomains(ctx context.Context, m *db.TxManager, now time.Time, domains []
 					}
 				}
 			}
-			if serves(ops.DomainMaintenance) {
+			if held[ops.DomainMaintenance] {
 				n, err := maintenance.ExpireOffers(ctx, tx, now, actor)
 				if err != nil {
 					return err
@@ -148,7 +194,7 @@ func RunDomains(ctx context.Context, m *db.TxManager, interval time.Duration, cl
 	t := time.NewTicker(interval)
 	defer t.Stop()
 	for {
-		if r, err := TickDomains(ctx, m, clock(), domains, reg); err != nil {
+		if r, err := TryTickDomains(ctx, m, clock(), domains, reg); err != nil {
 			logf("worker tick failed: %v", err)
 		} else if r.changes() > 0 {
 			logf("worker tick: %+v", r)

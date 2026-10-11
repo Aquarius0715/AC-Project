@@ -5241,3 +5241,17 @@ IR353 found a test that expected no rows and passed because the request was refu
    - an automation outcome expected not selected.
    All of them hold, so none was hiding a defect.
 2. The restriction schedule test only logged "notifications.list not implemented yet". It now checks that the customer's inbox holds the restriction notice the schedule returned (`noticeNotificationIds`).
+
+## IR356 Several scheduler instances per domain: an advisory lock per domain and tenant — 2026-10-11
+
+Backend architecture §10 asks that each due item run once even with several scheduler instances. OPEN-BE-08 left the lease open: the schedulers are sweeps (IR335), compose runs one per domain, and `platform.scheduled_items` stays empty. A second instance would rely only on the guarded updates. They hold for a single row, but two instances could still compete over the same tenant's reminders and drafts.
+
+1. **The lock.** Each tenant transaction of a domain's scheduler first takes a transaction-scoped advisory lock on the hashes of `scheduler:<domain>` and the tenant ID. Several domains are locked in the order of `scheduler.Domains`. The lock is released when the transaction ends.
+2. **The background tick** (`RunDomains` → `TryTickDomains`) uses `pg_try_advisory_xact_lock`. If another instance holds the lock, it leaves that domain and tenant alone (`Result.Skipped`); its next tick, a second later, catches up. It never waits.
+3. **The waiting tick** (`Tick`, `TickDomains`: a demo clock jump, the tests) uses `pg_advisory_xact_lock`, so its transitions are applied when it returns.
+4. **Unchanged.** The transitions themselves and their guards (IR335); compose's one scheduler per domain. `platform.scheduled_items` is kept for item-based scheduling such as EventBridge triggers. OPEN-BE-08 now keeps only the monthly energy report e-mail, which waits for a decision.
+5. **Tests.** Integration `TestSchedulerInstancesShareTheWork`, in the single-process and the split-service suites:
+   - While another connection holds the maintenance lock of tenant-a, the background tick skips it and leaves a due offer offered.
+   - The waiting tick blocks until the lock is released, then expires the offer once.
+   - Two background ticks at once expire a new offer once, with a single "offer_expired" event.
+   - With the try-lock always succeeding, the test fails.

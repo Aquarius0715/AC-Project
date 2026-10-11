@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND
-version: 0.39.0
+version: 0.40.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -54,7 +54,7 @@ Decisions applied (DEC-67, DEC-68, DEC-69):
 | IoT gateway service | Device registry and credentials, MQTT bridge, command dispatch and acknowledgement matching, heartbeat and connection state, firmware operations | Containers next to the MQTT broker | Connected devices, messages | Database, broker |
 | Telemetry processor | Validates and stores measurements (quality valid / missing / stale / suspect), evaluates alert policies, feeds automation conditions; a separate rollup role writes the 15-minute and hourly aggregates | Stream consumers | Messages per second | Time-series store |
 | Automation engine | Evaluates schedules and event conditions; arbitrates capability → restriction → HQ policy → customer rule (DEC-09); creates Commands through the same Command policy | Workers | Rules due | Database |
-| Scheduler | Time-based business transitions (§10) with exactly-once execution per due item | Several instances claiming items with database leases | Due items | Database |
+| Scheduler | Time-based business transitions (§10) with exactly-once execution per due item | Several instances per domain, one at a time per domain and tenant (advisory lock, IR356) | Due items | Database |
 | Notification worker | Renders en / ms templates, applies preferences and consents, delivers in-app, e-mail, WhatsApp; records delivery state | Queue consumers | Notifications | Database |
 | Import / export worker | CSV unit import (FR-A18), monthly energy report (FR-C16), MRV and audit exports, attachment scanning | Queue consumers | Jobs | Object storage |
 | Webhook receiver | Receives payment and provider callbacks, verifies signatures, converts them to internal events | Small stateless service | Requests | Outbox |
@@ -82,7 +82,7 @@ Decisions applied (DEC-67, DEC-68, DEC-69):
 | Cache | Amazon ElastiCache (Valkey / Redis OSS compatible) | Sessions, idempotency keys, rate limits |
 | Domain events and queues | Amazon SNS FIFO → Amazon SQS FIFO (message group = aggregate ID), dead-letter queues | Outbox relay publishes; consumers idempotent |
 | MQTT and device management | AWS IoT Core (X.509 certificates, IoT policies, custom domain), IoT rules → Amazon Kinesis Data Streams, AWS IoT Jobs for firmware | Configurable custom endpoint `mqtt.<domain>` |
-| Scheduler triggers | Amazon EventBridge Scheduler → ECS task / SQS | Due items still claimed with database leases (§10) |
+| Scheduler triggers | Amazon EventBridge Scheduler → ECS task / SQS | Each tick still takes the domain and tenant lock (§10, IR356) |
 | E-mail | Amazon SES | SPF, DKIM, DMARC; bounce and complaint events via SNS |
 | Speech (optional) | Amazon Transcribe | Only if en / ms languages meet the assistant's needs |
 | Secrets and keys | AWS Secrets Manager, AWS KMS | Automatic rotation; separate keys per environment |
@@ -224,9 +224,14 @@ Modelling rules:
 | Contractor payout drafts | The 1st of each month (Kuala Lumpur): the drafts of the month that ended, once | FR-A23, FR-P10, IR341 |
 | Firmware campaign waves | Campaign schedule: the notice 24 h before, the start, waves at 95 % success inside the window, auto-pause | FR-A20, IR339 |
 
-The scheduler claims due items with a database lease (`FOR UPDATE SKIP LOCKED`) so that each item runs once even with several instances; handlers are idempotent and audited with actorRoleAtTime=system.
+Each due item runs once even with several scheduler instances; handlers are idempotent and audited with actorRoleAtTime=system.
 
-As built (IR335), the worker runs one scheduler per business domain with clock-driven work: equipment, maintenance and billing (IR195, IR341). Each scheduler ticks every second of business time, with one transaction per tenant. Each transition is a set-based update guarded by the state it leaves, for example `status = 'offered' AND offer_expires_at <= now`, so a second run finds nothing to change. No lease table is used yet: `platform.scheduled_items` stays empty, and compose runs one scheduler per domain. Several instances would need the lease above (OPEN-BE-08).
+As built (IR335), the worker runs one scheduler per business domain with clock-driven work: equipment, maintenance and billing (IR195, IR341). Each scheduler ticks every second of business time, with one transaction per tenant. Each transition is a set-based update guarded by the state it leaves, for example `status = 'offered' AND offer_expires_at <= now`, so a second run finds nothing to change. Several instances of a domain's scheduler may run (IR356):
+- Before it changes anything, each tenant transaction takes a transaction-scoped advisory lock of its domain and tenant (`pg_try_advisory_xact_lock` on the hashes of `scheduler:<domain>` and the tenant ID).
+- The background tick skips a domain and tenant whose lock another instance holds; the next tick catches up.
+- The synchronous tick of a demo clock jump waits for the lock, so its transitions are applied when the jump returns.
+
+Compose runs one scheduler per domain. `platform.scheduled_items` stays empty; it is kept for item-based scheduling such as EventBridge triggers.
 
 | Scheduler | Built transitions |
 |---|---|
@@ -309,6 +314,6 @@ Items of the table above that are not scheduled yet:
 | OPEN-BE-05 | Decided 2026-10-07: retention in §7 (confirm with legal counsel before go-live) | — |
 | OPEN-BE-06 | Decided 2026-10-07: capacity in §13 | — |
 | OPEN-BE-07 | Contractor payout rail (bank transfer file or Stripe Connect) | Payouts (FR-A23) |
-| OPEN-BE-08 | The scheduled items that are not built yet (§10 as built) and the lease (`platform.scheduled_items`, `FOR UPDATE SKIP LOCKED`) for running several scheduler instances per domain | Scheduler, worker |
+| OPEN-BE-08 | The scheduled items that are not built yet (§10 as built): the monthly energy report e-mail waits for a decision. Several instances per domain are decided: the advisory lock per domain and tenant (IR356) | Scheduler, worker |
 
-Additional contracts for current version 0.39.0: Read IR01–IR349 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.40.0: Read IR01–IR356 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND-GO
-version: 0.34.0
+version: 0.35.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -261,7 +261,7 @@ All workers share `internal/platform/events` (SNS FIFO publish, SQS long-poll co
 | Role (`--role=`) | Input | Work | Notes |
 |---|---|---|---|
 | outbox | `platform.outbox` | `SELECT … FOR UPDATE SKIP LOCKED LIMIT 100` every 200 ms (and on `LISTEN outbox`), publish to SNS FIFO (MessageGroupId = aggregate ID, deduplication ID = event ID), set `published_at` | Several instances can run; ordering is per aggregate |
-| scheduler | `platform.scheduled_items` | Claims due items with a 60 s lease via `FOR UPDATE SKIP LOCKED`, runs the handler for the item kind (backend architecture §10) in a tenant transaction, sets `done_at` | Sweeps that are not item-based (command expiry every 5 s, stale sensors every 60 s) loop over tenants and `SET LOCAL app.tenant_id` per tenant |
+| scheduler | the domain's tables (`platform.scheduled_items` reserved) | As built: one sweep per domain every second of business time. Each tenant transaction first takes the advisory lock of its domain and tenant: `pg_try_advisory_xact_lock` in the background loop, which skips a held tenant; `pg_advisory_xact_lock` in a demo clock jump, which waits (IR356). Then come the set-based transitions guarded by the state they leave (backend architecture §10). Item-based scheduling would claim `platform.scheduled_items` with `FOR UPDATE SKIP LOCKED` | The sweeps loop over tenants and `SET LOCAL app.tenant_id` per tenant |
 | iot | SQS `command-requested`, SQS `device-ack` (IoT rule), SQS `device-event` | Publishes `/cmd` via the IoT data plane (QoS 1) and marks the Command sent; matches acknowledgements by command ID and accepts them only before `expires_at` (late acks recorded); writes device events and connection changes | Never retries a command after `expires_at` |
 | telemetry | Kinesis stream (IoT rule) | Shard leases and checkpoints in `platform.stream_checkpoints`; batches of up to 500 records written with `pgx.CopyFrom` into `monitoring.measurements`; quality evaluation; alert policy evaluation → AlertOpened | Raw copies also go to S3 Parquet through a second IoT rule action (Firehose) |
 | rollup | timer | Every 5 minutes upserts `measurements_15m` and, hourly, `measurements_1h` for closed buckets (`INSERT … ON CONFLICT DO UPDATE`) | Re-runnable for late data within 35 days |
@@ -307,4 +307,4 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | OPEN-GO-01 | Final choice of the TypeScript → Go contract generator (output reviewed for union types such as `UnitAction` and `Policy`) |
 | OPEN-GO-02 | WhatsApp provider SDK (depends on OPEN-BE-04) |
 
-Additional contracts for current version 0.34.0: Read IR01–IR333 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.35.0: Read IR01–IR356 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
