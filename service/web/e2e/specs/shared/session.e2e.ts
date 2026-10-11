@@ -1,8 +1,12 @@
 // The shell and the session (FR-X01, IR241, IR250, IR251): the frame names the signed-in organization and user, Sign out
 // ends the session — the identity provider's too (IR357) — a protected page asks to sign in again with returnTo, and a
 // sign-in that came back says why.
+import type { Page } from "@playwright/test";
 import { test, expect } from "../../fixtures/test";
 import { signIn } from "../../fixtures/auth";
+
+// the page's own alerts, not Next.js's route announcer (role alert too)
+const notice = (page: Page) => page.locator('[role="alert"]:not(#__next-route-announcer__)');
 
 test("the shell names the signed-in user, not the demo persona", async ({ page, app }) => {
   await page.goto(app.home);
@@ -35,11 +39,11 @@ test.describe("signed out", () => {
 
   test("a returned sign-in says why", async ({ page }) => {
     await page.goto("/login?error=role");
-    await expect(page.getByRole("status")).toContainText("belongs to another AC Project service");
+    await expect(notice(page)).toContainText("belongs to another AC Project service"); // an error banner is an alert (IR362)
     await page.goto("/login?error=expired");
-    await expect(page.getByRole("status")).toContainText("Your session ended");
+    await expect(notice(page)).toContainText("Your session ended");
     await page.goto("/login");
-    await expect(page.getByRole("status")).toHaveCount(0);
+    await expect(notice(page)).toHaveCount(0);
   });
 
   test("a protected page keeps where it was going", async ({ page, app }) => {

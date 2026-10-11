@@ -5347,3 +5347,14 @@ UX-06 says that when a dialog closes, focus returns to its trigger; NFR-01 asks 
 6. **Tests.**
    - Component test (Testing Library, jsdom): the first field takes focus, Tab and Shift+Tab cycle, Escape closes, and focus is back on the trigger. Cancel takes focus in a confirmation. Escape closes only the innermost of two dialogs, and focus returns to its trigger.
    - E2E `shared/keyboard`, one dialog per app (customer invite, contractor unavailable days, technician QR scan, HQ new policy): opened with Enter, 12 Tabs and a Shift+Tab stay inside, Escape closes it, and the trigger has focus.
+
+## IR362 Errors are announced at once: alert banners and an alert region for error toasts — 2026-10-11
+
+UX-06 asks that critical errors be announced through suitable live regions. Every `Banner` had `role="status"`, which is polite, and every toast went to one polite region, errors included. A refused submit, a failed save or "Your session ended" waited until the screen reader finished its current speech.
+
+1. **Banners.** A `crit` banner is `role="alert"`; the other tones stay `role="status"`.
+2. **Toasts.** An error toast (`crit`) goes to an alert region, which is rendered while an error toast shows; a role="alert" element is announced when it appears. Other toasts go to a status region that is always present. Telemetry updates are still not announced.
+3. **Specs.** Next.js renders its route announcer with `role="alert"` too. The sign-in notices of `shared/session` and `shared/demo` are therefore found as `[role="alert"]` without the announcer.
+4. **Tests.**
+   - Web unit (Testing Library, jsdom): a `crit` banner is an alert, and warn and info banners are statuses. An error toast lands in the alert region, and another toast in the status region.
+   - The full E2E suite passes; the smoke crawl's axe check stays clean.

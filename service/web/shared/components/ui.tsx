@@ -133,7 +133,7 @@ export function Stat({ label, value, sub }: { label: string; value: React.ReactN
 export function Banner({ tone = "primary", icon, children, action }: { tone?: Tone; icon?: string; children: React.ReactNode; action?: React.ReactNode }) {
   const bd = tone === "warn" ? "border-[#fdba74] bg-warn-soft/60" : tone === "crit" ? "border-crit bg-crit-soft/60" : tone === "ok" ? "border-[#86efac] bg-ok-soft/60" : "border-line bg-primary-soft/50";
   return (
-    <div role="status" className={cx("flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-3.5 py-2.5 text-[13px]", bd)}>
+    <div role={tone === "crit" ? "alert" : "status"} className={cx("flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-3.5 py-2.5 text-[13px]", bd)}>
       <span aria-hidden>{icon ?? (tone === "warn" ? "⚠" : tone === "crit" ? "✕" : tone === "ok" ? "✓" : "ⓘ")}</span>
       <div className="min-w-0 flex-1">{children}</div>
       {action}
@@ -425,10 +425,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      <div aria-live="polite" className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex flex-col items-center gap-2 px-4">
-        {items.map((t) => (
-          <div key={t.id} className={cx("pointer-events-auto max-w-md rounded-xl px-4 py-2.5 text-[13px] font-semibold shadow-lg", t.tone === "crit" ? "bg-crit text-white" : t.tone === "warn" ? "bg-warn text-white" : "bg-ink text-white")}>
-            {t.msg}
+      {/* errors are announced at once (an alert, announced when it appears), other results politely through a status
+          region that is always there (UX-06, IR362) */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex flex-col items-center gap-2 px-4">
+        {(["alert", "status"] as const).filter((role) => role === "status" || items.some((t) => t.tone === "crit")).map((role) => (
+          <div key={role} role={role} className="flex flex-col items-center gap-2">
+            {items.filter((t) => (t.tone === "crit") === (role === "alert")).map((t) => (
+              <div key={t.id} className={cx("pointer-events-auto max-w-md rounded-xl px-4 py-2.5 text-[13px] font-semibold shadow-lg", t.tone === "crit" ? "bg-crit text-white" : t.tone === "warn" ? "bg-warn text-white" : "bg-ink text-white")}>
+                {t.msg}
+              </div>
+            ))}
           </div>
         ))}
       </div>

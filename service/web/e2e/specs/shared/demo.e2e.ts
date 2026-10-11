@@ -42,7 +42,7 @@ test("Expire session asks to sign in again", async ({ page, app }) => {
   await page.goto("/demo");
   await page.getByRole("button", { name: /Expire session/ }).click();
   await expect(page).toHaveURL(/\/login\?error=expired$/);
-  await expect(page.getByRole("status")).toContainText("Your session ended");
+  await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toContainText("Your session ended"); // the banner, not Next.js's route announcer
   await page.goto(app.home);
   await expect(page).toHaveURL(/\/login\?returnTo=/);
 });
