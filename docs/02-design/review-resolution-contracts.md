@@ -5793,3 +5793,20 @@ This round's security check took up the last open item of the session design.
    - E2E `shared/session`: a copy of the session cookie, moved into another browser context, works until sign-out and asks to sign in after it, in each of the four apps. With the session sealed into the cookie, that copy would have kept working.
    - The demo panel's Expire session now deletes the stored session too. The projects' tests share one sign-in, so the E2E test of Expire session now signs in on its own, as the sign-out tests do. Its first run, still on the shared sign-in, signed out every later test of its project.
 5. **Checks.** The web checks and the E2E suite pass. The backend did not change.
+
+## IR383 The web apps in their containers use the session store; a Permissions-Policy on every page — 2026-10-11
+
+1. **The containers (compose, `full` profile).**
+   - The `customer-web-api` image was built from `service/web/Dockerfile` with IR382's code. The Next.js standalone server includes `@redis/client`.
+   - Inside the compose network, the container reaches Valkey at `redis://valkey:6379`: the web apps are on the `app` network with it.
+   - Against this container, the customer project of the E2E suite passed: 32 tests, one skipped. That includes the revocation of a copied session cookie and the security headers. Sessions it signed in appeared in Valkey.
+2. **Security headers (security check).**
+   - The headers network architecture §6 asks for were all in place (IR354).
+   - No app uses the camera, the microphone, geolocation, the Payment Request API, USB or screen capture:
+     - the QR scan types the code, with the camera simulated (DD-T13);
+     - the assistant takes text;
+     - payments go through the payment page.
+   - So the four apps now send `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()`. A page cannot ask for these features even if a script were injected.
+   - A real QR scanner would allow `camera=(self)` in the technician app only.
+3. **Tests.** E2E `shared/security-headers` asserts the policy in each of the four apps, both on the host-run apps and on the container.
+4. **Checks.** The web checks and the E2E suite pass. The backend did not change.

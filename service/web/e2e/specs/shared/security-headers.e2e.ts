@@ -1,5 +1,5 @@
 // The security headers of network architecture §6 (IR354): every page carries a Content-Security-Policy with a fresh
-// nonce, which Next.js puts on its scripts, and nosniff, a referrer policy and no framing. Static assets carry the
+// nonce, which Next.js puts on its scripts, and nosniff, a referrer policy, no framing and no powerful browser features (IR383). Static assets carry the
 // static headers too. Runs in each app's project, signed in as its user; nothing is changed.
 import { test, expect } from "../../fixtures/test";
 
@@ -12,6 +12,7 @@ test("pages carry the CSP with a fresh nonce and the static security headers", a
   for (const d of ["default-src 'self'", "object-src 'none'", "base-uri 'self'", "frame-ancestors 'none'", "connect-src 'self'"]) expect(csp).toContain(d);
   expect(csp).not.toContain("unsafe-eval"); // a production build
   expect([h["x-content-type-options"], h["referrer-policy"], h["x-frame-options"]]).toEqual(["nosniff", "strict-origin-when-cross-origin", "DENY"]);
+  expect(h["permissions-policy"]).toBe("camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()"); // IR383
   const html = await res!.text();
   expect(html, "the framework's scripts carry the nonce").toContain(`nonce="${nonce}"`);
   expect(html.match(/<script(?![^>]*nonce=)[^>]*>/g) ?? [], "scripts without the nonce").toEqual([]);

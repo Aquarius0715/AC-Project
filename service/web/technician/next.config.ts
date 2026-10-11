@@ -16,6 +16,9 @@ const nextConfig: NextConfig = {
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
       { key: "X-Frame-Options", value: "DENY" },
+      // the apps use none of these browser features, so a page cannot ask for them even if a script were injected
+      // (IR383); the simulated QR camera needs no camera. A real scanner would allow camera=(self) on its app only
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), display-capture=()" },
     ] }];
   },
   // report photos and the sign-off reach the Server Actions as files (JPEG/PNG up to 5 MiB, DD-T09 / DD-T15)
