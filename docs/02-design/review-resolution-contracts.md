@@ -4904,3 +4904,17 @@ BR-A23 generates the drafts on the 1st, and BR-P10 says the statements are gener
    - Boards 06, 07 and 08 now show the three schedulers with the jobs of IR336, IR339, IR340 and IR341: `--domain=equipment|maintenance|billing`, "worker-scheduler × 3", the service cards and the workers card.
    - Board 06's schema cards list the tables added since IR335: certificate_reminders, warranty_reminders, payout_runs, notify's ref_certificates, and filter_reminders / filter_reminder_watermarks, which were missing.
    - The right column is restacked, because the longer maintenance list had overlapped restrictions.
+
+## IR342 Use Cases: the demo clock starts the reminders and the monthly drafts — 2026-10-11
+
+IR336, IR340 and IR341 added clock-driven work that the Figma Use Cases page (838:8066) did not show. Its «time» Demo clock actor drove only UC-A15 (firmware campaigns), UC-A35 (restriction execution) and UC-P03 (offer expiry).
+
+1. **Board 05 (HQ · customers, access & devices).** The clock is associated with UC-A08 Review warranty & coverage (the warranty reminders to HQ, IR340). The line runs right of the actors and enters the use case from below, past its extension UC-A09. The clock's caption adds "warranty reminders", and a note says so.
+2. **Board 07 (HQ · contracts, billing & restrictions).** The clock is associated with UC-A34 Manage contractor payouts (the drafts on the 1st, IR341). The «extend» label of UC-A36 → UC-A32 moved up its dashed line so the new line stays visible, and a note says HQ approves and pays the drafts.
+3. **Board 09 (Contractor).** The clock is associated with UC-P12 Track certificates & request training (the 60/30/7-day reminders, IR336). The Email / WhatsApp gateway actor moved 40 px down, with its line, so the new line passes above it. A note says so.
+4. **Catalogue and actors.** On board 13 the Demo clock is a secondary actor of UC-A08, UC-A34 and UC-P12. On board 00 the Demo clock row also lists firmware waves, the filter, certificate and warranty reminders, and the payout drafts.
+5. **Click maps and User Flows.** The example inbox rows of IR336 and IR340 open other screens, so their click maps gain an item, each with a hotspot over the row:
+   - Contractor 07-3 item 4: “Certificate reminder row → 04-6”.
+   - Admin 15-3 item 4: “Warranty reminder row → 02-19”.
+   The User Flows boards (805:8066) carry the same transitions as lane chips: “→ 04-6 Certificate reminder row” on 07-3 with “← 07-3” on 04-6, and “→ 02-19 Warranty reminder row” on 15-3 with “← 15-3” on 02-19. No card overlaps another.
+6. **No code or contract change.** The use case count stays 126.
