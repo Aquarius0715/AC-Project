@@ -5596,3 +5596,20 @@ The second security cycle starts with the follow-up of IR367: cookie names that 
    - The session test reads the names on https (`__Host-` / `__Secure-`) and on http (plain), and checks the attributes of setting and of removing.
    - The sign-out test, on https, requires the response to remove `__Host-ac_session_client` with Secure, `Path=/` and `Max-Age=0`. With the old `cookies.delete` it fails: no Secure and no `Max-Age`, so the browser would keep the session cookie.
 4. **Checks.** The web checks (407 unit tests, the build) and the E2E suite pass. On http, its sign-out and Expire session tests run the new removal.
+
+## IR375 The write limit per membership: 60 writes a minute, counted in the shared cache — 2026-10-11
+
+The second security cycle continues with the limit IR370 left open. Network architecture §6 proposes writes 60 per minute per session.
+
+1. **The limit.**
+   - **Where it runs.** The Core API counts each write of a membership after authorization, before the Idempotency-Key is claimed (`ops.WriteLimiter`). An unauthenticated or refused call costs nothing, and reads are not counted.
+   - **How it counts.** A fixed window per minute, keyed by tenant and membership. The counter lives in the shared cache (ElastiCache in production, Valkey locally, `RATE_LIMIT_URL`), so every instance of every domain service counts the same writes. The key expires after two minutes. The window runs on wall time, not on the business clock the demo moves.
+   - **Over the limit.** RATE_LIMITED (429), with `retryAfterSeconds` and `Retry-After`: the seconds left in the minute, at least one. The default limit is 60 (`WRITE_LIMIT_PER_MINUTE`); without `RATE_LIMIT_URL` there is no limit.
+   - **A cache that does not answer** lets the write through and logs it. A sign-in session is never blocked by the cache, and the edge limits still hold.
+   - **The client.** `go-redis` v9.22, the last release that builds with the project's Go 1.25 (v9.23 needs Go 1.26). `govulncheck` finds nothing.
+2. **The apps say how long.** A Server Action's failure now carries `retryAfterSeconds`, and its line reads “Too many changes in a short time — try again in N s” (Malay as well), as the implementation contracts ask for RATE_LIMITED. 40 places that turn a Core API error into a result pass it on, and 22 result types name it.
+3. **Tests.**
+   - `TestWindow` runs the window on `miniredis`: three writes pass, and the fourth waits until the minute ends. Another membership counts on its own, while a second instance on the same store counts together. The key carries a TTL, a new minute starts again, and the last instant waits at least one second. A closed store is an error.
+   - `TestWriteLimit` puts the limit in the pipeline. The fourth write of the minute, of any operation, is RATE_LIMITED with `Retry-After: 40` and `retryAfterSeconds` 40. Reads and other members go on, and the next minute is free. A store that does not answer lets the writes through.
+   - The action-message test reads the waiting time.
+4. **Checks.** `make test-all` and `make vuln` pass, as do the web checks (407 unit tests, the build). The E2E suite passes on the stack with the limit on: 111 passed, 8 skipped. Afterwards Valkey held 7 counters of the last two minutes; the busiest membership-minute counted 17 writes, well under 60.

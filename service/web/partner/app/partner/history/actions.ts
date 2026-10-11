@@ -17,7 +17,7 @@ export type Communication = {
 type Preview = { id: string; templateKey: string; channel: string; recipientMembershipId: string; deliveryState: string; occurredAt: string; at: string };
 export type CommunicationFailure = { ok: false; stage: "note" | "preview"; noteSaved: boolean } & ActionFailure;
 type Failure = CommunicationFailure;
-const failure = (e: CoreError, stage: Failure["stage"], noteSaved: boolean): Failure => ({ ok: false, stage, noteSaved, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors });
+const failure = (e: CoreError, stage: Failure["stage"], noteSaved: boolean): Failure => ({ ok: false, stage, noteSaved, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds });
 
 export async function communicate(c: Communication): Promise<{ ok: true; value: { noteSaved: boolean; preview: Preview } } | Failure> {
   const message = c.message.trim();

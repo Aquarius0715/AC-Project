@@ -21,7 +21,7 @@ export async function assignTechnician(jobId: string, jobVersion: number, techni
   } catch (e) {
     if (e instanceof CoreError) {
       if (e.error.code === "CONFLICT") refresh(); // overlap, changed state or another version: show the latest
-      return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors };
+      return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
     }
     throw e;
   }

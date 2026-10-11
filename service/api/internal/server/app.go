@@ -50,6 +50,7 @@ type Config struct {
 	ServiceURLs       map[string]string // base URL per domain for internal queries of unserved domains (IR190)
 	PrincipalTTL      time.Duration     // principal cache of RemoteSource: 0 = 30 s, negative = no cache (IR181)
 	DemoClock         ScenarioClock     // shared scenario clock of several services in one binary (tests); overrides DemoStart
+	WriteLimit        ops.WriteLimiter  // writes per membership and minute (IR375); nil = no limit
 }
 
 // Server is the assembled Core API.
@@ -90,6 +91,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	reg := ops.NewRegistry()
 	reg.ServeDomains(cfg.Domains...)
 	reg.DB, reg.Rec, reg.Idem = m, notifyingRecorder{inner: db.Recorder{}}, db.Idempotency{M: m}
+	reg.Limit = cfg.WriteLimit
 	if cfg.Clock != nil {
 		reg.Clock = cfg.Clock
 	}

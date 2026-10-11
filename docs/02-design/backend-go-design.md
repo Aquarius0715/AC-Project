@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND-GO
-version: 0.41.0
+version: 0.42.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -114,6 +114,7 @@ Dispatcher steps for one operation:
 1. Look up the operation of the route (an unknown route or method → NOT_FOUND `error.unknownOperation`; an ID path parameter that is not a UUID → NOT_FOUND `error.notFound`, IR223). The route builds the JSON input first: path parameters named after the input fields they fill, then the query string for GET and DELETE (top-level fields, `object.field`, lists as repeated or comma-separated values with an empty value as the empty list, `cursor`, `limit`, `sort=field:direction`, the catalogued filters by name) or the JSON object body for POST, PUT and PATCH (no query parameters), then the fixed field (`payouts.transition` at `/approve` sets `action=approve`). Unknown or misplaced parameters are VALIDATION `error.notAllowed`, unreadable values `error.invalid`, a body that repeats a path parameter or the fixed field with another value `error.pathMismatch`. `NewBinding` rejects at start-up a route whose path parameter is not a scalar input field, a GET on a write, a DELETE on a read, or a query-string route of an input with lists of objects, maps or raw JSON.
 2. Decode JSON strictly (`DisallowUnknownFields`) into the generated input type; run `Validate()` → VALIDATION with `fieldErrors`.
 3. Authorize with the compiled policy → FORBIDDEN, or NOT_FOUND when the target is outside scope (D01). Denied attempts are written to the audit log in a separate short transaction.
+   - As built (IR375): a write then counts against its membership's write limit (`ops.WriteLimiter`, `internal/platform/ratelimit`). The limit is 60 per minute by default, in a fixed window kept in the shared cache (`RATE_LIMIT_URL`), so every instance and service counts together. Over the limit the answer is RATE_LIMITED with `retryAfterSeconds` and `Retry-After`. A cache that does not answer lets the write through, logged.
 4. Writes: require `Idempotency-Key`; insert `platform.idempotency_keys` (in_progress). A completed key with the same request hash returns the stored response; a different hash returns CONFLICT; an in-progress key returns CONFLICT with `retryAfterSeconds`.
 5. Run the handler inside `TxManager.WithTx`: writer pool for writes, reader pool and read-only transaction for reads. The transaction starts with `set_config('app.tenant_id', …, true)` and `set_config('app.membership_id', …, true)` so row-level security applies to every statement.
 6. The handler returns the result and records events (`call.Emit`) and audit entries (`call.Audit`). Before commit the dispatcher writes the audit rows and outbox rows in the same transaction.
@@ -240,7 +241,7 @@ Rules every handler follows:
 | CONFLICT | 409 | Version mismatch, unique / exclusion violation (23505 / 23P01), illegal state transition, idempotency key reuse |
 | OFFLINE | 409 | Command to an offline device (rejected before sending) |
 | TIMEOUT | 504 | Context deadline exceeded |
-| RATE_LIMITED | 429 | Per-session write limit, Stripe or provider throttling surfaced to the user |
+| RATE_LIMITED | 429 | Per-session write limit (as built per membership, IR375), Stripe or provider throttling surfaced to the user; `retryAfterSeconds` and `Retry-After` say how long to wait |
 | UNAVAILABLE | 503 | Retries exhausted (40001 / 40P01), dependency down, panic; `retryAfterSeconds` set when known |
 
 ## 7. Workers
@@ -296,4 +297,4 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | OPEN-GO-01 | Final choice of the TypeScript → Go contract generator (output reviewed for union types such as `UnitAction` and `Policy`) |
 | OPEN-GO-02 | WhatsApp provider SDK (depends on OPEN-BE-04) |
 
-Additional contracts for current version 0.41.0: Read IR01–IR371 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.42.0: Read IR01–IR375 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

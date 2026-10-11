@@ -1782,6 +1782,8 @@ export const ms: Record<string, string> = {
   "This item no longer exists or is outside your scope": "Item ini tidak lagi wujud atau di luar skop anda",
   "The service is unavailable — try again shortly": "Perkhidmatan tidak tersedia — cuba lagi sebentar lagi",
   "Your session ended — sign in again": "Sesi anda telah tamat — log masuk semula",
+  "Too many changes in a short time — try again in {s} s": "Terlalu banyak perubahan dalam masa yang singkat — cuba lagi dalam {s} saat",
+  "Too many changes in a short time — try again shortly": "Terlalu banyak perubahan dalam masa yang singkat — cuba lagi sebentar lagi",
   "Check the entered values": "Semak nilai yang dimasukkan",
 
   // partner overview (lib/partnerOverview)

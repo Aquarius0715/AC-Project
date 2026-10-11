@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.257.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
+Version: 0.258.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.258.0 (2026-10-11): The write limit per membership is built: 60 writes a minute, counted in the shared cache across instances and services. The write over the limit is RATE_LIMITED with the seconds to wait, and the apps say how long (IR375).
 0.257.0 (2026-10-11): On https the cookies carry the `__Host-` / `__Secure-` prefixes, so a sibling subdomain cannot set or shadow them, and every cookie is removed with the attributes it was set with (IR374).
 0.256.0 (2026-10-11): Container hardening. The local stack's data stores, broker, identity provider and API are reachable only from this machine. Our own containers drop every Linux capability, and the two `:latest` images are pinned (IR373).
 0.255.0 (2026-10-11): Server-side request forgery. Every outbound request goes to a configured address, and no request names a target. A path parameter `.` or `..`, which `fetch` would resolve into another path, now names no route (IR372).

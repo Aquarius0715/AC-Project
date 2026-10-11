@@ -53,7 +53,7 @@ export default async function AdminEnergyPage({ searchParams }: PageProps<"/admi
         summary = await coreOp<ApiEnergySummary>("energy.summary", { from, to, unitIds, ...(baseline ? { baselineId: baseline.id } : {}) });
       } catch (e) {
         if (!(e instanceof CoreError) || e.error.code !== "VALIDATION") throw e; // an unusable period or unit set shows next to the form
-        error = actionMessage({ code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors ?? {} }, i.t);
+        error = actionMessage({ code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds }, i.t);
       }
     }
     live.analysis = { unitIds, from: klLocal(from), to: klLocal(to), baselineId: baseline?.id ?? null, summary: summary ? summaryView(summary, i) : null, error };

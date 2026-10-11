@@ -8,7 +8,7 @@
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ApiCommand } from "@ac/web/lib/units";
 
-export type ActionResult<T> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string> };
+export type ActionResult<T> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
 /** commands.create set_temperature with the version the intent was resolved at, source voice; no job (AT-X02-N). */
 export async function sendVoiceChange(unitId: string, celsius: number, expectedVersion: number): Promise<ActionResult<ApiCommand>> {
@@ -16,7 +16,7 @@ export async function sendVoiceChange(unitId: string, celsius: number, expectedV
     const command = await coreOp<ApiCommand>("commands.create", { unitId, action: { kind: "set_temperature", celsius }, expectedUnitVersion: expectedVersion, source: "voice" }, { write: true });
     return { ok: true, value: command };
   } catch (e) {
-    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {} };
+    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds };
     return { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   }
 }

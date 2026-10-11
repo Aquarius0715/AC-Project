@@ -6,7 +6,7 @@ import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ApiContractFull, PlanType } from "@ac/web/lib/contracts";
 
-export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string> };
+export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
 export type ContractInput = {
   id?: string; customerId: string; unitIds: string[]; planType: PlanType; startAt: string; endAt: string; priceMinor: number; currency: "MYR" | "USD";
@@ -19,7 +19,7 @@ export async function saveContract(input: ContractInput, version?: number): Prom
     const k = await coreOp<ApiContractFull>("contracts.save", input, { write: true, expectedVersion: input.id ? version : undefined });
     return { ok: true, value: { id: k.id, version: k.version } };
   } catch (e) {
-    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {} };
+    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds };
     return { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     refresh();

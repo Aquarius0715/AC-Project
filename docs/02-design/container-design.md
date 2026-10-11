@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTAINER
-version: 0.38.0
+version: 0.39.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -117,6 +117,8 @@ Configuration is twelve-factor: every service reads environment variables only. 
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | backend | `test` / `test` (LocalStack) | not set (ECS task role) |
 | `BLOB_DIR` | backend (maintenance-api) | `/var/lib/ac/blobs` on the named volume `blobs` (the image creates the directory owned by `nonroot`, so the read-only container keeps report photos, certificates and problem attachments across restarts, IR229) | not set — the S3 store for bucket `ac-files` is not implemented yet (IR229, open) |
 | `OIDC_ISSUER` | backend, web | `http://localhost:8081/realms/ac` (Keycloak `KC_HOSTNAME` fixes the `iss` claim) | Cognito user pool issuer |
+| `RATE_LIMIT_URL` | backend | `redis://valkey:6379` | ElastiCache endpoint (TLS, `rediss://`) — the shared counters of the write limit per membership (IR375); unset = no limit |
+| `WRITE_LIMIT_PER_MINUTE` | backend | not set (60) | not set (60) — writes per membership and minute (network architecture §6) |
 | `OIDC_JWKS_URL` | backend | `http://keycloak:8080/realms/ac/protocol/openid-connect/certs` (container network) | not set (derived from the issuer discovery document) |
 | `OIDC_INTERNAL_ISSUER` | web | `http://keycloak:8080/realms/ac` (container network) | not set (same as `OIDC_ISSUER`) |
 | `OIDC_APP_CLIENT_ID` / `OIDC_ADMIN_CLIENT_ID` | backend, web | `ac-web` / `ac-admin-web` | Cognito app clients for `app.<domain>` / `admin.<domain>` (HQ network rule, IR117) |
@@ -177,4 +179,4 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 | OPEN-CT-03 | The server-side session store (ElastiCache in production, Valkey locally) with revocation on sign-out (backend architecture §6). Until then the BFF keeps the tokens in its sealed session cookie (IR333). Sign-out already ends the identity provider's session (IR357), so a copied cookie cannot be refreshed after it |
 | OPEN-CT-04 | OpenTelemetry instrumentation of the Go services and the web apps. The collector, Jaeger and `OTEL_EXPORTER_OTLP_ENDPOINT` are ready, but nothing exports traces or metrics yet (IR334) |
 
-Additional contracts for current version 0.38.0: Read IR01–IR373 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.39.0: Read IR01–IR375 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

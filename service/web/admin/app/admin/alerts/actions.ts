@@ -7,14 +7,14 @@ import { coreNow, coreOp, CoreError } from "@ac/web/lib/dal";
 import { alertPolicyInput, defaultRulesInput, metricUnit, type AdminPolicy, type NotificationDecision } from "@ac/web/lib/adminAlerts";
 import type { OpInput } from "@ac/web/lib/opTypes";
 
-export type ActionResult = { ok: true } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string> };
+export type ActionResult = { ok: true } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
 async function run(fn: () => Promise<unknown>): Promise<ActionResult> {
   try {
     await fn();
     return { ok: true };
   } catch (e) {
-    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {} };
+    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds };
     return { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   } finally {
     refresh();
@@ -69,7 +69,7 @@ export async function testPolicy(policyId: string, unitId: string, metric: strin
     const r = await coreOp<{ notifications: NotificationDecision[] }>("automations.simulate", input);
     return { ok: true, decision: r.notifications.find((n) => n.policyId === policyId && n.unitId === unitId) ?? null };
   } catch (e) {
-    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {} };
+    if (e instanceof CoreError) return { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds };
     return { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} };
   }
 }

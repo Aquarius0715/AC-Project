@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strconv"
@@ -132,6 +133,8 @@ type Registry struct {
 	// BeforeDispatch runs before every operation (inline mode: events from direct writes such as the change-capture
 	// triggers of IR186, the worker or device paths are applied before the operation reads their projections).
 	BeforeDispatch func(ctx context.Context)
+	// Limit bounds the writes of one membership (nil: no limit, IR375).
+	Limit WriteLimiter
 
 	queries map[string]query // internal queries (IR190)
 	// Remote sends queries of domains this process does not serve (nil: such queries are UNAVAILABLE).
@@ -278,6 +281,12 @@ func expectedVersion(s Spec, body []byte, header string) (*int, error) {
 	return &n, nil
 }
 
+// WriteLimiter bounds the writes of one caller (network architecture §6, IR375).
+type WriteLimiter interface {
+	// Allow counts one write of key and returns the whole seconds to wait when key is over its limit (0: allowed).
+	Allow(ctx context.Context, key string) (wait int, err error)
+}
+
 // fileBodies are the operations whose input carries BlobInput files (JPEG/PNG up to 5 MiB, sent base64 in JSON, so
 // about 6.7 MiB each): attachments.add and jobs.reportProblem one file, reports.signOff a signature and a site photo
 // (IR221), certificates.submit one PDF/JPEG/PNG of up to 10 MB, about 13.4 MB in JSON (IR133, IR277). Every other
@@ -347,6 +356,17 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 	if write {
 		if len(key) < 8 || len(key) > 128 { // platform.idempotency_keys CHECK (8–128)
 			return fail(c, apperr.Fields(map[string]string{"Idempotency-Key": "error.required"}), corr)
+		}
+		// the writes of one membership per minute, counted across instances and services (IR375). A store that does not
+		// answer lets the write through: the edge limits still hold, and a sign-in session is never blocked by the cache.
+		if r.Limit != nil && p != nil {
+			wait, err := r.Limit.Allow(ctx, p.TenantID.String()+":"+p.MembershipID.String())
+			if err != nil {
+				slog.WarnContext(ctx, "ops: write limit not checked", "err", err)
+			} else if wait > 0 {
+				c.Response().Header().Set("Retry-After", strconv.Itoa(wait))
+				return fail(c, apperr.E(apperr.RateLimited, "error.rateLimited").RetryAfter(wait), corr)
+			}
 		}
 		if r.Idem != nil {
 			sum := sha256.Sum256(append([]byte(name+"\n"), body...))

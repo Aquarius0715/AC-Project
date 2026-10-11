@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/auth"
 	"github.com/pradita/ac-project/service/api/internal/platform/democlock"
 	"github.com/pradita/ac-project/service/api/internal/platform/logging"
+	"github.com/pradita/ac-project/service/api/internal/platform/ratelimit"
 )
 
 // Main runs one domain service (IR180): it serves only the operations of domains, with /healthz and /readyz and the
@@ -80,6 +82,21 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		if v := os.Getenv(strings.ToUpper(d) + "_API_URL"); v != "" {
 			cfg.ServiceURLs[d] = v
 		}
+	}
+	// the write limit per membership (IR375): RATE_LIMIT_URL is the shared counter store, WRITE_LIMIT_PER_MINUTE the
+	// limit (60 by default, network architecture §6); without a store there is no limit
+	if url := os.Getenv("RATE_LIMIT_URL"); url != "" {
+		store, err := ratelimit.NewValkey(url)
+		if err != nil {
+			return cfg, fmt.Errorf("RATE_LIMIT_URL: %w", err)
+		}
+		limit := 60
+		if v := os.Getenv("WRITE_LIMIT_PER_MINUTE"); v != "" {
+			if limit, err = strconv.Atoi(v); err != nil || limit < 1 {
+				return cfg, fmt.Errorf("WRITE_LIMIT_PER_MINUTE: %q", v)
+			}
+		}
+		cfg.WriteLimit = &ratelimit.Window{Store: store, Limit: limit, Window: time.Minute, Prefix: "ac:rl:write:"}
 	}
 	if cfg.DemoOps { // fixture.clock unless DEMO_CLOCK_START overrides it (IR36); shared with the workers (IR168)
 		start, err := democlock.StartFromEnv(os.Getenv)

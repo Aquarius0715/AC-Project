@@ -22,7 +22,7 @@ const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
   } catch (e) {
     if (e instanceof CoreError) {
       if (e.error.code === "CONFLICT") refresh();
-      return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors };
+      return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
     }
     throw e;
   }

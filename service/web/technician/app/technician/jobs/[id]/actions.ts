@@ -13,7 +13,7 @@ import type { OpInput } from "@ac/web/lib/opTypes";
 
 type Result<T> = { ok: true; value: T } | ({ ok: false } & ActionFailure);
 const failed = (e: unknown): Result<never> => {
-  if (e instanceof CoreError) return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors };
+  if (e instanceof CoreError) return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
   throw e;
 };
 const run = async <T,>(fn: () => Promise<T>, reload = false): Promise<Result<T>> => {

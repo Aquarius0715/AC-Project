@@ -17,7 +17,9 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
     expect(actionMessage(failure({ code: "CONFLICT", messageKey: "errors.operation_not_running" }))).toBe("Operation not running");
     expect(actionMessage(failure({ code: "NOT_FOUND", messageKey: "error.notFound" }))).toBe("This item no longer exists or is outside your scope");
     expect(actionMessage(failure({ code: "FORBIDDEN", messageKey: "error.forbidden" }))).toMatch(/permission/);
-    expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "error.rateLimited" }))).toBe("RATE_LIMITED: Rate limited");
+    // IR375: the write limit says how long to wait
+    expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "error.rateLimited", retryAfterSeconds: 40 }))).toBe("Too many changes in a short time — try again in 40 s");
+    expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "error.rateLimited" }))).toBe("Too many changes in a short time — try again shortly");
   });
   it("words the line in the display language; field names and domain keys stay humanized English (IR269)", () => {
     const t = translator("ms");
@@ -28,7 +30,7 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
       actionMessage(failure({ code: "CONFLICT", messageKey: "errors.operation_not_running" }), t), actionMessage(failure({ code: "RATE_LIMITED", messageKey: "error.rateLimited" }), t),
     ]).toEqual([
       "Reason terlalu pendek atau terlalu panjang", "Duration minutes di luar julat", "Unit — unit mismatch", "Seseorang telah mengubahnya sebentar tadi — skrin kini menunjukkan versi terkini",
-      "Item ini tidak lagi wujud atau di luar skop anda", "Sesi anda telah tamat — log masuk semula", "Operation not running", "RATE_LIMITED: Rate limited",
+      "Item ini tidak lagi wujud atau di luar skop anda", "Sesi anda telah tamat — log masuk semula", "Operation not running", "Terlalu banyak perubahan dalam masa yang singkat — cuba lagi sebentar lagi",
     ]);
   });
 });

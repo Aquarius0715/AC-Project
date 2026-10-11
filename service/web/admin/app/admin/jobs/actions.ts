@@ -25,7 +25,7 @@ const run = async (fn: () => Promise<unknown>): Promise<Result> => {
   } catch (e) {
     if (e instanceof CoreError) {
       if (e.error.code === "CONFLICT") refresh();
-      return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors };
+      return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
     }
     throw e;
   }
@@ -94,7 +94,7 @@ export async function createJob(input: { unitId: string; type: OpInput<"jobs.cre
     }, { write: true });
     return { ok: true, value: { id: job.id } };
   } catch (e) {
-    if (e instanceof CoreError) return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors };
+    if (e instanceof CoreError) return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
     throw e;
   }
 }
@@ -103,7 +103,7 @@ type Failure = { ok: false } & ActionFailure;
 const failure = (e: unknown, conflictRefresh = true): Failure => {
   if (e instanceof CoreError) {
     if (conflictRefresh && e.error.code === "CONFLICT") refresh();
-    return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors };
+    return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
   }
   throw e;
 };

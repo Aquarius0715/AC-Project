@@ -4,7 +4,7 @@
 // API sends keys, not texts.
 import { translator, type T } from "@ac/web/lib/i18n";
 
-export type ActionFailure = { code: string; messageKey: string; fieldErrors: Record<string, string> };
+export type ActionFailure = { code: string; messageKey: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 
 const fieldText: Record<string, string> = {
   "error.required": "{field} is required",
@@ -38,6 +38,10 @@ export function actionMessage(r: ActionFailure, t: T = translator("en")): string
     return fieldText[key] ? t(fieldText[key], { field: name }) : t("{field} — {problem}", { field: name, problem: humanize(key).toLowerCase() });
   }
   if (r.messageKey === "error.versionConflict") return t("Someone changed this in the meantime — the screen now shows the latest version");
+  // the write limit per member (IR375): how long to wait, as the implementation contracts ask for RATE_LIMITED
+  if (r.code === "RATE_LIMITED") {
+    return r.retryAfterSeconds ? t("Too many changes in a short time — try again in {s} s", { s: r.retryAfterSeconds }) : t("Too many changes in a short time — try again shortly");
+  }
   if (r.messageKey.startsWith("errors.")) return humanize(r.messageKey);
   return codeText[r.code] ? t(codeText[r.code]) : `${r.code}: ${humanize(r.messageKey)}`;
 }

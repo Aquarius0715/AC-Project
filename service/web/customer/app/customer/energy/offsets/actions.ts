@@ -6,9 +6,9 @@ import { refresh } from "next/cache";
 import { coreOp, CoreError } from "@ac/web/lib/dal";
 import type { ApiOffsetRecord, ApiQuote } from "@ac/web/lib/offsets";
 
-export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string> };
+export type ActionResult<T = null> = { ok: true; value: T } | { ok: false; messageKey: string; code: string; fieldErrors: Record<string, string>; retryAfterSeconds?: number | null };
 const failure = (e: unknown): ActionResult<never> => (e instanceof CoreError
-  ? { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {} }
+  ? { ok: false, messageKey: e.error.messageKey, code: e.error.code, fieldErrors: e.error.fieldErrors ?? {}, retryAfterSeconds: e.error.retryAfterSeconds }
   : { ok: false, messageKey: "error.unavailable", code: "UNAVAILABLE", fieldErrors: {} });
 
 /** offsets.preview: a demo quote for the energy selection (no offset record is created). */

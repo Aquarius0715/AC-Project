@@ -19,7 +19,7 @@ const run = async <T,>(fn: () => Promise<T>): Promise<Result<T>> => {
     refresh();
     return { ok: true, value };
   } catch (e) {
-    if (e instanceof CoreError) return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors };
+    if (e instanceof CoreError) return { ok: false, code: e.error.code, messageKey: e.error.messageKey, fieldErrors: e.error.fieldErrors, retryAfterSeconds: e.error.retryAfterSeconds };
     throw e;
   }
 };
