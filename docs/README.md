@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.245.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
+Version: 0.246.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.246.0 (2026-10-11): The backend Go design describes the code as built: package per business area, one transaction-script function per operation with pgx SQL, the operation pipeline in internal/ops, and the first plan's unbuilt parts (sqlc, domain/, types_gen.go) listed as such (IR363).
 0.245.0 (2026-10-11): Errors are announced at once: error banners are alerts and error toasts go to an alert region (IR362).
 0.244.0 (2026-10-11): Dialogs keep keyboard focus: focus moves in when one opens, Tab stays inside, Escape returns focus to the trigger, and only the innermost of stacked dialogs answers (IR361).
 0.243.0 (2026-10-11): The axe-core check also covers the main dialogs (16 call sites), and the shared checkbox is 20 px for WCAG 2.5.8 target spacing (IR360).

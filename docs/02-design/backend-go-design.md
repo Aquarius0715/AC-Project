@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND-GO
-version: 0.35.0
+version: 0.36.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -18,7 +18,7 @@ This document turns the [backend architecture](backend-architecture.md) into an 
 | Language | Go 1.25 or later (one module `github.com/pradita/ac-project/service/api` (`service/api/go.mod`) in the official Go server layout (IR174): commands in `service/api/cmd/{api,worker,migrate,seed,gen}`, every package in `service/api/internal/`, DB integration tests in `service/api/test/integration`, Dockerfiles in `service/api/build/`; current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
 | HTTP framework | Echo v5 (`github.com/labstack/echo/v5`, checked with v5.4.0) for the Core API and the webhook receiver, structured as in the official Echo guide (IR173): handlers `func(c *echo.Context) error` return errors to one central `HTTPErrorHandler`; middleware from `echo/v5/middleware`; route group `/v1`; graceful shutdown with `echo.StartConfig`; `log/slog` as `e.Logger`; tests with `net/http/httptest` against `e.ServeHTTP` |
 | Database driver | pgx v5 (`github.com/jackc/pgx/v5`, `pgxpool`); no ORM |
-| Query code | sqlc generates typed Go from SQL in `db/queries/<schema>/*.sql`; hand-written SQL only for dynamic list filters |
+| Query code | As built (IR363): pgx with the SQL written in each operation function; list filters and sort columns come from allowlists (`paging.OrderBy`, filter maps). sqlc, planned first, is not adopted (§2) |
 | Migrations | `cmd/migrate` + `internal/migrate` + `internal/migrations` (IR167, IR174): embedded `migrations/NNNNNN_name.up.sql` files applied in order under an advisory lock, one transaction each (`-- migrate:no-transaction` for `CONCURRENTLY`), bookkeeping in the golang-migrate compatible `schema_migrations` table; `000001_init` is [db/schema.sql](db/schema.sql) |
 | IDs | UUIDv7 from `github.com/google/uuid` (`uuid.NewV7`), time-ordered for index locality |
 | Validation | Generated input structs + a `Validate() *DomainError` method per input (rules from the DD documents); `go-playground/validator` only for simple tags |
@@ -27,80 +27,68 @@ This document turns the [backend architecture](backend-architecture.md) into an 
 | Payments | `stripe-go` (current major version) with webhook signature verification |
 | Authentication | Cognito access tokens verified with JWKS (`lestrrat-go/jwx`), cached keys |
 | Configuration | Environment variables parsed into a typed struct (`caarlos0/env`); secrets fetched from Secrets Manager at start-up |
-| Tests | `go test`, `testcontainers-go` (PostgreSQL 16, LocalStack), `httptest` for Echo, `golangci-lint` |
+| Tests | `go test` against a local PostgreSQL 16 test database (`make testdb`), `httptest` for Echo, `gofmt` and `go vet`. As built (IR363), `testcontainers-go` and `golangci-lint`, planned first, are not used |
 | Runtime | Everything runs in Docker ([container design](container-design.md), IR119): static binaries with `CGO_ENABLED=0` in a distroless image, linux/arm64 on ECS Fargate (Graviton), Docker Compose locally and in CI |
 
 The core request pipeline in §4 and the example handler in §5 were compiled and run against PostgreSQL 16 with [db/schema.sql](db/schema.sql) on 2026-10-07 (create, update with version, stale version → 409 CONFLICT, validation → 422, unknown field → 422, cross-tenant create → 404, HQ user outside the company network → 403, outbox rows written in the same transaction).
 
 ## 2. Repository layout
 
+As built (IR363; the first design's plan is listed at the end of this section):
+
 ```text
-service/api/        (IR174, moved under service/api by IR179; the Next.js apps are the siblings service/web/* and service/web/shared, IR178)
-  go.mod
-  Makefile          gen, seed, test, test-unit, test-integration, cover, resetdb, testdb
-  build/            api.Dockerfile, worker.Dockerfile, migrate.Dockerfile (context service/)
-  scripts/          resetdb.sh, covermerge.py
+service/api/        (IR174; under service/api since IR179; the Next.js apps are service/web/*, IR178)
+  go.mod  Makefile  gen, swagger, seed, test, test-all, test-cluster, cover, resetdb, testdb
+  build/            service.Dockerfile (gateway and domain services), worker.Dockerfile, migrate.Dockerfile
+  scripts/          resetdb.sh, covermerge.py, swag_annotate.py
   cmd/
-    gateway/        Core API entry: routes the catalog's REST routes (IR222) to the domain service that owns each route's operation (IR180)
-    identity-api/ equipment-api/ maintenance-api/ billing-api/ energy-api/
-                    business-domain Core API services (Echo) — the REST routes of their domain's operations, /healthz, /readyz
-    webhook/        Webhook receiver (Echo) — /stripe, /ses, /whatsapp
-    worker/         one binary, --role=outbox|scheduler|notification|telemetry|iot|automation|importexport|rollup
-    migrate/        applies internal/migrations (one-off ECS task before deploy, IR167)
-    seed/           loads the demo fixture
-    gen/            code generators (operations, contracts) — run in CI, output committed
+    gateway/        Core API entry: forwards each REST route (IR222) to the domain service that owns its operation (IR180)
+    identity-api/ equipment-api/ maintenance-api/ billing-api/ energy-api/   the five domain services (Echo)
+    worker/         one binary, --role=outbox|scheduler|notification|… (IR166, IR195)
+    migrate/  seed/  gen/ (ops: catalog, REST routes, contracts; restdoc: the route list for the swag annotations)
   internal/
-    server/         composition root and Echo layer (app.go wiring, http.go newEcho + middleware, demo.*, unit detail join)
-    migrate/ migrations/ seed/ scheduler/   migration runner + embedded SQL, fixture loader, clock-driven transitions
-    platform/
-      config/       typed configuration
-      apperr/       DomainError, codes, PostgreSQL error mapping
-      httpx/        Echo setup, middleware, error handler, JSON envelope
-      auth/         JWT verification, Principal, membership loader, HQ-network check
-      authz/        policies compiled from the operation catalog authorization column
-      db/           pgxpool (writer / reader), TxManager, RLS context
-      idempotency/  Idempotency-Key store (platform.idempotency_keys)
-      outbox/       outbox writer and relay
-      audit/        audit writer (masking rules)
-      events/       event envelope, SNS publisher, SQS consumer loop, processed_events de-duplication
-      clock/ ids/ observability/ awsx/
-    ops/            registry, dispatcher, catalog_gen.go (from operation-catalog.csv)
-    contracts/      types_gen.go (from service-contracts.ts via JSON Schema)
-    modules/
-      identity/ assets/ devices/ control/ monitoring/ maintenance/
-      billing/ restrictions/ energy/ notify/ audit/
-        module.go     Register(reg, deps): binds operation names to handlers
-        handlers.go   one function per operation (input → output)
-        domain/       pure rules and state machines (no I/O)
-        store/        sqlc output + small repository helpers
-        consumers.go  event consumers for this module
-  db/
-    migrations/
-    queries/<schema>/*.sql
-  sqlc.yaml
-  test/
-    contract/       catalog coverage and DomainError mapping tests
-    acceptance/     AT-* scenarios replayed against the API with fixture-contract.json seeds
-  Dockerfile        targets runtime and dev (container design §3)
-  Makefile
-  (compose.yaml lives at the repository root and runs the whole system — container design §4)
+    server/         composition root: app.go wiring, http.go Echo + middleware, event consumers, cross-domain wiring, demo
+    gateway/        the gateway's route table, the embedded swagger.json and Swagger UI
+    ops/            the operation pipeline: registry (catalog_gen.go), REST binding (rest.go), validation, authorization,
+                    idempotency, expected version, transaction, events and audit (Call), internal queries between services
+    platform/       apperr (DomainError), auth (OIDC / JWT, Principal), authz, db (pgx pools, TxManager, RLS context),
+                    events (envelope, publish, replica consumers), paging, blob (file store), democlock, unitscope
+    modules/        one package per business area: identity assets devices control monitoring maintenance billing
+                    restrictions energy notify audit summaries voice writes
+    scheduler/      the clock-driven transitions per domain (IR195, IR356)
+    migrate/ migrations/ seed/
+  test/integration/ the Core API against PostgreSQL, run in one process and with the split services
 ```
 
-Dependency rules (checked by `go-arch-lint` or import tests in CI):
+**A module.** One file per feature (for example `modules/maintenance/reports.go`) holds:
+- the input types, with `Validate()` for the field rules (run before authorization);
+- the result types (the JSON of `service-contracts.ts`);
+- one function per operation, for example `func (m Reports) saveDraft(ctx context.Context, c *ops.Call, in *DraftInput) (Report, error)`. It checks scope and versions, applies the rules, runs its SQL with pgx in the call's transaction, and records events and audit entries — a transaction script per operation;
+- a `Register…` function that binds each catalog name to its function (`ops.Register(r, "jobs.saveDraft", m.saveDraft)`). Mode and authorization come from the generated catalog. A name that is not in the catalog panics at start-up.
 
-1. `modules/<a>` never imports `modules/<b>`. Cross-module needs go through a small interface in the caller's package that `app/` wires (for example `control.UnitReader` implemented by assets), or through events.
-2. `domain/` packages import only the standard library and `contracts/`.
-3. Only `app/` constructs pools, AWS clients, and Echo. Handlers receive dependencies, never globals.
-4. A module only queries its own schema (enforced by sqlc configuration per module and a CI grep for foreign schema names).
+**Dependency rules as built:**
+1. Each domain service runs with its own database role and owns its schemas. It reads another domain's data only through that domain's internal queries (IR182–IR192) or its `ref_*` copies, and changes it only through events. The single-process build wires the same interfaces locally.
+2. A module may import another module's package for its types and query helpers (for example `identity.LoadMembers`). The database roles, not import rules, keep each service in its own schemas.
+3. Only `internal/server` builds pools, the Echo instance and clients. Operation functions receive them through `ops.Call` and their module struct.
+4. Small interfaces sit in the package that uses them, for example `control.JobVersions`, which maintenance implements.
+
+**Planned in the first design, not built:**
+- per-module `domain/` (pure state machines) and `store/` (sqlc) packages, with `db/queries` and `sqlc.yaml`;
+- `contracts/types_gen.go`;
+- the packages `platform/config`, `httpx`, `idempotency`, `outbox`, `audit` and `clock`. Their work lives in `ops`, `db`, `events` and `server`;
+- the webhook receiver (compose's `planned` profile);
+- the `test/contract` and `test/acceptance` suites, whose checks the integration and E2E suites carry.
+
+SQL stays inline with pgx. sqlc remains an option if the SQL should be type-checked at build time.
 
 ## 3. Code generation from the specification
 
 | Source (docs) | Generator | Output | Check in CI |
 |---|---|---|---|
-| [operation-catalog.csv](operation-catalog.csv) | `cmd/gen/ops` | `internal/ops/catalog_gen.go`: 197 entries with name, mode, module, design IDs, authorization expression | Every catalog operation has exactly one registered handler; no extra handlers |
-| [service-contracts.ts](service-contracts.ts) | `typescript-json-schema` → `go-jsonschema` | `internal/contracts/types_gen.go` (inputs, results, entities) | Regenerating produces no diff |
+| [operation-catalog.csv](operation-catalog.csv) | `cmd/gen/ops` | `internal/ops/catalog_gen.go`: 202 entries with name, mode, module, design IDs, authorization expression | Every catalog operation has exactly one registered handler; no extra handlers |
+| [service-contracts.ts](service-contracts.ts) | `cmd/gen/ops` | The web's `contracts.gen.ts` (IR313). The Go inputs and results are hand-written structs with JSON tags; the planned `types_gen.go` is not built (IR363) | The web's contract tests (IR312, IR314) and the integration tests read the API's JSON against the contract |
 | [write-version-catalog.csv](write-version-catalog.csv) | `cmd/gen/ops` | expected-version requirement per write operation | Writes listed as `required` reject a missing version with VALIDATION |
-| [fixture-contract.json](../04-agentic-sdlc/fixture-contract.json) | `test/acceptance/seed` | Seed loader for acceptance tests | AT scenarios pass |
+| [fixture-contract.json](../04-agentic-sdlc/fixture-contract.json) | `internal/seed` (`cmd/seed`, `make seed`) | The demo fixture of the integration tests and the local stack | The integration and E2E suites pass on it |
 
 The authorization column (for example `client:self-customer:owner | admin:alert.policy.write`) is parsed into a list of alternatives; each alternative is a role plus a permission and named scope predicates implemented in `platform/authz` (`self-customer`, `owner`, `assigned-valid-job`, `own-company`, `own-valid-offer`, `demo-only`, …). An unknown predicate fails generation, so the catalog and the code cannot drift.
 
@@ -191,11 +179,12 @@ Reads that must see the caller's own write immediately (for example the detail r
 
 ## 5. Handler pattern
 
-Handlers are plain functions; business rules live in `domain/` and are unit-tested without a database.
+Operation functions are plain functions, registered by name (§2). Each holds its rules and its SQL together. The few rules that need no database are plain helpers with unit tests: campaign waves, payout months, certificate and warranty stages, threshold operators. Every SQL statement runs in at least one integration test (IR311). The example is the shape of `units.save`:
 
 ```go
 func RegisterAssets(r *ops.Registry) {
-	ops.Register(r, "units.save", ops.Write, authz.Require("asset.write"),
+	// the mode (write) and the authorization (admin:asset.write) come from the generated catalog
+	ops.Register(r, "units.save",
 		func(ctx context.Context, c *ops.Call, in *UnitSaveInput) (Unit, error) {
 			if in.ID == nil {
 				id := uuid.Must(uuid.NewV7())
@@ -233,8 +222,8 @@ Rules every handler follows:
 
 1. **Visibility first.** A target that does not exist or is outside the caller's scope is NOT_FOUND, never FORBIDDEN (D01). Zero affected rows on a scoped insert or update means NOT_FOUND unless a version mismatch is confirmed, which is CONFLICT.
 2. **Versions.** Updates use `WHERE id = $1 AND version = $2` and `version = version + 1`; aggregates with child rows lock the parent with `SELECT … FOR UPDATE` first.
-3. **State machines.** Status transitions call `domain.<Aggregate>.Transition(from, event)`; illegal transitions are CONFLICT with a message key from the DD tables (for example Command, MaintenanceJob, Restriction in [common design §5](common.md#5-state-transitions-and-consistency)).
-4. **Time.** `c.Now` (UTC, from `platform/clock`) is the only clock; tests inject a fixed clock. Pools scan `timestamptz` in UTC so every Instant is serialized with `Z`, independent of the host time zone.
+3. **State machines.** A status change is an update guarded by the states it may leave (`WHERE status IN (…)`). An illegal or concurrent transition changes no row and answers CONFLICT with a message key from the DD tables (for example Command, MaintenanceJob, Restriction in [common design §5](common.md#5-state-transitions-and-consistency)).
+4. **Time.** `c.Now` (UTC) is the only clock: the business clock, which `platform/democlock` shifts in demo runs; tests inject a fixed clock. Pools scan `timestamptz` in UTC so every Instant is serialized with `Z`, independent of the host time zone.
 5. **Side effects.** No HTTP calls to AWS or Stripe inside a transaction, except creating a Stripe Checkout Session, which is made idempotent with the operation's key and stored before commit. Everything else is an outbox event handled by a worker.
 6. **Audit and events.** Every successful write records exactly one audit entry per changed aggregate and the events listed in backend architecture §8.
 
@@ -275,7 +264,7 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 
 - Secrets (database credentials via IAM authentication tokens or Secrets Manager, Stripe restricted key, provider keys) are loaded at start-up and refreshed on rotation; they are never logged (the slog handler masks keys named `*secret*`, `*token*`, `*password*`, `authorization`, e-mail and phone values).
 - The database role used by the services (`ac_app` / `ac_worker`) has no `BYPASSRLS` and no DDL rights; migrations run with a separate owner role.
-- All SQL is parameterised (sqlc); dynamic list filters are built from an allowlist of column names.
+- All SQL is parameterised (pgx placeholders); dynamic list filters are built from an allowlist of column names.
 - Request bodies are size-limited and strictly decoded; outbound HTTP clients have timeouts and only allowlisted hosts (enforced again by the Network Firewall).
 - `govulncheck` and image scanning run in CI; dependency updates weekly.
 
@@ -283,8 +272,8 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 
 | Level | Tool | Scope |
 |---|---|---|
-| Domain unit tests | `go test` | State machines, calculations (energy, coverage, emissions), validation, authorization predicates — table-driven, no I/O |
-| Store tests | `testcontainers-go` PostgreSQL 16 + migrations | sqlc queries, RLS isolation (a second tenant sees nothing), constraints (overlap, one pending command, append-only audit) |
+| Unit tests | `go test` | Pure helpers (campaign waves, payout months, reminder stages, thresholds), validation rules that REST cannot reach, authorization predicates, the REST binding — table-driven, no I/O |
+| Integration tests | a local PostgreSQL 16 test database, reset per run (`make testdb`) | The operations with their SQL, RLS isolation (a second tenant sees nothing), constraints (overlap, one pending command, append-only audit), in one process and with the split services |
 | API tests | `httptest` + Echo | Status mapping, idempotency replay, version conflicts, HQ-network rule, owner-only rules; every SQL statement of a module runs in at least one test, checked on the coverage profile after `make cover` (IR311) |
 | Contract tests | generated from the catalog | Every operation registered once, mode and authorization match the catalog, inputs reject unknown fields; each operation's input rules answer VALIDATION before authorization (`TestRequiredInputs`, IR307) |
 | Acceptance tests | `test/acceptance` | AT-* cases from the requirement documents replayed against the API with fixture-contract.json seeds and a fixed clock (the same cases that drive the Phase 1A mock) |
@@ -294,7 +283,7 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 
 ## 10. Build, run, and deploy
 
-- `make gen` (sqlc, operation and contract generators; it also writes the web's routes.gen.ts and contracts.gen.ts, IR313), `make swagger` (Swagger 2.0 from the swag annotations of the handlers, served by the gateway at `/docs` and `/swagger.json`, IR220), `make lint`, `make test`, `make cover` (merged coverage of all packages), `make resetdb` (rebuild the local database from schema.sql and reseed), `make test` / `make test-cluster` (each on a freshly rebuilt test database, `ac_test` / `ac_test_cluster`), `make test-all` (both suites at once, about a minute and a quarter, IR225), `make up` (`docker compose --profile full up`), `make down`.
+- `make gen` (the operation and contract generators; it also writes the web's routes.gen.ts and contracts.gen.ts, IR313), `make swagger` (Swagger 2.0 from the swag annotations of the handlers, served by the gateway at `/docs` and `/swagger.json`, IR220), `make test`, `make cover` (merged coverage of all packages), `make resetdb` (rebuild the local database from schema.sql and reseed), `make test` / `make test-cluster` (each on a freshly rebuilt test database, `ac_test` / `ac_test_cluster`), `make test-all` (both suites at once, about a minute and a quarter, IR225), `make up` (`docker compose --profile full up`), `make down`.
 - Dockerfile: multi-stage `golang:1.25` builder → `gcr.io/distroless/static-debian12:nonroot` runtime, read-only root filesystem, `healthcheck` subcommand, graceful SIGTERM drain ([container design §3](container-design.md#3-dockerfile-standards)).
 - One image, several ECS services: `api`, `webhook`, and one service per worker role (independent autoscaling: API on CPU and request count, workers on SQS backlog and Kinesis iterator age).
 - Deploy order: migrations (expand) → workers → API → BFF; contract steps of migrations ship one release later (database design §9).
@@ -307,4 +296,4 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | OPEN-GO-01 | Final choice of the TypeScript → Go contract generator (output reviewed for union types such as `UnitAction` and `Policy`) |
 | OPEN-GO-02 | WhatsApp provider SDK (depends on OPEN-BE-04) |
 
-Additional contracts for current version 0.35.0: Read IR01–IR356 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.36.0: Read IR01–IR363 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

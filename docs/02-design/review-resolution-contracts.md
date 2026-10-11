@@ -5358,3 +5358,24 @@ UX-06 asks that critical errors be announced through suitable live regions. Ever
 4. **Tests.**
    - Web unit (Testing Library, jsdom): a `crit` banner is an alert, and warn and info banners are statuses. An error toast lands in the alert region, and another toast in the status region.
    - The full E2E suite passes; the smoke crawl's axe check stays clean.
+
+## IR363 The backend Go design describes the code as built — 2026-10-11
+
+A question on the backend's style ("does it follow MVC?") led to a reread of the backend Go design. Its §2, §3, §5 and the tooling rows still described the first plan rather than the code:
+- per-module `module.go`, `handlers.go`, `domain/` (state machines tested without a database) and `store/` (sqlc);
+- `db/queries`, `sqlc.yaml` and `contracts/types_gen.go`;
+- the packages `platform/httpx`, `idempotency`, `outbox`, `audit`, `config` and `clock`;
+- the dependency rule "`modules/<a>` never imports `modules/<b>`";
+- `domain.<Aggregate>.Transition` for state machines;
+- `testcontainers-go`, `golangci-lint` and a `make lint` target;
+- 197 catalog entries.
+
+1. **Layout (§2)** is the tree as built. `cmd` holds the gateway, the five domain services, the worker, migrate, seed and gen. `internal` holds `server`, `gateway`, `ops`, `platform` (apperr, auth, authz, blob, db, democlock, events, paging, unitscope), `modules` (14 packages), `scheduler`, migrate, migrations and seed. `test/integration` comes last.
+2. **A module (§2)** is one file per feature. It holds the input types (`Validate`), the result types, and one function per operation that checks scope and versions, applies the rules and runs its SQL with pgx in the call's transaction — a transaction script per operation. `ops.Register` binds each catalog name to its function; mode and authorization come from the generated catalog.
+3. **Dependency rules as built.** Each domain service uses its own database role and owns its schemas. It reads other domains through their internal queries or `ref_*` copies and changes them through events (IR182–IR192). Packages may import each other for types and helpers, and small interfaces sit in the package that uses them.
+4. **Not built, listed as such:** `domain/` and `store/`, sqlc, `types_gen.go`, the platform packages above (their work lives in `ops`, `db`, `events` and `server`), the webhook receiver, and the `test/contract` / `test/acceptance` suites. SQL stays inline with pgx; sqlc remains an option.
+5. **Elsewhere.**
+   - §3 reads 202 catalog entries. The contracts row names the web's `contracts.gen.ts`, with hand-written Go structs checked by the contract and integration tests. The fixture row names `internal/seed`.
+   - §5 describes operation functions, guarded status updates (`WHERE status IN (…)` → CONFLICT), and the business clock with `platform/democlock`.
+   - The tooling rows name the local test database, `gofmt` and `go vet`. The test table names unit tests for pure helpers and integration tests for SQL, RLS and constraints.
+6. **No code changes.**
