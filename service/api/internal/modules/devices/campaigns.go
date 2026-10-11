@@ -89,14 +89,14 @@ func campaignDetail(ctx context.Context, c *ops.Call, id uuid.UUID) (Campaign, e
 	}
 	x.Progress = map[string]int{"succeeded": 0, "installing": 0, "pending": 0, "failed": 0, "skipped": 0}
 	x.Results, x.DeviceIDs = []CampaignResult{}, []uuid.UUID{}
-	rows, err := c.Tx.Query(ctx, `SELECT device_id, wave, result, detail, operation_id FROM devices.firmware_campaign_devices WHERE campaign_id = $1 ORDER BY wave, device_id`, id)
+	rows, err := c.Tx.Query(ctx, `SELECT device_id, wave, result, detail, operation_id, result_at FROM devices.firmware_campaign_devices WHERE campaign_id = $1 ORDER BY wave, device_id`, id)
 	if err != nil {
 		return x, err
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var r CampaignResult
-		if err := rows.Scan(&r.DeviceID, &r.WaveIndex, &r.Status, &r.ReasonKey, &r.OperationID); err != nil {
+		if err := rows.Scan(&r.DeviceID, &r.WaveIndex, &r.Status, &r.ReasonKey, &r.OperationID, &r.At); err != nil {
 			return x, err
 		}
 		x.Results = append(x.Results, r)
@@ -461,7 +461,7 @@ func campaignsControl(ctx context.Context, c *ops.Call, in *ControlInput) (Campa
 		if state != "running" && state != "paused" {
 			return Campaign{}, apperr.E(apperr.Conflict, "error.invalidState")
 		}
-		tag, err := c.Tx.Exec(ctx, `UPDATE devices.firmware_campaign_devices SET result = 'pending', detail = NULL, operation_id = NULL
+		tag, err := c.Tx.Exec(ctx, `UPDATE devices.firmware_campaign_devices SET result = 'pending', detail = NULL, operation_id = NULL, result_at = NULL
 			WHERE campaign_id = $1 AND device_id = $2 AND result IN ('failed','skipped')`, in.CampaignID, *in.DeviceID)
 		if err != nil {
 			return Campaign{}, err
@@ -477,13 +477,17 @@ func campaignsControl(ctx context.Context, c *ops.Call, in *ControlInput) (Campa
 		if in.Action == "resume" && c.Now.Before(start) {
 			to = "scheduled" // resuming before the start time returns to scheduled
 		}
+		if in.Action == "resume" {
+			clear := ""
+			reason = &clear // the runner's pause reason ends with the pause (IR339)
+		}
 		next = to
 		if in.Action == "abort" {
 			r := strings.TrimSpace(*in.Reason)
 			reason = &r
 		}
 	}
-	if err := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = $2, reason = COALESCE($3, reason), version = version + 1, updated_at = platform.app_now()
+	if err := c.Tx.QueryRow(ctx, `UPDATE devices.firmware_campaigns SET state = $2, reason = NULLIF(COALESCE($3, reason), ''), version = version + 1, updated_at = platform.app_now()
 		WHERE id = $1 RETURNING version`, in.CampaignID, next, reason).Scan(&v); err != nil {
 		return Campaign{}, err
 	}

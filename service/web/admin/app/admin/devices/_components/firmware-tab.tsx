@@ -6,13 +6,14 @@ import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { showTime } from "@ac/web/lib/i18n";
-import { campaignErrors, campaignStart, type CampaignDraft, type CampaignRow } from "@ac/web/lib/devices";
+import { campaignErrors, campaignStart, resultReason, waveStates, type CampaignDraft, type CampaignRow, type WaveState } from "@ac/web/lib/devices";
 import { controlCampaign, scheduleCampaign } from "../actions";
 import type { DevicesLive } from "./devices-view";
 
 const tone = (s: CampaignRow["state"]) => (s === "completed" ? "ok" : s === "running" ? "primary" : s === "paused" ? "warn" : s === "aborted" ? "crit" : "muted");
 const stateWord: Record<CampaignRow["state"], string> = { scheduled: "scheduled", running: "running", paused: "paused", aborted: "aborted", completed: "completed" };
 const resultWord: Record<string, string> = { pending: "pending", installing: "installing", succeeded: "succeeded", failed: "failed", skipped: "skipped" };
+const waveWord: Record<WaveState, [string, "ok" | "primary" | "warn" | "crit" | "muted"]> = { done: ["Done", "ok"], running: ["Running", "primary"], paused: ["Paused", "warn"], aborted: ["Aborted", "crit"], waiting: ["Waiting", "muted"] };
 
 /** Firmware campaigns (DD-A20): the campaign list, the campaignId detail with wave progress and per-device results,
  * pause / resume / abort / retry, and scheduling a new campaign (start at least 24 hours ahead). Texts in the display
@@ -53,13 +54,14 @@ export function FirmwareTab({ live }: { live: DevicesLive }) {
         <Card title={`${sel.model} · ${sel.versions}`} sub={t("Auto-pause if failures exceed {n} % within a wave · window {from}–{to} device local time · starts {time}", { n: sel.c.autoPauseFailurePercent, from: sel.c.window.startLocal, to: sel.c.window.endLocal, time: sel.start })} action={live.canWrite && <span className="flex gap-2">{(sel.state === "running" || sel.state === "scheduled") && <Btn size="sm" disabled={pending} onClick={() => control("pause")}>{t("Pause")}</Btn>}{sel.state === "paused" && <Btn size="sm" disabled={pending} onClick={() => control("resume")}>{t("Resume")}</Btn>}{["scheduled", "running", "paused"].includes(sel.state) && <Btn size="sm" variant="danger" disabled={pending} onClick={() => { setReason(""); setModal("abort"); }}>{t("Abort")}</Btn>}</span>}>
           <div className="flex flex-col gap-3">{sel.c.waves.map((w, n) => {
             const inWave = sel.c.results.filter((r) => r.waveIndex === n);
+            const [word, chip] = waveWord[waveStates(sel.c)[n]];
             const ok = inWave.filter((r) => r.status === "succeeded").length;
             const pct = inWave.length ? Math.round((ok * 100) / inWave.length) : 0;
-            return <div key={w.label}><div className="mb-1 flex justify-between text-xs"><b>{t("Wave {n} · {percent} %", { n: n + 1, percent: w.percent })}</b><span className="text-muted">{t("{done} / {total} succeeded", { done: ok, total: inWave.length })}</span></div><UtilBar pct={pct} tone={pct >= 95 ? "ok" : "primary"} /></div>;
+            return <div key={w.label}><div className="mb-1 flex items-center justify-between gap-2 text-xs"><b>{t("Wave {n} · {percent} %", { n: n + 1, percent: w.percent })}</b><span className="flex items-center gap-2 text-muted">{t("{done} / {total} succeeded", { done: ok, total: inWave.length })}<Badge tone={chip}>{t(word)}</Badge></span></div><UtilBar pct={pct} tone={pct >= 95 ? "ok" : "primary"} /></div>;
           })}</div>
           <div className="mt-3"><SummaryList items={[[t("Succeeded / installing / pending"), `${sel.c.progress.succeeded} / ${sel.c.progress.installing} / ${sel.c.progress.pending}`], [t("Failed"), t("{n} · failed devices keep their old version", { n: sel.c.progress.failed })], [t("Skipped"), t("{n} · busy, offline or tampered", { n: sel.c.progress.skipped })], ...(sel.c.reason ? [[t("Reason"), sel.c.reason] as [string, string]] : [])]} /></div>
           <h3 className="mb-1 mt-4 text-[13px] font-bold">{t("Devices")}</h3>
-          <div className="flex flex-col gap-1">{sel.c.results.map((r) => <div key={r.deviceId} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px]"><span>{serial.get(r.deviceId) ?? r.deviceId.slice(0, 8)} <span className="text-xs text-muted">{t("wave {n}", { n: r.waveIndex + 1 })}{r.reasonKey ? ` · ${r.reasonKey}` : ""}</span></span><span className="flex items-center gap-2"><Badge tone={r.status === "succeeded" ? "ok" : r.status === "failed" ? "crit" : r.status === "skipped" ? "warn" : "muted"}>{t(resultWord[r.status] ?? r.status)}</Badge>{live.canWrite && (r.status === "failed" || r.status === "skipped") && ["running", "paused"].includes(sel.state) && <Btn size="sm" disabled={pending} onClick={() => control("retry_device", r.deviceId)}>{t("Retry")}</Btn>}</span></div>)}</div>
+          <div className="flex flex-col gap-1">{sel.c.results.map((r) => <div key={r.deviceId} className="flex items-center justify-between gap-2 border-t border-line py-1.5 text-[13px]"><span className="min-w-0">{serial.get(r.deviceId) ?? r.deviceId.slice(0, 8)} <span className="text-xs text-muted">{t("wave {n}", { n: r.waveIndex + 1 })}{r.reasonKey ? ` · ${resultReason(r.reasonKey, t)}` : ""}</span></span><span className="flex shrink-0 items-center gap-2">{r.at && <span className="text-xs text-muted">{showTime(r.at, i.display)}</span>}<Badge tone={r.status === "succeeded" ? "ok" : r.status === "failed" ? "crit" : r.status === "skipped" ? "warn" : "muted"}>{t(resultWord[r.status] ?? r.status)}</Badge>{live.canWrite && (r.status === "failed" || r.status === "skipped") && ["running", "paused"].includes(sel.state) && <Btn size="sm" disabled={pending} onClick={() => control("retry_device", r.deviceId)}>{t("Retry")}</Btn>}</span></div>)}</div>
         </Card>
       )}
       <Modal open={modal === "new"} onClose={close} title={t("New firmware campaign")} footer={<><Btn onClick={close}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={schedule}>{t("campaign::Schedule")}</Btn></>}>

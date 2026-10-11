@@ -4832,3 +4832,31 @@ Backend architecture §10 listed a "follow-up classification reminder" as not bu
 5. **Tests.**
    - Integration (`TestRateAndReportProblem`): the HQ and client list rows carry the follow-up, its class and createdAt, and the class after classification.
    - Web: the pending row in English and Malay; a classified row; the result types against the contract (IR314).
+
+## IR339 Firmware campaigns run on the equipment scheduler — 2026-10-11
+
+BR-A20 and DD-A20 define how a firmware campaign rolls out, but only its operations existed: schedule, pause, resume, abort and retry. Nothing sent the customers' notice, started a campaign, installed a wave or completed it (backend architecture §10, "not built"). The runner is now an equipment scheduler job (registry job, IR54 pattern), after the IR67 operation time-outs of the same tick.
+
+1. **Notice.** 24 h before startAt a scheduled campaign notifies each client member of each affected unit's customer, once (`firmware_campaigns.notice_sent_at`):
+   - one in-app device_operation notification about the unit, severity normal;
+   - params `at` = startAt, status `scheduled`, message "Firmware update from <day>, <from>–<to> local time. The AC may restart for about 2 minutes.";
+   - audited `firmwareCampaigns.notice`.
+   A campaign paused before its start sends the notice when resumed.
+2. **Start.** At startAt a scheduled campaign becomes running (`firmwareCampaigns.start`, audited as the system).
+3. **Waves.**
+   - Waves run in order. A wave installs once every earlier wave reached 95 % success (succeeded ÷ devices of the wave; an empty wave passes).
+   - Installs happen only inside the window, read in Kuala Lumpur time: no site has another zone, and a window may run over midnight.
+   - A pending device gets one queued firmware operation of the campaign (`device_operations.campaign_id`); IR67 starts it a second later. Each request is audited `firmwareCampaigns.install` on the device.
+4. **Skips and results.** `FirmwareCampaignResult.reasonKey` names why:
+   - Skipped at dispatch: `errors.device_unbound`, `errors.other_model`, `errors.tamper_unresolved`, `errors.device_offline`, and `errors.device_busy` (D05: an operation, a command in flight, a diagnostic run or a restriction on the unit, or an unfinished operation of the device itself).
+   - Already on the target version: succeeded without an operation.
+   - From the finished operation: succeeded; skipped `errors.device_busy` for CONFLICT and `errors.device_offline` for OFFLINE at its start; failed `errors.install_timeout` for TIMEOUT and `errors.install_failed` for a reported failure. A failed device keeps its old version (FR-T11).
+   - `at` is when the result was set (`firmware_campaign_devices.result_at`).
+5. **Auto-pause.** A new failure that takes its wave above autoPauseFailurePercent pauses the campaign. The reason is "Auto-paused: <n> of <m> devices failed in wave <w> (more than <p> %)." (`firmwareCampaigns.autoPause`). Resume clears the reason; the campaign pauses again only on a further failure, and the wave still waits for 95 %. Retry resets a failed or skipped device to pending without a time.
+6. **Completion.** Once every wave passed and no device is pending or installing, the campaign is completed (`firmwareCampaigns.complete`).
+7. **Web.**
+   - Each wave shows Done, Running, Paused, Aborted or Waiting next to its count.
+   - Each device row words its reason ("Skipped — offline", "Failed — no answer within 60 s; the old version is kept", …) and shows the time of its result in the display time zone. Figma Admin 04-9 has a Result and a When column.
+8. **Tests.**
+   - Unit: the window (bounds, over midnight), the outcome mapping, the 95 % rule; web: reasons, wave states, Malay.
+   - Integration, in both suites (`TestFirmwareCampaignRunner`): the notice once, the start, the pilot, the four skip reasons, a reported failure and the auto-pause, nothing while paused, Retry and Resume, an install that times out, the wait below 95 %, the window, a device already on target, and the completion with every result's time.

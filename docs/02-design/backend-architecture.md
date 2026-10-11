@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND
-version: 0.35.0
+version: 0.36.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -220,7 +220,7 @@ Modelling rules:
 | Filter cleaning reminders | Every 15 minutes of business time: an overdue unit once per cleaning cycle (customer settings) | FR-C18, IR239 |
 | Automation schedules | Schedule start / end | FR-C04 |
 | Monthly energy report | Month end, when enabled in preferences | FR-C16 |
-| Firmware campaign waves | Campaign schedule | FR-A20 |
+| Firmware campaign waves | Campaign schedule: the notice 24 h before, the start, waves at 95 % success inside the window, auto-pause | FR-A20, IR339 |
 
 The scheduler claims due items with a database lease (`FOR UPDATE SKIP LOCKED`) so that each item runs once even with several instances; handlers are idempotent and audited with actorRoleAtTime=system.
 
@@ -228,7 +228,7 @@ As built (IR335), the worker runs one scheduler per business domain (IR195). Eac
 
 | Scheduler | Built transitions |
 |---|---|
-| Equipment | Command expiry at `expiresAt`, diagnostic run ends (IR123), automation schedules (FR-C04, IR54), device operation start and time-out (IR67) |
+| Equipment | Command expiry at `expiresAt`, diagnostic run ends (IR123), automation schedules (FR-C04, IR54), device operation start and time-out (IR67), firmware campaigns (IR339) |
 | Maintenance | Offer expiry, the slot proposal reply deadline (IR113), auto-confirm of completed jobs (FR-C17), the work window end (the assignment history is frozen, IR89), filter cleaning reminders (IR239), certificate expiry reminders (IR336) |
 
 Items of the table above that are not scheduled yet:
@@ -241,9 +241,7 @@ Items of the table above that are not scheduled yet:
 - **Shown by the app:**
   - the 15-minute work window warning (IR89): the technician's job workspace and overview compute it from the business clock (IR337);
   - the follow-up classify-by time (IR114): the HQ Jobs row and detail compute it from the job's createdAt (IR338).
-- **Not built:**
-  - the monthly energy report e-mail: the report is exported on demand with `energy.exportReport`; the e-mail on the 1st waits for a decision (IR338);
-  - the start of firmware campaign waves.
+- **Not built:** the monthly energy report e-mail. The report is exported on demand with `energy.exportReport`; the e-mail on the 1st waits for a decision (IR338).
 
 ## 11. External integrations
 
@@ -310,4 +308,4 @@ Items of the table above that are not scheduled yet:
 | OPEN-BE-07 | Contractor payout rail (bank transfer file or Stripe Connect) | Payouts (FR-A23) |
 | OPEN-BE-08 | The scheduled items that are not built yet (§10 as built) and the lease (`platform.scheduled_items`, `FOR UPDATE SKIP LOCKED`) for running several scheduler instances per domain | Scheduler, worker |
 
-Additional contracts for current version 0.35.0: Read IR01–IR338 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.36.0: Read IR01–IR339 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

@@ -589,7 +589,8 @@ CREATE TABLE devices.firmware_campaigns (        -- FR-A20
   auto_pause_failure_percent int NOT NULL CHECK (auto_pause_failure_percent BETWEEN 1 AND 50),   -- IR111 / DD-A20
   start_at                   timestamptz NOT NULL,
   state                      text NOT NULL CHECK (state IN ('scheduled','running','paused','aborted','completed')),
-  reason                     text,
+  reason                     text,                     -- abort reason, or why the runner paused it (IR339)
+  notice_sent_at             timestamptz,              -- the customers' notice 24 h before the start (BR-A20, IR339)
   version                    int NOT NULL DEFAULT 1,
   created_at                 timestamptz NOT NULL DEFAULT platform.app_now(),
   updated_at                 timestamptz NOT NULL DEFAULT platform.app_now()
@@ -602,7 +603,8 @@ CREATE TABLE devices.firmware_campaign_devices (
   wave         int NOT NULL,
   result       text NOT NULL DEFAULT 'pending' CHECK (result IN ('pending','installing','succeeded','failed','skipped')),
   operation_id uuid REFERENCES devices.device_operations(id),
-  detail       text,
+  detail       text,                                   -- FirmwareCampaignResult.reasonKey (IR339)
+  result_at    timestamptz,                            -- when the result was set (FirmwareCampaignResult.at)
   PRIMARY KEY (campaign_id, device_id)
 );
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  campaignErrors, campaignRows, campaignStart, capabilityDraft, capabilityErrors, deviceRows, modelRows, parseWaves,
+  campaignErrors, campaignRows, campaignStart, capabilityDraft, capabilityErrors, deviceRows, modelRows, parseWaves, resultReason, waveStates,
   type ApiCampaign, type ApiCapability, type ApiDevice, type CampaignDraft,
 } from "@ac/web/lib/devices";
 import { i18nOf } from "@ac/web/lib/i18n";
@@ -34,6 +34,18 @@ describe("HQ device registry", () => {
       autoPauseFailurePercent: 5, startAt: "2026-09-16T02:00:00Z", state: "scheduled", progress: { succeeded: 0, installing: 0, pending: 1, failed: 0, skipped: 0 }, results: [], reason: null };
     expect(campaignRows([c], [cap])[0]).toMatchObject({ model: "DemoAir SPL-100", versions: "any → v2", start: "16 Sept 2026, 10:00 am MYT" });
   });
+
+  it("words the runner's results and each wave's state (BR-A20, IR339)", () => {
+    expect([resultReason("errors.device_offline"), resultReason("errors.install_timeout"), resultReason("error.checksum_mismatch"), resultReason(null)])
+      .toEqual(["Skipped — offline", "Failed — no answer within 60 s; the old version is kept", "checksum mismatch", ""]);
+    const r = (waveIndex: number, status: ApiCampaign["results"][number]["status"]) => ({ deviceId: `d${waveIndex}${status}`, waveIndex, status, reasonKey: null, at: null });
+    const waves = [{ label: "Pilot", percent: 34 }, { label: "All", percent: 100 }, { label: "Rest", percent: 100 }];
+    const results = [r(0, "succeeded"), r(0, "succeeded"), r(1, "succeeded"), r(1, "failed"), r(2, "pending")];
+    expect(waveStates({ waves, results, state: "running" })).toEqual(["done", "running", "waiting"]);
+    expect(waveStates({ waves, results, state: "paused" })).toEqual(["done", "paused", "waiting"]);
+    expect(waveStates({ waves, results: results.map((x) => ({ ...x, status: "pending" as const })), state: "scheduled" })).toEqual(["waiting", "waiting", "waiting"]);
+    expect(waveStates({ waves: waves.slice(0, 1), results: [r(0, "succeeded")], state: "completed" })).toEqual(["done"]);
+  });
 });
 
 describe("HQ device registry in Malay with the display time zone (IR295)", () => {
@@ -43,5 +55,6 @@ describe("HQ device registry in Malay with the display time zone (IR295)", () =>
     expect(campaignErrors(draft({ modelId: "" }), NOW, "Asia/Tokyo", MS.t)).toEqual({ modelId: "Pilih model" });
     expect(campaignRows([{ ...({} as ApiCampaign), id: "k", version: 1, modelId: "x", fromVersions: [], targetVersion: "v2", deviceIds: [], startAt: "2026-09-16T02:00:00Z", state: "paused" } as ApiCampaign], [], MS)[0])
       .toMatchObject({ model: "model", versions: "mana-mana → v2", start: "16 Sep 2026, 11:00 PG GMT+9" });
+    expect(resultReason("errors.device_busy", MS.t)).toBe("Dilangkau — unit sedang sibuk (operasi, arahan, ujian diagnostik atau sekatan)");
   });
 });

@@ -42,7 +42,7 @@ export type ApiCampaign = {
   id: string; version: number; modelId: string; fromVersions: string[]; targetVersion: string; deviceIds: string[]; waves: { label: string; percent: number }[];
   window: { startLocal: string; endLocal: string }; autoPauseFailurePercent: number; startAt: string; state: "scheduled" | "running" | "paused" | "aborted" | "completed";
   progress: { succeeded: number; installing: number; pending: number; failed: number; skipped: number };
-  results: { deviceId: string; waveIndex: number; status: "pending" | "installing" | "succeeded" | "failed" | "skipped"; reasonKey: string | null }[]; reason: string | null;
+  results: { deviceId: string; waveIndex: number; status: "pending" | "installing" | "succeeded" | "failed" | "skipped"; reasonKey: string | null; at: string | null }[]; reason: string | null;
 };
 
 const KL = "Asia/Kuala_Lumpur";
@@ -137,6 +137,35 @@ export function campaignRows(cs: ApiCampaign[], caps: ApiCapability[], i: I18n =
     id: c.id, version: c.version, model: model.get(c.modelId) ?? t("model"), versions: `${c.fromVersions.join(", ") || t("any")} → ${c.targetVersion}`, state: c.state,
     devices: c.deviceIds.length, start: showTime(c.startAt, i.display), c,
   }));
+}
+
+/** Why the runner skipped or failed a device (FirmwareCampaignResult.reasonKey, IR339), worded as Figma Admin 04-9. */
+const RESULT_REASON: Record<string, string> = {
+  "errors.device_busy": "Skipped — the unit is busy (an operation, command, diagnostic run or restriction)",
+  "errors.device_offline": "Skipped — offline",
+  "errors.tamper_unresolved": "Skipped — open tamper event",
+  "errors.device_unbound": "Skipped — no longer bound to a unit",
+  "errors.other_model": "Skipped — now on a unit of another model",
+  "errors.install_failed": "Failed — the device reported an error; the old version is kept",
+  "errors.install_timeout": "Failed — no answer within 60 s; the old version is kept",
+};
+export function resultReason(key: string | null, t: T = en): string {
+  if (!key) return "";
+  return RESULT_REASON[key] ? t(RESULT_REASON[key]) : key.replace(/^errors?\./, "").replace(/_/g, " ");
+}
+
+/** Each wave's state for its chip: Done once 95 % of its devices succeeded (BR-A20), the first wave that has not is
+ * the campaign's current one (running, paused or aborted with it), later ones wait; nothing runs before the start. */
+export type WaveState = "done" | "running" | "paused" | "aborted" | "waiting";
+export function waveStates(c: Pick<ApiCampaign, "waves" | "results" | "state">): WaveState[] {
+  let current = true;
+  return c.waves.map((_, n) => {
+    const inWave = c.results.filter((r) => r.waveIndex === n);
+    if (inWave.filter((r) => r.status === "succeeded").length * 100 >= 95 * inWave.length && c.state !== "scheduled") return "done";
+    if (!current || c.state === "scheduled") return "waiting";
+    current = false;
+    return c.state === "completed" ? "done" : c.state;
+  });
 }
 
 /** The firmware campaign form (DD-A20): waves ascend and end at 100 %, auto-pause 1–50 %, start ≥ 24 h ahead. The start
