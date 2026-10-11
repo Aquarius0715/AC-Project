@@ -48,3 +48,25 @@ func TestClaimable(t *testing.T) {
 		t.Fatalf("completion on the last warranty instant counts: %v", got)
 	}
 }
+
+// TestWarrantyStage: the latest BR-A19 reminder a warranty end has reached — 90 or 30 days before it, each from that
+// very instant — and none earlier than 90 days (IR340).
+func TestWarrantyStage(t *testing.T) {
+	now := time.Date(2026, 9, 14, 0, 0, 0, 0, time.UTC)
+	day := 24 * time.Hour
+	for name, c := range map[string]struct {
+		ends time.Time
+		want int
+	}{
+		"91 days":        {now.Add(91 * day), 0},
+		"a second early": {now.Add(90*day + time.Second), 0},
+		"90 days":        {now.Add(90 * day), 90},
+		"31 days":        {now.Add(31 * day), 90},
+		"30 days":        {now.Add(30 * day), 30},
+		"an hour":        {now.Add(time.Hour), 30},
+	} {
+		if got := warrantyStage(c.ends, now); got != c.want {
+			t.Errorf("%s: %d, want %d", name, got, c.want)
+		}
+	}
+}

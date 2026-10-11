@@ -361,6 +361,17 @@ CREATE TABLE assets.units (                      -- ACUnit
 CREATE INDEX units_customer ON assets.units (tenant_id, customer_org_id) WHERE NOT archived;
 CREATE INDEX units_property ON assets.units (tenant_id, property_id, space_id) WHERE NOT archived;
 CREATE INDEX units_connection ON assets.units (tenant_id, connection) WHERE NOT archived;
+CREATE INDEX units_warranty_end ON assets.units (tenant_id, warranty_ends_at) WHERE NOT archived AND warranty_ends_at IS NOT NULL;  -- warranty reminders (IR340)
+
+CREATE TABLE assets.warranty_reminders (         -- BR-A19: each reminder once per unit and warranty end (IR340)
+  unit_id          uuid NOT NULL REFERENCES assets.units(id),
+  warranty_ends_at timestamptz NOT NULL,                -- a changed warranty end gets its own reminders
+  days_before      int NOT NULL CHECK (days_before IN (90, 30)),
+  tenant_id        uuid NOT NULL,
+  sent_at          timestamptz NOT NULL,
+  notifications    int NOT NULL DEFAULT 0,              -- in-app notifications to HQ (asset.read)
+  PRIMARY KEY (unit_id, warranty_ends_at, days_before)
+);
 
 CREATE TABLE assets.unit_alert_policies (        -- units carry policies (IR108); default policy is implicit
   tenant_id  uuid NOT NULL,
@@ -1681,7 +1692,7 @@ CREATE TABLE notify.notifications (
   scope_version_at_creation  int NOT NULL,
   type                       text NOT NULL,
   channel                    text NOT NULL DEFAULT 'inApp' CHECK (channel IN ('inApp','email','whatsapp')),   -- inApp simulated, email/whatsapp preview (IR04)
-  template_key               text NOT NULL CHECK (template_key IN ('alert','quality','schedule_change','report_return','completion','payment','payment_reminder','restriction','inquiry','job_update','device_operation','invite','certificate_expiry')),
+  template_key               text NOT NULL CHECK (template_key IN ('alert','quality','schedule_change','report_return','completion','payment','payment_reminder','restriction','inquiry','job_update','device_operation','invite','certificate_expiry','warranty_expiring')),
   target                     jsonb NOT NULL,     -- {kind,id}
   params                     jsonb NOT NULL,
   source_alert_id            uuid,

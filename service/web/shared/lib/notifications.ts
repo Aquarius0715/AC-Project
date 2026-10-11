@@ -36,18 +36,23 @@ const titles: Record<string, string> = {
   device_operation: "Device operation — {name}",
   invite: "Invitation — {name}",
   certificate_expiry: "Certificate expiring — {name}",
+  warranty_expiring: "Warranty ending — {name}",
 };
 
 /** Templates whose detail line comes from the params in the user's language: a certificate reminder (BR-P09) names
- * the day the certificate expires (IR336). */
+ * the day the certificate expires (IR336), a warranty reminder (BR-A19) the day the warranty ends (IR340). */
 const details: Record<string, (n: ApiNotification, display: Display) => string> = {
   certificate_expiry: (n, display) => translate(display.locale, "Expires {date}", { date: showDate(n.params.at, display) }),
+  warranty_expiring: (n, display) => translate(display.locale, "Warranty ends {date} · no maintenance contract", { date: showDate(n.params.at, display) }),
 };
 
 /** Types whose title and link come from the type rather than the template: a filter cleaning reminder (alert template,
  * IR104 maintenance → cleaning_due) opens the customer's Filter care tab (IR239). */
 const typeTitles: Record<string, string> = { cleaning_due: "Filter cleaning due on {name}" };
-const typeRoutes: Partial<Record<Role, Record<string, string>>> = { client: { cleaning_due: "/customer/maintenance?tab=filter-care" } };
+const typeRoutes: Partial<Record<Role, Record<string, string>>> = {
+  client: { cleaning_due: "/customer/maintenance?tab=filter-care" },
+  admin: { warranty_expiring: "/admin/units?tab=warranty" }, // Customers & units › Warranty & coverage (FR-A19)
+};
 
 const routes: Record<Role, Partial<Record<TargetKind, (id: string) => string>>> = {
   client: { unit: (id) => `/customer/units/${id}`, job: (id) => `/customer/maintenance?jobId=${id}`, invoice: (id) => `/customer/payments/${id}`, restriction: () => "/customer/payments", inquiry: () => "/customer/maintenance", client_user: () => "/customer/users" },

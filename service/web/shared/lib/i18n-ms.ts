@@ -5473,6 +5473,8 @@ export const ms: Record<string, string> = {
   "Filter cleaning due on {name}": "Pembersihan penapis perlu dibuat pada {name}",
   "Certificate expiring — {name}": "Sijil hampir tamat — {name}",
   "Expires {date}": "Tamat tempoh {date}",
+  "Warranty ending — {name}": "Waranti hampir tamat — {name}",
+  "Warranty ends {date} · no maintenance contract": "Waranti tamat {date} · tiada kontrak penyelenggaraan",
 
   // demo controls
   "Visually separated from business screens. Nothing here reaches real devices, payments, notifications, or IoT connections (FR-X05).":

@@ -118,6 +118,8 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		OrgActive: []assets.OrgActivity{billing.Usage{}, maintenance.Usage{}}}
 	am.Details = unitDetails{}
 	assets.Register(reg, am)
+	// IR340: warranty reminders to HQ (BR-A19)
+	reg.AddJob(ops.DomainEquipment, am.RemindWarranties)
 	eq := equipmentView{am: am, alerts: monitoring.Alerts{}, tel: monitoring.Telemetry{Sensors: devices.Models{}}, models: devices.Models{}} // other domains' view (IR193)
 	devices.Register(reg, devices.Capabilities{Units: am})
 	monitoring.RegisterAlerts(reg, monitoring.Alerts{Units: am, Access: maintenance.Access{}, Devices: deviceRecoveries{}})

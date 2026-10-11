@@ -39,6 +39,15 @@ describe("inbox rows and alert rows", () => {
       .toEqual(["Sijil hampir tamat — Aisha · Indoor AC", "Tamat tempoh 13 Okt 2026"]);
   });
 
+  it("opens Warranty & coverage from a warranty reminder and names the end day (BR-A19, IR340)", () => {
+    const n = note({ type: "warranty_expiring", templateKey: "warranty_expiring", target: { kind: "unit", id: "u1" },
+      params: { targetName: "Bedroom AC", at: "2026-10-13T16:00:00Z", status: "expiring", reason: null, message: null } });
+    const r = inboxRow(n, "admin");
+    expect([r.t, r.d, r.href]).toEqual(["Warranty ending — Bedroom AC", "Warranty ends 14 Oct 2026 · no maintenance contract", "/admin/units?tab=warranty"]);
+    const ms = inboxRow(n, "admin", { locale: "ms", timeZone: "UTC" });
+    expect([ms.t, ms.d]).toEqual(["Waranti hampir tamat — Bedroom AC", "Waranti tamat 13 Okt 2026 · tiada kontrak penyelenggaraan"]);
+  });
+
   it("lists alerts with their status and the read state of their notifications (DD-C08, IR242)", () => {
     const alert = (id: string, severity: ApiAlert["severity"], status: string, over: Partial<ApiAlert> = {}): ApiAlert => ({
       id, unitId: "u1", type: "sensor", severity, status, causeCode: "unknown", evidenceKind: "inferred", evidenceText: "Cleaning due (250 h of run time since the last cleaning). Not a fault.", detectedAt: "2026-09-14T01:00:00Z", ...over,

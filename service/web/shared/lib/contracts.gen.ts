@@ -138,7 +138,7 @@ export type FireResult = {eventId:ID;results:(Omit<Decision,'decision'> & {decis
 export type Channel = 'inApp'|'email'|'whatsapp';
 export type FilterCareChannel = Exclude<Channel,'whatsapp'>; // filter-care reminders go in-app and by e-mail (IR134 item 4)
 export type Target = {kind:'unit'|'job'|'invoice'|'restriction'|'device'|'inquiry'|'client_user'|'certificate';id:ID};
-export type Notification = Entity & {sourceAlertId:ID|null;type:NotificationType;recipientMembershipId:ID;scopeVersionAtCreation:number;target:Target;templateKey:'alert'|'quality'|'schedule_change'|'report_return'|'completion'|'payment'|'payment_reminder'|'restriction'|'inquiry'|'job_update'|'device_operation'|'invite'|'certificate_expiry';params:{targetName:string;at:Instant;status:string;reason:string|null;amountMinor:number|null;currency:Currency|null;method:PaymentMethod|null;message:string|null};channel:Channel;deliveryState:'preview'|'simulated'|'failed';severity:Severity;occurredAt:Instant;readAt:Instant|null};
+export type Notification = Entity & {sourceAlertId:ID|null;type:NotificationType;recipientMembershipId:ID;scopeVersionAtCreation:number;target:Target;templateKey:'alert'|'quality'|'schedule_change'|'report_return'|'completion'|'payment'|'payment_reminder'|'restriction'|'inquiry'|'job_update'|'device_operation'|'invite'|'certificate_expiry'|'warranty_expiring';params:{targetName:string;at:Instant;status:string;reason:string|null;amountMinor:number|null;currency:Currency|null;method:PaymentMethod|null;message:string|null};channel:Channel;deliveryState:'preview'|'simulated'|'failed';severity:Severity;occurredAt:Instant;readAt:Instant|null};
 export type NotificationPreview = Notification;
 export type AuditView = Entity & {actorId:ID;actorName:string|null;actorRoleAtTime:Role|'system';action:string;targetRef:{kind:string;id:ID};previousVersion:number|null;nextVersion:number|null;occurredAt:Instant;correlationId:ID;result:'success'|'denied'|'failed'|'pending';maskedBefore:Record<string,string|null>;maskedAfter:Record<string,string|null>;reason:string|null};
 export type EnergyBaseline = Entity & {unitIds:ID[];period:Range;method:'demo_fixed'|'demo_period_comparison';baselineKWh:number|null;quality:BaselineQuality;boundaryId:EnergyBoundaryId;boundary:string;assumptions:string;source:string};
@@ -204,7 +204,7 @@ export type EnergyBoundaryId = 'ac_input_electricity'|'whole_building_electricit
 export type MeasurementIssue = 'unit_mismatch'|'non_finite'|'out_of_range'|'invalid_time';
 export type RawMeasurement = {unitId:ID;sensorId:ID;metric:Metric;value:number|null;unit:string;observedAt:Instant;receivedAt:Instant;origin:Measurement['origin'];quality:Quality;sequence?:number;eventId:ID}; // IR77: omitted sequence = latest+1
 export type JobDecisionReceipt = {jobId:ID;jobVersion:number;offerId:ID;decision:'accept'|'decline'};
-export type NotificationType = 'cleaning_due'|'fault'|'quality'|'schedule_change'|'report_return'|'completion'|'payment'|'payment_reminder'|'restriction'|'inquiry'|'job_update'|'device_operation'|'certificate_expiry';
+export type NotificationType = 'cleaning_due'|'fault'|'quality'|'schedule_change'|'report_return'|'completion'|'payment'|'payment_reminder'|'restriction'|'inquiry'|'job_update'|'device_operation'|'certificate_expiry'|'warranty_expiring';
 export type InvoiceReminderReceipt = {invoiceId:ID;invoiceVersion:number;notificationId:ID};
 
 /** IR107–IR112: Figma-confirmed screens (2026-10-01). */

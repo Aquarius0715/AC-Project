@@ -165,7 +165,7 @@ func inboxFrom() string {
 
 var (
 	severities = []string{"critical", "warning", "normal"}
-	types      = []string{"cleaning_due", "fault", "quality", "schedule_change", "report_return", "completion", "payment", "payment_reminder", "restriction", "inquiry", "job_update", "device_operation", "certificate_expiry"}
+	types      = []string{"cleaning_due", "fault", "quality", "schedule_change", "report_return", "completion", "payment", "payment_reminder", "restriction", "inquiry", "job_update", "device_operation", "certificate_expiry", "warranty_expiring"}
 )
 
 // @Summary		notifications.list (read)

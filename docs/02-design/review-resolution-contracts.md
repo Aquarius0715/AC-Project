@@ -4860,3 +4860,25 @@ BR-A20 and DD-A20 define how a firmware campaign rolls out, but only its operati
 8. **Tests.**
    - Unit: the window (bounds, over midnight), the outcome mapping, the 95 % rule; web: reasons, wave states, Malay.
    - Integration, in both suites (`TestFirmwareCampaignRunner`): the notice once, the start, the pilot, the four skip reasons, a reported failure and the auto-pause, nothing while paused, Retry and Resume, an install that times out, the wait below 95 %, the window, a device already on target, and the completion with every result's time.
+
+## IR340 Warranty end reminders to HQ from the equipment scheduler — 2026-10-11
+
+BR-A19 notifies HQ 90 and 30 days before a warranty ends without a contract. The Figma Admin Warranty & maintenance coverage tab (FR-A19) says so too: "Reminders: HQ is notified 90 / 30 days before a warranty ends without a contract." The coverage status was only computed when read (`expiring` within 90 days, IR111); nothing sent the reminders. They are now an equipment scheduler job (registry job, IR54 pattern, like IR336).
+
+1. **Which reminder.**
+   - A unit gets a reminder when it is not archived, its `warrantyEndsAt` is within 90 days, and no active contract covers it. A contract is active when its term contains now (`billing.activeContracts`).
+   - The unit gets the latest reminder it has reached: 90 or 30 days before the end.
+   - Each reminder goes once per warranty end (`assets.warranty_reminders`, one row per unit, warranty end and reminder), and an earlier one never follows a later one.
+   - A changed warranty end (unit edit) gets its own reminders.
+2. **Notifications.**
+   - Recipients: each active HQ membership with asset.read. Those members read unit notifications (IR142) and the Warranty & coverage tab.
+   - Content: type and templateKey `warranty_expiring`, severity normal (warning for the 30-day reminder), target the unit, params `at` = warrantyEndsAt and status `expiring`.
+   - The job audits `units.remindWarranty` with the reason "<n> days before the warranty ends".
+3. **Contracts.** `NotificationType` and `Notification.templateKey` gain `warranty_expiring`. As with `certificate_expiry` (IR336), `notifications.preview` and `notifications.recipients` do not take it. Clients never receive it.
+4. **Web.** The HQ inbox titles it "Warranty ending — <unit>", the detail reads "Warranty ends <date> · no maintenance contract" in the user's language and time zone, and the row opens Customers & units › Warranty & coverage (`/admin/units?tab=warranty`). DD-A19 describes the reminders.
+5. **Schema.** `assets.warranty_reminders`, a partial index of the units by warranty end, and the template key in the CHECK.
+6. **Tests.**
+   - Unit: `warrantyStage` at its boundaries.
+   - Integration (`TestWarrantyReminders`, both suites): the 90-day reminder to every asset.read admin and only the 30-day one with 20 days left; none for a unit beyond 90 days, ended, archived or under contract; no repeat; a moved warranty end with its own reminder; HQ's inbox fields; none for a client.
+   - Web: the inbox row in English and Malay.
+7. **Figma.** Admin Notifications (/notifications, FR-X07) shows a read 90-day reminder, “Warranty ending — Office AC”, “Warranty ends 15 Oct 2026 · no maintenance contract”, which opens Customers & units › Warranty & coverage. The All tab counts 10.

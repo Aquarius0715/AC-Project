@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND
-version: 0.36.0
+version: 0.37.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -216,6 +216,7 @@ Modelling rules:
 | Auto-confirm completed jobs | 7 days after completion without rating | FR-C17 (BR-C17) |
 | Follow-up classify-by time | createdAt + 1 business day, display only in HQ Jobs (IR114 item 3) | IR114, IR338 |
 | Invoice reminders | Due and overdue dates | FR-A08 |
+| Warranty end reminders | 90 and 30 days before warrantyEndsAt while no active contract covers the unit: one reminder each to HQ (asset.read) | FR-A19, IR340 |
 | Certificate expiry reminders | 60, 30 and 7 days before expiry: one reminder each to the contractor admins (BR-P09). The status reads `expiring` within 30 days of expiry and `expired` from it on (IR133 item 2) | FR-P09, FR-A21, IR336 |
 | Filter cleaning reminders | Every 15 minutes of business time: an overdue unit once per cleaning cycle (customer settings) | FR-C18, IR239 |
 | Automation schedules | Schedule start / end | FR-C04 |
@@ -228,7 +229,7 @@ As built (IR335), the worker runs one scheduler per business domain (IR195). Eac
 
 | Scheduler | Built transitions |
 |---|---|
-| Equipment | Command expiry at `expiresAt`, diagnostic run ends (IR123), automation schedules (FR-C04, IR54), device operation start and time-out (IR67), firmware campaigns (IR339) |
+| Equipment | Command expiry at `expiresAt`, diagnostic run ends (IR123), automation schedules (FR-C04, IR54), device operation start and time-out (IR67), firmware campaigns (IR339), warranty reminders (IR340) |
 | Maintenance | Offer expiry, the slot proposal reply deadline (IR113), auto-confirm of completed jobs (FR-C17), the work window end (the assignment history is frozen, IR89), filter cleaning reminders (IR239), certificate expiry reminders (IR336) |
 
 Items of the table above that are not scheduled yet:
@@ -308,4 +309,4 @@ Items of the table above that are not scheduled yet:
 | OPEN-BE-07 | Contractor payout rail (bank transfer file or Stripe Connect) | Payouts (FR-A23) |
 | OPEN-BE-08 | The scheduled items that are not built yet (§10 as built) and the lease (`platform.scheduled_items`, `FOR UPDATE SKIP LOCKED`) for running several scheduler instances per domain | Scheduler, worker |
 
-Additional contracts for current version 0.36.0: Read IR01–IR339 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.37.0: Read IR01–IR340 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

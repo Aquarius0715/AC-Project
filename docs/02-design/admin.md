@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.49.0
+version: 0.50.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -760,6 +760,8 @@ Scope: FR-A19 / Main display pattern: **UI-LIST**. Service boundary: `units.cove
 
 **Boundary cases and failures**: Claim outside warranty → VALIDATION.
 
+**Reminders (BR-A19, IR340)**: the equipment scheduler notifies each HQ member with asset.read 90 and 30 days before a unit's warranty ends while no active contract covers it. Only the latest reminder reached is sent, once per warranty end; a changed warranty end gets its own. Archived units and covered units get none. The notification reads “Warranty ending — <unit>”, “Warranty ends <date> · no maintenance contract”, and opens this tab.
+
 **Verification**: Check the traceability entries under AT-A19 (N/E/B).
 
 ### DD-A20 Details
@@ -874,7 +876,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.49.0: Read IR01–IR339 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.50.0: Read IR01–IR340 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 
