@@ -55,7 +55,7 @@ export const STAGES = [
 ] as const;
 export type Stage = (typeof STAGES)[number]["id"];
 export const stageOf = (v?: string): Stage | null => (STAGES.some((s) => s.id === v) ? (v as Stage) : null);
-export const SORTS = [{ id: "status", text: "Status ↑", field: "status", direction: "asc" }, { id: "dueAt", text: "Deadline ↑", field: "dueAt", direction: "asc" }, { id: "severity", text: "Severity ↓", field: "severity", direction: "desc" }] as const;
+export const SORTS = [{ id: "status", text: "Status, earliest stage first", field: "status", direction: "asc" }, { id: "dueAt", text: "Deadline, soonest first", field: "dueAt", direction: "asc" }, { id: "severity", text: "Severity, most severe first", field: "severity", direction: "desc" }] as const;
 export type HqSort = (typeof SORTS)[number]["id"];
 export const sortOf = (v?: string): HqSort => (SORTS.some((s) => s.id === v) ? (v as HqSort) : "status");
 
@@ -93,7 +93,7 @@ export function filtersOf(q: Query, hqOrgId: string | null, withStage = true): R
 }
 
 export type HqRow = { id: string; short: string; title: string; customer: string; type: string; origin: string; status: string; badge: { status: string; overdue: boolean }; line: string; lineTone?: Tone };
-const ack = (a: string | null, t: T) => t(a === "accepted" ? "accepted ✓" : a === "cant_make" ? "can’t make it ⚠" : "awaiting acceptance");
+const ack = (a: string | null, t: T) => t(a === "accepted" ? "accepted" : a === "cant_make" ? "can’t make it" : "awaiting acceptance");
 /** One job of the list: unit, customer, type, origin, status (Time proposed derived, IR89 overdue) and what is next. */
 export function hqRow(j: ApiHqRow, now: number, n: Names, unitOrg: Map<string, string>, i: I18n = EN): HqRow {
   const { t } = i;
@@ -116,7 +116,7 @@ export function hqRow(j: ApiHqRow, now: number, n: Names, unitOrg: Map<string, s
     case "cancelled": line = statusWord("cancelled", t); break;
   }
   // a client's follow-up waits for HQ's classification within one business day (IR114, Figma Admin 06-17)
-  if (j.followUpClass === "pending" && j.followUpOfJobId) [line, lineTone] = [t("↩ Follow-up of {id} · classify by {time}", { id: j.followUpOfJobId.slice(0, 8), time: classifyBy(j.createdAt, i) }), "warn"];
+  if (j.followUpClass === "pending" && j.followUpOfJobId) [line, lineTone] = [t("Follow-up of {id} · classify by {time}", { id: j.followUpOfJobId.slice(0, 8), time: classifyBy(j.createdAt, i) }), "warn"];
   return {
     id: j.id, short: j.id.slice(0, 8), title: n.units.get(j.unitId) ?? t("Unit"), customer: n.customers.get(unitOrg.get(j.unitId) ?? "") ?? t("customer"),
     type: typeLabel(j.type, t), origin: j.origin, status: j.displayStatus === "time_proposed" ? "time_proposed" : j.status, badge: { status: j.displayStatus === "time_proposed" ? "time_proposed" : j.status, overdue }, line, lineTone,
@@ -152,7 +152,7 @@ export function delivery(j: ApiHqJob, n: Names, now: number, i: I18n = EN): Deli
   const window = a ? slotText({ startAt: a.scheduledStart, endAt: a.scheduledEnd }, i) : "";
   const done = a?.status === "completed" ? ` · ${t("ended at completion")}` : "";
   const ackLine = a?.status === "completed" ? { tone: "ok" as Tone, text: t("{name} completed the job — the assignment ended with it, so {name}’s time is free again (IR234).", { name: tech }) }
-    : a ? (a.acknowledgement === "accepted" ? { tone: "ok" as Tone, text: t("{name} accepted the assignment ✓", { name: tech }) }
+    : a ? (a.acknowledgement === "accepted" ? { tone: "ok" as Tone, text: t("{name} accepted the assignment", { name: tech }) }
       : a.acknowledgement === "cant_make" ? { tone: "warn" as Tone, text: `${a.cantMakeReason ? t("{name} can’t make this time: “{reason}”", { name: tech, reason: a.cantMakeReason }) : t("{name} can’t make this time", { name: tech })}${a.alternativeSlot ? ` · ${t("could do {slot}", { slot: slotText(a.alternativeSlot, i) })}` : ""}. ${t("Any new time needs the client’s approval.")}` }
       : { tone: "primary" as Tone, text: t("Waiting for {name} to accept (受領).", { name: tech }) }) : null;
   if (o && j.contractorOrgId) {

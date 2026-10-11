@@ -169,7 +169,7 @@ function AssignCard({ sel, choice, zone, otherZone }: { sel: Selected; choice: C
           </Field>
         )}
         {m.kind === "extend" && chosen && chosen.id !== sel.currentId && <Banner tone="warn">{t("On save, {current} loses action access immediately. The job keeps its state; {name} continues in a new draft version and the original report authorship is kept.", { current: currentName ?? t("the current technician"), name: chosen.name })}</Banner>}
-        {sel.ack && m.kind === "reassign" && sel.ack.status !== "cant_make" && <Banner tone={sel.ack.status === "accepted" ? "ok" : "primary"}>{t(sel.ack.status === "accepted" ? "The current technician accepted the assignment ✓" : "Waiting for the current technician to accept (受領).")}</Banner>}
+        {sel.ack && m.kind === "reassign" && sel.ack.status !== "cant_make" && <Banner tone={sel.ack.status === "accepted" ? "ok" : "primary"}>{t(sel.ack.status === "accepted" ? "The current technician accepted the assignment" : "Waiting for the current technician to accept (受領).")}</Banner>}
         {sel.text.alternative && <p className="text-[11px] text-muted">{t("The technician could do {slot} instead — a different time needs the client’s approval via HQ.", { slot: sel.text.alternative })}</p>}
         {sel.candidates.length > 0 && !sel.candidates.some((c) => c.eligible) && <Banner tone="warn">{t("No technician of your company can take this time (busy, unavailable or not qualified). Free a technician in Team & capacity, or ask HQ to agree another time with the client.")}</Banner>}
         {chosen && (chosen.eligible

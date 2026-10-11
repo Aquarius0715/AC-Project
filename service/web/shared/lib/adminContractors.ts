@@ -8,6 +8,7 @@ import { businessDay, KL } from "@ac/web/lib/clientBilling";
 import { EN, showDayMonth, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { qualificationLabel } from "@ac/web/lib/partnerJobDetail";
+import type { IconName } from "@ac/web/components/Icon";
 
 const en = translator("en");
 
@@ -46,12 +47,12 @@ export function contractorRows(orgs: { id: string; name: string }[], profiles: A
 }
 
 /** The 90-day KPI tiles (IR131 item 6); SLA targets are per plan type (SLA tab), so the tiles name the measure. */
-export function kpiTiles(k: ApiKpis, t: T = en): { label: string; value: string; sub: string; tone?: "warn" | "crit" }[] {
+export function kpiTiles(k: ApiKpis, t: T = en): { label: string; value: string; icon?: IconName; sub: string; tone?: "warn" | "crit" }[] {
   return [
     { label: t("Offer acceptance"), value: pct(k.offerAcceptance), sub: t(k.offerAcceptance === null ? "no answered offers · 90 d" : "of answered or expired offers · 90 d") },
     { label: t("Arrival in window"), value: pct(k.arrivalInWindow), sub: t(k.arrivalInWindow === null ? "no check-ins · 90 d" : "check-ins inside the scheduled slot") },
     { label: t("Report accepted first time"), value: pct(k.firstTimeAccepted), sub: t(k.firstTimeAccepted === null ? "no reviewed reports · 90 d" : "first submitted version accepted") },
-    { label: t("Customer rating"), value: k.averageRating === null ? "—" : `${k.averageRating.toFixed(1)} ★`, sub: t(k.ratingCount === 1 ? "1 rating (Client)" : "{n} ratings (Client)", { n: k.ratingCount }) },
+    { label: t("Customer rating"), value: k.averageRating === null ? "—" : k.averageRating.toFixed(1), icon: k.averageRating === null ? undefined : "star", sub: t(k.ratingCount === 1 ? "1 rating (Client)" : "{n} ratings (Client)", { n: k.ratingCount }) },
     { label: t("Rework rate"), value: pct(k.reworkRate), sub: t(k.reworkRate === null ? "no completed jobs · 90 d" : "completed jobs with a rework follow-up"), tone: k.reworkRate !== null && k.reworkRate > 10 ? "warn" : undefined },
   ];
 }

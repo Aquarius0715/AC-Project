@@ -93,7 +93,7 @@ export function fitFor(s: Slot): Fit {
   if (d < "2026-10-01") return { hq: "tech-internal-a: booked · tech-internal-b: not qualified (refrigerant)", partner: "contractor-a: no free hours · contractor-b: outside service area", fits: "none" };
   if (d === "2026-10-02") return { hq: "tech-internal-a: overlaps job-c04 follow-up", partner: "contractor-a: tech-external-a fully booked", fits: "none" };
   const internal = s.win.startsWith("14") && d >= "2026-10-01";
-  return { hq: internal ? "tech-internal-a: free ✓ (refrigerant ✓)" : "tech-internal-b: not qualified", partner: "contractor-a: tech-external-a free ✓", fits: internal ? "both" : "contractor" };
+  return { hq: internal ? "tech-internal-a: free (refrigerant qualified)" : "tech-internal-b: not qualified", partner: "contractor-a: tech-external-a free", fits: internal ? "both" : "contractor" };
 }
 
 /* ---------- store ---------- */

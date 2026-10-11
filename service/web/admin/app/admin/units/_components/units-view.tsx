@@ -111,7 +111,7 @@ function CustomerList({ live }: { live: UnitsLive }) {
             { key: "u", label: t("Units"), render: (r) => r.units },
             { key: "o", label: t("Operation"), render: (r) => r.operation, hideBelow: "md" },
             { key: "a", label: t("Alerts"), render: (r) => (r.status === "inactive" ? "—" : r.alerts), hideBelow: "md" },
-            ...(live.standingKnown ? [{ key: "k", label: t("Contract"), render: (r: CustomerRow) => <div className="flex flex-wrap gap-1">{r.marks.map((m) => <Badge key={m.label} tone={m.tone}>{m.label}</Badge>)}</div>, hideBelow: "md" as const }] : []),
+            ...(live.standingKnown ? [{ key: "k", label: t("Contract"), render: (r: CustomerRow) => <div className="flex flex-wrap gap-1">{r.marks.map((m) => <Badge key={m.label} tone={m.tone} icon={m.icon}>{m.label}</Badge>)}</div>, hideBelow: "md" as const }] : []),
             { key: "x", label: "", render: () => "›" },
           ]} />
         )}
@@ -170,7 +170,7 @@ function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
         <button type="button" className="font-semibold text-primary" onClick={() => nav({ customerId: null, tab: null, locationId: null, propertyId: null, unitId: null, powerState: null, connections: null, search: null })}>{t("‹ Customers")}</button>
         <span className="text-muted">/ {r.name}{c.unit ? ` / ${c.unit.u.displayName}` : ""}</span>
-        {r.marks.map((x) => <Badge key={x.label} tone={x.tone}>{x.label}</Badge>)}
+        {r.marks.map((x) => <Badge key={x.label} tone={x.tone} icon={x.icon}>{x.label}</Badge>)}
         <div className="ml-auto flex gap-2">
           {canWrite && <Btn size="sm" onClick={() => setM({ kind: "customer" })}>{t("Edit customer")}</Btn>}
           {canWrite && r.status === "active" && c.tree.length > 0 && <Btn size="sm" variant="primary" onClick={newUnitAt}>{t("+ New unit")}</Btn>}

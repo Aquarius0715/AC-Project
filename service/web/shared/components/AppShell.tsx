@@ -155,7 +155,7 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
       {role === "technician" && session?.dataSource === "api" && <QrScan open={qr} onClose={() => setQr(false)} />}
       <Modal open={qr && session?.dataSource !== "api"} onClose={() => setQr(false)} title="Scan unit QR" footer={<><Btn onClick={() => setQr(false)}>Close</Btn><Link href="/technician/jobs/job-contractor-a" onClick={() => setQr(false)} className="inline-flex items-center rounded-control border border-primary bg-primary px-3.5 py-2 text-[13px] font-semibold text-white">Open job →</Link></>}>
         <div className="grid h-40 place-items-center rounded-xl bg-ink/90 text-xs text-white">[ camera preview ]</div>
-        <SummaryList items={[["Result", <Badge key="m" tone="ok">✓ Matched</Badge>], ["Label", "AC-QR-online-rto · scanned 10:04"], ["Unit", "Bedroom AC · unit-online-rto · customer-a · Home A › 1F › Bedroom"], ["Your job today", "job-contractor-a"]]} />
+        <SummaryList items={[["Result", <Badge key="m" tone="ok" icon="check">Matched</Badge>], ["Label", "AC-QR-online-rto · scanned 10:04"], ["Unit", "Bedroom AC · unit-online-rto · customer-a · Home A › 1F › Bedroom"], ["Your job today", "job-contractor-a"]]} />
         <Banner>Units outside your assignments show “Not in your assignments” (NOT_FOUND).</Banner>
       </Modal>
       {role === "client" && <AssistantPanel open={assistant} onClose={() => setAssistant(false)} context={title} live={!!live} />}

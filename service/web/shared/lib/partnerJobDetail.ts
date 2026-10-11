@@ -126,7 +126,7 @@ export function detailBanner(j: ApiDetail, techName: string | null, now: number,
       const a = j.assignment;
       const ended = a && Date.parse(a.scheduledEnd) <= now;
       if (ended) return { tone: "crit", text: t("The work window ended {time} without a submitted report — extend or reassign in Schedule (IR89).", { time: showTime(a!.scheduledEnd, display) }) };
-      const ack = a?.acknowledgement === "accepted" ? t("accepted by the technician ✓")
+      const ack = a?.acknowledgement === "accepted" ? t("accepted by the technician")
         : a?.acknowledgement === "cant_make" ? (a.cantMakeReason ? t("the technician can’t make it (“{reason}”) — reassign in Schedule", { reason: a.cantMakeReason }) : t("the technician can’t make it — reassign in Schedule"))
         : t("awaiting the technician’s acceptance");
       const slot = a ? showSpan(a.scheduledStart, a.scheduledEnd, display) : "";

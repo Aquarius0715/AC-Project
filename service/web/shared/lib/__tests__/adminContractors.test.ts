@@ -30,7 +30,7 @@ describe("HQ contractor register", () => {
   });
 
   it("shows the KPI tiles and the profile facts", () => {
-    expect(kpiTiles(kpis).map((t) => [t.label, t.value])).toEqual([["Offer acceptance", "92 %"], ["Arrival in window", "96 %"], ["Report accepted first time", "84 %"], ["Customer rating", "4.6 ★"], ["Rework rate", "8 %"]]);
+    expect(kpiTiles(kpis).map((t) => [t.label, t.value])).toEqual([["Offer acceptance", "92 %"], ["Arrival in window", "96 %"], ["Report accepted first time", "84 %"], ["Customer rating", "4.6"], ["Rework rate", "8 %"]]);
     const empty = kpiTiles({ ...kpis, offerAcceptance: null, averageRating: null, ratingCount: 0, reworkRate: 12.5 });
     expect([empty[0].value, empty[0].sub, empty[3].value, empty[3].sub, empty[4].tone]).toEqual(["—", "no answered offers · 90 d", "—", "0 ratings (Client)", "warn"]);
     expect(profileFacts(profile({}), NOW)).toEqual([["Registration", "SSM 202301012345"], ["Service areas", "Kuala Lumpur, Selangor"], ["Delegation period", "1 Apr 2026 – 31 Jan 2027"], ["Contact", "ops@contractor-a.example"], ["Insurance", "valid to 31 Jan 2027"]]); // Kuala Lumpur days

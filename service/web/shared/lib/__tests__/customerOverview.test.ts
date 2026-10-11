@@ -53,10 +53,10 @@ describe("customer overview", () => {
 
   it("compares the energy of the period and keeps missing values apart from 0", () => {
     const e = energyCard("7d", sum(18.6), sum(20.2), [{ label: "Mon", kWh: 3 }, { label: "Tue", kWh: null }], [2, 2.5], "all 5 units");
-    expect([e.sub, e.total, e.delta, e.labels, e.series, e.gaps]).toEqual(["Last 7 days · all 5 units", "18.6", { text: "↓ 8% vs the 7 days before (20.2 kWh)", tone: "ok" }, ["Mon", "Tue"], [[2, 2.5], [3, 0]], true]);
+    expect([e.sub, e.total, e.delta, e.labels, e.series, e.gaps]).toEqual(["Last 7 days · all 5 units", "18.6", { text: "8% vs the 7 days before (20.2 kWh)", icon: "arrowDown", tone: "ok" }, ["Mon", "Tue"], [[2, 2.5], [3, 0]], true]);
     expect(energyCard("today", sum(null), sum(1), [], [], "AC u1")).toMatchObject({ total: null, delta: null, sub: "Today · AC u1" });
-    expect(energyCard("today", sum(2), sum(1), [], [], "x").delta).toEqual({ text: "↑ 100% vs yesterday at this time (1.0 kWh)", tone: "warn" });
-    expect(energyCard("7d", sum(18.6), sum(20.2), [], [], "semua 5 unit", MS_TOKYO)).toMatchObject({ sub: "7 hari lepas · semua 5 unit", delta: { text: "↓ 8% berbanding 7 hari sebelumnya (20.2 kWh)", tone: "ok" } });
+    expect(energyCard("today", sum(2), sum(1), [], [], "x").delta).toEqual({ text: "100% vs yesterday at this time (1.0 kWh)", icon: "arrowUp", tone: "warn" });
+    expect(energyCard("7d", sum(18.6), sum(20.2), [], [], "semua 5 unit", MS_TOKYO)).toMatchObject({ sub: "7 hari lepas · semua 5 unit", delta: { text: "8% berbanding 7 hari sebelumnya (20.2 kWh)", icon: "arrowDown", tone: "ok" } });
     expect(emissionsCard(sum(10, { emissionsKg: 13.2, savedEmissionsKg: 2.1 }), "demo_fixed")).toEqual({ total: "13.2", factor: "MY 2026 · 0.7 kgCO₂e/kWh (demo factor)", baseline: "15.3 kgCO₂e (demo_fixed)", saved: "2.1 kgCO₂e" });
     expect(emissionsCard(sum(null, {}, false), null)).toEqual({ total: null, factor: null, baseline: null, saved: null });
   });

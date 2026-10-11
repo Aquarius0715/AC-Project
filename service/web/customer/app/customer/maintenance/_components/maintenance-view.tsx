@@ -15,6 +15,7 @@ import { filterRefusal } from "@ac/web/lib/customerFilterCare";
 import { addNote, cancelRequest, createRequest, rateJob, reportProblem, requestReschedule, respondProposal } from "../actions";
 import type { MaintenanceLive } from "../_lib/load";
 import { FilterCareTab, type CleaningPrefill } from "./filter-care";
+import { Icon } from "@ac/web/components/Icon";
 
 type Detail = NonNullable<MaintenanceLive["detail"]>;
 type Slot = { startAt: string; endAt: string };
@@ -75,7 +76,7 @@ export function MaintenanceView({ live }: { live: MaintenanceLive }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold text-muted">{r.short}</span><b>{r.unit}</b><OriginBadge origin={r.origin} /></div>
                     <div className="text-xs text-muted">{r.place ? `${r.place} · ` : ""}{r.type}</div>
-                    <div className={cx("text-xs", r.warn && "font-semibold text-warn")}>{r.line}</div>
+                    <div className={cx("flex items-center gap-1.5 text-xs", r.warn && "font-semibold text-warn")}><Icon name={r.icon} className="shrink-0" />{r.line}</div>
                   </div>
                   <JobStatusBadge s={r.status as JobStatus} /><span className="text-muted">›</span>
                 </ListRow>
@@ -114,7 +115,7 @@ function JobDetail({ d, open, onDone, onFail }: { d: Detail; open: (m: ModalKind
       {d.preferred.length > 0 && (
         <div className="mt-3 flex flex-col gap-1">
           <b className="text-[13px]">{j.preferenceRound > 1 ? t("Your preferred times (round {n})", { n: j.preferenceRound }) : t("Your preferred times")}</b>
-          {d.preferred.map((p) => <div key={p.text} className="flex items-center justify-between rounded-lg bg-surface2 px-3 py-1.5 text-[13px]"><span>{p.text}</span>{p.note && <Badge tone="ok">{p.note}</Badge>}</div>)}
+          {d.preferred.map((p) => <div key={p.text} className="flex items-center justify-between rounded-lg bg-surface2 px-3 py-1.5 text-[13px]"><span>{p.text}</span>{p.note && <Badge tone="ok" icon="check">{p.note}</Badge>}</div>)}
         </div>
       )}
       {d.declined && <div className="mt-3"><Banner tone="warn">{d.declined}</Banner></div>}
@@ -153,7 +154,7 @@ function JobDetail({ d, open, onDone, onFail }: { d: Detail; open: (m: ModalKind
             </>
           )}
           {d.feedback.kind === "rate" && <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[11px] text-muted">{d.feedback.text}</span><Btn onClick={() => open("problem")}>{t("Report a problem")}</Btn><Btn variant="primary" onClick={() => open("rate")}>{t("Confirm & rate")}</Btn></div>}
-          {(d.feedback.kind === "edit" || d.feedback.kind === "rated") && <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[13px]">{d.feedback.text}</span>{d.feedback.kind === "edit" && <Btn size="sm" onClick={() => open("rate")}>{t("Edit rating")}</Btn>}<Btn size="sm" onClick={() => open("problem")}>{t("Report a problem")}</Btn></div>}
+          {(d.feedback.kind === "edit" || d.feedback.kind === "rated") && <div className="mt-3 flex flex-wrap items-center justify-end gap-2"><span className="mr-auto text-[13px]">{t("Rated")} <span role="img" aria-label={t("{n} of 5 stars", { n: d.feedback.stars ?? 0 })} className="inline-flex align-[-0.125em] text-warn">{Array.from({ length: d.feedback.stars ?? 0 }, (_, k) => <Icon key={k} name="star" filled />)}</span>{d.feedback.text}</span>{d.feedback.kind === "edit" && <Btn size="sm" onClick={() => open("rate")}>{t("Edit rating")}</Btn>}<Btn size="sm" onClick={() => open("problem")}>{t("Report a problem")}</Btn></div>}
         </>
       )}
       {j.followUpOfJobId && <p className="mt-3 text-xs text-muted">{t("Follow-up of")} <Link className="font-semibold text-primary hover:underline" href={`/customer/maintenance?jobId=${j.followUpOfJobId}`}>{j.followUpOfJobId.slice(0, 8)}</Link> · {followUpText(j.followUpClass, t)}</p>}

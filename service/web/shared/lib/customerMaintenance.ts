@@ -6,6 +6,7 @@
 import { EN, showDate, showSpan, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import type { Slot } from "@ac/web/lib/partnerOverview";
+import type { IconName } from "@ac/web/components/Icon";
 
 export type ApiClientRow = {
   projection: "summary"; id: string; version: number; unitId: string; type: string; status: string; displayStatus: string; origin: string; dueAt: string;
@@ -47,7 +48,7 @@ export const tabOf = (displayStatus: string): StatusTab =>
 const ORDER = ["time_proposed", "requested", "in_progress", "rework_requested", "submitted", "offered", "accepted", "assigned", "on_hold", "completed", "cancelled"];
 export const tabOfQuery = (v?: string): StatusTab => (STATUS_TABS.some(([t]) => t === v) ? (v as StatusTab) : "all");
 
-export type ClientRow = { id: string; short: string; unit: string; place: string; origin: "plan" | "request"; type: string; status: string; tab: StatusTab; line: string; warn: boolean };
+export type ClientRow = { id: string; short: string; unit: string; place: string; origin: "plan" | "request"; type: string; status: string; tab: StatusTab; line: string; icon: IconName; warn: boolean };
 const TYPE: Record<string, string> = { reactive: "Repair", preventive: "Preventive maintenance", periodic: "Periodic inspection" };
 /** One request of the list (Figma 07a): unit and place, origin, type and what is next — business status order. */
 export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: string; place: string }, i: I18n = EN): ClientRow[] {
@@ -56,16 +57,16 @@ export function clientRows(rows: ApiClientRow[], unit: (id: string) => { name: s
   return [...rows].sort((a, b) => ORDER.indexOf(a.displayStatus) - ORDER.indexOf(b.displayStatus) || Date.parse(a.dueAt) - Date.parse(b.dueAt)).map((j) => {
     const u = unit(j.unitId);
     const plan = j.origin === "periodic_plan";
-    let line = "", warn = false;
+    let line = "", warn = false, icon: IconName = "time";
     switch (j.displayStatus) {
-      case "time_proposed": [line, warn] = [t("⇄ A new visit time needs your reply — nothing is booked until you accept"), true]; break;
-      case "requested": line = j.preferredSlots.length ? t("◷ Preferred {slot} · +{n} more (not confirmed yet)", { slot: slot(j.preferredSlots[0]), n: j.preferredSlots.length - 1 }) : plan ? t("◷ Plan visit {slot} · HQ is booking it", { slot: slot(j.requestedSlot) }) : t("◷ Waiting for HQ"); break;
-      case "completed": line = j.scheduledSlot ? t("✓ Completed · visit {slot} · report available", { slot: slot(j.scheduledSlot) }) : t("✓ Completed · report available"); break;
-      case "cancelled": line = t("Cancelled"); break;
-      case "offered": case "accepted": line = t(plan ? "◷ Scheduled {slot} · booking the technician" : "◷ Confirmed {slot} · booking the technician", { slot: j.scheduledSlot ? slot(j.scheduledSlot) : "" }); break;
-      default: line = `${t(plan ? "◷ Scheduled {slot}" : "◷ Confirmed {slot}", { slot: j.scheduledSlot ? slot(j.scheduledSlot) : "" })}${j.assignmentAcknowledgement === "accepted" ? t(" · technician confirmed") : ""}`;
+      case "time_proposed": [line, warn, icon] = [t("A new visit time needs your reply — nothing is booked until you accept"), true, "swap"]; break;
+      case "requested": line = j.preferredSlots.length ? t("Preferred {slot} · +{n} more (not confirmed yet)", { slot: slot(j.preferredSlots[0]), n: j.preferredSlots.length - 1 }) : plan ? t("Plan visit {slot} · HQ is booking it", { slot: slot(j.requestedSlot) }) : t("Waiting for HQ"); break;
+      case "completed": icon = "success"; line = j.scheduledSlot ? t("Completed · visit {slot} · report available", { slot: slot(j.scheduledSlot) }) : t("Completed · report available"); break;
+      case "cancelled": [line, icon] = [t("Cancelled"), "cancelled"]; break;
+      case "offered": case "accepted": line = t(plan ? "Scheduled {slot} · booking the technician" : "Confirmed {slot} · booking the technician", { slot: j.scheduledSlot ? slot(j.scheduledSlot) : "" }); break;
+      default: line = `${t(plan ? "Scheduled {slot}" : "Confirmed {slot}", { slot: j.scheduledSlot ? slot(j.scheduledSlot) : "" })}${j.assignmentAcknowledgement === "accepted" ? t(" · technician confirmed") : ""}`;
     }
-    return { id: j.id, short: j.id.slice(0, 8), unit: u.name, place: u.place, origin: plan ? "plan" : "request", type: t(plan ? "Periodic inspection" : TYPE[j.type] ?? j.type), status: j.displayStatus, tab: tabOf(j.displayStatus), line, warn };
+    return { id: j.id, short: j.id.slice(0, 8), unit: u.name, place: u.place, origin: plan ? "plan" : "request", type: t(plan ? "Periodic inspection" : TYPE[j.type] ?? j.type), status: j.displayStatus, tab: tabOf(j.displayStatus), line, icon, warn };
   });
 }
 
@@ -89,7 +90,7 @@ const RANK = ["1st", "2nd", "3rd"];
 /** The preferred times with the booked one marked (request origin, open jobs). */
 export function preferredLines(j: ApiClientJob, i: I18n = EN): { text: string; note: string | null }[] {
   if (j.origin === "periodic_plan" || ["completed", "cancelled"].includes(j.status)) return [];
-  return j.preferredSlots.map((s, k) => ({ text: `${RANK[k] ? i.t(RANK[k]) : `${k + 1}`} · ${slotLong(s, i)}`, note: sameSlot(s, j.scheduledSlot) ? i.t("✓ booked") : null }));
+  return j.preferredSlots.map((s, k) => ({ text: `${RANK[k] ? i.t(RANK[k]) : `${k + 1}`} · ${slotLong(s, i)}`, note: sameSlot(s, j.scheduledSlot) ? i.t("booked") : null }));
 }
 
 /** The proposal to answer (Figma 07k): who proposes, the time, who comes, the message and the reply deadline. */
@@ -117,7 +118,8 @@ export function planVisit(j: ApiClientJob, now: number, t: T = en): { can: boole
 }
 
 /** What a completed job offers (IR110, DD-C17): Confirm & rate for 7 days, editing the rating until editableUntil. */
-export function feedback(j: ApiClientJob, now: number, i: I18n = EN): { kind: "rate" | "edit" | "rated" | "none"; text: string } {
+/** The feedback line under a completed job: the stars are drawn by the screen (DEC-74), `text` is what follows them. */
+export function feedback(j: ApiClientJob, now: number, i: I18n = EN): { kind: "rate" | "edit" | "rated" | "none"; text: string; stars?: number } {
   const { t } = i;
   if (j.status !== "completed") return { kind: "none", text: "" };
   const r = j.rating;
@@ -126,7 +128,7 @@ export function feedback(j: ApiClientJob, now: number, i: I18n = EN): { kind: "r
     return open ? { kind: "rate", text: t("Is everything working? Your confirmation closes the job.") } : { kind: "none", text: t("Confirmed automatically after 7 days.") };
   }
   const editable = now < Date.parse(r.editableUntil);
-  return { kind: editable ? "edit" : "rated", text: `${t("Rated {stars}", { stars: "★".repeat(r.stars) })}${r.tags.length ? ` · ${r.tags.map((x) => t(x)).join(", ")}` : ""}${editable ? t(" · editable until {when}", { when: showTime(r.editableUntil, i.display) }) : ""}` };
+  return { kind: editable ? "edit" : "rated", stars: r.stars, text: `${r.tags.length ? ` · ${r.tags.map((x) => t(x)).join(", ")}` : ""}${editable ? t(" · editable until {when}", { when: showTime(r.editableUntil, i.display) }) : ""}` };
 }
 export const RATING_TAGS = ["On time", "Clean work", "Explained clearly", "Polite", "Fixed the problem"];
 export const PROBLEMS: { id: "same_problem" | "new_damage" | "not_completed" | "other"; label: string }[] = [

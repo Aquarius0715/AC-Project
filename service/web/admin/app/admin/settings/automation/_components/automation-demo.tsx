@@ -26,7 +26,7 @@ export function AutomationDemo() {
   const simulate = () => setResult(facts.map((f) => (f.value === "" ? { unit: f.unit, d: "missing_data — tariff reading unavailable, action skipped" } : +f.value > +val ? { unit: f.unit, d: `${sel.name} → set ${temp} °C` } : { unit: f.unit, d: "no rule matched" })));
   return (
     <Page>
-      <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted">HQ automation policies · priority ↓</span><Check label="Show disabled" checked={showOff} onChange={setShowOff} /></div>
+      <div className="flex items-center justify-between gap-3"><span className="text-xs text-muted">HQ automation policies · highest priority first</span><Check label="Show disabled" checked={showOff} onChange={setShowOff} /></div>
       <div className="split-rev">
         <Card title="HQ automation policies" action={<Btn size="sm" variant="primary" onClick={() => toast("New policy draft created")}>+ New</Btn>} className="self-start">
           {["ACROSS CUSTOMERS", "CUSTOMER-A"].map((g) => <div key={g} className="mb-3"><div className="mb-1 text-[10px] font-bold tracking-wide text-muted">{g}</div><div className="flex flex-col gap-2">{pols.filter((p) => p.group === g && (showOff || p.on)).map((p) => <ListRow key={p.id} selected={sel.id === p.id} onClick={() => { setSel(p); setResult(null); setFired(false); }}><div className="min-w-0 flex-1"><b className="text-[13px]">{p.name}</b><div className="text-[11px] text-muted">{p.sub}</div><div className="text-[11px] text-muted">Priority {p.pri}{!p.on && " · Off"}</div></div></ListRow>)}</div></div>)}

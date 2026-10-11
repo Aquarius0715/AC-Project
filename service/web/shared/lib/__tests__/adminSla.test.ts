@@ -28,7 +28,7 @@ describe("HQ SLA by customer", () => {
     const tiles = slaTiles(sc());
     expect(tiles.map((t) => [t.label, t.value, t.sub, t.tone])).toEqual([
       ["Response ≤ 4 h", "94 %", "target 100 % of jobs", "warn"], ["Arrival in window", "96 %", "targets 90–95 % by plan", undefined], ["First-time fix", "86 %", "target 85 %", undefined],
-      ["Avg. customer rating", "4.5 ★", "27 ratings", undefined], ["Open & overdue", "1", "2 breaches in the period", "crit"],
+      ["Avg. customer rating", "4.5", "27 ratings", undefined], ["Open & overdue", "1", "2 breaches in the period", "crit"],
     ]);
     const one = slaTiles(sc({ customers: [{ ...metrics, customerId: "c-a", planType: "rto", jobCount: 1, status: "on_track" }], totals: { ...metrics, arrivalInWindow: null, openOverdue: 0 }, breaches: [] }));
     expect([one[1].value, one[1].sub, one[4].sub, one[4].tone]).toEqual(["—", "target 95 %", "0 breaches in the period", undefined]);
@@ -39,7 +39,7 @@ describe("HQ SLA by customer", () => {
       [{ name: "Home A", customerOrgId: "o-a" }, { name: "Office A", customerOrgId: "o-a" }, { name: "Home B", customerOrgId: "o-b" }], [{ customerOrgId: "o-a" }, { customerOrgId: "o-a" }, { customerOrgId: "o-b" }]);
     expect(rows.map((r) => [r.name, r.sub, r.plan, r.jobs, r.ftf, r.status.label])).toEqual([["Demo Customer A", "Home A, Office A · 2 units", "RTO", 18, "86 %", "On track"], ["Demo Customer B", "Home B · 1 unit", "General", 9, "70 %", "Breached"]]);
     expect(breachRows(sc(), new Map([["c-b", "Demo Customer B"]])).map((b) => [b.short, b.text, b.kind, b.tone])).toEqual([["job-a11-", "Demo Customer B · response 6 h 10 min vs 4 h", "Response", "warn"], ["job-x-00", "customer · open past its due time", "Overdue", "crit"]]);
-    expect(slaCsv(rows.slice(0, 1), sc().period)).toBe('"Customer","Plan","Jobs","Response","Arrival","First-time fix","Rating","Overdue","Status","Period from","Period to"\n"Demo Customer A","RTO","18","94 %","96 %","86 %","4.5 ★","1","On track","2026-06-16","2026-09-14"\n');
+    expect(slaCsv(rows.slice(0, 1), sc().period)).toBe('"Customer","Plan","Jobs","Response","Arrival","First-time fix","Rating","Overdue","Status","Period from","Period to"\n"Demo Customer A","RTO","18","94 %","96 %","86 %","4.5","1","On track","2026-06-16","2026-09-14"\n');
   });
 
   it("shows the targets per plan and checks the edit form", () => {

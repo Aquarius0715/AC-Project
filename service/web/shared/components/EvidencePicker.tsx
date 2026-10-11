@@ -5,6 +5,7 @@
 // attached to the alert at detection last (“none attached” when it has none). The rows come from alertEvidence.ts.
 import { useT } from "./I18n";
 import { evidenceHeading, togglePick, type EvidenceRow } from "@ac/web/lib/alertEvidence";
+import { Icon } from "./Icon";
 
 function Row({ title, sub, checked, disabled, onChange }: { title: string; sub: string; checked: boolean; disabled?: boolean; onChange?: (on: boolean) => void }) {
   return (
@@ -31,7 +32,7 @@ export function EvidencePicker({ rows, policyless, picked, onChange, loading, er
           {attached.length ? attached.map(row) : <Row title={t("Evidence attached to this alert")} sub={t("none attached")} checked={false} disabled />}
         </div>
       )}
-      {error && <p className="pb-2 text-xs font-medium text-crit">✕ {error}</p>}
+      {error && <p className="flex items-center gap-1 pb-2 text-xs font-medium text-crit"><Icon name="error" />{error}</p>}
     </fieldset>
   );
 }

@@ -13,6 +13,7 @@ import { saveSlaTargets } from "../actions";
 import type { SlaLive } from "../_lib/load";
 import { JobsTabs } from "./jobs-header";
 import { NewJobModal } from "./jobs-view";
+import { Icon } from "@ac/web/components/Icon";
 
 /** HQ SLA by customer (FR-A22, DD-A22, Figma Admin 06-10) from the Core API. Texts in the display language; a target's
  * start is typed and shown in the display time zone (IR291). */
@@ -36,7 +37,7 @@ export function SlaView({ live }: { live: SlaLive }) {
         <Select aria-label={t("Contractor")} className="w-auto" value={live.contractorId} onChange={(e) => patch({ contractorId: e.target.value || null })}><option value="">{t("Contractor: All")}</option>{live.contractors.map((c) => <option key={c.id} value={c.id}>{t("Contractor: {name}", { name: c.name })}</option>)}</Select>
         <Btn size="sm" className="ml-auto" onClick={() => setModal("targets")}>{t("Edit SLA targets")}</Btn>
       </div>
-      <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>{live.tiles.map((k) => <Kpi key={k.label} label={k.label} value={k.value} sub={k.sub} tone={k.tone} />)}</div>
+      <div className="grid-fluid" style={{ ["--min" as string]: "180px" }}>{live.tiles.map((k) => <Kpi key={k.label} label={k.label} value={k.value} icon={k.icon} sub={k.sub} tone={k.tone} />)}</div>
       <div className="split">
         <Card title={t("Customers")} action={<Btn size="sm" disabled={!live.rows.length} onClick={exportCsv}>{t("Export CSV")}</Btn>}>
           {live.rows.length === 0 ? <EmptyState title={t("No jobs in this period")}>{t(live.contractorId ? "The scorecard counts jobs created in the period and delivered by the contractor." : "The scorecard counts jobs created in the period.")}</EmptyState> : (
@@ -44,7 +45,7 @@ export function SlaView({ live }: { live: SlaLive }) {
               <thead><tr className="bg-surface2 text-left text-[11px] uppercase text-muted"><th className="px-2 py-1.5">{t("Customer")}</th><th>{t("Plan")}</th><th>{t("Jobs")}</th><th>{t("Response")}</th><th>{t("Arrival")}</th><th>{t("First-time fix")}</th><th>{t("Rating")}</th><th>{t("Overdue")}</th><th>{t("Status")}</th></tr></thead>
               <tbody>{live.rows.map((r) => (
                 <tr key={r.id} className="border-t border-line">
-                  <td className="px-2 py-2"><b>{r.name}</b><div className="text-[11px] text-muted">{r.sub}</div></td><td className="text-xs">{r.plan}</td><td>{r.jobs}</td><td>{r.response}</td><td>{r.arrival}</td><td>{r.ftf}</td><td>{r.rating}</td>
+                  <td className="px-2 py-2"><b>{r.name}</b><div className="text-[11px] text-muted">{r.sub}</div></td><td className="text-xs">{r.plan}</td><td>{r.jobs}</td><td>{r.response}</td><td>{r.arrival}</td><td>{r.ftf}</td><td>{r.rating}{r.rating !== "—" && <Icon name="star" filled className="ml-0.5 text-warn" />}</td>
                   <td>{r.overdue ? <Badge tone="crit">{r.overdue}</Badge> : "0"}</td><td><Badge tone={r.status.tone}>{r.status.label}</Badge></td>
                 </tr>
               ))}</tbody>

@@ -29,7 +29,7 @@ test("an unknown label is refused and a unit's label matches", async ({ browser,
   const labels = dialog.getByText("Labels on the units of your open jobs:").getByRole("button"); // the one-tap labels only
   test.skip((await labels.count()) === 0, "no open job for this technician now (the seed's work window has passed)");
   await labels.first().click();
-  await expect(dialog.getByText("✓ Matched")).toBeVisible();
+  await expect(dialog.getByText("Matched", { exact: true })).toBeVisible();
   await dialog.getByRole("link", { name: "Open unit" }).click();
   await page.waitForURL(/\/technician\/units\/[0-9a-f-]{36}/);
   await expect(page.getByRole("main")).not.toContainText("This page isn’t available");

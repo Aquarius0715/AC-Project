@@ -23,8 +23,8 @@ export const TABS = [{ id: "today", label: "Today" }, { id: "all", label: "All a
 export type TechTab = (typeof TABS)[number]["id"];
 export const tabOf = (v?: string): TechTab => (v === "all" ? "all" : "today");
 export const SORTS = [
-  { id: "severity", text: "Severity ↓", word: "severity", field: "severity", direction: "desc" }, { id: "dueAt", text: "Deadline ↑", word: "deadline", field: "dueAt", direction: "asc" },
-  { id: "status", text: "Progress ↑", word: "progress", field: "status", direction: "asc" },
+  { id: "severity", text: "Severity, most severe first", word: "severity", field: "severity", direction: "desc" }, { id: "dueAt", text: "Deadline, soonest first", word: "deadline", field: "dueAt", direction: "asc" },
+  { id: "status", text: "Progress, earliest stage first", word: "progress", field: "status", direction: "asc" },
 ] as const;
 export type TechSort = (typeof SORTS)[number]["id"];
 export const sortOf = (v?: string): TechSort => (SORTS.some((s) => s.id === v) ? (v as TechSort) : "severity");

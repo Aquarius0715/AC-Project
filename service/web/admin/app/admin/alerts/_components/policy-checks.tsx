@@ -8,6 +8,7 @@ import { useOp } from "@ac/web/lib/useOp";
 import { inboxRow, type ApiNotification } from "@ac/web/lib/notifications";
 import { metricLabel, metricUnit, recipientRole, testOutcome, type ApiRecipient, type NotificationDecision, type Operator, type PolicyRecipient, type Severity } from "@ac/web/lib/adminAlerts";
 import { testPolicy } from "../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 type Unit = { id: string; name: string };
 const TONE = { ok: "text-ok", warn: "text-warn", crit: "text-crit", muted: "text-muted" } as const;
@@ -111,7 +112,7 @@ export function DemoTest({ saved, dirty, unit, demo }: { saved: Tested; dirty: b
               <span>{unitSymbol}</span><span>{t("on {name}", { name: unit.name })}</span>
               <Btn size="sm" disabled={pending} onClick={run}>{t("Evaluate (demo)")}</Btn>
             </div>
-            {result && <p role="status" className={cx("mt-1 text-xs", TONE[result.tone])}>{result.text}</p>}
+            {result && <p role="status" className={cx("mt-1 flex items-start gap-1.5 text-xs", TONE[result.tone])}><Icon name={result.tone === "ok" ? "success" : result.tone === "crit" ? "error" : result.tone === "warn" ? "warning" : "info"} className="mt-px" />{result.text}</p>}
           </>
         )}
     </section>

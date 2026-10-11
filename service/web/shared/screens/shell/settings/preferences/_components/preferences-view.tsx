@@ -10,6 +10,7 @@ import { MICROPHONE } from "@ac/web/lib/assistant";
 import { codeComplete, groupKey, type QrPath } from "@ac/web/lib/twoFactor";
 import { useT } from "@ac/web/components/I18n";
 import { disableTwoFactor, enableTwoFactor, savePreferences } from "../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 export type PreferencesLive = {
   prefs: { locale: "en" | "ms"; timezone: string; currency: "MYR"; monthlyReportEmail: boolean; twoFactorEnabled: boolean };
@@ -67,7 +68,7 @@ export function PreferencesView({ live }: { live: PreferencesLive }) {
           <span className="flex items-center gap-2">{tf.enabled ? <><Badge tone="ok">{t("On")}</Badge><Btn size="sm" onClick={() => setModal("off")}>{t("Turn off")}</Btn></> : <><Badge>{t("Off")}</Badge><Btn size="sm" variant="primary" onClick={() => setModal("on")}>{t("Turn on")}</Btn></>}</span>
         </div>
         <p className="mt-1 text-[11px] text-muted">{t("Demo only — any 6 digits are accepted and the demo sign-in is unchanged (FR-X08).")}</p>
-        <div className="mt-5 flex justify-end gap-2"><Btn disabled={!dirty || pending} onClick={reset}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!dirty || pending} onClick={save}>{t("✓ Save preferences")}</Btn></div>
+        <div className="mt-5 flex justify-end gap-2"><Btn disabled={!dirty || pending} onClick={reset}>{t("Cancel")}</Btn><Btn variant="primary" disabled={!dirty || pending} onClick={save}><Icon name="check" />{t("Save preferences")}</Btn></div>
       </Card>
       {modal === "on" && <TurnOn setupKey={tf.setupKey} qr={live.qr} onClose={() => setModal(null)} />}
       {modal === "off" && <TurnOff onClose={() => setModal(null)} />}
@@ -94,7 +95,7 @@ function TurnOn({ setupKey, qr, onClose }: { setupKey: string | null; qr: QrPath
             <b>3&nbsp;&nbsp;{t("Save your 8 recovery codes (shown after verifying)")}</b>
           </div>
         </div>
-        {error && <p className="text-xs text-crit">✕ {error}</p>}
+        {error && <p className="flex items-center gap-1 text-xs text-crit"><Icon name="error" />{error}</p>}
         <Banner>{t("Demo: no real authenticator is called — any 6 digits are accepted, and sign-in is unchanged. Turning off later asks for a current code.")}</Banner>
       </div>}
     </Modal>
@@ -109,7 +110,7 @@ function TurnOff({ onClose }: { onClose: () => void }) {
   return (
     <Modal open onClose={onClose} title={t("Turn off two-step verification")} footer={<><Btn onClick={onClose}>{t("Keep it on")}</Btn><Btn variant="danger" disabled={!codeComplete(code) || pending} onClick={() => run(() => disableTwoFactor(code), t("Two-step verification turned off"), onClose, (f) => setError(actionMessage(f, t)))}>{t("Turn off")}</Btn></>}>
       <Field label={t("Enter a 6-digit code from your authenticator app")}><CodeInput label={t("6-digit code")} value={code} onChange={setCode} autoFocus /></Field>
-      {error && <p className="mt-2 text-xs text-crit">✕ {error}</p>}
+      {error && <p className="mt-2 flex items-center gap-1 text-xs text-crit"><Icon name="error" />{error}</p>}
     </Modal>
   );
 }

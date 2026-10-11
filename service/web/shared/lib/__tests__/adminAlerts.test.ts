@@ -154,7 +154,7 @@ describe("Test with demo data (DD-A05 item 7, IR348)", () => {
   const d = (decision: NotificationDecision["decision"], reason: NotificationDecision["reason"] = null): NotificationDecision => ({ unitId: "u1", policyId: "pol-1", decision, reason });
   it("words each decision of automations.simulate for the reading", () => {
     expect([testOutcome(d("selected"), p, 30, "Bedroom AC"), testOutcome(d("failed", "no_recipient"), p, 31, "Bedroom AC")]).toEqual([
-      { tone: "ok", text: "✓ 30 °C on Bedroom AC raises an alert and notifies the recipients — simulated, nothing is stored." },
+      { tone: "ok", text: "30 °C on Bedroom AC raises an alert and notifies the recipients — simulated, nothing is stored." },
       { tone: "crit", text: "An alert, but nobody is notified: no recipient may read Bedroom AC." },
     ]);
     // not due: below the threshold, or meeting it outside the active hours

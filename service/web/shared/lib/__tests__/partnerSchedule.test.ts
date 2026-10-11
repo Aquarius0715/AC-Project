@@ -39,7 +39,7 @@ describe("partner schedule", () => {
     ];
     expect(rows.map((r) => [r.title, r.line, r.tone ?? ""])).toEqual([
       ["Lobby AC", "Accepted · awaiting assignment", ""],
-      ["Lobby AC", "Assigned · tech-external-a · can’t make it ⚠", "warn"],
+      ["Lobby AC", "Assigned · tech-external-a · can’t make it", "warn"],
       ["Lobby AC", "Work window ended · reassignment required", "crit"],
       ["Lobby AC", "On hold by HQ", "warn"],
       ["2 Demo Avenue", "Accepted · delegation starts 22 Sept 2026, 8:00 am MYT", "muted"],

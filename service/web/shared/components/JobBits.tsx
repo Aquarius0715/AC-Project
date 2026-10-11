@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge, Input, Select, cx } from "./ui";
-import type { IconName } from "@ac/web/components/Icon";
+import { Icon, type IconName } from "@ac/web/components/Icon";
 import type { JobStatus, Origin, Slot } from "@ac/web/lib/jobs";
 import { statusLabel } from "@ac/web/lib/jobs";
 import { useT } from "./I18n";
@@ -10,9 +10,9 @@ import { useT } from "./I18n";
 export function OriginBadge({ origin }: { origin: Origin }) {
   const t = useT();
   return origin === "plan" ? (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#f3ebff] px-2 py-0.5 text-[11px] font-semibold leading-4 text-[#6d28d9]"><span aria-hidden>↻</span>{t("Periodic plan")}</span>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#f3ebff] px-2 py-0.5 text-[11px] font-semibold leading-4 text-[#6d28d9]"><Icon name="routine" />{t("Periodic plan")}</span>
   ) : (
-    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#e0f7f5] px-2 py-0.5 text-[11px] font-semibold leading-4 text-[#0b6e66]"><span aria-hidden>✉</span>{t("Client request")}</span>
+    <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[#e0f7f5] px-2 py-0.5 text-[11px] font-semibold leading-4 text-[#0b6e66]"><Icon name="mail" />{t("Client request")}</span>
   );
 }
 
@@ -46,7 +46,7 @@ export function PreferredSlotsInput({ value, onChange, error, label = "Preferred
           <Select aria-label={`${RANKS[i]} preferred window`} value={s.win} onChange={(e) => set(i, { win: e.target.value })} className="min-w-0 flex-1">{WINDOWS.map((w) => <option key={w}>{w}</option>)}</Select>
         </div>
       ))}
-      {error ? <span className="text-xs font-medium text-crit">✕ {error}</span> : <span className="text-[11px] text-muted">{hint ?? "3 different times, at least 1 day ahead. HQ books one of them. If none can be met, HQ proposes another time — you accept or decline it."}</span>}
+      {error ? <span className="flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{error}</span> : <span className="text-[11px] text-muted">{hint ?? "3 different times, at least 1 day ahead. HQ books one of them. If none can be met, HQ proposes another time — you accept or decline it."}</span>}
     </fieldset>
   );
 }

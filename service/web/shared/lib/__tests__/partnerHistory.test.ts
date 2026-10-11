@@ -27,7 +27,7 @@ describe("partner job history", () => {
   it("summarises a job with its events", () => {
     const r = historyRow(summary({}), events, NOW, units, names)!;
     expect([r.title, r.sub, r.tech, r.last, r.badge, r.tab, r.delegation, r.version, r.origin]).toEqual([
-      "Office AC", "4 events · 3 customer-visible · 2 notes · delegation until 26 Sept 2026, 12:00 am MYT", { name: "tech-external-a", sub: "accepted the slot ✓" },
+      "Office AC", "4 events · 3 customer-visible · 2 notes · delegation until 26 Sept 2026, 12:00 am MYT", { name: "tech-external-a", sub: "accepted the slot" },
       { title: "Work started", at: "2026-09-21T01:05:00Z", when: "today 9:05 am MYT" }, { text: "In progress", tone: "primary" }, "active", "until 26 Sept 2026, 12:00 am MYT", 7, "client_request",
     ]);
     const overdue = historyRow(summary({ status: "assigned", scheduledSlot: slot("2026-09-20T01:00:00Z", "2026-09-20T03:00:00Z") }), [], NOW, units, names)!;
@@ -76,7 +76,7 @@ describe("partner job history", () => {
   it("words the history in Malay with the times in the display time zone (IR278)", () => {
     const r = historyRow(summary({}), events, NOW, units, names, MS)!;
     expect([r.sub, r.tech.sub, r.last, r.badge.text]).toEqual([
-      "4 peristiwa · 3 boleh dilihat pelanggan · 2 nota · delegasi hingga 26 Sep 2026, 1:00 PG GMT+9", "menerima slot ✓",
+      "4 peristiwa · 3 boleh dilihat pelanggan · 2 nota · delegasi hingga 26 Sep 2026, 1:00 PG GMT+9", "menerima slot",
       { title: "Kerja dimulakan", at: "2026-09-21T01:05:00Z", when: "hari ini 10:05 PG GMT+9" }, "Sedang berjalan",
     ]);
     const h = historyRow({ projection: "history", jobId: "job-9-hhhh", type: "periodic", status: "completed", completedAt: null }, [events[0]], NOW, units, names, MS)!;

@@ -25,9 +25,9 @@ export function tabFilters(tab: TabId, fromAt: string, toAt: string): NonNullabl
 }
 
 export const SORTS = [
-  { id: "status:asc", label: "Status ↑", text: "status, then deadline" }, { id: "status:desc", label: "Status ↓", text: "status (last first)" },
-  { id: "dueAt:asc", label: "Deadline ↑", text: "deadline (soonest first)" }, { id: "dueAt:desc", label: "Deadline ↓", text: "deadline (latest first)" },
-  { id: "severity:desc", label: "Unit urgency ↓", text: "unit urgency (IR30)" },
+  { id: "status:asc", label: "Status, earliest stage first", text: "status, then deadline" }, { id: "status:desc", label: "Status, latest stage first", text: "status (last first)" },
+  { id: "dueAt:asc", label: "Deadline, soonest first", text: "deadline (soonest first)" }, { id: "dueAt:desc", label: "Deadline, latest first", text: "deadline (latest first)" },
+  { id: "severity:desc", label: "Unit urgency, most urgent first", text: "unit urgency (IR30)" },
 ] as const;
 export type SortId = (typeof SORTS)[number]["id"];
 export const sortOf = (v?: string): SortId => (SORTS.find((s) => s.id === v)?.id ?? "status:asc");
@@ -46,7 +46,7 @@ const mmddhm = (iso: string) => klTime(iso).slice(5);
 /** A slot in Kuala Lumpur as "09-21 10:00–12:00" (schedule and job detail until they are translated). */
 export const slotText = (s: Slot) => (klTime(s.startAt).slice(0, 10) === klTime(s.endAt).slice(0, 10) ? `${mmddhm(s.startAt)}–${hhmm(s.endAt)}` : `${mmddhm(s.startAt)} → ${mmddhm(s.endAt)}`);
 const typeText: Record<string, string> = { periodic: "Periodic inspection", reactive: "Repair", preventive: "Preventive maintenance" };
-const ack: Record<string, { sub: string; tone?: Tone }> = { pending: { sub: "awaiting the technician’s acceptance" }, accepted: { sub: "accepted ✓" }, cant_make: { sub: "can’t make it ⚠ — reassign", tone: "warn" } };
+const ack: Record<string, { sub: string; tone?: Tone }> = { pending: { sub: "awaiting the technician’s acceptance" }, accepted: { sub: "accepted" }, cant_make: { sub: "can’t make it — reassign", tone: "warn" } };
 const historyStatus: Record<string, string> = { completed: "Completed", cancelled: "Cancelled" };
 
 /** One list row: what the company sees of a job in its projection (offer, summary inside the window, history after). */

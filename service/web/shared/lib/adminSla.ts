@@ -8,6 +8,7 @@ import { EN, showDate, showTime, translator, zonedParts, type I18n, type T } fro
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { planLabel } from "@ac/web/lib/contracts";
 import { csvQuoted } from "@ac/web/lib/csv";
+import type { IconName } from "@ac/web/components/Icon";
 
 const en = translator("en");
 
@@ -40,7 +41,7 @@ function targetText(values: number[], t: T): string {
 const planName = (plan: string, t: T) => (planLabel[plan as PlanType] ? t(planLabel[plan as PlanType]) : plan);
 
 /** The KPI tiles (Figma 06-10) with the targets of the plan types of the customers in the scorecard; no data is “—”. */
-export function slaTiles(sc: ApiScorecard, t: T = en): { label: string; value: string; sub: string; tone?: "warn" | "crit" }[] {
+export function slaTiles(sc: ApiScorecard, t: T = en): { label: string; value: string; icon?: IconName; sub: string; tone?: "warn" | "crit" }[] {
   const used = [...new Set(sc.customers.map((c) => c.planType))];
   const ts = plans(sc.targets, used.length ? used : ["general"]);
   const hours = [...new Set(ts.map((x) => x.responseHours))].sort((a, b) => a - b);
@@ -52,7 +53,7 @@ export function slaTiles(sc: ApiScorecard, t: T = en): { label: string; value: s
     { label: hours.length === 1 ? t("Response ≤ {n} h", { n: hours[0] }) : t("Response within target"), value: pct(m.responseWithinTarget), sub: hours.length === 1 ? t("target 100 % of jobs") : t("≤ {hours} h by plan · target 100 %", { hours: hours.join(" / ") }), tone: below(m.responseWithinTarget, 100) },
     { label: t("Arrival in window"), value: pct(m.arrivalInWindow), sub: targetText(ts.map((x) => x.arrivalInWindowPercent), t), tone: below(m.arrivalInWindow, arrival) },
     { label: t("First-time fix"), value: pct(m.firstTimeFix), sub: targetText(ts.map((x) => x.firstTimeFixPercent), t), tone: below(m.firstTimeFix, ftf) },
-    { label: t("Avg. customer rating"), value: m.averageRating === null ? "—" : `${m.averageRating.toFixed(1)} ★`, sub: t(m.ratingCount === 1 ? "1 rating" : "{n} ratings", { n: m.ratingCount }) },
+    { label: t("Avg. customer rating"), value: m.averageRating === null ? "—" : m.averageRating.toFixed(1), icon: m.averageRating === null ? undefined : "star", sub: t(m.ratingCount === 1 ? "1 rating" : "{n} ratings", { n: m.ratingCount }) },
     { label: t("Open & overdue"), value: String(m.openOverdue), sub: t(sc.breaches.length === 1 ? "1 breach in the period" : "{n} breaches in the period", { n: sc.breaches.length }), tone: m.openOverdue > 0 ? "crit" : undefined },
   ];
 }
@@ -71,7 +72,7 @@ export function slaRows(sc: ApiScorecard, customers: { id: string; name: string;
       id: c.customerId, name: cust?.name ?? t("customer"),
       sub: `${props.length > 2 ? t("{n} properties", { n: props.length }) : props.join(", ") || t("no properties")} · ${t(n === 1 ? "1 unit" : "{n} units", { n })}`,
       plan: planName(c.planType, t), jobs: c.jobCount, response: pct(c.responseWithinTarget), arrival: pct(c.arrivalInWindow), ftf: pct(c.firstTimeFix),
-      rating: c.averageRating === null ? "—" : `${c.averageRating.toFixed(1)} ★`, overdue: c.openOverdue, status: status ? { label: t(status.label), tone: status.tone } : { label: c.status, tone: "muted" },
+      rating: c.averageRating === null ? "—" : c.averageRating.toFixed(1), overdue: c.openOverdue, status: status ? { label: t(status.label), tone: status.tone } : { label: c.status, tone: "muted" },
     };
   });
 }

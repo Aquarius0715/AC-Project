@@ -43,7 +43,7 @@ export function AlertsLiveView({ live }: { live: AlertsLive }) {
       <div className="min-w-0 flex-1">
         <button type="button" onClick={() => show(a)} className="block w-full text-left hover:opacity-80">
           <span className="flex flex-wrap items-center gap-2">
-            <b className={cx(a.unread.length > 0 && "text-primary")}>{a.title}</b><SeverityBadge s={a.severity} /><Badge tone="muted">{a.kind}</Badge>
+            <b className={cx(a.unread.length > 0 && "text-primary")}>{a.title}</b><SeverityBadge s={a.severity} /><Badge tone="muted" icon={a.kindIcon}>{a.kind}</Badge>
             <Badge tone={a.status.tone}>{a.status.text}</Badge>{a.unread.length > 0 ? <Badge tone="primary">{t("Unread")}</Badge> : a.notes > 0 && <Badge tone="ok" icon="check">{t("Read")}</Badge>}
           </span>
           <span className="block text-xs text-muted">{a.where}</span><span className="mt-1 block text-xs">{a.evidence}</span>

@@ -85,7 +85,7 @@ test("a customer request reaches the partner's technician", async ({ browser }) 
 
     await test.step("the partner and the customer see it accepted", async () => {
       await partner.goto(`/partner/schedule?jobId=${jobId}`);
-      await expect(partner.getByRole("main")).toContainText("The current technician accepted the assignment ✓");
+      await expect(partner.getByRole("main")).toContainText("The current technician accepted the assignment");
       await customer.goto(`/customer/maintenance?jobId=${jobId}`);
       await expect(customer.getByRole("main")).toContainText("tech-external-a");
     });

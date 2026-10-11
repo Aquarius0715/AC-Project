@@ -39,13 +39,13 @@ describe("HQ maintenance jobs", () => {
     expect(hqRow(row({}), NOW, names, unitOrg)).toMatchObject({ title: "Bedroom AC", customer: "Demo Customer A", type: "Repair", status: "requested", line: "2 preferred times · book one or propose" });
     expect(hqRow(row({ displayStatus: "time_proposed" }), NOW, names, unitOrg)).toMatchObject({ status: "time_proposed", line: "Time proposed · waiting for the client" });
     const late = hqRow(row({ status: "assigned", displayStatus: "assigned", scheduledSlot: slot("2026-09-20T02:00:00Z", "2026-09-20T04:00:00Z"), technicianMembershipId: "m-int", assignmentAcknowledgement: "cant_make" }), NOW, names, unitOrg);
-    expect([late.badge, late.line, late.lineTone]).toEqual([{ status: "assigned", overdue: true }, "tech-internal-a · can’t make it ⚠ · window ended", "warn"]);
+    expect([late.badge, late.line, late.lineTone]).toEqual([{ status: "assigned", overdue: true }, "tech-internal-a · can’t make it · window ended", "warn"]);
     // a pending follow-up names the original job and the classify-by time (IR114, Figma Admin 06-17); classified, the status line returns
     const follow = hqRow(row({ followUpOfJobId: "job-c02-orig", followUpClass: "pending", createdAt: "2026-09-22T03:05:00Z" }), NOW, names, unitOrg);
-    expect([follow.line, follow.lineTone]).toEqual(["↩ Follow-up of job-c02- · classify by 23 Sept 2026, 11:05 am MYT", "warn"]);
+    expect([follow.line, follow.lineTone]).toEqual(["Follow-up of job-c02- · classify by 23 Sept 2026, 11:05 am MYT", "warn"]);
     expect(hqRow(row({ followUpOfJobId: "job-c02-orig", followUpClass: "rework" }), NOW, names, unitOrg).line).toBe("2 preferred times · book one or propose");
     expect(hqRow(row({ followUpOfJobId: "job-c02-orig", followUpClass: "pending", createdAt: "2026-09-22T03:05:00Z" }), NOW, names, unitOrg, MS).line)
-      .toBe("↩ Susulan kepada job-c02- · kelaskan sebelum 23 Sep 2026, 12:05 PTG GMT+9");
+      .toBe("Susulan kepada job-c02- · kelaskan sebelum 23 Sep 2026, 12:05 PTG GMT+9");
   });
 
   it("shows the stepper, the facts and the delivery", () => {

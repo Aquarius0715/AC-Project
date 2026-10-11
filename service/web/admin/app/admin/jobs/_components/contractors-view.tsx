@@ -59,7 +59,7 @@ function ContractorDetail({ d, open }: { d: Detail; open: (m: ModalState) => voi
   const r = d.rates;
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      {d.kpis && <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>{d.kpis.map((k) => <Kpi key={k.label} label={k.label} value={k.value} sub={k.sub} tone={k.tone} />)}</div>}
+      {d.kpis && <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>{d.kpis.map((k) => <Kpi key={k.label} label={k.label} value={k.value} icon={k.icon} sub={k.sub} tone={k.tone} />)}</div>}
       <div className="split">
         <Card title={d.org.name} sub={p ? undefined : t("No contractor profile yet — offers still work; add one to record its registration, areas and insurance")}
           action={p ? <span className="flex gap-2"><Btn size="sm" onClick={() => open({ kind: "profile", organizationId: p.organizationId })}>{t("Edit")}</Btn><Btn size="sm" variant={p.status === "active" ? "danger" : "primary"} onClick={() => open({ kind: "status" })}>{t(p.status === "active" ? "Suspend offers" : "Resume offers")}</Btn></span>

@@ -41,7 +41,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   for (const name of ["Kerja", "Pelan", "Kontraktor", "SLA mengikut pelanggan"]) await expect(main.getByRole("tab", { name: new RegExp(`^${name}`) })).toBeVisible();
   await expect(main.getByRole("tab", { name: /^Kerja/ })).toHaveAttribute("aria-selected", "true");
   await expect(main.getByRole("combobox", { name: "Pelanggan" })).toContainText("Pelanggan: Semua");
-  await expect(main.getByRole("combobox", { name: "Isih" })).toContainText("Isih: Status ↑");
+  await expect(main.getByRole("combobox", { name: "Isih" })).toContainText("Isih: Status, peringkat terawal dahulu");
   await expect(main.getByRole("heading", { name: "Kerja · semua pelanggan", exact: true })).toBeVisible();
   await expect(main).toContainText(/\d+ kerja dalam skop/);
   if (await main.getByText("Tetingkap yang diminta", { exact: true }).count()) {

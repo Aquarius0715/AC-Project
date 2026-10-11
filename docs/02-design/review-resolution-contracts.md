@@ -6134,3 +6134,32 @@ User request (2026-10-12): the icons look inconsistent, and some render like emo
    - Screenshots of the customer overview and HQ's customers screen show one icon style in the sidebar, header, badges and search field.
 8. **E2E.** Fifteen specs named an empty state's heading with its glyph ("○ No invoices"), and two found a field error by its "✕". The headings are now named without the glyph, which is an aria-hidden icon, and the two field errors are checked by their message.
 9. **Checks.** Typecheck, lint, the web unit tests (458), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped.
+
+## IR394 One icon library, part 2: the shared components, shared screens and the mappers' texts — 2026-10-12
+
+IR393 converted the shell and the shared parts. This part converts the glyphs that were left in the shared code.
+
+1. **Shared components and screens.**
+   - The assistant: the microphone, the close button and the result marks.
+   - The job tags: periodic plan, client request.
+   - The evidence picker's error, the QR scan's match, and the demo controls' tiles: device offline or restored, delayed transport, expired session.
+   - The sign-in page: the language, the app mark and the role mark.
+   - Preferences: the save button and the errors.
+   - All of them use the `Icon` names now. `TriggerTile` takes an icon name.
+2. **Texts that carried a glyph.**
+   - **Sort labels.** They appear inside native `<option>` elements, which cannot hold an icon, and a screen reader reads "upwards arrow". So they are words now, for example "Deadline, soonest first" and "Severity, most severe first", and the same in Malay.
+   - **Status texts.** The ✓ and ⚠ in "accepted ✓" and "can’t make it ⚠ — reassign" only repeated what the text and its tone say, so they are gone.
+   - **Badges and rows that kept a glyph:**
+     - "‼ Overdue" is a badge with the `alert` icon;
+     - each alert kind has its own icon (inspection, load cause, reminder, air quality, fault);
+     - each customer maintenance row has an icon by its state;
+     - the booked preferred time is a check badge;
+     - the energy change draws its arrow (up, down, or minus for no change).
+   - **Ratings.** The rating tiles and the SLA table show the number with a filled star icon, and the CSV export carries the number alone. The customer's rated job shows "Rated" with one star per point, read as "4 of 5 stars".
+   - **The policy test result.** It shows the icon of its tone, not a ✓ in the text.
+3. **The Malay dictionary.** Every English key that lost a glyph was renamed, and its Malay text lost the same glyph. The new sort words have their own Malay text, and "Rated" and "{n} of 5 stars" are new. The i18n test checks both directions: no missing and no unused entry.
+4. **Tests.**
+   - The mapper tests expect the texts without glyphs and the new icon fields (energy change, alert kinds, maintenance rows).
+   - Seven E2E specs expect the new texts: "Overdue", "Matched", the Malay sort labels of four screens, and the accepted assignment.
+5. **Next.** The glyphs in the four apps' own screens, the arrows in link texts, then Figma and the guard test.
+6. **Checks.** Typecheck, lint, the web unit tests (458), the four builds and the validators pass. The E2E suite passes (117 tests, 8 skipped); the two Malay sort labels found in the full run were rerun after the fix.

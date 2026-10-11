@@ -80,7 +80,7 @@ export function QrScan({ open, onClose }: { open: boolean; onClose: () => void }
           {state.kind === "refused" && <Banner tone={state.absent ? "warn" : "crit"}><b>{state.title}</b> — {state.text}</Banner>}
           {m && state.kind === "matched" && (
             <>
-              <p className="flex flex-wrap items-center gap-2"><Badge tone="ok">{t("✓ Matched")}</Badge><span className="text-xs text-muted">{t("label {code} · scanned {time}", { code: state.code.length > 24 ? `${state.code.slice(0, 24)}…` : state.code, time: showClock(state.at, i18n.display) })}</span></p>
+              <p className="flex flex-wrap items-center gap-2"><Badge tone="ok" icon="check">{t("Matched")}</Badge><span className="text-xs text-muted">{t("label {code} · scanned {time}", { code: state.code.length > 24 ? `${state.code.slice(0, 24)}…` : state.code, time: showClock(state.at, i18n.display) })}</span></p>
               <b className="text-[15px]">{m.title}</b>
               {m.sub && <span className="text-xs text-muted">{m.sub}</span>}
               {m.job ? <div className={m.job.tone === "ok" ? "rounded-xl bg-ok-soft p-3 text-ok" : "rounded-xl bg-primary-soft p-3 text-primary"}><b className="block">{m.job.label}</b><span className="text-xs">{m.job.text}</span></div>

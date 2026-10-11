@@ -3,6 +3,7 @@ import { Badge, Banner } from "@ac/web/components/ui";
 import { ROLES, type Role } from "@ac/web/lib/nav";
 import { continueHref, loginError, otherServices, safeReturnTo } from "@ac/web/lib/login";
 import { ContinueLink } from "./continue-link";
+import { Icon } from "@ac/web/components/Icon";
 
 export type AppLinks = Partial<Record<Role, string>>;
 type Params = Record<string, string | string[] | undefined>;
@@ -18,15 +19,15 @@ export function LoginScreen({ role, others = {}, params = {}, api }: { role: Rol
   const names = otherServices(role);
   return (
     <main className="relative grid min-h-dvh place-items-center px-4 py-10">
-      <span className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1.5 text-xs font-semibold" aria-label="Language: English, the only language in this build">🌐 English</span>
+      <span className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1.5 text-xs font-semibold" aria-label="Language: English, the only language in this build"><Icon name="language" /> English</span>
       <div className="w-full max-w-[350px] rounded-2xl border border-line bg-surface p-6 text-center shadow-sm">
-        <span aria-hidden className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-xl bg-primary text-xl text-white">❄</span>
+        <span aria-hidden className="mx-auto mb-3 grid h-10 w-10 place-items-center rounded-xl bg-primary text-xl text-white"><Icon name="cooling" /></span>
         <h1 className="text-lg font-bold">AC Project — {cfg.loginTitle}</h1>
         <p className="mt-1 text-[13px] text-muted">{cfg.loginSub}</p>
         <div className="mt-2"><Badge className="uppercase tracking-wide">Not real authentication</Badge></div>
         {error && <div className="mt-4 text-left"><Banner tone="crit">{error}</Banner></div>}
         <div className="mt-4 flex items-center gap-3 rounded-xl bg-primary-soft/70 p-3 text-left">
-          <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary text-sm text-white">☻</span>
+          <span aria-hidden className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary text-sm text-white"><Icon name="account" /></span>
           <span className="min-w-0"><span className="block text-[13px] font-bold">{cfg.loginUser}</span><span className="block text-[11px] text-muted">{cfg.loginDesc}</span></span>
         </div>
         <ContinueLink role={role} href={href}>Continue as {cfg.loginUser} →</ContinueLink>

@@ -12,6 +12,7 @@ import { waitForCommand } from "@ac/web/lib/unitCommands";
 import { useStoredValue } from "@ac/web/lib/urlState";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { sendVoiceChange } from "@ac/web/screens/shell/assistant/actions";
+import { Icon } from "./Icon";
 
 /** The header assistant (FR-X02, Figma Client 09a–09g). In API mode (`live`) it reads voice.resolveIntent with the
  * fixed en/ms grammar (D09), confirms a change before anything is sent and follows the command until the device
@@ -36,10 +37,10 @@ function Frame({ title, state, children, footer, lang, setLang, onClose, context
     <div className="fixed inset-0 z-40 flex justify-end bg-ink/30" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <aside role="dialog" aria-label={title} className="flex h-full w-full flex-col bg-surface shadow-2xl sm:max-w-[420px]">
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <h2 className="flex items-center gap-2 font-bold">🎙 {title} <span className="rounded-full bg-surface2 px-2 py-0.5 text-[11px] font-semibold text-muted">{state}</span></h2>
+          <h2 className="flex items-center gap-2 font-bold"><Icon name="mic" /> {title} <span className="rounded-full bg-surface2 px-2 py-0.5 text-[11px] font-semibold text-muted">{state}</span></h2>
           <div className="flex items-center gap-2">
             <select aria-label={t("Language")} value={lang} onChange={(e) => setLang?.(e.target.value as Locale)} className="rounded-control border border-line px-2 py-1 text-xs"><option value="en">English</option><option value="ms">Bahasa Melayu</option></select>
-            <button aria-label={t("Close")} onClick={onClose} className="rounded-lg px-2 py-1 text-muted hover:bg-surface2">✕</button>
+            <button aria-label={t("Close")} onClick={onClose} className="rounded-lg px-2 py-1 text-muted hover:bg-surface2"><Icon name="close" /></button>
           </div>
         </div>
         <p className="border-b border-line bg-surface2/60 px-4 py-2 text-[11px] text-muted">{t("Context: {context} · you can control units you have permission for", { context })}</p>
@@ -153,7 +154,7 @@ function LiveAssistant({ onClose, context }: { onClose: () => void; context: str
       footer={<>
         <form className="flex items-center gap-2 border-t border-line p-3" onSubmit={(e) => { e.preventDefault(); if (text.trim() && !busy) { ask(text.trim(), "text"); setText(""); } }}>
           <input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder={t("Type a message…")} aria-label={t("Message")} maxLength={200} className="min-w-0 flex-1 rounded-control border border-line px-3 py-2 text-[13px]" />
-          <button type="button" disabled={busy || state === "listening"} onClick={voice} aria-label={t("Voice input")} className={cx("grid h-10 w-10 place-items-center rounded-full text-white disabled:opacity-50", mic ? "bg-primary" : "bg-muted")}>🎙</button>
+          <button type="button" disabled={busy || state === "listening"} onClick={voice} aria-label={t("Voice input")} className={cx("grid h-10 w-10 place-items-center rounded-full text-white disabled:opacity-50", mic ? "bg-primary" : "bg-muted")}><Icon name="mic" className="text-lg" /></button>
         </form>
         <p className="px-4 pb-3 text-[11px] text-muted">{mic ? t("Voice or text · changes are always confirmed before sending · no business write before you confirm") : t("Text only — the microphone is off on this device · changes are always confirmed before sending")}</p>
       </>}>
@@ -181,7 +182,7 @@ function LiveAssistant({ onClose, context }: { onClose: () => void; context: str
           }
           return (
             <div key={n} className={cx("rounded-2xl px-3 py-2 text-[13px]", m.p.tone === "ok" ? "bg-ok-soft" : m.p.tone === "crit" ? "bg-crit-soft" : "bg-primary-soft")}>
-              <b className={m.p.tone === "ok" ? "text-ok" : m.p.tone === "crit" ? "text-crit" : "text-primary"}>{m.p.tone === "ok" ? "✓ " : m.p.tone === "crit" ? "✕ " : "⟳ "}{m.p.title}</b>
+              <b className={m.p.tone === "ok" ? "text-ok" : m.p.tone === "crit" ? "text-crit" : "text-primary"}><Icon name={m.p.tone === "ok" ? "success" : m.p.tone === "crit" ? "error" : "refresh"} /> {m.p.title}</b>
               {m.p.rows && <div className="mt-1"><SummaryList items={m.p.rows} /></div>}
               <p className="mt-1 text-xs">{m.p.detail}</p>
               {m.p.tone !== "info" && <div className="mt-2 flex flex-wrap items-center gap-2">{m.p.tone === "crit" && <Btn size="sm" disabled={busy} onClick={() => ask(m.question, "text")}>{t("Try again")}</Btn>}<Link className="text-xs font-semibold text-primary" href={`/customer/units/${m.unitId}`}>{t("Open Unit Control")}</Link>{m.p.tone === "ok" && <span className="text-[11px] text-muted">{t("Undo is a new command")}</span>}</div>}
@@ -189,7 +190,7 @@ function LiveAssistant({ onClose, context }: { onClose: () => void; context: str
         })}
         {state === "listening" && (
           <div className="rounded-2xl bg-primary-soft p-3 text-[13px]">
-            <b className="text-primary">● {t("Listening…")}</b>
+            <b className="text-primary"><Icon name="live" /> {t("Listening…")}</b>
             <p className="mt-1">“{ex.change}”</p>
             <p className="text-[11px] text-muted">{t("Live transcript (demo — no real microphone) · tap Stop when done")}</p>
             <div className="mt-2"><Btn size="sm" variant="primary" onClick={() => { setState("idle"); ask(ex.change, "voice"); }}>{t("Stop")}</Btn></div>
@@ -297,7 +298,7 @@ function DemoAssistant({ onClose, context }: { onClose: () => void; context: str
       footer={<>
         <form className="flex items-center gap-2 border-t border-line p-3" onSubmit={(e) => { e.preventDefault(); if (text.trim()) { interpret(text.trim(), "text"); setText(""); } }}>
           <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type a message…" className="min-w-0 flex-1 rounded-control border border-line px-3 py-2 text-[13px]" />
-          <button type="button" onClick={voice} aria-label="Voice input" className="grid h-10 w-10 place-items-center rounded-full bg-primary text-white">🎙</button>
+          <button type="button" onClick={voice} aria-label="Voice input" className="grid h-10 w-10 place-items-center rounded-full bg-primary text-white"><Icon name="mic" className="text-lg" /></button>
         </form>
         <p className="px-4 pb-3 text-[11px] text-muted">Voice or text · changes are always confirmed before sending · no business write before you confirm</p>
       </>}>
@@ -318,9 +319,9 @@ function DemoAssistant({ onClose, context }: { onClose: () => void; context: str
               Which AC did you mean? I never guess the target.
               <div className="mt-2 flex flex-wrap gap-2">{m.options.map((o) => <Btn key={o} size="sm" onClick={() => setMsgs((s) => [...s.filter((x) => x.kind !== "ask"), { kind: "confirm", target: o, temp: m.temp }])}>{o}</Btn>)}</div>
             </div>);
-          return <div key={n} className={cx("rounded-xl px-3 py-2 text-[13px] font-semibold", m.tone === "ok" ? "bg-ok-soft text-ok" : m.tone === "crit" ? "bg-crit-soft text-crit" : "bg-primary-soft text-primary")}>{m.tone === "ok" ? "✓ " : m.tone === "crit" ? "✕ " : "↻ "}{m.text}</div>;
+          return <div key={n} className={cx("rounded-xl px-3 py-2 text-[13px] font-semibold", m.tone === "ok" ? "bg-ok-soft text-ok" : m.tone === "crit" ? "bg-crit-soft text-crit" : "bg-primary-soft text-primary")}><Icon name={m.tone === "ok" ? "success" : m.tone === "crit" ? "error" : "refresh"} /> {m.text}</div>;
         })}
-        {listening && <div className="self-center rounded-full bg-primary-soft px-4 py-2 text-xs font-bold text-primary">🎙 Listening… speak now</div>}
+        {listening && <div className="self-center rounded-full bg-primary-soft px-4 py-2 text-xs font-bold text-primary"><Icon name="mic" /> Listening… speak now</div>}
         <div ref={end} />
       </div>
     </Frame>

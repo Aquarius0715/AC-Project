@@ -46,7 +46,7 @@ describe("partner job list", () => {
       line: "Assigned tech-external-a · 21 Sept, 10:00 am – 12:00 pm MYT", tech: { name: "tech-external-a", sub: "awaiting the technician’s acceptance" },
       slot: { main: "21 Sept, 10:00 am – 12:00 pm MYT", sub: "Due 25 Sept 2026, 6:00 pm MYT" }, badge: { text: "Assigned", tone: "primary" },
     });
-    expect(jobRow(summary("assigned", { ...assigned, assignmentAcknowledgement: "cant_make" }), NOW, units, names).tech).toEqual({ name: "tech-external-a", sub: "can’t make it ⚠ — reassign", tone: "warn", subTone: "warn" });
+    expect(jobRow(summary("assigned", { ...assigned, assignmentAcknowledgement: "cant_make" }), NOW, units, names).tech).toEqual({ name: "tech-external-a", sub: "can’t make it — reassign", tone: "warn", subTone: "warn" });
     expect(jobRow(summary("in_progress", { ...assigned, scheduledSlot: slot("2026-09-20T01:00:00Z", "2026-09-20T09:00:00Z") }), NOW, units, names)).toMatchObject({ line: "Work window ended 20 Sept 2026, 5:00 pm MYT · report not submitted", slot: { main: "Ended 20 Sept 2026, 5:00 pm MYT", tone: "crit" }, badge: { text: "Overdue", tone: "crit" } });
     expect(jobRow(summary("in_progress", assigned), NOW, units, names)).toMatchObject({ line: "In progress · tech-external-a on site", badge: { text: "In progress" } });
     expect(jobRow(summary("submitted", assigned), NOW, units, names)).toMatchObject({ href: "/partner/jobs/11111111-aaaa/review", line: "Submitted by tech-external-a · awaiting your review", badge: { text: "Submitted" } });
@@ -71,7 +71,7 @@ describe("partner job list", () => {
     });
     const cantMake = { assignmentId: "as", technicianMembershipId: "m-a", assignmentAcknowledgement: "cant_make", scheduledSlot: slot("2026-09-21T02:00:00Z", "2026-09-21T04:00:00Z") };
     expect(jobRow(summary("assigned", cantMake), NOW, units, names, MS_TOKYO)).toMatchObject({
-      line: "Ditugaskan tech-external-a · 21 Sep, 11:00 PG – 1:00 PTG GMT+9", tech: { sub: "tidak dapat hadir ⚠ — tugaskan semula", subTone: "warn" },
+      line: "Ditugaskan tech-external-a · 21 Sep, 11:00 PG – 1:00 PTG GMT+9", tech: { sub: "tidak dapat hadir — tugaskan semula", subTone: "warn" },
       slot: { sub: "Tarikh akhir 25 Sep 2026, 7:00 PTG GMT+9" }, badge: { text: "Ditugaskan" },
     });
     expect(jobRow({ projection: "history", jobId: "33333333-cccc", type: "reactive", status: "completed", completedAt: "2026-09-10T06:00:00Z" }, NOW, units, names, MS_TOKYO))

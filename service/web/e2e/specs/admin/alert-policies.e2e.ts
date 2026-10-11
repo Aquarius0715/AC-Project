@@ -275,7 +275,7 @@ test("the notification preview and the demo test of a policy attached to a unit"
   await main.getByRole("button", { name: "Save policy" }).click();
   await expect(main).toContainText("Policy v2");
   await check.getByRole("button", { name: "Evaluate (demo)" }).click();
-  await expect(check.getByRole("status")).toHaveText("✓ 45 °C on Bedroom AC raises an alert and notifies the recipients — simulated, nothing is stored.");
+  await expect(check.getByRole("status")).toHaveText("45 °C on Bedroom AC raises an alert and notifies the recipients — simulated, nothing is stored.");
   await check.getByRole("spinbutton", { name: "Reading" }).fill("44.9");
   await check.getByRole("button", { name: "Evaluate (demo)" }).click();
   await expect(check.getByRole("status")).toHaveText("No alert: 44.9 °C does not meet ≥ 45 °C.");
@@ -306,7 +306,7 @@ test("the default policy's demo test on a unit of the scoped customer", async ({
   const check = main.locator("section").filter({ has: page.getByRole("heading", { name: "Test with demo data", exact: true }) }).last();
   await expect(check.getByRole("spinbutton", { name: "Reading" })).toHaveValue("35");
   await check.getByRole("button", { name: "Evaluate (demo)" }).click();
-  await expect(check.getByRole("status")).toHaveText(/^✓ 35 µg\/m³ on .+ raises an alert and notifies the recipients — simulated, nothing is stored\.$/);
+  await expect(check.getByRole("status")).toHaveText(/^35 µg\/m³ on .+ raises an alert and notifies the recipients — simulated, nothing is stored\.$/);
   await check.getByRole("spinbutton", { name: "Reading" }).fill("34.9");
   await check.getByRole("button", { name: "Evaluate (demo)" }).click();
   await expect(check.getByRole("status")).toHaveText("No alert: 34.9 µg/m³ does not meet ≥ 35 µg/m³.");

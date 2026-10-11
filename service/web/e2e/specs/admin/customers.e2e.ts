@@ -7,7 +7,7 @@ import { test, expect } from "../../fixtures/test";
 test("a customer's row marks the overdue invoice and the active restriction", async ({ page }) => {
   await page.goto("/admin/units");
   const row = page.getByRole("main").getByRole("row", { name: /Demo Customer A/ });
-  await expect(row).toContainText("‼ Overdue");
+  await expect(row).toContainText("Overdue");
   await expect(row).toContainText("Restriction active");
   await row.click();
   await page.waitForURL(/customerId=/);

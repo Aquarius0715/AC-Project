@@ -36,10 +36,10 @@ export function DemoView({ live }: { live: DemoLive }) {
           {device && live.hidden > 0 && <p className="-mt-2 mb-3 text-[11px] text-muted">{t(live.hidden === 1 ? "{n} more device needs a current assignment before their history can be read (SR24)." : "{n} more devices need a current assignment before their history can be read (SR24).", { n: live.hidden })}</p>}
           <div className="grid-fluid" style={{ ["--min" as string]: "240px" }}>
             {device?.fault
-              ? <TriggerTile icon="⌁" tone="ok" title={t("Restore connection")} sub={t("restored on {unit} · the open communication_lost as its source", { unit: device.unit })} disabled={busy} onClick={() => run(() => deviceSignal(device.id, true), t("{unit}: connection restored", { unit: device.unit }), ok, fail)} />
-              : <TriggerTile icon="⌁" title={t("Device offline")} sub={device ? t("communication_lost on {unit}", { unit: device.unit }) : t(live.hidden ? "Your devices need a current assignment here (SR24)" : live.devices ? "No device is bound to a unit you can see" : "Devices are not visible to this role")} disabled={busy} onClick={device ? () => run(() => deviceSignal(device.id, false), t("{unit}: connection lost", { unit: device.unit }), ok, fail) : undefined} />}
-            <TriggerTile icon="◷" title={t("Delay transport")} sub={t("3000ms on commands.create · browser demo only (IR37)")} disabled />
-            <TriggerTile icon="☻" title={t("Expire session")} sub={t("session_expired for current Membership")} disabled={busy} onClick={() => startExpire(() => expireSession())} />
+              ? <TriggerTile icon="online" tone="ok" title={t("Restore connection")} sub={t("restored on {unit} · the open communication_lost as its source", { unit: device.unit })} disabled={busy} onClick={() => run(() => deviceSignal(device.id, true), t("{unit}: connection restored", { unit: device.unit }), ok, fail)} />
+              : <TriggerTile icon="offline" title={t("Device offline")} sub={device ? t("communication_lost on {unit}", { unit: device.unit }) : t(live.hidden ? "Your devices need a current assignment here (SR24)" : live.devices ? "No device is bound to a unit you can see" : "Devices are not visible to this role")} disabled={busy} onClick={device ? () => run(() => deviceSignal(device.id, false), t("{unit}: connection lost", { unit: device.unit }), ok, fail) : undefined} />}
+            <TriggerTile icon="time" title={t("Delay transport")} sub={t("3000ms on commands.create · browser demo only (IR37)")} disabled />
+            <TriggerTile icon="signOut" title={t("Expire session")} sub={t("session_expired for current Membership")} disabled={busy} onClick={() => startExpire(() => expireSession())} />
           </div>
         </>
       }

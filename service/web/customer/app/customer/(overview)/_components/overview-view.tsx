@@ -9,6 +9,7 @@ import { OVERVIEW_PERIODS, type OverviewPeriod } from "@ac/web/lib/customerOverv
 import { showClock } from "@ac/web/lib/i18n";
 import { useT } from "@ac/web/components/I18n";
 import type { OverviewLive } from "../_lib/load";
+import { Icon } from "@ac/web/components/Icon";
 
 /** Customer overview (FR-C01, DD-C01, Figma Client 01a) from the Core API: the scope and period live in the URL; the
  * texts and times follow the user's display language and time zone (IR260). */
@@ -55,7 +56,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
         <Card title={t("Energy used")} sub={live.energy?.sub ?? t("No units in this selection")} action={<span className="text-xs text-muted">kWh</span>}>
           {live.energy ? <>
             <div className="text-[28px] font-bold">{live.energy.total ?? "—"} <span className="text-sm font-medium text-muted">{live.energy.total === null ? t("no data") : "kWh"}</span></div>
-            {live.energy.delta && <div className={live.energy.delta.tone === "ok" ? "mb-2 text-xs font-semibold text-ok" : "mb-2 text-xs font-semibold text-warn"}>{live.energy.delta.text}</div>}
+            {live.energy.delta && <div className={live.energy.delta.tone === "ok" ? "mb-2 text-xs font-semibold text-ok" : "mb-2 text-xs font-semibold text-warn"}><Icon name={live.energy.delta.icon} /> {live.energy.delta.text}</div>}
             <BarChart labels={live.energy.labels} series={live.energy.series} />
             <div className="mt-1 flex gap-4 text-[11px] text-muted"><span><i className="mr-1 inline-block h-2 w-2 bg-primary" />{t("Last 7 days")}</span><span><i className="mr-1 inline-block h-2 w-2 bg-[#c9d8ee]" />{t("7 days before")}</span></div>
             {live.energy.gaps && <p className="mt-1 text-[11px] text-muted">{t("Days without readings show no bar — not 0 kWh.")}</p>}

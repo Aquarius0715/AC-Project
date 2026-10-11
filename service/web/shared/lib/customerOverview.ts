@@ -9,6 +9,7 @@ import { EN, intlTag, relativeTime, showClock, showTime, type I18n } from "@ac/w
 import { airNumber, type ApiMeasurement } from "@ac/web/lib/air";
 import type { ApiPropertyRow, ApiUnitRow } from "@ac/web/lib/assets";
 import type { ApiEnergySummary } from "@ac/web/lib/energy";
+import type { IconName } from "@ac/web/components/Icon";
 
 export type OverviewPeriod = "today" | "7d" | "30d";
 export const OVERVIEW_PERIODS: { id: OverviewPeriod; label: string }[] = [{ id: "today", label: "Today" }, { id: "7d", label: "7d" }, { id: "30d", label: "30d" }];
@@ -69,7 +70,7 @@ export function overviewRows(units: OverviewUnit[], place: (u: OverviewUnit) => 
   });
 }
 
-export type EnergyCard = { sub: string; total: string | null; delta: { text: string; tone: "ok" | "warn" } | null; labels: string[]; series: number[][]; gaps: boolean };
+export type EnergyCard = { sub: string; total: string | null; delta: { text: string; icon: IconName; tone: "ok" | "warn" } | null; labels: string[]; series: number[][]; gaps: boolean };
 const previousName: Record<OverviewPeriod, string> = { today: "yesterday at this time", "7d": "the 7 days before", "30d": "the 30 days before" };
 /** The energy card: the period's kWh and its change against the previous period; bars for the last 7 days (dark)
  * against the 7 days before (light). A missing value is never a 0 kWh total. */
@@ -79,7 +80,7 @@ export function energyCard(kind: OverviewPeriod, cur: ApiEnergySummary | null, p
   const delta = total !== null && was !== null && was > 0 ? Math.round(((total - was) / was) * 100) : null;
   return {
     sub: `${i.t(periodLabel[kind])} · ${scope}`, total: total === null ? null : one(total),
-    delta: delta === null ? null : { text: i.t("{arrow} {pct}% vs {previous} ({kWh} kWh)", { arrow: delta < 0 ? "↓" : delta > 0 ? "↑" : "±", pct: Math.abs(delta), previous: i.t(previousName[kind]), kWh: one(was!) }), tone: delta <= 0 ? "ok" : "warn" },
+    delta: delta === null ? null : { text: i.t("{pct}% vs {previous} ({kWh} kWh)", { pct: Math.abs(delta), previous: i.t(previousName[kind]), kWh: one(was!) }), icon: delta < 0 ? "arrowDown" : delta > 0 ? "arrowUp" : "remove", tone: delta <= 0 ? "ok" : "warn" },
     labels: week.map((d) => d.label), series: [before.map((v) => v ?? 0), week.map((d) => d.kWh ?? 0)], gaps: week.some((d) => d.kWh === null) || before.some((v) => v === null),
   };
 }

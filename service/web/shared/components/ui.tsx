@@ -104,7 +104,7 @@ export function PageHead({ title, sub, action }: { title: React.ReactNode; sub?:
   );
 }
 
-export function Kpi({ label, value, unit, badge, sub, href, link, tone }: { label: string; value: React.ReactNode; unit?: string; badge?: React.ReactNode; sub?: React.ReactNode; href?: string; link?: string; tone?: "crit" | "warn" | "ok" }) {
+export function Kpi({ label, value, icon, unit, badge, sub, href, link, tone }: { label: string; value: React.ReactNode; icon?: IconName; unit?: string; badge?: React.ReactNode; sub?: React.ReactNode; href?: string; link?: string; tone?: "crit" | "warn" | "ok" }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-2xl border border-line bg-surface p-4">
       <div className="flex items-center justify-between gap-2 text-xs text-muted">
@@ -113,6 +113,7 @@ export function Kpi({ label, value, unit, badge, sub, href, link, tone }: { labe
       </div>
       <div className={cx("text-[28px] font-bold leading-9", tone === "warn" && "text-warn", tone === "crit" && "text-crit", tone === "ok" && "text-ok")}>
         {value}
+        {icon && <Icon name={icon} filled className="ml-1 text-[20px] text-warn" />}
         {unit && <span className="ml-1 text-sm font-medium text-muted">{unit}</span>}
       </div>
       {sub && <p className="text-xs text-muted">{sub}</p>}

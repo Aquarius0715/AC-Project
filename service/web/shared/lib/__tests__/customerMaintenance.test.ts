@@ -28,10 +28,10 @@ describe("customer maintenance", () => {
       row({ id: "job-plan", origin: "periodic_plan", status: "assigned", displayStatus: "assigned", preferredSlots: [], scheduledSlot: slot("2026-12-08T02:00:00Z", "2026-12-08T03:00:00Z"), assignmentAcknowledgement: "accepted" }),
     ], () => unit);
     expect(rows.map((r) => [r.id, r.tab, r.origin, r.type, r.line, r.warn])).toEqual([
-      ["job-prop", "reply", "request", "Repair", "⇄ A new visit time needs your reply — nothing is booked until you accept", true],
-      ["job-1-aaaa", "requested", "request", "Repair", "◷ Preferred 16 Sept, 10:00 am – 12:00 pm MYT · +2 more (not confirmed yet)", false],
-      ["job-plan", "scheduled", "plan", "Periodic inspection", "◷ Scheduled 8 Dec, 10:00 – 11:00 am MYT · technician confirmed", false],
-      ["job-c-done", "completed", "request", "Repair", "✓ Completed · visit 8 Sept, 10:00 – 11:00 am MYT · report available", false],
+      ["job-prop", "reply", "request", "Repair", "A new visit time needs your reply — nothing is booked until you accept", true],
+      ["job-1-aaaa", "requested", "request", "Repair", "Preferred 16 Sept, 10:00 am – 12:00 pm MYT · +2 more (not confirmed yet)", false],
+      ["job-plan", "scheduled", "plan", "Periodic inspection", "Scheduled 8 Dec, 10:00 – 11:00 am MYT · technician confirmed", false],
+      ["job-c-done", "completed", "request", "Repair", "Completed · visit 8 Sept, 10:00 – 11:00 am MYT · report available", false],
     ]);
   });
 
@@ -42,7 +42,7 @@ describe("customer maintenance", () => {
       ["Confirmed time", "Thu, 17 Sept, 10:00 am – 12:00 pm MYT"], ["Technician", "tech-internal-a · HQ"],
     ]);
     expect(detailFacts(job({ status: "offered", contractorOrgId: "org-c", scheduledSlot: row({}).preferredSlots[0] }), unit).at(-1)).toEqual(["Technician", "being confirmed — the name shows once the technician accepts"]);
-    expect(preferredLines(booked).map((l) => [l.text, l.note])).toEqual([["1st · Wed, 16 Sept, 10:00 am – 12:00 pm MYT", null], ["2nd · Thu, 17 Sept, 10:00 am – 12:00 pm MYT", "✓ booked"], ["3rd · Fri, 18 Sept, 10:00 am – 12:00 pm MYT", null]]);
+    expect(preferredLines(booked).map((l) => [l.text, l.note])).toEqual([["1st · Wed, 16 Sept, 10:00 am – 12:00 pm MYT", null], ["2nd · Thu, 17 Sept, 10:00 am – 12:00 pm MYT", "booked"], ["3rd · Fri, 18 Sept, 10:00 am – 12:00 pm MYT", null]]);
     expect(detailFacts(job({ followUpOfJobId: "job-0-zzzz", followUpClass: "pending" }), unit)[2]).toEqual(["Follow-up of", "job-0-zz · Under HQ review"]);
   });
 
@@ -60,7 +60,7 @@ describe("customer maintenance", () => {
     expect(feedback(job({ status: "completed", completedAt: "2026-09-13T01:00:00Z" }), NOW).kind).toBe("rate");
     expect(feedback(job({ status: "completed", completedAt: "2026-09-01T01:00:00Z" }), NOW).kind).toBe("none");
     const rated = job({ status: "completed", completedAt: "2026-09-13T01:00:00Z", rating: { stars: 4, tags: ["On time"], comment: null, ratedAt: "2026-09-13T02:00:00Z", editableUntil: "2026-09-20T02:00:00Z" } });
-    expect(feedback(rated, NOW)).toEqual({ kind: "edit", text: "Rated ★★★★ · On time · editable until 20 Sept 2026, 10:00 am MYT" });
+    expect(feedback(rated, NOW)).toEqual({ kind: "edit", stars: 4, text: " · On time · editable until 20 Sept 2026, 10:00 am MYT" });
     expect(feedback({ ...rated, rating: { ...rated.rating!, editableUntil: "2026-09-13T03:00:00Z" } }, NOW).kind).toBe("rated");
   });
 
@@ -82,7 +82,7 @@ describe("customer maintenance", () => {
     const t = translator("ms");
     const one = slot("2026-09-16T02:00:00Z", "2026-09-16T04:00:00Z");
     const [row] = clientRows([{ projection: "summary", id: "job-1-aaaa", version: 1, unitId: "u1", type: "reactive", status: "requested", displayStatus: "requested", origin: "client_request", dueAt: "2026-09-20T00:00:00Z", requestedSlot: one, scheduledSlot: null, preferredSlots: [one, one, one], assignmentAcknowledgement: null }], () => ({ name: "Bedroom AC", place: "" }), i);
-    expect([row.type, row.line]).toEqual(["Pembaikan", "◷ Pilihan 16 Sep, 11:00 PG – 1:00 PTG GMT+9 · +2 lagi (belum disahkan)"]);
+    expect([row.type, row.line]).toEqual(["Pembaikan", "Pilihan 16 Sep, 11:00 PG – 1:00 PTG GMT+9 · +2 lagi (belum disahkan)"]);
     expect(preferredError([one, { startAt: "", endAt: "" }, one], NOW, 3, t)).toBe("Masukkan tarikh dan kedua-dua masa bagi setiap masa pilihan.");
     expect(contactError("call 0123456789", t)).toMatch(/^Tiada alamat e-mel/);
     expect(clientJobRefusal({ code: "CONFLICT", messageKey: "error.versionConflict", fieldErrors: {} }, t)).toBe("Tidak disimpan: permintaan telah berubah — keadaan terkini dipaparkan.");

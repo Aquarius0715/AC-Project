@@ -20,7 +20,7 @@ const policy = (over: Partial<ApiCustomerPolicy>): ApiCustomerPolicy => ({
 describe("HQ customers & units", () => {
   it("marks each customer's standing and counts the register", () => {
     expect([standingMarks("inactive", null), standingMarks("active", standing({ overdue: 1, restriction: { id: "r", state: "applied", contractId: "k" } })), standingMarks("active", standing({})), standingMarks("active", standing({ contracts: 0 }))].map((m) => m.map((x) => x.label)))
-      .toEqual([["Inactive"], ["‼ Overdue", "Restriction applied"], ["Good standing"], ["No contract"]]);
+      .toEqual([["Inactive"], ["Overdue", "Restriction applied"], ["Good standing"], ["No contract"]]);
     // without restriction.read the contracts' activeRestrictionIds still tell that a restriction is active (IR319)
     const k = { id: "k1", customerId: "c-a", unitIds: ["u1"], planType: "rto" as const, startAt: "2026-01-01T00:00:00Z", endAt: "2027-01-01T00:00:00Z", activeRestrictionIds: ["r1"] };
     expect(standingOf("c-a", [k], [], null, NOW).restriction).toEqual({ id: "r1", state: "active", contractId: "k1" });

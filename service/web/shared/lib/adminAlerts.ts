@@ -264,7 +264,7 @@ export function testOutcome(d: NotificationDecision | null, p: Pick<AdminPolicy,
   const unit = metricUnit[p.metric] ?? "";
   const v = { value, unit, op: opSymbol[p.operator], threshold: p.threshold, name: unitName };
   if (!d) return { tone: "warn", text: t("The policy did not run on {name} — it is no longer attached to it.", v) };
-  if (d.decision === "selected") return { tone: "ok", text: t("✓ {value} {unit} on {name} raises an alert and notifies the recipients — simulated, nothing is stored.", v) };
+  if (d.decision === "selected") return { tone: "ok", text: t("{value} {unit} on {name} raises an alert and notifies the recipients — simulated, nothing is stored.", v) };
   if (d.decision === "failed") return { tone: "crit", text: t("An alert, but nobody is notified: no recipient may read {name}.", v) };
   switch (d.reason) {
     case "disabled": return { tone: "warn", text: t("No alert: the policy is off. Switch it on and save it to test it.") };

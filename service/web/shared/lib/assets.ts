@@ -9,6 +9,7 @@ import { businessDay } from "@ac/web/lib/clientBilling";
 import { amount, klStamp, one } from "@ac/web/lib/energy";
 import { metricLabel, metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
 import { csvCell } from "@ac/web/lib/csv";
+import type { IconName } from "@ac/web/components/Icon";
 
 export type Profile = "rto" | "general" | "energy" | "environment";
 export type Connection = "online" | "offline" | "unknown" | "connecting" | "error";
@@ -59,14 +60,14 @@ export function standing(customerId: string, contracts: ApiContractLite[], overd
       : restrictions === null ? mine.filter((k) => k.activeRestrictionIds.length).map((k) => ({ id: k.activeRestrictionIds[0], state: "active", contractId: k.id }))[0] ?? null : null,
   };
 }
-export type Mark = { label: string; tone: "crit" | "warn" | "ok" | "muted" };
+export type Mark = { label: string; tone: "crit" | "warn" | "ok" | "muted"; icon?: IconName };
 const restrictionLabel: Record<string, string> = { applied: "Restriction applied", requested: "Restriction requested", release_requested: "Release requested", scheduled: "Restriction scheduled", active: "Restriction active" };
 /** Contract column badges (Figma 02-1): Overdue / restriction state / Good standing / No contract / Inactive. */
 export function standingMarks(status: "active" | "inactive", s: Standing | null, t: T = en): Mark[] {
   if (status === "inactive") return [{ label: t("Inactive"), tone: "muted" }];
   if (!s) return [];
   const out: Mark[] = [];
-  if (s.overdue) out.push({ label: t("‼ Overdue"), tone: "crit" });
+  if (s.overdue) out.push({ label: t("Overdue"), tone: "crit", icon: "alert" });
   if (s.restriction) out.push({ label: t(restrictionLabel[s.restriction.state]), tone: "warn" });
   if (!out.length) out.push(s.contracts ? { label: t("Good standing"), tone: "ok" } : { label: t("No contract"), tone: "muted" });
   return out;

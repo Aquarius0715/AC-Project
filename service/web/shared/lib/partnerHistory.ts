@@ -16,7 +16,7 @@ export const TABS = [
 ] as const;
 export type HistoryTab = (typeof TABS)[number]["id"];
 export const tabOf = (v?: string): HistoryTab => (TABS.some((t) => t.id === v) ? (v as HistoryTab) : "all");
-export const SORTS = [{ id: "latest", text: "Latest event ↓" }, { id: "status", text: "Status ↑" }] as const;
+export const SORTS = [{ id: "latest", text: "Latest event first" }, { id: "status", text: "Status, earliest stage first" }] as const;
 export type HistorySort = (typeof SORTS)[number]["id"];
 export const sortOf = (v?: string): HistorySort => (SORTS.some((s) => s.id === v) ? (v as HistorySort) : "latest");
 export const PERIODS = [{ id: "90d", label: "last 90 days" }, { id: "all", label: "all time" }] as const;
@@ -34,7 +34,7 @@ const STATUS_LABEL: Record<string, string> = {
 const statusLabel = (s: string, t: T) => (STATUS_LABEL[s] ? t(STATUS_LABEL[s]) : s.replace(/_/g, " "));
 const STATUS_TONE: Record<string, Tone> = { accepted: "primary", assigned: "primary", in_progress: "primary", on_hold: "warn", rework_requested: "warn", submitted: "primary", completed: "ok", cancelled: "muted" };
 const eventTitle = (action: string, t: T) => (jobEventTitle[action] ? t(jobEventTitle[action]) : action.replace(/[._]/g, " "));
-const ACKS: Record<string, string> = { accepted: "accepted the slot ✓", cant_make: "can’t make it ⚠", pending: "awaiting acceptance" };
+const ACKS: Record<string, string> = { accepted: "accepted the slot", cant_make: "can’t make it", pending: "awaiting acceptance" };
 
 export type HistoryRow = {
   id: string; short: string; title: string; origin: string | null; version: number | null; ended: boolean; status: string; tab: Exclude<HistoryTab, "all"> | null;

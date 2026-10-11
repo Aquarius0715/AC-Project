@@ -1,5 +1,6 @@
 import { Card, DemoBadge, cx } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
+import { Icon, type IconName } from "@ac/web/components/Icon";
 
 const jump = "rounded-control bg-primary-soft px-3 py-2 text-[13px] font-semibold text-ink hover:bg-primary-soft/70 disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -14,9 +15,9 @@ export function DemoFrame({ clock, scenario, reset, triggers, above }: { clock: 
       </div>
       {above}
       <div className="grid-fluid" style={{ ["--min" as string]: "300px" }}>
-        <Card title={<span className="flex items-center gap-2"><span aria-hidden>◷</span>{t("Demo clock")}</span>}>{clock}</Card>
-        <Card title={<span className="flex items-center gap-2"><span aria-hidden>◍</span>{t("Scenario")}</span>}>{scenario}</Card>
-        <Card title={<span className="flex items-center gap-2 text-crit"><span aria-hidden>↻</span>{t("Reset")}</span>}>{reset}</Card>
+        <Card title={<span className="flex items-center gap-2"><Icon name="time" />{t("Demo clock")}</span>}>{clock}</Card>
+        <Card title={<span className="flex items-center gap-2"><Icon name="demo" />{t("Scenario")}</span>}>{scenario}</Card>
+        <Card title={<span className="flex items-center gap-2 text-crit"><Icon name="refresh" />{t("Reset")}</span>}>{reset}</Card>
       </div>
       <Card title={t("Trigger failures")}>{triggers}</Card>
     </div>
@@ -38,10 +39,10 @@ export function ClockFace({ time, onMinute, onHour, disabled }: { time: string; 
 }
 
 /** One trigger tile: icon, name and what it does; a tile that cannot run here says why. */
-export function TriggerTile({ icon, title, sub, onClick, disabled, tone }: { icon: string; title: string; sub: string; onClick?: () => void; disabled?: boolean; tone?: "ok" }) {
+export function TriggerTile({ icon, title, sub, onClick, disabled, tone }: { icon: IconName; title: string; sub: string; onClick?: () => void; disabled?: boolean; tone?: "ok" }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled || !onClick} className={cx("flex min-w-0 flex-col items-start gap-0.5 rounded-xl border border-line bg-surface px-3 py-2.5 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-60", tone === "ok" && "border-[#86efac]")}>
-      <span className="flex items-center gap-2 text-[13px] font-semibold"><span aria-hidden className={cx("text-crit", tone === "ok" && "text-ok")}>{icon}</span>{title}</span>
+      <span className="flex items-center gap-2 text-[13px] font-semibold"><Icon name={icon} className={cx("text-crit", tone === "ok" && "text-ok")} />{title}</span>
       <span className="text-[11px] text-muted">{sub}</span>
     </button>
   );

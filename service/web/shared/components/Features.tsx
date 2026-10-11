@@ -3,6 +3,7 @@
 /** Features confirmed from the Figma proposals on 2026-10-02 (FR-C14, C16, A18–A20, A23). */
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, PowerBadge, Select, Steps, SummaryList, Toggle, UtilBar, cx, useToast } from "./ui";
+import { Icon } from "./Icon";
 
 /* ───── Client · Energy export (FR-C16) ───── */
 export function ExportReportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -41,7 +42,7 @@ export function GroupControl({ space, units }: { space: string; units: GUnit[] }
       <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
         {units.map((u) => (
           <button key={u.id} disabled={!u.online} onClick={() => toggle(u.id)} aria-pressed={sel.includes(u.id)} className={cx("rounded-xl border p-3 text-left disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
-            <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><span className="text-xs">{sel.includes(u.id) ? "☑" : "☐"}</span></div>
+            <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><Icon name={sel.includes(u.id) ? "checked" : "unchecked"} className="text-sm" /></div>
             <div className="text-[11px] text-muted">{u.temp === null ? "—" : `${u.temp} °C · ${u.w} W`}</div>
             <div className="mt-1 flex gap-1"><PowerBadge s={u.state} />{!u.online && <Badge tone="unknown">Offline</Badge>}{u.min && <Badge tone="warn">min {u.min} °C</Badge>}</div>
           </button>
@@ -74,7 +75,7 @@ export function ImportCsvModal({ open, onClose }: { open: boolean; onClose: () =
       <Steps steps={["Upload & mapping", "Preview"]} current={step} />
       {step === 0 ? <>
         <Field label="Customer" hint="Rows are created under this customer only. Properties / floors / rooms that do not exist are created."><Select><option>customer-a · Tan household</option><option>customer-b · Lim Trading Sdn Bhd</option></Select></Field>
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-line p-3 text-[13px]"><span>📄 units-office-a.csv <span className="text-xs text-muted">· 24 rows · 9 columns · UTF-8 · 6 KB</span></span><Btn size="sm">Download template</Btn></div>
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-dashed border-line p-3 text-[13px]"><span><Icon name="document" /> units-office-a.csv <span className="text-xs text-muted">· 24 rows · 9 columns · UTF-8 · 6 KB</span></span><Btn size="sm">Download template</Btn></div>
         <DataTable rowKey={(r) => r.c} rows={[{ c: "property", f: "Property name", req: true }, { c: "floor", f: "Floor", req: false }, { c: "room", f: "Room / space", req: true }, { c: "unit_name", f: "Unit name", req: true }, { c: "model", f: "Model", req: true }, { c: "installed_on", f: "Install date (warranty)", req: false }]} cols={[{ key: "c", label: "CSV column", render: (r) => <code>{r.c}</code> }, { key: "f", label: "Field", render: (r) => <Select className="w-auto"><option>{r.f}</option></Select> }, { key: "r", label: "", render: (r) => <Badge tone={r.req ? "primary" : "muted"}>{r.req ? "Required" : "Optional"}</Badge> }]} />
       </> : <>
         <div className="grid-fluid" style={{ ["--min" as string]: "140px" }}><Kpi label="Rows" value={24} /><Kpi label="Will be created" value={22} tone="ok" /><Kpi label="Errors (skipped)" value={2} tone="crit" /></div>
