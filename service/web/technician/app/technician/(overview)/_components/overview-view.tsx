@@ -19,12 +19,12 @@ export function OverviewView({ live }: { live: OverviewLive }) {
         {live.kpis.map((k) => <Kpi key={k.label} label={k.label} value={k.value} sub={k.sub} tone={k.tone} />)}
       </div>
       {live.pending.length === 1 && (
-        <Banner tone="warn" icon="✉" action={<LinkBtn size="sm" variant="primary" href={`/technician/jobs/${live.pending[0].id}`}>{t("Review & accept")}</LinkBtn>}>
+        <Banner tone="warn" icon="mail" action={<LinkBtn size="sm" variant="primary" href={`/technician/jobs/${live.pending[0].id}`}>{t("Review & accept")}</LinkBtn>}>
           <b>{t("New assignment to accept — {job}", { job: `${live.pending[0].short} · ${live.pending[0].title} · ${live.pending[0].slotText}` })}</b>. {t("The visit time was agreed with the client; accept it or say you can’t make it.")}
         </Banner>
       )}
       {live.pending.length > 1 && (
-        <Banner tone="warn" icon="✉" action={<LinkBtn size="sm" variant="primary" href={`/technician/jobs/${live.pending[0].id}`}>{t("Review the first")}</LinkBtn>}>
+        <Banner tone="warn" icon="mail" action={<LinkBtn size="sm" variant="primary" href={`/technician/jobs/${live.pending[0].id}`}>{t("Review the first")}</LinkBtn>}>
           <b>{t("{n} new assignments to accept", { n: live.pending.length })}</b> — {live.pending.map((j, k) => <span key={j.id}>{k ? ", " : ""}<Link className="font-semibold underline" href={`/technician/jobs/${j.id}`}>{j.short} · {j.slotText}</Link></span>)}. {t("The visit times were agreed with the client.")}
         </Banner>
       )}

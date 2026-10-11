@@ -21,7 +21,7 @@ export function OverviewDemo() {
           <Tabs value={range} onChange={setRange} tabs={[{ id: "today", label: "Today" }, { id: "7d", label: "7d" }, { id: "30d", label: "30d" }]} />
         </div>
         <div className="text-right text-xs">
-          <div className="font-semibold">Updated 09:12:30 <Badge tone={stale ? "unknown" : "ok"} icon="●">{stale ? "Stale" : "Live"}</Badge></div>
+          <div className="font-semibold">Updated 09:12:30 <Badge tone={stale ? "unknown" : "ok"} icon="live">{stale ? "Stale" : "Live"}</Badge></div>
           <div className="text-muted">Today = 00:00–09:12 · Asia/Kuala_Lumpur</div>
         </div>
       </div>
@@ -90,9 +90,9 @@ export function OverviewDemo() {
           <p className="mt-2 text-[11px] text-muted">Estimate only — savings are not a tradable balance.</p>
           <TextLink href="/customer/energy" className="mt-2 inline-block">Carbon impact →</TextLink>
         </Card>
-        <Card title="Air quality · Bedroom" action={<Badge tone="ok" icon="●">Live</Badge>}>
+        <Card title="Air quality · Bedroom" action={<Badge tone="ok" icon="live">Live</Badge>}>
           <div className="text-[28px] font-bold"><span className="text-xs font-normal text-muted">CO2 </span>1000 <span className="text-sm font-medium text-muted">ppm</span></div>
-          <div className="my-1"><Badge tone="warn" icon="⚠">Ventilation recommended</Badge></div>
+          <div className="my-1"><Badge tone="warn" icon="warning">Ventilation recommended</Badge></div>
           <p className="mb-2 text-[11px] text-muted">Observed 09:12 · Bedroom AC sensor · threshold 1000 ppm</p>
           <LineChart points={[640, 650, 700, 760, 820, 880, 930, 960, 980, 1000]} min={400} max={1200} threshold={1000} height={90} />
           <p className="mt-1 text-xs">PM2.5 <b>12 µg/m³</b> <span className="text-muted">· No current advice</span></p>

@@ -15,7 +15,9 @@ describe("announcements", () => {
   it("makes an error banner an alert and other banners a status", () => {
     render(<><Banner tone="crit">Not submitted</Banner><Banner tone="warn">Window ends soon</Banner><Banner>Saved</Banner></>);
     expect(screen.getByRole("alert").textContent).toContain("Not submitted");
-    expect(screen.getAllByRole("status").map((x) => x.textContent)).toEqual(["⚠Window ends soon", "ⓘSaved"]);
+    expect(screen.getAllByRole("status").map((x) => x.textContent)).toEqual(["Window ends soon", "Saved"]);
+    // each banner's icon is a Lucide drawing, hidden from assistive technology (DEC-74)
+    expect([...screen.getByRole("alert").querySelectorAll("svg"), ...screen.getAllByRole("status").flatMap((x) => [...x.querySelectorAll("svg")])].map((x) => [x.getAttribute("aria-hidden"), x.classList.contains("lucide")])).toEqual([["true", true], ["true", true], ["true", true]]);
   });
   it("puts an error toast in the alert region and other toasts in the status region", () => {
     render(<ToastProvider><Pusher /></ToastProvider>);

@@ -12,6 +12,7 @@ import {
 } from "@ac/web/lib/clientAutomations";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { deleteAutomation, saveAutomation, testEvent, updateConsent } from "../actions";
+import { Icon } from "@ac/web/components/Icon";
 
 type Ac = { id: string; name: string; property: string; path: string };
 export type AutomationsLive = {
@@ -36,7 +37,7 @@ function ConsentCard({ live, compact }: { live: AutomationsLive; compact?: boole
   const [pending, run] = useAction();
   const c = live.consent;
   const flip = () => c.version !== null && run(() => updateConsent(!c.granted, c.version!), t(c.granted ? "Location consent withdrawn — location automations are off" : "Location consent granted"));
-  const badge = <Badge tone={c.tone === "ok" ? "ok" : c.tone === "warn" ? "warn" : "muted"} icon={c.granted ? "✓" : c.tone === "warn" ? "⊘" : "○"}>{c.title}</Badge>;
+  const badge = <Badge tone={c.tone === "ok" ? "ok" : c.tone === "warn" ? "warn" : "muted"} icon={c.granted ? "check" : c.tone === "warn" ? "unsupported" : "dot"}>{c.title}</Badge>;
   const action = c.version !== null && <Btn size="sm" variant={c.granted ? "secondary" : "primary"} disabled={pending} onClick={flip}>{t(c.granted ? (compact ? "Withdraw" : "Withdraw consent") : (compact ? "Grant" : "Grant consent"))}</Btn>;
   return (
     <div className={cx("rounded-2xl border p-4", c.tone === "warn" ? "border-crit bg-warn-soft/60" : compact ? "border-line bg-primary-soft/40" : "border-line bg-surface")}>
@@ -72,7 +73,7 @@ function List({ live, notice, setNotice, create, edit }: { live: AutomationsLive
             <Card key={c.id} className={cx(c.status.tone === "warn" && "border-crit")}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2"><b className="text-[15px]">{c.name}</b><Badge tone="primary">{triggerInfo[c.trigger].icon} {t(triggerInfo[c.trigger].label)}</Badge><Badge tone={c.status.tone} icon={c.status.tone === "ok" ? "●" : c.status.tone === "warn" ? "⊘" : "○"}>{c.status.text}</Badge></div>
+                  <div className="flex flex-wrap items-center gap-2"><b className="text-[15px]">{c.name}</b><Badge tone="primary" icon={triggerInfo[c.trigger].icon}>{t(triggerInfo[c.trigger].label)}</Badge><Badge tone={c.status.tone} icon={c.status.tone === "ok" ? "live" : c.status.tone === "warn" ? "unsupported" : "dot"}>{c.status.text}</Badge></div>
                   <p className="mt-1 text-[13px]"><span className="text-muted">{t("When")}</span> {c.when}</p>
                   <p className="text-[13px]"><span className="text-muted">{t("Then")}</span> {c.then}</p>
                   <p className="text-xs text-muted">{c.place}</p>
@@ -185,7 +186,7 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
               {triggers.map((tr) => (
                 <button key={tr} type="button" role="radio" aria-checked={draft.trigger === tr} disabled={!!rule && (tr === "schedule") !== sched} onClick={() => set({ trigger: tr, extras: fitExtras({ ...draft, trigger: tr }) })}
                   className={cx("rounded-xl border px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50", draft.trigger === tr ? "border-primary bg-primary-soft text-primary ring-1 ring-primary" : "border-line bg-surface hover:bg-surface2")}>
-                  <div className="text-[13px] font-semibold">{triggerInfo[tr].icon} {t(triggerInfo[tr].label)}</div><div className="text-[11px] text-muted">{t(triggerInfo[tr].sub)}</div>
+                  <div className="flex items-center gap-1.5 text-[13px] font-semibold"><Icon name={triggerInfo[tr].icon} />{t(triggerInfo[tr].label)}</div><div className="text-[11px] text-muted">{t(triggerInfo[tr].sub)}</div>
                 </button>
               ))}
             </div>
@@ -277,7 +278,7 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
         </div>
       </div>
       <Modal open={test !== null} onClose={() => setTest(null)} title={t("Test result — simulation only")} footer={<><Btn onClick={() => setTest(null)}>{t("Back to edit")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTest(null); save(); }}>{t("Save automation")}</Btn></>}>
-        <p className="text-xs text-muted"><Badge tone="primary" icon="ⓘ">{t("No command sent")}</Badge> {t("Simulated events for “{name}” ({zone}):", { name: draft.name.trim() || t("this automation"), zone: draft.timezone })}</p>
+        <p className="text-xs text-muted"><Badge tone="primary" icon="info">{t("No command sent")}</Badge> {t("Simulated events for “{name}” ({zone}):", { name: draft.name.trim() || t("this automation"), zone: draft.timezone })}</p>
         {test?.length === 0 && <p className="text-[13px] text-muted">{t("No upcoming run in the next weeks.")}</p>}
         {test?.map((r) => (
           <div key={r.at + r.title} className={cx("rounded-xl px-3 py-2 text-[13px]", r.tone === "ok" ? "bg-ok-soft/70" : "bg-surface2")}>

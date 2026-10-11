@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { createContext, isValidElement, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
 import { useT } from "@ac/web/components/I18n";
+import { Icon, type IconName } from "@ac/web/components/Icon";
 
 export const cx = (...a: unknown[]) => a.filter((x): x is string => typeof x === "string" && x !== "").join(" ");
 
@@ -17,10 +18,10 @@ const toneCls: Record<Tone, string> = {
   muted: "bg-surface2 text-muted",
 };
 
-export function Badge({ tone = "muted", icon, children, className }: { tone?: Tone; icon?: string; children: React.ReactNode; className?: string }) {
+export function Badge({ tone = "muted", icon, children, className }: { tone?: Tone; icon?: IconName; children: React.ReactNode; className?: string }) {
   return (
     <span className={cx("inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-semibold leading-4", toneCls[tone], className)}>
-      {icon && <span aria-hidden>{icon}</span>}
+      {icon && <Icon name={icon} />}
       {children}
     </span>
   );
@@ -29,16 +30,16 @@ export function Badge({ tone = "muted", icon, children, className }: { tone?: To
 // the state badges speak the display language (IR258); the state values themselves stay as stored
 export function PowerBadge({ s }: { s: "running" | "stopped" | "unknown" }) {
   const t = useT();
-  return s === "running" ? <Badge tone="ok" icon="▶">{t("Running")}</Badge> : s === "stopped" ? <Badge tone="muted" icon="■">{t("Stopped")}</Badge> : <Badge tone="unknown" icon="?">{t("Unknown")}</Badge>;
+  return s === "running" ? <Badge tone="ok" icon="running">{t("Running")}</Badge> : s === "stopped" ? <Badge tone="muted" icon="stopped">{t("Stopped")}</Badge> : <Badge tone="unknown" icon="unknown">{t("Unknown")}</Badge>;
 }
 export function ConnBadge({ s }: { s: "online" | "offline" | "connecting" | "unknown" | "error" }) {
   const t = useT();
-  return s === "online" ? <Badge tone="ok" icon="●">{t("Online")}</Badge> : s === "offline" ? <Badge tone="unknown" icon="⊘">{t("Offline")}</Badge> : s === "error" ? <Badge tone="crit" icon="✕">{t("Error")}</Badge>
-    : s === "unknown" ? <Badge tone="unknown" icon="?">{t("Unknown")}</Badge> : <Badge tone="primary" icon="↻">{t("Connecting")}</Badge>;
+  return s === "online" ? <Badge tone="ok" icon="online">{t("Online")}</Badge> : s === "offline" ? <Badge tone="unknown" icon="offline">{t("Offline")}</Badge> : s === "error" ? <Badge tone="crit" icon="error">{t("Error")}</Badge>
+    : s === "unknown" ? <Badge tone="unknown" icon="unknown">{t("Unknown")}</Badge> : <Badge tone="primary" icon="refresh">{t("Connecting")}</Badge>;
 }
 export function SeverityBadge({ s }: { s: "critical" | "warning" | "normal" }) {
   const t = useT();
-  return s === "critical" ? <Badge tone="crit" icon="✕">{t("Critical")}</Badge> : s === "warning" ? <Badge tone="warn" icon="⚠">{t("Warning")}</Badge> : <Badge tone="primary" icon="ⓘ">{t("Info")}</Badge>;
+  return s === "critical" ? <Badge tone="crit" icon="critical">{t("Critical")}</Badge> : s === "warning" ? <Badge tone="warn" icon="warning">{t("Warning")}</Badge> : <Badge tone="primary" icon="info">{t("Info")}</Badge>;
 }
 export function OnOffBadge({ on }: { on: boolean }) {
   const t = useT();
@@ -130,11 +131,11 @@ export function Stat({ label, value, sub }: { label: string; value: React.ReactN
   );
 }
 
-export function Banner({ tone = "primary", icon, children, action }: { tone?: Tone; icon?: string; children: React.ReactNode; action?: React.ReactNode }) {
+export function Banner({ tone = "primary", icon, children, action }: { tone?: Tone; icon?: IconName; children: React.ReactNode; action?: React.ReactNode }) {
   const bd = tone === "warn" ? "border-[#fdba74] bg-warn-soft/60" : tone === "crit" ? "border-crit bg-crit-soft/60" : tone === "ok" ? "border-[#86efac] bg-ok-soft/60" : "border-line bg-primary-soft/50";
   return (
     <div role={tone === "crit" ? "alert" : "status"} className={cx("flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border px-3.5 py-2.5 text-[13px]", bd)}>
-      <span aria-hidden>{icon ?? (tone === "warn" ? "⚠" : tone === "crit" ? "✕" : tone === "ok" ? "✓" : "ⓘ")}</span>
+      <Icon name={icon ?? (tone === "warn" ? "warning" : tone === "crit" ? "error" : tone === "ok" ? "success" : "info")} className="text-[15px]" />
       <div className="min-w-0 flex-1">{children}</div>
       {action}
     </div>
@@ -144,7 +145,7 @@ export function Banner({ tone = "primary", icon, children, action }: { tone?: To
 export function EmptyState({ title, children, action }: { title: string; children?: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="rounded-2xl border border-line bg-surface p-5">
-      <h3 className="font-bold">○ {title}</h3>
+      <h3 className="flex items-center gap-1.5 font-bold"><Icon name="info" className="text-muted" />{title}</h3>
       {children && <p className="mt-1 text-xs text-muted">{children}</p>}
       {action && <div className="mt-3">{action}</div>}
     </div>
@@ -153,9 +154,9 @@ export function EmptyState({ title, children, action }: { title: string; childre
 export function ErrorState({ title, children, onRetry }: { title: string; children?: React.ReactNode; onRetry?: () => void }) {
   return (
     <div className="rounded-2xl border border-crit bg-surface p-5">
-      <h3 className="font-bold text-crit">✕ {title}</h3>
+      <h3 className="flex items-center gap-1.5 font-bold text-crit"><Icon name="error" />{title}</h3>
       {children && <p className="mt-1 text-xs text-muted">{children}</p>}
-      <div className="mt-3"><Btn size="sm" onClick={onRetry}>↻ Retry</Btn></div>
+      <div className="mt-3"><Btn size="sm" onClick={onRetry}><Icon name="refresh" /> Retry</Btn></div>
     </div>
   );
 }
@@ -186,7 +187,7 @@ export function Steps({ steps, current }: { steps: string[]; current: number }) 
     <ol className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold">
       {steps.map((s, i) => (
         <li key={s} className={cx("flex items-center gap-1.5", i === current ? "text-primary" : i < current ? "text-ok" : "text-muted")}>
-          <span className={cx("grid h-5 w-5 place-items-center rounded-full text-[11px]", i === current ? "bg-primary text-white" : i < current ? "bg-ok-soft" : "bg-surface2")}>{i < current ? "✓" : i + 1}</span>
+          <span className={cx("grid h-5 w-5 place-items-center rounded-full text-[11px]", i === current ? "bg-primary text-white" : i < current ? "bg-ok-soft" : "bg-surface2")}>{i < current ? <Icon name="check" /> : i + 1}</span>
           {s}
         </li>
       ))}
@@ -237,7 +238,7 @@ export function Field({ label, hint, error, children, className }: { label: stri
     <Tag role={group ? "group" : undefined} aria-label={group ? label : undefined} className={cx("flex min-w-0 flex-col gap-1 text-xs font-semibold text-ink", className)}>
       <span aria-hidden={group || undefined}>{label}</span>
       {children}
-      {error ? <span className="font-medium text-crit">✕ {error}</span> : hint ? <span className="font-normal text-muted">{hint}</span> : null}
+      {error ? <span className="flex items-center gap-1 font-medium text-crit"><Icon name="error" />{error}</span> : hint ? <span className="font-normal text-muted">{hint}</span> : null}
     </Tag>
   );
 }
@@ -300,7 +301,12 @@ export function Choice<T extends string>({ options, value, onChange }: { options
   );
 }
 export function Search({ placeholder, value, onChange }: { placeholder: string; value: string; onChange: (v: string) => void }) {
-  return <Input type="search" placeholder={"🔍  " + placeholder} value={value} onChange={(e) => onChange(e.target.value)} />;
+  return (
+    <span className="relative flex w-full min-w-0 items-center">
+      <Icon name="search" className="pointer-events-none absolute left-3 text-muted" />
+      <Input type="search" placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)} className="pl-8" />
+    </span>
+  );
 }
 
 /** A select for long lists (DD-A03 search-selects): typing narrows the options, the first `limit` matches are listed,
@@ -335,7 +341,7 @@ export function SearchSelect({ value, onChange, options, label, placeholder, lim
         }}
         className={cx(inputCls, "pr-8")}
       />
-      <span aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted">▼</span>
+      <Icon name="chevronDown" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted" />
       {open && (
         <ul id={`${id}-list`} role="listbox" aria-label={label} className="absolute z-30 mt-1 max-h-72 w-full min-w-[220px] overflow-auto rounded-control border border-line bg-surface py-1 shadow-lg">
           {shown.map((o, k) => (
@@ -397,7 +403,7 @@ export function Modal({ open, title, onClose, children, footer, wide }: { open: 
       <div ref={box} role="dialog" aria-modal="true" aria-labelledby={id} className={cx("flex max-h-[92dvh] w-full flex-col rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl", wide ? "sm:max-w-3xl" : "sm:max-w-[560px]")}>
         <div data-part="header" className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
           <h2 id={id} className="text-base font-bold">{title}</h2>
-          <button aria-label={t("Close")} onClick={onClose} className="rounded-lg px-2 py-1 text-muted hover:bg-surface2">✕</button>
+          <button aria-label={t("Close")} onClick={onClose} className="rounded-lg px-2 py-1 text-muted hover:bg-surface2"><Icon name="close" /></button>
         </div>
         <div data-part="body" className="flex flex-col gap-3 overflow-y-auto px-5 py-4">{children}</div>
         {footer && <div data-part="footer" className="flex flex-wrap justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}

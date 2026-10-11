@@ -60,7 +60,7 @@ describe("the air-quality screen in the display language and time zone (FR-C07, 
 
   it("never reads missing allergen data as “no allergens”, in either language (IR98)", () => {
     const seen: ApiAllergen = { availability: "available", substance: "Dust mite", value: 12, unit: "ng/m³", sourceLabel: "Lab kit", observedAt: "2026-09-14T01:00:00Z", evidenceText: "Kit #4" };
-    expect(allergenView(seen, MS_TOKYO)).toEqual({ title: "Alergen (Dust mite)", badge: { text: "Dikesan", tone: "warn", icon: "⚠" }, text: "12 ng/m³ · Sumber: Lab kit · 10:00 PG GMT+9 · Kit #4" });
+    expect(allergenView(seen, MS_TOKYO)).toEqual({ title: "Alergen (Dust mite)", badge: { text: "Dikesan", tone: "warn", icon: "warning" }, text: "12 ng/m³ · Sumber: Lab kit · 10:00 PG GMT+9 · Kit #4" });
     expect(allergenView({ ...seen, unit: null }).text).toBe("Value unknown (no unit) · Source: Lab kit · 9:00 am MYT · Kit #4");
     expect([allergenView(null).text, allergenView({ ...seen, evidenceText: null }, MS_TOKYO).badge.text, allergenView({ ...seen, availability: "unsupported" }, MS_TOKYO).text]).toEqual([
       "No observation for this selection — this does not mean “no allergens”.", "Tidak diketahui", "Unit ini tidak dapat memerhati alergen — ini tidak bermaksud “tiada alergen”.",

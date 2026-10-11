@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { ROLES, ROLE_KEY, Role, roleFromPath, type ShellLive } from "@ac/web/lib/nav";
 import { Badge, Banner, Btn, Modal, SummaryList, ToastProvider, cx } from "./ui";
+import { Icon, type IconName } from "./Icon";
 import { useJobStore } from "@ac/web/lib/jobs";
 import { AssistantPanel } from "./Assistant";
 import { QrScan } from "./QrScan";
@@ -26,21 +27,21 @@ export function useStoredRole(): Role {
 
 const signOut = "flex w-full items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-crit hover:bg-crit-soft/50";
 const SHARED = [
-  { href: "/notifications", label: "Notifications", icon: "🔔" },
-  { href: "/settings/preferences", label: "Preferences", icon: "✲" },
-];
+  { href: "/notifications", label: "Notifications", icon: "notifications" },
+  { href: "/settings/preferences", label: "Preferences", icon: "preferences" },
+] satisfies { href: string; label: string; icon: IconName }[];
 
-function NavLink({ href, label, icon, badge, active }: { href: string; label: string; icon: string; badge?: string; active: boolean }) {
+function NavLink({ href, label, icon, badge, active }: { href: string; label: string; icon: IconName; badge?: string; active: boolean }) {
   return (
     <Link href={href} aria-current={active ? "page" : undefined} className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold", active ? "bg-primary-soft text-primary" : "text-ink hover:bg-surface2")}>
-      <span aria-hidden className="w-4 text-center text-muted">{icon}</span>
+      <Icon name={icon} className={cx("text-[15px]", active ? "text-primary" : "text-muted")} />
       <span className="min-w-0 flex-1 leading-tight">{label}</span>
       {badge && <span className="grid h-[18px] min-w-[18px] place-items-center rounded-full bg-crit px-1 text-[10px] font-bold text-white">{badge}</span>}
     </Link>
   );
 }
 
-type NavItem = { href: string; label: string; icon: string; badge?: string; match?: string[] };
+type NavItem = { href: string; label: string; icon: IconName; badge?: string; match?: string[] };
 /** The role's sidebar items with the active one: the longest matching path, where an item whose href carries a query
  * (Sidebar › Assigned jobs = /technician?tab=all) wins on its path only when the query matches too. */
 function RoleNav({ items, base, pathname, search }: { items: NavItem[]; base: string; pathname: string; search: string }) {
@@ -110,17 +111,17 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
         {open && <div className="fixed inset-0 z-30 bg-ink/40 lg:hidden" onClick={() => setOpen(false)} />}
         <aside className={cx("fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col gap-1 overflow-y-auto border-r border-line bg-surface p-4 transition-transform lg:sticky lg:top-0 lg:h-dvh lg:w-auto lg:translate-x-0", open ? "translate-x-0" : "-translate-x-full")}>
           <Link href={cfg.base} className="mb-3 flex items-center gap-2.5">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-lg text-white">❄</span>
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-lg text-white"><Icon name="cooling" /></span>
             <span className="leading-tight"><span className="block text-[15px] font-bold">{cfg.app}</span><span className="block text-[11px] text-muted">{t(cfg.sub)}</span></span>
           </Link>
           <div className="px-3 pb-1 text-[10px] font-bold tracking-wider text-muted">{scope}</div>
           <Suspense fallback={<RoleNav items={items} base={cfg.base} pathname={pathname} search="" />}><RoleNavWithQuery items={items} base={cfg.base} pathname={pathname} /></Suspense>
           <div className="my-2 border-t border-line" />
           <nav className="flex flex-col gap-0.5">
-            {role === "client" && owner && <NavLink href="/customer/users" label={t("Users")} icon="☺" active={pathname === "/customer/users"} />}
+            {role === "client" && owner && <NavLink href="/customer/users" label={t("Users")} icon="users" active={pathname === "/customer/users"} />}
             {SHARED.map((s) => <NavLink key={s.href} {...s} label={t(s.label)} active={pathname === s.href} badge={s.href !== "/notifications" ? undefined : live ? count(s.href) : String(3 + unread)} />)}
             <Link href="/demo" className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-warn hover:bg-warn-soft/50", pathname === "/demo" && "bg-warn-soft/60")}>
-              <span aria-hidden className="w-4 text-center">✦</span>
+              <Icon name="demo" className="text-[15px]" />
               <span className="flex-1">{t("Demo controls")}</span>
               <Badge tone="warn">DEMO</Badge>
             </Link>
@@ -128,24 +129,24 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
           <div className="mt-auto pt-4">
             {live ? (
               // API mode (FR-X01, IR250): sign-out ends the BFF session; the full navigation also clears the screen and its cache
-              <form action="/bff/auth/logout" method="post"><button type="submit" className={signOut}><span aria-hidden className="w-4 text-center">↦</span>{t("Sign out")}</button></form>
-            ) : <Link href="/login" className={signOut}><span aria-hidden className="w-4 text-center">↦</span>{t("Sign out")}</Link>}
+              <form action="/bff/auth/logout" method="post"><button type="submit" className={signOut}><Icon name="signOut" className="text-[15px]" />{t("Sign out")}</button></form>
+            ) : <Link href="/login" className={signOut}><Icon name="signOut" className="text-[15px]" />{t("Sign out")}</Link>}
           </div>
         </aside>
 
         <div className="flex min-w-0 flex-col">
           <header className={cx("sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b px-4 backdrop-blur sm:px-6 lg:px-8", demo ? "border-[#fdba74] bg-warn-soft" : "border-line bg-surface/95")}>
             <div className="flex min-w-0 items-center gap-3">
-              <button aria-label={t("Open menu")} onClick={() => setOpen(true)} className="grid h-9 w-9 place-items-center rounded-control border border-line lg:hidden">☰</button>
+              <button aria-label={t("Open menu")} onClick={() => setOpen(true)} className="grid h-9 w-9 place-items-center rounded-control border border-line lg:hidden"><Icon name="menu" /></button>
               {/* Demo controls are always labelled demo (FR-X05, Figma 10e) */}
-              <h1 className={cx("flex min-w-0 items-center gap-2 text-[15px] font-bold", demo && "text-warn")}>{demo && <span aria-hidden>✦</span>}<span className="truncate">{title}</span>{demo && <Badge tone="warn" className="uppercase tracking-wide max-sm:hidden">{t("Always labelled demo")}</Badge>}</h1>
+              <h1 className={cx("flex min-w-0 items-center gap-2 text-[15px] font-bold", demo && "text-warn")}>{demo && <Icon name="demo" />}<span className="truncate">{title}</span>{demo && <Badge tone="warn" className="uppercase tracking-wide max-sm:hidden">{t("Always labelled demo")}</Badge>}</h1>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {role === "technician" && <button onClick={() => setQr(true)} className="inline-flex items-center gap-1.5 rounded-control border border-line px-3 py-1.5 text-xs font-bold hover:bg-surface2">▣ <span className="max-sm:hidden">{t("Scan QR")}</span></button>}
+              {role === "technician" && <button onClick={() => setQr(true)} className="inline-flex items-center gap-1.5 rounded-control border border-line px-3 py-1.5 text-xs font-bold hover:bg-surface2"><Icon name="qr" /> <span className="max-sm:hidden">{t("Scan QR")}</span></button>}
               {role === "client" && (
-                <button onClick={() => setAssistant(true)} className="inline-flex items-center gap-1.5 rounded-full border border-primary bg-primary-soft/50 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary-soft">🎙 <span className="max-sm:hidden">{t("Assistant")}</span></button>
+                <button onClick={() => setAssistant(true)} className="inline-flex items-center gap-1.5 rounded-full border border-primary bg-primary-soft/50 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary-soft"><Icon name="mic" /> <span className="max-sm:hidden">{t("Assistant")}</span></button>
               )}
-              <span className="inline-flex items-center gap-1.5 rounded-control bg-surface2 px-3 py-1.5 text-xs font-semibold">☻ <span className="max-sm:hidden">{chip}</span><span className="sm:hidden">{chip.split(" — ")[0]}</span></span>
+              <span className="inline-flex items-center gap-1.5 rounded-control bg-surface2 px-3 py-1.5 text-xs font-semibold"><Icon name="account" /> <span className="max-sm:hidden">{chip}</span><span className="sm:hidden">{chip.split(" — ")[0]}</span></span>
             </div>
           </header>
           <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-8">{children}</main>

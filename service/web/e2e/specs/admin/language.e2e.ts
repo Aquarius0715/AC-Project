@@ -270,7 +270,7 @@ test("the HQ overview in Malay keeps the period in Kuala Lumpur days", async ({ 
   await expect(main).toContainText("Baca sahaja · entri ditambah hanya oleh peristiwa perniagaan");
   await main.getByRole("tab", { name: "Peristiwa peranti" }).click();
   await page.waitForURL(/tab=devices/);
-  await expect(main.getByRole("heading", { name: "○ Pilih peranti", exact: true })).toBeVisible(); // no fallback device (IR320)
+  await expect(main.getByRole("heading", { name: "Pilih peranti", exact: true })).toBeVisible(); // no fallback device (IR320)
   await setDisplay(page, ENGLISH, zone);
   zoneBefore = null;
   await page.goto("/admin");

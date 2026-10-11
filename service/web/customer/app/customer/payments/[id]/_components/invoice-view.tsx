@@ -74,13 +74,13 @@ function PaymentTab({ live }: { live: InvoiceLive }) {
     <>
       <Banner tone="warn" action={<DemoBadge />}>{t("Demo payment — no real money moves. No card number, CVV or expiry is collected.")}</Banner>
       <div className="split">
-        <Card title={t(i.status === "Paid" ? "Amount paid" : "Amount due")} action={<Badge tone={statusTone[i.status]} icon={i.status === "Overdue" ? "‼" : i.status === "Paid" ? "✓" : i.status === "Processing" ? "⟳" : undefined}>{t(i.status)}</Badge>}>
+        <Card title={t(i.status === "Paid" ? "Amount paid" : "Amount due")} action={<Badge tone={statusTone[i.status]} icon={i.status === "Overdue" ? "alert" : i.status === "Paid" ? "check" : i.status === "Processing" ? "refresh" : undefined}>{t(i.status)}</Badge>}>
           <div className="text-[32px] font-bold">{i.amount.split(" ")[0]} <span className="text-base text-muted">{i.amount.split(" ")[1]}</span></div>
           <p className="text-xs text-muted">{i.due}{live.otherZone && ` · ${t("Kuala Lumpur date (Asia/Kuala_Lumpur)")}`}</p>
           <SummaryList items={[[t("Contract"), live.contract ? `${live.contract.name} · ${live.contract.id.slice(0, 8)}` : "—"], [t("Contract scope"), live.contract?.scope ?? "—"]]} />
           {open && (
             <div className="mt-4 flex flex-col gap-3">
-              <Banner icon="⟳"><b>{t("Processing payment")}</b><div className="text-xs">{t("{id} · {method}. Processing is not paid — please don’t start another payment. This page updates when the receipt is confirmed.", { id: open.id.slice(0, 8), method: methodText(open.method, "demo") })}</div></Banner>
+              <Banner icon="refresh"><b>{t("Processing payment")}</b><div className="text-xs">{t("{id} · {method}. Processing is not paid — please don’t start another payment. This page updates when the receipt is confirmed.", { id: open.id.slice(0, 8), method: methodText(open.method, "demo") })}</div></Banner>
               <div className="rounded-xl border border-dashed border-warn bg-warn-soft/30 p-3 text-[13px]">
                 <div className="mb-2 flex items-center gap-2"><DemoBadge /><b>{t("Demo payment provider")}</b><span className="text-xs text-muted">{t("test events, separate from the payment form")}</span></div>
                 <div className="flex flex-wrap gap-2">

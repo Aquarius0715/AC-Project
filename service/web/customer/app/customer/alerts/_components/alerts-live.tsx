@@ -44,7 +44,7 @@ export function AlertsLiveView({ live }: { live: AlertsLive }) {
         <button type="button" onClick={() => show(a)} className="block w-full text-left hover:opacity-80">
           <span className="flex flex-wrap items-center gap-2">
             <b className={cx(a.unread.length > 0 && "text-primary")}>{a.title}</b><SeverityBadge s={a.severity} /><Badge tone="muted">{a.kind}</Badge>
-            <Badge tone={a.status.tone}>{a.status.text}</Badge>{a.unread.length > 0 ? <Badge tone="primary">{t("Unread")}</Badge> : a.notes > 0 && <Badge tone="ok" icon="✓">{t("Read")}</Badge>}
+            <Badge tone={a.status.tone}>{a.status.text}</Badge>{a.unread.length > 0 ? <Badge tone="primary">{t("Unread")}</Badge> : a.notes > 0 && <Badge tone="ok" icon="check">{t("Read")}</Badge>}
           </span>
           <span className="block text-xs text-muted">{a.where}</span><span className="mt-1 block text-xs">{a.evidence}</span>
         </button>
@@ -87,7 +87,7 @@ export function AlertsLiveView({ live }: { live: AlertsLive }) {
       <Modal open={!!open} onClose={() => setOpen(null)} title={open?.title ?? ""} footer={<Btn onClick={() => setOpen(null)}>{t("Back to list")}</Btn>}>
         {open && (
           <>
-            <div className="flex flex-wrap gap-2"><SeverityBadge s={open.severity} /><Badge tone={open.status.tone}>{open.status.text}</Badge>{open.notes > 0 && <Badge tone="ok" icon="✓">{t("Read")}</Badge>}</div>
+            <div className="flex flex-wrap gap-2"><SeverityBadge s={open.severity} /><Badge tone={open.status.tone}>{open.status.text}</Badge>{open.notes > 0 && <Badge tone="ok" icon="check">{t("Read")}</Badge>}</div>
             <SummaryList items={[[t("Where"), open.where], [t("Evidence"), open.evidence], [t("Status"), open.status.detail]]} />
             <p className="text-xs text-muted">{t(open.status.state === "resolved" ? "This alert is resolved. It stays in the list as a record." : "Reading an alert does not resolve it. It stays under “Needs attention” until the cause is resolved.")}</p>
           </>

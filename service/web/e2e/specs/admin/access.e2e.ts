@@ -40,11 +40,11 @@ test("the organization filter narrows the memberships; an unknown membership is 
 
   // a membership the list does not hold: no other membership opens in its place
   await page.goto("/admin/settings/access?role=admin&membershipId=00000000-0000-4000-8000-000000000000");
-  await expect(main.getByRole("heading", { name: "○ That membership is not in this list" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "That membership is not in this list" })).toBeVisible();
   await expect(main.getByRole("heading", { name: "Identity & role" })).toHaveCount(0);
   await main.getByRole("button", { name: "Clear the filters" }).click();
   await page.waitForURL((u) => !u.searchParams.has("role") && u.searchParams.get("membershipId") === "00000000-0000-4000-8000-000000000000");
-  await expect(main.getByRole("heading", { name: "○ That membership is not in this list" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "That membership is not in this list" })).toBeVisible();
 });
 
 // Figma Admin 03-2 → 03-8 (IR384, IR385): Sign out everywhere asks for a reason, then ends every session of the user

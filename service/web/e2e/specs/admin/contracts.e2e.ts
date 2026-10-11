@@ -28,5 +28,5 @@ test("the contract scope, plan counts, eligibility and the restricted contract's
   await main.getByLabel("Customer").first().selectOption({ label: "Demo Customer B" });
   await page.waitForURL(/customerId=[0-9a-f-]{36}/);
   await expect(main).toContainText("0 contracts in scope");
-  await expect(main.getByRole("heading", { name: "○ No contracts" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "No contracts" })).toBeVisible();
 });

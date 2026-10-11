@@ -61,8 +61,8 @@ export function MaintenanceView({ live }: { live: MaintenanceLive }) {
         ) : <Card title={t("Filters by AC")}><p className="text-[13px] text-muted">{t("Loading filter care…")}</p></Card>
       ) : going ? <Card title={t("My requests")}><p className="text-[13px] text-muted">{t("Loading your requests…")}</p></Card> : (
         <>
-          {replies > 0 && <Banner tone="warn" icon="⇄" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); const r = live.rows.find((x) => x.tab === "reply"); if (r) open(r.id); }}>{t("Review")}</Btn>}>{t("A new visit time needs your reply ({n}). Nothing is booked until you accept.", { n: replies })}</Banner>}
-          {live.rateBanner && <Banner tone="ok" icon="✓" action={<Btn size="sm" variant="primary" onClick={() => open(live.rateBanner!.jobId)}>{t("Confirm & rate")}</Btn>}><b>{live.rateBanner.text}</b> {t("Is everything working? Your confirmation closes the job.")}</Banner>}
+          {replies > 0 && <Banner tone="warn" icon="swap" action={<Btn size="sm" variant="primary" onClick={() => { setTab("reply"); const r = live.rows.find((x) => x.tab === "reply"); if (r) open(r.id); }}>{t("Review")}</Btn>}>{t("A new visit time needs your reply ({n}). Nothing is booked until you accept.", { n: replies })}</Banner>}
+          {live.rateBanner && <Banner tone="ok" icon="check" action={<Btn size="sm" variant="primary" onClick={() => open(live.rateBanner!.jobId)}>{t("Confirm & rate")}</Btn>}><b>{live.rateBanner.text}</b> {t("Is everything working? Your confirmation closes the job.")}</Banner>}
           <PageHead title={t("My requests")} sub={t(live.rows.length === 1 ? "{n} request · sorted by status (business order)" : "{n} requests · sorted by status (business order)", { n: live.rows.length })} action={<Btn variant="primary" onClick={() => setModal("new")}>{t("+ New maintenance request")}</Btn>} />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Tabs value={tab} onChange={setTab} tabs={STATUS_TABS.filter(([s]) => s !== "reply" || replies > 0).map(([id, label]) => ({ id, label: t(label), count: count(id) }))} />

@@ -40,7 +40,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
           <Tabs value={live.period} onChange={(v: OverviewPeriod) => patch({ period: v === "today" ? null : v })} tabs={OVERVIEW_PERIODS.map((p) => ({ ...p, label: t(p.label) }))} />
         </div>
         <div className="text-right text-xs">
-          <div className="flex items-center justify-end gap-2 font-semibold">{t("Updated {time}", { time: showClock(live.asOf, live.display) })} <Badge tone={stale ? "unknown" : "ok"} icon="●">{t(stale ? "Stale" : "Live")}</Badge><Btn size="sm" onClick={() => router.refresh()}>{t("↻ Refresh")}</Btn></div>
+          <div className="flex items-center justify-end gap-2 font-semibold">{t("Updated {time}", { time: showClock(live.asOf, live.display) })} <Badge tone={stale ? "unknown" : "ok"} icon="live">{t(stale ? "Stale" : "Live")}</Badge><Btn size="sm" onClick={() => router.refresh()}>{t("↻ Refresh")}</Btn></div>
           <div className="text-muted">{live.note}</div>
         </div>
       </div>
@@ -75,7 +75,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
         <Card title={live.air ? t("Air quality · {room}", { room: live.air.room }) : t("Air quality")} action={live.air && <Badge tone={live.air.co2.feed.tone} icon={live.air.co2.feed.icon}>{live.air.co2.feed.text}</Badge>}>
           {live.air ? <>
             <div className="text-[28px] font-bold"><span className="text-xs font-normal text-muted">CO2 </span>{live.air.co2.value ?? "—"} <span className="text-sm font-medium text-muted">ppm</span></div>
-            {live.air.co2.warn && <div className="my-1"><Badge tone="warn" icon="⚠">{t("Ventilation recommended")}</Badge></div>}
+            {live.air.co2.warn && <div className="my-1"><Badge tone="warn" icon="warning">{t("Ventilation recommended")}</Badge></div>}
             <p className="mb-2 text-[11px] text-muted">{t("{sub} · {unit} sensor · threshold 1000 ppm", { sub: live.air.co2.sub, unit: live.air.unit })}</p>
             {live.air.points.some((p) => p !== null) ? <LineChart points={live.air.points} min={400} max={Math.max(1200, ...live.air.points.filter((p): p is number => p !== null).map((p) => p + 100))} threshold={1000} height={90} />
               : <p className="text-[11px] text-muted">{t("No CO2 readings in the last 24 h.")}</p>}
@@ -122,7 +122,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
           </Card>
           <Card title={t("Automations")} action={<span className="text-xs text-muted">{t("{on} on · {off} off", { on: live.automations.on, off: live.automations.off })}</span>}>
             {live.automations.items.map((x) => (
-              <div key={x.id} className="flex items-center justify-between gap-2 py-2"><div className="min-w-0"><div className="font-bold">{x.name}</div><div className="text-[11px] text-muted">{x.line}</div></div><Badge tone={x.status.tone} icon={x.status.tone === "ok" ? "●" : undefined}>{x.status.text}</Badge></div>
+              <div key={x.id} className="flex items-center justify-between gap-2 py-2"><div className="min-w-0"><div className="font-bold">{x.name}</div><div className="text-[11px] text-muted">{x.line}</div></div><Badge tone={x.status.tone} icon={x.status.tone === "ok" ? "live" : undefined}>{x.status.text}</Badge></div>
             ))}
             {live.automations.items.length === 0 && <p className="text-xs text-muted">{t("No automations for these units.")}</p>}
             <TextLink href="/customer/automations" className="mt-1 inline-block">{t("Manage automations →")}</TextLink>

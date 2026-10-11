@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge, Input, Select, cx } from "./ui";
+import type { IconName } from "@ac/web/components/Icon";
 import type { JobStatus, Origin, Slot } from "@ac/web/lib/jobs";
 import { statusLabel } from "@ac/web/lib/jobs";
 import { useT } from "./I18n";
@@ -18,7 +19,7 @@ export function OriginBadge({ origin }: { origin: Origin }) {
 const statusTone: Record<JobStatus, Parameters<typeof Badge>[0]["tone"]> = {
   requested: "primary", time_proposed: "warn", offered: "primary", accepted: "primary", assigned: "primary", in_progress: "warn", submitted: "primary", rework_requested: "warn", completed: "ok", cancelled: "muted", on_hold: "unknown",
 };
-const statusIcon: Partial<Record<JobStatus, string>> = { requested: "○", time_proposed: "⇄", offered: "○", accepted: "◔", assigned: "◔", in_progress: "↻", submitted: "◷", rework_requested: "↻", completed: "✓", cancelled: "×", on_hold: "■" };
+const statusIcon: Record<JobStatus, IconName> = { requested: "requested", time_proposed: "proposed", offered: "offered", accepted: "accepted", assigned: "assigned", in_progress: "inProgress", submitted: "submitted", rework_requested: "rework", completed: "completed", cancelled: "cancelled", on_hold: "paused" };
 export function JobStatusBadge({ s }: { s: JobStatus }) {
   const t = useT();
   return <Badge tone={statusTone[s]} icon={statusIcon[s]}>{t(statusLabel[s])}</Badge>;

@@ -4,6 +4,7 @@
 import { EN, intlTag, showDate, showTime, translator, type I18n, type T } from "@ac/web/lib/i18n";
 import type { UnitAction } from "@ac/web/lib/contracts.gen";
 import type { OpInput } from "@ac/web/lib/opTypes";
+import type { IconName } from "@ac/web/components/Icon";
 
 const en = translator("en");
 
@@ -32,12 +33,12 @@ export type ApiDecision = { unitId: string; decision: "selected" | "suppressed";
 
 export type Trigger = "schedule" | "presence" | "location" | "routine" | "weather";
 export const triggers: Trigger[] = ["schedule", "presence", "location", "routine", "weather"];
-export const triggerInfo: Record<Trigger, { label: string; sub: string; icon: string }> = {
-  schedule: { label: "Schedule", sub: "Days & time", icon: "◷" },
-  presence: { label: "Presence", sub: "Room occupied / empty", icon: "●" },
-  location: { label: "Location", sub: "Arrive / leave (consent)", icon: "⌖" },
-  routine: { label: "Routine", sub: "Your usual pattern (demo)", icon: "↻" },
-  weather: { label: "Weather", sub: "Outdoor conditions", icon: "☀" },
+export const triggerInfo: Record<Trigger, { label: string; sub: string; icon: IconName }> = {
+  schedule: { label: "Schedule", sub: "Days & time", icon: "schedule" },
+  presence: { label: "Presence", sub: "Room occupied / empty", icon: "presence" },
+  location: { label: "Location", sub: "Arrive / leave (consent)", icon: "location" },
+  routine: { label: "Routine", sub: "Your usual pattern (demo)", icon: "routine" },
+  weather: { label: "Weather", sub: "Outdoor conditions", icon: "weather" },
 };
 const conditionTrigger = { occupancy: "presence", location: "location", pattern: "routine", weather: "weather" } as const;
 export const triggerOf = (a: ApiAutomation): Trigger => (a.kind === "schedule" ? "schedule" : conditionTrigger[a.condition.type]);

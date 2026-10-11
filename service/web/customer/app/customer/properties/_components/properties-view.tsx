@@ -15,6 +15,7 @@ import { useI18n, useT } from "@ac/web/components/I18n";
 import type { T } from "@ac/web/lib/i18n";
 import { sendCommand } from "../actions";
 import { RenameModal, type Renaming } from "../../_components/rename-modal";
+import { Icon, type IconName } from "@ac/web/components/Icon";
 
 export type PropertiesLive = {
   tree: TreeProperty[]; selection: Selection | null; owner: boolean;
@@ -47,10 +48,10 @@ export function PropertiesView({ live }: { live: PropertiesLive }) {
           <div className="flex flex-col text-[13px]">
             {live.tree.map((p) => (
               <div key={p.id}>
-                <Row depth={0} selected={!live.filter && selId === p.id} onClick={() => go({ propertyId: p.id })} icon="⌂" name={p.name} tag={kind(t, p.kind)}
+                <Row depth={0} selected={!live.filter && selId === p.id} onClick={() => go({ propertyId: p.id })} icon="home" name={p.name} tag={kind(t, p.kind)}
                   onRename={() => setRenaming({ kind: "property", id: p.id, version: p.version, name: p.name, where: t("{name} · {kind} (property)", { name: p.name, kind: kind(t, p.kind) }) })} />
                 {p.spaces.map((s) => <SpaceRow key={s.id} s={s} p={p} depth={1} selId={live.filter ? "" : selId} go={go} rename={setRenaming} />)}
-                {p.unassigned > 0 && <Row depth={1} selected={!live.filter && selId === `unassigned:${p.id}`} onClick={() => go({ propertyId: p.id, unassignedOnly: "true" })} icon="?" name={t("Unassigned units")} meta={t("· {units} · placed by HQ", { units: units_(t, p.unassigned) })} />}
+                {p.unassigned > 0 && <Row depth={1} selected={!live.filter && selId === `unassigned:${p.id}`} onClick={() => go({ propertyId: p.id, unassignedOnly: "true" })} icon="unknown" name={t("Unassigned units")} meta={t("· {units} · placed by HQ", { units: units_(t, p.unassigned) })} />}
               </div>
             ))}
           </div>
@@ -65,12 +66,12 @@ export function PropertiesView({ live }: { live: PropertiesLive }) {
   );
 }
 
-function Row({ depth, selected, onClick, icon, name, tag, meta, onRename }: { depth: number; selected: boolean; onClick: () => void; icon: string; name: string; tag?: string; meta?: string; onRename?: () => void }) {
+function Row({ depth, selected, onClick, icon, name, tag, meta, onRename }: { depth: number; selected: boolean; onClick: () => void; icon: IconName; name: string; tag?: string; meta?: string; onRename?: () => void }) {
   const t = useT();
   return (
     <div className={cx("flex items-center gap-2 rounded-lg px-2 py-1.5", selected ? "bg-primary-soft" : "hover:bg-surface2")} style={{ paddingLeft: 8 + depth * 16 }}>
       <button type="button" onClick={onClick} aria-pressed={selected} className="flex min-w-0 flex-1 items-center gap-2 text-left">
-        <span aria-hidden className="text-muted">{icon}</span><span className="truncate font-semibold">{name}</span>
+        <Icon name={icon} className="text-muted" /><span className="truncate font-semibold">{name}</span>
         {tag && <span className="rounded bg-surface2 px-1.5 text-[10px] text-muted">{tag}</span>}
         {meta && <span className="truncate text-[11px] text-muted">{meta}</span>}
       </button>
@@ -82,7 +83,7 @@ function SpaceRow({ s, p, depth, selId, go, rename }: { s: TreeSpace; p: TreePro
   const t = useT();
   return (
     <>
-      <Row depth={depth} selected={selId === s.id} onClick={() => go({ spaceId: s.id })} icon={s.children.length ? "▾" : "›"} name={s.name} tag={kind(t, s.kind)}
+      <Row depth={depth} selected={selId === s.id} onClick={() => go({ spaceId: s.id })} icon={s.children.length ? "chevronDown" : "chevronRight"} name={s.name} tag={kind(t, s.kind)}
         meta={s.direct ? `· ${units_(t, s.direct)}` : undefined} onRename={() => rename({ kind: "space", id: s.id, version: s.version, name: s.name, where: t("{name} · {kind} in {property}", { name: s.name, kind: kind(t, s.kind), property: p.name }) })} />
       {s.children.map((c) => <SpaceRow key={c.id} s={c} p={p} depth={depth + 1} selId={selId} go={go} rename={rename} />)}
     </>

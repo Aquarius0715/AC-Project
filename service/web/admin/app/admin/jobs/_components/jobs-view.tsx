@@ -134,7 +134,7 @@ function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fre
 
       {j.status === "requested" && sp?.status !== "pending" && j.followUpClass !== "pending" && (
         <>
-          {sp?.status === "declined" && <Banner tone="crit" icon="✕"><b>{t("The client declined the proposed time")}{d.texts.declinedAt ? ` · ${d.texts.declinedAt}` : ""}</b> — {sp.declineReason?.replace(/_/g, " ")}{sp.declineComment ? `: “${sp.declineComment}”` : ""}. {t("Held capacity was released; the client sent new preferred times (round {round}).", { round: j.preferenceRound })}</Banner>}
+          {sp?.status === "declined" && <Banner tone="crit" icon="error"><b>{t("The client declined the proposed time")}{d.texts.declinedAt ? ` · ${d.texts.declinedAt}` : ""}</b> — {sp.declineReason?.replace(/_/g, " ")}{sp.declineComment ? `: “${sp.declineComment}”` : ""}. {t("Held capacity was released; the client sent new preferred times (round {round}).", { round: j.preferenceRound })}</Banner>}
           {d.preferred.length > 0 ? (
             <Card title={d.preferred[0].plan ? t("Plan occurrence — book this time") : j.preferenceRound > 1 ? t("Client’s preferred times (round {round}) — book one of these", { round: j.preferenceRound }) : t("Client’s preferred times — book one of these")} sub={t("HQ technicians free and qualified for each time (members.eligible)")}>
               <div className="scroll-x"><table className="w-full min-w-[640px] text-[13px]">

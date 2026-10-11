@@ -53,7 +53,7 @@ export function PaymentsView({ live }: { live: PaymentsLive }) {
               {live.invoices.map((i) => (
                 <div key={i.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
                   <div><b>{i.number}</b><div className="text-xs text-muted">{i.due}</div></div>
-                  <div className="flex items-center gap-3"><b>{i.amount}</b><Badge tone={statusTone[i.status]} icon={i.status === "Overdue" ? "‼" : i.status === "Paid" ? "✓" : undefined}>{t(i.status)}</Badge>
+                  <div className="flex items-center gap-3"><b>{i.amount}</b><Badge tone={statusTone[i.status]} icon={i.status === "Overdue" ? "alert" : i.status === "Paid" ? "check" : undefined}>{t(i.status)}</Badge>
                     {i.payable ? <LinkBtn size="sm" variant="primary" href={`/customer/payments/${i.id}`}>{t("Pay now")}</LinkBtn> : <Link href={`/customer/payments/${i.id}`} className="text-muted" aria-label={t("Open {number}", { number: i.number })}>›</Link>}</div>
                 </div>
               ))}

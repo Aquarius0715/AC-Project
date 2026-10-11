@@ -17,7 +17,7 @@ export function OverviewDemo({ tab: initial }: { tab?: string }) {
       <div className="grid-fluid" style={{ ["--min"as string]: "180px" }}>
         <Kpi label="Assigned units" value={2} sub="in your assignments" /><Kpi label="Not started" value={1} sub="job-t07" /><Kpi label="Overdue" value={0} tone="ok" sub="No overdue jobs" />
       </div>
-      {pending.map((j) => <Banner key={j.id} tone="warn" icon="✉" action={<LinkBtn size="sm" variant="primary" href={`/technician/jobs/${j.id}`}>Review & accept</LinkBtn>}><b>New assignment to accept — {j.id} · {j.unit} · {fmt(j.scheduled)}</b> · assigned by {j.contractor ?? "HQ"}. The visit time was agreed with the client.</Banner>)}
+      {pending.map((j) => <Banner key={j.id} tone="warn" icon="mail" action={<LinkBtn size="sm" variant="primary" href={`/technician/jobs/${j.id}`}>Review & accept</LinkBtn>}><b>New assignment to accept — {j.id} · {j.unit} · {fmt(j.scheduled)}</b> · assigned by {j.contractor ?? "HQ"}. The visit time was agreed with the client.</Banner>)}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
           <Tabs value={tab} onChange={setTab} tabs={[{ id: "today", label: "Today", count: 2 }, { id: "all", label: "All assigned", count: all.length }]} />

@@ -21,6 +21,7 @@ import {
 import { amount } from "@ac/web/lib/energy";
 import { typeLabel } from "@ac/web/lib/partnerJobDetail";
 import { archiveLocation, archiveUnit, createCustomer, deleteUnit, importCommit, importPreview, importUndo, inviteClientUser, previewPasswordReset, recordWarrantyClaim, removeClientUser, resendInvite, saveProperty, saveSpace, saveUnit, setDefaultRule, setUnitPolicies, updateClientUser, updateCustomer, signOutEverywhere } from "../actions";
+import { Icon, type IconName } from "@ac/web/components/Icon";
 
 export type UnitLive = {
   u: ApiUnitDetail; path: string; model: string; device: { id: string; serial: string; connection: Connection } | null; deviceKnown: boolean;
@@ -206,10 +207,10 @@ function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
               <div className="flex flex-col gap-0.5">
                 {c.tree.map((p) => (
                   <div key={p.id}>
-                    <Node depth={0} selected={selId === p.id} onClick={() => nav({ locationId: p.id, ...clearUnit })} icon="⌂" name={p.name} meta={`${t(kindLabel[p.kind])} · ${units(t, p.units)}`}
+                    <Node depth={0} selected={selId === p.id} onClick={() => nav({ locationId: p.id, ...clearUnit })} icon="home" name={p.name} meta={`${t(kindLabel[p.kind])} · ${units(t, p.units)}`}
                       menu={canWrite && <LocationMenu onRename={() => setM({ kind: "rename", p })} onDelete={() => setM({ kind: "archive", p })} />} />
                     {p.spaces.map((x) => <SpaceNode key={x.id} s={x} depth={1} selId={selId} nav={nav} canWrite={canWrite} setM={setM} />)}
-                    {p.unassigned > 0 && <Node depth={1} selected={selId === `unassigned:${p.id}`} onClick={() => nav({ locationId: `unassigned:${p.id}`, ...clearUnit })} icon="·" name={t("Unassigned")} meta={units(t, p.unassigned)} />}
+                    {p.unassigned > 0 && <Node depth={1} selected={selId === `unassigned:${p.id}`} onClick={() => nav({ locationId: `unassigned:${p.id}`, ...clearUnit })} icon="dot" name={t("Unassigned")} meta={units(t, p.unassigned)} />}
                     {canWrite && <AddLink depth={1} onClick={() => setM({ kind: "space", propertyId: p.id, parentSpaceId: null, spaceKind: p.kind === "office" ? "area" : "floor" })}>{t(p.kind === "office" ? "+ Add floor / area" : "+ Add floor")}</AddLink>}
                   </div>
                 ))}
@@ -240,11 +241,11 @@ function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
   );
 }
 
-function Node({ depth, selected, onClick, icon, name, meta, menu }: { depth: number; selected: boolean; onClick: () => void; icon: string; name: string; meta: string; menu?: React.ReactNode }) {
+function Node({ depth, selected, onClick, icon, name, meta, menu }: { depth: number; selected: boolean; onClick: () => void; icon: IconName; name: string; meta: string; menu?: React.ReactNode }) {
   return (
     <div className={cx("flex items-center gap-1 rounded-lg pr-1", selected ? "bg-primary-soft/60" : "hover:bg-surface2/70")} style={{ paddingLeft: depth * 14 }}>
       <button type="button" onClick={onClick} aria-pressed={selected} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-[13px]">
-        <span aria-hidden className="text-muted">{icon}</span><b className="truncate">{name}</b><span className="ml-auto shrink-0 text-[11px] text-muted">{meta}</span>
+        <Icon name={icon} className="text-muted" /><b className="truncate">{name}</b><span className="ml-auto shrink-0 text-[11px] text-muted">{meta}</span>
       </button>
       {menu}
     </div>
@@ -255,7 +256,7 @@ function SpaceNode({ s, depth, selId, nav, canWrite, setM }: { s: TreeSpace; dep
   const container = s.kind === "floor" || s.kind === "area";
   return (
     <>
-      <Node depth={depth} selected={selId === s.id} onClick={() => nav({ locationId: s.id, ...clearUnit })} icon={s.children.length ? "▾" : "·"} name={s.name}
+      <Node depth={depth} selected={selId === s.id} onClick={() => nav({ locationId: s.id, ...clearUnit })} icon={s.children.length ? "chevronDown" : "chevronRight"} name={s.name}
         meta={`${t(kindLabel[s.kind])}${s.units ? ` · ${s.units}` : ""}`} menu={canWrite && <LocationMenu onRename={() => setM({ kind: "rename", s })} onDelete={() => setM({ kind: "archive", s })} />} />
       {s.children.map((x) => <SpaceNode key={x.id} s={x} depth={depth + 1} selId={selId} nav={nav} canWrite={canWrite} setM={setM} />)}
       {canWrite && container && <AddLink depth={depth + 1} onClick={() => setM({ kind: "space", propertyId: s.propertyId, parentSpaceId: s.id, spaceKind: "room" })}>{t("+ Add room")}</AddLink>}
@@ -330,7 +331,7 @@ function UnitsCard({ c, sel, nav, canWrite, onNew }: { c: CustomerLive; sel: Sel
           { key: "l", label: t("Location"), render: (u) => u.location, hideBelow: "sm" },
           { key: "p", label: t("Power"), render: (u) => <PowerBadge s={u.power} /> },
           { key: "c", label: t("Connection"), render: (u) => <ConnBadge s={u.conn} />, hideBelow: "sm" },
-          { key: "a", label: t("Alerts"), render: (u) => (u.alerts ? <Badge tone="warn" icon="⚠">{u.alerts}</Badge> : "—"), hideBelow: "md" },
+          { key: "a", label: t("Alerts"), render: (u) => (u.alerts ? <Badge tone="warn" icon="warning">{u.alerts}</Badge> : "—"), hideBelow: "md" },
           { key: "y", label: t("Policies"), render: (u) => u.policies, hideBelow: "md" },
           { key: "x", label: "", render: () => "›" },
         ]} />
@@ -371,7 +372,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: { live: UnitsLive; c: Custo
   const attachedIds = x.attached.filter((p) => p.kind === "alert").map((p) => p.id);
   return (
     <>
-      <Card title={<span className="flex flex-wrap items-center gap-2">{u.displayName}<PowerBadge s={u.effectivePowerState === "on" ? "running" : u.effectivePowerState === "off" ? "stopped" : "unknown"} /><ConnBadge s={u.connection} />{x.seen && <span className="text-[11px] font-normal text-muted">{t("seen {time}", { time: x.seen })}</span>}{u.activeAlertCount > 0 && <Badge tone="warn" icon="⚠">{count(t, u.activeAlertCount, "1 open alert", "{n} open alerts")}</Badge>}</span>}
+      <Card title={<span className="flex flex-wrap items-center gap-2">{u.displayName}<PowerBadge s={u.effectivePowerState === "on" ? "running" : u.effectivePowerState === "off" ? "stopped" : "unknown"} /><ConnBadge s={u.connection} />{x.seen && <span className="text-[11px] font-normal text-muted">{t("seen {time}", { time: x.seen })}</span>}{u.activeAlertCount > 0 && <Badge tone="warn" icon="warning">{count(t, u.activeAlertCount, "1 open alert", "{n} open alerts")}</Badge>}</span>}
         sub={<>{u.id.slice(0, 8)} · {t("version {v}", { v: u.version })} · <button type="button" className="font-semibold text-primary" onClick={() => nav({ unitId: null, locationId: u.archived ? null : u.spaceId ?? `unassigned:${u.propertyId}` })}>{t("‹ back to {place}", { place: back })}</button></>}
         action={live.canWrite && !u.archived && <Btn size="sm" variant="danger" onClick={() => setModal("delete")}>{t("Delete unit…")}</Btn>}>
         {u.archived && <div className="mb-3"><Banner tone="warn">{t("Read only — {note}. Archived units are excluded from lists, summaries and KPI denominators (IR39).", { note: x.archivedNote ?? "" })}</Banner></div>}

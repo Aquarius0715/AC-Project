@@ -38,5 +38,5 @@ test("the cause invoice filter and the units' Details links", async ({ browser, 
   // an invoice no restriction cites stays selectable from a link and says so
   await page.goto("/admin/restrictions?invoiceId=00000000-0000-4000-8000-000000000000");
   await expect(main.getByRole("combobox", { name: "Cause invoice" })).toContainText("no restriction cites it");
-  await expect(main.getByRole("heading", { name: "○ No restrictions" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "No restrictions" })).toBeVisible();
 });

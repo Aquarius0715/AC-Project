@@ -42,7 +42,7 @@ export function AlertsView({ rows = seed }: { rows?: Alert[] }) {
   const Item = ({ a }: { a: Alert }) => (
     <button onClick={() => openAlert(a)} className="flex w-full items-start gap-3 border-t border-line px-1 py-3 text-left first:border-0 hover:bg-surface2/50">
       <span className="mt-0.5">{a.icon}</span>
-      <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><b className={cx(!a.read && "text-primary")}>{a.title}</b><Badge tone="muted">{a.kind}</Badge>{a.read && <Badge tone="ok" icon="✓">Read</Badge>}</span><span className="block text-xs text-muted">{a.where}</span><span className="mt-1 block text-xs">{a.ev}</span></span>
+      <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-2"><b className={cx(!a.read && "text-primary")}>{a.title}</b><Badge tone="muted">{a.kind}</Badge>{a.read && <Badge tone="ok" icon="check">Read</Badge>}</span><span className="block text-xs text-muted">{a.where}</span><span className="mt-1 block text-xs">{a.ev}</span></span>
       <span className="text-muted">›</span>
     </button>
   );
@@ -62,7 +62,7 @@ export function AlertsView({ rows = seed }: { rows?: Alert[] }) {
         </>
       ) : <PoliciesPanel />}
       <Modal open={!!open} onClose={() => setOpen(null)} title={open?.title ?? ""} footer={<Btn onClick={() => setOpen(null)}>Back to list</Btn>}>
-        {open && <><div className="flex gap-2"><SeverityBadge s={open.sev} /><Badge tone="ok" icon="✓">Read</Badge><Badge tone="warn">Unresolved</Badge></div><SummaryList items={[["Where", open.where], ["Evidence", open.ev], ["Status", "Opened → auto Read, still Unresolved"]]} /><p className="text-xs text-muted">Reading an alert does not resolve it. It stays under “Needs attention” until the cause is resolved.</p></>}
+        {open && <><div className="flex gap-2"><SeverityBadge s={open.sev} /><Badge tone="ok" icon="check">Read</Badge><Badge tone="warn">Unresolved</Badge></div><SummaryList items={[["Where", open.where], ["Evidence", open.ev], ["Status", "Opened → auto Read, still Unresolved"]]} /><p className="text-xs text-muted">Reading an alert does not resolve it. It stays under “Needs attention” until the cause is resolved.</p></>}
       </Modal>
     </Page>
   );

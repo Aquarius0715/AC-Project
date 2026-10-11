@@ -44,7 +44,7 @@ export function InvoiceDemo({ id, tab }: { id: string; tab?: string }) { // SCR-
       <div className="text-[13px] text-muted"><Link href="/customer/payments" className="font-semibold text-primary">← Contracts & payments</Link> › Invoice {id}</div>
       <Banner tone="warn" action={<DemoBadge />}>Demo payment — no real money moves. No card number, CVV or expiry is collected.</Banner>
       <div className="split">
-        <Card title="Amount due" action={paid ? <Badge tone="ok" icon="✓">Paid</Badge> : phase === "confirmed" ? <Badge tone="ok" icon="✓">Confirmed</Badge> : phase === "processing" ? <Badge tone="primary">Processing</Badge> : <Badge tone="crit">Unpaid</Badge>}>
+        <Card title="Amount due" action={paid ? <Badge tone="ok" icon="check">Paid</Badge> : phase === "confirmed" ? <Badge tone="ok" icon="check">Confirmed</Badge> : phase === "processing" ? <Badge tone="primary">Processing</Badge> : <Badge tone="crit">Unpaid</Badge>}>
           <div className="text-[32px] font-bold">120.00 <span className="text-base text-muted">MYR</span></div>
           <p className="text-xs text-muted">Due Sep 10, 2026 · issued Aug 27</p>
           <SummaryList items={[["Contract", "RTO Plan · contract-rto-a"], ["Contract scope", "3 units (Bedroom AC, Meeting room AC, Lobby AC)"]]} />

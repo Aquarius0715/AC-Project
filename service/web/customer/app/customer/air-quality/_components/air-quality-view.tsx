@@ -10,6 +10,7 @@ import {
   airMetrics, airNumber, airPeriods, metricInfo, ventDurations, ventMethods, type AirMetric, type AirPeriod, type AirRow, type MetricCard, type VentMethod,
 } from "@ac/web/lib/air";
 import { logVentilation } from "../actions";
+import type { IconName } from "@ac/web/components/Icon";
 
 type Tone = MetricCard["feed"]["tone"];
 export type AirLive = {
@@ -17,7 +18,7 @@ export type AirLive = {
   roomKey: string; unitId: string; unitName: string; path: string; spaceId: string | null;
   connection: "online" | "offline" | "unknown" | "connecting" | "error"; updated: string; freshAir: boolean;
   cards: MetricCard[]; strip: { tone: "warn" | "primary"; title: string; text: string }; clean: string | null;
-  allergen: { title: string; badge: { text: string; tone: Tone; icon: string }; text: string };
+  allergen: { title: string; badge: { text: string; tone: Tone; icon: IconName }; text: string };
   metric: AirMetric; period: AirPeriod;
   chart: {
     title: string; sub: string; points: (number | null)[]; labels: string[]; guide: number | null; min: number; max: number; ticks: number[];

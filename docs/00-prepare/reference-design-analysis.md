@@ -1,6 +1,6 @@
 ---
 document_id: PREP-STYLE
-version: 0.7.0
+version: 0.7.1
 status: source-inspected
 owner: design-agent
 updated: 2026-09-14
@@ -39,7 +39,7 @@ The reference is the [customer Loyalty page](https://aconland-mudah-milik.vercel
 | Information hierarchy | Heading → dark summary → KPIs → details/history | Adopt as a shared page pattern; replace points with each role's business metrics |
 | KPIs | 2→4 columns (at 768px and above), gap 12→16px, value 24→30px | Explicit extension to one column when long translations or 360px width cause layout problems |
 | Details/history | Main content plus 20rem side area at 1024px and above, gap 20px | Optional shared detail pattern; place history below on small screens |
-| Icons | Mostly inline SVG; sidebar 16px/stroke 1.75; Lucide found in toggle | The build uses glyphs in its own components (DEC-03, decided 2026-10-10); do not claim every SVG is from Lucide |
+| Icons | Mostly inline SVG; sidebar 16px/stroke 1.75; Lucide found in toggle | Since DEC-74 (2026-10-12) the build takes every icon from Lucide through its own `Icon` component, replacing the glyphs that DEC-03 kept; do not claim every SVG of the reference is from Lucide |
 
 ## Parts not copied directly
 

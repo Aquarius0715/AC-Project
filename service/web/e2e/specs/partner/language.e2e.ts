@@ -41,8 +41,8 @@ test("the contractor screens in Malay keep Kuala Lumpur days and show instants i
     await expect(main.getByRole("heading", { name: /^(Semakan bukti|Tiada laporan untuk disemak)$/ })).toBeVisible();
   }
   await page.goto("/partner/schedule");
-  await expect(main.getByRole("heading", { name: /^(Kerja yang diterima|○ Tiada kerja yang diterima)$/ })).toBeVisible();
-  if (await main.getByRole("heading", { name: "Kerja yang diterima", exact: true }).count()) { // not the empty state's "○ Tiada kerja yang diterima"
+  await expect(main.getByRole("heading", { name: /^(Kerja yang diterima|Tiada kerja yang diterima)$/ })).toBeVisible();
+  if (await main.getByRole("heading", { name: "Kerja yang diterima", exact: true }).count()) { // not the empty state's "Tiada kerja yang diterima"
     await expect(main.getByRole("heading", { name: "Tetingkap delegasi" })).toBeVisible();
     await expect(main.getByRole("combobox", { name: "Isih" })).toContainText("Status ↑");
     await expect(main).toContainText(/GMT\+9/); // the delegation windows in the display zone

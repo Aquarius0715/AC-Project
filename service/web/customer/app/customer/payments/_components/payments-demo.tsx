@@ -31,7 +31,7 @@ export function PaymentsDemo() {
               {sel.invoices.map(([id, due, amt, st]) => (
                 <div key={id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line p-3">
                   <div><b>{id}</b><div className="text-xs text-muted">{due}</div></div>
-                  <div className="flex items-center gap-3"><b>{amt}</b>{st === "unpaid" ? <><Badge tone="crit">Unpaid</Badge><LinkBtn size="sm" variant="primary" href={`/customer/payments/${id}`}>Pay</LinkBtn></> : <><Badge tone="ok" icon="✓">Paid</Badge><Link href={`/customer/payments/${id}`} className="text-muted">›</Link></>}</div>
+                  <div className="flex items-center gap-3"><b>{amt}</b>{st === "unpaid" ? <><Badge tone="crit">Unpaid</Badge><LinkBtn size="sm" variant="primary" href={`/customer/payments/${id}`}>Pay</LinkBtn></> : <><Badge tone="ok" icon="check">Paid</Badge><Link href={`/customer/payments/${id}`} className="text-muted">›</Link></>}</div>
                 </div>
               ))}
               {sel.invoices.length === 0 && <p className="text-xs text-muted">No invoices.</p>}

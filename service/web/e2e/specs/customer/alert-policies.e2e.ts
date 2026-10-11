@@ -40,7 +40,7 @@ test("a policy is created, edited, switched off and deleted", async ({ page }) =
   await page.getByLabel("Threshold").fill("30");
   await page.getByLabel("Recovery").fill("31"); // above the threshold: not the safe side for "above"
   await page.getByRole("button", { name: "Save policy" }).click();
-  await expect(page.getByRole("main")).toContainText("✕");
+  await expect(page.getByRole("main")).toContainText("Recovery 31 must be below the 30 threshold");
   await page.getByLabel("Recovery").fill("28");
   await page.getByLabel("Email").check();
   await page.getByRole("button", { name: "Save policy" }).click();

@@ -73,10 +73,10 @@ test("the audit log keeps its filters and the open entry in the URL", async ({ p
 
   // an ID that matches nothing looks the same whether it does not exist or is out of scope; a reversed period searches nothing
   await page.goto("/admin/audit?correlationId=00000000-0000-4000-8000-000000000000");
-  await expect(main.getByRole("heading", { name: "○ No entries with this correlation ID" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "No entries with this correlation ID" })).toBeVisible();
   await expect(main).toContainText("This looks the same for an ID that does not exist and for one outside your managed scope.");
   await page.goto("/admin/audit?from=2026-09-10&to=2026-09-01");
-  await expect(main.getByRole("heading", { name: "○ Nothing was searched" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "Nothing was searched" })).toBeVisible();
   await expect(main).toContainText("Period must be start < end, at most 366 days");
 });
 
@@ -84,10 +84,10 @@ test("device events load only for a picked device and link the event's audit tra
   await page.goto("/admin/audit?tab=devices");
   const main = page.getByRole("main");
   await expect(main.getByRole("tab", { name: /^Device events/ })).toHaveAttribute("aria-selected", "true");
-  await expect(main.getByRole("heading", { name: "○ Pick a device" })).toBeVisible(); // no fallback device (IR33)
+  await expect(main.getByRole("heading", { name: "Pick a device" })).toBeVisible(); // no fallback device (IR33)
   await expect(main.getByRole("heading", { name: "Device events · newest first" })).toHaveCount(0);
   await page.goto("/admin/audit?tab=devices&deviceId=00000000-0000-4000-8000-000000000000");
-  await expect(main.getByRole("heading", { name: "○ That device is not in your list" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "That device is not in your list" })).toBeVisible();
 
   // the demo device AC-DEMO-0001 (Bedroom AC); a year of events so the seed's are in the period
   await page.goto("/admin/audit?tab=devices&from=2026-01-01&to=2026-12-31");
@@ -106,6 +106,6 @@ test("device events load only for a picked device and link the event's audit tra
     await expect(detail.getByRole("link", { name: "Filter log →" })).toHaveAttribute("href", `/admin/audit?targetKind=device_event&targetId=${eventId}`);
     await expect(detail).toContainText("Notes are added from Devices & models (device.write), not here.");
   } else {
-    await expect(main.getByRole("heading", { name: "○ No device events in this period" })).toBeVisible();
+    await expect(main.getByRole("heading", { name: "No device events in this period" })).toBeVisible();
   }
 });

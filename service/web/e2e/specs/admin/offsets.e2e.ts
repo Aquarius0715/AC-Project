@@ -18,5 +18,5 @@ test("the offset record filters live in the URL", async ({ page }) => {
   await page.waitForURL((u) => !u.searchParams.has("created"));
 
   await page.goto("/admin/offsets?recordId=00000000-0000-4000-8000-000000000000");
-  await expect(main.getByRole("heading", { name: "○ That record is not in this list" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "That record is not in this list" })).toBeVisible();
 });

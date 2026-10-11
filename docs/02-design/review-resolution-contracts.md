@@ -6101,3 +6101,36 @@ IR391 held the inputs to the contract. This round did the same for the results, 
    - On the code before this round, the test reports the 30 writes above.
 4. **Tests that leaned on the extras.** Four integration tests read a detail field from a write result: `jobs.assign`'s assignment, `jobs.extendAccess`'s offer, `jobs.create`'s projection and `devices.register`'s running operation. They now read the detail through `jobs.get` or `devices.get`, and check that the write answers none of it.
 5. **Checks.** `make test-all` (both modes), the web checks (458 unit tests) and the validators pass. With the maintenance, equipment and gateway images rebuilt, the E2E suite passes: 117 tests, 8 skipped.
+
+## IR393 One icon library: Lucide through the shared Icon component, part 1 (the shell and the shared parts) — 2026-10-12
+
+User request (2026-10-12): the icons look inconsistent, and some render like emoji; every icon should come from the same icon library (DEC-74).
+
+1. **What was there.** The apps used 62 kinds of symbol and emoji characters as icons, 1,197 times in 158 files.
+   - The sidebar mixed geometric glyphs (▤ ◷ ⓘ ≋ ▣) with colour emoji (🔔 🔧).
+   - The badges, banners, buttons and screens used ⚠ ✓ ✕ ✉ ★ 🔒 🎙 📄 📷 🗑 🌐 🔍.
+   - Their look depends on the platform's fonts, and some show as colour emoji.
+2. **The library.** Lucide, as `lucide-react` 1.55.0, pinned exactly.
+   - It has an ISC licence and no dependencies of its own. The lockfile's integrity matches the registry's, and `npm audit --omit=dev` finds 0 vulnerabilities.
+   - The icons are inline SVG, so they work in Server Components and under the nonce Content-Security-Policy, and only the icons used are bundled.
+   - The reference design analysed earlier also draws its icons with Lucide (reference design analysis).
+3. **One component.**
+   - `shared/components/Icon.tsx` maps semantic names to drawings, for example `alerts` → Bell, `warning` → TriangleAlert, `jobs` → ClipboardList.
+   - Screens name a meaning, so a meaning has one icon everywhere.
+   - Icons are 1em of the text with stroke 2, on the text baseline. Next to text they are `aria-hidden`; an icon that stands alone takes its name from its control or from `label`.
+4. **Replaced in this part.**
+   - The sidebar items of the four roles, the shared items (notifications, preferences, users, demo controls, sign-out), the app mark, and the header (menu, QR scan, assistant, the account chip).
+   - The state badges: power, connection, severity and job states. Each job state has its own icon.
+   - The banners' default icons, the empty and error states, the step marks, the field errors, the search field (an icon inside the field instead of 🔍 in its placeholder), the select chevron and the modal close button.
+   - Every `icon` of `Badge` and `Banner` is now an icon name. TypeScript found the 39 screens that passed a glyph, and the air-quality and automation mappers now return names too.
+   - The location trees of the customer's properties and HQ's units.
+5. **Next parts.** The glyphs still left inside screen texts, then the arrows in link texts (with the Malay dictionary's keys), then the Figma screens and components. A guard test will then refuse emoji and symbol icons.
+6. **Security checks in this round** (approved by the user on 2026-10-12).
+   - **Escalation by identity-api's service account (IR386).** Among realm-management's roles, the account could map only read roles: `query-clients`, `query-groups`, `query-realms`, `query-users` and `view-users`. It is not offered `realm-admin`, `manage-clients`, `manage-realm` or `impersonation`, and listing the roles is refused (403). So it cannot raise its own rights. Its roles were unchanged afterwards: `manage-users` only.
+   - **Image scan with `docker scout`.** Not run: the tool needs a Docker ID sign-in, which only the user can do. The Go dependencies (govulncheck) and the shipped npm dependencies (audit) are clean.
+7. **Tests.**
+   - The banner test now checks that each banner's icon is a Lucide drawing hidden from assistive technology.
+   - The allergen view returns the icon name.
+   - Screenshots of the customer overview and HQ's customers screen show one icon style in the sidebar, header, badges and search field.
+8. **E2E.** Fifteen specs named an empty state's heading with its glyph ("○ No invoices"), and two found a field error by its "✕". The headings are now named without the glyph, which is an aria-hidden icon, and the two field errors are checked by their message.
+9. **Checks.** Typecheck, lint, the web unit tests (458), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped.

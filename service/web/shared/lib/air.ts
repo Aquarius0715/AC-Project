@@ -7,6 +7,7 @@ import { periodRange } from "@ac/web/lib/clientEnergy";
 import { roundAway } from "@ac/web/lib/energy";
 import { spacePath, type ApiPropertyRow, type ApiSpaceRow, type ApiUnitRow } from "@ac/web/lib/assets";
 import { DEFAULT_DISPLAY, EN, relativeTime, showClock, showDate, showDay, showSpan, translator, type Display, type I18n, type T } from "@ac/web/lib/i18n";
+import type { IconName } from "@ac/web/components/Icon";
 
 const en = translator("en");
 
@@ -82,7 +83,7 @@ export function airSelection(rooms: AirRoom[], unitId?: string, spaceId?: string
  * suspect reading is never shown as a current normal value (D07); humidity 0 is a measured zero. */
 export type MetricCard = {
   metric: AirMetric; label: string; unit: string; value: string | null;
-  feed: { text: string; tone: Tone; icon: string }; status: { text: string; tone: Tone; icon: string }; sub: string; advice: string; warn: boolean;
+  feed: { text: string; tone: Tone; icon: IconName }; status: { text: string; tone: Tone; icon: IconName }; sub: string; advice: string; warn: boolean;
 };
 const reasonText: Record<string, string> = { unit_mismatch: "unit mismatch", non_finite: "not a number", out_of_range: "out of range", invalid_time: "invalid time" };
 const originText: Record<string, string> = { estimated: "estimated", inspection: "inspection" };
@@ -92,26 +93,26 @@ export function metricCard(metric: AirMetric, m: ApiMeasurement | undefined, has
   const { unit, guide } = metricInfo[metric];
   const label = t(metricInfo[metric].label);
   const noAdvice = t(metric === "temperature" ? "Setpoint is on Unit Control" : metric === "humidity" ? "Not enough data for advice" : "Not enough data for {metric} advice", { metric: label });
-  const unavailable = (sub: string, feed = { text: t("Unavailable"), tone: "unknown" as Tone, icon: "⊘" }): MetricCard =>
-    ({ metric, label, unit, value: null, feed, status: { text: t("Not measured"), tone: "muted", icon: "○" }, sub, advice: noAdvice, warn: false });
-  if (!hasSensor) return unavailable(t("No {metric} sensor on this model", { metric: label }), { text: t("Unsupported"), tone: "muted", icon: "⊘" });
+  const unavailable = (sub: string, feed = { text: t("Unavailable"), tone: "unknown" as Tone, icon: "offline" as IconName }): MetricCard =>
+    ({ metric, label, unit, value: null, feed, status: { text: t("Not measured"), tone: "muted", icon: "dot" }, sub, advice: noAdvice, warn: false });
+  if (!hasSensor) return unavailable(t("No {metric} sensor on this model", { metric: label }), { text: t("Unsupported"), tone: "muted", icon: "unsupported" });
   if (!m) return unavailable(t("No reading yet"));
   const at = showClock(m.observedAt, display);
   if (m.quality === "stale") return unavailable(m.value !== null ? t("No reading since {time} (last {value} {unit})", { time: at, value: airNumber(metric, m.value), unit }) : t("No reading since {time}", { time: at }));
   if (m.quality === "suspect") {
     return {
-      metric, label, unit, value: m.value === null ? null : airNumber(metric, m.value), feed: { text: t("Suspect"), tone: "warn", icon: "!" },
-      status: { text: t("Suspect"), tone: "warn", icon: "!" }, sub: t("Observed {time} · {reason}", { time: at, reason: t(reasonText[m.qualityReason ?? ""] ?? "unreliable reading") }), advice: t("Not used for advice"), warn: false,
+      metric, label, unit, value: m.value === null ? null : airNumber(metric, m.value), feed: { text: t("Suspect"), tone: "warn", icon: "alert" },
+      status: { text: t("Suspect"), tone: "warn", icon: "alert" }, sub: t("Observed {time} · {reason}", { time: at, reason: t(reasonText[m.qualityReason ?? ""] ?? "unreliable reading") }), advice: t("Not used for advice"), warn: false,
     };
   }
-  if (m.value === null) return unavailable(t(metric === "humidity" ? "No reading (null) — not 0% · {time}" : "No reading (null) · {time}", { time: at }), { text: t("Unknown"), tone: "unknown", icon: "?" });
+  if (m.value === null) return unavailable(t(metric === "humidity" ? "No reading (null) — not 0% · {time}" : "No reading (null) · {time}", { time: at }), { text: t("Unknown"), tone: "unknown", icon: "unknown" });
   const high = guide !== null && m.value >= guide;
-  const status = guide === null ? { text: t("Measured"), tone: "muted" as Tone, icon: "●" } : high ? { text: t("High"), tone: "warn" as Tone, icon: "⚠" } : { text: t("Within guide"), tone: "ok" as Tone, icon: "✓" };
+  const status = guide === null ? { text: t("Measured"), tone: "muted" as Tone, icon: "live" as IconName } : high ? { text: t("High"), tone: "warn" as Tone, icon: "warning" as IconName } : { text: t("Within guide"), tone: "ok" as Tone, icon: "check" as IconName };
   const advice = t(metric === "co2" ? (high ? "Ventilation recommended (≥ 1000 ppm)" : "No current advice")
     : metric === "pm25" ? (high ? "Filter cleaning recommended (≥ 35 µg/m³)" : "No current advice")
     : metric === "temperature" ? "Setpoint is on Unit Control" : "No current advice");
   return {
-    metric, label, unit, value: airNumber(metric, m.value), feed: { text: t("Live"), tone: "ok", icon: "●" }, status,
+    metric, label, unit, value: airNumber(metric, m.value), feed: { text: t("Live"), tone: "ok", icon: "live" }, status,
     sub: `${t("Observed {time}", { time: at })}${m.origin === "measured" ? "" : ` · ${t(originText[m.origin] ?? m.origin)}`}`, advice, warn: high,
   };
 }
@@ -155,16 +156,16 @@ export function cleanNote(g: Guidance[], pm25: ApiMeasurement | undefined, room:
 
 /** The allergen strip (IR98): an observation needs substance, source, time and evidence, a number also its unit; missing
  * or unsupported data never reads as “no allergens”, and nothing is derived from PM2.5. */
-export function allergenView(a: ApiAllergen | null, i: I18n = EN): { title: string; badge: { text: string; tone: Tone; icon: string }; text: string } {
+export function allergenView(a: ApiAllergen | null, i: I18n = EN): { title: string; badge: { text: string; tone: Tone; icon: IconName }; text: string } {
   const { t, display } = i;
   const title = t("Allergen");
-  if (!a) return { title, badge: { text: t("Unknown"), tone: "unknown", icon: "?" }, text: t("No observation for this selection — this does not mean “no allergens”.") };
-  if (a.availability === "unsupported") return { title, badge: { text: t("Unsupported"), tone: "muted", icon: "⊘" }, text: t("This unit cannot observe allergens — this does not mean “no allergens”.") };
-  if (a.availability === "not_measured") return { title, badge: { text: t("Not measured"), tone: "muted", icon: "○" }, text: t("No observation — this does not mean “no allergens”.") };
-  if (!a.substance || !a.sourceLabel || !a.observedAt || !a.evidenceText) return { title, badge: { text: t("Unknown"), tone: "unknown", icon: "?" }, text: t("Incomplete observation — shown as unknown, this does not mean “no allergens”.") };
+  if (!a) return { title, badge: { text: t("Unknown"), tone: "unknown", icon: "unknown" }, text: t("No observation for this selection — this does not mean “no allergens”.") };
+  if (a.availability === "unsupported") return { title, badge: { text: t("Unsupported"), tone: "muted", icon: "unsupported" }, text: t("This unit cannot observe allergens — this does not mean “no allergens”.") };
+  if (a.availability === "not_measured") return { title, badge: { text: t("Not measured"), tone: "muted", icon: "dot" }, text: t("No observation — this does not mean “no allergens”.") };
+  if (!a.substance || !a.sourceLabel || !a.observedAt || !a.evidenceText) return { title, badge: { text: t("Unknown"), tone: "unknown", icon: "unknown" }, text: t("Incomplete observation — shown as unknown, this does not mean “no allergens”.") };
   const value = a.value === null ? [] : [a.unit ? `${a.value} ${a.unit}` : t("Value unknown (no unit)")];
   return {
-    title: t("Allergen ({substance})", { substance: a.substance }), badge: { text: t("Detected"), tone: "warn", icon: "⚠" },
+    title: t("Allergen ({substance})", { substance: a.substance }), badge: { text: t("Detected"), tone: "warn", icon: "warning" },
     text: [...value, t("Source: {source}", { source: a.sourceLabel }), showClock(a.observedAt, display), a.evidenceText].join(" · "),
   };
 }

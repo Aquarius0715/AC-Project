@@ -1,8 +1,9 @@
+import type { IconName } from "@ac/web/components/Icon";
 import type { Display } from "@ac/web/lib/i18n";
 
 export type Role = "client" | "admin" | "contractor" | "technician";
 
-export type NavItem = { href: string; label: string; icon: string; badge?: string; match?: string[] };
+export type NavItem = { href: string; label: string; icon: IconName; badge?: string; match?: string[] };
 /** The shell in API mode (lib/shell.ts, IR241): the signed-in user, the membership's organization, the sidebar badge
  * counts by href and the user's display language and time zone (IR258, IR259). The demo keeps the fixed scope, chip
  * and badges below. */
@@ -35,14 +36,14 @@ export const ROLES: Record<Role, RoleConfig> = {
     loginTitle: "Client",
     loginSub: "Sign in to manage your units and account",
     nav: [
-      { href: "/customer", label: "Overview", icon: "⌂" },
-      { href: "/customer/properties", label: "Units & locations", icon: "▤", match: ["/customer/units"] },
-      { href: "/customer/automations", label: "Automations & schedules", icon: "◷" },
-      { href: "/customer/energy", label: "Energy & cost", icon: "ⓘ" },
-      { href: "/customer/air-quality", label: "Air quality", icon: "≋" },
-      { href: "/customer/alerts", label: "Alerts", icon: "🔔", badge: "2" },
-      { href: "/customer/maintenance", label: "Maintenance", icon: "🔧" },
-      { href: "/customer/payments", label: "Contracts & payments", icon: "▣" },
+      { href: "/customer", label: "Overview", icon: "overview" },
+      { href: "/customer/properties", label: "Units & locations", icon: "units", match: ["/customer/units"] },
+      { href: "/customer/automations", label: "Automations & schedules", icon: "automations" },
+      { href: "/customer/energy", label: "Energy & cost", icon: "energy" },
+      { href: "/customer/air-quality", label: "Air quality", icon: "airQuality" },
+      { href: "/customer/alerts", label: "Alerts", icon: "alerts", badge: "2" },
+      { href: "/customer/maintenance", label: "Maintenance", icon: "maintenance" },
+      { href: "/customer/payments", label: "Contracts & payments", icon: "billing" },
     ],
   },
   contractor: {
@@ -57,12 +58,12 @@ export const ROLES: Record<Role, RoleConfig> = {
     loginTitle: "Partner",
     loginSub: "Sign in to manage jobs and your technicians",
     nav: [
-      { href: "/partner", label: "Overview", icon: "⌂" },
-      { href: "/partner/jobs", label: "Jobs", icon: "▤", badge: "1" },
-      { href: "/partner/schedule", label: "Schedule & assignments", icon: "◷" },
-      { href: "/partner/team", label: "Team & capacity", icon: "☻" },
-      { href: "/partner/history", label: "Job history", icon: "↺" },
-      { href: "/partner/payouts", label: "Payouts", icon: "▣" },
+      { href: "/partner", label: "Overview", icon: "overview" },
+      { href: "/partner/jobs", label: "Jobs", icon: "jobs", badge: "1" },
+      { href: "/partner/schedule", label: "Schedule & assignments", icon: "schedule" },
+      { href: "/partner/team", label: "Team & capacity", icon: "team" },
+      { href: "/partner/history", label: "Job history", icon: "history" },
+      { href: "/partner/payouts", label: "Payouts", icon: "payouts" },
     ],
   },
   technician: {
@@ -77,9 +78,9 @@ export const ROLES: Record<Role, RoleConfig> = {
     loginTitle: "Technician",
     loginSub: "Sign in to view assigned jobs and devices",
     nav: [
-      { href: "/technician", label: "Overview", icon: "⌂" },
-      { href: "/technician?tab=all", label: "Assigned jobs", icon: "▤", match: ["/technician/jobs"] },
-      { href: "/technician/devices", label: "Devices", icon: "▥" },
+      { href: "/technician", label: "Overview", icon: "overview" },
+      { href: "/technician?tab=all", label: "Assigned jobs", icon: "jobs", match: ["/technician/jobs"] },
+      { href: "/technician/devices", label: "Devices", icon: "devices" },
     ],
   },
   admin: {
@@ -94,20 +95,20 @@ export const ROLES: Record<Role, RoleConfig> = {
     loginTitle: "Admin",
     loginSub: "Sign in to manage customers, contracts, and access",
     nav: [
-      { href: "/admin", label: "Overview", icon: "⌂" },
-      { href: "/admin/units", label: "Customers & units", icon: "▤" },
-      { href: "/admin/settings/access", label: "Access & roles", icon: "⚿" },
-      { href: "/admin/devices", label: "Devices & models", icon: "▥" },
-      { href: "/admin/alerts", label: "Alert policies", icon: "🔔", badge: "1" },
-      { href: "/admin/jobs", label: "Maintenance jobs", icon: "🔧" },
-      { href: "/admin/billing/contracts", label: "Contracts", icon: "❒" },
-      { href: "/admin/billing", label: "Billing", icon: "▣" },
-      { href: "/admin/restrictions", label: "Restrictions", icon: "⛔" },
-      { href: "/admin/settings/automation", label: "Automation policies", icon: "◷" },
-      { href: "/admin/energy", label: "Energy analysis", icon: "ⓘ" },
-      { href: "/admin/mrv", label: "MRV", icon: "≋" },
-      { href: "/admin/offsets", label: "Offsets", icon: "❀" },
-      { href: "/admin/audit", label: "Audit", icon: "☰" },
+      { href: "/admin", label: "Overview", icon: "overview" },
+      { href: "/admin/units", label: "Customers & units", icon: "customers" },
+      { href: "/admin/settings/access", label: "Access & roles", icon: "access" },
+      { href: "/admin/devices", label: "Devices & models", icon: "devices" },
+      { href: "/admin/alerts", label: "Alert policies", icon: "alertPolicies", badge: "1" },
+      { href: "/admin/jobs", label: "Maintenance jobs", icon: "maintenance" },
+      { href: "/admin/billing/contracts", label: "Contracts", icon: "contracts" },
+      { href: "/admin/billing", label: "Billing", icon: "billing" },
+      { href: "/admin/restrictions", label: "Restrictions", icon: "restrictions" },
+      { href: "/admin/settings/automation", label: "Automation policies", icon: "automations" },
+      { href: "/admin/energy", label: "Energy analysis", icon: "energy" },
+      { href: "/admin/mrv", label: "MRV", icon: "mrv" },
+      { href: "/admin/offsets", label: "Offsets", icon: "offsets" },
+      { href: "/admin/audit", label: "Audit", icon: "audit" },
     ],
   },
 };

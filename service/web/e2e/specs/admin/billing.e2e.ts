@@ -20,7 +20,7 @@ test("billing months filter the invoices and the related restriction opens on th
 
   // a month without invoices, then all months again
   await page.goto("/admin/billing?from=2026-09&to=2026-09");
-  await expect(main.getByRole("heading", { name: "○ No invoices" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "No invoices" })).toBeVisible();
   await main.getByRole("button", { name: "All months ✕" }).click();
   await page.waitForURL((u) => !u.searchParams.has("from") && !u.searchParams.has("to"));
   await expect(main).toContainText("in this scope");
@@ -61,5 +61,5 @@ test("the payouts filters live in the URL and Generate drafts takes only an ende
 
   // a statement the filtered list does not hold
   await page.goto("/admin/billing?tab=payouts&statementId=00000000-0000-4000-8000-000000000000");
-  await expect(main.getByRole("heading", { name: "○ That statement is not in this list" })).toBeVisible();
+  await expect(main.getByRole("heading", { name: "That statement is not in this list" })).toBeVisible();
 });

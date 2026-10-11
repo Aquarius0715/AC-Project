@@ -37,7 +37,7 @@ test("reminder settings refuse too few hours, then are saved and put back", asyn
   await dialog.getByRole("button", { name: "Custom" }).click();
   await dialog.getByLabel("Hours of running").fill("20");
   await dialog.getByRole("button", { name: "Save reminders" }).click();
-  await expect(dialog).toContainText("✕");
+  await expect(dialog).toContainText("Whole hours from 50 to 2000.");
   await dialog.getByLabel("Hours of running").fill("120");
   await dialog.getByRole("button", { name: "All users of the location" }).click();
   await save();

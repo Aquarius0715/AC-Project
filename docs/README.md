@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.275.0 / Created: 2026-09-14 / Updated: 2026-10-12 / Status: Draft for review / Language: English
+Version: 0.276.0 / Created: 2026-09-14 / Updated: 2026-10-12 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.276.0 (2026-10-12): Every icon comes from one library, Lucide, through a shared Icon component (DEC-74); the sidebars, header, badges, banners and shared controls are converted, and the screens' remaining glyphs, the link arrows and Figma follow (IR393).
 0.275.0 (2026-10-12): Every operation's result type now answers exactly its contract result, checked for all 204 operations; 30 writes that answered their read model (JobDetail, UnitSummary, DeviceDetail) answer the contract's MaintenanceJob, ACUnit and Device (IR392).
 0.274.0 (2026-10-12): Every operation's input type now holds exactly its contract input, checked for all 204 operations by a test on each side; the device history reads, members.save and demo.trigger were brought in line (IR391).
 0.273.0 (2026-10-12): Each payment write takes its own ID (`payments.confirm` paymentId, `payments.recordManual` invoiceId); cross-site scripting checked again; the redirects to sign-in after a refused session are under unit test (IR390).
