@@ -5562,3 +5562,24 @@ The ninth security check reviewed server-side request forgery (SSRF): can a clie
    - Still, such a value is never valid input, and a link could steer a page's read to another path. A path parameter `.` or `..` now names no route: the relay answers `error.unknownOperation`, and a page gets NOT_FOUND as for a missing record. A value with dots inside (`../x`, `...`, `%2e%2e`) stays one encoded segment, as before.
 3. **Tests.** The `coreRequest` test shows that `fetch` resolves the dot segments. It refuses `.` and `..` in `units.get`, `attachments.getContent` and `summaries.get`, and keeps dotted values as one segment. Without the fix it fails.
 4. **Checks.** The web checks (405 unit tests, the build) and the E2E suite pass.
+
+## IR373 Container hardening: what the local stack exposes to the network, and the containers' privileges — 2026-10-11
+
+The tenth security check reviewed the containers: images, privileges, and what the local stack makes reachable.
+
+1. **Checked and in order.**
+   - The images are multi-stage and the runtimes distroless and non-root (IR369).
+   - Our own services already ran with a read-only root filesystem and `no-new-privileges`.
+   - PostgreSQL keeps its data in a named volume.
+   - The production task settings ask for a read-only root and a non-root user.
+2. **Findings and fixes.**
+   - **The local stack was reachable from the network.** Docker publishes a `host:container` port on every interface of the machine. A connection to the machine's own network address reached PostgreSQL (5432), Keycloak (8081), Mosquitto (1883), LocalStack (4566) and the gateway (8080). Anyone on the same network, at a café for example, could then:
+     - use the database with its local superuser password;
+     - open Keycloak's admin console with the bootstrap password, and reset an HQ user's password and one-time code;
+     - publish telemetry or command results to the anonymous MQTT broker;
+     - read the LocalStack queues and buckets.
+
+     These ports, and the webhook receiver's and Jaeger's, are now bound to `127.0.0.1`. Before the fix all five answered on the network address; after it, none does, while they still answer on `localhost`. The containers keep reaching each other on the Compose networks. The web apps' ports stay open to the network for showing the demo on other devices, and signing in from another device cannot work anyway, since the issuer is `localhost`.
+   - **The containers kept the default Linux capabilities.** Our own images (the four web apps, the domain services, the workers, the gateway and the migration job) run as non-root on ports above 1024 and need none. They now drop all of them (`cap_drop: [ALL]`), and the production task settings say the same (`linuxParameters.capabilities.drop`). A running container shows `CapDrop ["ALL"]`. The gateway and the services stay healthy, and a web container still serves `/login` and `/customer`.
+   - **Two images floated on `:latest`.** `stripe/stripe-mock` and `stripe/stripe-cli` are now pinned to the release their `latest` pointed to, by tag and digest: v0.206.0, the image already pulled, and v1.53.1. The other third-party images name a release series.
+3. **Checks.** The Compose file validates. The stack runs recreated with the new settings: PostgreSQL with its volume, Keycloak re-imported, and the services after it. The E2E suite passes on it.

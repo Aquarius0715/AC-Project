@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTAINER
-version: 0.37.0
+version: 0.38.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -41,6 +41,7 @@ One backend image with several entry commands keeps every service on the same bu
 | Toolchain | Node 22 LTS | Go 1.25 (current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
 | User | `nonroot` (UID 65532) | `nonroot:nonroot` |
 | Filesystem | Read-only root; tmpfs `/tmp`, `/app/.next/cache` | Read-only root; tmpfs `/tmp` |
+| Privileges | No Linux capability (`cap_drop: [ALL]`) and `no-new-privileges` (as built, IR373) | same |
 | Health | ALB / compose HTTP check on the app port | Binary subcommand `healthcheck` (no shell or curl in distroless) for `/healthz`; ALB uses `/readyz` |
 | Shutdown | Next.js handles SIGTERM | Echo `Shutdown` with a 25 s drain inside ECS `stopTimeout` 30 s; workers stop polling and finish in-flight messages |
 | Architecture | `linux/arm64` for Fargate Graviton; `linux/amd64` also built for x86 developer machines and CI | same |
@@ -99,11 +100,11 @@ Local stand-ins for the AWS managed services:
 | SQS / SNS FIFO, Kinesis, Firehose, S3, SES, Secrets Manager, KMS, EventBridge Scheduler | `localstack/localstack:4` | Resources created by `docker/localstack/init-aws.sh`; the AWS clients will use `AWS_ENDPOINT_URL` (none is built yet, IR334) |
 | AWS IoT Core (MQTT, rules) | `eclipse-mosquitto:2` + `iot-bridge` | Same topic layout; the bridge forwards topics to Kinesis / SQS like the IoT rules. Mutual TLS and IoT policies are verified in staging against IoT Core |
 | Amazon Cognito | `keycloak:26` realm `ac` (`docker/keycloak/realm-ac.json`) | Two OIDC clients `ac-web` and `ac-admin-web` (HQ network rule), TOTP (required for HQ users; the local realm pre-provisions a test TOTP credential per HQ user for end-to-end runs, IR177); one local user per fixture actor (username = `membershipId` in `docs/04-agentic-sdlc/fixture-contract.json`, password `local-pass`); the Go verifier is configured by issuer and JWKS URL only; brute-force protection like Cognito's lockout (10 failures lock an account for 60 s, growing to 15 min, IR370) |
-| Stripe API / webhooks | `stripe/stripe-mock` (offline) and Stripe CLI (test mode) | Live mode never outside production |
+| Stripe API / webhooks | `stripe/stripe-mock` (offline) and Stripe CLI (test mode), each pinned by version and digest (IR373) | Live mode never outside production |
 | Weather source | `wiremock` (`docker/wiremock`) | Fixed demo responses |
 | CloudWatch / X-Ray | OpenTelemetry collector + Jaeger | Same OTLP exporter configuration |
 
-Compose networks mirror the network zones: `edge` (browser-facing web, webhook, Keycloak), `app` (application services), `data` (data stand-ins). Only ports needed for development are published to the host.
+Compose networks mirror the network zones: `edge` (browser-facing web, webhook, Keycloak), `app` (application services), `data` (data stand-ins). Only ports needed for development are published to the host. As built (IR373), the ports of PostgreSQL, LocalStack, Mosquitto, Keycloak, the gateway, the webhook receiver and Jaeger are bound to `127.0.0.1`, so only this machine reaches them. They have local passwords or none: the database superuser, the identity provider's admin console, the anonymous broker. The web apps' ports stay open to the network for showing the demo on other devices. Signing in from another device does not work in any case, because the issuer is `localhost`.
 
 Configuration is twelve-factor: every service reads environment variables only. The variable names are the same locally (compose) and on ECS (task definitions); only the values differ.
 
@@ -153,7 +154,7 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 | Registry | Amazon ECR per account (dev, staging, prod), immutable tags, scan on push, cross-region replication to ap-southeast-1 |
 | Tags | `git-<sha>` (immutable) plus release tags; deployments reference digests |
 | Services | the four web apps `customer-web`, `partner-web`, `technician-web` and `admin-web` (IR178); `gateway` and the five domain services `identity-api`, `equipment-api`, `maintenance-api`, `billing-api` and `energy-api` (IR180); `webhook`, `worker-outbox`, `worker-scheduler-equipment`, `worker-scheduler-maintenance`, `worker-scheduler-billing`, `worker-iot`, `worker-telemetry`, `worker-rollup`, `worker-automation`, `worker-notification` and `worker-importexport`; task `migrate` |
-| Task settings | `readonlyRootFilesystem: true`, non-root user, no privileged mode, `stopTimeout: 30`, awsvpc networking in the private subnets of network architecture §2a, one security group per service |
+| Task settings | `readonlyRootFilesystem: true`, non-root user, no privileged mode, all Linux capabilities dropped (`linuxParameters.capabilities.drop: ["ALL"]`, as in Compose, IR373), `stopTimeout: 30`, awsvpc networking in the private subnets of network architecture §2a, one security group per service |
 | Configuration | Environment variables in the task definition; secrets from Secrets Manager via the `secrets` field; IAM task role per service (least privilege: e.g. only `worker-iot` may publish to IoT Core) |
 | Scaling | the web apps, the gateway and the domain services on CPU and ALB request count; workers on SQS backlog per task and Kinesis iterator age; minimum two tasks across two AZs for the web apps, the gateway, the domain services, `webhook`, `worker-outbox` and `worker-iot` |
 | Logs and traces | `awslogs` driver to CloudWatch (JSON), ADOT collector sidecar for OTLP traces and metrics |
@@ -176,4 +177,4 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 | OPEN-CT-03 | The server-side session store (ElastiCache in production, Valkey locally) with revocation on sign-out (backend architecture §6). Until then the BFF keeps the tokens in its sealed session cookie (IR333). Sign-out already ends the identity provider's session (IR357), so a copied cookie cannot be refreshed after it |
 | OPEN-CT-04 | OpenTelemetry instrumentation of the Go services and the web apps. The collector, Jaeger and `OTEL_EXPORTER_OTLP_ENDPOINT` are ready, but nothing exports traces or metrics yet (IR334) |
 
-Additional contracts for current version 0.37.0: Read IR01–IR370 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.38.0: Read IR01–IR373 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
