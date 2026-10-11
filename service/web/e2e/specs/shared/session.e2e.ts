@@ -34,6 +34,31 @@ test("Sign out ends the session, at the identity provider too", async ({ browser
   }
 });
 
+test("a copy of the session cookie stops working at sign-out", async ({ browser, app }) => {
+  // IR382: the session lives in the store and the cookie only names it, so sign-out revokes every copy at once (with
+  // the session sealed into the cookie, a copy kept working until its access token expired)
+  const fresh = { baseURL: app.url, storageState: { cookies: [], origins: [] } };
+  const context = await browser.newContext(fresh);
+  const other = await browser.newContext(fresh);
+  try {
+    const page = await context.newPage();
+    await signIn(page, app);
+    const copy = (await context.cookies()).filter((c) => c.name.includes("ac_session_"));
+    expect(copy).toHaveLength(1);
+    await other.addCookies(copy);
+    const elsewhere = await other.newPage();
+    await elsewhere.goto(app.home);
+    await expect(elsewhere.getByRole("banner")).toContainText(app.user); // the copy works while the session lasts
+    await page.getByRole("button", { name: "Sign out" }).click();
+    await page.waitForURL(/\/login$/);
+    await elsewhere.goto(app.home);
+    await expect(elsewhere).toHaveURL(new RegExp(`/login\\?returnTo=${encodeURIComponent(app.home)}`));
+  } finally {
+    await context.close();
+    await other.close();
+  }
+});
+
 test.describe("signed out", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 

@@ -1,6 +1,6 @@
 ---
 document_id: DD-NETWORK
-version: 0.35.0
+version: 0.36.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, review-agent, operations]
@@ -69,7 +69,7 @@ The Core API, databases, broker, and management interfaces have no public names.
 | F02 | Browser (Z0) | Identity provider | HTTPS 443 | OIDC redirect | Sign-in, reset, two-step verification pages |
 | F03 | Web/BFF (Z2) | Identity provider | HTTPS 443 via Z5 | Client credentials (private-key JWT) | Token exchange, logout |
 | F04 | Web/BFF (Z2) | Core API (Z3) | HTTPS (internal), mutual TLS | Service token + user context | `/v1/*`: the REST routes of the operation catalog (IR222, IR223); no other Z2 → Z3 path |
-| F05 | Web/BFF (Z2) | Cache (Z4) | TLS 6379-class port | Service identity | Sessions only |
+| F05 | Web/BFF (Z2) | Cache (Z4) | TLS 6379-class port | Service identity | Sessions only (as built, IR382: `SESSION_STORE_URL`) |
 | F06 | Core API and workers (Z3) | Relational database (Z4) | TLS 5432-class port | Per-service database roles | Row-level security by tenant |
 | F07 | Z3 services | Message broker, Kinesis, cache (Z4 endpoints) | TLS | Service identity | Private endpoints only |
 | F08 | Z3 services | Object storage (Z4 private endpoint) | HTTPS 443 | Service identity | Issues pre-signed URLs for F12 |
@@ -158,4 +158,4 @@ Give these to customer IT before installation (office sites; homes normally need
 | OPEN-NW-03 | Decided 2026-10-07: HQ admin app only from the company network (§3, DEC-68); the company must supply its office egress addresses and VPN egress addresses | — |
 | OPEN-NW-04 | Decided 2026-10-07: customer office firewall requirements in §5a | — |
 
-Additional contracts for current version 0.35.0: Read IR01–IR375 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.36.0: Read IR01–IR382 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { APP_ROLE, cookieOptions, OIDC_COOKIE, oidcConfig, oidcCookieOptions, roleHome, SESSION_COOKIE, sessionFromTokens, seal, unseal } from "@ac/web/lib/session";
+import { APP_ROLE, cookieOptions, createSessionCookie, OIDC_COOKIE, oidcConfig, oidcCookieOptions, roleHome, SESSION_COOKIE, sessionFromTokens, unseal } from "@ac/web/lib/session";
 
 type Pending = { state: string; verifier: string; returnTo: string | null };
 
-// GET /bff/auth/callback: exchanges the code, reads tenant / membership / role claims and stores the session cookie.
+// GET /bff/auth/callback: exchanges the code, reads tenant / membership / role claims and starts the session: a new
+// stored record and its sealed ID in the cookie (IR382), or the sealed session itself without the store.
 export async function GET(req: NextRequest) {
   const cfg = oidcConfig();
   const pending = unseal<Pending>(req.cookies.get(OIDC_COOKIE)?.value);
@@ -24,8 +25,14 @@ export async function GET(req: NextRequest) {
   const session = sessionFromTokens(t);
   if (!session) return NextResponse.redirect(new URL("/login?error=membership", cfg.appUrl));
   if (session.role !== APP_ROLE) return NextResponse.redirect(new URL("/login?error=role", cfg.appUrl)); // another role's app
+  let cookie: string;
+  try {
+    cookie = await createSessionCookie(session, req.cookies.get(SESSION_COOKIE)?.value); // a new ID: no session fixation
+  } catch {
+    return NextResponse.redirect(new URL("/login?error=session", cfg.appUrl)); // the store did not answer
+  }
   const res = NextResponse.redirect(new URL(pending.returnTo ?? roleHome[session.role], cfg.appUrl));
-  res.cookies.set(SESSION_COOKIE, seal(session), cookieOptions());
+  res.cookies.set(SESSION_COOKIE, cookie, cookieOptions());
   res.cookies.set(OIDC_COOKIE, "", oidcCookieOptions(0));
   return res;
 }

@@ -4,16 +4,17 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { needsRefresh, SESSION_COOKIE, unseal, type Session } from "@ac/web/lib/session";
+import { loadSession, needsRefresh, SESSION_COOKIE, type Session } from "@ac/web/lib/session";
 import type { DomainError } from "@ac/web/lib/ops";
 import { coreRequest } from "@ac/web/lib/rest";
 import { DEFAULT_DISPLAY, isLocale, type Display } from "@ac/web/lib/i18n";
 import type { ListArgs, OpArgs } from "@ac/web/lib/opTypes";
 
-/** The session from the signed cookie, or null. proxy.ts refreshes tokens before pages render (Server Components
- * cannot write cookies), so an expired token here means the refresh failed. Memoized per render pass. */
+/** The session of the cookie (sealed, or stored under the sealed ID it holds, IR382), or null. proxy.ts refreshes tokens
+ * before pages render (Server Components cannot write cookies), so an expired token here means the refresh failed.
+ * Memoized per render pass. */
 export const getSession = cache(async (): Promise<Session | null> => {
-  const s = unseal<Session>((await cookies()).get(SESSION_COOKIE)?.value);
+  const s = await loadSession((await cookies()).get(SESSION_COOKIE)?.value);
   return s && !needsRefresh(s) ? s : null;
 });
 

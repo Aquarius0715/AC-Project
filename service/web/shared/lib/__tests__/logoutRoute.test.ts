@@ -1,11 +1,24 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { SESSION_COOKIE, seal, type Session } from "@ac/web/lib/session";
+import { createSessionCookie, loadSession, SESSION_COOKIE, seal, type Session } from "@ac/web/lib/session";
 import { POST } from "@ac/web/bff/auth/logout/route";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }) }));
+// the session store, used only where a test sets SESSION_STORE_URL (IR382)
+const kv = vi.hoisted(() => new Map<string, string>());
+vi.mock("@redis/client", () => ({
+  createClient: () => {
+    const c = {
+      on: () => c, connect: async () => c,
+      getEx: async (k: string) => kv.get(k) ?? null,
+      set: async (k: string, v: string, o: { condition?: string }) => (o.condition === "XX" && !kv.has(k) ? null : (kv.set(k, v), "OK")),
+      del: async (k: string) => (kv.delete(k) ? 1 : 0),
+    };
+    return c;
+  },
+}));
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -55,5 +68,20 @@ describe("POST /bff/auth/logout", () => {
     const res = await signOut(seal(session), { origin: "https://evil.example", "sec-fetch-site": "cross-site" });
     expect([res.status, dropped(res)]).toEqual([403, false]);
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+// IR382: with the session store, sign-out deletes the stored session, so a copied cookie opens nothing afterwards
+describe("POST /bff/auth/logout with the session store", () => {
+  it("deletes the stored session and ends the provider's session with the stored refresh token", async () => {
+    vi.stubEnv("SESSION_STORE_URL", "redis://store.test:6379");
+    const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetch);
+    const cookie = await createSessionCookie(session);
+    const copy = `${cookie}`;
+    const res = await signOut(cookie);
+    expect([res.status, dropped(res), kv.size]).toEqual([303, true, 0]);
+    expect(new URLSearchParams(String((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body)).get("refresh_token")).toBe("r-1");
+    expect(await loadSession(copy)).toBeNull();
   });
 });

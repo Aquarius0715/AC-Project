@@ -5756,3 +5756,40 @@ After IR379, the web code was searched for writes sent one after another and for
      - With the property scope widened on purpose, the test fails.
    - **An automation on an archived unit.** `TestAutomationOnArchivedUnit` archives one of customer B's units and saves an automation on it. The answer is NOT_FOUND and nothing is linked, as IR329 noted.
 4. **Checks.** `make test-all` and the validators pass. Only tests and the container design changed.
+
+## IR382 The server-side session store: sign-out revokes every copy of the session cookie (OPEN-CT-03) — 2026-10-11
+
+This round's security check took up the last open item of the session design.
+
+1. **The gap.**
+   - The BFF kept the tokens in its sealed session cookie (IR333), and the server had no session of its own to revoke.
+   - Since IR357, sign-out ends the identity provider's session, so a copy of the cookie cannot be refreshed. But its access token still worked until it expired: 5 minutes in the local realm, and up to an hour with Cognito's default.
+   - Backend architecture §6 and network flow F05 asked for a server-side store; compose already passed `SESSION_STORE_URL` to the web apps, but nothing read it.
+2. **The store, as built.**
+   - With `SESSION_STORE_URL` (Valkey locally, ElastiCache with TLS in production), each sign-in is a record in the store:
+     - the key is the SHA-256 of a random 256-bit session ID, so no key reveals a cookie;
+     - the value is the session sealed with the cookie key, so the store never holds a token in clear;
+     - the cookie holds only the sealed ID (Next.js authentication guide, database sessions).
+   - Each read extends the idle lifetime of 30 minutes. The record ends 12 hours after its sign-in however active it is, the absolute lifetime of §6.
+   - A new sign-in gets a new ID and deletes the browser's previous record, so a planted session ID is of no use.
+   - A token refresh rewrites the record only while it still exists (`SET … XX`), so a sign-out in another tab stays a sign-out.
+   - Sign-out deletes the record, then ends the identity provider's session (IR357) and drops the cookie. A copy of the cookie stops working at once.
+   - A cookie of the other mode is refused: a session sealed into a cookie before the store was configured cannot bypass revocation.
+   - When the store does not answer within 2 seconds, the session counts as absent (fail closed), and a sign-in returns to the sign-in page. Commands fail at once while the connection is down (no offline queue).
+   - The proxy, the Data Access Layer, the BFF routes and the demo's session expiry all read through the same functions. Without `SESSION_STORE_URL` the sealed cookie carries the session as before.
+   - The client is `@redis/client` 6.3.0, the core of node-redis: MIT, no dependencies, its two peer dependencies optional. Next.js 16 runs the proxy in Node.js, so the proxy can reach the store.
+3. **Local stack.** Valkey's port is bound to `127.0.0.1:6379`, so the web apps run on the host for the E2E suite use the store too. Another device on the network does not reach it.
+4. **Tests.**
+   - `sessionStore.test.ts`, against a store kept in memory, covers:
+     - only a sealed ID in the cookie, and no token in clear in the store;
+     - revocation of a copied cookie;
+     - the sliding 30 minutes and the 12 hours;
+     - a refresh that cannot bring a signed-out session back;
+     - a new ID per sign-in;
+     - refusal of an altered cookie and of the other mode;
+     - fail closed while the store is down.
+   - The logout route test deletes the stored session and ends the provider's session with the stored refresh token.
+   - With revocation switched off, 5 of these 13 cases fail.
+   - E2E `shared/session`: a copy of the session cookie, moved into another browser context, works until sign-out and asks to sign in after it, in each of the four apps. With the session sealed into the cookie, that copy would have kept working.
+   - The demo panel's Expire session now deletes the stored session too. The projects' tests share one sign-in, so the E2E test of Expire session now signs in on its own, as the sign-out tests do. Its first run, still on the shared sign-in, signed out every later test of its project.
+5. **Checks.** The web checks and the E2E suite pass. The backend did not change.

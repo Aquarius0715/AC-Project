@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTAINER
-version: 0.40.0
+version: 0.41.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -96,7 +96,7 @@ Local stand-ins for the AWS managed services:
 | Production (AWS) | Local container | Notes |
 |---|---|---|
 | Aurora PostgreSQL 16 | `postgres:16` | Same schema and RLS; only DEFAULT partitions (no pg_partman) |
-| ElastiCache (Valkey) | `valkey/valkey:8` | Sessions, idempotency fast path |
+| ElastiCache (Valkey) | `valkey/valkey:8` | The BFF session store (IR382) and the write limit's counters (IR375) |
 | SQS / SNS FIFO, Kinesis, Firehose, S3, SES, Secrets Manager, KMS, EventBridge Scheduler | `localstack/localstack:4` | Resources created by `docker/localstack/init-aws.sh`; the AWS clients will use `AWS_ENDPOINT_URL` (none is built yet, IR334) |
 | AWS IoT Core (MQTT, rules) | `eclipse-mosquitto:2` + `iot-bridge` | Same topic layout; the bridge forwards topics to Kinesis / SQS like the IoT rules. Mutual TLS and IoT policies are verified in staging against IoT Core |
 | Amazon Cognito | `keycloak:26` realm `ac` (`docker/keycloak/realm-ac.json`) | Two OIDC clients `ac-web` and `ac-admin-web` (HQ network rule), TOTP (required for HQ users; the local realm pre-provisions a test TOTP credential per HQ user for end-to-end runs, IR177); one local user per fixture actor (username = `membershipId` in `docs/04-agentic-sdlc/fixture-contract.json`, password `local-pass`); the Go verifier is configured by issuer and JWKS URL only; brute-force protection like Cognito's lockout (10 failures lock an account for 60 s, growing to 15 min, IR370) |
@@ -104,7 +104,7 @@ Local stand-ins for the AWS managed services:
 | Weather source | `wiremock` (`docker/wiremock`) | Fixed demo responses |
 | CloudWatch / X-Ray | OpenTelemetry collector + Jaeger | Same OTLP exporter configuration |
 
-Compose networks mirror the network zones: `edge` (browser-facing web, webhook, Keycloak), `app` (application services), `data` (data stand-ins). Only ports needed for development are published to the host. As built (IR373), the ports of PostgreSQL, LocalStack, Mosquitto, Keycloak, the gateway, the webhook receiver and Jaeger are bound to `127.0.0.1`, so only this machine reaches them. They have local passwords or none: the database superuser, the identity provider's admin console, the anonymous broker. The web apps' ports stay open to the network for showing the demo on other devices. Signing in from another device does not work in any case, because the issuer is `localhost`.
+Compose networks mirror the network zones: `edge` (browser-facing web, webhook, Keycloak), `app` (application services), `data` (data stand-ins). Only ports needed for development are published to the host. As built (IR373, IR382), the ports of PostgreSQL, Valkey, LocalStack, Mosquitto, Keycloak, the gateway, the webhook receiver and Jaeger are bound to `127.0.0.1`, so only this machine reaches them. They have local passwords or none: the database superuser, the identity provider's admin console, the anonymous broker, the session store without a password. The web apps' ports stay open to the network for showing the demo on other devices. Signing in from another device does not work in any case, because the issuer is `localhost`.
 
 Configuration is twelve-factor: every service reads environment variables only. The variable names are the same locally (compose) and on ECS (task definitions); only the values differ.
 
@@ -136,7 +136,7 @@ Configuration is twelve-factor: every service reads environment variables only. 
 | `SESSION_SECRET` | web (BFF) | a local value in `compose.yaml` | Secrets Manager — Key material of the sealed session cookie (AES-256-GCM, key derived with HKDF, IR333). Required on https, at least 32 characters: without it the app seals and opens no session (IR367) |
 | `APP_URL` / `OIDC_APP_CLIENT_SECRET` | web (BFF) | `http://localhost:3000`–`3003` / the Keycloak client secret | the app's host name / Secrets Manager — The OIDC redirect URI and the confidential client |
 | `CUSTOMER_WEB_URL` / `PARTNER_WEB_URL` / `TECHNICIAN_WEB_URL` / `ADMIN_WEB_URL` | web | `http://localhost:3000`–`3003` | the four host names — Links between the four apps (IR178) |
-| `SESSION_STORE_URL` | web (BFF) | `redis://valkey:6379` | ElastiCache endpoint (TLS) — Reserved for the server-side session store: not read yet, sessions live in the sealed cookie (OPEN-CT-03) |
+| `SESSION_STORE_URL` | web (BFF) | `redis://valkey:6379` (web apps run on the host: `redis://127.0.0.1:6379`) | ElastiCache endpoint (TLS, `rediss://`) — The server-side session store (IR382): the record of each sign-in, revoked at sign-out; unset = the session sealed into the cookie (IR333) |
 
 As built (IR334), the code reads the database, OIDC, demo, blob, internal-call and web-session variables above. `APP_ENV`, the `AWS_*` variables, `MQTT_URL`, `IOT_DATA_ENDPOINT`, `STRIPE_API_BASE`, `WEATHER_API_BASE` and `OTEL_EXPORTER_OTLP_ENDPOINT` are set for integrations that are not built yet, and nothing reads them:
 
@@ -188,7 +188,7 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 |---|---|
 | OPEN-CT-01 | Whether developers on x86 laptops need the `amd64` variant in the shared registry or build locally only |
 | OPEN-CT-02 | The S3 blob store (bucket `ac-files`, LocalStack locally) for staging and production; until then the maintenance service keeps uploaded files in the local directory store on the `blobs` volume (IR229) |
-| OPEN-CT-03 | The server-side session store (ElastiCache in production, Valkey locally) with revocation on sign-out (backend architecture §6). Until then the BFF keeps the tokens in its sealed session cookie (IR333). Sign-out already ends the identity provider's session (IR357), so a copied cookie cannot be refreshed after it |
+| OPEN-CT-03 | Closed by IR382: the BFF keeps each sign-in in the session store (ElastiCache in production, Valkey locally) and deletes it at sign-out (backend architecture §6) |
 | OPEN-CT-04 | OpenTelemetry instrumentation of the Go services and the web apps. The collector, Jaeger and `OTEL_EXPORTER_OTLP_ENDPOINT` are ready, but nothing exports traces or metrics yet (IR334) |
 
-Additional contracts for current version 0.40.0: Read IR01–IR381 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.41.0: Read IR01–IR382 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

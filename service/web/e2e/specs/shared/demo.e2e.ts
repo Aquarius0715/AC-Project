@@ -2,6 +2,7 @@
 // disabled with their reason, a device fault and its recovery when the role has a device it can manage, and Expire
 // session. The clock is moved only with E2E_ADVANCE_CLOCK=1, because the demo clock never goes back.
 import { test, expect } from "../../fixtures/test";
+import { signIn } from "../../fixtures/auth";
 
 test("the panel is labelled demo and shows the Core API clock", async ({ page }) => {
   await page.goto("/demo");
@@ -38,11 +39,19 @@ test("a device loses its connection and gets it back", async ({ page }) => {
   await expect(select.locator("option:checked")).toHaveText(/ · online$/);
 });
 
-test("Expire session asks to sign in again", async ({ page, app }) => {
-  await page.goto("/demo");
-  await page.getByRole("button", { name: /Expire session/ }).click();
-  await expect(page).toHaveURL(/\/login\?error=expired$/);
-  await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toContainText("Your session ended"); // the banner, not Next.js's route announcer
-  await page.goto(app.home);
-  await expect(page).toHaveURL(/\/login\?returnTo=/);
+test("Expire session asks to sign in again", async ({ browser, app }) => {
+  // a sign-in of its own: expiring deletes the stored session (IR382), which the project's other tests share
+  const context = await browser.newContext({ baseURL: app.url, storageState: { cookies: [], origins: [] } });
+  try {
+    const page = await context.newPage();
+    await signIn(page, app);
+    await page.goto("/demo");
+    await page.getByRole("button", { name: /Expire session/ }).click();
+    await expect(page).toHaveURL(/\/login\?error=expired$/);
+    await expect(page.locator('[role="alert"]:not(#__next-route-announcer__)')).toContainText("Your session ended"); // the banner, not Next.js's route announcer
+    await page.goto(app.home);
+    await expect(page).toHaveURL(/\/login\?returnTo=/);
+  } finally {
+    await context.close();
+  }
 });

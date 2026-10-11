@@ -349,6 +349,7 @@ services:
 
   valkey:              # ElastiCache (sessions, idempotency fast path, rate limits)
     image: valkey/valkey:8
+    ports: ["127.0.0.1:6379:6379"]   # this machine only (IR373): web apps run on the host reach the session store (IR382)
     networks: [app, data]
     profiles: [infra, backend, full]
 

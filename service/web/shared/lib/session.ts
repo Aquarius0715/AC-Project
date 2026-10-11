@@ -1,9 +1,12 @@
-// BFF session (backend architecture §5, §6): the OIDC tokens and the selected tenant / membership live in an httpOnly
-// cookie sealed with AES-256-GCM, so the browser keeps an opaque value that only this server can open and that any
-// altered byte invalidates (IR333). The production step is a server-side store (ElastiCache) with revocation.
+// BFF session (backend architecture §5, §6): the OIDC tokens and the selected tenant / membership. With SESSION_STORE_URL
+// they live in the server-side store (Valkey locally, ElastiCache in production) and the httpOnly cookie holds only a
+// sealed random session ID, so sign-out revokes the session at once (IR382). Without it the cookie carries the session
+// itself, sealed with AES-256-GCM: an opaque value that only this server can open and that any altered byte invalidates
+// (IR333).
 import "server-only";
-import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
+import { createClient } from "@redis/client";
 
 export type Session = {
   accessToken: string;
@@ -140,18 +143,138 @@ export function needsRefresh(s: Session): boolean {
   return s.expiresAt - REFRESH_LEEWAY_SECONDS <= Date.now() / 1000;
 }
 
+// ---- the server-side session store (backend architecture §6, OPEN-CT-03, IR382) ----
+// A record per sign-in under the SHA-256 of a random 256-bit session ID, so the keys reveal no cookie. The value is
+// sealed with the cookie key, so the store never holds a token in clear. Each read extends the idle lifetime; the
+// record ends 12 hours after the sign-in however active it is. The cookie is the sealed ID; a cookie of the other mode
+// is refused, so a session sealed into a cookie before the store was configured cannot bypass revocation.
+
+/** The absolute lifetime of a stored session: 12 hours from its sign-in (backend architecture §6). */
+export const ABSOLUTE_SECONDS = 12 * 60 * 60;
+const STORE_TIMEOUT_MS = 2000;
+
+type Stored = { session: Session; startedAt: number }; // epoch seconds of the sign-in
+type StoreClient = {
+  getEx(key: string, options: { type: "EX"; value: number }): Promise<string | null>;
+  set(key: string, value: string, options: { expiration: { type: "EX"; value: number }; condition?: "XX" }): Promise<string | null>;
+  del(key: string): Promise<number>;
+};
+
+let client: Promise<StoreClient> | null = null;
+
+/** The store's client, connected once per process; null without SESSION_STORE_URL (the cookie carries the session). A
+ * failed connection is tried again by the next request; commands fail at once while it is down (no offline queue). */
+function store(): Promise<StoreClient> | null {
+  const url = process.env.SESSION_STORE_URL;
+  if (!url) return null;
+  if (!client) {
+    const c = createClient({ url, disableOfflineQueue: true, socket: { connectTimeout: STORE_TIMEOUT_MS, reconnectStrategy: (n: number) => Math.min(100 * 2 ** n, 2000) } });
+    c.on("error", (e: Error) => console.warn(`session store: ${e.message}`));
+    client = c.connect().then(() => c as unknown as StoreClient, (e: unknown) => {
+      client = null;
+      throw e;
+    });
+  }
+  return client;
+}
+
+/** A store call that gives up after 2 seconds: the session then counts as absent (fail closed). */
+const timed = <T,>(p: Promise<T>): Promise<T> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<never>((_, fail) => { timer = setTimeout(() => fail(new Error("session store timeout")), STORE_TIMEOUT_MS); });
+  return Promise.race([p, late]).finally(() => clearTimeout(timer));
+};
+const keyOf = (id: string) => `ac:session:${createHash("sha256").update(id).digest("hex")}`;
+const idOf = (cookie: string | undefined) => {
+  const id = unseal<{ sid?: unknown }>(cookie)?.sid;
+  return typeof id === "string" && id.length >= 43 ? id : null;
+};
+
+/** The session a cookie value names: in store mode the live record of its sealed ID (the read extends the idle
+ * lifetime), else the sealed session itself. Null when the cookie is missing, altered or of the other mode, when the
+ * record was deleted or has expired, or when the store does not answer. */
+export async function loadSession(cookie: string | undefined): Promise<Session | null> {
+  const c = store();
+  if (!c) {
+    const s = unseal<Session>(cookie);
+    return s && typeof s.accessToken === "string" ? s : null;
+  }
+  const id = idOf(cookie);
+  if (!id) return null;
+  try {
+    const rec = unseal<Stored>((await timed((await timed(c)).getEx(keyOf(id), { type: "EX", value: SESSION_MAX_AGE }))) ?? undefined);
+    if (!rec) return null;
+    if (Date.now() / 1000 - rec.startedAt >= ABSOLUTE_SECONDS) {
+      await dropSession(cookie);
+      return null;
+    }
+    return rec.session;
+  } catch (e) {
+    console.warn(`session store: ${(e as Error).message}`);
+    return null;
+  }
+}
+
+/** The cookie value of a new sign-in: store mode stores the session under a new random ID and deletes the record the
+ * browser's previous cookie named; cookie mode seals the session. Throws when the store does not answer. */
+export async function createSessionCookie(s: Session, previous?: string): Promise<string> {
+  const c = store();
+  if (!c) return seal(s);
+  const id = randomBytes(32).toString("base64url");
+  const rec: Stored = { session: s, startedAt: Math.floor(Date.now() / 1000) };
+  await timed((await timed(c)).set(keyOf(id), seal(rec), { expiration: { type: "EX", value: SESSION_MAX_AGE } }));
+  await dropSession(previous);
+  return seal({ sid: id });
+}
+
+/** The cookie value after a token refresh: store mode rewrites the record only while it still exists, so a sign-out
+ * in another tab stays a sign-out, and keeps the cookie; cookie mode seals the new session. Null when the record is
+ * gone or the store does not answer. */
+export async function renewSessionCookie(cookie: string | undefined, s: Session): Promise<string | null> {
+  const c = store();
+  if (!c) return seal(s);
+  const id = idOf(cookie);
+  if (!id || !cookie) return null;
+  try {
+    const sc = await timed(c);
+    const rec = unseal<Stored>((await timed(sc.getEx(keyOf(id), { type: "EX", value: SESSION_MAX_AGE }))) ?? undefined);
+    if (!rec) return null;
+    const ok = await timed(sc.set(keyOf(id), seal({ session: s, startedAt: rec.startedAt } satisfies Stored), { expiration: { type: "EX", value: SESSION_MAX_AGE }, condition: "XX" }));
+    return ok === null ? null : cookie;
+  } catch (e) {
+    console.warn(`session store: ${(e as Error).message}`);
+    return null;
+  }
+}
+
+/** Deletes the stored session a cookie names (sign-out, a failed refresh, a new sign-in); cookie mode has nothing to
+ * delete. Best effort: when the store does not answer, the record ends with its idle lifetime. */
+export async function dropSession(cookie: string | undefined): Promise<void> {
+  const c = store();
+  const id = c ? idOf(cookie) : null;
+  if (!c || !id) return;
+  try {
+    await timed((await timed(c)).del(keyOf(id)));
+  } catch (e) {
+    console.warn(`session store: ${(e as Error).message}`);
+  }
+}
+
 /** The signed-in session (route handlers only: refreshing rewrites or clears the cookie). */
 export async function readSession(): Promise<Session | null> {
   const jar = await cookies();
-  const s = unseal<Session>(jar.get(SESSION_COOKIE)?.value);
+  const cookie = jar.get(SESSION_COOKIE)?.value;
+  const s = await loadSession(cookie);
   if (!s) return null;
   if (!needsRefresh(s)) return s;
   const next = await refresh(s);
-  if (!next) {
+  const renewed = next ? await renewSessionCookie(cookie, next) : null;
+  if (!next || !renewed) {
+    await dropSession(cookie);
     jar.set(SESSION_COOKIE, "", clearedCookieOptions());
     return null;
   }
-  jar.set(SESSION_COOKIE, seal(next), cookieOptions());
+  jar.set(SESSION_COOKIE, renewed, cookieOptions());
   return next;
 }
 

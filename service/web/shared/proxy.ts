@@ -1,9 +1,9 @@
 // Shared proxy logic (each app's proxy.ts calls authProxy with its role): optimistic auth checks, as the Next.js authentication
-// guide recommends — it reads the signed session cookie and never calls the Core API; it calls the identity
+// guide recommends — it reads the session (the sealed cookie, or the store record it names) and never calls the Core API; it calls the identity
 // provider only to refresh a token that is about to expire. The Core API authorizes every operation (D01); this only keeps signed-out users and the wrong role
 // out of the role areas in API mode. The Phase 1A demo (DATA_SOURCE=mock) is unaffected.
 import { NextResponse, type NextRequest } from "next/server";
-import { clearedCookieOptions, cookieOptions, needsRefresh, oidcConfig, refresh, roleHome, SESSION_COOKIE, seal, unseal, type Session } from "@ac/web/lib/session";
+import { clearedCookieOptions, cookieOptions, dropSession, loadSession, needsRefresh, oidcConfig, refresh, renewSessionCookie, roleHome, SESSION_COOKIE, type Session } from "@ac/web/lib/session";
 import { contentSecurityPolicy, HSTS, newNonce, originOf } from "@ac/web/lib/securityHeaders";
 
 const sharedAreas = ["/notifications", "/settings"]; // shared pages that need a session but no particular role
@@ -25,15 +25,17 @@ export async function authProxy(req: NextRequest, appRole: Session["role"]) {
     return res;
   };
   if (process.env.DATA_SOURCE !== "api") return secure(NextResponse.next({ request: { headers } }));
-  let session = unseal<Session>(req.cookies.get(SESSION_COOKIE)?.value);
+  const cookie = req.cookies.get(SESSION_COOKIE)?.value;
+  let session = await loadSession(cookie); // the sealed cookie, or the stored session it names (IR382)
   if (session && session.role !== appRole) session = null;
-  // Server Components cannot write cookies, so an access token about to expire is refreshed here (the one network
-  // call proxy makes, only near expiry) and the new cookie is forwarded to the page render and the browser.
+  // Server Components cannot write cookies, so an access token about to expire is refreshed here (the identity
+  // provider is called only near expiry) and the renewed cookie is forwarded to the page render and the browser.
   let renewed: string | null | undefined;
   if (session && needsRefresh(session)) {
     const next = await refresh(session);
-    renewed = next ? seal(next) : null;
-    session = next;
+    renewed = next ? await renewSessionCookie(cookie, next) : null;
+    if (!renewed) await dropSession(cookie);
+    session = renewed ? next : null;
   }
   const pass = () => {
     if (renewed !== undefined) {
