@@ -5255,3 +5255,16 @@ Backend architecture §10 asks that each due item run once even with several sch
    - The waiting tick blocks until the lock is released, then expires the offer once.
    - Two background ticks at once expire a new offer once, with a single "offer_expired" event.
    - With the try-lock always succeeding, the test fails.
+
+## IR357 Sign-out ends the identity provider's session — 2026-10-11
+
+Backend architecture §6 says sign-out revokes the server session and the IdP refresh token. The BFF only dropped its cookie; the Keycloak session ended with its own lifetime (30 minutes idle locally). Two consequences followed:
+- The refresh token in the sealed cookie stayed valid. A copied cookie could keep refreshing the access token after the user signed out.
+- "Continue as …" on the sign-in page signed the person straight back in without asking for the password.
+
+1. **Sign-out (`POST /bff/auth/logout`).** The route opens the session cookie and ends the identity provider's session of that sign-in. It uses Keycloak's back-channel logout: the refresh token, posted with the client's credentials to the internal logout endpoint, with a 3-second limit. Then it drops the cookie and returns to `/login`, as before.
+2. **Always signs out.** When the provider refuses or does not answer, the cookie is still dropped; the provider's session then ends with its own lifetime. With no session, a forged cookie or no refresh token, the provider is not called.
+3. **What remains.** The access token of a copied cookie works until it expires (5 minutes in the local realm). The server-side session store, which can revoke at once, stays OPEN-CT-03. The production identity provider (Cognito) uses its own revocation endpoint when the BFF moves to it.
+4. **Tests.**
+   - Web unit: the logout call (endpoint, body, time limit, refusal and network failure). The route ends the provider's session with the session's refresh token and returns 303 to `/login` with the cookie dropped. It still signs out when the provider is down, and calls nothing without a session.
+   - E2E `shared/session` (each app): "Sign out ends the session, at the identity provider too" signs in a context of its own, signs out, and starts the sign-in again. The provider asks for the password instead of coming back. Against the build without the fix, this test failed.

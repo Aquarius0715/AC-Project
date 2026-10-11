@@ -1,7 +1,7 @@
 import { createCipheriv, randomBytes } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SESSION_COOKIE, cookieKey, cookieOptions, jwtClaims, needsRefresh, oidcConfig, readSession, refresh, roleHome, safeReturnTo, seal, sessionFromTokens, unseal, type Session } from "@ac/web/lib/session";
+import { SESSION_COOKIE, cookieKey, cookieOptions, endIdpSession, jwtClaims, needsRefresh, oidcConfig, readSession, refresh, roleHome, safeReturnTo, seal, sessionFromTokens, unseal, type Session } from "@ac/web/lib/session";
 
 // the BFF session (backend architecture §5) is server code: next/headers is the request's cookie jar
 const jar = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn(), delete: vi.fn() }));
@@ -118,6 +118,27 @@ describe("refreshing the access token", () => {
     vi.stubGlobal("fetch", fetch);
     expect(await refresh(session({ refreshToken: null }))).toBeNull();
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+// IR357: sign-out ends the identity provider's session (backend architecture §6)
+describe("ending the identity provider's session", () => {
+  it("posts the refresh token with the client's credentials to the internal logout endpoint", async () => {
+    vi.stubEnv("OIDC_INTERNAL_ISSUER", "http://keycloak:8080/realms/ac");
+    vi.stubEnv("OIDC_APP_CLIENT_SECRET", "test-client-secret");
+    const fetch = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetch);
+    expect(await endIdpSession("r-1")).toBe(true);
+    const [url, init] = fetch.mock.calls[0] as unknown as [string, RequestInit];
+    expect([url, init.method]).toEqual(["http://keycloak:8080/realms/ac/protocol/openid-connect/logout", "POST"]);
+    expect(Object.fromEntries(new URLSearchParams(String(init.body)))).toEqual({ refresh_token: "r-1", client_id: "ac-web", client_secret: "test-client-secret" });
+    expect(init.signal).toBeInstanceOf(AbortSignal); // never waits long for the provider
+  });
+  it("answers false when the provider refuses or cannot be reached", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "invalid_grant" }), { status: 400 })));
+    expect(await endIdpSession("r-1")).toBe(false);
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
+    expect(await endIdpSession("r-1")).toBe(false);
   });
 });
 

@@ -112,6 +112,7 @@ trace = rows('00-prepare/traceability.csv')
 # 0.125.0 (2026-10-10): DEC-73 / IR234; Assignment.status completed, schema CHECK, jobs.review validation note; counts unchanged.
 # 0.126.0 (2026-10-10): IR235; SCR-A06 interaction, DD-A21 boundary; counts unchanged.
 # 0.127.0 (2026-10-10): IR236; SlaScorecard targets + customer planType, DD-A22, SCR-A06 interaction; counts unchanged.
+# 0.240.0 (2026-10-11): IR357 sign-out ends the IdP session (backend architecture 0.41.0, container design 0.34.0); counts unchanged.
 # 0.239.0 (2026-10-11): IR356 scheduler advisory lock per domain and tenant (backend architecture 0.40.0, backend Go design 0.35.0); counts unchanged.
 # 0.238.0 (2026-10-11): IR354 web security headers (DD-COMMON 0.108.0, network architecture 0.32.0), IR355 integration status checks; counts unchanged.
 # 0.237.0 (2026-10-11): IR353 coverage round, forInvoice filter branch removed, HQ contact window per IR42; counts unchanged.

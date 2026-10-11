@@ -91,6 +91,24 @@ export async function refresh(s: Session): Promise<Session | null> {
   }
 }
 
+/** Ends the identity provider's session of a sign-in (backend architecture §6: sign-out revokes the IdP session and
+ * its refresh token, IR357): Keycloak's back-channel logout, the refresh token posted with the client's credentials
+ * to the internal logout endpoint. False when the provider refused or did not answer within 3 seconds. */
+export async function endIdpSession(refreshToken: string): Promise<boolean> {
+  const cfg = oidcConfig();
+  try {
+    const r = await fetch(`${cfg.internalIssuer}/protocol/openid-connect/logout`, {
+      method: "POST", cache: "no-store",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ refresh_token: refreshToken, client_id: cfg.clientId, client_secret: cfg.clientSecret }),
+      signal: AbortSignal.timeout(3000),
+    });
+    return r.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** True when the access token expires within the refresh leeway. */
 export function needsRefresh(s: Session): boolean {
   return s.expiresAt - REFRESH_LEEWAY_SECONDS <= Date.now() / 1000;
