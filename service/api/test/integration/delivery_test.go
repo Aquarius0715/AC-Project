@@ -126,8 +126,14 @@ func TestOfferAcceptAssign(t *testing.T) {
 		t.Error("other contractor assign")
 	}
 	code, m = asg(&contrA, job, "tech-external-a", s2, 3, "")
-	if code != 200 || data(m)["status"] != "assigned" || data(m)["assignment"].(map[string]any)["acknowledgement"] != "pending" || data(m)["scheduledSlot"] == nil {
+	if code != 200 || data(m)["status"] != "assigned" || data(m)["assignmentId"] == nil || data(m)["scheduledSlot"] == nil {
 		t.Fatalf("contractor assign: %d %v", code, m)
+	}
+	if _, extra := data(m)["assignment"]; extra { // the write answers MaintenanceJob, the detail is jobs.get's (IR392)
+		t.Errorf("jobs.assign answers the detail: %v", data(m))
+	}
+	if _, g := post(s, &contrA, "jobs.get", `{"jobId":"`+job+`"}`); data(g)["assignment"].(map[string]any)["acknowledgement"] != "pending" {
+		t.Errorf("the assignment waits for the technician: %v", data(g)["assignment"])
 	}
 	if code, _ := asg(&hq, job, "tech-internal-a", s2, 4, ""); code != 403 {
 		t.Error("HQ assigns internal jobs only")

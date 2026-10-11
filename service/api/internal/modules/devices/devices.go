@@ -345,7 +345,7 @@ func (m *Module) technicianGate(ctx context.Context, c *ops.Call, jobID *uuid.UU
 // @Produce		json
 // @Param			Idempotency-Key	header		string			true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			request			body		RegisterInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=DeviceDetail}
+// @Success		200				{object}	ops.Envelope{data=Device}
 // @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
@@ -356,7 +356,13 @@ func (m *Module) technicianGate(ctx context.Context, c *ops.Call, jobID *uuid.UU
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/devices [post]
-func (m *Module) register(ctx context.Context, c *ops.Call, in *RegisterInput) (DeviceDetail, error) {
+func (m *Module) register(ctx context.Context, c *ops.Call, in *RegisterInput) (Device, error) {
+	d, err := m.registerDetail(ctx, c, in)
+	return d.Device, err
+}
+
+// registerDetail is register answering the device with its detail (IR392: the write itself answers Device).
+func (m *Module) registerDetail(ctx context.Context, c *ops.Call, in *RegisterInput) (DeviceDetail, error) {
 	if err := m.technicianGate(ctx, c, in.JobID, in.UnitID); err != nil {
 		return DeviceDetail{}, err
 	}

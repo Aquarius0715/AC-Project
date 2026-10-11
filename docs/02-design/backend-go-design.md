@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND-GO
-version: 0.46.0
+version: 0.47.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -277,7 +277,7 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | Unit tests | `go test` | Pure helpers (campaign waves, payout months, reminder stages, thresholds), validation rules that REST cannot reach, authorization predicates, the REST binding — table-driven, no I/O |
 | Integration tests | a local PostgreSQL 16 test database, reset per run (`make testdb`) | The operations with their SQL, RLS isolation (a second tenant sees nothing), constraints (overlap, one pending command, append-only audit), in one process and with the split services. Authorization by target: every operation a client, contractor or technician may call, tried with another party's records and a stale version (`TestForeignTargets`, IR366) |
 | API tests | `httptest` + Echo | Status mapping, idempotency replay, version conflicts, HQ-network rule, owner-only rules; every SQL statement of a module runs in at least one test, checked on the coverage profile after `make cover` (IR311) |
-| Contract tests | generated from the catalog | Every operation registered once, mode and authorization match the catalog, inputs reject unknown fields; each operation's input type takes exactly the fields of its contract input (`TestInputsMatchContract`, IR391: against `service/web/shared/lib/contractInputs.gen.json`, which the web's `contractInputs.test.ts` derives from the contract with the TypeScript checker and keeps current); each operation's input rules answer VALIDATION before authorization (`TestRequiredInputs`, IR307) |
+| Contract tests | generated from the catalog | Every operation registered once, mode and authorization match the catalog, inputs reject unknown fields; each operation's input type takes exactly the fields of its contract input, and its result type answers exactly its contract result (`TestInputsMatchContract`, IR391, and `TestResultsMatchContract`, IR392: against `service/web/shared/lib/contractInputs.gen.json` and `contractResults.gen.json`, which the web's `contractInputs.test.ts` derives from the contract with the TypeScript checker and keeps current); each operation's input rules answer VALIDATION before authorization (`TestRequiredInputs`, IR307) |
 | Acceptance tests | `test/acceptance` | AT-* cases from the requirement documents replayed against the API with fixture-contract.json seeds and a fixed clock (the same cases that drive the Phase 1A mock) |
 | Integration | LocalStack, Stripe CLI, IoT device simulator | Outbox → SNS → SQS flows, Stripe webhooks, MQTT command round trip in staging |
 | Load | k6 | Design capacity in backend architecture §13 |
@@ -298,4 +298,4 @@ The webhook receiver (`cmd/webhook`) is a separate Echo service: `/stripe` verif
 | OPEN-GO-01 | Final choice of the TypeScript → Go contract generator (output reviewed for union types such as `UnitAction` and `Policy`) |
 | OPEN-GO-02 | WhatsApp provider SDK (depends on OPEN-BE-04) |
 
-Additional contracts for current version 0.46.0: Read IR01–IR391 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.47.0: Read IR01–IR392 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

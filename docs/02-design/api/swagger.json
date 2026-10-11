@@ -6250,7 +6250,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/devices.DeviceDetail"
+                                            "$ref": "#/definitions/devices.Device"
                                         }
                                     }
                                 }
@@ -6371,7 +6371,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/devices.DeviceDetail"
+                                            "$ref": "#/definitions/devices.Device"
                                         }
                                     }
                                 }
@@ -10779,7 +10779,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -10986,7 +10986,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -11228,7 +11228,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -11349,7 +11349,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -11470,7 +11470,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -11591,7 +11591,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -11840,7 +11840,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -11961,7 +11961,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -12203,7 +12203,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -12580,7 +12580,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -12708,7 +12708,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -12836,7 +12836,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -12957,7 +12957,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -13078,7 +13078,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -13319,7 +13319,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -13925,7 +13925,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -14046,7 +14046,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -14167,7 +14167,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -14288,7 +14288,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -14409,7 +14409,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -14537,7 +14537,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -14665,7 +14665,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -14786,7 +14786,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -14907,7 +14907,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -15028,7 +15028,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -20014,7 +20014,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/maintenance.Job"
+                                            "$ref": "#/definitions/maintenance.MaintenanceJob"
                                         }
                                     }
                                 }
@@ -24658,7 +24658,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/assets.Unit"
+                                            "$ref": "#/definitions/assets.ACUnit"
                                         }
                                     }
                                 }
@@ -25440,7 +25440,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/assets.Unit"
+                                            "$ref": "#/definitions/assets.ACUnit"
                                         }
                                     }
                                 }
@@ -25798,7 +25798,7 @@
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/assets.Unit"
+                                            "$ref": "#/definitions/assets.ACUnit"
                                         }
                                     }
                                 }
@@ -26345,6 +26345,80 @@
                 },
                 "retryAfterSeconds": {
                     "type": "integer"
+                }
+            }
+        },
+        "assets.ACUnit": {
+            "type": "object",
+            "properties": {
+                "alertPolicyIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "archived": {
+                    "type": "boolean"
+                },
+                "capabilityVersion": {
+                    "type": "integer"
+                },
+                "connection": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "customerOrgId": {
+                    "type": "string"
+                },
+                "displayName": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "installedAt": {
+                    "type": "string"
+                },
+                "lastSeenAt": {
+                    "type": "string"
+                },
+                "modelId": {
+                    "type": "string"
+                },
+                "observedRestriction": {
+                    "type": "object"
+                },
+                "observedState": {
+                    "$ref": "#/definitions/assets.ObservedState"
+                },
+                "propertyId": {
+                    "type": "string"
+                },
+                "serviceScope": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "spaceId": {
+                    "type": "string"
+                },
+                "tenantId": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                },
+                "warrantyEndsAt": {
+                    "type": "string"
                 }
             }
         },
@@ -31775,7 +31849,41 @@
                 }
             }
         },
-        "maintenance.Job": {
+        "maintenance.JobIDInput": {
+            "type": "object",
+            "properties": {
+                "jobId": {
+                    "type": "string"
+                }
+            }
+        },
+        "maintenance.KPIs": {
+            "type": "object",
+            "properties": {
+                "arrivalInWindow": {
+                    "type": "number"
+                },
+                "averageRating": {
+                    "type": "number"
+                },
+                "firstTimeAccepted": {
+                    "type": "number"
+                },
+                "offerAcceptance": {
+                    "type": "number"
+                },
+                "period": {
+                    "$ref": "#/definitions/maintenance.Range"
+                },
+                "ratingCount": {
+                    "type": "integer"
+                },
+                "reworkRate": {
+                    "type": "number"
+                }
+            }
+        },
+        "maintenance.MaintenanceJob": {
             "type": "object",
             "properties": {
                 "alertIds": {
@@ -31783,9 +31891,6 @@
                     "items": {
                         "type": "string"
                     }
-                },
-                "assignment": {
-                    "$ref": "#/definitions/maintenance.Assignment"
                 },
                 "assignmentId": {
                     "type": "string"
@@ -31812,9 +31917,6 @@
                 "dueAt": {
                     "type": "string"
                 },
-                "eventCursor": {
-                    "type": "integer"
-                },
                 "followUpClass": {
                     "type": "string"
                 },
@@ -31827,7 +31929,6 @@
                 "occurrenceAt": {
                     "type": "string"
                 },
-                "offer": {},
                 "origin": {
                     "type": "string"
                 },
@@ -31845,10 +31946,6 @@
                     "items": {
                         "$ref": "#/definitions/maintenance.Slot"
                     }
-                },
-                "projection": {
-                    "description": "detail",
-                    "type": "string"
                 },
                 "rating": {
                     "type": "object"
@@ -31895,40 +31992,6 @@
                 },
                 "warrantyClaims": {
                     "type": "object"
-                }
-            }
-        },
-        "maintenance.JobIDInput": {
-            "type": "object",
-            "properties": {
-                "jobId": {
-                    "type": "string"
-                }
-            }
-        },
-        "maintenance.KPIs": {
-            "type": "object",
-            "properties": {
-                "arrivalInWindow": {
-                    "type": "number"
-                },
-                "averageRating": {
-                    "type": "number"
-                },
-                "firstTimeAccepted": {
-                    "type": "number"
-                },
-                "offerAcceptance": {
-                    "type": "number"
-                },
-                "period": {
-                    "$ref": "#/definitions/maintenance.Range"
-                },
-                "ratingCount": {
-                    "type": "integer"
-                },
-                "reworkRate": {
-                    "type": "number"
                 }
             }
         },

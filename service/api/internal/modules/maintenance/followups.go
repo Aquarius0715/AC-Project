@@ -141,7 +141,7 @@ func (in *RateInput) Validate() map[string]string {
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get)"
 // @Param			jobId				path		string		true	"input field jobId"
 // @Param			request				body		RateInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -152,7 +152,12 @@ func (in *RateInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/rate [post]
-func (m FollowUps) rate(ctx context.Context, c *ops.Call, in *RateInput) (Job, error) {
+func (m FollowUps) rate(ctx context.Context, c *ops.Call, in *RateInput) (MaintenanceJob, error) {
+	return written(m.rateJob(ctx, c, in))
+}
+
+// rateJob is rate answering the job with its detail extras.
+func (m FollowUps) rateJob(ctx context.Context, c *ops.Call, in *RateInput) (Job, error) {
 	s, err := m.lock(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
@@ -298,7 +303,7 @@ func (in *ProblemInput) Validate() map[string]string {
 // @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get)"
 // @Param			jobId				path		string			true	"input field jobId"
 // @Param			request				body		ProblemInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -309,7 +314,12 @@ func (in *ProblemInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/report-problem [post]
-func (m FollowUps) reportProblem(ctx context.Context, c *ops.Call, in *ProblemInput) (Job, error) {
+func (m FollowUps) reportProblem(ctx context.Context, c *ops.Call, in *ProblemInput) (MaintenanceJob, error) {
+	return written(m.reportProblemJob(ctx, c, in))
+}
+
+// reportProblemJob is reportProblem answering the job with its detail extras.
+func (m FollowUps) reportProblemJob(ctx context.Context, c *ops.Call, in *ProblemInput) (Job, error) {
 	s, err := m.lock(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
@@ -400,7 +410,7 @@ func (in *ClassifyInput) Validate() map[string]string {
 // @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get)"
 // @Param			jobId				path		string			true	"input field jobId"
 // @Param			request				body		ClassifyInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -411,7 +421,12 @@ func (in *ClassifyInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/classify-follow-up [post]
-func (m FollowUps) classify(ctx context.Context, c *ops.Call, in *ClassifyInput) (Job, error) {
+func (m FollowUps) classify(ctx context.Context, c *ops.Call, in *ClassifyInput) (MaintenanceJob, error) {
+	return written(m.classifyJob(ctx, c, in))
+}
+
+// classifyJob is classify answering the job with its detail extras.
+func (m FollowUps) classifyJob(ctx context.Context, c *ops.Call, in *ClassifyInput) (Job, error) {
 	s, err := m.lock(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
@@ -476,7 +491,7 @@ func (in *CostInput) Validate() map[string]string {
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
 // @Param			jobId				path		string		true	"input field jobId"
 // @Param			request				body		CostInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -487,7 +502,12 @@ func (in *CostInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/cost-lines [put]
-func (m FollowUps) saveCost(ctx context.Context, c *ops.Call, in *CostInput) (Job, error) {
+func (m FollowUps) saveCost(ctx context.Context, c *ops.Call, in *CostInput) (MaintenanceJob, error) {
+	return written(m.saveCostJob(ctx, c, in))
+}
+
+// saveCostJob is saveCost answering the job with its detail extras.
+func (m FollowUps) saveCostJob(ctx context.Context, c *ops.Call, in *CostInput) (Job, error) {
 	s, err := m.lock(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
@@ -537,7 +557,7 @@ func (in *ExtendInput) Validate() map[string]string {
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
 // @Param			jobId				path		string		true	"input field jobId"
 // @Param			request				body		ExtendInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -548,7 +568,12 @@ func (in *ExtendInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/extend-access [post]
-func (m FollowUps) extendAccess(ctx context.Context, c *ops.Call, in *ExtendInput) (Job, error) {
+func (m FollowUps) extendAccess(ctx context.Context, c *ops.Call, in *ExtendInput) (MaintenanceJob, error) {
+	return written(m.extendAccessJob(ctx, c, in))
+}
+
+// extendAccessJob is extendAccess answering the job with its detail extras.
+func (m FollowUps) extendAccessJob(ctx context.Context, c *ops.Call, in *ExtendInput) (Job, error) {
 	if _, err := m.lock(ctx, c, in.JobID); err != nil {
 		return Job{}, err
 	}
@@ -626,7 +651,7 @@ type WarrantyClaim struct {
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get)"
 // @Param			jobId				path		string		true	"input field jobId"
 // @Param			request				body		ClaimInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -637,7 +662,12 @@ type WarrantyClaim struct {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/warranty-claims [post]
-func (m FollowUps) recordWarrantyClaim(ctx context.Context, c *ops.Call, in *ClaimInput) (Job, error) {
+func (m FollowUps) recordWarrantyClaim(ctx context.Context, c *ops.Call, in *ClaimInput) (MaintenanceJob, error) {
+	return written(m.recordWarrantyClaimJob(ctx, c, in))
+}
+
+// recordWarrantyClaimJob is recordWarrantyClaim answering the job with its detail extras.
+func (m FollowUps) recordWarrantyClaimJob(ctx context.Context, c *ops.Call, in *ClaimInput) (Job, error) {
 	s, err := m.lock(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err

@@ -6070,3 +6070,34 @@ It is also this round's security check: an input type that takes fields outside 
    - `MemberInput` has no `displayName`.
    - The trigger's added fields have concrete types (bool, string, number, object). The first attempt read them as raw JSON, and the generator then dropped every property of the trigger's definition, so they were typed instead. The definition now lists all 31 fields of the contract's variants.
 6. **Checks.** `make test-all` (both modes), the web checks (457 unit tests) and the validators pass. With the equipment, identity and gateway images rebuilt, the E2E suite passes: 117 tests, 8 skipped.
+
+## IR392 Every operation's result type answers exactly its contract result — 2026-10-12
+
+IR391 held the inputs to the contract. This round did the same for the results, for all 204 operations. That covers the top-level fields, and for a page or an array the fields of its items. It is also the round's security check: a result that answers fields outside its contract is excessive data exposure (OWASP API3).
+
+1. **Findings.** Thirty writes answered more than their contract result. They gave the read model a write uses, where the contract promises the primary resource. D12 says not to turn read-model extras into extra DTO fields.
+   - **26 job writes answered `JobDetail`** (`projection`, `assignment`, `offer`, `eventCursor`) where the contract result is `MaintenanceJob`. These are `jobs.create`, `assign`, `cancel`, `checkIn`, `classifyFollowUp`, `extendAccess`, `hold`, `offer`, `pauseWork`, `proposePartnerSlot`, `proposeSlot`, `rate`, `recordWarrantyClaim`, `reportProblem`, `requestReschedule`, `resolvePartnerSlot`, `respondProposal`, `resumeHold`, `resumeRework`, `review`, `saveCost`, `start`, `submit`, `withdrawPartnerSlot`, `withdrawProposal` and `plans.generateNext`.
+     - Every job load applies the IR42 role projection before it answers, so nothing leaked across roles. The extras were the caller's own projection.
+   - **`units.save` and `units.setAlertPolicies` answered `UnitSummary`** (`effectivePowerState`, `latestMeasurements`, `activeAlertCount`) where the contract result is `ACUnit`.
+   - **`devices.register` and `devices.bind` answered `DeviceDetail`** (`calibrationRefs`, `activeOperation`) where the contract result is `Device`.
+   - Every other operation matched its contract.
+2. **Fixed.**
+   - The Go types now follow the contract's composition: `Job` embeds `MaintenanceJob`, `Unit` embeds `ACUnit`, and `DeviceDetail` embeds `Device`.
+   - Each of the 30 writes answers the contract type. A thin handler returns the contract type, and the work stays in a function that loads the full read model. The API description shows `MaintenanceJob`, `ACUnit` and `Device` for these routes.
+   - The web reads only contract fields of these results (results.test.ts, IR314), so the web did not change.
+3. **The check is now permanent.**
+   - The web's `contractInputs.test.ts` also writes `shared/lib/contractResults.gen.json`: each operation's result fields, and the item fields of a page or an array.
+   - The Core API's `TestResultsMatchContract` holds every registered result type to that list. The registry now records each handler's result type (`ops.Operation.Result`).
+   - Fifteen operations pick their answer's shape per request, and the test lists them with the reason. Their own tests check each shape. They are:
+     - the IR42 job projections (`jobs.get`, `jobs.list`);
+     - the SR03 restriction projections (`restrictions.get`, `list`, `reconcile`, `retry`);
+     - `locations.rename` (a property or a space);
+     - `payments.simulate` (the event picks the answer);
+     - the policies, which write their kind's fields;
+     - `voice.resolveIntent`;
+     - the three `demoSession.*` operations the BFF answers.
+   - `writes.getResult` never answers the `failed` variant's `error`: a rejected write leaves no record (IR118). The test names this too.
+   - Any other operation whose type is decided at run time fails the test until it is listed.
+   - On the code before this round, the test reports the 30 writes above.
+4. **Tests that leaned on the extras.** Four integration tests read a detail field from a write result: `jobs.assign`'s assignment, `jobs.extendAccess`'s offer, `jobs.create`'s projection and `devices.register`'s running operation. They now read the detail through `jobs.get` or `devices.get`, and check that the write answers none of it.
+5. **Checks.** `make test-all` (both modes), the web checks (458 unit tests) and the validators pass. With the maintenance, equipment and gateway images rebuilt, the E2E suite passes: 117 tests, 8 skipped.

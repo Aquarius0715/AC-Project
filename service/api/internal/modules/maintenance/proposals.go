@@ -131,7 +131,7 @@ func (in *ProposeInput) Validate() map[string]string {
 // @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
 // @Param			jobId				path		string			true	"input field jobId"
 // @Param			request				body		ProposeInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -142,7 +142,12 @@ func (in *ProposeInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/slot-proposals [post]
-func (m Proposals) proposeSlot(ctx context.Context, c *ops.Call, in *ProposeInput) (Job, error) {
+func (m Proposals) proposeSlot(ctx context.Context, c *ops.Call, in *ProposeInput) (MaintenanceJob, error) {
+	return written(m.proposeSlotJob(ctx, c, in))
+}
+
+// proposeSlotJob is proposeSlot answering the job with its detail extras.
+func (m Proposals) proposeSlotJob(ctx context.Context, c *ops.Call, in *ProposeInput) (Job, error) {
 	r, err := m.Delivery.lock(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
@@ -231,7 +236,7 @@ func (in *ProposalRef) Validate() map[string]string {
 // @Param			jobId				path		string		true	"input field jobId"
 // @Param			proposalId			path		string		true	"input field proposalId"
 // @Param			request				body		ProposalRef	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -242,7 +247,12 @@ func (in *ProposalRef) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/slot-proposals/{proposalId}/withdraw [post]
-func (m Proposals) withdrawProposal(ctx context.Context, c *ops.Call, in *ProposalRef) (Job, error) {
+func (m Proposals) withdrawProposal(ctx context.Context, c *ops.Call, in *ProposalRef) (MaintenanceJob, error) {
+	return written(m.withdrawProposalJob(ctx, c, in))
+}
+
+// withdrawProposalJob is withdrawProposal answering the job with its detail extras.
+func (m Proposals) withdrawProposalJob(ctx context.Context, c *ops.Call, in *ProposalRef) (Job, error) {
 	if _, err := m.Delivery.lock(ctx, c, in.JobID); err != nil {
 		return Job{}, err
 	}
@@ -322,7 +332,7 @@ func (in *RespondInput) Validate() map[string]string {
 // @Param			jobId				path		string			true	"input field jobId"
 // @Param			proposalId			path		string			true	"input field proposalId"
 // @Param			request				body		RespondInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -333,7 +343,12 @@ func (in *RespondInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/slot-proposals/{proposalId}/respond [post]
-func (m Proposals) respond(ctx context.Context, c *ops.Call, in *RespondInput) (Job, error) {
+func (m Proposals) respond(ctx context.Context, c *ops.Call, in *RespondInput) (MaintenanceJob, error) {
+	return written(m.respondJob(ctx, c, in))
+}
+
+// respondJob is respond answering the job with its detail extras.
+func (m Proposals) respondJob(ctx context.Context, c *ops.Call, in *RespondInput) (Job, error) {
 	r, err := m.Delivery.load(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
@@ -480,7 +495,7 @@ func (in *RescheduleInput) Validate() map[string]string {
 // @Param			X-Expected-Version	header		integer			true	"all: required (target job, read jobs.get;jobs.list)"
 // @Param			jobId				path		string			true	"input field jobId"
 // @Param			request				body		RescheduleInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -491,7 +506,12 @@ func (in *RescheduleInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/request-reschedule [post]
-func (m Proposals) requestReschedule(ctx context.Context, c *ops.Call, in *RescheduleInput) (Job, error) {
+func (m Proposals) requestReschedule(ctx context.Context, c *ops.Call, in *RescheduleInput) (MaintenanceJob, error) {
+	return written(m.requestRescheduleJob(ctx, c, in))
+}
+
+// requestRescheduleJob is requestReschedule answering the job with its detail extras.
+func (m Proposals) requestRescheduleJob(ctx context.Context, c *ops.Call, in *RescheduleInput) (Job, error) {
 	r, err := m.Delivery.load(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
@@ -582,7 +602,7 @@ func (in *PartnerProposeInput) Validate() map[string]string {
 // @Param			X-Expected-Version	header		integer				true	"all: required (target job, read jobs.get;jobs.list)"
 // @Param			jobId				path		string				true	"input field jobId"
 // @Param			request				body		PartnerProposeInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -593,7 +613,12 @@ func (in *PartnerProposeInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/partner-slot-proposals [post]
-func (m Proposals) proposePartner(ctx context.Context, c *ops.Call, in *PartnerProposeInput) (Job, error) {
+func (m Proposals) proposePartner(ctx context.Context, c *ops.Call, in *PartnerProposeInput) (MaintenanceJob, error) {
+	return written(m.proposePartnerJob(ctx, c, in))
+}
+
+// proposePartnerJob is proposePartner answering the job with its detail extras.
+func (m Proposals) proposePartnerJob(ctx context.Context, c *ops.Call, in *PartnerProposeInput) (Job, error) {
 	var expires time.Time
 	err := c.Tx.QueryRow(ctx, `SELECT offer_expires_at FROM maintenance.offers WHERE id = $1 AND job_id = $2 AND contractor_org_id = $3 AND decision IS NULL AND expired_at IS NULL FOR UPDATE`,
 		in.OfferID, in.JobID, c.Principal.OrgID).Scan(&expires)
@@ -666,7 +691,7 @@ func (m Proposals) partnerProposal(ctx context.Context, c *ops.Call, in *Proposa
 // @Param			jobId				path		string		true	"input field jobId"
 // @Param			proposalId			path		string		true	"input field proposalId"
 // @Param			request				body		ProposalRef	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -677,7 +702,12 @@ func (m Proposals) partnerProposal(ctx context.Context, c *ops.Call, in *Proposa
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/partner-slot-proposals/{proposalId}/withdraw [post]
-func (m Proposals) withdrawPartner(ctx context.Context, c *ops.Call, in *ProposalRef) (Job, error) {
+func (m Proposals) withdrawPartner(ctx context.Context, c *ops.Call, in *ProposalRef) (MaintenanceJob, error) {
+	return written(m.withdrawPartnerJob(ctx, c, in))
+}
+
+// withdrawPartnerJob is withdrawPartner answering the job with its detail extras.
+func (m Proposals) withdrawPartnerJob(ctx context.Context, c *ops.Call, in *ProposalRef) (Job, error) {
 	status, _, _, _, _, err := m.partnerProposal(ctx, c, in, true)
 	if err != nil {
 		return Job{}, err
@@ -737,7 +767,7 @@ func (in *ResolveInput) Validate() map[string]string {
 // @Param			jobId				path		string			true	"input field jobId"
 // @Param			proposalId			path		string			true	"input field proposalId"
 // @Param			request				body		ResolveInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -748,7 +778,12 @@ func (in *ResolveInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/partner-slot-proposals/{proposalId}/resolve [post]
-func (m Proposals) resolvePartner(ctx context.Context, c *ops.Call, in *ResolveInput) (Job, error) {
+func (m Proposals) resolvePartner(ctx context.Context, c *ops.Call, in *ResolveInput) (MaintenanceJob, error) {
+	return written(m.resolvePartnerJob(ctx, c, in))
+}
+
+// resolvePartnerJob is resolvePartner answering the job with its detail extras.
+func (m Proposals) resolvePartnerJob(ctx context.Context, c *ops.Call, in *ResolveInput) (Job, error) {
 	status, _, slot, tech, org, err := m.partnerProposal(ctx, c, &ProposalRef{JobID: in.JobID, ProposalID: in.ProposalID}, false)
 	if err != nil {
 		return Job{}, err

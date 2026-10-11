@@ -41,8 +41,11 @@ func TestJobsCreate(t *testing.T) {
 	code, m := write(s, &customerA, "jobs.create", jobBody(unit, map[string]string{"contactWindow": `" Weekdays 09:00-18:00 "`}), 0)
 	j := data(m)
 	if code != 200 || j["status"] != "requested" || j["origin"] != "client_request" || len(j["preferredSlots"].([]any)) != 3 ||
-		j["dueAt"] != clock.Add(27*time.Hour).Format(time.RFC3339) || j["contactWindow"] != "Weekdays 09:00-18:00" || j["projection"] != "detail" || j["preferenceRound"].(float64) != 1 {
+		j["dueAt"] != clock.Add(27*time.Hour).Format(time.RFC3339) || j["contactWindow"] != "Weekdays 09:00-18:00" || j["preferenceRound"].(float64) != 1 {
 		t.Fatalf("create: %d %v", code, m)
+	}
+	if _, detail := j["projection"]; detail { // the write answers MaintenanceJob; the projections are jobs.get's (IR392)
+		t.Errorf("jobs.create answers a projection: %v", j)
 	}
 	// HQ receives every field (IR42): a reader without job.write sees the customer's contact window too (IR353)
 	owner(t, `DELETE FROM identity.membership_permissions WHERE membership_id = $1 AND permission = 'job.write'`, seed.ID("hq-restriction-manager"))

@@ -86,8 +86,8 @@ type Assignment struct {
 	TechnicianName *string `json:"technicianName"`
 }
 
-// Job is MaintenanceJob of service-contracts.ts plus the JobDetail / JobSummary extras.
-type Job struct {
+// MaintenanceJob is MaintenanceJob of service-contracts.ts: what a job write answers (IR392).
+type MaintenanceJob struct {
 	ID                  uuid.UUID       `json:"id"`
 	TenantID            uuid.UUID       `json:"tenantId"`
 	Version             int             `json:"version"`
@@ -122,6 +122,11 @@ type Job struct {
 	Rating              json.RawMessage `json:"rating" swaggertype:"object"`
 	CustomerConfirmedAt *time.Time      `json:"customerConfirmedAt"`
 	WarrantyClaims      json.RawMessage `json:"warrantyClaims" swaggertype:"object"`
+}
+
+// Job is a MaintenanceJob with the JobDetail / JobSummary extras, as jobs.get and the job projections read it.
+type Job struct {
+	MaintenanceJob
 	// detail
 	Projection  string      `json:"projection"`
 	Assignment  *Assignment `json:"assignment"`
@@ -130,6 +135,10 @@ type Job struct {
 	// summary-only
 	customerOrg uuid.UUID
 }
+
+// written is the answer of a job write: the job in the caller's projection without the JobDetail extras, as the
+// contract's MaintenanceJob (IR392).
+func written(j Job, err error) (MaintenanceJob, error) { return j.MaintenanceJob, err }
 
 const jobCols = `j.id, j.tenant_id, j.version, j.created_at, j.updated_at, j.plan_id, j.occurrence_at, j.unit_id, j.type, j.status, j.symptom, j.contact_window,
 	lower(j.requested_slot), upper(j.requested_slot), j.origin, j.preferred_slots, j.preference_round, lower(j.scheduled_slot), upper(j.scheduled_slot), j.due_at,
@@ -288,7 +297,7 @@ func PreferredSlotsOK(now time.Time, slots []Slot) bool {
 // @Produce		json
 // @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			request			body		CreateInput	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Job}
+// @Success		200				{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
@@ -299,7 +308,12 @@ func PreferredSlotsOK(now time.Time, slots []Slot) bool {
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs [post]
-func (m Jobs) create(ctx context.Context, c *ops.Call, in *CreateInput) (Job, error) {
+func (m Jobs) create(ctx context.Context, c *ops.Call, in *CreateInput) (MaintenanceJob, error) {
+	return written(m.createJob(ctx, c, in))
+}
+
+// createJob is create answering the job with its detail extras.
+func (m Jobs) createJob(ctx context.Context, c *ops.Call, in *CreateInput) (Job, error) {
 	if c.Principal.Role == "client" && in.DueAt != nil {
 		return Job{}, apperr.Fields(map[string]string{"dueAt": "error.notAllowed"})
 	}
@@ -1136,7 +1150,7 @@ func (m Jobs) finishScoped(ctx context.Context, c *ops.Call, id uuid.UUID, actio
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
 // @Param			jobId				path		string		true	"input field jobId"
 // @Param			request				body		CancelInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -1147,7 +1161,12 @@ func (m Jobs) finishScoped(ctx context.Context, c *ops.Call, id uuid.UUID, actio
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/cancel [post]
-func (m Jobs) cancel(ctx context.Context, c *ops.Call, in *CancelInput) (Job, error) {
+func (m Jobs) cancel(ctx context.Context, c *ops.Call, in *CancelInput) (MaintenanceJob, error) {
+	return written(m.cancelJob(ctx, c, in))
+}
+
+// cancelJob is cancel answering the job with its detail extras.
+func (m Jobs) cancelJob(ctx context.Context, c *ops.Call, in *CancelInput) (Job, error) {
 	status, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
@@ -1208,7 +1227,7 @@ func (in *ReasonInput) Validate() map[string]string {
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
 // @Param			jobId				path		string		true	"input field jobId"
 // @Param			request				body		ReasonInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -1219,7 +1238,12 @@ func (in *ReasonInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/hold [post]
-func (m Jobs) hold(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, error) {
+func (m Jobs) hold(ctx context.Context, c *ops.Call, in *ReasonInput) (MaintenanceJob, error) {
+	return written(m.holdJob(ctx, c, in))
+}
+
+// holdJob is hold answering the job with its detail extras.
+func (m Jobs) holdJob(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, error) {
 	status, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
@@ -1249,7 +1273,7 @@ func (m Jobs) hold(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, erro
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
 // @Param			jobId				path		string		true	"input field jobId"
 // @Param			request				body		ReasonInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -1260,7 +1284,12 @@ func (m Jobs) hold(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, erro
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/resume-hold [post]
-func (m Jobs) resumeHold(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, error) {
+func (m Jobs) resumeHold(ctx context.Context, c *ops.Call, in *ReasonInput) (MaintenanceJob, error) {
+	return written(m.resumeHoldJob(ctx, c, in))
+}
+
+// resumeHoldJob is resumeHold answering the job with its detail extras.
+func (m Jobs) resumeHoldJob(ctx context.Context, c *ops.Call, in *ReasonInput) (Job, error) {
 	status, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err

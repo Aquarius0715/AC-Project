@@ -629,7 +629,7 @@ func (m Reports) lockJob(ctx context.Context, c *ops.Call, id uuid.UUID) (string
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;reports.get)"
 // @Param			jobId				path		string		true	"input field jobId"
 // @Param			request				body		SubmitInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -640,7 +640,12 @@ func (m Reports) lockJob(ctx context.Context, c *ops.Call, id uuid.UUID) (string
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/submit [post]
-func (m Reports) submit(ctx context.Context, c *ops.Call, in *SubmitInput) (Job, error) {
+func (m Reports) submit(ctx context.Context, c *ops.Call, in *SubmitInput) (MaintenanceJob, error) {
+	return written(m.submitJob(ctx, c, in))
+}
+
+// submitJob is submit answering the job with its detail extras.
+func (m Reports) submitJob(ctx context.Context, c *ops.Call, in *SubmitInput) (Job, error) {
 	status, unit, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
@@ -809,7 +814,7 @@ func (in *ReviewInput) Validate() map[string]string {
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;reports.get)"
 // @Param			jobId				path		string		true	"input field jobId"
 // @Param			request				body		ReviewInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -820,7 +825,12 @@ func (in *ReviewInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/review [post]
-func (m Reports) review(ctx context.Context, c *ops.Call, in *ReviewInput) (Job, error) {
+func (m Reports) review(ctx context.Context, c *ops.Call, in *ReviewInput) (MaintenanceJob, error) {
+	return written(m.reviewJob(ctx, c, in))
+}
+
+// reviewJob is review answering the job with its detail extras.
+func (m Reports) reviewJob(ctx context.Context, c *ops.Call, in *ReviewInput) (Job, error) {
 	var contractor *uuid.UUID
 	if err := c.Tx.QueryRow(ctx, `SELECT contractor_org_id FROM maintenance.jobs WHERE id = $1`, in.JobID).Scan(&contractor); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -921,7 +931,7 @@ func NewDraftFromLatest(ctx context.Context, c *ops.Call, job uuid.UUID) error {
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
 // @Param			jobId				path		string		true	"input field jobId"
 // @Param			request				body		JobIDInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -932,7 +942,12 @@ func NewDraftFromLatest(ctx context.Context, c *ops.Call, job uuid.UUID) error {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/resume-rework [post]
-func (m Reports) resumeRework(ctx context.Context, c *ops.Call, in *JobIDInput) (Job, error) {
+func (m Reports) resumeRework(ctx context.Context, c *ops.Call, in *JobIDInput) (MaintenanceJob, error) {
+	return written(m.resumeReworkJob(ctx, c, in))
+}
+
+// resumeReworkJob is resumeRework answering the job with its detail extras.
+func (m Reports) resumeReworkJob(ctx context.Context, c *ops.Call, in *JobIDInput) (Job, error) {
 	status, _, err := m.lockJob(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err

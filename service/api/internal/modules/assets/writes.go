@@ -432,7 +432,7 @@ func (in *UnitSave) Validate() map[string]string {
 // @Produce		json
 // @Param			Idempotency-Key	header		string		true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
 // @Param			request			body		UnitSave	true	"input"
-// @Success		200				{object}	ops.Envelope{data=Unit}
+// @Success		200				{object}	ops.Envelope{data=ACUnit}
 // @Failure		401				{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403				{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404				{object}	apperr.DomainError	"NOT_FOUND"
@@ -443,7 +443,13 @@ func (in *UnitSave) Validate() map[string]string {
 // @Failure		504				{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/units [post]
-func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (Unit, error) {
+func (m *Module) unitsSave(ctx context.Context, c *ops.Call, in *UnitSave) (ACUnit, error) {
+	u, err := m.unitsSaveUnit(ctx, c, in)
+	return u.ACUnit, err
+}
+
+// unitsSaveUnit is unitsSave answering the unit with its summary fields.
+func (m *Module) unitsSaveUnit(ctx context.Context, c *ops.Call, in *UnitSave) (Unit, error) {
 	if in.InstalledAt != nil && in.InstalledAt.After(c.Now) {
 		return Unit{}, apperr.Fields(map[string]string{"installedAt": "error.future"})
 	}

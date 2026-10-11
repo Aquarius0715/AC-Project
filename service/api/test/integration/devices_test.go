@@ -53,7 +53,8 @@ func TestDevicesRegisterListGet(t *testing.T) {
 		t.Fatalf("register: %d %v", code, m)
 	}
 	d := data(m)
-	if d["serial"] != strings.ToUpper(serial) || len(d["sensors"].([]any)) != 2 || d["unitId"] != nil || d["targetUnitId"] != unit || d["activeOperation"] != nil {
+	_, detail := d["activeOperation"] // the write answers Device; calibrations and the running operation are devices.get's (IR392)
+	if d["serial"] != strings.ToUpper(serial) || len(d["sensors"].([]any)) != 2 || d["unitId"] != nil || d["targetUnitId"] != unit || detail {
 		t.Fatalf("device (unbound until bind, D05): %v", d)
 	}
 	dev := d["id"].(string)

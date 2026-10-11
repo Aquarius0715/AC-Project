@@ -25,8 +25,8 @@ type ObservedState struct {
 	ObservedAt *time.Time `json:"observedAt"`
 }
 
-// Unit is ACUnit plus the UnitSummary fields this module owns.
-type Unit struct {
+// ACUnit is ACUnit of service-contracts.ts: what a unit write answers (IR392).
+type ACUnit struct {
 	ID                  uuid.UUID       `json:"id"`
 	TenantID            uuid.UUID       `json:"tenantId"`
 	Version             int             `json:"version"`
@@ -48,9 +48,14 @@ type Unit struct {
 	ObservedState       ObservedState   `json:"observedState"`
 	ObservedRestriction json.RawMessage `json:"observedRestriction" swaggertype:"object"`
 	LastSeenAt          *time.Time      `json:"lastSeenAt"`
-	EffectivePowerState string          `json:"effectivePowerState"`
-	LatestMeasurements  []any           `json:"latestMeasurements"`
-	ActiveAlertCount    int             `json:"activeAlertCount"`
+}
+
+// Unit is UnitSummary: ACUnit plus the summary fields this module owns.
+type Unit struct {
+	ACUnit
+	EffectivePowerState string `json:"effectivePowerState"`
+	LatestMeasurements  []any  `json:"latestMeasurements"`
+	ActiveAlertCount    int    `json:"activeAlertCount"`
 }
 
 // UnitDetail is UnitDetail of service-contracts.ts: the unit summary plus the detail parts other modules own.

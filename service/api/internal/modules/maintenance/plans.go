@@ -378,7 +378,7 @@ func (in *GenerateInput) Validate() map[string]string {
 // @Param			X-Expected-Version	header		integer			true	"all: required (target plan, read plans.get)"
 // @Param			id					path		string			true	"input field id"
 // @Param			request				body		GenerateInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -389,7 +389,12 @@ func (in *GenerateInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/plans/{id}/generate-next [post]
-func (m Plans) generateNext(ctx context.Context, c *ops.Call, in *GenerateInput) (Job, error) {
+func (m Plans) generateNext(ctx context.Context, c *ops.Call, in *GenerateInput) (MaintenanceJob, error) {
+	return written(m.generateNextJob(ctx, c, in))
+}
+
+// generateNextJob is generateNext answering the job with its detail extras.
+func (m Plans) generateNextJob(ctx context.Context, c *ops.Call, in *GenerateInput) (Job, error) {
 	p, err := m.load(ctx, c, in.ID, true)
 	if err != nil {
 		return Job{}, err

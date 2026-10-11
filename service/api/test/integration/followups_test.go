@@ -228,9 +228,11 @@ func TestCostsAccessWarrantyAndProjections(t *testing.T) {
 	if code, m := write(s, &hq, "jobs.extendAccess", `{"jobId":"`+j2+`","accessValidUntil":"`+ts(200)+`","reason":" "}`, 3); code != 422 || fields(m) != "reason=error.length" {
 		t.Errorf("extension reason: %d %s", code, fields(m))
 	}
-	if code, m := write(s, &hq, "jobs.extendAccess", `{"jobId":"`+j2+`","accessValidUntil":"`+ts(200)+`","reason":"parts delayed"}`, 3); code != 200 ||
-		data(m)["offer"].(map[string]any)["accessValidUntil"] != ts(200) {
+	if code, m := write(s, &hq, "jobs.extendAccess", `{"jobId":"`+j2+`","accessValidUntil":"`+ts(200)+`","reason":"parts delayed"}`, 3); code != 200 {
 		t.Fatalf("extend: %d %v", code, m)
+	}
+	if _, m := post(s, &hq, "jobs.get", `{"jobId":"`+j2+`"}`); data(m)["offer"].(map[string]any)["accessValidUntil"] != ts(200) { // the write answers MaintenanceJob (IR392)
+		t.Fatalf("extended access: %v", data(m)["offer"])
 	}
 	if _, m := post(s, &contrA, "jobs.get", `{"jobId":"`+j2+`"}`); data(m)["offer"] == nil || len(data(m)["costs"].([]any)) != 0 {
 		t.Fatalf("contractor detail: %v", m)

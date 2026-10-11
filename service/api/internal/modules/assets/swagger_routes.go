@@ -119,7 +119,7 @@ func swaggerSpacesSaveUpdate() {}
 //	@Param			X-Expected-Version	header		integer		true	"id present: required (target units, read units.list)"
 //	@Param			id					path		string		true	"input field id"
 //	@Param			request				body		UnitSave	true	"input; the path parameters come from the route"
-//	@Success		200					{object}	ops.Envelope{data=Unit}
+//	@Success		200					{object}	ops.Envelope{data=ACUnit}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 //	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"

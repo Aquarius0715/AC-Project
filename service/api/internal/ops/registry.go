@@ -10,6 +10,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -97,6 +98,7 @@ type Operation struct {
 	Spec     Spec
 	Expr     authz.Expr
 	NewInput func() any
+	Result   reflect.Type // the handler's result type, held to the contract's result by TestResultsMatchContract (IR392)
 	Handle   func(ctx context.Context, c *Call, in any) (any, error)
 }
 
@@ -181,6 +183,7 @@ func Register[I any, O any](r *Registry, name string, h func(context.Context, *C
 	r.ops[name] = &Operation{
 		Spec: spec, Expr: expr,
 		NewInput: func() any { return new(I) },
+		Result:   reflect.TypeOf((*O)(nil)).Elem(),
 		Handle:   func(ctx context.Context, c *Call, in any) (any, error) { return h(ctx, c, in.(*I)) },
 	}
 }

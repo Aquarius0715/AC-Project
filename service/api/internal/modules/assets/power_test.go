@@ -10,7 +10,7 @@ func TestEffectivePower(t *testing.T) {
 	on, off := true, false
 	at := func(d time.Duration) *time.Time { x := now.Add(d); return &x }
 	mk := func(conn string, p *bool, obs *time.Time) *Unit {
-		return &Unit{Connection: conn, ObservedState: ObservedState{Power: p, ObservedAt: obs}}
+		return &Unit{ACUnit: ACUnit{Connection: conn, ObservedState: ObservedState{Power: p, ObservedAt: obs}}}
 	}
 	cases := []struct {
 		u           *Unit

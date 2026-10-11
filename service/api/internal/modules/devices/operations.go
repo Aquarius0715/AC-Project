@@ -127,7 +127,7 @@ func (in *BindInput) Validate() map[string]string {
 //	@Param			X-Expected-Version	header		integer		true	"all: required (target device, read devices.get)"
 //	@Param			deviceId			path		string		true	"input field deviceId"
 //	@Param			request				body		BindInput	true	"input; the path parameters come from the route"
-//	@Success		200					{object}	ops.Envelope{data=DeviceDetail}
+//	@Success		200					{object}	ops.Envelope{data=Device}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 //	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -138,7 +138,13 @@ func (in *BindInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/devices/{deviceId}/bind [post]
-func (m *Module) bind(ctx context.Context, c *ops.Call, in *BindInput) (DeviceDetail, error) {
+func (m *Module) bind(ctx context.Context, c *ops.Call, in *BindInput) (Device, error) {
+	d, err := m.bindDetail(ctx, c, in)
+	return d.Device, err
+}
+
+// bindDetail is bind answering the device with its detail (IR392: the write itself answers Device).
+func (m *Module) bindDetail(ctx context.Context, c *ops.Call, in *BindInput) (DeviceDetail, error) {
 	if err := m.technicianGate(ctx, c, in.JobID, in.UnitID); err != nil {
 		return DeviceDetail{}, err
 	}

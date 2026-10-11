@@ -143,7 +143,7 @@ func (in *SetPoliciesInput) Validate() map[string]string {
 //	@Param			X-Expected-Version	header		integer				true	"all: required (target units, read units.get)"
 //	@Param			unitId				path		string				true	"input field unitId"
 //	@Param			request				body		SetPoliciesInput	true	"input; the path parameters come from the route"
-//	@Success		200					{object}	ops.Envelope{data=Unit}
+//	@Success		200					{object}	ops.Envelope{data=ACUnit}
 //	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 //	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 //	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -154,7 +154,13 @@ func (in *SetPoliciesInput) Validate() map[string]string {
 //	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 //	@Security		BearerAuth
 //	@Router			/v1/units/{unitId}/alert-policies [put]
-func (m *Module) unitsSetAlertPolicies(ctx context.Context, c *ops.Call, in *SetPoliciesInput) (Unit, error) {
+func (m *Module) unitsSetAlertPolicies(ctx context.Context, c *ops.Call, in *SetPoliciesInput) (ACUnit, error) {
+	u, err := m.unitsSetAlertPoliciesUnit(ctx, c, in)
+	return u.ACUnit, err
+}
+
+// unitsSetAlertPoliciesUnit is unitsSetAlertPolicies answering the unit with its summary fields.
+func (m *Module) unitsSetAlertPoliciesUnit(ctx context.Context, c *ops.Call, in *SetPoliciesInput) (Unit, error) {
 	var org uuid.UUID
 	var customerID *uuid.UUID
 	err := c.Tx.QueryRow(ctx, `SELECT u.customer_org_id, (SELECT id FROM assets.customers WHERE organization_id = u.customer_org_id)

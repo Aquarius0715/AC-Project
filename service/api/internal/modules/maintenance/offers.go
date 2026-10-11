@@ -169,7 +169,7 @@ func (in *OfferInput) Validate() map[string]string {
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
 // @Param			jobId				path		string		true	"input field jobId"
 // @Param			request				body		OfferInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -180,7 +180,12 @@ func (in *OfferInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/offers [post]
-func (m Delivery) offer(ctx context.Context, c *ops.Call, in *OfferInput) (Job, error) {
+func (m Delivery) offer(ctx context.Context, c *ops.Call, in *OfferInput) (MaintenanceJob, error) {
+	return written(m.offerJob(ctx, c, in))
+}
+
+// offerJob is offer answering the job with its detail extras.
+func (m Delivery) offerJob(ctx context.Context, c *ops.Call, in *OfferInput) (Job, error) {
 	if !c.Now.Before(in.OfferExpiresAt) {
 		return Job{}, apperr.Fields(map[string]string{"offerExpiresAt": "error.past"})
 	}
@@ -443,7 +448,7 @@ func (in *AssignInput) Validate() map[string]string {
 // @Param			X-Expected-Version	header		integer		true	"all: required (target job, read jobs.get;jobs.list)"
 // @Param			jobId				path		string		true	"input field jobId"
 // @Param			request				body		AssignInput	true	"input; the path parameters come from the route"
-// @Success		200					{object}	ops.Envelope{data=Job}
+// @Success		200					{object}	ops.Envelope{data=MaintenanceJob}
 // @Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
 // @Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
 // @Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
@@ -454,7 +459,12 @@ func (in *AssignInput) Validate() map[string]string {
 // @Failure		504					{object}	apperr.DomainError	"TIMEOUT"
 // @Security		BearerAuth
 // @Router			/v1/jobs/{jobId}/assign [post]
-func (m Delivery) assign(ctx context.Context, c *ops.Call, in *AssignInput) (Job, error) {
+func (m Delivery) assign(ctx context.Context, c *ops.Call, in *AssignInput) (MaintenanceJob, error) {
+	return written(m.assignJob(ctx, c, in))
+}
+
+// assignJob is assign answering the job with its detail extras.
+func (m Delivery) assignJob(ctx context.Context, c *ops.Call, in *AssignInput) (Job, error) {
 	r, err := m.load(ctx, c, in.JobID)
 	if err != nil {
 		return Job{}, err
