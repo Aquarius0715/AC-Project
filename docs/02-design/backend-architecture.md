@@ -1,6 +1,6 @@
 ---
 document_id: DD-BACKEND
-version: 0.37.0
+version: 0.38.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -221,16 +221,18 @@ Modelling rules:
 | Filter cleaning reminders | Every 15 minutes of business time: an overdue unit once per cleaning cycle (customer settings) | FR-C18, IR239 |
 | Automation schedules | Schedule start / end | FR-C04 |
 | Monthly energy report | Month end, when enabled in preferences | FR-C16 |
+| Contractor payout drafts | The 1st of each month (Kuala Lumpur): the drafts of the month that ended, once | FR-A23, FR-P10, IR341 |
 | Firmware campaign waves | Campaign schedule: the notice 24 h before, the start, waves at 95 % success inside the window, auto-pause | FR-A20, IR339 |
 
 The scheduler claims due items with a database lease (`FOR UPDATE SKIP LOCKED`) so that each item runs once even with several instances; handlers are idempotent and audited with actorRoleAtTime=system.
 
-As built (IR335), the worker runs one scheduler per business domain (IR195). Each scheduler ticks every second of business time, with one transaction per tenant. Each transition is a set-based update guarded by the state it leaves, for example `status = 'offered' AND offer_expires_at <= now`, so a second run finds nothing to change. No lease table is used yet: `platform.scheduled_items` stays empty, and compose runs one scheduler per domain. Several instances would need the lease above (OPEN-BE-08).
+As built (IR335), the worker runs one scheduler per business domain with clock-driven work: equipment, maintenance and billing (IR195, IR341). Each scheduler ticks every second of business time, with one transaction per tenant. Each transition is a set-based update guarded by the state it leaves, for example `status = 'offered' AND offer_expires_at <= now`, so a second run finds nothing to change. No lease table is used yet: `platform.scheduled_items` stays empty, and compose runs one scheduler per domain. Several instances would need the lease above (OPEN-BE-08).
 
 | Scheduler | Built transitions |
 |---|---|
 | Equipment | Command expiry at `expiresAt`, diagnostic run ends (IR123), automation schedules (FR-C04, IR54), device operation start and time-out (IR67), firmware campaigns (IR339), warranty reminders (IR340) |
 | Maintenance | Offer expiry, the slot proposal reply deadline (IR113), auto-confirm of completed jobs (FR-C17), the work window end (the assignment history is frozen, IR89), filter cleaning reminders (IR239), certificate expiry reminders (IR336) |
+| Billing | The contractor payout drafts of the month that ended, on the 1st (IR341) |
 
 Items of the table above that are not scheduled yet:
 
@@ -309,4 +311,4 @@ Items of the table above that are not scheduled yet:
 | OPEN-BE-07 | Contractor payout rail (bank transfer file or Stripe Connect) | Payouts (FR-A23) |
 | OPEN-BE-08 | The scheduled items that are not built yet (§10 as built) and the lease (`platform.scheduled_items`, `FOR UPDATE SKIP LOCKED`) for running several scheduler instances per domain | Scheduler, worker |
 
-Additional contracts for current version 0.37.0: Read IR01–IR340 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.38.0: Read IR01–IR341 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

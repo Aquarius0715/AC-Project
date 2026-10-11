@@ -723,6 +723,36 @@ func (m Payouts) list(ctx context.Context, c *ops.Call, in *paging.Query) (pagin
 }
 
 // RegisterPayouts binds the payout operations.
+// ---- monthly drafts (scheduler job) ----
+
+// endedPeriod is the month (YYYY-MM) that ended last before now in Kuala Lumpur.
+func endedPeriod(now time.Time) string {
+	l := now.In(kualaLumpur)
+	return time.Date(l.Year(), l.Month(), 1, 0, 0, 0, 0, kualaLumpur).AddDate(0, -1, 0).Format("2006-01")
+}
+
+// GenerateMonthly is the billing scheduler job of BR-A23 / BR-P10 (IR341). On the 1st of each month (Kuala Lumpur)
+// it generates the drafts of the month that ended, exactly as payouts.generate does, once per month
+// (billing.payout_runs). A month that ended while the scheduler was down is generated at its first tick. HQ can
+// still regenerate the drafts; approved and paid statements are never touched.
+func (m Payouts) GenerateMonthly(ctx context.Context, c *ops.Call) (int, error) {
+	period := endedPeriod(c.Now)
+	tag, err := c.Tx.Exec(ctx, `INSERT INTO billing.payout_runs (tenant_id, period, ran_at) VALUES (current_setting('app.tenant_id')::uuid, $1, $2) ON CONFLICT DO NOTHING`,
+		period, c.Now)
+	if err != nil || tag.RowsAffected() == 0 { // generated already
+		return 0, err
+	}
+	drafts, err := m.generate(ctx, c, &GenerateInput{Period: period})
+	if err != nil {
+		return 0, err
+	}
+	if _, err := c.Tx.Exec(ctx, `UPDATE billing.payout_runs SET statements = $2 WHERE tenant_id = current_setting('app.tenant_id')::uuid AND period = $1`,
+		period, len(drafts)); err != nil {
+		return 0, err
+	}
+	return 1, nil
+}
+
 func RegisterPayouts(r *ops.Registry, m Payouts) {
 	ops.Register(r, "payouts.generate", m.generate)
 	ops.Register(r, "payouts.transition", m.transition)

@@ -1506,6 +1506,14 @@ CREATE TABLE billing.payout_queries (
   resolved_at   timestamptz
 );
 
+CREATE TABLE billing.payout_runs (               -- BR-A23: the scheduler's monthly draft generation, once per month (IR341)
+  tenant_id   uuid NOT NULL,
+  period      text NOT NULL CHECK (period ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),   -- YYYY-MM, Asia/Kuala_Lumpur
+  ran_at      timestamptz NOT NULL,
+  statements  int NOT NULL DEFAULT 0,                  -- drafts generated
+  PRIMARY KEY (tenant_id, period)
+);
+
 -- ---------------------------------------------------------------------------------------------
 -- restrictions
 -- ---------------------------------------------------------------------------------------------

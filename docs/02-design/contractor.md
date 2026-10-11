@@ -1,6 +1,6 @@
 ---
 document_id: DD-P
-version: 0.33.0
+version: 0.34.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -356,11 +356,13 @@ Scope: FR-P10 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 **Boundary cases and failures**: Draft or other-company statements are NOT_FOUND. Network failure keeps the message for retry.
 
+**Statements (BR-P10, IR341)**: HQ's drafts of the month that ended are generated on the 1st by the billing scheduler; the contractor sees a statement once HQ approves it.
+
 **Verification**: Check the traceability entries under AT-P10 (N/E/B).
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.33.0: Read IR01–IR336 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.34.0: Read IR01–IR341 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 0.14.0: Under IR25, get the pre-acceptance address from the unit's installation property. After expiry, freeze only report presence and acceptance state for report display.
 

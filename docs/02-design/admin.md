@@ -1,6 +1,6 @@
 ---
 document_id: DD-A
-version: 0.50.0
+version: 0.51.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -866,6 +866,8 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 **Boundary cases and failures**: Mark paid before the pay date or on a draft → CONFLICT.
 
+**Monthly drafts (BR-A23, IR341)**: the billing scheduler generates the drafts of the month that ended on the 1st (Kuala Lumpur), once per month, as Generate drafts does. Generate drafts regenerates them later; approved and paid statements are never touched.
+
 **Verification**: Check the traceability entries under AT-A23 (N/E/B).
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
@@ -876,7 +878,7 @@ Scope: FR-A23 / Main display pattern: **UI-LIST / UI-DETAIL**. Service boundary:
 
 A07 may save only when Contract.activeRestrictionIds is empty and hasUnresolvedRecovery=false. Resolving an A09 recovery case does not release a successor restriction. Device demo events use bindingId fetched from Device (SR24/SR26).
 
-Additional contracts for current version 0.50.0: Read IR01–IR340 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.51.0: Read IR01–IR341 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
 
 A13/A14 distinguish IR11 boundaryId (fixed options) from boundary (description). MRV supports on-screen previews of saved versions; file export is outside scope (IR15).
 

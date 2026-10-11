@@ -1,12 +1,12 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "003f771ba319d94ff40569f84790f6a40446c6bd363086f7579ad0335ee05b91",
+  "spec_baseline_id": "385f8a63c75913bcc15395a04b40befc7de1cffcdbf588407c8549adbbd67fee",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
     {
       "path": "00-prepare/PrepareDocument.md",
-      "sha256": "55ddd4489ab758d70fa701eba7f52e29084b7ec97a366647acd2329d0e1c4565"
+      "sha256": "d26d22f939e2e650707e0623f9afda73fdf99dfef3acdcb99a999b3b4387c7f0"
     },
     {
       "path": "00-prepare/company-requirement-map.csv",
@@ -94,7 +94,7 @@
     },
     {
       "path": "02-design/admin.md",
-      "sha256": "ba14dd30f7c143a8a7b593edaea35d6a2acb2a44e94892bc069182618ed9f721"
+      "sha256": "aa12cd667df22f43fe28cf8dd722f5cd17f04beffc8e10a1e408adc04b1ca419"
     },
     {
       "path": "02-design/api/swagger.json",
@@ -102,7 +102,7 @@
     },
     {
       "path": "02-design/backend-architecture.md",
-      "sha256": "b887b718a8d856dc601202173328f7bd1d1b6c92697d1acbe8d71fed2010a67a"
+      "sha256": "bf90abd10bd42de94374bcec3e60c6830f8662b4b6828d23303ac0b6fd723943"
     },
     {
       "path": "02-design/backend-go-design.md",
@@ -118,15 +118,15 @@
     },
     {
       "path": "02-design/container-design.md",
-      "sha256": "40022a949a620198863172d22c1237f1c459ffc3bcf1e1dd2858cced0d3ce223"
+      "sha256": "cf452c8f4c1977dcbd7072ec796c4d093ba0ff3d95f3cca347216a27a5462f40"
     },
     {
       "path": "02-design/contractor.md",
-      "sha256": "a1f396e52212b325c83e5412a4b1c24077a5c4f7a4357d7f026ebfc640d9e906"
+      "sha256": "c222462109a21c0535390477229f73b5cd92511b9f01c12a302778521cc46c9e"
     },
     {
       "path": "02-design/database-design.md",
-      "sha256": "10ef179fa6f3a3b31f42ca838e73f22a6ba158e5f0e2bff7a08fcdc80d788b02"
+      "sha256": "3c28c39a46062f1dd8957ce01abecc89fd0d7d38dbaba8adb4e04a62ea18341e"
     },
     {
       "path": "02-design/deterministic-contracts.md",
@@ -154,7 +154,7 @@
     },
     {
       "path": "02-design/review-resolution-contracts.md",
-      "sha256": "10e8369e7396dc645738662e515117fcdc483afff706e64e175084424f79c1e3"
+      "sha256": "29a4194fdf2b83c00f466df4030392e09af4a39fb3da342a2cbc611ae173fa43"
     },
     {
       "path": "02-design/service-contracts.ts",
@@ -282,7 +282,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "f1cd16f16cae77675b342f130089142aa7daed813f69e65f3b0bd89ac51baa52"
+      "sha256": "85d8a089e859f6aeb212b9a3302787d9fbf5b2f63e097ddf1180bd76f9871146"
     },
     {
       "path": "tools/check_review_regressions.py",
@@ -294,7 +294,7 @@
     },
     {
       "path": "tools/validate_documents.py",
-      "sha256": "0957e7d33cb4cd5d4c82568716ee2dd7034af1170a3378374664e6d4c1497442"
+      "sha256": "e7078653cf4744a33c9418918f016430a3d20d1460353a326cb32d8a56856965"
     }
   ]
 }

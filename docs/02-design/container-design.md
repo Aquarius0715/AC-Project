@@ -1,6 +1,6 @@
 ---
 document_id: DD-CONTAINER
-version: 0.32.0
+version: 0.33.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -28,7 +28,7 @@ Checked on 2026-10-07: the `web` image built from `service/web/Dockerfile` serve
 | `ac-customer-web` / `ac-partner-web` / `ac-technician-web` / `ac-admin-web` | `service/web/Dockerfile` with `--build-arg APP=<name>` (context `service/web/`, npm workspace with the shared package `service/web/shared`) | One Next.js standalone server per entry point (IR178); `DATA_SOURCE=mock` keeps the Phase 1A fixtures, `DATA_SOURCE=api` renders through the server-only DAL and Server Actions | Compose `<name>-web` (demo, ports 3000–3003) and `<name>-web-api` (full) / one ECS service per app behind the ALB (customer, partner, technician host names; admin host on the HQ network, IR117) |
 | `ac-gateway` / `ac-identity-api` / `ac-equipment-api` / `ac-maintenance-api` / `ac-billing-api` / `ac-energy-api` | `service/api/build/service.Dockerfile --build-arg SERVICE=<name>` (context `service/api/`, `./cmd/<name>`) | Static Go binary `/app/server` (IR180): the gateway routes the catalog's REST routes (IR222) to the business-domain service that owns each route's operation; each domain service serves only its operations (≈ 36 MB, gateway ≈ 22 MB); `/app/server healthcheck` | Compose `gateway` (port 8080) and five internal domain services / one ECS service each (the ALB can route the catalog's paths directly) |
 | `ac-migrate` | `service/api/build/migrate.Dockerfile` (context `service/api/`, `./cmd/migrate`) | Static Go binary `/app/migrate up` with the embedded migrations (IR167); locally `APP_LOGIN_PASSWORD` creates `ac_app_login` and the domain logins `ac_<domain>_login` (IR194) and `SEED_FIXTURE` loads the demo fixture once | Compose `migrate` (one-off; `api` and the workers wait for it) / ECS one-off task before the deploy |
-| `ac-worker` | `service/api/build/worker.Dockerfile` (context `service/api/`, `./cmd/worker`) | Static Go binary `/app/worker --role=<role>`; the scheduler runs per business domain (`--role=scheduler --domain=<equipment or maintenance>`, IR195) on the domain's database login, asking other domains through internal queries; other roles idle until built | Compose `worker-scheduler-<domain>` and `worker-*` / ECS services per role and domain |
+| `ac-worker` | `service/api/build/worker.Dockerfile` (context `service/api/`, `./cmd/worker`) | Static Go binary `/app/worker --role=<role>`; the scheduler runs per business domain (`--role=scheduler --domain=<equipment, maintenance or billing>`, IR195, IR341) on the domain's database login, asking other domains through internal queries; other roles idle until built | Compose `worker-scheduler-<domain>` and `worker-*` / ECS services per role and domain |
 
 One backend image with several entry commands keeps every service on the same build and version; each ECS service overrides the command (`/app/worker --role=telemetry`, …). The `iotbridge` and `devicesim` binaries are built only into the `dev` target and never pushed to the production repository.
 
@@ -84,7 +84,7 @@ COPY --from=build-dev /out/ /app/
 | `demo` | `customer-web`, `partner-web`, `technician-web`, `admin-web` (mock mode, ports 3000–3003) | Phase 1A clickable demo |
 | `infra` | PostgreSQL 16, Valkey, LocalStack, Mosquitto, Keycloak, stripe-mock, weather mock | Stand-ins for AWS services |
 | `schema` | one-off `migrate` (cmd/migrate): schema, local `ac_app_login` and the domain logins `ac_<domain>_login`, demo fixture | Database only, without the Go services |
-| `backend` | `migrate`, `gateway` (8080), `identity-api`, `equipment-api`, `maintenance-api`, `billing-api`, `energy-api`, `worker-scheduler-equipment`, `worker-scheduler-maintenance` and the idle `worker-*` roles, with the `infra` stand-ins | Go backend against the stand-ins (IR180, IR194, IR195) |
+| `backend` | `migrate`, `gateway` (8080), `identity-api`, `equipment-api`, `maintenance-api`, `billing-api`, `energy-api`, `worker-scheduler-equipment`, `worker-scheduler-maintenance`, `worker-scheduler-billing` and the idle `worker-*` roles, with the `infra` stand-ins | Go backend against the stand-ins (IR180, IR194, IR195, IR341) |
 | `full` | `customer-web-api`, `partner-web-api`, `technician-web-api`, `admin-web-api` (BFF mode, ports 3000–3003) + backend + infra | Production-like end-to-end runs and acceptance tests |
 | `planned` | `webhook` (8082), `iot-bridge`, `device-sim` | Services whose commands are not built yet; not started by the other profiles (IR197) |
 | `obs` | OpenTelemetry collector, Jaeger (16686) | Traces |
@@ -152,7 +152,7 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 |---|---|
 | Registry | Amazon ECR per account (dev, staging, prod), immutable tags, scan on push, cross-region replication to ap-southeast-1 |
 | Tags | `git-<sha>` (immutable) plus release tags; deployments reference digests |
-| Services | the four web apps `customer-web`, `partner-web`, `technician-web` and `admin-web` (IR178); `gateway` and the five domain services `identity-api`, `equipment-api`, `maintenance-api`, `billing-api` and `energy-api` (IR180); `webhook`, `worker-outbox`, `worker-scheduler-equipment`, `worker-scheduler-maintenance`, `worker-iot`, `worker-telemetry`, `worker-rollup`, `worker-automation`, `worker-notification` and `worker-importexport`; task `migrate` |
+| Services | the four web apps `customer-web`, `partner-web`, `technician-web` and `admin-web` (IR178); `gateway` and the five domain services `identity-api`, `equipment-api`, `maintenance-api`, `billing-api` and `energy-api` (IR180); `webhook`, `worker-outbox`, `worker-scheduler-equipment`, `worker-scheduler-maintenance`, `worker-scheduler-billing`, `worker-iot`, `worker-telemetry`, `worker-rollup`, `worker-automation`, `worker-notification` and `worker-importexport`; task `migrate` |
 | Task settings | `readonlyRootFilesystem: true`, non-root user, no privileged mode, `stopTimeout: 30`, awsvpc networking in the private subnets of network architecture §2a, one security group per service |
 | Configuration | Environment variables in the task definition; secrets from Secrets Manager via the `secrets` field; IAM task role per service (least privilege: e.g. only `worker-iot` may publish to IoT Core) |
 | Scaling | the web apps, the gateway and the domain services on CPU and ALB request count; workers on SQS backlog per task and Kinesis iterator age; minimum two tasks across two AZs for the web apps, the gateway, the domain services, `webhook`, `worker-outbox` and `worker-iot` |
@@ -176,4 +176,4 @@ Container-only variables of the stand-ins (`POSTGRES_*`, `KC_BOOTSTRAP_ADMIN_*`,
 | OPEN-CT-03 | The server-side session store (ElastiCache in production, Valkey locally) with revocation on sign-out (backend architecture §6). Until then the BFF keeps the tokens in its sealed session cookie (IR333) |
 | OPEN-CT-04 | OpenTelemetry instrumentation of the Go services and the web apps. The collector, Jaeger and `OTEL_EXPORTER_OTLP_ENDPOINT` are ready, but nothing exports traces or metrics yet (IR334) |
 
-Additional contracts for current version 0.32.0: Read IR01–IR334 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.33.0: Read IR01–IR341 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

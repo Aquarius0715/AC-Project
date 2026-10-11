@@ -169,7 +169,9 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	billing.RegisterInquiries(reg, bill)
 	audit.Register(reg)
 	mv := maintenanceView{src: maintenance.PayoutSource{Jobs: jobs}}
-	billing.RegisterPayouts(reg, billing.Payouts{Source: mv})
+	payouts := billing.Payouts{Source: mv}
+	billing.RegisterPayouts(reg, payouts)
+	reg.AddJob(ops.DomainBilling, payouts.GenerateMonthly) // IR341: the payout drafts of the month that ended, on the 1st (BR-A23)
 	registerCrossDomain(reg, eq, mv)
 	maintenance.RegisterWorkforce(reg, maintenance.Workforce{Delivery: delivery})
 	filters := maintenance.FilterCare{Units: eq, Run: eq}

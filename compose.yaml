@@ -300,6 +300,13 @@ services:
       <<: *backend-env
       DATABASE_URL: postgres://ac_maintenance_login:local@postgres:5432/ac?sslmode=disable
       DATABASE_READER_URL: postgres://ac_maintenance_login:local@postgres:5432/ac?sslmode=disable
+  worker-scheduler-billing:       # the monthly payout drafts on the 1st (IR341): billing's role; maintenance asked over HTTP
+    <<: *worker
+    command: ["/app/worker", "--role=scheduler", "--domain=billing"]
+    environment:
+      <<: *backend-env
+      DATABASE_URL: postgres://ac_billing_login:local@postgres:5432/ac?sslmode=disable
+      DATABASE_READER_URL: postgres://ac_billing_login:local@postgres:5432/ac?sslmode=disable
   worker-iot:          { <<: *worker, command: ["/app/worker", "--role=iot"] }
   worker-telemetry:    { <<: *worker, command: ["/app/worker", "--role=telemetry"] }
   worker-rollup:       { <<: *worker, command: ["/app/worker", "--role=rollup"] }

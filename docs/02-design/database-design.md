@@ -1,6 +1,6 @@
 ---
 document_id: DD-DATABASE
-version: 0.35.0
+version: 0.36.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent, operations]
@@ -26,7 +26,7 @@ The source of truth for fields and states is [service-contracts.ts](service-cont
 | control | Control | commands, diagnostic_runs, automations, automation_units, automation_policies, automation_policy_units, automation_runs, evaluation_events, schedule_watermarks |
 | monitoring | Monitoring & alerts | alert_policies, default_rule_settings, alerts, ventilation_logs, allergen_observations, measurements (partitioned), measurements_15m, measurements_1h, alert_notifications (requested alert notifications for the cooldown, IR191) |
 | maintenance | Maintenance | plans, jobs, job_alerts, slot_proposals, offers, partner_slot_proposals, assignments, work_reports (versioned), report_reviews, attachments, job_notes, job_events, job_history_snapshots, contractors, rate_cards, certificates, certificate_reminders (the BR-P09 expiry reminders sent, IR336), unavailability, sla_targets, filter_care_settings, filter_cleanings, filter_reminders, filter_reminder_watermarks, parts_catalog, ref_memberships reference copy (IR192) |
-| billing | Billing | contracts (versioned), contract_units, invoices, payments, stripe_events, inquiries, payout_statements, payout_lines, payout_queries, ref_customers and ref_units reference copies (IR194, IR199) |
+| billing | Billing | contracts (versioned), contract_units, invoices, payments, stripe_events, inquiries, payout_statements, payout_lines, payout_queries, payout_runs (the scheduler's monthly draft runs, IR341), ref_customers and ref_units reference copies (IR194, IR199) |
 | restrictions | Restrictions | restrictions, restriction_invoices, restriction_units, restriction_commands (billing's record of the commands it requested, IR194) |
 | energy | Energy & carbon | baselines (versioned), emission_factors (versioned), mrv_reports (versioned), mrv_reviews, offset_quotes, offset_records, offset_attempts, ref_* reference copies including minute-slot power samples (IR189) |
 | notify | Notifications | notifications, deliveries, templates, ref_* reference copies of other domains' rows kept from RowChanged events (IR188) |
@@ -194,4 +194,4 @@ At the design capacity (20,000 units, about 120,000 measurements per minute) the
 - `identity.users.last_sign_in_at` is the business time of the latest sign-in, and `sign_in_auth_time` is the identity provider's `auth_time` of that sign-in. Only a later `auth_time` replaces them (IR268).
 - Personal data anonymisation (backend architecture §7) updates `identity.users` (status `anonymised`, e-mail replaced) and `identity.client_users`; audit rows keep IDs but never contact data (masked at write time).
 
-Additional contracts for current version 0.35.0: Read IR01–IR340 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.36.0: Read IR01–IR341 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

@@ -22,7 +22,7 @@ import (
 
 func main() {
 	role := flag.String("role", "scheduler", "worker role (compose.yaml): scheduler runs the clock-driven transitions")
-	domain := flag.String("domain", "", "scheduler of one business domain (equipment, maintenance); empty runs every domain")
+	domain := flag.String("domain", "", "scheduler of one business domain (equipment, maintenance, billing); empty runs every domain")
 	flag.Parse()
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

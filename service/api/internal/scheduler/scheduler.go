@@ -1,8 +1,8 @@
-// Package scheduler runs the clock-driven transitions (worker tick, backend Go design §7). Each business domain has
-// its own scheduler (IR195): equipment expires commands and advances diagnostic runs, maintenance expires offers and
-// proposals, confirms unrated jobs and freezes histories. A domain scheduler uses the domain's database role and asks
-// other domains through the registry's internal queries; Tick (all domains, local) serves tests and single-process
-// runs.
+// Package scheduler runs the clock-driven transitions (worker tick, backend Go design §7). Each business domain with
+// clock-driven work has its own scheduler (IR195): equipment expires commands and advances diagnostic runs,
+// maintenance expires offers and proposals, confirms unrated jobs and freezes histories, billing generates the
+// monthly payout drafts (IR341). A domain scheduler uses the domain's database role and asks other domains through
+// the registry's internal queries; Tick (all domains, local) serves tests and single-process runs.
 package scheduler
 
 import (
@@ -24,7 +24,7 @@ import (
 )
 
 // Domains that have clock-driven transitions.
-var Domains = []string{ops.DomainEquipment, ops.DomainMaintenance}
+var Domains = []string{ops.DomainEquipment, ops.DomainMaintenance, ops.DomainBilling}
 
 // Result counts the changes of one tick.
 type Result struct {

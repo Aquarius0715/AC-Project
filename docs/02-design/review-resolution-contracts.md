@@ -4882,3 +4882,21 @@ BR-A19 notifies HQ 90 and 30 days before a warranty ends without a contract. The
    - Integration (`TestWarrantyReminders`, both suites): the 90-day reminder to every asset.read admin and only the 30-day one with 20 days left; none for a unit beyond 90 days, ended, archived or under contract; no repeat; a moved warranty end with its own reminder; HQ's inbox fields; none for a client.
    - Web: the inbox row in English and Malay.
 7. **Figma.** Admin Notifications (/notifications, FR-X07) shows a read 90-day reminder, “Warranty ending — Office AC”, “Warranty ends 15 Oct 2026 · no maintenance contract”, which opens Customers & units › Warranty & coverage. The All tab counts 10.
+
+## IR341 Monthly payout drafts from a billing scheduler — 2026-10-11
+
+BR-A23 generates the drafts on the 1st, and BR-P10 says the statements are generated on the 1st. `payouts.generate` (IR137) existed, but only as HQ's Generate drafts: nothing ran it on the 1st. Billing had no scheduler (IR195 gave one to equipment and maintenance).
+
+1. **A billing scheduler.**
+   - `scheduler.Domains` gains billing. compose.yaml gains `worker-scheduler-billing`: `--role=scheduler --domain=billing` on the billing login, asking maintenance for the accepted jobs and rate cards over HTTP.
+   - The split-cluster test harness ticks it with the other schedulers.
+   - Container design §2, §4 and §5 and backend architecture §10 list it.
+2. **The job.**
+   - Each tick takes the month that ended last in Kuala Lumpur (`YYYY-MM`). It generates that month's drafts exactly as `payouts.generate` does, once per month (`billing.payout_runs`, one row per tenant and month, with the number of drafts).
+   - A month that ended while the scheduler was down is generated at its first tick, and so is the month before the first start.
+   - The drafts are audited `payouts.generate` as the system.
+   - HQ's Generate drafts still regenerates a month. Approved and paid statements are never touched (IR137 item 1).
+3. **No contract change.** The drafts are the ones Generate drafts makes. DD-A23 and DD-P10 describe the monthly run.
+4. **Tests.**
+   - Unit: `endedPeriod`, with Kuala Lumpur month and year boundaries.
+   - Integration (`TestMonthlyPayoutDrafts`, both suites): the August draft from the September clock; no regeneration on a later tick; a later run leaves an approved statement.

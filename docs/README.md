@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.224.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
+Version: 0.225.0 / Created: 2026-09-14 / Updated: 2026-10-11 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.225.0 (2026-10-11): A billing scheduler (`worker-scheduler-billing`) generates the contractor payout drafts of the month that ended on the 1st, once per month (BR-A23, BR-P10, IR341).
 0.224.0 (2026-10-11): HQ is reminded 90 and 30 days before a unit's warranty ends without a contract (BR-A19); notifications gain the warranty_expiring type (IR340).
 0.223.0 (2026-10-11): Firmware campaigns run on the equipment scheduler — the customers' notice 24 h before, the start, waves at 95 % success inside the install window, skips with reasons, auto-pause and completion; HQ sees each wave's state and each device's reason and time (IR339).
 0.222.0 (2026-10-11): HQ Jobs rows show a pending follow-up with its classify-by time (JobSummary gains createdAt, followUpOfJobId and followUpClass); §10 counts the classify-by time as an app display and records the monthly report e-mail as a user decision (IR338).
