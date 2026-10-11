@@ -17,6 +17,7 @@ export type ApiNotification = {
   channel: string;
   occurredAt: string;
   readAt: string | null;
+  severity?: "critical" | "warning" | "normal";
 };
 
 export type InboxRow = { id: string; version: number; t: string; d: string; w: string; read: boolean; href: string };

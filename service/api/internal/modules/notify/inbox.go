@@ -523,6 +523,8 @@ type PreviewInput struct {
 	SourceAlertID         *uuid.UUID `json:"sourceAlertId,omitempty"`
 	Message               *string    `json:"message,omitempty"`
 	Reason                *string    `json:"reason,omitempty"`
+	// Severity is an alert's severity (the policy's or rule's, IR348); other templates keep their own
+	Severity *string `json:"severity,omitempty"`
 }
 
 // Validate implements ops.Validator.
@@ -531,6 +533,14 @@ func (in *PreviewInput) Validate() map[string]string {
 	in.validate(fe)
 	if in.RecipientMembershipID == uuid.Nil {
 		fe["recipientMembershipId"] = "error.required"
+	}
+	if in.Severity != nil {
+		switch {
+		case in.TemplateKey != "alert":
+			fe["severity"] = "error.notAllowed"
+		case !slices.Contains(severities, *in.Severity):
+			fe["severity"] = "error.invalid"
+		}
 	}
 	// the message carries a job note (1–2000, DD-P07) or a reminder text; the reason stays 1–1000 (IR228)
 	for k, f := range map[string]struct {
@@ -588,17 +598,20 @@ func (Inbox) preview(ctx context.Context, c *ops.Call, in *PreviewInput) (Notifi
 	if err := c.Tx.QueryRow(ctx, `SELECT scope_version FROM identity.memberships WHERE id = $1`, in.RecipientMembershipID).Scan(&scope); err != nil {
 		return Notification{}, err
 	}
-	typ := in.TemplateKey
-	if typ == "alert" {
-		typ = "fault"
+	typ, status := in.TemplateKey, in.TemplateKey
+	if typ == "alert" { // as the notifier sends it: a fault of the policy's severity about an open alert (IR104, IR348)
+		typ, status = "fault", "open"
 	}
 	severity := "normal"
 	if in.TemplateKey == "payment_reminder" || in.TemplateKey == "restriction" || in.TemplateKey == "alert" {
 		severity = "warning"
 	}
+	if in.Severity != nil {
+		severity = *in.Severity
+	}
 	return Notification{ID: uuid.New(), TenantID: c.Principal.TenantID, Version: 1, CreatedAt: c.Now, UpdatedAt: c.Now, SourceAlertID: in.SourceAlertID, Type: typ,
 		RecipientMembershipID: in.RecipientMembershipID, ScopeVersionAtCreation: scope, Target: map[string]string{"kind": in.Target.Kind, "id": in.Target.ID.String()},
-		TemplateKey: in.TemplateKey, Params: Params{TargetName: t.name, At: c.Now, Status: typ, Reason: in.Reason, Message: in.Message}, Channel: in.Channel,
+		TemplateKey: in.TemplateKey, Params: Params{TargetName: t.name, At: c.Now, Status: status, Reason: in.Reason, Message: in.Message}, Channel: in.Channel,
 		DeliveryState: "preview", Severity: severity, OccurredAt: c.Now}, nil
 }
 

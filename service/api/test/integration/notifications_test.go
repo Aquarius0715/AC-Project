@@ -159,9 +159,22 @@ func TestNotificationRecipientsPreview(t *testing.T) {
 	if code, m := post(s, &customerA, "notifications.recipients", `{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","query":{}}`); code != 200 || len(items(m)) == 0 {
 		t.Errorf("unit recipients: %d %v", code, m)
 	}
-	// an alert message is a fault notification of warning severity
-	if code, m := post(s, &hq, "notifications.preview", `{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","recipientMembershipId":"`+seed.ID("customer-a").String()+`","message":"Please check the unit"}`); code != 200 || data(m)["type"] != "fault" || data(m)["severity"] != "warning" {
+	// an alert message is a fault notification about an open alert, of warning severity unless the policy's is given
+	// (IR348: as the notifier sends it)
+	alertPreview := func(extra string) (int, map[string]any) {
+		return post(s, &hq, "notifications.preview", `{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","recipientMembershipId":"`+seed.ID("customer-a").String()+`"`+extra+`}`)
+	}
+	if code, m := alertPreview(`,"message":"Please check the unit"`); code != 200 || data(m)["type"] != "fault" || data(m)["severity"] != "warning" || data(m)["params"].(map[string]any)["status"] != "open" {
 		t.Errorf("alert preview: %d %v", code, m)
+	}
+	if code, m := alertPreview(`,"severity":"critical"`); code != 200 || data(m)["severity"] != "critical" || data(m)["deliveryState"] != "preview" {
+		t.Errorf("critical alert preview: %d %v", code, m)
+	}
+	if code, m := alertPreview(`,"severity":"loud"`); code != 422 || fields(m) != "severity=error.invalid" {
+		t.Errorf("unknown severity: %d %s", code, fields(m))
+	}
+	if code, m := post(s, &hq, "notifications.preview", `{"target":{"kind":"invoice","id":"`+inv+`"},"templateKey":"payment_reminder","channel":"email","recipientMembershipId":"`+recipient+`","message":"Please pay","severity":"critical"}`); code != 422 || fields(m) != "severity=error.notAllowed" {
+		t.Errorf("severity of a payment reminder: %d %s", code, fields(m))
 	}
 	if code, _ := post(s, &customerB, "notifications.recipients", `{"target":{"kind":"unit","id":"`+unit+`"},"templateKey":"alert","channel":"inApp","query":{}}`); code != 404 {
 		t.Error("unit of another customer")

@@ -33661,6 +33661,10 @@
                 "recipientMembershipId": {
                     "type": "string"
                 },
+                "severity": {
+                    "description": "Severity is an alert's severity (the policy's or rule's, IR348); other templates keep their own",
+                    "type": "string"
+                },
                 "sourceAlertId": {
                     "type": "string"
                 },

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   adminAlertRows, alertPolicyInput, conditionErrors, copyable, defaultRulesInput, HQ_METRICS, newPolicyDraft, policyChanges, policyErrors, policyRows, recoveryError, ruleChanges, settingText,
-  type ApiAdminAlert, type ApiPolicy,
+  testOutcome, type ApiAdminAlert, type ApiPolicy, type NotificationDecision,
 } from "@ac/web/lib/adminAlerts";
 import { i18nOf } from "@ac/web/lib/i18n";
 
@@ -146,5 +146,23 @@ describe("the default policy's rules and the customers' switches (DD-A05 item 9,
         { ruleKey: "ac_offline", name: "AC offline", category: "connection", metric: "heartbeat_gap", operator: "gte", threshold: 15, recoveryThreshold: 1, durationSeconds: 1, activeWindow: null, severity: "warning" },
       ],
     });
+  });
+});
+
+describe("Test with demo data (DD-A05 item 7, IR348)", () => {
+  const p = { metric: "temperature", operator: "gte" as const, threshold: 30 };
+  const d = (decision: NotificationDecision["decision"], reason: NotificationDecision["reason"] = null): NotificationDecision => ({ unitId: "u1", policyId: "pol-1", decision, reason });
+  it("words each decision of automations.simulate for the reading", () => {
+    expect([testOutcome(d("selected"), p, 30, "Bedroom AC"), testOutcome(d("failed", "no_recipient"), p, 31, "Bedroom AC")]).toEqual([
+      { tone: "ok", text: "✓ 30 °C on Bedroom AC raises an alert and notifies the recipients — simulated, nothing is stored." },
+      { tone: "crit", text: "An alert, but nobody is notified: no recipient may read Bedroom AC." },
+    ]);
+    // not due: below the threshold, or meeting it outside the active hours
+    expect([testOutcome(d("suppressed", "not_due"), p, 29.9, "Bedroom AC").text, testOutcome(d("suppressed", "not_due"), p, 30, "Bedroom AC").text]).toEqual([
+      "No alert: 29.9 °C does not meet ≥ 30 °C.", "No alert: 30 °C meets ≥ 30 °C, but not within the active hours.",
+    ]);
+    expect(["disabled", "cooldown", "quality", "owner_forbidden"].map((r) => testOutcome(d("suppressed", r as NotificationDecision["reason"]), p, 30, "Bedroom AC").tone)).toEqual(["warn", "muted", "warn", "warn"]);
+    expect(testOutcome(null, p, 30, "Bedroom AC")).toEqual({ tone: "warn", text: "The policy did not run on Bedroom AC — it is no longer attached to it." });
+    expect(testOutcome(d("suppressed", "not_due"), { metric: "refrigerant_pressure", operator: "lte", threshold: 350 }, 351, "AC", MS.t).text).toBe("Tiada amaran: 351 kPa tidak memenuhi ≤ 350 kPa.");
   });
 });

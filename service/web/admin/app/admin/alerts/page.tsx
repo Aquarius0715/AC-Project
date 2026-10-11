@@ -62,7 +62,7 @@ export default async function AdminAlertsPage({ searchParams }: PageProps<"/admi
         pol: {
           policyId: one(sp.policyId) ?? null, newFor: one(sp.new) ?? null, from: one(sp.from) ?? null, canWrite: perms.has("alert.policy.write"), timezone: display.timeZone,
           customers: customers.items.filter((c) => c.status !== "inactive").map((c) => ({ id: c.id, name: c.name })),
-          units: units.items.filter((u) => !u.archived).map((u) => ({ id: u.id, customerId: custByOrg.get(u.customerOrgId) ?? null })),
+          units: units.items.filter((u) => !u.archived).map((u) => ({ id: u.id, name: u.displayName, customerId: custByOrg.get(u.customerOrgId) ?? null })),
         },
       }}
     />

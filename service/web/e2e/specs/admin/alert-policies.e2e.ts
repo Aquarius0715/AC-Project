@@ -219,3 +219,95 @@ test("the default policy's rules, a customer's switch and a rule copied as a cus
   await main.getByRole("button", { name: "Discard" }).click(); // nothing is created
   await page.waitForURL((u) => !u.searchParams.has("new") && !u.searchParams.has("from"));
 });
+
+// DD-A05 item 7 (Figma 38:5, IR348): the notification preview (notifications.preview with the policy's severity) and
+// the demo test (automations.simulate: nothing is stored) of a policy attached to Bedroom AC on its unit page. The
+// threshold is 45 °C, far above the demo's readings, so the policy never alerts for real while it is on; deleting it
+// detaches it again.
+test("the notification preview and the demo test of a policy attached to a unit", async ({ page }) => {
+  const name = `E2E hot room ${Date.now()}`;
+  await page.goto("/admin/alerts?tab=policies");
+  const main = page.getByRole("main");
+  await main.getByRole("combobox", { name: "Customer" }).selectOption({ label: "Demo Customer A" });
+  await page.waitForURL(/customerId=/);
+  await main.getByRole("button", { name: "+ New policy for Demo Customer A" }).click();
+  await page.waitForURL(/new=/);
+  await main.getByRole("textbox", { name: /^Name/ }).fill(name);
+  await main.getByRole("spinbutton", { name: /^Alert when ≥/ }).fill("45");
+  await main.getByRole("spinbutton", { name: /^Recover/ }).fill("43");
+  await main.getByRole("button", { name: "+ Add recipient" }).click();
+  await page.getByRole("dialog").getByRole("checkbox", { name: /^hq-operator/ }).check();
+  await page.getByRole("dialog").getByRole("button", { name: "Add 1 recipient" }).click();
+
+  // the preview before saving: what hq-operator is shown for a unit of the customer, at the policy's severity
+  const preview = main.locator("section").filter({ has: page.getByRole("heading", { name: "Notification preview", exact: true }) }).last(); // the editor card is a section too
+  await expect(preview).toContainText(/What hq-operator sees for .+ \(notifications\.preview · in-app\)\./);
+  await expect(preview).toContainText(/Alert on /);
+  await expect(preview).toContainText("Warning");
+  await main.getByRole("button", { name: "Critical", exact: true }).click();
+  await expect(preview).toContainText("Critical");
+  const check = main.locator("section").filter({ has: page.getByRole("heading", { name: "Test with demo data", exact: true }) }).last(); // the editor card is a section too
+  await expect(check).toContainText("Save the policy first: the test evaluates the saved version.");
+  await main.getByRole("button", { name: "Save policy" }).click();
+  await page.waitForURL(/policyId=[0-9a-f-]{36}/);
+  created = new URL(page.url()).searchParams.get("policyId");
+  await expect(check).toContainText("Attach the policy to a unit first: the test runs on one of its units.");
+
+  // attach it on Bedroom AC's unit page, then back by the unit's Edit link (scoped to the customer and the unit)
+  await page.goto("/admin/alerts");
+  await main.getByRole("button", { name: /Possible open window/ }).click();
+  await main.getByRole("link", { name: "Open unit →" }).click();
+  await page.waitForURL(/unitId=/);
+  await main.getByRole("button", { name: "+ Attach policy" }).click();
+  await page.getByRole("dialog").getByRole("checkbox", { name: new RegExp(name) }).check();
+  await page.getByRole("dialog").getByRole("button", { name: "Attach 1 policy" }).click();
+  await main.locator(`a[href*="policyId=${created}"]`).click();
+  await page.waitForURL((u) => u.searchParams.get("policyId") === created && u.searchParams.has("unitId"));
+  await expect(main).toContainText("Attached to 1 unit of Demo Customer A: Bedroom AC");
+
+  // the test: off, then on at the reading and just below it
+  await expect(check.getByRole("spinbutton", { name: "Reading" })).toHaveValue("45");
+  await check.getByRole("button", { name: "Evaluate (demo)" }).click();
+  await expect(check.getByRole("status")).toHaveText("No alert: the policy is off. Switch it on and save it to test it.");
+  await main.getByRole("switch", { name: "Enabled" }).click();
+  await main.getByRole("button", { name: "Save policy" }).click();
+  await expect(main).toContainText("Policy v2");
+  await check.getByRole("button", { name: "Evaluate (demo)" }).click();
+  await expect(check.getByRole("status")).toHaveText("✓ 45 °C on Bedroom AC raises an alert and notifies the recipients — simulated, nothing is stored.");
+  await check.getByRole("spinbutton", { name: "Reading" }).fill("44.9");
+  await check.getByRole("button", { name: "Evaluate (demo)" }).click();
+  await expect(check.getByRole("status")).toHaveText("No alert: 44.9 °C does not meet ≥ 45 °C.");
+
+  // deleting detaches it from Bedroom AC
+  await main.getByRole("button", { name: "Delete policy" }).click();
+  await expect(page.getByRole("dialog")).toContainText("is detached from 1 unit and deleted.");
+  await page.getByRole("dialog").getByRole("button", { name: "Delete policy" }).click();
+  await page.waitForURL((u) => !u.searchParams.has("policyId"));
+});
+
+// IR348: the default policy's rules are tested the same way, on a unit of the scoped customer whose rule is on; a rule
+// whose metric takes no synthetic reading (AC offline: a heartbeat gap) says so. Nothing is stored.
+test("the default policy's demo test on a unit of the scoped customer", async ({ page }) => {
+  await page.goto("/admin/alerts?tab=policies");
+  const main = page.getByRole("main");
+  await main.getByRole("combobox", { name: "Customer" }).selectOption({ label: "Demo Customer A" });
+  await page.waitForURL(/customerId=/);
+  await main.locator("section").filter({ has: page.getByRole("heading", { name: "Alert policies", exact: true }) }).getByRole("button", { name: /Default policy/ }).click();
+  await page.waitForURL(/policyId=/);
+  const rules = main.getByRole("region", { name: "Rules" });
+  await rules.getByRole("button", { name: /^Dust \/ filter/ }).click();
+  // the preview: what one of the customer's users is shown, at the rule's severity
+  const preview = main.locator("section").filter({ has: page.getByRole("heading", { name: "Notification preview", exact: true }) }).last();
+  await expect(preview).toContainText(/What .+ sees for .+ \(notifications\.preview · in-app\)\./);
+  await expect(preview).toContainText(/Alert on /);
+  await expect(preview).toContainText("Warning");
+  const check = main.locator("section").filter({ has: page.getByRole("heading", { name: "Test with demo data", exact: true }) }).last();
+  await expect(check.getByRole("spinbutton", { name: "Reading" })).toHaveValue("35");
+  await check.getByRole("button", { name: "Evaluate (demo)" }).click();
+  await expect(check.getByRole("status")).toHaveText(/^✓ 35 µg\/m³ on .+ raises an alert and notifies the recipients — simulated, nothing is stored\.$/);
+  await check.getByRole("spinbutton", { name: "Reading" }).fill("34.9");
+  await check.getByRole("button", { name: "Evaluate (demo)" }).click();
+  await expect(check.getByRole("status")).toHaveText("No alert: 34.9 µg/m³ does not meet ≥ 35 µg/m³.");
+  await rules.getByRole("button", { name: /^AC offline/ }).click();
+  await expect(check).toContainText("A synthetic reading cannot be entered for this rule's metric.");
+});

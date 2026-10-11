@@ -13,6 +13,7 @@ import {
 import { deletePolicy, savePolicy } from "../actions";
 import { DefaultPolicyEditor } from "./default-policy";
 import { ConditionFields, WindowEditor } from "./policy-parts";
+import { DemoTest, NotificationPreview } from "./policy-checks";
 
 /** API mode: the selected policy (`policyId`) or the owner customer of a new one (`new`, copied from the default rule
  * `from`) from the URL (DD-A05 items 5, 8 and 9), whether the session may write policies, the display time zone a new
@@ -20,7 +21,7 @@ import { ConditionFields, WindowEditor } from "./policy-parts";
  * policy's recipients for one of them). */
 export type PoliciesLive = {
   policyId: string | null; newFor: string | null; from: string | null; canWrite: boolean; timezone: string;
-  customers: { id: string; name: string }[]; units: { id: string; customerId: string | null }[];
+  customers: { id: string; name: string }[]; units: { id: string; name: string; customerId: string | null }[];
 };
 
 const CHANNEL: Record<Channel, string> = { inApp: "In-app", email: "Email", whatsapp: "WhatsApp" };
@@ -49,7 +50,7 @@ export const seedPolicies: AdminPolicy[] = [
   { ...demoPolicy("policy-humidity-a", "Night humidity", "Humidity ≥ 70 % · 30 min · 22–06", "humidity", 70, 65, 1800, false, []), severity: "normal" },
 ];
 export const demoCustomers = [{ id: "customer-a", name: "customer-a" }];
-const demoUnits = [{ id: "unit-online-rto", customerId: "customer-a" }];
+const demoUnits = [{ id: "unit-online-rto", name: "Bedroom AC", customerId: "customer-a" }];
 const demoCandidates: ApiRecipient[] = [
   { id: "customer-a", role: "client", displayLabel: "customer-a", allowedChannels: ["inApp", "email", "whatsapp"] },
   { id: "hq-operator", role: "admin", displayLabel: "hq-operator", allowedChannels: ["inApp", "email"] },
@@ -101,9 +102,13 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
   const status = tried && problems ? t(problems === 1 ? "VALIDATION · 1 problem · nothing saved" : "VALIDATION · {n} problems · nothing saved", { n: problems })
     : isNew ? t("New policy · not saved yet")
     : changes.length ? `${t(changes.length === 1 ? "1 unsaved change" : "{n} unsaved changes", { n: changes.length })} · ${changes.join(", ")}` : t("No unsaved changes");
-  // the unit notifications.recipients is asked about: one the policy is attached to, else one of its customer's
+  // the unit notifications.recipients and .preview are asked about: one the policy is attached to, else one of its
+  // customer's; the demo test runs on a unit the saved policy is attached to
   const units = live?.units ?? demoUnits;
-  const target = draft ? draft.unitIds[0] ?? units.find((u) => u.customerId === draft.customerId)?.id ?? null : null;
+  const customerUnit = draft ? units.find((u) => u.customerId === draft.customerId) ?? null : null;
+  const previewUnit = draft?.unitIds[0] ? { id: draft.unitIds[0], name: draft.unitNames[0] ?? draft.unitIds[0] } : customerUnit && { id: customerUnit.id, name: customerUnit.name };
+  const target = previewUnit?.id ?? null;
+  const testUnit = p?.id && p.unitIds[0] ? { id: p.unitIds[0], name: p.unitNames[0] ?? p.unitIds[0] } : null;
 
   const save = () => {
     setTried(true);
@@ -164,7 +169,7 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
             </EmptyState>
           </Card>
         ) : draft.kind === "default_alert" && p ? (
-          <DefaultPolicyEditor p={p} customers={customers} canWrite={canWrite} copyFor={copyFor} onCopy={onCopy} demo={!live} />
+          <DefaultPolicyEditor p={p} customers={customers} units={units} canWrite={canWrite} copyFor={copyFor} onCopy={onCopy} demo={!live} />
         ) : (
           <Card
             title={<span className="inline-flex flex-wrap items-center gap-2">{draft.name.trim() || t("New alert policy")}<Badge tone={isNew ? "warn" : "muted"}>{isNew ? t("Not saved") : t("Policy v{n}", { n: draft.version })}</Badge></span>}
@@ -211,6 +216,10 @@ export function PoliciesTab({ pols, live, sel, select, showOff = true, copyFor, 
               </section>
               <section className="grid-fluid" style={{ ["--min" as string]: "180px" }}><Field label={t("Cooldown (min)")} hint={t("Same severity is not re-sent within this window (1–1440)")} error={tried ? errors.cooldown : undefined}><Input type="number" value={draft.cooldown} onChange={(e) => set("cooldown", +e.target.value)} /></Field><Field label={t("Escalate after (min)")} hint={t("Escalate if still unacknowledged (1–1440)")} error={tried ? errors.escalate : undefined}><Input type="number" value={draft.escalate} onChange={(e) => set("escalate", +e.target.value)} /></Field></section>
             </fieldset>
+            <div className="mt-5 flex flex-col gap-5">
+              <NotificationPreview recipients={draft.recipients} severity={draft.severity} customerName={draft.customerName} unit={previewUnit} demo={!live} />
+              {p && <DemoTest saved={p} dirty={isNew || changes.length > 0} unit={testUnit} demo={!live} />}
+            </div>
             {canWrite && (
               <div className="mt-5 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-3">
                 {!isNew && <Btn variant="danger" disabled={pending} onClick={() => setDeleting(true)}>{t("Delete policy")}</Btn>}

@@ -254,3 +254,25 @@ export function alertPolicyInput(p: AdminPolicy): OpInput<"policies.save"> {
     escalateAfterMinutes: p.escalate, cooldownMinutes: p.cooldown,
   };
 }
+
+/** NotificationDecision of service-contracts.ts: one policy's outcome for one unit in automations.simulate. */
+export type NotificationDecision = { unitId: string; policyId: string; decision: "selected" | "suppressed" | "failed"; reason: "not_due" | "quality" | "disabled" | "owner_forbidden" | "cooldown" | "no_recipient" | null };
+const holds = (op: Operator, v: number, threshold: number) => (op === "gt" ? v > threshold : op === "gte" ? v >= threshold : op === "lt" ? v < threshold : v <= threshold);
+/** What “Test with demo data” found for a synthetic reading (DD-A05 item 7, IR348), in words and a tone; null means the
+ * policy did not run on the unit (no longer attached). */
+export function testOutcome(d: NotificationDecision | null, p: Pick<AdminPolicy, "metric" | "operator" | "threshold">, value: number, unitName: string, t: T = en): { tone: "ok" | "warn" | "crit" | "muted"; text: string } {
+  const unit = metricUnit[p.metric] ?? "";
+  const v = { value, unit, op: opSymbol[p.operator], threshold: p.threshold, name: unitName };
+  if (!d) return { tone: "warn", text: t("The policy did not run on {name} — it is no longer attached to it.", v) };
+  if (d.decision === "selected") return { tone: "ok", text: t("✓ {value} {unit} on {name} raises an alert and notifies the recipients — simulated, nothing is stored.", v) };
+  if (d.decision === "failed") return { tone: "crit", text: t("An alert, but nobody is notified: no recipient may read {name}.", v) };
+  switch (d.reason) {
+    case "disabled": return { tone: "warn", text: t("No alert: the policy is off. Switch it on and save it to test it.") };
+    case "cooldown": return { tone: "muted", text: t("No alert yet: a notification about {name} went out within the cooldown.", v) };
+    case "quality": return { tone: "warn", text: t("No alert: the reading does not count (missing, stale or not valid).") };
+    case "owner_forbidden": return { tone: "warn", text: t("No alert: the member who made the policy no longer has access.") };
+    default: return holds(p.operator, value, p.threshold)
+      ? { tone: "muted", text: t("No alert: {value} {unit} meets {op} {threshold} {unit}, but not within the active hours.", v) }
+      : { tone: "muted", text: t("No alert: {value} {unit} does not meet {op} {threshold} {unit}.", v) };
+  }
+}

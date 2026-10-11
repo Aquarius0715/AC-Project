@@ -8,6 +8,7 @@ import { conditionText } from "@ac/web/lib/assets";
 import { conditionErrors, copyable, metricLabel, ruleChanges, settingText, type AdminPolicy, type DefaultRule } from "@ac/web/lib/adminAlerts";
 import { saveDefaultRules, switchDefaultRule } from "../actions";
 import { ConditionFields, WindowEditor } from "./policy-parts";
+import { DefaultRulePreview, DemoTest } from "./policy-checks";
 
 const CATEGORY: Record<string, string> = { air_quality: "Air quality", fault: "Fault", maintenance: "Maintenance", connection: "Connection" };
 const SHOWN = 20; // the customers listed before the search-select (DD-A05 item 9, Figma 268:2)
@@ -16,8 +17,9 @@ const SHOWN = 20; // the customers listed before the search-select (DD-A05 item 
  * severity as the HQ template — saved for every unit at the policy's version — and, for that rule, the switch of each
  * customer with an optional reason (policies.setDefaultRule). A rule whose metric a policy may watch can be copied as a
  * customer's policy. The key, name, category and metric of a rule are fixed (IR120 item 2). */
-export function DefaultPolicyEditor({ p, customers, canWrite, copyFor, onCopy, demo }: {
-  p: AdminPolicy; customers: { id: string; name: string }[]; canWrite: boolean; copyFor: { id: string; name: string } | null; onCopy: (ruleKey: string) => void; demo: boolean;
+export function DefaultPolicyEditor({ p, customers, units, canWrite, copyFor, onCopy, demo }: {
+  p: AdminPolicy; customers: { id: string; name: string }[]; units: { id: string; name: string; customerId: string | null }[]; canWrite: boolean;
+  copyFor: { id: string; name: string } | null; onCopy: (ruleKey: string) => void; demo: boolean;
 }) {
   const t = useT();
   const i18n = useI18n();
@@ -49,6 +51,13 @@ export function DefaultPolicyEditor({ p, customers, canWrite, copyFor, onCopy, d
   const sorted = [...customers].sort((a, b) => a.name.localeCompare(b.name));
   const listed = [...sorted.slice(0, SHOWN), ...sorted.slice(SHOWN).filter((c) => more.includes(c.id))];
   const setting = (customerId: string) => p.settings.find((s) => s.ruleKey === rule.ruleKey && s.customerId === customerId);
+  // the demo test runs the saved rule on a unit of the scoped customer, else of any customer (the default policy is on
+  // every unit), whose customer has not switched the rule off — there it would never alert
+  const savedRule = p.rules.find((r) => r.ruleKey === rule.ruleKey) ?? rule;
+  const inScope = copyFor ? units.filter((u) => u.customerId === copyFor.id) : units;
+  const testUnit = inScope.find((u) => setting(u.customerId ?? "")?.enabled !== false) ?? null;
+  const previewUnit = testUnit ?? inScope[0] ?? null;
+  const customerOf = (u: { customerId: string | null }) => customers.find((c) => c.id === u.customerId)?.name ?? "";
 
   const save = () => {
     setTried(true);
@@ -122,6 +131,14 @@ export function DefaultPolicyEditor({ p, customers, canWrite, copyFor, onCopy, d
               options={sorted.slice(SHOWN).filter((c) => !more.includes(c.id)).map((c) => ({ id: c.id, label: c.name }))} /></div>
           )}
         </section>
+        {previewUnit && <DefaultRulePreview key={previewUnit.id} unit={{ id: previewUnit.id, name: previewUnit.name }} customerName={customerOf(previewUnit)} severity={rule.severity} demo={demo} />}
+        {copyable(rule) && testUnit ? (
+          <DemoTest key={rule.ruleKey} saved={{ id: p.id, version: p.version, metric: savedRule.metric, operator: savedRule.operator, threshold: savedRule.threshold, on: true }}
+            dirty={changed.includes(rule.name)} unit={{ id: testUnit.id, name: testUnit.name }} demo={demo} />
+        ) : (
+          <section><h3 className="mb-1 text-[13px] font-bold">{t("Test with demo data")}</h3><p className="text-xs text-muted">{t(!copyable(rule) ? "A synthetic reading cannot be entered for this rule's metric."
+            : inScope.length ? "The rule is off for every customer in scope, so it cannot be tested here." : "There is no unit to test the rule on.")}</p></section>
+        )}
         <section><h3 className="mb-1 text-[13px] font-bold">{t("Owner & units")}</h3>
           <div className="text-xs font-semibold">{t("Owner")}</div><div className="mt-1"><Badge tone="primary">{t("HQ default (all customers)")}</Badge></div>
           <p className="mt-2 rounded-xl bg-surface2 px-3 py-2 text-[13px]">{t("Attached to every unit of every customer — automatically, and it cannot be detached. To change a limit for one customer only, copy the rule as that customer’s policy.")}</p>

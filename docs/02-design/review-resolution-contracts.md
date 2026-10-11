@@ -5052,3 +5052,32 @@ DD-A05 item 9 and Figma Admin 268:2 describe the default policy's editor: its ru
      - Shows that Clogged filter cannot be copied.
      - Copies Ventilation as a Demo Customer A draft and discards it.
    - afterEach restores the limits and switches through the operation relay if a run stops halfway.
+
+## IR348 The HQ policy editor's notification preview and demo test — 2026-10-11
+
+DD-A05 item 7 orders the editor's last steps: the notification preview per recipient (`notifications.preview`), then the demo test, then save. IR346 item 5 left both out, because `notifications.preview` rendered an alert as a warning with the status "fault". The notifier sends the policy's severity about an open alert.
+
+1. **Contract.**
+   - `notifications.preview` gains `severity?` (Severity), for the alert template only. Another template is VALIDATION `severity=error.notAllowed`; an unknown value is `severity=error.invalid`.
+   - An alert preview carries that severity (warning when it is omitted) and `params.status` "open", as the notifier sends it (IR104, IR155 item 4).
+   - The catalog, Swagger and `contracts.gen.ts` follow.
+2. **Notification preview (customer policies).**
+   - Shows what one recipient sees for a unit of the policy: its first attached unit, or else one of the customer's units. The row is the inbox row: the severity, "Alert on <unit>", the time and the status. "Open unit → · Request maintenance →" follow it.
+   - "Preview as <recipient>" picks among the draft's recipients. The draft's severity is used, before saving too.
+   - A recipient who may not get the notification says so.
+3. **Default policy.** The selected rule is previewed for a user of a unit's customer (`notifications.recipients`, role client: the default policy notifies them in-app, IR155 item 3), at the rule's severity.
+4. **Test with demo data.**
+   - A Server Action calls `automations.simulate` with one synthetic, valid reading of the metric at the Core API's clock.
+   - It runs on a unit of the saved policy: an attached unit, or for the default policy a unit of the scoped customer whose rule is on.
+   - The policy's decision is put into words: an alert and notifications; not met; met outside the active hours; the policy off; the cooldown; no recipient; a reading that does not count; an owner without access.
+   - Nothing is stored. The demo evaluation takes the reading as lasting the duration (IR155 item 2). Unsaved changes are not tested.
+   - A new or unattached policy says why there is no test. So does a default rule whose metric takes no synthetic reading (heartbeat gap, compressor cycles, airflow drop).
+5. **Figma 38:5 / 268:2.**
+   - The test is worded as the simulation: no clock advance. The "for 59 s" and "recovers" lines are replaced by outcomes the simulation gives, and the reading's box holds the number.
+   - The preview card is the notification ("Alert on Bedroom AC · open").
+6. **Tests.**
+   - Integration: an alert preview's status and default severity, a critical preview, an unknown severity, and a severity on a payment reminder.
+   - Web unit: the test outcomes in English and Malay.
+   - E2E `admin/alert-policies`:
+     - A policy at 45 °C attached to Bedroom AC: the preview before saving, at warning and then critical. The test reads "off" until the policy is on; then 45 alerts and 44.9 is not met. Deleting the policy detaches it.
+     - The default policy's PM2.5 rule: the preview for a customer user; 35 alerts and 34.9 is not met. AC offline has no test.

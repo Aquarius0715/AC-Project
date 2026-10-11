@@ -341,7 +341,7 @@ export type OperationContracts = {
   'notifications.list': {input:Query;result:Page<Notification>;mode:'read'};
   'notifications.markRead': {input:{id:ID};result:Notification;mode:'write'};
   'notifications.recipients': {input:{target:Target;templateKey:Notification['templateKey'];channel:Channel;role?:Role;query:Query};result:Page<NotificationRecipient>;mode:'read'};
-  'notifications.preview': {input:{target:Target;templateKey:Notification['templateKey'];channel:Channel;recipientMembershipId:ID;sourceAlertId?:ID;message?:string;reason?:string};result:NotificationPreview;mode:'read'};
+  'notifications.preview': {input:{target:Target;templateKey:Notification['templateKey'];channel:Channel;recipientMembershipId:ID;sourceAlertId?:ID;message?:string;reason?:string;severity?:Severity};result:NotificationPreview;mode:'read'};
   'offsets.list': {input:Query;result:Page<OffsetRecord>;mode:'read'};
   'offsets.preview': {input:{customerId?:ID;purpose:string;amountKg:number;period:Range;unitIds:ID[]};result:OffsetQuote;mode:'write'};
   'offsets.simulate': {input:({event:'request';quoteId:ID;quoteVersion:number}|{event:'purchase_confirm'|'retire'|'fail';recordId:ID;attemptId:ID;eventId:ID}|{event:'retry';recordId:ID;attemptId:ID}) & {demoConfirmed:true};result:OffsetRecord;mode:'write'};
