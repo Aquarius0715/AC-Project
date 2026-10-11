@@ -5181,3 +5181,29 @@ The audit's remaining items are wording; the screens keep their as-built text (I
      - The row showed the linked photo. "+ Link photo" linked the second; a reading was added and the photo unlinked again. Nothing was saved.
      - Submitted, the HQ report review and "Open report →" named the linked photo.
      - The temporary rows were deleted, and no projection or notification kept them.
+
+## IR353 Coverage round: untested rules covered, a dead filter removed, the HQ contact window per IR42 — 2026-10-11
+
+`make cover` read 88.2 % of 15,314 statements. Two scans looked for untested validation rules and for zero-count blocks that hold logic. They found two defects and several untested rules.
+
+1. **`restrictions.forInvoice` (fix).**
+   - The read handled an `invoiceId` filter: restrictions that also cite a second invoice.
+   - The query catalog allows only `contractId` and `status` for this read; the invoice is its REST path. The REST binding refuses a filter named like an input field (`invoiceId=error.notAllowed`), so the branch could never run.
+   - Its test expected no rows. A refused request has none, so the test passed for the wrong reason.
+   - The branch is removed, the restriction query no longer takes extra conditions, and the test expects the refusal.
+2. **HQ contact window (fix).**
+   - `jobs.get` returned `contactWindow: null` to an HQ reader without `job.write`. No document asks for that, and IR42 says HQ receives all fields.
+   - The HQ job detail then read "no contact window" for a window the customer gave.
+   - HQ readers now receive it.
+3. **Rules no test reached.**
+   - Integration:
+     - `members.save` refuses two tenant scopes for HQ (`scopes=error.invalid`).
+     - `attachments.list` refuses a missing `to` (`to=error.required`).
+     - `jobs.respondProposal` (a decline with new times) and `jobs.requestReschedule` refuse a time today (`preferredSlots=error.slotRules`).
+     - An HQ reader without `job.write` reads the contact window. With the old masking put back, this test fails.
+   - Unit, for three rules that REST cannot reach (the route carries the field, or the binding refuses unknown parameters first):
+     - `payouts.transition`: an unknown action, a missing statement, a reason over 1000 characters, and the reason trimmed.
+     - `firmwareCampaigns.control`: each action, abort reasons, a retry without a device, and an unknown action.
+     - `telemetry.series`: any query filter is refused; an empty or null object passes.
+4. **Kept.** The other zero-count blocks are database error returns or defensive checks behind authorization. For example, the client branch of the restriction projection is unreachable: every caller is HQ-only.
+5. **Coverage after the round:** 88.24 % (13,508 of 15,308 statements; the removed branch took 6). The scan finds no untested validation rule. 93 unit tests and 144 integration tests.

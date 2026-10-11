@@ -92,6 +92,7 @@ func TestMRVEvidenceAttachments(t *testing.T) {
 		`{"unitIds":[],"from":"` + from.Format(time.RFC3339) + `","to":"` + to.Format(time.RFC3339) + `","query":{}}`:                              "unitIds=error.invalid",
 		`{"unitIds":["` + unit + `","` + unit + `"],"from":"` + from.Format(time.RFC3339) + `","to":"` + to.Format(time.RFC3339) + `","query":{}}`: "unitIds=error.invalid",
 		`{"unitIds":["` + unit + `"],"to":"` + to.Format(time.RFC3339) + `","query":{}}`:                                                           "from=error.required",
+		`{"unitIds":["` + unit + `"],"from":"` + from.Format(time.RFC3339) + `","query":{}}`:                                                       "to=error.required",
 		`{"unitIds":["` + unit + `"],"from":"` + to.Format(time.RFC3339) + `","to":"` + from.Format(time.RFC3339) + `","query":{}}`:                "to=error.range",
 		`{"unitIds":["` + unit + `"],"from":"` + from.Format(time.RFC3339) + `","to":"` + from.Add(367*day).Format(time.RFC3339) + `","query":{}}`: "to=error.range",
 		body(`"filters":{"x":1}`, unit): "x=error.notAllowed",

@@ -44,6 +44,15 @@ func TestJobsCreate(t *testing.T) {
 		j["dueAt"] != clock.Add(27*time.Hour).Format(time.RFC3339) || j["contactWindow"] != "Weekdays 09:00-18:00" || j["projection"] != "detail" || j["preferenceRound"].(float64) != 1 {
 		t.Fatalf("create: %d %v", code, m)
 	}
+	// HQ receives every field (IR42): a reader without job.write sees the customer's contact window too (IR353)
+	owner(t, `DELETE FROM identity.membership_permissions WHERE membership_id = $1 AND permission = 'job.write'`, seed.ID("hq-restriction-manager"))
+	t.Cleanup(func() {
+		owner(t, `INSERT INTO identity.membership_permissions (tenant_id, membership_id, permission) VALUES ($1, $2, 'job.write') ON CONFLICT DO NOTHING`,
+			seed.ID("tenant-a"), seed.ID("hq-restriction-manager"))
+	})
+	if code, m := post(s, &restrMgr, "jobs.get", `{"jobId":"`+j["id"].(string)+`"}`); code != 200 || data(m)["contactWindow"] != "Weekdays 09:00-18:00" {
+		t.Errorf("HQ reader without job.write: %d %v", code, data(m)["contactWindow"])
+	}
 	// HQ on behalf: 0 alternatives, explicit dueAt
 	code, m = write(s, &hq, "jobs.create", jobBody(unit, map[string]string{"alternativeSlots": "[]", "dueAt": `"` + clock.Add(48*time.Hour).Format(time.RFC3339) + `"`}), 0)
 	if code != 200 || len(data(m)["preferredSlots"].([]any)) != 1 || data(m)["dueAt"] != clock.Add(48*time.Hour).Format(time.RFC3339) {

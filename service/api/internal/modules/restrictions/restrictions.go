@@ -323,21 +323,21 @@ type listFilter struct {
 	Status     *string    `json:"status,omitempty"` // => state
 }
 
-func (m Restrictions) query(ctx context.Context, c *ops.Call, in paging.Query, f listFilter, extra []string, args []any) ([]Restriction, *string, int, int, error) {
+func (m Restrictions) query(ctx context.Context, c *ops.Call, in paging.Query, f listFilter) ([]Restriction, *string, int, int, error) {
 	order, err := paging.OrderBy(in.Sort, map[string]string{"id": "r.id", "createdAt": "r.created_at", "updatedAt": "r.updated_at", "executeAfter": "r.execute_after", "noticeAt": "r.notice_at"}, "r.created_at DESC, r.id DESC")
 	if err != nil {
 		return nil, nil, 0, 0, err
 	}
-	// the cursor binds the filter and the extra conditions' values (SR14)
+	// the cursor binds the filter (SR14)
 	w, err := paging.Resolve(in, struct {
 		F listFilter `json:"f"`
-		X []any      `json:"x"`
-	}{f, args}, c.Principal.ScopeVersion, 1)
+	}{f}, c.Principal.ScopeVersion, 1)
 	if err != nil {
 		return nil, nil, 0, 0, err
 	}
+	var args []any
 	add := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
-	conds := append([]string{"TRUE"}, extra...)
+	conds := []string{"TRUE"}
 	if f.ContractID != nil {
 		conds = append(conds, "r.contract_id = "+add(*f.ContractID))
 	}
@@ -423,7 +423,7 @@ func (m Restrictions) list(ctx context.Context, c *ops.Call, in *paging.Query) (
 	if !fullReader(c) && (f.ContractID != nil || f.InvoiceID != nil) {
 		return paging.Page[any]{}, apperr.E(apperr.Forbidden, "error.forbidden")
 	}
-	xs, next, total, snap, err := m.query(ctx, c, *in, f, nil, nil)
+	xs, next, total, snap, err := m.query(ctx, c, *in, f)
 	if err != nil {
 		return paging.Page[any]{}, err
 	}
@@ -487,15 +487,10 @@ func (m Restrictions) forInvoice(ctx context.Context, c *ops.Call, in *ForInvoic
 	if err := decodeFilter(in.Query.Filters, &f); err != nil {
 		return paging.Page[Restriction]{}, err
 	}
-	// query catalog: invoiceId => causeInvoiceIds contains AND input.invoiceId; contractId => contractId
-	var extra []string
-	var args []any
-	if f.InvoiceID != nil && *f.InvoiceID != in.InvoiceID {
-		args = append(args, *f.InvoiceID)
-		extra = append(extra, "EXISTS (SELECT 1 FROM restrictions.restriction_invoices ri WHERE ri.restriction_id = r.id AND ri.invoice_id = $1)")
-	}
+	// query catalog: input.invoiceId (the REST path) => causeInvoiceIds contains; contractId => contractId; status => state.
+	// invoiceId is no filter of this read: the REST binding refuses it as error.notAllowed
 	f.InvoiceID = &in.InvoiceID
-	xs, next, total, snap, err := m.query(ctx, c, in.Query, f, extra, args)
+	xs, next, total, snap, err := m.query(ctx, c, in.Query, f)
 	if err != nil {
 		return paging.Page[Restriction]{}, err
 	}

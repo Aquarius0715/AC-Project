@@ -394,9 +394,6 @@ func (m Jobs) load(ctx context.Context, c *ops.Call, id uuid.UUID, scope string,
 		return j, err
 	}
 	j.Projection = "detail"
-	if c.Principal.Role == "admin" && !c.Principal.Permissions["job.write"] {
-		j.ContactWindow = nil
-	}
 	if j.SlotProposal, err = m.pendingOrLastProposal(ctx, c, id); err != nil {
 		return j, err
 	}

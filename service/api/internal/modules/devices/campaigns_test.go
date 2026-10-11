@@ -1,8 +1,11 @@
 package devices
 
 import (
+	"maps"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestWaveOf(t *testing.T) {
@@ -76,6 +79,33 @@ func TestWavePassed(t *testing.T) {
 	} {
 		if got := c.w.passed(); got != c.want {
 			t.Errorf("%v: %v", c.w, got)
+		}
+	}
+}
+
+// TestControlInput: firmwareCampaigns.control pauses, resumes, aborts with a reason of 1–1000 characters or retries one
+// device (IR111). Over REST the action and the device come from the route, so an unknown action or a retry without a
+// device reaches this rule only from the other callers of the operation.
+func TestControlInput(t *testing.T) {
+	camp, dev := uuid.New(), uuid.New()
+	reason, blank := "vendor recall", "   "
+	for name, c := range map[string]struct {
+		in   ControlInput
+		want map[string]string
+	}{
+		"pause":                {ControlInput{CampaignID: camp, Action: "pause"}, map[string]string{}},
+		"resume":               {ControlInput{CampaignID: camp, Action: "resume"}, map[string]string{}},
+		"abort":                {ControlInput{CampaignID: camp, Action: "abort", Reason: &reason}, map[string]string{}},
+		"abort without reason": {ControlInput{CampaignID: camp, Action: "abort"}, map[string]string{"reason": "error.length"}},
+		"abort blank reason":   {ControlInput{CampaignID: camp, Action: "abort", Reason: &blank}, map[string]string{"reason": "error.length"}},
+		"retry a device":       {ControlInput{CampaignID: camp, Action: "retry_device", DeviceID: &dev}, map[string]string{}},
+		"retry without device": {ControlInput{CampaignID: camp, Action: "retry_device"}, map[string]string{"deviceId": "error.required"}},
+		"unknown action":       {ControlInput{CampaignID: camp, Action: "restart"}, map[string]string{"action": "error.invalid"}},
+		"no campaign":          {ControlInput{Action: "pause"}, map[string]string{"campaignId": "error.required"}},
+	} {
+		in := c.in
+		if got := in.Validate(); !maps.Equal(got, c.want) {
+			t.Errorf("%s: %v, want %v", name, got, c.want)
 		}
 	}
 }

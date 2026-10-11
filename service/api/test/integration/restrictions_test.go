@@ -540,16 +540,15 @@ func TestRestrictionReconcileNotApplied(t *testing.T) {
 		items(m)[0]["exception"].(map[string]any)["reason"] != nil || items(m)[0]["releaseIntent"].(map[string]any)["actorMembershipId"] != "masked" {
 		t.Fatalf("client mask: %v", m)
 	}
-	// query catalog: contractId => contractId; invoiceId => also cites that invoice
+	// query catalog: contractId => contractId, status => state; the invoice is the path, not a filter
 	if _, m := post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{"filters":{"contractId":"`+k+`"}}}`); len(items(m)) != 1 {
 		t.Errorf("forInvoice contract filter: %v", m)
 	}
 	if _, m := post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{"filters":{"contractId":"`+uuid.NewString()+`"}}}`); len(items(m)) != 0 {
 		t.Errorf("forInvoice other contract: %v", m)
 	}
-	if _, m := post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{"filters":{"invoiceId":"`+uuid.NewString()+`"}}}`); len(items(m)) != 0 {
-		t.Errorf("forInvoice second invoice: %v", m)
-	}
+	code, m = post(s, &customerB, "restrictions.forInvoice", `{"invoiceId":"`+inv+`","query":{"filters":{"invoiceId":"`+uuid.NewString()+`"}}}`)
+	refusal(t, "forInvoice invoiceId filter", code, m, "invoiceId=error.notAllowed")
 	owner(t, `UPDATE assets.units SET last_seen_at = $2, observed_restriction = NULL WHERE id = $1`, u, clock)
 	code, m = write(s, &restrMgr, "restrictions.reconcile", `{"restrictionId":"`+id+`","unitIds":["`+u+`"]}`, ver(get()))
 	if code != 200 || data(m)["state"] != "released" || unitState(m, u)["releaseState"] != "not_required" || unitState(m, u)["applyState"] != "not_applied" {

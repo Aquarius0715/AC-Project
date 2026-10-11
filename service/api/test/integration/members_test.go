@@ -42,6 +42,7 @@ func TestMembersSave(t *testing.T) {
 	}
 	refused := map[string]string{ // the field each VALIDATION case is refused for
 		"admin unit scope":       "scopes=error.invalid",
+		"admin two tenants":      "scopes=error.invalid",
 		"blank reason":           "reason=error.length",
 		"employment for admin":   "employment=error.notAllowed",
 		"external without end":   "validUntil=errors.external_needs_end",
@@ -64,6 +65,7 @@ func TestMembersSave(t *testing.T) {
 		"write without read":     {map[string]string{"role": `"admin"`, "employment": "null", "permissions": `["job.write"]`, "scopes": `[]`}, 422},
 		"unknown permission":     {map[string]string{"role": `"admin"`, "employment": "null", "permissions": `["god.mode"]`, "scopes": `[]`}, 422},
 		"admin unit scope":       {map[string]string{"role": `"admin"`, "employment": "null", "permissions": `[]`}, 422},
+		"admin two tenants":      {map[string]string{"role": `"admin"`, "employment": "null", "permissions": `[]`, "scopes": `[{"kind":"tenant","id":"` + seed.ID("tenant-a").String() + `"},{"kind":"tenant","id":"` + uuid.NewString() + `"}]`}, 422},
 		"external without end":   {map[string]string{"employment": `"external"`, "organizationId": `"` + contractor + `"`}, 422},
 		"until before from":      {map[string]string{"validUntil": `"` + clock.Add(-2*time.Hour).Format(time.RFC3339) + `"`}, 422},
 		"blank reason":           {map[string]string{"reason": `" "`}, 422},

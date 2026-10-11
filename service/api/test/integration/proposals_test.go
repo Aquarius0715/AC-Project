@@ -153,6 +153,11 @@ func TestSlotProposals(t *testing.T) {
 	j3 := data(m)["id"].(string)
 	propose(j3, slotJSON(99, 2), internalHold, ts(48), 1)
 	newSlots := `[` + slotJSON(120, 2) + `,` + slotJSON(144, 2) + `,` + slotJSON(168, 2) + `]`
+	// the new times follow the request's slot rules (IR113): a time today is refused
+	today := `[` + slotJSON(1, 2) + `,` + slotJSON(144, 2) + `,` + slotJSON(168, 2) + `]`
+	if code, m := respond(&customerA, j3, proposalOf(j3), `"decision":"decline","declineReason":"too_late","preferredSlots":`+today, 2); code != 422 || fields(m) != "preferredSlots=error.slotRules" {
+		t.Errorf("decline with a time today: %d %s", code, fields(m))
+	}
 	if code, m := respond(&customerA, j3, proposalOf(j3), `"decision":"decline","declineReason":"too_late","comment":" evenings only ","preferredSlots":`+newSlots, 2); code != 200 ||
 		data(m)["preferenceRound"].(float64) != 2 || data(m)["status"] != "requested" {
 		t.Fatalf("decline with slots: %d %v", code, m)
@@ -279,6 +284,9 @@ func TestPartnerProposalsAndReschedule(t *testing.T) {
 	}
 	if code, _ := write(s, &customerB, "jobs.requestReschedule", `{"jobId":"`+pj+`","preferredSlots":`+three+`}`, 2); code != 404 {
 		t.Error("other customer reschedules")
+	}
+	if code, m := write(s, &customerA, "jobs.requestReschedule", `{"jobId":"`+pj+`","preferredSlots":[`+slotJSON(1, 2)+`,`+slotJSON(194, 2)+`,`+slotJSON(218, 2)+`]}`, 2); code != 422 || fields(m) != "preferredSlots=error.slotRules" {
+		t.Errorf("reschedule to a time today: %d %s", code, fields(m))
 	}
 	if code, m := write(s, &customerA, "jobs.requestReschedule", `{"jobId":"`+pj+`","preferredSlots":`+three+`,"comment":"travelling"}`, 2); code != 200 ||
 		data(m)["status"] != "requested" || data(m)["assignmentId"] != nil || data(m)["preferenceRound"].(float64) != 2 {
