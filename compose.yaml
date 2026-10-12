@@ -354,6 +354,9 @@ services:
 
   valkey:              # ElastiCache (sessions, idempotency fast path, rate limits)
     image: valkey/valkey:8
+    user: "999:999"                # the image's valkey user, not root (security loop, IR414)
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     command: ["valkey-server", "--requirepass", "${VALKEY_PASSWORD:-local-valkey-only}"] # local only: the store refuses clients without the password (security loop, IR411)
     ports: ["127.0.0.1:6379:6379"]   # this machine only (IR373): web apps run on the host reach the session store (IR382)
     networks: [app, data]
@@ -372,6 +375,9 @@ services:
 
   mosquitto:           # AWS IoT Core stand-in (MQTT 3.1.1/5); mutual TLS is verified in staging against IoT Core
     image: eclipse-mosquitto:2
+    user: "1883:1883"              # the image's mosquitto user, not root (security loop, IR414)
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     ports: ["127.0.0.1:1883:1883"]   # this machine only: not reachable from other devices on the network (IR373)
     volumes: [./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro, ./docker/mosquitto/passwd:/mosquitto/config/passwd:ro]
     networks: [data]
@@ -392,6 +398,9 @@ services:
 
   stripe-mock:         # offline Stripe API for tests; use the Stripe CLI (profile stripe) for real test-mode webhooks
     image: stripe/stripe-mock:v0.206.0@sha256:aeb96b83e87a893d2ac005e363ac01ffa6e59a5ad85b49c155dfc9129de02e78   # pinned (IR373)
+    user: "1000:1000"              # not root (security loop, IR414)
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     networks: [app]
     profiles: [infra, backend, full]
 
@@ -403,6 +412,9 @@ services:
 
   weather-mock:        # weather source stand-in (WireMock)
     image: wiremock/wiremock:3.9.1
+    user: "1000:1000"              # not root (security loop, IR414)
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
     volumes: [./docker/wiremock:/home/wiremock:ro]
     networks: [app]
     profiles: [infra, backend, full]
