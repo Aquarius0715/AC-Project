@@ -6391,3 +6391,33 @@ No popup, menu or panel is hand-made any more: they are all shadcn/ui components
    - The two policy-owner steps choose the option on the page.
    - The axe checks in the policy dialog and in the smoke crawl caught the unnamed chevron; they pass now.
 7. **Checks.** Typecheck, lint, the web unit tests (460), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped. Screenshots show the combobox, the assistant sheet and the mobile menu sheet.
+
+## IR403 shadcn/ui, phase 4: toasts, tables and charts — 2026-10-12
+
+Toasts, tables and charts now come from established libraries, through their shadcn/ui components (DEC-75).
+
+1. **Toasts are Sonner,** through shadcn/ui's `Toaster` in the light theme (no `next-themes`).
+   - `useToast` is unchanged. Sonner announces through one polite region, so an error toast carries its text in an alert and every other toast in a status (UX-06, IR362).
+   - Sonner puts its stylesheet into the page at run time, without a nonce. The production `style-src` allows exactly that stylesheet by its SHA-256 (`shared/lib/styleHashes.gen.ts`).
+   - Sonner adds the `<style>` element to the head before its text, and the browser checks it at that moment too. So the list also holds the hash of the empty text. An empty stylesheet styles nothing, and the text is checked again when it arrives.
+   - `styleHashes.test.ts` reads the stylesheet from the installed Sonner. It fails when the generated file is stale, so a Sonner upgrade that changes the stylesheet fails there, not as refused styles. `UPDATE_STYLE_HASHES=1` rewrites the file.
+2. **`DataTable` is shadcn/ui's Table on TanStack Table 9** (`useTable`, the core row model, and row ids from `rowKey`).
+   - The props, the column classes, `hideBelow`, the "No data" row and the keyboard rows (IR294) are unchanged.
+   - The open row carries `aria-current` and `data-state="selected"`.
+3. **`BarChart` and `LineChart` are shadcn/ui's chart on Recharts 3.**
+   - Both fill the width and are `height` pixels tall. `LineChart` no longer takes a viewBox `width`, and the text keeps its size on wide cards.
+   - A line still breaks at every gap, and a reading between two gaps is a dot. `shadeGaps` shades the gaps, and a threshold is a dashed line.
+   - Both charts have a tooltip. Recharts' keyboard layer makes each chart one tab stop, and its arrow keys move the tooltip. The chart's name is "Bar chart" or "Line chart", in Malay too.
+   - `BarChart` takes `names` for its series: the names appear in the tooltip and in shadcn/ui's legend. The legend replaces the hand-made legends of the customer overview and the energy screen, live and demo.
+   - With no baseline, the energy screen's one actual series is now drawn in the primary colour that its legend shows; before, it was drawn in the baseline colour.
+   - shadcn's chart writes the config's colours into a `<style>` element, which the nonce CSP refuses. `ChartContainer` puts them in its style attribute instead (`style-src-attr`).
+4. **`UtilBar` is shadcn/ui's Progress** (Base UI). The name, value and tones are unchanged, and an unknown value is indeterminate.
+5. **Dependencies.**
+   - Added, pinned: @tanstack/react-table 9.2.8, recharts 3.8.0 and sonner 2.0.8.
+   - `npm audit --omit=dev` finds nothing. All 738 packages have verified registry signatures.
+   - No added package uses `eval` or `new Function` in the built pages. es-toolkit has one, in its `template` function, which Recharts does not import.
+6. **Tests.**
+   - Sonner adds a toast on the next timer tick, and keeps its toasts in one store that replays open toasts to a new Toaster. So the toast tests wait for the toast and dismiss everything after each test.
+   - New: `dataTable.test.tsx` (3 tests) and `charts.test.tsx` (5 tests).
+   - The E2E smoke crawl and the keyboard spec caught Sonner's empty `<style>` element as a refusal on every page, before its hash was in the list.
+7. **Checks.** CHECKS_PLACEHOLDER

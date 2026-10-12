@@ -1,6 +1,6 @@
 ---
 document_id: UX-COMMON
-version: 0.38.0
+version: 0.39.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -40,7 +40,8 @@ Validate each screen's cases that add detail to the source (AT-*-SRC) together w
 | Forms | Controlled inputs in the shared Field, with one pure validator per form in `shared/lib` | Keep input state in the form component; the Server Action returns the Core API's field errors, shown on the same fields |
 | Input validation | The form's pure validator (Vitest covers it); the Core API checks again (VALIDATION with fieldErrors) | Keep required fields, formats and conditional rules for each use case in its validator; keep them apart from the API types |
 | Data reads/updates | Server Components through the DAL (`shared/lib/dal.ts`); writes are Server Actions | No client-side query cache in API mode. The Phase 1A browser demo keeps its in-browser Repository |
-| Lists/charts | The shared DataTable and the in-house LineChart / BarChart | Use the shared table for lists; a chart never joins gaps in the data |
+| Lists/charts | shadcn/ui's Table on TanStack Table (the shared `DataTable`), shadcn/ui's chart on Recharts (the shared `LineChart` / `BarChart`) and shadcn/ui's Progress (`UtilBar`), IR403 | Use the shared table for lists. A chart never joins gaps in the data; a reading between two gaps is a dot. Name a bar chart's series (`names`) for its tooltip and legend. A chart's colours are custom properties in its style attribute: the nonce CSP refuses the `<style>` element that shadcn's chart writes |
+| Toasts | Sonner, through shadcn/ui's `Toaster` (`ToastProvider` and `useToast`), IR403 | An error toast is an alert and every other toast a status (UX-06). Sonner inserts its style sheet at run time; the CSP allows it by its SHA-256 (`shared/lib/styleHashes.gen.ts`). A unit test fails when the hash is stale, and `UPDATE_STYLE_HASHES=1` rewrites it |
 | Date input | Native date and time inputs | Times are typed in the display time zone and converted with `zonedInstant` (NFR-08); display uses `showTime` / `showSpan` (IR44) |
 | Translation | Plain dictionaries chosen on the server, as in the Next.js internationalization guide (English keys, `shared/lib/i18n-ms.ts`) | Update en (English)/ms (Malay) together; English is the default. The i18n key check keeps the code's texts and the dictionary the same |
 | Testing | Vitest, React Testing Library, Playwright, axe-core | Assign separate roles for logic tests, user interaction tests, E2E tests across screens, and automated accessibility checks |
@@ -72,7 +73,7 @@ DEC-75 (2026-10-12, product owner) supersedes DEC-03:
   - Recharts for charts;
   - cmdk, react-day-picker and input-otp.
 - Server Components and Server Actions stay for data, the Next.js way.
-- The rows above that still name in-house parts (forms, lists and charts, translation) move to those libraries in the DEC-75 phases.
+- The rows above that still name in-house parts (forms, translation) move to those libraries in the DEC-75 phases.
 - Pin every runtime dependency exactly. Keep the shadcn CLI a development dependency.
 
 For a library not listed here, record the required feature, the cost and impact, and whether replacement is possible. Do not force a component where semantic HTML is enough.
@@ -184,7 +185,7 @@ Charts and status cards must let users move from an overview to evidence and det
 
 Validate English/Malay keys, plurals, and long translations. Mark ms dictionary text as an unverified implementation-agent draft; Business/UI/UX must review it before company acceptance (IR74). Fall back to en for missing ms keys; if both are missing, show the key string. Lint must check that en/ms key sets match (IR44). Use locale tags en-MY/ms-MY, amounts in the order "120.00 MYR," temperatures with one decimal place, and decimal half-up rounding (IR44). Format times with Intl.DateTimeFormat and money with Intl.NumberFormat; show the time zone for bookings. Changing language must not change measurement units or stored UTC values. For voice demos, confirm the transcript, target, and action, then process it as a normal Command.
 
-Use WCAG 2.2 AA as the design target. Normal text must have at least 4.5:1 contrast; large text at least 3:1. Check that controls are recognizable and focus is visible. These are implementation test criteria, not a guarantee of compliance. As built (IR359): secondary text (`text-muted`, Figma `color/text-muted`) is #5B6E84 (4.56:1 or more on every light surface), and placeholders and chart labels on white (`text-subtle`) are #64788E (4.55:1). The E2E smoke crawl runs axe-core (WCAG 2.x A / AA) on every page it reaches and fails on any critical or serious violation, and the specs that open the main dialogs check each dialog the same way (IR360). Checkboxes are 20 px, so neighbours keep 24 px apart (WCAG 2.5.8). Dialogs follow the WAI-ARIA dialog pattern: focus moves in when one opens, Tab stays inside, and Escape returns focus to the trigger (IR361). Error banners and error toasts are alerts; other banners and toasts are polite status messages (IR362). [Official W3C quick reference](https://www.w3.org/WAI/WCAG22/quickref/)
+Use WCAG 2.2 AA as the design target. Normal text must have at least 4.5:1 contrast; large text at least 3:1. Check that controls are recognizable and focus is visible. These are implementation test criteria, not a guarantee of compliance. As built (IR359): secondary text (`text-muted`, Figma `color/text-muted`) is #5B6E84 (4.56:1 or more on every light surface), and placeholders on white (`text-subtle`) are #64788E (4.55:1). Chart labels use the secondary text colour (IR403). The E2E smoke crawl runs axe-core (WCAG 2.x A / AA) on every page it reaches and fails on any critical or serious violation, and the specs that open the main dialogs check each dialog the same way (IR360). Checkboxes are 20 px, so neighbours keep 24 px apart (WCAG 2.5.8). Dialogs follow the WAI-ARIA dialog pattern: focus moves in when one opens, Tab stays inside, and Escape returns focus to the trigger (IR361). Error banners and error toasts are alerts; other banners and toasts are polite status messages (IR362). [Official W3C quick reference](https://www.w3.org/WAI/WCAG22/quickref/)
 
 The project's target touch area is 44×44px. Allow the main scenarios to be completed with a keyboard alone. When a Dialog closes, return focus to its trigger. Announce critical errors through suitable live regions; do not announce every telemetry (sensor measurement, Measurement) update. When refetching displayed data, use aria-busy and an "Updating" indicator; do not return to a skeleton (IR83). Also test at 200% browser zoom, 360px width, and with a screen reader.
 
@@ -239,7 +240,7 @@ For shared routes, select schedule/event for C04/C05 and payment/restriction/inq
 
 Approvals applied on 2026-09-16: Use SR17 for period presets. Show the offset retry button only for failed, and label the failed purchase/retirement stage (SR18). Follow SR19 for contract edit denial reasons and links to restriction cancellation/release.
 
-Additional contracts for current version 0.36.0: Read IR01–IR393 in the [review resolution contracts](../02-design/review-resolution-contracts.md). They take priority over older text on the same issue; follow IR72 when rules conflict.
+Additional contracts for current version 0.39.0: Read IR01–IR403 in the [review resolution contracts](../02-design/review-resolution-contracts.md). They take priority over older text on the same issue; follow IR72 when rules conflict.
 
 0.14.0: Under IR25, get the address before acceptance from the unit's installation property. After expiry, freeze only whether a report exists and its acceptance status.
 

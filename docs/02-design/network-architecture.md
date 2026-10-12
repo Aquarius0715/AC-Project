@@ -1,6 +1,6 @@
 ---
 document_id: DD-NETWORK
-version: 0.38.0
+version: 0.39.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, review-agent, operations]
@@ -128,7 +128,7 @@ Give these to customer IT before installation (office sites; homes normally need
     - **The write limit per session (IR375).** It counts per membership, 60 writes a minute by default (`WRITE_LIMIT_PER_MINUTE`), in the shared cache (ElastiCache; Valkey locally, `RATE_LIMIT_URL`), so all instances and services count together. The write over the limit is RATE_LIMITED with the seconds to wait, and the apps say how long. Reads are not limited.
 - DDoS protection at the edge for `app`, `hooks`, and `mqtt`.
 - Security headers on `app`: HSTS, Content-Security-Policy (self + identity provider + payment page redirect), X-Content-Type-Options, Referrer-Policy, frame-ancestors none.
-  - As built (IR354): the web apps send these headers themselves, so every environment has them. `next.config.ts` sets nosniff, `strict-origin-when-cross-origin` and `X-Frame-Options: DENY`. `proxy.ts` sets a per-request nonce Content-Security-Policy, with forms limited to the app and the identity provider. HSTS and `upgrade-insecure-requests` are added when the request came over HTTPS. As built (IR383): a `Permissions-Policy` denies the camera, microphone, geolocation, payment, USB and display-capture features, which no app uses, so a page cannot ask for them even if a script were injected.
+  - As built (IR354): the web apps send these headers themselves, so every environment has them. `next.config.ts` sets nosniff, `strict-origin-when-cross-origin` and `X-Frame-Options: DENY`. `proxy.ts` sets a per-request nonce Content-Security-Policy, with forms limited to the app and the identity provider. HSTS and `upgrade-insecure-requests` are added when the request came over HTTPS. As built (IR383): a `Permissions-Policy` denies the camera, microphone, geolocation, payment, USB and display-capture features, which no app uses, so a page cannot ask for them even if a script were injected. As built (IR403): `style-src` lists the nonce and the SHA-256 of the one style sheet a library inserts at run time (Sonner's toasts, `styleHashes.gen.ts`), and no `'unsafe-inline'` outside dev; style attributes stay allowed by `style-src-attr`.
 
 ## 7. Certificates and keys
 
@@ -159,4 +159,4 @@ Give these to customer IT before installation (office sites; homes normally need
 | OPEN-NW-03 | Decided 2026-10-07: HQ admin app only from the company network (§3, DEC-68); the company must supply its office egress addresses and VPN egress addresses | — |
 | OPEN-NW-04 | Decided 2026-10-07: customer office firewall requirements in §5a | — |
 
-Additional contracts for current version 0.38.0: Read IR01–IR386 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.39.0: Read IR01–IR403 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

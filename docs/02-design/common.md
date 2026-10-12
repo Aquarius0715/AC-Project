@@ -1,6 +1,6 @@
 ---
 document_id: DD-COMMON
-version: 0.113.0
+version: 0.114.0
 status: draft
 owner: design-agent
 consumers: [implementation-agent, test-agent, review-agent]
@@ -41,14 +41,14 @@ service/web/
 - Interactive reads: reads that follow a gesture, such as the technician's QR scan, go through the BFF Route Handler `/bff/ops/<operation>`. It takes requests from the app's own pages only: another site's request is refused (FORBIDDEN, CSRF, IR358). The apps send it reads only; a contract test checks every browser call against `coreWrites`, which is generated from the catalog's mode.
 - The browser never calls the Core API.
 
-**Security headers (IR354).** Every response carries nosniff, a referrer policy and `X-Frame-Options: DENY` (each app's `next.config.ts`). Every page also carries a Content-Security-Policy with a fresh nonce from `proxy.ts`, which Next.js puts on its scripts and styles. Pages therefore render per request: the root layout awaits `connection()`. HSTS is added over HTTPS.
+**Security headers (IR354).** Every response carries nosniff, a referrer policy and `X-Frame-Options: DENY` (each app's `next.config.ts`). Every page also carries a Content-Security-Policy with a fresh nonce from `proxy.ts`, which Next.js puts on its scripts and styles. Base UI gets the nonce through its CSPProvider (IR401). Sonner's run-time style sheet is allowed by its hash (IR403). Pages therefore render per request: the root layout awaits `connection()`. HSTS is added over HTTPS.
 
 **Phase 1A demo (`DATA_SOURCE` unset).** The same routes render the demo components with in-browser fixture rows; nothing reaches a network. The shared demo stores (jobs, client users) live in the tab (`lib/demoStore`); their actions run in the tab and return refusals at once (IR309). The four apps of a tab on one origin see the same demo data, and switching roles keeps it; a reload or the reset on `/demo` brings back the seed (FR-X05).
 
 **Navigation.** `next/link` and `next/navigation` are used directly. Filters, tabs and the selection live in the URL: `lib/urlState.ts` reads them through `useSyncExternalStore`, and `useUrlPatch` writes them, replacing the history entry. One router serves every app, so the earlier Navigation-interface proposal is not used.
 
 **UI and forms — DEC-03, decided 2026-10-10.** The SRC-02 production condition “shared libraries, reactForms” has no archived original. DEC-03 first proposed shadcn/ui, Lucide, React Hook Form, Zod and TanStack Query. On 2026-10-10 the product owner decided to keep the build's approach, which follows the Next.js guides; the role designs and the UIUX specification (UX-01–UX-03) now describe it:
-- UI: shadcn/ui components on Tailwind CSS 4 (`shared/components/ui/`, DEC-75), themed with the palette of the Figma UI Guideline. The product components of `shared/components/ui.tsx` (`Btn`, `Card`, `Badge` and so on) are built on them until the screens use them directly. Icons are Lucide, through the shared `Icon` component (DEC-74; [icon rules](../03-uiux/UIUXSpecification.md)).
+- UI: shadcn/ui components on Tailwind CSS 4 (`shared/components/ui/`, DEC-75), themed with the palette of the Figma UI Guideline. The product components of `shared/components/ui.tsx` (`Btn`, `Card`, `Badge` and so on) are built on them until the screens use them directly. Icons are Lucide, through the shared `Icon` component (DEC-74; [icon rules](../03-uiux/UIUXSpecification.md)). Tables are TanStack Table, charts Recharts and toasts Sonner, each through its shadcn/ui component (IR403).
 - Forms: controlled inputs, pure validators per form in `shared/lib`, and the Core API's field errors from Server Actions.
 - Translation: plain dictionaries chosen on the server, as in the Next.js internationalization guide (UX-01).
 
@@ -262,4 +262,4 @@ API paths, HTTP methods, databases, server authentication and authorization, rea
 
 0.9.0 correction contracts: Read the [Strict Review Correction Contracts](strict-review-contracts.md) and [Per-Operation Version Contract](write-version-catalog.csv) together.
 
-Additional contracts for current version 0.111.0: Read IR01–IR384 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.
+Additional contracts for current version 0.114.0: Read IR01–IR403 in the [Re-review Correction Contracts](review-resolution-contracts.md). They take priority over older text on the same topic; follow IR72 for conflict precedence.

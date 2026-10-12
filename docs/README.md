@@ -1,6 +1,6 @@
 # AC Project Frontend Development Documents
 
-Version: 0.285.0 / Created: 2026-09-14 / Updated: 2026-10-12 / Status: Draft for review / Language: English
+Version: 0.286.0 / Created: 2026-09-14 / Updated: 2026-10-12 / Status: Draft for review / Language: English
 
 These documents cover a clickable frontend demo (1A) for monitoring, controlling, maintaining, and managing contracts for Split Unit AC. The 1A specification covers frontend design only; API specifications, HTTP contracts, databases, server processing, and production operations are not 1A inputs, and the frontend defines replaceable interfaces for them. The production backend and network are designed separately as PROPOSED targets on AWS (DEC-68, IR117) in the [backend architecture](02-design/backend-architecture.md) and [network architecture](02-design/network-architecture.md) (IR116). Application implementation is also outside the scope of this documentation work.
 
@@ -99,6 +99,7 @@ The 0.16.0 decision records are retained in [runs/DOC-0.16.0](04-agentic-sdlc/ru
 
 0.29.0 (2026-10-07): Everything runs in Docker ([container design](02-design/container-design.md), DEC-70, IR119): `web/Dockerfile` (Next.js standalone, distroless, read-only), backend image design (Go 1.25, distroless static, healthcheck subcommand), repository-root `compose.yaml` with profiles demo / infra / schema / backend / full / obs / stripe and local stand-ins for AWS services. The demo and infra profiles were started and checked. Phase 1A scope and counts unchanged.
 
+0.286.0 (2026-10-12): shadcn/ui phase 4: toasts are Sonner, the shared table is TanStack Table on the shadcn Table, and the charts are shadcn charts on Recharts; the page CSP allows Sonner's stylesheet by its hash (IR403).
 0.285.0 (2026-10-12): shadcn/ui phase 3b: the search select is the Combobox, the automations menu a DropdownMenu, and the assistant and the mobile menu are Sheets (IR402).
 0.284.0 (2026-10-12): shadcn/ui phase 3a: dialogs, tabs, switches, checkboxes, choice buttons and the row menus are shadcn components on Base UI; the CSP nonce reaches Base UI (IR401).
 0.283.0 (2026-10-12): shadcn/ui adopted (DEC-75, supersedes DEC-03), phase 1. The shadcn foundation is in place, with the UI Guideline theme, and the product components (buttons, cards, badges, alerts, empty states and inputs) render shadcn components (IR400).
