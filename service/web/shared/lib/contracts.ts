@@ -66,7 +66,7 @@ export function draftErrors(d: ContractDraft, t: T = en): Partial<Record<keyof C
   if (!d.end || (d.start && d.end <= d.start)) e.end = t("End must be after start");
   if (!/^\d+(\.\d{1,2})?$/.test(d.price.trim())) e.price = t("A price ≥ 0 with at most 2 decimals");
   if (d.restrictionEligible && d.planType !== "rto") e.restrictionEligible = t("Only RTO contracts can be restriction eligible");
-  if (d.restrictionEligible && (d.rulesVersion.trim().length < 1 || d.rulesVersion.trim().length > 64)) e.rulesVersion = t("Required when eligible (1–64 characters)");
+  if (d.restrictionEligible && ([...d.rulesVersion.trim()].length < 1 || [...d.rulesVersion.trim()].length > 64)) e.rulesVersion = t("Required when eligible (1–64 characters)");
   return e;
 }
 

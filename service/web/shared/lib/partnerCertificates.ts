@@ -153,7 +153,7 @@ export const FILE_TYPES = ["application/pdf", "image/jpeg", "image/png"];
 export function certificateErrors(f: CertForm, t: T = en): Partial<Record<"membershipId" | "name" | "number" | "issued" | "expires" | "file", string>> {
   const e: Partial<Record<"membershipId" | "name" | "number" | "issued" | "expires" | "file", string>> = {};
   if (!f.membershipId) e.membershipId = t("Choose a technician");
-  const name = f.name.trim().length, number = f.number.trim().length;
+  const name = [...f.name.trim()].length, number = [...f.number.trim()].length;
   if (name < 1 || name > 120) e.name = t("1–120 characters");
   if (number < 1 || number > 64) e.number = t("1–64 characters");
   if (!isDate(f.issued)) e.issued = t("Choose the issue date");

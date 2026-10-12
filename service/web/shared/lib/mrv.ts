@@ -83,7 +83,7 @@ export function mrvDraftErrors(d: MRVDraft, t: T = en): Record<string, string> {
   if (!d.from || !d.to || d.from >= d.to) e.period = t("The end must be after the start");
   if (!d.baseline) e.baseline = t("Choose a baseline version");
   if (!d.factor) e.factor = t("Choose an emission factor version");
-  if (d.boundary.trim().length < 1 || d.boundary.length > 500) e.boundary = t("1–500 characters");
+  if ([...d.boundary.trim()].length < 1 || d.boundary.length > 500) e.boundary = t("1–500 characters");
   return e;
 }
 
@@ -109,12 +109,12 @@ export function mrvDraftOf(c?: MRVConditions, baseline?: ApiBaseline): MRVDraft 
 export type FactorDraft = { region: string; year: string; kgCO2ePerKWh: string; source: string };
 export function factorErrors(d: FactorDraft, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (d.region.trim().length < 1 || d.region.trim().length > 120) e.region = t("1–120 characters");
+  if ([...d.region.trim()].length < 1 || [...d.region.trim()].length > 120) e.region = t("1–120 characters");
   const y = Number(d.year);
   if (!(Number.isInteger(y) && y >= 2000 && y <= 2100)) e.year = t("A year 2000–2100");
   const k = Number(d.kgCO2ePerKWh);
   if (!(d.kgCO2ePerKWh.trim() !== "" && k > 0 && k <= 10)) e.kgCO2ePerKWh = t("Above 0 and at most 10 kgCO₂e/kWh");
-  if (d.source.trim().length < 1 || d.source.trim().length > 500) e.source = t("1–500 characters, stating the demo source");
+  if ([...d.source.trim()].length < 1 || [...d.source.trim()].length > 500) e.source = t("1–500 characters, stating the demo source");
   return e;
 }
 export const factorInput = (d: FactorDraft, id?: string) => ({

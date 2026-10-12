@@ -229,7 +229,7 @@ const minutes = (s: string) => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5)
 /** The checks automations.save makes, shown before saving (the API checks again). */
 export function draftErrors(d: Draft, tr: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  const n = d.name.trim().length;
+  const n = [...d.name.trim()].length;
   if (n < 1 || n > 120) e.name = tr("1–120 characters");
   if (!d.unitId) e.unitId = tr("Choose the AC");
   if (d.trigger === "schedule") {

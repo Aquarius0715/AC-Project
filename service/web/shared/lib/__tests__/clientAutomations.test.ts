@@ -74,3 +74,14 @@ describe("ventilation in a customer rule (DD-C05 “within unit capabilities”,
     expect(summaryText(d, "Bedroom AC", "Home A", ms)).toContain("pengudaraan tinggi");
   });
 });
+
+// A name is counted in Unicode code points, as the API counts it (1–120 after trimming): 120 emoji are a valid name even
+// though they are 240 UTF-16 units (the web's string length), and 121 are not (IR-loop validator review).
+describe("automation name length", () => {
+  it("counts code points, as the API does", () => {
+    const d = draftOf(schedule);
+    expect(draftErrors({ ...d, name: "😀".repeat(120) })).not.toHaveProperty("name");
+    expect(draftErrors({ ...d, name: "😀".repeat(121) })).toHaveProperty("name");
+    expect(draftErrors({ ...d, name: "   " })).toHaveProperty("name");
+  });
+});

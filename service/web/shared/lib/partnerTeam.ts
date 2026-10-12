@@ -156,7 +156,7 @@ export function unavailabilityErrors(f: UnavailabilityForm, t: T = en): Partial<
     if (days < 0) e.to = t("The last day must be on or after the first day");
     else if (days > 30) e.to = t("At most 31 days at a time");
   }
-  if (f.note.trim().length > 500) e.note = t("At most 500 characters");
+  if ([...f.note.trim()].length > 500) e.note = t("At most 500 characters");
   return e;
 }
 

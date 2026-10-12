@@ -118,11 +118,11 @@ export const pendingCertificates = (certs: ApiCertificate[]) => certs.filter((c)
 /** The profile form (IR131 item 1): registration 1–64, 1–20 distinct service areas of 1–80, a contact e-mail. */
 export function profileErrors(f: { registrationNo: string; serviceAreas: string; contactEmail: string }, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  const r = f.registrationNo.trim().length;
+  const r = [...f.registrationNo.trim()].length;
   if (r < 1 || r > 64) e.registrationNo = t("1–64 characters.");
   const areas = areasOf(f.serviceAreas);
   if (areas.length < 1 || areas.length > 20 || areas.some((a) => a.length > 80) || new Set(areas.map((a) => a.toLowerCase())).size !== areas.length) e.serviceAreas = t("1–20 different areas, comma-separated.");
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.contactEmail.trim()) || f.contactEmail.trim().length > 254) e.contactEmail = t("A valid e-mail address.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.contactEmail.trim()) || [...f.contactEmail.trim()].length > 254) e.contactEmail = t("A valid e-mail address.");
   return e;
 }
 export const areasOf = (v: string) => v.split(",").map((a) => a.trim()).filter(Boolean);
@@ -134,7 +134,7 @@ export function rateCardErrors(f: { effectiveFrom: string | null; lines: { workT
   if (f.lines.length < 1 || f.lines.length > 4) e.lines = t("1–4 lines.");
   else if (new Set(f.lines.map((l) => l.workType)).size !== f.lines.length) e.lines = t("Each work type once.");
   else if (f.lines.some((l) => !/^\d+(\.\d{1,2})?$/.test(l.amount.trim()))) e.lines = t("Amounts are non-negative with at most two decimals.");
-  else if (f.lines.some((l) => l.note.trim().length > 200)) e.lines = t("Notes up to 200 characters.");
+  else if (f.lines.some((l) => [...l.note.trim()].length > 200)) e.lines = t("Notes up to 200 characters.");
   return e;
 }
 /** The first day of next month in Kuala Lumpur (00:00), the default start of a new rate card. */

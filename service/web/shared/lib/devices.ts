@@ -85,8 +85,8 @@ const num = (s: string) => (s.trim() === "" ? NaN : Number(s));
 /** The capability rules of DD-A04 (boundary cases) checked before capabilities.save; the API checks them again. */
 export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
-  if (d.manufacturer.trim().length < 1 || d.manufacturer.trim().length > 120) e.manufacturer = t("1–120 characters");
-  if (d.model.trim().length < 1 || d.model.trim().length > 120) e.model = t("1–120 characters");
+  if ([...d.manufacturer.trim()].length < 1 || [...d.manufacturer.trim()].length > 120) e.manufacturer = t("1–120 characters");
+  if ([...d.model.trim()].length < 1 || [...d.model.trim()].length > 120) e.model = t("1–120 characters");
   if ((d.modeControl || d.fanControl || d.temperatureOn) && !d.control) e.control = t("Mode, fan or temperature control needs power control");
   if (d.modeControl && d.modes.length === 0) e.modes = t("Choose at least one mode");
   if (d.fanControl && d.fanLevels.length === 0) e.fanLevels = t("Choose at least one fan level");
@@ -104,7 +104,7 @@ export function capabilityErrors(d: CapabilityDraft, update: boolean, t: T = en)
     if (!(Number.isInteger(v) && v >= 10 && v <= 86400)) e.sensors = t("Stale after must be 10–86400 seconds");
   }
   if (d.firmware.some((x) => x.length > 32)) e.firmware = t("Firmware versions are at most 32 characters");
-  if (update && (d.changeReason.trim().length < 1 || d.changeReason.trim().length > 1000)) e.changeReason = t("A reason is required (1–1000 characters)");
+  if (update && ([...d.changeReason.trim()].length < 1 || [...d.changeReason.trim()].length > 1000)) e.changeReason = t("A reason is required (1–1000 characters)");
   return e;
 }
 

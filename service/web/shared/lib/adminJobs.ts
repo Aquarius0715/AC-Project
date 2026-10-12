@@ -269,7 +269,7 @@ export const reviewModeOf = (j: Pick<ApiHqJob, "contractorOrgId">) => (j.contrac
 export function newJobErrors(f: { unitId: string; symptom: string; slots: Slot[] }, now: number, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!f.unitId) e.unitId = t("Choose the unit.");
-  const s = f.symptom.trim().length;
+  const s = [...f.symptom.trim()].length;
   if (s < 10 || s > 2000) e.symptom = t("Describe the symptom in 10–2000 characters.");
   const today = new Date(now + 8 * 3600_000).toISOString().slice(0, 10);
   const keys = new Set<string>();

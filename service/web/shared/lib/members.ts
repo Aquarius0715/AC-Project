@@ -112,7 +112,7 @@ export function memberErrors(d: MemberDraft, ctx: { selfUserId: string; current?
   if (!d.validFrom) e.validFrom = t("Required");
   if (d.validUntil && d.validFrom && d.validUntil <= d.validFrom) e.validUntil = t("Must be after valid from");
   if (d.role === "technician" && d.employment === "external" && !d.validUntil) e.validUntil = t("External technicians need an end date (IR74)");
-  if (d.reason.trim().length < 1 || d.reason.length > 1000) e.reason = t("A change reason is required (1–1000 characters)");
+  if ([...d.reason.trim()].length < 1 || d.reason.length > 1000) e.reason = t("A change reason is required (1–1000 characters)");
   return e;
 }
 
