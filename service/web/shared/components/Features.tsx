@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Check, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, PowerBadge, Select, Steps, SummaryList, Toggle, UtilBar, cx, useToast } from "./ui";
 import { Icon } from "./Icon";
+import { Button } from "@ac/web/components/ui/button";
 
 /* ───── Client · Energy export (FR-C16) ───── */
 export function ExportReportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -41,11 +42,11 @@ export function GroupControl({ space, units }: { space: string; units: GUnit[] }
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 px-3 py-2 text-[13px]"><b>{sel.length} selected</b><span className="flex gap-2"><Btn size="sm" onClick={() => setSel(units.filter((u) => u.online).map((u) => u.id))}>Select all online ({units.filter((u) => u.online).length})</Btn><Btn size="sm" variant="ghost" onClick={() => setSel([])}>Clear</Btn></span></div>
       <div className="grid-fluid" style={{ ["--min" as string]: "170px" }}>
         {units.map((u) => (
-          <button key={u.id} disabled={!u.online} onClick={() => toggle(u.id)} aria-pressed={sel.includes(u.id)} className={cx("rounded-xl border p-3 text-left disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
+          <Button key={u.id} variant="outline" disabled={!u.online} onClick={() => toggle(u.id)} aria-pressed={sel.includes(u.id)} className={cx("h-auto justify-start rounded-xl p-3 text-left font-normal whitespace-normal disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
             <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><Icon name={sel.includes(u.id) ? "checked" : "unchecked"} className="text-sm" /></div>
             <div className="text-[11px] text-muted-foreground">{u.temp === null ? "—" : `${u.temp} °C · ${u.w} W`}</div>
             <div className="mt-1 flex gap-1"><PowerBadge s={u.state} />{!u.online && <Badge tone="unknown">Offline</Badge>}{u.min && <Badge tone="warn">min {u.min} °C</Badge>}</div>
-          </button>
+          </Button>
         ))}
       </div>
       <Card title={`Apply to ${sel.length} selected ACs`}>

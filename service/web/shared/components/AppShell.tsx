@@ -15,6 +15,7 @@ import { DEFAULT_DISPLAY, isLocale, LOCALE_KEY, translate, type Display } from "
 import { I18nProvider } from "./I18n";
 import { useBffSession } from "@ac/web/lib/useOp";
 import { Sheet, SheetContent } from "@ac/web/components/ui/sheet";
+import { Button } from "@ac/web/components/ui/button";
 
 export function useStoredRole(): Role {
   const pathname = usePathname();
@@ -126,7 +127,7 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
           <div className="mt-auto pt-4">
             {live ? (
               // API mode (FR-X01, IR250): sign-out ends the BFF session; the full navigation also clears the screen and its cache
-              <form action="/bff/auth/logout" method="post"><button type="submit" className={signOut}><Icon name="signOut" className="text-[15px]" />{t("Sign out")}</button></form>
+              <form action="/bff/auth/logout" method="post"><Button type="submit" variant="ghost" className={signOut}><Icon name="signOut" className="text-[15px]" />{t("Sign out")}</Button></form>
             ) : <Link href="/login" className={signOut}><Icon name="signOut" className="text-[15px]" />{t("Sign out")}</Link>}
           </div>
     </>
@@ -145,14 +146,14 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
         <div className="flex min-w-0 flex-col">
           <header className={cx("sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b px-4 backdrop-blur sm:px-6 lg:px-8", demo ? "border-[#fdba74] bg-warn-soft" : "border-line bg-surface/95")}>
             <div className="flex min-w-0 items-center gap-3">
-              <button aria-label={t("Open menu")} onClick={() => setOpen(true)} className="grid h-9 w-9 place-items-center rounded-control border border-line lg:hidden"><Icon name="menu" /></button>
+              <Button variant="outline" size="icon" aria-label={t("Open menu")} onClick={() => setOpen(true)} className="size-9 rounded-control lg:hidden"><Icon name="menu" /></Button>
               {/* Demo controls are always labelled demo (FR-X05, Figma 10e) */}
               <h1 className={cx("flex min-w-0 items-center gap-2 text-[15px] font-bold", demo && "text-warn")}>{demo && <Icon name="demo" />}<span className="truncate">{title}</span>{demo && <Badge tone="warn" className="uppercase tracking-wide max-sm:hidden">{t("Always labelled demo")}</Badge>}</h1>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {role === "technician" && <button onClick={() => setQr(true)} className="inline-flex items-center gap-1.5 rounded-control border border-line px-3 py-1.5 text-xs font-bold hover:bg-surface2"><Icon name="qr" /> <span className="max-sm:hidden">{t("Scan QR")}</span></button>}
+              {role === "technician" && <Btn size="sm" onClick={() => setQr(true)} className="gap-1.5 font-bold"><Icon name="qr" /> <span className="max-sm:hidden">{t("Scan QR")}</span></Btn>}
               {role === "client" && (
-                <button onClick={() => setAssistant(true)} className="inline-flex items-center gap-1.5 rounded-full border border-primary bg-primary-soft/50 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary-soft"><Icon name="mic" /> <span className="max-sm:hidden">{t("Assistant")}</span></button>
+                <Button variant="outline" size="sm" onClick={() => setAssistant(true)} className="gap-1.5 rounded-full border-primary bg-primary-soft/50 font-bold text-primary hover:bg-primary-soft"><Icon name="mic" /> <span className="max-sm:hidden">{t("Assistant")}</span></Button>
               )}
               <span className="inline-flex items-center gap-1.5 rounded-control bg-surface2 px-3 py-1.5 text-xs font-semibold"><Icon name="account" /> <span className="max-sm:hidden">{chip}</span><span className="sm:hidden">{chip.split(" — ")[0]}</span></span>
             </div>

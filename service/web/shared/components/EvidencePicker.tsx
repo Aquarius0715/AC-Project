@@ -6,11 +6,12 @@
 import { useT } from "./I18n";
 import { evidenceHeading, togglePick, type EvidenceRow } from "@ac/web/lib/alertEvidence";
 import { Icon } from "./Icon";
+import { Checkbox } from "@ac/web/components/ui/checkbox";
 
 function Row({ title, sub, checked, disabled, onChange }: { title: string; sub: string; checked: boolean; disabled?: boolean; onChange?: (on: boolean) => void }) {
   return (
     <label className="flex items-start gap-2.5 border-t border-line py-2 text-[13px] first:border-0">
-      <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-[#005bea]" checked={checked} disabled={disabled} onChange={(e) => onChange?.(e.target.checked)} />
+      <Checkbox className="mt-0.5 shrink-0" checked={checked} disabled={disabled} onCheckedChange={(v) => onChange?.(v === true)} />
       <span className="min-w-0"><b className="block font-semibold">{title}</b><span className="block text-[11px] text-muted-foreground">{sub}</span></span>
     </label>
   );

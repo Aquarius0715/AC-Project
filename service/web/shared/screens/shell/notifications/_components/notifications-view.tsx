@@ -10,6 +10,7 @@ import type { InboxRow } from "@ac/web/lib/notifications";
 import { actionMessage, type ActionFailure } from "@ac/web/lib/actionMessage";
 import type { T } from "@ac/web/lib/i18n";
 import { markAllRead, markRead } from "../actions";
+import { Button } from "@ac/web/components/ui/button";
 
 const initial = [
   { id: "s1", t: "Alert opened on Bedroom AC", d: "alert-window-a · unresolved · linked evidence available", w: "09:12 today", read: false, href: "" },
@@ -71,7 +72,7 @@ export function NotificationsView({ rows }: { rows?: InboxRow[] }) {
           {shown.map((n) => {
             const body = <><span className={cx("mt-1.5 h-2 w-2 shrink-0 rounded-full", n.read ? "bg-transparent" : "bg-primary")} /><span className="min-w-0 flex-1"><span className={cx("block text-[13px]", !n.read && "font-bold")}>{n.t}</span><span className="block text-xs text-muted-foreground">{n.d}</span></span><span className="shrink-0 text-xs text-muted-foreground">{n.w}</span></>;
             const cls = "flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-surface2/60";
-            return <li key={n.id}>{n.href ? <Link href={n.href} onClick={() => open(n)} className={cls}>{body}</Link> : <button onClick={() => open(n)} className={cls}>{body}</button>}</li>;
+            return <li key={n.id}>{n.href ? <Link href={n.href} onClick={() => open(n)} className={cls}>{body}</Link> : <Button variant="ghost" onClick={() => open(n)} className={`h-auto justify-start whitespace-normal ${cls}`}>{body}</Button>}</li>;
           })}
           {shown.length === 0 && <li className="p-6 text-center text-muted-foreground">{t(tab === "unread" ? "No unread notifications" : "No notifications")}</li>}
         </ul>

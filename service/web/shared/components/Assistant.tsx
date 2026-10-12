@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
-import { Btn, SummaryList, cx } from "./ui";
+import { Btn, Input, Select, SummaryList, cx } from "./ui";
 import { useI18n } from "./I18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { candidateGroups, changeCard, examples, groupSummary, helpText, MICROPHONE, progressOf, roomOf, stateText, temperatureText, type CandidateGroup, type PanelState, type Progress, type ResolvedIntent } from "@ac/web/lib/assistant";
@@ -14,6 +14,7 @@ import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { sendVoiceChange } from "@ac/web/screens/shell/assistant/actions";
 import { Icon } from "./Icon";
 import { Sheet, SheetContent } from "@ac/web/components/ui/sheet";
+import { Button } from "@ac/web/components/ui/button";
 
 /** The header assistant (FR-X02, Figma Client 09a–09g). In API mode (`live`) it reads voice.resolveIntent with the
  * fixed en/ms grammar (D09), confirms a change before anything is sent and follows the command until the device
@@ -40,8 +41,8 @@ function Frame({ title, state, children, footer, lang, setLang, onClose, context
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <h2 className="flex items-center gap-2 font-bold"><Icon name="mic" /> {title} <span className="rounded-full bg-surface2 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{state}</span></h2>
           <div className="flex items-center gap-2">
-            <select aria-label={t("Language")} value={lang} onChange={(e) => setLang?.(e.target.value as Locale)} className="rounded-control border border-line px-2 py-1 text-xs"><option value="en">English</option><option value="ms">Bahasa Melayu</option></select>
-            <button aria-label={t("Close")} onClick={onClose} className="rounded-lg px-2 py-1 text-muted-foreground hover:bg-surface2"><Icon name="close" /></button>
+            <Select aria-label={t("Language")} value={lang} onChange={(e) => setLang?.(e.target.value as Locale)} className="w-auto text-xs"><option value="en">English</option><option value="ms">Bahasa Melayu</option></Select>
+            <Button variant="ghost" size="icon-sm" aria-label={t("Close")} onClick={onClose} className="text-muted-foreground"><Icon name="close" /></Button>
           </div>
         </div>
         <p className="border-b border-line bg-surface2/60 px-4 py-2 text-[11px] text-muted-foreground">{t("Context: {context} · you can control units you have permission for", { context })}</p>
@@ -154,15 +155,15 @@ function LiveAssistant({ onClose, context }: { onClose: () => void; context: str
     <Frame title={t("Assistant")} state={stateText(state, t)} lang={lang} setLang={setLang} onClose={onClose} context={context} t={t}
       footer={<>
         <form className="flex items-center gap-2 border-t border-line p-3" onSubmit={(e) => { e.preventDefault(); if (text.trim() && !busy) { ask(text.trim(), "text"); setText(""); } }}>
-          <input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder={t("Type a message…")} aria-label={t("Message")} maxLength={200} className="min-w-0 flex-1 rounded-control border border-line px-3 py-2 text-[13px]" />
-          <button type="button" disabled={busy || state === "listening"} onClick={voice} aria-label={t("Voice input")} className={cx("grid h-10 w-10 place-items-center rounded-full text-white disabled:opacity-50", mic ? "bg-primary" : "bg-muted-foreground")}><Icon name="mic" className="text-lg" /></button>
+          <Input ref={input} value={text} onChange={(e) => setText(e.target.value)} placeholder={t("Type a message…")} aria-label={t("Message")} maxLength={200} className="min-w-0 flex-1 text-[13px]" />
+          <Button type="button" size="icon" disabled={busy || state === "listening"} onClick={voice} aria-label={t("Voice input")} className={cx("size-10 rounded-full text-white disabled:opacity-50", mic ? "bg-primary" : "bg-muted-foreground")}><Icon name="mic" className="text-lg" /></Button>
         </form>
         <p className="px-4 pb-3 text-[11px] text-muted-foreground">{mic ? t("Voice or text · changes are always confirmed before sending · no business write before you confirm") : t("Text only — the microphone is off on this device · changes are always confirmed before sending")}</p>
       </>}>
       <div className="flex flex-1 flex-col gap-3 overflow-y-auto p-4" aria-live="polite">
         <div className="max-w-[90%] rounded-2xl rounded-bl-sm bg-surface2 px-3 py-2 text-[13px]">{t("Hi! Ask about temperatures, change a setting, or ask for help.")}
           <div className="mt-2 text-[11px] font-semibold text-muted-foreground">{t("Try")}</div>
-          <div className="mt-1 flex flex-col gap-1 text-xs">{[ex.temperature, ex.change, ex.help].map((s) => <button key={s} disabled={busy} className="rounded-lg border border-line bg-surface px-2 py-1 text-left hover:bg-primary-soft disabled:opacity-50" onClick={() => ask(s, "text")}>“{s}”</button>)}</div>
+          <div className="mt-1 flex flex-col gap-1 text-xs">{[ex.temperature, ex.change, ex.help].map((s) => <Button key={s} variant="outline" size="sm" disabled={busy} className="h-auto justify-start bg-surface px-2 py-1 text-left font-normal whitespace-normal hover:bg-primary-soft" onClick={() => ask(s, "text")}>“{s}”</Button>)}</div>
         </div>
         {msgs.map((m, n) => {
           if (m.kind === "user") return <div key={n} className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-[13px] text-white">{m.text}<div className="text-[10px]">{m.via === "voice" ? t("You · voice") : t("You · text")}</div></div>;
@@ -298,8 +299,8 @@ function DemoAssistant({ onClose, context }: { onClose: () => void; context: str
     <Frame title="Assistant" state={listening ? "Listening" : "Idle"} lang={lang} setLang={setLang} onClose={onClose} context={context} t={t}
       footer={<>
         <form className="flex items-center gap-2 border-t border-line p-3" onSubmit={(e) => { e.preventDefault(); if (text.trim()) { interpret(text.trim(), "text"); setText(""); } }}>
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type a message…" className="min-w-0 flex-1 rounded-control border border-line px-3 py-2 text-[13px]" />
-          <button type="button" onClick={voice} aria-label="Voice input" className="grid h-10 w-10 place-items-center rounded-full bg-primary text-white"><Icon name="mic" className="text-lg" /></button>
+          <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type a message…" className="min-w-0 flex-1 text-[13px]" />
+          <Button type="button" size="icon" onClick={voice} aria-label="Voice input" className="size-10 rounded-full text-white"><Icon name="mic" className="text-lg" /></Button>
         </form>
         <p className="px-4 pb-3 text-[11px] text-muted-foreground">Voice or text · changes are always confirmed before sending · no business write before you confirm</p>
       </>}>
@@ -307,7 +308,7 @@ function DemoAssistant({ onClose, context }: { onClose: () => void; context: str
         {msgs.map((m, n) => {
           if (m.kind === "user") return <div key={n} className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-2 text-[13px] text-white">{m.text}<div className="text-[10px]">You · {m.via}</div></div>;
           if (m.kind === "bot") return <div key={n} className="max-w-[90%] rounded-2xl rounded-bl-sm bg-surface2 px-3 py-2 text-[13px]">{m.text}{n === 0 && (
-            <div className="mt-2 flex flex-col gap-1 text-xs">{["What’s the temperature in Bedroom?", "Set Bedroom AC to 24 degrees", "Help: how do schedules work?"].map((s) => <button key={s} className="rounded-lg border border-line bg-surface px-2 py-1 text-left hover:bg-primary-soft" onClick={() => interpret(s, "text")}>“{s}”</button>)}</div>)}</div>;
+            <div className="mt-2 flex flex-col gap-1 text-xs">{["What’s the temperature in Bedroom?", "Set Bedroom AC to 24 degrees", "Help: how do schedules work?"].map((s) => <Button key={s} variant="outline" size="sm" className="h-auto justify-start bg-surface px-2 py-1 text-left font-normal whitespace-normal hover:bg-primary-soft" onClick={() => interpret(s, "text")}>“{s}”</Button>)}</div>)}</div>;
           if (m.kind === "confirm") return (
             <div key={n} className="rounded-2xl border border-line bg-surface p-3 text-[13px]">
               <div className="mb-2 font-bold">I understood:</div>

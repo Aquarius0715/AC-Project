@@ -15,6 +15,7 @@ import { showClock } from "@ac/web/lib/i18n";
 import { useI18n } from "./I18n";
 import { qrMatch, qrRefusal, scanCode, type ApiQrJob, type ApiQrResolution, type ApiQrUnit, type QrMatch } from "@ac/web/lib/techQr";
 import { Icon } from "@ac/web/components/Icon";
+import { Button } from "@ac/web/components/ui/button";
 
 const OPEN = ["assigned", "in_progress", "on_hold", "rework_requested"]; // the jobs units.resolveQr opens (IR230)
 
@@ -71,7 +72,7 @@ export function QrScan({ open, onClose }: { open: boolean; onClose: () => void }
           {assigned.length > 0 && (
             <div className="text-[11px] text-white/80">
               {t("Labels on the units of your open jobs:")}
-              <div className="mt-1 flex flex-wrap gap-1">{assigned.map((u) => <button key={u.id} type="button" onClick={() => { setCode(`ac-unit:${u.id}`); void scan(`ac-unit:${u.id}`); }} className="rounded-full border border-white/30 px-2 py-0.5 hover:bg-white/10">{u.displayName}</button>)}</div>
+              <div className="mt-1 flex flex-wrap gap-1">{assigned.map((u) => <Button key={u.id} type="button" variant="outline" size="sm" onClick={() => { setCode(`ac-unit:${u.id}`); void scan(`ac-unit:${u.id}`); }} className="h-auto rounded-full border-white/30 bg-transparent px-2 py-0.5 text-white hover:bg-white/10">{u.displayName}</Button>)}</div>
             </div>
           )}
         </div>
