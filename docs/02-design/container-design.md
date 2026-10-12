@@ -37,9 +37,9 @@ One backend image with several entry commands keeps every service on the same bu
 | Rule | Web (Node) | Backend (Go) |
 |---|---|---|
 | Build | Multi-stage: `npm ci` → `npm run typecheck && npm run build` | Multi-stage: `go mod download` → `CGO_ENABLED=0 go build -trimpath -ldflags="-s -w"`; cross-compiled with `$BUILDPLATFORM` / `$TARGETARCH` |
-| Base | `gcr.io/distroless/nodejs22-debian12:nonroot` | `gcr.io/distroless/static-debian12:nonroot` |
-| Toolchain | Node 22 LTS | Go 1.25 (current pgx v5 and golang.org/x modules require Go ≥ 1.25) |
-| User | `nonroot` (UID 65532) | `nonroot:nonroot` |
+| Base | `node:22-bookworm-slim` (as built, IR409; the distroless Node 22 line stopped at 22.22.0, while the fixes need 22.23.x). npm, npx and corepack are removed from the runtime, and the Debian packages are upgraded to their security fixes | `gcr.io/distroless/static-debian12:nonroot` |
+| Toolchain | Node 22 LTS (22.23.3 or later) | Go 1.26.9 (`go.mod` toolchain line, IR408: docker scout found standard-library CVEs fixed only from 1.26.9) |
+| User | `node` (UID 1000, as built, IR409) | `nonroot:nonroot` |
 | Filesystem | Read-only root; tmpfs `/tmp`, `/app/.next/cache` | Read-only root; tmpfs `/tmp` |
 | Privileges | No Linux capability (`cap_drop: [ALL]`) and `no-new-privileges` (as built, IR373) | same |
 | Health | ALB / compose HTTP check on the app port | Binary subcommand `healthcheck` (no shell or curl in distroless) for `/healthz`; ALB uses `/readyz` |

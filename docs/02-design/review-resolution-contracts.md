@@ -4738,8 +4738,8 @@ R324 checked compose.yaml and docker/ against the container design and the code.
 R325 compared the files under docker/ and the variables of compose.yaml with the container design and with the code.
 
 1. **The stand-ins match the design.**
-   - **Keycloak (`docker/keycloak/realm-ac.json`).** Realm `ac` has the two confidential clients with PKCE S256: `ac-web` for the customer, partner and technician apps (ports 3000–3002) and `ac-admin-web` for the admin app (3003). It has the ten fixture users with their role attribute. The three HQ users carry a TOTP credential, as §4 says.
-   - **Mosquitto.** The broker listens on 1883 and allows anonymous clients, standing in locally for IoT Core's mutual TLS.
+   - **Keycloak (`docker/keycloak/realm-ac.json`).** Realm `ac` has the two confidential clients with PKCE S256: `ac-web` for the customer, partner and technician apps (ports 3000–3002) and `ac-admin-web` for the admin app (3003). It has the ten fixture users with their role attribute. The three HQ users carry a TOTP credential, as §4 says. As built (IR412): the realm requires a password of at least 12 characters that does not contain the username; Amazon Cognito must carry the same policy in production.
+   - **Mosquitto.** The broker listens on 1883 and allows anonymous clients, standing in locally for IoT Core's mutual TLS. As built (IR413): anonymous clients are refused, and a password file holds one named user (`iot-bridge`, for the planned bridge). The broker runs as its image's non-root user, with every capability dropped (IR414).
    - **WireMock.** It answers `GET /v1/current` with the fixed demo weather.
    - **OpenTelemetry collector.** It takes OTLP on 4317 and 4318 and sends traces to Jaeger.
 2. **What is built, and what waits.**
