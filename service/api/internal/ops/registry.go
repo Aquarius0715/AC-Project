@@ -138,6 +138,9 @@ type Registry struct {
 	// BeforeDispatch runs before every operation (inline mode: events from direct writes such as the change-capture
 	// triggers of IR186, the worker or device paths are applied before the operation reads their projections).
 	BeforeDispatch func(ctx context.Context)
+	// WrapTx, when set, wraps the transaction each operation and query runs in. Tests use it to make chosen statements
+	// fail and reach the database error paths; nil in production.
+	WrapTx func(pgx.Tx) pgx.Tx
 	// Limit bounds the writes of one membership (nil: no limit, IR375).
 	Limit WriteLimiter
 
@@ -397,7 +400,7 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 	var out any
 	var cursor int64
 	err = r.DB.Run(ctx, !write, p, func(tx pgx.Tx) error {
-		call.Tx = tx
+		call.Tx = r.txFor(tx)
 		// business time of this transaction for SQL defaults and platform.app_now() (IR157)
 		if tx != nil {
 			if _, err := tx.Exec(ctx, `SELECT set_config('app.now', $1, true)`, call.Now.UTC().Format(time.RFC3339Nano)); err != nil {
@@ -438,4 +441,12 @@ func (r *Registry) run(c *echo.Context, op *Operation, body []byte, corr string)
 		r.AfterCommit(ctx)
 	}
 	return c.JSONBlob(http.StatusOK, resp)
+}
+
+// txFor is the transaction a call runs in: tx itself unless WrapTx is set.
+func (r *Registry) txFor(tx pgx.Tx) pgx.Tx {
+	if r.WrapTx == nil || tx == nil {
+		return tx
+	}
+	return r.WrapTx(tx)
 }

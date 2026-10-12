@@ -220,7 +220,7 @@ func (r *Registry) serveQuery(c *echo.Context, token string, p *Principal, beare
 	}
 	var out any
 	err = r.DB.Run(ctx, true, p, func(tx pgx.Tx) error {
-		call.Tx = tx
+		call.Tx = r.txFor(tx)
 		if _, err := tx.Exec(ctx, `SELECT set_config('app.now', $1, true)`, now.UTC().Format(time.RFC3339Nano)); err != nil {
 			return err
 		}

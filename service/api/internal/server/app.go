@@ -12,6 +12,7 @@ import (
 	"github.com/pradita/ac-project/service/api/internal/platform/events"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/labstack/echo/v5"
 
 	"github.com/pradita/ac-project/service/api/internal/modules/assets"
@@ -52,6 +53,7 @@ type Config struct {
 	DemoClock         ScenarioClock         // shared scenario clock of several services in one binary (tests); overrides DemoStart
 	WriteLimit        ops.WriteLimiter      // writes per membership and minute (IR375); nil = no limit
 	IdentityProvider  identity.SessionEnder // ends a user's sessions at the identity provider (IR386); nil = none
+	WrapTx            func(pgx.Tx) pgx.Tx   // tests only: wraps each operation's transaction to inject database failures; nil = none
 }
 
 // Server is the assembled Core API.
@@ -217,6 +219,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 		}
 		reg.Remote = q
 	}
+	reg.WrapTx = cfg.WrapTx
 	if len(cfg.Domains) == 0 { // one process serves every domain: apply events inline after each write
 		reg.AfterCommit = func(ctx context.Context) {
 			if err := srv.DrainEvents(context.WithoutCancel(ctx)); err != nil && cfg.Logger != nil {
