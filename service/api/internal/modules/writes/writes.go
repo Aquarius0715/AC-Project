@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 
@@ -25,7 +26,7 @@ func (in *Input) Validate() map[string]string {
 	if strings.TrimSpace(in.Operation) == "" {
 		fe["operation"] = "error.required"
 	}
-	if n := len(in.IdempotencyKey); n < 8 || n > 128 {
+	if n := utf8.RuneCountInString(in.IdempotencyKey); n < 8 || n > 128 { // 8–128 characters (review-resolution-contracts writes.getResult)
 		fe["idempotencyKey"] = "error.invalid"
 	}
 	return fe
