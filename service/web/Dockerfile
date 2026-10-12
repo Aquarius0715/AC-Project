@@ -22,14 +22,19 @@ COPY shared shared
 COPY ${APP} ${APP}
 RUN npm run typecheck -w ${APP} && npm run build -w ${APP}
 
-FROM gcr.io/distroless/nodejs${NODE_VERSION}-debian12:nonroot AS runtime
+# The runtime is the official Node image, not distroless: distroless's Node 22 line stops at 22.22.0, and the fixes need
+# 22.23.x (docker scout, IR408). The server runs as the image's non-root `node` user; npm, npx and corepack are removed,
+# as the server only needs node. The Debian packages are upgraded to their security fixes (docker scout, IR408).
+FROM node:${NODE_VERSION}-bookworm-slim AS runtime
 ARG APP
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
+RUN apt-get update && apt-get upgrade -y && apt-get clean && rm -rf /var/lib/apt/lists/* \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
 # standalone output keeps the workspace layout (outputFileTracingRoot = service/web/)
-COPY --from=build --chown=nonroot:nonroot /src/${APP}/.next/standalone ./
-COPY --from=build --chown=nonroot:nonroot /src/${APP}/.next/static ./${APP}/.next/static
+COPY --from=build --chown=node:node /src/${APP}/.next/standalone ./
+COPY --from=build --chown=node:node /src/${APP}/.next/static ./${APP}/.next/static
 WORKDIR /app/${APP}
-USER nonroot
+USER node
 EXPOSE 3000
-CMD ["server.js"]
+CMD ["node", "server.js"]
