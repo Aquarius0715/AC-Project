@@ -209,8 +209,14 @@ func (in *CapabilitySave) Validate() map[string]string {
 		}
 		seen[s.Metric] = true
 	}
-	if !uniqueIn(in.FirmwareCandidates, nil) {
-		fe["firmwareCandidates"] = "error.invalid"
+	// a candidate is 1–32 characters once trimmed, and no two candidates are the same after trimming (the "+ Add version" rule of the Admin device model editor)
+	seenFirmware := map[string]bool{}
+	for _, v := range in.FirmwareCandidates {
+		x := strings.TrimSpace(v)
+		if n := utf8.RuneCountInString(x); n < 1 || n > 32 || seenFirmware[x] {
+			fe["firmwareCandidates"] = "error.invalid"
+		}
+		seenFirmware[x] = true
 	}
 	switch { // DD-A04: a change reason is required on update and not taken on create
 	case in.ID != nil && in.ChangeReason == nil:
