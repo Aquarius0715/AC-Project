@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useEffectEvent } from "react";
 import { Badge, Banner, Btn, Card, Choice, cx, DataTable, EmptyState, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilBar, Plain } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -97,11 +97,13 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
     setRep(r); setDirty(false); setSavedAt(new Date(now).toISOString()); setRefused(null); after?.(r);
   }, failed);
   // autosave 20 s after the last edit while the work window is open (the API keeps every saved version)
+  // the timer restarts with each edit, not with every render; the save it runs reads the latest draft (useEffectEvent)
+  const autosave = useEffectEvent(() => save());
   useEffect(() => {
     if (!dirty || !editable || pending) return;
-    const t = setTimeout(() => save(), 20_000);
+    const t = setTimeout(() => autosave(), 20_000);
     return () => clearTimeout(t);
-  });
+  }, [draft, dirty, editable, pending]);
   const withSaved = (fn: (r: Rep) => void) => (dirty || !rep ? save(fn) : fn(rep));
   const addPhotos = (files: FileList | null) => {
     if (!files?.length) return;
