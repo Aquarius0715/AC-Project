@@ -36,6 +36,7 @@ export const ms: Record<string, string> = {
   "Demo controls": "Kawalan demo",
   "Sign out": "Log keluar",
   "Open menu": "Buka menu",
+  "Menu": "Menu",
   "Scan QR": "Imbas QR",
   "Assistant": "Pembantu",
   "Always labelled demo": "Sentiasa dilabel demo",

@@ -14,6 +14,7 @@ import { setStoredValue, useStoredValue } from "@ac/web/lib/urlState";
 import { DEFAULT_DISPLAY, isLocale, LOCALE_KEY, translate, type Display } from "@ac/web/lib/i18n";
 import { I18nProvider } from "./I18n";
 import { useBffSession } from "@ac/web/lib/useOp";
+import { Sheet, SheetContent } from "@ac/web/components/ui/sheet";
 
 export function useStoredRole(): Role {
   const pathname = usePathname();
@@ -104,12 +105,8 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
   const demo = pathname === "/demo";
 
 
-  return (
-    <I18nProvider display={display}>
-    <ToastProvider>
-      <div className="min-h-dvh lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
-        {open && <div className="fixed inset-0 z-30 bg-ink/40 lg:hidden" onClick={() => setOpen(false)} />}
-        <aside className={cx("fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col gap-1 overflow-y-auto border-r border-line bg-surface p-4 transition-transform lg:sticky lg:top-0 lg:h-dvh lg:w-auto lg:translate-x-0", open ? "translate-x-0" : "-translate-x-full")}>
+  const sidebar = (
+    <>
           <Link href={cfg.base} className="mb-3 flex items-center gap-2.5">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-lg text-white"><Icon name="cooling" /></span>
             <span className="leading-tight"><span className="block text-[15px] font-bold">{cfg.app}</span><span className="block text-[11px] text-muted-foreground">{t(cfg.sub)}</span></span>
@@ -132,7 +129,18 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
               <form action="/bff/auth/logout" method="post"><button type="submit" className={signOut}><Icon name="signOut" className="text-[15px]" />{t("Sign out")}</button></form>
             ) : <Link href="/login" className={signOut}><Icon name="signOut" className="text-[15px]" />{t("Sign out")}</Link>}
           </div>
-        </aside>
+    </>
+  );
+
+  return (
+    <I18nProvider display={display}>
+    <ToastProvider>
+      <div className="min-h-dvh lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
+        {/* the sidebar: in the page from lg up, in a sheet opened by the menu button below (shadcn/ui Sheet, DEC-75) */}
+        <aside className="hidden flex-col gap-1 overflow-y-auto border-r border-line bg-surface p-4 lg:sticky lg:top-0 lg:flex lg:h-dvh">{sidebar}</aside>
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetContent side="left" showCloseButton={false} aria-label={t("Menu")} className="gap-1 overflow-y-auto bg-surface p-4 data-[side=left]:w-[260px] lg:hidden">{sidebar}</SheetContent>
+        </Sheet>
 
         <div className="flex min-w-0 flex-col">
           <header className={cx("sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b px-4 backdrop-blur sm:px-6 lg:px-8", demo ? "border-[#fdba74] bg-warn-soft" : "border-line bg-surface/95")}>

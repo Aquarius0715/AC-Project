@@ -13,6 +13,8 @@ import {
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { deleteAutomation, saveAutomation, testEvent, updateConsent } from "../actions";
 import { Icon } from "@ac/web/components/Icon";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ac/web/components/ui/dropdown-menu";
+import { Button } from "@ac/web/components/ui/button";
 
 type Ac = { id: string; name: string; property: string; path: string };
 export type AutomationsLive = {
@@ -53,7 +55,6 @@ function ConsentCard({ live, compact }: { live: AutomationsLive; compact?: boole
 function List({ live, notice, setNotice, create, edit }: { live: AutomationsLive; notice: Notice | null; setNotice: (n: Notice | null) => void; create: () => void; edit: (id: string) => void }) {
   const t = useT();
   const [pending, run] = useAction();
-  const [menu, setMenu] = useState<string | null>(null);
   const [del, setDel] = useState<RuleCard | null>(null);
   const on = live.cards.filter((c) => c.enabled).length;
   const rule = (id: string) => live.rules.find((r) => r.id === id)!;
@@ -87,13 +88,13 @@ function List({ live, notice, setNotice, create, edit }: { live: AutomationsLive
                   </span>
                   <span className="flex gap-2">
                     <Btn size="sm" onClick={() => edit(c.id)}>{t("Edit")}</Btn>
-                    <Btn size="sm" variant="ghost" aria-label={t("More for {name}", { name: c.name })} aria-expanded={menu === c.id} onClick={() => setMenu(menu === c.id ? null : c.id)}><Icon name="more" /></Btn>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t("More for {name}", { name: c.name })} />}><Icon name="more" /></DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="min-w-40">
+                        <DropdownMenuItem variant="destructive" onClick={() => setDel(c)}><Icon name="delete" /> {t("Delete")}</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </span>
-                  {menu === c.id && (
-                    <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-xl border border-line bg-surface p-1 shadow-lg">
-                      <button type="button" className="w-full rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-crit hover:bg-crit-soft" onClick={() => { setDel(c); setMenu(null); }}><Icon name="delete" /> {t("Delete")}</button>
-                    </div>
-                  )}
                 </div>
               </div>
             </Card>

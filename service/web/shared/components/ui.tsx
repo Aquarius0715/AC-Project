@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Children, createContext, isValidElement, useCallback, useContext, useId, useRef, useState } from "react";
+import { Children, createContext, isValidElement, useCallback, useContext, useRef, useState } from "react";
 import { useT } from "@ac/web/components/I18n";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { Alert } from "@ac/web/components/ui/alert";
@@ -9,10 +9,12 @@ import { Badge as UIBadge } from "@ac/web/components/ui/badge";
 import { Button, buttonVariants } from "@ac/web/components/ui/button";
 import { Card as UICard, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@ac/web/components/ui/card";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
+import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@ac/web/components/ui/combobox";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@ac/web/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ac/web/components/ui/dropdown-menu";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@ac/web/components/ui/empty";
 import { Input as UIInput } from "@ac/web/components/ui/input";
+import { InputGroupAddon } from "@ac/web/components/ui/input-group";
 import { NativeSelect } from "@ac/web/components/ui/native-select";
 import { Switch } from "@ac/web/components/ui/switch";
 import { Tabs as UITabs, TabsList, TabsTrigger } from "@ac/web/components/ui/tabs";
@@ -348,50 +350,32 @@ export function Search({ placeholder, value, onChange }: { placeholder: string; 
   );
 }
 
-/** A select for long lists (DD-A03 search-selects): typing narrows the options, the first `limit` matches are listed,
- * the arrow keys and Enter choose one and Escape closes. Closed, it shows the chosen option. An ARIA 1.2 combobox with
- * a listbox popup; `label` names it. */
+/** A select for long lists (DD-A03 search-selects): the shadcn/ui Combobox. Typing narrows the options, the first
+ * `limit` matches are listed, the arrow keys and Enter choose one and Escape closes; closed, it shows the chosen
+ * option. `label` names the input and its list. */
 export function SearchSelect({ value, onChange, options, label, placeholder, limit = 20, className }: {
   value: string; onChange: (id: string) => void; options: { id: string; label: string }[]; label: string; placeholder?: string; limit?: number; className?: string;
 }) {
   const t = useT();
-  const id = useId();
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const [active, setActive] = useState(0);
-  const current = options.find((o) => o.id === value);
-  const needle = q.trim().toLowerCase();
-  const matches = needle ? options.filter((o) => o.label.toLowerCase().includes(needle)) : options;
-  const shown = matches.slice(0, limit);
-  const close = () => { setOpen(false); setQ(""); };
-  const choose = (o: { id: string }) => { close(); if (o.id !== value) onChange(o.id); };
-  const start = () => { setOpen(true); setQ(""); setActive(Math.max(0, options.slice(0, limit).findIndex((o) => o.id === value))); };
+  const [query, setQuery] = useState("");
+  const current = options.find((o) => o.id === value) ?? null;
+  const needle = query.trim().toLowerCase();
+  // the chosen option's own label in the input lists everything, as an empty input does
+  const matches = !needle || needle === current?.label.toLowerCase() ? options : options.filter((o) => o.label.toLowerCase().includes(needle));
   return (
-    <div className={cx("relative min-w-0", className)}>
-      <UIInput
-        role="combobox" aria-label={label} aria-expanded={open} aria-controls={`${id}-list`} aria-autocomplete="list" aria-activedescendant={open && shown[active] ? `${id}-${active}` : undefined}
-        value={open ? q : current?.label ?? ""} placeholder={placeholder ?? t("Type to search…")} onFocus={start} onBlur={close}
-        onChange={(e) => { setQ(e.target.value); setActive(0); setOpen(true); }}
-        onKeyDown={(e) => {
-          if (e.key === "ArrowDown") { e.preventDefault(); if (!open) start(); else setActive((a) => Math.min(a + 1, shown.length - 1)); }
-          else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
-          else if (e.key === "Enter" && open && shown[active]) { e.preventDefault(); choose(shown[active]); }
-          else if (e.key === "Escape" && open) { e.preventDefault(); close(); }
-        }}
-        className="pr-8"
-      />
-      <Icon name="chevronDown" className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-      {open && (
-        <ul id={`${id}-list`} role="listbox" aria-label={label} className="absolute z-30 mt-1 max-h-72 w-full min-w-[220px] overflow-auto rounded-control border border-line bg-surface py-1 shadow-lg">
-          {shown.map((o, k) => (
-            <li key={o.id || "all"} id={`${id}-${k}`} role="option" aria-selected={o.id === value} onMouseDown={(e) => { e.preventDefault(); choose(o); }} onMouseEnter={() => setActive(k)}
-              className={cx("cursor-pointer px-3 py-1.5 text-[13px]", k === active && "bg-primary-soft", o.id === value && "font-semibold")}>{o.label}</li>
-          ))}
-          {shown.length === 0 && <li className="px-3 py-1.5 text-xs text-muted-foreground">{t("No match — try another name")}</li>}
-          {matches.length > shown.length && <li className="px-3 py-1.5 text-[11px] text-muted-foreground">{t("{n} more — type to narrow the list", { n: matches.length - shown.length })}</li>}
-        </ul>
-      )}
-    </div>
+    <Combobox items={options} filteredItems={matches} limit={limit} value={current} openOnInputClick
+      itemToStringLabel={(o: { id: string; label: string }) => o.label} isItemEqualToValue={(a: { id: string }, b: { id: string }) => a.id === b.id}
+      onInputValueChange={(q) => setQuery(q)} onValueChange={(o) => { if (o && o.id !== value) onChange(o.id); }}>
+      {/* the input opens the list (a click, the arrow keys); the chevron only shows that it is a list */}
+      <ComboboxInput aria-label={label} placeholder={placeholder ?? t("Type to search…")} showTrigger={false} className={cn("w-full min-w-0", className)}>
+        <InputGroupAddon align="inline-end" aria-hidden><Icon name="chevronDown" className="text-muted-foreground" /></InputGroupAddon>
+      </ComboboxInput>
+      <ComboboxContent>
+        <ComboboxEmpty>{t("No match — try another name")}</ComboboxEmpty>
+        <ComboboxList aria-label={label}>{(o: { id: string; label: string }) => <ComboboxItem key={o.id || "all"} value={o}>{o.label}</ComboboxItem>}</ComboboxList>
+        {matches.length > limit && <p className="px-3 py-1.5 text-[11px] text-muted-foreground">{t("{n} more — type to narrow the list", { n: matches.length - limit })}</p>}
+      </ComboboxContent>
+    </Combobox>
   );
 }
 

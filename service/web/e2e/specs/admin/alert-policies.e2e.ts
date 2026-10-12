@@ -33,7 +33,7 @@ test("HQ creates an alert policy for a customer, edits it and deletes it", async
   const owner = dialog.getByRole("combobox", { name: "Owner (customer)" });
   await owner.click();
   await owner.fill("Demo Customer A");
-  await dialog.getByRole("option", { name: "Demo Customer A" }).click();
+  await page.getByRole("option", { name: "Demo Customer A" }).click(); // the list opens over the dialog
   await dialog.getByRole("button", { name: "Start the policy" }).click();
   await page.waitForURL(/tab=policies&new=[0-9a-f-]{36}/);
 
@@ -213,7 +213,7 @@ test("the default policy's rules, a customer's switch and a rule copied as a cus
   const owner = page.getByRole("dialog").getByRole("combobox", { name: "Owner (customer)" });
   await owner.click();
   await owner.fill("Demo Customer A");
-  await page.getByRole("dialog").getByRole("option", { name: "Demo Customer A" }).click();
+  await page.getByRole("option", { name: "Demo Customer A" }).click(); // the list opens over the dialog
   await page.getByRole("dialog").getByRole("button", { name: "Start the policy" }).click();
   await page.waitForURL((u) => u.searchParams.get("from") === "ventilation_co2" && !!u.searchParams.get("new"));
   await expect(main.getByRole("textbox", { name: /^Name/ })).toHaveValue("Ventilation");

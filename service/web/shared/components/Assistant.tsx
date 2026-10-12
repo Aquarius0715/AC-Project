@@ -13,6 +13,7 @@ import { useStoredValue } from "@ac/web/lib/urlState";
 import type { ApiUnitDetail } from "@ac/web/lib/units";
 import { sendVoiceChange } from "@ac/web/screens/shell/assistant/actions";
 import { Icon } from "./Icon";
+import { Sheet, SheetContent } from "@ac/web/components/ui/sheet";
 
 /** The header assistant (FR-X02, Figma Client 09a–09g). In API mode (`live`) it reads voice.resolveIntent with the
  * fixed en/ms grammar (D09), confirms a change before anything is sent and follows the command until the device
@@ -34,8 +35,8 @@ function Frame({ title, state, children, footer, lang, setLang, onClose, context
   title: string; state: string; children: ReactNode; footer: ReactNode; lang: Locale; setLang?: (l: Locale) => void; onClose: () => void; context: string; t: T;
 }) {
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-ink/30" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <aside role="dialog" aria-label={title} className="flex h-full w-full flex-col bg-surface shadow-2xl sm:max-w-[420px]">
+    <Sheet open onOpenChange={(next) => { if (!next) onClose(); }}>
+      <SheetContent side="right" showCloseButton={false} aria-label={title} className="gap-0 bg-surface p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-[420px]">
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <h2 className="flex items-center gap-2 font-bold"><Icon name="mic" /> {title} <span className="rounded-full bg-surface2 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">{state}</span></h2>
           <div className="flex items-center gap-2">
@@ -46,8 +47,8 @@ function Frame({ title, state, children, footer, lang, setLang, onClose, context
         <p className="border-b border-line bg-surface2/60 px-4 py-2 text-[11px] text-muted-foreground">{t("Context: {context} · you can control units you have permission for", { context })}</p>
         {children}
         {footer}
-      </aside>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Input, Modal, OnOffBadge, Page, PageHead, Select, SummaryList, Toggle, cx, useToast } from "@ac/web/components/ui";
 import { Icon, type IconName } from "@ac/web/components/Icon";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ac/web/components/ui/dropdown-menu";
+import { Button } from "@ac/web/components/ui/button";
 
 type Auto = { id: string; name: string; kind: string; icon: IconName; when: string; then: string; unit: string; note?: string; on: boolean };
 const seed: Auto[] = [
@@ -21,7 +23,6 @@ export function AutomationsDemo() {
   const [consent, setConsent] = useState(true);
   const [edit, setEdit] = useState<Auto | "new" | null>(null);
   const [del, setDel] = useState<Auto | null>(null);
-  const [menu, setMenu] = useState<string | null>(null);
   const [step, setStep] = useState<"form" | "review">("form");
   const [f, setF] = useState({ name: "", kind: "Schedule", time: "18:00", temp: "25", unit: "Bedroom AC" });
   const [err, setErr] = useState<Record<string, string>>({});
@@ -67,8 +68,10 @@ export function AutomationsDemo() {
                     <OnOffBadge on={a.on && !paused} />
                     <Toggle on={a.on} onChange={(v) => setList((l) => l.map((x) => (x.id === a.id ? { ...x, on: v } : x)))} label={`Toggle ${a.name}`} />
                     <Btn size="sm" onClick={() => open(a)}>Edit</Btn>
-                    <Btn size="sm" variant="ghost" aria-label="More" onClick={() => setMenu(menu === a.id ? null : a.id)}><Icon name="more" /></Btn>
-                    {menu === a.id && <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-xl border border-line bg-surface p-1 shadow-lg"><button className="w-full rounded-lg px-3 py-2 text-left text-[13px] font-semibold text-crit hover:bg-crit-soft" onClick={() => { setDel(a); setMenu(null); }}>Delete…</button></div>}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label="More" />}><Icon name="more" /></DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="min-w-40"><DropdownMenuItem variant="destructive" onClick={() => setDel(a)}><Icon name="delete" /> Delete…</DropdownMenuItem></DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               </Card>

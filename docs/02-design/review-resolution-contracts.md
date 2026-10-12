@@ -6372,3 +6372,22 @@ The interactive parts of the product components are now shadcn/ui components on 
    - The customer "Create policy" link is a `LinkBtn`; the hand-styled link had no gap for its icon. The empty-list hint names it without "+".
    - The alert-policy spec's cleanup counted the E2E policies before the list had rendered, so a policy left by a failed run was never removed. It now waits for the list, and the left-over policy is gone.
 6. **Checks.** Typecheck, lint, the web unit tests (460), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped. One test failed once on data left by an earlier failed run, and passes on the restored data. Screenshots show the dialog, the menu, the tabs and the switches.
+
+## IR402 shadcn/ui, phase 3b: the search select, the last hand-made popups and the side panels — 2026-10-12
+
+No popup, menu or panel is hand-made any more: they are all shadcn/ui components on Base UI (DEC-75).
+
+1. **`SearchSelect` is the shadcn Combobox.** The props are the same: value, options, label, placeholder and limit.
+   - Typing narrows the options. With the chosen option's own label in the input, everything is listed. The first `limit` matches are shown, with "{n} more — type to narrow the list".
+   - Arrow keys, Enter and Escape behave as before. The list carries the field's name.
+   - The list opens over a dialog (a portal), so a spec finds its options on the page.
+   - The chevron is decorative. The input opens the list on a click or with the arrow keys. As a toggle button, the chevron had no accessible name (axe button-name, critical: the HQ access screen and the policy dialog).
+2. **The customer automations' "More" menu** is a DropdownMenu, and Delete is a destructive item (live and demo).
+3. **The assistant** is a shadcn Sheet on the right, named "Assistant". As a modal, it now keeps focus and hides the page behind it from assistive technology.
+4. **The mobile menu** is a shadcn Sheet on the left, named "Menu" (Malay "Menu"). It holds the same sidebar content as the page's sidebar from the lg width up, and still closes on navigation.
+5. **Sheet widths** are set with the sheet's side prefix (`data-[side=left]:w-[260px]`). A plain width class loses to the component's own side-prefixed one.
+6. **Tests.**
+   - The automations spec deletes through the menu item.
+   - The two policy-owner steps choose the option on the page.
+   - The axe checks in the policy dialog and in the smoke crawl caught the unnamed chevron; they pass now.
+7. **Checks.** Typecheck, lint, the web unit tests (460), the four builds and the validators pass. The E2E suite passes: 117 tests, 8 skipped. Screenshots show the combobox, the assistant sheet and the mobile menu sheet.

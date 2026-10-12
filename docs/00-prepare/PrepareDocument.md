@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.284.0
+version: 0.285.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -271,6 +271,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.285.0: shadcn/ui phase 3b, the search select, the last hand-made popups and the side panels (IR402). Phase 1A unchanged.
 0.284.0: shadcn/ui phase 3a, dialogs, menus, tabs and the choice controls (IR401). Phase 1A unchanged.
 0.283.0: shadcn/ui adopted (DEC-75, supersedes DEC-03), phase 1: foundation and the product components on it (IR400). Phase 1A unchanged.
 0.282.0: Icons part 7, the last character icons, a guard test and the icon rules (IR399). Phase 1A unchanged.
