@@ -129,3 +129,40 @@ func TestTargetsFromEnv(t *testing.T) {
 		t.Fatal("relative URL must fail")
 	}
 }
+
+// Every response of the gateway, proxied or its own, is not sniffed and not cached, and carries one request ID: the
+// upstream service's copy of the header is replaced, not added to it (security loop, IR407).
+func TestResponsesAreNotSniffedOrCachedAndCarryOneRequestID(t *testing.T) {
+	targets := Targets{}
+	for _, d := range ops.Domains {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("X-Request-Id", "upstream-id")
+			w.Header().Set("Cache-Control", "public, max-age=3600")
+			w.Header().Set("X-Content-Type-Options", "sniff-me")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":{}}`))
+		}))
+		t.Cleanup(srv.Close)
+		u, _ := url.Parse(srv.URL)
+		targets[d] = u
+	}
+	e := New(targets, nil)
+	rt := ops.SpecByName()["jobs.create"].Routes[0]
+	req := httptest.NewRequest(rt.Method, rt.Path, strings.NewReader(`{"limit":1}`))
+	req.Header.Set("Authorization", "Bearer tok")
+	for _, r := range []*http.Request{req, httptest.NewRequest(http.MethodGet, "/healthz", nil)} {
+		w := httptest.NewRecorder()
+		e.ServeHTTP(w, r)
+		h := w.Result().Header
+		if got := h.Values("X-Request-Id"); len(got) != 1 || got[0] == "upstream-id" {
+			t.Errorf("%s %s: X-Request-Id = %q, want one gateway ID", r.Method, r.URL.Path, got)
+		}
+		if got := h.Values("X-Content-Type-Options"); len(got) != 1 || got[0] != "nosniff" {
+			t.Errorf("%s %s: X-Content-Type-Options = %q, want one nosniff", r.Method, r.URL.Path, got)
+		}
+		if got := h.Values("Cache-Control"); len(got) != 1 || got[0] != "no-store" {
+			t.Errorf("%s %s: Cache-Control = %q, want one no-store", r.Method, r.URL.Path, got)
+		}
+	}
+}

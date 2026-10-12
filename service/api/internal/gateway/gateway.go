@@ -52,6 +52,22 @@ func envKey(domain string) string {
 	return string(b) + "_API_URL"
 }
 
+// setNotSniffedOrCached sets the two headers every gateway response carries: the browser keeps no copy of the body and
+// does not guess its type (personal data, IR407).
+func setNotSniffedOrCached(h http.Header) {
+	h.Set("X-Content-Type-Options", "nosniff")
+	h.Set("Cache-Control", "no-store")
+}
+
+// notSniffedOrCached is the middleware that sets setNotSniffedOrCached on the gateway's own responses (/healthz, /docs,
+// errors of unknown routes).
+func notSniffedOrCached(next echo.HandlerFunc) echo.HandlerFunc {
+	return func(c *echo.Context) error {
+		setNotSniffedOrCached(c.Response().Header())
+		return next(c)
+	}
+}
+
 // New builds the gateway Echo instance (same middleware conventions as the services, IR173).
 func New(targets Targets, logger *slog.Logger) *echo.Echo {
 	e := echo.New()
@@ -61,10 +77,19 @@ func New(targets Targets, logger *slog.Logger) *echo.Echo {
 	e.HTTPErrorHandler = ops.HTTPErrorHandler
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestIDWithConfig(middleware.RequestIDConfig{Generator: func() string { return uuid.Must(uuid.NewV7()).String() }}))
+	e.Use(notSniffedOrCached)
 	proxies := map[string]*httputil.ReverseProxy{}
 	for d, u := range targets {
 		p := httputil.NewSingleHostReverseProxy(u)
 		p.Transport = &http.Transport{ResponseHeaderTimeout: 35 * time.Second, MaxIdleConnsPerHost: 64}
+		// the gateway's middleware sets the request ID and the two headers on every response; the upstream's copies of
+		// them are dropped here, or the proxy would add them a second time (IR407)
+		p.ModifyResponse = func(resp *http.Response) error {
+			resp.Header.Del(echo.HeaderXRequestID)
+			resp.Header.Del("X-Content-Type-Options")
+			resp.Header.Del("Cache-Control")
+			return nil
+		}
 		p.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
 			e.Logger.Error("upstream failed", "domain", d, "error", err)
 			de := apperr.E(apperr.Unavailable, "error.unavailable")
