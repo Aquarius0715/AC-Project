@@ -7,6 +7,7 @@ import { Job, JobStatus, Slot, fitFor, fmt, jobActions, longDate, useJobs } from
 import { units } from "@ac/web/lib/client";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
+import { symptomLength } from "@ac/web/lib/customerMaintenance";
 
 type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
 const tabOf = (s: JobStatus): StatusTab =>
@@ -154,7 +155,7 @@ function NewRequest({ open, onClose, onDone }: { open: boolean; onClose: () => v
   const [sym, setSym] = useState("");
   const [slots, setSlots] = useState<Slot[]>(blank());
   const [tried, setTried] = useState(false);
-  const symErr = tried && (sym.trim().length < 10 || sym.length > 2000) ? "Symptoms must be 10–2000 characters" : undefined;
+  const symErr = tried && (symptomLength(sym) < 10 || symptomLength(sym) > 2000) ? "Symptoms must be 10–2000 characters" : undefined;
   const slotErr = tried ? preferredError(slots) : undefined;
   const submit = () => {
     setTried(true);
@@ -167,7 +168,7 @@ function NewRequest({ open, onClose, onDone }: { open: boolean; onClose: () => v
     <Modal open={open} onClose={onClose} title="New maintenance request" footer={<><Btn onClick={onClose}>Cancel</Btn><Btn variant="primary" onClick={submit}>Submit request</Btn></>}>
       <Field label="Unit"><Select value={unitId} onChange={(e) => setUnitId(e.target.value)}>{units.map((u) => <option key={u.id} value={u.id}>{u.name} · {u.loc}</option>)}</Select></Field>
       <Field label="Type"><Choice value={type} onChange={setType} options={[{ id: "Reactive", label: "Reactive" }, { id: "Preventive", label: "Preventive" }]} /></Field>
-      <Field label="Symptoms (10–2000 characters)" error={symErr} hint={`${sym.length} / 2000`}><Textarea value={sym} onChange={(e) => setSym(e.target.value)} placeholder="Cold air is weak and there is water dripping from the indoor unit." /></Field>
+      <Field label="Symptoms (10–2000 characters)" error={symErr} hint={`${symptomLength(sym)} / 2000`}><Textarea value={sym} onChange={(e) => setSym(e.target.value)} placeholder="Cold air is weak and there is water dripping from the indoor unit." /></Field>
       <PreferredSlotsInput value={slots} onChange={setSlots} error={slotErr} />
       <Banner>Nothing is booked yet — you will see “Scheduled” once a time is confirmed. Any time outside your 3 options needs your approval.</Banner>
     </Modal>

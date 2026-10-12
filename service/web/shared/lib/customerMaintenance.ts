@@ -153,6 +153,11 @@ export function preferredError(slots: Slot[], now: number, count = 3, t: T = en)
   return null;
 }
 /** The contact window rule (IR64, IR90): up to 200 characters without an e-mail address or a phone number. */
+// the symptom length the API checks (jobs.create): the trimmed text, counted in code points (characters), as the API counts it
+export function symptomLength(v: string): number {
+  return [...v.trim()].length;
+}
+
 export function contactError(v: string, tr: T = en): string | null {
   const t = v.trim();
   if (t.length > 200) return tr("Up to 200 characters.");

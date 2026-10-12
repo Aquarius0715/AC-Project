@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  symptomLength,
   clientEventTitle, clientJobRefusal, slotLong, slotShort, clientRows, contactError, declinedNotice, detailFacts, feedback, followUpText, notesOf, planVisit, preferredError, preferredLines, proposalCard, tabOf, tabOfQuery,
   type ApiClientJob, type ApiClientRow,
 } from "@ac/web/lib/customerMaintenance";
@@ -95,5 +96,10 @@ describe("customer maintenance", () => {
     expect([clientEventTitle("job.offered", { "job.offered": "Offer received from HQ" }), clientEventTitle("job.checked_in", { "job.checked_in": "Checked in on site" }), clientEventTitle("x.y", {})])
       .toEqual(["HQ booked a service partner", "Checked in on site", "x y"]);
   });
-});
 
+  it("counts the symptom the way the API does: trimmed, in characters (code points), not UTF-16 units", () => {
+    expect(symptomLength("  ten chars!  ")).toBe(10);
+    expect(symptomLength("😀".repeat(10))).toBe(10); // an emoji is one character to the API but two UTF-16 units
+    expect(symptomLength(" " + "x".repeat(2000) + " ")).toBe(2000); // 2000 after trimming is within the limit
+  });
+});

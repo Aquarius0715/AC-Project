@@ -10,7 +10,7 @@ import { showTime, zonedInstant, zonedParts } from "@ac/web/lib/i18n";
 import { useDisplay, useT } from "@ac/web/components/I18n";
 import type { JobStatus } from "@ac/web/lib/jobs";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
-import { clientJobRefusal, contactError, followUpText, PROBLEMS, preferredError, RATING_TAGS, STATUS_TABS, type StatusTab } from "@ac/web/lib/customerMaintenance";
+import { clientJobRefusal, contactError, followUpText, PROBLEMS, preferredError, RATING_TAGS, STATUS_TABS, symptomLength, type StatusTab } from "@ac/web/lib/customerMaintenance";
 import { filterRefusal } from "@ac/web/lib/customerFilterCare";
 import { addNote, cancelRequest, createRequest, rateJob, reportProblem, requestReschedule, respondProposal } from "../actions";
 import type { MaintenanceLive } from "../_lib/load";
@@ -209,7 +209,7 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
   const [contact, setContact] = useState("");
   const [tried, setTried] = useState(false);
   const slots = rows.map((r) => toSlot(r, timeZone));
-  const symErr = sym.trim().length < 10 || sym.length > 2000 ? t("Symptoms must be 10–2000 characters") : null;
+  const symErr = symptomLength(sym) < 10 || symptomLength(sym) > 2000 ? t("Symptoms must be 10–2000 characters") : null;
   const slotErr = preferredError(slots, now, 3, t);
   const cErr = contactError(contact, t);
   const submit = () => {
@@ -221,7 +221,7 @@ function NewRequest({ live, prefill, onClose, onFail }: ModalProps & { live: Mai
     <Modal open wide onClose={() => onClose()} title={t("New maintenance request")} footer={<><Btn onClick={() => onClose()}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={submit}>{t("Submit request")}</Btn></>}>
       <Field label={t("Unit")}><Select value={unitId} onChange={(e) => setUnitId(e.target.value)}>{live.units.map((u) => <option key={u.id} value={u.id}>{u.name}{u.place ? ` · ${u.place}` : ""}</option>)}</Select></Field>
       <Field label={t("Type")}><Choice value={type} onChange={setType} options={[{ id: "reactive", label: t("Repair") }, { id: "preventive", label: t("Preventive") }]} /></Field>
-      <Field label={t("Symptoms (10–2000 characters)")} error={tried ? symErr ?? undefined : undefined} hint={`${sym.length} / 2000`}><Textarea value={sym} onChange={(e) => setSym(e.target.value)} placeholder={t("Cold air is weak and there is water dripping from the indoor unit.")} /></Field>
+      <Field label={t("Symptoms (10–2000 characters)")} error={tried ? symErr ?? undefined : undefined} hint={`${symptomLength(sym)} / 2000`}><Textarea value={sym} onChange={(e) => setSym(e.target.value)} placeholder={t("Cold air is weak and there is water dripping from the indoor unit.")} /></Field>
       <TimesInput rows={rows} onChange={setRows} error={tried ? slotErr : null} />
       <Field label={t("Contact window (optional)")} hint={t("Use HH:mm for times (example: Weekdays 09:00-18:00) — no phone numbers or e-mail addresses")} error={tried ? cErr ?? undefined : undefined}><Input value={contact} maxLength={200} onChange={(e) => setContact(e.target.value)} /></Field>
       <Banner>{t("Nothing is booked yet — you will see “Scheduled” once a time is confirmed. Any time outside your 3 options needs your approval.")}</Banner>
