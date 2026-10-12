@@ -54,7 +54,9 @@ test("the technician overview in Malay keeps the timeline in Kuala Lumpur hours"
     // an assigned job too (Figma 423:604, IR94, IR283, IR317)
     await expect(main.getByRole("term").filter({ hasText: /^Akses$/ })).toBeVisible();
     await expect(main).toContainText("Ring the demo bell (fictional)"); // the seed property's entry instructions stay as written
-    if (await main.getByRole("button", { name: /Mulakan kerja/ }).isEnabled()) {
+    // inside the window the links show for an assigned job (Mulakan kerja) and for one in progress (its save button, after
+    // another spec checked the job in); a spec may have checked it in already, so either counts
+    if (await main.getByRole("button", { name: /Mulakan kerja|Simpan/ }).count()) {
       for (const name of ["Bukti amaran", "Diagnostik"]) await expect(main.getByRole("link", { name, exact: true }).first()).toBeVisible();
     }
     // the job's unit (IR283): the register, the history and alerts, then Monitoring with another period in the URL
