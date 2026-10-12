@@ -266,11 +266,16 @@ export const reviewModeOf = (j: Pick<ApiHqJob, "contractorOrgId">) => (j.contrac
 
 /** The New job form (DD-A06 item 8): symptom 10–2000, the 1st preferred time plus up to two more (IR113 item 2: future,
  * on a later calendar day than today, 1–4 hours, distinct). */
-export function newJobErrors(f: { unitId: string; symptom: string; slots: Slot[] }, now: number, t: T = en): Record<string, string> {
+export function newJobErrors(f: { unitId: string; symptom: string; slots: Slot[]; contactWindow?: string }, now: number, t: T = en): Record<string, string> {
   const e: Record<string, string> = {};
   if (!f.unitId) e.unitId = t("Choose the unit.");
   const s = [...f.symptom.trim()].length;
   if (s < 10 || s > 2000) e.symptom = t("Describe the symptom in 10–2000 characters.");
+  // the API's rule (ContactWindowOK, IR64): up to 200 characters, no e-mail address and no run of 7 digits once spaces and
+  // - ( ) + tabs are removed
+  const contact = (f.contactWindow ?? "").trim();
+  if ([...contact].length > 200) e.contactWindow = t("Up to 200 characters.");
+  else if (contact.includes("@") || /\d{7,}/.test(contact.replace(/[ \-()+\t]/g, ""))) e.contactWindow = t("No e-mail addresses or phone numbers in the contact window.");
   const today = new Date(now + 8 * 3600_000).toISOString().slice(0, 10);
   const keys = new Set<string>();
   f.slots.forEach((x, i) => {

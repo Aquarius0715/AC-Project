@@ -3600,6 +3600,7 @@ export const ms: Record<string, string> = {
   "Enter a non-negative amount with at most two decimals.": "Masukkan amaun bukan negatif dengan paling banyak dua perpuluhan.",
   "Choose the unit.": "Pilih unit.",
   "Describe the symptom in 10–2000 characters.": "Terangkan simptom dalam 10–2000 aksara.",
+  "No e-mail addresses or phone numbers in the contact window.": "Tiada alamat e-mel atau nombor telefon dalam tetingkap hubungi.",
   "The times must differ.": "Masa mesti berbeza.",
   "Accepted — the job is completed. Completion does not resolve linked alerts.": "Diterima — kerja selesai. Penyelesaian tidak menyelesaikan amaran yang dipautkan.",
   "Returned for rework — the technician works on the next version.": "Dikembalikan untuk kerja semula — juruteknik mengusahakan versi seterusnya.",

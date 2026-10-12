@@ -94,6 +94,19 @@ describe("HQ maintenance jobs", () => {
     expect(costLineOf({ kind: "actual", description: "x", visibility: "customer", amount: "-1", currency: "MYR" }).error).toMatch(/non-negative/);
   });
 
+  // the contact window follows the API's rule (ContactWindowOK, IR64): up to 200 characters, no e-mail address, no run of
+  // seven digits once spaces and - ( ) + tabs are removed
+  it("checks the contact window of a new job as the API does", () => {
+    const base = { unitId: "u1", symptom: "Water dripping from the indoor unit", slots: [slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z")] };
+    expect(newJobErrors({ ...base, contactWindow: "9:00–18:00" }, NOW)).toEqual({});
+    expect(newJobErrors({ ...base, contactWindow: "Ring the demo bell" }, NOW)).toEqual({});
+    expect(newJobErrors({ ...base, contactWindow: "call a@b.c" }, NOW)).toHaveProperty("contactWindow");
+    expect(newJobErrors({ ...base, contactWindow: "012-345 6789" }, NOW)).toHaveProperty("contactWindow");
+    expect(newJobErrors({ ...base, contactWindow: "1234567" }, NOW)).toHaveProperty("contactWindow");
+    expect(newJobErrors({ ...base, contactWindow: "x".repeat(201) }, NOW)).toHaveProperty("contactWindow");
+    expect(newJobErrors({ ...base, contactWindow: "x".repeat(200) }, NOW)).toEqual({});
+  });
+
   it("checks a new job and the review mode", () => {
     const ok = newJobErrors({ unitId: "u1", symptom: "Water dripping from the indoor unit", slots: [slot("2026-09-22T02:00:00Z", "2026-09-22T04:00:00Z"), slot("2026-09-23T02:00:00Z", "2026-09-23T04:00:00Z")] }, NOW);
     expect(ok).toEqual({});

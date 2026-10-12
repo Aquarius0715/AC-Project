@@ -511,7 +511,7 @@ export function NewJobModal({ live, initial, onClose, onCreated }: { live: { now
   const [refusal, setRefusal] = useState<string | null>(null);
   // typed in the display time zone and sent as instants (NFR-08); "from tomorrow" stays the Kuala Lumpur day (IR113)
   const slots = times.map((x) => ({ startAt: zonedInstant(x.date, x.from, zone), endAt: zonedInstant(x.date, x.to, zone) }));
-  const errors = newJobErrors({ unitId, symptom, slots }, now, t);
+  const errors = newJobErrors({ unitId, symptom, slots, contactWindow: contact }, now, t);
   const dueAt = due ? fromZonedInput(due, zone) : null;
   const dueError = dueAt && Date.parse(dueAt) < Date.parse(slots[0].endAt) ? t("The due time cannot be before the end of the 1st time.") : undefined;
   const set = (n: number, k: "date" | "from" | "to", v: string) => setTimes(times.map((x, m) => (m === n ? { ...x, [k]: v } : x)));
