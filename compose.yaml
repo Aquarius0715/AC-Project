@@ -348,6 +348,9 @@ services:
       POSTGRES_PASSWORD: local
     ports: ["127.0.0.1:5432:5432"]   # this machine only: not reachable from other devices on the network (IR373)
     volumes: [pgdata:/var/lib/postgresql/data]
+    cap_drop: [ALL]                  # only what the entrypoint needs to set up the data directory and drop to postgres (security loop, IR414)
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETGID, SETUID]
+    security_opt: [no-new-privileges:true]
     healthcheck: { test: ["CMD-SHELL", "pg_isready -U postgres -d ac"], interval: 5s, timeout: 3s, retries: 20 }
     networks: [data]
     profiles: [infra, schema, backend, full]
