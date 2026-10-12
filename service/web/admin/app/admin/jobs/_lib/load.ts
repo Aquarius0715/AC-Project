@@ -84,8 +84,11 @@ export async function loadJobs(sp: SP) {
   const newUnit = one(sp.new), fromAlert = one(sp.alertId);
   const alert = newUnit && fromAlert ? await optional(coreOp<{ id: string; type: string; causeCode: string; evidenceText: string }>("alerts.get", { id: fromAlert }), null) : null;
   const newJob = newUnit ? { unitId: newUnit, symptom: alert ? t("Alert {id}: {title} — {evidence}", { id: alert.id.slice(0, 8), title: alertTitle(alert, t), evidence: alert.evidenceText }).slice(0, 2000) : "" } : null;
+  // the job the new-job dialog just created: ?jobId=<id>&created=book|requested (its detail opens step 2, or says it was saved as requested)
+  const createdKind = one(sp.created);
+  const created = createdKind === "book" || createdKind === "requested" ? { id: one(sp.jobId) ?? "", book: createdKind === "book" } : null;
   const base = {
-    ...head, q, newJob, period, periodChip: period ? periodChip(period, i) : null, sort, sorts: SORTS.map((x) => ({ id: x.id, text: t(x.text) })), total: list.total,
+    ...head, q, newJob, created, period, periodChip: period ? periodChip(period, i) : null, sort, sorts: SORTS.map((x) => ({ id: x.id, text: t(x.text) })), total: list.total,
     stages: STAGES.map((x, k) => ({ id: x.id, label: t(x.label), count: counts[k] })),
     deliveries: [{ id: "internal", name: t("Internal") }, ...contractors.map((c) => ({ id: c.id, name: c.name }))],
     assignees: members.filter((m) => m.role === "technician").map((m) => ({ id: m.id, name: m.displayName })),

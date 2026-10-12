@@ -33,20 +33,18 @@ export function JobsView({ live }: { live: JobsLive }) {
   const patch = useUrlPatch();
   const [creating, setCreating] = useState(!!live.newJob); // opened by ?new=<unitId> (an alert's Request maintenance)
   // The job New job just created: its detail opens step 2 (book) or says it was saved as requested.
-  const [fresh, setFresh] = useState<Fresh | null>(() => pendingFresh);
-  useEffect(() => { pendingFresh = null; }, []);
+  const [fresh, setFresh] = useState<Fresh | null>(() => (live.created?.id ? live.created : null));
   return (
     <Page className="max-w-[1440px]">
       <JobsTabs tab="jobs" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => setCreating(true)}><Icon name="add" /> {t("New job")}</Btn>} />
       {creating && <NewJobModal live={live} initial={live.newJob ?? undefined} onClose={() => { setCreating(false); if (live.newJob) patch({ new: null, alertId: null }); }} onCreated={(f) => { setCreating(false); setFresh(f); }} />}
-      <JobsTab live={live} patch={patch} fresh={fresh} onFresh={() => setFresh(null)} />
+      <JobsTab live={live} patch={patch} fresh={fresh} onFresh={() => { setFresh(null); patch({ created: null }); }} />
     </Page>
   );
 }
 
 type Fresh = { id: string; book: boolean };
 // New job opened from another tab hands the created job over here (browser module state; never set during rendering).
-let pendingFresh: Fresh | null = null;
 
 function JobsTab({ live, patch, fresh, onFresh }: { live: JobsLive; patch: (p: Record<string, string | null>) => void; fresh: Fresh | null; onFresh: () => void }) {
   const t = useT();
@@ -524,8 +522,8 @@ export function NewJobModal({ live, initial, onClose, onCreated }: { live: { now
     run(() => createJob({ unitId, type, symptom, slots, dueAt, contactWindow: contact }), t(book ? "Job created — choose who does the work" : "Job created (requested)"),
       (v) => {
         if (onCreated) onCreated({ id: v.id, book });
-        else { pendingFresh = { id: v.id, book }; onClose(); }
-        router.push(`/admin/jobs?jobId=${v.id}`);
+        else onClose();
+        router.push(`/admin/jobs?jobId=${v.id}&created=${book ? "book" : "requested"}`);
       }, (f) => setRefusal(hqRefusal(f, t)));
   };
   const groups = [...new Set(live.units.map((u) => u.customer))];
