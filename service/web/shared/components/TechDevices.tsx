@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, ConnBadge, Field, Input, ListRow, Modal, Page, Search, Tabs, Textarea, Timeline, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, ConnBadge, Field, Input, ListRow, Modal, Page, Search, Tabs, Textarea, Timeline, useToast, Plain } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 
 const devices = [
@@ -59,7 +59,7 @@ export function DevicesView({ initial }: { initial?: string }) {
             {fw === "ok" && <div className="mt-3"><Banner tone="ok">Firmware v2.0 succeeded — history appended.</Banner></div>}
           </Card>
           <Card title="Sensors (5)" sub="from the unit’s capability v3">
-            <div className="scroll-x"><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>Metric</th><th>Unit</th><th>Stale after</th><th>Last calibrated</th><th /></tr></thead><tbody>{[["temperature", "°C"], ["humidity", "%"], ["co2", "ppm"], ["pm25", "µg/m³"], ["power", "kW"]].map(([m, u], i) => <tr key={m} className="border-t border-line"><td className="py-2">{m}</td><td>{u}</td><td>120 s</td><td>{i === 0 && sel.id === "ac-001" ? "2026-09-21 09:40" : "Never"}</td><td><button className="text-xs font-semibold text-primary" onClick={() => setCal(m)}>Calibrate <Icon name="arrowRight" /></button></td></tr>)}</tbody></table></div>
+            <div className="scroll-x"><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>Metric</th><th>Unit</th><th>Stale after</th><th>Last calibrated</th><th /></tr></thead><tbody>{[["temperature", "°C"], ["humidity", "%"], ["co2", "ppm"], ["pm25", "µg/m³"], ["power", "kW"]].map(([m, u], i) => <tr key={m} className="border-t border-line"><td className="py-2">{m}</td><td>{u}</td><td>120 s</td><td>{i === 0 && sel.id === "ac-001" ? "2026-09-21 09:40" : "Never"}</td><td><Plain className="text-xs font-semibold text-primary" onClick={() => setCal(m)}>Calibrate <Icon name="arrowRight" /></Plain></td></tr>)}</tbody></table></div>
           </Card>
           <div className="split-even">
             <Card title="Operation history"><div className="text-[13px]">{[["firmware", "2026-09-21 09:14", "v1 → v2"], ["check", "2026-09-21 09:12", "heartbeat confirmed"]].map(([k, t, d]) => <div key={t} className="flex flex-wrap justify-between gap-2 border-t border-line py-2 first:border-0"><span><b>{k}</b> · {d}</span><span className="text-xs text-muted-foreground">{t}</span></div>)}</div></Card>

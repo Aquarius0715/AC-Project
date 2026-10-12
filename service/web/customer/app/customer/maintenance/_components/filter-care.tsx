@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Fragment, useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, Modal, SummaryList, UtilBar, cx } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, Modal, SummaryList, UtilBar, cx, Plain } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { cleaningSymptom, DEFAULT_FILTER_HOURS, filterStatus, reminderErrors, reminderInput, type FilterGroup, type FilterRow, type ReminderForm } from "@ac/web/lib/customerFilterCare";
@@ -50,7 +50,7 @@ export function FilterCareTab({ f, owner, onRequest, onDone, onFail }: Props) {
           <td className="px-3 py-2.5 max-sm:hidden"><Progress pct={g.pct} tone={g.badge.tone === "crit" ? "crit" : g.badge.tone === "warn" ? "warn" : "primary"} text={g.progress} /></td>
           <td className="px-3 py-2.5"><Badge tone={g.badge.tone}>{g.badge.label}</Badge></td>
           <td className="px-3 py-2.5 text-right">
-            <button type="button" aria-expanded={shown} className="text-[13px] font-semibold text-primary hover:underline" onClick={() => setOpen((s) => (shown ? s.filter((k) => k !== g.key) : [...s, g.key]))}>{shown ? t("Hide") : t("View {n}", { n: g.rows.length })}</button>
+            <Plain type="button" aria-expanded={shown} className="text-[13px] font-semibold text-primary hover:underline" onClick={() => setOpen((s) => (shown ? s.filter((k) => k !== g.key) : [...s, g.key]))}>{shown ? t("Hide") : t("View {n}", { n: g.rows.length })}</Plain>
           </td>
         </tr>
         {shown && g.rows.map((r) => unitRow(r, true))}

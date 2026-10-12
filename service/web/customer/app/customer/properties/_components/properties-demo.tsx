@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Btn, Card, Field, Input, Modal, Page, PowerBadge, SummaryList, Badge, cx, useToast } from "@ac/web/components/ui";
+import { Btn, Card, Field, Input, Modal, Page, PowerBadge, SummaryList, Badge, cx, useToast, Plain } from "@ac/web/components/ui";
 import { GroupControl, GUnit } from "@ac/web/components/Features";
 import { Icon } from "@ac/web/components/Icon";
 
@@ -36,13 +36,13 @@ function TreeRow({ n, depth, sel, onSel, onRename }: { n: Node; depth: number; s
   return (
     <>
       <div className={cx("flex items-center gap-2 rounded-lg px-2 py-1.5", sel === n.id ? "bg-primary-soft" : "hover:bg-surface2")} style={{ paddingLeft: 8 + depth * 16 }}>
-        <button onClick={() => onSel(n.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+        <Plain onClick={() => onSel(n.id)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
           <Icon name={n.children ? "chevronDown" : n.unassigned ? "unknown" : "chevronRight"} className="text-muted-foreground" />
           <span className="truncate font-semibold">{n.name}</span>
           {n.type && <span className="rounded bg-surface2 px-1.5 text-[10px] text-muted-foreground">{n.type}</span>}
           {n.units !== undefined && <span className="text-[11px] text-muted-foreground">· {n.units} unit{n.units > 1 ? "s" : ""}</span>}
-        </button>
-        {!n.unassigned && <button aria-label={`Rename ${n.name}`} onClick={() => onRename(n)} className="text-muted-foreground hover:text-primary"><Icon name="edit" /></button>}
+        </Plain>
+        {!n.unassigned && <Plain aria-label={`Rename ${n.name}`} onClick={() => onRename(n)} className="text-muted-foreground hover:text-primary"><Icon name="edit" /></Plain>}
       </div>
       {n.children?.map((c) => <TreeRow key={c.id} n={c} depth={depth + 1} sel={sel} onSel={onSel} onRename={onRename} />)}
     </>
@@ -79,7 +79,7 @@ export function PropertiesDemo() {
             </>
           )}
           {groupUnits[sel] && (
-            <div className="mb-3 flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">{groupUnits[sel].length} ACs ·</span>{(["single", "group"] as const).map((m) => <button key={m} aria-pressed={mode === m} onClick={() => setMode(m)} className={cx("rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{m === "single" ? "Single AC" : "Group control"}</button>)}</div>
+            <div className="mb-3 flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">{groupUnits[sel].length} ACs ·</span>{(["single", "group"] as const).map((m) => <Plain key={m} aria-pressed={mode === m} onClick={() => setMode(m)} className={cx("rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{m === "single" ? "Single AC" : "Group control"}</Plain>)}</div>
           )}
           {groupUnits[sel] && mode === "group" && <GroupControl space={sel === "ws" ? "Workstations" : sel === "meeting" ? "Meeting room" : "Bedroom"} units={groupUnits[sel]} />}
           {sel === "ws" && mode === "single" && <div className="flex flex-col gap-2">{groupUnits.ws.map((u) => <Link key={u.id} href="/customer/units/unit-online-rto" className="flex items-center justify-between rounded-xl border border-line p-3 hover:bg-surface2/60"><b className="flex items-center gap-1.5"><Icon name="units" className="text-primary" />{u.name}</b><span className="flex items-center gap-3 text-xs"><PowerBadge s={u.state} />{u.temp ?? "—"} °C <Icon name="chevronRight" /></span></Link>)}</div>}

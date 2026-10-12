@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, BarChart, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, Field, Input, Kpi, LinkBtn, Modal, Page, Select, SummaryList, Tabs } from "@ac/web/components/ui";
+import { Badge, BarChart, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, Field, Input, Kpi, LinkBtn, Modal, Page, Select, SummaryList, Tabs, Plain } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { klLocal, one, type SummaryView } from "@ac/web/lib/energy";
@@ -64,7 +64,7 @@ export function EnergyView({ live }: { live: EnergyLive }) {
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px]">
           <span className="text-xs text-muted-foreground">{t("Units")}</span>
-          {live.unitIds.map((u) => <Badge key={u} tone="primary">{names.get(u)}{live.unitIds.length > 1 && <button type="button" aria-label={t("Remove {name}", { name: names.get(u) ?? "" })} className="ml-1" onClick={() => setUnits(live.unitIds.filter((x) => x !== u))}><Icon name="close" /></button>}</Badge>)}
+          {live.unitIds.map((u) => <Badge key={u} tone="primary">{names.get(u)}{live.unitIds.length > 1 && <Plain type="button" aria-label={t("Remove {name}", { name: names.get(u) ?? "" })} className="ml-1" onClick={() => setUnits(live.unitIds.filter((x) => x !== u))}><Icon name="close" /></Plain>}</Badge>)}
           {live.unitIds.length < 4 && (
             <Select aria-label={t("Compare unit")} className="w-auto" value="" onChange={(e) => e.target.value && setUnits([...live.unitIds, e.target.value])}>
               <option value="">{t("Add a unit to compare")}</option>{live.units.filter((u) => !live.unitIds.includes(u.id)).map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}

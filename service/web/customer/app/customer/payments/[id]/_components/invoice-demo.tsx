@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, DemoBadge, Modal, Page, SummaryList, Timeline, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, DemoBadge, Modal, Page, SummaryList, Timeline, useToast, Plain } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 
 type Phase = "choose" | "processing" | "confirmed" | "failed";
@@ -54,7 +54,7 @@ export function InvoiceDemo({ id, tab }: { id: string; tab?: string }) { // SCR-
               <h3 className="mt-4 mb-2 text-[13px] font-bold">Payment method</h3>
               <div className="flex flex-col gap-2">
                 {([["credit", "Credit card (demo)", "Simulated card payment — no card details"], ["debit", "Debit card (demo)", "Simulated card payment — no card details (this one fails in the demo)"], ["bank", "Payment instructions", "Bank transfer details — viewing them does not pay the invoice"]] as const).map(([k, t, d]) => (
-                  <button key={k} onClick={() => setMethod(k)} aria-pressed={method === k} className={`rounded-xl border p-3 text-left ${method === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}><b className="text-[13px]">{t}</b><div className="text-xs text-muted-foreground">{d}</div></button>
+                  <Plain key={k} onClick={() => setMethod(k)} aria-pressed={method === k} className={`rounded-xl border p-3 text-left ${method === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}><b className="text-[13px]">{t}</b><div className="text-xs text-muted-foreground">{d}</div></Plain>
                 ))}
               </div>
               <div className="mt-3 flex justify-end">{method === "bank" ? <Btn onClick={() => toast("Bank instructions shown — invoice stays unpaid", "warn")}>View instructions</Btn> : <Btn variant="primary" onClick={pay}>Pay now</Btn>}</div>

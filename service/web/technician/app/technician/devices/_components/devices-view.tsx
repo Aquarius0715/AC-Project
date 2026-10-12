@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Badge, Banner, Btn, Card, Check, ConnBadge, cx, EmptyState, Field, Input, ListRow, Modal, Page, Search, Select, Textarea } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, ConnBadge, cx, EmptyState, Field, Input, ListRow, Modal, Page, Search, Select, Textarea, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -112,10 +112,10 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">{counts.map(({ f, label, n }) => (
-          <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}
+          <Plain key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}
             className={cx("flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-semibold", filter === f ? "border-ink bg-ink text-white" : "border-line bg-surface")}>
             {f !== "all" && <span className={cx("h-2 w-2 rounded-full", f === "online" ? "bg-ok" : f === "offline" ? "bg-crit" : "bg-warn")} />}{label} <span className="text-xs opacity-70">{n}</span>
-          </button>
+          </Plain>
         ))}</div>
         <div className="flex flex-wrap items-center gap-2"><div className="w-64"><Search placeholder={t("Search serial, device or unit…")} value={q} onChange={setQ} /></div>
           {live.canMaintain && <Btn variant="primary" disabled={live.register.length === 0} title={live.register.length ? undefined : t("Every assigned unit already has a device")} onClick={() => { setErrors({}); setModal("register"); }}><Icon name="add" /> {t("Register device")}</Btn>}</div>
@@ -164,9 +164,9 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
                     { label: t("Calibrate sensor"), sub: t("reference vs measured"), act: () => { setCal({ sensorId: dv.detail.sensors[0]?.id ?? "", reference: "", measured: "" }); setErrors({}); setModal("calibrate"); }, off: dv.detail.sensors.length === 0 },
                     { label: t("Update firmware"), sub: dv.detail.activeOperation?.kind === "firmware" ? t("running…") : dv.firmware.length ? t("{version} available", { version: dv.firmware.join(", ") }) : t("no newer candidate"), act: () => { setFw(dv.firmware[dv.firmware.length - 1] ?? ""); setErrors({}); setModal("firmware"); }, off: dv.firmware.length === 0 },
                   ].map((a) => (
-                    <button key={a.label} type="button" disabled={pending || busy || !canWrite || a.off} onClick={a.act} className="rounded-xl border border-line px-3 py-2 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50">
+                    <Plain key={a.label} type="button" disabled={pending || busy || !canWrite || a.off} onClick={a.act} className="rounded-xl border border-line px-3 py-2 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50">
                       <div className="text-[13px] font-semibold">{a.label}</div><div className="text-[11px] text-muted-foreground">{a.sub}</div>
-                    </button>
+                    </Plain>
                   ))}
                 </div>
               )}
@@ -200,8 +200,8 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
                     <div className="mt-2 flex flex-wrap items-center gap-3">
                       {live.canMaintain && <Btn size="sm" disabled={pending || !canWrite} onClick={() => { setNote({ eventId: dv.events![0].id, text: "" }); setErrors({}); setModal("note"); }}>{t("Add response note…")}</Btn>}
                       {live.canAcknowledge && openAlerts(dv.events).map((a) => (
-                        <button key={a.id} type="button" disabled={pending} className="text-[13px] font-semibold text-primary disabled:opacity-50"
-                          onClick={() => run(() => acknowledgeAlert(a.id, a.version), t("Alert acknowledged — the tamper state stays until the device reports it clear"), ok(), failed)}>{t("Acknowledge {type} alert {id}", { type: a.type, id: a.id.slice(0, 8) })} <Icon name="arrowRight" /></button>
+                        <Plain key={a.id} type="button" disabled={pending} className="text-[13px] font-semibold text-primary disabled:opacity-50"
+                          onClick={() => run(() => acknowledgeAlert(a.id, a.version), t("Alert acknowledged — the tamper state stays until the device reports it clear"), ok(), failed)}>{t("Acknowledge {type} alert {id}", { type: a.type, id: a.id.slice(0, 8) })} <Icon name="arrowRight" /></Plain>
                       ))}
                     </div>
                   )}
@@ -215,7 +215,7 @@ export function TechDevicesView({ live }: { live: TechDevicesLive }) {
                         <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><th /></tr></thead>
                         <tbody>{dv.sensors.map((s) => (
                           <tr key={s.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{s.metric}</td><td>{s.unit}</td><td>{s.stale}</td><td className="text-xs">{s.calibrated}</td>
-                            <td className="pr-3 text-right">{live.canMaintain && <button type="button" disabled={pending || busy || !canWrite} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => { setCal({ sensorId: s.id, reference: "", measured: "" }); setErrors({}); setModal("calibrate"); }}>{t("Calibrate")} <Icon name="arrowRight" /></button>}</td></tr>
+                            <td className="pr-3 text-right">{live.canMaintain && <Plain type="button" disabled={pending || busy || !canWrite} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => { setCal({ sensorId: s.id, reference: "", measured: "" }); setErrors({}); setModal("calibrate"); }}>{t("Calibrate")} <Icon name="arrowRight" /></Plain>}</td></tr>
                         ))}</tbody>
                       </table></div>
                     )}

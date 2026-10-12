@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, EmptyState, Field, Page, SeverityBadge, SummaryList, Textarea, cx, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, EmptyState, Field, Page, SeverityBadge, SummaryList, Textarea, cx, useToast, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { EvidencePicker } from "@ac/web/components/EvidencePicker";
 import { evidenceProblem, evidenceRefusal } from "@ac/web/lib/alertEvidence";
@@ -87,9 +87,9 @@ export function AlertEvidenceView({ live }: { live: AlertsLive }) {
               {live.count > 1 && (
                 <Card title={t("Alerts on this unit ({n})", { n: live.count })}>
                   {live.choices.map((x) => (
-                    <button key={x.id} type="button" onClick={() => { setMsg(null); setPicked([]); patch({ alertId: x.id }); }} className={cx("flex w-full items-center justify-between gap-2 border-t border-line py-2 text-left first:border-0", x.id === a.id && "font-bold")}>
+                    <Plain key={x.id} type="button" onClick={() => { setMsg(null); setPicked([]); patch({ alertId: x.id }); }} className={cx("flex w-full items-center justify-between gap-2 border-t border-line py-2 text-left first:border-0", x.id === a.id && "font-bold")}>
                       <span className="min-w-0"><span className="block text-[13px]">{x.title}</span><span className="text-xs font-normal text-muted-foreground">{x.sub}</span></span><SeverityBadge s={x.severity} />
-                    </button>
+                    </Plain>
                   ))}
                 </Card>
               )}

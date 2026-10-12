@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilBar, cx, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilBar, cx, useToast, Plain } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
@@ -106,7 +106,7 @@ function Workspace({ id }: { id: string }) {
       {status === "Submitted" && <Banner tone="ok">Submitted v1 — read-only, awaiting quality review.</Banner>}
       {status === "In progress" && <Banner tone="warn">Work window ends in 15 min — unsaved input will be discarded at 12:00 (IR89).</Banner>}
       {status === "On hold" && <Banner tone="warn" action={<Btn size="sm" variant="ghost" onClick={() => setStatus("In progress")}>Demo: HQ resumes</Btn>}>On hold by HQ — save and submit are blocked (CONFLICT, IR93). Your draft v2 is kept; you can continue when HQ resumes the job.</Banner>}
-      {status === "In progress" && <p className="text-right text-[11px] text-muted-foreground"><button className="underline" onClick={() => setStatus("On hold")}>Demo: HQ puts the job on hold</button></p>}
+      {status === "In progress" && <p className="text-right text-[11px] text-muted-foreground"><Plain className="underline" onClick={() => setStatus("On hold")}>Demo: HQ puts the job on hold</Plain></p>}
       {errs.length > 0 && <Banner tone="crit"><b>Can’t submit:</b><ul className="list-disc pl-5 text-xs">{errs.slice(0, 5).map((e) => <li key={e}>{e}</li>)}</ul></Banner>}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
@@ -115,7 +115,7 @@ function Workspace({ id }: { id: string }) {
               {groups[tab].map((k) => (
                 <li key={k} className="py-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-[13px] font-semibold">{k}</span>
-                    <div className="flex flex-wrap gap-1">{([["normal", "Normal"], ["attention", "Attention"], ["not_inspected", "Not inspected"], ["not_applicable", "N/A"]] as const).map(([v, l]) => <button key={v} disabled={readOnly} onClick={() => setRes((r) => ({ ...r, [k]: v }))} aria-pressed={res[k] === v} className={cx("rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-60", res[k] === v ? (v === "attention" ? "border-warn bg-warn-soft text-warn" : v === "normal" ? "border-ok bg-ok-soft text-ok" : "border-primary bg-primary-soft text-primary") : "border-line hover:bg-surface2")}>{l}</button>)}</div></div>
+                    <div className="flex flex-wrap gap-1">{([["normal", "Normal"], ["attention", "Attention"], ["not_inspected", "Not inspected"], ["not_applicable", "N/A"]] as const).map(([v, l]) => <Plain key={v} disabled={readOnly} onClick={() => setRes((r) => ({ ...r, [k]: v }))} aria-pressed={res[k] === v} className={cx("rounded-lg border px-2.5 py-1 text-xs font-semibold disabled:opacity-60", res[k] === v ? (v === "attention" ? "border-warn bg-warn-soft text-warn" : v === "normal" ? "border-ok bg-ok-soft text-ok" : "border-primary bg-primary-soft text-primary") : "border-line hover:bg-surface2")}>{l}</Plain>)}</div></div>
                   {(res[k] === "attention" || res[k] === "not_inspected" || res[k] === "not_applicable") && <div className="mt-1.5"><Input disabled={readOnly} placeholder="Reason…" value={why[k] ?? ""} onChange={(e) => setWhy((w) => ({ ...w, [k]: e.target.value }))} /></div>}
                 </li>
               ))}
@@ -127,10 +127,10 @@ function Workspace({ id }: { id: string }) {
           </Card>
           <Card title="Work report — draft v2">
             <Field label="Work performed & next action (10–4000 characters)"><Textarea disabled={readOnly} value={work} onChange={(e) => setWork(e.target.value)} className="min-h-[110px]" /></Field>
-            <p className="mt-3 text-[13px] font-semibold">Replacement parts: {parts.length} lines · R32 +0.25 kg <button className="text-xs text-primary" onClick={() => setView("parts")}>(see Parts & refrigerant)</button></p>
+            <p className="mt-3 text-[13px] font-semibold">Replacement parts: {parts.length} lines · R32 +0.25 kg <Plain className="text-xs text-primary" onClick={() => setView("parts")}>(see Parts & refrigerant)</Plain></p>
             <div className="grid-fluid mt-2" style={{ ["--min"as string]: "150px" }}><Field label="Next action"><Select disabled={readOnly}><option>None</option><option>Re-inspect</option><option>Replace part</option></Select></Field></div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface2 p-3"><div><b className="text-[13px]">Customer sign-off</b><div>{signed ? <Badge tone="ok">Signed · {signed}</Badge> : <Badge tone="warn">Not signed</Badge>}</div></div><Btn size="sm" disabled={readOnly} onClick={() => setSignModal(true)}>{signed ? "Sign again" : "Get signature"}</Btn></div>
-            <div className="mt-3 rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted-foreground">Photos (JPEG/PNG, ≤5 MiB, ≤10) · 1 attached · <button disabled={readOnly} className="font-semibold text-primary disabled:opacity-50" onClick={() => toast("Photo added (demo)")}><Icon name="add" /> Add photo</button></div>
+            <div className="mt-3 rounded-xl border border-dashed border-line p-4 text-center text-xs text-muted-foreground">Photos (JPEG/PNG, ≤5 MiB, ≤10) · 1 attached · <Plain disabled={readOnly} className="font-semibold text-primary disabled:opacity-50" onClick={() => toast("Photo added (demo)")}><Icon name="add" /> Add photo</Plain></div>
             <p className="mt-2 text-[11px] text-muted-foreground">Submitted versions become read-only. Rework resumes from rework_requested as a new draft version.</p>
             {!readOnly && <div className="mt-3 flex flex-wrap justify-end gap-2"><Btn onClick={() => toast("Draft autosaved 11:44")}>Save draft</Btn><Btn variant="primary" onClick={submit}>Submit report</Btn></div>}
           </Card>
@@ -165,7 +165,7 @@ function Workspace({ id }: { id: string }) {
 function PartsView({ parts, readOnly, onRemove }: { parts: { p: string; c: string; src: string; q: number; lot: string }[]; readOnly: boolean; onRemove: (i: number) => void }) {
   return (
     <div className="flex flex-col gap-3">
-      <DataTable rowKey={(r) => r.p} rows={parts} cols={[{ key: "p", label: "Part", render: (r) => <div><b>{r.p}</b><div className="text-[11px] text-muted-foreground">{r.c}</div></div> }, { key: "s", label: "Source", render: (r) => r.src }, { key: "q", label: "Qty", render: (r) => r.q }, { key: "l", label: "Lot / serial", render: (r) => r.lot }, { key: "x", label: "", render: (r) => <button disabled={readOnly} className="text-xs font-semibold text-primary" onClick={() => onRemove(parts.indexOf(r))}>Remove</button> }]} />
+      <DataTable rowKey={(r) => r.p} rows={parts} cols={[{ key: "p", label: "Part", render: (r) => <div><b>{r.p}</b><div className="text-[11px] text-muted-foreground">{r.c}</div></div> }, { key: "s", label: "Source", render: (r) => r.src }, { key: "q", label: "Qty", render: (r) => r.q }, { key: "l", label: "Lot / serial", render: (r) => r.lot }, { key: "x", label: "", render: (r) => <Plain disabled={readOnly} className="text-xs font-semibold text-primary" onClick={() => onRemove(parts.indexOf(r))}>Remove</Plain> }]} />
       <b className="text-[13px]">Refrigerant (R32) — cylinder CYL-R32-0182</b>
       <div className="grid-fluid" style={{ ["--min" as string]: "120px" }}>{[["Recovered", "0.40 kg"], ["Charged", "0.65 kg"], ["Net added", "+0.25 kg"], ["Leak check", "Pass · electronic detector"]].map(([k, v]) => <div key={k} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{k}</div><div className="font-bold">{v}</div></div>)}</div>
       <p className="text-[11px] text-muted-foreground">Stock is deducted from your van when the report is accepted. Refrigerant amounts are kept per unit for leak-check logs.</p>

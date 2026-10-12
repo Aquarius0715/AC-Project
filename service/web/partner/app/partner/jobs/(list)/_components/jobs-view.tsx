@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Banner, cx, EmptyState, Page, PageHead, Select, Tabs } from "@ac/web/components/ui";
+import { Badge, Banner, cx, EmptyState, Page, PageHead, Select, Tabs, Plain } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -55,9 +55,9 @@ export function JobsView({ live }: { live: JobsLive }) {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
           <span>{t("Showing {shown} of {total} · Sorted by {sort} · KPI counts on Overview use the same period (your company only)", { shown: live.rows.length, total: live.total, sort: live.sortText })}</span>
           <span className="flex items-center gap-3">
-            {live.paging.page > 1 && <button className="font-semibold text-primary" onClick={() => patch(reset)}><Icon name="chevronLeft" /> {t("First page")}</button>}
+            {live.paging.page > 1 && <Plain className="font-semibold text-primary" onClick={() => patch(reset)}><Icon name="chevronLeft" /> {t("First page")}</Plain>}
             <span>{t("Page {page} of {of}", { page: live.paging.page, of: live.paging.of })}</span>
-            {live.nextCursor && <button className="font-semibold text-primary" onClick={() => patch({ cursor: live.nextCursor, page: String(live.paging.page + 1) })}>{t("Next")} <Icon name="chevronRight" /></button>}
+            {live.nextCursor && <Plain className="font-semibold text-primary" onClick={() => patch({ cursor: live.nextCursor, page: String(live.paging.page + 1) })}>{t("Next")} <Icon name="chevronRight" /></Plain>}
           </span>
         </div>
       </section>

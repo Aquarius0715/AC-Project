@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, Timeline, cx, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, Kpi, ListRow, Modal, Page, Select, SummaryList, Tabs, Textarea, Timeline, cx, useToast, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge, PreferredSlotsInput, Rank, preferredError } from "@ac/web/components/JobBits";
 import { Job, JobStatus, Slot, fitFor, fmt, jobActions, longDate, statusLabel, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
@@ -33,7 +33,7 @@ export function JobsDemo({ jobId, tab: initial }: { jobId?: string; tab?: string
       {tab === "jobs" && (
         <>
           <div className="scroll-x"><div className="grid min-w-[880px] grid-cols-10 overflow-hidden rounded-2xl border border-line bg-surface">
-            {PIPE.map((s) => <button key={s} onClick={() => setStage(stage === s ? null : s)} className={cx("border-r border-line px-3 py-2 text-left last:border-r-0 hover:bg-surface2", stage === s && "bg-primary-soft")}><div className="text-[11px] text-muted-foreground">{statusLabel[s]}</div><div className={cx("text-lg font-bold", s === "time_proposed" && jobs.some((j) => j.status === s) && "text-warn")}>{jobs.filter((j) => j.status === s).length}</div></button>)}
+            {PIPE.map((s) => <Plain key={s} onClick={() => setStage(stage === s ? null : s)} className={cx("border-r border-line px-3 py-2 text-left last:border-r-0 hover:bg-surface2", stage === s && "bg-primary-soft")}><div className="text-[11px] text-muted-foreground">{statusLabel[s]}</div><div className={cx("text-lg font-bold", s === "time_proposed" && jobs.some((j) => j.status === s) && "text-warn")}>{jobs.filter((j) => j.status === s).length}</div></Plain>)}
           </div></div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap gap-2">

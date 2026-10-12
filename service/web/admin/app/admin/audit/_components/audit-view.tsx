@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { Badge, Banner, Btn, Card, Choice, DataTable, EmptyState, Field, Input, ListRow, Page, Select, SummaryList, Tabs, TextLink, Timeline } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, DataTable, EmptyState, Field, Input, ListRow, Page, Select, SummaryList, Tabs, TextLink, Timeline, Plain } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
@@ -118,7 +118,7 @@ export function AuditView({ live }: { live?: AuditLive }) {
               <Field label={t("Target")}><Select value={f.targetKind} onChange={(e) => search({ targetKind: e.target.value, targetId: "" })}><option value="">{t("Target: All")}</option>{kinds.map((k) => <option key={k} value={k}>{k}</option>)}</Select></Field>
               <Field label={t("Correlation ID")}><Input value={f.correlationId} onChange={(e) => typeCorr(e.target.value)} placeholder="corr-…" /></Field>
             </div>
-            {f.targetId && <div className="mt-2"><span className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-xs">{t("Target ID")} · <span className="font-mono">{f.targetKind ? `${f.targetKind} · ` : ""}{f.targetId}</span><button aria-label={t("Clear the target ID")} onClick={() => search({ targetId: "" })}><Icon name="close" /></button></span></div>}
+            {f.targetId && <div className="mt-2"><span className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-xs">{t("Target ID")} · <span className="font-mono">{f.targetKind ? `${f.targetKind} · ` : ""}{f.targetId}</span><Plain aria-label={t("Clear the target ID")} onClick={() => search({ targetId: "" })}><Icon name="close" /></Plain></span></div>}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
               <Choice value={f.result} onChange={(v) => search({ result: v })} options={(["All", "Success", "Denied", "Failed", "Pending"] as const).map((k) => ({ id: k, label: k === "All" ? t("All") : resultWord(k, t) }))} />
               <span className="flex flex-wrap items-center gap-3">
@@ -172,7 +172,7 @@ export function AuditView({ live }: { live?: AuditLive }) {
 }
 
 function FilterLink({ onClick, children }: { onClick: () => void; children: ReactNode }) {
-  return <button className="text-xs font-semibold text-primary hover:underline" onClick={onClick}>{children}</button>;
+  return <Plain className="text-xs font-semibold text-primary hover:underline" onClick={onClick}>{children}</Plain>;
 }
 
 /** Why the list is empty: nothing was searched (an invalid period, Figma Admin 338:602), an unknown or out-of-scope

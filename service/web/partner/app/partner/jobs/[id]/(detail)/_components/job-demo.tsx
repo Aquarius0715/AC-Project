@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Field, Input, Modal, Page, Select, SummaryList, Textarea, LinkBtn, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Field, Input, Modal, Page, Select, SummaryList, Textarea, LinkBtn, useToast, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge, WINDOWS } from "@ac/web/components/JobBits";
 import { Job, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { Icon } from "@ac/web/components/Icon";
@@ -114,7 +114,7 @@ function StaticOffer({ id }: { id: string }) {
             {cap.map(([n, q, h]) => <div key={n} className="mb-3"><b className="text-[13px]">{n}</b><div className="text-[11px] text-muted-foreground">{q}</div><div className="mt-1 grid grid-cols-5 gap-1 text-center text-[11px]">{["Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => <div key={d} className={`rounded-lg py-1 ${h[i] === "—" ? "bg-surface2 text-muted-foreground" : "bg-ok-soft text-ok"}`}>{d}<div className="font-bold">{h[i]}</div></div>)}</div></div>)}
           </Card>
           <Card><SummaryList items={[["OFFERED", "09-13 18:20 by hq-operator"], ["OFFER ID", "offer-p09-1 (1st offer)"], ["OPEN OFFERS", "1 of 1"]]} /></Card>
-          <button className="text-left text-[11px] text-muted-foreground underline" onClick={() => setS("expired")}>Preview: expired / cancelled state</button>
+          <Plain className="text-left text-[11px] text-muted-foreground underline" onClick={() => setS("expired")}>Preview: expired / cancelled state</Plain>
         </div>
       </div>
       {modal === "decline" && <DeclineModal id={id} onClose={() => setModal(null)} onDone={() => { setModal(null); setS("declined"); toast("Offer declined", "warn"); }} />}

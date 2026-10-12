@@ -149,7 +149,7 @@ function CertificateModal({ live, kind, row, onClose }: { live: Live; kind: "ren
       <div className="flex flex-col gap-1 text-xs font-semibold text-ink">
         <span>{t("Certificate file")}</span>
         <label className={cx("block cursor-pointer rounded-xl border border-dashed px-4 py-4 text-center hover:bg-surface2", err("file") ? "border-crit" : "border-line")}>
-          <input type="file" accept={FILE_TYPES.join(",")} className="sr-only" onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); set({ file: f ? { name: f.name, type: f.type, size: f.size } : null }); }} />
+          <Input type="file" accept={FILE_TYPES.join(",")} className="sr-only h-px w-px" onChange={(e) => { const f = e.target.files?.[0] ?? null; setFile(f); set({ file: f ? { name: f.name, type: f.type, size: f.size } : null }); }} />
           <b className="flex items-center gap-1 text-[13px]">{file ? <><Icon name="document" />{`${file.name} · ${fileSize(file.size)}`}</> : t("Choose a file")}</b>
           <span className="block text-[11px] font-normal text-muted-foreground">{t("PDF / JPG / PNG, up to 10 MB")}{file ? ` · ${t("Replace")}` : ""}</span>
         </label>

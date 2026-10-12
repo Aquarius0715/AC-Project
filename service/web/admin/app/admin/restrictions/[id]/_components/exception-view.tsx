@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Field, Input, Page, SummaryList, Textarea, Timeline } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Field, Input, Page, SummaryList, Textarea, Timeline, Plain } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { zonedInstant, zonedParts } from "@ac/web/lib/i18n";
@@ -66,9 +66,9 @@ export function ExceptionView({ live }: { live: Live }) {
               const o = actionOutcome(k, r.state, t);
               const permitted = allowedFor(k);
               return (
-                <button key={k} disabled={!permitted || !o.allowed} onClick={() => setAct(k)} aria-pressed={act === k} className={`rounded-xl border p-3 text-left disabled:opacity-50 ${act === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}>
+                <Plain key={k} disabled={!permitted || !o.allowed} onClick={() => setAct(k)} aria-pressed={act === k} className={`rounded-xl border p-3 text-left disabled:opacity-50 ${act === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}>
                   <b className="text-[13px]">{label[k]}</b><div className="font-mono text-[10px] text-muted-foreground">{ops[k]}</div><div className="mt-1 text-xs text-muted-foreground">{permitted ? o.result : k === "override" ? t("Needs restriction.override") : t("Needs restriction.write")}</div>
-                </button>
+                </Plain>
               );
             })}</div>
             {needsDate && <div className="mt-4 max-w-xs"><Field label={t("Until · future, at most 90 days")} error={tried ? dateErr : undefined} hint={t("Expiry never reapplies the restriction — conditions are checked again · times in {zone}", { zone })}><Input type="datetime-local" value={until} onChange={(e) => setUntil(e.target.value)} /></Field></div>}

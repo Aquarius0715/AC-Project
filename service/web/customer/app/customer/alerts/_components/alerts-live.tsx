@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
-import { Badge, Banner, Btn, Card, Check, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, cx } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, cx, Plain } from "@ac/web/components/ui";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { InboxAlert } from "@ac/web/lib/alerts";
 import { policyRefusal } from "@ac/web/lib/customerPolicies";
@@ -42,20 +42,20 @@ export function AlertsLiveView({ live }: { live: AlertsLive }) {
     <div className="flex w-full items-start gap-3 border-t border-line px-1 py-3 first:border-0">
       <Icon name={a.group === "attn" ? "warning" : "info"} className="mt-0.5" />
       <div className="min-w-0 flex-1">
-        <button type="button" onClick={() => show(a)} className="block w-full text-left hover:opacity-80">
+        <Plain type="button" onClick={() => show(a)} className="block w-full text-left hover:opacity-80">
           <span className="flex flex-wrap items-center gap-2">
             <b className={cx(a.unread.length > 0 && "text-primary")}>{a.title}</b><SeverityBadge s={a.severity} /><Badge tone="muted" icon={a.kindIcon}>{a.kind}</Badge>
             <Badge tone={a.status.tone}>{a.status.text}</Badge>{a.unread.length > 0 ? <Badge tone="primary">{t("Unread")}</Badge> : a.notes > 0 && <Badge tone="ok" icon="check">{t("Read")}</Badge>}
           </span>
           <span className="block text-xs text-muted-foreground">{a.where}</span><span className="mt-1 block text-xs">{a.evidence}</span>
-        </button>
+        </Plain>
         <div className="mt-2 flex flex-wrap gap-2">
           <Link href={`/customer/units/${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("View unit")}</Link>
           {a.type === "maintenance" && a.status.state !== "resolved" && <Link href="/customer/maintenance?tab=filter-care" className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Book cleaning")}</Link>}
           {a.cause === "fault" && a.group === "attn" && <Link href={`/customer/maintenance?new=${a.unitId}`} className="rounded-control bg-primary-soft px-2.5 py-1 text-xs font-semibold text-primary">{t("Request repair")}</Link>}
         </div>
       </div>
-      <button type="button" aria-label={t("Open {title}", { title: a.title })} onClick={() => show(a)} className="text-muted-foreground"><Icon name="chevronRight" /></button>
+      <Plain type="button" aria-label={t("Open {title}", { title: a.title })} onClick={() => show(a)} className="text-muted-foreground"><Icon name="chevronRight" /></Plain>
     </div>
   );
   return (

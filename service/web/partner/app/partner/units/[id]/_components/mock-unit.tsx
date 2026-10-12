@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { BarChart, Banner, Card, ConnBadge, Page, SummaryList } from "@ac/web/components/ui";
+import { BarChart, Banner, Card, ConnBadge, Page, SummaryList, Plain } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 
 /** Phase 1A demo view of the contractor unit page (fixture values). */
@@ -10,7 +10,7 @@ export function MockPartnerUnit({ id }: { id: string }) {
   const [ended, setEnded] = useState(false);
   return (
     <Page>
-      <div className="flex flex-wrap items-center justify-between gap-2"><div><h1 className="text-lg font-bold">Rooftop unit · {id}</h1><p className="text-xs text-muted-foreground">Diagnosis-scoped view for job-p02 — no billing, payments, or other contracts.</p></div><button className="text-[11px] text-muted-foreground underline" onClick={() => setEnded((e) => !e)}>{ended ? "show live" : "preview: delegation ended"}</button></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><h1 className="text-lg font-bold">Rooftop unit · {id}</h1><p className="text-xs text-muted-foreground">Diagnosis-scoped view for job-p02 — no billing, payments, or other contracts.</p></div><Plain className="text-[11px] text-muted-foreground underline" onClick={() => setEnded((e) => !e)}>{ended ? "show live" : "preview: delegation ended"}</Plain></div>
       {ended && <Banner tone="crit">Delegation ended while open (FORBIDDEN) — live values cleared; only a history snapshot remains.</Banner>}
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">

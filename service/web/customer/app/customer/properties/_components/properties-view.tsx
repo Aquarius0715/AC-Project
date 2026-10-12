@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Banner, Btn, Card, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Modal, Page, PowerBadge, SummaryList, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Modal, Page, PowerBadge, SummaryList, useToast, Plain } from "@ac/web/components/ui";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { Connection, PowerState, Selection, TreeProperty, TreeSpace } from "@ac/web/lib/assets";
 import { changeText, groupPlan, type GroupChange, type PlanRow, type RoomUnit } from "@ac/web/lib/clientProperties";
@@ -70,12 +70,12 @@ function Row({ depth, selected, onClick, icon, name, tag, meta, onRename }: { de
   const t = useT();
   return (
     <div className={cx("flex items-center gap-2 rounded-lg px-2 py-1.5", selected ? "bg-primary-soft" : "hover:bg-surface2")} style={{ paddingLeft: 8 + depth * 16 }}>
-      <button type="button" onClick={onClick} aria-pressed={selected} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+      <Plain type="button" onClick={onClick} aria-pressed={selected} className="flex min-w-0 flex-1 items-center gap-2 text-left">
         <Icon name={icon} className="text-muted-foreground" /><span className="truncate font-semibold">{name}</span>
         {tag && <span className="rounded bg-surface2 px-1.5 text-[10px] text-muted-foreground">{tag}</span>}
         {meta && <span className="truncate text-[11px] text-muted-foreground">{meta}</span>}
-      </button>
-      {onRename && <button type="button" aria-label={t("Rename {name}", { name })} onClick={onRename} className="text-muted-foreground hover:text-primary"><Icon name="edit" /></button>}
+      </Plain>
+      {onRename && <Plain type="button" aria-label={t("Rename {name}", { name })} onClick={onRename} className="text-muted-foreground hover:text-primary"><Icon name="edit" /></Plain>}
     </div>
   );
 }
@@ -158,8 +158,8 @@ function Panel({ live, sel, rename, go }: { live: PropertiesLive; sel: Selection
         {canGroup && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <span className="text-xs text-muted-foreground">{t("{acs} in {space} ·", { acs: acs_(t, direct.length), space: s.name })}</span>
-            {(["single", "group"] as const).map((m) => <button key={m} type="button" aria-pressed={mode === m} onClick={() => go({ spaceId: s.id, mode: m === "group" ? "group" : null })}
-              className={cx("inline-flex items-center gap-1 rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{t(m === "single" ? "Single AC" : "Group control")}</button>)}
+            {(["single", "group"] as const).map((m) => <Plain key={m} type="button" aria-pressed={mode === m} onClick={() => go({ spaceId: s.id, mode: m === "group" ? "group" : null })}
+              className={cx("inline-flex items-center gap-1 rounded-control border px-3 py-1 text-xs font-semibold", mode === m ? "border-primary bg-primary-soft text-primary" : "border-line")}>{mode === m && <Icon name="check" />}{t(m === "single" ? "Single AC" : "Group control")}</Plain>)}
           </div>
         )}
         {mode === "group" ? <GroupPanel key={s.id} live={{ ...live, units: direct, details: live.details.filter((d) => d.spaceId === s.id) }} space={s.name} /> : live.units.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No air conditioner in this {kind}.", { kind: kind(t, s.kind).toLowerCase() })}</p> : <>
@@ -220,13 +220,13 @@ function GroupPanel({ live, space }: { live: PropertiesLive; space: string }) {
         {live.units.map((u) => {
           const tr = track[u.id];
           return (
-            <button key={u.id} type="button" disabled={sending} onClick={() => toggle(u.id)} aria-pressed={sel.includes(u.id)}
+            <Plain key={u.id} type="button" disabled={sending} onClick={() => toggle(u.id)} aria-pressed={sel.includes(u.id)}
               className={cx("rounded-xl border p-3 text-left disabled:opacity-60", sel.includes(u.id) ? "border-2 border-primary bg-primary-soft/50" : "border-line bg-surface")}>
               <div className="flex items-center justify-between"><b className="text-[13px]">{u.name}</b><Icon name={sel.includes(u.id) ? "checked" : "unchecked"} className="text-sm" /></div>
               <div className="text-[11px] text-muted-foreground">{!u.online ? (u.seen ? t("last seen {when}", { when: u.seen }) : t("no connection yet")) : u.temp === "—" && u.watts === "—" ? t("no recent reading") : `${u.temp} · ${u.watts}`}</div>
               <div className="mt-1 flex flex-wrap gap-1"><PowerBadge s={u.power} /><ConnBadge s={u.conn} />{tr && <Badge tone={tr.status === "Confirmed" ? "ok" : tr.status === "Failed" ? "crit" : tr.status === "Waiting" ? "warn" : "primary"}>{t(tr.status)}</Badge>}</div>
               {(tr?.status === "Failed" || tr?.status === "Waiting") && <div className={cx("mt-1 text-[11px]", tr.status === "Failed" ? "text-crit" : "text-warn")}>{tr.note}</div>}
-            </button>
+            </Plain>
           );
         })}
       </div>

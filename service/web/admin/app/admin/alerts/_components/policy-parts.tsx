@@ -1,6 +1,6 @@
 "use client";
 
-import { Btn, Check, Field, Input, LineChart, Select, cx } from "@ac/web/components/ui";
+import { Btn, Check, Field, Input, LineChart, Select, cx, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { windowText } from "@ac/web/lib/customerPolicies";
 import { HQ_METRICS, metricLabel, metricUnit, opSymbol, type ApiPolicy, type Operator } from "@ac/web/lib/adminAlerts";
@@ -48,7 +48,7 @@ export function WindowEditor({ value, onChange, timezone, error }: { value: Wind
       {value ? (
         <div className="flex flex-wrap items-center gap-2">
           <Btn size="sm" onClick={() => set({ weekdays: [1, 2, 3, 4, 5] })}>{t("Mon–Fri")}</Btn><Btn size="sm" onClick={() => set({ weekdays: [1, 2, 3, 4, 5, 6, 7] })}>{t("Every day")}</Btn>
-          {DAYS.map((d, i) => <button key={d} type="button" aria-pressed={value.weekdays.includes(i + 1)} onClick={() => set({ weekdays: value.weekdays.includes(i + 1) ? value.weekdays.filter((x) => x !== i + 1) : [...value.weekdays, i + 1].sort() })} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", value.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</button>)}
+          {DAYS.map((d, i) => <Plain key={d} type="button" aria-pressed={value.weekdays.includes(i + 1)} onClick={() => set({ weekdays: value.weekdays.includes(i + 1) ? value.weekdays.filter((x) => x !== i + 1) : [...value.weekdays, i + 1].sort() })} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", value.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</Plain>)}
           <Input aria-label={t("From")} type="time" className="w-32" value={value.startLocal} onChange={(e) => set({ startLocal: e.target.value })} /> – <Input aria-label={t("To")} type="time" className="w-32" value={value.endLocal} onChange={(e) => set({ endLocal: e.target.value })} />
           <span className="text-xs text-muted-foreground">{timezone}</span>
         </div>

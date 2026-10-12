@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, LinkBtn, Modal, Select, SeverityBadge, Toggle, cx } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, Field, Input, LinkBtn, Modal, Select, SeverityBadge, Toggle, cx, Plain } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import type { ActionFailure } from "@ac/web/lib/actionMessage";
 import { metricUnit, opSymbol, type Operator, type Severity } from "@ac/web/lib/adminAlerts";
@@ -120,9 +120,9 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
         <h3 className="mt-4 text-[13px] font-bold">{t("1 · When …")} <span className="font-normal text-muted-foreground">{t("What to watch")}</span></h3>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {metricGroups.map((g) => (
-            <button key={g.id} type="button" aria-pressed={f.group === g.id} onClick={() => set({ group: g.id, metric: metricOfGroup(g.id) })} className={cx("rounded-xl border p-3 text-left", f.group === g.id ? "border-primary bg-primary-soft text-primary" : "border-line hover:bg-surface2")}>
+            <Plain key={g.id} type="button" aria-pressed={f.group === g.id} onClick={() => set({ group: g.id, metric: metricOfGroup(g.id) })} className={cx("rounded-xl border p-3 text-left", f.group === g.id ? "border-primary bg-primary-soft text-primary" : "border-line hover:bg-surface2")}>
               <b className="block text-[13px]">{t(g.label)}</b><span className="text-[11px] text-muted-foreground">{g.sub}</span>
-            </button>
+            </Plain>
           ))}
         </div>
         {f.group === "air" && <div className="mt-2"><Choice value={f.metric as "co2"} onChange={(v) => set({ metric: v })} options={[{ id: "co2", label: "CO₂ (ppm)" }, { id: "pm25" as "co2", label: "PM2.5 (µg/m³)" }]} /></div>}
@@ -144,7 +144,7 @@ function PolicyEditor({ p, editor, onDone, onFail }: Props & { editor: NonNullab
           {f.windowOn && (
             <div className="flex flex-wrap items-center gap-2">
               <Btn size="sm" onClick={() => set({ weekdays: [1, 2, 3, 4, 5] })}>{t("Mon–Fri")}</Btn><Btn size="sm" onClick={() => set({ weekdays: [1, 2, 3, 4, 5, 6, 7] })}>{t("Every day")}</Btn>
-              {days.map((d, i) => <button key={d} type="button" aria-pressed={f.weekdays.includes(i + 1)} onClick={() => set({ weekdays: f.weekdays.includes(i + 1) ? f.weekdays.filter((x) => x !== i + 1) : [...f.weekdays, i + 1] })} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", f.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</button>)}
+              {days.map((d, i) => <Plain key={d} type="button" aria-pressed={f.weekdays.includes(i + 1)} onClick={() => set({ weekdays: f.weekdays.includes(i + 1) ? f.weekdays.filter((x) => x !== i + 1) : [...f.weekdays, i + 1] })} className={cx("rounded-control border px-2 py-1 text-xs font-semibold", f.weekdays.includes(i + 1) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(d)}</Plain>)}
               <Input aria-label={t("From")} type="time" className="w-32" value={f.start} onChange={(e) => set({ start: e.target.value })} /> – <Input aria-label={t("To")} type="time" className="w-32" value={f.end} onChange={(e) => set({ end: e.target.value })} />
               <span className="text-xs text-muted-foreground">{editor.policy?.timezone ?? p.timezone}</span>
             </div>

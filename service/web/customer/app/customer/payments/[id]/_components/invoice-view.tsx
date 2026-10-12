@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, DemoBadge, EmptyState, Field, Modal, Page, SummaryList, Tabs, Textarea, Timeline } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, DemoBadge, EmptyState, Field, Modal, Page, SummaryList, Tabs, Textarea, Timeline, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -99,7 +99,7 @@ function PaymentTab({ live }: { live: InvoiceLive }) {
               <h3 className="mb-2 mt-4 text-[13px] font-bold">{t("Payment method")}</h3>
               <div className="flex flex-col gap-2">
                 {methods.map(([k, label, d]) => (
-                  <button key={k} type="button" onClick={() => setMethod(k)} aria-pressed={method === k} className={`rounded-xl border p-3 text-left ${method === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}><b className="text-[13px]">{t(label)}</b><div className="text-xs text-muted-foreground">{t(d)}</div></button>
+                  <Plain key={k} type="button" onClick={() => setMethod(k)} aria-pressed={method === k} className={`rounded-xl border p-3 text-left ${method === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}><b className="text-[13px]">{t(label)}</b><div className="text-xs text-muted-foreground">{t(d)}</div></Plain>
                 ))}
               </div>
               <div className="mt-3 flex justify-end"><Btn variant="primary" disabled={pending} onClick={pay}>{t(method === "instructions" ? "View instructions" : failed ? "Try again — Demo" : "Continue to payment — Demo")}</Btn></div>

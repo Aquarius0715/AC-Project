@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, EmptyState, Field, Input, ListRow, Page, Select } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, DataTable, DemoBadge, EmptyState, Field, Input, ListRow, Page, Select, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -141,7 +141,7 @@ export function AutomationView({ live }: { live: Live }) {
                     <td className="pr-2"><Select aria-label={t("Fact")} value={f.kind ?? d.type} onChange={(e) => editFact(i, { kind: e.target.value as AutoCondition["type"], value: "" })}>{kinds.map((k) => <option key={k.id} value={k.id}>{k.label} · {factOf[k.id].metric}</option>)}</Select></td>
                     <td className="pr-2">{fact.boolean ? <Select aria-label={t("Value")} value={f.value} onChange={(e) => editFact(i, { value: e.target.value })}><option value="">{t("— no reading")}</option><option value="true">{t("true")}</option><option value="false">{t("false")}</option></Select> : <Input aria-label={t("Value")} type="number" step="0.1" value={f.value} placeholder={t("— no reading")} onChange={(e) => editFact(i, { value: e.target.value })} />}</td>
                     <td className="pr-2"><Select aria-label={t("Quality")} value={f.quality} onChange={(e) => editFact(i, { quality: e.target.value as FactRow["quality"] })}><option value="valid">{t("valid")}</option><option value="stale">{t("stale")}</option><option value="suspect">{t("suspect")}</option><option value="missing">{t("missing")}</option></Select></td>
-                    <td><button aria-label={t("Remove the fact")} className="text-muted-foreground hover:text-crit" onClick={() => removeFact(i)}><Icon name="close" /></button></td>
+                    <td><Plain aria-label={t("Remove the fact")} className="text-muted-foreground hover:text-crit" onClick={() => removeFact(i)}><Icon name="close" /></Plain></td>
                   </tr>
                 );
               })}</tbody></table></div>

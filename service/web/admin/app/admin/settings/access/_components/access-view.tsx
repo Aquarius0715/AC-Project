@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Search, SearchSelect, Select, Textarea } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Search, SearchSelect, Select, Textarea, Plain } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -110,7 +110,7 @@ export function AccessView({ live }: { live: Live }) {
               {d.role === "admin" ? <p className="text-xs text-muted-foreground">{t("Admins act on every customer of the tenant.")} <Badge tone="primary">{t("All customers (tenant)")}</Badge></p>
                 : d.role === "contractor" ? <p className="text-xs text-muted-foreground">{d.organizationId ? t("Contractors act for their own organization ({name}).", { name: scopeName({ kind: "organization", id: d.organizationId }) }) : t("Contractors act for their own organization.")}</p>
                 : <>
-                  <div className="flex flex-wrap gap-1.5">{d.scopes.map((s) => <span key={`${s.kind}:${s.id}`} className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-xs">{kindWord[s.kind] ?? s.kind} · {scopeName(s)}{live.canWrite && <button aria-label={t("Remove scope")} onClick={() => set({ scopes: d.scopes.filter((x) => x !== s) })}><Icon name="close" /></button>}</span>)}{d.scopes.length === 0 && <span className="text-xs text-muted-foreground">{t("No targets — zero business targets.")}</span>}</div>
+                  <div className="flex flex-wrap gap-1.5">{d.scopes.map((s) => <span key={`${s.kind}:${s.id}`} className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2.5 py-1 text-xs">{kindWord[s.kind] ?? s.kind} · {scopeName(s)}{live.canWrite && <Plain aria-label={t("Remove scope")} onClick={() => set({ scopes: d.scopes.filter((x) => x !== s) })}><Icon name="close" /></Plain>}</span>)}{d.scopes.length === 0 && <span className="text-xs text-muted-foreground">{t("No targets — zero business targets.")}</span>}</div>
                   {live.canWrite && <div className="mt-2 flex flex-wrap items-end gap-2"><Field label={t("Add scope")}><Select value={scopeKind} onChange={(e) => { setScopeKind(e.target.value as typeof scopeKind); setScopeId(""); }}><option value="unit">{t("Unit")}</option><option value="property">{t("Property")}</option><option value="organization">{t("Customer organization")}</option></Select></Field><Field label={t("Target")}><SearchSelect className="w-64" label={t("Target")} value={scopeId} onChange={setScopeId} placeholder={t("Type to search…")} options={targets.filter((x) => !d.scopes.some((s) => s.id === x.id)).map((x) => ({ id: x.id, label: x.name }))} /></Field><Btn size="sm" disabled={!scopeId} onClick={() => { set({ scopes: [...d.scopes, { kind: scopeKind, id: scopeId }] }); setScopeId(""); }}><Icon name="add" /> {t("Add")}</Btn></div>}
                   {err("scopes") && <p className="mt-1 text-xs text-crit">{err("scopes")}</p>}
                 </>}

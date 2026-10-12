@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, ConnBadge, cx, DataTable, EmptyState, Field, LineChart, LinkBtn, Modal, Page, Select, SummaryList, Tabs } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, ConnBadge, cx, DataTable, EmptyState, Field, LineChart, LinkBtn, Modal, Page, Select, SummaryList, Tabs, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -66,14 +66,14 @@ export function AirQualityView({ live }: { live: AirLive | null }) {
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "210px" }}>
         {live.cards.map((m) => (
-          <button key={m.metric} type="button" aria-pressed={m.metric === live.metric} onClick={() => patch({ metric: m.metric })}
+          <Plain key={m.metric} type="button" aria-pressed={m.metric === live.metric} onClick={() => patch({ metric: m.metric })}
             className={cx("flex min-w-0 flex-col gap-1 rounded-2xl border bg-surface p-4 text-left", m.metric === live.metric ? "border-primary ring-1 ring-primary" : "border-line hover:border-primary/50")}>
             <span className="flex items-center justify-between gap-2 text-xs text-muted-foreground">{m.label}<Badge tone={m.feed.tone} icon={m.feed.icon}>{m.feed.text}</Badge></span>
             <span className="text-[28px] font-bold leading-9">{m.value ?? "—"}{m.value !== null && <span className="ml-1 text-sm font-medium text-muted-foreground">{m.unit}</span>}</span>
             <span><Badge tone={m.status.tone} icon={m.status.icon}>{m.status.text}</Badge></span>
             <span className="text-[11px] text-muted-foreground">{m.sub}</span>
             <span className={cx("text-xs font-semibold", m.warn && "text-warn")}>{m.advice}</span>
-          </button>
+          </Plain>
         ))}
       </div>
       <Card><div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]"><b>{live.allergen.title}</b><Badge tone={live.allergen.badge.tone} icon={live.allergen.badge.icon}>{live.allergen.badge.text}</Badge><span className="text-xs text-muted-foreground">{live.allergen.text}</span></div></Card>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Btn, Card, Check, ConnBadge, cx, EmptyState, Field, Input, ListRow, Modal, Search, Select, Textarea } from "@ac/web/components/ui";
+import { Badge, Btn, Card, Check, ConnBadge, cx, EmptyState, Field, Input, ListRow, Modal, Search, Select, Textarea, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -64,10 +64,10 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">{counts.map(({ f, label, n }) => (
-          <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}
+          <Plain key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}
             className={cx("flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-semibold", filter === f ? "border-ink bg-ink text-white" : "border-line bg-surface")}>
             {f !== "all" && f !== "nosensors" && <span className={cx("h-2 w-2 rounded-full", f === "online" ? "bg-ok" : f === "offline" ? "bg-crit" : "bg-warn")} />}{label} <span className="text-xs opacity-70">{n}</span>
-          </button>
+          </Plain>
         ))}</div>
         <div className="flex flex-wrap items-center gap-2"><div className="w-64"><Search placeholder={t("Search serial, device or unit…")} value={q} onChange={setQ} /></div>
           {live.canWrite && <Btn variant="primary" onClick={() => setModal("register")}><Icon name="add" /> {t("Register device")}</Btn>}</div>
@@ -110,9 +110,9 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
                     { label: t("Calibrate sensor"), sub: t("reference vs measured"), act: () => calibrateOf(dv.detail.sensors[0]?.id ?? ""), off: dv.detail.sensors.length === 0 },
                     { label: t("Update firmware"), sub: dv.detail.activeOperation?.kind === "firmware" ? t("running…") : dv.firmware.length ? t("{version} available", { version: dv.firmware.join(", ") }) : t("no newer candidate"), act: () => { setFw(dv.firmware[dv.firmware.length - 1] ?? ""); setModal("firmware"); }, off: dv.firmware.length === 0 },
                   ].map((a) => (
-                    <button key={a.label} type="button" disabled={pending || busy || a.off} onClick={a.act} className="rounded-xl border border-line px-3 py-2 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50">
+                    <Plain key={a.label} type="button" disabled={pending || busy || a.off} onClick={a.act} className="rounded-xl border border-line px-3 py-2 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50">
                       <div className="text-[13px] font-semibold">{a.label}</div><div className="text-[11px] text-muted-foreground">{a.sub}</div>
-                    </button>
+                    </Plain>
                   ))}
                 </div>
               )}
@@ -131,7 +131,7 @@ export function DeviceTab({ live }: { live: DevicesLive }) {
                     <thead className="bg-surface2 text-left text-[11px] uppercase text-muted-foreground"><tr><th className="px-3 py-2">{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after")}</th><th>{t("Last calibrated")}</th><th /></tr></thead>
                     <tbody>{dv.sensors.map((x) => (
                       <tr key={x.id} className="border-t border-line"><td className="px-3 py-2 font-semibold">{x.metric}</td><td>{x.unit}</td><td>{x.stale}</td><td className="text-xs">{x.calibrated}</td>
-                        <td className="pr-3 text-right">{live.canWrite && <button type="button" disabled={pending || busy} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => calibrateOf(x.id)}>{t("Calibrate")} <Icon name="arrowRight" /></button>}</td></tr>
+                        <td className="pr-3 text-right">{live.canWrite && <Plain type="button" disabled={pending || busy} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => calibrateOf(x.id)}>{t("Calibrate")} <Icon name="arrowRight" /></Plain>}</td></tr>
                     ))}</tbody>
                   </table></div>
                 )}

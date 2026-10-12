@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Banner, Btn, Card, ErrorState, Kpi, Page, TextLink } from "@ac/web/components/ui";
+import { Banner, Btn, Card, ErrorState, Kpi, Page, TextLink, Plain } from "@ac/web/components/ui";
 import { mockKpis, type Kpis } from "@ac/web/lib/adminSummary";
 import { Icon } from "@ac/web/components/Icon";
 
@@ -17,7 +17,7 @@ export function AdminOverviewDemo() {
   const empty = state === "empty";
   return (
     <Page>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><span>As of 09:00 MYT · 2026-09-14 00:00–09:00 (Asia/Kuala_Lumpur)</span><span className="flex gap-3"><button className="underline" onClick={() => setState("loading")}>skeleton</button><button className="underline" onClick={() => setState("error")}>error</button><button className="underline" onClick={() => setState(empty ? "ok" : "empty")}>{empty ? "normal" : "zero units"}</button></span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><span>As of 09:00 MYT · 2026-09-14 00:00–09:00 (Asia/Kuala_Lumpur)</span><span className="flex gap-3"><Plain className="underline" onClick={() => setState("loading")}>skeleton</Plain><Plain className="underline" onClick={() => setState("error")}>error</Plain><Plain className="underline" onClick={() => setState(empty ? "ok" : "empty")}>{empty ? "normal" : "zero units"}</Plain></span></div>
       {empty && <Banner tone="warn">Zero units in scope — nothing to show yet.</Banner>}
       <div className="grid-fluid" style={{ ["--min"as string]: "200px" }}>
         <Kpi label="Active customers" value={empty ? 0 : k.customers} sub="Customer active (IR40)" href="/admin/units" link="Open" />

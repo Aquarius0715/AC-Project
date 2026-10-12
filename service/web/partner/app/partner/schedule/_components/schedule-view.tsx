@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, EmptyState, Field, Input, ListRow, Page, Select, Textarea, cx } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, EmptyState, Field, Input, ListRow, Page, Select, Textarea, cx, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -142,11 +142,11 @@ function AssignCard({ sel, choice, zone, otherZone }: { sel: Selected; choice: C
           <div role="radiogroup" aria-label={t("Technician")} className="flex flex-col gap-1.5">
             {sel.candidates.length === 0 && <p className="text-[13px] text-muted-foreground">{t("No technicians in your company yet — add them in Team & capacity.")}</p>}
             {sel.candidates.map((c) => (
-              <button key={c.id} type="button" role="radio" aria-checked={tech === c.id} disabled={!c.eligible} onClick={() => setTech(c.id)}
+              <Plain key={c.id} type="button" role="radio" aria-checked={tech === c.id} disabled={!c.eligible} onClick={() => setTech(c.id)}
                 className={cx("flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left", tech === c.id ? "border-primary bg-primary-soft/60" : "border-line bg-surface", !c.eligible && "cursor-not-allowed opacity-70")}>
                 <span className="min-w-0"><b className={cx("block text-[13px]", tech === c.id && "text-primary")}>{c.name}</b><span className="block text-[11px] text-muted-foreground">{c.sub}</span></span>
                 <Badge tone={c.badge.tone === "muted" ? "muted" : c.badge.tone}>{c.badge.text}</Badge>
-              </button>
+              </Plain>
             ))}
           </div>
           <p className="mt-1 text-[11px] text-muted-foreground">

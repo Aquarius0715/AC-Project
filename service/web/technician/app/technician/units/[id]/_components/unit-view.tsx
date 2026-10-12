@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Banner, Card, ConnBadge, LineChart, LinkBtn, Page, SeverityBadge, SummaryList, Tabs, TextLink, cx } from "@ac/web/components/ui";
+import { Badge, Banner, Card, ConnBadge, LineChart, LinkBtn, Page, SeverityBadge, SummaryList, Tabs, TextLink, cx, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
 import type { Period, SeriesChart, Tile } from "@ac/web/lib/techUnit";
@@ -78,7 +78,7 @@ export function TechUnitView({ live }: { live: UnitLive }) {
               {live.others.map((m) => (
                 <Card key={m.metric} title={m.label} action={<b className={cx("text-[13px]", m.tone === "warn" && "text-warn")}>{m.value}</b>}>
                   {m.points.every((v) => v === null) ? <p className="text-xs text-muted-foreground">{t("No valid readings in this period.")}</p> : <LineChart points={m.points} height={56} />}
-                  <div className="mt-1 flex justify-between gap-2 text-[11px] text-muted-foreground"><span>{m.sub}</span><button type="button" className="font-semibold text-primary" onClick={() => patch({ metric: m.metric })}>{t("Chart")} <Icon name="arrowRight" /></button></div>
+                  <div className="mt-1 flex justify-between gap-2 text-[11px] text-muted-foreground"><span>{m.sub}</span><Plain type="button" className="font-semibold text-primary" onClick={() => patch({ metric: m.metric })}>{t("Chart")} <Icon name="arrowRight" /></Plain></div>
                 </Card>
               ))}
             </div>

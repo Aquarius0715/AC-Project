@@ -4,7 +4,7 @@ import { useState } from "react";
 import { setSearchParam, useSearchParam } from "@ac/web/lib/urlState";
 import { ImportCsvModal, WarrantyTab } from "@ac/web/components/Features";
 import { ClientRole, ClientUser, clientUserActions, emailError, useClientUsers } from "@ac/web/lib/clientUsers";
-import { Badge, Banner, Btn, Card, DataTable, Field, Input, Kpi, ListRow, Modal, Page, PowerBadge, ConnBadge, Search, Select, SummaryList, Tabs, useToast, ActionMenu } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, DataTable, Field, Input, Kpi, ListRow, Modal, Page, PowerBadge, ConnBadge, Search, Select, SummaryList, Tabs, useToast, ActionMenu, Plain } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 
 type Cust = { id: string; name: string; status: "active" | "inactive"; props: number; units: number; op: string; alerts: number | string; contract: string };
@@ -67,12 +67,12 @@ export function UnitsDemo() {
   }
   return (
     <Page>
-      <div className="flex flex-wrap items-center gap-2 text-[13px]"><button className="font-semibold text-primary" onClick={() => { setCust(null); setUnit(null); }}><Icon name="arrowLeft" /> Customers & units</button><span className="text-muted-foreground"> › {cust.id} · {cust.name}</span></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13px]"><Plain className="font-semibold text-primary" onClick={() => { setCust(null); setUnit(null); }}><Icon name="arrowLeft" /> Customers & units</Plain><span className="text-muted-foreground"> › {cust.id} · {cust.name}</span></div>
       <Tabs value={tab} onChange={setTab} tabs={[{ id: "units", label: "Units & locations" }, { id: "users", label: "Users" }, { id: "policies", label: "Alert policies" }]} />
       {tab === "units" && (
         <div className="split-rev">
           <Card title="Locations" action={<Btn size="sm" onClick={() => setModal("location")}><Icon name="add" /> Add</Btn>} className="self-start">
-            <div className="flex flex-col gap-1.5">{locations.map((l) => <ListRow key={l.id} selected={loc === l.id} onClick={() => { setLoc(l.id); setUnit(null); }}><b className="flex flex-1 items-center gap-1.5 text-[13px]"><Icon name="home" className="text-muted-foreground" />{l.name}</b><button aria-label="Rename" className="text-muted-foreground" onClick={(e) => { e.stopPropagation(); setName(l.name); setModal("rename"); }}><Icon name="edit" /></button></ListRow>)}</div>
+            <div className="flex flex-col gap-1.5">{locations.map((l) => <ListRow key={l.id} selected={loc === l.id} onClick={() => { setLoc(l.id); setUnit(null); }}><b className="flex flex-1 items-center gap-1.5 text-[13px]"><Icon name="home" className="text-muted-foreground" />{l.name}</b><Plain aria-label="Rename" className="text-muted-foreground" onClick={(e) => { e.stopPropagation(); setName(l.name); setModal("rename"); }}><Icon name="edit" /></Plain></ListRow>)}</div>
             <Btn size="sm" variant="danger" className="mt-3" onClick={() => setModal("delete")}>Delete location…</Btn>
           </Card>
           <div className="flex min-w-0 flex-col gap-4">

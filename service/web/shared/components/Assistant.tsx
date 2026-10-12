@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Btn, Input, Select, SummaryList, cx } from "./ui";
+import { RadioGroup, RadioGroupItem } from "@ac/web/components/ui/radio-group";
 import { useI18n } from "./I18n";
 import { actionMessage } from "@ac/web/lib/actionMessage";
 import { candidateGroups, changeCard, examples, groupSummary, helpText, MICROPHONE, progressOf, roomOf, stateText, temperatureText, type CandidateGroup, type PanelState, type Progress, type ResolvedIntent } from "@ac/web/lib/assistant";
@@ -215,7 +216,6 @@ function CandidatePicker({ m, t, busy, onPick, onCancel }: {
   const [picked, setPicked] = useState<string | null>(null);
   const g = m.groups[room];
   const chosen = g?.units.length === 1 ? g.units[0].unitId : picked;
-  const id = useId();
   return (
     <div className="rounded-2xl bg-surface2 p-3 text-[13px]">
       <b>{several ? t("Which {room} did you mean?", { room: roomOf(m.groups) }) : t("Which AC in {path} did you mean?", { path: g.path })}</b>
@@ -223,13 +223,17 @@ function CandidatePicker({ m, t, busy, onPick, onCancel }: {
       {several && (
         <fieldset className="mt-2 flex flex-col gap-1.5">
           <legend className="sr-only">{t("Room")}</legend>
-          {m.groups.map((x, k) => <RadioCard key={x.path} name={`${id}-room`} checked={room === k} onChange={() => { setRoom(k); setPicked(null); }} title={x.path} detail={groupSummary(x, t)} />)}
+          <RadioGroup value={String(room)} onValueChange={(v) => { setRoom(Number(v)); setPicked(null); }} className="gap-1.5">
+            {m.groups.map((x, k) => <RadioCard key={x.path} value={String(k)} title={x.path} detail={groupSummary(x, t)} />)}
+          </RadioGroup>
         </fieldset>
       )}
       {g && g.units.length > 1 && (
         <fieldset className="mt-3 flex flex-col gap-1.5">
           <legend className={several ? "mb-1.5 font-semibold" : "sr-only"}>{several ? t("Then: which AC in {path}?", { path: g.path }) : t("AC")}</legend>
-          {g.units.map((u) => <RadioCard key={u.unitId} name={`${id}-unit`} checked={picked === u.unitId} onChange={() => setPicked(u.unitId)} title={u.label} detail={m.status[u.unitId] ?? ""} />)}
+          <RadioGroup value={picked ?? ""} onValueChange={(v) => setPicked(v)} className="gap-1.5">
+            {g.units.map((u) => <RadioCard key={u.unitId} value={u.unitId} title={u.label} detail={m.status[u.unitId] ?? ""} />)}
+          </RadioGroup>
         </fieldset>
       )}
       <div className="mt-3 flex justify-end gap-2">
@@ -240,10 +244,10 @@ function CandidatePicker({ m, t, busy, onPick, onCancel }: {
   );
 }
 
-function RadioCard({ name, checked, onChange, title, detail }: { name: string; checked: boolean; onChange: () => void; title: string; detail: string }) {
+function RadioCard({ value, title, detail }: { value: string; title: string; detail: string }) {
   return (
-    <label className={cx("flex cursor-pointer items-start gap-2 rounded-lg border bg-surface px-2.5 py-2", checked ? "border-primary ring-1 ring-primary" : "border-line hover:bg-primary-soft")}>
-      <input type="radio" name={name} checked={checked} onChange={onChange} className="mt-1 accent-[var(--color-primary)]" />
+    <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-line bg-surface px-2.5 py-2 hover:bg-primary-soft has-data-checked:border-primary has-data-checked:ring-1 has-data-checked:ring-primary">
+      <RadioGroupItem value={value} className="mt-1" />
       <span><b className="block text-[13px]">{title}</b>{detail && <span className="block text-[11px] text-muted-foreground">{detail}</span>}</span>
     </label>
   );

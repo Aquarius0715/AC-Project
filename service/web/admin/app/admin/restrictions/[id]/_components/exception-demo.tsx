@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Banner, Btn, Card, Check, Field, Input, Page, SummaryList, Textarea, Timeline, useToast } from "@ac/web/components/ui";
+import { Banner, Btn, Card, Check, Field, Input, Page, SummaryList, Textarea, Timeline, useToast, Plain } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
 
 type A = "defer" | "exempt" | "cancel" | "override";
@@ -33,7 +33,7 @@ export function ExceptionDemo({ id }: { id: string }) {
       <div className="split">
         <div className="flex min-w-0 flex-col gap-4">
           <Card title="Choose an action" sub="restrictions.defer / exempt / cancel / override">
-            <div className="grid-fluid" style={{ ["--min"as string]: "220px" }}>{acts.map(([k, l, op, d]) => <button key={k} disabled={k === "override" && !hasOverride} onClick={() => setAct(k)} aria-pressed={act === k} className={`rounded-xl border p-3 text-left disabled:opacity-50 ${act === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}><b className="text-[13px]">{l}</b><div className="font-mono text-[10px] text-muted-foreground">{op}</div><div className="mt-1 text-xs text-muted-foreground">{d}</div></button>)}</div>
+            <div className="grid-fluid" style={{ ["--min"as string]: "220px" }}>{acts.map(([k, l, op, d]) => <Plain key={k} disabled={k === "override" && !hasOverride} onClick={() => setAct(k)} aria-pressed={act === k} className={`rounded-xl border p-3 text-left disabled:opacity-50 ${act === k ? "border-primary bg-primary-soft/60" : "border-line hover:bg-surface2"}`}><b className="text-[13px]">{l}</b><div className="font-mono text-[10px] text-muted-foreground">{op}</div><div className="mt-1 text-xs text-muted-foreground">{d}</div></Plain>)}</div>
             {needsDate && <div className="mt-4 max-w-xs"><Field label="Exception until · required, future" error={dateErr} hint="Expiry does not reapply the restriction automatically — conditions are checked again"><Input type="date" value={until} onChange={(e) => setUntil(e.target.value)} /></Field></div>}
             <div className="mt-3"><Field label="Reason · required" error={tried && !reason.trim() ? "A reason is required" : undefined} hint={`${reason.length} / 1000`}><Textarea value={reason} onChange={(e) => setReason(e.target.value)} /></Field></div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><Check label="demo: I hold restriction.override" checked={hasOverride} onChange={setHasOverride} /><Btn variant={act === "override" ? "danger" : "primary"} disabled={done} onClick={run}>Apply {acts.find((a) => a[0] === act)![1].toLowerCase()}</Btn></div>

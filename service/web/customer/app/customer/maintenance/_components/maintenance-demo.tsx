@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, UtilBar, cx, useToast } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, DataTable, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, UtilBar, cx, useToast, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge, PreferredSlotsInput, SlotLine, preferredError } from "@ac/web/components/JobBits";
 import { Job, JobStatus, Slot, fitFor, fmt, jobActions, longDate, useJobs } from "@ac/web/lib/jobs";
 import { units } from "@ac/web/lib/client";
 import { Icon, type IconName } from "@ac/web/components/Icon";
+import { Checkbox } from "@ac/web/components/ui/checkbox";
 
 type StatusTab = "all" | "reply" | "requested" | "scheduled" | "progress" | "completed" | "cancelled";
 const tabOf = (s: JobStatus): StatusTab =>
@@ -186,7 +187,7 @@ function DeclineModal({ open, j, onClose, onDone }: { open: boolean; j: Job; onC
       <p className="text-xs text-muted-foreground">{j.id} · {j.unit} · proposed {j.proposal ? longDate(j.proposal.slot) : ""}</p>
       <Field label="Reason"><Choice value={reason} onChange={setReason} options={[{ id: "not_home", label: "I’m not at home then" }, { id: "too_late", label: "Too late for me" }, { id: "other", label: "Other" }]} /></Field>
       <Field label="Comment to HQ (optional)"><Input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Away on Oct 1. Any weekday afternoon next week works." /></Field>
-      <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" className="h-4 w-4 accent-[#005bea]" checked={give} onChange={(e) => setGive(e.target.checked)} />Give 3 new preferred times (recommended)</label>
+      <label className="flex items-center gap-2 text-[13px]"><Checkbox className="h-4 w-4 accent-[#005bea]" checked={give} onCheckedChange={(v) => setGive(v === true)} />Give 3 new preferred times (recommended)</label>
       {give && <PreferredSlotsInput value={slots} onChange={setSlots} error={err} label="New preferred times" hint="Declining never cancels the request — use “Cancel request” for that." />}
       <Banner>HQ looks again and either books one of your times or sends another proposal.</Banner>
     </Modal>
@@ -213,8 +214,8 @@ function RateModal({ open, onClose, onDone }: { open: boolean; onClose: () => vo
   const TAGS = ["On time", "Clean work", "Explained clearly", "Polite"];
   return (
     <Modal open={open} onClose={onClose} title="Confirm & rate job-c02" footer={<><Btn onClick={onClose}>Not now</Btn><Btn variant="primary" onClick={onDone}>Confirm & submit</Btn></>}>
-      <Field label="How was the service? (required)"><div className="flex gap-1 text-2xl">{[1, 2, 3, 4, 5].map((n) => <button key={n} aria-label={`${n} stars`} onClick={() => setStars(n)} className={n <= stars ? "text-[#f59e0b]" : "text-line"}><Icon name="star" filled /></button>)}</div></Field>
-      <Field label="What went well? (optional)"><div className="flex flex-wrap gap-1.5">{TAGS.map((t) => <button key={t} aria-pressed={tags.includes(t)} onClick={() => setTags((s) => (s.includes(t) ? s.filter((x) => x !== t) : [...s, t]))} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", tags.includes(t) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t}</button>)}</div></Field>
+      <Field label="How was the service? (required)"><div className="flex gap-1 text-2xl">{[1, 2, 3, 4, 5].map((n) => <Plain key={n} aria-label={`${n} stars`} onClick={() => setStars(n)} className={n <= stars ? "text-[#f59e0b]" : "text-line"}><Icon name="star" filled /></Plain>)}</div></Field>
+      <Field label="What went well? (optional)"><div className="flex flex-wrap gap-1.5">{TAGS.map((t) => <Plain key={t} aria-pressed={tags.includes(t)} onClick={() => setTags((s) => (s.includes(t) ? s.filter((x) => x !== t) : [...s, t]))} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", tags.includes(t) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t}</Plain>)}</div></Field>
       {stars <= 2 && <Banner tone="warn">What went wrong? You can also “Report a problem” instead.</Banner>}
       <Field label="Comment (optional)"><Textarea placeholder="Technician was quick and tidy." /></Field>
       <p className="text-[11px] text-muted-foreground">You can edit the rating for 7 days. Unconfirmed jobs are confirmed automatically after 7 days.</p>

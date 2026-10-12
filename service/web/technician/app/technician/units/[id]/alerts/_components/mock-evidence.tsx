@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Badge, Banner, Btn, Card, Field, Page, SummaryList, Textarea, Timeline, useToast } from "@ac/web/components/ui";
 import { Icon } from "@ac/web/components/Icon";
+import { Checkbox } from "@ac/web/components/ui/checkbox";
 
 type St = "Open" | "Acknowledged" | "Resolved";
 
@@ -32,7 +33,7 @@ export function MockAlertEvidence({ id }: { id: string }) {
           <Card title="Resolution" sub="Automatic resolution requires a remeasurement below 28°C sustained for 60 seconds — or a reason below with alert.resolve permission.">
             <Field label="Resolution reason (required, 1–1000 characters)"><Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Confirmed on-site that airflow is restored after filter cleaning." /></Field>
             {msg && <div className="mt-2"><Banner tone="crit">{msg}</Banner></div>}
-            <div className="mt-3 flex flex-wrap items-center gap-2"><Btn disabled={st !== "Open"} onClick={() => { setSt("Acknowledged"); toast("Alert acknowledged"); }}>Acknowledge</Btn><Btn variant="primary" disabled={st === "Resolved"} onClick={resolve}>Resolve alert</Btn><label className="ml-auto flex items-center gap-1.5 text-[11px] text-muted-foreground"><input type="checkbox" checked={canResolve} onChange={(e) => setCanResolve(e.target.checked)} /> demo: I have alert.resolve</label></div>
+            <div className="mt-3 flex flex-wrap items-center gap-2"><Btn disabled={st !== "Open"} onClick={() => { setSt("Acknowledged"); toast("Alert acknowledged"); }}>Acknowledge</Btn><Btn variant="primary" disabled={st === "Resolved"} onClick={resolve}>Resolve alert</Btn><label className="ml-auto flex items-center gap-1.5 text-[11px] text-muted-foreground"><Checkbox checked={canResolve} onCheckedChange={(v) => setCanResolve(v === true)} /> demo: I have alert.resolve</label></div>
             <p className="mt-2 text-[11px] text-muted-foreground">Recurrence after resolution creates a new alertId with previousAlertId linking back to this event.</p>
           </Card>
           <Card title="Alert history"><Timeline items={[{ time: "09:20", title: "On-site check — confirmed elevated", detail: "tech-internal-a · origin=inspection · photo attached" }, { time: "09:14", title: "Notified", detail: "in-app → tech-internal-a, hq-operator, customer contact (simulated)" }, { time: "09:12", title: "Raised", detail: "sensor-online-temp 30.4 °C · ≥ 30 °C for 60 s", tone: "warn" }, { time: "09:05", title: "Modeled load rising", detail: "estimate 29–31 °C · confidence unknown" }]} /></Card>

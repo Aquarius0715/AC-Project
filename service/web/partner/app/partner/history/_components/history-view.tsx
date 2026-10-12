@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Page, Select, Textarea, cx } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Page, Select, Textarea, cx, Plain } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -32,7 +32,7 @@ function List({ live }: { live: HistoryLive }) {
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div role="tablist" className="flex flex-wrap gap-2">
-          {live.tabs.map((x) => <button key={x.id} role="tab" aria-selected={live.tab === x.id} onClick={() => patch({ tab: x.id === "all" ? null : x.id })} className={cx("rounded-control border px-3 py-1.5 text-[13px] font-semibold", live.tab === x.id ? "border-primary bg-primary text-white" : "border-line bg-surface text-ink hover:bg-surface2")}>{x.label} ({x.count})</button>)}
+          {live.tabs.map((x) => <Plain key={x.id} role="tab" aria-selected={live.tab === x.id} onClick={() => patch({ tab: x.id === "all" ? null : x.id })} className={cx("rounded-control border px-3 py-1.5 text-[13px] font-semibold", live.tab === x.id ? "border-primary bg-primary text-white" : "border-line bg-surface text-ink hover:bg-surface2")}>{x.label} ({x.count})</Plain>)}
         </div>
         <div className="flex flex-wrap gap-2">
           <Select aria-label={t("Sort")} className="w-auto" value={live.sort} onChange={(e) => patch({ sort: e.target.value === "latest" ? null : e.target.value })}>{live.sorts.map((s) => <option key={s.id} value={s.id}>{s.text}</option>)}</Select>
@@ -89,7 +89,7 @@ function Detail({ live, detail }: { live: HistoryLive; detail: Detail }) {
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
             {([["all", t("All events"), detail.items.length], ["customer", t("Customer-visible"), count("customer")], ["internal", t("Internal"), count("internal")]] as const).map(([id, label, n]) => (
-              <button key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", view === id ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{label} ({n})</button>
+              <Plain key={id} type="button" aria-pressed={view === id} onClick={() => setView(id)} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", view === id ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{label} ({n})</Plain>
             ))}
           </div>
           <ol className="mt-3 flex flex-col">

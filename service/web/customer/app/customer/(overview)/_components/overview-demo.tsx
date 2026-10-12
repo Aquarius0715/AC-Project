@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Btn, Card, ConnBadge, Kpi, LineChart, BarChart, Page, PowerBadge, SeverityBadge, Tabs, TextLink, OnOffBadge, Banner } from "@ac/web/components/ui";
+import { Badge, Btn, Card, ConnBadge, Kpi, LineChart, BarChart, Page, PowerBadge, SeverityBadge, Tabs, TextLink, OnOffBadge, Banner, Plain, Select } from "@ac/web/components/ui";
 import { units as mockUnits, week, mockCounts, type CustomerCounts, type UnitRow } from "@ac/web/lib/client";
 import { Icon } from "@ac/web/components/Icon";
 
@@ -17,8 +17,8 @@ export function OverviewDemo() {
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">Viewing</span>
-          <select aria-label="Property" className="rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold"><option>Property: Home A</option><option>Property: Office A</option></select>
-          <select aria-label="Unit" className="rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold"><option>Unit: All units ({units.length})</option>{units.map((u) => <option key={u.id}>{u.name}</option>)}</select>
+          <Select aria-label="Property" className="rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold"><option>Property: Home A</option><option>Property: Office A</option></Select>
+          <Select aria-label="Unit" className="rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs font-semibold"><option>Unit: All units ({units.length})</option>{units.map((u) => <option key={u.id}>{u.name}</option>)}</Select>
           <Tabs value={range} onChange={setRange} tabs={[{ id: "today", label: "Today" }, { id: "7d", label: "7d" }, { id: "30d", label: "30d" }]} />
         </div>
         <div className="text-right text-xs">
@@ -99,7 +99,7 @@ export function OverviewDemo() {
           <TextLink href="/customer/air-quality" className="mt-1 inline-block">Air quality details <Icon name="arrowRight" /></TextLink>
         </Card>
       </div>
-      <div className="flex justify-end"><button className="text-[11px] text-muted-foreground underline" onClick={() => setStale((s) => !s)}>{stale ? "Hide" : "Show"} offline/stale state</button></div>
+      <div className="flex justify-end"><Plain className="text-[11px] text-muted-foreground underline" onClick={() => setStale((s) => !s)}>{stale ? "Hide" : "Show"} offline/stale state</Plain></div>
     </Page>
   );
 }

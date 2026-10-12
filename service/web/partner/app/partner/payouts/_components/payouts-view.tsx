@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, DataTable, EmptyState, Field, Kpi, ListRow, Modal, Page, Select, SummaryList, Textarea } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, DataTable, EmptyState, Field, Kpi, ListRow, Modal, Page, Select, SummaryList, Textarea, Plain } from "@ac/web/components/ui";
 import { useLocale, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -80,7 +80,7 @@ export function PayoutsView({ live }: { live: PayoutsLive }) {
               { key: "status", label: t("Status"), render: (r) => <Badge tone={r.tone}>{r.statusText}</Badge> },
               { key: "amount", label: sel.statement.currency, render: (r) => <span className="font-semibold">{r.amount}</span>, className: "text-right" },
               { key: "action", label: "", render: (r) => r.question ? <span className="text-[11px] text-muted-foreground">{t(r.question.state === "open" ? "Question open" : r.question.state === "adjusted" ? "Adjusted" : "Answered")}</span>
-                : r.askable ? <button type="button" disabled={pending} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => { setAsk({ lineId: r.lineId! }); setTopic(r.status === "deduction" ? "deduction" : "amount"); setError(null); }}>{t("Ask HQ")}</button>
+                : r.askable ? <Plain type="button" disabled={pending} className="text-xs font-semibold text-primary disabled:opacity-50" onClick={() => { setAsk({ lineId: r.lineId! }); setTopic(r.status === "deduction" ? "deduction" : "amount"); setError(null); }}>{t("Ask HQ")}</Plain>
                 : <span className="text-[11px] text-muted-foreground">{r.status === "not_included" ? t("next statement") : ""}</span> },
             ]} />
             <div className="mt-3"><SummaryList items={[...sel.totals.map(([k, v]): [string, React.ReactNode] => [k, <b key={k}>{v}</b>]), [t("Bank account"), t("set by HQ — not shown in this demo")]]} /></div>

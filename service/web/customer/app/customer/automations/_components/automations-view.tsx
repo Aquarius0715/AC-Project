@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Badge, Banner, Btn, Card, cx, EmptyState, Field, Input, Modal, Page, PageHead, Select, Toggle } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, cx, EmptyState, Field, Input, Modal, Page, PageHead, Select, Toggle, Plain } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 import { useOp } from "@ac/web/lib/useOp";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -15,6 +15,7 @@ import { deleteAutomation, saveAutomation, testEvent, updateConsent } from "../a
 import { Icon } from "@ac/web/components/Icon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@ac/web/components/ui/dropdown-menu";
 import { Button } from "@ac/web/components/ui/button";
+import { Checkbox } from "@ac/web/components/ui/checkbox";
 
 type Ac = { id: string; name: string; property: string; path: string };
 export type AutomationsLive = {
@@ -177,7 +178,7 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
   const step = (n: number, title: string, sub?: string) => <div className="flex items-start gap-2"><span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink text-[11px] font-bold text-white">{n}</span><div><div className="text-[15px] font-bold">{title}</div>{sub && <div className="text-xs text-muted-foreground">{sub}</div>}</div></div>;
   return (
     <Page>
-      <div className="text-[13px] text-muted-foreground"><button type="button" className="font-semibold text-primary" onClick={onCancel}><Icon name="arrowLeft" /> {t("Automations")}</button> › <b className="text-ink">{t(rule ? "Edit automation" : "Create automation")}</b></div>
+      <div className="text-[13px] text-muted-foreground"><Plain type="button" className="font-semibold text-primary" onClick={onCancel}><Icon name="arrowLeft" /> {t("Automations")}</Plain> › <b className="text-ink">{t(rule ? "Edit automation" : "Create automation")}</b></div>
       <div className="split">
         <Card>
           <div className="flex flex-col gap-4">
@@ -185,10 +186,10 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
             {step(1, t("When …"), rule ? undefined : t("Choose what starts the automation"))}
             <div className="grid-fluid" style={{ ["--min" as string]: "150px" }} role="radiogroup" aria-label={t("Trigger")}>
               {triggers.map((tr) => (
-                <button key={tr} type="button" role="radio" aria-checked={draft.trigger === tr} disabled={!!rule && (tr === "schedule") !== sched} onClick={() => set({ trigger: tr, extras: fitExtras({ ...draft, trigger: tr }) })}
+                <Plain key={tr} type="button" role="radio" aria-checked={draft.trigger === tr} disabled={!!rule && (tr === "schedule") !== sched} onClick={() => set({ trigger: tr, extras: fitExtras({ ...draft, trigger: tr }) })}
                   className={cx("rounded-xl border px-3 py-2 text-left disabled:cursor-not-allowed disabled:opacity-50", draft.trigger === tr ? "border-primary bg-primary-soft text-primary ring-1 ring-primary" : "border-line bg-surface hover:bg-surface2")}>
                   <div className="flex items-center gap-1.5 text-[13px] font-semibold"><Icon name={triggerInfo[tr].icon} />{t(triggerInfo[tr].label)}</div><div className="text-[11px] text-muted-foreground">{t(triggerInfo[tr].sub)}</div>
-                </button>
+                </Plain>
               ))}
             </div>
             {!!rule && <p className="-mt-2 text-[11px] text-muted-foreground">{t("A saved schedule stays a schedule and an event rule stays an event rule — create a new automation to switch.")}</p>}
@@ -198,8 +199,8 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
                   <div className="flex flex-wrap gap-1.5">
                     {dayLong.map((d, k) => {
                       const on = draft.weekdays.includes(k + 1);
-                      return <button key={d} type="button" aria-pressed={on} onClick={() => set({ weekdays: on ? draft.weekdays.filter((x) => x !== k + 1) : [...draft.weekdays, k + 1] })}
-                        className={cx("rounded-full border px-3 py-1 text-[13px] font-semibold", on ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{t(dayShort[k])}</button>;
+                      return <Plain key={d} type="button" aria-pressed={on} onClick={() => set({ weekdays: on ? draft.weekdays.filter((x) => x !== k + 1) : [...draft.weekdays, k + 1] })}
+                        className={cx("rounded-full border px-3 py-1 text-[13px] font-semibold", on ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{t(dayShort[k])}</Plain>;
                     })}
                   </div>
                 </Field>
@@ -208,7 +209,7 @@ function Editor({ live, onDone, onCancel }: { live: AutomationsLive; onDone: (n:
                   <Field label={t("End")} hint={t("24-hour HH:mm")} error={errors.endLocal}><Input inputMode="numeric" maxLength={5} placeholder="HH:mm" value={draft.endLocal} onChange={(e) => set({ endLocal: e.target.value })} /></Field>
                   <Field label={t("Time zone")} hint={t("From your preferences")}><Input value={draft.timezone} readOnly className="bg-surface2" /></Field>
                 </div>
-                <label className="flex items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={draft.endsNextDay} onChange={(e) => set({ endsNextDay: e.target.checked })} />{t("Ends next day (overnight) — off: end must be later than start; equal start/end is invalid")}</label>
+                <label className="flex items-center gap-2 text-xs text-muted-foreground"><Checkbox checked={draft.endsNextDay} onCheckedChange={(v) => set({ endsNextDay: v === true })} />{t("Ends next day (overnight) — off: end must be later than start; equal start/end is invalid")}</label>
                 {errors.endsNextDay && <p className="-mt-2 flex items-center gap-1 text-xs font-medium text-crit"><Icon name="error" />{errors.endsNextDay}</p>}
               </>
             )}
@@ -319,8 +320,8 @@ function OnlyIf({ draft, errors, set }: { draft: Draft; errors: Record<string, s
             <span className="flex flex-wrap gap-1">
               {dayLong.map((d, k) => {
                 const on = x.weekdays.includes(k + 1);
-                return <button key={d} type="button" aria-pressed={on} onClick={() => put(i, { ...x, weekdays: on ? x.weekdays.filter((w) => w !== k + 1) : [...x.weekdays, k + 1] })}
-                  className={cx("rounded-full border px-2 py-0.5 text-xs font-semibold", on ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{t(dayShort[k])}</button>;
+                return <Plain key={d} type="button" aria-pressed={on} onClick={() => put(i, { ...x, weekdays: on ? x.weekdays.filter((w) => w !== k + 1) : [...x.weekdays, k + 1] })}
+                  className={cx("rounded-full border px-2 py-0.5 text-xs font-semibold", on ? "border-primary bg-primary-soft text-primary" : "border-line bg-surface")}>{t(dayShort[k])}</Plain>;
               })}
             </span>
           )}

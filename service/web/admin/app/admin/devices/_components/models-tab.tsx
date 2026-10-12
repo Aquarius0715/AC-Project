@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Btn, Card, Check, EmptyState, Field, Input, ListRow, Modal, Select, Textarea, Timeline } from "@ac/web/components/ui";
+import { Badge, Btn, Card, Check, EmptyState, Field, Input, ListRow, Modal, Select, Textarea, Timeline, Plain } from "@ac/web/components/ui";
 import { useI18n } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { showTime } from "@ac/web/lib/i18n";
@@ -89,7 +89,7 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
           </section>
           <section>
             <h3 className="mb-2 text-[13px] font-bold">{t("Sensors")}</h3>
-            <div className="scroll-x"><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after (s)")}</th><th>{t("Boundary")}</th><th /></tr></thead><tbody>{d.sensors.map((s, n) => <tr key={s.metric} className="border-t border-line"><td className="py-1.5">{s.metric}</td><td>{metricUnit[s.metric]}</td><td><Input type="number" className="w-28" aria-label={t("Stale after (s)")} value={s.staleAfterSeconds} onChange={(e) => set({ sensors: d.sensors.map((x, j) => (j === n ? { ...x, staleAfterSeconds: e.target.value } : x)) })} /></td><td className="text-xs text-muted-foreground">{s.metric === "power" ? "ac_input_electricity" : "—"}</td><td><button type="button" className="text-xs text-crit" onClick={() => set({ sensors: d.sensors.filter((_, j) => j !== n) })}>{t("Remove")}</button></td></tr>)}</tbody></table></div>
+            <div className="scroll-x"><table className="w-full min-w-[420px] text-[13px]"><thead className="text-left text-[11px] uppercase text-muted-foreground"><tr><th>{t("Metric")}</th><th>{t("Unit")}</th><th>{t("Stale after (s)")}</th><th>{t("Boundary")}</th><th /></tr></thead><tbody>{d.sensors.map((s, n) => <tr key={s.metric} className="border-t border-line"><td className="py-1.5">{s.metric}</td><td>{metricUnit[s.metric]}</td><td><Input type="number" className="w-28" aria-label={t("Stale after (s)")} value={s.staleAfterSeconds} onChange={(e) => set({ sensors: d.sensors.map((x, j) => (j === n ? { ...x, staleAfterSeconds: e.target.value } : x)) })} /></td><td className="text-xs text-muted-foreground">{s.metric === "power" ? "ac_input_electricity" : "—"}</td><td><Plain type="button" className="text-xs text-crit" onClick={() => set({ sensors: d.sensors.filter((_, j) => j !== n) })}>{t("Remove")}</Plain></td></tr>)}</tbody></table></div>
             {available.length > 0 && <div className="mt-2 flex items-end gap-2"><Field label={t("Add sensor")}><Select value={pick} onChange={(e) => setNewSensor(e.target.value as Metric)}>{available.map((m) => <option key={m} value={m}>{m} ({metricUnit[m]})</option>)}</Select></Field><Btn size="sm" onClick={() => set({ sensors: [...d.sensors, { metric: pick, staleAfterSeconds: "120" }] })}>{t("Add")}</Btn></div>}
             {err("sensors") && <p className="mt-1 text-xs text-crit">{err("sensors")}</p>}
           </section>
@@ -102,7 +102,7 @@ export function ModelsTab({ live }: { live: DevicesLive }) {
                 return (
                   <span key={v} className="inline-flex items-center gap-1.5 rounded-control border border-primary/40 bg-primary-soft px-2.5 py-1 text-xs">
                     <b>{v}</b><span className="text-muted-foreground">{on ? t(on === 1 ? "current on 1 device" : "current on {n} devices", { n: on }) : n === d.firmware.length - 1 ? t("latest") : ""}</span>
-                    <button type="button" aria-label={t("Remove {name}", { name: v })} className="text-muted-foreground hover:text-ink" onClick={() => set({ firmware: d.firmware.filter((x) => x !== v) })}><Icon name="close" /></button>
+                    <Plain type="button" aria-label={t("Remove {name}", { name: v })} className="text-muted-foreground hover:text-ink" onClick={() => set({ firmware: d.firmware.filter((x) => x !== v) })}><Icon name="close" /></Plain>
                   </span>
                 );
               })}

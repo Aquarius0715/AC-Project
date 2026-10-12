@@ -14,6 +14,7 @@ import type { ContractorsLive } from "../_lib/load";
 import { JobsTabs } from "./jobs-header";
 import { NewJobModal } from "./jobs-view";
 import { Icon } from "@ac/web/components/Icon";
+import { Checkbox } from "@ac/web/components/ui/checkbox";
 
 type Detail = NonNullable<ContractorsLive["detail"]>;
 type ModalState = null | { kind: "profile"; organizationId: string | null } | { kind: "status" } | { kind: "rates" } | { kind: "verify" } | { kind: "job" };
@@ -174,7 +175,7 @@ function RatesModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now: 
       <div className="flex flex-col gap-2">
         {lines.map((l, n) => (
           <div key={l.workType} className="flex flex-wrap items-end gap-2">
-            <label className="mb-2 flex w-60 items-center gap-2 text-[13px] font-semibold"><input type="checkbox" checked={l.on} onChange={(e) => setLines(lines.map((x, k) => (k === n ? { ...x, on: e.target.checked } : x)))} />{t(WORK_TYPES[n].label)}</label>
+            <label className="mb-2 flex w-60 items-center gap-2 text-[13px] font-semibold"><Checkbox checked={l.on} onCheckedChange={(v) => setLines(lines.map((x, k) => (k === n ? { ...x, on: v === true } : x)))} />{t(WORK_TYPES[n].label)}</label>
             <Field label={t("Amount {n}", { n: n + 1 })}><Input inputMode="decimal" disabled={!l.on} value={l.amount} onChange={(e) => setLines(lines.map((x, k) => (k === n ? { ...x, amount: e.target.value } : x)))} placeholder="0.00" /></Field>
             <Field label={t("Note {n}", { n: n + 1 })}><Input disabled={!l.on} value={l.note} maxLength={200} onChange={(e) => setLines(lines.map((x, k) => (k === n ? { ...x, note: e.target.value } : x)))} /></Field>
           </div>

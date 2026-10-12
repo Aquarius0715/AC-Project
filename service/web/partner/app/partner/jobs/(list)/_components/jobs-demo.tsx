@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, EmptyState, ErrorState, Page, PageHead, Select, Tabs } from "@ac/web/components/ui";
+import { Badge, EmptyState, ErrorState, Page, PageHead, Select, Tabs, Plain } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { PJob, pjobs } from "@ac/web/lib/partner";
 import { fmt, useJobs } from "@ac/web/lib/jobs";
@@ -54,7 +54,7 @@ export function JobsDemo({ status }: { status?: string }) {
           <p className="text-[11px] text-muted-foreground">Showing {jobs.length} of {rows.length} · Sorted by status, then deadline · Visit times are fixed when offered; a different time needs the client’s approval via HQ.</p>
         </div>
       )}
-      <div className="flex justify-end gap-3 text-[11px] text-muted-foreground"><button className="underline" onClick={() => setState("empty")}>empty state</button><button className="underline" onClick={() => setState("error")}>stale state</button><button className="underline" onClick={() => setState("ok")}>normal</button></div>
+      <div className="flex justify-end gap-3 text-[11px] text-muted-foreground"><Plain className="underline" onClick={() => setState("empty")}>empty state</Plain><Plain className="underline" onClick={() => setState("error")}>stale state</Plain><Plain className="underline" onClick={() => setState("ok")}>normal</Plain></div>
     </Page>
   );
 }

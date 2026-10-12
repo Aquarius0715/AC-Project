@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Badge, Banner, Btn, Card, Choice, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, cx } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, Field, Input, ListRow, Modal, Page, PageHead, Select, SummaryList, Tabs, Textarea, Timeline, cx, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
 import { useAction } from "@ac/web/lib/useAction";
 import { showTime, zonedInstant, zonedParts } from "@ac/web/lib/i18n";
@@ -16,6 +16,7 @@ import { addNote, cancelRequest, createRequest, rateJob, reportProblem, requestR
 import type { MaintenanceLive } from "../_lib/load";
 import { FilterCareTab, type CleaningPrefill } from "./filter-care";
 import { Icon } from "@ac/web/components/Icon";
+import { Checkbox } from "@ac/web/components/ui/checkbox";
 
 type Detail = NonNullable<MaintenanceLive["detail"]>;
 type Slot = { startAt: string; endAt: string };
@@ -250,7 +251,7 @@ function DeclineModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
       <p className="text-xs text-muted-foreground">{t("{job} · {unit} · proposed {when}", { job: j.id.slice(0, 8), unit: d.unit.name, when: d.proposal?.when ?? "" })}</p>
       <Field label={t("Reason")}><Choice value={reason} onChange={setReason} options={[{ id: "not_home", label: t("I’m not at home then") }, { id: "too_late", label: t("Too late for me") }, { id: "other", label: t("Other") }]} /></Field>
       <Field label={t("Comment to HQ (optional, up to 1000)")}><Input value={comment} maxLength={1000} onChange={(e) => setComment(e.target.value)} placeholder={t("Away that day. Any weekday afternoon next week works.")} /></Field>
-      <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" className="h-4 w-4 accent-[#005bea]" checked={give} onChange={(e) => setGive(e.target.checked)} />{t("Give 3 new preferred times (recommended)")}</label>
+      <label className="flex items-center gap-2 text-[13px]"><Checkbox className="h-4 w-4 accent-[#005bea]" checked={give} onCheckedChange={(v) => setGive(v === true)} />{t("Give 3 new preferred times (recommended)")}</label>
       {give && <TimesInput rows={rows} onChange={setRows} error={tried ? err : null} label={t("New preferred times")} />}
       <Banner>{t("HQ looks again and either books one of your times or sends another proposal. Declining never cancels the request.")}</Banner>
     </Modal>
@@ -286,9 +287,9 @@ function RateModal({ d, onClose, onFail }: ModalProps & { d: Detail }) {
   const [tried, setTried] = useState(false);
   return (
     <Modal open onClose={() => onClose()} title={t(j.rating ? "Edit rating {job}" : "Confirm & rate {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => onClose()}>{t("Not now")}</Btn><Btn variant="primary" disabled={pending} onClick={() => { setTried(true); if (!stars) return; run(() => rateJob(j.id, j.version, stars as 1 | 2 | 3 | 4 | 5, tags, comment), t("Thanks — rating saved"), () => onClose(t(j.rating ? "Thanks — rating updated ({stars} of 5 stars)." : "Thanks — job confirmed and rated ({stars} of 5 stars).", { stars })), onFail); }}>{t(j.rating ? "Save rating" : "Confirm & submit")}</Btn></>}>
-      <Field label={t("How was the service? (required)")} error={tried && !stars ? t("Choose 1–5 stars") : undefined}><div className="flex gap-1 text-2xl">{[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" aria-label={t("{n} stars", { n })} aria-pressed={n === stars} onClick={() => setStars(n)} className={n <= stars ? "text-[#f59e0b]" : "text-line"}><Icon name="star" filled /></button>)}</div></Field>
+      <Field label={t("How was the service? (required)")} error={tried && !stars ? t("Choose 1–5 stars") : undefined}><div className="flex gap-1 text-2xl">{[1, 2, 3, 4, 5].map((n) => <Plain key={n} type="button" aria-label={t("{n} stars", { n })} aria-pressed={n === stars} onClick={() => setStars(n)} className={n <= stars ? "text-[#f59e0b]" : "text-line"}><Icon name="star" filled /></Plain>)}</div></Field>
       {/* the tags are stored in English (the API's values); only their labels follow the language */}
-      <Field label={t("What went well? (optional)")}><div className="flex flex-wrap gap-1.5">{RATING_TAGS.map((tag) => <button key={tag} type="button" aria-pressed={tags.includes(tag)} onClick={() => setTags((s) => (s.includes(tag) ? s.filter((x) => x !== tag) : [...s, tag]))} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", tags.includes(tag) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(tag)}</button>)}</div></Field>
+      <Field label={t("What went well? (optional)")}><div className="flex flex-wrap gap-1.5">{RATING_TAGS.map((tag) => <Plain key={tag} type="button" aria-pressed={tags.includes(tag)} onClick={() => setTags((s) => (s.includes(tag) ? s.filter((x) => x !== tag) : [...s, tag]))} className={cx("rounded-full border px-3 py-1 text-xs font-semibold", tags.includes(tag) ? "border-primary bg-primary-soft text-primary" : "border-line")}>{t(tag)}</Plain>)}</div></Field>
       {stars > 0 && stars <= 2 && <Banner tone="warn">{t("What went wrong? You can also “Report a problem” — HQ then looks at it as a follow-up.")}</Banner>}
       <Field label={t("Comment (optional, up to 1000)")}><Textarea value={comment} maxLength={1000} onChange={(e) => setComment(e.target.value)} placeholder={t("Technician was quick and tidy.")} /></Field>
       <p className="text-[11px] text-muted-foreground">{t("You can edit the rating for 7 days. Unconfirmed jobs are confirmed automatically after 7 days.")}</p>
@@ -324,8 +325,8 @@ function ProblemModal({ d, now, onClose, onFail }: ModalProps & { d: Detail; now
     <Modal open wide onClose={() => onClose()} title={t("Report a problem — {job}", { job: j.id.slice(0, 8) })} footer={<><Btn onClick={() => onClose()}>{t("Cancel")}</Btn><Btn variant="primary" disabled={pending} onClick={send}>{t("Send report")}</Btn></>}>
       <Field label={t("What happened?")}><Choice value={reason} onChange={setReason} options={PROBLEMS.map((p) => ({ ...p, label: t(p.label) }))} /></Field>
       <Field label={t("Details (10–2000 characters)")} error={tried ? detErr ?? undefined : undefined}><Textarea value={details} maxLength={2000} onChange={(e) => setDetails(e.target.value)} /></Field>
-      <Field label={t("Photos (optional, up to 5 JPEG/PNG)")} error={fileErr ?? undefined}><input type="file" accept="image/jpeg,image/png" multiple onChange={(e) => setFiles(Array.from(e.target.files ?? []))} className="text-[13px]" /></Field>
-      <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" className="h-4 w-4 accent-[#005bea]" checked={!!visit} onChange={(e) => setVisit(e.target.checked ? threeRows(now, timeZone)[0] : null)} />{t("Suggest a visit time")}</label>
+      <Field label={t("Photos (optional, up to 5 JPEG/PNG)")} error={fileErr ?? undefined}><Input type="file" accept="image/jpeg,image/png" multiple onChange={(e) => setFiles(Array.from(e.target.files ?? []))} className="text-[13px]" /></Field>
+      <label className="flex items-center gap-2 text-[13px]"><Checkbox className="h-4 w-4 accent-[#005bea]" checked={!!visit} onCheckedChange={(v) => setVisit(v === true ? threeRows(now, timeZone)[0] : null)} />{t("Suggest a visit time")}</label>
       {visit && <TimesInput rows={[visit]} onChange={(r) => setVisit(r[0])} error={tried ? visitErr : null} label={t("Preferred visit")} />}
       <Banner>{t("Creates a follow-up request linked to {job} (“Under HQ review”). HQ decides within 1 business day: rework (free) or a new request.", { job: j.id.slice(0, 8) })}</Banner>
     </Modal>

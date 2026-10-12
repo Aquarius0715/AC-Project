@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Btn, Card, Check, EmptyState, Field, ListRow, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Textarea, Timeline, useToast, cx } from "@ac/web/components/ui";
+import { Btn, Card, Check, EmptyState, Field, ListRow, Modal, Page, Select, SeverityBadge, SummaryList, Tabs, Textarea, Timeline, useToast, cx, Plain } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { EvidencePicker } from "@ac/web/components/EvidencePicker";
 import { useUrlTab } from "@ac/web/lib/useUrlTab";
@@ -151,9 +151,9 @@ export function AdminAlertsView({ live }: { live?: Live }) {
           {live && <ScopeBar scope={live.scope} q={live.q} text={t(al.length === 1 ? "1 alert in scope" : "{n} alerts in scope", { n: al.length })} clear="alertId" />}
           <div className="flex flex-wrap items-stretch gap-3">
             {counts.map(([s, n]) => (
-              <button key={s} type="button" aria-pressed={status === s} onClick={() => pickStatus(s)} className={cx("min-w-[140px] flex-1 rounded-2xl border bg-surface p-4 text-left", status === s ? "border-primary ring-1 ring-primary" : "border-line hover:bg-surface2")}>
+              <Plain key={s} type="button" aria-pressed={status === s} onClick={() => pickStatus(s)} className={cx("min-w-[140px] flex-1 rounded-2xl border bg-surface p-4 text-left", status === s ? "border-primary ring-1 ring-primary" : "border-line hover:bg-surface2")}>
                 <div className="text-xs text-muted-foreground">{t(ST[s])}</div><div className="text-2xl font-bold">{n}</div>
-              </button>
+              </Plain>
             ))}
             {live && (
               <Select aria-label={t("Severity")} className="w-auto self-center" value={live.q.severity ?? ""} onChange={(e) => patch({ severity: e.target.value || null, alertId: null })}>

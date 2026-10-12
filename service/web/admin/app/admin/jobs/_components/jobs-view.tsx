@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Select, SummaryList, Textarea, cx } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Select, SummaryList, Textarea, cx, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
@@ -17,6 +17,7 @@ import { assignInternal, cancelJob, classifyFollowUp, createJob, extendAccess, h
 import type { JobsLive } from "../_lib/load";
 import { JobsTabs, ScopeBar } from "./jobs-header";
 import { Icon } from "@ac/web/components/Icon";
+import { Checkbox } from "@ac/web/components/ui/checkbox";
 
 type Detail = NonNullable<JobsLive["detail"]>;
 const TYPES = [{ id: "", label: "All" }, { id: "reactive", label: "Repair" }, { id: "periodic", label: "Periodic" }, { id: "preventive", label: "Preventive" }];
@@ -56,7 +57,7 @@ function JobsTab({ live, patch, fresh, onFresh }: { live: JobsLive; patch: (p: R
     <>
       <ScopeBar scope={live.scope} q={q} text={`${t(inScope === 1 ? "1 job in scope" : "{n} jobs in scope", { n: inScope })}${live.period ? ` · ${t("in the period")}` : ""}`} clear="jobId" />
       <div className="scroll-x"><div className="grid min-w-[980px] grid-cols-10 overflow-hidden rounded-2xl border border-line bg-surface">
-        {live.stages.map((s) => <button key={s.id} type="button" aria-pressed={q.stage === s.id} onClick={() => patch({ stage: q.stage === s.id ? null : s.id, jobId: null })} className={cx("border-r border-line px-3 py-2 text-left last:border-r-0 hover:bg-surface2", q.stage === s.id && "bg-primary-soft")}><div className="text-[11px] text-muted-foreground">{s.label}</div><div className={cx("text-lg font-bold", s.id === "time_proposed" && s.count > 0 && "text-warn", s.count === 0 && "text-muted-foreground")}>{s.count}</div></button>)}
+        {live.stages.map((s) => <Plain key={s.id} type="button" aria-pressed={q.stage === s.id} onClick={() => patch({ stage: q.stage === s.id ? null : s.id, jobId: null })} className={cx("border-r border-line px-3 py-2 text-left last:border-r-0 hover:bg-surface2", q.stage === s.id && "bg-primary-soft")}><div className="text-[11px] text-muted-foreground">{s.label}</div><div className={cx("text-lg font-bold", s.id === "time_proposed" && s.count > 0 && "text-warn", s.count === 0 && "text-muted-foreground")}>{s.count}</div></Plain>)}
       </div></div>
       <div className="flex flex-wrap items-center gap-2">
         <Select aria-label={t("Type")} className="w-auto" value={q.type ?? ""} onChange={(e) => patch({ type: e.target.value || null })}>{TYPES.map((x) => <option key={x.id} value={x.id}>{t("Type: {value}", { value: t(x.label) })}</option>)}</Select>
@@ -64,8 +65,8 @@ function JobsTab({ live, patch, fresh, onFresh }: { live: JobsLive; patch: (p: R
         <Select aria-label={t("Delivery")} className="w-auto" value={q.delivery ?? ""} onChange={(e) => patch({ delivery: e.target.value || null })}><option value="">{t("Delivery: All")}</option>{live.deliveries.map((d) => <option key={d.id} value={d.id}>{t("Delivery: {name}", { name: d.name })}</option>)}</Select>
         <Select aria-label={t("Assignee")} className="w-auto" value={q.assignee ?? ""} onChange={(e) => patch({ assignee: e.target.value || null })}><option value="">{t("Assignee: All")}</option>{live.assignees.map((a) => <option key={a.id} value={a.id}>{t("Assignee: {name}", { name: a.name })}</option>)}</Select>
         <Select aria-label={t("Sort")} className="w-auto" value={live.sort} onChange={(e) => patch({ sort: e.target.value === "status" ? null : e.target.value })}>{live.sorts.map((s) => <option key={s.id} value={s.id}>{t("Sort: {sort}", { sort: s.text })}</option>)}</Select>
-        <label className="flex items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1.5 text-[13px]"><input type="checkbox" checked={q.overdue === "1"} onChange={(e) => patch({ overdue: e.target.checked ? "1" : null })} /> {t("Overdue only")}</label>
-        {live.periodChip && <button type="button" onClick={() => patch({ from: null, to: null, jobId: null })} className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary" aria-label={t("{period} — clear the requested-time period", { period: live.periodChip })}>{live.periodChip} <Icon name="close" /></button>}
+        <label className="flex items-center gap-1.5 rounded-control border border-line bg-surface px-3 py-1.5 text-[13px]"><Checkbox checked={q.overdue === "1"} onCheckedChange={(v) => patch({ overdue: v === true ? "1" : null })} /> {t("Overdue only")}</label>
+        {live.periodChip && <Plain type="button" onClick={() => patch({ from: null, to: null, jobId: null })} className="rounded-full bg-primary-soft px-3 py-1 text-xs font-semibold text-primary" aria-label={t("{period} — clear the requested-time period", { period: live.periodChip })}>{live.periodChip} <Icon name="close" /></Plain>}
       </div>
       <div className="split-rev">
         <Card title={t("Jobs · all customers")} sub={live.sorts.find((s) => s.id === live.sort)!.text} className="self-start">
@@ -180,7 +181,7 @@ function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fre
 
       {d.report ? (
         <Card title={d.report.title} sub={d.report.sub} tone={d.report.tone === "warn" ? "warn" : d.report.tone === "ok" ? "ok" : undefined}
-          action={<button type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => setModal({ kind: "report" })}>{t("Open report")} <Icon name="arrowRight" /></button>}>
+          action={<Plain type="button" className="text-xs font-semibold text-primary hover:underline" onClick={() => setModal({ kind: "report" })}>{t("Open report")} <Icon name="arrowRight" /></Plain>}>
           <ReportRows rows={d.report.rows} />
           {d.report.readings.length > 0 && <div className="mt-2"><SummaryList items={d.report.readings} /></div>}
           {d.report.photos.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{d.report.photos.map((p) => (
@@ -205,7 +206,7 @@ function JobDetail({ d, live, fresh, onFresh }: { d: Detail; live: JobsLive; fre
           <div className="scroll-x"><table className="w-full min-w-[560px] text-[13px]">
             <thead><tr className="text-left text-[11px] uppercase text-muted-foreground"><th className="py-1.5">{t("Kind")}</th><th>{t("Description")}</th><th>{t("Visibility")}</th><th className="text-right">{t("Amount")}</th><th className="w-8"><span className="sr-only">{t("Remove")}</span></th></tr></thead>
             <tbody>{d.costs.map((l, i) => <tr key={i} className="border-t border-line"><td className="py-1.5">{t(l.kind === "estimate" ? "Estimate" : "Actual")}</td><td>{l.description}</td><td className="text-xs text-muted-foreground">{t(l.visibility === "customer" ? "Customer" : "Internal")}</td><td className="text-right font-semibold">{money(l.amountMinor, l.currency)}</td>
-              <td className="text-right"><button type="button" aria-label={t("Remove {name}", { name: l.description })} disabled={pending || j.status === "cancelled"} className="rounded px-1.5 text-muted-foreground hover:bg-surface2 hover:text-crit disabled:opacity-40" onClick={() => run(() => saveCosts(j.id, j.version, d.costs.filter((_, k) => k !== i)), t("Cost line removed"), () => close(t("Removed “{name}”.", { name: l.description })), failed)}><Icon name="close" /></button></td></tr>)}</tbody>
+              <td className="text-right"><Plain type="button" aria-label={t("Remove {name}", { name: l.description })} disabled={pending || j.status === "cancelled"} className="rounded px-1.5 text-muted-foreground hover:bg-surface2 hover:text-crit disabled:opacity-40" onClick={() => run(() => saveCosts(j.id, j.version, d.costs.filter((_, k) => k !== i)), t("Cost line removed"), () => close(t("Removed “{name}”.", { name: l.description })), failed)}><Icon name="close" /></Plain></td></tr>)}</tbody>
           </table></div>
         )}
         <div className="mt-3 grid-fluid" style={{ ["--min" as string]: "180px" }}>
@@ -431,7 +432,7 @@ function ReviewModal({ d, report, decision, onClose, onFail }: Omit<ModalProps, 
       <p className="text-xs text-muted-foreground">jobs.review · decision={decision}{report.mode === "hq_escalation" ? ` · ${t("HQ escalation")}` : ""} · {t("report v{v} by {name}", { v: report.version, name: report.author })}</p>
       {decision === "return" && (
         <fieldset className="flex flex-col gap-1.5"><legend className="mb-1 text-[13px] font-semibold">{t("Items that need rework")}</legend>
-          {report.rework.map((x) => <label key={x.label} className="flex items-start gap-2 text-[13px]"><input type="checkbox" className="mt-0.5" checked={items.includes(x.label)} onChange={(e) => setItems(e.target.checked ? [...items, x.label] : items.filter((v) => v !== x.label))} />{x.label}</label>)}
+          {report.rework.map((x) => <label key={x.label} className="flex items-start gap-2 text-[13px]"><Checkbox className="mt-0.5" checked={items.includes(x.label)} onCheckedChange={(v) => setItems(v === true ? [...items, x.label] : items.filter((v) => v !== x.label))} />{x.label}</label>)}
         </fieldset>
       )}
       <Field label={t("Reason · required")} hint={t("1–1000 characters · shown to the technician and kept in the review history.")} error={tried ? error : undefined}><Textarea value={r} maxLength={1000} onChange={(e) => setR(e.target.value)} placeholder={t(decision === "return" ? "Airflow still low after cleaning; re-check the blower and attach an after photo." : "The contractor has not reviewed within the agreed time; HQ accepts on the evidence.")} /></Field>

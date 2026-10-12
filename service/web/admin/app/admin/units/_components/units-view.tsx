@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Banner, Btn, Card, Check, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Input, Kpi, LinkBtn, Modal, Page, PowerBadge, Search, Select, SummaryList, Tabs, Textarea, TextLink, Toggle, ActionMenu } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, Choice, ConnBadge, cx, DataTable, EmptyState, Field, Input, Kpi, LinkBtn, Modal, Page, PowerBadge, Search, Select, SummaryList, Tabs, Textarea, TextLink, Toggle, ActionMenu, Plain } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -165,7 +165,7 @@ function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
   return (
     <Page>
       <div className="flex flex-wrap items-center gap-2 text-[13px]">
-        <button type="button" className="font-semibold text-primary" onClick={() => nav({ customerId: null, tab: null, locationId: null, propertyId: null, unitId: null, powerState: null, connections: null, search: null })}><Icon name="chevronLeft" /> {t("Customers")}</button>
+        <Plain type="button" className="font-semibold text-primary" onClick={() => nav({ customerId: null, tab: null, locationId: null, propertyId: null, unitId: null, powerState: null, connections: null, search: null })}><Icon name="chevronLeft" /> {t("Customers")}</Plain>
         <span className="text-muted-foreground">/ {r.name}{c.unit ? ` / ${c.unit.u.displayName}` : ""}</span>
         {r.marks.map((x) => <Badge key={x.label} tone={x.tone} icon={x.icon}>{x.label}</Badge>)}
         <div className="ml-auto flex gap-2">
@@ -241,9 +241,9 @@ function CustomerScreen({ live, c }: { live: UnitsLive; c: CustomerLive }) {
 function Node({ depth, selected, onClick, icon, name, meta, menu }: { depth: number; selected: boolean; onClick: () => void; icon: IconName; name: string; meta: string; menu?: React.ReactNode }) {
   return (
     <div className={cx("flex items-center gap-1 rounded-lg pr-1", selected ? "bg-primary-soft/60" : "hover:bg-surface2/70")} style={{ paddingLeft: depth * 14 }}>
-      <button type="button" onClick={onClick} aria-pressed={selected} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-[13px]">
+      <Plain type="button" onClick={onClick} aria-pressed={selected} className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-[13px]">
         <Icon name={icon} className="text-muted-foreground" /><b className="truncate">{name}</b><span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{meta}</span>
-      </button>
+      </Plain>
       {menu}
     </div>
   );
@@ -261,7 +261,7 @@ function SpaceNode({ s, depth, selId, nav, canWrite, setM }: { s: TreeSpace; dep
   );
 }
 const AddLink = ({ depth, onClick, children }: { depth: number; onClick: () => void; children: React.ReactNode }) => (
-  <button type="button" onClick={onClick} className="block py-1 text-left text-[12px] font-semibold text-primary" style={{ paddingLeft: depth * 14 + 8 }}>{children}</button>
+  <Plain type="button" onClick={onClick} className="block py-1 text-left text-[12px] font-semibold text-primary" style={{ paddingLeft: depth * 14 + 8 }}>{children}</Plain>
 );
 function LocationMenu({ onRename, onDelete }: { onRename: () => void; onDelete: () => void }) {
   const t = useT();
@@ -369,7 +369,7 @@ function UnitEdit({ live, c, x, nav, run, pending }: { live: UnitsLive; c: Custo
   return (
     <>
       <Card title={<span className="flex flex-wrap items-center gap-2">{u.displayName}<PowerBadge s={u.effectivePowerState === "on" ? "running" : u.effectivePowerState === "off" ? "stopped" : "unknown"} /><ConnBadge s={u.connection} />{x.seen && <span className="text-[11px] font-normal text-muted-foreground">{t("seen {time}", { time: x.seen })}</span>}{u.activeAlertCount > 0 && <Badge tone="warn" icon="warning">{count(t, u.activeAlertCount, "1 open alert", "{n} open alerts")}</Badge>}</span>}
-        sub={<>{u.id.slice(0, 8)} · {t("version {v}", { v: u.version })} · <button type="button" className="font-semibold text-primary" onClick={() => nav({ unitId: null, locationId: u.archived ? null : u.spaceId ?? `unassigned:${u.propertyId}` })}><Icon name="chevronLeft" /> {t("back to {place}", { place: back })}</button></>}
+        sub={<>{u.id.slice(0, 8)} · {t("version {v}", { v: u.version })} · <Plain type="button" className="font-semibold text-primary" onClick={() => nav({ unitId: null, locationId: u.archived ? null : u.spaceId ?? `unassigned:${u.propertyId}` })}><Icon name="chevronLeft" /> {t("back to {place}", { place: back })}</Plain></>}
         action={live.canWrite && !u.archived && <Btn size="sm" variant="danger" onClick={() => setModal("delete")}>{t("Delete unit…")}</Btn>}>
         {u.archived && <div className="mb-3"><Banner tone="warn">{t("Read only — {note}. Archived units are excluded from lists, summaries and KPI denominators (IR39).", { note: x.archivedNote ?? "" })}</Banner></div>}
         <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
@@ -905,7 +905,7 @@ function ImportWizard({ live, onClose }: { live: UnitsLive; onClose: () => void 
           <Select value={customerId} onChange={(v) => { setCustomerId(v.target.value); setPreview(null); }}>{live.activeCustomers.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</Select>
         </Field>
         <div className="flex flex-wrap items-center gap-3">
-          <input aria-label={t("CSV file")} type="file" accept=".csv,text/csv" className="text-[13px]" onChange={(v) => pick(v.target.files?.[0])} />
+          <Input aria-label={t("CSV file")} type="file" accept=".csv,text/csv" className="text-[13px]" onChange={(v) => pick(v.target.files?.[0])} />
           <Btn size="sm" variant="ghost" onClick={() => download("units-template.csv", importTemplate)}>{t("Download template")}</Btn>
         </div>
         {file && <p className="text-[12px] text-muted-foreground"><Icon name="document" /> {file.name} · {count(t, shape?.rows ?? 0, "1 row", "{n} rows")} · {count(t, shape?.header.length ?? 0, "1 column", "{n} columns")} · UTF-8 · {Math.max(1, Math.round(file.size / 1024))} KB{tooBig ? ` — ${t("too large: split the file (at most about 900 KB, 1000 rows)")}` : ""}</p>}

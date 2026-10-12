@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, Check, DataTable, EmptyState, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, Textarea } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Check, DataTable, EmptyState, Field, Input, ListRow, Modal, Page, Select, Steps, SummaryList, Textarea, Plain } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -58,7 +58,7 @@ function Manager({ live }: { live: NonNullable<RestrictionsLive> }) {
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">{states.map((s) => <button key={s} onClick={() => nav({ status: live.scope.status === s ? null : s, restrictionId: null })} aria-pressed={live.scope.status === s} className={`rounded-full px-2.5 py-1 text-xs ${live.scope.status === s ? "bg-primary-soft text-primary" : "bg-surface2"}`}><span className="text-muted-foreground">{stateWord(s, t)}</span> <b>{live.counts[s]}</b></button>)}</div>
+        <div className="flex flex-wrap gap-2">{states.map((s) => <Plain key={s} onClick={() => nav({ status: live.scope.status === s ? null : s, restrictionId: null })} aria-pressed={live.scope.status === s} className={`rounded-full px-2.5 py-1 text-xs ${live.scope.status === s ? "bg-primary-soft text-primary" : "bg-surface2"}`}><span className="text-muted-foreground">{stateWord(s, t)}</span> <b>{live.counts[s]}</b></Plain>)}</div>
         {live.canWrite && <Btn size="sm" variant="primary" onClick={() => setScheduling(true)}><Icon name="add" /> {t("Schedule restriction")}</Btn>}
       </div>
       {live.full && (

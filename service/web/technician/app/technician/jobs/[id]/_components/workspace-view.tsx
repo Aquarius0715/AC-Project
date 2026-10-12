@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { Badge, Banner, Btn, Card, Choice, cx, DataTable, EmptyState, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilBar } from "@ac/web/components/ui";
+import { Badge, Banner, Btn, Card, Choice, cx, DataTable, EmptyState, Field, Input, Modal, Page, Select, SummaryList, Tabs, Textarea, UtilBar, Plain } from "@ac/web/components/ui";
 import { useI18n, useT } from "@ac/web/components/I18n";
 import { useAction } from "@ac/web/lib/useAction";
 import { metricUnit, type Metric } from "@ac/web/lib/devices";
@@ -167,7 +167,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
           <div className="flex flex-wrap gap-1.5">{ph.linked.map((x) => (
             <span key={x.id} className="inline-flex items-center gap-1 rounded-full bg-surface2 px-2 py-0.5 text-xs">
               <Icon name="camera" /> {x.status === "missing" ? x.name : <a href={photoUrl(x)} target="_blank" rel="noreferrer" className="font-semibold text-primary">{x.name}</a>}
-              {editable && <button type="button" aria-label={t("Unlink {photo} from {item}", { photo: x.name, item: name })} className="text-muted-foreground hover:text-ink" onClick={() => edit((d) => linkPhoto(d, it.componentKey, x.id, false))}><Icon name="close" /></button>}
+              {editable && <Plain type="button" aria-label={t("Unlink {photo} from {item}", { photo: x.name, item: name })} className="text-muted-foreground hover:text-ink" onClick={() => edit((d) => linkPhoto(d, it.componentKey, x.id, false))}><Icon name="close" /></Plain>}
             </span>
           ))}</div>
         )}
@@ -261,7 +261,7 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                     <td className="pr-2 text-muted-foreground">{metricUnit[m.metric]}</td>
                     <td className="pr-2">{editable ? <Select aria-label={t("Linked item")} value={m.componentKey} onChange={(e) => edit((d) => ({ ...d, readings: d.readings.map((x, k) => (k === i ? { ...x, componentKey: e.target.value } : x)) }))}>{live.components.map((c) => <option key={c.key} value={c.key}>{t(groupLabel[c.group])} › {label(c.key)}</option>)}</Select> : label(m.componentKey)}</td>
                     <td className="pr-2 text-xs text-muted-foreground">{f.clock(m.observedAt)}</td>
-                    <td>{editable && <button type="button" className="text-xs font-semibold text-primary" onClick={() => edit((d) => ({ ...d, readings: d.readings.filter((_, k) => k !== i) }))}>{t("Remove")}</button>}</td>
+                    <td>{editable && <Plain type="button" className="text-xs font-semibold text-primary" onClick={() => edit((d) => ({ ...d, readings: d.readings.filter((_, k) => k !== i) }))}>{t("Remove")}</Plain>}</td>
                   </tr>
                 ))}</tbody>
               </table></div>
@@ -273,12 +273,12 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
                     { key: "p", label: t("Part"), render: (p) => <div><b>{p.name}</b><div className="text-[11px] text-muted-foreground">{p.catalogCode ?? t("custom")}{p.replacesComponentKey ? ` · ${t("replaces {part}", { part: label(p.replacesComponentKey) })}` : ""}</div></div> },
                     { key: "s", label: t("Source"), render: (p) => t(sources.find((x) => x.id === p.source)?.label ?? p.source) }, { key: "q", label: t("Qty"), render: (p) => p.quantity },
                     { key: "l", label: t("Lot / serial"), render: (p) => p.lotSerial ?? "—" },
-                    { key: "x", label: "", render: (p) => editable ? <button type="button" className="text-xs font-semibold text-primary" onClick={() => edit((d) => ({ ...d, parts: d.parts.filter((x) => x !== p) }))}>{t("Remove")}</button> : null },
+                    { key: "x", label: "", render: (p) => editable ? <Plain type="button" className="text-xs font-semibold text-primary" onClick={() => edit((d) => ({ ...d, parts: d.parts.filter((x) => x !== p) }))}>{t("Remove")}</Plain> : null },
                   ]} />
                 )}
                 {draft.refrigerant.map((r, i) => (
                   <div key={i}>
-                    <div className="mb-1 flex items-center justify-between"><b className="text-[13px]">{t("Refrigerant ({kind}) — cylinder {id}", { kind: r.refrigerant, id: r.cylinderId })}</b>{editable && <button type="button" className="text-xs font-semibold text-primary" onClick={() => edit((d) => ({ ...d, refrigerant: d.refrigerant.filter((_, k) => k !== i) }))}>{t("Remove")}</button>}</div>
+                    <div className="mb-1 flex items-center justify-between"><b className="text-[13px]">{t("Refrigerant ({kind}) — cylinder {id}", { kind: r.refrigerant, id: r.cylinderId })}</b>{editable && <Plain type="button" className="text-xs font-semibold text-primary" onClick={() => edit((d) => ({ ...d, refrigerant: d.refrigerant.filter((_, k) => k !== i) }))}>{t("Remove")}</Plain>}</div>
                     <div className="grid-fluid" style={{ ["--min" as string]: "120px" }}>{[[t("Recovered"), `${r.recoveredKg.toFixed(2)} kg`], [t("Charged"), `${r.chargedKg.toFixed(2)} kg`], [t("Net added"), `${r.chargedKg - r.recoveredKg >= 0 ? "+" : "−"}${Math.abs(r.chargedKg - r.recoveredKg).toFixed(2)} kg`], [t("Leak check"), `${t(LEAK[r.leakCheck] ?? r.leakCheck)}${r.leakCheckMethod ? ` · ${r.leakCheckMethod}` : ""}`]].map(([k, v]) => <div key={k} className="rounded-xl bg-surface2 p-3"><div className="text-[11px] text-muted-foreground">{k}</div><div className="font-bold">{v}</div></div>)}</div>
                   </div>
                 ))}
@@ -302,14 +302,14 @@ export function WorkspaceView({ live }: { live: WorkspaceLive }) {
             {(inWork || live.report) && (
               <div className="mt-2 flex flex-col gap-3">
                 <Field label={t("Work performed & next action (10–4000 characters)")}>{editable ? <Textarea value={draft.workText} maxLength={4000} className="min-h-[110px]" onChange={(e) => edit((d) => ({ ...d, workText: e.target.value }))} /> : <p className="font-normal">{draft.workText || "—"}</p>}</Field>
-                <p className="text-[13px] font-semibold">{t(draft.parts.length === 1 ? "Replacement parts: 1 line" : "Replacement parts: {n} lines", { n: draft.parts.length })}{draft.refrigerant.length ? ` · ${draft.refrigerant[0].refrigerant} ${netKg >= 0 ? "+" : "−"}${Math.abs(netKg).toFixed(2)} kg` : ""} <button type="button" className="text-xs text-primary" onClick={() => setView("parts")}>{t("(see Parts & refrigerant)")}</button></p>
+                <p className="text-[13px] font-semibold">{t(draft.parts.length === 1 ? "Replacement parts: 1 line" : "Replacement parts: {n} lines", { n: draft.parts.length })}{draft.refrigerant.length ? ` · ${draft.refrigerant[0].refrigerant} ${netKg >= 0 ? "+" : "−"}${Math.abs(netKg).toFixed(2)} kg` : ""} <Plain type="button" className="text-xs text-primary" onClick={() => setView("parts")}>{t("(see Parts & refrigerant)")}</Plain></p>
                 <div>
                   <p className="mb-1 text-xs font-semibold">{t("Photos (JPEG/PNG, ≤5 MiB, ≤{max})", { max: MAX_PHOTOS })}</p>
                   <div className="flex flex-wrap gap-2">
                     {photos.map((a) => <Photo key={a.id} src={photoUrl(a)} name={a.name} />)}
                     {editable && photos.length < MAX_PHOTOS && (
                       <label className={cx("grid h-16 w-20 cursor-pointer place-items-center rounded-lg border border-dashed border-line text-xl text-muted-foreground hover:bg-surface2", pending && "pointer-events-none opacity-50")}>
-                        +<input type="file" accept="image/jpeg,image/png" className="sr-only" onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
+                        +<Input type="file" accept="image/jpeg,image/png" className="sr-only h-px w-px" onChange={(e) => { addPhotos(e.target.files); e.target.value = ""; }} />
                       </label>
                     )}
                     {!editable && photos.length === 0 && <span className="text-xs text-muted-foreground">{t("No photos.")}</span>}
@@ -521,7 +521,7 @@ function SignModal({ open, pending, summary, onClose, onSign }: { open: boolean;
       {absent ? (
         <>
           <Field label={t("Why the customer could not sign")}><Textarea value={reason} maxLength={1000} onChange={(e) => setReason(e.target.value)} /></Field>
-          <Field label={t("Site photo (JPEG/PNG)")}><input type="file" accept="image/jpeg,image/png" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} /></Field>
+          <Field label={t("Site photo (JPEG/PNG)")}><Input type="file" accept="image/jpeg,image/png" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} /></Field>
         </>
       ) : (
         <div>
@@ -529,7 +529,7 @@ function SignModal({ open, pending, summary, onClose, onSign }: { open: boolean;
             onPointerDown={(e) => { drawing.current = true; const c = e.currentTarget.getContext("2d")!; const [x, y] = point(e); c.lineWidth = 2.5; c.lineCap = "round"; c.strokeStyle = "#0f172a"; c.beginPath(); c.moveTo(x, y); e.currentTarget.setPointerCapture(e.pointerId); }}
             onPointerMove={(e) => { if (!drawing.current) return; const c = e.currentTarget.getContext("2d")!; const [x, y] = point(e); c.lineTo(x, y); c.stroke(); setDrawn(true); }}
             onPointerUp={() => { drawing.current = false; }} />
-          <div className="mt-1 flex justify-between text-[11px] text-muted-foreground"><span className="flex items-center gap-1"><Icon name="signature" />{t("Sign here")}</span><button type="button" className="font-semibold text-primary" onClick={clear}>{t("Clear")}</button></div>
+          <div className="mt-1 flex justify-between text-[11px] text-muted-foreground"><span className="flex items-center gap-1"><Icon name="signature" />{t("Sign here")}</span><Plain type="button" className="font-semibold text-primary" onClick={clear}>{t("Clear")}</Plain></div>
         </div>
       )}
       {error && <Banner tone="crit">{error}</Banner>}

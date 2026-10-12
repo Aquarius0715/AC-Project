@@ -1,4 +1,4 @@
-import { Card, DemoBadge, cx } from "@ac/web/components/ui";
+import { Card, DemoBadge, cx, Plain } from "@ac/web/components/ui";
 import { useT } from "@ac/web/components/I18n";
 import { Icon, type IconName } from "@ac/web/components/Icon";
 
@@ -31,8 +31,8 @@ export function ClockFace({ time, onMinute, onHour, disabled }: { time: string; 
       <div className="font-mono text-xl font-bold tracking-tight">{time}</div>
       <p className="mt-1 text-[11px] text-muted-foreground">{t("Real-time speed · advancing jumps do not consume session lifetime")}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <button type="button" className={jump} disabled={disabled} onClick={onMinute}>{t("+1 min")}</button>
-        <button type="button" className={jump} disabled={disabled} onClick={onHour}>{t("+1 hour")}</button>
+        <Plain type="button" className={jump} disabled={disabled} onClick={onMinute}>{t("+1 min")}</Plain>
+        <Plain type="button" className={jump} disabled={disabled} onClick={onHour}>{t("+1 hour")}</Plain>
       </div>
     </>
   );
@@ -41,9 +41,9 @@ export function ClockFace({ time, onMinute, onHour, disabled }: { time: string; 
 /** One trigger tile: icon, name and what it does; a tile that cannot run here says why. */
 export function TriggerTile({ icon, title, sub, onClick, disabled, tone }: { icon: IconName; title: string; sub: string; onClick?: () => void; disabled?: boolean; tone?: "ok" }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled || !onClick} className={cx("flex min-w-0 flex-col items-start gap-0.5 rounded-xl border border-line bg-surface px-3 py-2.5 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-60", tone === "ok" && "border-[#86efac]")}>
+    <Plain type="button" onClick={onClick} disabled={disabled || !onClick} className={cx("flex min-w-0 flex-col items-start gap-0.5 rounded-xl border border-line bg-surface px-3 py-2.5 text-left hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-60", tone === "ok" && "border-[#86efac]")}>
       <span className="flex items-center gap-2 text-[13px] font-semibold"><Icon name={icon} className={cx("text-crit", tone === "ok" && "text-ok")} />{title}</span>
       <span className="text-[11px] text-muted-foreground">{sub}</span>
-    </button>
+    </Plain>
   );
 }

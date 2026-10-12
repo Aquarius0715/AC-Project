@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Banner, Btn, Card, DataTable, Field, LineChart, Modal, Page, Select, Tabs, Textarea, useToast } from "@ac/web/components/ui";
-
+import { Badge, Banner, Btn, Card, DataTable, Field, LineChart, Modal, Page, Select, Tabs, Textarea, useToast, Plain } from "@ac/web/components/ui";
 const series = {
   co2: { label: "CO2", unit: "ppm", pts: [620, 600, 580, 560, 640, 760, 880, 760, 700, 820, 940, 1000], min: 400, max: 1200, th: 1000 },
   pm25: { label: "PM2.5", unit: "µg/m³", pts: [9, 8, 8, 10, 11, 12, 14, 13, 12, 12, 12, 12], min: 0, max: 40, th: 35 },
@@ -24,8 +23,8 @@ export function AirQualityDemo() {
   return (
     <Page>
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-surface px-4 py-3 text-xs">
-        <div className="flex items-center gap-2"><span className="text-muted-foreground">Viewing</span><select className="rounded-control border border-line px-2.5 py-1.5 font-semibold" aria-label="Unit"><option>Bedroom (Bedroom AC)</option><option>Living room AC</option></select></div>
-        <span className="text-muted-foreground">Updated 09:12:30 · <button className="underline" onClick={() => setMissing((m) => !m)}>{missing ? "show normal" : "show missing-data state"}</button></span>
+        <div className="flex items-center gap-2"><span className="text-muted-foreground">Viewing</span><Select className="rounded-control border border-line px-2.5 py-1.5 font-semibold" aria-label="Unit"><option>Bedroom (Bedroom AC)</option><option>Living room AC</option></Select></div>
+        <span className="text-muted-foreground">Updated 09:12:30 · <Plain className="underline" onClick={() => setMissing((m) => !m)}>{missing ? "show normal" : "show missing-data state"}</Plain></span>
       </div>
       <div className="grid-fluid" style={{ ["--min" as string]: "210px" }}>
         {[

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Banner, Card, EmptyState, Kpi, LinkBtn, Page, Select, SeverityBadge, TextLink, cx } from "@ac/web/components/ui";
+import { Badge, Banner, Card, EmptyState, Kpi, LinkBtn, Page, Select, SeverityBadge, TextLink, cx, Plain } from "@ac/web/components/ui";
 import { OriginBadge } from "@ac/web/components/JobBits";
 import { useT } from "@ac/web/components/I18n";
 import { useUrlPatch } from "@ac/web/lib/useUrlPatch";
@@ -31,13 +31,13 @@ export function OverviewView({ live }: { live: OverviewLive }) {
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div role="tablist" className="flex flex-wrap gap-2">
-          {live.tabs.map((x) => <button key={x.id} role="tab" aria-selected={live.tab === x.id} onClick={() => patch({ tab: x.id === "today" ? null : x.id })} className={cx("rounded-control border px-3 py-1.5 text-[13px] font-semibold", live.tab === x.id ? "border-primary bg-primary text-white" : "border-line bg-surface text-ink hover:bg-surface2")}>{x.label} ({x.count})</button>)}
+          {live.tabs.map((x) => <Plain key={x.id} role="tab" aria-selected={live.tab === x.id} onClick={() => patch({ tab: x.id === "today" ? null : x.id })} className={cx("rounded-control border px-3 py-1.5 text-[13px] font-semibold", live.tab === x.id ? "border-primary bg-primary text-white" : "border-line bg-surface text-ink hover:bg-surface2")}>{x.label} ({x.count})</Plain>)}
         </div>
         <Select aria-label={t("Sort")} className="w-auto" value={live.sort} onChange={(e) => patch({ sort: e.target.value === "severity" ? null : e.target.value })}>{live.sorts.map((s) => <option key={s.id} value={s.id}>{s.text}</option>)}</Select>
       </div>
       <Card title={live.title}>
         {live.rows.length === 0 ? (
-          <EmptyState title={t(live.tab === "today" ? "No assigned jobs today" : "No assigned jobs")} action={live.tab === "today" && all ? <button type="button" className="text-sm font-semibold text-primary" onClick={() => patch({ tab: "all" })}>{t("All assigned ({n})", { n: all })} <Icon name="arrowRight" /></button> : undefined}>
+          <EmptyState title={t(live.tab === "today" ? "No assigned jobs today" : "No assigned jobs")} action={live.tab === "today" && all ? <Plain type="button" className="text-sm font-semibold text-primary" onClick={() => patch({ tab: "all" })}>{t("All assigned ({n})", { n: all })} <Icon name="arrowRight" /></Plain> : undefined}>
             {t("Jobs assigned to you appear here. Past assignments stay in their job history.")}
           </EmptyState>
         ) : (
