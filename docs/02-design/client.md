@@ -180,6 +180,7 @@ Scope: FR-C04 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
    - Require an end action; do not silently turn power OFF.
 3. Save timezone, start/end actions, and enabled in Automation. Creation alone does not send a Command. The equipment scheduler job evaluates demo-clock start/end occurrences internally, rechecks owner permissions at trigger time, and creates Commands, once per occurrence (IR214). Screens do not call automations.fire for these triggers (IR54). The editor previews an unsaved schedule with automations.nextRuns draft; Delete (⋯ menu, confirmation) is automations.delete and keeps the rule's Commands (IR214).
 4. Queries to update: `automations / next-run preview / audit`。
+5. Delete (`automations.delete`, Figma 03g–03i): the owner confirms in a dialog; the rule leaves the list and the screen shows the removed state. As with disabling, its scheduled events create no new Commands.
 
 **Boundary cases and failures**: Reject zero weekdays, missing end actions, and ambiguous or nonexistent times (such as daylight-saving changes). After disabling a rule, its scheduled events must not create new requests.
 
