@@ -373,7 +373,7 @@ services:
   mosquitto:           # AWS IoT Core stand-in (MQTT 3.1.1/5); mutual TLS is verified in staging against IoT Core
     image: eclipse-mosquitto:2
     ports: ["127.0.0.1:1883:1883"]   # this machine only: not reachable from other devices on the network (IR373)
-    volumes: [./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro]
+    volumes: [./docker/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro, ./docker/mosquitto/passwd:/mosquitto/config/passwd:ro]
     networks: [data]
     profiles: [infra, backend, full]
 
