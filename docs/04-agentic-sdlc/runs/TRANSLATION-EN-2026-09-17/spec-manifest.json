@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "2f82a600b8883156a624a3ddebce42ee75b5a189cc0f77579382b67ed4f2cf2b",
+  "spec_baseline_id": "874bc5704e15a2d4d99a45b190a01daa1465c2ed14ca110c8d0df20fb558b3c5",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -130,7 +130,7 @@
     },
     {
       "path": "02-design/database-design.md",
-      "sha256": "c377fe4c088ebdc16f77d575733ef60038b6acc663b485f7378e64b5e44d4eec"
+      "sha256": "8f0e196c5bd0b4e055ef44c0a42a16b216bea33c90defa579133be5aef3450f3"
     },
     {
       "path": "02-design/deterministic-contracts.md",
