@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
+import { toast } from "sonner";
 import { ToastProvider } from "@ac/web/components/ui";
 import { useAction } from "@ac/web/lib/useAction";
 
@@ -14,6 +15,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  toast.dismiss(); // Sonner's store outlives the Toaster: an open toast would be replayed in the next test
   vi.unstubAllGlobals();
 });
 
@@ -34,18 +36,19 @@ const press = async (result: Result) => {
 describe("useAction", () => {
   it("shows the success toast and runs after", async () => {
     const { after, failed } = await press({ ok: true, value: "unit-1" });
-    expect([screen.getByRole("status").textContent, after.mock.calls, failed.mock.calls.length, assign.mock.calls.length]).toEqual(["Saved unit-1", [["unit-1"]], 0, 0]);
+    expect([(await screen.findByRole("status")).textContent, after.mock.calls, failed.mock.calls.length, assign.mock.calls.length]).toEqual(["Saved unit-1", [["unit-1"]], 0, 0]);
   });
 
   it("shows a refusal as an error toast and runs failed", async () => {
     const { after, failed } = await press({ ok: false, code: "CONFLICT", messageKey: "error.versionConflict", fieldErrors: {} });
-    expect(screen.getByRole("alert").textContent).not.toBe("");
+    expect((await screen.findByRole("alert")).textContent).not.toBe("");
     expect([after.mock.calls.length, failed.mock.calls.length, assign.mock.calls.length]).toEqual([0, 1, 0]);
   });
 
   it("sends a session HQ signed out everywhere to sign-in, back to this page", async () => {
     const { after, failed } = await press({ ok: false, code: "UNAUTHENTICATED", messageKey: "errors.session_revoked", fieldErrors: {} });
     expect(assign.mock.calls).toEqual([["/login?error=revoked&returnTo=%2Fadmin%2Funits%3FcustomerId%3Dc-1%26tab%3Dusers"]]);
+    await act(() => new Promise((r) => setTimeout(r, 20))); // past the tick on which Sonner would add a toast
     expect([after.mock.calls.length, failed.mock.calls.length, screen.queryByRole("alert")?.textContent ?? ""]).toEqual([0, 0, ""]);
   });
 

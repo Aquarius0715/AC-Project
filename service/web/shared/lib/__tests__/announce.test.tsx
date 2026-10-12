@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from "vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
+import { toast } from "sonner";
 import { Banner, ToastProvider, useToast } from "@ac/web/components/ui";
 
-afterEach(cleanup);
+// Sonner keeps its toasts in one store for the page and replays the ones still open to a new Toaster: clear it after each
+// test (DEC-75, IR403)
+afterEach(() => { cleanup(); toast.dismiss(); });
 
 function Pusher() {
   const toast = useToast();
@@ -19,10 +22,11 @@ describe("announcements", () => {
     // each banner's icon is a Lucide drawing, hidden from assistive technology (DEC-74)
     expect([...screen.getByRole("alert").querySelectorAll("svg"), ...screen.getAllByRole("status").flatMap((x) => [...x.querySelectorAll("svg")])].map((x) => [x.getAttribute("aria-hidden"), x.classList.contains("lucide")])).toEqual([["true", true], ["true", true], ["true", true]]);
   });
-  it("puts an error toast in the alert region and other toasts in the status region", () => {
+  it("puts an error toast in the alert region and other toasts in the status region", async () => {
     render(<ToastProvider><Pusher /></ToastProvider>);
     act(() => { screen.getByRole("button", { name: "ok" }).click(); screen.getByRole("button", { name: "crit" }).click(); });
-    expect(screen.getByRole("alert").textContent).toBe("Not saved: CONFLICT");
-    expect(screen.getByRole("status").textContent).toBe("Saved");
+    // Sonner adds a toast on the next timer tick
+    expect((await screen.findByRole("alert")).textContent).toBe("Not saved: CONFLICT");
+    expect((await screen.findByRole("status")).textContent).toBe("Saved");
   });
 });

@@ -46,7 +46,7 @@ export function TechUnitView({ live }: { live: UnitLive }) {
             <Card title={t("Time-series monitoring")} action={periods}>
               {live.stopped && <div className="mb-3"><Banner tone="warn">{live.stopped}</Banner></div>}
               <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>{[live.tiles.temperature, live.tiles.power, live.tiles.connection].map((x) => <TileBox key={x.label} tile={x} />)}</div>
-              <Series chart={live.chart} width={700} />
+              <Series chart={live.chart} />
             </Card>
             <Card title={t("Maintenance history")}>
               {live.history.length === 0 ? <p className="text-[13px] text-muted-foreground">{t("No jobs of yours on this unit.")}</p> : live.history.map((j) => (
@@ -71,13 +71,13 @@ export function TechUnitView({ live }: { live: UnitLive }) {
           <Card title={live.chart.title} action={periods}>
             {live.stopped && <div className="mb-3"><Banner tone="warn">{live.stopped}</Banner></div>}
             <div className="grid-fluid" style={{ ["--min" as string]: "160px" }}>{[live.tiles.temperature, live.tiles.power, live.tiles.operation, live.tiles.connection].map((x) => <TileBox key={x.label} tile={x} />)}</div>
-            <Series chart={live.chart} width={1000} />
+            <Series chart={live.chart} />
           </Card>
           {live.others.length > 0 && (
             <div className="grid-fluid" style={{ ["--min" as string]: "260px" }}>
               {live.others.map((m) => (
                 <Card key={m.metric} title={m.label} action={<b className={cx("text-[13px]", m.tone === "warn" && "text-warn")}>{m.value}</b>}>
-                  {m.points.every((v) => v === null) ? <p className="text-xs text-muted-foreground">{t("No valid readings in this period.")}</p> : <LineChart points={m.points} height={56} width={500} />}
+                  {m.points.every((v) => v === null) ? <p className="text-xs text-muted-foreground">{t("No valid readings in this period.")}</p> : <LineChart points={m.points} height={56} />}
                   <div className="mt-1 flex justify-between gap-2 text-[11px] text-muted-foreground"><span>{m.sub}</span><button type="button" className="font-semibold text-primary" onClick={() => patch({ metric: m.metric })}>{t("Chart")} <Icon name="arrowRight" /></button></div>
                 </Card>
               ))}
@@ -106,11 +106,11 @@ function TileBox({ tile }: { tile: Tile }) {
   );
 }
 
-function Series({ chart, width }: { chart: SeriesChart; width: number }) {
+function Series({ chart }: { chart: SeriesChart }) {
   const t = useT();
   return (
     <div className="mt-3">
-      {chart.empty ? <div className="rounded-xl border border-dashed border-line p-6 text-center text-[13px] text-muted-foreground">{t("No valid readings in this period.")}</div> : <LineChart points={chart.points} height={200} width={width} labels={chart.labels} />}
+      {chart.empty ? <div className="rounded-xl border border-dashed border-line p-6 text-center text-[13px] text-muted-foreground">{t("No valid readings in this period.")}</div> : <LineChart points={chart.points} height={200} labels={chart.labels} />}
       <p className="mt-1 text-[11px] text-muted-foreground">{[chart.count, chart.gap, t("Gaps in missing data are not connected by lines. Reordered or duplicate demo events never roll values backward.")].filter(Boolean).join(" · ")}</p>
     </div>
   );

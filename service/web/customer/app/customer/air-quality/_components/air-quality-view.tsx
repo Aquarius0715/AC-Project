@@ -90,7 +90,7 @@ export function AirQualityView({ live }: { live: AirLive | null }) {
           : !c.valid ? <p className="text-[13px] text-muted-foreground">{noValid}</p>
           : view === "chart" ? (
             <>
-              <LineChart points={c.points} min={c.min} max={c.max} threshold={c.guide ?? undefined} ticks={c.ticks} shadeGaps width={1200} height={300} labels={c.labels} />
+              <LineChart points={c.points} min={c.min} max={c.max} threshold={c.guide ?? undefined} ticks={c.ticks} shadeGaps height={300} labels={c.labels} />
               <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
                 <span className="text-primary">— {label} ({info.unit})</span>
                 {c.guide !== null && <span className="text-crit">- - {c.guide} {info.unit} {t(live.metric === "co2" ? "ventilation guide" : "cleaning guide")}</span>}

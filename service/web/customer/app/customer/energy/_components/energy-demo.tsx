@@ -45,8 +45,7 @@ export function EnergyDemo() {
       <Card title="Daily energy — Actual vs Baseline" sub={`kWh per day · ${sel.join(", ")} · Sep 14–20 · baseline = demo_fixed normal operation`} action={<Tabs value={view} onChange={setView} tabs={[{ id: "chart", label: "Chart" }, { id: "table", label: "Table" }]} />}>
         {view === "chart" ? (
           <>
-            <BarChart labels={week} series={[base, actual]} unit="kWh" height={200} />
-            <div className="mt-1 flex flex-wrap gap-4 text-[11px] text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 bg-primary" />Actual (measured)</span><span><i className="mr-1 inline-block h-2 w-2 bg-[#c9d8ee]" />Baseline (normal operation)</span></div>
+            <BarChart labels={week} series={[base, actual]} names={["Baseline (normal operation)", "Actual (measured)"]} unit="kWh" height={200} />
           </>
         ) : <DataTable rows={days.map((d, i) => ({ d, a: actual[i], b: base[i] }))} rowKey={(r) => r.d} cols={[{ key: "d", label: "Day", render: (r) => r.d }, { key: "a", label: "Actual (kWh)", render: (r) => r.a }, { key: "b", label: "Baseline (kWh)", render: (r) => r.b }, { key: "s", label: "Difference", render: (r) => (r.b - r.a).toFixed(1) }]} />}
         <p className="mt-3 text-xs text-muted-foreground"><Icon name="time" /> <b>Peak window 17:00–21:00</b> — 34% of energy used in peak · highest draw 1.2 kW (Thu 18:40) · pre-cooling before 17:00 lowers peak cost</p>

@@ -2763,6 +2763,8 @@ export const ms: Record<string, string> = {
   "No readings yet. Record each measurement with its unit and the component it belongs to — an unmeasured value is left empty, never 0.": "Belum ada bacaan. Rekod setiap ukuran dengan unitnya dan komponen yang berkaitan — nilai yang tidak diukur dibiarkan kosong, bukan 0.",
   "Metric": "Metrik",
   "Value": "Nilai",
+  "Bar chart": "Carta bar",
+  "Line chart": "Carta garisan",
   "Linked item": "Item berkaitan",
   "Observed": "Diperhatikan",
   "Remove": "Buang",

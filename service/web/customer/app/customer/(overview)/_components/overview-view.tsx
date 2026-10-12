@@ -57,8 +57,7 @@ export function OverviewView({ live }: { live: OverviewLive }) {
           {live.energy ? <>
             <div className="text-[28px] font-bold">{live.energy.total ?? "—"} <span className="text-sm font-medium text-muted-foreground">{live.energy.total === null ? t("no data") : "kWh"}</span></div>
             {live.energy.delta && <div className={live.energy.delta.tone === "ok" ? "mb-2 text-xs font-semibold text-ok" : "mb-2 text-xs font-semibold text-warn"}><Icon name={live.energy.delta.icon} /> {live.energy.delta.text}</div>}
-            <BarChart labels={live.energy.labels} series={live.energy.series} />
-            <div className="mt-1 flex gap-4 text-[11px] text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 bg-primary" />{t("Last 7 days")}</span><span><i className="mr-1 inline-block h-2 w-2 bg-[#c9d8ee]" />{t("7 days before")}</span></div>
+            <BarChart labels={live.energy.labels} series={live.energy.series} names={[t("7 days before"), t("Last 7 days")]} />
             {live.energy.gaps && <p className="mt-1 text-[11px] text-muted-foreground">{t("Days without readings show no bar — not 0 kWh.")}</p>}
           </> : <p className="text-[13px] text-muted-foreground">{t("Choose a property with units.")}</p>}
           <TextLink href="/customer/energy" className="mt-2 inline-block">{t("Energy details & table view")} <Icon name="arrowRight" /></TextLink>

@@ -80,8 +80,7 @@ export function OverviewDemo() {
         <Card title="Energy used" sub="This week · Sep 14–20 · all 5 units" action={<span className="text-xs text-muted-foreground">kWh</span>}>
           <div className="text-[28px] font-bold">18.6 <span className="text-sm font-medium text-muted-foreground">kWh</span></div>
           <div className="mb-2 text-xs font-semibold text-ok"><Icon name="arrowDown" /> 8% vs last week (20.2 kWh)</div>
-          <BarChart labels={week} series={[[3.1, 2.9, 2.4, 3.3, 2.9, 2.2, 1.8].map((v) => v + 0.4), [3.1, 2.9, 2.4, 3.3, 2.9, 2.2, 1.8]]} />
-          <div className="mt-1 flex gap-4 text-[11px] text-muted-foreground"><span><i className="mr-1 inline-block h-2 w-2 bg-primary" />This week</span><span><i className="mr-1 inline-block h-2 w-2 bg-[#c9d8ee]" />Last week</span></div>
+          <BarChart labels={week} series={[[3.1, 2.9, 2.4, 3.3, 2.9, 2.2, 1.8].map((v) => v + 0.4), [3.1, 2.9, 2.4, 3.3, 2.9, 2.2, 1.8]]} names={["Last week", "This week"]} />
           <TextLink href="/customer/energy" className="mt-2 inline-block">Energy details & table view <Icon name="arrowRight" /></TextLink>
         </Card>
         <Card title="Estimated emissions" sub="This week · all 5 units · factor-demo-2026 (demo factor)" action={<span className="text-xs text-muted-foreground">kgCO2e</span>}>

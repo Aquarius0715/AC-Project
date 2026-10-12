@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { contentSecurityPolicy, HSTS, newNonce, originOf, sameOriginRequest } from "@ac/web/lib/securityHeaders";
 import { authProxy } from "@ac/web/proxy";
+import { STYLE_HASHES } from "@ac/web/lib/styleHashes.gen";
 
 // the proxy reads the session module, which is server code
 vi.mock("server-only", () => ({}));
@@ -17,7 +18,7 @@ describe("the page Content-Security-Policy", () => {
   it("allows the app's own scripts and styles with the request's nonce only", () => {
     const d = directives(contentSecurityPolicy("abc=", { dev: false, https: false, formActions: ["http://localhost:8081"] }));
     expect(d).toEqual({
-      "default-src": "'self'", "script-src": "'self' 'nonce-abc=' 'strict-dynamic'", "style-src": "'self' 'nonce-abc='", "style-src-attr": "'unsafe-inline'",
+      "default-src": "'self'", "script-src": "'self' 'nonce-abc=' 'strict-dynamic'", "style-src": `'self' 'nonce-abc=' ${STYLE_HASHES.join(" ")}`, "style-src-attr": "'unsafe-inline'",
       "img-src": "'self' blob: data:", "font-src": "'self'", "connect-src": "'self'", "object-src": "'none'", "base-uri": "'self'",
       "form-action": "'self' http://localhost:8081", "frame-ancestors": "'none'",
     });

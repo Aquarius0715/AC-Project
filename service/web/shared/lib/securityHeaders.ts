@@ -2,7 +2,9 @@
 // them itself, so local, staging and production responses match. The page Content-Security-Policy follows the Next.js
 // CSP guide: proxy.ts makes a fresh nonce per page request, and Next.js puts it on its own scripts and styles. React
 // style attributes stay allowed (style-src-attr), and forms may post to the app and the identity provider only.
-// Pure code, unit-tested.
+// Pure code, unit-tested. A <style> a library adds at run time without the nonce is allowed by its hash only
+// (styleHashes.gen.ts: Sonner's stylesheet, DEC-75).
+import { STYLE_HASHES } from "./styleHashes.gen";
 
 /** The Content-Security-Policy of one page response. `dev` adds what `next dev` needs (eval, inline styles); `https`
  * upgrades subresource requests once the app is served over HTTPS. */
@@ -10,7 +12,7 @@ export function contentSecurityPolicy(nonce: string, o: { dev: boolean; https: b
   return [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${o.dev ? " 'unsafe-eval'" : ""}`,
-    `style-src 'self' ${o.dev ? "'unsafe-inline'" : `'nonce-${nonce}'`}`,
+    `style-src 'self' ${o.dev ? "'unsafe-inline'" : [`'nonce-${nonce}'`, ...STYLE_HASHES].join(" ")}`,
     "style-src-attr 'unsafe-inline'",
     "img-src 'self' blob: data:",
     "font-src 'self'",

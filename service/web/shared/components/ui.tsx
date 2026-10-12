@@ -8,6 +8,7 @@ import { Alert } from "@ac/web/components/ui/alert";
 import { Badge as UIBadge } from "@ac/web/components/ui/badge";
 import { Button, buttonVariants } from "@ac/web/components/ui/button";
 import { Card as UICard, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@ac/web/components/ui/card";
+import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@ac/web/components/ui/chart";
 import { Checkbox } from "@ac/web/components/ui/checkbox";
 import { Combobox, ComboboxContent, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList } from "@ac/web/components/ui/combobox";
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@ac/web/components/ui/dialog";
@@ -16,11 +17,17 @@ import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTi
 import { Input as UIInput } from "@ac/web/components/ui/input";
 import { InputGroupAddon } from "@ac/web/components/ui/input-group";
 import { NativeSelect } from "@ac/web/components/ui/native-select";
+import { Progress } from "@ac/web/components/ui/progress";
 import { Switch } from "@ac/web/components/ui/switch";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@ac/web/components/ui/table";
 import { Tabs as UITabs, TabsList, TabsTrigger } from "@ac/web/components/ui/tabs";
+import { Toaster } from "@ac/web/components/ui/sonner";
 import { Textarea as UITextarea } from "@ac/web/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@ac/web/components/ui/toggle-group";
 import { cn } from "@ac/web/lib/utils";
+import { tableFeatures, useTable, type ColumnDef, type RowData } from "@tanstack/react-table";
+import { Bar, BarChart as RBarChart, CartesianGrid, Line, LineChart as RLineChart, ReferenceArea, ReferenceLine, XAxis, YAxis } from "recharts";
+import { toast } from "sonner";
 
 // The product's components (DEC-75): the screens' names (Btn, Card, Badge, …) built on the shadcn/ui components of
 // components/ui/. A later phase moves the screens to the shadcn components themselves.
@@ -416,67 +423,70 @@ export function useModal() {
 /* ───────────── Toast ───────────── */
 const ToastCtx = createContext<(msg: string, tone?: Tone) => void>(() => {});
 export const useToast = () => useContext(ToastCtx);
+/** The toasts: shadcn/ui's Sonner. Sonner announces through one polite region, so an error carries its text in an alert
+ * (announced at once) and every other result in a status (UX-06, IR362). */
 export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<{ id: number; msg: string; tone: Tone }[]>([]);
   const push = useCallback((msg: string, tone: Tone = "ok") => {
-    const id = Date.now() + Math.random();
-    setItems((s) => [...s, { id, msg, tone }]);
-    setTimeout(() => setItems((s) => s.filter((x) => x.id !== id)), 3600);
+    const body = <span role={tone === "crit" ? "alert" : "status"}>{msg}</span>;
+    if (tone === "crit") toast.error(body);
+    else if (tone === "warn") toast.warning(body);
+    else if (tone === "ok") toast.success(body);
+    else toast.info(body);
   }, []);
   return (
     <ToastCtx.Provider value={push}>
       {children}
-      {/* errors are announced at once (an alert, announced when it appears), other results politely through a status
-          region that is always there (UX-06, IR362) */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-4 z-[60] flex flex-col items-center gap-2 px-4">
-        {(["alert", "status"] as const).filter((role) => role === "status" || items.some((t) => t.tone === "crit")).map((role) => (
-          <div key={role} role={role} className="flex flex-col items-center gap-2">
-            {items.filter((t) => (t.tone === "crit") === (role === "alert")).map((t) => (
-              <div key={t.id} className={cx("pointer-events-auto max-w-md rounded-xl px-4 py-2.5 text-[13px] font-semibold shadow-lg", t.tone === "crit" ? "bg-crit text-white" : t.tone === "warn" ? "bg-warn text-white" : "bg-ink text-white")}>
-                {t.msg}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
+      <Toaster position="bottom-center" />
     </ToastCtx.Provider>
   );
 }
 
 /* ───────────── Data display ───────────── */
 export type Col<T> = { key: string; label: string; render: (r: T) => React.ReactNode; className?: string; hideBelow?: "sm" | "md" };
+// TanStack Table builds the rows and cells (shadcn/ui's data table, DEC-75); a column carries its classes as meta
+const tableFx = tableFeatures({ columnMeta: {} as { className?: string; hideBelow?: "sm" | "md" } });
+const hideCls = (m?: { hideBelow?: "sm" | "md" }) => (m?.hideBelow === "sm" ? "max-sm:hidden" : m?.hideBelow === "md" ? "max-md:hidden" : undefined);
 /** Responsive table: scrolls horizontally if needed; optional columns hide on narrow containers. A row that opens a
  * record (`onRowClick`) is focusable and opens with Enter or Space as well as a click (keyboard access, IR294). */
-export function DataTable<T>({ cols, rows, rowKey, onRowClick, selectedKey }: { cols: Col<T>[]; rows: T[]; rowKey: (r: T) => string; onRowClick?: (r: T) => void; selectedKey?: string }) {
+export function DataTable<T extends RowData>({ cols, rows, rowKey, onRowClick, selectedKey }: { cols: Col<T>[]; rows: T[]; rowKey: (r: T) => string; onRowClick?: (r: T) => void; selectedKey?: string }) {
   const t = useT();
+  const columns = cols.map((c): ColumnDef<typeof tableFx, T> => ({ id: c.key, header: c.label, cell: ({ row }) => c.render(row.original), meta: { className: c.className, hideBelow: c.hideBelow } }));
+  const table = useTable({ features: tableFx, data: rows, columns, getRowId: (r) => rowKey(r) });
   return (
-    <div className="scroll-x rounded-xl border border-line">
-      <table className="w-full border-collapse text-left text-[13px]">
-        <thead>
-          <tr className="bg-surface2 text-[11px] uppercase tracking-wide text-muted-foreground">
-            {cols.map((c) => (
-              <th key={c.key} className={cx("whitespace-nowrap px-3 py-2 font-semibold", c.hideBelow === "sm" && "max-sm:hidden", c.hideBelow === "md" && "max-md:hidden", c.className)}>{c.label}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => {
-            const k = rowKey(r);
+    <div className="overflow-hidden rounded-xl border">
+      <Table className="text-[13px]">
+        <TableHeader>
+          {table.getHeaderGroups().map((g) => (
+            <TableRow key={g.id} className="bg-muted text-[11px] tracking-wide text-muted-foreground uppercase hover:bg-muted">
+              {g.headers.map((h) => (
+                <TableHead key={h.id} className={cx("h-auto px-3 py-2 font-semibold text-muted-foreground", hideCls(h.column.columnDef.meta), h.column.columnDef.meta?.className)}>
+                  {h.isPlaceholder ? null : <table.FlexRender header={h} />}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.map((row) => {
+            const r = row.original;
+            const selected = selectedKey === row.id;
             return (
-              <tr key={k} onClick={onRowClick && (() => onRowClick(r))} tabIndex={onRowClick ? 0 : undefined} aria-current={selectedKey === k ? "true" : undefined}
+              <TableRow key={row.id} onClick={onRowClick && (() => onRowClick(r))} tabIndex={onRowClick ? 0 : undefined} aria-current={selected ? "true" : undefined} data-state={selected ? "selected" : undefined}
                 onKeyDown={onRowClick && ((e) => { if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onRowClick(r); } })}
-                className={cx("border-t border-line", onRowClick && "cursor-pointer outline-none hover:bg-surface2/60 focus-visible:bg-surface2/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary", selectedKey === k && "bg-primary-soft/60")}>
-                {cols.map((c) => (
-                  <td key={c.key} className={cx("px-3 py-2.5 align-middle", c.hideBelow === "sm" && "max-sm:hidden", c.hideBelow === "md" && "max-md:hidden", c.className)}>{c.render(r)}</td>
+                className={cx("data-[state=selected]:bg-primary-soft/60", onRowClick && "cursor-pointer outline-none focus-visible:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary")}>
+                {row.getAllCells().map((cell) => (
+                  <TableCell key={cell.id} className={cx("px-3 py-2.5 whitespace-normal", hideCls(cell.column.columnDef.meta), cell.column.columnDef.meta?.className)}>
+                    <table.FlexRender cell={cell} />
+                  </TableCell>
                 ))}
-              </tr>
+              </TableRow>
             );
           })}
           {rows.length === 0 && (
-            <tr><td colSpan={cols.length} className="px-3 py-6 text-center text-muted-foreground">{t("No data")}</td></tr>
+            <TableRow className="hover:bg-transparent"><TableCell colSpan={cols.length} className="h-24 text-center text-muted-foreground">{t("No data")}</TableCell></TableRow>
           )}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -488,79 +498,69 @@ export function ListRow({ selected, onClick, href, children, className }: { sele
   return <button type="button" onClick={onClick} aria-pressed={selected} className={cls}>{children}</button>;
 }
 
-/* ───────────── Charts (responsive SVG; scale with container width) ───────────── */
-export function BarChart({ labels, series, unit, height = 160, colors = ["#c9d8ee", "#005bea"] }: { labels: string[]; series: number[][]; unit?: string; height?: number; colors?: string[] }) {
+/* ───────────── Charts: shadcn/ui's chart on Recharts (DEC-75); full width, `height` pixels tall ───────────── */
+const axisTick = { fontSize: 10 };
+/** Grouped bars, one group per label. `names` name the series in the tooltip and the legend under the chart. */
+export function BarChart({ labels, series, names, unit, height = 160, colors = ["#c9d8ee", "#005bea"] }: { labels: string[]; series: number[][]; names?: string[]; unit?: string; height?: number; colors?: string[] }) {
+  const t = useT();
   const max = Math.max(1, ...series.flat()) * 1.1;
-  const W = 600;
-  const pad = { l: 28, r: 4, t: 8, b: 20 };
-  const bw = (W - pad.l - pad.r) / labels.length;
-  const gw = bw * 0.7 / series.length;
+  const data = labels.map((label, i) => ({ label, ...Object.fromEntries(series.map((s, j) => [`s${j}`, s[i]])) }));
+  const config: ChartConfig = Object.fromEntries(series.map((_, j) => [`s${j}`, { label: names?.[j] ?? t("Value"), color: colors[j % colors.length] }]));
   return (
-    <svg viewBox={`0 0 ${W} ${height}`} className="w-full" style={{ height: "auto", aspectRatio: `${W}/${height}` }} role="img" aria-label="Bar chart">
-      {[0, 0.5, 1].map((f) => (
-        <g key={f}>
-          <line x1={pad.l} x2={W} y1={pad.t + (height - pad.t - pad.b) * (1 - f)} y2={pad.t + (height - pad.t - pad.b) * (1 - f)} stroke="#e3edf8" />
-          <text x={0} y={pad.t + (height - pad.t - pad.b) * (1 - f) + 4} fontSize="10" fill="#64788e">{Math.round(max * f)}</text>
-        </g>
-      ))}
-      {labels.map((l, i) => (
-        <g key={l}>
-          {series.map((s, j) => {
-            const h = ((height - pad.t - pad.b) * s[i]) / max;
-            return <rect key={j} x={pad.l + i * bw + bw * 0.15 + j * gw} y={height - pad.b - h} width={gw - 1} height={h} rx={2} fill={colors[j % colors.length]} />;
-          })}
-          <text x={pad.l + i * bw + bw / 2} y={height - 5} fontSize="10" textAnchor="middle" fill="#5b6e84">{l}</text>
-        </g>
-      ))}
-      {unit && <text x={W - 2} y={10} fontSize="10" textAnchor="end" fill="#64788e">{unit}</text>}
-    </svg>
+    <ChartContainer config={config} className="aspect-auto w-full" style={{ height: height + (names ? 28 : 0) }}>
+      <RBarChart data={data} margin={{ top: unit ? 14 : 6, right: 4, bottom: 0, left: 0 }} title={t("Bar chart")}>
+        <CartesianGrid vertical={false} />
+        <XAxis dataKey="label" tickLine={false} axisLine={false} tick={axisTick} interval={0} />
+        <YAxis domain={[0, max]} ticks={[0, max / 2, max]} tickFormatter={(v: number) => (max < 10 ? v.toFixed(1) : String(Math.round(v)))} tickLine={false} axisLine={false} tick={axisTick} width={28} />
+        {unit && <text x="100%" y={10} dx={-2} textAnchor="end" fontSize={10} className="fill-muted-foreground">{unit}</text>}
+        <ChartTooltip cursor={false} content={<ChartTooltipContent labelFormatter={(v) => (unit ? <>{v} <span className="font-normal text-muted-foreground">· {unit}</span></> : v)} />} />
+        {names && <ChartLegend content={<ChartLegendContent />} />}
+        {series.map((_, j) => <Bar key={j} dataKey={`s${j}`} fill={`var(--color-s${j})`} radius={2} isAnimationActive={false} />)}
+      </RBarChart>
+    </ChartContainer>
   );
 }
 
-/** A line chart in a viewBox of `width` × `height` units scaled to the container width (a wider viewBox keeps the text
- * small on wide cards); null points are gaps. */
-export function LineChart({ points, min, max, threshold, height = 120, width = 600, color = "#005bea", labels, ticks, shadeGaps }: { points: (number | null)[]; min?: number; max?: number; threshold?: number; height?: number; width?: number; color?: string; labels?: string[]; ticks?: number[]; shadeGaps?: boolean }) {
-  const W = width;
+/** A line chart; null points are gaps, never joined (a value between two gaps is a dot). `labels` spread evenly under
+ * the chart, `ticks` draw gridlines with their values, `shadeGaps` shades the gaps; `name` names the value in the tooltip. */
+export function LineChart({ points, min, max, threshold, height = 120, color = "var(--color-primary)", labels, ticks, shadeGaps, name }: { points: (number | null)[]; min?: number; max?: number; threshold?: number; height?: number; color?: string; labels?: string[]; ticks?: number[]; shadeGaps?: boolean; name?: string }) {
+  const t = useT();
   const vals = points.filter((p): p is number => p !== null);
   const lo = min ?? Math.min(...vals, threshold ?? Infinity);
   const hi = max ?? Math.max(...vals, threshold ?? -Infinity);
-  const y = (v: number) => 8 + (height - 28) * (1 - (v - lo) / (hi - lo || 1));
-  const step = (W - 12) / Math.max(1, points.length - 1);
-  const x = (i: number) => 6 + step * i;
-  // gaps (null) break the line — missing data is never connected; a value between two gaps is drawn as a dot
-  const runs: number[][] = [];
+  const last = Math.max(0, points.length - 1);
+  const data = points.map((v, i) => ({ i, v }));
   const gaps: [number, number][] = [];
-  let cur: number[] = [];
   points.forEach((p, i) => {
-    if (p === null) {
-      if (cur.length) runs.push(cur);
-      cur = [];
-      if (gaps.length && gaps[gaps.length - 1][1] === i - 1) gaps[gaps.length - 1][1] = i;
-      else gaps.push([i, i]);
-      return;
-    }
-    cur.push(i);
+    if (p !== null) return;
+    if (gaps.length && gaps[gaps.length - 1][1] === i - 1) gaps[gaps.length - 1][1] = i;
+    else gaps.push([i, i]);
   });
-  if (cur.length) runs.push(cur);
-  const clampX = (v: number) => Math.min(W - 6, Math.max(6, v));
+  const isolated = (i: number) => points[i] !== null && (i === 0 || points[i - 1] === null) && (i === last || points[i + 1] === null);
+  // the labels sit evenly from the first point to the last, the outer ones flush with the ends
+  const at = (k: number) => (labels && labels.length > 1 ? (last * k) / (labels.length - 1) : 0);
   return (
-    <svg viewBox={`0 0 ${W} ${height}`} className="w-full" style={{ height: "auto", aspectRatio: `${W}/${height}` }} role="img" aria-label="Line chart">
-      {shadeGaps && vals.length > 0 && gaps.map(([a, b]) => <rect key={a} x={clampX(x(a) - step / 2)} y={4} width={Math.max(1, clampX(x(b) + step / 2) - clampX(x(a) - step / 2))} height={height - 24} fill="#94a3b8" opacity={0.14} />)}
-      {ticks?.map((t) => <g key={t}><line x1={0} x2={W} y1={y(t)} y2={y(t)} stroke="#e2e8f0" /><text x={2} y={y(t) - 2} fontSize="9" fill="#5b6e84">{t}</text></g>)}
-      {threshold !== undefined && <line x1={0} x2={W} y1={y(threshold)} y2={y(threshold)} stroke="#dc2626" strokeDasharray="4 3" />}
-      {runs.map((r, i) => r.length === 1 ? <circle key={i} cx={x(r[0])} cy={y(points[r[0]]!)} r={3} fill={color} />
-        : <path key={i} d={r.map((j, k) => `${k ? "L" : "M"}${x(j).toFixed(1)},${y(points[j]!).toFixed(1)}`).join("")} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" />)}
-      {labels?.map((l, i) => <text key={i} x={6 + ((W - 12) * i) / Math.max(1, labels.length - 1)} y={height - 4} fontSize="10" fill="#5b6e84" textAnchor={i === 0 ? "start" : i === labels.length - 1 ? "end" : "middle"}>{l}</text>)}
-    </svg>
+    <ChartContainer config={{ v: { label: name ?? t("Value"), color } }} className="aspect-auto w-full" style={{ height }}>
+      <RLineChart data={data} margin={{ top: 8, right: 6, bottom: labels ? 0 : 4, left: 6 }} title={t("Line chart")}>
+        {ticks && <CartesianGrid vertical={false} />}
+        <XAxis type="number" dataKey="i" domain={[0, last]} hide={!labels} ticks={labels?.map((_, k) => at(k))} interval={0} tickLine={false} axisLine={false}
+          tick={({ x, y, index }) => <text x={x} y={y} dy={8} fontSize={10} className="fill-muted-foreground" textAnchor={index === 0 ? "start" : index === (labels?.length ?? 0) - 1 ? "end" : "middle"}>{labels?.[index]}</text>} />
+        <YAxis domain={[lo, hi]} hide={!ticks} ticks={ticks} mirror tickLine={false} axisLine={false} tick={axisTick} />
+        {shadeGaps && vals.length > 0 && gaps.map(([a, b]) => <ReferenceArea key={a} x1={Math.max(0, a - 0.5)} x2={Math.min(last, b + 0.5)} fill="#94a3b8" fillOpacity={0.14} />)}
+        {threshold !== undefined && <ReferenceLine y={threshold} stroke="var(--color-crit)" strokeDasharray="4 3" />}
+        <ChartTooltip content={<ChartTooltipContent hideLabel />} />
+        <Line dataKey="v" type="linear" stroke="var(--color-v)" strokeWidth={2} isAnimationActive={false}
+          dot={({ index, cx, cy }) => (isolated(index) ? <circle key={index} cx={cx} cy={cy} r={3} fill="var(--color-v)" /> : null)} />
+      </RLineChart>
+    </ChartContainer>
   );
 }
 
-/** A progress bar; `label` names it for assistive technology (WCAG 4.1.2, IR359). */
+/** A progress bar (shadcn/ui's Progress); `label` names it for assistive technology (WCAG 4.1.2, IR359). */
 export function UtilBar({ pct, tone = "primary", label }: { pct: number | null; tone?: Tone; label?: string }) {
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-surface2" role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct ?? undefined}>
-      <div className={cx("h-full rounded-full", tone === "ok" ? "bg-ok" : tone === "warn" ? "bg-warn" : tone === "crit" ? "bg-crit" : "bg-primary")} style={{ width: `${pct ?? 0}%` }} />
-    </div>
+    <Progress value={pct} aria-label={label}
+      className={cx("*:data-[slot=progress-track]:h-2", tone === "ok" ? "**:data-[slot=progress-indicator]:bg-ok" : tone === "warn" ? "**:data-[slot=progress-indicator]:bg-warn" : tone === "crit" ? "**:data-[slot=progress-indicator]:bg-crit" : undefined)} />
   );
 }
 
