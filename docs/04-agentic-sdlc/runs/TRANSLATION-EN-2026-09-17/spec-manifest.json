@@ -1,6 +1,6 @@
 {
   "version": "0.210.0",
-  "spec_baseline_id": "1e863f98cc7064396f9cbc20de99ef6aef1896fc95076e87337443448fecdf5f",
+  "spec_baseline_id": "591414e24719ad59a0c75f1cae5ac991f0a4630f9439e3f2d9bc56eea28ce9cc",
   "hash_algorithm": "sha256",
   "canonicalization": "UTF-8 JSON(spec_files), ensure_ascii=False, sort_keys=True, separators=(comma,colon)",
   "spec_files": [
@@ -91,6 +91,10 @@
     {
       "path": "01-requirements/technician.md",
       "sha256": "28f615d474f011fec523143467b1b24a67eff37fc1afab5516a8b2d5aa8ebb77"
+    },
+    {
+      "path": "01-requirements/use-case-catalogue.csv",
+      "sha256": "246bbe63dbc99e1652070ce7d2c7f22dd466996792dde5f5240f02eb7c30fc99"
     },
     {
       "path": "02-design/admin.md",
@@ -282,7 +286,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "15b0a1966acbdda3d47b6505f0a5b5f11a85d4127c4d6ca0130fd43ac322b891"
+      "sha256": "478ebdbe7cc5bf9173c67b47c3f9a351659dd472147c1a1a85b69dde43a59e73"
     },
     {
       "path": "tools/check_review_regressions.py",

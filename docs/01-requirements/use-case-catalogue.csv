@@ -1,0 +1,128 @@
+id,use_case,primary_actor,secondary_actors,relationships,requirement_permission,screens
+UC-X01,Sign in (demo role picker),Visitor,—,—,FR-X01,C 10a · A 15-1 · P 07-1 · T 04-1
+UC-X02,Reset password,Visitor,Email / WhatsApp gateway,—,FR-X01,C 10b · A 15-2 · P 07-2 · T 04-2
+UC-X03,Extend session,Signed-in user,Demo clock,—,FR-X01 · IR55,session prompt (all screens)
+UC-X04,Sign out,Signed-in user,—,—,FR-X01,account menu (all screens)
+UC-X05,Switch membership / role (demo),Signed-in user,—,«include» X10,FR-X01 · FR-X05,role picker
+UC-X06,Read notifications,Signed-in user,—,«include» X10,FR-X07,C 10c · A 15-3 · P 07-3 · T 04-3
+UC-X07,Set preferences (language; channels; consent),Signed-in user,—,«include» X10,FR-X01,C 10d · A 15-4 · P 07-4 · T 04-4
+UC-X08,Turn two-step verification on / off,—,—,«extend» X07,FR-X08,C 10g · A 15-7 · P 07-7 · T 04-7
+UC-X09,Use demo controls (reset · trigger · clock),Signed-in user,—,«include» X10,FR-X05,C 10e · A 15-5 · P 07-5 · T 04-5
+UC-X10,Check access (tenant · role · scope · period · capability),—,—,included by every use case,FR-X04 · IR112,C 10f · A 15-6 · P 01-4; 02-12; 07-6 · T 02-9; 04-6
+UC-C01,View monitoring dashboard,Client,—,—,FR-C01,01a; 01b
+UC-C02,Browse properties & units (read-only),Client,—,—,FR-C02,02a; 02d; 02i; 02j
+UC-C03,Rename location or unit,—,—,«extend» C02,FR-C02 · IR109,02b; 02c
+UC-C04,Control an AC,Client,—,«include» C05,FR-C03,02e; 02h; 02k
+UC-C05,Confirm & track AC command,—,AC unit / IoT device,included by C04; C06; C09,FR-C03,02f; 02g
+UC-C06,Control a group of ACs (one room / area),Client owner,—,«include» C05,FR-C14,02m; 02n
+UC-C07,Attach / detach alert policy on this AC,Client,—,—,FR-C15 · IR108,02e; 02l
+UC-C08,Ask status or help via assistant,Client,—,—,FR-X02,09a; 09b; 09d; 09g
+UC-C09,Change temperature via assistant,—,—,«extend» C08 · «include» C05,FR-X02,09c; 09e; 09f
+UC-C10,Manage schedules,Client,—,—,FR-C04,03a; 03b; 03c; 03d; 03g; 03h; 03i
+UC-C11,Manage condition automations,Client,—,—,FR-C05,03e; 03f
+UC-C12,Grant / withdraw location consent,—,—,«extend» C11,FR-C05 · IR53,03e; 03f; 10d
+UC-C13,Run automation at trigger,Demo clock,Location & weather feed · AC unit / IoT device,—,FR-C04 · FR-C05,03c
+UC-C14,Compare energy & cost,Client,—,—,FR-C06,04a; 04b
+UC-C15,Export monthly energy report,—,Email gateway,«extend» C14,FR-C16,04g
+UC-C16,View emissions & request demo offset,Client,—,—,FR-C13,04a; 04c; 04d; 04e; 04f
+UC-C17,Check air quality & advice,Client,—,—,FR-C07,05a; 05b
+UC-C18,Log ventilation (manual record),—,—,«extend» C17,FR-C07 · IR110,05c
+UC-C19,View alerts & notifications,Client,—,—,FR-C08,06a; 06b; 06c; 06d; 10c
+UC-C20,Manage customer alert policies,Client,—,—,FR-C15 · IR108,06e; 06f; 06g
+UC-C21,Switch Default-policy rule on / off,—,—,«extend» C20,FR-C15 · IR115 (owner only),06e
+UC-C22,Request maintenance (3 preferred times),Client,—,—,FR-C09 · IR113,07d; 07e; 07f
+UC-C23,Track requests; progress & reports,Client,—,—,FR-C09,07a; 07b; 07c
+UC-C24,Cancel requested job,—,—,«extend» C23,FR-C09,07b
+UC-C25,Accept / decline HQ-proposed time,Client,—,—,FR-C09 · IR113,07k; 07l; 07m
+UC-C26,Ask another time for a periodic visit,Client,—,—,FR-C09 · IR113,07n
+UC-C27,Confirm & rate completed job,Client,Demo clock,—,FR-C17,07g; 07h
+UC-C28,Report a problem,—,—,«extend» C27,FR-C17,07i
+UC-C29,Manage filter care,Client,—,—,FR-C18,07j
+UC-C30,Edit filter reminders,Client owner,—,«extend» C29,FR-C18,07j
+UC-C31,View contracts & invoices,Client,—,—,FR-C10,08a
+UC-C32,Pay invoice (demo card / instructions),Client,Payment service,—,FR-C11,08b; 08d; 08e; 08f
+UC-C33,Open payment guidance (e-mail / WhatsApp),—,Email / WhatsApp gateway,«extend» C32,FR-C11,08c
+UC-C34,View restriction & send inquiry,Client,—,—,FR-C12,08g; 02k
+UC-C35,Invite members & resend invites,Client owner,Email gateway (preview),—,FR-C19 · IR114 · clientUsers.*,11a; 11b; 11c
+UC-C36,Send coordination note,—,—,«extend» C23,FR-C09 · IR114 · jobs.addNote,07b; 07o; 07p
+UC-A01,View overall dashboard,HQ user,—,—,FR-A01 · dashboard.read,01-1…01-10
+UC-A02,Manage customers,HQ user,—,—,FR-A02 · asset.write,02-1; 02-8
+UC-A03,Manage location tree (property · floor · area · room),HQ user,—,—,FR-A02 · asset.write,02-2; 02-9; 02-10; 02-12; 02-13
+UC-A04,Manage units (create · edit · move · delete),HQ user,—,—,FR-A02 · asset.write,02-3…02-7; 02-11
+UC-A05,Attach alert policies to a unit,—,—,«extend» A04,FR-A02 · IR108,02-4; 02-14
+UC-A06,Import units from CSV,HQ user,—,—,FR-A18 · asset.write,02-17; 02-18
+UC-A07,Manage client user accounts,HQ user,Email gateway,—,FR-A17 · asset.write,02-15
+UC-A08,Review warranty & coverage,HQ user,Demo clock,—,FR-A19,02-19
+UC-A09,Mark warranty claim filed,—,—,«extend» A08,FR-A19,02-19
+UC-A10,Manage memberships & permissions,HQ user,—,—,FR-A03 · IR107 · identity.write,03-1…03-5; 03-7
+UC-A11,Revoke access,—,—,«extend» A10,FR-A03,03-6
+UC-A12,Manage models & capabilities,HQ user,—,—,FR-A04 · device.write,04-1; 04-5; 04-6
+UC-A13,Register; bind; calibrate & rebind devices,HQ user,AC unit / IoT device,—,FR-A04 · device.write,04-2; 04-3; 04-4; 04-8
+UC-A14,Investigate device events & tamper,HQ user,AC unit / IoT device,—,FR-A04 · FR-A16 · audit.read,04-7
+UC-A15,Run firmware campaign,HQ user,AC unit / IoT device · Demo clock,—,FR-A20 · device.write,04-9; 04-10
+UC-A16,Handle alerts (acknowledge · resolve),HQ user,AC unit / IoT device,—,FR-A05 · alert.resolve,05-1; 05-2; 05-6
+UC-A17,Manage alert policies (Default + customer),HQ user,—,—,FR-A05 · FR-A12 · alert.policy.write,05-3; 05-5; 05-7; 05-8; 02-16
+UC-A18,Switch Default rule per customer,—,—,«extend» A17,FR-A05 · IR108,05-4
+UC-A19,Create job or periodic plan,HQ user,—,«extend» A16,FR-A06 · job.write,06-2; 06-6; 06-7
+UC-A20,Book one of the client's 3 preferred times,HQ user,—,—,FR-A06 · IR113,06-11
+UC-A21,Propose another time to the client,—,—,«extend» A20,FR-A06 · IR113,06-12…06-15
+UC-A22,Assign internally or offer to a contractor,HQ user,Demo clock,—,FR-A06 · job.write,06-3; 06-4; 06-16
+UC-A23,Track job; costs & put on hold,HQ user,—,—,FR-A06 · job.write,06-1; 06-8
+UC-A24,Review report (accept / return for rework),HQ user,—,—,FR-A06 · job.write,06-1; 06-5
+UC-A25,Classify follow-up (rework / new request),HQ user,—,—,FR-A06 · FR-C17 · IR114 · job.write,06-17; 06-18
+UC-A26,Manage contractor register,HQ user,—,—,FR-A21 · job.write,06-9
+UC-A27,Verify certificate renewals,—,—,«extend» A26,FR-A21 · FR-P09,06-9
+UC-A28,Monitor SLA scorecard,HQ user,—,—,FR-A22,06-10
+UC-A29,Manage contract plans (create · revise),HQ user,—,—,FR-A07 · contract.write,07-1…07-4
+UC-A30,Issue invoices,HQ user,—,—,FR-A08 · billing.write,08-1; 08-3
+UC-A31,Send payment reminder,—,Email / WhatsApp gateway,«extend» A30,FR-A08,08-1; 08-6
+UC-A32,Confirm card payment / record manual payment,HQ user,Payment service,—,FR-A08 · billing.payment,08-2; 08-5; 08-7
+UC-A33,Answer customer inquiries,HQ user,—,—,FR-C12 · FR-A08,08-4
+UC-A34,Manage contractor payouts,HQ user,Demo clock,—,FR-A23 · billing.payment,08-8
+UC-A35,Schedule & execute restriction,HQ user,Demo clock · AC unit / IoT device,—,FR-A09 · restriction.write,09-1; 09-2; 09-5; 09-7; 09-9
+UC-A36,Release restriction after payment,—,AC unit / IoT device,«extend» A32,FR-A09 · IR35,09-4
+UC-A37,Grant grace / exception / cancel,HQ user,—,—,FR-A10 · restriction.write,09-3; 09-6
+UC-A38,Override release (forced),HQ user,AC unit / IoT device,—,FR-A10 · restriction.override,09-8
+UC-A39,Manage automation policies,HQ user,—,—,FR-A11 · automation.policy.write,10-1; 10-4
+UC-A40,Simulate & fire demo event,—,AC unit / IoT device,«extend» A39,FR-A11,10-2; 10-3
+UC-A41,Analyse energy savings,HQ user,—,—,FR-A13 · energy.read,11-1; 11-3; 11-4
+UC-A42,Manage baselines,—,—,«extend» A41,FR-A13 · energy.write,11-2
+UC-A43,Prepare MRV report (draft · compare versions),HQ user,—,—,FR-A14 · mrv.write,12-1; 12-2; 12-4; 12-5
+UC-A44,Record MRV review,HQ user,—,—,FR-A14 · mrv.review,12-1
+UC-A45,Manage emission factors,HQ user,—,—,FR-A14 · mrv.factors,12-3
+UC-A46,Process demo offsets (quote · request · retire · proof),HQ user,—,—,FR-A15 · offset.write,13-1…13-4
+UC-A47,View carbon-market concept,—,—,«extend» A46,FR-A15,13-5
+UC-A48,Search audit log (correlation ID),HQ user,—,—,FR-A16 · audit.read,14-1…14-5
+UC-A49,Sign a user out everywhere (all sessions),—,—,«extend» A10,FR-A03 · FR-A17 · identity.write / asset.write · IR384,03-2; 03-8; 02-15
+UC-P01,View work dashboard,Contractor,—,—,FR-P01,01-1; 01-2; 01-3
+UC-P02,Browse own jobs by status,Contractor,—,—,FR-P01,02-1…02-6
+UC-P03,Accept offer at the agreed visit time,Contractor,Demo clock,—,FR-P02 · partner.accept,02-7; 02-11; 02-22
+UC-P04,Decline offer with reason,Contractor,—,—,FR-P02 · partner.accept,02-8; 02-9; 02-10
+UC-P05,Propose another visit time,Contractor,—,—,FR-P02 · IR113,02-23; 02-24
+UC-P06,View target unit & alert evidence,Contractor,—,—,FR-P04 · FR-P08,02-13; 02-14
+UC-P07,Review technician report (accept),Contractor,—,—,FR-P05 · partner.review,02-15; 02-18; 02-19; 02-20
+UC-P08,Return report for rework,—,—,«extend» P07,FR-P05,02-16; 02-17
+UC-P09,Assign / reassign own technician,Contractor,—,—,FR-P03 · partner.assign,03-1…03-10
+UC-P10,View team capacity & availability,Contractor,—,—,FR-P06,04-1…04-5
+UC-P11,Record unavailable days,—,—,«extend» P10,FR-P06,04-8
+UC-P12,Track certificates & request training,Contractor,Demo clock,—,FR-P09 · partner.assign,04-6
+UC-P13,Upload certificate renewal,—,—,«extend» P12,FR-P09,04-7
+UC-P14,Write job note & view history,Contractor,Email / WhatsApp gateway,—,FR-P07 · FR-P08,05-1…05-6; 02-21
+UC-P15,View payout statements,Contractor,—,—,FR-P10,06-1
+UC-P16,Ask HQ about a statement line,—,—,«extend» P15,FR-P10,06-2
+UC-T01,View assigned work,Technician,—,—,FR-T01 · IR76,01-1…01-5
+UC-T02,Scan unit QR,—,—,«extend» T01,FR-T13,01-6
+UC-T03,Accept new assignment (acknowledge),Technician,—,—,FR-T08 · IR113,02-33
+UC-T04,Report “can't make this time”,—,—,«extend» T03,FR-T08,02-34
+UC-T05,Check in at site & start job,Technician,Demo clock,—,FR-T13 · FR-T08 · IR49,02-32; 02-1; 02-8; 02-25
+UC-T06,Record inspections (indoor · outdoor · electrical),Technician,—,—,FR-T04 · FR-T05 · FR-T06,02-2; 02-3
+UC-T07,Record parts; refrigerant & time on site,Technician,—,—,FR-T14,02-29; 02-30
+UC-T08,Submit work report,Technician,—,«include» T09,FR-T09,02-4; 02-5; 02-6
+UC-T09,Capture customer sign-off,—,Customer on site,included by T08,FR-T15,02-31
+UC-T10,Rework & resubmit returned report,Technician,—,«include» T08,FR-T08,02-7
+UC-T11,View unit register,Technician,—,—,FR-T02,02-10; 02-13; 02-26
+UC-T12,Monitor time series,Technician,AC unit / IoT device,—,FR-T03,02-11; 02-12
+UC-T13,Handle alert evidence (ack · remeasure · resolve),Technician,—,—,FR-T07 · alert.resolve,02-14…02-17
+UC-T14,Run remote diagnostic / test run,Technician,AC unit / IoT device,—,FR-T10 · control.diagnose,02-18…02-24; 02-27; 02-28
+UC-T15,Manage IoT device (register · bind · calibrate · firmware),Technician,AC unit / IoT device,—,FR-T11 · device.maintain,03-1…03-7; 03-11
+UC-T16,Respond to device faults,Technician,AC unit / IoT device,—,FR-T12,03-8; 03-9; 03-10
