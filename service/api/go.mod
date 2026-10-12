@@ -1,8 +1,8 @@
 module github.com/pradita/ac-project/service/api
 
-go 1.25.0
+go 1.26.0
 
-toolchain go1.25.13
+toolchain go1.26.9
 
 require (
 	github.com/MicahParks/keyfunc/v3 v3.8.2

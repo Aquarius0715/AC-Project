@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # AC Project migrate — one-off schema migration task (database design §9); runs before the API and workers start.
 # Build context: service/api/ (one Go module: cmd/migrate + internal/).
-ARG GO_VERSION=1.25
+ARG GO_VERSION=1.26
 
 FROM golang:${GO_VERSION}-bookworm AS build
 WORKDIR /src

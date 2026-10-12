@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 # AC Project worker — background worker roles (scheduler ticks the clock-driven transitions; other roles follow).
 # Build context: service/api/ (one Go module: cmd/worker + internal/).
-ARG GO_VERSION=1.25
+ARG GO_VERSION=1.26
 
 FROM golang:${GO_VERSION}-bookworm AS build
 WORKDIR /src

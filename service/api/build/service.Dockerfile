@@ -2,7 +2,7 @@
 # AC Project Core API services (IR180): one image per business-domain service or the gateway, from one Go module.
 # Build with --build-arg SERVICE=gateway | identity-api | equipment-api | maintenance-api | billing-api | energy-api;
 # context service/api/.
-ARG GO_VERSION=1.25
+ARG GO_VERSION=1.26
 
 FROM golang:${GO_VERSION}-bookworm AS build
 ARG SERVICE
