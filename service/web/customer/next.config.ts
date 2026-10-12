@@ -7,6 +7,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   env: { AC_APP_ROLE: "client" }, // this app's role (session cookie name, sign-in checks)
   output: "standalone", // self-contained server bundle for the Docker image (container design §3)
+  poweredByHeader: false, // no X-Powered-By: Next.js on responses (it names the framework to attackers)
   transpilePackages: ["@ac/web"],
   outputFileTracingRoot: path.join(__dirname, ".."),
   turbopack: { root: path.join(__dirname, "..") },
