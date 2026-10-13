@@ -139,7 +139,7 @@ export type SimulationResult = {eventId:ID;results:Decision[];notifications:Noti
 export type FireResult = {eventId:ID;results:(Omit<Decision,'decision'> & {decision:'requested'|'suppressed'|'failed';commandId:ID|null})[];notifications:NotificationOutcome[]};
 export type Channel = 'inApp'|'email'|'whatsapp';
 export type FilterCareChannel = Exclude<Channel,'whatsapp'>; // filter-care reminders go in-app and by e-mail (IR134 item 4)
-export type Target = {kind:'unit'|'job'|'invoice'|'restriction'|'device'|'inquiry'|'client_user'|'certificate';id:ID};
+export type Target = {kind:'unit'|'job'|'invoice'|'restriction'|'device'|'inquiry'|'client_user'|'partner_user'|'certificate';id:ID};
 export type Notification = Entity & {sourceAlertId:ID|null;type:NotificationType;recipientMembershipId:ID;scopeVersionAtCreation:number;target:Target;templateKey:'alert'|'quality'|'schedule_change'|'report_return'|'completion'|'payment'|'payment_reminder'|'restriction'|'inquiry'|'job_update'|'device_operation'|'invite'|'certificate_expiry'|'warranty_expiring';params:{targetName:string;at:Instant;status:string;reason:string|null;amountMinor:number|null;currency:Currency|null;method:PaymentMethod|null;message:string|null};channel:Channel;deliveryState:'preview'|'simulated'|'failed';severity:Severity;occurredAt:Instant;readAt:Instant|null};
 export type NotificationPreview = Notification;
 export type NotificationsMarked = {markedIds:ID[];skippedIds:ID[]};
@@ -214,6 +214,8 @@ export type InvoiceReminderReceipt = {invoiceId:ID;invoiceVersion:number;notific
 export type ClientRole = 'owner'|'member';
 export type SessionsRevoked = {membershipId:ID;userId:ID;revokedAt:Instant;membershipIds:ID[]};
 export type ClientUser = Entity & {customerId:ID;membershipId:ID|null;email:string;displayName:string|null;clientRole:ClientRole;status:'invited'|'active'|'disabled';lastSignInAt:Instant|null;allowedChannels:Channel[];invitedAt:Instant;invitedByMembershipId:ID};
+export type PartnerRole = 'contractor'|'technician';
+export type PartnerUser = Entity & {organizationId:ID;membershipId:ID|null;email:string;displayName:string|null;partnerRole:PartnerRole;status:'invited'|'active'|'disabled';lastSignInAt:Instant|null;accessUntil:Instant|null;invitedAt:Instant;invitedByMembershipId:ID};
 export type LocationTarget = {kind:'property'|'space'|'unit';id:ID};
 export type VentilationLog = Entity & {spaceId:ID;unitId:ID|null;method:'window_opened'|'door_opened'|'ventilation_fan'|'other';durationMinutes:number;co2AtLog:{value:number;unit:'ppm';observedAt:Instant}|null;loggedByMembershipId:ID;loggedAt:Instant};
 export type ImportRow = {rowNumber:number;propertyName:string;floorName:string|null;roomName:string|null;unitName:string;modelCode:string;serial:string|null;installedOn:string|null;warrantyEnd:string|null;result:'ready'|'warning'|'error';messageKey:string|null};
@@ -405,6 +407,10 @@ export type OperationContracts = {
   'clientUsers.save': {input:{id?:ID;customerId:ID;email:string;clientRole:ClientRole;status?:'active'|'disabled';reason?:string};result:ClientUser;mode:'write'};
   'clientUsers.remove': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
   'clientUsers.resendInvite': {input:{id:ID};result:NotificationPreview;mode:'read'};
+  'partnerUsers.list': {input:Query;result:Page<PartnerUser>;mode:'read'};
+  'partnerUsers.save': {input:{id?:ID;email:string;partnerRole:PartnerRole;status?:'active'|'disabled';reason?:string};result:PartnerUser;mode:'write'};
+  'partnerUsers.remove': {input:{id:ID;reason:string};result:DeletedResource;mode:'write'};
+  'partnerUsers.resendInvite': {input:{id:ID};result:NotificationPreview;mode:'read'};
   'units.importPreview': {input:{customerId:ID;fileName:string;csvText:string;mapping:Record<string,string>};result:ImportPreview;mode:'read'};
   'units.importCommit': {input:{previewId:ID;customerId:ID};result:UnitImport;mode:'write'};
   'units.importUndo': {input:{importId:ID;reason:string};result:UnitImport;mode:'write'};

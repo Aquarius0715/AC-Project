@@ -39,6 +39,7 @@ P0 means the core foundational flow. P1 is also required for completion in phase
 | FR-P08 | P0 | Production instructions SRC-02 + added design details / BIZ-12 | Delegation/work-period boundaries | Reject other-company jobs, out-of-period units, billing changes, and restriction changes even through direct URLs/service calls. |
 | FR-P09 | P1 | Figma-confirmed screen specification 2026-10-01 (Contractor 04-6/04-7) / BIZ-12 | Certificate expiry and renewals | Track own technicians' certificates, see which assignments an expiring certificate blocks, upload renewals for HQ verification, and request training. |
 | FR-P10 | P1 | Figma-confirmed screen specification 2026-10-01 (Contractor 06-1/06-2) / BIZ-12, BIZ-21 | Payout statements | View HQ-approved payout statements (lines, deductions, net, pay date) and ask HQ about a line. |
+| FR-P11 | P1 | User request 2026-10-13 (DEC-76) / BIZ-12 | Company users (contractor) | A contractor manages its own company's accounts: lists contractors and technicians, invites either role by e-mail, changes or resends a pending invite, disables / re-enables and removes accounts. Never another company's accounts, never its own account, and the company always keeps an active contractor. |
 
 ## Business boundaries and dependencies
 
@@ -267,6 +268,23 @@ Design: [DD-P09](../02-design/contractor.md#dd-p09-details). Assess parent AT-P0
 
 Design: [DD-P10](../02-design/contractor.md#dd-p10-details). Assess parent AT-P10 using all N/E/B cases in traceability.
 
+
+### FR-P11 Company users (contractor)
+
+- **Company request basis**: SRC-06 BIZ-12 — Contractor company self-service; user request 2026-10-13 (“Contractor can manage the Contractors and Technicians of the same organization”, DEC-76). Replaces the part of BR-A21 that kept all contractor staff accounts with HQ.
+- **Entry conditions**: Contractor Membership of the company; Sidebar › Users (`/partner/users`). Technicians have no Users item and the operations are FORBIDDEN for them.
+- **Main flow**: Users → the company's accounts (name, e-mail, role Contractor/Technician, status, access until, last sign-in) → + Invite user (e-mail, role) → the row shows “Invite pending” with Resend invite (preview) → on an invite, Edit (e-mail, role) or Remove; on an account, Disable / Enable or Remove, each with a reason.
+- **Business rule BR-P11**: `partnerUsers.*` act only on the caller's company (`contractor:own-company`). E-mail is unique per company, compared case-insensitively. A pending invite's e-mail and role can change; an accepted account's e-mail and role are fixed (remove and invite again). An invite becomes the active account when HQ creates the membership for that e-mail (`members.save`). Disabling ends the account's access now and keeps its access end; enabling brings that end back unless it has passed (CONFLICT `errors.access_expired`). The caller's own account cannot be changed or removed (CONFLICT `errors.own_account`), and the last active contractor cannot be disabled or removed (CONFLICT `errors.last_contractor`). Invitations and resends are previews only (FR-X05). Permissions, qualifications and access periods stay with HQ (FR-A03).
+- **Resulting business state**: PartnerUser rows of the company: invited (no membership yet), active (linked membership open), disabled (membership closed now, access end kept).
+- **Boundaries/prohibitions**: Another company's account or invite → NOT_FOUND. Duplicate e-mail → VALIDATION with the input kept. A status on an invite → CONFLICT `errors.invite_pending`. A change without reason → VALIDATION.
+
+| Acceptance ID | Given / When | Then (observable result) |
+|---|---|---|
+| AT-P11-N | contractor-a with its technician tech-external-a. When: open Users → invite lim.tech@example.com as Technician → Resend invite → disable tech-external-a (reason “On leave”) → enable it again | ① List shows contractor-a (Contractor, Active) and tech-external-a (Technician, Active, access until 2026-10-01) ② One PartnerUser invited ③ Resend returns a NotificationPreview only ④ tech-external-a's membership ends now ⑤ Its access until 2026-10-01 comes back |
+| AT-P11-E | ① Invite contractor-a's own e-mail again (any case) ② Disable or remove the own account ③ contractor-b opens contractor-a's invite ④ A technician opens /partner/users | ① VALIDATION, input kept ② CONFLICT, zero changes ③ NOT_FOUND ④ Page unavailable (FORBIDDEN), no Users item |
+| AT-P11-B | ① Change an accepted account's role ② Remove the company's last active contractor ③ Enable an account whose access end has passed | ① VALIDATION (immutable) ② CONFLICT ③ CONFLICT |
+
+Design: [DD-P11](../02-design/contractor.md#dd-p11-details). Assess parent AT-P11 using all N/E/B cases in traceability.
 
 0.9.0 correction contracts: Read [strict review correction contracts](../02-design/strict-review-contracts.md) and [operation version contracts](../02-design/write-version-catalog.csv) together.
 

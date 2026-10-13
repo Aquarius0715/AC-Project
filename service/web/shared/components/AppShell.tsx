@@ -102,7 +102,7 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
   const best = Math.max(0, ...items.map((i) => score(i.href, i.match)));
   const activeHref = best ? items.find((i) => score(i.href, i.match) === best)?.href : undefined;
   const sharedActive = SHARED.find((s) => pathname === s.href);
-  const title = sharedActive ? t(sharedActive.label) : pathname === "/customer/users" ? t("Users") : pathname === "/demo" ? t("Demo controls") : items.find((i) => i.href === activeHref)?.label ?? "AC Project";
+  const title = sharedActive ? t(sharedActive.label) : pathname === "/customer/users" || pathname === "/partner/users" ? t("Users") : pathname === "/demo" ? t("Demo controls") : items.find((i) => i.href === activeHref)?.label ?? "AC Project";
   const demo = pathname === "/demo";
 
 
@@ -117,6 +117,7 @@ export function AppShell({ role: forced, live, children }: { role?: Role; live?:
           <div className="my-2 border-t border-line" />
           <nav className="flex flex-col gap-0.5">
             {role === "client" && owner && <NavLink href="/customer/users" label={t("Users")} icon="users" active={pathname === "/customer/users"} />}
+            {role === "contractor" && <NavLink href="/partner/users" label={t("Users")} icon="users" active={pathname === "/partner/users"} />}
             {SHARED.map((s) => <NavLink key={s.href} {...s} label={t(s.label)} active={pathname === s.href} badge={s.href !== "/notifications" ? undefined : live ? count(s.href) : String(3 + unread)} />)}
             <Link href="/demo" className={cx("flex items-center gap-2.5 rounded-control px-3 py-2 text-[13px] font-semibold text-warn hover:bg-warn-soft/50", pathname === "/demo" && "bg-warn-soft/60")}>
               <Icon name="demo" className="text-[15px]" />

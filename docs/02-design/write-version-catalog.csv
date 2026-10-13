@@ -96,6 +96,9 @@ offsets.simulate,event=request,none,offsets.preview,omit,quoteVersion=OffsetQuot
 offsets.simulate,event=retry,offset record,offsets.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 organizations.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 organizations.save,id present,organizations,organizations.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+partnerUsers.remove,all,partner_user,partnerUsers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+partnerUsers.save,id omitted,none,none,omit,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
+partnerUsers.save,id present,partner_user,partnerUsers.list,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 payments.confirm,all,payment,invoices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 payments.recordManual,all,invoice,invoices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects
 payments.simulate,event=initiate|instructions,invoice,invoices.get,required,none,D01; version mismatch CONFLICT; missing/unneeded version VALIDATION; zero side effects

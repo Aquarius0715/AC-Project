@@ -104,13 +104,13 @@ func testVerifier(t *testing.T) testTokens {
 }
 
 // serverCfg builds a server on the test database; opt adjusts the configuration (domains, identity source). In
-// cluster mode an all-domain server is the split-service facade (cluster_test.go).
+// cluster mode an all-domain server is the split-service facade (cluster_test.go), unless it injects failures.
 func serverCfg(t *testing.T, opt func(*apiserver.Config)) *apiserver.Server {
 	t.Helper()
 	v := testVerifier(t)
 	cfg := apiserver.Config{DatabaseURL: testDB("ac_app_login"), Clock: clockFunc}
 	opt(&cfg)
-	if clusterMode && len(cfg.Domains) == 0 {
+	if clusterMode && len(cfg.Domains) == 0 && cfg.WrapTx == nil { // a failing transaction is injected in-process only
 		f := clusterFacade(t, cfg, v)
 		lastServer = f
 		return f

@@ -446,6 +446,18 @@ func membersSave(ctx context.Context, c *ops.Call, in *MemberInput) (Member, err
 				return Member{}, err
 			}
 		}
+		// FR-P11: the contractor company's user list includes the new active account; a pending invite for the same
+		// email becomes this account
+		if in.Role == "contractor" || in.Role == "technician" {
+			if _, err := c.Tx.Exec(ctx, `INSERT INTO identity.partner_users (tenant_id, organization_id, membership_id, email, display_name, partner_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
+				SELECT current_setting('app.tenant_id')::uuid, o.id, $1, u.email, u.display_name, $5, 'active', $3, $4, $3, $3
+				FROM identity.organizations o, identity.users u WHERE o.id = $2 AND o.kind = 'contractor' AND u.id = $6
+				ON CONFLICT (tenant_id, organization_id, email) DO UPDATE SET membership_id = EXCLUDED.membership_id, display_name = EXCLUDED.display_name,
+					partner_role = EXCLUDED.partner_role, status = 'active', version = identity.partner_users.version + 1, updated_at = EXCLUDED.updated_at
+				WHERE identity.partner_users.membership_id IS NULL`, id, in.OrganizationID, c.Now, c.Principal.MembershipID, in.Role, in.UserID); err != nil {
+				return Member{}, err
+			}
+		}
 	} else {
 		x, err := scanMember(c.Tx.QueryRow(ctx, "SELECT "+memberCols+" FROM identity.memberships m WHERE m.id = $1 FOR UPDATE", *in.ID))
 		if errors.Is(err, pgx.ErrNoRows) {

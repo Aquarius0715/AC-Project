@@ -110,6 +110,7 @@ UC-P13,Upload certificate renewal,—,—,«extend» P12,FR-P09,04-7
 UC-P14,Write job note & view history,Contractor,Email / WhatsApp gateway,—,FR-P07 · FR-P08,05-1…05-6; 02-21
 UC-P15,View payout statements,Contractor,—,—,FR-P10,06-1
 UC-P16,Ask HQ about a statement line,—,—,«extend» P15,FR-P10,06-2
+UC-P17,Invite & manage company users,Contractor,Email gateway (preview),—,FR-P11 · IR416 · partnerUsers.*,08-1…08-4
 UC-T01,View assigned work,Technician,—,—,FR-T01 · IR76,01-1…01-5
 UC-T02,Scan unit QR,—,—,«extend» T01,FR-T13,01-6
 UC-T03,Accept new assignment (acknowledge),Technician,—,—,FR-T08 · IR113,02-33

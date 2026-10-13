@@ -815,6 +815,26 @@
   "name",
   "status"
  ],
+ "partnerUsers.list": [
+  "cursor",
+  "filters",
+  "limit",
+  "sort"
+ ],
+ "partnerUsers.remove": [
+  "id",
+  "reason"
+ ],
+ "partnerUsers.resendInvite": [
+  "id"
+ ],
+ "partnerUsers.save": [
+  "email",
+  "id",
+  "partnerRole",
+  "reason",
+  "status"
+ ],
  "parts.list": [
   "cursor",
   "filters",

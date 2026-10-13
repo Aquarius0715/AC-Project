@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.286.0
+version: 0.288.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -171,6 +171,7 @@ Small text and controls are adjusted for readability and usability in work scree
 | DEC-73 | A completed job releases its assignment at completion: the Assignment becomes completed, stops booking the technician and granting unit access, and the technician keeps the job as history | User request in this conversation, 2026-10-10 (“完了したジョブの割り当ては完了時に解除してください”); reflected in IR234 |
 | DEC-74 | Every icon of the four web apps and the Figma screens comes from one icon library, Lucide (`lucide-react`, pinned), through one shared `Icon` component with semantic names. It is the one exception to DEC-03: glyphs and emoji render differently per platform and font, some as colour emoji, with mixed weights and sizes, and in-house glyphs cannot give one consistent style. Cost: one ISC-licensed dependency with no dependencies of its own; the icons are inline SVG and tree-shaken. Replacement stays possible by changing the one map | User request in this conversation, 2026-10-12 (“アイコンが、統一感がありません。絵文字？のようになってしまっている箇所があります。アイコンを全て同じアイコンライブラリからとってきて、統一感を出してください”); reflected from IR393 |
 | DEC-75 | The UI is built from shadcn/ui components (style base-nova on Base UI, Tailwind CSS 4, Lucide), and established libraries do the logic where one exists; this supersedes DEC-03 (the 2026-10-10 in-house components, forms and dictionaries). Libraries: React Hook Form and Zod (forms, through shadcn Form/Field), Sonner (toasts), TanStack Table (tables), Recharts (charts), cmdk (command, combobox), react-day-picker with date-fns (date picker), input-otp (one-time code). Server Components and Server Actions stay for data, the Next.js way; TanStack Query only where a client component needs a cache, polling or optimistic updates; the translation library is decided in its own phase (the English-keyed dictionary is large). Phases: 1 foundation and the product components on it, 2 forms, 3 dialogs, menus and selects, 4 tables, charts and toasts, 5 screens on shadcn directly with a guard against hand-built UI, 6 Figma restyled, 7 translation. Cost: the components are copied into the repository (`shared/components/ui/`) and restyled to the UI Guideline; runtime dependencies are pinned exactly and the shadcn CLI is a development dependency; the screens keep their roles and names, so the E2E suite stays the check | User request in this conversation, 2026-10-12 (“UIですが、統一性を持たせるために、UIComponentを使いたいのですが、判断として妥当でしょうか”; then “shadcn/uiの導入を進めてください。できるだけ、chadcnのコンポーネントを使ってください。UI、ロジックはなるべく既存ライブラリを使いたいです”); reflected from IR400 |
+| DEC-76 | A contractor manages its own company's accounts: it invites contractors and technicians by e-mail, changes or resends pending invites, and disables, enables and removes accounts, never its own and never the last active contractor; HQ keeps permissions, qualifications and access periods (FR-A03) | User request in this conversation, 2026-10-13 (“Contractorでもユーザー管理の画面や機能を作ってください。Contractorは同じ組織のContractorとTechnicianを管理することができます。”); reflected in IR416 |
 
 **DEC-10 (design proposal)**: Preserve work status on reassignment. Release restrictions only after all cause invoices fixed at notice time are paid. Release does not automatically power units on or restore previous set temperatures. Manual payment recording, test-run end confirmation, and viewing saved reports are specified for the 1A demo. This does not mean company approval of commercial rules. See [input/output contract DDC-08](../02-design/implementation-contracts.md#ddc-08-multi-resource-revisit-and-cross-role-contracts).
 
@@ -271,6 +272,8 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.288.0: Contractors manage their own company's users, FR-P11 (DEC-76, IR416). Phase 1A unchanged.
+0.287.0: The use case catalogue is in the repository (IR415). Phase 1A unchanged.
 0.286.0: shadcn/ui phase 4, toasts, tables and charts on Sonner, TanStack Table and Recharts (IR403). Phase 1A unchanged.
 0.285.0: shadcn/ui phase 3b, the search select, the last hand-made popups and the side panels (IR402). Phase 1A unchanged.
 0.284.0: shadcn/ui phase 3a, dialogs, menus, tabs and the choice controls (IR401). Phase 1A unchanged.

@@ -15,6 +15,7 @@ P = {
  'capabilities': ('devices', 'devices.capabilities', 'devices.capabilities'),
  'certificates': ('maintenance', 'maintenance.certificates', 'maintenance.certificates'),
  'clientUsers': ('identity', 'identity.client_users;identity.memberships', 'identity.client_users;identity.memberships'),
+ 'partnerUsers': ('identity', 'identity.partner_users;identity.memberships;identity.users', 'identity.partner_users;identity.memberships'),
  'commands': ('control', 'control.commands', 'control.commands'),
  'consents': ('identity', 'identity.consents', 'identity.consents'),
  'contractors': ('maintenance', 'maintenance.contractors', 'maintenance.contractors'),

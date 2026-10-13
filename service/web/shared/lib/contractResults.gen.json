@@ -3275,6 +3275,80 @@
   ],
   "items": null
  },
+ "partnerUsers.list": {
+  "fields": [
+   "items",
+   "nextCursor",
+   "snapshotVersion",
+   "total"
+  ],
+  "items": [
+   "accessUntil",
+   "createdAt",
+   "displayName",
+   "email",
+   "id",
+   "invitedAt",
+   "invitedByMembershipId",
+   "lastSignInAt",
+   "membershipId",
+   "organizationId",
+   "partnerRole",
+   "status",
+   "tenantId",
+   "updatedAt",
+   "version"
+  ]
+ },
+ "partnerUsers.remove": {
+  "fields": [
+   "deleted",
+   "id"
+  ],
+  "items": null
+ },
+ "partnerUsers.resendInvite": {
+  "fields": [
+   "channel",
+   "createdAt",
+   "deliveryState",
+   "id",
+   "occurredAt",
+   "params",
+   "readAt",
+   "recipientMembershipId",
+   "scopeVersionAtCreation",
+   "severity",
+   "sourceAlertId",
+   "target",
+   "templateKey",
+   "tenantId",
+   "type",
+   "updatedAt",
+   "version"
+  ],
+  "items": null
+ },
+ "partnerUsers.save": {
+  "fields": [
+   "accessUntil",
+   "createdAt",
+   "displayName",
+   "email",
+   "id",
+   "invitedAt",
+   "invitedByMembershipId",
+   "lastSignInAt",
+   "membershipId",
+   "organizationId",
+   "partnerRole",
+   "status",
+   "tenantId",
+   "updatedAt",
+   "version"
+  ],
+  "items": null
+ },
  "parts.list": {
   "fields": [
    "items",

@@ -37,9 +37,10 @@ func TestForeignTargets(t *testing.T) {
 	custA, orgA, unitA, devA := id("cust-a"), id("org-customer-a"), id("unit-online-rto"), id("device-online-rto")
 	alertA, cmdA, invA, jobA := id("alert-window-a"), id("cmd-limited-apply"), id("invoice-overdue-a"), id("job-internal-a")
 	propA, roomA, notifA := id("property-home-a"), id("room-1"), id("notif-alert-window-a")
-	var sensorA, clientUserA string
+	var sensorA, clientUserA, partnerUserA string
 	ownerScan(t, `SELECT id::text FROM devices.sensors WHERE device_id = $1 ORDER BY id LIMIT 1`, []any{devA}, &sensorA)
 	ownerScan(t, `SELECT id::text FROM identity.client_users WHERE customer_id = $1 ORDER BY id LIMIT 1`, []any{custA}, &clientUserA)
+	ownerScan(t, `SELECT id::text FROM identity.partner_users WHERE organization_id = $1 ORDER BY id LIMIT 1`, []any{seed.ID("org-contractor-a")}, &partnerUserA)
 	policyA := newPolicy(t, "cust-a", "alert")
 	code, m := write(s, &customerA, "automations.save", scheduleRule(unitA, nil), 0)
 	if code != 200 {
@@ -144,6 +145,9 @@ func TestForeignTargets(t *testing.T) {
 		{&customerB, "notifications.recipients", `{"target":{"kind":"unit","id":"` + unitA + `"},"templateKey":"alert","channel":"inApp","query":{}}`, 0},
 		{&customerB, "voice.resolveIntent", `{"text":"temperature Bedroom","locale":"en","selectedUnitId":"` + unitA + `"}`, 0},
 		// contractor B → contractor A
+		{&contrB, "partnerUsers.resendInvite", `{"id":"` + partnerUserA + `"}`, 0},
+		{&contrB, "partnerUsers.save", `{"id":"` + partnerUserA + `","email":"moved@example.com","partnerRole":"technician","status":"disabled","reason":"left"}`, 1},
+		{&contrB, "partnerUsers.remove", `{"id":"` + partnerUserA + `","reason":"left"}`, 1},
 		{&contrB, "jobs.get", `{"jobId":"` + jobC + `"}`, 0},
 		{&contrB, "jobs.events", `{"jobId":"` + jobC + `","query":{"limit":5}}`, 0},
 		{&contrB, "jobs.accept", `{"jobId":"` + jobC + `","offerId":"` + offerC + `","termsVersion":"v1"}`, 1},
@@ -258,6 +262,7 @@ func TestForeignTargets(t *testing.T) {
 		{&customerB, "spaces.list", `{"limit":100,"filters":{"propertyId":"` + propA + `"}}`, []string{propA, roomA}},
 		{&customerB, "ventilation.list", `{"limit":100,"filters":{"unitId":"` + unitA + `"}}`, []string{unitA}},
 		{&customerB, "clientUsers.list", `{"limit":100,"filters":{"customerId":"` + custA + `"}}`, []string{custA, clientUserA}},
+		{&contrB, "partnerUsers.list", `{"limit":100}`, []string{partnerUserA}},
 		{&customerB, "filterCare.list", `{"limit":100,"filters":{"customerId":"` + custA + `"}}`, []string{unitA, custA}},
 		{&customerB, "filterCare.list", `{"limit":100,"filters":{"unitId":"` + unitA + `"}}`, []string{unitA}},
 		{&customerB, "capabilities.list", `{"limit":100}`, []string{unitA, unitW}},

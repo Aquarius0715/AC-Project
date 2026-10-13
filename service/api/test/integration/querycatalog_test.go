@@ -98,6 +98,7 @@ func TestQueryCatalogFilters(t *testing.T) {
 		"restrictions.forInvoice": {"status": `"applied"`},
 		"units.list":              {"status": `"online"`, "includeDescendants": `true,"spaceId":"` + seed.ID("floor-1").String() + `"`},
 		"clientUsers.list":        {"status": `"active"`},
+		"partnerUsers.list":       {"status": `"active"`, "partnerRole": `"technician"`},
 		"contractors.list":        {"status": `"active"`},
 		"certificates.list":       {"status": `"valid"`},
 		"payouts.list":            {"status": `"draft"`},

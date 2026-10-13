@@ -3,7 +3,7 @@
 import type { Role } from "@ac/web/lib/nav";
 import { DEFAULT_DISPLAY, showDate, showTime, translate, type Display } from "@ac/web/lib/i18n";
 
-type TargetKind = "unit" | "job" | "invoice" | "restriction" | "device" | "inquiry" | "client_user" | "certificate";
+type TargetKind = "unit" | "job" | "invoice" | "restriction" | "device" | "inquiry" | "client_user" | "partner_user" | "certificate";
 
 /** Notification of service-contracts.ts (fields shown in the inbox). */
 export type ApiNotification = {
@@ -58,7 +58,7 @@ const typeRoutes: Partial<Record<Role, Record<string, string>>> = {
 const routes: Record<Role, Partial<Record<TargetKind, (id: string) => string>>> = {
   client: { unit: (id) => `/customer/units/${id}`, job: (id) => `/customer/maintenance?jobId=${id}`, invoice: (id) => `/customer/payments/${id}`, restriction: () => "/customer/payments", inquiry: () => "/customer/maintenance", client_user: () => "/customer/users" },
   admin: { unit: (id) => `/admin/units?unitId=${id}`, job: (id) => `/admin/jobs?jobId=${id}`, invoice: (id) => `/admin/billing?invoiceId=${id}`, inquiry: (id) => `/admin/billing?inquiryId=${id}`, restriction: (id) => `/admin/restrictions/${id}`, device: (id) => `/admin/devices?deviceId=${id}`, client_user: () => "/admin/settings/access" },
-  contractor: { unit: (id) => `/partner/units/${id}`, job: (id) => `/partner/jobs/${id}`, certificate: () => "/partner/team?tab=certifications" },
+  contractor: { unit: (id) => `/partner/units/${id}`, job: (id) => `/partner/jobs/${id}`, certificate: () => "/partner/team?tab=certifications", partner_user: () => "/partner/users" },
   technician: { unit: (id) => `/technician/units/${id}`, job: (id) => `/technician/jobs/${id}`, device: (id) => `/technician/devices/${id}` },
 };
 

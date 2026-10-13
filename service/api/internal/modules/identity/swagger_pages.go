@@ -39,3 +39,13 @@ type OrganizationPage struct {
 }
 
 var _ = paging.Page[Organization](OrganizationPage{})
+
+// PartnerUserPage is paging.Page[PartnerUser].
+type PartnerUserPage struct {
+	Items           []PartnerUser `json:"items"`
+	NextCursor      *string       `json:"nextCursor"`
+	Total           int           `json:"total"`
+	SnapshotVersion int           `json:"snapshotVersion"`
+}
+
+var _ = paging.Page[PartnerUser](PartnerUserPage{})

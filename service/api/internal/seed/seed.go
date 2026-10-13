@@ -470,6 +470,13 @@ func Apply(ctx context.Context, tx pgx.Tx, f *Fixture) error {
 		WHERE m.role = 'client' AND m.id = ANY($2) ON CONFLICT DO NOTHING`, f.SeedCreatedAt, clientMemberships(f)); err != nil {
 		return fmt.Errorf("client users: %w", err)
 	}
+	// partner_users rows for the seed contractor company accounts (contractors and their technicians, active; FR-P11)
+	if err := ex(`INSERT INTO identity.partner_users (id, tenant_id, organization_id, membership_id, email, display_name, partner_role, status, invited_at, invited_by_membership_id, created_at, updated_at)
+		SELECT m.id, m.tenant_id, m.organization_id, m.id, u.email, u.display_name, m.role, 'active', $1, m.id, $1, $1
+		FROM identity.memberships m JOIN identity.users u ON u.id = m.user_id JOIN identity.organizations o ON o.id = m.organization_id
+		WHERE o.kind = 'contractor' AND m.role IN ('contractor','technician') ON CONFLICT DO NOTHING`, f.SeedCreatedAt); err != nil {
+		return fmt.Errorf("partner users: %w", err)
+	}
 	if err := applyBusiness(ex, f); err != nil {
 		return err
 	}

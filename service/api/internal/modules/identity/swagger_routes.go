@@ -17,6 +17,7 @@ var (
 	_ = swaggerClientUsersSaveUpdate
 	_ = swaggerMembersSaveUpdate
 	_ = swaggerOrganizationsSaveUpdate
+	_ = swaggerPartnerUsersSaveUpdate
 )
 
 // swaggerClientUsersSaveUpdate documents a further REST route.
@@ -102,3 +103,31 @@ func swaggerMembersSaveUpdate() {}
 //	@Security		BearerAuth
 //	@Router			/v1/organizations/{id} [put]
 func swaggerOrganizationsSaveUpdate() {}
+
+// swaggerPartnerUsersSaveUpdate documents a further REST route.
+//
+//	@Summary		partnerUsers.save (write) — update
+//	@ID				partnerUsers.save.update
+//	@Description	Authorization: contractor:own-company
+//	@Description	Validation: D01; input constraints in the corresponding DD; expectedVersion required for updates; email unique per company; email and role fixed once accepted; not the caller's own account and not the last active contractor (CONFLICT)
+//	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
+//	@Description	Design: DD-P11
+//	@Tags			partnerUsers
+//	@Accept			json
+//	@Produce		json
+//	@Param			Idempotency-Key		header		string				true	"D04: the same key replays the stored response; another body for the same key is CONFLICT"
+//	@Param			X-Expected-Version	header		integer				true	"id present: required (target partner_user, read partnerUsers.list)"
+//	@Param			id					path		string				true	"input field id"
+//	@Param			request				body		PartnerUserInput	true	"input; the path parameters come from the route"
+//	@Success		200					{object}	ops.Envelope{data=PartnerUser}
+//	@Failure		401					{object}	apperr.DomainError	"UNAUTHENTICATED"
+//	@Failure		403					{object}	apperr.DomainError	"FORBIDDEN"
+//	@Failure		404					{object}	apperr.DomainError	"NOT_FOUND"
+//	@Failure		409					{object}	apperr.DomainError	"CONFLICT / OFFLINE"
+//	@Failure		422					{object}	apperr.DomainError	"VALIDATION (fieldErrors)"
+//	@Failure		429					{object}	apperr.DomainError	"RATE_LIMITED (retryAfterSeconds)"
+//	@Failure		503					{object}	apperr.DomainError	"UNAVAILABLE"
+//	@Failure		504					{object}	apperr.DomainError	"TIMEOUT"
+//	@Security		BearerAuth
+//	@Router			/v1/partner-users/{id} [put]
+func swaggerPartnerUsersSaveUpdate() {}

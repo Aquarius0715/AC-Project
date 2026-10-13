@@ -150,6 +150,7 @@ func New(ctx context.Context, cfg Config, v auth.Verifier) (*Server, error) {
 	control.RegisterDiagnostics(reg, control.Diagnostics{Commands: cmds, Jobs: maintenance.Access{}})
 	identity.RegisterPreferences(reg)
 	identity.RegisterClientUsers(reg)
+	identity.RegisterPartnerUsers(reg)
 	identity.RegisterTwoFactor(reg)
 	writes.Register(reg)
 	assets.RegisterQr(reg, maintenance.QrAccess{}) // an Assets operation; maintenance answers the assignment (IR194)

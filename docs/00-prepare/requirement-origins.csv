@@ -28,6 +28,7 @@ FR-P07,Production instructions SRC-02 + added design details,BIZ-12;BIZ-20,"gene
 FR-P08,Production instructions SRC-02 + added design details,BIZ-12,"general maintenance (regular, reactive and preventive)",Access limits based on contractor and assignment period
 FR-P09,Figma-confirmed screen specification 2026-10-01,BIZ-12,"Figma wireframe (VOeKPrid46kOf24ktEfe8r), confirmed by the user 2026-10-01",Certificate renewals verified by HQ
 FR-P10,Figma-confirmed screen specification 2026-10-01,BIZ-12;BIZ-21,"Figma wireframe (VOeKPrid46kOf24ktEfe8r), confirmed by the user 2026-10-01",Payout statements and questions
+FR-P11,User request 2026-10-13,BIZ-12,"Contractorでもユーザー管理の画面や機能を作ってください。Contractorは同じ組織のContractorとTechnicianを管理することができます。 (user request 2026-10-13, DEC-76)",Contractor manages its own company's contractors and technicians
 FR-T01,Company original SRC-06 + added design details,BIZ-04;BIZ-08,For End Users/Clients / Technicians / Admin/HQ; Purpose is to monitor every aspect,Visibility limited by assignment period
 FR-T02,Company original SRC-06 + added design details,BIZ-06;BIZ-07;BIZ-10,For HVAC / any air con brands; Select for Categories; Indoor Unit Parts / Outdoor Unit Parts / Electrical and Control Parts,Unit register fields and viewing steps
 FR-T03,Company original SRC-06 + added design details,BIZ-08;BIZ-11,Purpose is to monitor every aspect; Predictive Maintenance / Predictive diagnostics,Series selection and quality display

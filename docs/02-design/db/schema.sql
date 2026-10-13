@@ -282,6 +282,26 @@ CREATE TABLE identity.client_users (           -- customer-side user list and in
   UNIQUE (tenant_id, customer_id, email)
 );
 
+CREATE TABLE identity.partner_users (          -- contractor company accounts and invites, managed by the contractor (FR-P11)
+  id                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id                uuid NOT NULL,
+  organization_id          uuid NOT NULL,
+  membership_id            uuid,
+  email                    citext NOT NULL,
+  display_name             text,
+  partner_role             text NOT NULL CHECK (partner_role IN ('contractor','technician')),
+  status                   text NOT NULL CHECK (status IN ('invited','active','disabled')),
+  access_until             timestamptz,   -- the account's access end (restored to the membership when re-enabled)
+  invited_at               timestamptz NOT NULL,
+  invited_by_membership_id uuid NOT NULL,
+  last_invite_sent_at      timestamptz,
+  version                  int NOT NULL DEFAULT 1,
+  created_at               timestamptz NOT NULL DEFAULT platform.app_now(),
+  updated_at               timestamptz NOT NULL DEFAULT platform.app_now(),
+  FOREIGN KEY (tenant_id, organization_id) REFERENCES identity.organizations(tenant_id, id),
+  UNIQUE (tenant_id, organization_id, email)
+);
+
 -- ---------------------------------------------------------------------------------------------
 -- assets
 -- ---------------------------------------------------------------------------------------------

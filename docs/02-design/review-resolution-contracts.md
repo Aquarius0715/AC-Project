@@ -6421,3 +6421,21 @@ Toasts, tables and charts now come from established libraries, through their sha
    - New: `dataTable.test.tsx` (3 tests) and `charts.test.tsx` (5 tests).
    - The E2E smoke crawl and the keyboard spec caught Sonner's empty `<style>` element as a refusal on every page, before its hash was in the list.
 7. **Checks.** CHECKS_PLACEHOLDER
+
+## IR416 Contractors manage their own company's users (FR-P11, DEC-76) — 2026-10-13
+
+The user asked that a contractor can manage the contractors and technicians of its own organization (DEC-76). Until now, BR-A21 kept every contractor staff account with HQ, and the partner app showed the team read-only.
+
+1. **Data.** `identity.partner_users` holds the accounts and invites of each contractor company: e-mail (unique per company, case-insensitive), role contractor or technician, status invited / active / disabled, the linked membership, and the access end kept while disabled. The seed lists every contractor-company membership as active.
+2. **Operations** (`contractor:own-company`, identity service): `partnerUsers.list` (filters status, partnerRole, search), `partnerUsers.save` (invite without id; with id and version: a pending invite's e-mail and role, or an account's status, with a reason), `partnerUsers.remove` (reason, version) and `partnerUsers.resendInvite` (preview only, IR111). 208 operations, 229 routes; the identity service has 33.
+3. **Rules.**
+   - Another company's account or invite is NOT_FOUND; technicians, clients and HQ are FORBIDDEN.
+   - An accepted account's e-mail and role are fixed (VALIDATION `error.immutable`): remove it and invite again.
+   - A status on an invite is CONFLICT `errors.invite_pending`. The invite becomes the active account when HQ creates a contractor or technician membership for its e-mail at that company (`members.save`).
+   - Disabling closes the membership now and keeps its access end; enabling brings that end back, or is CONFLICT `errors.access_expired` once it has passed.
+   - The caller's own account cannot be changed or removed (CONFLICT `errors.own_account`), and the company keeps one active contractor (CONFLICT `errors.last_contractor`).
+   - Permissions, qualifications and access periods stay with HQ (FR-A03).
+4. **Screens.** Partner app Users (`/partner/users`, SCR-P11), contractors only; Figma Contractor row 08 (08-1…08-4).
+5. **Tests.** `partnerusers_test.go` (3 tests), the foreign-target cases in `idor_test.go`, and the filter samples in `querycatalog_test.go`.
+6. **Test suite fix.** In cluster mode, a test server that injects a failing transaction (`WrapTx`) is built in-process, because the split-service facade cannot carry the hook. The seven fault-injection tests passed only in the single-process suite before.
+

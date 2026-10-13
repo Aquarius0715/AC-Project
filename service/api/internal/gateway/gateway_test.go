@@ -94,8 +94,8 @@ func TestRoutesEveryRESTRouteToItsDomain(t *testing.T) {
 			}
 		}
 	}
-	if routes != 224 {
-		t.Fatalf("%d REST routes, want 224", routes)
+	if routes != 229 {
+		t.Fatalf("%d REST routes, want 229", routes)
 	}
 }
 
