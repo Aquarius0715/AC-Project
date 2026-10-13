@@ -80,7 +80,12 @@ func TestPartnerUsers(t *testing.T) {
 	if code, m := post(s, &contrA, "partnerUsers.list", `{"filters":{"partnerRole":"owner"}}`); code != 422 || fields(m) != "filters=error.invalid" {
 		t.Errorf("bad role filter: %d %s", code, fields(m))
 	}
-	// resend: the invitation e-mail is queued again (IR418), pending invites of the own company
+	// resend: not sooner than 5 minutes after the last invitation e-mail (IR423), then queued again (IR418), pending
+	// invites of the own company
+	if code, m := write(s, &contrA, "partnerUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 429 || m["messageKey"] != "errors.invite_recently_sent" || m["retryAfterSeconds"] != float64(300) {
+		t.Errorf("resend right after the invite: %d %v", code, m)
+	}
+	owner(t, `UPDATE identity.partner_users SET last_invite_sent_at = last_invite_sent_at - interval '5 minutes' WHERE id = $1`, id)
 	if code, m := write(s, &contrA, "partnerUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 200 || data(m)["deliveryState"] != "queued" || data(m)["target"].(map[string]any)["kind"] != "partner_user" {
 		t.Fatalf("resend: %d %v", code, m)
 	}
@@ -288,6 +293,7 @@ func TestInviteMail(t *testing.T) {
 	if code != 200 {
 		t.Fatalf("invite: %d %v", code, m)
 	}
+	owner(t, `UPDATE identity.partner_users SET last_invite_sent_at = last_invite_sent_at - interval '5 minutes' WHERE id = $1`, data(m)["id"])
 	if code, _ := write(s, &contrA, "partnerUsers.resendInvite", `{"id":"`+data(m)["id"].(string)+`"}`, 0); code != 200 {
 		t.Fatal("resend")
 	}

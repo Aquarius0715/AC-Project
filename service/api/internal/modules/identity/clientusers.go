@@ -447,7 +447,7 @@ type InvitePreview struct {
 // @Summary		clientUsers.resendInvite (write)
 // @ID				clientUsers.resendInvite
 // @Description	Authorization: client:self-customer:owner | admin:asset.write
-// @Description	Validation: D01; input constraints in the corresponding DD; queues the invitation e-mail (IR418)
+// @Description	Validation: D01; input constraints in the corresponding DD; queues the invitation e-mail (IR418); pending invites only (CONFLICT); at most every 5 minutes per invite (RATE_LIMITED retryAfterSeconds; IR423)
 // @Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 // @Description	Design: DD-A17, DD-C19
 // @Tags			clientUsers
@@ -477,6 +477,9 @@ func clientUsersResend(ctx context.Context, c *ops.Call, in *ResendInput) (Invit
 	}
 	if x.Status != "invited" {
 		return InvitePreview{}, apperr.E(apperr.Conflict, "errors.invite_not_pending")
+	}
+	if err := inviteResendWait(ctx, c, "client_users", x.ID); err != nil {
+		return InvitePreview{}, err
 	}
 	if err := queueClientInvite(ctx, c, x.CustomerID, x.Email, x.ClientRole); err != nil {
 		return InvitePreview{}, err

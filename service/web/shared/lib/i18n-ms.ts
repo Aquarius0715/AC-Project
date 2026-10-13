@@ -5710,6 +5710,7 @@ export const ms: Record<string, string> = {
   "{name} is now an owner": "{name} kini pemilik",
   "{name} is now a member": "{name} kini ahli",
   "Invitation e-mail queued for {email}": "E-mel jemputan dibariskan untuk {email}",
+  "The invitation was e-mailed a moment ago — send it again in {m} min": "Jemputan telah dihantar melalui e-mel sebentar tadi — hantar semula dalam {m} min",
   "Invitation e-mail queued again for {email}": "E-mel jemputan dibariskan semula untuk {email}",
   "Invitation e-mails are sent by the notification service (IR418); in development they arrive in the local Mailpit inbox.": "E-mel jemputan dihantar oleh perkhidmatan pemberitahuan (IR418); dalam pembangunan ia tiba di peti masuk Mailpit tempatan.",
   "They get an invitation to sign in to the customer app and see only your properties and units. The invite stays “pending” until their account is opened.": "Mereka menerima jemputan untuk log masuk ke aplikasi pelanggan dan hanya melihat hartanah dan unit anda. Jemputan kekal “belum selesai” sehingga akaun mereka dibuka.",

@@ -48,13 +48,13 @@ func TestClientUsers(t *testing.T) {
 		t.Errorf("duplicate email (case-insensitive): %d %s", code, fields(m))
 	}
 	_, m = post(s, &customerB, "clientUsers.list", `{"limit":100}`)
-	var owner map[string]any
+	var seedOwner map[string]any
 	for _, it := range items(m) {
 		if it["membershipId"] == seed.ID("customer-b").String() {
-			owner = it
+			seedOwner = it
 		}
 	}
-	if owner == nil || owner["clientRole"] != "owner" || owner["status"] != "active" {
+	if seedOwner == nil || seedOwner["clientRole"] != "owner" || seedOwner["status"] != "active" {
 		t.Fatalf("seed owner listed: %v", m)
 	}
 	if _, m := post(s, &hq, "clientUsers.list", `{"filters":{"customerId":"`+cust+`","status":"invited","clientRole":"member"},"limit":100}`); len(items(m)) == 0 {
@@ -66,11 +66,15 @@ func TestClientUsers(t *testing.T) {
 	if _, m := post(s, &customerA, "clientUsers.list", `{"limit":100}`); len(items(m)) == 0 || items(m)[0]["customerId"] != seed.ID("cust-a").String() {
 		t.Error("client list scoped to own customer")
 	}
-	// resend: the invitation e-mail is queued again (IR418)
+	// resend: not sooner than 5 minutes after the last invitation e-mail (IR423), then queued again (IR418)
+	if code, m := write(s, &customerB, "clientUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 429 || m["messageKey"] != "errors.invite_recently_sent" || m["retryAfterSeconds"] != float64(300) {
+		t.Errorf("resend right after the invite: %d %v", code, m)
+	}
+	owner(t, `UPDATE identity.client_users SET last_invite_sent_at = last_invite_sent_at - interval '5 minutes' WHERE id = $1`, id)
 	if code, m := write(s, &customerB, "clientUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 200 || data(m)["deliveryState"] != "queued" || data(m)["templateKey"] != "invite" {
 		t.Fatalf("resend: %d %v", code, m)
 	}
-	if code, _ := write(s, &customerB, "clientUsers.resendInvite", `{"id":"`+owner["id"].(string)+`"}`, 0); code != 409 {
+	if code, _ := write(s, &customerB, "clientUsers.resendInvite", `{"id":"`+seedOwner["id"].(string)+`"}`, 0); code != 409 {
 		t.Error("resend to an active user")
 	}
 	if code, _ := write(s, &customerA, "clientUsers.resendInvite", `{"id":"`+id+`"}`, 0); code != 404 {
@@ -80,14 +84,14 @@ func TestClientUsers(t *testing.T) {
 	upd := func(target map[string]any, role, status string, v int) (int, map[string]any) {
 		return save(&hq, `{"id":"`+target["id"].(string)+`","customerId":"`+cust+`","email":"`+target["email"].(string)+`","clientRole":"`+role+`","status":"`+status+`","reason":"admin change"}`, v)
 	}
-	ov := int(owner["version"].(float64))
-	if code, _ := upd(owner, "member", "active", ov); code != 409 {
+	ov := int(seedOwner["version"].(float64))
+	if code, _ := upd(seedOwner, "member", "active", ov); code != 409 {
 		t.Error("demote the last owner")
 	}
-	if code, _ := upd(owner, "owner", "disabled", ov); code != 409 {
+	if code, _ := upd(seedOwner, "owner", "disabled", ov); code != 409 {
 		t.Error("disable the last owner")
 	}
-	if code, _ := write(s, &hq, "clientUsers.remove", `{"id":"`+owner["id"].(string)+`","reason":"leaving"}`, ov); code != 409 {
+	if code, _ := write(s, &hq, "clientUsers.remove", `{"id":"`+seedOwner["id"].(string)+`","reason":"leaving"}`, ov); code != 409 {
 		t.Error("remove the last owner")
 	}
 	if code, m := save(&hq, `{"id":"`+id+`","customerId":"`+cust+`","email":"`+email+`","clientRole":"member"}`, 1); code != 422 || fields(m) != "reason=error.required" {

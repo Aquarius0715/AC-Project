@@ -712,7 +712,7 @@ Scope: FR-A17 / Main display pattern: **UI-LIST**. Service boundary: `clientUser
 **Steps**
 
 1. Table: user (name, email), role, status (“Invite pending · invited <date> by <actor>”), last sign-in, notification channels, ⋯ menu.
-2. “+ Invite user” (centered modal) → `clientUsers.save` without id. Menu: change role / disable (`clientUsers.save` with id), resend invite (`clientUsers.resendInvite`, queues the invitation e-mail, IR418 only), reset password (`auth.previewPasswordReset`, generic message), sign out everywhere (`members.revokeSessions` with the user's membership, the modal of Admin 03-8, IR384; not offered while the invite is pending), remove (`clientUsers.remove`).
+2. “+ Invite user” (centered modal) → `clientUsers.save` without id. Menu: change role / disable (`clientUsers.save` with id), resend invite (`clientUsers.resendInvite`, queues the invitation e-mail, IR418; at most every 5 minutes per invite, IR423), reset password (`auth.previewPasswordReset`, generic message), sign out everywhere (`members.revokeSessions` with the user's membership, the modal of Admin 03-8, IR384; not offered while the invite is pending), remove (`clientUsers.remove`).
 3. Queries to update: `client users / audit`.
 
 **Boundary cases and failures**: Last active owner → CONFLICT; duplicate email → VALIDATION; a changed e-mail of an accepted user → VALIDATION `error.immutable` (IR422). No permission editor for client users.

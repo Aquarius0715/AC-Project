@@ -20,6 +20,7 @@ describe("actionMessage (one toast line per failed Server Action)", () => {
     // IR375: the write limit says how long to wait
     expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "error.rateLimited", retryAfterSeconds: 40 }))).toBe("Too many changes in a short time — try again in 40 s");
     expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "error.rateLimited" }))).toBe("Too many changes in a short time — try again shortly");
+    expect(actionMessage(failure({ code: "RATE_LIMITED", messageKey: "errors.invite_recently_sent", retryAfterSeconds: 241 }))).toBe("The invitation was e-mailed a moment ago — send it again in 5 min");
   });
   it("words the line in the display language; field names and domain keys stay humanized English (IR269)", () => {
     const t = translator("ms");

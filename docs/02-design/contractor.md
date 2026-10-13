@@ -383,7 +383,7 @@ Scope: FR-P11 / Main display pattern: **UI-LIST / UI-FORM**. Service boundary: `
 
 1. `partnerUsers.list` (status filter in the URL) shows name, e-mail, role, status, access until and last sign-in; the caller's row is marked “You” and has no actions; an active account whose access end has passed (business clock) reads “Access ended” and can only be removed.
 2. + Invite user opens a centered dialog (e-mail, role Contractor/Technician) → `partnerUsers.save` without id → the list refetches and the invitation e-mail is queued (IR418).
-3. On an invite: Resend invite (`partnerUsers.resendInvite`, queues the invitation e-mail again, IR418), Edit invite (e-mail, role, reason → `partnerUsers.save` with id and version), Remove (reason → `partnerUsers.remove`).
+3. On an invite: Resend invite (`partnerUsers.resendInvite`, queues the invitation e-mail again, IR418; at most every 5 minutes per invite, sooner → RATE_LIMITED `errors.invite_recently_sent` with the seconds to wait, IR423), Edit invite (e-mail, role, reason → `partnerUsers.save` with id and version), Remove (reason → `partnerUsers.remove`).
 4. On an account: Disable / Enable (reason → `partnerUsers.save` with status) and Remove (reason → `partnerUsers.remove`).
 
 **Boundary cases and failures**: Duplicate e-mail → VALIDATION (fieldErrors.email, input kept). The own account → CONFLICT `errors.own_account`; the last active contractor → CONFLICT `errors.last_contractor`; a technician with an active assignment → CONFLICT `errors.technician_booked` (reassign first, IR421); enabling after the access end → CONFLICT `errors.access_expired`; a stale version → CONFLICT, the list refetches. Technician sessions have no Users item; the direct URL shows Page unavailable (FORBIDDEN).

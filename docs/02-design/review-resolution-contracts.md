@@ -6498,3 +6498,11 @@ Found in review: HQ could change the e-mail of a client user who had already sig
 1. `clientUsers.save` refuses a changed e-mail of an accepted user for every caller (VALIDATION `fieldErrors.email = error.immutable`, compared case-insensitively); a pending invite's e-mail can still be corrected. The admin web never offered the change. A new address is a new invite; changing the sign-in identity's e-mail belongs to the identity provider.
 2. The HQ Invite user dialog says the invitation is sent by e-mail and the toast says it is queued (IR418), instead of the demo's preview wording.
 3. Test: `TestClientUserMembershipSync` (HQ changing an accepted user's e-mail → VALIDATION).
+
+## IR423 An invitation is e-mailed at most every 5 minutes — 2026-10-14
+
+Found in review (security, rate limits): Resend invite queued a new invitation e-mail on every call. The write limit per member (60 a minute, IR375) was the only bound, so an owner, a contractor or HQ could send dozens of e-mails a minute to an address that had agreed to nothing.
+
+1. `clientUsers.resendInvite` and `partnerUsers.resendInvite` lock the invite and refuse a resend sooner than 5 minutes after the last invitation e-mail (the invite itself counts): RATE_LIMITED `errors.invite_recently_sent` with `retryAfterSeconds`. Nothing is queued then.
+2. The web says when the invite can be sent again ("The invitation was e-mailed a moment ago — send it again in n min", English and Malay).
+3. Tests: `TestClientUsers`, `TestPartnerUsers`, `TestInviteMail` (an immediate resend is refused with 300 s; after 5 minutes it is queued), `actionMessage.test.ts`.

@@ -50,6 +50,10 @@ export function actionMessage(r: ActionFailure, t: T = translator("en")): string
   if (r.messageKey === "error.versionConflict") return t("Someone changed this in the meantime — the screen now shows the latest version");
   // the write limit per member (IR375): how long to wait, as the implementation contracts ask for RATE_LIMITED
   if (r.code === "RATE_LIMITED") {
+    // one invite is e-mailed at most every 5 minutes (IR423)
+    if (r.messageKey === "errors.invite_recently_sent") {
+      return t("The invitation was e-mailed a moment ago — send it again in {m} min", { m: Math.max(1, Math.ceil((r.retryAfterSeconds ?? 300) / 60)) });
+    }
     return r.retryAfterSeconds ? t("Too many changes in a short time — try again in {s} s", { s: r.retryAfterSeconds }) : t("Too many changes in a short time — try again shortly");
   }
   if (keyText[r.messageKey]) return t(keyText[r.messageKey]);

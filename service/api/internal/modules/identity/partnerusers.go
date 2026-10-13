@@ -192,6 +192,26 @@ func otherActiveContractor(ctx context.Context, c *ops.Call, org, except uuid.UU
 	return ok, err
 }
 
+// InviteResendGap is the least time between two invitation e-mails to one invite (IR423): the write limit per member
+// alone would let 60 e-mails a minute reach an address that has not agreed to anything.
+const InviteResendGap = 5 * time.Minute
+
+// inviteResendWait locks the invite row of table and refuses a resend sooner than InviteResendGap after the last
+// invitation e-mail (RATE_LIMITED with the seconds to wait).
+func inviteResendWait(ctx context.Context, c *ops.Call, table string, id uuid.UUID) error {
+	var last *time.Time
+	if err := c.Tx.QueryRow(ctx, `SELECT last_invite_sent_at FROM identity.`+table+` WHERE id = $1 FOR UPDATE`, id).Scan(&last); err != nil {
+		return err
+	}
+	if last == nil {
+		return nil
+	}
+	if wait := last.Add(InviteResendGap).Sub(c.Now); wait > 0 {
+		return apperr.E(apperr.RateLimited, "errors.invite_recently_sent").RetryAfter(int((wait + time.Second - 1) / time.Second))
+	}
+	return nil
+}
+
 // notSelfOrLast refuses a change to the caller's own account, one that would leave the company without an active
 // contractor, and closing a technician who still holds an active assignment (IR421: reassign the job first).
 func notSelfOrLast(ctx context.Context, c *ops.Call, x PartnerUser) error {
@@ -418,7 +438,7 @@ func (in *PartnerResendInput) Validate() map[string]string {
 //	@Summary		partnerUsers.resendInvite (write)
 //	@ID				partnerUsers.resendInvite
 //	@Description	Authorization: contractor:own-company
-//	@Description	Validation: D01; input constraints in the corresponding DD; queues the invitation e-mail (IR418); pending invites only (CONFLICT)
+//	@Description	Validation: D01; input constraints in the corresponding DD; queues the invitation e-mail (IR418); pending invites only (CONFLICT); at most every 5 minutes per invite (RATE_LIMITED retryAfterSeconds; IR423)
 //	@Description	Recovery: D04: call writes.getResult with the key, then retry the same intent
 //	@Description	Design: DD-P11
 //	@Tags			partnerUsers
@@ -445,6 +465,9 @@ func partnerUsersResend(ctx context.Context, c *ops.Call, in *PartnerResendInput
 	}
 	if x.Status != "invited" {
 		return InvitePreview{}, apperr.E(apperr.Conflict, "errors.invite_not_pending")
+	}
+	if err := inviteResendWait(ctx, c, "partner_users", x.ID); err != nil {
+		return InvitePreview{}, err
 	}
 	if err := queuePartnerInvite(ctx, c, x.Email, x.PartnerRole); err != nil {
 		return InvitePreview{}, err
