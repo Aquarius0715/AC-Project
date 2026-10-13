@@ -24,14 +24,14 @@ import (
 
 func main() {
 	broker := flag.String("broker", envOr("MQTT_URL", "tcp://localhost:1883"), "MQTT broker URL")
-	tenant := flag.String("tenant", "", "tenant ID the devices belong to (required)")
+	tenant := flag.String("tenant", seed.ID("tenant-a").String(), "tenant ID the devices belong to (the demo tenant by default)")
 	names := flag.String("devices", strings.Join(demoDevices(), ","), "comma-separated fixture device IDs (demoSeed.devices); their API IDs are derived with seed.ID")
 	firmware := flag.String("firmware", "v1", "firmware version the modules report")
 	interval := flag.Duration("telemetry-interval", time.Minute, "time between telemetry batches (design: every minute)")
 	beat := flag.Duration("heartbeat-interval", time.Minute, "time between heartbeats (design: every 60 seconds)")
 	flag.Parse()
-	if *tenant == "" || *names == "" {
-		log.Fatal("--tenant is required, and --devices must name at least one device")
+	if *names == "" {
+		log.Fatal("--devices must name at least one device")
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

@@ -325,20 +325,30 @@ services:
   worker-notification: { <<: *worker, command: ["/app/worker", "--role=notification"] }
   worker-importexport: { <<: *worker, command: ["/app/worker", "--role=importexport"] }
 
-  iot-bridge:          # local stand-in for AWS IoT rules: MQTT topics -> Kinesis / SQS
-    <<: *backend
+  # IoT demo (profile iot): simulated modules publish telemetry and heartbeats, and answer commands, on the broker; the
+  # bridge carries the telemetry and the acknowledgements to the demo trigger of the Core API (gateway). Each logs in with
+  # its own API key from .env.local (docker/mosquitto/passwd.sh writes the broker's password file from those keys).
+  iot-bridge:          # local stand-in for AWS IoT rules: MQTT topics -> the Core API's demo trigger
     image: ac-api:dev-tools
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: dev, args: { SERVICE: gateway } }
-    command: ["/app/iotbridge"]
-    profiles: [planned]          # binary not built yet (cmd/iotbridge, cmd/devicesim)
+    command: ["/app/iotbridge", "--broker", "tcp://mosquitto:1883", "--api", "http://gateway:8080"]
+    environment:
+      MQTT_USER: iot-bridge
+      MQTT_PASSWORD: ${MQTT_IOT_BRIDGE_KEY:?set MQTT_IOT_BRIDGE_KEY in .env.local}
+    networks: [data, app]
+    depends_on: { mosquitto: { condition: service_started }, gateway: { condition: service_healthy } }
+    profiles: [iot]
 
-  device-sim:          # simulated IoT modules (telemetry each minute, heartbeats, command acks)
-    <<: *backend
+  device-sim:          # simulated IoT modules (telemetry each minute, heartbeats, command acks) for the demo fixture devices
     image: ac-api:dev-tools
     build: { context: ./service/api, dockerfile: build/service.Dockerfile, target: dev, args: { SERVICE: gateway } }
-    command: ["/app/devicesim", "--devices=20"]
-    networks: [data]
-    profiles: [planned]          # binary not built yet (cmd/iotbridge, cmd/devicesim)
+    command: ["/app/devicesim", "--broker", "tcp://mosquitto:1883"]
+    environment:
+      MQTT_USER: device-sim
+      MQTT_PASSWORD: ${MQTT_DEVICE_SIM_KEY:?set MQTT_DEVICE_SIM_KEY in .env.local}
+    networks: [data, app]
+    depends_on: { mosquitto: { condition: service_started } }
+    profiles: [iot]
 
   # ------------------------------------------------------------------ local stand-ins for AWS services
   postgres:            # Aurora PostgreSQL 16

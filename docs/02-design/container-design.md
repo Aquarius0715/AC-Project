@@ -87,7 +87,8 @@ COPY --from=build-dev /out/ /app/
 | `schema` | one-off `migrate` (cmd/migrate): schema, local `ac_app_login` and the domain logins `ac_<domain>_login`, demo fixture | Database only, without the Go services |
 | `backend` | `migrate`, `gateway` (8080), `identity-api`, `equipment-api`, `maintenance-api`, `billing-api`, `energy-api`, `worker-scheduler-equipment`, `worker-scheduler-maintenance`, `worker-scheduler-billing` and the idle `worker-*` roles, with the `infra` stand-ins | Go backend against the stand-ins (IR180, IR194, IR195, IR341) |
 | `full` | `customer-web-api`, `partner-web-api`, `technician-web-api`, `admin-web-api` (BFF mode, ports 3000–3003) + backend + infra | Production-like end-to-end runs and acceptance tests |
-| `planned` | `webhook` (8082), `iot-bridge`, `device-sim` | Services whose commands are not built yet; not started by the other profiles (IR197) |
+| `planned` | `webhook` (8082) | Services whose commands are not built yet; not started by the other profiles (IR197) |
+| `iot` | `iot-bridge`, `device-sim` (with `backend`) | IoT demo: simulated modules publish telemetry and heartbeats and answer commands on the broker; the bridge carries the telemetry and acknowledgements to the demo trigger. Each logs in with its own API key from `.env.local` (`docker/mosquitto/passwd.sh` writes the broker password file); start with `docker compose --env-file .env.local --profile backend --profile iot up` |
 | `obs` | OpenTelemetry collector, Jaeger (16686) | Traces |
 | `stripe` | Stripe CLI forwarding test-mode webhooks to `webhook:8080/stripe` | Needs `STRIPE_TEST_SECRET_KEY` in `.env.local` |
 

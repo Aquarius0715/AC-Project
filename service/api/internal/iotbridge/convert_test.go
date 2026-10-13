@@ -45,7 +45,7 @@ func TestTriggersUseTheFixtureIDs(t *testing.T) {
 		t.Errorf("value or receipt time %+v", tr.Measurement)
 	}
 	// the API keys a repeat on the measurement's own event ID and the scenario sequence: both must be the reading's
-	if tr.Measurement.Quality != "valid" || tr.Measurement.EventID != tr.EventID || tr.Measurement.Sequence == nil || *tr.Measurement.Sequence != 1 {
+	if tr.Measurement.Quality != "valid" || tr.Measurement.EventID != tr.EventID || tr.Measurement.Sequence != nil {
 		t.Errorf("quality, event ID or sequence of the measurement: %+v", tr.Measurement)
 	}
 }
@@ -56,12 +56,21 @@ func TestEventIDIsOnePerReading(t *testing.T) {
 	r := NewResolver(Links)
 	a, _ := r.Triggers(batch("device-online-rto", 7), received)
 	b, _ := r.Triggers(batch("device-online-rto", 7), received.Add(time.Minute))
-	c, _ := r.Triggers(batch("device-online-rto", 8), received)
+	next := batch("device-online-rto", 8)
+	next.Measurements[0].ObservedAt = at.Add(time.Minute) // the next reading of the sensor is another reading
+	c, _ := r.Triggers(next, received)
 	if a[0].EventID != b[0].EventID {
 		t.Error("a redelivered reading has a new event ID")
 	}
 	if a[0].EventID == c[0].EventID {
 		t.Error("two readings share an event ID")
+	}
+	// a restarted simulator starts its sequence again: the same sequence at a later time is another reading
+	later := batch("device-online-rto", 7)
+	later.Measurements[0].ObservedAt = at.Add(time.Hour)
+	d, _ := r.Triggers(later, received)
+	if d[0].EventID == a[0].EventID {
+		t.Error("a restarted sequence at a later time is the same event")
 	}
 }
 
