@@ -1,6 +1,6 @@
 ---
 document_id: PREP-001
-version: 0.299.0
+version: 0.300.0
 status: review-draft
 audience: business-stakeholders
 scope: frontend-only
@@ -274,6 +274,7 @@ Reversible proposals adopted in the 0.17.0 independent review (FRV) are recorded
 0.27.0: Production target on AWS with Stripe payments and HQ access limited to the company network; retention, capacity and customer office firewall requirements defined (DEC-68, IR117). Phase 1A unchanged.
 0.28.0: Backend implementation design in Go + Echo and database design with an executable PostgreSQL schema (DEC-69, IR118). Phase 1A unchanged.
 0.29.0: Everything runs in Docker — image catalogue, Dockerfile standards, Compose stack with local stand-ins for AWS services, ECS Fargate runtime (DEC-70, IR119). Phase 1A unchanged.
+0.300.0: Local secrets refused outside local runs (IR430). Phase 1A unchanged.
 0.299.0: Polling loops log a repeating failure once a minute (IR429). Phase 1A unchanged.
 0.298.0: Platform table retention (IR428). Phase 1A unchanged.
 0.297.0: Event consumers dead-letter a failing event (IR427). Phase 1A unchanged.

@@ -80,6 +80,11 @@ func ConfigFromEnv(logger *slog.Logger, domains []string) (Config, error) {
 		InternalToken:     os.Getenv("INTERNAL_API_TOKEN"),
 		ServiceURLs:       map[string]string{},
 	}
+	// outside the demo the service token must be a real secret: not short, and not the public local value of
+	// compose.yaml (IR430), which anyone could send to the internal endpoints
+	if t := cfg.InternalToken; !cfg.DemoOps && t != "" && (len(t) < 32 || strings.Contains(t, "change-me")) {
+		return cfg, fmt.Errorf("INTERNAL_API_TOKEN: at least 32 characters and not the local value outside the demo")
+	}
 	for _, d := range ops.Domains { // <DOMAIN>_API_URL of the other services (IR190), optional
 		if v := os.Getenv(strings.ToUpper(d) + "_API_URL"); v != "" {
 			cfg.ServiceURLs[d] = v

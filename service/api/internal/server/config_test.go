@@ -2,6 +2,7 @@ package server
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 // identity provider's admin API (IR386) takes all four IDP_* values or none, and its URLs are http(s).
 func TestConfigFromEnv(t *testing.T) {
 	idpEnv := []string{"IDP_TOKEN_URL", "IDP_ADMIN_URL", "IDP_ADMIN_CLIENT_ID", "IDP_ADMIN_CLIENT_SECRET"}
-	for _, k := range append([]string{"RATE_LIMIT_URL", "WRITE_LIMIT_PER_MINUTE", "DEMO_OPS", "DEMO_CLOCK_START", "ADDR", "ENERGY_API_URL"}, idpEnv...) {
+	for _, k := range append([]string{"RATE_LIMIT_URL", "WRITE_LIMIT_PER_MINUTE", "DEMO_OPS", "DEMO_CLOCK_START", "ADDR", "ENERGY_API_URL", "INTERNAL_API_TOKEN"}, idpEnv...) {
 		t.Setenv(k, "")
 	}
 	cfg, err := ConfigFromEnv(nil, []string{"identity"})
@@ -75,5 +76,27 @@ func TestConfigFromEnv(t *testing.T) {
 		if _, err := ConfigFromEnv(nil, nil); err == nil {
 			t.Errorf("IDP_ADMIN_URL=%q accepted", bad)
 		}
+	}
+}
+
+// TestInternalTokenOutsideTheDemo (IR430): outside the demo a short service token or the public local value of
+// compose.yaml stops the start; in the demo the local value is fine.
+func TestInternalTokenOutsideTheDemo(t *testing.T) {
+	t.Setenv("RATE_LIMIT_URL", "")
+	t.Setenv("DEMO_OPS", "")
+	for _, bad := range []string{"short", "local-internal-token-change-me"} {
+		t.Setenv("INTERNAL_API_TOKEN", bad)
+		if _, err := ConfigFromEnv(nil, nil); err == nil || !strings.Contains(err.Error(), "INTERNAL_API_TOKEN") {
+			t.Errorf("%q outside the demo: %v", bad, err)
+		}
+	}
+	t.Setenv("INTERNAL_API_TOKEN", strings.Repeat("k", 32))
+	if _, err := ConfigFromEnv(nil, nil); err != nil {
+		t.Errorf("a real token: %v", err)
+	}
+	t.Setenv("DEMO_OPS", "1")
+	t.Setenv("INTERNAL_API_TOKEN", "local-internal-token-change-me")
+	if _, err := ConfigFromEnv(nil, nil); err != nil {
+		t.Errorf("the local value in the demo: %v", err)
 	}
 }

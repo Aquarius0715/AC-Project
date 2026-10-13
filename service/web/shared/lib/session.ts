@@ -33,15 +33,19 @@ export const OIDC_COOKIE = `${httpsApp() ? "__Secure-" : ""}ac_oidc_${APP_ROLE}`
 /** Shortest SESSION_SECRET a deployment on https accepts. */
 export const MIN_SECRET_LENGTH = 32;
 
+/** The local default secret of plain-http runs (compose.yaml uses the same value). */
+const LOCAL_SECRET = "local-dev-session-secret-change-me";
+
 /** The cookie key: 32 bytes derived from SESSION_SECRET with HKDF-SHA256 (the secret itself is never the key). On https
- * a missing, empty or short secret is refused rather than replaced by the local one, so a deployment without its secret
- * cannot seal or open a session and fails closed (IR367). Plain-http local runs keep the local default. */
+ * a missing, empty or short secret is refused rather than replaced by the local one, and so is the public local value
+ * (IR430: it is long enough, but it is in the repository), so a deployment without its own secret cannot seal or open
+ * a session and fails closed (IR367). Plain-http local runs keep the local default. */
 export function cookieKey(): Buffer {
   const secret = process.env.SESSION_SECRET || undefined;
-  if (oidcConfig().appUrl.startsWith("https") && (secret === undefined || secret.length < MIN_SECRET_LENGTH)) {
-    throw new Error(`SESSION_SECRET of at least ${MIN_SECRET_LENGTH} characters is required on https`);
+  if (oidcConfig().appUrl.startsWith("https") && (secret === undefined || secret.length < MIN_SECRET_LENGTH || secret.includes("change-me"))) {
+    throw new Error(`SESSION_SECRET of at least ${MIN_SECRET_LENGTH} characters, not the local value, is required on https`);
   }
-  return Buffer.from(hkdfSync("sha256", secret ?? "local-dev-session-secret-change-me", "", "ac bff session cookie", 32));
+  return Buffer.from(hkdfSync("sha256", secret ?? LOCAL_SECRET, "", "ac bff session cookie", 32));
 }
 
 const IV_BYTES = 12, TAG_BYTES = 16;

@@ -53,9 +53,9 @@ describe("the sealed session cookie (AES-256-GCM, IR333)", () => {
     expect(unseal(t)).toEqual({ a: 1 });
   });
 
-  it("on https needs a real secret: none, an empty or a short one seals nothing (IR367)", () => {
+  it("on https needs a real secret: none, an empty, a short one or the local value seals nothing (IR367, IR430)", () => {
     vi.stubEnv("APP_URL", "https://ac.example.com");
-    for (const v of [undefined, "", "x".repeat(31)]) {
+    for (const v of [undefined, "", "x".repeat(31), "local-dev-session-secret-change-me"]) {
       vi.stubEnv("SESSION_SECRET", v);
       expect(() => cookieKey()).toThrow(/SESSION_SECRET/);
       expect(() => seal({ a: 1 })).toThrow(/SESSION_SECRET/);

@@ -6611,3 +6611,11 @@ Found in review: while the database is away, the scheduler (every second) and ea
 
 1. `logging.Repeats` logs a failure once, then the same failure at most once a minute with how often it recurred, a different failure at once, and the first success after a failure as a recovery. The scheduler loop and `events.Consumer.Run` use it; the dead-letter lines (IR427) stay one per event.
 2. Test: `TestRepeats`.
+
+## IR430 The public local secrets are refused outside local runs — 2026-10-14
+
+Found in review (security, secrets): the local values in `compose.yaml` are in the repository. The web apps refused a missing or short `SESSION_SECRET` on https (IR367), but the local value `local-dev-session-secret-change-me` is 34 characters and passed, so a deployment that copied it would seal sessions with a key anyone can derive. The Go services checked nothing about `INTERNAL_API_TOKEN`, so a deployment with the local `local-internal-token-change-me` would open the internal endpoints (principals, internal queries) to anyone who reads the repository.
+
+1. Web: on https, `cookieKey` also refuses a secret that is the local value (contains `change-me`); the app cannot seal or open a session and fails closed.
+2. Go: outside the demo (`DEMO_OPS` not `1`), `ConfigFromEnv` refuses an `INTERNAL_API_TOKEN` shorter than 32 characters or containing `change-me`, so the service does not start. The demo stack keeps the local value.
+3. Tests: `session.test.ts` (the local value on https), `TestInternalTokenOutsideTheDemo`.
