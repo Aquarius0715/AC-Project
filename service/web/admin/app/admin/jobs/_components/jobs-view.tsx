@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Badge, Banner, Btn, Card, Choice, EmptyState, Field, Input, ListRow, Modal, Page, Select, SummaryList, Textarea, cx, Plain } from "@ac/web/components/ui";
 import { JobStatusBadge, OriginBadge } from "@ac/web/components/JobBits";
 import { useI18n, useT } from "@ac/web/components/I18n";
@@ -34,11 +34,12 @@ export function JobsView({ live }: { live: JobsLive }) {
   const [creating, setCreating] = useState(!!live.newJob); // opened by ?new=<unitId> (an alert's Request maintenance)
   // The job New job just created: its detail opens step 2 (book) or says it was saved as requested.
   const [fresh, setFresh] = useState<Fresh | null>(() => (live.created?.id ? live.created : null));
+  const clearFresh = useCallback(() => { setFresh(null); patch({ created: null }); }, [patch]);
   return (
     <Page className="max-w-[1440px]">
       <JobsTabs tab="jobs" counts={live.counts} q={live.q} action={<Btn variant="primary" size="sm" onClick={() => setCreating(true)}><Icon name="add" /> {t("New job")}</Btn>} />
       {creating && <NewJobModal live={live} initial={live.newJob ?? undefined} onClose={() => { setCreating(false); if (live.newJob) patch({ new: null, alertId: null }); }} onCreated={(f) => { setCreating(false); setFresh(f); }} />}
-      <JobsTab live={live} patch={patch} fresh={fresh} onFresh={() => { setFresh(null); patch({ created: null }); }} />
+      <JobsTab live={live} patch={patch} fresh={fresh} onFresh={clearFresh} />
     </Page>
   );
 }
